@@ -47,7 +47,7 @@ from .utilities import (ft, ift,
                         agg_help, explain_validation, remove_fuzz)
 from .decl_writer import format_program
 import aggregate.random_agg as ar
-from .spectral import Distortion
+from .spectral import Distortion, choquet_weights
 from .pentagon import complete_pentagon, Pentagon
 from . import tail as _tail
 # Re-export the bounded tables for back-compat; tail.py is the source of truth.
@@ -5672,23 +5672,62 @@ class Aggregate:
     # Distortion, ruin theory, plotting
     # ================================================================
 
-    def apply_distortion(self, dist):
-        """
-        Apply distortion to the aggregate density and append as exag column to density_df.
+    def apply_distortion(self, dist, *, view='ask', S_calculation='forwards',
+                         allow_deficit=False):
+        r"""
+        Apply distortion to the aggregate density; appends ``gS``,
+        ``gp_total`` and ``exag`` columns to ``density_df``.
 
-        :param dist:
-        :return:
+        Routes through the exact-discrete Choquet helper
+        (:func:`~aggregate.spectral.choquet_weights`):
+        ``exag(a) = rho_g(X ∧ a) = Σ_{x≤a} x·gp + a·g(S(a))``, a direct
+        sum carrying the origin -- valid on windowed and signed supports
+        (the old ``cumsum(gS)·bs`` idiom assumed a zero-origin grid). The
+        effective ``g`` resolves ``view`` × the object's value-type role
+        (:meth:`~aggregate.spectral.Distortion.effective_g`), so a
+        payoff-role aggregate prices through the dual automatically.
+
+        Parameters
+        ----------
+        dist : Distortion
+            The distortion to apply.
+        view : {'ask', 'bid'}
+            Pricing view; composes with the value-type role by XOR.
+        S_calculation : {'forwards', 'backwards'}
+            Deficit-parking direction; see
+            :func:`~aggregate.spectral.choquet_weights`.
+        allow_deficit : bool
+            Explicit truncation policy for a materially defective pmf.
+            Default False raises
+            :class:`~aggregate.constants.DefectiveDistributionError`.
+
+        Raises
+        ------
+        ValueError
+            For a mass distortion on an unbounded support: the mass lands
+            on the last represented bucket, which is a different bounded
+            problem, not an approximation. Certify ``self.bounded = True``
+            if the support is in fact bounded.
         """
         if self.agg_density is None:
             logger.warning('You must update before applying a distortion ')
             return
+        if getattr(dist, 'has_mass', False) and not self.bounded:
+            raise ValueError(
+                f'mass distortion ({dist.name}) on an unbounded aggregate: '
+                f'the mass lands on the last represented bucket, a '
+                f'different bounded problem. Certify `bounded = True` if '
+                f'the support is in fact bounded.')
 
-        S = self.density_df.S
-        # some dist return np others don't this converts to numpy...
-        gS = np.array(dist.g(S))
-
-        self.density_df['gS'] = gS
-        self.density_df['exag'] = np.hstack((0, gS[:-1])).cumsum() * self.bs
+        g, _, _ = dist.effective_g(view, is_loss_value=self._is_loss_value)
+        x = self.density_df.loss.to_numpy()
+        p = self.density_df.p_total.to_numpy()
+        w = choquet_weights(x, p, g, S_calculation=S_calculation,
+                            allow_deficit=allow_deficit)
+        self.density_df['gS'] = w.gS
+        self.density_df['gp_total'] = w.gp
+        # exag(a) = rho(X ∧ a); the strict-tail gp sum telescopes to g(S(a))
+        self.density_df['exag'] = np.cumsum(x * w.gp) + x * w.gS
 
     def pollaczeck_khinchine(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=1):
         """

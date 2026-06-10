@@ -118,13 +118,19 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     (removed with the `p_{unit}` write at numerics-2) and the
     sampling/switcheroo cluster (mechanically re-sourced at numerics-2;
     redesign still its own future plan).
-- [ ] **N3 `[A]` Portfolio apply-distortion calcs.** Which columns;
-  **handling masses (currently black-magic / a cluster)**; signed /
-  `value_type` distortion pricing (`dev/plan-numerics-3-distortion.md`:
-  `add_exa` column audit, distortion pricing, `value_type` consumption — signed
-  books now compute the objective columns but `apply_distortion` raises
-  `NotImplementedError` until this lands); `plot_twelve` impact;
-  **trim unused `density_df` columns**. **needs N2.**
+- [x] **N3 `[A]` Portfolio apply-distortion calcs.** — **done 1.0.0a57**
+  (`dev/done/plan-numerics-3-distortion.md`): one exact-discrete Choquet
+  helper (`spectral.choquet_weights`, `gp = g(T) − g(S)`, capped dot
+  products carrying the origin) behind every price surface; unified
+  linear/lifted builder at `apply_distortion` (alpha vs beta tail share;
+  the `_collapsed_exeqa` linear engine deleted); `T.*`/`M.*` columns and
+  `efficient` removed (explicit `L/M/P/Q`, per-line capital on demand by
+  the layer-ROE construction); mass-on-unbounded guard moved into the
+  builder; tiered deficit policy (`DefectiveDistributionError` /
+  `DEFICIT_MATERIALITY`); `view × value_type` 2×2 on `_is_loss_value`;
+  signed totals price via `dot(kappa, gp)`; `allocation_diagnostics`
+  feeds `plot_twelve`; cache key widened. Step-0 audit + verdicts in
+  `dev/audit-numerics-3-findings.md`.
 - [ ] **N4 `[A]` Bounds numerics read-through** (#30 + #10) — `bounds.py`
   (IME 2022, 513-point binary `s_grid`) end-to-end. **needs N2; prereq for N5.**
 - [x] **N5 `[A]` `Portfolio.pricing_bounds` rewrite** (#32 + #11) — **done
@@ -133,7 +139,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   `(TVaR_p, a_i(p))` curve, no `s_grid` interpolation needed. Bounded
   totals (`a=` / `p=`, linear NA, tail collapse) landed in the same
   release; the collapse idiom was factored into
-  `Portfolio._collapsed_exeqa`, shared with `price(allocation='linear')`.
+  `Portfolio._collapsed_exeqa`, shared with `price(allocation='linear')`
+  (absorbed into `AllocationBounds` itself at numerics-3, 1.0.0a57, when
+  the linear price engine moved onto the unified frame).
 - [x] **N5b `[A]` `PricingBounds` — cross-pricing ranges** — **done 1.0.0a37**
   (`dev/done/plan-pricing-bounds.md`): given `X` priced to P, the range of the
   price of another risk `Y` over the consistent family, by slicing the convex

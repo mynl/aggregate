@@ -1,12 +1,12 @@
 {
   "env": {
-    "aggregate": "1.0.0a55",
+    "aggregate": "1.0.0a56",
     "numpy": "2.4.5",
     "scipy": "1.17.1",
     "pandas": "3.0.3",
     "python": "3.14.3"
   },
-  "commit": "50f1d0a1dd5430667e9e495d3bd89517485f2a1a",
+  "commit": "e20b131f98c212bab86ef72af13cfe7912b55b06",
   "tolerance": {
     "rtol": 1e-12,
     "atol": 1e-14
@@ -171,8 +171,6 @@
         "stats_df": "Port.CNC__stats_df.parquet",
         "describe": "Port.CNC__describe.parquet",
         "density_df": "Port.CNC__density_df.parquet",
-        "augmented__ccoc": "Port.CNC__augmented__ccoc.parquet",
-        "pricing_at__ccoc": "Port.CNC__pricing_at__ccoc.parquet",
         "price__ccoc__linear": "Port.CNC__price__ccoc__linear.parquet",
         "augmented__dual": "Port.CNC__augmented__dual.parquet",
         "pricing_at__dual": "Port.CNC__pricing_at__dual.parquet",
@@ -203,7 +201,7 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 2323.2028909353085,
+              "price": 2323.2028909405703,
               "a_reg": 3715.5,
               "reg_p": 0.99
             }
@@ -223,13 +221,13 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 2474.4262144360987,
+              "price": 2474.4262144370723,
               "a_reg": 3715.5,
               "reg_p": 0.99
             },
             {
               "method": "lifted",
-              "price": 2474.42621443707,
+              "price": 2474.4262144370723,
               "a_reg": 3715.5,
               "reg_p": 0.99
             }
@@ -249,13 +247,13 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 2809.5842655168317,
+              "price": 2809.5842655183524,
               "a_reg": 3715.5,
               "reg_p": 0.99
             },
             {
               "method": "lifted",
-              "price": 2809.5842655183424,
+              "price": 2809.5842655183524,
               "a_reg": 3715.5,
               "reg_p": 0.99
             }
@@ -309,13 +307,13 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 2751.374336283639,
+              "price": 2751.374336284234,
               "a_reg": 4467.5,
               "reg_p": 0.99
             },
             {
               "method": "lifted",
-              "price": 2751.374336284229,
+              "price": 2751.374336284234,
               "a_reg": 4467.5,
               "reg_p": 0.99
             }
@@ -335,13 +333,13 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 3069.111158113879,
+              "price": 3069.111158114003,
               "a_reg": 4467.5,
               "reg_p": 0.99
             },
             {
               "method": "lifted",
-              "price": 3069.1111581139935,
+              "price": 3069.111158114003,
               "a_reg": 4467.5,
               "reg_p": 0.99
             }
@@ -361,13 +359,13 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 3637.639805182227,
+              "price": 3637.639805182373,
               "a_reg": 4467.5,
               "reg_p": 0.99
             },
             {
               "method": "lifted",
-              "price": 3637.639805182387,
+              "price": 3637.639805182373,
               "a_reg": 4467.5,
               "reg_p": 0.99
             }
@@ -421,13 +419,13 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 30.73636363636363,
+              "price": 30.736363636363635,
               "a_reg": 100.0,
               "reg_p": 0.99
             },
             {
               "method": "lifted",
-              "price": 30.7363636363636,
+              "price": 30.736363636363635,
               "a_reg": 100.0,
               "reg_p": 0.99
             }
@@ -447,13 +445,13 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 39.5050633700349,
+              "price": 39.50506337003488,
               "a_reg": 100.0,
               "reg_p": 0.99
             },
             {
               "method": "lifted",
-              "price": 39.50506337003489,
+              "price": 39.50506337003488,
               "a_reg": 100.0,
               "reg_p": 0.99
             }
@@ -473,13 +471,13 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 68.02857142857141,
+              "price": 68.02857142857142,
               "a_reg": 100.0,
               "reg_p": 0.99
             },
             {
               "method": "lifted",
-              "price": 68.02857142857133,
+              "price": 68.02857142857142,
               "a_reg": 100.0,
               "reg_p": 0.99
             }

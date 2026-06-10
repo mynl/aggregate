@@ -312,9 +312,11 @@ class Pentagon():
         """Build a solved ``Pentagon`` from an augmented-distortion row.
 
         Pulls the core amounts for ``line`` off a single row of an
-        ``apply_distortion`` augmented frame (``exa_{line}``/``exag_{line}``/
-        ``T.M_{line}``/``T.Q_{line}``; the unsuffixed ``exa``/``exag`` for a
-        bare ``Aggregate``), solves, and attaches optional provenance.
+        ``apply_distortion`` augmented frame (``exa_{line}``/``exag_{line}``,
+        with ``M = P - L``; the unsuffixed ``exa``/``exag`` for a bare
+        ``Aggregate``), solves, and attaches optional provenance. Per-line
+        capital ``Q`` is a layer-integral quantity not derivable from one
+        row -- use :meth:`Portfolio.pentagon_at` when ``Q`` is needed.
 
         Parameters
         ----------
@@ -342,18 +344,12 @@ class Pentagon():
         if f'exa_{line}' in row.index:
             L = row[f'exa_{line}']
             P = row[f'exag_{line}']
-            M = row[f'T.M_{line}']
-            Q = row[f'T.Q_{line}']
         else:
             # bare Aggregate row
             L = row['exa']
             P = row['exag']
-            M = P - L
-            Q = None  # not available without an asset level; solve from L,P,M
-        if Q is None:
-            p.solve(L=L, P=P, M=M)
-        else:
-            p.solve(L=L, P=P, M=M, Q=Q)
+        # M = P - L; per-line Q needs the layer integral (pentagon_at)
+        p.solve(L=L, P=P, M=P - L)
         if distortion is not None:
             p.distortion = distortion
             p.shape = getattr(distortion, 'shape', None)

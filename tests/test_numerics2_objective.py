@@ -365,10 +365,16 @@ def test_aggregate_direct_sums_dice():
 # Signed books refuse the (numerics-3) distortion surface
 # ---------------------------------------------------------------------------
 
-def test_signed_apply_distortion_refuses(signed_port):
+def test_signed_apply_distortion_prices_totals(signed_port):
+    # numerics-3 removed the numerics-2 stopgap refusal: signed books now
+    # price the total exactly (dot(x, gp) carrying the origin); the
+    # per-line equal-priority distorted columns stay NaN (steering 6).
+    # Full coverage in tests/test_numerics3_distortion.py.
     from aggregate.spectral import Distortion
-    with pytest.raises(NotImplementedError, match='numerics-3'):
-        signed_port.apply_distortion(Distortion('tvar', 0.8))
+    aug = signed_port.apply_distortion(Distortion('tvar', 0.8))
+    assert np.isfinite(aug.exag_total.to_numpy()).all()
+    assert aug[f'exag_{signed_port.line_names[0]}'].isna().all()
+    signed_port._augmented_dfs.clear()
 
 
 # ---------------------------------------------------------------------------

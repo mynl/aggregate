@@ -439,3 +439,17 @@ port N2.PosOrigin agg A dfreq [1] dsev [10 11] agg B dfreq [1] dsev [20 22] [.6 
 port N2.SignedLN agg A 8 claims ssev 20 * lognorm 0.4 - 25 poisson agg L 4 claims sev lognorm 30 cv 0.4 poisson   note{signed continuous; exeqa vs Monte Carlo incl a<0}
 agg N2.Dice dfreq [1] dsev [1:6]                                                                                  note{hand checks: lev(3)=2.5 exlea(3)=2 exgta(3)=5}
 pnl N2.PnL 10 prem - dfreq [1] dsev [2 5] [.5 .5]                                                                 note{signed Aggregate direct sums carry the origin}
+
+
+# N3. Distortion spine (numerics-3)
+# =================================
+# Programs behind tests/test_numerics3_distortion.py (1.0.0a57): the exact-
+# discrete Choquet helper, the view x value_type 2x2, the unified linear/
+# lifted builder, builder-level mass guard, signed total pricing, and the
+# on-demand per-line capital. See dev/done/plan-numerics-3-distortion.md.
+agg N3.Dice dfreq [1:6] dsev [1:6]                                                                                note{six-surface consistency target; choquet hand checks}
+port N3.OneDice agg D dfreq [1:6] dsev [1:6]                                                                      note{one-line port: line == total}
+port N3.Bodoff agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed note{bounded discrete; linear vs lifted; mass distortion exact}
+port N3.SignedD agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed totals price via dot(kappa, gp); shares NaN}
+port N3.PayPair pnl P1 10 prem - dfreq [1] dsev [2 5] [.5 .5] pnl P2 8 prem - dfreq [1] dsev [1 3]                note{homogeneous payoff book prices through the dual}
+port N3.Unb agg U 5 claims sev lognorm 10 cv 1 poisson                                                            note{mass-on-unbounded refused in the lifted builder (G6)}

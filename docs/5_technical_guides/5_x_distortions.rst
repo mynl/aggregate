@@ -239,22 +239,34 @@ notably:
 #. :class:`Distortion`: ``price``
 #. Working by hand using ``density_df.p_total``.
 
-All of these methods use the same approach, the integral is approximated as a left Riemann sum:
+All of these methods route through one exact-discrete Choquet engine,
+:func:`~aggregate.spectral.choquet_weights`. The bucketed law is an exact
+discrete atom table :math:`\Pr(X=x_k)=p_k`, with strict tail
+:math:`S_k=\Pr(X>x_k)` and inclusive tail :math:`T_k=\Pr(X\ge x_k)`; the
+exact distorted atom weights are
 
 .. math::
 
-   \int_0^\infty g(S(t))dt \approx
-   \sum_{k=0}{n} g(S(kb))b
+   gp_k = g(T_k) - g(S_k),
 
-The implementation computes
+a probability mass function, and
 
-* ``S`` as ``1 - p_total.cumsum()``,
-* ``gS = d.g(S)``, and
-* ``(gS.loc[:a - bs] * np.diff(S.index)).sum()`` or ``.cumsum().iloc[-1]``.
+.. math::
 
-The ``p_total.cumsum()`` idiom automatically accounts for the case where the output distribution is not normalized (sums to :math:`<1`).
-Using ``sum`` vs. ``cumsum`` is usually an O(1e-16) difference. These methods all use the forward difference of :math:`dt` and match against the unlagged values of ``S`` or ``gS`` (per PIR p. 272-3). The :class:`Aggregate` method prepends 0 and then computes a ``cumsum``, so the ``a`` index gives the right value. Remember, ``pandas.Series.loc[:a]`` *includes* the element with index ``a`` (whereas ``iloc[:n]`` does not).
-When ``a`` is given, the series includes ``a`` (based on  ``.loc[:a]``) and the last value is dropped from the sum product.
+   \rho_g(X\wedge a) = \sum_k \min(x_k, a)\, gp_k
+   = \sum_{x_k \le a} x_k\, gp_k + a\, g(S(a)).
+
+This dot-product form carries the grid origin, so it is exact on signed,
+shifted and nonuniform supports; the old left-Riemann layer sum
+:math:`x_0 + \sum_k g(S_k)(x_{k+1}-x_k)` is equivalent by discrete
+integration by parts and survives only as an internal reconciliation
+assert. ``S_calculation`` survives as the deficit-parking direction for a
+non-normalized law: ``forwards`` parks the missing mass at the top atom
+(conservative), ``backwards`` zeroes the represented tail. A *materially*
+defective law raises ``DefectiveDistributionError`` unless the caller
+passes ``allow_deficit=True``; small FFT-truncation deficits (already
+advertised by ``DefectiveDistributionWarning`` at construction) are
+parked without complaint.
 
 The next block of code provides a reconciliation of methods. Build an aggregate and put it in a :class:`Portfolio` object to expose ``calibrate_distortions``.
 

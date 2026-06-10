@@ -1,5 +1,105 @@
 # Changelog
 
+## 1.0.0a57
+
+### Numerics-3 — distortion spine (one Choquet engine; linear/lifted unified)
+
+Third plan of the numerics program
+(`dev/done/plan-numerics-3-distortion.md`). All distorted pricing routes
+through one exact-discrete Choquet helper; the linear and lifted
+allocations become one builder; the `T.*`/`M.*` column families are gone.
+Step-0 audit with measured verdicts in `dev/audit-numerics-3-findings.md`.
+
+- **One Choquet helper.** `spectral.choquet_weights(x, p, g)` computes the
+  exact distorted atom weights `gp = g(T) − g(S)` (`T = P(X ≥ x)`, the
+  strict shift of `S = P(X > x)`; a pmf on a clean law) and is the *only*
+  place they are computed: `Distortion.price` (both `method='dx'` and
+  `'ds'` now return the identical `Σ min(x,a)·gp` value), `make_q`,
+  `Aggregate.apply_distortion` and `Portfolio._build_augmented` all route
+  through it. Choquet values are capped dot products carrying the grid
+  origin — exact on signed, shifted and nonuniform supports. The layer
+  form `x0 + Σ g(S)·Δx` survives only as an internal reconciliation
+  assert.
+- **Deficit policy** (new `DefectiveDistributionError`,
+  `constants.DEFICIT_MATERIALITY = 1e-4`): pmf deficits at the validation
+  noise floor are renormalized away; small FFT-truncation losses (already
+  advertised by `DefectiveDistributionWarning`) are parked per
+  `S_calculation` (forwards: top atom, backwards: bottom atom — the two
+  agree to tolerance on a clean law, asserted); material deficits raise
+  unless `allow_deficit=True` is passed explicitly.
+- **`view × value_type` pricing axis.** `Distortion.effective_g(view,
+  is_loss_value=...)` resolves the 2×2 by XOR (dual iff `bid` XOR payoff
+  role), branching on the canonical `_is_loss_value` flag, never the
+  configurable label strings. A payoff-role object prices as the dual of
+  the matching loss object, surviving label reconfiguration.
+- **Unified linear/lifted builder.** `apply_distortion(distortion, *,
+  view, S_calculation, allocation='lifted', allow_deficit=False)` builds
+  one column schema for both methods in one O(n) sweep across all asset
+  levels: `exag_i = Σ_{k≤a} κ_i·gp + a·g(S(a))·TAIL_i` with `TAIL` = beta
+  (`exi_xgtag`, lifted) or alpha (`exi_xgta`, linear). **Breaking:** the
+  separate `_collapsed_exeqa` linear pricing engine is deleted;
+  `Portfolio.price` reads rows of the unified frame for both methods.
+  Linear **totals** are unchanged (≤ 2e-12 vs the a56 capture) but linear
+  **per-line** values move: the unified formula keeps the `X = a` state at
+  its true `κ(a)` and splits only the strict tail by alpha (the old
+  engine merged `X ≥ a` into the collapsed atom), and per-line capital now
+  uses the same layer-ROE construction as lifted (the old separate
+  `rcoc` engine differed structurally). Lifted surfaces reproduce a56 to
+  1e-14 (exact books) / 1e-11 (64k-row FFT books, fp order-of-ops drift);
+  locked by `tests/data/numerics3_precapture.json` +
+  `tests/test_numerics3_distortion.py`; the corpus baselines were
+  recaptured.
+- **Breaking: `T.*`/`M.*` columns removed** (`T.L/T.P/T.M/T.Q/T.LR/...`,
+  `M.L/M.P/M.M/M.Q/...`) along with the `tm_renamer` property. Pricing
+  readers use explicit `L = exa`, `P = exag`, `M = P − L`; per-line
+  capital `Q_i(a)` is computed **on demand** by the layer-ROE
+  construction (line layer margin ÷ total layer ROE, integrated; the
+  layer margin is the exact first difference of `exag_i − exa_i`) inside
+  `pricing_at` / `pentagon_at` / `price`, with `Σ_i Q_i(a) = a −
+  exag_total(a)` reconciled. Zero-total-margin layers contribute zero
+  capital (under the identity distortion per-line `Q` is 0 — there is no
+  margin to allocate); fully-loss-funded layers (`gS = 1`) use the
+  L'Hôpital ROE limit.
+- **Breaking: mass-on-unbounded guard moved into the builder** (G6).
+  `apply_distortion` / `Aggregate.apply_distortion` refuse a mass
+  distortion (e.g. `ccoc`) on an unbounded support for the lifted frame —
+  previously only `price(allocation='lifted')` refused, so `exag_total`
+  could still build an unstable frame. `allocation='linear'` remains
+  available (the collapsed default atom is bounded by construction; the
+  unstable beta columns are blanked). `analyze_distortions` skips such
+  members of a sweep with a `UserWarning` instead of failing the exhibit.
+- **Breaking: `efficient` removed entirely** from `apply_distortion` /
+  `price`; one frame shape. The diagnostic layer curves moved to the new
+  explicit `Portfolio.allocation_diagnostics(distortion,
+  surface='lifted'|'linear')` frame (`layer_loss/premium/margin/capital`,
+  `cum_margin/cum_capital`, `layer_roe_total`, plus kappa/alpha/beta and
+  `F/gF/S/gS/gp_total`); `pedagogy.plot_twelve` consumes it (the
+  efficient→full cache-pop hack is gone).
+- **Breaking: `apply_distortion` cache key widened** from the distortion
+  name to `(name, view, role-flag, S_calculation, allocation)`, so
+  bid/ask, loss/payoff, forwards/backwards and linear/lifted frames
+  coexist (previously a second call with different options returned the
+  stale first frame). `augmented_dfs` is keyed accordingly.
+- **Aggregate surface aligned.** `Aggregate.apply_distortion(dist, *,
+  view, S_calculation, allow_deficit)` writes `gS`, `gp_total` and the
+  exact `exag = ρ_g(X ∧ a)`; the six surfaces (`Distortion.price` dx/ds,
+  Portfolio `exag_total` / `price` both methods, Aggregate `exag` /
+  `price`) agree on the total premium to machine precision.
+- **Signed (P&L) books price.** The numerics-2 `NotImplementedError` is
+  gone: total distorted columns (`gS/gp_total/exag_total`) are exact on
+  signed windows and the signed total prices via `dot(κ, gp)`
+  (additive across units); the equal-priority per-line distorted columns
+  are NaN (not a recovery share on a signed grid). Homogeneous payoff
+  books price through the dual automatically; mixed books still raise at
+  construction (hygiene-4).
+- `AllocationBounds` owns its bounded-total collapse directly (built from
+  the `exi_xgta_*` columns); reproduces its baseline unchanged.
+- `Pentagon.from_row` reads `L/P` and derives `M` (per-line `Q` needs the
+  layer integral — use `Portfolio.pentagon_at`).
+- Docs: `5_x_distortions.rst` / `5_x_portfolio_calculations.rst` /
+  `2_x_10mins.rst` updated to the exact-discrete formulation (doc build
+  pending, run manually).
+
 ## 1.0.0a56
 
 ### Numerics-2 — objective spine (shifted-support kappa + direct sums)

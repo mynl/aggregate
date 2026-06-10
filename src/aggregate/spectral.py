@@ -39,8 +39,14 @@ except ImportError:
 
 import hashlib
 
-from .constants import FIG_H, FIG_W, INFO_NA, info_row
+from .config import get_settings
+from .constants import (DEFICIT_MATERIALITY, DefectiveDistributionError,
+                        FIG_H, FIG_W, INFO_NA, info_row)
 from .random_agg import RANDOM
+
+# Resolved once per session from config (validation.noise); the deficit /
+# fuzz materiality floor for the exact-discrete Choquet helper.
+VALIDATION_NOISE = get_settings().validation.noise
 
 
 def _short_hash(s):
@@ -76,10 +82,209 @@ _DISTORTION_DENSITY_N = 101
 __all__ = [
     'Distortion',
     'approx_ccoc',
+    'choquet_weights', 'ChoquetWeights',
     'tvar_weights',
     'p_to_parameters', 'consistent_distortions',
     'convex_distortion', 'bagged_distortion', 'convex_example',
 ]
+
+
+# ---------------------------------------------------------------------------
+# Exact-discrete Choquet weights -- the ONE place distorted atom weights are
+# computed (``choquet-calc-method.md``). ``Distortion.price``, ``make_q``,
+# ``Aggregate.apply_distortion`` and ``Portfolio._build_augmented`` all route
+# through here.
+# ---------------------------------------------------------------------------
+
+ChoquetWeights = namedtuple('ChoquetWeights', 'S T gS gp deficit')
+"""Result of :func:`choquet_weights`.
+
+``S`` strict tail ``P(X > x_k)``; ``T`` inclusive tail ``P(X >= x_k)``
+(``T_k = S_{k-1}``, ``T_0 = 1``); ``gS = g(S)``; ``gp = g(T) - g(S)`` the
+exact distorted atom weights (a pmf on a clean law); ``deficit`` the
+measured ``1 - sum(p)`` before any renormalization.
+"""
+
+
+def choquet_weights(x, p, g, *, S_calculation='forwards',
+                    allow_deficit=False, tol=None):
+    r"""Exact discrete distorted atom weights for the law ``P(X = x_k) = p_k``.
+
+    The bucketed law is an exact discrete atom table, not a curve. The
+    distorted weights are
+
+    .. math::
+
+        S_k = \Pr(X > x_k),\quad T_k = \Pr(X \ge x_k) = S_{k-1},\quad
+        gp_k = g(T_k) - g(S_k),
+
+    a pmf (``gp >= 0``, ``sum(gp) = 1``) for any normalized law and
+    concave ``g``. Choquet values follow by plain dot products,
+    orientation-agnostically (signed, shifted, sparse and nonuniform
+    supports all work):
+
+    .. math::
+
+        \rho_g(X) = \sum_k x_k\,gp_k,\qquad
+        \rho_g(X\wedge a) = \sum_k \min(x_k, a)\,gp_k.
+
+    Parameters
+    ----------
+    x : array_like
+        Outcomes, sorted non-decreasing (callers sort; duplicates allowed).
+    p : array_like
+        Probability masses aligned with ``x``. Tiny negative FFT fuzz
+        (``>= -tol``) is tolerated and kept (it cancels exactly in the
+        tail sums); material negatives raise.
+    g : callable
+        The distortion function to apply (already resolved for view and
+        value-type role -- see :meth:`Distortion.effective_g`). The helper
+        computes unconditionally; bounded/mass gatekeeping lives in the
+        caller that knows the support (``Aggregate`` / ``Portfolio``).
+    S_calculation : {'forwards', 'backwards'}
+        Survives only as the **deficit-parking direction**: ``forwards``
+        (``S = 1 - cumsum(p)``) parks unrepresented mass at the **top**
+        atom (conservative); ``backwards`` (reverse exclusive cumsum)
+        zeroes the represented tail, so under the ``T_0 = 1`` convention
+        the deficit lands at the **bottom** atom. On a clean law the two
+        agree to ``tol`` (asserted).
+    allow_deficit : bool
+        Explicit truncation policy for a *material* deficit
+        (``1 - sum(p)`` above
+        :data:`~aggregate.constants.DEFICIT_MATERIALITY`): missing
+        probability at unknown loss values is an economic error, and the
+        default ``False`` raises
+        :class:`~aggregate.constants.DefectiveDistributionError`.
+        ``True`` opts into the parking policy above. Deficits between the
+        noise floor ``tol`` and the materiality floor (small
+        FFT-truncation losses, already advertised at construction by
+        ``DefectiveDistributionWarning``) are parked without complaint;
+        deficits within ``tol`` are renormalized away. A material
+        *surplus* (``sum(p) > 1``) always raises.
+    tol : float, optional
+        Materiality floor; defaults to the config validation noise
+        (``~1e-12``).
+
+    Returns
+    -------
+    ChoquetWeights
+        ``(S, T, gS, gp, deficit)`` numpy arrays plus the measured
+        deficit. Effective atom masses including any parked deficit are
+        ``T - S``.
+
+    Notes
+    -----
+    The layer form :math:`x_0 + \sum_k (x_{k+1}-x_k)\,g(S_k)` is
+    asserted equal to ``dot(x, gp)`` on every call (discrete integration
+    by parts; exact because ``S`` ends at 0 in both directions) -- it is
+    a reconciliation, never the computation.
+    """
+    if tol is None:
+        tol = VALIDATION_NOISE
+    x = np.asarray(x, dtype=float)
+    p = np.asarray(p, dtype=float)
+    if x.shape != p.shape or x.ndim != 1:
+        raise ValueError('x and p must be 1-d arrays of equal length')
+    if len(x) == 0:
+        raise ValueError('empty probability vector')
+    if np.any(np.diff(x) < 0):
+        raise ValueError('x must be sorted non-decreasing')
+    if S_calculation not in ('forwards', 'backwards'):
+        raise ValueError(
+            f"S_calculation must be 'forwards' or 'backwards', "
+            f"not {S_calculation!r}")
+
+    # validate, but KEEP tiny negative FFT fuzz: zeroing it perturbs the
+    # partial cumsums (the fuzz cancels exactly in the tail, e.g. S hits
+    # exact 0 at the essential sup) and a mass distortion amplifies the
+    # resulting dust by the g jump at 0. Material negatives are invalid.
+    worst = float(p.min())
+    if worst < -tol:
+        raise ValueError(
+            f'p contains material negative mass (min {worst:.3e} '
+            f'< -tol {tol:.0e})')
+
+    deficit = 1.0 - p.sum()
+    if abs(deficit) <= tol:
+        # fp dust: absorb by exact renormalization, after which the two
+        # parking directions agree (asserted below). Skip the division
+        # when the sum is exactly 1 -- it would only inject rounding dust
+        # into the tail, which a mass distortion amplifies by the g jump
+        # at 0.
+        if deficit != 0.0:
+            p = p / p.sum()
+    elif deficit < 0:
+        # surplus: no parking interpretation exists for negative missing
+        # mass -- renormalize small, refuse material
+        if -deficit <= DEFICIT_MATERIALITY:
+            p = p / p.sum()
+        else:
+            raise DefectiveDistributionError(
+                f'probability vector sums to {p.sum():.12g} > 1; '
+                f'invalid law (surplus {-deficit:.3e})')
+    elif deficit <= DEFICIT_MATERIALITY or allow_deficit:
+        # small FFT-truncation loss (advertised by the construction-time
+        # DefectiveDistributionWarning) or an explicit truncation policy:
+        # park per S_calculation -- forwards at the top atom, backwards
+        # at the bottom atom
+        logger.debug(
+            f'choquet_weights: parking pmf deficit {deficit:.3e} '
+            f'({S_calculation})')
+    else:
+        raise DefectiveDistributionError(
+            f'probability vector carries a material deficit '
+            f'{deficit:.6e} > {DEFICIT_MATERIALITY:.0e}: missing mass at '
+            f'unknown loss values. Pass allow_deficit=True to park it '
+            f'(forwards: top atom; backwards: bottom atom), or widen '
+            f'the grid.')
+
+    # strict tail S and inclusive tail T = S shifted (T_k = S_{k-1});
+    # built per parking direction, then endpoints forced exactly so the
+    # telescoping sum(gp) = g(T_0) - g(S_last) = 1 is exact.
+    if S_calculation == 'forwards':
+        S = np.maximum(1.0 - np.cumsum(p), 0.0)
+        S[-1] = 0.0           # parks any deficit at the top atom
+    else:
+        c = np.cumsum(p[::-1])[::-1]          # inclusive tail
+        S = np.minimum(np.append(c[1:], 0.0), 1.0)
+    # T_0 = 1 forces any retained deficit to the bottom atom under
+    # backwards parking ("zeroes the represented tail")
+    T = np.concatenate(([1.0], S[:-1]))
+    if abs(deficit) <= tol:
+        # D7: on a clean law forwards and backwards agree to tol
+        S_other = (np.append(np.cumsum(p[::-1])[::-1][1:], 0.0)
+                   if S_calculation == 'forwards'
+                   else np.maximum(1.0 - np.cumsum(p), 0.0))
+        agreement = float(np.max(np.abs(S - S_other)))
+        assert agreement <= max(tol, 4 * len(p) * np.finfo(float).eps), (
+            f'forwards/backwards S disagree by {agreement:.3e} on a '
+            f'clean law -- defective-distribution diagnostic')
+
+    gS = np.asarray(g(S), dtype=float)
+    gT = np.asarray(g(T), dtype=float)
+    gp = gT - gS
+    # exact discrete law: gp is a pmf; clip float fuzz, refuse material
+    # negatives (invalid distortion or tail vector)
+    neg = gp < 0
+    if neg.any():
+        worst = gp.min()
+        if worst < -tol:
+            raise ValueError(
+                f'distorted atom weights materially negative (min '
+                f'{worst:.3e}): invalid distortion or tail vector')
+        gp = np.where(neg, 0.0, gp)
+
+    # reconciliation (steering rule 1): the layer form survives only as
+    # this assert, never as the computation
+    rho = float(np.dot(x, gp))
+    layer = float(x[0] + np.sum(np.diff(x) * gS[:-1]))
+    scale = max(float(np.sum(np.abs(x) * gp)) + abs(x[0]), 1e-30)
+    rec_tol = max(1e-12, 8 * len(x) * np.finfo(float).eps)
+    assert abs(rho - layer) <= rec_tol * scale, (
+        f'gp dot-product {rho:.12g} fails to reconcile with the layer '
+        f'form {layer:.12g} (rel {abs(rho - layer) / scale:.3e})')
+
+    return ChoquetWeights(S, T, gS, gp, deficit)
 
 
 # ---------------------------------------------------------------------------
@@ -563,6 +768,49 @@ class Distortion:
     def g_dual(self, x):
         """The dual distortion ``1 - g(1 - x)``."""
         return 1 - self.g(1 - x)
+
+    def effective_g(self, view='ask', *, is_loss_value=True):
+        """Resolve ``view`` × value-type role to the effective distortion.
+
+        The pricing view (``ask``/``bid``) and the value-type **role**
+        (loss vs payoff sign convention) are orthogonal inputs; each
+        independently toggles ``g ↔ g_dual``, composing by XOR -- the
+        dual applies iff ``(view == 'bid') XOR (payoff role)``:
+
+        ====== ======== ==========
+        view    loss     payoff
+        ====== ======== ==========
+        ask     ``g``    ``g_dual``
+        bid     ``g_dual`` ``g``
+        ====== ======== ==========
+
+        Ask-of-loss puts the heaviest distortion weight on the large-loss
+        tail; ask-of-payoff sorts ascending so the largest *good* outcome
+        is down-weighted, which is the dual.
+
+        Parameters
+        ----------
+        view : {'ask', 'bid'}
+            Pricing view.
+        is_loss_value : bool
+            The canonical value-type **role flag** (``_is_loss_value`` on
+            ``Aggregate`` / ``Portfolio``). Callers must pass the flag,
+            never compare the user-configurable ``loss``/``payoff`` label
+            strings.
+
+        Returns
+        -------
+        (g, g_prime, is_dual) : tuple
+            The effective distortion function, its derivative, and
+            whether the dual was selected. For the dual,
+            ``g_prime(s) = g'(1 - s)`` by the chain rule.
+        """
+        if view not in ('ask', 'bid'):
+            raise ValueError(f"view must be 'ask' or 'bid', not {view!r}")
+        use_dual = (view == 'bid') != (not bool(is_loss_value))
+        if use_dual:
+            return self.g_dual, (lambda s: self.g_prime(1 - s)), True
+        return self.g, self.g_prime, False
 
     # ------------------------------------------------------------------
     # Class-level lists derived from the registry
@@ -1500,26 +1748,24 @@ class Distortion:
         Replaces the older ``price`` (tuple return) and ``price2``
         (DataFrame return); strictly preferred in new code.
 
-        ``S_calculation='forwards'`` (the default) computes
-        ``S = 1 - ser.cumsum()``; ``S_calculation='backwards'`` computes
-        ``S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]``.
-
-        With a normalised ``ser`` (``Σp == 1`` up to numerical noise) the
-        two are equivalent. Under a *genuine* deficit
-        (``Σp < 1 − VALIDATION_NOISE``) they diverge by exactly the
-        deficit: forwards plateaus at the deficit (carries the missing
-        mass in the tail, equivalent under ``dx`` pricing to placing it
-        at the largest observed ``x``), backwards reaches zero (drops
-        the missing mass entirely). Forwards is the library default
-        because it is the conservative, mass-preserving choice; the
+        ``S_calculation`` survives as the **deficit-parking direction**
+        (see :func:`choquet_weights`). With a normalised ``ser``
+        (``Σp == 1`` up to numerical noise) the two are equivalent.
+        Under a *genuine* deficit (``Σp < 1 − VALIDATION_NOISE``) they
+        diverge by exactly the deficit: ``forwards`` parks the missing
+        mass at the largest represented outcome (conservative),
+        ``backwards`` zeroes the represented tail so the deficit lands
+        at the bottom atom. Forwards is the library default; the
         :class:`DefectiveDistributionWarning` emitted by
         :meth:`Aggregate.update_work` (or
         :meth:`Portfolio.update`) advertises the deficit at construction
         time so divergence here is never silent.
 
-        ``method='dx'`` computes ``∫ gS dx`` (fewer diffs);
-        ``method='ds'`` computes ``∫ x d(gS)``. Neither requires a
-        unique index.
+        Both ``method`` values route through the exact-discrete Choquet
+        engine ``ρ(X∧a) = Σ min(x, a)·gp`` of :func:`choquet_weights`
+        (which asserts the layer-form ``∫ gS dx`` reconciliation
+        internally); the parameter is retained for signature
+        compatibility. Neither requires a unique index.
 
         Asset level ``a`` must be present in ``ser.index`` (no
         interpolation).
@@ -1527,7 +1773,7 @@ class Distortion:
         :param ser: probability series indexed by outcome.
         :param a: asset level (truncation point).
         :param kind: ``'ask'``, ``'bid'``, or ``'both'``.
-        :param method: ``'dx'`` or ``'ds'``.
+        :param method: ``'dx'`` or ``'ds'`` (equivalent; see above).
         :param S_calculation: ``'forwards'`` (default) or ``'backwards'``.
         :param as_frame: return a DataFrame instead of a namedtuple.
         """
@@ -1541,55 +1787,27 @@ class Distortion:
 
         if not ser.index.is_monotonic_increasing:
             ser = ser.sort_index(ascending=True)
+        if a < np.inf:
+            assert a in ser.index, f'a={a} must be in the index of ser'
 
-        if S_calculation == 'forwards':
-            if a < np.inf:
-                assert a in ser.index, f'a={a} must be in the index of ser'
-                ser = ser.loc[:a]
-            S = np.maximum(0, 1 - ser.cumsum())
-            if a == np.inf:
-                S.iloc[-1] = 0
-        else:
-            S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]
-            S = np.minimum(1, S)
-            if a < np.inf:
-                assert a in ser.index, f'a={a} must be in the index of ser'
-                S = S.loc[:a]
+        x = ser.index.to_numpy(dtype=float)
+        p = ser.to_numpy(dtype=float)
+        xa = np.minimum(x, a)
 
-        gS = dual_gS = None
         el = bid = ask = np.nan
-
-        if kind == 'ask':
-            gS = np.array(self.g(S))
-        elif kind == 'both':
-            gS = np.array(self.g(S))
-            dual_gS = np.array(self.g_dual(S))
-        elif kind == 'bid':
-            dual_gS = np.array(self.g_dual(S))
-
-        if method == 'dx':
-            dx = np.diff(S.index)
-            x0 = S.index[0]
-            el = (S.iloc[:-1].values * dx).sum() + x0
-            if gS is not None:
-                ask = (gS[:-1] * dx).sum() + x0
-            if dual_gS is not None:
-                bid = (dual_gS[:-1] * dx).sum() + x0
-        else:
-            # ds: the last adjustment to ∫ x dgS is to add a P(X>a)
-            # provided a is finite; if a is infinite we let it equal 0
-            # so the algebra collapses correctly.
-            if a == np.inf:
-                a = 0
-            dS = np.diff(S, prepend=1.)
-            x = np.array(S.index)
-            el = -((x * dS).sum()) + a * S.iloc[-1]
-            if gS is not None:
-                dgS = np.diff(gS, prepend=1.)
-                ask = -((x * dgS).sum()) + a * gS[-1]
-            if dual_gS is not None:
-                ddual_gS = np.diff(dual_gS, prepend=1.)
-                bid = -((x * ddual_gS).sum()) + a * dual_gS[-1]
+        # legacy public surface prices defective laws (the construction-
+        # time DefectiveDistributionWarning already advertised them), so
+        # opt into the parking policy here.
+        w = choquet_weights(x, p, self.g,
+                            S_calculation=S_calculation, allow_deficit=True)
+        el = float(np.dot(xa, w.T - w.S))
+        if kind in ('ask', 'both'):
+            ask = float(np.dot(xa, w.gp))
+        if kind in ('bid', 'both'):
+            w_dual = choquet_weights(x, p, self.g_dual,
+                                     S_calculation=S_calculation,
+                                     allow_deficit=True)
+            bid = float(np.dot(xa, w_dual.gp))
 
         if as_frame:
             return pd.DataFrame([[bid, el, ask, self.name, a]],
@@ -1603,13 +1821,15 @@ class Distortion:
         """
         Vector of risk-adjusted probabilities for use in pricing.
 
-        Uses backwards S calculation, ask pricing, and ``method='ds'``;
-        see :meth:`price` for details.
-
-        Used as::
+        Uses backwards S calculation and ask pricing, routed through
+        :func:`choquet_weights` (``q`` is the exact distorted atom
+        weight vector ``gp = g(T) - g(S)``); see :meth:`price` for
+        details. For finite ``a`` the returned ``q`` does not include
+        the collapsed tail as an atom; callers add the terminal
+        adjustment::
 
             q = d.make_q(x, a)
-            ask = -((x * q['q']).sum()) + a * q['gS'].iloc[-1]
+            ask = (x * q['q']).sum() + a * q['gS'].iloc[-1]
         """
         if not isinstance(ser, pd.Series):
             raise ValueError(f'ser must be a pandas Series, not {type(ser)}')
@@ -1620,17 +1840,15 @@ class Distortion:
             raise ValueError(
                 'Sum of input probabilities must be 1. Try '
                 'remove_fuzz=True if using a Portfolio')
-        S = ser[::-1].cumsum().shift(1, fill_value=0)[::-1]
-        S = np.minimum(1, S)
+        w = choquet_weights(ser.index.to_numpy(dtype=float),
+                            ser.to_numpy(dtype=float), self.g,
+                            S_calculation='backwards', allow_deficit=True)
+        df = pd.DataFrame({'p': w.T - w.S, 'q': w.gp, 'S': w.S, 'gS': w.gS},
+                          index=ser.index)
         if a < np.inf:
             assert a in ser.index, f'a={a} must be in the index of ser'
-            S = S.loc[:a]
-
-        gS = np.array(self.g(S))
-        dS = -np.diff(S, prepend=1.)
-        dgS = -np.diff(gS, prepend=1.)
-        return pd.DataFrame({'p': dS, 'q': dgS, 'S': S, 'gS': gS},
-                            index=S.index)
+            df = df.loc[:a]
+        return df
 
     # ------------------------------------------------------------------
     # Calibration

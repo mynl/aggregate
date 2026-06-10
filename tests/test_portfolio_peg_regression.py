@@ -50,7 +50,13 @@ def peg():
     bs = BASELINE['meta']['bs']
     port = build_peg(update=True, calibrate=True, p=p, coc=coc,
                      log2=log2, bs=bs)
-    ad = port.analyze_distortions(p=p).pricing_df
+    # ccoc (mass) on the unbounded PEG is refused by the lifted builder
+    # (numerics-3 G6); analyze the no-mass quartet, which keeps the
+    # pre-change lifted regression lock intact. ccoc pricing coverage
+    # lives in the baseline corpus under allocation='linear'.
+    no_mass = {k: v for k, v in port.distortions.items()
+               if not getattr(v, 'has_mass', False)}
+    ad = port.analyze_distortions(p=p, distortions=no_mass).pricing_df
     return port, ad
 
 
@@ -83,6 +89,10 @@ def test_pricing(peg):
     """
     _, ad = peg
     for dname, by_column in BASELINE['pricing'].items():
+        if dname == 'ccoc':
+            # mass distortion on the unbounded PEG: the lifted builder
+            # refuses (numerics-3 G6); rows are no longer produced
+            continue
         assert dname in ad.index.get_level_values(0).unique(), \
             f'distortion {dname!r} missing from analyze_distortions output'
         for column, by_stat in by_column.items():
@@ -102,7 +112,10 @@ def test_price_stand_alone_shape_and_identities(peg):
     identities."""
     port, _ = peg
     p = BASELINE['meta']['p_calibration']
-    dname = next(iter(port.distortions))
+    # first no-mass distortion: ccoc (mass) is refused on the
+    # unbounded PEG by Aggregate/Portfolio gatekeeping (numerics-3)
+    dname = next(n for n, d in port.distortions.items()
+                 if not getattr(d, 'has_mass', False))
     a = port.price_stand_alone(port.distortions[dname], p=p)
 
     # canonical orientation: 8 pentagon stats are the columns; rows are one per
@@ -137,7 +150,10 @@ def test_price_stand_alone_shape_and_identities(peg):
 def test_price_stand_alone_arg_checks(peg):
     """Bad arguments raise the documented exceptions."""
     port, _ = peg
-    dname = next(iter(port.distortions))
+    # first no-mass distortion: ccoc (mass) is refused on the
+    # unbounded PEG by Aggregate/Portfolio gatekeeping (numerics-3)
+    dname = next(n for n, d in port.distortions.items()
+                 if not getattr(d, 'has_mass', False))
     dist = port.distortions[dname]
 
     with pytest.raises(ValueError):

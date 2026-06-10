@@ -25,6 +25,7 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
            'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR', 'FT_NOISE_FLOOR',
            'Validation', 'DefectiveDistributionWarning',
+           'DefectiveDistributionError',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
            'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row']
@@ -57,6 +58,19 @@ EXEQA_NOISE_FLOOR = 1e-4
 # branch is preferred over division in the per-line FT decomposition (avoids
 # divide-by-near-zero).
 FT_NOISE_FLOOR = 1e-10
+# Economic-materiality floor on the pmf deficit ``1 - Σp`` in the Choquet
+# helper (``spectral.choquet_weights``). Below the validation noise floor a
+# deficit is fp dust and is renormalized away; between the noise floor and
+# this value it is a small FFT-truncation loss already advertised by
+# ``DefectiveDistributionWarning`` at construction and is parked per the
+# ``S_calculation`` direction; above it the missing probability sits at
+# unknown loss values and pricing raises ``DefectiveDistributionError``
+# unless the caller passes an explicit truncation policy
+# (``allow_deficit=True``). Calibration: everyday under-padded grids carry
+# 1e-8..1e-5 (parked; the price error is bounded by deficit x window
+# width), while genuinely defective laws (e.g. heavy-tail pareto on a
+# finite window without normalization) carry 1e-3+.
+DEFICIT_MATERIALITY = 1e-4
 
 # Column / view labels for reinsurance reporting (``describe``,
 # ``reins_describe``, ``reins_stats_df``). Centralised so the wording is
@@ -137,4 +151,18 @@ class DefectiveDistributionWarning(UserWarning):
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).
+    """
+
+
+class DefectiveDistributionError(ValueError):
+    """Raised when a Choquet computation receives a materially defective law.
+
+    A probability vector whose total falls short of 1 by more than the
+    validation noise floor carries *unrepresented mass at unknown loss
+    values* -- an economic problem, not numerical dust. The exact-discrete
+    Choquet helper (:func:`aggregate.spectral.choquet_weights`) refuses to
+    price such a law unless the caller explicitly opts into a parking
+    policy (``allow_deficit=True``: forwards parks the deficit at the top
+    atom, backwards at the bottom atom). See
+    ``dev/../math/docs/choquet-calc-method.md``.
     """

@@ -261,12 +261,12 @@ distorted probabilities defined by :math:`g`.
       -
       - :math:`O(n)`
     * - gp_total
-      - Estimate of :math:`-d g(S(x))/dx`
-      - Difference of :math:`g(S)`
+      - exact distorted atom weights :math:`g(T_k)-g(S_k)`, :math:`T_k=\Pr(X\ge x_k)`
+      - one Choquet helper (``spectral.choquet_weights``)
       - :math:`O(n)`
     * - exag_total
-      - :math:`\mathsf E_g[X\wedge a]`
-      - Cumulative sum of :math:`g(S)`
+      - :math:`\mathsf E_g[X\wedge a] = \rho_g(X\wedge a)`
+      - :math:`\sum_{x_k\le a} x_k\,gp_k + a\,g(S(a))` (carries the origin)
       - :math:`O(n)`
     * - exag_line
       - :math:`\mathsf E_g[X_i(a)]`
@@ -274,22 +274,40 @@ distorted probabilities defined by :math:`g`.
       - :math:`O(n)`
 
 
--  exag_total is easy to compute as the cumulative sums of :math:`g(S)`
--  exag_line is computed as
+-  The bucketed law is treated as an exact discrete atom table:
+   ``gp_total`` is the distorted probability mass function
+   :math:`gp_k = g(\Pr(X\ge x_k)) - g(\Pr(X > x_k))` (a pmf for a
+   normalized law), computed once by
+   :func:`~aggregate.spectral.choquet_weights` and shared by every
+   pricing surface (``Distortion.price``, ``Aggregate`` and
+   ``Portfolio``). The old derivative view ``-dg(S)/dx`` and the layer
+   form :math:`\int g(S)\,dx` survive only as reconciliations.
+-  exag_total is the capped dot product
+   :math:`\sum_{x_k \le a} x_k\,gp_k + a\,g(S(a))`, exact on signed and
+   windowed grids (the old cumulative sum of :math:`g(S)\cdot bs`
+   assumed a zero-origin grid).
+-  exag_line is one further sweep using ``exeqa`` (:math:`\kappa_i`) and
+   a tail share:
 
    .. math::
-      \mathsf{E}_g[X_i(a)] &= \mathsf{E}\left[X_i\frac{X\wedge a}{X}g'S(X)\right] \\
-      &=  \mathsf{E}\left[\mathsf{E}\left[X_i\frac{X\wedge a}{X}g'S(X)\mid X \right]\right] \\
-      &=  \mathsf{E}\left[\mathsf{E}[X_i \mid X] 1_{\{X\le a\}} g'S(X) \right] +
-      a \mathsf{E}\left[\frac{\mathsf{E}[X_i\mid X]}{X} 1_{\{X > a\}} g'S(X) \right] \\
-      &= \int_0^a \mathsf{E}[X_i\mid X=x] g'(S(x))f_X(x)dx +
-      \int_a^\infty  \mathsf{E}[X_i\mid X=x] x^{-1} g'S(x)f_X(x)dx.
+      \mathsf{E}_g[X_i(a)] = \sum_{x_k\le a} \kappa_i(x_k)\,gp_k
+      + a\,g(S(a))\,\mathrm{TAIL}_i(a),
 
-   The first integral is computed as a cumulative sum of
-   its terms, the second is computed as a reverse cumulative sum, both
-   using ``exeqa``. This expectation can also be expressed using :math:`\beta_i(a)`.
--  If :math:`g` has a probability mass at :math:`s=0` then **how are the
-   masses dealt with**?
+   where :math:`\mathrm{TAIL}_i` is :math:`\beta_i(a)=\mathsf
+   E_g[X_i/X\mid X>a]` (``exi_xgtag_line``) for the **lifted**
+   allocation and the objective :math:`\alpha_i(a)=\mathsf
+   E[X_i/X\mid X>a]` (``exi_xgta_line``) for the **linear** allocation
+   -- the only difference between the two methods, decided once at
+   :meth:`~aggregate.Portfolio.apply_distortion`. On a signed (P&L)
+   grid the share :math:`X_i/X` is not a recovery share, so the
+   per-line distorted columns are left NaN; the signed total prices
+   exactly via :math:`\sum_k \kappa_i(x_k)\,gp_k`.
+-  If :math:`g` has a probability mass at :math:`s=0` the mass lands on
+   the largest atom. On a genuinely bounded law this is exact; on an
+   unbounded distribution represented by a finite FFT window it is a
+   *different bounded problem*, so the lifted builder refuses
+   (``allocation='linear'`` remains available -- the collapsed default
+   atom is bounded by construction).
 
 Finally we discuss computing the impact of line specific collateral.
 

@@ -1362,7 +1362,7 @@ Plot Twelve
 
 The :meth:`plot_twelve` method produces a detailed analysis of the behavior of a two unit portfolio. To run it, build the portfolio and calibrate some distortions. Then apply one of the distortions (to compute an augmented version of ``density_df`` with pricing information). We give two examples.
 
-First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed line benefits from pooling at low capital levels, resulting in negative margins to the thin-tail line in compensation. At moderate to high capital levels the total margin for both lines is positive. Assets are 12.5.  The argument ``efficient=False`` in :meth:`apply_distortion` includes extra columns in ``density_df`` that are needed to compute the plot.
+First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed line benefits from pooling at low capital levels, resulting in negative margins to the thin-tail line in compensation. At moderate to high capital levels the total margin for both lines is positive. Assets are 12.5.  The layer-curve columns the plot needs come from :meth:`Portfolio.allocation_diagnostics`, which :meth:`plot_twelve` calls internally.
 
 
 .. ipython:: python
@@ -1377,10 +1377,10 @@ First, the case of a thin-tailed and a thick-tailed unit. Here, the thick tailed
     print(f'Asset P value {p09.cdf(12.5):.5g}')
     p09.calibrate_distortions(coc=0.1, a=12.5);
     qd(p09.distortion_df)
-    p09.apply_distortion('dual', efficient=False);
+    p09.apply_distortion('dual');
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
     @savefig 10mins_twelve_p09.png
-    plot_twelve(p09, fig, axs, p=0.999, p2=0.999)
+    plot_twelve(p09, fig, axs, 'dual', p=0.999, p2=0.999)
 
 
 There is a lot of information here. We refer to the charts as
@@ -1535,10 +1535,10 @@ Apply the dual distortion and then create the twelve plot.
 .. ipython:: python
     :okwarning:
 
-    p10.apply_distortion('dual', efficient=False);
+    p10.apply_distortion('dual');
     fig, axs = plt.subplots(4, 3, figsize=(3 * 3.5, 4 * 2.45), constrained_layout=True)
     @savefig 10min_twelve_plot.png
-    p10.twelve_plot(fig, axs, p=0.999995, p2=0.999999)
+    plot_twelve(p10, fig, axs, 'dual', p=0.999995, p2=0.999999)
 
 
 Applying the same distortion on a stand-alone basis produces:

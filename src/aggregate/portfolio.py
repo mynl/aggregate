@@ -29,7 +29,7 @@ __all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations',
            'swap_density_df']
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
                       PricingResult)
-from .spectral import Distortion, DISTORTION_DTYPE
+from .spectral import Distortion, DISTORTION_DTYPE, choquet_weights
 from . import tail as _tail
 from .tail import TailClass
 from .pentagon import (PENTAGON_STATS, PENTAGON_DTYPE, complete_pentagon,
@@ -345,7 +345,6 @@ class Portfolio(object):
         self.discretization_calc = ''
         self.normalize = None
         self._line_renamer = None
-        self._tm_renamer = None
         # if created by uw it stores the program here
         self.program = ''
         self.distortions = None
@@ -662,8 +661,8 @@ class Portfolio(object):
         With assets specified (``a`` or ``p``) the total is bounded at
         ``X ∧ a``: default states ``X >= a`` collapse to a single atom
         carrying the *linear* natural allocation ``a · E[X_i/X | X >= a]``
-        (built by :meth:`_collapsed_exeqa`, shared with
-        ``price(allocation='linear')``); the feasible premium range becomes
+        (the collapse is built inside ``AllocationBounds`` from the
+        ``exi_xgta_*`` columns); the feasible premium range becomes
         ``[E[X ∧ a], a]``. With neither given the total is unbounded.
 
         Replaces the pre-1.0 ``pricing_bounds`` method (removed at
@@ -3250,12 +3249,17 @@ class Portfolio(object):
         self.distortions = distortions
         return distortion_df
 
-    def apply_distortion(self, distortion, *, view='ask', S_calculation='forwards', efficient=True):
+    def apply_distortion(self, distortion, *, view='ask', S_calculation='forwards',
+                         allocation='lifted', allow_deficit=False):
         """
         Apply ``distortion`` and return the resulting augmented_df.
 
-        Results are cached on ``self._augmented_dfs`` keyed by distortion name. A
-        second call with the same distortion is an O(1) dict lookup; the returned
+        Results are cached on ``self._augmented_dfs`` keyed by
+        ``(name, view, role, S_calculation, allocation)`` so bid/ask,
+        loss/payoff, forwards/backwards and linear/lifted frames coexist
+        (the ``role`` slot is the canonical value-type flag
+        ``_is_loss_value``, never the configurable label string). A second
+        call with the same key is an O(1) dict lookup; the returned
         DataFrame is the same object (``is``-identical) as the prior call.
 
         Parameters
@@ -3264,18 +3268,27 @@ class Portfolio(object):
             A ``Distortion`` instance, or the name of a previously calibrated
             distortion (looked up in ``self.distortions``).
         view : {'ask', 'bid'}
-            Pricing view. Default 'ask'.
+            Pricing view. Composes with the portfolio's value-type role by
+            XOR to select ``g`` or ``g_dual``; see
+            :meth:`~aggregate.spectral.Distortion.effective_g`.
         S_calculation : {'forwards', 'backwards'}
-            How to (re)compute the total survival ``S``. Default 'forwards' --
-            recompute from ``1 - p_total.cumsum()`` to keep the tail accurate.
-        efficient : bool
-            If True (the default) compute only the columns needed for pricing
-            (T.* series). If False, also build the M.* marginal columns.
+            Deficit-parking direction for the exact-discrete tail; see
+            :func:`~aggregate.spectral.choquet_weights`. Equivalent on a
+            clean (normalized) law.
+        allocation : {'lifted', 'linear'}
+            Tail-share choice for the per-line ``exag_*`` columns: lifted
+            uses the distorted tail share ``exi_xgtag_*`` (beta), linear
+            the objective ``exi_xgta_*`` (alpha). Identical column schema;
+            the total columns do not depend on the choice.
+        allow_deficit : bool
+            Explicit truncation policy for a materially defective total
+            (``1 - sum(p_total)`` above the validation noise floor).
+            Default False raises ``DefectiveDistributionError``.
 
         Returns
         -------
         pandas.DataFrame
-            The cached ``augmented_df`` for this distortion.
+            The cached ``augmented_df`` for this key.
 
         Notes
         -----
@@ -3286,12 +3299,14 @@ class Portfolio(object):
         if isinstance(distortion, str):
             distortion = self.distortions[distortion]
         name = distortion.name
-        if name not in self._augmented_dfs:
-            self._augmented_dfs[name] = self._build_augmented(
-                distortion, view=view, S_calculation=S_calculation, efficient=efficient)
+        key = (name, view, self._is_loss_value, S_calculation, allocation)
+        if key not in self._augmented_dfs:
+            self._augmented_dfs[key] = self._build_augmented(
+                distortion, view=view, S_calculation=S_calculation,
+                allocation=allocation, allow_deficit=allow_deficit)
         self._distortion = distortion
         self._last_applied_distortion_name = name
-        return self._augmented_dfs[name]
+        return self._augmented_dfs[key]
 
     def augmented_df(self, distortion):
         """
@@ -3305,14 +3320,15 @@ class Portfolio(object):
     @property
     def augmented_dfs(self):
         """
-        The augmented_df cache as a dict ``{distortion_name: DataFrame}``.
+        The augmented_df cache as a dict keyed by
+        ``(distortion_name, view, role, S_calculation, allocation)``.
 
         Read-only view -- mutate via ``apply_distortion`` (insert) or
         ``update`` (clear).
         """
         return self._augmented_dfs
 
-    def pricing_at(self, distortion, *, p=None, a=None):
+    def pricing_at(self, distortion, *, p=None, a=None, allocation='lifted'):
         """Pentagon pricing readout per line at probability ``p`` or asset ``a``.
 
         Warms the augmented_df cache for ``distortion`` and pulls the
@@ -3328,6 +3344,9 @@ class Portfolio(object):
         a : float, optional
             Asset level; snapped to the index. Exactly one of ``p`` or ``a``
             must be provided.
+        allocation : {'lifted', 'linear'}
+            Tail-share choice for the per-line premium allocation; passed
+            through to :meth:`apply_distortion`.
 
         Returns
         -------
@@ -3339,24 +3358,29 @@ class Portfolio(object):
 
         Notes
         -----
-        Consolidates row-extraction logic that previously lived in ``price``
-        and ``analyze_distortion``.
+        ``L = exa``, ``P = exag``, ``M = P - L``; per-line capital ``Q`` is
+        computed on demand by the layer-ROE construction
+        (:meth:`_line_capital_at` -- no persistent per-line ``Q`` column).
+        Total ``Q`` uses the exact row identity ``a - exag_total``.
         """
         if (p is None) == (a is None):
             raise ValueError(
                 'pricing_at requires exactly one of p= (probability) '
                 'or a= (asset level).')
+        if isinstance(distortion, str):
+            distortion = self.distortions[distortion]
         if a is None:
             a = self.q(p)
         else:
             a = self.snap(a)
-        aug = self.apply_distortion(distortion)
+        aug = self.apply_distortion(distortion, allocation=allocation)
         if a in aug.index:
             row = aug.loc[a]
         else:
             logger.warning(
                 f'pricing_at: asset level {a} not in augmented_df.index; using last row.')
             row = aug.iloc[-1]
+            a = float(row['loss'])
         lines = list(self.line_names_ex)
         out = pd.DataFrame(
             index=lines,
@@ -3364,19 +3388,23 @@ class Portfolio(object):
             dtype=float,
         )
         out.index.name = 'line'
-        for line in lines:
+        line_q = self._line_capital_at(aug, a, distortion)
+        for line in self.line_names:
             out.loc[line, 'L'] = row[f'exa_{line}']
             out.loc[line, 'P'] = row[f'exag_{line}']
-            out.loc[line, 'M'] = row[f'T.M_{line}']
-            out.loc[line, 'Q'] = row[f'T.Q_{line}']
-        # exact total Q = a - exag_total beats the layer-by-layer cumsum,
+            out.loc[line, 'Q'] = line_q[line]
+        out.loc['total', 'L'] = row['exa_total']
+        out.loc['total', 'P'] = row['exag_total']
+        out['M'] = out.P - out.L
+        # exact total Q = a - exag_total beats the layer-by-layer sum,
         # which can drift by a few buckets in the tail.
         out.loc['total', 'Q'] = a - row['exag_total']
         # fill a + ratios and stamp the canonical categorical (pentagon.py)
         out = complete_pentagon(out)
         return out
 
-    def pentagon_at(self, distortion, *, p=None, a=None, line='total'):
+    def pentagon_at(self, distortion, *, p=None, a=None, line='total',
+                    allocation='lifted'):
         """Single-line pentagon as a :class:`~aggregate.pentagon.Pentagon` object.
 
         The object-flavored analogue of :meth:`pricing_at`: returns one fully
@@ -3397,6 +3425,9 @@ class Portfolio(object):
             Asset level; snapped to the index.
         line : str, default 'total'
             Which unit to read (``'total'`` for the portfolio total).
+        allocation : {'lifted', 'linear'}
+            Tail-share choice for the per-line premium allocation; passed
+            through to :meth:`apply_distortion`.
 
         Returns
         -------
@@ -3407,7 +3438,8 @@ class Portfolio(object):
         -----
         Reads the same augmented-distortion row as :meth:`pricing_at`; the
         total ``Q`` uses the exact ``a - exag_total`` (matching ``pricing_at``),
-        so the two agree.
+        per-line ``Q`` the on-demand layer-ROE construction
+        (:meth:`_line_capital_at`), so the two agree.
         """
         if (p is None) == (a is None):
             raise ValueError(
@@ -3419,8 +3451,12 @@ class Portfolio(object):
             a = self.q(p)
         else:
             a = self.snap(a)
-        aug = self.apply_distortion(distortion)
-        row = aug.loc[a] if a in aug.index else aug.iloc[-1]
+        aug = self.apply_distortion(distortion, allocation=allocation)
+        if a in aug.index:
+            row = aug.loc[a]
+        else:
+            row = aug.iloc[-1]
+            a = float(row['loss'])
         peg = Pentagon(obj=self)
         L = row[f'exa_{line}']
         P = row[f'exag_{line}']
@@ -3428,167 +3464,348 @@ class Portfolio(object):
             # exact total Q, matching pricing_at
             Q = a - row['exag_total']
         else:
-            Q = row[f'T.Q_{line}']
+            Q = self._line_capital_at(aug, a, distortion, lines=[line])[line]
         # L, P, Q are the three independent amounts; M = P - L, a = P + Q follow.
         peg.solve(L=L, P=P, Q=Q)
         peg.distortion = distortion
         peg.shape = getattr(distortion, 'shape', None)
         return peg
 
-    def _build_augmented(self, dist, *, view='ask', S_calculation='forwards', efficient=True):
-        """Construct an augmented_df from ``self.density_df`` under ``dist``.
+    def _build_augmented(self, dist, *, view='ask', S_calculation='forwards',
+                         allocation='lifted', allow_deficit=False):
+        r"""Construct an augmented_df from ``self.density_df`` under ``dist``.
 
         Pure builder: returns the frame without touching ``self`` (the
-        ``apply_distortion`` wrapper writes it into the cache). The common
-        path is shared between the ``efficient`` and full branches; only
-        the per-line marginal-margin (``M.*_{line}``) and eta-mu columns
-        are gated by ``efficient=False`` (consumed by
-        :func:`pedagogy.plot_twelve`).
+        ``apply_distortion`` wrapper writes it into the cache). One
+        O(n) sweep serves both allocation methods and **all** asset
+        levels; everything is a direct sum over the exact discrete atom
+        table that carries the origin ``x0`` (never ``cumsum(S)·bs``):
+
+        .. math::
+
+            exag_i(a) = \sum_{k \le a} \kappa_i(x_k)\,gp_k
+                        + a\,g(S(a))\,\mathrm{TAIL}_i(a)
+
+        with ``TAIL = exi_xgtag`` (beta, the distorted tail share) for
+        ``allocation='lifted'`` and ``TAIL = exi_xgta`` (alpha, the
+        objective tail share) for ``'linear'`` -- the *only* difference
+        between the two methods. The distorted atom weights ``gp`` come
+        from the one Choquet helper
+        (:func:`~aggregate.spectral.choquet_weights`); the effective
+        ``g`` resolves ``view`` × the portfolio's value-type role
+        (:meth:`~aggregate.spectral.Distortion.effective_g`).
 
         Notes
         -----
-        The L'Hôpital ROE fallback at the right end (``Q_total==0``,
-        ``gS==1``) is ``ROE = 1/g'(1) - 1``: the limit of
-        ``(gS-S)/(1-gS)`` as ``S → 1``. Earlier the ``efficient`` branch
-        used ``g'(1)``, the full branch used ``1/g'(1) - 1`` — the
-        two disagreed at the boundary and ``efficient`` was wrong.
-        Unified here.
+        * **Mass guard (G6).** The lifted tail split integrates ``gp``
+          across tail states, so a distortion with a mass on an
+          unbounded support puts essentially all tail weight on the last
+          represented bucket -- a different bounded problem, refused
+          here (not just in ``price``). The linear split and all total
+          columns depend on the tail only through ``g(S(a))`` and are
+          stable; with a mass on an unbounded support the linear frame
+          is built with the beta columns blanked.
+        * **Signed support.** The total columns (``gS``, ``gp_total``,
+          ``exag_total``) are exact on any signed window. The per-line
+          ``exag_*`` columns require the equal-priority share
+          ``kappa/x`` -- not a recovery share on a signed grid
+          (steering 6) -- and are left NaN; price signed line variables
+          directly via ``dot(exeqa_i, gp_total)``.
+        * The frame is truncated at the last reliable ``exeqa`` row
+          (FFT-noise cut, positional); the tail sums feeding beta are
+          computed on the full law first.
         """
-
-        # The distorted surface is still zero-origin (cumsum·bs, loc[0]
-        # idioms); the signed/windowed rewrite is numerics-3. Refuse rather
-        # than emit wrong numbers on the signed books numerics-2 enabled.
-        if float(self.density_df.loss.iloc[0]) < 0:
-            raise NotImplementedError(
-                'apply_distortion / pricing on signed (P&L) support is not '
-                'yet available; see dev/plan-numerics-3-distortion.md.')
+        if allocation not in ('lifted', 'linear'):
+            raise ValueError(
+                f"allocation must be 'lifted' or 'linear', not {allocation!r}")
+        mass_unbounded = getattr(dist, 'has_mass', False) and not self.bounded
+        if allocation == 'lifted' and mass_unbounded:
+            raise ValueError(
+                f"lifted allocation on an unbounded portfolio with a mass "
+                f"distortion ({dist.name}) is unstable on the right edge "
+                f"(essentially all the distortion weight lands on the last "
+                f"bucket). Use allocation='linear' or certify "
+                f"`portfolio.bounded = True` if the support is in fact bounded.")
 
         df = self.density_df.copy()
+        loss = df.loss.to_numpy()
+        p_total = df.p_total.to_numpy()
+        signed = float(loss[0]) < 0
 
-        # forwards S keeps the tail accurate (recomputed from p_total cumsum);
-        # backwards is the historical default, retained for thin-tailed cases.
-        if S_calculation == 'forwards':
-            df['S'] = 1 - df.p_total.cumsum()
+        g, g_prime, _ = dist.effective_g(view, is_loss_value=self._is_loss_value)
+        w = choquet_weights(loss, p_total, g, S_calculation=S_calculation,
+                            allow_deficit=allow_deficit)
+        gS = w.gS
+        gp = w.gp
+        df['S'] = w.S
+        df['gS'] = gS
+        df['gF'] = 1 - gS
+        df['gp_total'] = gp
 
-        if view == 'bid':
-            g = dist.g_dual
-            g_prime = lambda x: dist.g_prime(1 - x)
-        elif view == 'ask':
-            g = dist.g
-            g_prime = dist.g_prime
-        else:
-            raise ValueError(f'view must be bid or ask, not {view}')
+        # exag_total(a) = rho(X ∧ a) at every grid point, carrying the
+        # origin; the strict-tail gp sum telescopes to g(S(a)) exactly.
+        df['exag_total'] = np.cumsum(loss * gp) + loss * gS
 
-        # cosmetic floor at zero for residual float noise
-        cut_eps = np.finfo(float).eps
-        n_neg = (df.S < 0).sum()
-        if n_neg:
-            n_below_neg_eps = (df.S < -cut_eps).sum()
-            logger.warning(f'{n_below_neg_eps} negative S < -eps values being set to zero...')
-        df.loc[df.S < 0, 'S'] = 0
+        if signed:
+            # equal-priority kappa/x is not a recovery share on a signed
+            # grid (steering 6): blank the per-line distorted allocation;
+            # totals above are exact.
+            for line in self.line_names:
+                df[f'exi_xgtag_{line}'] = np.nan
+                df[f'exag_{line}'] = np.nan
+            return df
 
-        df['gS'] = g(df.S)
-        df['gF'] = 1 - df.gS
-        df['gp_total'] = -np.diff(df.gS, prepend=1)
-        # kill -0 entries from np.diff
-        df.loc[df.gp_total == 0, 'gp_total'] = 0.0
-
-        # Truncate where the exeqa decomposition breaks down (discrete "gaps"
-        # in p_total are ignored — error is only meaningful on support).
+        # Truncate where the exeqa decomposition breaks down (FFT noise;
+        # discrete "gaps" in p_total are ignored — error is only
+        # meaningful on support). Positional indexing: no zero-origin
+        # assumption. Truncate BEFORE the per-line sweep: beyond the cut
+        # the shares are FFT junk, so the per-line tail sums close with a
+        # collapsed atom at the cut (below) rather than integrating noise.
         lnp = '|'.join(self.line_names)
         idx_pne0 = df.query(' p_total > 0 ').index
         exeqa_err = np.abs(
             (df.loc[idx_pne0].filter(regex=f'exeqa_({lnp})').sum(axis=1) - df.loc[idx_pne0].loss) /
             df.loc[idx_pne0].loss)
         exeqa_err.iloc[0] = 0
-        # +1 to keep the last reliable row (iloc[:idx] is exclusive)
-        idx = int(exeqa_err[exeqa_err < EXEQA_NOISE_FLOOR].index[-1] / self.bs + 1)
-        logger.debug(f'index of max reliable value = {idx}')
-        if idx:
+        reliable = exeqa_err[exeqa_err < EXEQA_NOISE_FLOOR]
+        if len(reliable):
+            # +1 to keep the last reliable row (iloc[:idx] is exclusive)
+            idx = int(np.searchsorted(df.index.to_numpy(),
+                                      reliable.index[-1], side='left')) + 1
+            logger.debug(f'index of max reliable value = {idx}')
             df = df.iloc[:idx]
-        gSeq0 = (df.gS == 0)
-        logger.debug(f'len(S==0) = {np.sum(gSeq0)} elements')
+            loss = loss[:idx]
+            gS = gS[:idx]
+            gp = gp[:idx]
 
-        if not np.all(df.S.iloc[1:] <= df.S.iloc[:-1].values):
-            logger.error('S = density_df.S is not non-increasing...carrying on but you should investigate...')
-
-        # Per-line distorted conditional means and ground-up ``exag``.
-        # The shift(-1, fill_value=last_x) puts the tail mass on the
-        # right of bucket ``a`` so the denominator gS sums to the same
-        # numerator weights — without it the last bucket leaks tail
-        # probability (Nov 2020 fix).
+        # Per-line distorted tail shares (beta) and allocations. The share
+        # columns are exi_xeqa = kappa/x with the origin-row 0 convention
+        # (add_exa). The distorted tail mass beyond the cut, g(S_cut) in
+        # total, collapses onto the cut row at its share -- the exact
+        # analogue of the old fill-value closure; it vanishes when the
+        # frame runs to the end of the support (gS_cut == 0).
+        gSeq0 = gS == 0
         for line in self.line_names:
-            last_gS = df.gS.iloc[-1]
-            last_x = df[f'exeqa_{line}'].iloc[-1] / df.loss.iloc[-1] * last_gS
-            df[f'exi_xgtag_{line}'] = (
-                (df[f'exeqa_{line}'] / df.loss * df.gp_total)
-                .shift(-1, fill_value=last_x)[::-1].cumsum()) / df.gS
-            df.loc[gSeq0, f'exi_xgtag_{line}'] = 0.0
+            share = df[f'exi_xeqa_{line}'].to_numpy()
+            kappa = df[f'exeqa_{line}'].to_numpy()
+            sgp = share * gp
+            # strict tail sum Σ_{j>k} share_j gp_j + the collapsed closure
+            closure = share[-1] * gS[-1]
+            tail_g_share = (np.cumsum(sgp[::-1])[::-1] - sgp) + closure
+            with np.errstate(divide='ignore', invalid='ignore'):
+                beta = np.where(gSeq0, 0.0, tail_g_share / gS)
+            df[f'exi_xgtag_{line}'] = beta
+            tail = beta if allocation == 'lifted' else df[f'exi_xgta_{line}'].to_numpy()
+            if mass_unbounded:
+                # linear frame under a mass distortion on an unbounded
+                # support: beta inherits the top-bucket artifact -- blank
+                # it; the alpha-based allocation below is stable.
+                df[f'exi_xgtag_{line}'] = np.nan
             df[f'exag_{line}'] = (
-                df[f'exi_xgtag_{line}'] * df.gS).shift(1, fill_value=0).cumsum() * self.bs
+                np.cumsum(kappa * gp)
+                + np.where(gSeq0, 0.0, loss * gS * tail))
+        return df
 
-        # ---- Total-level block (single source of truth, both branches) ----
-        df['exag_total'] = df.gS.shift(1, fill_value=0).cumsum() * self.bs
-        df['M.M_total'] = df.gS - df.S
-        df['M.Q_total'] = 1 - df.gS
-        # Layer ROE is the same on every layer by law invariance; at the
-        # right edge ``M.Q_total==0`` so use the L'Hôpital limit
-        # ``ROE(1) = lim (gS-S)/(1-gS) = 1/g'(1) - 1``. When ``g'(1)==0``
-        # (TVaR beyond its threshold) the limit is ``+∞`` — premium is
-        # 100% loss-funded, no capital — and ``M.Q_{line}/inf == 0``.
+    def _line_capital_at(self, aug, a, dist, *, view='ask', lines=None):
+        r"""Per-line allocated capital ``Q_i(a)`` by the layer-ROE construction.
+
+        .. math::
+
+            Q_i(a) = \sum_{k:\,x_k < a}
+                \left(gS_k\,\beta_{i,k} - S_k\,\alpha_{i,k}\right)
+                \frac{1 - gS_k}{gS_k - S_k}\,\Delta x_k
+
+        -- line layer margin divided by total layer ROE, integrated. This
+        is the one legitimately layer-based quantity (capital *is*
+        allocated by layer); it is computed on demand at the requested
+        ``a`` (D7: no persistent per-line ``Q`` column). A ``gS == S``
+        layer has zero margin and contributes zero capital (the ratio is
+        guarded). The layer margin is taken as the exact first difference
+        of the frame's cumulative margin ``exag_i - exa_i``, which equals
+        ``(gS·beta - S·alpha)·Δx`` identically on the lifted frame and is
+        the frame-consistent alpha-based margin on the linear frame.
+
+        Parameters
+        ----------
+        aug : pandas.DataFrame
+            An augmented frame from :meth:`apply_distortion` (carries
+            ``S``/``gS``/``exa_*``/``exag_*``).
+        a : float
+            Asset level on the grid (callers snap).
+        dist : Distortion
+            The distortion that built ``aug``; supplies ``g'(1)`` for the
+            L'Hôpital ROE limit at ``gS == 1`` layers (the fully
+            loss-funded bottom, where line margins may offset with zero
+            total layer capital).
+        view : {'ask', 'bid'}
+            View used to build ``aug`` (resolves the effective ``g'``).
+        lines : list of str, optional
+            Subset of unit names; default all ``line_names``.
+
+        Returns
+        -------
+        dict[str, float]
+            ``{line: Q_i(a)}``.
+
+        Notes
+        -----
+        Reconciles ``Σ_i Q_i(a) == a - exag_total(a)`` exactly (asserted,
+        scale-aware) whenever no layer hit the zero-margin guard; the
+        identity carries the origin through ``exag_total``.
+        """
+        if lines is None:
+            lines = list(self.line_names)
+        loss = aug.loss.to_numpy()
+        pos = int(np.searchsorted(loss, a))
+        # layers [x_k, x_{k+1}) for k < pos lie below a
+        S = aug.S.to_numpy()[:pos]
+        gS = aug.gS.to_numpy()[:pos]
+        denom = gS - S
+        one_minus_gS = 1 - gS
+        # reciprocal layer ROE = (1 - gS)/(gS - S). At gS == 1 (fully
+        # loss-funded layers, 0/0) use the L'Hôpital limit
+        # 1/ROE(1) = g'(1)/(1 - g'(1)); when g'(1) == 1 (identity) the
+        # line margins are zero there and the fill is moot (guarded to 0
+        # below). A genuine zero-total-margin layer (gS == S with
+        # gS < 1) has zero margin and contributes zero capital.
+        _, g_prime, _ = dist.effective_g(view,
+                                         is_loss_value=self._is_loss_value)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            gp1 = float(g_prime(1))
+        if np.isnan(gp1):
+            # g'(1) undefined (e.g. wang): the fully-loss-funded layers
+            # get no capital, matching the legacy skip-NaN cumsum
+            inv_fill = 0.0
+        elif gp1 == 1:
+            inv_fill = np.inf   # identity-like; margins are zero there
+        else:
+            inv_fill = gp1 / (1 - gp1)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ratio = np.where(
+                one_minus_gS == 0, inv_fill,
+                np.where(denom != 0, one_minus_gS / np.where(denom == 0, 1.0, denom), 0.0))
+        out = {}
+        for line in lines:
+            # layer margin·Δx as the exact first difference of the frame's
+            # cumulative margin: for the lifted frame this telescopes to
+            # (gS·beta - S·alpha)·Δx identically; for the linear frame it
+            # is the frame-consistent (alpha-based) margin, which stays
+            # stable under a mass distortion on an unbounded support
+            # (where beta is blanked).
+            cum_margin = (aug[f'exag_{line}']
+                          - aug[f'exa_{line}']).to_numpy()
+            m_dx = np.diff(cum_margin)[:pos]
+            # zero-margin layers contribute zero even when ratio is the
+            # inf fill (0·inf guard)
+            out[line] = float(np.sum(np.where(m_dx == 0, 0.0, m_dx * ratio)))
+        guarded = (denom == 0) & (one_minus_gS != 0)
+        if (len(lines) == len(self.line_names) and pos
+                and not guarded.any()):
+            total = sum(out.values())
+            target = a - float(aug['exag_total'].to_numpy()[pos])
+            scale = max(abs(target), abs(a), 1e-30)
+            rec_tol = max(1e-9, 64 * pos * np.finfo(float).eps)
+            if abs(total - target) > rec_tol * scale:
+                logger.warning(
+                    f'line capital reconciliation: sum Q_i = {total:.10g} vs '
+                    f'a - exag_total = {target:.10g} '
+                    f'(rel {abs(total - target) / scale:.3e})')
+        return out
+
+    def allocation_diagnostics(self, distortion, *, surface='lifted',
+                               view='ask', S_calculation='forwards'):
+        r"""Layer-curve diagnostic frame for a distorted portfolio.
+
+        The explicit consumer surface for :func:`pedagogy.plot_twelve`
+        and similar exhibits (pedagogy consumes, never dictates --
+        steering 7): the core pricing frame no longer carries layer
+        diagnostic columns. Sourced from the
+        :meth:`apply_distortion` frame for ``surface``.
+
+        Parameters
+        ----------
+        distortion : Distortion or str
+            Passed through to :meth:`apply_distortion`.
+        surface : {'lifted', 'linear'}
+            Which allocation surface to diagnose.
+        view, S_calculation
+            Passed through to :meth:`apply_distortion`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed like the augmented frame. Carries ``loss``, ``F``,
+            ``gF``, ``S``, ``gS``, ``gp_total``; per line ``exeqa_*``
+            (kappa), ``exi_xgta_*`` (alpha), ``exi_xgtag_*`` (beta); and
+            the layer curves, per line and total:
+
+            * ``layer_loss_*`` = ``S·alpha`` (total: ``S``)
+            * ``layer_premium_*`` = ``gS·beta`` (total: ``gS``)
+            * ``layer_margin_*`` = ``layer_premium - layer_loss``
+            * ``layer_capital_*`` = ``layer_margin / layer_roe_total``
+              (total: ``1 - gS``)
+            * ``cum_margin_*`` = ``exag - exa`` (cumulative margin)
+            * ``cum_capital_*`` = integrated layer capital (total: the
+              exact ``loss - exag_total``)
+            * ``layer_roe_total`` = ``(gS - S)/(1 - gS)`` with the
+              L'Hôpital fill ``1/g'(1) - 1`` at ``gS == 1``.
+        """
+        if isinstance(distortion, str):
+            distortion = self.distortions[distortion]
+        aug = self.apply_distortion(distortion, view=view,
+                                    S_calculation=S_calculation,
+                                    allocation=surface)
+        cols = ['loss', 'F', 'S', 'gS', 'gF', 'gp_total']
+        cols += [c for line in self.line_names_ex
+                 for c in (f'exeqa_{line}', f'exi_xgta_{line}',
+                           f'exi_xgtag_{line}', f'exa_{line}',
+                           f'exag_{line}')
+                 if c in aug.columns]
+        df = aug[cols].copy()
+
+        loss = aug.loss.to_numpy()
+        S = aug.S.to_numpy()
+        gS = aug.gS.to_numpy()
+        # layer ROE with the L'Hôpital fill at the right end (gS == 1):
+        # ROE(1) = lim (gS-S)/(1-gS) = 1/g'(1) - 1; when g'(1) == 0 the
+        # limit is +inf (premium 100% loss-funded, no capital) and the
+        # layer capital divides to zero.
+        _, g_prime, _ = distortion.effective_g(
+            view, is_loss_value=self._is_loss_value)
         gp1 = float(g_prime(1))
-        gprime1 = np.inf if gp1 == 0 else 1 / gp1 - 1
-        df['M.ROE_total'] = np.where(
-            df['M.Q_total'] != 0,
-            df['M.M_total'] / df['M.Q_total'],
-            gprime1)
-        roe_zero = (df['M.ROE_total'] == 0.0)
+        roe_fill = np.inf if gp1 == 0 else 1 / gp1 - 1
+        mq_total = 1 - gS
+        with np.errstate(divide='ignore', invalid='ignore'):
+            layer_roe = np.where(mq_total != 0, (gS - S) / mq_total, roe_fill)
+        df['layer_roe_total'] = layer_roe
+        dx = np.diff(loss)
 
-        # ---- Per-line T.M / T.Q (needed by both branches; consumed by pricing_at) ----
-        for line in self.line_names_ex:
-            df[f'T.M_{line}'] = df[f'exag_{line}'] - df[f'exa_{line}']
-            mm_l = df[f'T.M_{line}'].diff().shift(-1) / self.bs
-            mq_l = mm_l / df['M.ROE_total']
-            mq_l.iloc[-1] = 0
-            mq_l.loc[roe_zero] = np.nan
-            df[f'T.Q_{line}'] = mq_l.shift(1).cumsum() * self.bs
-            df.loc[0, f'T.Q_{line}'] = 0
+        def cum_int(layer):
+            """Σ_{j<k} layer_j Δx_j -- bottom-up layer integral."""
+            return np.concatenate(([0.0], np.cumsum(layer[:-1] * dx)))
 
-        if efficient:
-            return df
-
-        # ---- Full diagnostic columns (pedagogy.plot_twelve) ----
-        df['M.L_total'] = df['S']
-        df['M.P_total'] = df['gS']
-        for line in self.line_names_ex:
-            df[f'T.L_{line}'] = df[f'exa_{line}']
-            df[f'T.P_{line}'] = df[f'exag_{line}']
-            df.loc[0, f'T.P_{line}'] = 0
-            df[f'T.LR_{line}'] = df[f'exa_{line}'] / df[f'exag_{line}']
-            df.loc[0, f'T.M_{line}'] = 0
-            df[f'M.M_{line}'] = df[f'T.M_{line}'].diff().shift(-1) / self.bs
-            mq = df[f'M.M_{line}'] / df['M.ROE_total']
-            mq.iloc[-1] = 0
-            mq.loc[roe_zero] = np.nan
-            df[f'M.Q_{line}'] = mq
-            if line != 'total':
-                df[f'M.L_{line}'] = df[f'exi_xgta_{line}'] * df['S']
-                df[f'M.P_{line}'] = df[f'exi_xgtag_{line}'] * df['gS']
-            df[f'M.LR_{line}'] = df[f'M.L_{line}'] / df[f'M.P_{line}']
-            df[f'T.ROE_{line}'] = df[f'T.M_{line}'] / df[f'T.Q_{line}']
-            df[f'T.PQ_{line}'] = df[f'T.P_{line}'] / df[f'T.Q_{line}']
-            df[f'M.PQ_{line}'] = df[f'M.P_{line}'] / df[f'M.Q_{line}']
-
-        # Recompute totals from definitions to absorb small drift from the
-        # per-line cumulative sums in the loop above.
-        df['T.L_total'] = df['exa_total']
-        df['T.P_total'] = df['exag_total']
-        df['T.Q_total'] = df.loss - df['exag_total']
-        df['T.M_total'] = df['exag_total'] - df['exa_total']
-        df['T.PQ_total'] = df['T.P_total'] / df['T.Q_total']
-        df['T.LR_total'] = df['T.L_total'] / df['T.P_total']
-        df['T.ROE_total'] = df['T.M_total'] / df['T.Q_total']
-
+        with np.errstate(divide='ignore', invalid='ignore'):
+            for line in self.line_names:
+                alpha = aug[f'exi_xgta_{line}'].to_numpy()
+                beta = aug[f'exi_xgtag_{line}'].to_numpy()
+                ll = S * alpha
+                lp = gS * beta
+                lm = lp - ll
+                df[f'layer_loss_{line}'] = ll
+                df[f'layer_premium_{line}'] = lp
+                df[f'layer_margin_{line}'] = lm
+                lq = np.where(layer_roe != 0, lm / layer_roe, np.nan)
+                df[f'layer_capital_{line}'] = lq
+                df[f'cum_margin_{line}'] = (
+                    aug[f'exag_{line}'] - aug[f'exa_{line}'])
+                df[f'cum_capital_{line}'] = cum_int(np.nan_to_num(lq))
+        df['layer_loss_total'] = S
+        df['layer_premium_total'] = gS
+        df['layer_margin_total'] = gS - S
+        df['layer_capital_total'] = mq_total
+        df['cum_margin_total'] = aug['exag_total'] - aug['exa_total']
+        # exact row identity, preferred over the integrated layer drift
+        df['cum_capital_total'] = loss - aug['exag_total'].to_numpy()
         return df
 
     def var_dict(self, p, kind='lower', total='total', snap=False):
@@ -3624,74 +3841,7 @@ class Portfolio(object):
             d = {k: self.snap(v) for k, v in d.items()}
         return d
 
-    def _collapsed_exeqa(self, a, *, collapse=None):
-        """Tail-collapsed slice of ``density_df`` for linear-NA work at assets ``a``.
-
-        The bounded total ``X ∧ a`` keeps the grid rows ``loss < a``
-        unchanged and collapses all default states ``X >= a`` into a single
-        atom at ``a``. Under the *linear* natural allocation
-        (equal-priority proportional sharing in default: unit i receives
-        ``a · X_i / X``), the conditional allocation at the collapsed atom
-        is
-
-            ``exeqa_i(a) = a · E[X_i / X | X >= a] = a · exi_xgta_i(a - bs)``
-
-        read from the precomputed ``exi_xgta_*`` columns. The atom's
-        probability is ``S(a - bs)``: the construction forces ``S(a) = 0``,
-        so the whole tail mass — including any PMF deficit — lands in the
-        last bucket. ``exeqa_total`` at the atom is filled from the sum of
-        parts (there is no ``exi_xgta_total``).
-
-        Single owner of this delicate collapse idiom, shared by
-        :meth:`price` (``allocation='linear'``) and
-        :class:`~aggregate.bounds.AllocationBounds`.
-
-        Parameters
-        ----------
-        a : float
-            Asset level; must lie on the loss grid (callers snap).
-        collapse : bool, optional
-            Force (``True``) or suppress (``False``) the exeqa tail
-            re-aiming. Default ``None`` collapses iff the tail mass
-            ``sf(a)`` exceeds the PMF deficit ``1 - sum(p_total)`` — i.e.,
-            there is real mass beyond ``a``, not just FFT leakage.
-
-        Returns
-        -------
-        S, loss, exeqa, ps : DataFrame
-            All indexed by loss on ``[0, a]``: survival (with ``S(a) = 0``
-            forced), loss levels, conditional allocations (tail-collapsed
-            last row), and the resulting probability masses.
-        """
-        sle = slice(0, a)
-        S = self.density_df.loc[sle, ['S']].copy()
-        loss = self.density_df.loc[sle, ['loss']]
-        # deal losses for allocations; not eta-mu versions
-        exeqa = self.density_df.filter(regex='exeqa_[^η]').loc[sle]
-
-        # last entry collapses all remaining losses from a-bs onwards
-        S.loc[a, 'S'] = 0.
-        ps = pd.DataFrame(-np.diff(S, prepend=1, axis=0), index=S.index)
-
-        # Tail-collapse on exeqa is distortion-independent: when
-        # sf(a) > 1 - sum(p_total) the tail-bucket carries the
-        # missing tail mass and exeqa at a has to be re-aimed at
-        # a * exi_xgta_{line}.
-        if collapse is None:
-            collapse = bool(self.sf(a) > (1 - self.density_df.p_total.sum()))
-        if collapse:
-            logger.info('Collapsing tail events by replacing exeqa with a * exi_xgta')
-            rner = lambda x: x.replace('exi_xgta_', 'exeqa_')
-            exeqa.loc[a, :] = self.density_df.filter(
-                regex='exi_xgta_.+$(?<!exi_xgta_sum)'). \
-                rename(columns=rner).loc[a - self.bs] * a
-            # there is no exi_xgta_total — fill from the sum of parts
-            if np.isnan(exeqa.loc[a, 'exeqa_total']):
-                exeqa.loc[a, 'exeqa_total'] = exeqa.loc[a].fillna(0).sum()
-
-        return S, loss, exeqa, ps
-
-    def price(self, p, distortion=None, *, allocation=None, view='ask', efficient=True):
+    def price(self, p, distortion=None, *, allocation=None, view='ask'):
         """Price the total under a distortion and allocate to units.
 
         ``rho(X ∧ q(p))`` for a single distortion (or a dict / list of
@@ -3700,11 +3850,13 @@ class Portfolio(object):
         otherwise. ``allocation`` defaults to :attr:`allocation_method`
         (``'linear'`` out of the box); pass ``'lifted'`` to override.
 
-        Lifted allocation reads from the risk-adjusted ``augmented_df``
-        and is unstable on the right edge for distortions with a mass
-        on an unbounded support. In that case ``price`` **refuses**
-        and points at ``'linear'`` — linear collapses tail states using
-        objective probabilities and stays bounded.
+        Both methods read rows of the same unified augmented frame
+        (:meth:`apply_distortion`); the only difference is the tail
+        share allocating the collapsed default states -- objective
+        ``alpha`` (linear) vs distorted ``beta`` (lifted). Lifted is
+        unstable on the right edge for distortions with a mass on an
+        unbounded support; the builder **refuses** that combination and
+        points at ``'linear'``.
 
         Parameters
         ----------
@@ -3717,9 +3869,6 @@ class Portfolio(object):
             ``None`` (default) reads :attr:`allocation_method`.
         view : {'ask', 'bid'}
             Pricing view.
-        efficient : bool
-            Build only the columns needed for pricing (``augmented_df``
-            is faster). Lifted only.
 
         Returns
         -------
@@ -3741,16 +3890,6 @@ class Portfolio(object):
             assert self.distortions is not None, 'Must pass a distortion or calibrate distortions prior to calling'
             distortion = self.distortions
 
-        if allocation == 'lifted' and not self.bounded:
-            bad = [name for name, d in distortion.items() if getattr(d, 'has_mass', False)]
-            if bad:
-                raise ValueError(
-                    f"lifted allocation on an unbounded portfolio with a mass distortion "
-                    f"is unstable on the right edge (essentially all the distortion weight "
-                    f"lands on the last bucket). Distortion(s) with mass: {bad}. "
-                    f"Use allocation='linear' (the new default) or certify "
-                    f"`portfolio.bounded = True` if the support is in fact bounded.")
-
         # figure regulatory assets; applied to unlimited losses
         if p > 1:
             a_reg = self.snap(p)
@@ -3759,94 +3898,41 @@ class Portfolio(object):
             a_reg = self.q(p)
             reg_p = p
 
-        if allocation == 'lifted':
-            dfs = {}
-            price = {}
-            last_price = 0
-            for k, v in distortion.items():
-                logger.info(f'Executing for {k}, lifted')
-                aug_df = self.apply_distortion(v, view=view, efficient=efficient)
-                if a_reg in aug_df.index:
-                    aug_row = aug_df.loc[a_reg]
-                else:
-                    logger.warning('Regulatory assets not in augmented_df. Using last.')
-                    aug_row = aug_df.iloc[-1]
+        dfs = {}
+        price = {}
+        last_price = 0
+        for k, v in distortion.items():
+            logger.info(f'Executing for {k}, {allocation}')
+            aug_df = self.apply_distortion(v, view=view, allocation=allocation)
+            if a_reg in aug_df.index:
+                aug_row = aug_df.loc[a_reg]
+                a_eff = a_reg
+            else:
+                logger.warning('Regulatory assets not in augmented_df. Using last.')
+                aug_row = aug_df.iloc[-1]
+                a_eff = float(aug_row['loss'])
 
-                df = pd.DataFrame(
-                    index=pd.Index(list(self.line_names_ex), name='line'),
-                    columns=['L', 'M', 'P', 'Q'],
-                    dtype=float,
-                )
-                for line in self.line_names_ex:
-                    df.loc[line, 'L'] = aug_row[f'exa_{line}']
-                    df.loc[line, 'P'] = aug_row[f'exag_{line}']
-                    df.loc[line, 'M'] = aug_row[f'T.M_{line}']
-                    df.loc[line, 'Q'] = aug_row[f'T.Q_{line}']
-                df = complete_pentagon(df)
-                price[k] = last_price = df.loc['total', 'P']
-                dfs[k] = df.sort_index()
+            df = pd.DataFrame(
+                index=pd.Index(list(self.line_names_ex), name='line'),
+                columns=['L', 'M', 'P', 'Q'],
+                dtype=float,
+            )
+            line_q = self._line_capital_at(aug_df, a_eff, v, view=view)
+            for line in self.line_names:
+                df.loc[line, 'L'] = aug_row[f'exa_{line}']
+                df.loc[line, 'P'] = aug_row[f'exag_{line}']
+                df.loc[line, 'Q'] = line_q[line]
+            df.loc['total', 'L'] = aug_row['exa_total']
+            df.loc['total', 'P'] = aug_row['exag_total']
+            df['M'] = df.P - df.L
+            # exact total capital, immune to layer-sum drift
+            df.loc['total', 'Q'] = a_eff - aug_row['exag_total']
+            df = complete_pentagon(df)
+            price[k] = last_price = df.loc['total', 'P']
+            dfs[k] = df.sort_index()
 
-            df = pd.concat(dfs.values(), keys=dfs.keys(), names=['distortion', 'unit'])
-
-            ans = PricingResult(df, last_price, price, a_reg, reg_p)
-
-        elif allocation == 'linear':
-            # Tail-collapsed slice [0, a_reg] — S, loss levels, conditional
-            # allocations and masses. The delicate collapse construction
-            # lives in _collapsed_exeqa (shared with AllocationBounds);
-            # p == 1 suppresses the collapse (a_reg is the essential sup).
-            S, loss, exeqa, ps = self._collapsed_exeqa(
-                a_reg, collapse=None if p != 1 else False)
-
-            # Distortion-independent expected-loss integral (αS) — hoist
-            # so the per-distortion loop only redoes the distortion-
-            # dependent alloc_prem / capital.
-            # Eq 14.20 (PIR p. 372): row x carries f_x = (p_x · exeqa_x / loss_x) · bs;
-            # the reverse-cumsum-then-sum integrates over [0, a_reg].
-            exp_loss = ((ps.to_numpy() * self.bs) / loss.to_numpy() * exeqa)[::-1].cumsum()[::-1]
-            exp_loss_sum = exp_loss.replace([np.inf, -np.inf, np.nan], 0).sum()
-
-            dfs = {}
-            price = {}
-            last_price = 0
-            for k, v in distortion.items():
-                logger.info(f'Executing for {k}, linear')
-                if view == 'ask':
-                    gS = v.g(S)
-                else:
-                    gS = 1 - v.g(1 - S)
-                gS = pd.DataFrame(gS, index=S.index, columns=['S'])
-                gps = pd.DataFrame(-np.diff(gS, prepend=1, axis=0), index=S.index)
-
-                # alloc_prem = β g(S) integral (Eq 14.23)
-                alloc_prem = ((gps.to_numpy() * self.bs) / loss.to_numpy() * exeqa)[::-1].cumsum()[::-1]
-                margin = alloc_prem - exp_loss
-
-                # reciprocal cost of capital = capital / margin = (1 - gS) / (gS - S);
-                # at gS = S = 1 the layer is fully loss-funded, no equity — use the
-                # L'Hôpital limit fv = g'(1) / (1 - g'(1)) as the fill.
-                rcoc = (1 - gS) / (gS - S)
-                gprime = v.g_prime(1)
-                fv = gprime / (1 - gprime)
-                rcoc = rcoc.fillna(fv).shift(1, fill_value=fv)
-                capital = margin * rcoc.values
-
-                alloc_prem_sum = alloc_prem.replace([np.inf, -np.inf, np.nan], 0).sum()
-                capital_sum = capital.replace([np.inf, -np.inf, np.nan], 0).sum()
-
-                df = pd.concat(
-                    (exp_loss_sum, alloc_prem_sum, capital_sum),
-                    axis=1, keys=['L', 'P', 'Q']
-                ).rename(index=lambda x: x.replace('exeqa_', '')).sort_index()
-                df['M'] = df.P - df.L
-                df = complete_pentagon(df)
-                price[k] = last_price = df.loc['total', 'P']
-                dfs[k] = df
-
-            df = pd.concat(dfs.values(), keys=dfs.keys(), names=['distortion', 'unit'])
-            ans = PricingResult(df, last_price, price, a_reg, reg_p)
-
-        return ans
+        df = pd.concat(dfs.values(), keys=dfs.keys(), names=['distortion', 'unit'])
+        return PricingResult(df, last_price, price, a_reg, reg_p)
 
     def price_stand_alone(self, dist, p):
         """
@@ -4094,6 +4180,11 @@ class Portfolio(object):
         ``analyze_distortions2(p, dists=None)``. The output shape matches the
         legacy ``analyze_distortions2``: rows are ``(distortion, stat)``,
         columns are line names.
+
+        A mass distortion on an unbounded portfolio cannot build the
+        lifted frame (the mass lands on the last represented bucket); such
+        members of the sweep are skipped with a ``UserWarning`` -- price
+        them explicitly with ``price(..., allocation='linear')``.
         """
         if (p is None) == (a is None):
             raise ValueError(
@@ -4110,6 +4201,16 @@ class Portfolio(object):
             a_cal = self.snap(a)
         per_dist = {}
         for name, d in distortions.items():
+            # a mass distortion on an unbounded support cannot build the
+            # lifted frame (numerics-3 G6); skip it from the sweep with a
+            # visible warning rather than failing the whole exhibit.
+            if getattr(d, 'has_mass', False) and not self.bounded:
+                warnings.warn(
+                    f'analyze_distortions: skipping {name} -- mass '
+                    f'distortion on an unbounded portfolio (lifted frame '
+                    f'refused). Price it explicitly with '
+                    f"allocation='linear'.")
+                continue
             # pricing_at returns lines × canonical pentagon columns; transpose
             # so stats are rows and lines are columns. The transpose drops the
             # categorical column dtype, so work in plain string labels here and
@@ -4122,6 +4223,10 @@ class Portfolio(object):
             exhibit.loc['a'] = a_row
             # canonical stat order (pentagon.py), trailing octet semantics
             per_dist[name] = exhibit.reindex(PENTAGON_STATS)
+        if not per_dist:
+            raise ValueError(
+                'analyze_distortions: nothing to price -- every requested '
+                'distortion is a mass distortion on an unbounded portfolio.')
         pricing_df = pd.concat(
             per_dist.values(),
             keys=per_dist.keys(),
@@ -4133,9 +4238,14 @@ class Portfolio(object):
             pricing_df.index.levels[0].astype(DISTORTION_DTYPE), level='distortion')
         pricing_df.index = pricing_df.index.set_levels(
             pricing_df.index.levels[1].astype(PENTAGON_DTYPE), level='stat')
-        # snapshot only the distortions analysed
+        # snapshot only the distortions analysed (default-key frames; the
+        # cache key is (name, view, role, S_calculation, allocation))
         augmented_dfs = {
-            n: self._augmented_dfs[n] for n in distortions if n in self._augmented_dfs
+            n: frame for (n_, view_, role_, sc_, alloc_), frame
+            in self._augmented_dfs.items()
+            for n in distortions
+            if n_ == n and view_ == 'ask' and sc_ == 'forwards'
+            and alloc_ == 'lifted'
         }
         return AnalyzeDistortionsResult(
             distortions=dict(distortions),
@@ -4177,19 +4287,6 @@ class Portfolio(object):
             self._line_renamer = { ln: rename(ln) for ln in self.line_names_ex}
 
         return self._line_renamer
-
-    @property
-    def tm_renamer(self):
-        """
-        rename exa -> TL, exag -> TP etc.
-        :return:
-        """
-        if self._tm_renamer is None:
-            self._tm_renamer = { f'exa_{l}' : f'T.L_{l}' for l in self.line_names_ex}
-            self._tm_renamer.update({ f'exag_{l}' : f'T.P_{l}' for l in self.line_names_ex})
-
-        return self._tm_renamer
-
 
     def nice_program(self, wrap_col=90):
         """

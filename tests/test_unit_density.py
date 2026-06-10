@@ -262,7 +262,7 @@ def test_plot_twelve_off_p_unit():
     from aggregate.pedagogy import plot_twelve
     port = build(PLAIN_PROGRAM)
     d = Distortion('ph', 0.6)
-    port.apply_distortion(d, efficient=False)
+    port.apply_distortion(d)
     assert f'p_{port.line_names[0]}' not in port.density_df.columns
     fig, axs = plt.subplots(4, 3, figsize=(12, 16))
     plot_twelve(port, fig, axs, d)

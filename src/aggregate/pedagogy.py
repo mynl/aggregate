@@ -1288,7 +1288,9 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
     Provenance: originally ``twelve_plot`` in ``portfolio_pir``.
 
     Must run a distortion first, e.g.
-    ``port.apply_distortion(port.distortions['ph'], efficient=False)``.
+    ``port.apply_distortion(port.distortions['ph'])``. Layer curves come
+    from :meth:`Portfolio.allocation_diagnostics` (the explicit diagnostic
+    frame); unit densities from the numerics-1 native accessors.
 
     Panels (by row × column index in ``axs``):
 
@@ -1419,15 +1421,9 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
     a21.set(xlim=[0, xmax], ylim=[0, xmax], aspect='equal')
     a21.legend(loc='upper left')
 
-    # plot_twelve needs the M.* (marginal-margin) per-line columns produced
-    # only when ``efficient=False``. ``augmented_df()`` uses the default
-    # (``efficient=True``); if a lean version is cached, drop it and
-    # rebuild the full version.
-    aug_df = port.augmented_df(distortion_name)
-    first_line = port.line_names[0]
-    if f'M.M_{first_line}' not in aug_df.columns:
-        port._augmented_dfs.pop(distortion_name, None)
-        aug_df = port.apply_distortion(distortion_name, efficient=False)
+    # layer-curve diagnostic frame (kappa/alpha/beta + layer margin and
+    # cumulative margin); the core pricing frame no longer carries these.
+    aug_df = port.allocation_diagnostics(distortion_name, surface='lifted')
     aug_df.filter(regex=f'exi_xgta_({port.line_name_pipe})'). \
         rename(columns=_short_renamer(port, 'exi_xgta')). \
         sort_index(axis=1).plot(ylim=[-0.05, 1.05], ax=a22, lw=1)
@@ -1447,11 +1443,13 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
     a23.legend(loc='upper left')
     a23.set(xlim=[0, xmax], title=r'$\beta_i(x)=E_{Q}[X_i/X \mid X> x]$')
 
-    aug_df.filter(regex='M.M').rename(columns=_short_renamer(port, 'M.M')). \
+    aug_df.filter(regex='^layer_margin_'). \
+        rename(columns=_short_renamer(port, 'layer_margin')). \
         sort_index(axis=1).iloc[:, sort_order].plot(ax=a32, lw=1)
     a32.set(xlim=[0, xmax], title='Margin density $M_i(x)$')
 
-    aug_df.filter(regex='T.M').rename(columns=_short_renamer(port, 'T.M')). \
+    aug_df.filter(regex='^cum_margin_'). \
+        rename(columns=_short_renamer(port, 'cum_margin')). \
         sort_index(axis=1).iloc[:, sort_order].plot(ax=a42, lw=1)
     a42.set(xlim=[0, xmax], title=r'Margin $\bar M_i(x)$')
 

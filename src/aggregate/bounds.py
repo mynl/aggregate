@@ -1115,10 +1115,9 @@ class AllocationBounds(_HullEngine):
         below ``a`` are kept as-is and all default states ``X >= a``
         collapse into a single atom at ``a`` carrying the *linear* natural
         allocation ``a · E[X_i/X | X >= a]`` (equal-priority proportional
-        sharing; the lifted allocation is not offered).  Built by
-        :meth:`Portfolio._collapsed_exeqa`, the same construction used by
-        ``Portfolio.price(allocation='linear')``.  ``a`` is snapped to the
-        loss grid.  Default ``np.inf`` is the unbounded total.
+        sharing; the lifted allocation is not offered).  The collapse is
+        built here from the ``exi_xgta_*`` columns.  ``a`` is snapped to
+        the loss grid.  Default ``np.inf`` is the unbounded total.
     units : list of str, optional
         Unit (line) names to include.  Default: all of ``port.line_names``.
     s_floor : float, default 1e-14
@@ -1239,15 +1238,27 @@ class AllocationBounds(_HullEngine):
         # conditional allocations kappa_i(x) = E[X_i | X = x] = exeqa_i.
         # Bounded (finite a): X ∧ a with the default states X >= a collapsed
         # into one atom at a carrying the linear-NA allocations
-        # a·E[X_i/X | X >= a] — built by Portfolio._collapsed_exeqa, the
-        # same construction price(allocation='linear') uses.
+        # a·E[X_i/X | X >= a] = a·exi_xgta_i(a - bs). The collapse forces
+        # S(a) = 0, so the whole tail mass — including any pmf deficit —
+        # lands in the atom. (Sole owner of this idiom since the linear
+        # price engine moved onto the unified apply_distortion frame.)
         # ------------------------------------------------------------------
         if np.isfinite(self.a):
             self.a = float(port.snap(self.a))
-            S_df, _, exeqa_df, ps = port._collapsed_exeqa(self.a)
-            x = S_df.index.to_numpy(dtype=float)
-            prob = ps.to_numpy(dtype=float).ravel()
-            unit_kappa = exeqa_df[kcols].to_numpy(dtype=float)
+            sub = df.loc[:self.a]
+            x = sub.index.to_numpy(dtype=float)
+            S_col = sub['S'].to_numpy(dtype=float).copy()
+            S_col[-1] = 0.0
+            prob = -np.diff(S_col, prepend=1.0)
+            unit_kappa = sub[kcols].to_numpy(dtype=float).copy()
+            # re-aim the atom only when real mass lies beyond a (not just
+            # FFT leakage measured by the pmf deficit)
+            if port.sf(self.a) > (1 - df.p_total.sum()):
+                logger.info('Collapsing tail states: exeqa at the atom '
+                            'becomes a * exi_xgta(a - bs)')
+                acols = [f'exi_xgta_{u}' for u in self.units]
+                unit_kappa[-1, :] = (
+                    sub[acols].iloc[-2].to_numpy(dtype=float) * self.a)
         else:
             x = df.index.to_numpy(dtype=float)
             prob = df['p_total'].to_numpy(dtype=float)

@@ -203,18 +203,21 @@ def capture_port_case(name: str, program: str, grid: dict) -> dict:
         methods = C.PORT_METHODS[(name, label)]
         dist = _build_distortion(dspec)
 
-        # augmented_df is method-independent for now (lifted form) — the
-        # ``allocation_method`` member lands in meta.6. Today we get the
-        # lifted-shaped augmented_df and snapshot it once. Linear pricing
-        # is captured via the price() readout below.
-        aug = obj.apply_distortion(dist, efficient=True)
-        aug_sub = _select_columns(aug, C.AUGMENTED_COLUMNS)
-        frame_key = f"augmented__{label}"
-        frames[frame_key] = _write_parquet(aug_sub, name, frame_key)
+        # augmented_df (lifted-form snapshot; the captured totals are
+        # allocation-independent). The lifted builder refuses a mass
+        # distortion on an unbounded support (numerics-3 G6), so that
+        # combination snapshots no augmented/pricing_at frames -- linear
+        # pricing is still captured via the price() readout below.
+        mass_unbounded = getattr(dist, 'has_mass', False) and not obj.bounded
+        if not mass_unbounded:
+            aug = obj.apply_distortion(dist)
+            aug_sub = _select_columns(aug, C.AUGMENTED_COLUMNS)
+            frame_key = f"augmented__{label}"
+            frames[frame_key] = _write_parquet(aug_sub, name, frame_key)
 
-        # pricing_at row at p=PRICING_P (one DataFrame per distortion).
-        pa = obj.pricing_at(dist, p=C.PRICING_P)
-        frames[f"pricing_at__{label}"] = _write_parquet(pa, name, f"pricing_at__{label}")
+            # pricing_at row at p=PRICING_P (one DataFrame per distortion).
+            pa = obj.pricing_at(dist, p=C.PRICING_P)
+            frames[f"pricing_at__{label}"] = _write_parquet(pa, name, f"pricing_at__{label}")
 
         # price() under each requested method — capture price + per-line df.
         method_entries = []

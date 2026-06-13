@@ -10,6 +10,17 @@
 > gap, and closes it. The first run is a long job (the whole 1.0.0a series); every
 > run after that is a small incremental top-up tied to the latest `a*` / `b*`
 > release.
+>
+> **Ownership and edit flow.** `features.qmd` is the **single source of truth
+> for its own content**, and the author edits it directly — prose, examples,
+> cast, structure. Author edits are authoritative and survive runs. A task run
+> is **additive and repair-only**: it (a) adds sections / ledger rows for new
+> CHANGELOG items, (b) repairs cells broken by API drift, (c) keeps the ledger
+> consistent. It never rewrites or deletes author prose; if a restructure seems
+> warranted, it is *proposed* in the run summary, not performed. Git is the
+> reconciliation layer — the author commits their edits, the run's changes
+> arrive as a reviewable diff. This spec governs the *process*; the doc governs
+> the *content*.
 
 ---
 
@@ -61,6 +72,10 @@ it should all be here.
   "why it matters" in a sentence. For depth, calibrate to the existing Sphinx
   docs (the 10-minutes guide is the register) — this doc is headed there (§1).
   Tight density, not short length: the full document will run to tens of pages.
+- **Citations** follow the standing order in `CLAUDE.md` ("Citations and
+  bibliography"): `bibliography:` + `csl:` lines in the YAML, `@Key` cites
+  found by searching `C:/s/TELOS/Biblio/uber-library.bib` (never invented),
+  and a `## References` / `::: {#refs}` block at the end.
 
 ### 2.2 Top-level section layout
 
@@ -128,137 +143,24 @@ possible should borrow an existing cast member rather than mint a throwaway.
 Add a new member only when none of the existing ones can illustrate a feature,
 and say why in a comment.
 
-> **This block is the canonical definition of the cast.** The `execute` step
-> copies it verbatim into `features.qmd` §2. To change the cast, **edit it here**
-> and it flows through on the next run — do not diverge the two.
+> **The cast's canonical home is `features.qmd` §2 itself** (since the first
+> run landed, 2026-06-11). This section keeps the *design brief* only —
+> clustering, minimality, the reuse rules above — not a second copy of the
+> code. To change the cast, edit `features.qmd` §2 directly; there is no
+> copy-through step.
 >
-> **The run has full license to edit this block** — fix API drift and parse
-> errors, tidy names and comments, and tune programs to be more educational /
-> illustrative. The cast is expected to evolve and settle over time; what is
-> most useful long-term is hard to call up front, so improve it whenever an
-> improvement is clear, and report the edits in the run summary. Compositional
-> judgment calls (drop a member, change what a member is *for*) deserve a note
-> to the author but need not block the run.
+> **The run has license to edit the cast in `features.qmd`** — fix API drift
+> and parse errors, tidy names and comments, and tune programs to be more
+> educational / illustrative — reporting the edits in the run summary.
+> Compositional judgment calls (drop a member, change what a member is *for*)
+> deserve a note to the author but need not block the run.
 
 Members are **clustered** (`n.a`, `n.b`, …) so closely-related examples — and the
 features they illustrate — sit together. Renumber freely as the set evolves.
-
-```python
-from aggregate import build, qd
-
-# ── The cast: built once, reused throughout ────────────────────────────────
-# Clustered by theme. Each is the minimal program that exercises a distinct
-# surface; feature sections borrow these rather than minting throwaways.
-
-# 1. Core aggregate ─────────────────────────────────────────────────────────
-# 1.a simple — the workhorse: mixed-gamma (neg-binomial) frequency, layered lognormal
-simple = build('agg Simple 100 claims 1000 xs 0 sev lognorm 100 cv 1.0 mixed gamma 0.25')
-
-# 1.b defective — essentially defective tail (shifted Pareto; mass pushed to the limit)
-defective = build('agg Defective 10 claims sev 100 * pareto 1.3 - 100 poisson '
-                  'hints{bs=0.25; log2=16;}')
-
-# 2. Discrete, exact moments ─────────────────────────────────────────────────
-dice = build('agg Dice dfreq [3] dsev [1:6]')
-
-# 3. Signed & P&L ────────────────────────────────────────────────────────────
-# 3.a signed_d — signed discrete (dsev with a negative atom auto-signs the agg)
-signed_d = build('agg SignedD dfreq [5] dsev [-1 2]')
-
-# 3.b signed_s — signed continuous via ssev; a PER-CLAIM shift (premium booked per claim)
-signed_s = build('agg SignedS 10 claim ssev 100 - lognorm 80 cv 0.025 poisson')
-
-# 3.c pnl — book-level premium minus loss. Contrast 3.b: SAME MEAN, DIFFERENT VARIANCE —
-#     the pnl premium is one deterministic shift; the ssev +100 is multiplied by the
-#     (random) claim count, so 3.b carries extra variance from 100*N. The qmd section
-#     should pull this contrast apart explicitly.
-pnl = build('pnl PNL 1000 premium - 10 claim sev lognorm 80 cv 0.025 poisson')
-
-# 4. Multivariate ────────────────────────────────────────────────────────────
-# 4.a mv_indep — INDEPENDENT (shared frequency only; positive baseline corr from
-#     the shared mixing / common shock). Splicing an unbounded base works since a48.
-mv_indep = build('''
-multivariate Cat 25 claims
-    agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 0.65 splice [0 250]
-    agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 0.95 splice [0 300]
-    mixed gamma .2
-''')
-
-# 4.b mv_copula — COPULA-coupled (Gumbel, upper-tail dependence)
-mv_copula = build('''
-multivariate CatC 25 claims
-    agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 0.65 splice [0 250]
-    agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 0.95 splice [0 300]
-    copula gumbel 0.4
-    mixed gamma .2
-''')
-
-# 5. Reinsurance ─────────────────────────────────────────────────────────────
-# 5.a reins — occurrence reinsurance; describe now reports gross/net.
-#     Drives reins_describe / reins_stats_df. (Note: the occ clause comes BEFORE freq.)
-reins = build('agg Re 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
-              'occurrence net of 50% po 300 xs 200 and 100% po 500 xs 500 '
-              'poisson')
-
-# 5.b netceded — the SAME program as 5.a with the `netceded` prefix: the occurrence
-#     (Ceded, Net) law as a bivariate. Literally 5.a with `netceded ` prepended.
-netceded = build('netceded agg Re 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
-                 'occurrence net of 50% po 300 xs 200 and 100% po 500 xs 500 '
-                 'poisson')
-
-# 6. Mixtures ────────────────────────────────────────────────────────────────
-# 6.a mix_sev — weighted MIXTURE of severities (single exposure)
-mix_sev = build('agg MixSev 100 claims 2000 xs 0 '
-                'sev lognorm [50 100 200] cv [1 1.5 2] wts [.5 .3 .2] poisson')
-
-# 6.b mix_exp — several EXPOSURE bands, one severity
-mix_exp = build('agg MixExp [100 200 50] claims 2000 xs 0 sev lognorm 100 cv 2 poisson')
-
-# 6.c mix_both — JOINT mixed severity + exposure (the gnarly one): paired exposure/limit
-#     bands AND a two-component severity mixture of shifted pareto / lognormal.
-#     The qmd should spend time pulling apart exactly what this builds.
-mix_both = build('agg MixBoth [100 200 50] claims [1000 2000 5000] xs 0 '
-                 'sev [200 150] * [pareto lognorm] [2.1 0.8] + [-200 0] wts [.2 .8] poisson')
-
-# 7. Portfolios ──────────────────────────────────────────────────────────────
-# 7.a book — a Portfolio for combine / pentagon pricing / allocation & pricing bounds
-book = build('''
-port Book
-    agg A 100 claims 2000 xs 0 sev lognorm 100 cv 1.0 mixed gamma 0.5
-    agg B  50 claims 4000 xs 0 sev lognorm 200 cv 2.0 mixed gamma 0.4
-''')
-
-# 7.b book_w_re — the same book with occurrence reinsurance on each unit
-book_w_re = build('''
-port Book
-    agg A 100 claims 2000 xs 0 sev lognorm 100 cv 1.0 occurrence net of 50% po 1000 xs 1000 mixed gamma 0.5
-    agg B  50 claims 4000 xs 0 sev lognorm 200 cv 2.0 occurrence net of 50% po 2000 xs 1000 mixed gamma 0.4
-''')
-
-# 8. Approximate (a47) vs exact on a non-zero window (a51) ───────────────────
-# 8.a big — very-high-frequency book via the `approximate` shortcut (sgamma fit).
-#     Note `approximate` comes AFTER the frequency clause. The info line and the
-#     self-describing fit note are a50.
-big = build('agg Big 1e6 claims dsev [1 3] poisson approximate sgamma')
-
-# 8.b bigex — the EXACT convolution for comparison: since a51 it resolves at
-#     bs=1 on a two-sided output window far from 0 (mean 2e6, sd ≈ 2,200)
-#     instead of wasting the whole grid on [0, 2e6).
-bigex = build('agg BigEx 1e6 claims dsev [1 3] poisson')
-```
-
-| Member | Drives |
-|---|---|
-| `simple` | reporting quartet, tail class, `density` property, config effects |
-| `defective` | defective / mass-at-limit tail, deficit warnings, `hints{}` |
-| `dice` | discrete/exact moments, `dsev_bucket` |
-| `signed_d` | signed `dsev`, signed-aware `describe` (SD vs CV) |
-| `signed_s` / `pnl` | `ssev`, `shift - dist`, per-claim vs book-level premium (`pnl`) |
-| `mv_indep` / `mv_copula` | `multivariate`, `copula` (and the no-copula baseline) |
-| `reins` / `netceded` | reins gross/net reporting; `netceded` occurrence bivariate |
-| `mix_sev` / `mix_exp` / `mix_both` | mixed severity, mixed exposure, and the joint |
-| `book` / `book_w_re` | combine, pentagon pricing, `price_pentagon` / `price_stand_alone`, bounds; reins in a portfolio |
-| `big` / `bigex` | `approximate sgamma` vs the exact convolution on a non-zero output window (a51) |
+The current roster (see `features.qmd` §2 for the live definitions): `simple`,
+`defective`, `dice`, `signed_d`, `signed_s`, `pnl`, `mv_indep`, `mv_copula`,
+`reins`, `netceded`, `mix_sev`, `mix_exp`, `mix_both`, `book`, `book_w_re`,
+`big`, `bigex`.
 
 #### Pending dependencies (do not block the whole run on these)
 
@@ -294,6 +196,10 @@ harness (a38), config-file *plumbing* (a30 — though its user-facing surface,
   for the harness; in a plain shell `$env:UV_LINK_MODE = "copy"`.
 - Note the current version in `pyproject.toml` and skim recent `git log` —
   the author may have landed things ahead of the plans (standing workflow rule).
+- Check `git status` / `git diff` for **uncommitted author edits to
+  `features.qmd`**. They are authoritative — work around them additively, never
+  revert them, and note in the run summary that the run started from an edited
+  working copy.
 
 ### 3.1 Build the work list
 
@@ -322,6 +228,12 @@ For each work item:
 
 Keep the cast small and the examples leveraged — resist one-object-per-feature
 sprawl. Cross-link sections rather than re-introducing an object.
+
+**Additive and repair-only** (the ownership rule in the header): closing the
+gap means *adding* coverage and *repairing* broken cells. Author prose and
+examples already in the doc are not rewritten, reorganized, or deleted — if the
+run believes a restructure would improve the doc, it says so in the run summary
+and waits.
 
 ### 3.3 Housekeeping touches
 
@@ -368,13 +280,13 @@ This task is **part of release hygiene**, not a separately versioned change:
 
 ---
 
-## 6. First-run note
+## 6. First-run note (completed 2026-06-11, at a57)
 
-The first execution is large (the entire `a1`–`a57` series) and will surface
-judgement calls — which features share a cast object, how deep each example goes,
-where the user-facing/internal line falls. **Expect feedback that edits both this
-spec and the output `.qmd`.** Once tuned, subsequent runs are a small top-up per
-release. Treat the initial classification below as a seed, not gospel.
+The first execution covered the entire `a1`–`a57` series; `features.qmd` now
+exists with a 57-row ledger and passed the §4 gate. Subsequent runs are the
+small top-up per release. The seed classification below is **retained for
+reference** (it records where each item was placed); the live state is the
+ledger in `features.qmd`.
 
 ### 6.1 Seed classification (a21–a57, verified against CHANGELOG)
 

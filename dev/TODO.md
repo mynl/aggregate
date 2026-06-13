@@ -358,6 +358,13 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   the `decl.lark` terminals (five hand-maintained mirrors today). Independent of
   the unparser (`decl_writer` reuses `AggLexer` as-is, shipped a53); ties the
   parked DecL colorization (#22).
+- [ ] **D11 `[B]`** Transition the Sphinx docs' bibliography to the master
+  `C:/s/TELOS/Biblio/uber-library.bib` (per the CLAUDE.md "Citations and
+  bibliography" standing order, added 2026-06-11). The docs currently use an
+  older biblio file with slightly different keys — sweep the `.rst` citations,
+  map old keys → uber keys, and point the docs' bibtex config at the master
+  file (or an exported subset) so the docs and the `dev/*.qmd` artifacts cite
+  identically.
 
 ---
 

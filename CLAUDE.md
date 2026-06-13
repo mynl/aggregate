@@ -125,6 +125,20 @@ Aliasing/moment-matching validation is controlled by flags in `constants.py` and
 
 All new functions and any modified existing functions must include a docstring. The project uses NumPy-style docstrings (Parameters / Returns / Notes sections). For non-trivial mathematical logic, the Notes section should explain the algorithm or formula — this is an actuarial library where the "why" is often as important as the "what". Inline comments are appropriate for non-obvious numpy/FFT operations.
 
+## Citations and bibliography (standing order)
+
+All authored documents — Quarto `.qmd` pages and any future artifact that supports citations — reference the author's master BibTeX library. This applies to every future doc request without being re-asked.
+
+- **Bibliography:** `C:/s/TELOS/Biblio/uber-library.bib` (~7,100 entries), maintained by the author with `archivum` (`C:/s/TELOS/Python/archivum_project`). **Read-only from this project — never edit it.** If a needed reference is missing, list it in the run summary for the author to add via archivum, then cite once the key exists.
+- **Keys** follow `AuthorYYYY[a-z]` (e.g. `Mildenhall2022a`). Always `rg` the bib file for the exact key — never guess or fabricate one.
+- **Quarto YAML** on every page:
+  ```yaml
+  bibliography: C:/s/TELOS/Biblio/uber-library.bib
+  csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+  ```
+- Cite inline with `@Key` / `[@Key; @Key2]`; pages that cite end with a `## References` heading over an empty `::: {#refs}` div.
+- House anchors: `Mildenhall2022` (Similar Risks Have Similar Prices, IME), `Mildenhall2022a` (*Pricing Insurance Risk*, with Major), `Major2026` (*Introduction to Capital Modeling and Portfolio Management*, CAS), `Grubel1999`/`Grubel2000` (FFT compound distributions), `Klugman2012` (*Loss Models*), `Heckman1983`, `Panjer1981`, `Wang1995`/`Wang1996` (distortions).
+
 ## Testing
 
 The pytest suite at `tests/` is the primary test mechanism — run with `uv run pytest`. Each line of `aggregate/agg/test_suite.agg` (categories A–O: frequencies, severities, reinsurance, distortions, case studies, papers) becomes two parametrized cases:

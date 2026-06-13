@@ -1,6 +1,7 @@
 
+## Rebuild Docs
 
-```python
+```bash
 $env:UV_LINK_MODE = "copy"
 uv run --extra dev --extra notebook jupyter lab
 
@@ -10,6 +11,19 @@ $env:UV_LINK_MODE = "copy"
 uv sync --extra dev --extra notebook
 uv run jupyter lab
 ```
+
+## Rebuild quarto 
+```bash 
+cd T:\tmp\quarto
+$env:QUARTO_PYTHON = "T:\worktrees\aggregate_REFACTOR\.venv\Scripts\python.exe"
+quarto preview        # live-reload in the browser; or just open _site\index.html
+
+The QUARTO_PYTHON line matters — it points Quarto at the repo venv so import aggregate resolves
+```
+
+SWIM - see what i mean
+AQIN - ask questions if needed
+gummage -> ! 
 
 Comprehensive remove fuzz improvements. what is done for Portfolio (which columns)? Mask approach seems best. This is done in Aggregate and Portfolio - but only called as a function in Portfolio. 
 

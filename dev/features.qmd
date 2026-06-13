@@ -1,0 +1,955 @@
+---
+title: "aggregate 1.0 — what changed since 0.30.1"
+jupyter: python3
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+---
+
+This notebook is the user-side, topical companion to `CHANGELOG.md`: everything
+`aggregate` 1.0 can do that 0.30.1 could not, organized by subject and shown by
+worked example. The changelog is chronological and developer-facing; this
+document answers *"what's new since the last release I used, and how do I use
+it?"* It covers the entire `1.0.0a*` series. Breaking changes vs 0.30.1 are
+flagged in each section. Maintained by `dev/task-features.md`; source of record
+for what shipped is `CHANGELOG.md`.
+
+# 1. Coverage ledger
+
+The maintenance contract: every major point in `CHANGELOG.md` is accounted for
+by a row. "Under the hood" + "—" means an internal change named in the appendix
+but not exampled.
+
+| Feature | Since | Section | Example object |
+|---|---|---|---|
+| `discover` / `build_many` / `interpret_file`; `~/.aggregate` move | a1 | Underwriter & persistence | `uw` |
+| `.help()` (was `.more`); `CannotBuild`; surface privatization | a2 | Underwriter & persistence / Under the hood | — |
+| `Aggregate.stats_df` — one canonical moment frame | a3 | Reporting quartet | `simple` |
+| PEG regression baseline; stats_df finish | a4 | Under the hood | — |
+| approximation & tilting dropped from `update` | a5 | Under the hood (see Pedagogy, DecL `approximate`) | — |
+| distortion calibration on `Distortion` subclasses | a6 | Under the hood | — |
+| pricing pipeline: `pricing_at`, explicit `p=`/`a=`, `distortions`, cache | a7 | Pricing & the pentagon | `book` |
+| `Portfolio.stats_df`; utilities slim-down; src layout; `*_fit` family | a8 | Reporting quartet / Under the hood | `book` |
+| `Tweedie` → `aggregate.tweedie` (submodule access) | a9 | Under the hood | — |
+| `FourierTools` → `aggregate.ft` (submodule access) | a10 | Under the hood | — |
+| `Bounds` redesigned — one-shot, envelope properties | a11 | Pricing & allocation bounds | `book` |
+| `extensions/` removed; `aggregate.pedagogy` created | a12 | Pedagogy helpers / Under the hood | — |
+| `Distortion` natural parameter names | a13 | Pricing & the pentagon | — |
+| `aggregate.style` — matplotlib house style | a14 | Configuration | — |
+| `Distortion` info / describe / stats_df / density_df quartet | a15 | Reporting quartet | — |
+| structured DecL parse errors; keyword word boundaries | a16 | Better parse errors | — |
+| `silence_warnings` opt-in (no global mute at import) | a16 | Configuration | — |
+| Kusuoka atom rows in `Distortion` stats | a16 | Pricing & the pentagon | — |
+| `so`/`po` by number; linear allocation default; `bounded`; forwards-`S`; `DefectiveDistributionWarning`; `EX`/`CV`/`Sk` headings | a17 | New DecL elements / Reporting quartet / Pricing | `reins`, `defective` |
+| `reins_bucket` linear/nearest rebucketing | a18 | Reporting quartet | `reins` |
+| reins reporting trio (`reins_describe` / `reins_stats_df` / `reins_density_df`), incl. Portfolio | a19 | Reporting quartet | `reins`, `book_w_re` |
+| `occ_bivariate` — joint (ceded, net) via 2D FFT | a20 | New DecL elements | `netceded` |
+| signed severity (`ssev`, signed `dsev`); output window | a21 | New DecL elements / Grids & windows | `signed_d`, `signed_s` |
+| signed `Portfolio` combine; `shift - dist` severity | a22 | New DecL elements | `signed_s` |
+| `pnl` premium keyword; signed-aware `describe` (SD) | a23 | New DecL elements / Reporting quartet | `pnl` |
+| `multivariate` / `copula` / `netceded` | a24 | New DecL elements | `mv_indep`, `mv_copula`, `netceded` |
+| `hints{}` build settings; `note{}` pure text | a25 | New DecL elements / Grids & windows | `defective` |
+| honest discrete severity — exact moments & quantiles | a26 | Reporting quartet | `dice` |
+| distortion flat-number DecL syntax | a27 | New DecL elements / Pricing | — |
+| `dsev_bucket` linear/nearest | a28 | Grids & windows | — |
+| tail-thickness classification | a29 | Tail classification | `simple`, `defective` |
+| config.toml; `show_settings`; `bucket_sizing_p` rename; Python ≥3.11 | a30 | Configuration | — |
+| the pentagon octet; one canonical pricing readout | a31 | Pricing & the pentagon | `book` |
+| legible `Underwriter` loading; `to_agg` | a32 | Underwriter & persistence | `uw` |
+| `price_stand_alone` restored | a33 | Pricing & the pentagon | `book` |
+| `distortion_df` / `calibration_df`; `gini_p` rename | a34 | Pricing & the pentagon | `book` |
+| empty `Underwriter()` default; `to_agg` modes & dependency order | a35 | Underwriter & persistence | `uw` |
+| `AllocationBounds` | a36 | Pricing & allocation bounds | `book` |
+| `PricingBounds`; the Gini lens | a37 | Pricing & allocation bounds | `book` |
+| knowledge-freeze regression harness | a38 | Under the hood | — |
+| keyword-only `Underwriter`; signed Lee plot; `density` property | a39 | Underwriter & persistence / Reporting quartet | `simple`, `signed_d` |
+| SD for zero-mean signed aggregates | a40 | Reporting quartet | `signed_d` |
+| `reinsurance_*` → `reins_*` rename | a41 | Reporting quartet | `reins` |
+| fuzz-removal consolidation | a42 | Under the hood | — |
+| signed `Portfolio.describe` spread; `price_pentagon` | a43 | Reporting quartet / Pricing & the pentagon | `book` |
+| module organization, dropped deps, lazy IPython | a44 | Under the hood | — |
+| `pnl` with signed loss severity (fix) | a45 | New DecL elements | `pnl` |
+| exponential-tilting pedagogy | a46 | Pedagogy helpers | `dice` |
+| `approximate` DecL keyword | a47 | New DecL elements / Grids & windows | `big` |
+| spliced unbounded severities build (fix) | a48 | New DecL elements | `mv_indep` |
+| portfolio combine grid: `best_window` | a49 | Under the hood (note in Grids & windows) | — |
+| always-present `approximate` info line; self-describing fit note; window-aware plots | a50 | Reporting quartet / Grids & windows | `big` |
+| non-zero output window for concentrated aggregates | a51 | Grids & windows | `bigex` |
+| `_` digit separators; `of` share synonym | a52 | New DecL elements | — |
+| `decl_writer`: `format_program` / `spec_to_decl`; canonical `pprogram` / `to_agg` | a53 | Programs as text | `mix_both` |
+| `value_type`; fixed-layout `info`; `pnl` prem/lr meta; `[labels]` config | a54 | Reporting quartet / Configuration | `pnl`, `book` |
+| `unit_density` / `unit_density_df` / `aligned_unit_density_df` | a55 | Reporting quartet | `book` |
+| `p_<unit>` columns & EPD family removed from `density_df`; signed objective columns | a56 | Reporting quartet / Under the hood | `book` |
+| one Choquet engine; `T.*`/`M.*` removed; `allocation_diagnostics`; signed books price | a57 | Pricing & the pentagon / Under the hood | `book` |
+
+# 2. The cast of examples
+
+A small set of objects built once and heavily leveraged: each is the minimal
+program that exercises a distinct piece of DecL surface, and the feature
+sections borrow these rather than minting throwaways. (Canonical definition
+lives in `dev/task-features.md` §2.4 — edit it there.)
+
+```{python}
+from aggregate import build, qd
+
+# ── The cast: built once, reused throughout ────────────────────────────────
+# Clustered by theme. Each is the minimal program that exercises a distinct
+# surface; feature sections borrow these rather than minting throwaways.
+
+# 1. Core aggregate ─────────────────────────────────────────────────────────
+# 1.a simple — the workhorse: mixed-gamma (neg-binomial) frequency, layered lognormal
+simple = build('agg Simple 100 claims 1000 xs 0 sev lognorm 100 cv 1.0 mixed gamma 0.25')
+
+# 1.b defective — essentially defective tail (shifted Pareto; mass pushed to the limit)
+defective = build('agg Defective 10 claims sev 100 * pareto 1.3 - 100 poisson '
+                  'hints{bs=0.25; log2=16;}')
+
+# 2. Discrete, exact moments ─────────────────────────────────────────────────
+dice = build('agg Dice dfreq [3] dsev [1:6]')
+
+# 3. Signed & P&L ────────────────────────────────────────────────────────────
+# 3.a signed_d — signed discrete (dsev with a negative atom auto-signs the agg)
+signed_d = build('agg SignedD dfreq [5] dsev [-1 2]')
+
+# 3.b signed_s — signed continuous via ssev; a PER-CLAIM shift (premium booked per claim)
+signed_s = build('agg SignedS 10 claim ssev 100 - lognorm 80 cv 0.025 poisson')
+
+# 3.c pnl — book-level premium minus loss. Contrast 3.b: SAME MEAN, DIFFERENT VARIANCE —
+#     the pnl premium is one deterministic shift; the ssev +100 is multiplied by the
+#     (random) claim count, so 3.b carries extra variance from 100*N.
+pnl = build('pnl PNL 1000 premium - 10 claim sev lognorm 80 cv 0.025 poisson')
+
+# 4. Multivariate ────────────────────────────────────────────────────────────
+# 4.a mv_indep — INDEPENDENT (shared frequency only; positive baseline corr from
+#     the shared mixing / common shock). Splicing an unbounded base works since a48.
+mv_indep = build('''
+multivariate Cat 25 claims
+    agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 0.65 splice [0 250]
+    agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 0.95 splice [0 300]
+    mixed gamma .2
+''')
+
+# 4.b mv_copula — COPULA-coupled (Gumbel, upper-tail dependence)
+mv_copula = build('''
+multivariate CatC 25 claims
+    agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 0.65 splice [0 250]
+    agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 0.95 splice [0 300]
+    copula gumbel 0.4
+    mixed gamma .2
+''')
+
+# 5. Reinsurance ─────────────────────────────────────────────────────────────
+# 5.a reins — occurrence reinsurance; describe now reports gross/net.
+#     Drives reins_describe / reins_stats_df. (Note: the occ clause comes BEFORE freq.)
+reins = build('agg Re 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
+              'occurrence net of 50% po 300 xs 200 and 100% po 500 xs 500 '
+              'poisson')
+
+# 5.b netceded — the SAME program as 5.a with the `netceded` prefix: the occurrence
+#     (Ceded, Net) law as a bivariate. Literally 5.a with `netceded ` prepended.
+netceded = build('netceded agg Re 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
+                 'occurrence net of 50% po 300 xs 200 and 100% po 500 xs 500 '
+                 'poisson')
+
+# 6. Mixtures ────────────────────────────────────────────────────────────────
+# 6.a mix_sev — weighted MIXTURE of severities (single exposure)
+mix_sev = build('agg MixSev 100 claims 2000 xs 0 '
+                'sev lognorm [50 100 200] cv [1 1.5 2] wts [.5 .3 .2] poisson')
+
+# 6.b mix_exp — several EXPOSURE bands, one severity
+mix_exp = build('agg MixExp [100 200 50] claims 2000 xs 0 sev lognorm 100 cv 2 poisson')
+
+# 6.c mix_both — JOINT mixed severity + exposure (the gnarly one): paired exposure/limit
+#     bands AND a two-component severity mixture of shifted pareto / lognormal.
+mix_both = build('agg MixBoth [100 200 50] claims [1000 2000 5000] xs 0 '
+                 'sev [200 150] * [pareto lognorm] [2.1 0.8] + [-200 0] wts [.2 .8] poisson')
+
+# 7. Portfolios ──────────────────────────────────────────────────────────────
+# 7.a book — a Portfolio for combine / pentagon pricing / allocation & pricing bounds
+book = build('''
+port Book
+    agg A 100 claims 2000 xs 0 sev lognorm 100 cv 1.0 mixed gamma 0.5
+    agg B  50 claims 4000 xs 0 sev lognorm 200 cv 2.0 mixed gamma 0.4
+''')
+
+# 7.b book_w_re — the same book with occurrence reinsurance on each unit
+book_w_re = build('''
+port Book
+    agg A 100 claims 2000 xs 0 sev lognorm 100 cv 1.0 occurrence net of 50% po 1000 xs 1000 mixed gamma 0.5
+    agg B  50 claims 4000 xs 0 sev lognorm 200 cv 2.0 occurrence net of 50% po 2000 xs 1000 mixed gamma 0.4
+''')
+
+# 8. Approximate (a47) vs exact on a non-zero window (a51) ───────────────────
+# 8.a big — very-high-frequency book via the `approximate` shortcut (sgamma fit).
+#     Note `approximate` comes AFTER the frequency clause. The info line and the
+#     self-describing fit note are a50.
+big = build('agg Big 1e6 claims dsev [1 3] poisson approximate sgamma')
+
+# 8.b bigex — the EXACT convolution for comparison: since a51 it resolves at
+#     bs=1 on a two-sided output window far from 0 (mean 2e6, sd ≈ 2,200)
+#     instead of wasting the whole grid on [0, 2e6).
+bigex = build('agg BigEx 1e6 claims dsev [1 3] poisson')
+```
+
+| Member | Drives |
+|---|---|
+| `simple` | reporting quartet, tail class, `density` property, config effects |
+| `defective` | defective / mass-at-limit tail, deficit warnings, `hints{}` |
+| `dice` | discrete/exact moments, `dsev_bucket` |
+| `signed_d` | signed `dsev`, signed-aware `describe` (SD vs CV) |
+| `signed_s` / `pnl` | `ssev`, `shift - dist`, per-claim vs book-level premium (`pnl`) |
+| `mv_indep` / `mv_copula` | `multivariate`, `copula` (and the no-copula baseline) |
+| `reins` / `netceded` | reins gross/net reporting; `netceded` occurrence bivariate |
+| `mix_sev` / `mix_exp` / `mix_both` | mixed severity, mixed exposure, and the joint |
+| `book` / `book_w_re` | combine, pentagon pricing, `price_pentagon` / `price_stand_alone`, bounds; reins in a portfolio |
+| `big` / `bigex` | `approximate sgamma` vs the exact convolution on a non-zero output window (a51) |
+
+# 3. New DecL elements
+
+## 3.1 Signed severity: `ssev` and negative `dsev` atoms (a21)
+
+A profit is a negative loss, so an aggregate can live on a signed grid. The
+severity family is now: `sev` — continuous, clamps its sub-zero tail at 0
+(unchanged from 0.30.1); `dsev` — discrete, never clamps, and a negative atom
+auto-signs the aggregate; `ssev` — new, the signed continuous sibling of `sev`.
+Signedness is recorded at parse time, so the analytic moments — and the
+automatic two-sided output window — are right before any FFT runs.
+
+```{python}
+qd(signed_d.describe)   # SD trio instead of CV — see Reporting quartet
+```
+
+```{python}
+# the signed Lee (quantile) plot starts cleanly at the true minimum (a39 fix)
+signed_d.plot()
+```
+
+## 3.2 `shift - dist`: premium minus loss per claim (a22)
+
+A constant minus a distribution parses as the natural P&L reading. The cast's
+`signed_s` is `ssev 100 - lognorm 80 cv 0.025` — premium 100 minus a lognormal
+loss, *per claim*. It is exactly `-1 * X + 100` (reflect, then shift) and needs
+`ssev` to keep the signed support.
+
+```{python}
+qd(signed_s.describe)
+```
+
+## 3.3 `pnl`: premium minus loss, once for the book (a23, fixed for signed losses in a45)
+
+The `pnl` keyword builds an ordinary loss aggregate and applies one
+deterministic book-level shift: `PnL = premium − A`. Contrast with `signed_s`:
+**same mean, different variance**. The `ssev 100 - …` shift is multiplied by
+the random claim count N, so `signed_s` carries the extra variance of `100·N`;
+the `pnl` premium is collected once.
+
+```{python}
+import pandas as pd
+cmp = pd.concat([signed_s.describe, pnl.describe], keys=['ssev (per claim)', 'pnl (book)'])
+qd(cmp)
+```
+
+`pnl` objects have `value_type == 'payoff'` — the pricing layer's sign
+convention (see Reporting quartet). The premium and implied loss ratio land in
+`stats_df`'s meta rows (a54):
+
+```{python}
+print(pnl.value_type)
+qd(pnl.stats_df.loc['meta'])
+```
+
+Since a45, the *loss* severity of a `pnl` may itself be signed (a `dsev` with a
+negative atom, or an `ssev`); previously the affine path silently wrapped the
+negative atoms.
+
+## 3.4 `multivariate` and `copula`: joint laws of two perils (a24)
+
+One event can drive two correlated perils, and you want the joint law of the
+two aggregates, not just the marginals. `multivariate` couples two component
+severities by a copula and accumulates them with a shared outer frequency
+through a 2D FFT. The component `dfreq [0 1] [p0 p1]` is the per-event trigger
+probability. The `copula` clause is optional — omitted means independence,
+where the only dependence is the shared (here gamma-mixed) count:
+
+```{python}
+qd(mv_indep.describe)
+print(f'corr, no copula (common shock only): {mv_indep.corr():.4f}')
+print(f'corr, Gumbel tau=0.4 on top:         {mv_copula.corr():.4f}')
+```
+
+The realized output correlation is reported alongside the copula parameter
+because they differ: compounding attenuates per-claim dependence, and shared
+mixing adds common-shock dependence on top — the independence copula still
+shows positive correlation. Copulas come from the new `aggregate.copula.Copula`
+factory (`normal`, `gumbel`, `clayton`, `fgm`, `independent`), each taking its
+natural dependence parameter.
+
+```{python}
+mv_copula.plot()   # joint per-claim severity (left), joint aggregate (right)
+```
+
+The splice on the lognormal base (`splice [0 250]`) caps an unbounded family;
+this crashed window sizing until the a48 fix.
+
+## 3.5 `netceded`: the joint (ceded, net) law of a reinsured aggregate (a20, a24)
+
+Prefix any occurrence-reinsured `agg` program with `netceded` and the result is
+the *joint* per-occurrence (Ceded, Net) law as a bivariate — the same 2D FFT
+engine with a comonotone per-claim severity (per claim, `(c(X), n(X))` lies on
+the line `c + n = X`). The margins reproduce the univariate ceded/net
+aggregates and `E[Ceded] + E[Net]` is the gross mean; the joint law carries
+what the margins cannot — the reinsurer-vs-cedent dependence:
+
+```{python}
+qd(netceded.describe)
+print(f'corr(Ceded, Net) = {netceded.corr():.4f}')
+```
+
+`Aggregate.occ_bivariate()` returns the same object from an already-built
+reinsured aggregate (e.g. `reins.occ_bivariate()`).
+
+## 3.6 `hints{}`: build settings out of `note{}` (a25)
+
+`note{...}` used to double as a `key=value` side-channel for build settings,
+so any `=` in note prose crashed the build. Notes are now pure annotation; a
+dedicated `hints{key=value; ...}` clause carries settings (`log2`, `bs`,
+`bucket_sizing_p`, …). Explicit `build(...)` keyword arguments always override
+hints. The cast's `defective` uses `hints{bs=0.25; log2=16;}`.
+
+## 3.7 Distortions in DecL: flat number list (a27)
+
+**Breaking vs 0.30.1.** The distortion form is uniformly
+`distortion NAME kind n1 n2 ...` — the kind's parameters in declaration order,
+no brackets. Each `Distortion` subclass declares its own DecL parameter order,
+so the parser no longer hard-codes kinds. Note `ccoc` takes the *return* `r`,
+not the discount.
+
+```{python}
+d1 = build('distortion D1 ph 0.7')
+d2 = build('distortion D2 bitvar 0.9 0.99 0.5')    # p0 p1 w1
+print(d1)
+print(d2)
+```
+
+## 3.8 Reinsurance share syntax: the number sets the meaning (a17, a52)
+
+`so` (share-of), `po` (part-of), and — since a52 — plain `of` are synonyms;
+the **number** decides. A literal percentage (`50% po 300 xs 200`) is the share
+directly; a bare amount (`150 po 300 xs 200`) is an absolute amount and the
+share is `amount / limit`. In 0.30.1 `50% po` silently divided the percentage
+by the limit. Layer validation (a18) also hard-errors on out-of-order or
+overlapping layers; express a gap with a zero-share layer.
+
+## 3.9 Number literals: `_` digit separators (a52)
+
+`agg BIG 10_000_000 claims …` parses exactly as Python reads `10_000_000`.
+
+## 3.10 `approximate`: method-of-moments aggregates (a47)
+
+For very-high-frequency books the exact convolution is overkill. The
+`approximate sgamma | slognorm | exact` directive (placed **after** the
+frequency clause) replaces the freq × sev convolution with a single shifted
+gamma / shifted lognormal fitted to the aggregate's first three moments —
+matching mean/CV/skew to ~7 significant figures. There is no special compute
+path: the object is rewritten as a fixed-1-claim aggregate of the fitted
+severity, so everything downstream (validation, `pnl`, Portfolio combine)
+works unchanged. Incompatible with occurrence reinsurance (rejected with a
+clear error); aggregate reinsurance rides along.
+
+```{python}
+print(big.info)    # the permanent `approximate` line + self-describing fit note (a50)
+```
+
+See Grids & windows for the accuracy comparison against `bigex`, the exact
+convolution.
+
+# 4. Better parse errors (a16)
+
+DecL parse failures are now structured reports with line/column, a source-line
+echo, caret marker, and "did you mean…" suggestions — instead of Lark's
+internal token namespace dump. The one-line summary is `str(e)`; the full
+rendered block is `e.report.render()` (also auto-printed by `build`):
+
+```{python}
+try:
+    build('agg Typo 10 cliams sev lognorm 50 cv 1 poisson')
+except ValueError as e:
+    print(e)
+```
+
+Keyword terminals also require word boundaries, so a typo like `aggx Re …`
+reports `Unexpected 'aggx'. Did you mean: agg?` at column 1 instead of a
+misleading downstream error.
+
+# 5. Programs as text: `decl_writer` (a53)
+
+`aggregate.decl_writer` is the structural inverse of the parser: it renders a
+parsed spec back to canonical DecL instead of pretty-printing by regex.
+`format_program` accepts a program string (or a spec) and returns canonical
+text — also `'html'`, `'ansi'`, `'latex'` via `fmt=`:
+
+```{python}
+from aggregate.decl_writer import format_program
+print(format_program(mix_both.program))
+```
+
+`Aggregate.pprogram` / `Portfolio.pprogram` now render this canonical form
+(`self.program` still holds the raw input), and `Underwriter.to_agg` exports
+canonical DecL, so saved `.agg` files round-trip cleanly.
+
+**Breaking vs 0.30.1:** `utilities.decl_pprint` is removed — use
+`format_program`.
+
+# 6. The reporting quartet: `info` / `describe` / `stats_df` / `density_df`
+
+## 6.1 One stats surface everywhere (a3, a8, a15)
+
+**Breaking vs 0.30.1.** The overlapping moment frames (`report_df`,
+`report_ser`, `statistics`, `statistics_df`, `audit_df` on both classes) are
+gone. The stats surface is exactly three things on `Aggregate`, `Portfolio`,
+*and* `Distortion` alike: `info` (text summary), `describe` (the daily-driver
+moment audit), `stats_df` (the canonical `(component, measure)` frame with
+`ex1/ex2/ex3` raw and `mean/cv/skew` derived moments, theoretical and
+empirical side by side). `Distortion` additionally has a `density_df` (the `g`
+function and friends on a grid). The validation philosophy — every build
+audited against exact moments, the declare → build → validate → trust cycle —
+is described in the package paper [@Mildenhall2024].
+
+```{python}
+qd(simple.describe)
+```
+
+```{python}
+qd(simple.stats_df)
+```
+
+## 6.2 Fixed-layout `info` and `value_type` (a54)
+
+`info` now has a fixed row layout — every row always present, same order, for
+every instance, `n/a` where unavailable — shared across all three classes.
+New rows include `value_type` (the loss/payoff pricing-sign convention),
+`x_min`/`x_max` (the realized window), always-present premium / expected loss
+/ loss ratio / `P(loss)`, and `bounded`/`id` footers.
+
+```{python}
+print(simple.info)
+```
+
+A `Portfolio` derives `value_type` from its units and **rejects a mixed
+loss/payoff book at construction** (no coherent sign convention):
+
+```{python}
+try:
+    build('''port Mixed
+        agg A 10 claims sev lognorm 100 cv 1 poisson
+        pnl B 1000 premium - 10 claim sev lognorm 80 cv 0.5 poisson''')
+except ValueError as e:
+    print(e)
+```
+
+## 6.3 Exact discrete moments (a26)
+
+Discrete severities (`dsev`, `fixed`) used to be faked through a continuous
+`rv_histogram` with sliver-width atoms — producing `ppf(0.5) = 149.9999999992`
+artifacts and quietly degrading the moments of large-valued discrete books.
+They are now backed by an honest discrete RV: exact step `cdf`/`sf`, exact
+`ppf`, and **all moments computed as exact finite sums** — unlimited, limited,
+and layered. A fair die has mean exactly 3.5:
+
+```{python}
+qd(dice.describe)   # Err columns exactly 0
+print('sev ppf(0.5) =', dice.sevs[0].fz.ppf(0.5))
+```
+
+## 6.4 Signed-aware `describe`: SD instead of CV (a23, a40, a43)
+
+`CV = sd/mean` is meaningless as the mean crosses 0, so for any signed object
+the moment table shows an SD trio instead of CV (visible in §3.1 above). The
+zero-mean case reports the correct SD — in 0.30.1-era logic it reconstructed
+`SD = mean × CV = 0 × NaN = NaN` (fixed a40, deriving variance from the second
+moment). `Portfolio.describe` makes the CV-vs-SD choice once, portfolio-wide,
+so a mixed signed/unsigned book renders one consistent frame (a43).
+
+```{python}
+zero_mean = build('agg ZM dfreq [3] dsev [-1 1]')   # mean 0, sd sqrt(3)
+qd(zero_mean.describe)
+```
+
+## 6.5 The `density` property and `sev_density_df` (a39, a21)
+
+`density` is `density_df.query('p_total > 0')` — the live support with the
+grid's leading/trailing zero buckets dropped, which is usually what you want
+to look at. The severity moved to its own frame `sev_density_df` (its own grid
+`xs_sev`), since a windowed or signed aggregate no longer shares a grid with
+its severity.
+
+```{python}
+qd(signed_d.density)
+```
+
+## 6.6 Reinsurance reporting (a18, a19, a41)
+
+Reinsurance reporting was rebuilt end to end. Three objects on `Aggregate`
+*and* (new) `Portfolio`:
+
+- `reins_describe` — the daily driver: per-stage gross/ceded/net with the same
+  eight columns as `describe`, where `Change` reads as validation error on the
+  gross row and as the cession impact on the ceded/net rows;
+- `reins_stats_df` — the per-layer layering summary (occurrence layers
+  conditional on attaching; meta rows for share/limit/attach, attach/detach
+  probabilities, loss-on-line);
+- `reins_density_df` — per-bucket gross/ceded/net densities with consistent
+  columns.
+
+`describe` itself becomes an economic view under reinsurance — Gross / Net /
+Change columns:
+
+```{python}
+qd(reins.describe)
+```
+
+```{python}
+qd(reins.reins_describe)
+```
+
+The portfolio version convolves the per-unit gross/ceded/net marginals:
+
+```{python}
+qd(book_w_re.reins_describe)
+```
+
+Net/ceded distributions are rebucketed onto the model grid mean-preservingly
+by default (`reins_bucket='linear'`, a18; `'nearest'` restores the historical
+snap). **Breaking vs 0.30.1:** the legacy `reinsurance_df` /
+`reinsurance_audit_df` / `reinsurance_report_df` family is gone, and the
+spelled-out method names are renamed: `reinsurance_kinds` → `reins_kinds`,
+`reinsurance_description` → `reins_description`, `reinsurance_occ_plot` →
+`reins_occ_plot` (a41 — `reins` is the canonical short form).
+
+## 6.7 Unit densities on a Portfolio (a55, a56)
+
+**Breaking vs 0.30.1.** `Portfolio.density_df` no longer carries `p_<unit>`
+columns (and the EPD columns are gone — stand-alone EPD is the one-liner
+`(e - lev)/e`). Unit pmfs live on the owning `Aggregate`s, on their native
+grids, read through explicit accessors:
+
+```{python}
+qd(book.unit_density_df().groupby(level='unit').head(2))   # long form, (unit, loss) index
+```
+
+`unit_density(unit)` returns one unit's pmf; `aligned_unit_density_df(grid=)`
+is the display adapter that scatters unit pmfs onto a common grid (and warns
+when a windowed book's view would be clipped).
+
+## 6.8 Validation: noise-aware, with honest deficit warnings (a17)
+
+Validation moments are tested against a definite noise floor (1e-12), so a
+fair die no longer "fails skew" on floating-point dust, and `describe` snaps
+dust to zero. A genuinely defective pmf — FFT mass off the top of the grid —
+raises `DefectiveDistributionWarning` at construction instead of surfacing
+silently in pricing. The cast's `defective` (Pareto 1.3, infinite variance) is
+built to show this:
+
+```{python}
+print(defective.explain_validation())
+```
+
+# 7. Grids, buckets & windows
+
+## 7.1 The sizing decision is inspectable (a21)
+
+`update` runs up to several sizing methods — exact-discrete lattice, bounded
+small-count, the legacy three-moment rule, windowed — and records them in
+`_bs_window_df`, then picks. `log2` is a cap; pinning `bs` keeps full manual
+control.
+
+```{python}
+qd(bigex._bs_window_df.iloc[:, :6])
+```
+
+**Breaking vs 0.30.1:** the `recommend_p` knob is renamed `bucket_sizing_p`
+everywhere (a30) — `build`/`update` keyword and `hints{}` key; no alias.
+
+## 7.2 Mean-preserving discrete bucketing: `dsev_bucket` (a28)
+
+Off-grid discrete atoms (an empirical sample with a non-integer `bs`) are now
+split across their two bracketing buckets so the discretized mean is exact
+(`dsev_bucket='linear'`, the default; `'nearest'` is the historical snap, with
+up to `bs/2` bias per atom). On-grid atoms (a die at `bs=1`) are unchanged.
+
+```{python}
+off = build('agg Off dfreq [1] dsev [0.3 1.7 2.4] [.5 .3 .2]', bs=0.5)
+print(f'discretized mean {off.est_m:.6f} == exact {0.3*.5 + 1.7*.3 + 2.4*.2:.6f}')
+```
+
+## 7.3 Non-zero output windows (a51)
+
+A concentrated aggregate — CV small enough that its whole mass sits far above
+0 — now computes on a two-sided window around the mass instead of the wasteful
+`[0, x_max]` grid. The cast's `bigex` (mean 2e6, sd ≈ 2,200) resolves at
+`bs = 1` on a window near the mean; on a 0-based grid it would get `bs` in the
+hundreds:
+
+```{python}
+qd(pd.concat([big.describe, bigex.describe], keys=['approximate sgamma', 'exact, windowed']))
+```
+
+Behavioral note (intended): `q`/`F`/plots of a windowed aggregate live on
+`[x_min, x_max]`, not from 0 — what is given up is the sub-tolerance region
+below the window. Pass `x_min=0` to `update` to force the legacy 0-based grid.
+Occurrence reinsurance suppresses windowing (its severity must share the
+output grid); plots are window-aware (a50) — the left edge anchors at the
+realized support:
+
+```{python}
+bigex.plot()
+```
+
+The portfolio combine grid was also fixed (a49, `best_window`): the shared
+`(bs, log2)` is now resolution + span — the finest unit bucket vs the no-wrap
+floor — so adding units no longer *coarsens* the grid, and all-integer
+discrete books land on the lattice (`bs=1`) instead of a spurious fine
+continuous `bs`.
+
+# 8. Tail-thickness classification (a29)
+
+Every `Aggregate` and `Portfolio` reports an ordered tail class on a five-rung
+scale — `bounded < super-exponential < exponential < subexponential <
+power-law` — by deterministic family lookup, with the aggregate rung the
+heavier of frequency and severity (the single-big-jump principle for
+subexponential-or-heavier severities). `bounded` is now a derived view of the
+classifier (with the certify setter `obj.bounded = True` as escape hatch).
+
+```{python}
+print(simple.tail_description)
+```
+
+```{python}
+print(defective.tail_explanation)   # power-law, with the tail index and variance flags
+print(f'dice bounded: {dice.bounded};  defective bounded: {defective.bounded}')
+```
+
+`Portfolio.tail_class` reports the worst-of across units and names the driving
+unit(s).
+
+# 9. Pricing & the pentagon
+
+## 9.1 One canonical readout: the octet (a31)
+
+Every pricing method emits the same eight accounting quantities in the same
+order: amounts `L` (loss), `M` (margin), `P = L + M` (premium), `Q` (capital),
+`a = P + Q` (assets), and ratios `LR = L/P`, `PQ = P/Q`, `ROE = M/Q`. Stats
+are always columns, one row per priced entity. In 0.30.1 each method built
+these independently and disagreed on naming and order. The framework is that
+of *Pricing Insurance Risk* [@Mildenhall2022a] and its capital-modeling
+companion [@Major2026].
+
+## 9.2 Distortions: natural parameters (a13) and the quartet
+
+**Breaking vs 0.30.1.** `Distortion` constructors take kind-specific names
+instead of the generic `(name, shape, r0, df, …)` slots: `Distortion('ph',
+a=0.7)`, `Distortion('wang', lam=0.2)`, `Distortion('dual', b=2)`,
+`Distortion('tvar', p=0.99)`, `Distortion('ccoc', r=0.1)` (keyword-only),
+`Distortion('bitvar', p0=, p1=, w1=)`. Each exposes its parameter as a
+read/write property. The named kinds include the proportional-hazards and
+Wang transforms [@Wang1995; @Wang1996]. Distortions carry the same `info` /
+`describe` / `stats_df` / `density_df` quartet as everything else (a15),
+including the Kusuoka spectral-measure atoms (a16):
+
+```{python}
+from aggregate import Distortion
+d = Distortion('bitvar', p0=0.9, p1=0.99, w1=0.5)
+qd(d.describe)
+```
+
+## 9.3 Calibration: `distortion_df` and `calibration_df` (a7, a34)
+
+`calibrate_distortions(coc=, p=)` (one point — the old list-based batch API is
+gone, a7) calibrates the canonical five (`ccoc, ph, wang, dual, tvar`) and
+splits the result into a per-distortion receipt and the shared target:
+
+```{python}
+book.calibrate_distortions(coc=0.10, p=0.995)
+qd(book.distortion_df)     # param, error, gini_p, area per distortion
+```
+
+```{python}
+qd(book.calibration_df)    # the target once: coc, p, F(a) + the octet
+```
+
+**Breaking vs 0.30.1:** `Distortion.standard_shape` is renamed `gini_p`
+(`= 2∫g − 1`); `Portfolio.dists` is renamed `distortions`; pricing methods
+take explicit `p=` *or* `a=` (the implicit `p > 1 → asset` convention is
+gone).
+
+## 9.4 Pricing a book (a7, a17, a57)
+
+`apply_distortion` is a cached build of the risk-adjusted frame;
+`pricing_at(distortion, p=|a=)` reads the octet at a capital level; `price`
+wraps both and returns a `PricingResult`:
+
+```{python}
+wang = book.distortions['wang']
+qd(book.pricing_at(wang, p=0.995))
+```
+
+Two allocation surfaces, one builder (a57): `allocation='lifted'` (risk-
+adjusted beta) or `'linear'` (objective alpha; the collapsed-tail default
+since a17 for robustness with mass distortions on unbounded books — lifted
+*refuses* a mass distortion on an unbounded support rather than emitting an
+unstable frame). The diagnostic layer curves live in
+`allocation_diagnostics`:
+
+```{python}
+diag = book.allocation_diagnostics(wang)
+qd(diag.filter(regex='layer_.*_total').iloc[2000:2005])
+```
+
+**Breaking vs 0.30.1 (a57):** the `T.*`/`M.*` column families are removed from
+the augmented frame — pricing readers use `L = exa`, `P = exag`, `M = P − L`,
+with per-line capital computed on demand by the layer-ROE construction; the
+`efficient` flag is gone (one frame shape); the cache is keyed on
+`(name, view, role, S_calculation, allocation)` so variant frames coexist.
+Signed (P&L) books now price (total premium via the Choquet dot product;
+equal-priority per-line columns are NaN on a signed grid).
+
+## 9.5 Stand-alone vs diversified (a33)
+
+`price_stand_alone(dist, p)` prices every unit backed by its own VaR(p)
+capital and contrasts the `sum` with the diversified `total` — the classic
+diversification-benefit exhibit:
+
+```{python}
+qd(book.price_stand_alone(wang, 0.995))
+```
+
+## 9.6 The `Pentagon` and `price_pentagon` (a31, a43)
+
+`pentagon_at(distortion, p=)` returns a `Pentagon` — an eight-vector with
+named attributes that completes any soluble partial input. `price_pentagon`
+needs **no distortion**: fix the capital level (`p=` or `a=`) plus exactly one
+target (`ROE=`, `P=`, `LR=`, `M=`, `Q=`, or `PQ=`) and it completes the octet
+by pure accounting:
+
+```{python}
+qd(book.price_pentagon(p=0.995, ROE=0.10))   # VaR capital + cost of capital
+```
+
+```{python}
+qd(simple.price_pentagon(a=12500, LR=0.70))  # works on an Aggregate too
+```
+
+# 10. Pricing & allocation bounds
+
+Three classes in `aggregate.bounds`, sharing one exact piecewise-linear hull
+engine on the FFT grid (no resampling — TVaR curves are affine in `1/(1-p)`
+within an atom, so hulls built at CDF breakpoints are exact and O(n)).
+
+## 10.1 `Bounds` — distortion envelopes for the total (a11, redesigned)
+
+The class implementing the similar-risks bounds of @Mildenhall2022 is now
+one-shot: construct with the object and premium, and read `p_star`,
+`min_envelope` (a coherent `Distortion`), `max_envelope`, `cloud_df` as
+properties:
+
+```{python}
+import numpy as np
+from aggregate.bounds import Bounds
+P = float(book.calibration_df['P'].iloc[0])
+b = Bounds(book, P, a=float(book.q(0.995)))
+print(f'p* = {b.p_star:.4f}; min envelope: {b.min_envelope}')
+```
+
+## 10.2 `AllocationBounds` — natural-allocation ranges (a36)
+
+Given that the total is priced to P, the range of natural-allocation premiums
+to each unit over *all* consistent distortions `{g : rho_g(X) = P}` — the
+similar-risks methodology [@Mildenhall2022] applied to allocations. The
+extremes are biTVaRs; the hulls are P-independent (build once, slice any
+premium):
+
+```{python}
+ab = book.allocation_bounds(p=0.995)
+qd(ab.bounds(P))
+```
+
+`ab.bitvars(P)` gives the achieving distortions, `ab.distortion(P, unit,
+bound)` reconstructs one, and `ab.check(P)` reprices from first principles.
+
+## 10.3 `PricingBounds` and the Gini lens (a37)
+
+Same machinery, different question: if a reference risk X is priced to P by
+*some* distortion, what is the price range of another risk Y? Any
+`Aggregate`/`Portfolio`/pmf works as either axis:
+
+```{python}
+pb = book.pricing_bounds(simple, p=0.995)
+qd(pb.bounds(P))
+```
+
+With the uniform reference (`uniform_source()`) as X, the constraint collapses
+to a mean-Kusuoka-level condition — the **Gini lens**, reading the envelope
+gap of Y's own TVaR curve.
+
+# 11. Configuration
+
+## 11.1 `config.toml` (a30)
+
+The hard-coded "secret bits" — default `log2`, default database, bucketing
+schemes, sizing percentile, validation tolerances — are now read from an
+optional, hand-editable `~/.aggregate/config.toml`. Values layer built-in
+defaults → config file → `AGGREGATE_*` environment variables → explicit
+keyword arguments, so a call argument always wins. The surface:
+`build.write_default_config()` (fully-commented template),
+`build.reload_settings()`, `aggregate.get_settings()` (resolved snapshot), and
+the source-annotated readout:
+
+```{python}
+build.show_settings()
+```
+
+Escape hatches: `AGGREGATE_CONFIG=/path` relocates, `AGGREGATE_CONFIG=none`
+ignores the file for reproducible runs. Unknown keys warn loudly.
+**Breaking vs 0.30.1:** minimum Python is 3.11; the tunables that lived in
+`aggregate.constants` (e.g. `VALIDATION_NOISE`) moved behind `get_settings()`.
+
+The `[labels]` section (a54) renames the printed `value_type` words
+(`loss`/`payoff` → e.g. `claim`/`P&L`) without moving any object's role —
+code branches on the underlying boolean, never the label text.
+
+## 11.2 Plot styling: `aggregate.style` (a14)
+
+The library no longer touches your matplotlib settings at import (the 0.30.1
+`knobble_fonts` machinery is gone). Opt in to the house style globally with
+`aggregate.style.use()`, or scoped:
+
+```{python}
+import aggregate.style
+with aggregate.style.context():
+    simple.plot()
+```
+
+## 11.3 Warnings are yours (a16)
+
+The package no longer runs `warnings.simplefilter('ignore')` at import.
+Muting is an explicit opt-in: `from aggregate import silence_warnings;
+silence_warnings()` — now with optional `category=`/`message=` scoping.
+
+# 12. Underwriter & persistence
+
+## 12.1 Construction: keyword-only, empty by default (a35, a39)
+
+A bare `Underwriter()` starts **empty** — no silent loading of the bundled
+`test_suite` (the module-level `build` still loads its configured databases).
+The constructor is keyword-only, so `Underwriter('test_suite')` — which used
+to silently *name* the underwriter after the database you meant to load — is
+now a `TypeError`. Use `Underwriter(databases='test_suite')`.
+
+```{python}
+from aggregate import Underwriter
+uw = Underwriter(name='demo')
+print(uw)
+```
+
+## 12.2 Legible loading (a32)
+
+One explicit pipeline: `databases=` is the *request*; the public `databases`
+attribute reports the file `Path`s actually loaded; `load(request)` /
+`reload()` / `resolve_databases(request)` / `available_databases()` are the
+verbs. Globs work (`databases=['cat_*']`), resolved across cwd →
+`~/.aggregate` → bundled. Every knowledge entry carries a `source` tag (file
+path or `'session'`). **Breaking vs 0.30.1:** `read_database(s)` is renamed
+`load`; the base data directory moved from `~/aggregate` to `~/.aggregate`
+(a1, no fallback); `show`/`qshow`/`qlist` are replaced by `discover(regex)`
+(a1):
+
+```{python}
+qd(build.discover('Dice'))
+```
+
+`build_many` is the explicit batch counterpart to `build` (which now raises
+`CannotBuild` — a `ValueError` — rather than returning `None`-ish objects,
+a2). `.more()` is renamed `.help()` everywhere (a2).
+
+## 12.3 Saving work: `to_agg` (a32, a35, a53)
+
+`to_agg(path)` writes selected knowledge entries back to a re-loadable `.agg`
+file — by default everything built this session, in dependency order
+(severities and distortions before the aggregates that reference them, a35),
+in canonical DecL via the unparser (a53). Modes mirror Python's: `'x'` (safe
+default — refuses to clobber), `'w'`, `'a'`:
+
+```{python}
+import tempfile, os
+uw.build('agg Demo 5 claims sev lognorm 10 cv 0.3 poisson', update=False)
+with tempfile.TemporaryDirectory() as td:
+    path = os.path.join(td, 'demo.agg')
+    uw.to_agg(path, mode='w')
+    print(open(path).read())
+```
+
+# 13. Pedagogy helpers
+
+The deleted `extensions/` package's doc-cited figure machinery lives on in
+`aggregate.pedagogy` (a12): `bodoff_exhibit`, `plot_twelve`,
+`plot_bivariate`, `plot_distortion_and_ins_stats`, `plot_spectral_three_panel`,
+`ClassicalPremium`, the book figures (`fig_4_1` …), `plot_lee`,
+`plot_max_min`, and the similar-risks plots. Submodule access only — none of
+it is core API.
+
+Exponential tilting (a46) returns here as pedagogy, not production: the
+operational aliasing control remains padding, but
+`tilted_aggregate_density(agg, log2=, bs=, tilt=)` runs a single tilted
+convolution locally for studying aliasing à la Grübel and Hermesmeier
+[@Grubel1999; @Grubel2000], and `gh_tilting_exhibit()` reproduces their
+Poisson comparison table:
+
+```{python}
+from aggregate.pedagogy import tilted_aggregate_density
+td_ = tilted_aggregate_density(dice, log2=6, bs=1, tilt=0.05)
+print(f'tilted convolution mass: {td_.sum():.6f} (reproduces the ordinary result; '
+      f'tilt=None is byte-identical)')
+```
+
+# 14. Under the hood
+
+Internal changes, named for the record — no new user-facing surface. Versions
+refer to `CHANGELOG.md` sections.
+
+- **a2** `Aggregate` surface privatization (`_audit_df`, `_limits`, …); FFT
+  core extracted to `_freq_sev_convolution`.
+- **a4** PEG regression baseline — the numeric contract every refactor
+  sub-project had to reproduce.
+- **a5** auto-approximation and FFT tilting removed from the `update`
+  pipeline (**breaking**: the `approx_freq_ge`/`approx_type`/`tilt_amount`
+  kwargs are gone; callers always get the exact FFT). The replacements are
+  design-time `approximate` (a47) and pedagogy tilting (a46).
+- **a6** distortion calibration moved onto the `Distortion` subclasses; the
+  dead `tt` branch removed.
+- **a8** `utilities.py` 3,753 → ~700 LOC; new `moments` and `iman_conover`
+  modules; public `*_fit` family (`lognorm_fit`, `gamma_fit`, `sgamma_fit`,
+  …) in `distributions`; src/ package layout.
+- **a9 / a10** `Tweedie` → `aggregate.tweedie`; `FourierTools` →
+  `aggregate.ft` (**breaking**: submodule access only; old
+  `aggregate.extensions.*` import paths are gone, a12).
+- **a16** per-module `__all__`; no import-time warning muting.
+- **a17** forwards-`S` default in `Distortion.price`; single
+  `_fft_aggregate` core; eta-mu/second-priority surface removed;
+  journey-of-discovery comments scrubbed.
+- **a38** knowledge-freeze regression harness
+  (`scripts/freeze_knowledge.py`) — snapshot/verify all knowledge-base
+  objects at 1e-12.
+- **a42** fuzz removal consolidated into vectorized `utilities.remove_fuzz`.
+- **a44** `make_ceder_netter` moved to `distributions`; unused runtime deps
+  dropped (`cycler`, `psutil`, `ipykernel`, `jinja2`); `IPython` import made
+  lazy (~1s off cold import).
+- **a49** portfolio combine grid: `best_window` (resolution + span) replaces
+  the RMS combine — see Grids & windows for the user-visible effect.
+- **a55–a57** the numerics spine: unit-density decoupling, shifted-support
+  kappa with direct sums carrying the grid origin, and the single
+  exact-discrete Choquet engine behind all distorted pricing. User-visible
+  column changes are covered in the Reporting quartet and Pricing sections.
+
+## References
+
+::: {#refs}
+:::

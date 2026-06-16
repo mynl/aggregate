@@ -89,7 +89,7 @@ are named to sort as a block:
 | `plan-numerics-1-unit-density` | Unit-density decoupling | accessors + migrate display readers off `p_{unit}` | no |
 | `plan-numerics-2-objective` | Objective spine | shifted-support kappa + direct-sum objective columns; drop `p_{unit}` write & dead EPD; signed objective falls out | no |
 | `plan-numerics-3-distortion` | Distortion spine | one Choquet helper; unified linear/lifted at `apply_distortion`; `T.*`/`M.*` gone; Aggregate-side alignment; `plot_twelve` adapter; `value_type` axis | yes |
-| `plan-numerics-4-windowed-combine` | Windowed combine | windowed portfolio combine + bivariate per-axis windowing, on the kappa-ready base | (reuses 2/3) |
+| `plan-numerics-4-windowed-combine` | MV windowing | integrate the 1A/1P windowing primitives (`plan-bucket-window-2`) into `multivariate` — bivariate per-axis windowing | (reuses 2/3) |
 
 **Why numerics-1 is worth splitting out.** It is pure-additive accessors plus
 mechanical reader migration — low risk, independently testable, and it shrinks
@@ -327,15 +327,33 @@ only in numerics-4.)
 ## 6. Recommended sequence
 
 ```
-plan-numerics-1-unit-density   (accessors + reader migration; low risk, no compute change)
-  └─ plan-numerics-2-objective    (shifted kappa + direct-sum objective; drop p_unit write; kill EPD; Aggregate objective cols)
-       └─ plan-numerics-3-distortion  (Choquet helper + unified linear/lifted incl. bounds; kill T./M.; Aggregate distortion; plot_twelve adapter; view×value_type)
-            └─ plan-numerics-4-windowed-combine  (supersedes the former window-port-bv draft) — now on a kappa-ready base
+plan-numerics-1-unit-density   ✅ landed a55  (accessors + reader migration)
+  └─ plan-numerics-2-objective    ✅ landed a56  (shifted kappa + direct-sum objective; drop p_unit write; kill EPD; Aggregate objective cols)
+       └─ plan-numerics-3-distortion  ✅ landed a57  (Choquet helper + unified linear/lifted incl. bounds; kill T./M.; Aggregate distortion; plot_twelve adapter; view×value_type)
+            └─ plan-numerics-4-windowed-combine  ⏳ pending — integrate 1A/1P windowing into multivariate
 ```
 
 Each plan is independently shippable with green `pytest`, a version bump, and a
 legacy regression at 1e-14 on key columns (D5; byte-equal where the computation
 path is untouched).
+
+### The map we are following now (2026-06-16)
+
+The critical front is **univariate output windowing with signs**, which the
+numerics-4 MV work depends on. Active sequence:
+
+```
+plan-bucket-window-2   ⏳ ACTIVE — Step 1: univariate symmetric windowing with signs
+     1A  Aggregate symmetric two-sided window (bounds-first, resolution-preserving, value_type skew)
+     1P  Portfolio windowed combine (Σ origins, pad-once, roll-combine)  ← was numerics-4 Part A
+  └─ plan-numerics-4   ⏳ next — integrate 1A + 1P into multivariate (bivariate per-axis windowing)
+       └─ plan-multivariate-punchup   ⏳ after — reconcile copula/netceded axis sizing + settle [multivariate] config
+```
+
+So: **bucket-window-2 (1A+1P) → numerics-4 (MV integration) → multivariate-punchup
+(MV sizing/coverage reconciliation).** Round-2 decisions for 1A/1P are finalized
+in `plan-bucket-window-2.md` (Q3 "looks right" / bounds-first; Q5 heavy-sev
+non-windowable; Q9 convention from `value_type`).
 
 **Decisions settled (D1–D4):** D1 — `p_{unit}` write removal lands wherever easiest in
 sequencing (gone by end of numerics-2 regardless). D2 — `AllocationBounds` moves onto the

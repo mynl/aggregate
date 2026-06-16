@@ -1,13 +1,20 @@
-# Plan numerics-4 — windowed portfolio combine + bivariate per-axis windowing
+# Plan numerics-4 — integrating 1A + 1P windowing into multivariate
 
-> Part of the numerics program; see `plan-numerics-0-meta.md`. **Supersedes the
-> former `plan-window-port-bv` draft** — that draft was untracked and has been
-> removed, so this plan (the Scope section below in particular) is now the **sole
-> record** of its Part A (windowed portfolio combine), Part B (bivariate per-axis
-> windowing), and P0 (occ-reins × windowing), re-based onto the kappa-ready
-> foundation that `plan-numerics-2-objective` establishes. Depends on numerics-2
-> (and numerics-3 for the priced/allocated views of a windowed book). **Last in the
-> program.**
+> Part of the numerics program; see `plan-numerics-0-meta.md`. **This plan
+> consumes the univariate windowing primitives built in
+> `plan-bucket-window-2.md` (Step 1: 1A Aggregate symmetric window, 1P Portfolio
+> windowed combine) and integrates them into `multivariate.py`** — bivariate
+> per-axis windowing. It also re-bases onto the kappa-ready foundation that
+> `plan-numerics-2-objective` establishes. Depends on numerics-2 (and numerics-3
+> for the priced/allocated views of a windowed book) **and on bucket-window-2
+> landing first** (it owns the 1-D sizer and the portfolio combine). **Last in
+> the program; `plan-multivariate-punchup.md` is the follow-on MV work.**
+>
+> **Scope moved out (2026-06-16):** the **windowed portfolio combine** (former
+> Part A) is now **1P in `plan-bucket-window-2.md`** — this plan *consumes* it,
+> it no longer owns it. What remains here is the genuinely multivariate piece:
+> per-axis windowing of the 2-D severity grid, which reuses 1A's per-axis sizer
+> and 1P's origin-sum / roll-combine machinery.
 
 ## Why it changes after numerics-2/3
 
@@ -31,19 +38,14 @@ double-handled `p_{unit}` and bespoke kappa.
 
 ## Scope (carried from the former window-port-bv draft, revised)
 
-### Part A — windowed portfolio combine
-- `best_window`: non-signed windowed origin `x_min = Σ x_min_k` (floored), `bs` from
-  summed band **widths** — generalise the hard-coded `x_min=0` non-signed branch.
-- `update`: route a windowed non-signed book through the existing roll-combine
-  (discriminator `signed or windowed`); drive each unit with its **explicit phase-1
-  origin** (not `x_min='auto'`), since a pinned shared `bs` won't re-fire the
-  strictly-finer gate.
-- Mixed books: window the total whenever it clears 0; off-window unit *views* read
-  empty/native via `unit_density` (no false wrapped mass in any core column —
-  reframed from the old per-column masking, which no longer applies since
-  `p_{unit}` is gone from `density_df`).
+### Part A — windowed portfolio combine → **moved to `plan-bucket-window-2.md` (1P)**
+Built in Step 1 alongside the 1A Aggregate sizer: `best_window` sums per-unit
+origins (`x_min = Σ x_min_k`, floored) and widths, pads once at the total, and
+routes the windowed non-signed book through the existing roll-combine. This plan
+**consumes** the result (uniform per-unit two-sided windows + the origin-sum /
+roll machinery); it is no longer a deliverable here. See bucket-window-2 §"1P".
 
-### Part B — bivariate per-axis windowing (the goal)
+### Part B — bivariate per-axis windowing (the goal of this plan)
 - `multivariate.size_axis` windowed variant, parametrized by coverage nines (keep
   the `WINDOW_NINES` vs `_WINDOW_NINES` split for 2-D memory).
 - per-axis output roll (`np.roll(T, −j0_i, axis=i)`), the pure-roll specialisation of
@@ -73,12 +75,16 @@ are now moot (per-column masking).
 
 ## Invariants / tests (carried + extended)
 
-- 2-unit high-mean book → shared `x_min>0`, `bs` finer than 0-based, `p_total` mass 1,
+> The portfolio-combine invariants below (2-unit high-mean book, mixed book,
+> `Σ kappa_i == x` on the windowed combine) now belong to **1P in
+> bucket-window-2**; listed here as the upstream guarantees this plan relies on.
+
+- *(1P)* 2-unit high-mean book → shared `x_min>0`, `bs` finer than 0-based, `p_total` mass 1,
   moments match; vs forced `x_min=0` legacy combine → moments agree.
-- mixed high-mean/ordinary → total windows, `p_total` right; ordinary unit's
+- *(1P)* mixed high-mean/ordinary → total windows, `p_total` right; ordinary unit's
   `aligned_unit_density_df` column off-window/empty (not wrapped garbage), its own
   `density_df` correct on its native window.
-- **`Σ_i kappa_i(x) == x`** on a *windowed* combine (ties numerics-2's anchor into the
+- *(1P)* **`Σ_i kappa_i(x) == x`** on a *windowed* combine (ties numerics-2's anchor into the
   windowed grid — the key cross-plan check).
 - bivariate: each axis windowed, grid far smaller than 0-based `[0,vmax]²`, both
   marginals match their 1-D windowed aggregates; mixed bivariate windows one axis,
@@ -90,11 +96,12 @@ are now moot (per-column masking).
 
 ## Files
 
-- `src/aggregate/portfolio.py` — `best_window`, `update` windowed routing.
 - `src/aggregate/multivariate.py` — `size_axis` windowed variant, per-axis roll.
 - `src/aggregate/distributions.py` — occ-reins on `xs_sev` (P0), per-unit window
   metadata.
-- `tests/test_bucket_sizing.py`, `tests/test_multivariate*.py`.
+- `tests/test_multivariate*.py`.
+- *(upstream, bucket-window-2 / 1P:* `src/aggregate/portfolio.py` `best_window`,
+  `update` windowed routing; `tests/test_bucket_sizing.py`.*)*
 
 ## Housekeeping
 

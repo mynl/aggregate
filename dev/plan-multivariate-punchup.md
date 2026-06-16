@@ -1,10 +1,14 @@
 # multivariate.py punch-up — sizing / coverage reconciliation (starter)
 
-> **STATUS: NOT STARTED — starter notes.** Captured 2026-06-05 while scoping
-> `dev/plan-config.md`. This is a seed for the multivariate tuning pass, not a
-> finished plan. The one config item that *was* clean (the `_WINDOW_NINES`
-> de-dup → `[multivariate] window_nines`) ships with the config work; everything
-> below is deferred to this effort so we don't pin half-tuned values into config.
+> **STATUS: NOT STARTED — starter notes. This is the MV follow-on AFTER
+> `plan-numerics-4` lands** (numerics-4 integrates the 1A/1P windowing primitives
+> from `plan-bucket-window-2.md` into `multivariate.py`; this plan then
+> reconciles the two axis-sizing code paths and settles the `[multivariate]`
+> config knobs on top of that windowed foundation). Captured 2026-06-05 while
+> scoping `dev/plan-config.md`. A seed for the tuning pass, not a finished plan.
+> The one config item that *was* clean (the `_WINDOW_NINES` de-dup →
+> `[multivariate] window_nines`) ships with the config work; everything below is
+> deferred to this effort so we don't pin half-tuned values into config.
 
 ## Why this exists
 

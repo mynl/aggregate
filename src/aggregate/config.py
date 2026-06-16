@@ -123,13 +123,31 @@ class DiscretizationSettings:
     window_nines : int
         Number of nines defining the automatic 1-D aggregate output window:
         it spans roughly the ``10**-window_nines .. 1 - 10**-window_nines``
-        quantiles (formerly ``WINDOW_NINES``).
+        quantiles (formerly ``WINDOW_NINES``). This is the **protected** edge
+        coverage -- the tail the sign convention cares about (the right tail
+        for a loss, the left for a payoff) -- sized deep to avoid clipping.
+    window_nines_trim : int
+        Number of nines for the **unprotected** edge of a windowed (two-sided)
+        aggregate: the cheap tail the convention does not price (the left for a
+        loss, the right for a payoff). Shallower than ``window_nines`` so the
+        window trims dead space on that side rather than wasting grid; only
+        affects a *windowed* book (mass band clears 0), never an ordinary
+        0-based one. See ``dev/plan-bucket-window-2.md`` §1A (Q1/Q2).
+    window_pad_skew : float
+        Padding-balance skew ``Delta`` in ``[0, 0.5)``. Once a windowed band is
+        placed, the power-of-2 slack is split with fraction ``f = 0.5 -/+ Delta``
+        below the band (``0.5 - Delta`` for a loss -> more room on the right
+        where the priced tail lives; ``0.5 + Delta`` for a payoff). ``0`` centres
+        the band exactly; the legacy behaviour was ``f = 0`` (all slack above).
+        See ``dev/plan-bucket-window-2.md`` §1A (Q4).
     """
 
     reins_bucket: str = 'linear'
     dsev_bucket: str = 'linear'
     bucket_sizing_p: float = 0.99999
     window_nines: int = 12
+    window_nines_trim: int = 6
+    window_pad_skew: float = 0.1
 
 
 @dataclass(frozen=True)

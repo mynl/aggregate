@@ -268,6 +268,23 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   **needs W1**; ties Track M.
 - [ ] **W3 `[B]`** Plot severity outside the aggregate window (#8) — inset,
   broken axis, or separate figure when grids don't overlap (`info` already warns).
+- [x] **W6 `[A]`** Bucket-window **1A** — convention-aware symmetric output
+  windowing (a58, `dev/plan-bucket-window-2.md` §1A). Per-edge window coverage
+  (`estimate_agg_window` `p_lo`/`p_hi`; `[discretization] window_nines_trim`),
+  balanced padding (`window_pad_skew`), convention from `value_type` with
+  `update(window_convention=…)` override, relaxed windowed-selection gate
+  (`<`→`≤`, placement-not-just-finer), and an explicit Regime-B (heavy
+  severity) branch with a `logger.info`. Ordinary + Regime-B books byte-stable.
+  **Deferred follow-up — W7:** Regime-B *clip remediation* (deepen upper
+  coverage / grow `log2` to capture the heavy right tail, e.g. the
+  `5000 claims cv 2` 3.9e-7 top-bucket clip). Needs a waste/clip threshold to
+  separate genuinely-wasteful Regime-B books from ordinary ones that merely
+  have `w_lo > 0`; own validated pass so it doesn't risk 1A byte-stability.
+- [ ] **W8 `[A]`** Bucket-window **1P** — `Portfolio` windowed combine
+  (`best_window`/`update`): sum per-unit origins/widths, pad once at the total,
+  route the windowed non-signed book through the roll-combine; `Σ kappa_i == x`
+  on the windowed grid. Consumes 1A's uniform per-unit two-sided windows. Next
+  step after W6 (`dev/plan-bucket-window-2.md` §1P).
 - [x] **W4 `[A]`** Signed (P&L) Lee-plot artifact (a39) — `Aggregate.plot`'s
   discrete zero-anchor row set `loss=0`, drawing a spurious vertical segment to
   the first point on signed support; anchor `loss` now equals its index.

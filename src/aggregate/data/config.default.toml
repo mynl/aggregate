@@ -62,7 +62,21 @@
 
 # window_nines: nines defining the automatic 1-D aggregate output window
 # (spans ~ 10**-n .. 1 - 10**-n quantiles). Higher = wider window. Typical 8..14.
+# This is the PROTECTED edge -- the tail the sign convention prices (the right
+# for a loss, the left for a payoff) -- sized deep to avoid clipping.
 # window_nines = 12
+
+# window_nines_trim: nines for the UNPROTECTED (cheap) edge of a windowed
+# two-sided aggregate -- the left for a loss, the right for a payoff. Shallower
+# than window_nines so the window trims dead space on that side rather than
+# wasting grid. Only affects a windowed book (mass band clears 0).
+# window_nines_trim = 6
+
+# window_pad_skew: padding-balance skew Delta in [0, 0.5). Once a windowed band
+# is placed, the power-of-2 slack is split f = 0.5 -/+ Delta below the band
+# (0.5 - Delta for a loss -> more room on the priced right; 0.5 + Delta for a
+# payoff). 0 centres the band exactly.
+# window_pad_skew = 0.1
 
 
 # [validation] -- moment-matching tolerances.

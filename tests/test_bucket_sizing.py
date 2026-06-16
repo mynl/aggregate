@@ -202,3 +202,85 @@ def test_window_ordinary_aggregate_unchanged():
     assert a.x_min == 0.0
     sel = a._bs_window_df.index[a._bs_window_df.selected][0]
     assert sel != 'windowed'
+
+
+# ---------------------------------------------------------------------------
+# 1A -- symmetric, convention-aware output windowing (plan-bucket-window-2 §1A).
+# Per-edge coverage (the convention skew lever), balanced padding (the band sits
+# sensibly in the grid rather than jammed at the bottom), the relaxed "no
+# coarser" selection gate, and the explicit Regime-B (heavy severity) branch.
+# ---------------------------------------------------------------------------
+
+def test_estimate_agg_window_per_edge_coverage():
+    """Per-edge coverage: a shallow edge is trimmed in; a deep edge is unmoved.
+
+    The convention-skew lever. A loss covers its upper (priced) edge deep and
+    trims the cheap lower edge shallow, so ``p_lo=6`` raises the lower edge
+    while ``p_hi=12`` leaves the upper edge at the symmetric value.
+    """
+    from aggregate.distributions import estimate_agg_window
+    both = estimate_agg_window(1000, 100, 0.3, p=12)
+    skew = estimate_agg_window(1000, 100, 0.3, p_lo=6, p_hi=12)
+    assert skew[0] > both[0]                      # shallow low edge trimmed up
+    assert skew[1] == pytest.approx(both[1])      # deep high edge unchanged
+
+
+def test_window_balanced_padding_redistributes_slack():
+    """A windowed band's origin sits below its band-bottom window origin.
+
+    ``_size`` places the window band-bottom (all power-of-2 slack above);
+    balanced padding (``window_pad_skew``) pushes a fraction of the slack below
+    the band so the log-density plot is not jammed against the grid floor. The
+    realized origin is therefore strictly below the ``windowed`` row's
+    band-bottom origin, and mass is conserved.
+    """
+    a = build('agg HM 100000 claims sev lognorm 100 cv 0.5 poisson')
+    df = a._bs_window_df
+    assert bool(df.loc['windowed', 'selected'])
+    band_bottom = float(df.loc['windowed', 'x_min'])
+    used = float(df.loc['used', 'x_min'])
+    assert used < band_bottom                     # slack pushed below the band
+    assert a.x_min == pytest.approx(used)
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
+
+
+def test_window_convention_override_mirrors_placement():
+    """``window_convention`` flips the padding skew; loss and payoff mirror.
+
+    A loss leaves more empty grid above the band (room for the priced right
+    tail); a payoff is the mirror image. The two placements are symmetric.
+    """
+    def fracs(conv):
+        a = build('agg HM 100000 claims sev lognorm 100 cv 0.5 poisson')
+        a.update(window_convention=conv)
+        d = a.agg_density
+        nz = np.flatnonzero(d > 1e-12)
+        top = a.x_min + a.bs * (1 << a.log2)
+        below = (a.xs[nz[0]] - a.x_min) / (top - a.x_min)
+        above = (top - a.xs[nz[-1]]) / (top - a.x_min)
+        return below, above
+
+    lo_below, lo_above = fracs('loss')
+    pay_below, pay_above = fracs('payoff')
+    assert lo_above > lo_below                     # loss: room on the right
+    assert pay_below > pay_above                   # payoff: room on the left
+    assert lo_below == pytest.approx(pay_above, abs=0.02)   # mirror
+    assert lo_above == pytest.approx(pay_below, abs=0.02)
+
+
+def test_window_regime_b_heavy_severity_stays_zero_based(caplog):
+    """Heavy severity (Regime B): band clears 0 but the origin cannot move.
+
+    ``5000 claims lognorm 100 cv 2`` has its mass band well above 0, but a
+    single cv-2 severity overflows the windowed extent, so the benign FFT wrap
+    is invalid. The windowed row is recorded but inapplicable; the grid stays
+    0-based and a discoverability ``logger.info`` explains why (no warning --
+    this is expected, not defective).
+    """
+    import logging
+    with caplog.at_level(logging.INFO, logger='aggregate.distributions'):
+        a = build('agg C3 5000 claims sev lognorm 100 cv 2 poisson')
+    assert 'windowed' in a._bs_window_df.index
+    assert not bool(a._bs_window_df.loc['windowed', 'applies'])
+    assert a.x_min == 0.0
+    assert any('non-windowable' in r.getMessage() for r in caplog.records)

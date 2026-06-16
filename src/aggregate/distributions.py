@@ -73,6 +73,17 @@ WINDOW_NINES = get_settings().discretization.window_nines
 # is provably narrow (a concentrated aggregate, agg_cv < 1/z); it never fires for
 # a genuinely wide band, which coarsens bs as before.
 WINDOW_LOG2_GROWTH = 4
+# WINDOW_NINES_TRIM: coverage (number of nines) for the *unprotected* edge of a
+# windowed two-sided aggregate -- the cheap tail the sign convention does not
+# price (the left edge for a loss, the right for a payoff). Shallower than
+# WINDOW_NINES so the window trims dead space on that side. Only affects a book
+# whose mass band clears 0 (windowed); ordinary 0-based books are untouched.
+WINDOW_NINES_TRIM = get_settings().discretization.window_nines_trim
+# WINDOW_PAD_SKEW: padding-balance skew Delta. After a windowed band is placed,
+# the power-of-2 slack is split with fraction f = 0.5 -/+ Delta below the band
+# (loss -> 0.5 - Delta, more room above/right; payoff -> 0.5 + Delta). 0 centres
+# the band; the legacy placement was f = 0 (all slack above the band).
+WINDOW_PAD_SKEW = get_settings().discretization.window_pad_skew
 # BUCKET_SIZING_P: percentile of the fitted distribution fed to
 # recommend_bucket to size bs (formerly BUCKET_SIZING_P). >1 is read as nines.
 BUCKET_SIZING_P = get_settings().discretization.bucket_sizing_p
@@ -499,7 +510,7 @@ def _estimate_agg_percentile(m, cv, skew, p=0.999):
     return np.maximum(np.maximum(pn, pl), np.maximum(pg, m * (1 + ss.norm.isf(1 - p) * cv)))
 
 
-def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P):
+def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P, p_lo=None, p_hi=None):
     """Two-sided output window ``[x_lo, x_hi]`` and width ``W`` for an aggregate.
 
     The signed counterpart of :func:`_estimate_agg_percentile`: where that
@@ -516,8 +527,15 @@ def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P):
         taken directly so the mean-zero case -- where ``cv`` is undefined --
         works.
     p : float
-        Coverage. ``p > 1`` is read as ``1 - 10**-p`` (e.g. ``p=6`` ->
-        ``1 - 1e-6``); the per-edge tail probability is ``1 - p``.
+        Coverage for *both* edges when ``p_lo`` / ``p_hi`` are not given.
+        ``p > 1`` is read as ``1 - 10**-p`` (e.g. ``p=6`` -> ``1 - 1e-6``); the
+        per-edge tail probability is ``1 - p``.
+    p_lo, p_hi : float, optional
+        Per-edge coverage. When supplied they override ``p`` on the lower /
+        upper edge respectively, so the two tails can be covered to different
+        depths -- the convention-skew lever (a loss covers its **upper** edge
+        deep to avoid clipping the priced right tail, and trims the cheap lower
+        edge shallow; a payoff mirrors). Same ``>1 -> nines`` reading as ``p``.
 
     Returns
     -------
@@ -533,8 +551,8 @@ def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P):
     - **Symmetric** (``|skew|`` below a tolerance, incl. any genuinely
       symmetric or mean-zero P&L): neither shifted-lognormal nor shifted-gamma
       is defined, so use a **normal** approximation for both edges
-      ``m -/+ z*sd`` with ``z = norm.isf(1-p)``. This is the default fallback,
-      not an afterthought.
+      ``m - z_lo*sd`` / ``m + z_hi*sd`` with ``z_e = norm.isf(1-p_e)``. This is
+      the default fallback, not an afterthought.
     - **Right-skewed** (``skew > 0``): fit shifted lognormal and shifted gamma
       to ``(m, sd, skew)`` and take the **wider** window
       (``min`` of the low quantiles, ``max`` of the high quantiles).
@@ -549,21 +567,34 @@ def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P):
     sd = abs(float(sd))
     if not np.isfinite(sd):
         raise ValueError('Infinite/undefined sd passed to estimate_agg_window')
-    p = float(np.where(p > 1, 1 - 10.0 ** -p, p))
-    tail = 1.0 - p
-    z = ss.norm.isf(tail)
+
+    def _to_prob(q):
+        return float(np.where(q > 1, 1 - 10.0 ** -q, q))
+
+    p = _to_prob(p)
+    p_lo = p if p_lo is None else _to_prob(p_lo)
+    p_hi = p if p_hi is None else _to_prob(p_hi)
+    tail_lo = 1.0 - p_lo
+    tail_hi = 1.0 - p_hi
+    z_lo = ss.norm.isf(tail_lo)
+    z_hi = ss.norm.isf(tail_hi)
     if sd == 0:
         return float(m), float(m), 0.0
 
     def _normal_window():
-        return float(m - z * sd), float(m + z * sd), float(2 * z * sd)
+        return float(m - z_lo * sd), float(m + z_hi * sd), float((z_lo + z_hi) * sd)
 
     skew_tol = 1e-3
     if abs(skew) <= skew_tol or not np.isfinite(skew):
         return _normal_window()
 
-    # Reflect for negative skew so the fits always see a right tail.
+    # Reflect for negative skew so the fits always see a right tail. Under the
+    # reflection the final lower edge comes from the reflected fit's *high*
+    # quantile and vice versa, so the per-edge tails swap with ``s``: the
+    # reflected ppf (low) carries the tail that ends up on the final low edge.
     s = 1.0 if skew > 0 else -1.0
+    fit_tail_lo = tail_lo if s == 1.0 else tail_hi
+    fit_tail_hi = tail_hi if s == 1.0 else tail_lo
     mm = s * m
     sk = s * skew
     cvv = sd / mm if mm != 0 else np.inf
@@ -572,15 +603,15 @@ def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P):
         try:
             shift, mu, sigma = sln_fit(mm, cvv, sk)
             fz = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-            los.append(float(fz.ppf(tail)))
-            his.append(float(fz.isf(tail)))
+            los.append(float(fz.ppf(fit_tail_lo)))
+            his.append(float(fz.isf(fit_tail_hi)))
         except Exception:  # pragma: no cover - defensive
             pass
         try:
             shift, alpha, theta = sgamma_fit(mm, cvv, sk)
             fz = ss.gamma(alpha, scale=theta, loc=shift)
-            los.append(float(fz.ppf(tail)))
-            his.append(float(fz.isf(tail)))
+            los.append(float(fz.ppf(fit_tail_lo)))
+            his.append(float(fz.isf(fit_tail_hi)))
         except Exception:  # pragma: no cover - defensive
             pass
     if not his:
@@ -4509,7 +4540,7 @@ class Aggregate:
         self._is_loss_value = value_type_role(v)
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
-               x_min='auto', x_max=None, **kwargs):
+               x_min='auto', x_max=None, window_convention=None, **kwargs):
         """
         Convenience function, delegates to update_work. Avoids having to pass xs. Also
         aliased as easy_update for backward compatibility.
@@ -4527,6 +4558,10 @@ class Aggregate:
         :param x_max: upper edge of the output window; informational, the grid
           length is fixed by ``log2``. Currently unused when ``x_min`` is given
           explicitly (the window is ``[x_min, x_min + (2**log2)*bs)``).
+        :param window_convention: ``'loss'`` / ``'payoff'`` to override the sign
+          convention orienting the automatic windowed placement (per-edge
+          coverage and padding skew). ``None`` (default) derives it from
+          ``value_type``. See ``dev/plan-bucket-window-2.md`` §1A.
         :param kwargs:  passed through to update
         :return:
 
@@ -4542,7 +4577,8 @@ class Aggregate:
         # reproduces ``recommend_bucket`` exactly, so ordinary aggregates are
         # unchanged.
         x_min_arg = None if (isinstance(x_min, str) and x_min == 'auto') else x_min
-        bs, log2, x_min = self._bs_window(log2, bs, x_min_arg, bucket_sizing_p)
+        bs, log2, x_min = self._bs_window(log2, bs, x_min_arg, bucket_sizing_p,
+                                          window_convention=window_convention)
         N = 1 << log2
         # ``x_min`` is the loss-convolution origin chosen by ``_bs_window``: 0 for
         # an ordinary aggregate or a non-negative-loss ``pnl``; a negative origin
@@ -6401,7 +6437,8 @@ class Aggregate:
         n_hi = f1 + zN * fsd
         return float(min(0.0, n_hi * s_min)), float(n_hi * s_max)
 
-    def _bs_window(self, log2, bs_in, x_min_in, bucket_sizing_p):
+    def _bs_window(self, log2, bs_in, x_min_in, bucket_sizing_p,
+                   window_convention=None):
         """Decide ``(bs, log2, x_min)`` for ``update`` and build ``_bs_window_df``.
 
         Runs up to three sizing methods and records each in the expert-
@@ -6423,6 +6460,11 @@ class Aggregate:
             it (snapped to ``bs``, D4).
         bucket_sizing_p : float
             Tail probability for the moment / bounded windows.
+        window_convention : {'loss', 'payoff'}, optional
+            Override the sign convention that orients the windowed placement
+            (per-edge coverage + padding skew). ``None`` (default) derives it
+            from ``self.value_type`` (``_is_loss_value``). See
+            ``dev/plan-bucket-window-2.md`` §1A (Q9).
 
         Returns
         -------
@@ -6439,14 +6481,18 @@ class Aggregate:
         - ``bounded_small`` -- bounded severity: ``[0, N_hi·s_max]`` from a high
           frequency quantile; selected only when tighter than ``moment``.
         - ``windowed`` -- non-signed high-mean / thin-spread aggregate
-          (``agg_cv < 1/z``): a two-sided window far from 0, computed via benign
-          FFT wrap. Auto-origin only; selected only when strictly finer than the
-          0-based pick. Gives the windowed grid a non-zero ``x_min`` (so ``q`` /
-          ``F`` / plots are defined on the window, not from 0); pass
-          ``x_min=0`` to force the legacy grid.
+          (``agg_cv < 1/z``): a convention-skewed two-sided window far from 0,
+          computed via benign FFT wrap. Auto-origin only; selected when the
+          severity fits the windowed extent and it is **no coarser** than the
+          0-based pick (it then reclaims the empty space below the band and
+          balances the power-of-2 slack). Gives the windowed grid a non-zero
+          ``x_min`` (so ``q`` / ``F`` / plots are defined on the window, not
+          from 0); pass ``x_min=0`` to force the legacy grid.
 
         Selection: ``exact_discrete`` > ``bounded_small`` (if tighter) >
-        ``moment``; ``windowed`` then overrides if strictly finer.
+        ``moment``; ``windowed`` then overrides when it applies and is no
+        coarser. The selected windowed origin is then balance-padded
+        (``window_pad_skew``) so the band sits sensibly in the grid (R2/R5).
         """
         N0 = 1 << log2
         m = self.agg_m
@@ -6462,9 +6508,22 @@ class Aggregate:
         # post-step (below + in ``_apply_agg_affine``). Hence ``_signed_severity``
         # not ``_signed`` -- the latter also reports ``True`` for the affine.
         signed = self._signed_severity()
+        # Sign convention orienting the windowed placement: loss -> protect the
+        # right (priced) tail and trim/balance toward it; payoff mirrors. From
+        # ``value_type`` unless explicitly overridden (Q9; branch on the boolean
+        # role, never the label string -- house rule).
+        if window_convention is None:
+            is_loss = bool(self._is_loss_value)
+        else:
+            is_loss = value_type_role(window_convention)
         # Window coverage: WINDOW_NINES nines (default 12) -- far tighter than
         # the legacy bucket p, so the window captures essentially all the mass.
+        # Per-edge coverage for the windowed two-sided placement: deep on the
+        # protected edge (anti-clip), shallow on the cheap edge (anti-waste).
         p = 1.0 - 10.0 ** -WINDOW_NINES
+        p_protect = 1.0 - 10.0 ** -WINDOW_NINES
+        p_trim = 1.0 - 10.0 ** -WINDOW_NINES_TRIM
+        p_lo_w, p_hi_w = (p_trim, p_protect) if is_loss else (p_protect, p_trim)
         lattice = self._severity_lattice()
 
         def _size(x_lo, x_hi, lattice_bs, force_origin=False, grow_cap=None):
@@ -6598,19 +6657,24 @@ class Aggregate:
         #   - the window lower edge clears 0 (``w_lo > 0``) -- this is exactly
         #     ``agg_cv < 1/z``, so an ordinary aggregate (whose window includes
         #     0) never qualifies.
-        # Selection then takes it only when *strictly finer* than the 0-based
-        # pick (below), which is the feasibility test: the band always fits the
-        # period by construction, so the only failure mode is "not actually
-        # finer", a quiet fall back to the 0-based grid.
+        # The edges use *per-edge* coverage (``p_lo_w, p_hi_w``), deep on the
+        # protected tail and shallow on the cheap one, so the convention skews
+        # the placement (Q1/Q2). Selection then takes it when the severity fits
+        # the windowed extent and it is **no coarser** than the 0-based pick
+        # (below) -- reclaiming the empty space below the band even when ``bs``
+        # is unchanged; the only quiet fall back is a coarser bucket.
         if (x_min_in is None and not signed and not self._agg_affine_active()
                 and self.occ_reins is None
                 and np.isfinite(sd) and sd > 0):
             try:
-                w_lo, w_hi, _Ww = estimate_agg_window(m, sd, skew, p)
+                w_lo, w_hi, _Ww = estimate_agg_window(
+                    m, sd, skew, p, p_lo=p_lo_w, p_hi=p_hi_w)
             except ValueError:
                 w_lo = -1.0  # no finite window (e.g. infinite variance)
             if w_lo > 0:
-                r = _row(w_lo, w_hi, lattice, f'1-1e-{WINDOW_NINES}',
+                r = _row(w_lo, w_hi, lattice,
+                         f'lo 1-1e-{WINDOW_NINES_TRIM if is_loss else WINDOW_NINES}'
+                         f' / hi 1-1e-{WINDOW_NINES if is_loss else WINDOW_NINES_TRIM}',
                          'two-sided window, benign FFT wrap',
                          force_origin=True, grow_cap=log2 + WINDOW_LOG2_GROWTH)
                 # Severity-fit guard: the severity discretises on [0, N*bs]; a
@@ -6623,6 +6687,17 @@ class Aggregate:
                 r['applies'] = bool(np.isfinite(sev_hi) and sev_hi < extent)
                 r['note'] += f'; sev_hi={sev_hi:.6g}, extent={extent:.6g}'
                 rows['windowed'] = r
+                if not r['applies']:
+                    # Regime B (heavy severity): the mass band clears 0 but a
+                    # single severity overflows the window, so the origin cannot
+                    # move -- the book keeps the floor-anchored grid (empty space
+                    # below the band is the price of the 0-containing severity
+                    # invariant). Discoverability only -- expected, not defective.
+                    logger.info(
+                        '%s: mass band clears 0 (w_lo=%.6g) but severity '
+                        'overflows the window (sev_hi=%.6g >= extent=%.6g); '
+                        'keeping the 0-based grid (heavy-severity, non-windowable).',
+                        self.name, w_lo, sev_hi, extent)
 
         # ---- selection (D1/D2) ------------------------------------------
         # bounded_small is selected a bit permissively -- it is a hard support
@@ -6635,12 +6710,15 @@ class Aggregate:
             selected = 'bounded_small'
         else:
             selected = 'moment'
-        # windowed overrides the 0-based pick only when it is applicable (the
-        # severity fits the windowed extent) and lands a strictly finer bucket.
-        # Self-limiting: it can only be finer when the mass band clears 0
-        # (``agg_cv < 1/z``), so ordinary aggregates are byte-for-byte unchanged.
+        # windowed overrides the 0-based pick when it is applicable (the
+        # severity fits the windowed extent) and is **no coarser** than that
+        # pick. ``<=`` (not ``<``) so a band that clears 0 wins on *placement*
+        # alone -- reclaiming the empty ``[0, x_lo)`` region and balancing the
+        # slack -- even when ``bs`` is unchanged. Self-limiting: ``applies`` can
+        # only hold when the mass band clears 0 *and* a single severity fits, so
+        # ordinary and heavy-severity (Regime B) aggregates are unchanged.
         if ('windowed' in rows and rows['windowed']['applies']
-                and rows['windowed']['bs'] < rows[selected]['bs']):
+                and rows['windowed']['bs'] <= rows[selected]['bs']):
             selected = 'windowed'
 
         # ---- realized grid (the ``used`` row) ---------------------------
@@ -6649,6 +6727,30 @@ class Aggregate:
         sel_x0 = float(rows[selected]['x_min'])
         if x_min_in is not None:           # explicit origin override (D4)
             sel_x0 = float(round(x_min_in / sel_bs) * sel_bs)
+        # ---- balanced padding (R2/R4/R5) --------------------------------
+        # A windowed band is placed band-bottom by ``_size`` (all power-of-2
+        # slack above it). Redistribute the slack so the band sits sensibly in
+        # the grid: fraction ``f = 0.5 -/+ window_pad_skew`` of the slack goes
+        # below the band (loss -> less below / more room on the priced right;
+        # payoff -> mirror). Only the *windowed* row is rebalanced -- ordinary,
+        # exact, and bounded rows keep their band-bottom origin (byte-stable);
+        # an explicit ``x_min`` also pins the origin. The shift is clamped so the
+        # grid still covers the window top and never crosses the 0 floor, so the
+        # benign FFT wrap stays valid (and is in fact safer -- margin both sides).
+        if (selected == 'windowed' and x_min_in is None
+                and not self._agg_affine_active()):
+            w_lo = float(rows['windowed']['x_min'])   # snapped band-bottom origin
+            w_hi = float(rows['windowed']['x_max'])
+            N = 1 << sel_l2
+            slack = N * sel_bs - (w_hi - w_lo)
+            if slack > 0:
+                f = 0.5 - WINDOW_PAD_SKEW if is_loss else 0.5 + WINDOW_PAD_SKEW
+                target = w_lo - f * slack
+                origin = float(np.floor(target / sel_bs) * sel_bs)
+                # keep the band: origin in [x_hi - N*bs, w_lo], and >= 0 floor.
+                lo_bound = max(0.0, float(np.ceil((w_hi - N * sel_bs) / sel_bs) * sel_bs))
+                origin = min(max(origin, lo_bound), w_lo)
+                sel_x0 = origin
         grid_x_max = sel_x0 + (1 << sel_l2) * sel_bs
 
         # ---- aggregate affine (pnl): tight, mass-centred P&L window ------

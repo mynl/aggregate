@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.0.0a58
+
+### Bucket-window 1A — convention-aware aggregate output windowing
+
+First step of `dev/plan-bucket-window-2.md` (Step 1, part 1A: the
+`Aggregate` sizer; part 1P, the `Portfolio` combine, follows). The automatic
+output window for a concentrated aggregate (mass band clears 0) is now
+symmetric in its estimator and oriented by the sign convention, and the band
+is placed sensibly in the grid rather than jammed against the floor.
+
+- **Per-edge window coverage** (`estimate_agg_window` gains `p_lo` / `p_hi`).
+  A windowed book covers its *protected* edge deep (anti-clip) and trims its
+  *cheap* edge shallow (anti-waste): for a loss the upper (priced right) tail
+  is protected and the lower trimmed; a payoff mirrors. New
+  `[discretization] window_nines_trim` (default 6) sets the trim depth;
+  `window_nines` (12) remains the protected depth. Backward compatible —
+  callers passing only `p` are unchanged.
+- **Balanced padding** (`[discretization] window_pad_skew`, default 0.1).
+  The power-of-2 slack around a windowed band is split `f = 0.5 -/+ skew`
+  below the band (loss -> more room on the right, payoff -> mirror) instead of
+  all above. Only the *windowed* row is rebalanced; ordinary, exact-discrete
+  and bounded books keep their band-bottom origin.
+- **Convention from `value_type`, with override.** The windowed skew branches
+  on `_is_loss_value` (never the label string); `update(window_convention=...)`
+  overrides per call. Defaults derive from the aggregate's `value_type`.
+- **Relaxed windowed-selection gate** (`<` -> `<=`). A band that clears 0 now
+  wins on *placement* -- reclaiming the empty `[0, x_lo)` region and balancing
+  the slack -- even when `bs` is unchanged, not only when strictly finer. The
+  severity-fit guard is unchanged, so the change cannot select a windowed grid
+  the severity does not fit.
+- **Explicit Regime-B (heavy severity) branch.** When the mass band clears 0
+  but a single severity overflows the windowed extent (the benign FFT wrap is
+  invalid), the book keeps the 0-based grid and a `logger.info` explains why
+  (expected, not defective -- no warning). This replaces the previous silent
+  fall-back.
+
+Byte-stability: ordinary aggregates (`agg_cv > 1/z`) and heavy-severity
+Regime-B books are unchanged -- the full `test_suite.agg` snapshot and the
+numerics-2/3 regression gates pass untouched. The only grids that move are
+genuinely windowed (Regime-A) books, which gain a centred placement.
+
+Deferred (documented in `dev/TODO.md`): Regime-B *clip remediation* (deepening
+upper coverage / growing `log2` to capture the heavy right tail, e.g. the
+`5000 claims cv 2` 3.9e-7 top-bucket clip). It needs a waste/clip threshold to
+separate genuinely-wasteful Regime-B books from ordinary ones that merely have
+`w_lo > 0`, and so deserves its own validated pass rather than risking the 1A
+byte-stability guarantee.
+
 ## 1.0.0a57
 
 ### Numerics-3 — distortion spine (one Choquet engine; linear/lifted unified)

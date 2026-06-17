@@ -549,8 +549,42 @@ SBJ already sizes correctly; this just tells the user the moments were untrustwo
 
 ## Out of scope (still)
 
-- A genuine 4-moment severity fit (NIG / GH). SBJ + the diagnostic suffice; a
-  4-parameter fit is a larger modeling change.
+- A genuine 4-moment severity fit (NIG / GH). SBJ suffices; a 4-parameter fit is
+  a larger modeling change.
 - Multivariate per-axis SBJ (numerics-4 consumes this 1-D primitive).
 
 Version bump a58 → a59 on landing.
+
+## As built (landed a59) — three corrections to this draft
+
+Implementation surfaced three things the draft above got wrong; the landed code
+follows these, and they supersede the draft where they conflict.
+
+1. **Signed vs positive are different *urgencies*, not one symmetric floor.**
+   - *Signed* (the `100 - lognorm` case) is a **correctness** bug: the severity
+     discretises on the same N-bucket grid, so if its negative reach exceeds the
+     grid width the FFT **wraps** and corrupts the whole law (47% mass loss).
+     The grid therefore **always** covers `[sbj_lo, sbj_hi]` — keeping the bulk
+     `bs` when it fits the log2 budget, else **coarsening `bs`** within the cap.
+     Aliasing is fixed at any log2.
+   - *Positive* (the `5000 cv 2` case) is only a **refinement**: a heavy MoM
+     window under-reaches, clipping a tiny far tail. The window extends to the
+     jump **only when it fits at the bulk `bs` within the requested `log2`**;
+     otherwise the MoM window is kept (clipping beats wrecking the bulk). A
+     material clip is still flagged by the existing `DefectiveDistribution`.
+
+2. **`log2` is honored — no silent growth.** The draft's "grow `log2` to keep
+   the bulk `bs`" violates the caller/hint contract (`test_hints` pins an
+   explicit/hinted `log2`) *and* the author's no-magic preference. The floor
+   never grows `log2` past the request (explicit, hinted, or the default 16) and
+   never coarsens a pinned `bs`. A genuinely heavy book that needs more grid is
+   the user's call to raise `log2` (the validation/deficit warning tells them).
+
+3. **The kurtosis diagnostic is dropped.** The "exact kurtosis ≈ 737 vs fit
+   3.08" tell was an artifact: 737 is the *empirical* kurtosis of the
+   already-aliased (47%-corrupted) distribution. The **true-law** compound
+   kurtosis of the signed case is ~4.8 (excess ~1.8), so a kurtosis-vs-fit test
+   never fires. With aliasing fixed at source and a positive-tail clip flagged by
+   `DefectiveDistribution`, no separate diagnostic is needed. `_severity_low_estimate`
+   and the `sbj` row in `_bs_window_df` were kept; the kurtosis machinery was not
+   built.

@@ -378,6 +378,21 @@ agg Window 10000000 claims dsev [1 2] poisson
 agg WinCts 100000 claims sev lognorm 100 cv 0.5 poisson
 
 # ============================================================
+# SBJ. Single-big-jump extent floor -- heavy / signed sevs (1.0.0a59)
+# ============================================================
+# The 3-moment MoM window is blind to a tail the first three moments miss. The
+# extent (not the resolution) is floored by one big claim on a typical bulk:
+# probe the severity at p** = 1 - (1-p*)/E[N], floor at ES - mu_X + q_X(p**).
+# SBJ.Signed is the catastrophic case (positive agg skew hides a heavy reflected
+# tail; without the floor the severity aliases and ~47% of mass is lost);
+# SBJ.Heavy is a positive heavy unlimited sev (window extends when log2 allows);
+# SBJ.Small is the constrained-log2 guard (keep the MoM window, honor log2).
+# See tests/test_bucket_sizing.py and dev/plan-bucket-window-2.md (1A-fix).
+agg SBJ.Signed 10 claims sev 100 - lognorm 10 cv 2.5 poisson                                                 note{signed heavy-left; grid must span the reach or the FFT aliases}
+agg SBJ.Heavy  5000 claims sev lognorm 100 cv 2 poisson                                                      note{positive heavy unlimited; far tail ~8e5, extends when log2 allows}
+agg SBJ.Small  5 claims sev lognorm 10 cv 2 poisson                                                          note{small heavy book, tail ~47k; constrained log2 keeps the MoM window}
+
+# ============================================================
 # HY3. Hygiene-3 batch: number separators + 'of' synonym (1.0.0a52)
 # ============================================================
 # Item 1: Python-style `_` digit-group separators in numbers (equal to their

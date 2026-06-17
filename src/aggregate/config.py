@@ -140,6 +140,14 @@ class DiscretizationSettings:
         where the priced tail lives; ``0.5 + Delta`` for a payoff). ``0`` centres
         the band exactly; the legacy behaviour was ``f = 0`` (all slack above).
         See ``dev/plan-bucket-window-2.md`` §1A (Q4).
+    sbj_tail_floor : float
+        Numerical-depth floor for the single-big-jump (SBJ) extent floor. To
+        cover the aggregate to ``p*`` the severity is probed at the deeper
+        ``p** = 1 - (1 - p*)/E[N]``; for a large ``E[N]`` this pushes
+        ``1 - p**`` past double precision (so ``q_X(p**)`` would be ``inf``).
+        The lower tail ``1 - p**`` is floored here at the deepest level the
+        severity is numerically meaningful (default ``1e-14``, about
+        ``window_nines + 2`` nines). See ``dev/plan-bucket-window-2.md`` §1A-fix.
     """
 
     reins_bucket: str = 'linear'
@@ -148,6 +156,7 @@ class DiscretizationSettings:
     window_nines: int = 12
     window_nines_trim: int = 6
     window_pad_skew: float = 0.1
+    sbj_tail_floor: float = 1e-14
 
 
 @dataclass(frozen=True)

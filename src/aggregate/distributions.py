@@ -87,6 +87,11 @@ WINDOW_PAD_SKEW = get_settings().discretization.window_pad_skew
 # BUCKET_SIZING_P: percentile of the fitted distribution fed to
 # recommend_bucket to size bs (formerly BUCKET_SIZING_P). >1 is read as nines.
 BUCKET_SIZING_P = get_settings().discretization.bucket_sizing_p
+# SBJ_TAIL_FLOOR: deepest lower-tail probability (1 - p**) the single-big-jump
+# extent floor will probe the severity at. The SBJ adjustment p** = 1 -
+# (1-p*)/E[N] deepens with E[N]; this floors 1 - p** so q_X(p**) stays finite
+# for an unbounded severity (the author's guard, §1A-fix). Default 1e-14.
+SBJ_TAIL_FLOOR = get_settings().discretization.sbj_tail_floor
 # VALIDATION_NOISE: absolute dust floor below which a quantity is treated as
 # exact zero / numerical noise.
 VALIDATION_NOISE = get_settings().validation.noise
@@ -6354,6 +6359,114 @@ class Aggregate:
                if self.limit is not None and len(self.limit) else np.inf)
         return min(hi, lim) if np.isfinite(lim) else hi
 
+    def _severity_low_estimate(self, tail):
+        """Lower (``~tail`` quantile) reach of the severity mixture.
+
+        The signed counterpart of :meth:`_severity_high_estimate`: how far
+        *below* zero a single occurrence reaches at lower-tail probability
+        ``tail``. Used by :meth:`_single_big_jump_window` to size the negative
+        extent (and grid width) of a signed aggregate so the severity cannot
+        wrap the FFT buffer (the aliasing failure mode).
+
+        Parameters
+        ----------
+        tail : float
+            Lower-tail probability (e.g. ``1e-14``); the reach is ``ppf(tail)``.
+
+        Returns
+        -------
+        float
+            The minimum component ``ppf(tail)`` -- a conservative (most
+            negative) bound on the severity's lower support. ``0.0`` for a
+            non-signed severity (no negative reach). ``-inf`` if a component
+            quantile cannot be evaluated.
+
+        Notes
+        -----
+        Bracketing the mixture quantile below by the minimum of the component
+        quantiles is the safe (wider) direction for grid sizing: it can only
+        widen the window, never clip the severity's negative tail.
+        """
+        if not self._signed_severity() or self.sevs is None:
+            return 0.0
+        los = []
+        for s in self.sevs:
+            if not getattr(s, 'signed', False):
+                continue
+            try:
+                los.append(float(s.fz.ppf(tail)))
+            except Exception:  # pragma: no cover - defensive
+                los.append(-np.inf)
+        return float(min(los)) if los else 0.0
+
+    def _single_big_jump_window(self, p_star):
+        """Single-big-jump extent floor for a heavy / signed severity.
+
+        For a subexponential severity the aggregate's far tail is dominated by a
+        single large claim on an otherwise typical bulk:
+        ``P(S > x) ~ E[N]·P(X > x)``. So to cover the aggregate to ``p_star``
+        the *severity* must be probed at the deeper level
+        ``p** = 1 - (1 - p_star)/E[N]`` -- one claim reaches there, the other
+        ``E[N]-1`` are typical (this is **not** ``N·q_X``, which would assume
+        *every* claim is huge and wildly over-size). The single-big-jump extent
+        replaces one typical claim (mean ``mu_X``) on the bulk (aggregate mean
+        ``ES``) by one big claim::
+
+            sbj_hi = ES - mu_X + q_X_hi(p**)      # one big claim up
+            sbj_lo = ES - mu_X + q_X_lo(p**)      # one big claim down (signed)
+
+        Parameters
+        ----------
+        p_star : float
+            Aggregate coverage to guarantee (e.g. ``1 - 1e-12``); ``> 1`` is
+            read as a number of nines.
+
+        Returns
+        -------
+        (sbj_lo, sbj_hi) : tuple of float, or None
+            The single-big-jump window edges (``sbj_lo == 0`` for a non-signed
+            severity). ``None`` when ``E[N]``, the severity mean, or the
+            ``p**`` quantile is unavailable (e.g. no finite variance) -- the
+            caller then keeps the existing window / recommend_bucket path.
+
+        Notes
+        -----
+        ``p**`` deepens with ``E[N]``; at ``E[N]=5000`` and
+        ``p_star = 1 - 1e-12``, ``1 - p** = 2e-16`` is past double precision and
+        ``q_X(p**) -> inf`` for an unbounded severity. The lower tail
+        ``1 - p**`` is therefore floored at ``SBJ_TAIL_FLOOR``
+        (``discretization.sbj_tail_floor``) and ``q_X_hi`` is capped by any
+        finite policy limit (via :meth:`_severity_high_estimate`).
+        """
+        en = float(self.n)
+        if not (np.isfinite(en) and en >= 1.0):
+            return None
+        try:
+            sev_m = float(self.stats_df['mixed'][('sev', 'mean')])
+        except (KeyError, ValueError, TypeError):
+            return None
+        es = float(self.agg_m)
+        if not (np.isfinite(sev_m) and np.isfinite(es)):
+            return None
+        # p** with the author's numerical-depth guard: 1 - p** = (1-p*)/E[N]
+        # floored at SBJ_TAIL_FLOOR so q_X(p**) stays finite for an unbounded
+        # severity.
+        p_star = float(np.where(p_star > 1, 1.0 - 10.0 ** -p_star, p_star))
+        tail = max((1.0 - p_star) / en, SBJ_TAIL_FLOOR)
+        p2 = 1.0 - tail
+        q_hi = self._severity_high_estimate(p2)
+        if not np.isfinite(q_hi):
+            return None
+        sbj_hi = es - sev_m + q_hi
+        if self._signed_severity():
+            q_lo = self._severity_low_estimate(tail)
+            sbj_lo = (es - sev_m + q_lo) if np.isfinite(q_lo) else q_lo
+        else:
+            sbj_lo = 0.0
+        if not np.isfinite(sbj_lo):
+            return None
+        return float(sbj_lo), float(sbj_hi)
+
     def _exact_discrete_window(self):
         """Exact aggregate support for a fully-discrete ``dfreq``/``fixed`` x ``dsev``.
 
@@ -6720,6 +6833,97 @@ class Aggregate:
         if ('windowed' in rows and rows['windowed']['applies']
                 and rows['windowed']['bs'] <= rows[selected]['bs']):
             selected = 'windowed'
+
+        # ---- single-big-jump extent floor (1A-fix) ----------------------
+        # A subexponential / signed severity can carry a far tail the 3-moment
+        # window misses (``P(S>x) ~ E[N]·P(X>x)``); the moment window then either
+        # clips the priced right tail (heavy positive sev) or -- for a signed sev
+        # whose positive skew hides a heavy reflected tail -- lets the severity
+        # wrap the FFT buffer (aliasing). Floor the SELECTED window's extent by
+        # one big claim on a typical bulk so the grid covers it; the resolution
+        # (``bs``) still follows the bulk/window. Self-activating: a light /
+        # thin / bounded / concentrated book has ``sbj`` inside the window (the
+        # ``max``/``min`` are no-ops) -> byte-stable. Only ``moment`` and
+        # ``windowed`` are floored -- ``exact_discrete`` and ``bounded_small``
+        # carry hard support bounds the SBJ moment estimate must not widen.
+        sbj = self._single_big_jump_window(p)
+        if sbj is not None:
+            # Record the grid the single-big-jump extent *alone* implies (sized
+            # like any other method row, via ``_size``), so the row is directly
+            # comparable to ``moment`` / ``windowed`` and never reads NaN. For a
+            # non-signed sev this is the 0-based ``[0, sbj_hi]`` grid; for a
+            # signed sev it carries the negative origin.
+            sx0, sbs, sl2 = _size(sbj[0], sbj[1], lattice)
+            rows['sbj'] = dict(
+                applies=True, x_min=float(sx0), x_max=float(sbj[1]),
+                W=float(sbj[1] - sx0), bs=float(sbs), log2=int(sl2),
+                coverage=f'E[N]-adj 1-1e-{WINDOW_NINES}',
+                note='single big jump: ES - mu_X + q_X(p**)')
+        else:
+            rows['sbj'] = dict(
+                applies=False, x_min=np.nan, x_max=np.nan, W=np.nan,
+                bs=np.nan, log2=np.nan, coverage=f'E[N]-adj 1-1e-{WINDOW_NINES}',
+                note='single big jump: n/a (no finite E[N] / variance)')
+        if sbj is not None and bs_in <= 0 and selected in ('moment', 'windowed'):
+            sbj_lo, sbj_hi = sbj
+            win_lo = float(rows[selected]['x_min'])
+            win_hi = float(rows[selected]['x_max'])
+            keep_bs = float(rows[selected]['bs'])
+            sel_l2 = int(rows[selected]['log2'])
+
+            def _apply_floor(x0, hi, bs, l2):
+                floored = dict(rows[selected])
+                floored.update(x_min=float(x0), x_max=float(hi),
+                               W=float(hi - x0), bs=float(bs), log2=int(l2),
+                               note=rows[selected]['note'] + '; sbj floor')
+                rows[selected] = floored
+
+            if signed and sbj_lo < win_lo:
+                # SIGNED -- correctness, non-negotiable. The severity discretises
+                # on the same N-bucket grid; if its full negative reach does not
+                # fit, the FFT *wraps* and corrupts the whole law (the LNS 47%
+                # mass-loss / aliasing failure). So the grid MUST cover
+                # [sbj_lo, sbj_hi] at any log2 -- keep the bulk ``bs`` if it fits
+                # the (hard) log2 budget, else coarsen ``bs`` to fit. Coarsening
+                # the bulk is the lesser evil vs. an aliased law.
+                floor_lo = min(win_lo, sbj_lo)
+                floor_hi = max(win_hi, sbj_hi)
+                x0 = float(np.floor(floor_lo / keep_bs) * keep_bs)
+                span = floor_hi - x0
+                need = int(np.ceil(np.log2(max(span / keep_bs + 1.0, 1.0))))
+                if need <= log2:
+                    _apply_floor(x0, floor_hi, keep_bs, max(need, sel_l2))
+                else:
+                    bs_f = round_bucket(span / (1 << log2))
+                    x0_f = float(np.floor(floor_lo / bs_f) * bs_f)
+                    _apply_floor(x0_f, floor_hi, bs_f, log2)
+            elif not signed and sbj_hi > win_hi:
+                # POSITIVE -- a refinement, NOT a correctness fix. A heavy
+                # unlimited severity's MoM window under-reaches the true tail, so
+                # extend the (non-negative) window up to the single big jump --
+                # but only when it fits at the bulk ``bs`` within the requested
+                # log2 budget (grow ``log2`` up to the cap, no further, no
+                # ``bs`` coarsening). If it does not fit, keep the MoM window:
+                # clipping a tiny far tail is the lesser evil vs. coarsening the
+                # bulk to uselessness (e.g. a 5-claim, mean-50 book whose tail
+                # reaches 47k). The DefectiveDistribution warning already tells
+                # the user to raise log2 when the clipped mass is material.
+                x0 = win_lo if selected == 'windowed' else 0.0
+                span = sbj_hi - x0
+                need = int(np.ceil(np.log2(max(span / keep_bs + 1.0, 1.0))))
+                if need <= log2:
+                    _apply_floor(x0, sbj_hi, keep_bs, max(need, sel_l2))
+                else:
+                    # Doesn't fit at the bulk ``bs`` within the requested log2;
+                    # keep the MoM window (clip the far tail) rather than coarsen
+                    # the bulk. Tell the user it is their call to widen the grid
+                    # -- info only (silent by default), expected, not defective.
+                    grid_top = x0 + (1 << sel_l2) * keep_bs
+                    logger.info(
+                        '%s: heavy right tail reaches %.6g but the grid top is '
+                        '%.6g at log2=%d, bs=%.6g; a sliver is clipped. Raise '
+                        'log2 to ~%d (keeping this bs) to capture it.',
+                        self.name, sbj_hi, grid_top, sel_l2, keep_bs, need)
 
         # ---- realized grid (the ``used`` row) ---------------------------
         sel_bs = float(rows[selected]['bs'])

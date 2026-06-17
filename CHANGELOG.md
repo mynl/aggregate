@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.0.0a59
+
+### Bucket-window 1A-fix — single-big-jump extent floor (heavy / signed severities)
+
+Second part of `dev/plan-bucket-window-2.md` (§1A-fix). The 3-moment
+method-of-moments output window is blind to a tail the first three moments do
+not capture. Two failure faces, one root cause, are addressed by flooring the
+selected window's *extent* (not its resolution) by a single big claim on an
+otherwise typical bulk — for a subexponential severity the aggregate's far tail
+is `P(S>x) ≈ E[N]·P(X>x)`, so the severity is probed at the `E[N]`-adjusted
+level `p** = 1 - (1-p*)/E[N]` and the extent floored at `ES - μ_X + q_X(p**)`.
+
+- **Signed severities — correctness (catastrophic case fixed).** A signed
+  severity (e.g. `100 - lognorm 10 cv 2.5`) can have positive aggregate skew
+  while its reflected tail reaches far below 0. The MoM window then misses the
+  reach entirely and the severity *wraps the FFT buffer* (aliasing), losing
+  ~47% of the mass and returning a garbage law. The grid now always covers the
+  single-big-jump reach `[sbj_lo, sbj_hi]` (width ≥ severity reach), keeping the
+  bulk `bs` when the log2 budget allows and coarsening `bs` within the log2 cap
+  otherwise — aliasing is corrected at any log2 (mass recovered to 1).
+- **Positive heavy severities — refinement.** A heavy unlimited severity's MoM
+  window under-reaches the true right tail (e.g. `5000 claims lognorm 100 cv 2`
+  clips ~3.9e-7 of the priced tail at the default grid). The window now extends
+  up to the single big jump **when it fits at the bulk `bs` within the requested
+  `log2`** (so a larger `log2` is captured fully and finely); at a constrained
+  `log2` the MoM window is kept (clipping a tiny far tail beats coarsening the
+  bulk to uselessness — e.g. a 5-claim, mean-50 book whose tail reaches 47k).
+  The existing `DefectiveDistribution` warning still flags a material clip.
+- **`log2` honored, no silent memory growth.** The single-big-jump floor never
+  grows `log2` past an explicit / hinted / default request and never coarsens a
+  pinned `bs`; light / thin / bounded / concentrated and windowed books are
+  byte-stable (the floor's `max`/`min` are no-ops). New
+  `[discretization] sbj_tail_floor` (default `1e-14`) caps how deep the severity
+  is probed (guards `q_X(p**) -> inf` for a large `E[N]` on an unbounded sev).
+- **Inspectability.** `_bs_window_df` gains an `sbj` row — the grid the
+  single-big-jump extent implies (origin / `bs` / `log2`, sized like every other
+  method row, so it never reads NaN); the selected method's `note` records when
+  the floor binds. When a positive heavy tail is clipped at a constrained
+  `log2`, a `logger.info` reports the reach and suggests the `log2` that would
+  capture it.
+
+New helpers `Aggregate._single_big_jump_window` and `._severity_low_estimate`.
+Byte-stability of the `test_suite.agg` snapshot and the numerics-2/3 regression
+gates is preserved.
+
+Deferred: the planned signed-only kurtosis *diagnostic* is dropped — the
+true-law compound kurtosis of the motivating signed case is modest (~4.8, not
+the ~737 the plan cited, which was the empirical kurtosis of the already-aliased
+distribution), so a kurtosis-vs-fit test does not fire. The aliasing it was
+meant to surface is now fixed at source, and a material positive-tail clip is
+already flagged by `DefectiveDistribution`.
+
 ## 1.0.0a58
 
 ### Bucket-window 1A — convention-aware aggregate output windowing

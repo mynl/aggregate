@@ -210,6 +210,13 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   So the genuine work is narrow — enumerate the real members per class
   (`Aggregate`/`Portfolio`/`Distortion`/`Underwriter`) and decide
   informative-`ValueError`-vs-`None` before touching anything.
+- [ ] **H10 `[A]` Promote `_bs_window_df` → public `bs_window_df`** — the grid-
+  sizer inspection frame is used and referenced enough (see
+  `dev/bucket-selection.rst`) that it should be a documented public member on
+  both `Aggregate` and `Portfolio`. Rename on the next code touch in
+  `distributions.py` / `portfolio.py` (keep `_bs_window_df` as a deprecated
+  alias for one release), update the bucket-selection doc and any tests. Folds
+  naturally into H9's public-`*_df` pass.
 
 ---
 
@@ -275,11 +282,18 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   `update(window_convention=…)` override, relaxed windowed-selection gate
   (`<`→`≤`, placement-not-just-finer), and an explicit Regime-B (heavy
   severity) branch with a `logger.info`. Ordinary + Regime-B books byte-stable.
-  **Deferred follow-up — W7:** Regime-B *clip remediation* (deepen upper
-  coverage / grow `log2` to capture the heavy right tail, e.g. the
-  `5000 claims cv 2` 3.9e-7 top-bucket clip). Needs a waste/clip threshold to
-  separate genuinely-wasteful Regime-B books from ordinary ones that merely
-  have `w_lo > 0`; own validated pass so it doesn't risk 1A byte-stability.
+- [x] **W7 `[A]`** Bucket-window **1A-fix** — single-big-jump extent floor
+  (a59, `dev/plan-bucket-window-2.md` §1A-fix). Floors the selected window's
+  *extent* (not its resolution) by one big claim on a typical bulk
+  (`ES - μ_X + q_X(p**)`, `p** = 1 - (1-p*)/E[N]`, depth-guarded by
+  `[discretization] sbj_tail_floor`). **Signed** sevs always span the reach
+  (anti-alias correctness — the `100 - lognorm` 47% mass-loss case fixed at any
+  log2); **positive heavy** sevs extend up to the jump when it fits at the bulk
+  `bs` within the requested `log2` (the `5000 claims cv 2` clip is captured at a
+  generous log2), else keep the MoM window (no silent log2 growth, no bulk
+  coarsening). `_bs_window_df` gains an `sbj` row. The planned signed-kurtosis
+  diagnostic was dropped (the true-law kurtosis is modest; the 737 figure was an
+  aliasing artifact). Light/thin/bounded/concentrated/windowed books byte-stable.
 - [ ] **W8 `[A]`** Bucket-window **1P** — `Portfolio` windowed combine
   (`best_window`/`update`): sum per-unit origins/widths, pad once at the total,
   route the windowed non-signed book through the roll-combine; `Σ kappa_i == x`

@@ -78,6 +78,14 @@
 # payoff). 0 centres the band exactly.
 # window_pad_skew = 0.1
 
+# sbj_tail_floor: numerical-depth floor for the single-big-jump extent floor.
+# A subexponential / signed severity can carry a far tail the 3-moment window
+# misses (P(S>x) ~ E[N] P(X>x)); the grid extent is floored by one big claim on
+# a typical bulk, probing the severity at p** = 1 - (1 - p*)/E[N]. For a large
+# E[N], 1 - p** underflows double precision, so it is floored here (default
+# 1e-14, ~ window_nines + 2 nines).
+# sbj_tail_floor = 1e-14
+
 
 # [validation] -- moment-matching tolerances.
 [validation]

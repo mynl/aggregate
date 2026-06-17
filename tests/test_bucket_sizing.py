@@ -284,3 +284,88 @@ def test_window_regime_b_heavy_severity_stays_zero_based(caplog):
     assert not bool(a._bs_window_df.loc['windowed', 'applies'])
     assert a.x_min == 0.0
     assert any('non-windowable' in r.getMessage() for r in caplog.records)
+
+
+# ----------------------------------------------------------------------
+# 1A-fix -- single-big-jump extent floor (heavy / signed severities)
+# ----------------------------------------------------------------------
+
+
+def test_sbj_signed_severity_recovers_mass_no_alias():
+    """Signed heavy-left severity: the grid must cover the reach (no aliasing).
+
+    ``10 claims 100 - lognorm 10 cv 2.5`` has *positive* aggregate skew (the
+    ``+100^3`` term dominates) but a reflected tail reaching ~-110k. The MoM
+    window misses it entirely, so without the single-big-jump floor the severity
+    wraps the FFT buffer and ~47% of the mass is lost. The floor forces the grid
+    to span the reach (coarsening ``bs`` within the log2 budget if needed), so
+    the law is mass-conserving and its mean matches the analytic.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg LNS 10 claims sev 100 - lognorm 10 cv 2.5 poisson')
+    assert a.x_min < 0.0                                  # grid reaches below 0
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
+    assert a.est_m == pytest.approx(a.agg_m, rel=1e-3)
+    # the sbj row is recorded and its lower edge drove the (negative) origin
+    assert 'sbj' in a._bs_window_df.index
+    assert float(a._bs_window_df.loc['sbj', 'x_min']) < 0.0
+
+
+def test_sbj_positive_heavy_extends_when_log2_allows():
+    """Positive heavy unlimited sev: a generous log2 captures the full tail.
+
+    ``5000 claims lognorm 100 cv 2`` reaches ~8e5 in the far tail; the default
+    grid clips a sliver. With headroom (``log2=19``) the single-big-jump floor
+    extends the window to the reach while keeping a fine bulk ``bs``, so the law
+    conserves mass and the mean is accurate.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg T5 5000 claims sev lognorm 100 cv 2 poisson', log2=19)
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
+    assert a.est_m == pytest.approx(a.agg_m, rel=1e-4)
+    assert float(a._bs_window_df.loc['sbj', 'x_max']) > 7e5
+
+
+def test_sbj_honors_explicit_log2_no_growth():
+    """The single-big-jump floor never grows ``log2`` past an explicit request.
+
+    A small heavy book (``5 claims lognorm 10 cv 2``, agg mean 50) has a far
+    tail near 47k. At a tight ``log2=12`` the floor must NOT grow the grid (that
+    would break the caller/hint contract) nor coarsen the bulk to uselessness:
+    it keeps the MoM window and the requested ``log2``.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg Small 5 claims sev lognorm 10 cv 2 poisson', log2=12)
+    assert a.log2 == 12
+
+
+def test_sbj_big_en_guard_finite_extent():
+    """The ``p**`` depth guard keeps the extent finite for a large ``E[N]``.
+
+    With ``E[N]=5000`` the naive ``p** = 1 - (1-p*)/E[N]`` underflows double
+    precision (``q_X(p**) -> inf`` for an unbounded sev). ``sbj_tail_floor``
+    floors the probe depth, so the recorded single-big-jump extent is finite.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg BigEN 5000 claims sev lognorm 100 cv 2 poisson')
+    sbj_hi = float(a._bs_window_df.loc['sbj', 'x_max'])
+    assert np.isfinite(sbj_hi) and sbj_hi > a.agg_m
+
+
+def test_sbj_light_book_byte_stable():
+    """A light / thin severity is untouched: the floor's ``max``/``min`` no-op.
+
+    ``50 claims gamma 100 cv 1`` is light-tailed; the single-big-jump extent
+    sits inside the MoM window, so the selected grid is identical with and
+    without the floor (the ``sbj`` row is recorded but does not bind).
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg Light 50 claims sev gamma 100 cv 1 poisson')
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
+    assert a.est_m == pytest.approx(a.agg_m, rel=1e-5)
+    assert 'sbj floor' not in str(a._bs_window_df.loc['moment', 'note'])

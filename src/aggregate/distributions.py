@@ -2241,6 +2241,37 @@ class Aggregate:
         """
         return _tail.explain_rows(self._tail_rows(), self._tail_info())
 
+    def tail_report(self, *, verbose: bool = False, color: bool = True) -> str:
+        """The tail narrative, ANSI-coloured for a terminal (thick tails in red).
+
+        The print-for-a-TTY companion to the plain :attr:`tail_description` /
+        :attr:`tail_explanation` properties (which stay uncoloured so they read
+        well inside :meth:`info` and logs). Thick (subexponential-or-heavier)
+        tail classes are emphasised in bold red.
+
+        Parameters
+        ----------
+        verbose : bool
+            ``False`` (default) returns the short aligned :attr:`tail_description`
+            lines; ``True`` the verbose :attr:`tail_explanation` prose.
+        color : bool
+            Emit ANSI colour (default ``True``). Pass ``color=False`` for plain
+            text identical to the matching property.
+
+        Returns
+        -------
+        str
+
+        Examples
+        --------
+        >>> print(a.tail_report())               # short, coloured
+        >>> print(a.tail_report(verbose=True))   # full prose, coloured
+        """
+        rows = self._tail_rows()
+        if verbose:
+            return _tail.explain_rows(rows, self._tail_info(), color=color)
+        return '\n'.join(_tail.describe_rows(rows, color=color))
+
     def _sev_label(self) -> str:
         """Short severity family label for tail text (the family, or ``'N components'``)."""
         if self.sevs is None or len(self.sevs) == 0:

@@ -451,10 +451,70 @@ def test_tail_narrative_color_emphasises_thick():
     assert '\x1b[1;31m' in colored                # subexponential emphasised
 
 
+def test_tail_report_public_color_accessor():
+    a = _agg('agg A 10 claims sev 100 * pareto 1.5 poisson')
+    assert '\x1b[1;31m' in a.tail_report()                       # coloured short
+    assert '\x1b[1;31m' in a.tail_report(verbose=True)           # coloured prose
+    assert a.tail_report(color=False) == a.tail_description      # plain == property
+    assert a.tail_report(verbose=True, color=False) == a.tail_explanation
+
+
 def test_severity_and_frequency_tail_description():
     a = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson')
     assert a.sevs[0].tail_description == 'lognorm, [0, inf), subexponential right tail'
     assert a.frequency.tail_description == 'poisson frequency, super-exponential count'
+
+
+@pytest.mark.parametrize('program,expected,alpha', [
+    ('agg A 10 claims sev 100 * fisk 2 poisson', TailClass.POWER_LAW, 2.0),
+    ('agg A 10 claims sev 100 * betaprime 2 3 poisson', TailClass.POWER_LAW, 3.0),
+    ('agg A 10 claims sev 100 * f 4 6 poisson', TailClass.POWER_LAW, 3.0),       # d2/2
+    ('agg A 10 claims sev 100 * invgamma 2 poisson', TailClass.POWER_LAW, 2.0),
+    ('agg A 10 claims sev 100 * rayleigh poisson', TailClass.SUPER_EXPONENTIAL, None),
+    ('agg A 10 claims sev 100 * maxwell poisson', TailClass.SUPER_EXPONENTIAL, None),
+    ('agg A 10 claims sev 100 * wald poisson', TailClass.EXPONENTIAL, None),
+    ('agg A 10 claims sev 100 * gibrat poisson', TailClass.SUBEXPONENTIAL, None),
+    ('agg A 10 claims sev 100 * gengamma 2 0.5 poisson', TailClass.SUBEXPONENTIAL, None),
+    ('agg A 10 claims sev 100 * gengamma 2 1.5 poisson', TailClass.SUPER_EXPONENTIAL, None),
+])
+def test_expanded_severity_family_tables(program, expected, alpha):
+    a = _agg(program)
+    cls, lc, got_alpha = classify_severity(a.sevs[0])
+    assert cls == expected
+    if alpha is not None:
+        assert got_alpha == pytest.approx(alpha)
+
+
+def test_tukeylambda_and_levy_stable_param():
+    from aggregate.tail import _family_right_class
+    import numpy as np
+    # tukeylambda: lambda>0 bounded, =0 exp, <0 power-law(alpha=-1/lambda)
+    assert _family_right_class('tukeylambda', 0.5, np.nan)[0] == TailClass.BOUNDED
+    assert _family_right_class('tukeylambda', 0.0, np.nan)[0] == TailClass.EXPONENTIAL
+    cls, _, al = _family_right_class('tukeylambda', -0.5, np.nan)
+    assert cls == TailClass.POWER_LAW and al == pytest.approx(2.0)
+    # levy_stable: alpha<2 power-law(index=alpha), alpha==2 super-exp
+    cls, _, al = _family_right_class('levy_stable', 1.5, 0.0)
+    assert cls == TailClass.POWER_LAW and al == pytest.approx(1.5)
+    assert _family_right_class('levy_stable', 2.0, 0.0)[0] == TailClass.SUPER_EXPONENTIAL
+
+
+def test_finite_support_family_is_bounded_via_fallback():
+    # argus has finite scipy support [0,1] but is not in _BOUNDED_SCIPY_SEVS;
+    # the fz.support() fallback classifies it bounded (spec-only).
+    a = _agg('agg A 10 claims sev 100 * argus 1 poisson')
+    assert a.sevs[0].bounded
+    assert classify_severity(a.sevs[0])[0] == TailClass.BOUNDED
+
+
+def test_asymmetric_two_sided_per_side():
+    # gumbel_r: super-exponential left, exponential right (different sides).
+    from aggregate.tail import _family_sides
+    import numpy as np
+    left, right, _, _ = _family_sides('gumbel_r', np.nan, np.nan)
+    assert left == TailClass.SUPER_EXPONENTIAL and right == TailClass.EXPONENTIAL
+    left, right, _, _ = _family_sides('loggamma', np.nan, np.nan)
+    assert left == TailClass.EXPONENTIAL and right == TailClass.SUPER_EXPONENTIAL
 
 
 def test_concentration_helper():

@@ -208,8 +208,20 @@ So a limited Lévy sizes as bounded (right) without any numeric fit, and the
 report shows both ("thick base, capped at L → effective bounded"). Histograms /
 empirical are bounded; splices are owned by the severity (§above). The only
 residual is a **genuinely unknown *and* unlimited** scipy family → treat
-**conservatively as thick** (size wide); never guess. Build out the family
-tables as new cases appear (cheap, exact) instead of estimating.
+**conservatively as thick** (size wide); never guess.
+
+> **Family tables populated (a63).** Rather than wait for cases to appear, the
+> `aggregate.tail` family tables were filled out from a reconciled survey of
+> *every* `scipy.stats` continuous distribution's tail behaviour (two independent
+> derivations cross-checked → `integrated.md` in the 2026-06-17 notes folder).
+> `SCIPY_SEV_TAIL` (~45 fixed-class families), `_POWER_LAW_ALPHA` (correct
+> shape-slot α per family), the parameter-aware set (`gengamma`, `gennorm`,
+> `dweibull`, `exponweib`, `tukeylambda`, `levy_stable`, …), `_SEV_LEFT_CLASS`
+> (asymmetric two-sided left tails), and a `fz.support()`-finiteness fallback in
+> `_severity_bounded` mean almost no standard family hits the `UNKNOWN`
+> conservative-thick path now. Single source: `_weibull_shape` /
+> `_family_right_class` / `_family_sides` feed both `classify_severity` and the
+> `tail_df` per-side classes.
 
 ### Data structure
 

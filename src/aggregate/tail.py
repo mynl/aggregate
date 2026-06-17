@@ -250,31 +250,104 @@ def classify_frequency(frequency) -> tuple[TailClass, Optional[bool]]:
 # Severity classification.
 # ----------------------------------------------------------------------------
 
-# scipy families with a fixed (param-independent) class and log-concavity flag.
+# scipy families with a fixed (param-independent) RIGHT-tail class and a
+# log-concavity flag. Two-sided families list their right class here; an
+# asymmetric left is recorded in ``_SEV_LEFT_CLASS``. Populated from the
+# reconciled SciPy tail survey (dev / 2026-06-17 integrated.md).
 SCIPY_SEV_TAIL: dict[str, tuple[TailClass, Optional[bool]]] = {
-    'norm':       (TailClass.SUPER_EXPONENTIAL, True),
-    'expon':      (TailClass.EXPONENTIAL, True),
-    'laplace':    (TailClass.EXPONENTIAL, True),
-    'logistic':   (TailClass.EXPONENTIAL, True),
-    'lognorm':    (TailClass.SUBEXPONENTIAL, False),
-    'invgauss':   (TailClass.EXPONENTIAL, False),   # semi-heavy; watch item
+    # --- super-exponential (Gaussian-type or faster) ---
+    'norm':         (TailClass.SUPER_EXPONENTIAL, True),
+    'powernorm':    (TailClass.SUPER_EXPONENTIAL, True),
+    'skewnorm':     (TailClass.SUPER_EXPONENTIAL, None),
+    'halfnorm':     (TailClass.SUPER_EXPONENTIAL, True),
+    'foldnorm':     (TailClass.SUPER_EXPONENTIAL, None),
+    'chi':          (TailClass.SUPER_EXPONENTIAL, None),
+    'maxwell':      (TailClass.SUPER_EXPONENTIAL, True),
+    'rayleigh':     (TailClass.SUPER_EXPONENTIAL, True),
+    'nakagami':     (TailClass.SUPER_EXPONENTIAL, None),
+    'rice':         (TailClass.SUPER_EXPONENTIAL, None),
+    'kstwobign':    (TailClass.SUPER_EXPONENTIAL, None),
+    'gompertz':     (TailClass.SUPER_EXPONENTIAL, None),
+    'exponpow':     (TailClass.SUPER_EXPONENTIAL, None),   # exp(-exp(x**b)); double-exp
+    'gumbel_l':     (TailClass.SUPER_EXPONENTIAL, None),   # right super; left exp
+    'loggamma':     (TailClass.SUPER_EXPONENTIAL, None),   # right super; left exp
+    # --- exponential ---
+    'expon':        (TailClass.EXPONENTIAL, True),
+    'laplace':      (TailClass.EXPONENTIAL, True),
+    'laplace_asymmetric': (TailClass.EXPONENTIAL, None),
+    'logistic':     (TailClass.EXPONENTIAL, True),
+    'genlogistic':  (TailClass.EXPONENTIAL, None),
+    'hypsecant':    (TailClass.EXPONENTIAL, True),
+    'dgamma':       (TailClass.EXPONENTIAL, None),
+    'genhyperbolic':(TailClass.EXPONENTIAL, None),
+    'norminvgauss': (TailClass.EXPONENTIAL, False),
+    'chi2':         (TailClass.EXPONENTIAL, None),
+    'erlang':       (TailClass.EXPONENTIAL, None),
+    'fatiguelife':  (TailClass.EXPONENTIAL, False),
+    'genexpon':     (TailClass.EXPONENTIAL, None),
+    'geninvgauss':  (TailClass.EXPONENTIAL, None),
+    'halflogistic': (TailClass.EXPONENTIAL, None),
+    'invgauss':     (TailClass.EXPONENTIAL, False),   # semi-heavy; watch item
+    'ncx2':         (TailClass.EXPONENTIAL, None),
+    'recipinvgauss':(TailClass.EXPONENTIAL, None),
+    'wald':         (TailClass.EXPONENTIAL, False),
+    'gumbel_r':     (TailClass.EXPONENTIAL, None),    # right exp; left super
+    'moyal':        (TailClass.EXPONENTIAL, None),    # right exp; left super
+    'exponnorm':    (TailClass.EXPONENTIAL, None),    # right exp; left super
+    'crystalball':  (TailClass.SUPER_EXPONENTIAL, None),  # right super; left power-law
+    # --- subexponential ---
+    'lognorm':      (TailClass.SUBEXPONENTIAL, False),
+    'gibrat':       (TailClass.SUBEXPONENTIAL, False),
+    'johnsonsu':    (TailClass.SUBEXPONENTIAL, False),
+    'powerlognorm': (TailClass.SUBEXPONENTIAL, False),
 }
 
 # Power-law families: scipy name -> callable(sev_a, sev_b) -> tail index alpha.
 # alpha is the exponent in P(X > x) ~ x**(-alpha). The shape slot differs by
-# family, which is a classic bug source, so each is mapped explicitly.
+# family (a classic bug source) so each is mapped explicitly. From the
+# reconciled SciPy survey (integrated.md). ``levy_l`` / ``crystalball`` carry a
+# power-law tail only on a side recorded in ``_SEV_LEFT_CLASS``.
 _POWER_LAW_ALPHA = {
-    'pareto':     lambda a, b: a,            # scipy shape b == sev_a
-    'lomax':      lambda a, b: a,            # Pareto type II, shape c == sev_a
+    'pareto':     lambda a, b: a,            # Pareto I, shape b == sev_a
+    'lomax':      lambda a, b: a,            # Pareto II, shape c == sev_a
     'fisk':       lambda a, b: a,            # log-logistic, shape c == sev_a
     'loglogistic':lambda a, b: a,
+    'loglaplace': lambda a, b: a,            # right ~ x**-(c+1) -> index c
     't':          lambda a, b: a,            # Student-t, df == sev_a
+    'nct':        lambda a, b: a,            # noncentral t, df == sev_a
     'cauchy':     lambda a, b: 1.0,          # alpha == 1
+    'halfcauchy': lambda a, b: 1.0,
+    'foldcauchy': lambda a, b: 1.0,
+    'skewcauchy': lambda a, b: 1.0,
     'invweibull': lambda a, b: a,            # Frechet, shape c == sev_a
     'frechet':    lambda a, b: a,
-    'invgamma':   lambda a, b: a,            # tail ~ x**(-(a+1)) -> index a
-    'burr':       lambda a, b: a * b,        # Burr XII, c*d == sev_a*sev_b
-    'burr12':     lambda a, b: a * b,
+    'invgamma':   lambda a, b: a,            # tail ~ x**-(a+1) -> index a
+    'kappa3':     lambda a, b: a,            # tail ~ x**-(a+1) -> index a
+    'burr':       lambda a, b: a * b,        # Burr III, c*d == sev_a*sev_b
+    'burr12':     lambda a, b: a * b,        # Burr XII, c*d == sev_a*sev_b
+    'mielke':     lambda a, b: b,            # Dagum, s == sev_b
+    'betaprime':  lambda a, b: b,            # ~ x**-(b+1) -> index b
+    'f':          lambda a, b: b / 2.0,      # ~ x**-(d2/2) -> index d2/2
+    'jf_skew_t':  lambda a, b: 2.0 * b,      # right ~ x**-(2b+1) -> index 2b
+    'levy':       lambda a, b: 0.5,          # survival ~ x**-1/2
+    'levy_l':     lambda a, b: 0.5,          # left power-law (right bounded)
+    'landau':     lambda a, b: 1.0,          # right ~ x**-2 -> survival x**-1; left super
+    'alpha':      lambda a, b: 1.0,          # right pdf ~ x**-2 -> survival x**-1
+    'rel_breitwigner': lambda a, b: 3.0,     # pdf ~ x**-4 -> survival x**-3
+}
+
+# Two-sided families whose LEFT tail class differs from the right. The right
+# class is in ``SCIPY_SEV_TAIL`` / ``_POWER_LAW_ALPHA``; this overrides the
+# (otherwise symmetric) left. Only consulted when the support is open on the
+# left -- a finite left support end is ``BOUNDED`` regardless.
+_SEV_LEFT_CLASS: dict[str, TailClass] = {
+    'gumbel_r':    TailClass.SUPER_EXPONENTIAL,
+    'gumbel_l':    TailClass.EXPONENTIAL,
+    'loggamma':    TailClass.EXPONENTIAL,
+    'moyal':       TailClass.SUPER_EXPONENTIAL,
+    'exponnorm':   TailClass.SUPER_EXPONENTIAL,
+    'landau':      TailClass.SUPER_EXPONENTIAL,
+    'crystalball': TailClass.POWER_LAW,
 }
 
 
@@ -310,72 +383,136 @@ def _severity_bounded(severity) -> bool:
     name = getattr(severity, 'sev_name', None)
     if isinstance(name, str) and name in _BOUNDED_SCIPY_SEVS:
         return True
+    # Fallback: a finite scipy support on both ends is bounded -- catches every
+    # finite-support family (argus, bradford, gausshyper, johnsonsb, irwinhall,
+    # powerlaw, loguniform, genhalflogistic, tukeylambda with lambda>0, ...)
+    # without enumerating them. ``fz.support()`` is spec-only (built in __init__).
+    try:
+        lo, hi = severity.fz.support()
+        if np.isfinite(lo) and np.isfinite(hi):
+            return True
+    except Exception:
+        pass
     return False
 
 
+def _weibull_shape(c) -> tuple[TailClass, Optional[bool], Optional[float]]:
+    """Weibull / stretched-exponential shape rule on ``exp(-x**c)``.
+
+    ``c > 1`` super-exponential (log-concave), ``c == 1`` exponential,
+    ``0 < c < 1`` subexponential; a non-finite shape falls back to exponential.
+    """
+    if not np.isfinite(c):
+        return TailClass.EXPONENTIAL, None, None
+    if c > 1.0:
+        return TailClass.SUPER_EXPONENTIAL, True, None
+    if c == 1.0:
+        return TailClass.EXPONENTIAL, True, None
+    return TailClass.SUBEXPONENTIAL, False, None
+
+
+def _family_right_class(name, a, b) -> tuple[TailClass, Optional[bool], Optional[float]]:
+    """RIGHT-tail class of a scipy family, ignoring any structural cap.
+
+    The single source consulted by :func:`classify_severity` (after the
+    structural-bounded test) and by the per-side / base-rung helpers. Returns
+    ``(rung, log_concave, alpha)``; ``alpha`` is set only for a POWER_LAW rung.
+    Param-aware families are resolved from ``sev_a`` / ``sev_b`` (the scipy shape
+    slots, in order); unrecognised families return ``UNKNOWN``.
+    """
+    if not isinstance(name, str):
+        return TailClass.UNKNOWN, None, None
+
+    # --- parameter-aware families (shape changes the rung) ---
+    if name == 'gamma':
+        return TailClass.EXPONENTIAL, bool(np.isfinite(a) and a >= 1.0), None
+    if name in ('weibull_min', 'dweibull', 'gennorm', 'halfgennorm'):
+        # weibull_min/dweibull shape c == sev_a; gennorm/halfgennorm beta == sev_a.
+        return _weibull_shape(a)
+    if name in ('gengamma', 'exponweib'):
+        # the Weibull exponent is the SECOND shape (sev_b); gengamma c<0 is heavy.
+        if name == 'gengamma' and np.isfinite(b) and b < 0:
+            alpha = (-b * a) if (np.isfinite(a) and np.isfinite(b)) else None
+            return TailClass.POWER_LAW, False, alpha
+        return _weibull_shape(b)
+    if name == 'genpareto':
+        # scipy shape c == xi. xi > 0 heavy (alpha = 1/xi); xi == 0 exponential.
+        if np.isfinite(a) and a > 0:
+            return TailClass.POWER_LAW, False, 1.0 / a
+        return TailClass.EXPONENTIAL, None, None
+    if name == 'tukeylambda':
+        # lambda > 0 bounded; lambda == 0 logistic/exponential; lambda < 0 power law.
+        if not np.isfinite(a):
+            return TailClass.UNKNOWN, None, None
+        if a > 0:
+            return TailClass.BOUNDED, None, None
+        if a == 0:
+            return TailClass.EXPONENTIAL, True, None
+        return TailClass.POWER_LAW, False, -1.0 / a
+    if name == 'levy_stable':
+        # stable index alpha == sev_a; alpha == 2 is Gaussian, alpha < 2 heavy.
+        if np.isfinite(a) and a < 2.0:
+            return TailClass.POWER_LAW, False, a
+        return TailClass.SUPER_EXPONENTIAL, True, None
+
+    # --- fixed-class lookups ---
+    if name in _POWER_LAW_ALPHA:
+        return TailClass.POWER_LAW, False, float(_POWER_LAW_ALPHA[name](a, b))
+    if name in SCIPY_SEV_TAIL:
+        cls, lc = SCIPY_SEV_TAIL[name]
+        return cls, lc, None
+    return TailClass.UNKNOWN, None, None
+
+
+def _family_sides(name, a, b) -> tuple[TailClass, TailClass, Optional[bool], Optional[float]]:
+    """Per-side decay classes ``(left, right, log_concave, alpha)`` of a family.
+
+    The right class is :func:`_family_right_class`; the left is the same
+    (symmetric) unless the family is in :data:`_SEV_LEFT_CLASS` (an asymmetric
+    two-sided family such as ``gumbel_r`` or ``loggamma``). The left class is
+    only material when the support is open on the left; a finite left end is
+    ``BOUNDED`` regardless (handled by the support, not here).
+    """
+    right, lc, alpha = _family_right_class(name, a, b)
+    left = _SEV_LEFT_CLASS.get(name, right) if isinstance(name, str) else right
+    return left, right, lc, alpha
+
+
 def classify_severity(severity) -> tuple[TailClass, Optional[bool], Optional[float]]:
-    """Classify a single severity component's tail.
+    """Classify a single severity component's overall tail.
 
     Parameters
     ----------
     severity : object
         A single ``aggregate.Severity`` (duck-typed). Reads ``sev_kind``,
-        ``sev_name``, ``sev_a``, ``sev_b``, ``limit``, ``sev_ub``.
+        ``sev_name``, ``sev_a``, ``sev_b``, ``limit``, ``sev_ub``, ``fz``.
 
     Returns
     -------
     (TailClass, bool or None, float or None)
-        The rung, the log-concavity flag, and the power-law index ``alpha``
-        (``None`` unless the rung is POWER_LAW).
+        The **overall** rung (the heavier of the two sides), the log-concavity
+        flag, and the power-law index ``alpha`` (``None`` unless POWER_LAW).
 
     Notes
     -----
-    Checks run in order: **structural-bounded → family lookup → param-aware
-    family → UNKNOWN**, returning at the first hit. The structural-bounded test
-    is first so ``bounded`` is decided from the spec alone (no density), which
-    the lifted-natural-allocation guard relies on. Param-aware families:
-    ``gamma`` is log-concave iff shape ``≥ 1``; ``weibull_min`` with shape
-    ``c > 1`` is super-exponential (log-concave), ``c == 1`` is the exponential,
-    ``c < 1`` is subexponential; ``genpareto`` with shape ``ξ > 0`` is power-law
-    with ``alpha = 1/ξ`` (``ξ == 0`` reduces to the exponential).
+    Order: **structural-bounded → family per-side → UNKNOWN**, returning at the
+    first hit. The structural-bounded test is first (and now also accepts any
+    finite scipy support) so ``bounded`` is decided from the spec alone, which
+    the lifted-natural-allocation guard relies on. The overall rung is the
+    heavier side (``UNKNOWN`` ranked conservatively), so an asymmetric two-sided
+    family (e.g. ``gumbel_r``: super-exp left, exponential right) reports its
+    heaviest tail. See :func:`_family_right_class` for the family table and
+    ``dev`` ``integrated.md`` for the reconciled SciPy survey behind it.
     """
     if _severity_bounded(severity):
         return TailClass.BOUNDED, None, None
-
     name = getattr(severity, 'sev_name', None)
     if not isinstance(name, str):
-        # meta / copy that was not bounded, or an unrecognised wrapper.
         return TailClass.UNKNOWN, None, None
-
     a = getattr(severity, 'sev_a', np.nan)
     b = getattr(severity, 'sev_b', np.nan)
-
-    # Param-aware families first.
-    if name == 'gamma':
-        return TailClass.EXPONENTIAL, bool(np.isfinite(a) and a >= 1.0), None
-    if name == 'weibull_min':
-        if not np.isfinite(a):
-            return TailClass.EXPONENTIAL, None, None
-        if a > 1.0:
-            return TailClass.SUPER_EXPONENTIAL, True, None
-        if a == 1.0:
-            return TailClass.EXPONENTIAL, True, None      # c == 1 is exponential
-        return TailClass.SUBEXPONENTIAL, False, None
-    if name == 'genpareto':
-        # scipy shape c == ξ. ξ > 0 heavy (alpha = 1/ξ); ξ == 0 exponential.
-        if np.isfinite(a) and a > 0:
-            return TailClass.POWER_LAW, False, 1.0 / a
-        return TailClass.EXPONENTIAL, None, None
-
-    if name in _POWER_LAW_ALPHA:
-        alpha = float(_POWER_LAW_ALPHA[name](a, b))
-        return TailClass.POWER_LAW, False, alpha
-
-    if name in SCIPY_SEV_TAIL:
-        cls, lc = SCIPY_SEV_TAIL[name]
-        return cls, lc, None
-
-    return TailClass.UNKNOWN, None, None
+    left, right, lc, alpha = _family_sides(name, a, b)
+    return _heaviest((left, right)), lc, alpha
 
 
 def _combine_severities(sevs):
@@ -756,37 +893,18 @@ def _base_rung(severity) -> TailClass:
 
     The structural-bounded test in :func:`classify_severity` masks a thick base
     once a finite ``limit`` / splice caps it (correctly -- the effective loss is
-    bounded). This helper recovers the base thickness so the report can say
-    "thick base, capped at L": it repeats the family lookup *without* the
-    structural-bounded short-circuit. Returns :attr:`~TailClass.UNKNOWN` for an
-    unrecognised family.
+    bounded). This helper recovers the base thickness (the heavier side) so the
+    report can say "thick base, capped at L": it consults the family table
+    *without* the structural-bounded short-circuit. Returns
+    :attr:`~TailClass.UNKNOWN` for an unrecognised family.
     """
     name = getattr(severity, 'sev_name', None)
     if not isinstance(name, str):
         return TailClass.UNKNOWN
     a = getattr(severity, 'sev_a', np.nan)
     b = getattr(severity, 'sev_b', np.nan)
-    if name == 'gamma':
-        return TailClass.EXPONENTIAL
-    if name == 'weibull_min':
-        if not np.isfinite(a):
-            return TailClass.EXPONENTIAL
-        if a > 1.0:
-            return TailClass.SUPER_EXPONENTIAL
-        if a == 1.0:
-            return TailClass.EXPONENTIAL
-        return TailClass.SUBEXPONENTIAL
-    if name == 'genpareto':
-        if np.isfinite(a) and a > 0:
-            return TailClass.POWER_LAW
-        return TailClass.EXPONENTIAL
-    if name in _POWER_LAW_ALPHA:
-        return TailClass.POWER_LAW
-    if name in SCIPY_SEV_TAIL:
-        return SCIPY_SEV_TAIL[name][0]
-    if name in _BOUNDED_SCIPY_SEVS:
-        return TailClass.BOUNDED
-    return TailClass.UNKNOWN
+    left, right, _, _ = _family_sides(name, a, b)
+    return _heaviest((left, right))
 
 
 def severity_support(severity) -> tuple[float, float]:
@@ -921,15 +1039,19 @@ def severity_tail_row(severity, component: str) -> TailRow:
     -------
     TailRow
         With per-side tail classes: a finite support end is ``BOUNDED``, an
-        infinite end carries the base-family decay rung. The note flags an
+        infinite end carries the family decay rung on that side (asymmetric
+        families such as ``gumbel_r`` differ left vs right). The note flags an
         uncapped power-law (``alpha`` + the failing moment) or a capped heavy
         base.
     """
-    _, _, alpha = classify_severity(severity)
-    base = _base_rung(severity)
+    name = getattr(severity, 'sev_name', None)
+    a = getattr(severity, 'sev_a', np.nan)
+    b = getattr(severity, 'sev_b', np.nan)
+    left_base, right_base, _, alpha = _family_sides(name, a, b)
+    base = _heaviest((left_base, right_base))
     lo, hi = severity_support(severity)
-    left = _side_class(np.isfinite(lo), base)
-    right = _side_class(np.isfinite(hi), base)
+    left = _side_class(np.isfinite(lo), left_base)
+    right = _side_class(np.isfinite(hi), right_base)
     if right == TailClass.POWER_LAW:
         note = _power_note(alpha)
     else:

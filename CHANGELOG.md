@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.0.0a63
+
+### Comprehensive scipy severity tail tables (the family classifier)
+
+Populates `aggregate.tail`'s family classifier from a reconciled survey of every
+`scipy.stats` continuous distribution's tail behavior (two independent
+derivations cross-checked, `C:/s/AI/notes/2026-06-17-probability-distribution-tails/integrated.md`).
+A user severity from any standard scipy family now classifies exactly instead of
+falling back to `UNKNOWN`:
+
+- **`SCIPY_SEV_TAIL`** expanded to ~45 fixed-class families (super-exponential:
+  `chi`, `maxwell`, `rayleigh`, `nakagami`, `rice`, `halfnorm`, `foldnorm`,
+  `gompertz`, `kstwobign`, `exponpow`, …; exponential: `chi2`, `erlang`,
+  `fatiguelife`, `wald`, `invgauss`, `genexpon`, `geninvgauss`, `ncx2`,
+  `recipinvgauss`, `halflogistic`, `hypsecant`, `dgamma`, `genlogistic`,
+  `norminvgauss`, …; subexponential: `gibrat`, `johnsonsu`, `powerlognorm`).
+- **`_POWER_LAW_ALPHA`** expanded with the correct shape-slot α for `loglaplace`,
+  `nct`, `halfcauchy`, `foldcauchy`, `skewcauchy`, `kappa3`, `mielke`,
+  `betaprime`, `f`, `jf_skew_t`, `levy`, `alpha`, `rel_breitwigner`, `landau`.
+- **Parameter-aware** families added to the classifier: `gengamma` (Weibull
+  exponent `c`; `c<0` → power-law), `exponweib`, `gennorm` / `halfgennorm`
+  (`β`), `dweibull`, `tukeylambda` (`λ>0` bounded / `=0` exp / `<0` power-law),
+  `levy_stable` (`α<2` power-law). The shared `_weibull_shape` /
+  `_family_right_class` / `_family_sides` helpers are now the single source for
+  `classify_severity` and the `tail_df` per-side classes (no parallel table).
+- **`_SEV_LEFT_CLASS`** records the asymmetric two-sided families whose left tail
+  differs from the right (`gumbel_r`, `gumbel_l`, `loggamma`, `moyal`,
+  `exponnorm`, `landau`, `crystalball`) so a signed/two-sided severity reports a
+  correct per-side `tail_df`.
+- **`bounded` is now robust to any finite scipy support**: `_severity_bounded`
+  falls back to `fz.support()` finiteness (spec-only), so finite-support families
+  not in `_BOUNDED_SCIPY_SEVS` (`argus`, `bradford`, `gausshyper`, `johnsonsb`,
+  `irwinhall`, `powerlaw`, `loguniform`, `genhalflogistic`, `tukeylambda` λ>0, …)
+  classify as bounded without enumeration.
+
+The four reconciled discrepancies between the two source views (`exponpow`
+right-tail = super-exponential; `genhalflogistic` bounded; `studentized_range`;
+`truncnorm`) are documented in `integrated.md`. Bucket selection does not read
+the tail classifier yet, so this remains report-only.
+
+Also adds **`Aggregate.tail_report(verbose=False, color=True)`** — the public,
+ANSI-coloured (thick tails in bold red) accessor for the a62 narrative; the plain
+`tail_description` / `tail_explanation` properties are unchanged (so `info()`
+stays plain). `tail_report(color=False)` equals the matching property.
+
 ## 1.0.0a62
 
 ### Bucket-selection 1A-bucket — the narrative tail report (`[tail-narrative]`)

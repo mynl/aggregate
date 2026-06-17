@@ -64,7 +64,7 @@ __all__ = [
     'classify_frequency', 'classify_severity', 'combine',
     'aggregate_tail_info', 'tail_class_label',
     'is_thick', 'thickness_label', 'severity_support', 'concentration',
-    'build_tail_rows', 'tail_frame',
+    'occ_net_severity_row', 'build_tail_rows', 'tail_frame',
     'describe_row', 'describe_rows', 'explain_rows',
     'CONCENTRATION_CV',
     '_BOUNDED_FREQS', '_BOUNDED_SCIPY_SEVS',
@@ -1095,6 +1095,52 @@ def combined_severity_row(sevs) -> TailRow:
     )
 
 
+def occ_net_severity_row(comb: TailRow, occ_reins) -> TailRow:
+    """Overlay row: the per-occurrence severity tail NET of occurrence reinsurance.
+
+    Informational only -- the bucket sizer works on the **gross** severity
+    (occurrence reinsurance is reported, never a sizing input; see
+    ``[reins-gross]``), so this row annotates how the cession reshapes the
+    retained per-occurrence tail *without* changing the grid. It is added after
+    the combined gross-severity row, before the aggregate.
+
+    Parameters
+    ----------
+    comb : TailRow
+        The combined gross effective-severity row.
+    occ_reins : sequence of (share, limit, attach)
+        The occurrence-reinsurance layers (``Aggregate.occ_reins``).
+
+    Returns
+    -------
+    TailRow
+        Labelled ``'severity (net occ)'``.
+
+    Notes
+    -----
+    The net is bounded above only when a top layer cedes **100%** of everything
+    above its attachment to infinity (``share >= 1`` and ``limit == inf``): the
+    net is then capped at that attachment. Finite layers, or partial
+    (``share < 1``) unlimited cessions, leave the gross tail class in place (the
+    retained tail is the same family, merely scaled).
+    """
+    net_cap = np.inf
+    for (s, y, a) in occ_reins:
+        if not np.isfinite(y) and float(s) >= 1.0:
+            net_cap = min(net_cap, float(a))
+    if np.isfinite(net_cap) and net_cap < comb.max:
+        hi, right = net_cap, TailClass.BOUNDED
+        note = f'net of occ reins: capped at {net_cap:.6g}'
+    else:
+        hi, right = comb.max, comb.right_tail
+        note = 'net of occ reins: tail retained'
+    return TailRow(
+        component='severity (net occ)', family=comb.family,
+        min=comb.min, max=float(hi), left_tail=comb.left_tail, right_tail=right,
+        note=note,
+    )
+
+
 def frequency_tail_row(frequency, *, n_min: float = 0.0,
                        n_max: float = np.inf,
                        zero_truncated: bool = False) -> TailRow:
@@ -1193,12 +1239,13 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
                     freq_max: float = np.inf, freq_zero_truncated: bool = False,
                     agg_m: float = np.nan, agg_sd: float = np.nan,
                     agg_reflect: bool = False,
-                    agg_shift: float = 0.0) -> list[TailRow]:
+                    agg_shift: float = 0.0, occ_reins=None) -> list[TailRow]:
     """Assemble the layered tail report as an ordered list of :class:`TailRow`.
 
     Rows, bottom-up: frequency; one per severity mix component (``comp0`` ...);
     the combined effective severity (only when there is more than one component);
-    the aggregate. Spec-only -- valid before ``update``.
+    an optional occurrence-reinsurance overlay (``severity (net occ)``, only when
+    ``occ_reins`` is given); the aggregate. Spec-only -- valid before ``update``.
 
     The aggregate's **structural support** is built from the count and combined
     severity extents (:func:`_agg_support`) and then mapped through any ``pnl``
@@ -1221,6 +1268,11 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
     agg_reflect, agg_shift : bool, float
         The ``pnl`` affine (``PnL = agg_shift - A`` when reflecting, else
         ``agg_shift + A``); inert defaults for an ordinary aggregate.
+    occ_reins : sequence of (share, limit, attach), optional
+        The occurrence-reinsurance layers (``Aggregate.occ_reins``). When given,
+        an informational ``severity (net occ)`` overlay row is appended after the
+        combined gross severity (the sizer works on gross -- this row only
+        annotates the retained tail; see :func:`occ_net_severity_row`).
 
     Returns
     -------
@@ -1236,6 +1288,8 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
         comb = combined_severity_row(sev_list)
         if len(sev_list) > 1:
             rows.append(comb)
+        if occ_reins is not None and len(occ_reins):
+            rows.append(occ_net_severity_row(comb, occ_reins))
         s_lo, s_hi = comb.min, comb.max
         sev_left, sev_right = comb.left_tail, comb.right_tail
     else:

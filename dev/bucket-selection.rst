@@ -138,12 +138,17 @@ power-of-two grid is reported in the ``used`` row.
     density is relabelled by a modular ``np.roll`` of ``round(x_min/bs)``
     buckets, which is exact for random frequency (it carries no ``N*s`` shift).
     Eligibility is deliberately narrow: auto origin only
-    (``x_min`` not pinned), non-signed, non-affine, finite positive sd, and no
-    *occurrence* reinsurance (whose severity rides the output grid). A
-    **severity-fit guard** then marks the row applicable only when a single
-    occurrence fits the windowed extent ``[0, N*bs]`` -- otherwise the benign
-    wrap is invalid (the ``fixed``-1 / ``approximate`` trap, and the heavy
-    *positive* "Regime B" book whose severity overflows a tight band).
+    (``x_min`` not pinned), non-signed, non-affine, finite positive sd, the
+    conservative ``concentrated`` flag from the tail report (``agg_cv <
+    CONCENTRATION_CV``, ~0.1; a64), and no *occurrence* reinsurance (whose
+    severity rides the output grid). A **severity-fit guard** then marks the row
+    applicable only when a single occurrence fits the windowed extent
+    ``[0, N*bs]``. Since a64, a thick-right / thin-left concentrated band floors
+    its upper edge by ``sbj_hi`` *before* the guard, which grows the extent
+    enough that a single heavy occurrence fits -- so the former heavy-*positive*
+    "Regime B" book (severity overflows a tight band) is reclaimed rather than
+    falling back to the 0-based grid. The guard still rejects the ``fixed``-1 /
+    ``approximate`` trap (a single thin severity already at the aggregate mean).
 
 ``sbj`` -- the single-big-jump extent floor
     Not a standalone sizing of the grid but a **floor on the selected window's
@@ -192,18 +197,20 @@ The methods combine in a fixed order.
    it fits at the bulk ``bs`` within the requested ``log2``** (so a generous
    ``log2`` is captured fully and finely). If it does not fit, the moment
    window is kept -- clipping a tiny far tail beats coarsening the bulk to
-   uselessness -- and a ``logger.info`` reports the reach and the ``log2`` that
-   would capture it. The ``log2`` budget (explicit, hinted, or the default) is
-   **never** silently grown, and a pinned ``bs`` is never coarsened.
+   uselessness -- and (since a64) a visible ``DefectiveDistributionWarning``
+   reports the reach, the estimated clipped mass, and the ``log2`` that would
+   capture it (also stashed in ``Aggregate._bs_clip``). The ``log2`` budget
+   (explicit, hinted, or the default) is **never** silently grown, and a pinned
+   ``bs`` is never coarsened. (This positive floor is gated on a thick right tail
+   from the tail report; for a thin tail the moment window already covers it.)
 
 4. **Balance the padding** (windowed selection, auto origin, non-affine). A
    windowed band is first placed band-bottom (all power-of-two slack above it);
-   the slack is then redistributed a *fixed* fraction ``f = 0.5 -/+
-   window_pad_skew`` below the band, so the band sits sensibly in the grid.
-   *Planned* (see below): make the split **tail-aware** -- the slack should
-   follow the tails, so a thick-right / thin-left book pushes it right (and the
-   mirror for thin-right / thick-left), while a book with balanced tails shares
-   it evenly -- rather than a single fixed convention skew.
+   the slack is then redistributed **tail-aware** (a64): an asymmetric band puts
+   ~3/4 of the slack on the thick side (``WINDOW_SLACK_THICK`` -- so a thick-right
+   / thin-left book pushes it right, and the mirror for thin-right / thick-left),
+   while a symmetric band (both tails thick or both thin) centres with the
+   loss/payoff convention skew (``window_pad_skew``) as a tie-breaker.
 
 5. **Reflect / shift for ``pnl``** (affine aggregates). The loss FFT runs on the
    non-negative grid sized above; the finished aggregate is reflected and/or
@@ -227,12 +234,15 @@ overridable per call via ``update(window_convention=...)``. The convention sets
   clipping the priced tail; the *cheap* tail is trimmed shallow at
   ``window_nines_trim``;
 
-* **padding skew** -- ``f = 0.5 - window_pad_skew`` for a loss (more room on the
-  priced right), ``0.5 + window_pad_skew`` for a payoff (mirror).
+* **padding skew** -- *only as a tie-breaker for a symmetric band* (a64):
+  ``f = 0.5 - window_pad_skew`` for a loss (more room on the priced right),
+  ``0.5 + window_pad_skew`` for a payoff (mirror). An asymmetric band ignores
+  the convention and skews to the thick tail instead.
 
 So a loss and its mirror-image payoff place their bands as reflections of one
-another. (Under the planned tail-aware padding, the convention skew becomes a
-*tie-breaker* applied on top of the tail-driven split.)
+another *when the tails are symmetric*; an asymmetric (thick-right / thin-left)
+book skews to the thick side under both readings (the per-edge coverage still
+follows the convention).
 
 Controls
 --------
@@ -333,35 +343,37 @@ prose never drift, with an ANSI ``color=True`` option that emphasises thick tail
 on a TTY. ``Severity`` and ``Frequency`` carry one-line ``tail_description``
 too.
 
-**Wire the sizer to the tail report.** The ``sbj`` floor is the computational
-twin of the single-big-jump principle the classifier already names. Gate it on a
-SUBEXPONENTIAL-or-heavier severity (a no-op for lighter classes, but explicit);
-for a POWER_LAW severity take the right-tail quantile from the exact tail law
-``q_X(p) \propto (1-p)^{-1/\alpha}`` rather than the three-moment shifted fit --
-both more accurate and the principled handling of the infinite-variance case
-that today falls back to :meth:`recommend_bucket`. A power-law / infinite-variance
-tail has no finite deep quantile to size to, so the plan does not chase one: it
-sizes the reachable bulk, **accepts the truncation without normalising**, and
-warns (exact below the truncation, deficit reported). The classifier is right-tail
-only today; the plan adds a left-tail rung and classifies non-family severities
+**Wire the sizer to the tail report (landed a64).** The ``sbj`` floor is the
+computational twin of the single-big-jump principle the classifier names, so it
+is gated on a thick (SUBEXPONENTIAL-or-heavier) tail via ``_loss_tail_classes``
+(a no-op for lighter classes, but explicit). A POWER_LAW / infinite-variance tail
+has **no finite deep quantile to size to**, so the sizer does *not* chase one
+(no ``alpha``-quantile, no :meth:`recommend_bucket` fallback -- the latter crashed
+on infinite cv): ``_reachable_bulk_high`` sizes the reachable bulk to a moderate
+``bucket_sizing_p`` from the severity's actual quantile, **accepts the truncation
+without normalising**, and warns (exact below the truncation, deficit reported).
+The classifier carries a left-tail rung and classifies non-family severities
 **structurally** (base family + limit / splice / attachment), with no numeric
 density estimator -- a genuinely unknown *and* unlimited family is treated
 conservatively as thick.
 
-**Asymmetric window for concentrated heavy-positive books.** ``T5`` above is the
-motivating case: its ideal grid is roughly ``[400k, 1.2M]`` -- the ``windowed``
-left-tail lift (``x_min`` off the floor, **trustworthy precisely because** the
-lognormal aggregate's left tail is thin: a large-deviation "conspiracy of many",
-no subexponential reach on the left) combined with the ``sbj`` right reach and a
-``bs`` coarse enough that a single severity fits. Realizing it means flooring the
-``windowed`` upper edge by ``sbj_hi``, *gating the left lift on a thin-left
-determination from the tail report*, and relaxing the selection gate so a
-windowed grid wins when it captures a reach the 0-based pick clips (not only when
-it is no coarser).
+**Asymmetric window for concentrated heavy-positive books (landed a64).** ``T5``
+above is the motivating case: its ideal grid is roughly ``[400k, 1.2M]`` -- the
+``windowed`` left-tail lift (``x_min`` off the floor, **trustworthy precisely
+because** the lognormal aggregate's left tail is thin: a large-deviation
+"conspiracy of many", no subexponential reach on the left) combined with the
+``sbj`` right reach and a ``bs`` coarse enough that a single severity fits. This
+is realized by flooring the ``windowed`` upper edge by ``sbj_hi`` (which grows
+the severity-discretisation extent enough that a single heavy occurrence fits --
+reclaiming the former "Regime B"), gating the left lift on a thin-left
+determination from the tail report, and relaxing the selection gate so a windowed
+grid wins when it captures a reach the 0-based pick clips (not only when it is no
+coarser).
 
-**Tail-aware padding.** Replace the fixed ``window_pad_skew`` slack split with
-the tail-driven rule in step 4 (slack follows the tails; convention skew becomes
-a tie-breaker).
+**Tail-aware padding (landed a64).** The fixed ``window_pad_skew`` slack split is
+replaced by a tail-driven rule: an asymmetric band puts ~3/4 of the slack on the
+thick side (``WINDOW_SLACK_THICK``); a symmetric band centres, with the
+loss/payoff convention demoted to a tie-breaker.
 
 **``bs_description`` / ``bs_explanation`` -- a narrative of the grid choice.**
 Grid selection is the #1 numerical decision, it is subtle, and it is a frequent

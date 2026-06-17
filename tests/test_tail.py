@@ -451,18 +451,43 @@ def test_tail_narrative_color_emphasises_thick():
     assert '\x1b[1;31m' in colored                # subexponential emphasised
 
 
-def test_tail_report_public_color_accessor():
-    a = _agg('agg A 10 claims sev 100 * pareto 1.5 poisson')
-    assert '\x1b[1;31m' in a.tail_report()                       # coloured short
-    assert '\x1b[1;31m' in a.tail_report(verbose=True)           # coloured prose
-    assert a.tail_report(color=False) == a.tail_description      # plain == property
-    assert a.tail_report(verbose=True, color=False) == a.tail_explanation
-
-
 def test_severity_and_frequency_tail_description():
     a = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson')
     assert a.sevs[0].tail_description == 'lognorm, [0, inf), subexponential right tail'
     assert a.frequency.tail_description == 'poisson frequency, super-exponential count'
+
+
+def test_occ_reins_overlay_row_capped():
+    """An unlimited 100% occurrence cession caps the net per-occurrence tail.
+
+    ``occurrence net of inf xs 1000`` cedes everything above 1000, so the
+    ``severity (net occ)`` overlay row is bounded at 1000 -- while the aggregate
+    row stays GROSS (subexponential), since the sizer ignores occ reinsurance.
+    """
+    a = _agg('agg A 100 claims sev lognorm 50 cv 1.5 '
+             'occurrence net of inf xs 1000 poisson')
+    df = a.tail_df
+    assert 'severity (net occ)' in df.index
+    net = df.loc['severity (net occ)']
+    assert net['right_tail'] == 'bounded'
+    assert net['max'] == 1000.0
+    assert 'capped at 1000' in str(net['note'])
+    # the aggregate is still sized on the gross (heavy) tail
+    assert df.loc['aggregate', 'right_tail'] == 'subexponential'
+
+
+def test_occ_reins_overlay_row_finite_layer_retains_tail():
+    """A finite occurrence layer leaves the net per-occurrence tail heavy.
+
+    ``occurrence net of 500 xs 1000`` cedes only a finite slice, so the gross
+    tail above 1500 is retained: the overlay row keeps the subexponential right
+    tail and reports the tail as retained.
+    """
+    a = _agg('agg B 100 claims sev lognorm 50 cv 1.5 '
+             'occurrence net of 500 xs 1000 poisson')
+    net = a.tail_df.loc['severity (net occ)']
+    assert net['right_tail'] == 'subexponential'
+    assert 'tail retained' in str(net['note'])
 
 
 @pytest.mark.parametrize('program,expected,alpha', [

@@ -324,7 +324,12 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   - [x] `[tail-narrative]` — `tail_description` / `tail_explanation` over the
     layered report (Aggregate + Severity + Frequency one-liners), ANSI option
     (a62, byte-stable, +7 tests).
-  - [ ] `[use-selection]`, `[bs-reporting]` — pending.
+  - [x] `[use-selection]` — wired the tail report into `_bs_window` (a64): six
+    items (thickness-gated SBJ floor; power-law honest truncation; thin-left
+    windowed left-lift reclaiming Regime B; tail-aware slack; concentration from
+    the report; clip→warning), plus the occ-re overlay row and signed-padding
+    verification. Borderline `cv` books revert to 0-based.
+  - [ ] `[bs-reporting]` — pending (next).
 - [ ] **W10 `[A]`** Retire `recommend_bucket` — replace the legacy one-shot
   sizer with a new (TBD) function that takes `log2` (and possibly `x_min`) as
   explicit arguments, then remove `recommend_bucket`. W9's honest-truncation path

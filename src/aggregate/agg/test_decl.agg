@@ -393,6 +393,22 @@ agg SBJ.Heavy  5000 claims sev lognorm 100 cv 2 poisson                         
 agg SBJ.Small  5 claims sev lognorm 10 cv 2 poisson                                                          note{small heavy book, tail ~47k; constrained log2 keeps the MoM window}
 
 # ============================================================
+# USE. Tail-report-driven bucket selection (1.0.0a64)
+# ============================================================
+# `[use-selection]` wires the layered tail report into `_bs_window`: the SBJ
+# floor is gated on a thick tail; a power-law (infinite-variance) book sizes the
+# reachable bulk and truncates honestly (warn, no normalize); a concentrated
+# heavy book is reclaimed by the thin-left upper-floor (former Regime B); the
+# windowed slack split is tail-aware (symmetric vs thick-skewed); occurrence
+# reinsurance adds a `severity (net occ)` overlay row to `tail_df`. See
+# tests/test_bucket_sizing.py, tests/test_tail.py and dev/plan-univariate-bucket.md.
+agg USE.PowerLaw   10 claims sev 100 * pareto 1.5 poisson                                                     note{infinite variance; reachable-bulk sizing + honest truncation}
+agg USE.SymWindow  100000 claims sev gamma 100 cv 0.5 poisson                                                 note{concentrated thin-tailed; symmetric slack split, convention tie-breaker}
+agg USE.SignedTwoSided 20 claims dsev [-50 -10 200 5000] poisson                                              note{signed two-sided reach; padding sits between the wrapped tails}
+agg USE.OccNetCapped 100 claims sev lognorm 50 cv 1.5 occurrence net of inf xs 1000 poisson                  note{unlimited 100% cession caps the net per-occurrence tail}
+agg USE.OccNetFinite 100 claims sev lognorm 50 cv 1.5 occurrence net of 500 xs 1000 poisson                  note{finite occ layer retains the heavy net tail}
+
+# ============================================================
 # HY3. Hygiene-3 batch: number separators + 'of' synonym (1.0.0a52)
 # ============================================================
 # Item 1: Python-style `_` digit-group separators in numbers (equal to their

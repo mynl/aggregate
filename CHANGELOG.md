@@ -1,5 +1,61 @@
 # Changelog
 
+## 1.0.0a64
+
+### Bucket-selection 1A-bucket — wiring the tail report into sizing (`[use-selection]`)
+
+Third task of `dev/plan-univariate-bucket.md`. The bucket sizer (`_bs_window`)
+now consults the layered tail report (`_loss_tail_classes`, `concentration`)
+instead of ad-hoc geometric proxies. Six changes, each byte-stability-gated
+against the full suite and `test_bucket_sizing.py`:
+
+1. **Thickness-gated single-big-jump floor.** The SBJ extent floor now fires
+   only for a genuinely **thick** (subexponential-or-heavier) tail -- the loss
+   right tail for a positive severity, the reflected left tail for a signed one
+   (`is_thick`). A no-op for thin tails (the MoM window already covers them),
+   now explicit and cheaper.
+2. **Power-law / infinite-variance: honest truncation.** An infinite-variance
+   (power-law) aggregate has no finite deep quantile to size to. The old
+   `recommend_bucket` fallback **re-raised** on infinite cv (a crash for an
+   unlimited Pareto); it is replaced by `_reachable_bulk_high`, which sizes the
+   reachable bulk to a moderate `bucket_sizing_p` coverage from the severity's
+   actual quantile, **warns**, and accepts the far tail as a reported deficit --
+   exact below the truncation, never normalized back in, no `alpha`-quantile
+   chase.
+3. **Thin-left-gated windowed left-lift (the asymmetric window).** A
+   concentrated heavy-severity book (the former "Regime B", which stayed 0-based
+   and clipped the tail) is now **reclaimed**: the windowed upper edge is floored
+   by the single-big-jump reach, which grows the grid -- and its severity
+   discretisation extent -- enough that a single heavy occurrence fits and the
+   thick right tail is captured. Lifting `x_min` off 0 is gated on a thin left
+   tail. Selection is relaxed so a (possibly coarser) windowed grid wins when it
+   captures a reach the 0-based pick clips.
+4. **Tail-aware padding / slack.** The fixed `window_pad_skew` split is replaced
+   by a tail-driven one: an **asymmetric** band puts ~3/4 of the power-of-2 slack
+   on the thick side (`WINDOW_SLACK_THICK`); a **symmetric** band centres, with
+   the loss/payoff convention demoted to a tie-breaker. (The per-edge window
+   *coverage* still follows the convention.)
+5. **Concentration from the report.** The windowed-eligibility gate is now the
+   conservative `concentrated` flag (`agg_cv < CONCENTRATION_CV`, ~0.1), the
+   single source of truth, replacing the looser geometric `w_lo > 0` (~0.21).
+   Borderline books (`cv` in ~[0.10, 0.21]) revert to the 0-based grid.
+6. **Far-tail clip → warning.** The positive-tail clip is promoted from a silent
+   `logger.info` to a visible `DefectiveDistributionWarning`, with a structured
+   `Aggregate._bs_clip` field (reach, grid top, `log2` needed, estimated clipped
+   mass via `_clipped_mass_estimate`) for the validation / bs report.
+
+Also: an informational **`severity (net occ)` overlay row** in `tail_df`
+(`occ_net_severity_row`) reporting how occurrence reinsurance reshapes the
+retained per-occurrence tail (bounded when a top layer cedes 100% to infinity,
+else the gross tail) -- the sizer still works on the gross severity. The
+signed-padding placement was verified (a two-sided signed book's negative and
+positive reaches coexist in the FFT buffer without collision).
+
+`Aggregate.tail_report` (added experimentally in a63, same-day) is **removed**:
+the ANSI `color=` option lives only on `aggregate.tail.describe_rows` /
+`explain_rows`, the future terminal/HTML hook; the plain `tail_description` /
+`tail_explanation` properties are the public surface.
+
 ## 1.0.0a63
 
 ### Comprehensive scipy severity tail tables (the family classifier)
@@ -39,11 +95,6 @@ The four reconciled discrepancies between the two source views (`exponpow`
 right-tail = super-exponential; `genhalflogistic` bounded; `studentized_range`;
 `truncnorm`) are documented in `integrated.md`. Bucket selection does not read
 the tail classifier yet, so this remains report-only.
-
-Also adds **`Aggregate.tail_report(verbose=False, color=True)`** — the public,
-ANSI-coloured (thick tails in bold red) accessor for the a62 narrative; the plain
-`tail_description` / `tail_explanation` properties are unchanged (so `info()`
-stays plain). `tail_report(color=False)` equals the matching property.
 
 ## 1.0.0a62
 

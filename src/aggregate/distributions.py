@@ -84,6 +84,13 @@ WINDOW_NINES_TRIM = get_settings().discretization.window_nines_trim
 # (loss -> 0.5 - Delta, more room above/right; payoff -> 0.5 + Delta). 0 centres
 # the band; the legacy placement was f = 0 (all slack above the band).
 WINDOW_PAD_SKEW = get_settings().discretization.window_pad_skew
+# WINDOW_SLACK_THICK: for an ASYMMETRIC windowed band (one tail thick, one thin),
+# the fraction of the power-of-2 slack placed on the *thick* side -- the tail
+# that needs the room (item 4, the "right look"). The thin side gets the rest
+# (1 - WINDOW_SLACK_THICK). Hardwired 3/4; the loss/payoff convention does not
+# apply when the tails are asymmetric (the tail shape dictates placement),
+# only as a tie-breaker for a symmetric band (WINDOW_PAD_SKEW).
+WINDOW_SLACK_THICK = 0.75
 # BUCKET_SIZING_P: percentile of the fitted distribution fed to
 # recommend_bucket to size bs (formerly BUCKET_SIZING_P). >1 is read as nines.
 BUCKET_SIZING_P = get_settings().discretization.bucket_sizing_p
@@ -2241,37 +2248,6 @@ class Aggregate:
         """
         return _tail.explain_rows(self._tail_rows(), self._tail_info())
 
-    def tail_report(self, *, verbose: bool = False, color: bool = True) -> str:
-        """The tail narrative, ANSI-coloured for a terminal (thick tails in red).
-
-        The print-for-a-TTY companion to the plain :attr:`tail_description` /
-        :attr:`tail_explanation` properties (which stay uncoloured so they read
-        well inside :meth:`info` and logs). Thick (subexponential-or-heavier)
-        tail classes are emphasised in bold red.
-
-        Parameters
-        ----------
-        verbose : bool
-            ``False`` (default) returns the short aligned :attr:`tail_description`
-            lines; ``True`` the verbose :attr:`tail_explanation` prose.
-        color : bool
-            Emit ANSI colour (default ``True``). Pass ``color=False`` for plain
-            text identical to the matching property.
-
-        Returns
-        -------
-        str
-
-        Examples
-        --------
-        >>> print(a.tail_report())               # short, coloured
-        >>> print(a.tail_report(verbose=True))   # full prose, coloured
-        """
-        rows = self._tail_rows()
-        if verbose:
-            return _tail.explain_rows(rows, self._tail_info(), color=color)
-        return '\n'.join(_tail.describe_rows(rows, color=color))
-
     def _sev_label(self) -> str:
         """Short severity family label for tail text (the family, or ``'N components'``)."""
         if self.sevs is None or len(self.sevs) == 0:
@@ -2321,6 +2297,7 @@ class Aggregate:
             agg_m=self.agg_m, agg_sd=self.agg_sd,
             agg_reflect=bool(getattr(self, '_agg_reflect', False)),
             agg_shift=float(getattr(self, '_agg_shift', 0.0)),
+            occ_reins=self.occ_reins,
         )
 
     def _frequency_count_support(self):
@@ -3692,6 +3669,7 @@ class Aggregate:
         self.i0 = 0           # index of physical 0 in the severity array
         self.xs_sev = None    # severity discretisation grid (may differ from xs)
         self._bs_window_df = None   # inspectable bucket/window estimator summary
+        self._bs_clip = None        # structured far-tail clip report (item 6) or None
         # F1 opt-in: when True the severity keeps its negative support (the
         # layering clamp ``x<0 -> 0`` is bypassed). Default False preserves the
         # established non-negative behaviour. Opt-in wiring is pending a design
@@ -6509,6 +6487,28 @@ class Aggregate:
                 los.append(-np.inf)
         return float(min(los)) if los else 0.0
 
+    def _loss_tail_classes(self):
+        """Loss-space ``(left_tail, right_tail)`` rungs for the bucket sizer.
+
+        The single-big-jump floor and the tail-aware slack split key off the
+        *loss* convolution's tail thickness -- the grid is sized on the loss
+        FFT, before any ``pnl`` reflect/shift. So this returns the aggregate's
+        per-side decay rungs from the shared tail report (:meth:`_tail_rows`),
+        undoing the affine swap ``tail_df`` applies for a reflecting ``pnl`` so
+        the rungs are oriented in loss space (the positive single-big-jump tail
+        is always ``right``, the signed reflected tail ``left``).
+
+        Returns
+        -------
+        (left_tail, right_tail) : tuple of aggregate.tail.TailClass
+            The loss-space aggregate decay rungs. Spec-only (valid before
+            :meth:`update`); fed to :func:`aggregate.tail.is_thick`.
+        """
+        agg = self._tail_rows()[-1]
+        if bool(getattr(self, '_agg_reflect', False)):
+            return agg.right_tail, agg.left_tail
+        return agg.left_tail, agg.right_tail
+
     def _single_big_jump_window(self, p_star):
         """Single-big-jump extent floor for a heavy / signed severity.
 
@@ -6576,6 +6576,114 @@ class Aggregate:
         if not np.isfinite(sbj_lo):
             return None
         return float(sbj_lo), float(sbj_hi)
+
+    def _reachable_bulk_high(self, p):
+        """Upper window edge for an infinite-variance (power-law) aggregate.
+
+        A power-law / infinite-variance tail has no finite deep quantile to
+        size to, so the moment window (and ``recommend_bucket``) cannot place a
+        sensible grid (``_estimate_agg_percentile`` raises). Instead size the
+        *reachable bulk* to a **moderate** coverage ``p`` -- the
+        ``bucket_sizing_p`` knob, default ``1 - 1e-5`` -- from the severity's
+        **actual** quantile (``fz.ppf``, which is finite for any ``p < 1`` even
+        when the moment-based estimate is not) via the single-big-jump relation
+        ``ES - mu_X + q_X(p**)``, ``p** = 1 - (1 - p)/E[N]``. The far tail
+        beyond this edge is then an honest truncation -- the aggregate is exact
+        below it and the missing mass is a reported deficit, never normalized
+        back in; the caller (:meth:`_bs_window`) warns.
+
+        Parameters
+        ----------
+        p : float
+            Moderate bulk coverage (``> 1`` is read as a number of nines).
+
+        Returns
+        -------
+        float
+            The reachable-bulk upper edge. ``q_X(p**)`` alone when the
+            aggregate mean is itself infinite (``alpha <= 1``); ``inf`` only if
+            no severity quantile can be evaluated (the caller then falls back).
+
+        Notes
+        -----
+        Deliberately does **not** chase the power-law ``alpha`` quantile: a
+        deeper ``p`` would push ``q_X`` arbitrarily far out and coarsen ``bs``
+        to uselessness for no real coverage gain. ``alpha`` is reported in the
+        tail report; it does not drive sizing.
+        """
+        en = float(self.n)
+        if not (np.isfinite(en) and en >= 1.0):
+            return np.inf
+        try:
+            sev_m = float(self.stats_df['mixed'][('sev', 'mean')])
+        except (KeyError, ValueError, TypeError):
+            sev_m = np.nan
+        es = float(self.agg_m)
+        p = float(np.where(p > 1, 1.0 - 10.0 ** -p, p))
+        tail = max((1.0 - p) / en, SBJ_TAIL_FLOOR)
+        p2 = 1.0 - tail
+        # actual severity quantile (valid for infinite cv), widest component,
+        # capped by any finite policy limit.
+        q_his = []
+        for s in (self.sevs if self.sevs is not None else []):
+            try:
+                q_his.append(float(s.fz.ppf(p2)))
+            except Exception:  # pragma: no cover - defensive
+                q_his.append(np.inf)
+        if not q_his:
+            return np.inf
+        q_hi = max(q_his)
+        lim = (float(self.limit.max())
+               if self.limit is not None and len(self.limit) else np.inf)
+        if np.isfinite(lim):
+            q_hi = min(q_hi, lim)
+        if not np.isfinite(q_hi):
+            return np.inf
+        if np.isfinite(es) and np.isfinite(sev_m):
+            return float(es - sev_m + q_hi)
+        # no finite aggregate mean (alpha <= 1): size to one big claim.
+        return float(q_hi)
+
+    def _clipped_mass_estimate(self, grid_top):
+        """Estimate the aggregate mass above ``grid_top`` via the single big jump.
+
+        When the far right tail does not fit the grid (item 6), the clipped
+        aggregate mass is dominated by the single-big-jump mechanism: a grid top
+        of ``grid_top`` corresponds to one big claim of size
+        ``grid_top - (ES - mu_X)`` on an otherwise typical bulk, so
+        ``P(S > grid_top) ~ E[N]·P(X > grid_top - ES + mu_X)``. Summed (the mix
+        is additive in the survival), capped at 1.
+
+        Parameters
+        ----------
+        grid_top : float
+            The realized grid's upper edge.
+
+        Returns
+        -------
+        float
+            The estimated clipped mass in ``[0, 1]``, or ``nan`` if it cannot be
+            formed (no finite ``E[N]`` / severity mean).
+        """
+        en = float(self.n)
+        try:
+            sev_m = float(self.stats_df['mixed'][('sev', 'mean')])
+        except (KeyError, ValueError, TypeError):
+            return np.nan
+        es = float(self.agg_m)
+        if not (np.isfinite(en) and en >= 1.0
+                and np.isfinite(sev_m) and np.isfinite(es)):
+            return np.nan
+        x_claim = grid_top - es + sev_m
+        sevs = self.sevs if self.sevs is not None else []
+        sf = 0.0
+        for s in sevs:
+            try:
+                sf += float(s.fz.sf(x_claim))
+            except Exception:  # pragma: no cover - defensive
+                return np.nan
+        n_comp = max(len(sevs), 1)
+        return float(min(en * sf / n_comp, 1.0))
 
     def _exact_discrete_window(self):
         """Exact aggregate support for a fully-discrete ``dfreq``/``fixed`` x ``dsev``.
@@ -6718,6 +6826,7 @@ class Aggregate:
         (``window_pad_skew``) so the band sits sensibly in the grid (R2/R5).
         """
         N0 = 1 << log2
+        self._bs_clip = None    # cleared each sizing; set only if the tail clips
         m = self.agg_m
         try:
             ex2 = float(self.stats_df['mixed'][('agg', 'ex2')])
@@ -6832,9 +6941,24 @@ class Aggregate:
             try:
                 x_hi = float(_estimate_agg_percentile(m, self.agg_cv, skew, p))
             except ValueError:
-                # no finite variance (e.g. Pareto) and bs free: last-resort
-                # legacy extent (recommend_bucket bumps p / uses the limit).
-                x_hi = float(N0 * round_bucket(self.recommend_bucket(log2, p=bucket_sizing_p)))
+                # No finite variance (power-law / infinite-variance severity):
+                # there is no finite deep quantile to size to (item 2). Size the
+                # REACHABLE BULK to a moderate coverage (``bucket_sizing_p``)
+                # from the severity's actual quantile and accept the far tail as
+                # an honest truncation -- the aggregate is exact below ``x_hi``
+                # and the missing mass is a reported deficit (never normalized
+                # back in, no ``recommend_bucket`` fudge, no ``alpha``-quantile
+                # chase). Warn so the user can raise ``log2`` if it matters.
+                x_hi = self._reachable_bulk_high(bucket_sizing_p)
+                if np.isfinite(x_hi):
+                    warnings.warn(
+                        f'{self.name}: infinite-variance (power-law) aggregate '
+                        f'-- no finite tail quantile to size to. Sizing the '
+                        f'reachable bulk to ~{bucket_sizing_p} coverage '
+                        f'(x_hi={x_hi:.6g}); the far tail beyond the grid is '
+                        f'truncated and reported as a deficit (not normalized). '
+                        f'Raise log2 to push the truncation deeper.',
+                        DefectiveDistributionWarning, stacklevel=2)
             if not np.isfinite(x_hi):
                 # deterministic (sd ~ 0) or undefined skew (NaN): a few sd above
                 # the mean (collapses to the mean for a point mass).
@@ -6877,25 +7001,56 @@ class Aggregate:
         #     (``xs == xs_sev``), which windowing breaks (the output window sits
         #     far above the severity grid). Aggregate reinsurance is fine -- it
         #     operates on the aggregate, on the windowed ``xs``/``x_min``.
-        #   - the window lower edge clears 0 (``w_lo > 0``) -- this is exactly
-        #     ``agg_cv < 1/z``, so an ordinary aggregate (whose window includes
-        #     0) never qualifies.
+        #   - the book is **concentrated** -- the tail report's conservative
+        #     ``concentrated`` flag (``agg_cv < CONCENTRATION_CV``, i.e. ~0.1),
+        #     the single source of truth (item 5). This replaces the looser
+        #     geometric ``w_lo > 0`` (~``cv < 0.21``) gate: a band that merely
+        #     grazes 0 is no longer windowed, so a borderline book reverts to the
+        #     0-based grid. The ``w_lo > 0`` geometry is still required below (the
+        #     band must actually clear 0 to be placed), but is now a necessary
+        #     condition under the stricter concentration gate, not the gate.
         # The edges use *per-edge* coverage (``p_lo_w, p_hi_w``), deep on the
         # protected tail and shallow on the cheap one, so the convention skews
         # the placement (Q1/Q2). Selection then takes it when the severity fits
         # the windowed extent and it is **no coarser** than the 0-based pick
         # (below) -- reclaiming the empty space below the band even when ``bs``
         # is unchanged; the only quiet fall back is a coarser bucket.
+        # Tail report and single-big-jump reach, computed once here so the
+        # windowed left-lift (item 3), the thickness gate (item 1) and the SBJ
+        # floor below all share them.
+        loss_left, loss_right = self._loss_tail_classes()
+        sbj = self._single_big_jump_window(p)
+        conc_flag, _conc_p = _tail.concentration(m, sd)
         if (x_min_in is None and not signed and not self._agg_affine_active()
                 and self.occ_reins is None
-                and np.isfinite(sd) and sd > 0):
+                and np.isfinite(sd) and sd > 0
+                and bool(conc_flag)):
             try:
                 w_lo, w_hi, _Ww = estimate_agg_window(
                     m, sd, skew, p, p_lo=p_lo_w, p_hi=p_hi_w)
             except ValueError:
                 w_lo = -1.0  # no finite window (e.g. infinite variance)
             if w_lo > 0:
-                r = _row(w_lo, w_hi, lattice,
+                # Thin-left-gated upper floor (item 3, the asymmetric window). A
+                # thick right tail (subexponential severity) reaches past the
+                # moment window; floor the windowed upper edge by the single-big-
+                # jump reach so the grid -- and with it the severity discretisation
+                # extent ``N*bs`` -- grows enough to (a) capture that tail and
+                # (b) let a single heavy occurrence fit the window (the
+                # severity-fit guard below then passes where the un-floored
+                # window failed -> Regime B is reclaimed). Lifting ``x_min`` off 0
+                # is only safe when the *left* tail is thin (no mass below
+                # ``w_lo`` to clip); a non-signed aggregate is bounded-left, so
+                # this holds, but gate on it explicitly for correctness and for a
+                # future signed windowing.
+                thin_left = not _tail.is_thick(loss_left)
+                w_hi_eff = w_hi
+                floored_up = False
+                if (thin_left and _tail.is_thick(loss_right)
+                        and sbj is not None and sbj[1] > w_hi):
+                    w_hi_eff = float(sbj[1])
+                    floored_up = True
+                r = _row(w_lo, w_hi_eff, lattice,
                          f'lo 1-1e-{WINDOW_NINES_TRIM if is_loss else WINDOW_NINES}'
                          f' / hi 1-1e-{WINDOW_NINES if is_loss else WINDOW_NINES_TRIM}',
                          'two-sided window, benign FFT wrap',
@@ -6909,6 +7064,8 @@ class Aggregate:
                 sev_hi = self._severity_high_estimate(p)
                 r['applies'] = bool(np.isfinite(sev_hi) and sev_hi < extent)
                 r['note'] += f'; sev_hi={sev_hi:.6g}, extent={extent:.6g}'
+                if floored_up:
+                    r['note'] += '; upper floored by sbj'
                 rows['windowed'] = r
                 if not r['applies']:
                     # Regime B (heavy severity): the mass band clears 0 but a
@@ -6934,15 +7091,29 @@ class Aggregate:
         else:
             selected = 'moment'
         # windowed overrides the 0-based pick when it is applicable (the
-        # severity fits the windowed extent) and is **no coarser** than that
-        # pick. ``<=`` (not ``<``) so a band that clears 0 wins on *placement*
-        # alone -- reclaiming the empty ``[0, x_lo)`` region and balancing the
-        # slack -- even when ``bs`` is unchanged. Self-limiting: ``applies`` can
-        # only hold when the mass band clears 0 *and* a single severity fits, so
-        # ordinary and heavy-severity (Regime B) aggregates are unchanged.
-        if ('windowed' in rows and rows['windowed']['applies']
-                and rows['windowed']['bs'] <= rows[selected]['bs']):
-            selected = 'windowed'
+        # severity fits the windowed extent) and EITHER
+        #   - it is **no coarser** than that pick (``bs <= sel bs``) -- a band
+        #     that clears 0 wins on *placement* alone, reclaiming the empty
+        #     ``[0, x_lo)`` region and balancing the slack even when ``bs`` is
+        #     unchanged; OR
+        #   - the 0-based pick **clips** the single-big-jump reach while the
+        #     windowed grid (upper-floored by ``sbj``, item 3) **captures** it --
+        #     a coarser windowed bulk ``bs`` is the price of not clipping the
+        #     thick right tail (the asymmetric-window reclaim of Regime B).
+        # Self-limiting: ``applies`` can only hold when the mass band clears 0
+        # *and* a single severity fits the (possibly floored) window.
+        win = rows.get('windowed')
+        if win is not None and win['applies']:
+            sel_top = (float(rows[selected]['x_min'])
+                       + (1 << int(rows[selected]['log2'])) * float(rows[selected]['bs']))
+            win_top = (float(win['x_min'])
+                       + (1 << int(win['log2'])) * float(win['bs']))
+            reach = float(sbj[1]) if sbj is not None else float(win['x_max'])
+            sel_clips = sel_top < reach
+            win_covers = win_top >= reach
+            if (win['bs'] <= rows[selected]['bs']
+                    or (sel_clips and win_covers)):
+                selected = 'windowed'
 
         # ---- single-big-jump extent floor (1A-fix) ----------------------
         # A subexponential / signed severity can carry a far tail the 3-moment
@@ -6956,7 +7127,8 @@ class Aggregate:
         # ``max``/``min`` are no-ops) -> byte-stable. Only ``moment`` and
         # ``windowed`` are floored -- ``exact_discrete`` and ``bounded_small``
         # carry hard support bounds the SBJ moment estimate must not widen.
-        sbj = self._single_big_jump_window(p)
+        # (``sbj`` and ``loss_left``/``loss_right`` were computed above, before
+        # the windowed block, which now also consumes them.)
         if sbj is not None:
             # Record the grid the single-big-jump extent *alone* implies (sized
             # like any other method row, via ``_size``), so the row is directly
@@ -6974,6 +7146,12 @@ class Aggregate:
                 applies=False, x_min=np.nan, x_max=np.nan, W=np.nan,
                 bs=np.nan, log2=np.nan, coverage=f'E[N]-adj 1-1e-{WINDOW_NINES}',
                 note='single big jump: n/a (no finite E[N] / variance)')
+        # Thickness gate (item 1): the single-big-jump mechanism only governs a
+        # *thick* (subexponential-or-heavier) tail -- the loss aggregate's right
+        # tail for a positive sev, its (reflected) left tail for a signed one.
+        # For a thin tail the MoM window already covers the reach, so the floor
+        # is a no-op; gating on the tail report makes that explicit and cheaper
+        # and stops the deep ``p**`` severity quantile firing where it should not.
         if sbj is not None and bs_in <= 0 and selected in ('moment', 'windowed'):
             sbj_lo, sbj_hi = sbj
             win_lo = float(rows[selected]['x_min'])
@@ -6988,7 +7166,7 @@ class Aggregate:
                                note=rows[selected]['note'] + '; sbj floor')
                 rows[selected] = floored
 
-            if signed and sbj_lo < win_lo:
+            if signed and _tail.is_thick(loss_left) and sbj_lo < win_lo:
                 # SIGNED -- correctness, non-negotiable. The severity discretises
                 # on the same N-bucket grid; if its full negative reach does not
                 # fit, the FFT *wraps* and corrupts the whole law (the LNS 47%
@@ -7007,7 +7185,7 @@ class Aggregate:
                     bs_f = round_bucket(span / (1 << log2))
                     x0_f = float(np.floor(floor_lo / bs_f) * bs_f)
                     _apply_floor(x0_f, floor_hi, bs_f, log2)
-            elif not signed and sbj_hi > win_hi:
+            elif not signed and _tail.is_thick(loss_right) and sbj_hi > win_hi:
                 # POSITIVE -- a refinement, NOT a correctness fix. A heavy
                 # unlimited severity's MoM window under-reaches the true tail, so
                 # extend the (non-negative) window up to the single big jump --
@@ -7026,14 +7204,24 @@ class Aggregate:
                 else:
                     # Doesn't fit at the bulk ``bs`` within the requested log2;
                     # keep the MoM window (clip the far tail) rather than coarsen
-                    # the bulk. Tell the user it is their call to widen the grid
-                    # -- info only (silent by default), expected, not defective.
+                    # the bulk. This is a visible warning (item 6), not a silent
+                    # log: the user should know a heavy tail is clipped and how
+                    # to widen the grid. The clipped-mass estimate is also stashed
+                    # in ``self._bs_clip`` for the validation report / bs report.
                     grid_top = x0 + (1 << sel_l2) * keep_bs
-                    logger.info(
-                        '%s: heavy right tail reaches %.6g but the grid top is '
-                        '%.6g at log2=%d, bs=%.6g; a sliver is clipped. Raise '
-                        'log2 to ~%d (keeping this bs) to capture it.',
-                        self.name, sbj_hi, grid_top, sel_l2, keep_bs, need)
+                    clipped = self._clipped_mass_estimate(grid_top)
+                    self._bs_clip = dict(
+                        reach=float(sbj_hi), grid_top=float(grid_top),
+                        log2=int(sel_l2), bs=float(keep_bs),
+                        need_log2=int(need), clipped_mass=float(clipped))
+                    cm = (f'~{clipped:.3g} of the aggregate mass'
+                          if np.isfinite(clipped) else 'a sliver')
+                    warnings.warn(
+                        f'{self.name}: heavy right tail reaches {sbj_hi:.6g} but '
+                        f'the grid top is {grid_top:.6g} at log2={sel_l2}, '
+                        f'bs={keep_bs:.6g}; {cm} is clipped. Raise log2 to '
+                        f'~{need} (keeping this bs) to capture it.',
+                        DefectiveDistributionWarning, stacklevel=2)
 
         # ---- realized grid (the ``used`` row) ---------------------------
         sel_bs = float(rows[selected]['bs'])
@@ -7041,16 +7229,24 @@ class Aggregate:
         sel_x0 = float(rows[selected]['x_min'])
         if x_min_in is not None:           # explicit origin override (D4)
             sel_x0 = float(round(x_min_in / sel_bs) * sel_bs)
-        # ---- balanced padding (R2/R4/R5) --------------------------------
+        # ---- tail-aware padding / slack (item 4) ------------------------
         # A windowed band is placed band-bottom by ``_size`` (all power-of-2
         # slack above it). Redistribute the slack so the band sits sensibly in
-        # the grid: fraction ``f = 0.5 -/+ window_pad_skew`` of the slack goes
-        # below the band (loss -> less below / more room on the priced right;
-        # payoff -> mirror). Only the *windowed* row is rebalanced -- ordinary,
-        # exact, and bounded rows keep their band-bottom origin (byte-stable);
-        # an explicit ``x_min`` also pins the origin. The shift is clamped so the
-        # grid still covers the window top and never crosses the 0 floor, so the
-        # benign FFT wrap stays valid (and is in fact safer -- margin both sides).
+        # the grid, with the split driven by the **tail report**, not a fixed
+        # convention skew. ``f`` is the fraction of slack below the band:
+        #   - asymmetric tails (one side thick, one thin) -> ~3/4 of the slack
+        #     goes to the *thick* side (the tail that needs room): ``f = 1/4``
+        #     for a thick right tail, ``f = 3/4`` for a thick left tail. The
+        #     loss/payoff convention does NOT enter here -- the tail shape does.
+        #   - symmetric tails (both thick or both thin) -> centre the band, with
+        #     the loss/payoff convention demoted to a tie-breaker
+        #     (``f = 0.5 -/+ window_pad_skew``: a loss leaves more room on the
+        #     priced right, a payoff mirrors).
+        # Only the *windowed* row is rebalanced -- ordinary, exact, and bounded
+        # rows keep their band-bottom origin (byte-stable); an explicit ``x_min``
+        # also pins the origin. The shift is clamped so the grid still covers the
+        # window top and never crosses the 0 floor, so the benign FFT wrap stays
+        # valid (and is in fact safer -- margin both sides).
         if (selected == 'windowed' and x_min_in is None
                 and not self._agg_affine_active()):
             w_lo = float(rows['windowed']['x_min'])   # snapped band-bottom origin
@@ -7058,7 +7254,14 @@ class Aggregate:
             N = 1 << sel_l2
             slack = N * sel_bs - (w_hi - w_lo)
             if slack > 0:
-                f = 0.5 - WINDOW_PAD_SKEW if is_loss else 0.5 + WINDOW_PAD_SKEW
+                thick_l = _tail.is_thick(loss_left)
+                thick_r = _tail.is_thick(loss_right)
+                if thick_r and not thick_l:
+                    f = 1.0 - WINDOW_SLACK_THICK     # thick right: room above
+                elif thick_l and not thick_r:
+                    f = WINDOW_SLACK_THICK           # thick left: room below
+                else:                                # symmetric: convention tie-break
+                    f = 0.5 - WINDOW_PAD_SKEW if is_loss else 0.5 + WINDOW_PAD_SKEW
                 target = w_lo - f * slack
                 origin = float(np.floor(target / sel_bs) * sel_bs)
                 # keep the band: origin in [x_hi - N*bs, w_lo], and >= 0 floor.

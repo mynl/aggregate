@@ -167,12 +167,15 @@ def test_window_severity_overflow_falls_back():
     """
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        exact = build('agg E 5000 claims sev lognorm 100 cv 2 poisson approximate exact')
         approx = build('agg A 5000 claims sev lognorm 100 cv 2 poisson approximate sgamma')
+    # The single fitted (thin-tailed sgamma) severity sits at the aggregate mean
+    # and overflows the un-floored window; item 3's upper floor only fires for a
+    # *thick* right tail, so this thin approximate is not floored and the
+    # severity-fit guard keeps it 0-based.
     assert not bool(approx._bs_window_df.loc['windowed', 'applies'])
     assert not bool(approx._bs_window_df.loc['windowed', 'selected'])
     assert approx.x_min == 0.0
-    assert approx.est_m == pytest.approx(exact.est_m, rel=1e-3)
+    assert approx.est_m == pytest.approx(approx.agg_m, rel=1e-3)
 
 
 def test_window_occ_reins_not_windowed():
@@ -244,46 +247,73 @@ def test_window_balanced_padding_redistributes_slack():
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
 
 
-def test_window_convention_override_mirrors_placement():
-    """``window_convention`` flips the padding skew; loss and payoff mirror.
+def _window_placement_fracs(prog, conv):
+    """(below, above) grid-slack fractions for a windowed book under ``conv``."""
+    a = build(prog)
+    a.update(window_convention=conv)
+    d = a.agg_density
+    nz = np.flatnonzero(d > 1e-12)
+    top = a.x_min + a.bs * (1 << a.log2)
+    below = (a.xs[nz[0]] - a.x_min) / (top - a.x_min)
+    above = (top - a.xs[nz[-1]]) / (top - a.x_min)
+    return below, above
 
-    A loss leaves more empty grid above the band (room for the priced right
-    tail); a payoff is the mirror image. The two placements are symmetric.
+
+def test_window_symmetric_convention_mirrors_placement():
+    """Symmetric tails: the loss/payoff convention tie-breaks the slack split.
+
+    A thin-tailed concentrated book (gamma severity -> exponential right tail,
+    bounded left -> both thin -> *symmetric*) falls to the convention
+    tie-breaker (item 4): a loss leaves more room above the band (the priced
+    right tail), a payoff mirrors it. The two placements are symmetric.
     """
-    def fracs(conv):
-        a = build('agg HM 100000 claims sev lognorm 100 cv 0.5 poisson')
-        a.update(window_convention=conv)
-        d = a.agg_density
-        nz = np.flatnonzero(d > 1e-12)
-        top = a.x_min + a.bs * (1 << a.log2)
-        below = (a.xs[nz[0]] - a.x_min) / (top - a.x_min)
-        above = (top - a.xs[nz[-1]]) / (top - a.x_min)
-        return below, above
-
-    lo_below, lo_above = fracs('loss')
-    pay_below, pay_above = fracs('payoff')
+    prog = 'agg HM 100000 claims sev gamma 100 cv 0.5 poisson'
+    lo_below, lo_above = _window_placement_fracs(prog, 'loss')
+    pay_below, pay_above = _window_placement_fracs(prog, 'payoff')
     assert lo_above > lo_below                     # loss: room on the right
     assert pay_below > pay_above                   # payoff: room on the left
     assert lo_below == pytest.approx(pay_above, abs=0.02)   # mirror
     assert lo_above == pytest.approx(pay_below, abs=0.02)
 
 
-def test_window_regime_b_heavy_severity_stays_zero_based(caplog):
-    """Heavy severity (Regime B): band clears 0 but the origin cannot move.
+def test_window_asymmetric_skews_to_thick_tail():
+    """Asymmetric tails: the slack skews to the THICK side, not by convention.
 
-    ``5000 claims lognorm 100 cv 2`` has its mass band well above 0, but a
-    single cv-2 severity overflows the windowed extent, so the benign FFT wrap
-    is invalid. The windowed row is recorded but inapplicable; the grid stays
-    0-based and a discoverability ``logger.info`` explains why (no warning --
-    this is expected, not defective).
+    A subexponential (lognorm) severity gives a thick right / thin left
+    aggregate. Item 4 puts ~3/4 of the slack above the band (room for the thick
+    right tail) -- so there is more room above than below under *both* the loss
+    and the payoff reading. The tail shape, not the convention, dictates the
+    split (contrast the symmetric book, where the payoff reading flips it).
     """
-    import logging
-    with caplog.at_level(logging.INFO, logger='aggregate.distributions'):
+    prog = 'agg HM 100000 claims sev lognorm 100 cv 0.5 poisson'
+    lo_below, lo_above = _window_placement_fracs(prog, 'loss')
+    pay_below, pay_above = _window_placement_fracs(prog, 'payoff')
+    assert lo_above > lo_below                      # thick right: room above (loss)
+    assert pay_above > pay_below                     # ... and also for payoff
+
+
+def test_window_heavy_severity_reclaimed_via_sbj_floor():
+    """Item 3: a heavy-severity concentrated book is reclaimed by the sbj floor.
+
+    ``5000 claims lognorm 100 cv 2`` is concentrated (agg cv ~0.03) with a thick
+    right tail and a thin (bounded) left tail. The un-floored windowed extent is
+    too small for a single cv-2 severity (the old Regime B, which stayed 0-based
+    and clipped the tail). Flooring the windowed upper edge by the single-big-
+    jump reach grows the extent past the severity reach, so the window now
+    *applies*: the grid lifts off 0, captures the heavy tail (no clip), and
+    conserves mass -- a strict improvement over the clipping 0-based grid.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
         a = build('agg C3 5000 claims sev lognorm 100 cv 2 poisson')
-    assert 'windowed' in a._bs_window_df.index
-    assert not bool(a._bs_window_df.loc['windowed', 'applies'])
-    assert a.x_min == 0.0
-    assert any('non-windowable' in r.getMessage() for r in caplog.records)
+    df = a._bs_window_df
+    assert bool(df.loc['windowed', 'applies'])
+    assert bool(df.loc['windowed', 'selected'])
+    assert 'upper floored by sbj' in str(df.loc['windowed', 'note'])
+    assert a.x_min > 0.0                                   # lifted off 0
+    assert a.x_min + a.bs * (1 << a.log2) > 1.2e6          # captures the sbj reach
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
+    assert a.est_m == pytest.approx(a.agg_m, rel=1e-2)
 
 
 # ----------------------------------------------------------------------
@@ -368,4 +398,70 @@ def test_sbj_light_book_byte_stable():
         a = build('agg Light 50 claims sev gamma 100 cv 1 poisson')
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
     assert a.est_m == pytest.approx(a.agg_m, rel=1e-5)
+
+
+def test_sbj_thin_tail_gated_off():
+    """Item 1: the single-big-jump floor does not bind for a thin right tail.
+
+    A gamma (exponential-tail, thin) severity classifies thin, so even when the
+    deep ``p**`` severity quantile pokes a hair past the MoM window the floor is
+    gated off -- the selected grid keeps the MoM window untouched. The ``sbj``
+    row is still recorded for inspection but never carries the ``sbj floor``
+    annotation onto the selected method.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg Thin 50 claims sev gamma 100 cv 1 poisson')
+    note = str(a._bs_window_df.loc['moment', 'note'])
+    assert 'sbj floor' not in note
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
+
+
+def test_infinite_variance_honest_truncation():
+    """Item 2: a power-law (infinite-variance) book sizes the reachable bulk.
+
+    ``10 claims sev 100 * pareto 1.5`` has a finite mean (3000) but infinite
+    variance, so there is no finite deep quantile to size to. The sizer must
+    NOT crash (the old ``recommend_bucket`` path re-raised on infinite cv); it
+    sizes the reachable bulk to ``bucket_sizing_p`` coverage, warns, and accepts
+    the far tail as an honest truncation: the probability mass is ~1 but the
+    estimated mean falls short of the analytic mean (the truncated power-law
+    tail carries mean), and the deficit is NOT normalized back in.
+    """
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        a = build('agg PL 10 claims sev 100 * pareto 1.5 poisson')
+    assert np.isfinite(a.bs) and a.bs > 0
+    msgs = [str(w.message) for w in caught if 'power-law' in str(w.message)]
+    assert msgs, 'expected an infinite-variance truncation warning'
+    assert float(a.agg_density.sum()) == pytest.approx(1.0, abs=1e-5)
+    # honest truncation: the far tail is dropped, not smeared back -- so the
+    # estimated mean is strictly below the (finite) analytic mean.
+    assert a.est_m < a.agg_m
+    assert a.est_m == pytest.approx(a.agg_m, rel=0.05)
     assert 'sbj floor' not in str(a._bs_window_df.loc['moment', 'note'])
+
+
+def test_signed_two_sided_reach_no_collision():
+    """[signed-padding] A signed book's negative and positive reaches coexist.
+
+    A signed severity (``dsev [-50 -10 200 5000]``, atoms on both sides of 0)
+    straddles 0 with a wide positive reach. The signed grid must place the FFT
+    zero-pad *between* the two wrapped tails (positives at the bottom of the
+    period, negatives wrapped to the top) so they cannot collide in the buffer.
+    Pinning mass to 1 and the mean to the analytic verifies the padding is
+    sufficient -- no aliasing across the buffer when the support is two-sided.
+
+    A severity heavy on *both* sides is not yet constructible (negative support
+    is clamped to 0 outside the explicit signed ``dsev`` / ``ssev`` path, pending
+    the F1 negative-support opt-in), so this exercises the realizable two-sided
+    case: a bounded negative reach with a wide positive one.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg SP 20 claims dsev [-50 -10 200 5000] poisson')
+    assert a._signed_severity()
+    assert a.x_min < 0.0                                   # negative origin
+    assert a.x_min + a.bs * (1 << a.log2) > 5000           # covers the positive reach
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
+    assert a.est_m == pytest.approx(a.agg_m, rel=1e-3)

@@ -274,6 +274,15 @@ DecL syntax). How much enters the default `qd`/`info` need not be decided now
 
 ## `[use-selection]` — using the report in bs selection
 
+> **LANDED (a64).** All six items wired into `_bs_window`, plus the occ-re
+> overlay row (`occ_net_severity_row`) and the signed-padding verification
+> (`test_signed_two_sided_reach_no_collision`). The "Regime B" heavy-severity
+> book is now reclaimed by the thin-left-gated upper floor (item 3); the old
+> `test_window_regime_b_*` is replaced by `test_window_heavy_severity_reclaimed_via_sbj_floor`,
+> and the convention-mirror test split into symmetric (mirrors) /asymmetric
+> (skews to thick) cases. Borderline `cv ∈ [0.10, 0.21]` books revert to the
+> 0-based grid (item 5). Next: `[bs-reporting]`.
+
 Each item is a self-contained change to `_bs_window`, byte-stability-gated
 (full suite + `test_suite.agg` snapshot; light / thin / bounded / windowed books
 unchanged). Sized on the **gross combined severity** (`[reins-gross]`).

@@ -956,6 +956,38 @@ class Portfolio(object):
                 f'(worst-of under independence{driver_txt}). Units -- {units}.')
 
     @property
+    def bs_window_df(self) -> 'pd.DataFrame':
+        """Curated, read-only view of the portfolio combine grid (``[bs-reporting]``).
+
+        One row per unit (its selected signed window) plus the realised shared
+        ``used`` grid, culled to the user-facing columns (``x_min`` / ``x_max`` /
+        ``bs`` / ``log2`` / ``note``). The full frame -- with the ``coverage``
+        string and window width ``W`` -- stays on the private
+        :attr:`_bs_window_df` for experts (folds in TODO **H10**). Returns
+        ``None`` before the grid is sized. See :attr:`bs_description`.
+        """
+        df = getattr(self, '_bs_window_df', None)
+        if df is None:
+            return None
+        return df.reindex(columns=['x_min', 'x_max', 'bs', 'log2', 'note']).copy()
+
+    @property
+    def bs_description(self) -> str:
+        """One-line summary of the shared portfolio combine grid (``[bs-reporting]``).
+
+        The realised ``(bs, log2, x_min)`` and grid top of the resolution + span
+        combine (``best_window``); ``'portfolio grid not sized yet'`` before the
+        grid is built.
+        """
+        df = getattr(self, '_bs_window_df', None)
+        if df is None or 'used' not in df.index:
+            return 'portfolio grid not sized yet (call update())'
+        u = df.loc['used']
+        top = float(u['x_min']) + (1 << int(u['log2'])) * float(u['bs'])
+        return (f'portfolio grid: bs={float(u["bs"]):g}, log2={int(u["log2"])}, '
+                f'x_min={float(u["x_min"]):g} (top={top:g})')
+
+    @property
     def allocation_method(self) -> str:
         """Natural-allocation method: ``'linear'`` (default) or ``'lifted'``.
 

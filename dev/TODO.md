@@ -211,15 +211,13 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   So the genuine work is narrow — enumerate the real members per class
   (`Aggregate`/`Portfolio`/`Distortion`/`Underwriter`) and decide
   informative-`ValueError`-vs-`None` before touching anything.
-- [ ] **H10 `[A]` Promote `_bs_window_df` → public `bs_window_df`** — the grid-
-  sizer inspection frame is used and referenced enough (see
-  `dev/bucket-selection.rst`) that it should be a documented public member on
-  both `Aggregate` and `Portfolio`. Rename on the next code touch in
-  `distributions.py` / `portfolio.py` (keep `_bs_window_df` as a deprecated
-  alias for one release), update the bucket-selection doc and any tests. Folds
-  naturally into H9's public-`*_df` pass and is **scheduled inside W9
-  (1A-bucket)** `[bs-reporting]`, which builds the curated public view
-  (`dev/plan-univariate-bucket.md`).
+- [x] **H10 `[A]` Promote `_bs_window_df` → public `bs_window_df`** — done in
+  `[bs-reporting]` (a65), but as a **curated view** rather than a rename: public
+  `bs_window_df` (read-only, user-facing columns) on both `Aggregate` and
+  `Portfolio`, with the private `_bs_window_df` retained for experts (the full
+  journey + `coverage` / `W`). Better than the rename-with-alias plan -- no
+  deprecation cycle, and the public surface stays curated.
+  (`dev/done/plan-univariate-bucket.md`).
 
 ---
 
@@ -308,7 +306,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   diagnostic was dropped (the true-law kurtosis is modest; the 737 figure was an
   aliasing artifact). Light/thin/bounded/concentrated/windowed books byte-stable.
 - [ ] **W9 `[A]`** Bucket **1A-bucket** — univariate tail intelligence + reporting
-  (`dev/plan-univariate-bucket.md`). A first-class thick/thin tail report for
+  (`dev/done/plan-univariate-bucket.md`). A first-class thick/thin tail report for
   freq/sev/agg (min/max/bounded/left/right + conservative concentration), exposed
   as `tail_df` + `tail_description`/`tail_explanation`; wiring it into `bs`/`x_min`
   selection (gate `sbj` on thickness, power-law `alpha` quantiles, thin-left-gated
@@ -329,13 +327,16 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     windowed left-lift reclaiming Regime B; tail-aware slack; concentration from
     the report; clip→warning), plus the occ-re overlay row and signed-padding
     verification. Borderline `cv` books revert to 0-based.
-  - [ ] `[bs-reporting]` — pending (next).
+  - [x] `[bs-reporting]` — `_bs_window_df` enriched; curated public
+    `bs_window_df` (Aggregate + Portfolio, folding in H10); `bs_description` /
+    `bs_explanation` narratives + `bs_describe` / `bs_explain` ANSI functions;
+    de-duplicated the clip vs deficit warning (a65). 1A-bucket plan complete.
 - [ ] **W10 `[A]`** Retire `recommend_bucket` — replace the legacy one-shot
   sizer with a new (TBD) function that takes `log2` (and possibly `x_min`) as
   explicit arguments, then remove `recommend_bucket`. W9's honest-truncation path
   (`[use-selection]` item 2: accept truncation, no-normalize, warn) removes its
   last real job (the infinite-variance fallback), so this follows W9. See
-  `dev/plan-univariate-bucket.md` (`[recommend-bucket]`).
+  `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`).
 - [ ] **W8 `[A]`** Bucket-window **1P** — `Portfolio` windowed combine
   (`best_window`/`update`): sum per-unit origins/widths, pad once at the total,
   route the windowed non-signed book through the roll-combine; `Σ kappa_i == x`

@@ -12,7 +12,7 @@ Automatic Grid Selection (``bs``, ``log2``, ``x_min``)
    ``1.0.0a59``. The companion page :ref:`num how agg reps a dist` covers the
    *severity* discretization (how a single distribution is laid on a lattice);
    this page covers the *grid* the aggregate is computed on. This document is
-   kept current by **``dev/plan-univariate-bucket.md``** (the "1A-bucket" plan),
+   kept current by **``dev/done/plan-univariate-bucket.md``** (the "1A-bucket" plan),
    which owns the tail-intelligence and reporting work flagged under
    :ref:`bs open planned` below. The inspection frame is currently
    ``Aggregate._bs_window_df``; the plan adds a curated public
@@ -312,8 +312,8 @@ as needed) and adds the curated public ``bs_window_df`` and narrative
 
 .. _bs open planned:
 
-Open / planned (owned by ``plan-univariate-bucket.md``)
--------------------------------------------------------
+Tail-aware sizing and reporting (landed; ``dev/done/plan-univariate-bucket.md``)
+-------------------------------------------------------------------------------
 
 **A first-class tail report (support + per-side tail class).** *(Structured
 frame landed in a60, schema revised in a61; the narrative extension and the
@@ -375,11 +375,15 @@ replaced by a tail-driven rule: an asymmetric band puts ~3/4 of the slack on the
 thick side (``WINDOW_SLACK_THICK``); a symmetric band centres, with the
 loss/payoff convention demoted to a tie-breaker.
 
-**``bs_description`` / ``bs_explanation`` -- a narrative of the grid choice.**
-Grid selection is the #1 numerical decision, it is subtle, and it is a frequent
-source of user confusion, so in addition to the (private, complete)
-``_bs_window_df`` and the (public, culled) ``bs_window_df`` the plan adds
-read-only ``bs_description`` (the short summary) and ``bs_explanation`` (the
-verbose prose) text properties -- the same narrative technique planned for the
-forthcoming validation report. ``Portfolio`` picks up the same surfaces when the
-windowed combine (1P, ``plan-bucket-window-2.md``) lands.
+**``bs_description`` / ``bs_explanation`` -- a narrative of the grid choice
+(landed a65).** Grid selection is the #1 numerical decision, it is subtle, and it
+is a frequent source of user confusion, so in addition to the (private, complete)
+``_bs_window_df`` and the (public, culled) ``bs_window_df`` there are read-only
+``bs_description`` (the short summary -- winning method, ``(bs, log2, x_min)``,
+grid top, any clip) and ``bs_explanation`` (the verbose prose -- the aggregate
+tail one-liner, which methods applied and why the winner won, how to widen a
+clipped tail) text properties, with ANSI-coloured variants in the module
+functions ``bs_describe`` / ``bs_explain`` -- the same narrative technique
+destined for the validation report. ``Portfolio`` carries ``bs_window_df`` and
+``bs_description`` already; its full windowed combine (1P,
+``plan-bucket-window-2.md``) inherits the rest when it lands.

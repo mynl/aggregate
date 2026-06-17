@@ -346,6 +346,14 @@ disproves the read.
 
 ## `[bs-reporting]` — make the choice legible
 
+> **LANDED (a65).** `_bs_window_df` enriched (`log2_need`, `clipped`); curated
+> public `bs_window_df` on `Aggregate` and `Portfolio` (folds in TODO H10);
+> `bs_description` / `bs_explanation` narratives with the `bs_describe` /
+> `bs_explain` ANSI module functions. Also de-duplicated the clip warning (the
+> sizing-time clip warning now suppresses the redundant update-time deficit
+> warning). Completes the 1A-bucket univariate plan; next is `plan-bucket-window-2.md`
+> §1P (the `Portfolio` windowed combine), which inherits these surfaces.
+
 1. **`_bs_window_df` — the complete decision journey.** Keep it private and add
    *as many columns/rows as needed* to record the journey, not just the outcome:
    why a method did/didn't apply (the severity-fit reason, not just `False`), how

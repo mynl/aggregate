@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.0a65
+
+### Bucket-selection 1A-bucket — making the grid choice legible (`[bs-reporting]`)
+
+Fourth task of `dev/plan-univariate-bucket.md`. The bucket-grid decision is the
+#1 numerical choice; this surfaces it. Pure reporting -- no change to the grid.
+
+- **`_bs_window_df` enriched** with two derived columns: `log2_need` (the log2 a
+  method's window needs at its own `bs` -- a row with `log2_need > log2` was
+  capped) and `clipped` (the estimated far-tail mass dropped, on the `used` row).
+- **`bs_window_df`** -- a curated, read-only public property on **`Aggregate`**
+  (method / window / grid / applies / selected / note) and **`Portfolio`** (one
+  row per unit + the realised `used` grid). Folds in TODO **H10**; the private
+  `_bs_window_df` keeps the expert extras (`coverage`, `W`).
+- **`bs_description` / `bs_explanation`** -- short and verbose narratives of the
+  grid choice (`Aggregate`; `bs_description` also on `Portfolio`). The short line
+  is the winning method + `(bs, log2, x_min)` + grid top + any clip; the verbose
+  prose adds the aggregate tail one-liner, which methods applied and why the
+  winner won, and how to widen a clipped tail. The ANSI-coloured variants are the
+  module functions `aggregate.distributions.bs_describe` / `bs_explain`
+  (`color=True`), mirroring the tail narrative.
+- **No more double warning.** A book whose far tail is clipped at sizing time
+  (item 6's `DefectiveDistributionWarning` + structured `_bs_clip`) no longer
+  *also* emits the generic update-time "PMF deficit" warning -- the sizing
+  warning is the same mass with actionable advice (the exact `log2` to raise to),
+  so the deficit warning is suppressed when `_bs_clip` is set. The most common
+  heavy book (`100 claims lognorm cv 2`) now warns once, not twice.
+
 ## 1.0.0a64
 
 ### Bucket-selection 1A-bucket — wiring the tail report into sizing (`[use-selection]`)

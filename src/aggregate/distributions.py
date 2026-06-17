@@ -640,6 +640,118 @@ def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P, p_lo=None, p_hi=None):
 
 
 # ---------------------------------------------------------------------------
+# Bucket-grid narrative ([bs-reporting]) -- the short / verbose explanation of
+# the grid choice. Plain by default; ``color=True`` emphasises a far-tail clip
+# (lost mass) in bold red, mirroring the tail narrative's ANSI option. The
+# ``bs_description`` / ``bs_explanation`` Aggregate properties delegate here.
+# ---------------------------------------------------------------------------
+
+_METHOD_BLURB = {
+    'moment': 'the 3-moment method-of-moments window',
+    'exact_discrete': 'the exact discrete (integer-lattice) support',
+    'bounded_small': 'the bounded-severity support window',
+    'windowed': 'a two-sided window far from 0 (benign FFT wrap)',
+    'sbj': 'the single-big-jump extent',
+}
+
+
+def _bs_grid_top(used) -> float:
+    """Realized grid top ``x_min + 2**log2 * bs`` from the ``used`` row."""
+    return float(used['x_min']) + (1 << int(used['log2'])) * float(used['bs'])
+
+
+def bs_describe(agg, *, color: bool = False) -> str:
+    """One-line summary of an aggregate's chosen bucket grid (``[bs-reporting]``).
+
+    Parameters
+    ----------
+    agg : Aggregate
+        A *sized* aggregate (``update`` has run, so ``_bs_window_df`` exists).
+    color : bool
+        Emit ANSI colour (a far-tail clip is bold red). Default plain.
+
+    Returns
+    -------
+    str
+        ``'<method> grid: bs=…, log2=…, x_min=… (top=…)'`` plus a clip note when
+        the far tail is truncated.
+    """
+    df = agg._bs_window_df
+    if df is None:
+        return 'bucket grid not sized yet (call update())'
+    sel = df.index[df['selected'].astype(bool)]
+    method = sel[0] if len(sel) else 'moment'
+    used = df.loc['used']
+    top = _bs_grid_top(used)
+    line = (f'{method} grid: bs={float(used["bs"]):g}, log2={int(used["log2"])}, '
+            f'x_min={float(used["x_min"]):g} (top={top:g})')
+    clip = agg._bs_clip
+    if clip is not None:
+        cm = clip.get('clipped_mass', float('nan'))
+        cm_txt = f'~{cm:.3g}' if np.isfinite(cm) else 'a sliver'
+        msg = f'; clips {cm_txt} of the tail (raise log2 to {int(clip["need_log2"])})'
+        if color:
+            msg = f'{_tail._ANSI_THICK}{msg}{_tail._ANSI_RESET}'
+        line += msg
+    return line
+
+
+def bs_explain(agg, *, color: bool = False) -> str:
+    """Verbose prose explaining an aggregate's bucket-grid choice (``[bs-reporting]``).
+
+    Walks the decision: what the book is (the aggregate tail one-liner), which
+    methods applied and which won (and why, from its row note), the realized
+    grid, and any far-tail clip with how to widen it.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        A *sized* aggregate.
+    color : bool
+        Emit ANSI colour (a far-tail clip is bold red). Default plain.
+
+    Returns
+    -------
+    str
+    """
+    df = agg._bs_window_df
+    if df is None:
+        return 'Bucket grid not sized yet (call update()).'
+    sel = df.index[df['selected'].astype(bool)]
+    method = sel[0] if len(sel) else 'moment'
+    used = df.loc['used']
+    top = _bs_grid_top(used)
+    agg_line = _tail.describe_row(agg._tail_rows()[-1], color=color)
+    applied = [i for i in df.index
+               if i not in ('used',) and bool(df.loc[i].get('applies'))]
+    blurb = _METHOD_BLURB.get(method, method)
+    parts = [
+        f'The aggregate is {agg_line}.',
+        f'Of the methods that applied ({", ".join(applied) or "moment"}), '
+        f'the {method} method won -- {blurb}.',
+        f'Realized grid: bs={float(used["bs"]):g}, log2={int(used["log2"])}, '
+        f'x_min={float(used["x_min"]):g}, top={top:g}.',
+    ]
+    need = df.loc[method].get('log2_need')
+    if need is not None and np.isfinite(need) and need > int(used['log2']):
+        parts.append(
+            f'The window needs log2={int(need)} to hold its full reach at this '
+            f'bs but the budget is {int(used["log2"])}, so it was capped.')
+    clip = agg._bs_clip
+    if clip is not None:
+        cm = clip.get('clipped_mass', float('nan'))
+        cm_txt = f'~{cm:.3g}' if np.isfinite(cm) else 'a sliver'
+        msg = (f'The heavy right tail reaches {float(clip["reach"]):g}, past the '
+               f'grid top {top:g}: {cm_txt} of the mass is clipped (a reported '
+               f'deficit, not normalized) -- raise log2 to {int(clip["need_log2"])} '
+               f'to capture it.')
+        if color:
+            msg = f'{_tail._ANSI_THICK}{msg}{_tail._ANSI_RESET}'
+        parts.append(msg)
+    return ' '.join(parts)
+
+
+# ---------------------------------------------------------------------------
 # Single-module helpers — used only inside distributions.py.
 # ---------------------------------------------------------------------------
 
@@ -2247,6 +2359,50 @@ class Aggregate:
         and the concentration. Derived from :attr:`tail_df`.
         """
         return _tail.explain_rows(self._tail_rows(), self._tail_info())
+
+    @property
+    def bs_window_df(self) -> 'pd.DataFrame':
+        """Curated, read-only view of the bucket/window decision (``[bs-reporting]``).
+
+        One row per sizing method that ran (``moment``, ``exact_discrete``,
+        ``bounded_small``, ``windowed``, ``sbj``) plus the realized ``used``
+        grid, culled to the user-facing columns: whether the method ``applies``,
+        whether it was ``selected``, the method window (``x_min`` / ``x_max``),
+        the grid (``bs`` / ``log2``), the log2 the window ``needs`` at that ``bs``,
+        any estimated ``clipped`` far-tail mass, and a one-line ``note``.
+
+        The complete decision journey (extra columns, coverage strings) stays on
+        the private :attr:`_bs_window_df` for experts. Returns ``None`` before
+        :meth:`update`. See :attr:`bs_description` / :attr:`bs_explanation` for the
+        narrative.
+        """
+        if self._bs_window_df is None:
+            return None
+        cols = ['applies', 'selected', 'x_min', 'x_max', 'bs', 'log2',
+                'log2_need', 'clipped', 'note']
+        return self._bs_window_df.reindex(columns=cols).copy()
+
+    @property
+    def bs_description(self) -> str:
+        """One-line summary of the chosen bucket grid (``[bs-reporting]``).
+
+        The winning method and the realized ``(bs, log2, x_min)`` with the grid
+        top, plus a clip note when the far tail is truncated. The verbose form is
+        :attr:`bs_explanation`; the ANSI-coloured variant is
+        ``aggregate.distributions.bs_describe(agg, color=True)``.
+        """
+        return bs_describe(self)
+
+    @property
+    def bs_explanation(self) -> str:
+        """Verbose prose explaining the bucket-grid choice (``[bs-reporting]``).
+
+        What the book is (the aggregate tail one-liner), which methods applied
+        and which won and why, the realized grid, and any far-tail clip with how
+        to widen it. The ANSI-coloured variant is
+        ``aggregate.distributions.bs_explain(agg, color=True)``.
+        """
+        return bs_explain(self)
 
     def _sev_label(self) -> str:
         """Short severity family label for tail text (the family, or ``'N components'``)."""
@@ -4874,8 +5030,13 @@ class Aggregate:
         # backwards S diverge by exactly the deficit in Distortion.price,
         # so surface it loudly at construction time rather than have one
         # answer silently differ from another downstream.
+        #
+        # When the sizer already issued a far-tail *clip* warning
+        # (``self._bs_clip`` set -- the positive single-big-jump reach did not
+        # fit the log2 budget), that warning is the same mass with actionable
+        # advice (the exact log2 to raise to), so we do not double-warn here.
         deficit = 1.0 - float(np.sum(self.agg_density))
-        if deficit > VALIDATION_NOISE:
+        if deficit > VALIDATION_NOISE and self._bs_clip is None:
             warnings.warn(
                 f'{self.name}: aggregate PMF deficit {deficit:.3e} '
                 f'(Σp = 1 − {deficit:.3e} < 1); forwards and backwards '
@@ -7315,6 +7476,23 @@ class Aggregate:
                 W=float(grid_x_max - sel_x0), bs=sel_bs, log2=sel_l2,
                 coverage=rows[selected]['coverage'],
                 note=f'realized grid ({selected})', selected=False)
+
+        # ---- journey columns (bs-reporting item 1) ----------------------
+        # Purely derived reporting -- no effect on the grid. ``log2_need`` is the
+        # log2 a method's own window needs at its own ``bs`` (so a row whose
+        # ``log2_need > log2`` was capped/coarsened to fit the budget);
+        # ``clipped`` carries the estimated far-tail mass dropped, on the ``used``
+        # row, when the positive sbj floor clipped (``self._bs_clip``).
+        def _need(r):
+            w = float(r['x_max']) - float(r['x_min'])
+            b = float(r['bs'])
+            if not (np.isfinite(w) and np.isfinite(b) and b > 0 and w > 0):
+                return np.nan
+            return float(np.ceil(np.log2(w / b + 1.0)))
+        df['log2_need'] = df.apply(_need, axis=1)
+        df['clipped'] = np.nan
+        if self._bs_clip is not None:
+            df.loc['used', 'clipped'] = float(self._bs_clip.get('clipped_mass', np.nan))
         self._bs_window_df = df
 
         return sel_bs, sel_l2, ret_x0

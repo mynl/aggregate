@@ -6,8 +6,9 @@
 > report (freq/sev/agg), wiring it into `bs`/`x_min` selection (incl. the
 > `windowed`↔`sbj` asymmetric window and tail-aware padding), and making the
 > decision legible (public `bs_window_df`, narrative `bs_description` /
-> `bs_explanation`) — has moved to **`dev/plan-univariate-bucket.md`** (the
-> "1A-bucket" plan), which now owns `dev/bucket-selection.rst`. **1P** (the
+> `bs_explanation`) — landed in **`dev/done/plan-univariate-bucket.md`** (the
+> "1A-bucket" plan, complete a62–a65), which owns `dev/bucket-selection.rst`.
+> **1P** (the
 > Portfolio windowed combine) remains open *here*; we return to it after
 > 1A-bucket, and it inherits 1A-bucket's reporting surfaces (`tail_df`,
 > `tail_description`/`tail_explanation`, `bs_window_df`,

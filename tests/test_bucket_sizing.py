@@ -465,3 +465,72 @@ def test_signed_two_sided_reach_no_collision():
     assert a.x_min + a.bs * (1 << a.log2) > 5000           # covers the positive reach
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
     assert a.est_m == pytest.approx(a.agg_m, rel=1e-3)
+
+
+# ----------------------------------------------------------------------
+# [bs-reporting] -- the public bs_window_df view and the bs narratives
+# ----------------------------------------------------------------------
+
+
+def test_bs_window_df_public_view():
+    """The curated ``bs_window_df`` exposes the user-facing decision columns."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg W 5000 claims sev lognorm 100 cv 2 poisson')
+    df = a.bs_window_df
+    assert list(df.columns) == ['applies', 'selected', 'x_min', 'x_max', 'bs',
+                                'log2', 'log2_need', 'clipped', 'note']
+    assert 'used' in df.index
+    assert bool(df.loc['windowed', 'selected'])             # the reclaimed window
+    # private frame keeps the expert extras (coverage, W)
+    assert 'coverage' in a._bs_window_df.columns
+    # before update there is no frame
+    from aggregate import Aggregate
+    assert Aggregate(**a.spec).bs_window_df is None
+
+
+def test_bs_description_and_explanation():
+    """``bs_description`` / ``bs_explanation`` narrate the chosen grid + the clip."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        # ordinary heavy book: the moment grid clips a far-tail sliver
+        a = build('agg O 100 claims sev lognorm 100 cv 2 poisson')
+    desc = a.bs_description
+    assert 'moment grid' in desc and 'bs=' in desc and 'log2=' in desc
+    assert 'clips' in desc and 'raise log2' in desc          # the clip note
+    expl = a.bs_explanation
+    assert 'subexponential right tail' in expl               # the tail one-liner
+    assert 'moment method won' in expl
+    assert 'not normalized' in expl                          # honest truncation
+
+    # the ANSI colour variant emphasises the clip in bold red
+    from aggregate.distributions import bs_describe
+    assert '\x1b[1;31m' in bs_describe(a, color=True)
+    assert '\x1b[' not in a.bs_description                   # property stays plain
+
+
+def test_bs_description_windowed_no_clip():
+    """A reclaimed windowed book reports its lifted grid and no clip."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg C3 5000 claims sev lognorm 100 cv 2 poisson')
+    desc = a.bs_description
+    assert 'windowed grid' in desc
+    assert 'clips' not in desc                               # mass conserved
+    assert a._bs_clip is None
+
+
+def test_portfolio_bs_window_df_and_description():
+    """[bs-reporting] Portfolio exposes the curated combine grid + a one-liner."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        p = build('port PP '
+                  'agg A 100 claims sev lognorm 100 cv 2 poisson '
+                  'agg B 50 claims sev gamma 50 cv 1 poisson')
+    df = p.bs_window_df
+    assert list(df.columns) == ['x_min', 'x_max', 'bs', 'log2', 'note']
+    assert 'used' in df.index
+    assert {'A', 'B'}.issubset(set(df.index))                # one row per unit
+    assert 'coverage' in p._bs_window_df.columns             # expert frame richer
+    desc = p.bs_description
+    assert 'portfolio grid' in desc and 'bs=' in desc and 'log2=' in desc

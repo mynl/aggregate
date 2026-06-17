@@ -427,3 +427,130 @@ aggregates; legacy non-windowed books byte-stable.
   netceded sizing reconciliation (`plan-multivariate-punchup.md`).
 - Occ-reins × windowing (numerics-4 P0).
 - The from-0 severity overlay on a windowed grid (W3).
+
+---
+
+# 1A-fix — single-big-jump extent floor (heavy / signed severities)
+
+> **Locked with the author (2026-06-17). Lands before 1P** (a windowed
+> portfolio combine inherits per-unit extents, so the per-unit extent must be
+> right first). Same method as 1A (`_bs_window`); reuses `_severity_high_estimate`.
+
+## The problem (two faces of one root cause)
+
+The 3-moment MoM window (`estimate_agg_window` / `_estimate_agg_percentile`)
+**underestimates a tail the first three moments do not capture.** Two cases
+found by testing a58:
+
+- **T5 — heavy sev, high freq** (`5000 claims lognorm 100 cv 2`): MoM upper edge
+  634k, true 1e-12 reach **797k** → ~3.9e-7 of the priced right tail clips off
+  the grid top. Mild (this was deferred as W7).
+- **LNSFixed — signed sev, moments lie** (`10 claims 100 - lognorm 10 cv 2.5`):
+  the severity is bounded above at 100 with a long left tail to ~−74k, but the
+  aggregate's skew is **+0.21** (positive — `E[X³]` is dominated by the `+100³`
+  term) so the MoM window is `[−749, 3557]`. The severity's −74k reach is ~9×
+  the whole grid width → the FFT **aliases** (not just clips) → **47% of mass
+  lost**, garbage law. Catastrophic. The exact kurtosis is **737** vs the
+  3-moment fit's **3.08** — a 240× tell that the moments are lying.
+
+Root cause is shared: **moment-based sizing is blind to a heavy tail.** Mild on
+a positive sev (skew still flags heaviness; T5), catastrophic on a signed/
+reflected sev (skew can be positive while the tail is heavy-left; LNS).
+
+## The principle — single big jump (subexponential EVT)
+
+For a subexponential severity the aggregate's far tail is one big claim on a
+typical bulk: `P(S > x) ≈ E[N]·P(X > x)`. So:
+
+- to cover the aggregate to `p*`, probe the **severity** at
+  `p** = 1 − (1 − p*)/E[N]` (one claim must reach there; the other `N−1` are
+  typical) — **not** `N × q_X` (that assumes *every* claim is huge: wildly
+  over-sizes);
+- the single-big-jump extent is **`ES − μ_X + q_X(p**)`** (replace one typical
+  claim by one big one), mirrored on the low side for a signed sev.
+
+## The rule — unconditional extent floor on the selected window
+
+Resolution (`bs`) stays sized from the **bulk / window** (today's logic). Only
+the **extent** is floored by the single big jump, per side:
+
+```
+sbj_hi = ES − μ_X + q_X_hi(p**)          # one big claim up
+sbj_lo = ES − μ_X + q_X_lo(p**)          # one big claim down (signed sev; else 0)
+grid must cover [ min(window_lo, sbj_lo), max(window_hi, sbj_hi) ]
+```
+
+- **Extent floor on the *selected* window's edges**, NOT a standalone `[0, sbj]`
+  sizing. Critical: a *windowed* book keeps its narrow band + fine `bs`; SBJ only
+  nudges its band edges if one big claim pokes past them (usually it does not —
+  for a concentrated high-freq light-sev book `q_X` is small).
+- **Unconditional / self-activating.** SBJ binds only when the tail is heavier
+  than the window already covers. Light / thin / bounded / concentrated books
+  have `sbj ≤ window` → **byte-stable**. Genuinely heavy non-windowed books
+  coarsen `bs` (measured: T5 `bs 10→20`, the 5-claim heavy `ORD 5→10`) — the
+  *safe* direction (tail capture), and within the author's tolerance (bs=25 was
+  acceptable for T5).
+- **Signed anti-alias.** For a signed sev additionally enforce grid **width**
+  `N·bs ≥ |severity reach|` (anchor `sbj_lo` on `min(sbj_lo, q_X_lo)`), so the
+  severity cannot wrap the FFT buffer (the LNS failure mode).
+
+## The guard (author's point)
+
+`p**` deepens with `E[N]`; at `E[N]=5000`, `1 − p** = 2e-16` (past double
+precision) → `q_X(p**) → ∞` for an unbounded sev. So:
+
+- **Floor `1 − p**` at `1e-14`** (≈ `WINDOW_NINES + 2` nines) — the deepest the
+  severity is numerically meaningful; config knob.
+- **Cap `q_X(p**)` by the severity limit** when finite (`_severity_high_estimate`
+  already does this).
+- **Infinite-variance / unlimited Pareto** (no finite `p**` quantile): fall back
+  to the existing limit / `recommend_bucket` path (already handled).
+
+## Kurtosis diagnostic — signed severities only
+
+A *positive* severity encodes a heavy right tail in its **skew**, which the MoM
+already consumes — it cannot be blindsided. The skew-lies pathology needs the
+reflection (bounded-above + heavy-left), i.e. a **signed** sev. So compute the
+analytic aggregate kurtosis (compound formula from the 4th severity moment) and,
+**for signed severities only**, flag via `explain_validation` when it exceeds the
+fitted-window kurtosis by a factor (e.g. ≥ 10×). Diagnostic, not a sizing gate —
+SBJ already sizes correctly; this just tells the user the moments were untrustworthy.
+
+## Mechanics (`_bs_window`)
+
+1. `_single_big_jump_window(p_star)` helper → `(sbj_lo, sbj_hi)` from `ES`,
+   `μ_X`, `_severity_high_estimate(p**)` (upper) and the signed `sev.ppf` (lower),
+   with the `1e-14` guard and limit cap.
+2. After the selected window `[x_lo, x_hi]` is chosen (moment / windowed /
+   bounded / exact), floor its extent: `x_hi ← max(x_hi, sbj_hi)`,
+   `x_lo ← min(x_lo, sbj_lo)`; resize `bs`/`log2` from the floored extent if it
+   grew (keep the bulk `bs` when SBJ does not bind).
+3. Signed: enforce width ≥ `|severity reach|`.
+4. Record an `sbj` row (or columns) in `_bs_window_df` for inspectability.
+5. Signed kurtosis diagnostic into validation.
+
+## Blast radius / regression
+
+- Light / thin / bounded / concentrated books: `sbj ≤ window` → **byte-stable**
+  (the numerics-2/3 1e-14 gate and `test_suite.agg` snapshot hold).
+- Heavy non-windowed books: `bs` coarsens (safe direction); re-snapshot, assert
+  mass conserved + no top/bottom clip above noise + moments match analytic.
+- Signed heavy-left books (LNS): from 47% mass loss → mass ~1; assert no alias.
+
+## Files
+
+- `src/aggregate/distributions.py` — `_single_big_jump_window` helper,
+  `_bs_window` extent floor + signed width guard, analytic agg kurtosis + signed
+  `explain_validation` diagnostic.
+- `src/aggregate/config.py` / `data/config.default.toml` — `[discretization]`
+  SBJ probe-depth floor (nines) + kurtosis-flag factor.
+- `tests/test_bucket_sizing.py` — T5 no-clip, LNS mass-recovered/no-alias,
+  byte-stable-for-light, signed kurtosis warning, big-`E[N]` guard.
+
+## Out of scope (still)
+
+- A genuine 4-moment severity fit (NIG / GH). SBJ + the diagnostic suffice; a
+  4-parameter fit is a larger modeling change.
+- Multivariate per-axis SBJ (numerics-4 consumes this 1-D primitive).
+
+Version bump a58 → a59 on landing.

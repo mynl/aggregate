@@ -24,7 +24,7 @@ import numpy as np
 import pytest
 
 import aggregate
-from aggregate import build, format_program
+from aggregate import Underwriter, build, format_program
 from aggregate.decl_writer import spec_to_decl, _split_statements
 
 # ----------------------------------------------------------------------
@@ -39,6 +39,12 @@ _COMMENT = re.compile(r'\s*(#|//).*$')
 # first parse's spec is not a fixed point (tweedie discards its note and bakes a
 # CP-gamma spec that bypasses the sev_weighted defaults), so fidelity is exempt.
 _FIDELITY_EXEMPT = {'K.Tweedie2'}
+
+# The corpus is the test_suite family, whose programs reference builtins it
+# defines (e.g. ``sev.One``). Parse against an underwriter that loads it, NOT
+# the module-level ``build`` singleton -- ``build`` now defaults to the curated
+# ``examples`` library, which does not carry those builtins.
+_uw = Underwriter(databases='test_suite')
 
 
 def _corpus_lines():
@@ -131,7 +137,7 @@ def _parse_one(text):
     """Parse a single canonical statement (rendered text) to ``(kind, name, spec)``."""
     statements = _split_statements(text)
     assert len(statements) == 1, f'expected one statement, got {len(statements)}'
-    return build.parser.parse(statements[0])
+    return _uw.parser.parse(statements[0])
 
 
 # ----------------------------------------------------------------------
@@ -147,7 +153,7 @@ def test_corpus_nonempty():
 def test_roundtrip(program):
     """Each corpus program is idempotent under the unparser, and faithful
     unless it is a known-lossy construct."""
-    kind0, name0, spec0 = build.parser.parse(program)
+    kind0, name0, spec0 = _uw.parser.parse(program)
     if kind0 == 'expr':
         pytest.skip('bare expression, not an unparsable object')
 

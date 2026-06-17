@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.0.0a60
+
+### Bucket-selection 1A-bucket — the layered thick/thin tail report (`tail_df`)
+
+First task of `dev/plan-univariate-bucket.md` (`[tail-report]`). A new
+first-class, **spec-only** report of tail shape, built bottom-up across the
+layers that determine grid choice. `Aggregate.tail_df` returns a DataFrame with
+one row per layer — `frequency`; one per severity mix component (`comp0` …); the
+combined effective `severity` (when there is more than one component); and the
+`aggregate` — carrying the structural fields the sizer reasons about:
+
+- `min` / `max` reach (claim-space layered-loss support per component;
+  method-of-moments reach for the aggregate, two-sided for a signed book, `nan`
+  for an infinite-variance power-law);
+- `bounded`, and `left` / `right` **thick-thin** labels (thick ⇔
+  subexponential-or-heavier; a non-negative layer is thin-left; `UNKNOWN` is
+  conservatively thick);
+- the `tail_class` rung, power-law `alpha`, and `log_concave`;
+- (aggregate row only) the conservative `concentrated` flag and its
+  `concentration_p` sd-margin, using the tighter `CONCENTRATION_CV = 0.1` cut.
+
+The report carries **two facts** for a capped heavy family — its base-family
+thickness and its structural bound — so a thick base capped by a finite `limit`
+/ splice is reported as effective-bounded with a `"subexponential base, capped
+at L"` note. No numeric tail estimator: classification is family-lookup plus
+structure (the grid the estimate would need is the very thing being chosen).
+
+New surfaces in `aggregate.tail`: `TailRow`, `is_thick`, `thickness_label`,
+`severity_support`, `concentration`, `build_tail_rows`, `tail_frame`,
+`CONCENTRATION_CV`. **Pure addition — byte-stable**: nothing in selection reads
+the report yet (that is the next task, `[use-selection]`).
+
 ## 1.0.0a59
 
 ### Bucket-window 1A-fix — single-big-jump extent floor (heavy / signed severities)

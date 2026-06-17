@@ -3,8 +3,10 @@
 This module is the **single source of truth** for tail shape. It exposes an
 ordered 5-rung scale (:class:`TailClass`) plus a separate ``log_concave`` flag,
 deterministic family-lookup classifiers for frequency and severity, the
-``combine`` rule that produces the aggregate class, and text builders for the
-``.info`` / ``.tail_description`` / ``.tail_explanation`` surfaces.
+``combine`` rule that produces the aggregate class, the layered thick/thin
+**tail report** (:class:`TailRow`, :func:`build_tail_rows`, :func:`tail_frame`),
+and text builders for the ``.info`` / ``.tail_description`` /
+``.tail_explanation`` surfaces.
 
 The bounded-support tables (:data:`_BOUNDED_FREQS`, :data:`_BOUNDED_SCIPY_SEVS`)
 live here, and ``Aggregate.bounded`` / ``Severity.bounded`` / ``Portfolio.bounded``
@@ -14,15 +16,26 @@ Design notes
 ------------
 * **Leaf module.** Classifiers take duck-typed objects and read attributes
   (``freq_name``, ``sev_name``, ``sev_a``, ``sev_b``, ``sev_kind``, ``limit``,
-  ``sev_ub``, ``_certified_bounded``) — they do **not** import ``distributions``
-  or ``portfolio``, so those modules can import ``tail`` with no cycle.
-* **Phase 1 (this module) is exact and deterministic.** Families not in the
-  tables resolve to :attr:`TailClass.UNKNOWN`; the numeric density-tail estimator
-  (mean-excess slope, log-log-S slope, discrete log-concavity) is deferred to a
-  future Phase 2 and is *not* implemented here.
-* **bounded is spec-only.** The BOUNDED determination uses only structural spec
-  information (finite family / atom / finite layer or splice cap / certify
-  override), never a computed density — so ``.bounded`` is correct *before*
+  ``attachment``, ``sev_ub``, ``signed``, ``support_atoms``, ``fz``) — they do
+  **not** import ``distributions`` or ``portfolio``, so those modules can import
+  ``tail`` with no cycle.
+* **Family lookup + structure — no numeric estimator.** Classification is exact
+  and deterministic from the spec: a family table plus the structural bound
+  (finite ``limit`` / splice cap / attachment). Families not in the tables
+  resolve to :attr:`TailClass.UNKNOWN`, which the sizer treats *conservatively
+  as thick* when the support is also unbounded — never guessed. There is **no**
+  numeric density-tail estimator (mean-excess slope, log-log-S slope): estimating
+  a tail numerically needs a discretised grid, but the grid is the very thing the
+  estimate is meant to choose (chicken-and-egg), so numerics cannot drive the
+  sizer. New families are handled by extending the tables (cheap, exact).
+* **Two facts, not one.** A capped heavy family carries both its *base-family
+  thickness* (e.g. a Lévy base is heavy) and its *structural bound* (a finite
+  ``limit`` / splice). The **effective** class the sizer uses combines them: a
+  thick base capped at ``L`` is *effective-bounded* (cover ``[0, L]``), while the
+  base heaviness still informs resolution within ``[0, L]``.
+* **Spec-only.** Every determination here — class, bound, support, thick/thin,
+  concentration — uses structural spec information and pre-computed moments,
+  never a post-``update`` density, so the whole report is valid *before*
   ``update()``.
 
 Notes
@@ -33,7 +46,7 @@ big-jump principle gives ``P(S>x) ~ E[N]·P(X>x)`` so the aggregate inherits the
 severity class; when severity is light, the compound decay is set by the heavier
 of the severity and frequency decay rates. This holds while the frequency PGF is
 analytic at 1 (all standard frequencies); genuinely heavy mixing (PIG / Sichel /
-Neyman-A) is a watch item that the deferred numeric estimator can refine.
+Neyman-A) is a watch item, classified conservatively from the family table.
 """
 
 from __future__ import annotations
@@ -43,14 +56,27 @@ from enum import IntEnum
 from typing import NamedTuple, Optional
 
 import numpy as np
+import pandas as pd
 
 __all__ = [
-    'TailClass', 'TailClasses', 'TailInfo',
+    'TailClass', 'TailClasses', 'TailInfo', 'TailRow',
     'classify_frequency', 'classify_severity', 'combine',
     'aggregate_tail_info', 'tail_class_label',
+    'is_thick', 'thickness_label', 'severity_support',
+    'build_tail_rows', 'tail_frame',
     'describe_lines', 'explain',
+    'CONCENTRATION_CV',
     '_BOUNDED_FREQS', '_BOUNDED_SCIPY_SEVS',
 ]
+
+
+# Conservative concentration cutoff: a book is "concentrated" (its mass band
+# clears 0, so the windowed left-lift is eligible) only when its coefficient of
+# variation is comfortably small -- the band then sits >= 1/CONCENTRATION_CV
+# standard deviations above 0. Tighter than the legacy 1/z ~ 0.14 gate: lifting
+# x_min when the band does not really clear 0 clips left-tail mass, so we err
+# toward *not* windowing when marginal. See plan-univariate-bucket [tail-report].
+CONCENTRATION_CV = 0.1
 
 
 # ----------------------------------------------------------------------------
@@ -80,9 +106,9 @@ class TailClass(IntEnum):
     SUBEXPONENTIAL < POWER_LAW``, ordered by tail-decay rate so that
     :func:`combine` (and Portfolio worst-of) can use the heavier = larger
     convention. ``UNKNOWN`` is a sentinel that is **not** on the order: it
-    represents "not yet determined" (e.g. a histogram or unrecognised family in
-    Phase 1) and *poisons* :func:`combine` rather than masquerading as a
-    thickness — see :func:`combine`.
+    represents "not determined" (an unrecognised family with unbounded support)
+    and *poisons* :func:`combine` rather than masquerading as a thickness — see
+    :func:`combine`. The sizer treats it conservatively as thick.
 
     Notes
     -----
@@ -138,9 +164,9 @@ class TailInfo:
     freq, sev, agg : TailClass
         Frequency, (thickest-component) severity, and combined aggregate rungs.
     freq_lc, sev_lc, agg_lc : bool or None
-        Log-concavity flags. ``agg_lc`` is ``None`` in Phase 1 (a random sum
-        does not inherit log-concavity analytically; the numeric estimator that
-        would set it is deferred to Phase 2). ``None`` means "not determined".
+        Log-concavity flags. ``agg_lc`` is always ``None`` (a random sum does not
+        inherit log-concavity analytically, and there is no numeric estimator to
+        set it). ``None`` means "not determined".
     alpha : float or None
         Power-law tail index of the thickest severity component, when it is a
         power-law family; otherwise ``None``. ``alpha < 2`` ⇒ infinite variance,
@@ -174,8 +200,8 @@ class TailInfo:
 # ----------------------------------------------------------------------------
 
 # freq_name -> (TailClass, log_concave). Mixed-Poisson families default to
-# EXPONENTIAL (geometric-type tail) with log_concave left None — provisional,
-# a Phase-2 numeric refinement can promote genuinely heavy mixing.
+# EXPONENTIAL (geometric-type tail) with log_concave left None. Genuinely heavy
+# mixing is a watch item; extend this table if a family warrants a heavier rung.
 FREQ_TAIL: dict[str, tuple[TailClass, Optional[bool]]] = {
     'fixed':        (TailClass.BOUNDED, True),
     'bernoulli':    (TailClass.BOUNDED, True),
@@ -230,7 +256,7 @@ SCIPY_SEV_TAIL: dict[str, tuple[TailClass, Optional[bool]]] = {
     'laplace':    (TailClass.EXPONENTIAL, True),
     'logistic':   (TailClass.EXPONENTIAL, True),
     'lognorm':    (TailClass.SUBEXPONENTIAL, False),
-    'invgauss':   (TailClass.EXPONENTIAL, False),   # semi-heavy; Phase-2 watch
+    'invgauss':   (TailClass.EXPONENTIAL, False),   # semi-heavy; watch item
 }
 
 # Power-law families: scipy name -> callable(sev_a, sev_b) -> tail index alpha.
@@ -427,8 +453,8 @@ def aggregate_tail_info(frequency, sevs) -> TailInfo:
     -------
     TailInfo
         Frequency / severity / aggregate rungs, log-concavity flags
-        (``agg_lc`` is ``None`` in Phase 1), the power-law ``alpha`` if any,
-        the driver, and structured flags.
+        (``agg_lc`` is always ``None`` — not analytically determined), the
+        power-law ``alpha`` if any, the driver, and structured flags.
 
     Notes
     -----
@@ -530,8 +556,8 @@ def explain(info: TailInfo, freq_label: str = '', sev_label: str = '') -> str:
 
     if info.agg == TailClass.UNKNOWN:
         return ('Aggregate tail undetermined (one or more components is an '
-                'unrecognised or numeric-only family; a numeric density '
-                'estimate is pending).')
+                'unrecognised family with unbounded support; it is sized '
+                'conservatively as thick).')
 
     freq_phrase = ('log-concave ' if info.freq_lc else '') + tail_class_label(info.freq)
     sev_phrase = ('log-concave ' if info.sev_lc else '') + tail_class_label(info.sev)
@@ -555,3 +581,419 @@ def explain(info: TailInfo, freq_label: str = '', sev_label: str = '') -> str:
             sentence += ' (infinite variance)'
 
     return sentence + '.'
+
+
+# ----------------------------------------------------------------------------
+# Layered thick/thin tail report (the [tail-report] structure).
+# ----------------------------------------------------------------------------
+
+def is_thick(rung: TailClass) -> bool:
+    """Whether a rung counts as a *thick* tail for bucket selection.
+
+    Thick ⇔ subexponential-or-heavier (:attr:`~TailClass.SUBEXPONENTIAL` or
+    :attr:`~TailClass.POWER_LAW`): the regime where the method-of-moments upper
+    edge under-reaches and the single-big-jump floor applies. Thin ⇔
+    exponential-or-lighter (BOUNDED, SUPER_EXPONENTIAL, EXPONENTIAL).
+    :attr:`~TailClass.UNKNOWN` is treated as **thick** -- conservative, since an
+    unrecognised family with unbounded support should be sized wide rather than
+    clipped.
+    """
+    if rung == TailClass.UNKNOWN:
+        return True
+    return rung >= TailClass.SUBEXPONENTIAL
+
+
+def thickness_label(rung: TailClass) -> str:
+    """``'thick'`` / ``'thin'`` label for a rung (see :func:`is_thick`)."""
+    return 'thick' if is_thick(rung) else 'thin'
+
+
+def concentration(agg_cv) -> tuple[Optional[bool], Optional[float]]:
+    """Conservative concentration flag and margin from the aggregate ``cv``.
+
+    Parameters
+    ----------
+    agg_cv : float
+        The aggregate coefficient of variation ``sd / mean``.
+
+    Returns
+    -------
+    (bool or None, float or None)
+        ``concentrated`` -- ``True`` iff ``cv < CONCENTRATION_CV`` (the mass band
+        clears 0 by a comfortable margin, so the windowed left-lift is eligible)
+        -- and ``concentration_p`` -- the sd-count ``1 / cv`` by which the band
+        clears 0 (reporting only, not a separate gate). ``(None, None)`` when the
+        ``cv`` is undefined (e.g. a mean-0 signed P&L); ``(True, inf)`` for a
+        deterministic ``cv == 0``.
+    """
+    if agg_cv is None or not np.isfinite(agg_cv):
+        return None, None
+    if agg_cv <= 0:
+        return True, np.inf
+    return bool(agg_cv < CONCENTRATION_CV), float(1.0 / agg_cv)
+
+
+def _base_rung(severity) -> TailClass:
+    """Un-layered *base-family* thickness, ignoring any finite limit/splice cap.
+
+    The structural-bounded test in :func:`classify_severity` masks a thick base
+    once a finite ``limit`` / splice caps it (correctly -- the effective loss is
+    bounded). This helper recovers the base thickness so the report can say
+    "thick base, capped at L": it repeats the family lookup *without* the
+    structural-bounded short-circuit. Returns :attr:`~TailClass.UNKNOWN` for an
+    unrecognised family.
+    """
+    name = getattr(severity, 'sev_name', None)
+    if not isinstance(name, str):
+        return TailClass.UNKNOWN
+    a = getattr(severity, 'sev_a', np.nan)
+    b = getattr(severity, 'sev_b', np.nan)
+    if name == 'gamma':
+        return TailClass.EXPONENTIAL
+    if name == 'weibull_min':
+        if not np.isfinite(a):
+            return TailClass.EXPONENTIAL
+        if a > 1.0:
+            return TailClass.SUPER_EXPONENTIAL
+        if a == 1.0:
+            return TailClass.EXPONENTIAL
+        return TailClass.SUBEXPONENTIAL
+    if name == 'genpareto':
+        if np.isfinite(a) and a > 0:
+            return TailClass.POWER_LAW
+        return TailClass.EXPONENTIAL
+    if name in _POWER_LAW_ALPHA:
+        return TailClass.POWER_LAW
+    if name in SCIPY_SEV_TAIL:
+        return SCIPY_SEV_TAIL[name][0]
+    if name in _BOUNDED_SCIPY_SEVS:
+        return TailClass.BOUNDED
+    return TailClass.UNKNOWN
+
+
+def severity_support(severity) -> tuple[float, float]:
+    """Spec-only claim-space support ``(min, max)`` of one severity component.
+
+    The support of the *layered loss* that feeds the FFT -- after splice,
+    reflect, and the ``limit xs attachment`` policy -- read from structural spec
+    only (atoms, ``fz.support()``, ``limit``, ``attachment``), so it is valid
+    before ``update``.
+
+    Parameters
+    ----------
+    severity : object
+        A single ``aggregate.Severity`` (duck-typed).
+
+    Returns
+    -------
+    (float, float)
+        ``(min, max)``. A discrete / empirical severity returns its atom range
+        (negative atoms preserved -> signed). A signed continuous severity
+        returns its straddling ``fz.support()`` directly. Otherwise the layered
+        loss has ``min = 0`` and ``max = limit`` (finite) or the underlying
+        support upper edge less the attachment (possibly ``inf``).
+    """
+    atoms = getattr(severity, 'support_atoms', None)
+    if atoms is not None and len(atoms):
+        return float(atoms[0]), float(atoms[-1])
+
+    signed = bool(getattr(severity, 'signed', False))
+    try:
+        lo, hi = severity.fz.support()
+        lo, hi = float(lo), float(hi)
+    except Exception:
+        lo, hi = 0.0, np.inf
+
+    if signed:
+        return lo, hi
+
+    limit = getattr(severity, 'limit', np.inf)
+    limit = float(limit) if limit is not None else np.inf
+    attach = getattr(severity, 'attachment', 0.0)
+    attach = float(attach) if attach is not None else 0.0
+    if np.isfinite(limit):
+        return 0.0, limit
+    s_hi = (hi - attach) if np.isfinite(hi) else np.inf
+    return 0.0, max(s_hi, 0.0)
+
+
+@dataclass(frozen=True)
+class TailRow:
+    """One row of the layered tail report (one component / layer).
+
+    Attributes
+    ----------
+    component : str
+        Row label: ``'frequency'``, ``'comp0'`` ... (per mix component),
+        ``'severity'`` (the combined effective severity), or ``'aggregate'``.
+    family : str
+        Family / driver label, e.g. ``'poisson'``, ``'lognorm'``,
+        ``'2 components'``, ``'severity-driven'``.
+    min, max : float
+        Smallest / largest attainable value (``max`` may be ``inf``).
+    bounded : bool
+        ``min`` and ``max`` both finite (``rung is BOUNDED``).
+    left, right : str
+        ``'thick'`` / ``'thin'`` lower- and upper-tail labels (see
+        :func:`is_thick`). ``left`` is ``'thin'`` for non-negative support.
+    rung : TailClass
+        The effective tail rung.
+    alpha : float or None
+        Power-law tail index, when applicable.
+    log_concave : bool or None
+        Log-concavity flag (``None`` when not determined).
+    concentrated : bool or None
+        Aggregate row only: the conservative "band clears 0" flag.
+    concentration_p : float or None
+        Aggregate row only: the sd-margin the band clears 0 (``1 / cv``).
+    note : str
+        Short structural note (e.g. ``'subexponential base, capped at 1,000'``).
+    """
+
+    component: str
+    family: str
+    min: float
+    max: float
+    bounded: bool
+    left: str
+    right: str
+    rung: TailClass
+    alpha: Optional[float] = None
+    log_concave: Optional[bool] = None
+    concentrated: Optional[bool] = None
+    concentration_p: Optional[float] = None
+    note: str = ''
+
+
+def _severity_note(severity, eff_rung: TailClass) -> str:
+    """Structural note for a severity row: flag a *recognised heavy* base capped.
+
+    Fires only when a known subexponential-or-heavier family (``base >=
+    SUBEXPONENTIAL``, so ``UNKNOWN`` and intrinsically-bounded histograms are
+    excluded) has been made effective-bounded by a finite ``limit`` / splice cap
+    -- the "thick base, capped at L" case.
+    """
+    base = _base_rung(severity)
+    limit = getattr(severity, 'limit', np.inf)
+    ub = getattr(severity, 'sev_ub', np.inf)
+    cap = min(float(limit) if limit is not None else np.inf,
+              float(ub) if ub is not None else np.inf)
+    if (eff_rung == TailClass.BOUNDED and base >= TailClass.SUBEXPONENTIAL
+            and np.isfinite(cap)):
+        return f'{tail_class_label(base)} base, capped at {cap:,.0f}'
+    return ''
+
+
+def _sev_family_label(severity) -> str:
+    """Best family label for a severity row (the scipy name, or kind)."""
+    name = getattr(severity, 'sev_name', None)
+    if isinstance(name, str):
+        return name
+    kind = getattr(severity, 'sev_kind', '')
+    return str(kind) if kind else ''
+
+
+def severity_tail_row(severity, component: str) -> TailRow:
+    """Build the :class:`TailRow` for one severity mix component.
+
+    Parameters
+    ----------
+    severity : object
+        A single ``aggregate.Severity`` (duck-typed).
+    component : str
+        The row label (e.g. ``'comp0'``).
+
+    Returns
+    -------
+    TailRow
+    """
+    rung, lc, alpha = classify_severity(severity)
+    lo, hi = severity_support(severity)
+    signed = bool(getattr(severity, 'signed', False))
+    left = thickness_label(rung) if signed else 'thin'
+    return TailRow(
+        component=component, family=_sev_family_label(severity),
+        min=lo, max=hi, bounded=(rung == TailClass.BOUNDED),
+        left=left, right=thickness_label(rung),
+        rung=rung, alpha=alpha, log_concave=lc,
+        note=_severity_note(severity, rung),
+    )
+
+
+def combined_severity_row(sevs) -> TailRow:
+    """Build the combined *effective severity* row (the exposure-weighted blend).
+
+    The blend mirrors :func:`_combine_severities`: thickest rung (UNKNOWN
+    poisons), ``log_concave = all`` components, the thickest power-law ``alpha``.
+    The support is the component union and the left tail is thick iff any
+    component's is.
+
+    Parameters
+    ----------
+    sevs : sequence
+        The severity components (``Aggregate.sevs``); must be non-empty.
+
+    Returns
+    -------
+    TailRow
+        Labelled ``'severity'``.
+    """
+    rung, lc, alpha = _combine_severities(sevs)
+    rows = [severity_tail_row(s, f'comp{i}') for i, s in enumerate(sevs)]
+    lo = min(r.min for r in rows)
+    hi = max(r.max for r in rows)
+    left = 'thick' if any(r.left == 'thick' for r in rows) else 'thin'
+    family = f'{len(rows)} components' if len(rows) > 1 else rows[0].family
+    return TailRow(
+        component='severity', family=family,
+        min=lo, max=hi, bounded=(rung == TailClass.BOUNDED),
+        left=left, right=thickness_label(rung),
+        rung=rung, alpha=alpha, log_concave=lc,
+        note='combined effective severity',
+    )
+
+
+def frequency_tail_row(frequency, *, n_min: float = 0.0,
+                       n_max: float = np.inf,
+                       zero_truncated: bool = False) -> TailRow:
+    """Build the frequency :class:`TailRow` (claim-count layer).
+
+    Parameters
+    ----------
+    frequency : object
+        The ``aggregate.Frequency`` (read for ``freq_name``).
+    n_min, n_max : float
+        Smallest / largest attainable claim count (supplied by the caller, which
+        knows the exposure ``n``).
+    zero_truncated : bool
+        Whether the count is genuinely zero-truncated (``zm`` with ``p0 == 0``),
+        as opposed to merely having a positive minimum atom.
+
+    Returns
+    -------
+    TailRow
+        Labelled ``'frequency'``; the left tail is always thin (counts >= 0).
+    """
+    rung, lc = classify_frequency(frequency)
+    family = getattr(frequency, 'freq_name', '') or ''
+    note = 'claim count'
+    if zero_truncated:
+        note += ', zero-truncated'
+    return TailRow(
+        component='frequency', family=family,
+        min=float(n_min), max=float(n_max), bounded=(rung == TailClass.BOUNDED),
+        left='thin', right=thickness_label(rung),
+        rung=rung, alpha=None, log_concave=lc, note=note,
+    )
+
+
+def aggregate_tail_row(info: TailInfo, *, agg_min: float = np.nan,
+                       agg_max: float = np.nan, agg_cv: float = np.nan,
+                       left: str = 'thin') -> TailRow:
+    """Build the aggregate :class:`TailRow` from the combine result and reach.
+
+    Parameters
+    ----------
+    info : TailInfo
+        The combine result (:func:`aggregate_tail_info`).
+    agg_min, agg_max : float
+        Estimated lower / upper reach of the aggregate (the caller's
+        method-of-moments percentiles).
+    agg_cv : float
+        Aggregate coefficient of variation (drives :func:`concentration`).
+    left : str
+        The resolved lower-tail label. ``'thin'`` for a non-negative aggregate;
+        the caller mirrors the appropriate severity tail for a signed one (the
+        reflected severity's left for an ``ssev`` / ``dsev`` book, the loss's
+        right tail for an affine ``pnl`` book) -- see the ``[q-left-combine]``
+        rule.
+
+    Returns
+    -------
+    TailRow
+        Labelled ``'aggregate'``.
+    """
+    rung = info.agg
+    conc, conc_p = concentration(agg_cv)
+    family = f'{info.driver}-driven' if info.driver != 'undetermined' else ''
+    return TailRow(
+        component='aggregate', family=family,
+        min=float(agg_min), max=float(agg_max), bounded=(rung == TailClass.BOUNDED),
+        left=left, right=thickness_label(rung),
+        rung=rung, alpha=info.alpha, log_concave=info.agg_lc,
+        concentrated=conc, concentration_p=conc_p,
+        note='frequency (x) combined severity',
+    )
+
+
+def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
+                    freq_max: float = np.inf, freq_zero_truncated: bool = False,
+                    agg_min: float = np.nan, agg_max: float = np.nan,
+                    agg_cv: float = np.nan, agg_left: str = 'thin') -> list[TailRow]:
+    """Assemble the layered tail report as an ordered list of :class:`TailRow`.
+
+    Rows, bottom-up: frequency; one per severity mix component (``comp0`` ...);
+    the combined effective severity (only when there is more than one component);
+    the aggregate. Spec-only -- valid before ``update``.
+
+    Parameters
+    ----------
+    frequency : object
+        The aggregate's ``Frequency``.
+    sevs : sequence or None
+        The severity components (``Aggregate.sevs``).
+    freq_min, freq_max : float
+        Claim-count support (the caller knows the exposure).
+    agg_min, agg_max : float
+        Aggregate reach estimates.
+    agg_cv : float
+        Aggregate coefficient of variation.
+    agg_left : str
+        The resolved aggregate lower-tail label (the caller resolves the signed
+        mirror; see :func:`aggregate_tail_row`).
+
+    Returns
+    -------
+    list of TailRow
+    """
+    info = aggregate_tail_info(frequency, sevs)
+    rows = [frequency_tail_row(frequency, n_min=freq_min, n_max=freq_max,
+                               zero_truncated=freq_zero_truncated)]
+    sev_list = list(sevs) if sevs is not None else []
+    rows.extend(severity_tail_row(s, f'comp{i}') for i, s in enumerate(sev_list))
+    if sev_list and len(sev_list) > 1:
+        rows.append(combined_severity_row(sev_list))
+    rows.append(aggregate_tail_row(
+        info, agg_min=agg_min, agg_max=agg_max,
+        agg_cv=agg_cv, left=agg_left))
+    return rows
+
+
+def tail_frame(rows) -> 'pd.DataFrame':
+    """Render a list of :class:`TailRow` as the public ``tail_df`` DataFrame.
+
+    Parameters
+    ----------
+    rows : sequence of TailRow
+        From :func:`build_tail_rows`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Indexed by ``component`` (frequency / comp* / severity / aggregate), with
+        columns ``family, min, max, left, right, bounded, tail_class, alpha,
+        log_concave, concentrated, concentration_p, note``.
+    """
+    data = [{
+        'component': r.component, 'family': r.family,
+        'min': r.min, 'max': r.max,
+        'left': r.left, 'right': r.right, 'bounded': r.bounded,
+        'tail_class': tail_class_label(r.rung),
+        'alpha': r.alpha, 'log_concave': r.log_concave,
+        'concentrated': r.concentrated, 'concentration_p': r.concentration_p,
+        'note': r.note,
+    } for r in rows]
+    cols = ['component', 'family', 'min', 'max', 'left', 'right', 'bounded',
+            'tail_class', 'alpha', 'log_concave', 'concentrated',
+            'concentration_p', 'note']
+    return pd.DataFrame(data, columns=cols).set_index('component')

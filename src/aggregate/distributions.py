@@ -2240,6 +2240,111 @@ class Aggregate:
         return f'{len(self.sevs)} components'
 
     @property
+    def tail_df(self) -> pd.DataFrame:
+        """The layered thick/thin tail report as a DataFrame.
+
+        One row per layer, bottom-up -- ``frequency``; one per severity mix
+        component (``comp0`` ...); the combined effective ``severity`` (only when
+        there is more than one component); and the ``aggregate`` -- with the
+        structural fields driving bucket selection: ``min`` / ``max`` reach,
+        ``bounded``, ``left`` / ``right`` thick-thin labels, the ``tail_class``
+        rung and power-law ``alpha``, ``log_concave``, and (aggregate row only)
+        the conservative ``concentrated`` flag and its ``concentration_p``
+        margin.
+
+        Spec-only -- built from the family classifier, the structural bounds, and
+        the pre-computed moments, so it is valid *before* :meth:`update`. See
+        :mod:`aggregate.tail` and ``dev/bucket-selection.rst``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by ``component``.
+        """
+        freq_min, freq_max, freq_zt = self._frequency_count_support()
+        agg_min, agg_max = self._aggregate_reach()
+        return _tail.tail_frame(_tail.build_tail_rows(
+            self.frequency, self.sevs,
+            freq_min=freq_min, freq_max=freq_max, freq_zero_truncated=freq_zt,
+            agg_min=agg_min, agg_max=agg_max, agg_cv=self.agg_cv,
+            agg_left=self._aggregate_left_tail(),
+        ))
+
+    def _frequency_count_support(self):
+        """Spec-only ``(min, max, zero_truncated)`` claim-count support.
+
+        The count magnitude lives on the aggregate (the exposure ``n``), not on
+        the bare :class:`Frequency`, so it is resolved here. Returns ``(n, n)``
+        for a ``fixed`` count, ``(0, 1)`` for ``bernoulli``, the atom range for
+        an ``empirical`` count, and ``(0, inf)`` otherwise -- with the third
+        element flagging a genuine zero-truncated (``zm``, ``p0 == 0``) count.
+        """
+        fname = getattr(self.frequency, 'freq_name', '')
+        n = float(self.n) if self.n else 0.0
+        if fname == 'fixed':
+            return n, n, False
+        if fname == 'bernoulli':
+            return 0.0, 1.0, False
+        if fname == 'empirical':
+            atoms = getattr(self.frequency, 'freq_a', None)
+            if atoms is not None and len(atoms):
+                return float(np.min(atoms)), float(np.max(atoms)), False
+        zt = False
+        lo = 0.0
+        if getattr(self.frequency, 'freq_zm', False):
+            p0 = getattr(self.frequency, 'freq_p0', None)
+            if p0 is not None and float(p0) == 0.0:
+                lo, zt = 1.0, True
+        return lo, np.inf, zt
+
+    def _aggregate_reach(self):
+        """Spec-only ``(min, max)`` reach estimate for the aggregate row.
+
+        Where the aggregate mass effectively lives -- the deep lower / upper
+        method-of-moments percentiles, mirroring the bucket sizer: the two-sided
+        :func:`estimate_agg_window` for a signed (straddling) book, otherwise the
+        one-sided :func:`_estimate_agg_percentile` (lower edge floored at 0).
+        ``nan`` when the variance is infinite (a power-law aggregate).
+        """
+        m, cv, sk, sd = self.agg_m, self.agg_cv, self.agg_skew, self.agg_sd
+        p = 1.0 - 1e-10
+        if self._signed() and np.isfinite(sd):
+            try:
+                lo, hi, _ = estimate_agg_window(m, sd, sk, p)
+                return float(lo), float(hi)
+            except ValueError:
+                return np.nan, np.nan
+        try:
+            hi = float(_estimate_agg_percentile(m, cv, sk, p))
+        except Exception:
+            hi = np.nan
+        try:
+            lo = max(float(_estimate_agg_percentile(m, cv, sk, 1e-10)), 0.0)
+        except Exception:
+            lo = np.nan
+        return lo, hi
+
+    def _aggregate_left_tail(self) -> str:
+        """Resolved ``'thick'`` / ``'thin'`` aggregate lower-tail label.
+
+        A non-negative aggregate is thin-left. A signed *severity* book
+        (``ssev`` / ``dsev``) mirrors the combined severity's (reflected) left
+        tail; an affine ``pnl`` book (premium - loss) has a left tail set by the
+        loss's *right* tail. See the ``[q-left-combine]`` rule in
+        ``dev/plan-univariate-bucket.md``.
+        """
+        if not self._signed():
+            return 'thin'
+        sevs = self.sevs if self.sevs is not None else []
+        if self._signed_severity() and sevs:
+            row = _tail.combined_severity_row(sevs)
+            return row.left
+        # affine pnl: large losses push the result far negative.
+        if sevs:
+            return _tail.combined_severity_row(sevs).right
+        return 'thin'
+
+    @property
     def reins_bucket(self) -> str:
         """Rebucketing scheme for reinsurance net/ceded distributions.
 

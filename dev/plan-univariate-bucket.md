@@ -35,12 +35,12 @@ Captured from the author's 2026-06-17 reviews; each row tracked to closure.
 | task | issue | decision | status |
 |---|---|---|---|
 | **`[recommend-bucket]`** | `recommend_bucket` is a legacy one-shot sizer. | **Replace** (not just reconcile) with a new sizer taking `log2` (and possibly `x_min`) as explicit args, then retire `recommend_bucket`. | Tracked — `dev/TODO.md` **W10** + §Also-noticed. |
-| **`[freq-tail]`** | Frequency needs its own tail report. | Yes — first-class layer (`min` can be `1` for zero-truncated; heavy mixing can *drive* the agg tail). | **Folded** — `[tail-report]`. |
-| **`[thick-thin]`** | Stop thinking "left / right tail" as separate objects. | Thickness is the property; each side is **thick / thin**. The bs decision basis is `{left thick/thin, right thick/thin, concentrated}`. Finer rung / `alpha` kept underneath only for quantile **magnitude**. **Thick ⇔ subexponential-or-heavier** (lognorm, power-law); thin ⇔ exponential-or-lighter. | **Folded + cut fixed** — `[tail-report]`. |
-| **`[splice-exposure]`** | Splice vs limit/attach. | **Severity owns both** splicing *and* `limit xs attach` (confirmed: `comp.limit` / `comp.attachment` live on `Severity`). So there is **no separate Exposure layer** — limit/attach is just part of each component severity, and blending the mix components is the "exposure rationalization". **Build order: mix components → combined effective severity → aggregate → bucket** (one FFT on the blended sev, *not* per-component aggregates), because the sizer is tail-aggressive: a small but thick component still asserts itself in the blend. The report is still a **DataFrame with a `component` column**. Empirical sevs are bounded (easy). | **Folded + simplified** — `[tail-report]`. |
+| **`[freq-tail]`** | Frequency needs its own tail report. | Yes — first-class layer (`min` can be `1` for zero-truncated; heavy mixing can *drive* the agg tail). | **LANDED (a60)** — `frequency` row in `tail_df`. |
+| **`[thick-thin]`** | Stop thinking "left / right tail" as separate objects. | Thickness is the property; each side is **thick / thin**. The bs decision basis is `{left thick/thin, right thick/thin, concentrated}`. Finer rung / `alpha` kept underneath only for quantile **magnitude**. **Thick ⇔ subexponential-or-heavier** (lognorm, power-law); thin ⇔ exponential-or-lighter. | **LANDED (a60)** — `is_thick` / `thickness_label`, `left` / `right` columns. |
+| **`[splice-exposure]`** | Splice vs limit/attach. | **Severity owns both** splicing *and* `limit xs attach` (confirmed: `comp.limit` / `comp.attachment` live on `Severity`). So there is **no separate Exposure layer** — limit/attach is just part of each component severity, and blending the mix components is the "exposure rationalization". **Build order: mix components → combined effective severity → aggregate → bucket** (one FFT on the blended sev, *not* per-component aggregates), because the sizer is tail-aggressive: a small but thick component still asserts itself in the blend. The report is still a **DataFrame with a `component` column**. Empirical sevs are bounded (easy). | **LANDED (a60)** — per-`comp` rows + combined `severity` row; occ-re row deferred to `[use-selection]`. |
 | **`[signed-padding]`** | Is FFT padding "in the middle" for a signed sev? | Code read (`_freq_sev_convolution`): positives at the bottom of the period, negatives wrapped to the top, `M−N` zeros **between** — already "in the middle". | **Open (verify)** — `[use-selection]` §padding; targeted test + sufficiency check when both tails heavy. |
 | **`[clip-warning]`** | The clip message is a silent `logger.info`. | Promote to a visible **warning** + structured clipped-mass field. **Do it with the rest** of `[use-selection]`, not as an early standalone. | **Folded** — `[use-selection]`. |
-| **`[reins-gross]`** | Reinsurance and the window. | **Size on GROSS, ignore reinsurance.** Aggregate re ignored; occ-re is a reported overlay row, never a sizing input. Gross is needed to report re impact anyway. | **Agreed / folded** — `[tail-report]`, `[use-selection]`. |
+| **`[reins-gross]`** | Reinsurance and the window. | **Size on GROSS, ignore reinsurance.** Aggregate re ignored; occ-re is a reported overlay row, never a sizing input. Gross is needed to report re impact anyway. | **Partly landed (a60)** — `tail_df` sizes/reports on gross; the **occ-re overlay row** is deferred to `[use-selection]` (lands with the gross-sizing wiring, where it has a sizing decision to annotate). |
 
 Resolved open questions this round: concentration cutoff, thick/thin cut,
 Exposure-vs-Severity structure, tail-aware slack formula (see each task).
@@ -67,6 +67,17 @@ This plan closes both.
 ---
 
 ## `[tail-report]` — the layered thick/thin tail report
+
+> **LANDED (a60).** `Aggregate.tail_df` (spec-only), the `TailRow` /
+> `build_tail_rows` / `tail_frame` machinery in `aggregate.tail`, the thick/thin
+> cut (`is_thick`), claim-space `severity_support`, and the conservative
+> `concentration` (`CONCENTRATION_CV = 0.1`) all shipped, byte-stable, with 11
+> new tests in `tests/test_tail.py`. **Deferred to `[use-selection]`:** the
+> occurrence-reinsurance overlay row (layer 4 below) — it reports a *net* impact
+> with no sizing consequence, so it lands with the gross-sizing wiring rather
+> than as a standalone reported row now. The `[q-left-combine]` rule is resolved
+> in `_aggregate_left_tail` (positive ⇒ thin; signed `ssev`/`dsev` ⇒ reflected
+> severity left; affine `pnl` ⇒ loss right tail).
 
 ### Layered model (`[freq-tail]`, `[splice-exposure]`, `[reins-gross]`)
 
@@ -307,9 +318,10 @@ disproves the read.
 
 ## Open questions (remaining)
 
-- **`[q-left-combine]`** Aggregate left-tail combine rule (positive ⇒ thin;
-  signed ⇒ reflected single big jump). Formalize + test — settled while building
-  `[tail-report]`, not a blocker.
+- *(none)* — `[q-left-combine]` resolved in a60 (`_aggregate_left_tail`):
+  positive ⇒ thin; signed `ssev`/`dsev` ⇒ reflected combined-severity left;
+  affine `pnl` ⇒ the loss's right tail. Tested by
+  `test_tail_df_signed_reach_is_two_sided`.
 
 **Resolved this round:** narrative naming (`tail_description` /
 `tail_explanation` kept, both; `bs_description` / `bs_explanation`; structured

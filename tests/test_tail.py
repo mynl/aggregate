@@ -15,7 +15,8 @@ import scipy.stats as ss
 from aggregate import build
 from aggregate.tail import (
     TailClass, classify_frequency, classify_severity, combine,
-    aggregate_tail_info, _BOUNDED_FREQS, _BOUNDED_SCIPY_SEVS,
+    aggregate_tail_info, is_thick, thickness_label, severity_support,
+    CONCENTRATION_CV, _BOUNDED_FREQS, _BOUNDED_SCIPY_SEVS,
 )
 
 
@@ -288,3 +289,92 @@ def test_tables_match_legacy():
     from aggregate import distributions as d
     assert d._BOUNDED_FREQS is _BOUNDED_FREQS
     assert d._BOUNDED_SCIPY_SEVS is _BOUNDED_SCIPY_SEVS
+
+
+# ---------------------------------------------------------------------------
+# Layered thick/thin tail report (tail_df).
+# ---------------------------------------------------------------------------
+
+def test_thick_thin_cut():
+    # thick <=> subexponential-or-heavier; UNKNOWN is conservatively thick.
+    assert is_thick(TailClass.SUBEXPONENTIAL) and is_thick(TailClass.POWER_LAW)
+    assert is_thick(TailClass.UNKNOWN)
+    for r in (TailClass.BOUNDED, TailClass.SUPER_EXPONENTIAL, TailClass.EXPONENTIAL):
+        assert not is_thick(r)
+    assert thickness_label(TailClass.SUBEXPONENTIAL) == 'thick'
+    assert thickness_label(TailClass.EXPONENTIAL) == 'thin'
+
+
+def test_tail_df_is_spec_only():
+    # The whole report is valid before update() (agg_density is None).
+    a = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson')
+    assert a.agg_density is None
+    df = a.tail_df
+    assert list(df.index) == ['frequency', 'comp0', 'aggregate']
+    assert {'min', 'max', 'left', 'right', 'bounded', 'tail_class',
+            'alpha', 'concentrated', 'concentration_p'} <= set(df.columns)
+
+
+def test_tail_df_layered_rows_and_thickness():
+    # The motivating multi-component book: one row per component + combined +
+    # freq + aggregate; lognorm cv 3 is thick-right, capped lognorm is bounded.
+    a = _agg('agg TAILTEST [20 30 40] claims [inf inf 1000] xs [100 0 0] '
+             'sev [gamma lognorm lognorm] [100 100 100] cv [1 3 1.3] mixed gamma .5')
+    df = a.tail_df
+    assert list(df.index) == ['frequency', 'comp0', 'comp1', 'comp2',
+                              'severity', 'aggregate']
+    assert df.loc['comp1', 'right'] == 'thick'          # lognorm cv 3
+    assert df.loc['comp2', 'bounded']                    # 1000 xs 0 caps it
+    assert df.loc['comp2', 'right'] == 'thin'
+    assert df.loc['severity', 'right'] == 'thick'        # blend takes thickest
+    assert df.loc['aggregate', 'right'] == 'thick'       # single big jump
+    # every row's left tail is thin (all support >= 0)
+    assert (df['left'] == 'thin').all()
+
+
+def test_tail_df_capped_heavy_note():
+    a = _agg('agg B 10 claims 1000 xs 0 sev lognorm 100 cv 2 poisson')
+    note = a.tail_df.loc['comp0', 'note']
+    assert 'subexponential base' in note and 'capped at 1,000' in note
+
+
+def test_tail_df_bounded_no_capped_note():
+    # An intrinsically-bounded (atom / uniform) base must NOT read as capped-heavy.
+    a = _agg('agg D dfreq [3] dsev [1:6]')
+    assert a.tail_df.loc['comp0', 'note'] == ''
+
+
+def test_tail_df_concentration_conservative():
+    # Large-E[N] low-cv book is concentrated; an ordinary book is not. The cut
+    # is the conservative CONCENTRATION_CV (0.1), tighter than the legacy ~0.14.
+    conc = _agg('agg C 5000 claims sev gamma 100 cv 1 poisson').tail_df.loc['aggregate']
+    assert conc['concentrated'] is True or conc['concentrated'] == True   # noqa
+    assert conc['concentration_p'] > 1.0 / CONCENTRATION_CV
+    ordinary = _agg('agg O 5 claims sev lognorm 100 cv 2 poisson').tail_df.loc['aggregate']
+    assert not ordinary['concentrated']
+
+
+def test_tail_df_power_law_alpha_and_nan_reach():
+    # Infinite variance (alpha 1.5): alpha is reported but the MoM reach is nan
+    # (honest -- no finite deep quantile to size to).
+    a = _agg('agg P 10 claims sev 1 * pareto 1.5 poisson')
+    row = a.tail_df.loc['aggregate']
+    assert row['tail_class'] == 'power-law'
+    assert row['alpha'] == pytest.approx(1.5)
+    assert np.isnan(row['min']) and np.isnan(row['max'])
+
+
+def test_tail_df_signed_reach_is_two_sided():
+    # A signed-severity aggregate reports a negative lower reach (not floored 0).
+    a = _agg('agg S dfreq [2] dsev [-3 -1 2 5]')
+    assert a._signed()
+    assert a.tail_df.loc['aggregate', 'min'] < 0.0
+
+
+def test_severity_support_layered():
+    # claim-space support of the layered loss: 0 .. limit (finite) or .. inf.
+    a = _agg('agg A 10 claims 1000 xs 0 sev lognorm 100 cv 2 poisson')
+    assert severity_support(a.sevs[0]) == (0.0, 1000.0)
+    b = _agg('agg B 10 claims sev lognorm 100 cv 2 poisson')
+    lo, hi = severity_support(b.sevs[0])
+    assert lo == 0.0 and np.isinf(hi)

@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-08** — current version 1.0.0a42.
+> **Last updated: 2026-06-17** — added B4 (ZT/ZM fix + shift helpers).
 
 ---
 
@@ -49,6 +49,7 @@ alongside. **Start at `N1`.**
 | ✅ | H6 | Underwriter database-loading rewrite | A | — | everything |
 |    | B1 | `10000 xs 0 lognorm` "sum sev<1" warning | A | — | everything |
 |    | B2 | "ugly histogram with spikes" (reconstruct) | A | — | everything |
+|    | B4 | ZT/ZM frequency broken + add shift helpers | A | — | everything |
 |    | F1 | `approximate()` — tail-aware family pick | A | tail (shipped) | H*, B*, N* |
 |    | F2 | G&H tilting DIY | A | — | H*, B*, N* |
 | ✅ | F3 | `pricing_at = P + Q` / Pentagon | A | — | H*, B* |
@@ -232,6 +233,16 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [x] **B3 `[A]`** Zero-mean signed aggregate SD/var reported `NaN` (a40) — SD was
   rebuilt as `mean*cv` (nan at mean 0); now derived from `ex2 - mean^2` /
   `MomentWrangler.central`. `dev/done/plan-signed-sd.md`.
+- [ ] **B4 `[A]`** **Zero-truncated / zero-modified frequency is broken.**
+  `poisson zt` raises `function value at x=0.0 is NaN; solver cannot continue`
+  for every parameterization; `zm` builds but the *semantics* are wrong. The
+  current design takes the **post-modification** mean and inverts to find the
+  base mean — the "figuring" step is fragile and the wrong contract. Redesign:
+  the user inputs the **un-truncated/un-modified base mean** and we apply the
+  ZT/ZM shift forward (no solver). **Ship helper functions** that do the
+  mean/parameter shift for the user (both directions, documented). Until then
+  the two ZM/ZT examples are commented out in `examples.agg`. Pairs with D5
+  (ZT/ZM docs). *(new, 2026-06-17)*
 
 ---
 
@@ -305,6 +316,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   reporting (full `_bs_window_df` journey, public `bs_window_df`,
   `bs_description`/`bs_explanation`). Owns `dev/bucket-selection.rst`. Folds in
   **H10**. Comes before W8.
+  - [x] `[tail-report]` — `Aggregate.tail_df`, the layered `TailRow` /
+    `build_tail_rows` / `tail_frame` machinery, thick/thin cut, claim-space
+    support, conservative concentration (a60, byte-stable, +11 tests). Occ-re
+    overlay row deferred into `[use-selection]`.
+  - [ ] `[tail-narrative]`, `[use-selection]`, `[bs-reporting]` — pending.
 - [ ] **W10 `[A]`** Retire `recommend_bucket` — replace the legacy one-shot
   sizer with a new (TBD) function that takes `log2` (and possibly `x_min`) as
   explicit arguments, then remove `recommend_bucket`. W9's honest-truncation path

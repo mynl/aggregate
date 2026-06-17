@@ -305,31 +305,48 @@ def test_thick_thin_cut():
     assert thickness_label(TailClass.EXPONENTIAL) == 'thin'
 
 
-def test_tail_df_is_spec_only():
+def test_tail_df_is_spec_only_and_schema():
     # The whole report is valid before update() (agg_density is None).
     a = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson')
     assert a.agg_density is None
     df = a.tail_df
     assert list(df.index) == ['frequency', 'comp0', 'aggregate']
-    assert {'min', 'max', 'left', 'right', 'bounded', 'tail_class',
-            'alpha', 'concentrated', 'concentration_p'} <= set(df.columns)
+    assert list(df.columns) == ['family', 'min', 'max', 'left_tail',
+                                'right_tail', 'bounded', 'concentrated',
+                                'concentration_p', 'note']
 
 
-def test_tail_df_layered_rows_and_thickness():
-    # The motivating multi-component book: one row per component + combined +
-    # freq + aggregate; lognorm cv 3 is thick-right, capped lognorm is bounded.
+def test_tail_df_per_side_tail_classes():
+    # The motivating multi-component book: per-side tail classes (not thick/thin),
+    # structural support, capped component reads bounded.
     a = _agg('agg TAILTEST [20 30 40] claims [inf inf 1000] xs [100 0 0] '
              'sev [gamma lognorm lognorm] [100 100 100] cv [1 3 1.3] mixed gamma .5')
     df = a.tail_df
     assert list(df.index) == ['frequency', 'comp0', 'comp1', 'comp2',
                               'severity', 'aggregate']
-    assert df.loc['comp1', 'right'] == 'thick'          # lognorm cv 3
-    assert df.loc['comp2', 'bounded']                    # 1000 xs 0 caps it
-    assert df.loc['comp2', 'right'] == 'thin'
-    assert df.loc['severity', 'right'] == 'thick'        # blend takes thickest
-    assert df.loc['aggregate', 'right'] == 'thick'       # single big jump
-    # every row's left tail is thin (all support >= 0)
-    assert (df['left'] == 'thin').all()
+    assert df.loc['comp1', 'right_tail'] == 'subexponential'   # lognorm cv 3
+    assert df.loc['comp2', 'right_tail'] == 'bounded'          # 1000 xs 0 caps it
+    assert df.loc['comp2', 'bounded']
+    assert df.loc['severity', 'right_tail'] == 'subexponential'  # blend thickest
+    assert df.loc['aggregate', 'right_tail'] == 'subexponential'
+    # every positive layer is bounded on the left (hard floor at 0)
+    assert (df['left_tail'] == 'bounded').all()
+
+
+def test_tail_df_structural_support_is_exact_when_bounded():
+    # Fixed 3 claims x dice [1..6] -> support exactly [3, 18], bounded.
+    df = _agg('agg D dfreq [3] dsev [1:6]').tail_df
+    assert df.loc['aggregate', 'min'] == 3.0
+    assert df.loc['aggregate', 'max'] == 18.0
+    assert df.loc['aggregate', 'bounded']
+
+
+def test_tail_df_unbounded_support_is_inf():
+    # A Poisson x lognorm book is unbounded above; bounded is False.
+    df = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson').tail_df
+    row = df.loc['aggregate']
+    assert row['min'] == 0.0 and np.isinf(row['max'])
+    assert not row['bounded']
 
 
 def test_tail_df_capped_heavy_note():
@@ -344,31 +361,42 @@ def test_tail_df_bounded_no_capped_note():
     assert a.tail_df.loc['comp0', 'note'] == ''
 
 
-def test_tail_df_concentration_conservative():
-    # Large-E[N] low-cv book is concentrated; an ordinary book is not. The cut
-    # is the conservative CONCENTRATION_CV (0.1), tighter than the legacy ~0.14.
+def test_tail_df_concentration_is_p_value():
+    # concentration_p = Phi(mean/sd) in (0, 1). Large-E[N] low-cv book is
+    # concentrated (p ~ 1); an ordinary book is not. Cut is CONCENTRATION_CV.
     conc = _agg('agg C 5000 claims sev gamma 100 cv 1 poisson').tail_df.loc['aggregate']
-    assert conc['concentrated'] is True or conc['concentrated'] == True   # noqa
-    assert conc['concentration_p'] > 1.0 / CONCENTRATION_CV
+    assert conc['concentrated']
+    assert 0.0 < conc['concentration_p'] <= 1.0
+    assert conc['concentration_p'] == pytest.approx(1.0, abs=1e-6)
     ordinary = _agg('agg O 5 claims sev lognorm 100 cv 2 poisson').tail_df.loc['aggregate']
     assert not ordinary['concentrated']
+    assert ordinary['concentration_p'] < 1.0
 
 
-def test_tail_df_power_law_alpha_and_nan_reach():
-    # Infinite variance (alpha 1.5): alpha is reported but the MoM reach is nan
-    # (honest -- no finite deep quantile to size to).
-    a = _agg('agg P 10 claims sev 1 * pareto 1.5 poisson')
-    row = a.tail_df.loc['aggregate']
-    assert row['tail_class'] == 'power-law'
-    assert row['alpha'] == pytest.approx(1.5)
-    assert np.isnan(row['min']) and np.isnan(row['max'])
+def test_tail_df_power_law_note_and_structural_support():
+    # Infinite variance (alpha 1.5): right_tail power-law, the note carries the
+    # index and the failing moment; support is structural [0, inf] (not a reach).
+    row = _agg('agg P 10 claims sev 1 * pareto 1.5 poisson').tail_df.loc['aggregate']
+    assert row['right_tail'] == 'power-law'
+    assert 'alpha=1.5' in row['note'] and 'infinite variance' in row['note']
+    assert row['min'] == 0.0 and np.isinf(row['max'])
 
 
-def test_tail_df_signed_reach_is_two_sided():
-    # A signed-severity aggregate reports a negative lower reach (not floored 0).
-    a = _agg('agg S dfreq [2] dsev [-3 -1 2 5]')
-    assert a._signed()
-    assert a.tail_df.loc['aggregate', 'min'] < 0.0
+def test_tail_df_signed_support_is_two_sided():
+    # A signed-severity aggregate has exact negative structural support.
+    df = _agg('agg S dfreq [2] dsev [-3 -1 2 5]').tail_df
+    assert df.loc['aggregate', 'min'] == -6.0   # 2 x (-3)
+    assert df.loc['aggregate', 'max'] == 10.0    # 2 x 5
+
+
+def test_tail_df_pnl_affine_support_and_tails():
+    # pnl = premium - loss: support [-inf, premium]; right is the premium cap
+    # (bounded), left mirrors the loss right tail (subexponential).
+    row = _agg('pnl X 1000 prem - 100 claims sev lognorm 30 cv 1 poisson').tail_df.loc['aggregate']
+    assert np.isneginf(row['min']) and row['max'] == 1000.0
+    assert row['right_tail'] == 'bounded'
+    assert row['left_tail'] == 'subexponential'
+    assert not row['bounded']
 
 
 def test_severity_support_layered():
@@ -378,3 +406,13 @@ def test_severity_support_layered():
     b = _agg('agg B 10 claims sev lognorm 100 cv 2 poisson')
     lo, hi = severity_support(b.sevs[0])
     assert lo == 0.0 and np.isinf(hi)
+
+
+def test_concentration_helper():
+    from aggregate.tail import concentration
+    c, p = concentration(100.0, 10.0)     # m/sd = 10 -> exactly the cut
+    assert p == pytest.approx(1.0, abs=1e-9)
+    assert not c                          # strict > 1/0.1, so 10 is not in
+    c2, p2 = concentration(0.0, 5.0)      # mean 0 -> Phi(0) = 0.5
+    assert p2 == pytest.approx(0.5) and not c2
+    assert concentration(1.0, np.inf) == (None, None)   # infinite variance

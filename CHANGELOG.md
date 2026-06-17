@@ -1,5 +1,68 @@
 # Changelog
 
+## 1.0.0a61
+
+### Curated `examples.agg` example library + `build` default
+
+A new `src/aggregate/agg/examples.agg` (Version 1) is the curated, public-facing
+DecL example set: ~32 hand-picked programs (2 severities, 2 distortions, ~21
+aggregates, 8 portfolios) organized A–J by what each illustrates, spanning the
+DecL-capability and numerical-character axes. It is the single source for the
+default `build` knowledge base, the twenty-minute intro, and the `aggregate_api`
+SPA examples dropdown.
+
+- **`build` default database changed** from `test_suite` to `examples`
+  (`config.py` `BuildSettings.databases`, `config.default.toml`). Out of the
+  box, `build` now loads the curated set rather than the historical reference
+  suite. Set `[build] databases = ["test_suite"]` to restore the old default.
+- **New `testers.agg`** — the back-room comprehensive-coverage companion (WIP
+  dumping ground), seeded from the legacy feature walkthrough; pending merge
+  with the `test_suite` family (TODO T1).
+- **Tests:** `test_decl_unparser` now parses its `test_suite` corpus through a
+  dedicated `Underwriter(databases='test_suite')` rather than the `build`
+  singleton (decoupled from the default-database choice); `test_config` asserts
+  the new default.
+- **TODO B4** logged: zero-truncated/zero-modified frequency is broken
+  (`poisson zt` raises; `zm` semantics inverted) — redesign to take the base
+  mean and ship forward shift helpers. The two ZM/ZT examples are commented out
+  in `examples.agg` meanwhile.
+- **Companion (`aggregate_api`):** the examples route reads the bundled
+  `agg/examples.agg` and folds `\`-line continuations, so multi-line `port`
+  programs are captured whole.
+
+### `tail_df` schema revision — support + per-side tail class
+
+Reworks the a60 `tail_df` to report **support and tail shape** (and nothing
+that belongs to grid selection). Per author review:
+
+- **`min` / `max` are now the structural support** (smallest / largest
+  *attainable* value; `-inf` / `inf` at an unbounded end), not a
+  method-of-moments reach. So `bounded` is the self-consistent `min` and `max`
+  both finite, the aggregate of a fixed 3 × dice `[1..6]` reads exactly
+  `[3, 18]`, a signed `dsev` book reads its exact two-sided support, and a `pnl`
+  book reads `[-inf, premium]`. The numeric grid *reach* moves to the bucket
+  report (`bs_window_df`, a later task).
+- **`left` / `right` thick-thin become `left_tail` / `right_tail` full tail
+  classes** (`bounded` / `super-exponential` / `exponential` /
+  `subexponential` / `power-law`): a finite support end is `bounded` (a hard
+  boundary, no tail), an infinite end carries the family decay rung. So a
+  lognorm reads `left_tail = bounded`, `right_tail = subexponential`; a `pnl`
+  book reads `right_tail = bounded` (premium cap), `left_tail = subexponential`
+  (the loss right tail, reflected). The sizer's thick/thin is the derived
+  `is_thick(right_tail)`.
+- **`concentration_p` is now `Phi(mean / sd)`** — the normal-approximation
+  probability the aggregate is positive (the band clears 0), a genuine p-value
+  in `(0, 1)` — replacing the a60 `1 / cv` sd-count. The conservative
+  `concentrated` gate (`cv < CONCENTRATION_CV = 0.1`) is unchanged.
+- **Dropped `tail_class`, `alpha`, `log_concave` columns.** None drives
+  selection; the actionable power-law fact moves into `note` as
+  `"power-law, alpha=1.5, infinite variance"`. Final columns: `family, min,
+  max, left_tail, right_tail, bounded, concentrated, concentration_p, note`.
+
+`aggregate.tail` API updated accordingly (`TailRow` fields; `concentration(m,
+sd)`; `build_tail_rows` takes `agg_m` / `agg_sd` / `agg_reflect` / `agg_shift`).
+Still **byte-stable** — selection does not read the report yet.
+
 ## 1.0.0a60
 
 ### Bucket-selection 1A-bucket — the layered thick/thin tail report (`tail_df`)

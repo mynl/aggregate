@@ -68,16 +68,28 @@ This plan closes both.
 
 ## `[tail-report]` — the layered thick/thin tail report
 
-> **LANDED (a60).** `Aggregate.tail_df` (spec-only), the `TailRow` /
-> `build_tail_rows` / `tail_frame` machinery in `aggregate.tail`, the thick/thin
-> cut (`is_thick`), claim-space `severity_support`, and the conservative
-> `concentration` (`CONCENTRATION_CV = 0.1`) all shipped, byte-stable, with 11
-> new tests in `tests/test_tail.py`. **Deferred to `[use-selection]`:** the
-> occurrence-reinsurance overlay row (layer 4 below) — it reports a *net* impact
-> with no sizing consequence, so it lands with the gross-sizing wiring rather
-> than as a standalone reported row now. The `[q-left-combine]` rule is resolved
-> in `_aggregate_left_tail` (positive ⇒ thin; signed `ssev`/`dsev` ⇒ reflected
-> severity left; affine `pnl` ⇒ loss right tail).
+> **LANDED (a60, schema revised a61).** `Aggregate.tail_df` (spec-only), the
+> `TailRow` / `build_tail_rows` / `tail_frame` machinery in `aggregate.tail`, the
+> thick/thin cut (`is_thick`), claim-space `severity_support`, structural
+> aggregate support (`_agg_support`, exact for bounded books, affine-mapped for
+> `pnl`), and the conservative `concentration` (`CONCENTRATION_CV = 0.1`) all
+> shipped, byte-stable, with ~14 tests in `tests/test_tail.py`.
+>
+> **a61 schema (author review):** the report is **support + tail shape**, nothing
+> from grid selection. `min`/`max` are the **structural support** (attainable
+> bounds, `±inf` at an open end), not a reach estimate; `bounded` is derived
+> `min`/`max`-finite; `left_tail`/`right_tail` carry the **full per-side tail
+> class** (`bounded` at a finite end, else the family decay rung), not thick/thin;
+> `concentration_p = Φ(mean/sd)` (P band clears 0). Dropped `tail_class`,
+> `alpha`, `log_concave` columns (the power-law fact lives in `note`). The reach
+> estimate moves to `bs_window_df`.
+>
+> **Deferred to `[use-selection]`:** the occurrence-reinsurance overlay row
+> (layer 4 below) — it reports a *net* impact with no sizing consequence, so it
+> lands with the gross-sizing wiring rather than as a standalone reported row
+> now. The `[q-left-combine]` rule is resolved in `build_tail_rows` (positive ⇒
+> `bounded` left; signed `ssev`/`dsev` ⇒ reflected severity left; affine `pnl` ⇒
+> loss right tail, premium-capped right).
 
 ### Layered model (`[freq-tail]`, `[splice-exposure]`, `[reins-gross]`)
 
@@ -123,27 +135,33 @@ bucket.** We size on the *blended* aggregate, not on per-component aggregates
 combined afterward — the sizer is deliberately tail-aggressive, so a small but
 thick component still asserts itself in the blend and gets covered.
 
-### Fields & decision basis (`[thick-thin]`)
+### Fields & decision basis (`[thick-thin]`, a61 schema)
 
-Per row, five structural fields plus (agg only) concentration:
+Per row, structural support + per-side tail class, plus (agg only) concentration:
 
 | field | meaning |
 |---|---|
-| `min` | smallest attainable value. |
-| `max` | largest attainable value or `inf`. |
-| `bounded` | `min` and `max` both finite. |
-| `left` | **thick / thin** lower-tail. `>= 0` support (all freqs, positive sevs) ⇒ thin; a signed or left-spliced sev can be thick. |
-| `right` | **thick / thin** upper-tail. |
+| `min` | smallest **attainable** value (`-inf` at an open left end). |
+| `max` | largest **attainable** value (`inf` at an open right end). |
+| `left_tail` | lower-tail class: `bounded` at a finite left end, else the family decay rung. |
+| `right_tail` | upper-tail class: `bounded` at a finite right end, else the family decay rung. |
+| `bounded` | derived: `min` and `max` both finite. |
 | `concentrated` | agg only: a *conservative* "band clears 0" flag — see below. |
-| `concentration_p` | agg only: the sd-margin the band clears 0 (reporting). |
+| `concentration_p` | agg only: `Φ(mean/sd)` = P(aggregate > 0) under a normal approx. |
+| `note` | power-law `alpha` + failing moment, capped-base, driver. |
 
-**The bs decision turns on `{left thick/thin, right thick/thin, concentrated}`:**
+**The bs decision turns on the *thickness* of each side (`is_thick(right_tail)` /
+`is_thick(left_tail)`, thick ⇔ subexponential-or-heavier) and `concentrated`:**
 
 - *right thick* ⇒ MoM upper edge under-reaches ⇒ apply the `sbj` floor.
-- *right thin* ⇒ MoM/normal upper quantile suffices.
-- *left thin* ⇒ safe to lift `x_min` (the windowed left-lift is trustworthy).
-- *left thick* (signed / left-spliced) ⇒ `x_min` must cover the reach (correctness).
+- *right thin* (incl. `bounded`) ⇒ MoM/normal upper quantile suffices.
+- *left thin* (`bounded` / light) ⇒ safe to lift `x_min` (windowed left-lift trustworthy).
+- *left thick* (signed / left-spliced / `pnl`) ⇒ `x_min` must cover the reach (correctness).
 - *concentrated* ⇒ mass band clears 0 ⇒ windowed placement eligible.
+
+(`alpha`, `log_concave`, and a single `tail_class` rung were dropped from the
+frame — none drives selection; `alpha`/infinite-moments live in `note`, and the
+narrative `tail_description` keeps the log-concavity prose.)
 
 **Thick ⇔ subexponential-or-heavier** (subexponential *and* power-law; lognorm is
 thick); **thin ⇔ exponential-or-lighter**. The finer rung (`… POWER_LAW` +

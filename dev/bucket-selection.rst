@@ -305,25 +305,30 @@ as needed) and adds the curated public ``bs_window_df`` and narrative
 Open / planned (owned by ``plan-univariate-bucket.md``)
 -------------------------------------------------------
 
-**A first-class tail report (freq / sev / agg, thick / thin per side).**
-*(Structured frame landed in a60; the narrative extension and the wiring below
-are still open.)* The sizer's decisions all turn on tail shape, but it currently
-reads only the ``bounded`` bit of :mod:`aggregate.tail`. The report is a
-structured, five-field summary -- ``min``, ``max``, ``bounded``, **left**
-thick/thin, **right** thick/thin -- plus a *conservative* concentration flag
-(``cv < CONCENTRATION_CV``, ``0.1``) for the **frequency**, each **severity**
-mixture component (then blended into the combined severity), and the
-**aggregate**. Frequencies are ``>= 0`` so their left tail is always thin; the
-aggregate left tail is thin for a positive book and inherits the severity's left
-jump for a signed one (a reflected ``ssev``/``dsev`` mirrors the combined
-severity's left; an affine ``pnl`` mirrors the loss's *right* tail). The decision
-basis is ``{left thick/thin, right thick/thin, concentrated}`` (the finer rung /
-``alpha`` is kept underneath only for tail-quantile *magnitude*). It is exposed
-now as the spec-only structured :attr:`Aggregate.tail_df` (a row per layer,
-indexed by ``component``); the narrative ``tail_description`` (short) /
-``tail_explanation`` (verbose) extension to the layered content, with the
-ANSI-colour option that renders well in JupyterLab, follows in
-``[tail-narrative]``.
+**A first-class tail report (support + per-side tail class).** *(Structured
+frame landed in a60, schema revised in a61; the narrative extension and the
+wiring below are still open.)* The sizer's decisions all turn on tail shape, but
+it currently reads only the ``bounded`` bit of :mod:`aggregate.tail`. The report
+gives, per layer -- the **frequency**, each **severity** mixture component (then
+blended into the combined severity), and the **aggregate** -- the **structural
+support** (``min`` / ``max``, the smallest / largest *attainable* value, ``+-inf``
+at an unbounded end) and the **tail class on each side** (``left_tail`` /
+``right_tail`` ``in {bounded, super-exponential, exponential, subexponential,
+power-law}``): a finite support end is ``bounded`` (a hard boundary, no tail), an
+infinite end carries the family decay rung. ``bounded`` is the derived
+``min``-and-``max``-finite. The aggregate row adds a *conservative* concentration
+flag (``cv < CONCENTRATION_CV``, ``0.1``) and ``concentration_p = Phi(mean/sd)``,
+the probability the band clears 0. The aggregate's per-side classes follow from
+the count and combined-severity support through the ``pnl`` affine: a positive
+book is ``bounded`` on the left (hard floor at 0); a signed ``ssev``/``dsev``
+mirrors the combined severity's left; an affine ``pnl`` mirrors the loss's
+*right* tail onto its left and caps the right at the premium. The sizer's
+thick/thin is the derived :func:`~aggregate.tail.is_thick` of the relevant side
+(thick ⇔ subexponential-or-heavier). It is exposed now as the spec-only
+:attr:`Aggregate.tail_df` (a row per layer, indexed by ``component``); the
+narrative ``tail_description`` (short) / ``tail_explanation`` (verbose) extension
+to the layered content, with the ANSI-colour option that renders well in
+JupyterLab, follows in ``[tail-narrative]``.
 
 **Wire the sizer to the tail report.** The ``sbj`` floor is the computational
 twin of the single-big-jump principle the classifier already names. Gate it on a

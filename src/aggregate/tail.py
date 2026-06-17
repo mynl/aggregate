@@ -51,6 +51,7 @@ Neyman-A) is a watch item, classified conservatively from the family table.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import NamedTuple, Optional
@@ -62,7 +63,7 @@ __all__ = [
     'TailClass', 'TailClasses', 'TailInfo', 'TailRow',
     'classify_frequency', 'classify_severity', 'combine',
     'aggregate_tail_info', 'tail_class_label',
-    'is_thick', 'thickness_label', 'severity_support',
+    'is_thick', 'thickness_label', 'severity_support', 'concentration',
     'build_tail_rows', 'tail_frame',
     'describe_lines', 'explain',
     'CONCENTRATION_CV',
@@ -596,7 +597,8 @@ def is_thick(rung: TailClass) -> bool:
     exponential-or-lighter (BOUNDED, SUPER_EXPONENTIAL, EXPONENTIAL).
     :attr:`~TailClass.UNKNOWN` is treated as **thick** -- conservative, since an
     unrecognised family with unbounded support should be sized wide rather than
-    clipped.
+    clipped. This is the derived helper the sizer applies to a ``left_tail`` /
+    ``right_tail`` column (which carry full rungs, not thick/thin).
     """
     if rung == TailClass.UNKNOWN:
         return True
@@ -608,29 +610,68 @@ def thickness_label(rung: TailClass) -> str:
     return 'thick' if is_thick(rung) else 'thin'
 
 
-def concentration(agg_cv) -> tuple[Optional[bool], Optional[float]]:
-    """Conservative concentration flag and margin from the aggregate ``cv``.
+def concentration(m: float, sd: float) -> tuple[Optional[bool], Optional[float]]:
+    """Conservative concentration flag and the ``P(aggregate > 0)`` diagnostic.
 
     Parameters
     ----------
-    agg_cv : float
-        The aggregate coefficient of variation ``sd / mean``.
+    m, sd : float
+        Aggregate mean and standard deviation (loss-space -- the axis the FFT
+        and the windowed left-lift operate on).
 
     Returns
     -------
     (bool or None, float or None)
-        ``concentrated`` -- ``True`` iff ``cv < CONCENTRATION_CV`` (the mass band
-        clears 0 by a comfortable margin, so the windowed left-lift is eligible)
-        -- and ``concentration_p`` -- the sd-count ``1 / cv`` by which the band
-        clears 0 (reporting only, not a separate gate). ``(None, None)`` when the
-        ``cv`` is undefined (e.g. a mean-0 signed P&L); ``(True, inf)`` for a
-        deterministic ``cv == 0``.
+        ``concentrated`` -- ``True`` iff the band clears 0 by a comfortable
+        margin, ``m / sd > 1 / CONCENTRATION_CV`` (i.e. ``cv < 0.1``), so the
+        windowed left-lift is eligible -- and ``concentration_p = Phi(m / sd)``,
+        the normal-approximation probability the aggregate is positive (the band
+        clears 0). ``(None, None)`` when ``sd`` is undefined; for a deterministic
+        ``sd == 0`` the point mass at ``m`` gives ``p = 1`` (``m > 0``) or ``0``.
+
+    Notes
+    -----
+    ``concentration_p`` saturates at ~1 for a strongly concentrated book
+    (``Phi(50) == 1``); its discrimination is in the marginal range (e.g.
+    ``Phi(1.8) = 0.96``). It is a reported diagnostic, not the gate -- the gate
+    is the conservative ``cv < CONCENTRATION_CV`` margin.
     """
-    if agg_cv is None or not np.isfinite(agg_cv):
+    if m is None or sd is None or not np.isfinite(sd):
         return None, None
-    if agg_cv <= 0:
-        return True, np.inf
-    return bool(agg_cv < CONCENTRATION_CV), float(1.0 / agg_cv)
+    if sd <= 0:
+        return bool(m > 0), (1.0 if m > 0 else 0.0)
+    z = float(m / sd)
+    p = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+    return bool(z > 1.0 / CONCENTRATION_CV), float(p)
+
+
+def _side_class(end_finite: bool, decay: TailClass) -> TailClass:
+    """Per-side tail class: ``BOUNDED`` at a finite support end, else the decay.
+
+    A finite support end is a hard boundary (no tail), so that side is
+    :attr:`~TailClass.BOUNDED`; an infinite end carries the family's decay rung.
+    """
+    return TailClass.BOUNDED if end_finite else decay
+
+
+def _heaviest(rungs) -> TailClass:
+    """The heaviest rung in ``rungs``, ranking ``UNKNOWN`` as most conservative."""
+    def key(r):
+        return int(TailClass.POWER_LAW) + 1 if r == TailClass.UNKNOWN else int(r)
+    rungs = list(rungs)
+    return max(rungs, key=key) if rungs else TailClass.BOUNDED
+
+
+def _power_note(alpha: Optional[float]) -> str:
+    """Note text for a power-law tail: index and the moment that fails."""
+    if alpha is None or not np.isfinite(alpha):
+        return 'power-law tail'
+    s = f'power-law, alpha={alpha:.3g}'
+    if alpha <= 1.0:
+        return s + ', infinite mean'
+    if alpha < 2.0:
+        return s + ', infinite variance'
+    return s
 
 
 def _base_rung(severity) -> TailClass:
@@ -721,6 +762,11 @@ def severity_support(severity) -> tuple[float, float]:
 class TailRow:
     """One row of the layered tail report (one component / layer).
 
+    A row reports a layer's **support** and its **tail class on each side**. The
+    public ``bounded`` view is derived in :func:`tail_frame` from ``min`` / ``max``
+    (both finite); the thick/thin the sizer needs is the derived :func:`is_thick`
+    of ``right_tail`` (or ``left_tail`` for a signed book).
+
     Attributes
     ----------
     component : str
@@ -730,56 +776,47 @@ class TailRow:
         Family / driver label, e.g. ``'poisson'``, ``'lognorm'``,
         ``'2 components'``, ``'severity-driven'``.
     min, max : float
-        Smallest / largest attainable value (``max`` may be ``inf``).
-    bounded : bool
-        ``min`` and ``max`` both finite (``rung is BOUNDED``).
-    left, right : str
-        ``'thick'`` / ``'thin'`` lower- and upper-tail labels (see
-        :func:`is_thick`). ``left`` is ``'thin'`` for non-negative support.
-    rung : TailClass
-        The effective tail rung.
-    alpha : float or None
-        Power-law tail index, when applicable.
-    log_concave : bool or None
-        Log-concavity flag (``None`` when not determined).
+        Structural support -- the smallest / largest **attainable** value
+        (``-inf`` / ``inf`` for an unbounded end), not a reach estimate.
+    left_tail, right_tail : TailClass
+        The tail class of the lower / upper tail: ``BOUNDED`` at a finite support
+        end (a hard boundary, no tail), else the family decay rung.
     concentrated : bool or None
         Aggregate row only: the conservative "band clears 0" flag.
     concentration_p : float or None
-        Aggregate row only: the sd-margin the band clears 0 (``1 / cv``).
+        Aggregate row only: ``Phi(mean / sd)`` -- ``P(aggregate > 0)`` under a
+        normal approximation.
     note : str
-        Short structural note (e.g. ``'subexponential base, capped at 1,000'``).
+        Short structural note (e.g. ``'subexponential base, capped at 1,000'``,
+        ``'power-law, alpha=1.5, infinite variance'``).
     """
 
     component: str
     family: str
     min: float
     max: float
-    bounded: bool
-    left: str
-    right: str
-    rung: TailClass
-    alpha: Optional[float] = None
-    log_concave: Optional[bool] = None
+    left_tail: TailClass
+    right_tail: TailClass
     concentrated: Optional[bool] = None
     concentration_p: Optional[float] = None
     note: str = ''
 
 
-def _severity_note(severity, eff_rung: TailClass) -> str:
-    """Structural note for a severity row: flag a *recognised heavy* base capped.
+def _severity_capped_note(severity, base: TailClass, right_tail: TailClass) -> str:
+    """Note for a *recognised heavy* base made effective-bounded by a cap.
 
     Fires only when a known subexponential-or-heavier family (``base >=
     SUBEXPONENTIAL``, so ``UNKNOWN`` and intrinsically-bounded histograms are
-    excluded) has been made effective-bounded by a finite ``limit`` / splice cap
-    -- the "thick base, capped at L" case.
+    excluded) has had its right tail capped to ``BOUNDED`` by a finite ``limit``
+    / splice -- the "thick base, capped at L" case.
     """
-    base = _base_rung(severity)
+    if right_tail != TailClass.BOUNDED or base < TailClass.SUBEXPONENTIAL:
+        return ''
     limit = getattr(severity, 'limit', np.inf)
     ub = getattr(severity, 'sev_ub', np.inf)
     cap = min(float(limit) if limit is not None else np.inf,
               float(ub) if ub is not None else np.inf)
-    if (eff_rung == TailClass.BOUNDED and base >= TailClass.SUBEXPONENTIAL
-            and np.isfinite(cap)):
+    if np.isfinite(cap):
         return f'{tail_class_label(base)} base, capped at {cap:,.0f}'
     return ''
 
@@ -806,27 +843,33 @@ def severity_tail_row(severity, component: str) -> TailRow:
     Returns
     -------
     TailRow
+        With per-side tail classes: a finite support end is ``BOUNDED``, an
+        infinite end carries the base-family decay rung. The note flags an
+        uncapped power-law (``alpha`` + the failing moment) or a capped heavy
+        base.
     """
-    rung, lc, alpha = classify_severity(severity)
+    _, _, alpha = classify_severity(severity)
+    base = _base_rung(severity)
     lo, hi = severity_support(severity)
-    signed = bool(getattr(severity, 'signed', False))
-    left = thickness_label(rung) if signed else 'thin'
+    left = _side_class(np.isfinite(lo), base)
+    right = _side_class(np.isfinite(hi), base)
+    if right == TailClass.POWER_LAW:
+        note = _power_note(alpha)
+    else:
+        note = _severity_capped_note(severity, base, right)
     return TailRow(
         component=component, family=_sev_family_label(severity),
-        min=lo, max=hi, bounded=(rung == TailClass.BOUNDED),
-        left=left, right=thickness_label(rung),
-        rung=rung, alpha=alpha, log_concave=lc,
-        note=_severity_note(severity, rung),
+        min=lo, max=hi, left_tail=left, right_tail=right, note=note,
     )
 
 
 def combined_severity_row(sevs) -> TailRow:
     """Build the combined *effective severity* row (the exposure-weighted blend).
 
-    The blend mirrors :func:`_combine_severities`: thickest rung (UNKNOWN
-    poisons), ``log_concave = all`` components, the thickest power-law ``alpha``.
-    The support is the component union and the left tail is thick iff any
-    component's is.
+    The support is the component union; each side's tail class is the heaviest
+    component's on that side (``UNKNOWN`` ranks most conservative). The note
+    carries the thickest power-law ``alpha`` when the blend's right tail is
+    power-law.
 
     Parameters
     ----------
@@ -838,18 +881,18 @@ def combined_severity_row(sevs) -> TailRow:
     TailRow
         Labelled ``'severity'``.
     """
-    rung, lc, alpha = _combine_severities(sevs)
     rows = [severity_tail_row(s, f'comp{i}') for i, s in enumerate(sevs)]
+    _, _, alpha = _combine_severities(sevs)
     lo = min(r.min for r in rows)
     hi = max(r.max for r in rows)
-    left = 'thick' if any(r.left == 'thick' for r in rows) else 'thin'
+    left = _heaviest(r.left_tail for r in rows)
+    right = _heaviest(r.right_tail for r in rows)
     family = f'{len(rows)} components' if len(rows) > 1 else rows[0].family
+    note = _power_note(alpha) if right == TailClass.POWER_LAW \
+        else 'combined effective severity'
     return TailRow(
         component='severity', family=family,
-        min=lo, max=hi, bounded=(rung == TailClass.BOUNDED),
-        left=left, right=thickness_label(rung),
-        rung=rung, alpha=alpha, log_concave=lc,
-        note='combined effective severity',
+        min=lo, max=hi, left_tail=left, right_tail=right, note=note,
     )
 
 
@@ -866,75 +909,103 @@ def frequency_tail_row(frequency, *, n_min: float = 0.0,
         Smallest / largest attainable claim count (supplied by the caller, which
         knows the exposure ``n``).
     zero_truncated : bool
-        Whether the count is genuinely zero-truncated (``zm`` with ``p0 == 0``),
-        as opposed to merely having a positive minimum atom.
+        Whether the count is genuinely zero-truncated (``zm`` with ``p0 == 0``).
 
     Returns
     -------
     TailRow
-        Labelled ``'frequency'``; the left tail is always thin (counts >= 0).
+        Labelled ``'frequency'``; the left tail is ``BOUNDED`` (counts have a
+        finite floor), the right tail is ``BOUNDED`` for a finite-count family
+        else the family decay rung.
     """
-    rung, lc = classify_frequency(frequency)
+    rung, _ = classify_frequency(frequency)
     family = getattr(frequency, 'freq_name', '') or ''
     note = 'claim count'
     if zero_truncated:
         note += ', zero-truncated'
     return TailRow(
         component='frequency', family=family,
-        min=float(n_min), max=float(n_max), bounded=(rung == TailClass.BOUNDED),
-        left='thin', right=thickness_label(rung),
-        rung=rung, alpha=None, log_concave=lc, note=note,
+        min=float(n_min), max=float(n_max),
+        left_tail=_side_class(np.isfinite(n_min), rung),
+        right_tail=_side_class(np.isfinite(n_max), rung),
+        note=note,
     )
 
 
-def aggregate_tail_row(info: TailInfo, *, agg_min: float = np.nan,
-                       agg_max: float = np.nan, agg_cv: float = np.nan,
-                       left: str = 'thin') -> TailRow:
-    """Build the aggregate :class:`TailRow` from the combine result and reach.
+def aggregate_tail_row(info: TailInfo, *, agg_min: float, agg_max: float,
+                       left_decay: TailClass, right_decay: TailClass,
+                       agg_m: float = np.nan, agg_sd: float = np.nan) -> TailRow:
+    """Build the aggregate :class:`TailRow` from the structural support + decays.
 
     Parameters
     ----------
     info : TailInfo
-        The combine result (:func:`aggregate_tail_info`).
+        The combine result (:func:`aggregate_tail_info`) -- supplies the driver
+        label and the power-law ``alpha``.
     agg_min, agg_max : float
-        Estimated lower / upper reach of the aggregate (the caller's
-        method-of-moments percentiles).
-    agg_cv : float
-        Aggregate coefficient of variation (drives :func:`concentration`).
-    left : str
-        The resolved lower-tail label. ``'thin'`` for a non-negative aggregate;
-        the caller mirrors the appropriate severity tail for a signed one (the
-        reflected severity's left for an ``ssev`` / ``dsev`` book, the loss's
-        right tail for an affine ``pnl`` book) -- see the ``[q-left-combine]``
-        rule.
+        Structural aggregate support (``-inf`` / ``inf`` at an unbounded end),
+        already mapped through any ``pnl`` affine by the caller.
+    left_decay, right_decay : TailClass
+        The aggregate's per-side decay rungs (used only at an infinite end),
+        already affine-mapped (swapped under a reflecting ``pnl``).
+    agg_m, agg_sd : float
+        Loss-space aggregate mean / sd (drive :func:`concentration`).
 
     Returns
     -------
     TailRow
         Labelled ``'aggregate'``.
     """
-    rung = info.agg
-    conc, conc_p = concentration(agg_cv)
+    left = _side_class(np.isfinite(agg_min), left_decay)
+    right = _side_class(np.isfinite(agg_max), right_decay)
+    conc, conc_p = concentration(agg_m, agg_sd)
     family = f'{info.driver}-driven' if info.driver != 'undetermined' else ''
+    note = _power_note(info.alpha) if right == TailClass.POWER_LAW else ''
     return TailRow(
         component='aggregate', family=family,
-        min=float(agg_min), max=float(agg_max), bounded=(rung == TailClass.BOUNDED),
-        left=left, right=thickness_label(rung),
-        rung=rung, alpha=info.alpha, log_concave=info.agg_lc,
-        concentrated=conc, concentration_p=conc_p,
-        note='frequency (x) combined severity',
+        min=float(agg_min), max=float(agg_max),
+        left_tail=left, right_tail=right,
+        concentrated=conc, concentration_p=conc_p, note=note,
     )
+
+
+def _mul_extreme(n: float, s: float) -> float:
+    """``n * s`` with the ``0 * inf`` indeterminate resolved to ``0``."""
+    if n == 0.0 or s == 0.0:
+        return 0.0
+    return float(n) * float(s)
+
+
+def _agg_support(n_lo: float, n_hi: float,
+                 s_lo: float, s_hi: float) -> tuple[float, float]:
+    """Structural support of ``S = sum_{N} X`` from count and severity extents.
+
+    ``N in [n_lo, n_hi]`` claims, each severity in ``[s_lo, s_hi]``. The maximum
+    sum takes the count that maximises the (signed) per-claim extreme, likewise
+    the minimum -- so an unbounded count or severity pushes the active side to
+    ``+-inf``. Exact for a bounded book (e.g. fixed 3 x dice [1, 6] -> [3, 18]).
+    """
+    hi = _mul_extreme(n_hi, s_hi) if s_hi > 0 else _mul_extreme(n_lo, s_hi)
+    lo = _mul_extreme(n_hi, s_lo) if s_lo < 0 else _mul_extreme(n_lo, s_lo)
+    return lo, hi
 
 
 def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
                     freq_max: float = np.inf, freq_zero_truncated: bool = False,
-                    agg_min: float = np.nan, agg_max: float = np.nan,
-                    agg_cv: float = np.nan, agg_left: str = 'thin') -> list[TailRow]:
+                    agg_m: float = np.nan, agg_sd: float = np.nan,
+                    agg_reflect: bool = False,
+                    agg_shift: float = 0.0) -> list[TailRow]:
     """Assemble the layered tail report as an ordered list of :class:`TailRow`.
 
     Rows, bottom-up: frequency; one per severity mix component (``comp0`` ...);
     the combined effective severity (only when there is more than one component);
     the aggregate. Spec-only -- valid before ``update``.
+
+    The aggregate's **structural support** is built from the count and combined
+    severity extents (:func:`_agg_support`) and then mapped through any ``pnl``
+    affine (``agg_reflect`` / ``agg_shift``); its per-side decay rungs combine the
+    frequency rung with the combined severity's per-side rungs (single big jump),
+    swapped under a reflecting ``pnl``.
 
     Parameters
     ----------
@@ -944,13 +1015,13 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
         The severity components (``Aggregate.sevs``).
     freq_min, freq_max : float
         Claim-count support (the caller knows the exposure).
-    agg_min, agg_max : float
-        Aggregate reach estimates.
-    agg_cv : float
-        Aggregate coefficient of variation.
-    agg_left : str
-        The resolved aggregate lower-tail label (the caller resolves the signed
-        mirror; see :func:`aggregate_tail_row`).
+    freq_zero_truncated : bool
+        Genuine zero-truncation flag for the frequency note.
+    agg_m, agg_sd : float
+        Loss-space aggregate mean / sd (drive concentration).
+    agg_reflect, agg_shift : bool, float
+        The ``pnl`` affine (``PnL = agg_shift - A`` when reflecting, else
+        ``agg_shift + A``); inert defaults for an ordinary aggregate.
 
     Returns
     -------
@@ -961,11 +1032,34 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
                                zero_truncated=freq_zero_truncated)]
     sev_list = list(sevs) if sevs is not None else []
     rows.extend(severity_tail_row(s, f'comp{i}') for i, s in enumerate(sev_list))
-    if sev_list and len(sev_list) > 1:
-        rows.append(combined_severity_row(sev_list))
+
+    if sev_list:
+        comb = combined_severity_row(sev_list)
+        if len(sev_list) > 1:
+            rows.append(comb)
+        s_lo, s_hi = comb.min, comb.max
+        sev_left, sev_right = comb.left_tail, comb.right_tail
+    else:
+        s_lo, s_hi = 0.0, np.inf
+        sev_left, sev_right = TailClass.BOUNDED, TailClass.UNKNOWN
+
+    freq_rung, _ = classify_frequency(frequency)
+    loss_lo, loss_hi = _agg_support(freq_min, freq_max, s_lo, s_hi)
+    left_decay = combine(freq_rung, sev_left)
+    right_decay = combine(freq_rung, sev_right)
+
+    if agg_reflect:
+        agg_min, agg_max = agg_shift - loss_hi, agg_shift - loss_lo
+        left_decay, right_decay = right_decay, left_decay
+    elif agg_shift != 0.0:
+        agg_min, agg_max = agg_shift + loss_lo, agg_shift + loss_hi
+    else:
+        agg_min, agg_max = loss_lo, loss_hi
+
     rows.append(aggregate_tail_row(
         info, agg_min=agg_min, agg_max=agg_max,
-        agg_cv=agg_cv, left=agg_left))
+        left_decay=left_decay, right_decay=right_decay,
+        agg_m=agg_m, agg_sd=agg_sd))
     return rows
 
 
@@ -981,19 +1075,19 @@ def tail_frame(rows) -> 'pd.DataFrame':
     -------
     pandas.DataFrame
         Indexed by ``component`` (frequency / comp* / severity / aggregate), with
-        columns ``family, min, max, left, right, bounded, tail_class, alpha,
-        log_concave, concentrated, concentration_p, note``.
+        columns ``family, min, max, left_tail, right_tail, bounded, concentrated,
+        concentration_p, note``. ``bounded`` is derived as ``min`` and ``max``
+        both finite.
     """
     data = [{
         'component': r.component, 'family': r.family,
         'min': r.min, 'max': r.max,
-        'left': r.left, 'right': r.right, 'bounded': r.bounded,
-        'tail_class': tail_class_label(r.rung),
-        'alpha': r.alpha, 'log_concave': r.log_concave,
+        'left_tail': tail_class_label(r.left_tail),
+        'right_tail': tail_class_label(r.right_tail),
+        'bounded': bool(np.isfinite(r.min) and np.isfinite(r.max)),
         'concentrated': r.concentrated, 'concentration_p': r.concentration_p,
         'note': r.note,
     } for r in rows]
-    cols = ['component', 'family', 'min', 'max', 'left', 'right', 'bounded',
-            'tail_class', 'alpha', 'log_concave', 'concentrated',
-            'concentration_p', 'note']
+    cols = ['component', 'family', 'min', 'max', 'left_tail', 'right_tail',
+            'bounded', 'concentrated', 'concentration_p', 'note']
     return pd.DataFrame(data, columns=cols).set_index('component')

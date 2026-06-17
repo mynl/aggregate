@@ -1,5 +1,18 @@
 # Plan bucket-window-2 — symmetric, convention-aware output windowing
 
+> **STATUS (2026-06-17).** **1A** (Aggregate sizer) landed a58 and **1A-fix**
+> (single-big-jump extent floor) landed a59 — see the §1A and §1A-fix sections
+> below. The further *univariate* bucket work — a first-class thick/thin tail
+> report (freq/sev/agg), wiring it into `bs`/`x_min` selection (incl. the
+> `windowed`↔`sbj` asymmetric window and tail-aware padding), and making the
+> decision legible (public `bs_window_df`, narrative `bs_description` /
+> `bs_explanation`) — has moved to **`dev/plan-univariate-bucket.md`** (the
+> "1A-bucket" plan), which now owns `dev/bucket-selection.rst`. **1P** (the
+> Portfolio windowed combine) remains open *here*; we return to it after
+> 1A-bucket, and it inherits 1A-bucket's reporting surfaces (`tail_df`,
+> `tail_description`/`tail_explanation`, `bs_window_df`,
+> `bs_description`/`bs_explanation`) at the `Portfolio` level.
+
 > **What this is.** A **round-1 design exploration**, not an execution plan. It
 > diagnoses the current window/`bs` asymmetry, fixes the design requirements,
 > proposes methods, and surfaces the decisions that rounds 2–3 must settle. **It
@@ -408,6 +421,13 @@ grid is the **general** path, not a special branch:
 **Cross-checks:** `Σ_i kappa_i(x) == x` on the windowed combine (numerics-2
 anchor, now on the windowed grid); marginals/moments match the per-unit windowed
 aggregates; legacy non-windowed books byte-stable.
+
+**Reporting parity (consumes 1A-bucket).** When 1P lands, `Portfolio` gains the
+same surfaces 1A-bucket builds for `Aggregate`: a portfolio-level `tail_df` +
+`tail_description`/`tail_explanation` (combining the unit tail reports), a curated
+public `bs_window_df` (the combine's per-unit → shared-grid journey), and
+`bs_description`/`bs_explanation` for the shared grid. Build these on the same
+helpers, not parallel implementations.
 
 ## Config / files (Step 1)
 

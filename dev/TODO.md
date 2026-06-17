@@ -216,7 +216,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   both `Aggregate` and `Portfolio`. Rename on the next code touch in
   `distributions.py` / `portfolio.py` (keep `_bs_window_df` as a deprecated
   alias for one release), update the bucket-selection doc and any tests. Folds
-  naturally into H9's public-`*_df` pass.
+  naturally into H9's public-`*_df` pass and is **scheduled inside W9
+  (1A-bucket)** `[bs-reporting]`, which builds the curated public view
+  (`dev/plan-univariate-bucket.md`).
 
 ---
 
@@ -294,11 +296,27 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   coarsening). `_bs_window_df` gains an `sbj` row. The planned signed-kurtosis
   diagnostic was dropped (the true-law kurtosis is modest; the 737 figure was an
   aliasing artifact). Light/thin/bounded/concentrated/windowed books byte-stable.
+- [ ] **W9 `[A]`** Bucket **1A-bucket** — univariate tail intelligence + reporting
+  (`dev/plan-univariate-bucket.md`). A first-class thick/thin tail report for
+  freq/sev/agg (min/max/bounded/left/right + conservative concentration), exposed
+  as `tail_df` + `tail_description`/`tail_explanation`; wiring it into `bs`/`x_min`
+  selection (gate `sbj` on thickness, power-law `alpha` quantiles, thin-left-gated
+  `windowed`↔`sbj` asymmetric window, tail-aware padding/slack); and legible
+  reporting (full `_bs_window_df` journey, public `bs_window_df`,
+  `bs_description`/`bs_explanation`). Owns `dev/bucket-selection.rst`. Folds in
+  **H10**. Comes before W8.
+- [ ] **W10 `[A]`** Retire `recommend_bucket` — replace the legacy one-shot
+  sizer with a new (TBD) function that takes `log2` (and possibly `x_min`) as
+  explicit arguments, then remove `recommend_bucket`. W9's honest-truncation path
+  (`[use-selection]` item 2: accept truncation, no-normalize, warn) removes its
+  last real job (the infinite-variance fallback), so this follows W9. See
+  `dev/plan-univariate-bucket.md` (`[recommend-bucket]`).
 - [ ] **W8 `[A]`** Bucket-window **1P** — `Portfolio` windowed combine
   (`best_window`/`update`): sum per-unit origins/widths, pad once at the total,
   route the windowed non-signed book through the roll-combine; `Σ kappa_i == x`
-  on the windowed grid. Consumes 1A's uniform per-unit two-sided windows. Next
-  step after W6 (`dev/plan-bucket-window-2.md` §1P).
+  on the windowed grid. Consumes 1A's uniform per-unit two-sided windows, and
+  inherits 1A-bucket's reporting surfaces at the `Portfolio` level. Next after
+  **W9** (`dev/plan-bucket-window-2.md` §1P).
 - [x] **W4 `[A]`** Signed (P&L) Lee-plot artifact (a39) — `Aggregate.plot`'s
   discrete zero-anchor row set `loss=0`, drawing a spurious vertical segment to
   the first point on signed support; anchor `loss` now equals its index.

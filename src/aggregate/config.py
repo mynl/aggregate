@@ -88,7 +88,8 @@ class BuildSettings:
     normalize : bool
         Whether ``update`` renormalises the discretized severity.
     databases : tuple of str
-        Database name(s) loaded on construction. ``"test_suite"`` keeps the
+        Database name(s) loaded on construction. ``"examples"`` is the shipped
+        default (the curated v1.0 example library); ``"test_suite"`` keeps the
         historical ``build`` knowledge base; ``"default"`` would load every
         bundled file, ``"all"`` bundled plus user.
     update : bool
@@ -99,7 +100,7 @@ class BuildSettings:
     bs: float = 0.0
     padding: int = 1
     normalize: bool = True
-    databases: tuple[str, ...] = ('test_suite',)
+    databases: tuple[str, ...] = ('examples',)
     update: bool = True
 
 

@@ -1,0 +1,165 @@
+# ======================================================================
+# other-distributions.agg  --  severity distributions used in insurance
+# ======================================================================
+#
+# Version: 1
+#
+# PURPOSE
+# -------
+# scipy.stats ships 100+ continuous distributions; actuaries use a small,
+# well-trodden subset. This file is a REFERENCE SET: one minimal
+# aggregate per distribution that has real support in the loss-modelling
+# literature, showing how to write it in DecL. Every program is the
+# simplest possible carrier --
+#
+#     agg <Name> 1 claim sev <severity> fixed
+#
+# -- a fixed single claim, so the aggregate IS the severity and you can
+# read its mean / cv / tail straight off `qd(build(...))`. Swap in a real
+# frequency (poisson, mixed gamma, ...) and limits to use one for real.
+#
+# This is NOT loaded by default. Load it explicitly:
+#     from aggregate import Underwriter
+#     uw = Underwriter(databases='other-distributions')
+# or add "other-distributions" to [build] databases in config.toml.
+#
+# SELECTION -- what counts as "relevant", and why
+# -----------------------------------------------
+# The picks (and their rough frequency in the sources below) are:
+#   lognormal, gamma, exponential, Weibull, inverse Gaussian -- the
+#     standard light/moderate-tailed severities (Klugman et al., Parodi);
+#   the GB2 family -- generalized gamma, beta-prime (B2), Burr XII
+#     (Singh-Maddala), Burr III (Dagum), log-logistic (Fisk) -- the
+#     flexible four/three-parameter curves that nest most of the others;
+#   Pareto (Type I), Lomax (Type II / shifted Pareto), the Generalized
+#     Pareto (peaks-over-threshold), inverse gamma, Frechet -- the
+#     heavy / power-law tails for large losses and reinsurance;
+#   Gumbel and the GEV -- extreme-value laws for block maxima;
+#   beta -- bounded severity, and the gateway to exposure-curve models.
+#
+# References (mentioned per the file's brief; cite by author/year):
+#   * Klugman, Panjer & Willmot, *Loss Models* -- Appendix A is the
+#     canonical actuarial severity table (the parameterizations below
+#     follow its families).
+#   * Parodi (2015), *Pricing in General Insurance*; Parodi, Thrumble &
+#     Watson (2024), *Loss Modelling from First Principles*; Parodi &
+#     Watson (2019), property-graph model of fire/explosion losses --
+#     lognormal, gamma, Weibull, Pareto/GPD as the working severities.
+#   * McDonald & Richards (1987), hazard rates of the generalized beta
+#     distributions; Cummins, Dionne, McDonald & Pritchett (1990),
+#     applications of the GB2 family to insurance loss processes; Venter
+#     (1983), transformed beta/gamma -- the GB2 umbrella: it nests the
+#     log-t, generalized gamma, B2, Burr III & XII, Lomax, Fisk,
+#     lognormal (limit), gamma and Weibull.
+#   * Bernegger (1997), *The Swiss Re Exposure Curves and the MBBEFD
+#     Distribution Class*, ASTIN Bulletin -- the two-parameter MBBEFD
+#     family for exposure rating (see the note in section E).
+#
+# DecL severity reminder: `scale * scipy_name shape... + loc` follows
+# scipy's (shape, loc, scale) convention; for a few families aggregate
+# also accepts the actuarial `name mean cv` form (used below where
+# natural). All shapes are scipy's; means here are ~10k for comparison.
+
+# Contents
+# --------
+# A. Light and moderate tails
+# B. Lognormal and the GB2 family
+# C. Heavy and power-law tails
+# D. Extreme-value distributions
+# E. Bounded severity and exposure curves
+
+
+# ----------------------------------------------------------------------
+# A. Light and moderate tails
+# ----------------------------------------------------------------------
+# The exponential is memoryless (constant hazard) -- the reference point
+# everything else is "more" or "less" tailed than. scale = mean, cv = 1.
+agg A.Exponential 1 claim sev 10000 * expon fixed note{Exponential: constant hazard, cv = 1. scipy expon; scale = mean.}
+# Gamma: shape > 1 gives an interior mode; lighter-than-exponential tail.
+# Shown in the actuary-friendly mean/cv form.
+agg A.Gamma 1 claim sev gamma 10000 cv 0.8 fixed note{Gamma severity by mean and cv (shape = 1/cv^2). Klugman et al.; Parodi.}
+# Weibull: hazard rises (c>1) or falls (c<1) with size; a workhorse for
+# attritional losses (Parodi). scipy weibull_min, shape c.
+agg A.Weibull 1 claim sev 10000 * weibull_min 1.5 fixed note{Weibull (weibull_min), shape c = 1.5: increasing hazard.}
+# Inverse Gaussian: right-skewed, heavier than gamma; common in pure-
+# premium / Tweedie work. mean/cv form supported.
+agg A.InverseGaussian 1 claim sev invgauss 10000 cv 0.7 fixed note{Inverse Gaussian by mean and cv -- right-skewed, Tweedie-adjacent.}
+
+
+# ----------------------------------------------------------------------
+# B. Lognormal and the GB2 family
+# ----------------------------------------------------------------------
+# Lognormal is the most-used severity in the literature (Parodi); a tail
+# between the light families and the power laws. mean/cv form.
+agg B.Lognormal 1 claim sev lognorm 10000 cv 1.5 fixed note{Lognormal by mean and cv -- the default working severity.}
+# The generalized (transformed) gamma -- Stacy's three-parameter law,
+# the GB2's gamma-side limit; nests gamma (a-shape), Weibull and
+# lognormal. scipy gengamma shapes (a, c).
+agg B.GenGamma 1 claim sev 10000 * gengamma 2 1.5 fixed note{Generalized (transformed) gamma, shapes a=2, c=1.5 -- nests gamma/Weibull/lognormal.}
+# Beta-prime (beta of the second kind, B2): the GB2 with scale, the
+# representative GB2 member in scipy. scipy betaprime shapes (a, b).
+agg B.BetaPrime 1 claim sev 10000 * betaprime 3 4 fixed note{Beta-prime / beta-of-the-2nd-kind (B2) -- the GB2 representative. Cummins et al. (1990).}
+# Burr XII (Singh-Maddala): GB2 with p=1; a flexible heavy-bodied curve
+# heavily used for liability. scipy burr12 shapes (c, d).
+agg B.Burr12 1 claim sev 10000 * burr12 3 1.2 fixed note{Burr XII / Singh-Maddala (GB2, p=1), shapes c=3, d=1.2.}
+# Burr III (Dagum): the GB2 with q=1, the Burr XII's mirror. scipy burr.
+agg B.BurrIII 1 claim sev 10000 * burr 3 1.2 fixed note{Burr III / Dagum (GB2, q=1), shapes c=3, d=1.2.}
+# Log-logistic (Fisk): GB2 with p=q=1; logistic on the log scale, a
+# moderately heavy tail. scipy fisk shape c.
+agg B.LogLogistic 1 claim sev 10000 * fisk 2.5 fixed note{Log-logistic / Fisk (GB2, p=q=1), shape c=2.5.}
+
+
+# ----------------------------------------------------------------------
+# C. Heavy and power-law tails
+# ----------------------------------------------------------------------
+# Power-law tails: tail index drives finiteness of moments. Shape 2.5 is
+# used so the variance is finite (the auto-sizer refuses infinite
+# variance without an explicit grid -- see examples.agg I.Heavy).
+#
+# Pareto Type I (single-parameter / European), shifted to ground-up so
+# support starts at 0. scipy pareto shape b; "- 10000" undoes the scale
+# floor. Tail index alpha = b.
+agg C.Pareto 1 claim sev 10000 * pareto 2.5 - 10000 fixed note{Pareto Type I (European), alpha = 2.5, shifted ground-up.}
+# Lomax (Pareto Type II / American / shifted Pareto): support from 0
+# natively, the GB2's Lomax member. scipy lomax shape c = alpha.
+agg C.Lomax 1 claim sev 10000 * lomax 2.5 fixed note{Lomax / Pareto Type II (shifted Pareto), alpha = 2.5.}
+# Generalized Pareto (GPD): the peaks-over-threshold tail of extreme-
+# value theory; xi = shape c sets tail heaviness (xi<1 finite mean).
+agg C.GPD 1 claim sev 10000 * genpareto 0.3 fixed note{Generalized Pareto (GPD), xi = 0.3 -- the peaks-over-threshold tail (EVT).}
+# Inverse gamma: a heavy right tail (reciprocal of a gamma), a Klugman
+# staple. scipy invgamma shape a; alpha = a sets tail.
+agg C.InverseGamma 1 claim sev 10000 * invgamma 4.07 fixed note{Inverse gamma, shape a = 4.07 -- heavy right tail (Klugman et al.).}
+
+
+# ----------------------------------------------------------------------
+# D. Extreme-value distributions
+# ----------------------------------------------------------------------
+# Block-maxima laws (Fisher-Tippett): the limiting distribution of the
+# largest loss in a period. Use for "largest event" / cat modelling, not
+# usually for ground-up attritional severity.
+#
+# Gumbel: the light-tailed (type I) extreme-value law. scipy gumbel_r,
+# location + scale (no shape).
+agg D.Gumbel 1 claim sev 5000 * gumbel_r + 20000 fixed note{Gumbel (type I extreme value) -- block maxima, light tail.}
+# Frechet: the heavy-tailed (type II) extreme-value law = inverse
+# Weibull. scipy invweibull shape c (tail index).
+agg D.Frechet 1 claim sev 10000 * invweibull 3 fixed note{Frechet / inverse Weibull (type II extreme value), shape c = 3.}
+# Generalized extreme value (GEV): the unified EVT family; scipy
+# genextreme shape c (c<0 is the heavy Frechet domain).
+agg D.GEV 1 claim sev 10000 * genextreme -0.2 + 20000 fixed note{Generalized extreme value (GEV), shape -0.2 (Frechet domain).}
+
+
+# ----------------------------------------------------------------------
+# E. Bounded severity and exposure curves
+# ----------------------------------------------------------------------
+# Beta on [0, scale]: a bounded severity -- natural for a loss as a
+# fraction of a known sum insured (a "destruction rate"). scipy beta
+# shapes (a, b); here scaled to [0, 100000].
+agg E.Beta 1 claim sev 100000 * beta 2 5 fixed note{Beta on [0, 100000] -- bounded severity / destruction rate, shapes a=2, b=5.}
+# NOTE -- MBBEFD (Bernegger 1997). The Swiss Re exposure-curve standard
+# for property per-risk rating is the two-parameter MBBEFD class
+# (Maxwell-Boltzmann / Bose-Einstein / Fermi-Dirac) on the destruction
+# ratio [0, 1]. It is an exposure-CURVE family, not a scipy.stats
+# continuous rv, so it has no `sev mbbefd ...` form here; the bounded
+# beta above is the closest in-vocabulary stand-in. Exposure-curve
+# support is tracked separately.

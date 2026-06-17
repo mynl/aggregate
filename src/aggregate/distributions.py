@@ -1426,6 +1426,18 @@ class Frequency(object):
         """
         return f'Frequency object of type {self.freq_name}\n{super(Frequency, self).__repr__()}'
 
+    @property
+    def tail_description(self) -> str:
+        """One line: this frequency family's right-tail class (count layer).
+
+        E.g. ``poisson frequency, super-exponential count``. The count *support*
+        depends on the exposure (the aggregate's ``n``), so a standalone
+        frequency reports only its family class; the full count support appears
+        in the aggregate's :attr:`~aggregate.distributions.Aggregate.tail_df`.
+        """
+        rung, _ = _tail.classify_frequency(self)
+        return f'{self.freq_name} frequency, {_tail.tail_class_label(rung)} count'
+
 
 # ---------------------------------------------------------------------------
 # Concrete Frequency<Kind> subclasses. Each declares its registry key as a
@@ -2204,31 +2216,30 @@ class Aggregate:
 
     @property
     def tail_description(self) -> str:
-        """Three aligned lines describing the frequency, severity, and aggregate tails.
+        """Three aligned lines summarising the frequency, severity, and aggregate tails.
 
-        E.g.::
+        Short narrative over the layered :attr:`tail_df` report -- per-layer
+        support and per-side tail class, plus the aggregate concentration. E.g.::
 
-            frequency tail           log-concave, super-exponential (poisson)
-            severity tail            subexponential (lognorm)
-            aggregate tail           subexponential
+            frequency tail           poisson, count [0, inf), super-exponential right tail
+            severity tail            lognorm, [0, inf), subexponential right tail
+            aggregate tail           [0, inf), subexponential right tail; not concentrated (P>0=1.00)
 
-        Derived from :attr:`tail_class`; the lines are also appended to
-        :meth:`info`.
+        The verbose form is :attr:`tail_explanation`; the lines are also appended
+        to :meth:`info`.
         """
-        info = self._tail_info()
-        return '\n'.join(_tail.describe_lines(
-            info, self.frequency.freq_name, self._sev_label()))
+        return '\n'.join(_tail.describe_rows(self._tail_rows()))
 
     @property
     def tail_explanation(self) -> str:
-        """One-sentence explanation of how the aggregate tail class arises.
+        """Verbose prose over the layered tail report (the per-component story).
 
-        E.g. "Log-concave super-exponential poisson frequency and
-        subexponential lognorm severity give a subexponential aggregate (single
-        big jump: P(S>x) approx E[N]*P(X>x))." Derived from :attr:`tail_class`.
+        Walks the book bottom-up -- frequency, the severity components and their
+        blend, the aggregate -- naming the single-big-jump mechanism (or the
+        frequency driver) for a thick right tail, any power-law moment failure,
+        and the concentration. Derived from :attr:`tail_df`.
         """
-        info = self._tail_info()
-        return _tail.explain(info, self.frequency.freq_name, self._sev_label())
+        return _tail.explain_rows(self._tail_rows(), self._tail_info())
 
     def _sev_label(self) -> str:
         """Short severity family label for tail text (the family, or ``'N components'``)."""
@@ -2264,14 +2275,22 @@ class Aggregate:
         pandas.DataFrame
             Indexed by ``component``.
         """
+        return _tail.tail_frame(self._tail_rows())
+
+    def _tail_rows(self):
+        """The layered tail report as a list of :class:`~aggregate.tail.TailRow`.
+
+        Single source for :attr:`tail_df`, :attr:`tail_description`, and
+        :attr:`tail_explanation`. Spec-only -- valid before :meth:`update`.
+        """
         freq_min, freq_max, freq_zt = self._frequency_count_support()
-        return _tail.tail_frame(_tail.build_tail_rows(
+        return _tail.build_tail_rows(
             self.frequency, self.sevs,
             freq_min=freq_min, freq_max=freq_max, freq_zero_truncated=freq_zt,
             agg_m=self.agg_m, agg_sd=self.agg_sd,
             agg_reflect=bool(getattr(self, '_agg_reflect', False)),
             agg_shift=float(getattr(self, '_agg_shift', 0.0)),
-        ))
+        )
 
     def _frequency_count_support(self):
         """Spec-only ``(min, max, zero_truncated)`` claim-count support.
@@ -4261,10 +4280,9 @@ class Aggregate:
             ('validation', self.explain_validation()),
         ]
         s = [info_row(label, value) for label, value in rows]
-        # Tail-thickness classification (frequency / severity / aggregate);
-        # spec-only, so available before update.
-        s.extend(_tail.describe_lines(
-            self._tail_info(), self.frequency.freq_name, self._sev_label()))
+        # Tail report summary (frequency / severity / aggregate -- support and
+        # per-side tail class); spec-only, so available before update.
+        s.extend(_tail.describe_rows(self._tail_rows()))
         s.append(info_row('bounded', self.bounded))
         s.append(info_row('id', self._spec_hash()))
         return '\n'.join(s)
@@ -8534,6 +8552,16 @@ class Severity(ss.rv_continuous):
         bounded object.
         """
         return self.tail_class == TailClass.BOUNDED
+
+    @property
+    def tail_description(self) -> str:
+        """One line: this severity's claim-space support and per-side tail class.
+
+        E.g. ``lognorm, [0, inf), subexponential right tail``. Derived from the
+        same :func:`~aggregate.tail.severity_tail_row` as the aggregate's
+        :attr:`~aggregate.distributions.Aggregate.tail_df` ``comp`` rows.
+        """
+        return _tail.describe_row(_tail.severity_tail_row(self, 'severity'))
 
     def _apply_lb_ub(self):
         """Wrap ``self.fz`` methods with truncation decorators for ``[lb, ub]``.

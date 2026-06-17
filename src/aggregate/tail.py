@@ -65,7 +65,7 @@ __all__ = [
     'aggregate_tail_info', 'tail_class_label',
     'is_thick', 'thickness_label', 'severity_support', 'concentration',
     'build_tail_rows', 'tail_frame',
-    'describe_lines', 'explain',
+    'describe_row', 'describe_rows', 'explain_rows',
     'CONCENTRATION_CV',
     '_BOUNDED_FREQS', '_BOUNDED_SCIPY_SEVS',
 ]
@@ -494,94 +494,171 @@ def aggregate_tail_info(frequency, sevs) -> TailInfo:
 # Width of the label column in ``.info`` output, matching the surrounding lines.
 _LABEL_W = 25
 
+# ANSI emphasis for a *thick* (subexponential-or-heavier) tail class when a
+# narrative is requested in colour -- bold red, the eye-catch for the heavy side.
+_ANSI_THICK = '\x1b[1;31m'
+_ANSI_RESET = '\x1b[0m'
 
-def _rung_phrase(rung: TailClass, lc: Optional[bool], family: Optional[str] = None,
-                 alpha: Optional[float] = None) -> str:
-    """Format one rung as ``[log-concave, ]<rung>[ (family)][, alpha=...]``."""
-    parts = []
-    if lc:
-        parts.append('log-concave')
+
+def _fmt_bound(x: float) -> str:
+    """Format a support bound: ``inf`` / ``-inf``, integer, or 4-sig-fig."""
+    if x == np.inf:
+        return 'inf'
+    if x == -np.inf:
+        return '-inf'
+    if float(x).is_integer():
+        return f'{int(x):,}'
+    return f'{x:,.4g}'
+
+
+def _support_text(lo: float, hi: float) -> str:
+    """Support interval text, e.g. ``[0, inf)`` / ``[3, 18]`` / ``(-inf, 1,000]``."""
+    lb = '(' if lo == -np.inf else '['
+    rb = ')' if hi == np.inf else ']'
+    return f'{lb}{_fmt_bound(lo)}, {_fmt_bound(hi)}{rb}'
+
+
+def _class_label(rung: TailClass, color: bool = False) -> str:
+    """Tail-class label, bold-red emphasised when ``color`` and the rung is thick."""
     label = tail_class_label(rung)
-    if rung == TailClass.POWER_LAW and alpha is not None and np.isfinite(alpha):
-        label = f'{label} (alpha={alpha:.3g})'
-    parts.append(label)
-    text = ', '.join(parts)
-    if family:
-        text = f'{text} ({family})'
-    return text
+    return f'{_ANSI_THICK}{label}{_ANSI_RESET}' if (color and is_thick(rung)) else label
 
 
-def describe_lines(info: TailInfo, freq_label: str = '', sev_label: str = '') -> list[str]:
-    """Three aligned ``.info``-style lines: frequency / severity / aggregate tail.
+def _sides_text(left: TailClass, right: TailClass, color: bool = False) -> str:
+    """Compact per-side tail-class phrase.
+
+    ``bounded`` both ends -> ``'bounded'``; one bounded end names only the open
+    side (``'subexponential right tail'``); two open ends name both (or
+    ``'<class> both tails'`` when equal).
+    """
+    B = TailClass.BOUNDED
+    if left == B and right == B:
+        return 'bounded'
+    if left == B:
+        return f'{_class_label(right, color)} right tail'
+    if right == B:
+        return f'{_class_label(left, color)} left tail'
+    if left == right:
+        return f'{_class_label(left, color)} both tails'
+    return f'left {_class_label(left, color)}, right {_class_label(right, color)}'
+
+
+def describe_row(row, color: bool = False) -> str:
+    """One-line phrase for a single :class:`TailRow`: family, support, sides."""
+    fam = f'{row.family}, ' if row.family else ''
+    return f'{fam}{_support_text(row.min, row.max)}, {_sides_text(row.left_tail, row.right_tail, color)}'
+
+
+def describe_rows(rows, *, color: bool = False) -> list[str]:
+    """Aligned ``.info``-style lines: frequency / severity / aggregate tail.
+
+    The short, three-line summary over the layered :class:`TailRow` report
+    (per-component detail is in :func:`explain_rows`). The severity line is the
+    combined effective severity when present, else the sole component.
 
     Parameters
     ----------
-    info : TailInfo
-        The struct from :func:`aggregate_tail_info`.
-    freq_label, sev_label : str
-        Family names to show in parentheses (e.g. ``'poisson'``, ``'lognorm'``).
+    rows : sequence of TailRow
+        From :func:`build_tail_rows`.
+    color : bool
+        Emphasise thick tail classes with ANSI bold-red (for a TTY).
 
     Returns
     -------
     list of str
-        Three lines, each ``<label padded to 25><phrase>``.
+        Up to three lines, each ``<label padded to 25><phrase>``.
     """
-    rows = [
-        ('frequency tail', _rung_phrase(info.freq, info.freq_lc, freq_label)),
-        ('severity tail', _rung_phrase(info.sev, info.sev_lc, sev_label, info.alpha)),
-        ('aggregate tail', _rung_phrase(info.agg, info.agg_lc, None, info.alpha)),
-    ]
-    return [f'{label:<{_LABEL_W}}{phrase}' for label, phrase in rows]
+    by = {r.component: r for r in rows}
+    comps = [r for r in rows if r.component.startswith('comp')]
+    sev = by.get('severity') or (comps[0] if comps else None)
+    out = []
+    if 'frequency' in by:
+        f = by['frequency']
+        fam = f'{f.family}, ' if f.family else ''
+        out.append(('frequency tail', f'{fam}count {_support_text(f.min, f.max)}, '
+                    f'{_sides_text(f.left_tail, f.right_tail, color)}'))
+    if sev is not None:
+        out.append(('severity tail', describe_row(sev, color)))
+    if 'aggregate' in by:
+        a = by['aggregate']
+        phrase = f'{_support_text(a.min, a.max)}, {_sides_text(a.left_tail, a.right_tail, color)}'
+        if a.concentration_p is not None:
+            tag = 'concentrated' if a.concentrated else 'not concentrated'
+            phrase += f'; {tag} (P>0={a.concentration_p:.2f})'
+        if a.note:
+            phrase += f' [{a.note}]'
+        out.append(('aggregate tail', phrase))
+    return [f'{label:<{_LABEL_W}}{phrase}' for label, phrase in out]
 
 
-def explain(info: TailInfo, freq_label: str = '', sev_label: str = '') -> str:
-    """One-sentence explanation of how the aggregate tail class arises.
+def explain_rows(rows, info: Optional[TailInfo] = None, *, color: bool = False) -> str:
+    """Verbose prose over the layered :class:`TailRow` report.
+
+    Walks the book bottom-up -- frequency, the severity components and their
+    blend, then the aggregate -- naming the single-big-jump mechanism (or the
+    frequency driver) for a thick right tail, the power-law moment failure, and
+    the concentration.
 
     Parameters
     ----------
-    info : TailInfo
-        The struct from :func:`aggregate_tail_info`.
-    freq_label, sev_label : str
-        Frequency and severity family names.
+    rows : sequence of TailRow
+        From :func:`build_tail_rows`.
+    info : TailInfo, optional
+        The combine result; used only for the aggregate ``driver``.
+    color : bool
+        Emphasise thick tail classes with ANSI bold-red.
 
     Returns
     -------
     str
-        A human-readable sentence; notes the single-big-jump mechanism for
-        heavy severity, the infinite-variance / infinite-mean flags for
-        power-law tails, and the analytic-PGF caveat is implicit in the
-        ``undetermined`` wording for unrecognised families.
     """
-    fl = f' {freq_label}' if freq_label else ''
-    sl = f' {sev_label}' if sev_label else ''
+    by = {r.component: r for r in rows}
+    comps = [r for r in rows if r.component.startswith('comp')]
+    sev = by.get('severity') or (comps[0] if comps else None)
+    out = []
 
-    if info.agg == TailClass.UNKNOWN:
-        return ('Aggregate tail undetermined (one or more components is an '
-                'unrecognised family with unbounded support; it is sized '
-                'conservatively as thick).')
+    if 'frequency' in by:
+        f = by['frequency']
+        fam = (f.family or 'count').capitalize()
+        out.append(f'{fam} frequency on counts {_support_text(f.min, f.max)} '
+                   f'({_sides_text(f.left_tail, f.right_tail, color)}).')
 
-    freq_phrase = ('log-concave ' if info.freq_lc else '') + tail_class_label(info.freq)
-    sev_phrase = ('log-concave ' if info.sev_lc else '') + tail_class_label(info.sev)
-    agg_label = tail_class_label(info.agg)
+    if len(comps) > 1 and sev is not None:
+        parts = [f'{c.family} {_support_text(c.min, c.max)} '
+                 f'({_class_label(c.right_tail, color)})' for c in comps]
+        out.append(f'Severity blends {len(comps)} components: ' + '; '.join(parts)
+                   + f'. The combined effective severity is {_support_text(sev.min, sev.max)}, '
+                   f'{_sides_text(sev.left_tail, sev.right_tail, color)}.')
+    elif sev is not None:
+        fam = (sev.family or 'severity').capitalize()
+        out.append(f'{fam} severity {_support_text(sev.min, sev.max)}, '
+                   f'{_sides_text(sev.left_tail, sev.right_tail, color)}.')
 
-    sentence = (f'{freq_phrase.capitalize()}{fl} frequency and {sev_phrase}{sl} '
-                f'severity give a {agg_label} aggregate')
+    if 'aggregate' in by:
+        a = by['aggregate']
+        s = (f'The aggregate is {_support_text(a.min, a.max)}, '
+             f'{_sides_text(a.left_tail, a.right_tail, color)}.')
+        if a.right_tail == TailClass.UNKNOWN:
+            s += (' Its right tail is undetermined (an unrecognised family with '
+                  'unbounded support; sized conservatively as thick).')
+        elif is_thick(a.right_tail):
+            driver = getattr(info, 'driver', None)
+            if driver == 'frequency':
+                s += ' Its right tail is set by the frequency (the severity is lighter).'
+            else:
+                s += (' Its right tail follows the severity by the single big jump '
+                      'P(S>x) ~ E[N]*P(X>x).')
+        if is_thick(a.left_tail) and a.left_tail != a.right_tail:
+            s += (' Its left tail is heavy (a signed / pnl book reaching far '
+                  'below 0); the grid must cover that reach.')
+        if a.note:
+            s += f' {a.note[0].upper()}{a.note[1:]}.'
+        if a.concentration_p is not None:
+            tag = 'concentrated' if a.concentrated else 'not concentrated'
+            s += f' It is {tag}: P(aggregate > 0) ~ {a.concentration_p:.3f}.'
+        out.append(s)
 
-    if info.agg in (TailClass.SUBEXPONENTIAL, TailClass.POWER_LAW):
-        sentence += ' (single big jump: P(S>x) approx E[N]*P(X>x))'
-    elif info.driver == 'frequency':
-        sentence += ' (frequency-driven; the severity is lighter)'
-    else:
-        sentence += ' (tail set by the heavier of frequency and severity decay)'
-
-    if info.agg == TailClass.POWER_LAW and info.alpha is not None and np.isfinite(info.alpha):
-        sentence += f'. Tail index alpha = {info.alpha:.3g}'
-        if info.alpha <= 1.0:
-            sentence += ' (infinite mean)'
-        elif info.alpha < 2.0:
-            sentence += ' (infinite variance)'
-
-    return sentence + '.'
+    return ' '.join(out)
 
 
 # ----------------------------------------------------------------------------

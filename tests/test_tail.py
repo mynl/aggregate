@@ -408,6 +408,55 @@ def test_severity_support_layered():
     assert lo == 0.0 and np.isinf(hi)
 
 
+def test_tail_narrative_is_layered_and_support_based():
+    a = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson')
+    desc = a.tail_description
+    assert 'frequency tail' in desc and 'aggregate tail' in desc
+    assert '[0, inf)' in desc                     # structural support, not reach
+    assert 'subexponential right tail' in desc    # per-side class phrasing
+    expl = a.tail_explanation
+    assert 'single big jump' in expl              # the mechanism
+    assert 'P(aggregate > 0)' in expl             # concentration sentence
+
+
+def test_tail_narrative_multi_component_breakdown():
+    a = _agg('agg T [20 30 40] claims [inf inf 1000] xs [100 0 0] '
+             'sev [gamma lognorm lognorm] [100 100 100] cv [1 3 1.3] mixed gamma .5')
+    expl = a.tail_explanation
+    assert 'blends 3 components' in expl
+    assert 'combined effective severity' in expl
+
+
+def test_tail_narrative_power_law_reports_moments():
+    a = _agg('agg P 10 claims sev 1 * pareto 1.5 poisson')
+    assert 'infinite variance' in a.tail_explanation
+    assert 'power-law' in a.tail_description
+
+
+def test_tail_narrative_pnl_heavy_left():
+    a = _agg('pnl X 1000 prem - 100 claims sev lognorm 30 cv 1 poisson')
+    desc = a.tail_description
+    assert '(-inf, 1,000]' in desc                # support through the affine
+    assert 'subexponential left tail' in desc
+    assert 'left tail is heavy' in a.tail_explanation
+
+
+def test_tail_narrative_color_emphasises_thick():
+    from aggregate.tail import describe_rows
+    a = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson')
+    rows = a._tail_rows()
+    plain = '\n'.join(describe_rows(rows, color=False))
+    colored = '\n'.join(describe_rows(rows, color=True))
+    assert '\x1b[' not in plain
+    assert '\x1b[1;31m' in colored                # subexponential emphasised
+
+
+def test_severity_and_frequency_tail_description():
+    a = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson')
+    assert a.sevs[0].tail_description == 'lognorm, [0, inf), subexponential right tail'
+    assert a.frequency.tail_description == 'poisson frequency, super-exponential count'
+
+
 def test_concentration_helper():
     from aggregate.tail import concentration
     c, p = concentration(100.0, 10.0)     # m/sd = 10 -> exactly the cut

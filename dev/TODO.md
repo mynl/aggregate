@@ -318,9 +318,13 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   **H10**. Comes before W8.
   - [x] `[tail-report]` — `Aggregate.tail_df`, the layered `TailRow` /
     `build_tail_rows` / `tail_frame` machinery, thick/thin cut, claim-space
-    support, conservative concentration (a60, byte-stable, +11 tests). Occ-re
-    overlay row deferred into `[use-selection]`.
-  - [ ] `[tail-narrative]`, `[use-selection]`, `[bs-reporting]` — pending.
+    support, conservative concentration (a60; schema revised a61 — structural
+    support + per-side tail class + `Phi(mean/sd)`). Occ-re overlay row deferred
+    into `[use-selection]`.
+  - [x] `[tail-narrative]` — `tail_description` / `tail_explanation` over the
+    layered report (Aggregate + Severity + Frequency one-liners), ANSI option
+    (a62, byte-stable, +7 tests).
+  - [ ] `[use-selection]`, `[bs-reporting]` — pending.
 - [ ] **W10 `[A]`** Retire `recommend_bucket` — replace the legacy one-shot
   sizer with a new (TBD) function that takes `log2` (and possibly `x_min`) as
   explicit arguments, then remove `recommend_bucket`. W9's honest-truncation path

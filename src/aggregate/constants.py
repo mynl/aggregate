@@ -89,7 +89,7 @@ REINS_LABEL_OUTPUT = 'Output'
 # --- shared ``info`` string convention --------------------------------------
 # Every ``info`` row across Aggregate / Portfolio / Distortion is a label
 # left-padded to one shared column width, no colon, value follows. The label
-# width matches ``tail.describe_lines``. ``INFO_NA`` is the fixed placeholder
+# width matches ``tail.describe_rows``. ``INFO_NA`` is the fixed placeholder
 # for a value that is not (yet) available -- rows are never conditionally
 # dropped, so two objects of one class always emit the same lines in the same
 # order. The contract is documented in ``dev/info-strings.rst``.

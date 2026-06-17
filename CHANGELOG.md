@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.0.0a62
+
+### Bucket-selection 1A-bucket — the narrative tail report (`[tail-narrative]`)
+
+Second task of `dev/plan-univariate-bucket.md`. The `tail_description` (short,
+aligned) and `tail_explanation` (verbose) properties now narrate the **layered**
+a61 `tail_df` — support and per-side tail class, not the old single-rung
+sentence. Built from one shared `Aggregate._tail_rows()` (the same `TailRow`
+list behind `tail_df`), so frame and prose never drift.
+
+- **`tail_description`** — three aligned lines (frequency / severity /
+  aggregate), e.g. `aggregate tail   [0, inf), subexponential right tail; not
+  concentrated (P>0=1.00)`. Also feeds `Aggregate.info()`.
+- **`tail_explanation`** — bottom-up prose: the per-component severity
+  breakdown and blend, the single-big-jump mechanism (or the frequency driver)
+  for a thick right tail, the power-law moment failure, the heavy-left
+  (signed / `pnl`) sizing note, and the concentration.
+- **`Severity.tail_description`** — one line (`lognorm, [0, inf), subexponential
+  right tail`), from the same `severity_tail_row`. **`Frequency.tail_description`**
+  — the family count class (support depends on exposure, so the full count
+  support shows only in the aggregate's `tail_df`).
+- **ANSI option** — `describe_rows` / `explain_rows` take `color=True` to
+  emphasise thick (subexponential-or-heavier) tail classes in bold-red for a
+  TTY; the properties stay plain (so `info()` is plain).
+
+`aggregate.tail` text builders rebuilt around the rows: `describe_row`,
+`describe_rows`, `explain_rows` replace the old `TailInfo`-based `describe_lines`
+/ `explain` (which carried the now-dropped log-concave / single-rung phrasing).
+**Byte-stable** — narrative only; selection still does not read the report.
+
 ## 1.0.0a61
 
 ### Curated `examples.agg` example library + `build` default

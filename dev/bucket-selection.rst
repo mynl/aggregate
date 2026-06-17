@@ -324,11 +324,14 @@ book is ``bounded`` on the left (hard floor at 0); a signed ``ssev``/``dsev``
 mirrors the combined severity's left; an affine ``pnl`` mirrors the loss's
 *right* tail onto its left and caps the right at the premium. The sizer's
 thick/thin is the derived :func:`~aggregate.tail.is_thick` of the relevant side
-(thick ⇔ subexponential-or-heavier). It is exposed now as the spec-only
-:attr:`Aggregate.tail_df` (a row per layer, indexed by ``component``); the
-narrative ``tail_description`` (short) / ``tail_explanation`` (verbose) extension
-to the layered content, with the ANSI-colour option that renders well in
-JupyterLab, follows in ``[tail-narrative]``.
+(thick ⇔ subexponential-or-heavier). It is exposed as the spec-only
+:attr:`Aggregate.tail_df` (a row per layer, indexed by ``component``), and as the
+narrative ``tail_description`` (short, three aligned lines, also in ``info()``) /
+``tail_explanation`` (verbose, the per-component story with the single-big-jump
+mechanism and concentration), both built from the same row list so frame and
+prose never drift, with an ANSI ``color=True`` option that emphasises thick tails
+on a TTY. ``Severity`` and ``Frequency`` carry one-line ``tail_description``
+too.
 
 **Wire the sizer to the tail report.** The ``sbj`` floor is the computational
 twin of the single-big-jump principle the classifier already names. Gate it on a

@@ -226,27 +226,37 @@ derived views (back-compat).
 
 ## `[tail-narrative]` — the narrative tail report
 
+> **LANDED (a62).** `tail_description` (short) / `tail_explanation` (verbose) now
+> narrate the layered a61 `tail_df`, built from one shared
+> `Aggregate._tail_rows()` so frame and prose never drift. `Severity` and
+> `Frequency` carry one-line `tail_description` too. ANSI emphasis via
+> `describe_rows`/`explain_rows(..., color=True)` (a self-contained bold-red on
+> thick rungs — the DecL `format`-program colorizer lexes DecL, so it is not a
+> fit for prose). `Portfolio` keeps its existing worst-of text (the layered
+> port-level narrative is part of 1P). +7 narrative tests; byte-stable.
+
 Per the house naming rule, **two** read-only text properties, extending today's
 same-named ones to the layered content — **keep both** (`tail_description` is
 short, `tail_explanation` verbose), on `Frequency`, `Severity`, `Aggregate` (and
 `Portfolio` later):
 
-- **`tail_description`** — the short, aligned summary:
+- **`tail_description`** — the short, aligned summary (a62, per-side **tail
+  class**, not thick/thin):
 
   ```
-  frequency   N >= 0, unbounded; thin left; thin right (gamma-mixed)
-  severity    X >= 0, unbounded; thin left; thick right (subexponential)
-  aggregate   S >= 0, unbounded; thin left; thick right; not concentrated (cv 0.21)
+  frequency tail   poisson, count [0, inf), super-exponential right tail
+  severity tail    lognorm, [0, inf), subexponential right tail
+  aggregate tail   [0, inf), subexponential right tail; not concentrated (P>0=1.00)
   ```
 
 - **`tail_explanation`** — the verbose prose (per-component breakdown, *why* the
   aggregate inherits the severity right tail, the single-big-jump sentence, the
-  driver).
+  heavy-left signed/`pnl` note, the driver, the concentration).
 
-Notes: **ANSI colour/emphasis option** reusing the existing `format`-program
-colour helper (plain text when not a TTY). How much of this enters the default
-`qd`/`info` need not be decided now (today's `tail_description` already feeds
-`info()`).
+Notes: the **ANSI colour/emphasis option** is a small self-contained rung
+emphasis (`color=True`), not the DecL `format`-program colorizer (which lexes
+DecL syntax). How much enters the default `qd`/`info` need not be decided now
+(today's `tail_description` already feeds `info()`).
 
 ---
 

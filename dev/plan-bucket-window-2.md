@@ -609,3 +609,228 @@ follows these, and they supersede the draft where they conflict.
    `DefectiveDistribution`, no separate diagnostic is needed. `_severity_low_estimate`
    and the `sbj` row in `_bs_window_df` were kept; the kurtosis machinery was not
    built.
+
+---
+
+# Round 3 — 1P reconciled with 1A-bucket (2026-06-17)
+
+> **Why this round.** 1A-bucket (`dev/done/plan-univariate-bucket.md`, a62–a65)
+> turned `_bs_window` into a full *tail-aware* sizer (layered tail report,
+> single-big-jump extent floor, concentration gating, honest truncation,
+> clip → `DefectiveDistributionWarning`, the public `bs_window_df` /
+> `bs_description` / `bs_explanation`). Re-reviewing §1P against the landed code:
+> the **skeleton holds** — general path, additive origins, pad-once, convention
+> skew, reporting parity — and more of it is pre-built than the round-2 text
+> implies. But the **span combine** and the **clip/reporting machinery** need
+> updating before 1P executes. This round records the deltas; it writes no code.
+
+## What the combine actually does today (lineage)
+
+- **`best_bucket`** (legacy, *DELETE BEFORE BETA*, `:1818`): root-sum-square of
+  per-unit *recommended buckets*, `bs = (Σ bs_k²)^0.5`. Combines **bucket sizes**,
+  and scales the wrong way — `k` identical units give `round_bucket(b·√k)`, so
+  *adding units coarsens the grid*.
+- **`best_window`** (a49, live, `:1852`): `resolution = min_k bs_k`;
+  `span = (Σ W_k)/N`; `bs = round_bucket(max(resolution, span))`; `x_min = 0`
+  non-signed (Plan A) / `Σ`-floored signed. So the live code does a **linear sum
+  of window *widths*** for span. (The old RMS was on `bs`; the current code adds
+  `W`.)
+
+## Why `Σ W_k` overstates (the author's intuition, made precise)
+
+Two independent "sum vs proper combine" errors:
+
+1. **Diversification.** The bulk band is a `√variance` quantity, so widths
+   combine by **root-sum-square** `√(Σσ_k²)`, *not* `Σσ_k`. For `k` iid units
+   `Σσ_k = √k · √(Σσ_k²)` — the linear sum overstates the bulk by `√k`. This is
+   the *same* RMS-vs-linear error `best_window` was built to fix on `bs`; it
+   merely moved from `bs` onto `W` (over-correcting from one extreme to the
+   other on a different quantity).
+2. **Single big jump.** The portfolio far tail is *one* big claim riding the
+   combined bulk: `P(S_tot > x) ≈ Σ_k E[N_k]·P(X_k > x)`. The extent floor is
+   therefore **max-type** (the heaviest unit's jump on the *total* bulk mean),
+   not `Σ` of per-unit floors. Now that each `W_k` already embeds its own a59
+   SBJ extent, `Σ W_k` **double-counts every unit's tail allowance**.
+
+Concretely, for non-signed loss units (`x_min_k = 0`, `W_k ≈ μ_k + z·σ_k +
+sbj_k`): `Σ W_k = Σμ_k + z·Σσ_k + Σ sbj_k`, whereas the true total support is
+`≈ Σμ_k + z·√(Σσ_k²) + (one sbj)`. The overstatement is exactly the two gaps
+`z·(Σσ_k − √Σσ_k²)` and `(Σ sbj_k − one sbj)`.
+
+**The caveat that keeps `Σ W_k` honest:** it is a *correct upper bound* on the
+true support width — support adds (`(max−min)` of a sum `= Σ(max−min)`), exact
+for bounded books — hence a **guaranteed no-wrap span**. That is *why* it was
+safe, and why the FFT doubling-padding currently absorbs its looseness. So the
+change is **tighten-with-validation**, not fix-a-bug: we trade guaranteed-safe-
+but-coarse for tight-but-must-be-proven-no-wrap.
+
+## The reconciled combine (target)
+
+Mirror 1A's **bulk / extent split** at the portfolio level. The bulk is sized by
+**Portfolio MM**, *not* by combining per-unit windows — neither by sum nor by
+RMS (see the next subsection for why both are wrong).
+
+- **`bs` / bulk from Portfolio MM.** Feed the exact total moments — already on the
+  object as `agg_m`, `agg_sd = agg_m·agg_cv`, `agg_skew` (`portfolio.py:356-358`,
+  the analytic compound moments of the sum; cumulants add under independence) —
+  straight into the *same* `estimate_agg_window(m, sd, skew, p)` path 1A uses.
+  **There is no width-combine step.** Per-unit widths enter *only* as the
+  resolution floor `min_k bs_k` (a unit's own lattice must survive — the "don't
+  lose sev `bs`" hard constraint, now portfolio-wide), never the span.
+- **One portfolio-level SBJ extent floor — the look-through.** The subexponential
+  tail of a sum is the *sum of the tails*, dominated by the heaviest unit:
+  `P(S_tot > x) ≈ Σ_k E[N_k]·P(X_k > x)`. The single-big-jump scenario is one big
+  claim in unit `k` on the *typical* bulk of everything else, which works out to
+
+  ```
+  sbj_hi_port = agg_m + max_k ( sbj_hi_k − ES_k )      # MAX, not Σ
+  ```
+
+  where each `sbj_hi_k = a._single_big_jump_window(p_star)[1]` is the unit's own
+  SBJ called with the **portfolio** `p_star` — each unit forms its own
+  `p**_k = 1 − (1 − p_star)/E[N_k]` from *its* frequency, and `sbj_hi_k − ES_k =
+  q_{X_k}(p**_k) − μ_{X_k}` is that unit's "jump excess" over a typical claim. So
+  the look-through *reuses* `_single_big_jump_window` per unit and takes the max
+  excess on top of the combined bulk mean — never `Σ sbj_k`. Lower edge mirrors
+  for signed. Self-activating, inert-when-not-binding exactly as in 1A: a thin /
+  bounded / well-diversified total has `sbj_hi_port ≤ MM bulk window`, so the
+  floor does not move the grid.
+  *Refinement:* `max_k` is tight when one unit dominates; when the `tail_class`
+  driver list names ≥ 2 comparably-heavy units, escalate to the pooled root-find
+  `Σ_k E[N_k](1 − F_{X_k}(x)) = 1 − p_star`.
+- **Origin — windowing is enabled for non-signed totals, not excluded.** The live
+  `best_window` hardcodes `x_min = 0` (Plan A). 1P **generalizes** this: a
+  non-signed total whose mass clears 0 (the high-frequency / tiny-cv case —
+  `Poisson(100000)` and friends) gets a **windowed origin** (Plan B), routed
+  through the existing signed roll-combine path, exactly as 1A windows the single
+  aggregate. Origins add for signed; pad once at the total.
+- **`bs` discipline — carry raw, round once.** `round_bucket` snaps *up* (≤ 2×).
+  Rounding per-unit in phase 1 *and* again at the combine compounds to **~4×**
+  worst-case coarsening. So: carry the **raw** (un-rounded) per-unit needs up from
+  phase 1; `round_bucket` a **single time** at the top. The wrinkle is the
+  resolution floor must stay lattice-aware (a discrete unit's `bs` must divide its
+  integer lattice), so the rule is: round the **span** term once at the top, keep
+  the resolution floor as the finest per-unit *lattice* value, and snap the final
+  `bs` to a multiple of that floor so the two stay commensurate. Caps worst-case
+  coarsening at ~2×, and since the algo's **only** failure direction is fidelity
+  loss (it coarsens rather than truncates — the SBJ floor + honored `log2` protect
+  the tail, clipping is always flagged), this directly shrinks the worst case.
+
+### The RMS-of-windows view (kept, inspectable — not the live span)
+
+The windows that propagate up from the units are **whatever each Agg selected**
+(exact lattice, bounded-sev, MM, or SBJ-floored) — *not* necessarily MM windows —
+so their RMS is a genuinely independent estimate worth carrying. In a strict
+normal world with a common tail-to-SD converter `k` (`w_i = k·σ_i`), the window
+of the sum is exactly `√(Σ w_i²)` — the `k` cancels (`k·√(Σ(w_i/k)²) = √(Σ w_i²)`),
+so RMS-of-windows, *not* the linear `Σ w_i`, is the right normal-approx combine.
+It runs **too high but conservative** in practice for one reason: the per-unit
+windows bake in each unit's *skew* (deep `k_i` from the sln/sgamma MM fit), while
+the sum **de-skews by CLT** and reaches its tail at a shallower `k_sum`. So
+`RMS(w_i) ≈ k̄_i·σ_tot ≥ k_sum·σ_tot = ` the MM window.
+
+Therefore: **`m_tot ± RMS(w_i)` is wired in as a standing candidate row in
+`bs_window_df`**, alongside the MM window and the SBJ floor — it is *not* selected
+as the live span, but the gap **`Port-MM − RMS(w_i)` reads directly as the
+skewness/diversification adjustment** the combine is making. If it never fires
+(never tighter than MM, never needed as a fallback) we drop it later; until then
+it is the cheapest possible sanity check on the MM window, visible to the user.
+
+## Reuse, don't reimplement (single source of truth)
+
+Run the *total* through the same tail-aware machinery rather than a parallel
+heuristic:
+
+- `_loss_tail_classes` / `tail_class` on the combined book (`tail_class` is
+  already worst-of; feed it combined moments so honest-truncation and
+  concentration apply to the total too).
+- A portfolio `_bs_clip` record + honest-truncation deficit handling, so a
+  clipped *total* warns **once** and `bs_explanation` has something to read.
+- **Finish reporting parity:** add Portfolio `bs_explanation` and a `tail_df`
+  frame; reconcile the curated `bs_window_df` columns with Aggregate's
+  (`clipped` / `log2_need`). `tail_description` / `tail_explanation`,
+  `bs_window_df`, `bs_description` already shipped (a65) — the per-unit → shared
+  journey rows exist; only these two surfaces and the clip columns are missing.
+- **Quiet the phase-1 pre-pass.** `best_window` now runs the full sizer per unit
+  (`:1922`), which can emit `DefectiveDistributionWarning` / `logger.info`.
+  Dedupe so `update()` warns once — mirror the Aggregate deficit/clip gate.
+
+## `x_min` policy — our algo decides, back-compat is not a ship gate (locked 2026-06-18)
+
+**v1.0 ships with our algo's `x_min`, even where it disagrees with prior
+versions.** The live non-signed `x_min = 0` is partly a back-compat choice
+(reproduce every pre-1.0 grid); we **drop that as a requirement**. The windowed
+origin from 1P is the shipped behavior.
+
+Crucially, this retires only *one* of the two stability claims the earlier rounds
+conflated:
+
+- **Back-compat with old published grids — dropped.** No assert that a non-signed
+  total reproduces its legacy 0-based grid. `x_min = 0` survives **only as an
+  opt-in reconciliation switch** (run a book both ways to explain a difference),
+  never as a gate.
+- **numerics-2/3 origin-invariance — kept, non-negotiable.** `Σ_i kappa_i(x) ==
+  x`, moments, and mass conservation must hold on *whatever* grid our algo picks.
+  This is correctness (the origin-carrying `exa`/`lev`/`kappa` math), not
+  back-compat — it is unaffected by, and in fact the guarantee that *licenses*,
+  moving `x_min`.
+
+So the review asserts flip from "reproduce the legacy grid" to "the new grid is
+**correct**," with `x_min = 0` as an optional cross-check, not a pass condition.
+
+## Best process for review (how to validate the reconciled combine)
+
+The combine has been *wrong in two opposite directions* (legacy RMS-on-`bs`
+coarsens; current linear-sum-on-`W` overstates), so the review pins the new MM
+rule against an ordering and proves no-wrap. The two reference windows are the
+ones now carried as inspectable rows in `bs_window_df`, so most of this is read
+off the frame, not recomputed in tests:
+
+1. **The ordering assert (the spine).** The three window widths satisfy
+
+   ```
+   MM window  ≤  RMS(w_i)  ≤  Σ w_i
+   (live)        (conservative)   (linear, way over)
+   ```
+
+   `MM ≤ RMS` because the sum de-skews (`k_sum ≤ k̄_i`); `RMS ≤ Σ` by quadrature.
+   Assert `MM ≤ RMS(w_i)` on every exemplar — if MM ever exceeds RMS the total
+   moments and the per-unit fits disagree and it is a **bug**, not a tuning miss.
+   `Port-MM − RMS(w_i)` *is* the skewness/diversification adjustment; eyeball it
+   per book.
+2. **Correctness assert (replaces the old "reproduce the legacy grid").** On the
+   grid *our algo picks* (not the legacy one — see the `x_min` policy above):
+   mass conserved, moments match analytic, `Σ_i kappa_i(x) == x` (the numerics-2/3
+   origin-invariance, non-negotiable). `x_min = 0` is an **optional** cross-check
+   to *explain* a difference, never a pass condition.
+3. **Improvement assert (the moved books).** No top/bottom-bucket clip above the
+   noise floor; the bulk is centered, not jammed against an edge; marginals/moments
+   match the per-unit windowed aggregates; the realized grid is at least as good as
+   (and usually finer than) the legacy 0-based one.
+4. **Compare on physical support, not raw index** (§4b) — padding placement
+   moves the index; the represented law at each physical `x` does not.
+5. **No-wrap proof.** Assert the realized span clears the true support (the SBJ
+   floor guarantees the tail; `RMS(w_i)` is the conservative bound the doubling-
+   padding always covers). A span exceeding `Σ w_i` would be the bug signal.
+6. **Exemplar spread — drive from the `agg` database.** Build the review/test
+   portfolios from the real example programs in `src/aggregate/agg` (the
+   `test_suite.agg` / `test_decl.agg` Portfolio entries), not just synthetic
+   one-offs, and append any new 1P cases to `test_decl.agg` under the matching
+   section (house rule). Cover heavy-unit, well-diversified-iid, mixed-sign, and
+   all-discrete portfolios. The **diversified-iid** book is the headline: legacy
+   RMS-on-`bs` coarsens, `Σ W_k` overstates by `√k`, and Portfolio MM should sit
+   `√k` tighter — the cleanest demonstration the combine is finally right.
+
+## Files / version (Round 3)
+
+Doc-only amendment — **no version bump, no CHANGELOG** (no behavior change). When
+1P *executes*: `portfolio.py` (`best_window` reconciled to Portfolio MM + the SBJ
+look-through, the inspectable `RMS(w_i)` row, a `_single_big_jump_window`,
+`_bs_clip`, `bs_explanation` / `tail_df`), reusing the `distributions.py` /
+`tail.py` helpers rather than re-implementing; asserts in
+`tests/test_bucket_sizing.py` per the review process above. Bump on landing.
+
+**Drive-by to fix on the way in:** the comment at `portfolio.py:2081-2082` claims
+non-signed books "keep the legacy `best_bucket` path exactly" — **stale and
+wrong**; the code at `:2092` calls `best_window`. Correct the comment when this
+block is touched.

@@ -19,7 +19,7 @@ from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
 from .config import get_settings
 from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
                             _flat_col_to_stats_index, approximate_from_mcvsk,
-                            value_type_label)
+                            estimate_agg_window, value_type_label)
 
 # Resolved once per session from config (see aggregate.config). VALIDATION_NOISE
 # is the absolute dust floor used throughout validation.
@@ -351,6 +351,10 @@ class Portfolio(object):
         self.distortion_df = None
         self.calibration_df = None
         self.figure = None
+        # bucket/window reporting (set by best_window / update)
+        self._bs_window_df = None
+        self._bs_clip = None            # portfolio far-tail clip record or None
+        self._combine_x_min = None      # windowed combine origin (Plan B) or None
 
         # for consistency with Aggregates
         self.agg_m = self.stats_df.loc[('agg', 'ex1'), 'total']
@@ -959,17 +963,21 @@ class Portfolio(object):
     def bs_window_df(self) -> 'pd.DataFrame':
         """Curated, read-only view of the portfolio combine grid (``[bs-reporting]``).
 
-        One row per unit (its selected signed window) plus the realised shared
-        ``used`` grid, culled to the user-facing columns (``x_min`` / ``x_max`` /
-        ``bs`` / ``log2`` / ``note``). The full frame -- with the ``coverage``
-        string and window width ``W`` -- stays on the private
-        :attr:`_bs_window_df` for experts (folds in TODO **H10**). Returns
-        ``None`` before the grid is sized. See :attr:`bs_description`.
+        One row per unit (its selected window), then the four candidate combine
+        rows (``mm`` Portfolio MM bulk / ``rms`` RMS-of-windows reference /
+        ``sbj`` single-big-jump look-through / ``sum`` legacy linear bound), then
+        the realised shared ``used`` grid -- culled to the user-facing columns
+        (``x_min`` / ``x_max`` / ``bs`` / ``log2`` / ``log2_need`` / ``clipped`` /
+        ``note``, parity with :attr:`Aggregate.bs_window_df`). The full frame --
+        with the ``coverage`` string and window width ``W`` -- stays on the
+        private :attr:`_bs_window_df` for experts. Returns ``None`` before the
+        grid is sized. See :attr:`bs_description` / :attr:`bs_explanation`.
         """
         df = getattr(self, '_bs_window_df', None)
         if df is None:
             return None
-        return df.reindex(columns=['x_min', 'x_max', 'bs', 'log2', 'note']).copy()
+        cols = ['x_min', 'x_max', 'bs', 'log2', 'log2_need', 'clipped', 'note']
+        return df.reindex(columns=cols).copy()
 
     @property
     def bs_description(self) -> str:
@@ -984,8 +992,101 @@ class Portfolio(object):
             return 'portfolio grid not sized yet (call update())'
         u = df.loc['used']
         top = float(u['x_min']) + (1 << int(u['log2'])) * float(u['bs'])
-        return (f'portfolio grid: bs={float(u["bs"]):g}, log2={int(u["log2"])}, '
+        line = (f'portfolio grid: bs={float(u["bs"]):g}, log2={int(u["log2"])}, '
                 f'x_min={float(u["x_min"]):g} (top={top:g})')
+        clip = getattr(self, '_bs_clip', None)
+        if clip is not None:
+            cm = clip.get('clipped_mass', float('nan'))
+            cm_txt = f'~{cm:.3g}' if np.isfinite(cm) else 'a sliver'
+            line += f'; clips {cm_txt} of the tail (raise log2 to {int(clip["need_log2"])})'
+        return line
+
+    @property
+    def bs_explanation(self) -> str:
+        """Verbose prose explaining the portfolio combine grid (``[bs-reporting]``).
+
+        Mirrors :attr:`Aggregate.bs_explanation` at the portfolio level: the
+        worst-of tail one-liner, the Portfolio MM bulk window vs the inspectable
+        ``mm <= rms <= sum`` reference ordering (the ``mm - rms`` gap is the
+        skewness/diversification adjustment the combine makes), whether the
+        single-big-jump look-through floored the extent, the realised shared
+        grid (windowed Plan B or 0-based Plan A), and any far-tail clip with how
+        to widen it. ``'portfolio grid not sized yet'`` before :meth:`update`.
+        """
+        df = getattr(self, '_bs_window_df', None)
+        if df is None or 'used' not in df.index:
+            return 'Portfolio grid not sized yet (call update()).'
+        u = df.loc['used']
+        top = float(u['x_min']) + (1 << int(u['log2'])) * float(u['bs'])
+        parts = [f'The portfolio is {self.tail_explanation}']
+        if {'mm', 'rms', 'sum'}.issubset(df.index):
+            mm_w = float(df.loc['mm', 'W'])
+            rms_w = float(df.loc['rms', 'W'])
+            sum_w = float(df.loc['sum', 'W'])
+            order = 'mm <= rms <= sum' if mm_w <= rms_w <= sum_w + 1e-9 \
+                else 'mm/rms/sum out of order (check moments)'
+            parts.append(
+                f'The bulk span is sized by Portfolio MM (width {mm_w:g}); the '
+                f'RMS-of-windows reference is {rms_w:g} and the legacy linear '
+                f'sum {sum_w:g} ({order}); the mm-rms gap {rms_w - mm_w:g} is '
+                f'the skewness/diversification adjustment.')
+        if 'sbj' in df.index and float(df.loc['sbj', 'x_max']) > float(df.loc['mm', 'x_max']):
+            parts.append(
+                f'The single-big-jump look-through floored the upper extent at '
+                f'{float(df.loc["sbj", "x_max"]):g} (a heavy unit reaches past '
+                f'the MM bulk).')
+        placement = ('windowed (Plan B, mass clears 0)' if float(u['x_min']) > 0
+                     else '0-based (Plan A)')
+        parts.append(
+            f'Realised {placement} grid: bs={float(u["bs"]):g}, '
+            f'log2={int(u["log2"])}, x_min={float(u["x_min"]):g}, top={top:g}.')
+        clip = getattr(self, '_bs_clip', None)
+        if clip is not None:
+            cm = clip.get('clipped_mass', float('nan'))
+            cm_txt = f'~{cm:.3g}' if np.isfinite(cm) else 'a sliver'
+            parts.append(
+                f'The combined support exceeds the grid top {top:g}: {cm_txt} of '
+                f'the mass is clipped (a reported deficit, not normalized) -- '
+                f'raise log2 to {int(clip["need_log2"])} to capture it.')
+        return ' '.join(parts)
+
+    @property
+    def tail_df(self) -> 'pd.DataFrame':
+        """Per-unit aggregate tail rows plus a worst-of ``total`` (``[bs-reporting]``).
+
+        One row per unit -- that unit's aggregate-level
+        :attr:`Aggregate.tail_df` row (support ``min`` / ``max``, ``left_tail`` /
+        ``right_tail`` classes, ``bounded``, ``concentrated`` /
+        ``concentration_p``) -- and a ``total`` row carrying the portfolio
+        worst-of :attr:`tail_class` and the total-moment concentration. Spec-only
+        (valid before :meth:`update`). See :attr:`tail_description` /
+        :attr:`tail_explanation` for the narrative.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by unit name, with a final ``total`` row.
+        """
+        rows = {a.name: a.tail_df.loc['aggregate'] for a in self.agg_list}
+        df = pd.DataFrame(rows).T
+        worst = self.tail_class
+        conc_flag, conc_p = _tail.concentration(float(self.agg_m), float(self.agg_sd))
+        total = pd.Series(INFO_NA, index=df.columns, dtype=object)
+        worst_label = _tail.tail_class_label(worst)
+        if 'left_tail' in df.columns:
+            total['left_tail'] = worst_label
+        if 'right_tail' in df.columns:
+            total['right_tail'] = worst_label
+        if 'bounded' in df.columns:
+            total['bounded'] = (worst == TailClass.BOUNDED)
+        if 'concentrated' in df.columns:
+            total['concentrated'] = bool(conc_flag)
+        if 'concentration_p' in df.columns:
+            total['concentration_p'] = float(conc_p)
+        if 'note' in df.columns:
+            total['note'] = 'portfolio worst-of (independence)'
+        df.loc['total'] = total
+        return df
 
     @property
     def allocation_method(self) -> str:
@@ -1849,46 +1950,115 @@ class Portfolio(object):
 
         return round_bucket(bs)
 
+    def _single_big_jump_window(self, p_star):
+        """Portfolio single-big-jump extent floor by look-through to the units.
+
+        The subexponential tail of an independent sum is the *sum* of the unit
+        tails, dominated by the heaviest unit:
+        ``P(S_tot > x) ~ sum_k E[N_k]*P(X_k > x)``. So the single-big-jump
+        scenario is one big claim in some unit ``k`` riding the *typical* bulk
+        of everything else -- the portfolio mean ``agg_m`` with one typical
+        claim (unit ``k``'s severity mean) replaced by one big one::
+
+            sbj_hi_port = agg_m + max_k ( sbj_hi_k - ES_k )      # MAX, not sum
+
+        where ``sbj_hi_k`` is unit ``k``'s own
+        :meth:`Aggregate._single_big_jump_window` upper edge called with the
+        **portfolio** ``p_star`` (each unit forms its own
+        ``p**_k = 1 - (1 - p_star)/E[N_k]`` from *its* frequency),
+        ``ES_k = a.agg_m`` is the unit's aggregate mean, and
+        ``sbj_hi_k - ES_k = q_{X_k}(p**_k) - mu_{X_k}`` is that unit's "jump
+        excess" over a typical claim. The lower edge mirrors over **signed**
+        units only (a non-negative unit reaches no lower than its 0 floor); for
+        an all-non-negative book ``sbj_lo = 0``.
+
+        ``max_k`` is tight when one unit dominates the tail; when two or more
+        comparably-heavy units drive it, the exact extent is the pooled
+        root-find ``sum_k E[N_k](1 - F_{X_k}(x)) = 1 - p_star`` (a documented
+        refinement, not yet wired -- the ``max`` is a safe lower bound on the
+        true reach for the dominant-unit case and the doubling-padding absorbs
+        the rest; see ``dev/plan-bucket-window-2.md`` Round 3).
+
+        Parameters
+        ----------
+        p_star : float
+            Portfolio aggregate coverage (``> 1`` read as a number of nines).
+
+        Returns
+        -------
+        (sbj_lo, sbj_hi) : tuple of float, or None
+            The portfolio single-big-jump window edges, or ``None`` when no
+            unit yields a finite SBJ window (no finite ``E[N]`` / variance).
+        """
+        m = float(self.agg_m)
+        if not np.isfinite(m):
+            return None
+        hi_excess, lo_excess = [], []
+        for a in self.agg_list:
+            sbj = a._single_big_jump_window(p_star)
+            if sbj is None:
+                continue
+            es_k = float(a.agg_m)
+            if not np.isfinite(es_k):
+                continue
+            hi_excess.append(float(sbj[1]) - es_k)
+            if a._signed_severity():
+                lo_excess.append(float(sbj[0]) - es_k)
+        if not hi_excess and not lo_excess:
+            return None
+        sbj_hi = m + max(hi_excess) if hi_excess else m
+        sbj_lo = m + min(lo_excess) if lo_excess else 0.0
+        return float(sbj_lo), float(sbj_hi)
+
     def best_window(self, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
-        """Decide the portfolio combine grid by *resolution* + *span* (replaces RMS).
+        """Decide the portfolio combine grid by **Portfolio MM** + SBJ look-through.
 
-        The portfolio-combine grid must satisfy two **independent** constraints;
-        the right combine is their **max**, never a root-sum-square:
+        Mirrors the per-aggregate :meth:`Aggregate._bs_window` *bulk / extent*
+        split at the portfolio level. The bulk is sized from the **exact total
+        moments**, never by combining per-unit windows (neither by linear sum --
+        which overstates by ``sqrt(k)`` for ``k`` iid units, ignoring
+        diversification -- nor by root-sum-square):
 
-        1. **Resolution** -- the finest bucket any unit needs,
-           ``min_k bs_k``, where ``bs_k`` is each unit's *natural selected*
-           ``bs`` from its own :meth:`Aggregate._bs_window` (captured here in a
-           phase-1 pre-pass). A finer shared grid is strictly better provided it
-           still fits -- there is no "over-cost" from one unit forcing the
-           portfolio finer.
-        2. **Span fit** -- the summed support must fit ``N = 2**log2`` buckets
-           without wrapping: ``W_tot / N``, where ``W_tot = sum_k W_k`` and
-           ``W_k`` is the **selected method's** support-window width
-           (``x_max - x_min`` of that unit's winning ``_bs_window_df`` row), *not*
-           the padded ``used``-row grid extent (``N*bs``, power-of-2 inflated --
-           that would needlessly re-coarsen).
+        1. **Bulk window from Portfolio MM.** Feed the analytic compound total
+           moments (``agg_m``, ``agg_sd = agg_m*agg_cv``, ``agg_skew``; cumulants
+           add under independence) straight into the *same*
+           :func:`estimate_agg_window` the single-aggregate sizer uses. This
+           gives the two-sided ``[mm_lo, mm_hi]`` where the combined mass lives.
+        2. **Resolution floor.** Per-unit widths enter *only* as the finest
+           bucket ``min_k bs_k`` -- a unit's own lattice must survive ("don't
+           lose sev ``bs``", now portfolio-wide), never the span.
+        3. **One portfolio SBJ extent floor** (the look-through,
+           :meth:`_single_big_jump_window`): ``sbj_hi_port = agg_m + max_k(
+           sbj_hi_k - ES_k)`` -- the heaviest unit's one big claim on the
+           combined bulk, **max** not sum, so the per-unit a59 extents are not
+           double-counted. Self-activating: a thin / well-diversified total has
+           ``sbj <= mm`` and the floor does not move the grid.
 
-        ``bs = round_bucket(max(min_k bs_k, W_tot / N))`` (a pinned ``bs_in > 0``
-        is honoured verbatim, D4). The bare ``W_tot / N`` floor relies on the
-        FFT ``padding`` (doubling) for headroom -- that reliance is by design.
+        The window is ``[x_lo, x_hi] = [min(mm_lo, sbj_lo), max(mm_hi, sbj_hi)]``.
+
+        ``bs`` discipline -- **carry raw, round once**: the MM span term
+        ``W_ext / N`` is rounded by ``round_bucket`` a *single* time at the top
+        (no per-unit + combine double-round); the resolution floor stays the
+        finest per-unit *lattice* value. ``bs = round_bucket(max(min_k bs_k,
+        W_ext / N))`` (a pinned ``bs_in > 0`` is honoured verbatim, D4).
 
         Origin and ``log2``:
 
-        - **non-signed** portfolio: the grid starts at ``x_min = 0`` (Plan A
-          keeps non-signed origins at 0; non-zero output windows are Plan B). The
-          per-unit selected rows carry ``x_min = 0`` and ``x_max`` = the from-0
-          extent, so ``W_k = x_max`` is exactly what must fit a 0-based grid.
-          ``log2`` is then **shrunk** to just hold ``W_tot`` at the chosen ``bs``
-          (``ceil(log2(W_tot/bs + 1))``, capped) -- a tiny all-integer discrete
-          book no longer inflates to the ``log2`` cap.
-        - **signed** (P&L) portfolio: the origin is the analytic estimate of the
-          summed-support min (floored so no per-line marginal wraps); ``update``
-          recomputes the realised origin from the units' post-snap ``x_min``.
-          ``log2`` is kept at the cap -- the signed origin estimate is built from
-          each unit's grid origin (0 for a non-negative unit, e.g. a point mass
-          at 12 reads ``x_min = 0``), so it is *not* the true summed-support min
-          and the grid must stay wide enough to absorb the offset. Tight signed
-          ``log2`` shrinkage is deferred to Plan B (which also fixes the origin).
+        - **non-signed, ordinary** (mass reaches 0, or not concentrated): the
+          grid starts at ``x_min = 0`` (Plan A); ``log2`` is **shrunk** to just
+          hold ``x_hi`` at ``bs`` (capped) -- a tiny discrete book no longer
+          inflates to the cap.
+        - **non-signed, concentrated and clear of 0** (the high-frequency /
+          tiny-cv case, e.g. ``Poisson(100000)``): the total is **windowed**
+          (Plan B), ``x_min = floor(x_lo / bs) * bs > 0``, routed by ``update``
+          through the signed roll-combine path. The concentration gate
+          (:func:`aggregate.tail.concentration`) is the same one
+          :meth:`Aggregate._bs_window` uses, so a merely-grazing book reverts to
+          the 0-based grid.
+        - **signed** (P&L): the origin is the windowed low edge ``x_lo`` floored;
+          ``update`` recomputes the realised origin from the units' post-snap
+          ``x_min``. ``log2`` stays at the cap and the span is floored at the
+          conservative ``max_k W_k / N`` so no per-line marginal wraps.
 
         Parameters
         ----------
@@ -1902,66 +2072,131 @@ class Portfolio(object):
         Returns
         -------
         (bs, log2, x_min) : tuple
-            Shared grid parameters. :attr:`_bs_window_df` (unit rows + a ``used``
-            row) is also populated.
+            Shared grid parameters. ``x_min > 0`` for a non-signed total signals
+            ``update`` to take the windowed roll path (Plan B).
+            :attr:`_bs_window_df` (unit rows, the MM / RMS / SBJ / sum candidate
+            rows, and a ``used`` row) is also populated.
 
         See Also
         --------
         best_bucket : the deprecated RMS combine (kept for comparison).
+        _single_big_jump_window : the portfolio SBJ look-through.
         Aggregate._bs_window : the per-unit window estimator consumed here.
         """
         signed = self._signed()
         N_cap = 1 << log2
+        p_star = 1.0 - 10.0 ** -WINDOW_NINES
 
         # ---- phase 1: per-unit natural windows (analytic, no FFT) ---------
         # Each unit sizes itself on its own (0-origin or signed) grid; we read
         # the *selected method* row, not the padded ``used`` row, for the width.
+        # Quiet the pre-pass: a unit may emit a clip warning here that the real
+        # combine re-issues once (deduped) -- silence the speculative pass.
         rows = []
         bs_ks, x_min_ks, W_ks = [], [], []
-        for a in self.agg_list:
-            bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, bucket_sizing_p)
-            wdf = a._bs_window_df
-            sel = wdf[wdf['selected']].iloc[0] if 'selected' in wdf.columns \
-                else wdf.loc['used']
-            sx_min, sx_max = float(sel['x_min']), float(sel['x_max'])
-            W_k = max(sx_max - sx_min, 0.0)
-            bs_ks.append(float(bs_k))
-            x_min_ks.append(sx_min)
-            W_ks.append(W_k)
-            rows.append(dict(unit=a.name, x_min=sx_min, x_max=sx_max, W=W_k,
-                             bs=float(bs_k), log2=int(l2_k),
-                             coverage=sel.get('coverage', ''),
-                             note=str(sel.get('note', ''))))
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', DefectiveDistributionWarning)
+            for a in self.agg_list:
+                bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, bucket_sizing_p)
+                wdf = a._bs_window_df
+                sel = wdf[wdf['selected']].iloc[0] if 'selected' in wdf.columns \
+                    else wdf.loc['used']
+                sx_min, sx_max = float(sel['x_min']), float(sel['x_max'])
+                W_k = max(sx_max - sx_min, 0.0)
+                bs_ks.append(float(bs_k))
+                x_min_ks.append(sx_min)
+                W_ks.append(W_k)
+                rows.append(dict(unit=a.name, x_min=sx_min, x_max=sx_max, W=W_k,
+                                 bs=float(bs_k), log2=int(l2_k),
+                                 coverage=sel.get('coverage', ''),
+                                 note=str(sel.get('note', ''))))
 
-        # ---- the resolution + span combine --------------------------------
+        # ---- the bulk window: Portfolio MM (NOT a width-combine) ----------
+        m = float(self.agg_m)
+        sd = float(self.agg_sd)
+        skew = float(self.agg_skew)
+        try:
+            mm_lo, mm_hi, _W_mm = estimate_agg_window(m, sd, skew, p_star)
+        except (ValueError, FloatingPointError):
+            # No finite window (e.g. infinite variance): fall back to the
+            # conservative linear sum of per-unit widths.
+            mm_lo, mm_hi = 0.0, float(sum(W_ks))
+
+        # ---- the portfolio SBJ extent floor (the look-through) ------------
+        sbj = self._single_big_jump_window(p_star)
+        if sbj is not None:
+            sbj_lo, sbj_hi = sbj
+        else:
+            sbj_lo, sbj_hi = mm_lo, mm_hi
+
+        # ---- the two inspectable reference windows ------------------------
+        # RMS(w_i): the normal-approx window combine (the k cancels, so it is
+        # ``m +/- sqrt(sum w_i^2)``); runs above the MM window because the
+        # per-unit windows bake in skew the sum de-skews away by CLT. Carried as
+        # a standing candidate row -- the gap ``MM - RMS`` reads as the
+        # skewness/diversification adjustment. ``sum w_i``: the legacy linear
+        # span, a guaranteed-no-wrap upper bound on the support width.
+        half_rms = float(np.sqrt(sum(w * w for w in W_ks))) / 2.0 if W_ks else 0.0
+        rms_lo, rms_hi = m - half_rms, m + half_rms
+        W_sum = float(sum(W_ks))
+
+        # ---- the chosen extent --------------------------------------------
+        # The SBJ floor only governs the *upper* extent for a non-negative book
+        # (its ``sbj_lo`` is the 0 floor, which must not pull the windowed origin
+        # down off the bulk); for a signed book it floors the lower edge too.
+        x_hi = max(mm_hi, sbj_hi)
+        x_lo_raw = min(mm_lo, sbj_lo) if signed else mm_lo
+        # Concentration gate (same source as Aggregate._bs_window): only a
+        # genuinely concentrated total that clears 0 is windowed (Plan B).
+        conc_flag, _conc_p = _tail.concentration(m, sd)
+        window_nonsigned = (not signed and bs_in <= 0 and bool(conc_flag)
+                            and x_lo_raw > 0)
+
+        # ---- bs: carry raw, round once ------------------------------------
         resolution = min(bs_ks) if bs_ks else 1.0
-        W_tot = float(sum(W_ks))
+        if signed:
+            x_lo = x_lo_raw
+        elif window_nonsigned:
+            x_lo = x_lo_raw                          # windowed origin (Plan B)
+        else:
+            x_lo = 0.0                               # 0-based (Plan A)
+        W_ext = max(x_hi - x_lo, 0.0)
         if bs_in > 0:
             bs = float(bs_in)
         else:
-            span = W_tot / N_cap if N_cap else W_tot
+            span = W_ext / N_cap if N_cap else W_ext
+            if signed:
+                # Wrap safety: every per-line marginal is driven on the shared
+                # grid, so N*bs must hold the widest unit too. Floor the span at
+                # ``max_k W_k / N`` (the MM span is usually wider, but guard the
+                # one-dominant-unit case).
+                span = max(span, (max(W_ks) if W_ks else 0.0) / N_cap)
             bs = round_bucket(max(resolution, span))
 
         # ---- origin and log2 ----------------------------------------------
         if signed:
-            # Analytic origin estimate: the summed-support min, floored so no
-            # per-line marginal wraps (a unit whose support starts above the sum
-            # of mins would otherwise wrap). update recomputes from realised
-            # post-snap unit origins. log2 stays at the cap (see docstring).
-            x_min = min(sum(x_min_ks), min(x_min_ks)) if x_min_ks else 0.0
-            x_min = float(np.floor(x_min / bs) * bs)
+            x_min = float(np.floor(x_lo / bs) * bs)
             log2_out = log2
+        elif window_nonsigned:
+            x_min = float(np.floor(x_lo / bs) * bs)
+            if bs_in > 0:
+                log2_out = log2
+            else:
+                need = (int(np.ceil(np.log2((x_hi - x_min) / bs + 1.0)))
+                        if x_hi > x_min else 1)
+                log2_out = min(log2, max(need, 1))
         else:
             x_min = 0.0
             if bs_in > 0:
                 log2_out = log2                       # user pinned the grid
             else:
-                # Shrink to just hold the summed (0-based) support at ``bs``;
-                # never exceed the cap, never below 1 (>= 2 buckets).
-                need = int(np.ceil(np.log2(W_tot / bs + 1.0))) if W_tot > 0 else 1
+                need = int(np.ceil(np.log2(x_hi / bs + 1.0))) if x_hi > 0 else 1
                 log2_out = min(log2, max(need, 1))
 
-        self._build_bs_window_df(rows, bs, log2_out, x_min)
+        cand = dict(mm=(mm_lo, mm_hi), rms=(rms_lo, rms_hi),
+                    sbj=(sbj_lo, sbj_hi), sum=(min(x_lo, 0.0), W_sum + min(x_lo, 0.0)))
+        self._build_bs_window_df(rows, bs, log2_out, x_min, cand,
+                                 resolution, W_ext)
         return bs, log2_out, x_min
 
     def _signed(self):
@@ -1981,36 +2216,71 @@ class Portfolio(object):
         """
         return any(a._signed() for a in self.agg_list)
 
-    def _build_bs_window_df(self, rows, bs, log2, x_min):
-        """Build the unit-indexed bucket/window summary for a signed combine.
+    def _build_bs_window_df(self, rows, bs, log2, x_min, cand, resolution, W_ext):
+        """Build the unit-indexed bucket/window summary for the combine.
 
         Mirrors :attr:`Aggregate._bs_window_df`'s idiom but swaps *method*
         rows for *unit* rows -- the Portfolio convention of one row per unit
         plus a summary line (cf. ``stats_df`` / ``describe``, which carry
         per-unit columns and a ``total``). Each unit row is that unit's
-        selected signed window; the final ``used`` row is the realised shared
-        portfolio grid ``[x_min, x_min + 2**log2 * bs)``.
+        selected window; then four **candidate** combine rows -- ``mm`` (the
+        Portfolio MM bulk, the live span), ``rms`` (the RMS-of-windows
+        normal-approx reference), ``sbj`` (the single-big-jump look-through),
+        and ``sum`` (the legacy linear-sum no-wrap bound) -- so the combine's
+        journey is inspectable; finally the ``used`` row is the realised shared
+        portfolio grid ``[x_min, x_min + 2**log2 * bs)``. The ``mm <= rms <=
+        sum`` ordering and the ``mm - rms`` skewness/diversification gap can be
+        read straight off the frame.
 
         Parameters
         ----------
         rows : list of dict
             Per-unit window rows (``unit``/``x_min``/``x_max``/``W``/``bs``/
-            ``log2``/``coverage``/``note``); empty for a non-signed portfolio.
+            ``log2``/``coverage``/``note``).
         bs, log2 : float, int
             The realised shared grid bucket size and log2.
         x_min : float
             The realised portfolio-grid origin.
+        cand : dict
+            ``{'mm': (lo, hi), 'rms': (lo, hi), 'sbj': (lo, hi),
+            'sum': (lo, hi)}`` -- the candidate window edges.
+        resolution : float
+            The resolution floor ``min_k bs_k``.
+        W_ext : float
+            The chosen extent width (for the ``used``-row note).
         """
         N = 1 << log2
         cols = ['x_min', 'x_max', 'W', 'bs', 'log2', 'coverage', 'note']
-        if rows:
-            df = pd.DataFrame(rows).set_index('unit')[cols]
-        else:
-            df = pd.DataFrame(columns=cols)
+        df = pd.DataFrame(rows).set_index('unit')[cols] if rows \
+            else pd.DataFrame(columns=cols)
+        cov = f'1-1e-{WINDOW_NINES}'
+        cand_note = {
+            'mm': 'Portfolio MM bulk (3-moment fit on total) -- the live span',
+            'rms': 'RMS-of-windows reference (normal approx); mm-rms = skew adj',
+            'sbj': 'single big jump look-through: agg_m + max_k(sbj_hi_k - ES_k)',
+            'sum': 'legacy linear sum of widths (guaranteed-no-wrap bound)',
+        }
+        for key in ('mm', 'rms', 'sbj', 'sum'):
+            lo, hi = cand[key]
+            df.loc[key] = dict(
+                x_min=float(lo), x_max=float(hi), W=float(hi - lo),
+                bs=float(bs), log2=int(log2), coverage=cov, note=cand_note[key])
         df.loc['used'] = dict(
             x_min=float(x_min), x_max=float(x_min + N * bs),
-            W=float(N * bs), bs=float(bs), log2=int(log2),
-            coverage=f'1-1e-{WINDOW_NINES}', note='realised portfolio grid')
+            W=float(N * bs), bs=float(bs), log2=int(log2), coverage=cov,
+            note=f'realised portfolio grid (resolution={resolution:g}, '
+                 f'extent={W_ext:g})')
+
+        # ---- journey columns (parity with Aggregate.bs_window_df) ---------
+        # ``log2_need`` is the log2 a row's window needs at the shared ``bs``;
+        # ``clipped`` (the realised far-tail deficit) is patched by ``update``.
+        def _need(r):
+            w, b = float(r['x_max']) - float(r['x_min']), float(r['bs'])
+            if not (np.isfinite(w) and np.isfinite(b) and b > 0 and w > 0):
+                return np.nan
+            return float(np.ceil(np.log2(w / b + 1.0)))
+        df['log2_need'] = df.apply(_need, axis=1)
+        df['clipped'] = np.nan
         self._bs_window_df = df
 
     def _bs_window(self, log2, bs_in, bucket_sizing_p=BUCKET_SIZING_P):
@@ -2077,23 +2347,30 @@ class Portfolio(object):
         if log2 <= 0:
             raise ValueError('log2 must be >= 0')
         self.log2 = log2
-        # Signed (P&L) portfolios route the bucket/window through the
-        # signed-aware ``_bs_window`` wrapper (coarsen-to-fit); non-signed
-        # books keep the legacy ``best_bucket`` path exactly (3.0 gate).
+        # Grid sizing routes through ``best_window`` (Portfolio MM bulk + SBJ
+        # look-through). ``self._combine_x_min`` records the windowed origin for
+        # a *non-signed* total whose mass clears 0 (Plan B): when set, ``update``
+        # takes the same roll-combine path as a signed book, placing the shared
+        # grid at ``x_min > 0`` instead of forcing the legacy 0-based grid.
         signed = self._signed()
+        self._combine_x_min = None
         if signed:
             bs, log2, _x_min_est = self._bs_window(log2, bs, bucket_sizing_p)
             self.log2 = log2
             self.bs = bs
         elif bs == 0:
-            # Non-signed auto-size: resolution + span combine (best_window),
-            # which also shrinks log2 to just hold the summed support -- a tiny
-            # all-integer discrete book no longer inflates to the log2 cap.
-            bs, log2, _x0 = self.best_window(log2, 0, bucket_sizing_p)
+            # Non-signed auto-size: Portfolio MM bulk + SBJ look-through
+            # (best_window), which shrinks log2 to just hold the extent -- a tiny
+            # discrete book no longer inflates to the log2 cap. A concentrated
+            # total that clears 0 is windowed (x_min > 0, Plan B).
+            bs, log2, x_min_est = self.best_window(log2, 0, bucket_sizing_p)
             self.log2 = log2
             self.bs = bs
-            logger.info(f'bs=0 entered, setting bs={bs:.6g}, log2={log2} via best_window '
-                        f'(resolution + span combine).')
+            if x_min_est > 0:
+                self._combine_x_min = float(x_min_est)
+            logger.info(f'bs=0 entered, setting bs={bs:.6g}, log2={log2}, '
+                        f'x_min={x_min_est:.6g} via best_window (Portfolio MM '
+                        f'+ SBJ look-through).')
         else:
             self.bs = bs
         self.padding = padding
@@ -2127,15 +2404,21 @@ class Portfolio(object):
         # Build the grid and the per-line densities, accumulating their
         # product in Fourier space to get ``p_total``.
         N = 1 << log2
-        if signed:
-            # ---- signed combine on a shared signed grid (plan 2/3) --------
-            # Drive each unit on its OWN signed window [x_min_k, ...) sharing
-            # the portfolio bs/log2/padding, so the unit object stays
-            # internally correct (no false deficit, right moments, right
-            # describe/plot -- plan 2c). The combine reads each unit's
-            # ftagg_density, which is origin-at-0 *regardless* of the unit's
-            # x_min (the output roll hits the density, never ftagg), so the
-            # units' FFTs still multiply correctly here.
+        # The roll-combine path serves both a signed (P&L) book and a windowed
+        # non-signed total (Plan B, ``self._combine_x_min`` set by best_window).
+        use_roll = signed or self._combine_x_min is not None
+        if use_roll:
+            # ---- roll combine on a shared (signed or windowed) grid --------
+            # Drive each unit on its OWN window [x_min_k, ...) sharing the
+            # portfolio bs/log2/padding, so the unit object stays internally
+            # correct (no false deficit, right moments, right describe/plot --
+            # plan 2c). The combine reads each unit's ftagg_density, which is
+            # origin-at-0 *regardless* of the unit's x_min (the output roll hits
+            # the density, never ftagg), so the units' FFTs still multiply
+            # correctly here -- and a heavy unit severity that cannot itself
+            # window stays on its own 0-based grid, so the portfolio windowing
+            # is not blocked by it (the per-aggregate Regime-B limitation does
+            # not bind the combine).
             ft_all = None
             x_mins = []
             for agg in self.agg_list:
@@ -2156,12 +2439,16 @@ class Portfolio(object):
                     ft_all = np.copy(agg.ftagg_density)
                 else:
                     ft_all *= agg.ftagg_density
-            # Realised portfolio origin: the support min of the independent
-            # sum is Sigma x_min_k; floored by min_k x_min_k so no per-line
-            # marginal wraps (safety floor on the plan's sum-of-windows).
-            # Snapped to bs (each unit x_min is already a multiple of bs, so
-            # the sum is too; the round guards fp dust).
-            x_min_tot = float(min(sum(x_mins), min(x_mins)))
+            # Realised portfolio origin. Signed: the support min of the
+            # independent sum is Sigma x_min_k; floored by min_k x_min_k so no
+            # per-line marginal wraps (safety floor on the plan's sum-of-
+            # windows). Windowed non-signed (Plan B): the Portfolio MM windowed
+            # origin from best_window (each unit sits at its own 0-origin; the
+            # *total* mass is what clears 0). Snapped to bs.
+            if signed:
+                x_min_tot = float(min(sum(x_mins), min(x_mins)))
+            else:
+                x_min_tot = float(self._combine_x_min)
             x_min_tot = float(np.round(x_min_tot / self.bs) * self.bs)
             j0_tot = int(round(x_min_tot / self.bs))
             xs = x_min_tot + np.arange(N, dtype=float) * self.bs
@@ -2213,16 +2500,26 @@ class Portfolio(object):
         # D6: the padded FT state is transient — drop it before returning.
         del unit_state, ft_all
 
-        # Mass-conservation check on the signed grid: a window narrower than
-        # the summed support shows up as a deficit (the wrapped tail would be
-        # truncated by the final [:N]). Surface it loudly, like the Aggregate
-        # path, rather than silently lose mass.
-        if signed:
+        # Mass-conservation check on the rolled grid (signed or windowed
+        # non-signed): a window narrower than the combined support shows up as a
+        # deficit (the wrapped tail would be truncated by the final [:N]).
+        # Surface it loudly, like the Aggregate path, and record it as the
+        # portfolio far-tail clip for the bs report.
+        if use_roll:
             deficit = 1.0 - float(np.sum(self.density_df['p_total']))
             if deficit > VALIDATION_NOISE:
+                top = float(x_min_tot + N * self.bs)
+                self._bs_clip = dict(
+                    reach=float('nan'), grid_top=top, log2=int(log2),
+                    bs=float(self.bs), need_log2=int(log2 + 1),
+                    clipped_mass=float(deficit))
+                if self._bs_window_df is not None \
+                        and 'used' in self._bs_window_df.index:
+                    self._bs_window_df.loc['used', 'clipped'] = float(deficit)
+                kind = 'signed' if signed else 'windowed'
                 warnings.warn(
                     f'{self.name}: portfolio PMF deficit {deficit:.3e} '
-                    f'(Σp = 1 − {deficit:.3e} < 1); the signed window is '
+                    f'(Σp = 1 − {deficit:.3e} < 1); the {kind} window is '
                     f'narrower than the combined support -- raise log2 or '
                     f'widen the grid.', DefectiveDistributionWarning,
                     stacklevel=2)

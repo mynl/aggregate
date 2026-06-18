@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.0.0a66
+
+### Portfolio windowed combine 1P — Portfolio MM + single-big-jump look-through
+
+Final task of `dev/done/plan-bucket-window-2.md` (Round 3). The portfolio
+combine grid is reconciled with the a62–a65 univariate (`Aggregate`) sizer. The
+old `best_window` sized the shared grid from a **linear sum of per-unit window
+widths**, which overstates the bulk by `sqrt(k)` for `k` iid units (it ignores
+diversification) and double-counts every unit's far-tail allowance. The combine
+now mirrors the per-aggregate *bulk / extent* split:
+
+- **Bulk from Portfolio MM.** The shared `bs`/span is sized from the **exact
+  total moments** (`agg_m`, `agg_sd`, `agg_skew`; cumulants add under
+  independence) fed straight into the same `estimate_agg_window` the single
+  aggregate uses — never a per-unit width combine. A diversified-iid book now
+  sizes `~sqrt(k)` tighter than before (the headline win).
+- **One portfolio single-big-jump extent floor** (`Portfolio._single_big_jump_window`):
+  a *look-through* to the units, `sbj_hi_port = agg_m + max_k(sbj_hi_k − ES_k)`
+  — the heaviest unit's one big claim on the combined bulk (**max**, not sum, so
+  the per-unit a59 extents are not double-counted). Self-activating: a thin /
+  well-diversified total leaves the grid unmoved.
+- **Resolution floor** stays `min_k bs_k` (a unit's lattice must survive), and
+  `bs` is `round_bucket`-ed **once** at the top (carry raw, round once).
+- **Windowed non-signed origin (Plan B).** A *concentrated* non-signed total
+  whose mass clears 0 (high-frequency / tiny-cv, e.g. `Poisson(100000)`) is now
+  **windowed** — the shared grid starts at `x_min > 0`, routed through the same
+  roll-combine path as a signed book — instead of wasting the whole lower grid
+  on a forced 0-based placement. The per-aggregate heavy-severity "Regime B"
+  limitation does **not** bind the combine (each unit keeps its own 0-based
+  severity grid; only the convolved *total* is relabelled).
+- **`x_min` policy:** the combine ships with the algorithm's `x_min`; back-compat
+  with old published grids is **not** a ship gate. The numerics-2/3
+  origin-invariance (`sum_i kappa_i(x) == x`, moments, mass) holds on whatever
+  grid is picked (verified in the 1P tests).
+- **Reporting parity (`[bs-reporting]`).** `Portfolio.bs_window_df` gains four
+  inspectable combine-candidate rows — `mm` (the live MM bulk), `rms`
+  (RMS-of-windows reference; the `mm − rms` gap reads as the
+  skewness/diversification adjustment), `sbj` (the look-through), and `sum` (the
+  legacy linear bound) — plus the `log2_need` / `clipped` columns (parity with
+  `Aggregate`). New `Portfolio.bs_explanation` (verbose grid prose) and
+  `Portfolio.tail_df` (per-unit + worst-of `total`). A windowed/signed combine
+  that clips the tail records `Portfolio._bs_clip` and warns once (the
+  speculative phase-1 pre-pass is silenced).
+
+**As-built note.** The review's `mm ≤ rms ≤ sum` ordering holds robustly for a
+diversified light-tailed book but can legitimately invert (`mm > rms`) for a
+*concentrated subexponential* total, where MM is tail/skew-aware while the RMS
+reference is symmetric-normal; the tests assert the ordering only in the clean
+regime, and `bs_explanation` flags an inversion rather than treating it as a bug.
+The multi-driver pooled root-find (`sum_k E[N_k](1−F_k(x)) = 1−p_star`) is left
+as a documented refinement; the `max_k` look-through is a safe dominant-unit
+bound that the FFT doubling-padding absorbs.
+
 ## 1.0.0a65
 
 ### Bucket-selection 1A-bucket — making the grid choice legible (`[bs-reporting]`)

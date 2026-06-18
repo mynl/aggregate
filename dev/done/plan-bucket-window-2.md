@@ -834,3 +834,52 @@ look-through, the inspectable `RMS(w_i)` row, a `_single_big_jump_window`,
 non-signed books "keep the legacy `best_bucket` path exactly" — **stale and
 wrong**; the code at `:2092` calls `best_window`. Correct the comment when this
 block is touched.
+
+---
+
+## As built (landed a66) — corrections to Round 3
+
+Execution surfaced a few places the Round-3 design needed adjusting; the landed
+code follows these and they supersede the text above where they conflict.
+
+1. **The SBJ lower edge does not floor a non-signed origin.** The portfolio
+   `_single_big_jump_window` returns `sbj_lo = 0` for an all-non-negative book
+   (the 0 floor). Letting that feed `x_lo_raw = min(mm_lo, sbj_lo)` would drag a
+   windowed origin back to 0 and defeat Plan B. So the SBJ floor governs the
+   **upper** extent for a non-negative book and the **lower** edge only for a
+   signed one: `x_hi = max(mm_hi, sbj_hi)`, `x_lo_raw = min(mm_lo, sbj_lo) if
+   signed else mm_lo`.
+
+2. **`MM ≤ RMS` is not a universal invariant — it can legitimately invert.** The
+   review spine (item 1) asserted `MM ≤ RMS(w_i)` "on every exemplar … if MM
+   exceeds RMS it is a bug." As built, that holds for a **diversified
+   light-tailed** book but inverts for a **concentrated subexponential** total:
+   there the MM window is skew/tail-aware (it widens for the deep `p_star`
+   lognormal tail) while RMS-of-windows is a symmetric-normal reference, so
+   `MM > RMS` with no inconsistency in the moments or fits. The tests therefore
+   assert the ordering only in the clean diversified regime, and `bs_explanation`
+   *flags* an inversion ("check moments") rather than asserting it away. The
+   ordering `RMS ≤ Σ wᵢ` (quadrature) always holds.
+
+3. **Plan B is gated on concentration, not merely "mass clears 0."** Using the
+   same `tail.concentration(m, sd)` flag the Aggregate sizer uses, so a discrete
+   book like `[5, 13]` (which clears 0 but is not concentrated) stays 0-based —
+   preserving the discrete-combine tests — while only a genuinely tiny-cv total
+   windows. A windowed non-signed total routes through the existing roll path
+   with the **Portfolio MM origin** (not `Σ` unit origins).
+
+4. **Wrap safety for signed books.** The signed span is floored at the
+   conservative `max_k W_k / N` so no per-line marginal wraps the shared grid
+   when the MM span happens to be narrower than the widest unit; `log2` stays at
+   the cap and the deficit check (now `_bs_clip`-recording) is the guard.
+
+5. **The pooled multi-driver root-find is not built.** The `max_k` look-through
+   ships as the dominant-unit bound (a safe lower bound on the true reach that
+   the doubling-padding absorbs); the pooled
+   `Σ_k E[N_k](1 − F_{X_k}(x)) = 1 − p_star` remains a documented refinement.
+
+Version bump a65 → a66 on landing. Files: `portfolio.py`
+(`best_window` reconciled, `_single_big_jump_window`, `_build_bs_window_df` with
+the mm/rms/sbj/sum candidate rows, `update` roll-routing for Plan B + `_bs_clip`,
+`bs_explanation`, `tail_df`); `tests/test_bucket_sizing.py` (the 1P block);
+`src/aggregate/agg/test_decl.agg` (the `BW.*` section).

@@ -528,9 +528,139 @@ def test_portfolio_bs_window_df_and_description():
                   'agg A 100 claims sev lognorm 100 cv 2 poisson '
                   'agg B 50 claims sev gamma 50 cv 1 poisson')
     df = p.bs_window_df
-    assert list(df.columns) == ['x_min', 'x_max', 'bs', 'log2', 'note']
+    assert list(df.columns) == \
+        ['x_min', 'x_max', 'bs', 'log2', 'log2_need', 'clipped', 'note']
     assert 'used' in df.index
     assert {'A', 'B'}.issubset(set(df.index))                # one row per unit
+    # the four inspectable combine candidate rows (MM / RMS / SBJ / sum)
+    assert {'mm', 'rms', 'sbj', 'sum'}.issubset(set(df.index))
     assert 'coverage' in p._bs_window_df.columns             # expert frame richer
     desc = p.bs_description
     assert 'portfolio grid' in desc and 'bs=' in desc and 'log2=' in desc
+
+
+# ---------------------------------------------------------------------------
+# 1P -- the portfolio combine reconciled to Portfolio MM + SBJ look-through
+# (dev/done/plan-bucket-window-2.md Round 3). The headline: the bulk span comes
+# from the *total moments*, not a per-unit width sum, so a diversified-iid book
+# sizes ~sqrt(k) tighter than the legacy linear combine.
+# ---------------------------------------------------------------------------
+
+
+def _diversified_iid(k=4):
+    units = ' '.join(
+        f'agg U{i} 200 claims sev gamma 100 cv 1.2 poisson' for i in range(k))
+    return build(f'port DivIID{k} {units}')
+
+
+def test_1p_diviid_mm_tighter_than_linear_sum():
+    """The headline: Portfolio MM sits well inside the legacy linear-sum span.
+
+    For ``k`` iid units the linear sum of widths overstates the bulk by
+    ``sqrt(k)`` (it ignores diversification); the Portfolio MM window, sized
+    from the total moments, recovers it. Read both off ``bs_window_df``.
+    """
+    p = _diversified_iid(4)
+    df = p._bs_window_df
+    mm_w = float(df.loc['mm', 'W'])
+    sum_w = float(df.loc['sum', 'W'])
+    # MM is strictly, materially tighter than the legacy linear sum.
+    assert mm_w < sum_w
+    assert sum_w / mm_w > 1.5, f'expected ~sqrt(4)=2x, got {sum_w / mm_w:.2f}'
+    # mass conserved on the MM-sized grid
+    assert float(np.sum(p.density_df['p_total'])) == pytest.approx(1.0, abs=1e-6)
+
+
+def test_1p_ordering_mm_le_rms_le_sum_for_light_iid():
+    """The review spine: ``mm <= rms <= sum`` on a diversified light-tailed book.
+
+    The RMS-of-windows reference is the normal-approx combine (the per-unit
+    ``k`` cancels); it sits between the skew-aware MM bulk and the linear sum.
+    The ordering is robust for a well-diversified light book; it can legitimately
+    invert (``mm > rms``) for a *concentrated subexponential* total, where MM is
+    tail/skew-aware and RMS is symmetric-normal (see the as-built note in the
+    plan), so this asserts only the clean regime.
+    """
+    p = _diversified_iid(6)
+    df = p._bs_window_df
+    mm_w = float(df.loc['mm', 'W'])
+    rms_w = float(df.loc['rms', 'W'])
+    sum_w = float(df.loc['sum', 'W'])
+    assert mm_w <= rms_w <= sum_w
+
+
+def test_1p_sbj_look_through_floors_extent():
+    """A heavy unit floors the combine extent via the SBJ look-through (max_k).
+
+    The ``sbj`` candidate row carries ``agg_m + max_k(sbj_hi_k - ES_k)`` -- the
+    heaviest unit's one big claim on the combined bulk -- and the realised grid
+    top covers it (no clip).
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        p = build('port Heavy '
+                  'agg HU 100 claims sev lognorm 100 cv 2 poisson '
+                  'agg LU 50 claims sev gamma 50 cv 1 poisson')
+    df = p._bs_window_df
+    # the SBJ look-through reaches past the MM bulk (heavy lognorm cv 2 driver)
+    assert float(df.loc['sbj', 'x_max']) > float(df.loc['mm', 'x_max'])
+    # the realised grid covers it and conserves mass
+    assert float(np.sum(p.density_df['p_total'])) > 1.0 - 1e-6
+
+
+def test_1p_windowed_nonsigned_plan_b():
+    """A concentrated non-signed total that clears 0 is windowed (Plan B).
+
+    Two high-frequency units; the *total* mass sits far from 0, so the combine
+    places the shared grid at ``x_min > 0`` (routed through the roll path) rather
+    than wasting the whole lower grid on a 0-based placement. Mass is conserved
+    and the objective-allocation invariant ``sum_i kappa_i(x) == x`` holds on the
+    windowed grid (numerics-2/3, non-negotiable).
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        p = build('port Win '
+                  'agg H1 5000 claims sev lognorm 10 cv 0.5 poisson '
+                  'agg H2 4000 claims sev gamma 10 cv 0.5 poisson')
+    assert p._combine_x_min is not None and p._combine_x_min > 0
+    assert float(p.density_df.index[0]) > 0.0          # windowed origin
+    assert float(np.sum(p.density_df['p_total'])) == pytest.approx(1.0, abs=1e-6)
+    # sum_i kappa_i(x) == x on the mass band
+    dd = p.density_df
+    kcols = [c for c in dd.columns
+             if c.startswith('exeqa_') and c != 'exeqa_total']
+    ksum = dd[kcols].sum(axis=1)
+    mask = dd['p_total'] > 1e-9
+    rel = np.max(np.abs(ksum[mask] - dd['loss'][mask])) / float(dd['loss'][mask].max())
+    assert rel < 1e-5, f'kappa invariance broken on windowed grid: rel={rel:.2e}'
+
+
+def test_1p_ordinary_nonsigned_stays_zero_based():
+    """A non-concentrated non-signed book keeps the 0-based grid (Plan A).
+
+    The Plan-B window only fires under the concentration gate; an ordinary
+    spread-out loss book (mass reaching toward 0) stays at ``x_min = 0``.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        p = build('port Ord '
+                  'agg A 100 claims sev lognorm 100 cv 2 poisson '
+                  'agg B 50 claims sev gamma 50 cv 1 poisson')
+    assert p._combine_x_min is None
+    assert float(p.density_df.index[0]) == 0.0
+
+
+def test_1p_reporting_surfaces():
+    """[bs-reporting] Portfolio gains ``bs_explanation`` and ``tail_df`` parity."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        p = build('port Rep '
+                  'agg A 100 claims sev lognorm 100 cv 2 poisson '
+                  'agg B 50 claims sev gamma 50 cv 1 poisson')
+    expl = p.bs_explanation
+    assert 'Portfolio MM' in expl and 'skewness/diversification' in expl
+    td = p.tail_df
+    assert 'total' in td.index
+    assert {'A', 'B'}.issubset(set(td.index))
+    # the worst-of total tail is a label, not a raw enum
+    assert td.loc['total', 'right_tail'] == 'subexponential'

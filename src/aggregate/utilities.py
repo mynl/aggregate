@@ -1,4 +1,5 @@
 from collections import namedtuple
+import inspect
 import itertools
 import logging
 from numbers import Number
@@ -27,7 +28,7 @@ __all__ = [
     'nice_multiple',
     'qd', 'mv',
     'make_var_tvar', 'kaplan_meier', 'kaplan_meier_np',
-    'agg_help', 'explain_validation',
+    'agg_help', 'explain_validation', 'introspect',
     'silence_warnings',
 ]
 
@@ -513,6 +514,82 @@ def agg_help(self, regex):
                     print(ob())
                 except Exception:
                     help(ob)
+
+
+def introspect(ob):
+    """
+    Discover the non-private methods and properties of an object ``ob``.
+
+    Used to build the class cheat sheets: it walks ``dir(ob)``, classifies each
+    public name as a method, property, or plain field, and records its type,
+    value, call signature, and docstring. The result is a :class:`pandas.DataFrame`
+    sorted by classification then name, ready to export and arrange by category.
+
+    Parameters
+    ----------
+    ob : object
+        Any instance. Typically an :class:`Underwriter`, :class:`Aggregate`,
+        :class:`Portfolio`, :class:`Severity`, or :class:`Distortion`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per public name with columns ``name``, ``kind`` (``method``,
+        ``property``, ``field``, or ``error``), ``value``, ``type``,
+        ``signature``, ``help`` (first docstring line), and ``length``.
+
+    Notes
+    -----
+    Accessing a property can raise — e.g. a :class:`Portfolio` property that
+    assumes the object has been updated. A bare ``getattr`` in the loop would
+    then abort the whole introspection (the historical reason this function
+    "would not run" on a Portfolio). Each access is therefore guarded: a name
+    whose access raises is reported with ``kind='error'`` and the exception text
+    in ``value``, so introspection always completes and surfaces the offender
+    instead of dying on it. Classification (property vs. field) is read from the
+    *class* via ``getattr(type(ob), name)`` so it does not depend on the instance
+    access succeeding.
+    """
+    names = [i for i in dir(ob) if i[0] != '_']
+    rows = []
+    for name in names:
+        class_attr = getattr(type(ob), name, None)
+        is_property = isinstance(class_attr, property)
+        # guarded access: a raising property must not abort the whole walk
+        try:
+            g = getattr(ob, name)
+        except Exception as e:  # noqa: BLE001 - report, don't propagate
+            rows.append([name, 'error', f'{type(e).__name__}: {e}', '', '', '', 0])
+            continue
+
+        value = ''
+        type_str = ''
+        signature = ''
+        help_str = ''
+        length = 0
+        if callable(g) and not is_property:
+            kind = 'method'
+            try:
+                signature = str(inspect.signature(g))
+            except (TypeError, ValueError):
+                signature = ''
+            help_str = (g.__doc__ or '').strip().split('\n')[0]
+        else:
+            kind = 'property' if is_property else 'field'
+            value = str(g)
+            type_str = str(type(g))
+            try:
+                length = len(g)
+            except TypeError:
+                length = 0
+
+        rows.append([name, kind, value, type_str, signature, help_str, length])
+
+    df = pd.DataFrame(
+        rows,
+        columns=['name', 'kind', 'value', 'type', 'signature', 'help', 'length'])
+    df = df.sort_values(['kind', 'length', 'name']).reset_index(drop=True)
+    return df
 
 
 def explain_validation(rv):

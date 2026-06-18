@@ -337,12 +337,14 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   (`[use-selection]` item 2: accept truncation, no-normalize, warn) removes its
   last real job (the infinite-variance fallback), so this follows W9. See
   `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`).
-- [ ] **W8 `[A]`** Bucket-window **1P** — `Portfolio` windowed combine
-  (`best_window`/`update`): sum per-unit origins/widths, pad once at the total,
-  route the windowed non-signed book through the roll-combine; `Σ kappa_i == x`
-  on the windowed grid. Consumes 1A's uniform per-unit two-sided windows, and
-  inherits 1A-bucket's reporting surfaces at the `Portfolio` level. Next after
-  **W9** (`dev/plan-bucket-window-2.md` §1P).
+- [x] **W8 `[A]`** Bucket-window **1P** — `Portfolio` windowed combine
+  (`best_window`/`update`), landed a66 (`dev/done/plan-bucket-window-2.md`
+  Round 3). Reconciled to **Portfolio MM** bulk (total moments, not a width sum)
+  + single-big-jump **look-through** (`max_k`, not Σ) + windowed non-signed
+  origin (Plan B) routed through the roll-combine; `Σ kappa_i == x` verified on
+  the windowed grid. Inherits 1A-bucket's reporting surfaces at the `Portfolio`
+  level (`bs_window_df` mm/rms/sbj/sum rows, `bs_explanation`, `tail_df`,
+  `_bs_clip`).
 - [x] **W4 `[A]`** Signed (P&L) Lee-plot artifact (a39) — `Aggregate.plot`'s
   discrete zero-anchor row set `loss=0`, drawing a spurious vertical segment to
   the first point on signed support; anchor `loss` now equals its index.

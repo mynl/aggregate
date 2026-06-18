@@ -3710,7 +3710,12 @@ class Aggregate:
                                 ``note``. Incompatible with occurrence reinsurance
                                 (which acts pre-convolution); aggregate reinsurance
                                 rides along unchanged. Set by the ``approximate``
-                                DecL keyword. See dev/done/plan-approximate.md.
+                                DecL keyword. The chosen kind is exposed on the
+                                instance as the **attribute** ``self.approximation``
+                                (``''`` when exact, else the kind) -- a distinct name
+                                from the ``approximate()`` *method* (the MoM-surrogate
+                                factory) so the two do not collide. See
+                                dev/done/plan-approximate.md.
         :param note:            free-text note, from a ``note{...}`` clause
         :param hints:           raw ``hints{...}`` build-settings string
             (``key=value;`` form). Pure annotation here; the underwriter
@@ -3743,7 +3748,16 @@ class Aggregate:
         # original spec was just captured into ``self._spec`` (so the object still
         # round-trips), and any ``pnl`` affine / aggregate reinsurance rides along
         # on the rewritten object unchanged. See dev/done/plan-approximate.md.
-        self.approximate = approximate
+        #
+        # Stored as ``self.approximation`` -- a *noun* attribute -- deliberately
+        # NOT ``self.approximate``, which would shadow the ``approximate()``
+        # method (the MoM-surrogate factory, the parity-partner of
+        # ``Portfolio.approximate``) on every instance. Falsey (``''``) for an
+        # exact freq x sev convolution, else the fit kind, so ``if
+        # a.approximation:`` reads as "is this object a moment-match surrogate?".
+        # The DecL keyword and the ``approximate=`` kwarg / spec key are
+        # unchanged; ``_spec`` maps ``'' -> 'exact'`` on the way out (round-trip).
+        self.approximation = '' if approximate == 'exact' else approximate
         # Structured record of the method-of-moments fit, populated below when
         # ``approximate != 'exact'``. Kept here (not folded into ``note``) so the
         # human-readable description can be composed *lazily* -- the original
@@ -4423,7 +4437,7 @@ class Aggregate:
             ('claim count', f'{self.n:,.3f}'),
             ('frequency distribution', self.frequency.freq_name),
             ('severity distribution', sev_desc),
-            ('approximate', getattr(self, 'approximate', 'exact')),
+            ('approximate', getattr(self, 'approximation', '') or 'exact'),
             ('bs', bss),
             ('log2', self.log2 if updated else INFO_NA),
             ('padding', self.padding if updated else INFO_NA),

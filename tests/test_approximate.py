@@ -50,7 +50,7 @@ def test_right_skew_matches_exact(kind):
         warnings.simplefilter("ignore")
         exact = build("agg E 5000 claims sev lognorm 100 cv 2 poisson")
         approx = build(f"agg A 5000 claims sev lognorm 100 cv 2 poisson approximate {kind}")
-    assert approx.approximate == kind
+    assert approx.approximation == kind
     assert approx.frequency.freq_name == "fixed"
     assert approx.n == 1
     # not signed: a right-skewed high-mean fit lives entirely on the positive axis
@@ -129,7 +129,7 @@ def test_agg_reins_allowed():
         warnings.simplefilter("ignore")
         a = build("agg AR 100 claims sev lognorm 100 cv 2 poisson "
                   "aggregate net of 100 xs 0 approximate sgamma")
-    assert a.approximate == "sgamma"
+    assert a.approximation == "sgamma"
 
 
 def test_unknown_kind_rejected():
@@ -147,7 +147,7 @@ def test_pnl_approximate_loss_part_fitted():
         warnings.simplefilter("ignore")
         approx = build("pnl PA 600000 prem - 5000 claims sev lognorm 100 cv 2 "
                        "poisson approximate sgamma")
-    assert approx.approximate == "sgamma"
+    assert approx.approximation == "sgamma"
     assert approx._agg_reflect is True
     assert approx._agg_shift == 600000.0
     # E[margin] = premium - E[loss] = 600000 - 500000
@@ -165,7 +165,7 @@ def test_portfolio_combine_conserves_mass():
         approx = build("port PA\n"
                        "  agg U1 50 claims sev lognorm 100 cv 1 poisson approximate sgamma\n"
                        "  agg U2 40 claims sev lognorm 80 cv 1.2 poisson")
-    assert approx.agg_list[0].approximate == "sgamma"
+    assert approx.agg_list[0].approximation == "sgamma"
     # each member conserves its own mass inside the portfolio
     assert approx.agg_list[0].agg_density.sum() == pytest.approx(1.0, abs=1e-6)
     # total mass and mean track the exact-member portfolio
@@ -180,10 +180,33 @@ def test_exact_default_is_inert():
         warnings.simplefilter("ignore")
         plain = build("agg P 100 claims sev lognorm 100 cv 2 poisson")
         explicit = build("agg P 100 claims sev lognorm 100 cv 2 poisson approximate exact")
-    assert plain.approximate == "exact"
-    assert explicit.approximate == "exact"
+    # the attribute is falsey for an exact convolution (``if a.approximation:``)
+    assert plain.approximation == ""
+    assert explicit.approximation == ""
+    assert not plain.approximation
     assert explicit.frequency.freq_name == "poisson"
     np.testing.assert_allclose(_theory(explicit), _theory(plain), rtol=0, atol=0)
+
+
+def test_approximate_method_not_shadowed_by_attribute():
+    """``Aggregate.approximate()`` (the MoM-surrogate *method*) stays callable.
+
+    Regression: the ``approximate=`` constructor kwarg is stored as the
+    ``approximation`` *attribute* so it does not shadow the same-named method
+    (the parity-partner of ``Portfolio.approximate``). The method must remain
+    callable on an instance and return a frozen scipy distribution.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        a = build("agg M 100 claims sev lognorm 100 cv 2 poisson")
+    assert callable(a.approximate)                       # not shadowed by a str
+    fz = a.approximate("slognorm")                       # the MoM surrogate
+    assert hasattr(fz, "cdf") and hasattr(fz, "ppf")     # frozen scipy rv
+    # mean of the fit tracks the aggregate mean
+    assert fz.mean() == pytest.approx(a.agg_m, rel=1e-3)
+    # ``approximate('all')`` returns the dict of five fits
+    allfits = a.approximate("all")
+    assert set(allfits) == {"norm", "gamma", "lognorm", "sgamma", "slognorm"}
 
 
 def test_note_and_info_surface_approximation():
@@ -232,7 +255,7 @@ def test_approximate_note_round_trips_via_program():
         warnings.simplefilter("ignore")
         a = build("agg A 5000 claims sev lognorm 100 cv 2 poisson approximate sgamma")
         b = build(a.program)
-    assert a.approximate == b.approximate == "sgamma"
+    assert a.approximation == b.approximation == "sgamma"
     assert b.note and "sgamma" in b.note
     # note length is stable across the round-trip (no recursive growth)
     assert len(b.note) == len(a.note)

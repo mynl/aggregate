@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.0a67
+
+### Fix: `Aggregate.approximate()` method was shadowed by a same-named attribute
+
+The `approximate=` constructor keyword added in `dev/done/plan-approximate.md`
+stored its value as `self.approximate`, which **shadowed** the existing
+`Aggregate.approximate()` method (the method-of-moments surrogate factory, the
+parity-partner of `Portfolio.approximate`) on every instance — `agg.approximate`
+was the string `'exact'`, and calling it raised `'str' object is not callable`.
+
+- **The build-time choice is now the attribute `Aggregate.approximation`** (a
+  noun), leaving `approximate()` callable as before. It is **falsey (`''`) for an
+  exact freq×sev convolution** and the fit kind (`'sgamma'` / `'slognorm'`)
+  otherwise, so `if a.approximation:` reads as "is this object a moment-match
+  surrogate?". The `approximate` DecL keyword, the `approximate=` kwarg, and the
+  spec key are unchanged; `describe` still shows the `approximate` row.
+- `Portfolio` was never affected (no `approximate` attribute) and is unchanged —
+  the two classes again expose the same `approximate()` method.
+- **Naming-vetting rule** added to `CLAUDE.md`: a new instance attribute set in
+  `__init__` silently shadows a method of the same name, so new public
+  method/attribute/kwarg names must be `rg`-checked against the existing surface
+  at planning time (noun for stored value, verb for action).
+
 ## 1.0.0a66
 
 ### Portfolio windowed combine 1P — Portfolio MM + single-big-jump look-through

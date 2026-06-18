@@ -1,10 +1,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Aggregate Cheat Sheet
 %
-% Start only Aggregate lines with \texttt so you can count them
-%
 % Created by Stephen J Mildenhall
 % (c) 2023
+%
+% Updated 2026 for aggregate v1.0.0a66 (REFACTOR branch):
+%   * regenerated from introspect(build('agg ... poisson')); terse lists
+%   * new: value_type, agg_premium/shift/reflect (pnl), approximate, tail_*,
+%     bs_window_df, reins_* (renamed from reinsurance_*), price_pentagon
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -22,13 +25,11 @@
 {\huge{\bf \textbf{\texttt{Aggregate} Class Cheat Sheet}}}
 
 \raggedright
- \texttt{\m Aggregate(name, exp\_el=0, exp\_premium=0, exp\_lr=0, exp\_en=0, exp\_attachment=None, exp\_limit=np.inf}, \\
- \texttt{\phantom{\m}sev\_name='', sev\_a=np.nan, sev\_b=0, sev\_mean=0, sev\_cv=0, sev\_loc=0, sev\_scale=0, sev\_xs=None, sev\_ps=None, } \\
- \texttt{\phantom{\m}sev\_lb=0, sev\_ub=np.inf, sev\_wt=1, sev\_conditional=True, }\\
-% \texttt{sev\_pick\_attachments=None, sev\_pick\_losses=None, }\\
- \texttt{\phantom{\m}occ\_reins=None, occ\_kind='', freq\_name='', freq\_a=0, freq\_b=0, freq\_zm=False, freq\_p0=np.nan, agg\_reins=None, agg\_kind='', note='')}${}^{[0]}$
+\texttt{\m Aggregate(name, exp\_el=0, exp\_premium=0, exp\_lr=0, exp\_en=0, exp\_attachment=None, exp\_limit=inf, sev\_name='',} \\
+\texttt{\phantom{\m}sev\_a, sev\_b, sev\_mean, sev\_cv, sev\_loc, sev\_scale, sev\_xs, sev\_ps, sev\_wt, sev\_lb, sev\_ub, sev\_conditional, } \\
+\texttt{\phantom{\m}occ\_reins, occ\_kind, freq\_name, freq\_a, freq\_b, freq\_zm, freq\_p0, agg\_reins, agg\_kind, approximate, note, hints)}${}^{[0]}$
 
-The \texttt{Aggregate} call signature follows the corresponding DecL clauses, using prefixes for exposure (including limit sub-clause), severity, occurrence reinsurance, frequency, aggregate reinsurance, and note. \texttt{sev\_xs, sev\_ps} equal \texttt{dsev} outcomes and probabilities, and \texttt{(occ|agg)\_reins} clauses are lists of (share, limit, attachment) triples.
+The constructor follows the DecL clauses (exposure, severity, occurrence reinsurance, frequency, aggregate reinsurance). Usually built via \texttt{build('agg ...')}.
 The following tables show all \texttt{\m methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
 
 
@@ -39,30 +40,25 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \begin{tikzpicture}
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
-% {\it italics stuff} \\
 
 \texttt{name},
 \texttt{limit},
 \texttt{attachment},
-\texttt{freq\_name},
-\texttt{freq\_a},
-\texttt{freq\_b},
-\texttt{freq\_p0},
-\texttt{freq\_zm},
-\texttt{note},
+\texttt{frequency},
+\texttt{sevs} (list of \texttt{Severity}),
+\texttt{en},
+\texttt{n} (frequency),
+\texttt{value\_type} (loss / premium for \texttt{pnl}),
 \texttt{sev\_pick\_attachments},
 \texttt{sev\_pick\_losses},
-\texttt{program} (DecL program),
-\texttt{pprogram} (pretty printed),
-\texttt{spec} (constructor kwarg dictionary; \texttt{Aggregate(**spec)} re-creates the object),
-\texttt{spec\_ex} (adds meta elements)
+\texttt{note},
+\texttt{hints},
+\texttt{program},
+\texttt{pprogram} (pretty),
+\texttt{pprogram\_html},
+\texttt{spec},
+\texttt{spec\_ex}
 
-%    \begin{center}\small{\begin{tabular}{llll}
-%        \textit{bs} & right & three & four \\ \hline
-%        \textit{log2} & right  & three & four  \\ \hline
-%        \textit{sev\_calc} & right  & three & four \\ \hline
-%        \textit{left} & right  & three & four \\ \hline
-%    \end{tabular}}\end{center}
 
     \end{minipage}
 };
@@ -74,23 +70,24 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \begin{tikzpicture}
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
-    
+
 \texttt{log2},
-\texttt{bs},
-\texttt{sev\_calc} (discrete=round, forward, backwards),
-\texttt{discretization\_calc} (distribution, survival, both),
+\texttt{bs} (bucket size),
+\texttt{sev\_calc} (round / forward / backward),
+\texttt{discretization\_calc} (distribution / survival / both),
 \texttt{normalize},
 \texttt{padding},
-\texttt{tilt\_vector},
-\texttt{approximation} (exact, slognorm, sgamma),
-\texttt{fzapprox} (frozen approximation rv),
-\texttt{\m picks},
+\texttt{approximate} (exact / sgamma / slognorm),
+\texttt{fzapprox},
+\texttt{dsev\_bucket}, \texttt{reins\_bucket},
+\texttt{x\_min}, \texttt{x\_max}, \texttt{i0},
+\texttt{\m update}, \texttt{\m update\_work},
 \texttt{\m discretize},
-\texttt{\m easy\_update},
 \texttt{\m recommend\_bucket},
-\texttt{\m rescale} (homogeneous severity or inhomogeneous frequency rescaling),
-\texttt{\m update},
-\texttt{\m update\_work}
+\texttt{\m picks},
+\texttt{\m rescale} (homog.\ sev / inhomog.\ freq),
+\texttt{\m snap}, \texttt{\m unwrap}
+
 
     \end{minipage}
 };
@@ -103,35 +100,13 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-{\it \texttt{est} prefix=estimated from FFT approximation} \\
-\texttt{agg\_m},
-\texttt{agg\_cv},
-\texttt{agg\_sd},
-\texttt{agg\_var},
-\texttt{agg\_skew}, \\
-\texttt{est\_m},
-\texttt{est\_cv},
-\texttt{est\_sd},
-\texttt{est\_var},
-\texttt{est\_skew}, \\
-\texttt{sev\_m},
-\texttt{sev\_cv},
-\texttt{sev\_sd},
-\texttt{sev\_var},
-\texttt{sev\_skew}, 
-\texttt{est\_sev\_m},
-\texttt{est\_sev\_cv},
-\texttt{est\_sev\_sd},
-\texttt{est\_sev\_var},
-\texttt{est\_sev\_skew},  
-\texttt{\m freq\_moms},
-\texttt{\m freq\_pmf},
-\texttt{\m freq\_pgf},
-\texttt{panjer\_ab} (Panjer parameters),
-\texttt{\m prn\_eq\_0} ($\Pr(N=0)$ unmodified),
-\texttt{n} (frequency),
-\texttt{en} (vector),
-\texttt{unmodified\_mean} (when ZT or ZM)
+{\it \texttt{est} prefix = estimated from FFT} \\
+\texttt{agg\_m}, \texttt{agg\_cv}, \texttt{agg\_sd}, \texttt{agg\_var}, \texttt{agg\_skew},
+\texttt{est\_m}, \texttt{est\_cv}, \texttt{est\_sd}, \texttt{est\_var}, \texttt{est\_skew},
+\texttt{sev\_m}, \texttt{sev\_cv}, \texttt{sev\_sd}, \texttt{sev\_var}, \texttt{sev\_skew},
+\texttt{est\_sev\_m}, \texttt{est\_sev\_cv}, \texttt{est\_sev\_sd}, \texttt{est\_sev\_var}, \texttt{est\_sev\_skew},
+\texttt{\m freq\_pmf}
+
 
     \end{minipage}
 };
@@ -144,18 +119,13 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{sevs} (list of \texttt{Severity}\,s),
-\texttt{\m cdf},
-\texttt{\m sf} (survival),
-\texttt{\m pdf},
-\texttt{\m pmf},
-\texttt{\m q} (lower quantile=VaR),
+\texttt{\m cdf}, \texttt{\m sf}, \texttt{\m pdf}, \texttt{\m pmf},
+\texttt{\m q} (lower quantile = VaR), \texttt{\m ppf},
 \texttt{\m tvar},
-\texttt{\m sev} (exact severity cdf, sf, pdf),
-\texttt{\m q\_sev},
-\texttt{\m tvar\_sev},
-\texttt{\m var\_dict}${}^{[1]}$, 
+\texttt{\m sev} (exact severity cdf/sf/pdf), \texttt{\m q\_sev}, \texttt{\m tvar\_sev},
+\texttt{\m var\_dict}${}^{[1]}$,
 \texttt{\m sample}
+
 
     \end{minipage}
 };
@@ -171,13 +141,16 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{describe} (validation statistics),    \\
-\texttt{valid} (true=``not unreasonable'' or false), \\
-\texttt{validation\_eps} (validation epsilon threshold 1e-04),
-\texttt{\m qt} (``quick test'' validation details),
-\texttt{\m aggregate\_error\_analysis} (agg errors over range of \texttt{bs}),
-\texttt{\m severity\_error\_analysis} (truncation and discretization errors by severity component)
-    
+\texttt{valid},
+\texttt{validation\_eps},
+\texttt{describe} (validation stats),
+\texttt{\m explain\_validation},
+\texttt{\m aggregate\_error\_analysis} (agg error over \texttt{bs}),
+\texttt{\m severity\_error\_analysis} (trunc.\ / discr.\ by component),
+\texttt{bs\_window\_df}, \texttt{bs\_description}, \texttt{bs\_explanation},
+\texttt{tail\_class}, \texttt{tail\_df}, \texttt{tail\_description}, \texttt{tail\_explanation}
+
+
     \end{minipage}
 };
 \node[fancytitle] at (box.north west) {5. Validation};
@@ -189,23 +162,16 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{density\_df}${}^{[1]}$ (main output), \\
-\texttt{report\_df} (component, mixture \& empirical stats), \\
-\texttt{agg\_density},
-\texttt{agg\_density\_ceded},
-\texttt{agg\_density\_gross},
-\texttt{agg\_density\_net},
-\texttt{sev\_density},
-\texttt{sev\_density\_ceded},
-\texttt{sev\_density\_gross},
-\texttt{sev\_density\_net},
-\texttt{ftagg\_density},
-\texttt{xs},
-\texttt{statistics\_df} (row, by component),
-\texttt{statistics\_total\_df} (row, indep. vs. mixed),
-\texttt{statistics} (cols, combined, better index),
-\texttt{audit\_df} (deprecated),
-\texttt{report\_ser} (internal, series),  {\it see also Reinsurance.}
+\texttt{density\_df}${}^{[1]}$ (main output),
+\texttt{stats\_df},
+\texttt{info},
+\texttt{density}, \texttt{agg\_density},
+\texttt{sev\_density}, \texttt{sev\_density\_df},
+\texttt{ftagg\_density} (FT),
+\texttt{xs}, \texttt{xs\_sev},
+\texttt{figure}, \texttt{bounded}
+{\it see also Reinsurance}
+
 
     \end{minipage}
 };
@@ -218,24 +184,15 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{agg\_kind} (net of or ceded to),
-\texttt{agg\_reins} (list),
-\texttt{agg\_reins\_df} (gcn loss and dists),
-\texttt{occ\_kind},
-\texttt{occ\_reins},
-\texttt{occ\_reins\_df},
-\texttt{\m agg\_ceder},
-\texttt{\m agg\_netter},
-\texttt{\m apply\_agg\_reins},
-\texttt{\m occ\_ceder},
-\texttt{\m occ\_netter},
-\texttt{\m apply\_occ\_reins},
-\texttt{\m reinsurance\_description} (text rendering of re),
-\texttt{reinsurance\_kinds} (None, occ, agg, occ \& agg),
-\texttt{reinsurance\_audit\_df} (stats by gcn, splits severity for occ),
-\texttt{reinsurance\_occ\_layer\_df} (aggregate gcn stats for occ layers),
-\texttt{reinsurance\_df} (all combinations of gcn occ and agg densities),
-\texttt{reinsurance\_report\_df} (m, cv, sd, skew for \texttt{reinsurance\_df}) 
+\texttt{occ\_kind}, \texttt{occ\_reins},
+\texttt{agg\_kind}, \texttt{agg\_reins},
+\texttt{agg\_density\_gross/ceded/net},
+\texttt{sev\_density\_gross/ceded/net},
+\texttt{occ\_ceder}, \texttt{occ\_netter}, \texttt{agg\_ceder}, \texttt{agg\_netter},
+\texttt{\m apply\_occ\_reins}, \texttt{\m apply\_agg\_reins},
+\texttt{\m reins\_description}, \texttt{reins\_kinds},
+\texttt{reins\_density\_df}, \texttt{reins\_describe}, \texttt{reins\_stats\_df}
+
 
     \end{minipage}
 };
@@ -253,9 +210,10 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{\m plot},
-\texttt{\m reinsurance\_occ\_plot}
-\texttt{figure} (return last figure),
-\texttt{\m limits} (suggest axis limits for plotting),
+\texttt{\m reins\_occ\_plot},
+\texttt{\m occ\_bivariate},
+\texttt{figure}
+
 
     \end{minipage}
 };
@@ -268,9 +226,11 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
+\texttt{\m price},
+\texttt{\m price\_pentagon},
 \texttt{\m apply\_distortion},
-\texttt{\m price(p, dist)}
-\texttt{\m cramer\_lundberg aka pollaczeck\_khinchine} (probability of eventual ruin vs. initial capital and margin)
+\texttt{\m cramer\_lundberg} (aka \texttt{\m pollaczeck\_khinchine}; prob.\ of eventual ruin)
+
 
     \end{minipage}
 };
@@ -283,9 +243,10 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-{\it Method of moments (shifted gamma or lognormal), or minimum entropy approximations.} \\
-\texttt{\m approximate},
-\texttt{\m entropy\_fit}
+\texttt{approximate} (exact / sgamma / slognorm),
+\texttt{\m entropy\_fit},
+\texttt{fzapprox}
+
 
     \end{minipage}
 };
@@ -298,28 +259,25 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{aggregate\_keys} (internal),
-\texttt{\m more(regex)} (print all methods and fields matching \texttt{regex}),
-\texttt{info} (text meta info),
-\texttt{\m html\_info\_blob} (internal),
-\texttt{\m json} (persist to json),
-\texttt{\m snap}${}^{[1]}$ (snap argument to index)
-    
+\texttt{\m help},
+\texttt{\m json} (persist),
+\texttt{value\_type},
+\texttt{spec}, \texttt{spec\_ex}
+
+
     \end{minipage}
 };
 \node[fancytitle] at (box.north west) {11. Meta};
 \end{tikzpicture}
 
 \bigskip \raggedright
-{\bf Notes:} 
+{\bf Notes:}
 
-[0]: Arguments \texttt{sev\_pick\_attachments=None, sev\_pick\_losses=None, } omitted; see help. 
+[0]: Full signature also has \texttt{sev\_signed/reflect}, \texttt{agg\_premium/shift/reflect} (the \texttt{pnl} affine wrapper), \texttt{reins\_bucket}, \texttt{dsev\_bucket}; see help.
 
-[1]: matches \texttt{Portfolio} 
+[1]: matches \texttt{Portfolio}.
 
-Any vectorizable input accepts numeric or iterable datatypes.  
-
-Abbreviations: gcn=gross (subject), ceded, and net; stats: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk
+Abbreviations: gcn = gross (subject), ceded, net; m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk; est=FFT estimate.
 
 
 % \vskip .25truein

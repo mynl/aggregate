@@ -4,6 +4,11 @@
 % Created by Stephen J Mildenhall
 % (c) 2023
 %
+% Updated 2026 for aggregate v1.0.0a66 (REFACTOR branch):
+%   * regenerated from introspect(Severity('lognorm', sev_mean=100, sev_cv=2))
+%   * Severity is a thin wrapper over a frozen scipy.stats rv (self.fz)
+%   * cv_to_shape / mean_to_scale gone; layer fields exp_attachment/exp_limit
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \input{cheat_sheet_macros.tex}
@@ -18,10 +23,11 @@
 
 {\huge{\textbf{\texttt{Severity} Class Cheat Sheet}}}
 
-\raggedright % The \texttt{Severity} call signature,  \\
-\texttt{\m Severity(name, sev\_name="", sev\_a=np.nan, sev\_b=0, sev\_mean=0, sev\_cv=0, sev\_loc=0, sev\_scale=0,} \\
-\texttt{\phantom{\m Severity(}sev\_xs=None, sev\_ps=None, sev\_wt=1, sev\_lb, sev\_ub, sev\_conditional=True) }\\
+\raggedright
+\texttt{\m Severity(sev\_name, exp\_attachment=None, exp\_limit=inf, sev\_mean=0, sev\_cv=0, sev\_a=nan, sev\_b=0, sev\_loc=0,} \\
+\texttt{\phantom{\m Severity(}sev\_scale=0, sev\_xs=None, sev\_ps=None, sev\_wt=1, sev\_lb=0, sev\_ub=inf, sev\_conditional=True, name='')} \\
 
+A \texttt{Severity} wraps a frozen \texttt{scipy.stats} rv (in \texttt{fz}) for a single ground-up loss, optionally cut to a layer by the attachment / limit clause. Mixtures and the \texttt{wt} weight are handled by \texttt{Aggregate}.
 The following tables show all \texttt{\m methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
 
 
@@ -32,26 +38,18 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \begin{tikzpicture}
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
-% {\it italics stuff} \\
 
-\texttt{name} {\it name for object } \\
-\texttt{sev\_name} {\it scipy distribution name, or  } \texttt{(c|d)histogram} \\
-\texttt{exp\_attachment} {\it gross loss attachment or} \texttt{None} \\
-\texttt{exp\_limit} {\it gross loss limit }
-\texttt{sev\_a} {\it shape parameter 1} \\
-\texttt{sev\_b} {\it shape parameter 2} \\
-\texttt{sev\_mean} {\it ground-up loss mean} \\
-\texttt{sev\_cv} {\it ground-up loss CV} \\
-\texttt{sev\_loc} {\it location (shift)} \\
-\texttt{sev\_scale} {\it scale factor } \\
-\texttt{sev\_xs} {\it vector of outcomes} \\
-\texttt{sev\_ps} {\it vector of probabilities; missing for equal likelihood} \\
-\texttt{sev\_wt} {\it ignored, mixing handled by } \texttt{Aggregate} \\
-\texttt{sev\_lb} {\it lower bound for conditional range} \\
-\texttt{sev\_ub} {\it upper bound} \\
-\texttt{sev\_conditional} {\it gross losses conditional on attaching layer (default) or unconditional} \\
-
-\it Specify the ground-up loss, optionally converted to gross loss by the limit clause.
+\texttt{name} {\it object name} \\
+\texttt{sev\_name} {\it scipy dist name, or} \texttt{(c|d)histogram} \\
+\texttt{sev\_kind}, \texttt{long\_name} {\it resolved labels} \\
+\texttt{sev\_mean}, \texttt{sev\_cv} {\it ground-up mean / CV, or} \\
+\texttt{sev\_a}, \texttt{sev\_b} {\it shape parameters 1, 2} \\
+\texttt{sev\_loc}, \texttt{sev\_scale} {\it shift and scale} \\
+\texttt{sev\_xs}, \texttt{sev\_ps} {\it (d)histogram outcomes / probs} \\
+\texttt{sev\_wt} {\it mixture weight (used by} \texttt{Aggregate}) \\
+\texttt{sev\_conditional} {\it losses conditional on attaching the layer (default) or unconditional} \\
+\texttt{sev\_signed}, \texttt{sev\_reflect} {\it allow negative / reflect about 0} \\
+\texttt{note}, \texttt{hints}, \texttt{program} {\it provenance}
 
 
     \end{minipage}
@@ -64,11 +62,11 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \begin{tikzpicture}
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
-    
-\texttt{\m cv\_to\_shape},
-\texttt{\m mean\_to\_scale},
-\texttt{pattach},
-\texttt{pdetach},
+
+\texttt{exp\_attachment}, \texttt{exp\_limit} {\it layer inputs} \\
+\texttt{attachment}, \texttt{limit}, \texttt{detachment} {\it resolved layer} \\
+\texttt{sev\_lb}, \texttt{sev\_ub} {\it conditional support bounds} \\
+\texttt{pattach}, \texttt{pdetach} {\it $\Pr$(attach), $\Pr$(detach)}
 
 
     \end{minipage}
@@ -82,19 +80,12 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{\m generic\_moment},
-\texttt{\m mean},
-\texttt{\m median},
-\texttt{\m moment},
-\texttt{\m moment\_type},
-\texttt{\m moms},
-\texttt{sev1},
-\texttt{sev2},
-\texttt{sev3},
+\texttt{sev1}, \texttt{sev2}, \texttt{sev3} (first three raw moments),
+\texttt{\m moms} (m, cv, skew),
+\texttt{\m mean}, \texttt{\m median}, \texttt{\m std}, \texttt{\m var},
 \texttt{\m stats},
-\texttt{\m std},
-\texttt{\m support},
-\texttt{\m var},
+\texttt{\m moment}, \texttt{\m generic\_moment}, \texttt{\m moment\_type},
+\texttt{\m support}
 
 
     \end{minipage}
@@ -108,21 +99,12 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{\m cdf},
-\texttt{\m entropy},
+\texttt{\m cdf}, \texttt{\m sf}, \texttt{\m pdf},
+\texttt{\m logcdf}, \texttt{\m logsf}, \texttt{\m logpdf},
+\texttt{\m ppf}, \texttt{\m isf},
+\texttt{\m rvs}, \texttt{\m interval},
 \texttt{\m expect},
-\texttt{\m interval},
-\texttt{\m isf},
-\texttt{\m logcdf},
-\texttt{\m logpdf},
-\texttt{\m logsf},
-\texttt{\m nnlf},
-\texttt{\m pdf},
-\texttt{\m ppf},
-\texttt{\m rvs},
-\texttt{\m sf},
-\texttt{\m vecentropy},
-
+\texttt{\m entropy}, \texttt{\m vecentropy}, \texttt{\m nnlf}
 
 
     \end{minipage}
@@ -165,7 +147,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\it None
+\it None (layer cut only; see Update)
 
     \end{minipage}
 };
@@ -181,8 +163,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{\m plot},
-
+\texttt{\m plot}
 
     \end{minipage}
 };
@@ -208,10 +189,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{\m fit},
-\texttt{\m fit\_loc\_scale},
-\texttt{\m freeze},
-
+\texttt{\m fit}, \texttt{\m fit\_loc\_scale}, \texttt{\m freeze}
 
     \end{minipage}
 };
@@ -223,10 +201,13 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \begin{tikzpicture}
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
-    
-\texttt{fz},
-\texttt{random\_state},
-\texttt{xtol},
+
+\texttt{fz} (the frozen scipy rv),
+\texttt{shapes}, \texttt{numargs} (scipy shape info),
+\texttt{conditional}, \texttt{signed},
+\texttt{bounded},
+\texttt{tail\_class}, \texttt{tail\_description}, \texttt{support\_description},
+\texttt{random\_state}, \texttt{xtol}
 
     \end{minipage}
 };
@@ -234,15 +215,11 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \end{tikzpicture}
 
 \bigskip \raggedright
-{\bf Notes:} 
+{\bf Notes:}
 
-[0]: Arguments \texttt{sev\_pick\_attachments=None, sev\_pick\_losses=None, } omitted; see help. 
+A \texttt{Severity} models one ground-up severity curve; frequency, mixing, and reinsurance live on \texttt{Aggregate}. \texttt{sev\_mean}+\texttt{sev\_cv} or \texttt{sev\_a}(+\texttt{sev\_b}) parameterise the shape; \texttt{sev\_loc}/\texttt{sev\_scale} then shift/scale.
 
-[1]: matches \texttt{Portfolio} 
-
-Any vectorizable input accepts numeric or iterable datatypes.  
-
-Abbreviations: gcn=gross (subject), ceded, and net; stats: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk
+Abbreviations: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness).
 
 
 % FOOTER

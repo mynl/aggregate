@@ -1,17 +1,21 @@
-\input{cheat_sheet_macros.tex}
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Aggregate Cheat Sheet
-%
-% Start only Aggregate lines with \texttt so you can count them
+% DecL Cheat Sheet  (multi-page)
 %
 % Created by Stephen J Mildenhall
 % (c) 2023
 %
+% Updated 2026 for aggregate v1.0.0a66 (REFACTOR branch):
+%   * grammar source of truth is aggregate/decl.lark (Lark Earley)
+%   * split into 3 pages:
+%       p1  agg + pnl  (the compound-distribution language)
+%       p2  port + multivariate (mv) + netceded
+%       p3  distortion
+%   * new clauses: approximate, pnl, multivariate/copula, netceded;
+%     severity gains ssev, xps, picks
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% \input{cheat_sheet_macros.tex}
+\input{cheat_sheet_macros.tex}
 \title{DecL Cheat Sheet}
 
 % color scheme defeined here - just change the suffixes
@@ -20,271 +24,340 @@
 \colorlet{textcolor}{texta}
 
 
-
 \begin{document}
 
-{\huge{\bf DecL Cheat Sheet for Compound Distributions}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PAGE 1 : agg + pnl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\raggedright The DecL specification of an \texttt{Aggregate} compound distribution object has eight clauses: \\
-\texttt{agg <NAME> <EXPOSURE> <LIMIT*> <SEVERITY> <OCC\_RE*> <FREQUENCY> <AGG\_RE*> <NOTE*>} \\
-Key: \texttt{<INPUT>} user input(s); \texttt{lower\_case} is a DecL keyword; \texttt{CLAUSE\_TYPE} is a valid clause; options: \texttt{a|b|c}; \texttt{inf} for infinity; clauses marked with an asterisk are optional.
+{\huge{\bf DecL Cheat Sheet \textnormal{(1/3)}: \texttt{agg} and \texttt{pnl}}}
+
+\raggedright An \texttt{Aggregate} compound distribution has the clause structure: \\
+\texttt{agg <NAME> <EXPOSURE> <LAYERS*> <SEVERITY> <OCC\_RE*> <FREQUENCY> <AGG\_RE*> <APPROX*> <TRAILER*>} \\
+Key: \texttt{<INPUT>} user input; \texttt{lower\_case} a DecL keyword; \texttt{CLAUSE} a sub-clause; options \texttt{a|b|c}; \texttt{inf} infinity; \texttt{*} optional. Build with \texttt{build('agg ...')}.
 
 \begin{multicols*}{3}
 
-%------------1. NAME CLAUSE ---------------
+%--- Name ---
 \begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
-% {\it italics stuff} \\
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{agg <NAME> ...} \\
+\texttt{sev <NAME> <SEVERITY>} {\it standalone severity}
 
-\texttt{agg <NAME>}
-\texttt{agg <NAME>}
-\texttt{sev <NAME> <SEVERITY>}
-
-\medskip\it Name of the compound or severity.\\
-Names match regex \rm \texttt{r'[a-zA-Z][\textbackslash.\_:~a-zA-Z0-9\textbackslash-]*'}.
-
-Created objects can be referenced \\
-\rm
-\texttt{agg.<NAME>}
-\texttt{agg <NEW\_NAME> agg.<OLD\_NAME>}
-
-
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {1. Name Clause };
+\medskip\it Names match \rm\texttt{[a-zA-Z][.\_:\textasciitilde a-zA-Z0-9-]*}.
+Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{dist.<NAME>}; clone with \texttt{agg <NEW> agg.<OLD>}.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {1. Name \& references};
 \end{tikzpicture}
 
-
-%------------2. EXPOSURE CLAUSE ---------------
+%--- Exposure ---
 \begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
-
-\texttt{<EXP\_LOSS> loss} \\
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{<EL> loss} \\
 \texttt{<PREMIUM> premium at <LR> lr} \\
 \texttt{<EXPOSURE> exposure at <RATE> rate} \\
 \texttt{<CLAIMS> claims} \\
-\texttt{dfreq <OUTCOMES> <PROBABILITIES*>}
+\texttt{dfreq <OUTCOMES> <PROBS*>} {\it fixed empirical freq}
 
-\medskip\it Outcomes entered \texttt{[1 2 3 4]}  or \texttt{[2:10:2]} and
-probabilities \texttt{[.5 .25 1/8 1/9]} or omitted for equally likely.
-
-
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {2. Exposure Clause};
+\medskip\it Outcomes \texttt{[1 2 3 4]} or \texttt{[2:10:2]}; probs \texttt{[.5 .25 .25]} or omitted = equally likely.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {2. Exposure};
 \end{tikzpicture}
 
-
-%------------ 3. LIMIT CLAUSE ---------------
+%--- Limit ---
 \begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{<LIMIT> xs <ATTACHMENT>} \\
+\texttt{tower [<BREAKS>]}
 
-\texttt{<LIMIT> xs <ATTACHMENT>}
-
-
-\medskip\it Occurrence limits applied to ground-up severity, unlimited reinstatements, losses conditional on attaching layer by default.
-
-
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {3. Limit Clause (optional)};
+\medskip\it Occurrence limits on ground-up severity, unlimited reinstatements, losses conditional on attaching by default.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {3. Limit / layers (optional)};
 \end{tikzpicture}
 
-
-%------------ 4. SEVERITY CLAUSE ---------------
+%--- Severity continuous ---
 \begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{sev <DIST> <MEAN> cv <CV>} \\
+\texttt{sev <DIST> <SHAPE1> <SHAPE2*>} \\
+\texttt{sev sev.<NAME>} {\it built-in}
 
-\texttt{sev <DIST\_NAME> <MEAN> cv <CV>} \\
-\texttt{sev <DIST\_NAME> <SHAPE1> <SHAPE2>} \\
-\texttt{sev sev.<NAME>>} \\
-\texttt{dsev <OUTCOMES> <PROBABILITIES>}
-
-\medskip\texttt{<SCALE> * SEV + <LOC>}.
-
-\medskip\texttt{SEV splice [<LB> <UB>]} {\it conditional in layer} \\
-\medskip\texttt{SEV !} {\it unconditional, when {\rm\texttt{ATTACHMENT}} > 0}
-
-% \medskip\it Scale and translate \texttt{<SCALE> * SEV + <LOC>}.
-% Conditional in a layer $(\mathrm{LB}, \mathrm{UB}]$:  \texttt{SEV splice [<LB> <UB>]}.
-% Make unconditional:  \texttt{SEV !}
-
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {4. Severity Clause };
+\medskip\texttt{<SCALE> * SEV + <LOC>} {\it scale \& shift} \\
+\texttt{SEV wts [<W>]} {\it mixture} \\
+\texttt{SEV splice [<LB> <UB>]} {\it conditional in layer} \\
+\texttt{SEV !} {\it unconditional (when} \texttt{ATTACH}>0) \\
+\texttt{ssev ...} {\it spliced severity}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {4. Severity (continuous)};
 \end{tikzpicture}
-
 
 \columnbreak
 
-
-%------------ 5. OCCURRENCE REINSURANCE CLAUSE ---------------
+%--- Severity discrete ---
 \begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{dsev <OUTCOMES> <PROBS*>} {\it discrete} \\
+\texttt{<DIST> xps [<X>] [<P>]} {\it empirical points} \\
+\texttt{picks [<X>] [<P>]} {\it match layer picks}
 
-\texttt{occurrence ceded to LAYERS} \\
+\medskip\it \texttt{dsev [1:6]} is a fair die; \texttt{xps} attaches outcomes/probabilities to a parametric severity.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {5. Severity (discrete)};
+\end{tikzpicture}
+
+%--- Frequency ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{poisson}, \texttt{bernoulli}, \texttt{fixed}, \texttt{geometric}, \texttt{logarithmic}, \\
+\texttt{binomial <P>}, \texttt{negbin <VAR\_MULT>}, \texttt{neymana <CLAIMS/OCC>}, \texttt{pascal <CV> <CLAIMS/OCC>}
+
+\medskip\texttt{mixed <MIX> <SHAPE1> <SHAPE2*>} \\
+\texttt{MIX = gamma|delaporte|ig|sig|sichel|beta}
+
+\medskip\texttt{FREQ zt} {\it zero-truncated} \\
+\texttt{FREQ zm <P0>} {\it zero-modified,} $\Pr(N{=}0){=}p_0$
+\end{minipage}};
+\node[fancytitle] at (box.north west) {6. Frequency};
+\end{tikzpicture}
+
+%--- Occ reins ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
 \texttt{occurrence net of LAYERS} \\
-\texttt{LAYER=<<SHARE> so> <LAYER> xs <ATTACH>}
-\texttt{LAYERS=LAYER1 and LAYER2 and ...}
+\texttt{occurrence ceded to LAYERS}
 
-\medskip\it $0\le \mathrm{SHARE} \le 1$  share of (\texttt{so})
+\medskip\texttt{LAYER = <LIMIT> xs <ATTACH>} \\
+\hspace*{1em}\texttt{| <SHARE> so <LIMIT> xs <ATTACH>} \\
+\hspace*{1em}\texttt{| <PCT> po <LIMIT> xs <ATTACH>} \\
+\texttt{LAYERS = LAYER and LAYER ...} {\it or} \texttt{tower [...]}
 
-% For example \texttt{250 xs 250}, \texttt{3 so 5 xs 5}, or \texttt{30\% po 1 xs 1}.
-
-\medskip\rm \texttt{LAYERS=tower[250 500 1000]} \\
-\medskip\it Specify layer breaks, expands to \texttt{250 xs 0},
-\texttt{250 xs 250}, and \texttt{500 xs 500}; ground-up layer automatically added.
-    
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {5. Occurrence Reinsurance Clause};
+\medskip\it \texttt{so} = share of, \texttt{po} = part of; $0\le\mathrm{share}\le1$.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {7. Occurrence reinsurance};
 \end{tikzpicture}
 
-
-%------------ 6. FREQUENCY CLAUSE ---------------
+%--- Agg reins ---
 \begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
-
-\texttt{poisson},
-\texttt{bernoulli},
-\texttt{fixed},
-\texttt{geometric},
-\texttt{logarithmic},
-\texttt{binomial <P>},
-\texttt{negbin <VAR\_MULT>},
-\texttt{neymana <CLAIMS-PER-OCC>},
-\texttt{pascal <CV> <CLAIMS-PER-OCC>} \\
-
-\texttt{mixed <MIXING DIST> <SHAPE1> <SHAPE2>} \\
-\texttt{MIXING DIST=gamma|delaporte|ig|sig|sichel|beta <CV> <VARIES>}
-
-\texttt{FREQ zt}  \\
-\texttt{FREQ zm <P0>} \\
-\medskip\it zero truncated, zero modified with $\Pr(N=0)=p0$
-
-
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {6. Frequency Clause };
-\end{tikzpicture}
-
-
-%------------ 7. AGGREGATE REINSURANCE CLAUSE ---------------
-\begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
-
-\texttt{aggregate ceded to LAYERS} \\
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
 \texttt{aggregate net of LAYERS} \\
+\texttt{aggregate ceded to LAYERS} \\
 \texttt{aggregate (net of|ceded to) tower [<BREAKS>]}
 
-
-% \it See Occurrence Reinsurance Clause for \texttt{LAYERS} and outputs.
-
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {7. Aggregate Reinsurance Clause};
+\medskip\it Same \texttt{LAYER} syntax as occurrence, applied to the aggregate loss.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {8. Aggregate reinsurance};
 \end{tikzpicture}
-
-
 
 \columnbreak
 
-
-%------------ 8. NOTE  ---------------
+%--- Approximate ---
 \begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{approximate exact} {\it (default)} \\
+\texttt{approximate sgamma} {\it shifted gamma} \\
+\texttt{approximate slognorm} {\it shifted lognormal}
 
-\texttt{note\{prems op A curve, effective 1/1/2024;\}} \\
-\texttt{note\{bs=100; log2=17; normalize=False\}} \\
-
-\medskip\it Add hints for updating; split on semicolon then split on equals. \\
-
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {8. Note};
+\medskip\it Alias \texttt{approx}. Replaces freq\,$\times$\,sev convolution with a single severity matched to the first three aggregate moments.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {9. Approximate (optional)};
 \end{tikzpicture}
 
-
-%------------ 9. VECTORIZATION ---------------
+%--- PnL ---
 \begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{pnl <NAME> <PREMIUM> prem - <AGG-BODY>}
 
-\it Exposure clause\\
-\rm\texttt{[1 2 3] claims} \\
-\texttt{[100 200 300] loss} \\
-\texttt{[100 200 300] premium at [.8 .7 .65] lr} \\
+\medskip\it Profit-and-loss = premium minus loss. The premium is one deterministic amount subtracted \rm once\it{} for the book (aggregate-level shift), unlike a constant in \texttt{sev} (per claim). The body after \texttt{prem -} is an ordinary aggregate; a bare \texttt{lr} binds to the stated premium.
 
-\it Layers clause \\
-\rm \texttt{[250 250 500] xs [0 250 500]} \it zip layers %  250 xs 0, 250 xs 250, and 500 xs 500.
-
-\it Severity clause \\
-\rm \texttt{[1 3] * expon 1 wts [.6 .4]} \\ %mixed exponential \\
-\texttt{[1 3] * [gamma lognorm] [4 1.25] wts [.6 .4]} \\ %  mixed severity types  \\
-\texttt{100 * lognorm [.75 1.5] wts [.6 .4] slice [0 200 inf]}
-\texttt{100 * lognorm [.5 .75 1.5] wts [.4 .4 .2] slice [0 0 200] [200 200 inf]}
-
-\it Vectors are broadcast; layers, exposure etc. are zipped.
-
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {9. Vectorization};
+\medskip\rm\texttt{pnl P 1000 prem - 700 loss sev lognorm 50 cv 2 poisson}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {10. PnL (premium $-$ loss)};
 \end{tikzpicture}
 
-
-%------------  10. MATH EXPRESSIONS  ---------------
+%--- Trailer + vectorization + math ---
 \begin{tikzpicture}
-\node [mybox] (box){%
-    \begin{minipage}{0.3\textwidth}\raggedright
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+{\bf Trailer} \texttt{note\{free text\}}, \texttt{hints\{bs=100; log2=17\}} {\it (build settings; both optional, order-free)}
 
-\it Only division, exponentiation, and exponential allowed\\
-\rm \texttt{123}, \texttt{12.34e2}, \texttt{-12.4e-5}, \texttt{-12.0}, \texttt{12.4\%} \\
-\texttt{1/2}, \texttt{3**4}, \texttt{exp(2)}
+\medskip{\bf Vectorize} \rm\texttt{[1 2 3] claims}; \texttt{[100 200] premium at [.8 .7] lr}; \texttt{[250 250 500] xs [0 250 500]} {\it zip}; \texttt{[1 3] * lognorm [.7 1.5] wts [.6 .4]}. {\it Vectors broadcast; layers / exposure zip.}
 
-Scale factor for lognormal $\mu,\sigma$ entered as \rm\texttt{exp(mu)/exp(sigma**2/2)}.
-
-{\bf Warning:} \it minus binds to the number: $-4^2=(-4)^2=16$; there is no unary minus.
-
-% \texttt{agg Dice dfreq [1:6] dsev [1:6]} a dice-roll of dice rolls
-% Classic gross, net occurrence, net of occurrence and aggregate progression \\
-% \texttt{agg Gross 1000 loss 5000 xs 0 sev lognorm 50 cv 2.5 mixed gamma 0.4} \\
-% \texttt{agg NetOcc agg.Gross occurrence net of 50\% po 500 xs 500 and 4000 xs 1000} \\
-% \texttt{agg Net agg.NetOcc occurrence net of 50\% po 500 xs 500 and 4000 xs 1000} \\
-% Create and use mixed severity
-% \texttt{sev MED [100 300 1000] * expon 1 wts [0.8 0.17 0.03]} \\
-% \texttt{agg CommAuto 2000 premium at 70\% lr sev.MED mixed gamma 0.25}
-
-    \end{minipage}
-};
-\node[fancytitle] at (box.north west) {10. Mathematical Expressions};
+\medskip{\bf Math} \rm\texttt{1/2}, \texttt{3**4}, \texttt{exp(2)}, \texttt{12.4\%}. {\it Warning: minus binds to the number,} $-4^2=16$ {\it (no unary minus).}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {11. Trailer, vectors, math};
 \end{tikzpicture}
 
-
-%------------ 11. META build and Underwriter  ---------------
-% \begin{tikzpicture}
-% \node [mybox] (box){%
-%     \begin{minipage}{0.3\textwidth}\raggedright
-
-%     \end{minipage}
-% };
-% \node[fancytitle] at (box.north west) {11. Meta (build and Underwriter stuff)};
-% \end{tikzpicture}
-
-% \bigskip \raggedright
-% {\bf Notes:}
-
-
-% FOOTER
 \makefooter
+\end{multicols*}
 
+\clearpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PAGE 2 : port + multivariate + netceded
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+{\huge{\bf DecL Cheat Sheet \textnormal{(2/3)}: \texttt{port}, \texttt{mv}, \texttt{netceded}}}
+
+\raggedright These declarations build collections and couplings of aggregates. Each component is an ordinary \texttt{agg} (or \texttt{pnl}) declaration.
+
+\begin{multicols*}{3}
+
+%--- Portfolio ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{port <NAME> <TRAILER*>} \\
+\hspace*{1em}\texttt{agg <UNIT1> ...} \\
+\hspace*{1em}\texttt{agg <UNIT2> ...} \\
+\hspace*{1em}\dots
+
+\medskip\it A \texttt{Portfolio} is a list of independent units sharing a discretization grid. Units may be \texttt{agg} or \texttt{pnl} lines, or references \texttt{agg.<NAME>}.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {1. Portfolio (\texttt{port})};
+\end{tikzpicture}
+
+%--- Portfolio example ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\rm\texttt{port MyBook} \\
+\hspace*{1em}\texttt{agg A 100 claims sev lognorm 50 cv 2 poisson} \\
+\hspace*{1em}\texttt{agg B 200 claims sev gamma 30 cv 1 poisson}
+
+\medskip\it Units are added independently; the portfolio total is their convolution. Per-unit reinsurance is set on each \texttt{agg} line.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {2. \texttt{port} example};
+\end{tikzpicture}
+
+\columnbreak
+
+%--- Multivariate ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{mv <NAME> <SHARED-EXPOSURE>} \\
+\hspace*{1em}\texttt{agg <A> ...} \\
+\hspace*{1em}\texttt{agg <B> ...} \\
+\hspace*{1em}\texttt{copula <KIND> <P*>} \\
+\hspace*{1em}\texttt{<FREQUENCY*>}
+
+\medskip\it Alias \texttt{multivariate}. Couples \rm exactly two\it{} component severities by a copula and accumulates them with a \rm shared\it{} outer frequency via a 2D FFT. Frequency optional (default poisson).
+\end{minipage}};
+\node[fancytitle] at (box.north west) {3. Multivariate (\texttt{mv})};
+\end{tikzpicture}
+
+%--- Copula clause ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{copula <KIND> <P>} {\it one-parameter} \\
+\texttt{copula <KIND>} {\it parameter-free} \\
+{\it omitted} = \texttt{copula independent}
+
+\medskip\texttt{KIND = normal|gumbel|clayton|fgm|independent}
+
+\medskip\rm\texttt{mv M 100 claims agg A ... agg B ... copula gumbel 0.4}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {4. Copula clause};
+\end{tikzpicture}
+
+\columnbreak
+
+%--- Netceded ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{netceded <AGG>}
+
+\medskip\it Build the bivariate (net, ceded) joint outcome of one reinsured aggregate --- the two coupled marginals are the \rm net\it{} and \rm ceded\it{} positions of the same loss, so their dependence is exact (comonotone within the layer). Lets you see net and ceded \rm jointly\it, not just their marginals.
+
+\medskip\rm\texttt{netceded agg G 100 claims sev lognorm 50 cv 2 occurrence net of 500 xs 500 poisson}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {5. \texttt{netceded}};
+\end{tikzpicture}
+
+\makefooter
+\end{multicols*}
+
+\clearpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PAGE 3 : distortion
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+{\huge{\bf DecL Cheat Sheet \textnormal{(3/3)}: \texttt{distortion}}}
+
+\raggedright A distortion $g$ defines a coherent risk measure / pricing functional. Declare one by kind and its natural parameters; the kind\,$\to$\,parameter mapping lives on each \texttt{Distortion} subclass.
+
+\begin{multicols*}{3}
+
+%--- Distortion decl ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{distortion <NAME> <KIND> <PARAMS>}
+
+\medskip\it Alias \texttt{dist}. \texttt{<PARAMS>} is a flat list of the kind's natural parameters (see table). Reference a stored distortion as \texttt{dist.<NAME>}.
+
+\medskip\rm\texttt{distortion D1 ph 0.9} \\
+\texttt{dist D2 wang 0.25} \\
+\texttt{dist D3 power 0 100 2}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {1. Declaration};
+\end{tikzpicture}
+
+%--- Kinds ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{ph <a>} {\it proportional hazard} \\
+\texttt{wang <lam>} {\it Wang / normal shift} \\
+\texttt{dual <b>} {\it dual moment} \\
+\texttt{tvar <p>} {\it tail VaR at} $p$ \\
+\texttt{ccoc <r>} {\it constant cost of capital} \\
+\texttt{bitvar <p0> <p1> <w1>} {\it two-point} \\
+\texttt{beta <a> <b>} \\
+\texttt{power <x0> <x1> <alpha>}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {2. Kinds \& parameters};
+\end{tikzpicture}
+
+\columnbreak
+
+%--- More kinds ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{wtdtvar ...} {\it weighted TVaR (knots)} \\
+\texttt{cll <b>} {\it capped log-linear} \\
+\texttt{clin <slope>} {\it capped linear} \\
+\texttt{lep <r>} {\it leverage-equivalent pricing} \\
+\texttt{ly <r>} {\it linear yield}
+
+\medskip\it List available kinds with \rm\texttt{Distortion.available\_distortions()}.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {3. More kinds};
+\end{tikzpicture}
+
+%--- Combinators ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{distortion <NAME> minimum dist.<A> dist.<B> ...} \\
+\texttt{distortion <NAME> mixture dist.<A> dist.<B> ... wts [<W>]}
+
+\medskip\it \texttt{minimum} = pointwise min of the referenced distortions; \texttt{mixture} = weighted average (weights via \texttt{wts}).
+\end{minipage}};
+\node[fancytitle] at (box.north west) {4. Combinators};
+\end{tikzpicture}
+
+\columnbreak
+
+%--- Usage ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\it Apply a distortion to price an aggregate or portfolio:
+
+\medskip\rm\texttt{a = build('agg A 100 claims sev lognorm 50 cv 2 poisson')} \\
+\texttt{d = build('distortion D ph 0.9')} \\
+\texttt{a.price(0.99, d)}
+
+\medskip\it or reference it inside pricing calls by \texttt{dist.<NAME>}. A distortion satisfies $g(0)=0$, $g(1)=1$, increasing and concave.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {5. Usage};
+\end{tikzpicture}
+
+\makefooter
 \end{multicols*}
 
 \end{document}

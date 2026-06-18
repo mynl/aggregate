@@ -313,103 +313,159 @@ def lognorm_approx(ser):
     return fz
 
 
-def approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output):
-    """
-    Dispatch from ``(m, cv, skew)`` to a method-of-moments approximation and
-    return it in the requested form. Backs ``Aggregate.approximate`` and
-    ``Portfolio.approximate``; see their documentation.
+def approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output,
+                           warn_degenerate=False):
+    """Dispatch ``(m, cv, skew)`` to a method-of-moments fit, in the requested form.
 
-    :param output: scipy - frozen scipy.stats continuous rv object; agg_decl
-      sev_decl - DecL program for severity (to substituate into an agg ; no name)
-      sev_kwargs - dictionary of parameters to create Severity
-      agg_decl - Decl program agg T 1 claim sev_decl fixed
-      any other string - created Aggregate object
-    """
-    if approx_type == 'norm':
-        sd = m*cv
-        if output == 'scipy':
-            return ss.norm(loc=m, scale=sd)
-        sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
-        decl = f'{sd} @ norm 1 # {m} '
-
-    elif approx_type == 'lognorm':
-        mu, sigma = lognorm_fit(m, cv)
-        sev = {'sev_name': 'lognorm', 'sev_a': sigma, 'sev_scale': np.exp(mu)}
-        if output == 'scipy':
-            return ss.lognorm(sigma, scale=np.exp(mu))
-        decl = f'{np.exp(mu)} * lognorm {sigma} '
-
-    elif approx_type == 'gamma':
-        shape, scale = gamma_fit(m, cv)
-        if output == 'scipy':
-            return ss.gamma(shape, scale=scale)
-        sev = {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
-        decl = f'{scale} * gamma {shape} '
-
-    elif approx_type == 'slognorm':
-        shift, mu, sigma = sln_fit(m, cv, skew)
-        if output == 'scipy':
-            return ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-        sev = {'sev_name': 'lognorm', 'sev_a': sigma, 'sev_scale': np.exp(mu), 'sev_loc': shift}
-        decl = f'{np.exp(mu)} * lognorm {sigma} + {shift} '
-
-    elif approx_type == 'sgamma':
-        shift, alpha, theta = sgamma_fit(m, cv, skew)
-        if output == 'scipy':
-            return ss.gamma(alpha, loc=shift, scale=theta)
-        sev = {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta, 'sev_loc': shift}
-        decl = f'{theta} * gamma {alpha} + {shift} '
-
-    else:
-        raise ValueError(f'Inadmissible approx_type {approx_type} passed to fit')
-
-    if output == 'agg_decl':
-        agg_str += decl
-        agg_str += ' fixed'
-        return agg_str
-    elif output == 'sev_kwargs':
-        return sev
-    elif output == 'sev_decl':
-        return decl
-    else:
-        return Aggregate(**{'name': name, 'note': note,
-                            'exp_en': 1, **sev, 'freq_name': 'fixed'})
-
-
-def _approximate_sev_kwargs(m, cv, skew, approx_type):
-    """Severity kwargs for a method-of-moments aggregate approximation.
-
-    Backs the ``approximate`` DecL keyword (and the matching ``Aggregate``
-    constructor parameter): given the aggregate's analytic first three moments,
-    return the ``sev_*`` keyword dict for a single continuous severity whose
-    moments match -- a shifted gamma (``approx_type='sgamma'``) or shifted
-    lognormal (``'slognorm'``) -- to be carried on a fixed frequency of 1 claim.
-
-    Both signs of skew are handled. For right skew the shifted fit is used
-    directly. For left skew the fit is performed on the *reflected* aggregate
-    ``-A`` (which is right-skewed) and mapped back through the ``sev_reflect``
-    machinery (``Y = sev_loc - X`` with the base built at loc 0); the returned
-    dict then carries ``sev_reflect=True`` and a signed (negative-support)
-    severity. For a (near-)symmetric aggregate (``|skew|`` below tolerance) both
-    shifted fits degenerate to their common limit, a normal, returned instead.
+    Backs ``Aggregate.approximate`` and ``Portfolio.approximate``. A thin
+    **output adapter** over the single fit core :func:`_approximate_sev_kwargs`,
+    which owns the family fits *and* the guards (symmetric -> normal, left-skew
+    -> reflected); this function only formats the core's ``sev_*`` kwargs into
+    the requested surface, so the two ``approximate`` surfaces and the
+    ``approximate`` DecL keyword share one implementation.
 
     Parameters
     ----------
     m, cv, skew : float
-        Analytic aggregate mean, coefficient of variation, and skewness. ``m``
-        may be negative; the helper is sign-agnostic via ``sd = m * cv``.
-    approx_type : {'sgamma', 'slognorm'}
-        Shifted-gamma or shifted-lognormal method-of-moments fit.
+        Analytic (or empirical) aggregate mean, coefficient of variation, and
+        skewness.
+    name, agg_str, note : str
+        Naming / note scaffolding for the DecL and Aggregate output forms.
+    approx_type : {'norm', 'lognorm', 'gamma', 'sgamma', 'slognorm'}
+        The fitted family. ``'all'`` is handled by the calling method, not here.
+    output : str
+        ``'scipy'`` -> frozen ``scipy.stats`` rv; ``'sev_kwargs'`` -> the
+        ``Severity`` kwargs dict; ``'sev_decl'`` -> a DecL severity fragment;
+        ``'agg_decl'`` -> a full ``agg ... fixed`` DecL program; any other string
+        -> a fixed-frequency :class:`Aggregate`.
+    warn_degenerate : bool
+        When ``True`` (the interactive ``.approximate()`` method) emit a
+        ``UserWarning`` if an explicitly-requested *shifted* family
+        (``slognorm`` / ``sgamma``) degenerates to a normal because the
+        distribution is symmetric.
+
+    Returns
+    -------
+    object
+        Per ``output``.
+
+    Notes
+    -----
+    A left-skewed (reflected) shifted fit has no native frozen ``scipy`` or
+    one-line DecL representation, so ``output='scipy'`` / ``'sev_decl'`` /
+    ``'agg_decl'`` raise ``ValueError`` for it -- use ``output='sev_kwargs'`` or
+    the default Aggregate object (both carry ``sev_reflect``), or
+    ``approx_type='norm'``.
+    """
+    sev = _approximate_sev_kwargs(m, cv, skew, approx_type,
+                                  warn_degenerate=warn_degenerate)
+    reflected = bool(sev.get('sev_reflect', False))
+
+    if output == 'scipy':
+        if reflected:
+            raise ValueError(
+                f"approx_type={approx_type!r} for this left-skewed distribution "
+                f"(skew={skew:.3g}) is a reflected fit with no native frozen scipy "
+                f"representation; use output='sev_kwargs' or the default Aggregate "
+                f"object (both reflect), or approx_type='norm'.")
+        return _sev_kwargs_to_scipy(sev)
+    if output == 'sev_kwargs':
+        return sev
+    if output in ('sev_decl', 'agg_decl'):
+        decl = _sev_kwargs_to_decl(sev, reflected, approx_type, skew)
+        return decl if output == 'sev_decl' else f'{agg_str}{decl} fixed'
+    # any other string -> a fixed-frequency Aggregate carrying the fitted sev
+    return Aggregate(**{'name': name, 'note': note, 'exp_en': 1, **sev,
+                        'freq_name': 'fixed'})
+
+
+def _sev_kwargs_to_scipy(sev):
+    """Frozen ``scipy.stats`` rv from method-of-moments ``sev_*`` kwargs.
+
+    Only the non-reflected families -- the caller rejects a reflected fit, which
+    has no native frozen scipy object.
+    """
+    nm = sev['sev_name']
+    loc = float(sev.get('sev_loc', 0.0))
+    scale = float(sev['sev_scale'])
+    if nm == 'norm':
+        return ss.norm(loc=loc, scale=scale)
+    if nm == 'lognorm':
+        return ss.lognorm(float(sev['sev_a']), loc=loc, scale=scale)
+    if nm == 'gamma':
+        return ss.gamma(float(sev['sev_a']), loc=loc, scale=scale)
+    raise ValueError(f'cannot build a scipy rv for sev_name={nm!r}')
+
+
+def _sev_kwargs_to_decl(sev, reflected, approx_type, skew):
+    """DecL severity fragment from method-of-moments ``sev_*`` kwargs.
+
+    A reflected (left-skew) fit has no clean one-line DecL form, so it raises --
+    use ``output='sev_kwargs'`` or the default Aggregate object instead.
+    """
+    if reflected:
+        raise ValueError(
+            f"approx_type={approx_type!r} for this left-skewed distribution "
+            f"(skew={skew:.3g}) is a reflected fit with no one-line DecL form; "
+            f"use output='sev_kwargs' or the default Aggregate object, or "
+            f"approx_type='norm'.")
+    nm = sev['sev_name']
+    scale = sev['sev_scale']
+    loc = sev.get('sev_loc')
+    if nm == 'norm':
+        return f'{scale} @ norm 1 # {loc} '
+    frag = f'{scale} * {nm} {sev["sev_a"]} '
+    if loc not in (None, 0, 0.0):
+        frag += f'+ {loc} '
+    return frag
+
+
+def _approximate_sev_kwargs(m, cv, skew, approx_type, warn_degenerate=False):
+    """Severity kwargs for a method-of-moments approximation -- the single fit core.
+
+    The **one** place the family fits and their guards live. Given the
+    aggregate's first three moments, return the ``sev_*`` keyword dict for a
+    single continuous severity whose moments match, for any of the five
+    families: the unshifted ``norm`` / ``lognorm`` / ``gamma``
+    (skew-independent) and the shifted ``sgamma`` / ``slognorm``. Both the
+    ``approximate`` DecL keyword / constructor and the ``Aggregate`` /
+    ``Portfolio`` ``approximate()`` methods (via :func:`approximate_from_mcvsk`)
+    consume it, so there is no second implementation to drift.
+
+    The shifted fits are defined only for **positive** skew, so:
+
+    - **(near-)symmetric** (``|skew|`` below tolerance): both shifted fits'
+      common limit is a **normal**, returned instead. When ``warn_degenerate``
+      and a shifted family was explicitly requested, a ``UserWarning`` is
+      emitted (the interactive ``.approximate()`` method sets this; the
+      declarative DecL/constructor path leaves it ``False`` and degrades
+      silently).
+    - **left (negative) skew**: fit the *reflected* aggregate ``-A`` (which is
+      right-skewed) and map back through the ``sev_reflect`` machinery
+      (``Y = sev_loc - X`` with the base built at loc 0); the returned dict
+      carries ``sev_reflect=True`` and a signed (negative-support) severity.
+
+    Parameters
+    ----------
+    m, cv, skew : float
+        Analytic (or empirical) aggregate mean, coefficient of variation, and
+        skewness. ``m`` may be negative; the helper is sign-agnostic via
+        ``sd = m * cv``.
+    approx_type : {'norm', 'lognorm', 'gamma', 'sgamma', 'slognorm'}
+        The fitted family.
+    warn_degenerate : bool
+        Emit a ``UserWarning`` when a shifted family degenerates to a normal
+        (symmetric input). Default ``False``.
 
     Returns
     -------
     dict
         ``sev_*`` keyword arguments for :class:`Severity` / the
-        :class:`Aggregate` constructor: always ``sev_name``, ``sev_a`` (where
-        applicable), ``sev_scale``, ``sev_loc``; plus ``sev_reflect=True`` for
-        the left-skew case and ``sev_signed=True`` whenever the fit carries mass
-        at or below zero (so the loss-layering ``x<0 -> 0`` clamp is bypassed and
-        the fitted distribution is represented exactly).
+        :class:`Aggregate` constructor: ``sev_name``, ``sev_a`` (where
+        applicable), ``sev_scale``, ``sev_loc`` (shifted families only); plus
+        ``sev_reflect=True`` for the left-skew case and ``sev_signed=True``
+        whenever the fit carries mass at or below zero (so the loss-layering
+        ``x<0 -> 0`` clamp is bypassed and the fit is represented exactly).
 
     Notes
     -----
@@ -419,9 +475,10 @@ def _approximate_sev_kwargs(m, cv, skew, approx_type):
     those fitters, so the freeze-checked windowing code that also calls them is
     unaffected.
     """
-    if approx_type not in ('sgamma', 'slognorm'):
+    valid = ('norm', 'lognorm', 'gamma', 'sgamma', 'slognorm')
+    if approx_type not in valid:
         raise ValueError(
-            f"approximate kind {approx_type!r} must be 'sgamma' or 'slognorm'")
+            f"approximate kind {approx_type!r} must be one of {', '.join(valid)}")
     m = float(m)
     cv = float(cv)
     skew = float(skew)
@@ -433,13 +490,35 @@ def _approximate_sev_kwargs(m, cv, skew, approx_type):
     # its mass on the positive axis (the ``loc`` is just the parameterisation),
     # in which case the ordinary 0-based grid is correct and cheaper.
     signed_tail = 1e-8
-    if abs(skew) <= skew_tol:
-        # Symmetric limit of both shifted fits is a normal.
-        sev = {'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m}
-        fz = ss.norm(loc=m, scale=sd)
+
+    def _mark_signed(sev, fz):
         if float(fz.ppf(signed_tail)) < 0:
             sev['sev_signed'] = True
         return sev
+
+    # ---- unshifted, skew-independent families -------------------------------
+    if approx_type == 'norm':
+        return _mark_signed({'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m},
+                            ss.norm(loc=m, scale=sd))
+    if approx_type == 'lognorm':
+        mu, sigma = lognorm_fit(m, cv)
+        return {'sev_name': 'lognorm', 'sev_a': sigma,
+                'sev_scale': float(np.exp(mu))}
+    if approx_type == 'gamma':
+        shape, scale = gamma_fit(m, cv)
+        return {'sev_name': 'gamma', 'sev_a': shape, 'sev_scale': scale}
+
+    # ---- shifted families: need positive skew -------------------------------
+    if abs(skew) <= skew_tol:
+        # Symmetric limit of both shifted fits is a normal.
+        if warn_degenerate:
+            warnings.warn(
+                f"approx_type={approx_type!r}: the distribution is symmetric "
+                f"(skew={skew:.3g}); the shifted fit degenerates to its normal "
+                f"limit, returned instead. Pass approx_type='norm' to select "
+                f"the normal explicitly.", UserWarning, stacklevel=3)
+        return _mark_signed({'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m},
+                            ss.norm(loc=m, scale=sd))
     if skew > 0:
         if approx_type == 'sgamma':
             shift, alpha, theta = sgamma_fit(m, cv, skew)
@@ -451,10 +530,7 @@ def _approximate_sev_kwargs(m, cv, skew, approx_type):
             sev = {'sev_name': 'lognorm', 'sev_a': sigma,
                    'sev_scale': float(np.exp(mu)), 'sev_loc': shift}
             fz = ss.lognorm(sigma, loc=shift, scale=float(np.exp(mu)))
-        if float(fz.ppf(signed_tail)) < 0:
-            # The fit places appreciable mass below zero; keep it exact.
-            sev['sev_signed'] = True
-        return sev
+        return _mark_signed(sev, fz)
     # Left (negative) skew: fit the reflected aggregate -A (right-skewed), then
     # map back via Y = sev_loc - X with sev_loc = -shift_R and X built at loc 0.
     m_r = -m
@@ -7912,20 +7988,24 @@ class Aggregate:
 
         Use case: exam questions with the normal approacimation!
 
-        :param approx_type: norm, lognorn, slognorm (shifted lognormal), gamma, sgamma. If 'all'
-            then returns a dictionary of each approx.
+        :param approx_type: norm, lognorm, slognorm (shifted lognormal), gamma, sgamma. If 'all'
+            then returns a dictionary of each admissible approx (families that
+            cannot be represented for this distribution/output are skipped).
         :param output: scipy - frozen scipy.stats continuous rv object;
           sev_decl - DecL program for severity (to substituate into an agg ; no name)
           sev_kwargs - dictionary of parameters to create Severity
           agg_decl - Decl program agg T 1 claim sev_decl fixed
           any other string - created Aggregate object
         :return: as above.
+
+        A shifted family (``slognorm`` / ``sgamma``) requested for a symmetric
+        distribution degenerates to its normal limit and emits a ``UserWarning``
+        (pass ``approx_type='norm'`` to select the normal explicitly). A
+        left-skewed distribution is fitted by reflection, which has no native
+        frozen ``scipy`` / one-line DecL form -- ``output='scipy'`` /
+        ``'sev_decl'`` / ``'agg_decl'`` raise ``ValueError`` for it; use
+        ``output='sev_kwargs'`` or the default Aggregate object.
         """
-
-        if approx_type == 'all':
-            return {kind: self.approximate(kind)
-                    for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']}
-
         # Prefer empirical moments (post-update) over theoretical (pre-update).
         emp = self.stats_df['empirical']
         if pd.notna(emp.get(('agg', 'mean'), np.nan)):
@@ -7933,11 +8013,25 @@ class Aggregate:
         else:
             mixed = self.stats_df['mixed']
             m, cv, skew = (mixed[('agg', 'mean')], mixed[('agg', 'cv')], mixed[('agg', 'skew')])
-
-        name = f'{approx_type[0:4]}.{self.name[0:5]}'
-        agg_str = f'agg {name} 1 claim sev '
         note = f'frozen version of {self.name}'
-        return approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output)
+
+        def _one(kind, warn):
+            nm = f'{kind[0:4]}.{self.name[0:5]}'
+            return approximate_from_mcvsk(m, cv, skew, nm, f'agg {nm} 1 claim sev ',
+                                          note, kind, output, warn_degenerate=warn)
+
+        if approx_type == 'all':
+            # Survey: stay quiet about degeneration, and skip a family that
+            # cannot be represented for this distribution/output (e.g. a
+            # reflected fit requested as a frozen scipy rv).
+            out = {}
+            for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']:
+                try:
+                    out[kind] = _one(kind, warn=False)
+                except ValueError:
+                    continue
+            return out
+        return _one(approx_type, warn=True)
 
     def entropy_fit(self, n_moments, tol=1e-10, verbose=False):
         """

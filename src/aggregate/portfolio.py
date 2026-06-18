@@ -1838,18 +1838,21 @@ class Portfolio(object):
         Returns a dictionary specification of the portfolio aggregate_project.
         If updated uses empirical moments, otherwise uses theoretic moments
 
-        :param approx_type: slognorm | sgamma | normal
+        :param approx_type: norm | lognorm | gamma | slognorm | sgamma | all
         :param output: return a dict or agg language specification
         :return:
+
+        A shifted family (``slognorm`` / ``sgamma``) requested for a symmetric
+        portfolio total degenerates to its normal limit and emits a
+        ``UserWarning`` (pass ``approx_type='norm'`` for the normal explicitly).
+        A left-skewed total is fitted by reflection, which has no native frozen
+        ``scipy`` / one-line DecL form; use ``output='sev_kwargs'`` or the
+        default Aggregate object for that case. Mirrors
+        :meth:`Aggregate.approximate`.
         """
-
-        if approx_type == 'all':
-            return {kind: self.approximate(kind)
-                    for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']}
-
         emp_mean = self.stats_df.loc[('agg', 'mean'), 'empirical']
         if pd.isna(emp_mean):
-            # not updated — use theoretical moments from the mixed column
+            # not updated — use theoretical moments from the total column
             m = float(self.stats_df.loc[('agg', 'mean'), 'total'])
             cv = float(self.stats_df.loc[('agg', 'cv'), 'total'])
             skew = float(self.stats_df.loc[('agg', 'skew'), 'total'])
@@ -1858,11 +1861,24 @@ class Portfolio(object):
             m = float(emp_mean)
             cv = float(self.stats_df.loc[('agg', 'cv'), 'empirical'])
             skew = float(self.stats_df.loc[('agg', 'skew'), 'empirical'])
-
-        name = f'{approx_type[0:4]}.{self.name[0:5]}'
-        agg_str = f'agg {name} 1 claim sev '
         note = f'frozen version of {self.name}'
-        return approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output)
+
+        def _one(kind, warn):
+            nm = f'{kind[0:4]}.{self.name[0:5]}'
+            return approximate_from_mcvsk(m, cv, skew, nm, f'agg {nm} 1 claim sev ',
+                                          note, kind, output, warn_degenerate=warn)
+
+        if approx_type == 'all':
+            # Survey: quiet about degeneration; skip a family that cannot be
+            # represented for this distribution/output (e.g. reflected + scipy).
+            out = {}
+            for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']:
+                try:
+                    out[kind] = _one(kind, warn=False)
+                except ValueError:
+                    continue
+            return out
+        return _one(approx_type, warn=True)
 
     def percentiles(self, pvalues=None):
         """

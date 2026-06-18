@@ -8,7 +8,7 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-17** — added B4 (ZT/ZM fix + shift helpers).
+> **Last updated: 2026-06-18** — added D12 (cheat-sheet refresh, held for `1.0.0b1`).
 
 ---
 
@@ -435,6 +435,14 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   the `decl.lark` terminals (five hand-maintained mirrors today). Independent of
   the unparser (`decl_writer` reuses `AggLexer` as-is, shipped a53); ties the
   parked DecL colorization (#22).
+- [ ] **D12 `[B]` Cheat-sheet tweaks once the UI settles** — the six class / DecL
+  cheat sheets (`cheat-sheets/`) were rebuilt for the v1.0 API on the
+  tectonic + `make.ps1` / `combine.ps1` build with auto-`\aggversion` stamping
+  from `pyproject.toml` (see the dir's `README.rst` "instructions for Claude").
+  **Revisit at the alpha→beta cut (`1.0.0b1`)**, when the API has stabilized:
+  re-run `introspect` per class, reconcile any renames/removals, and apply
+  pending wording/layout tweaks (incl.\ whether to densify DecL pages 2–3).
+  *(flagged 2026-06-18; author wants this held until the first beta.)*
 - [ ] **D11 `[B]`** Transition the Sphinx docs' bibliography to the master
   `C:/s/TELOS/Biblio/uber-library.bib` (per the CLAUDE.md "Citations and
   bibliography" standing order, added 2026-06-11). The docs currently use an

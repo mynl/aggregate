@@ -259,3 +259,94 @@ def test_approximate_note_round_trips_via_program():
     assert b.note and "sgamma" in b.note
     # note length is stable across the round-trip (no recursive growth)
     assert len(b.note) == len(a.note)
+
+
+# ----------------------------------------------------------------------
+# .approximate() method (a68): one fit core for both surfaces, symmetric
+# guard + warning, reflected-fit representability errors. See
+# dev/done/plan-approximate.md and the a68 CHANGELOG entry.
+# ----------------------------------------------------------------------
+def _symmetric_dice():
+    """12-die sum: symmetric (skew=0), the motivating nonsense-fit case."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return build("agg SymDice dfreq [12] dsev [1:6]")
+
+
+def test_method_symmetric_shifted_degenerates_to_normal_with_warning():
+    """``slognorm`` on a symmetric book returns the normal limit + a UserWarning.
+
+    Regression: previously ``sln_fit(m, cv, 0) -> (-inf, inf, 0)`` produced a
+    ``nan`` scipy distribution silently. Now the shifted fit degenerates to its
+    normal limit (a sensible answer) and says so.
+    """
+    a = _symmetric_dice()
+    with pytest.warns(UserWarning, match="symmetric"):
+        fz = a.approximate("slognorm", output="scipy")
+    # a real normal, not nonsense
+    assert np.isfinite(fz.mean()) and fz.mean() == pytest.approx(a.agg_m, rel=1e-6)
+    assert np.isfinite(fz.cdf(40))
+    # the explicit normal is identical and silent
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")          # any warning would fail
+        fzn = a.approximate("norm", output="scipy")
+    assert fzn.cdf(40) == pytest.approx(fz.cdf(40), rel=1e-12)
+
+
+def test_method_all_symmetric_is_quiet_and_admissible():
+    """``approximate('all')`` on a symmetric book is quiet and degrades cleanly."""
+    a = _symmetric_dice()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")          # 'all' must not warn
+        allfits = a.approximate("all")
+    assert {"norm", "gamma", "lognorm", "sgamma", "slognorm"} == set(allfits)
+    # the shifted families degenerated to the normal limit
+    assert allfits["slognorm"].mean() == pytest.approx(a.agg_m, rel=1e-6)
+
+
+def test_method_reflected_fit_representability():
+    """A left-skewed fit reflects: sev_kwargs works, frozen-scipy/decl error.
+
+    Driven straight through the fit core / adapter with a negative skew so the
+    test does not depend on a particular signed-severity DecL program.
+    """
+    from aggregate.distributions import (approximate_from_mcvsk,
+                                          _approximate_sev_kwargs)
+    sev = _approximate_sev_kwargs(100.0, 0.3, -0.8, "slognorm")
+    assert sev.get("sev_reflect") is True              # reflected fit
+    # no native frozen scipy / one-line DecL form -> explicit error
+    for out in ("scipy", "sev_decl", "agg_decl"):
+        with pytest.raises(ValueError, match="reflected"):
+            approximate_from_mcvsk(100.0, 0.3, -0.8, "n", "agg n 1 claim sev ",
+                                   "note", "slognorm", out)
+    # but the kwargs / Aggregate-object surfaces represent it fine
+    assert approximate_from_mcvsk(100.0, 0.3, -0.8, "n", "a", "nt",
+                                  "slognorm", "sev_kwargs").get("sev_reflect")
+
+
+def test_method_one_fit_core_shared():
+    """The method adapter and the construction core agree (one implementation).
+
+    The positive-skew shifted fit from ``approximate_from_mcvsk(output='scipy')``
+    is built from the very ``sev_kwargs`` the constructor path uses, so their
+    parameters match exactly.
+    """
+    from aggregate.distributions import (approximate_from_mcvsk,
+                                          _approximate_sev_kwargs)
+    m, cv, skew = 5000.0, 0.8, 1.3
+    sev = _approximate_sev_kwargs(m, cv, skew, "slognorm")
+    fz = approximate_from_mcvsk(m, cv, skew, "n", "a", "nt", "slognorm", "scipy")
+    # frozen lognorm built from the same (shape, loc, scale)
+    assert fz.kwds["loc"] == pytest.approx(sev["sev_loc"])
+    assert fz.kwds["scale"] == pytest.approx(sev["sev_scale"])
+    assert fz.args[0] == pytest.approx(sev["sev_a"])
+
+
+def test_portfolio_method_symmetric_warns_too():
+    """``Portfolio.approximate`` shares the same guard (symmetric -> normal + warn)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        p = build("port SymPort agg A dfreq [12] dsev [1:6]")
+    with pytest.warns(UserWarning, match="symmetric"):
+        fz = p.approximate("sgamma", output="scipy")
+    assert np.isfinite(fz.mean())

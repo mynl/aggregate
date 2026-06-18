@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.0.0a68
+
+### `approximate()`: one fit core, symmetric guard, honest reflected-fit errors
+
+`Aggregate.approximate()` / `Portfolio.approximate()` and the `approximate` DecL
+keyword had **two** moment-fit implementations. The method path
+(`approximate_from_mcvsk`) was the unguarded one: a symmetric or left-skewed
+distribution hit `sln_fit`/`sgamma_fit` with non-positive skew and got a
+degenerate `(-inf, inf, 0)` → a silent `nan` distribution (e.g. a 12-dice sum,
+`skew = 0`, with the default `slognorm`).
+
+- **Single fit core.** `_approximate_sev_kwargs` is now the one place the family
+  fits and guards live (generalized to all five families: `norm` / `lognorm` /
+  `gamma` / `sgamma` / `slognorm`). `approximate_from_mcvsk` is a thin **output
+  adapter** over it (`scipy` / `sev_kwargs` / `sev_decl` / `agg_decl` /
+  `Aggregate`), so the two `approximate` surfaces and the DecL keyword share one
+  implementation. No second path to drift.
+- **Symmetric → normal, with a warning.** A *shifted* family (`slognorm` /
+  `sgamma`) requested for a (near-)symmetric distribution now returns its normal
+  limit (the mathematically correct answer) and emits a `UserWarning` from the
+  interactive `.approximate()` method (pass `approx_type='norm'` to select it
+  explicitly). The declarative DecL/constructor path keeps degrading silently.
+- **Reflected (left-skew) fits error honestly where they can't be drawn.** A
+  left-skewed fit reflects (`sev_reflect`); that has no native frozen `scipy` or
+  one-line DecL form, so `output='scipy'` / `'sev_decl'` / `'agg_decl'` raise a
+  clear `ValueError` pointing to `output='sev_kwargs'` / the default `Aggregate`
+  object (which do reflect) or `approx_type='norm'`.
+- **`approximate('all')`** stays quiet about degeneration and skips any family it
+  can't represent for the given distribution/output (e.g. reflected + `scipy`),
+  returning the admissible subset.
+
 ## 1.0.0a67
 
 ### Fix: `Aggregate.approximate()` method was shadowed by a same-named attribute

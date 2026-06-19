@@ -11,7 +11,7 @@ Four items:
 4. ``value_type`` labels configurable via the ``[labels]`` config section;
    the role is the stable boolean ``_is_loss_value``.
 
-DecL programs used here are mirrored in ``src/aggregate/agg/test_decl.agg``
+DecL programs used here are mirrored in ``src/aggregate/agg/decl-testers.agg``
 section H4.
 """
 

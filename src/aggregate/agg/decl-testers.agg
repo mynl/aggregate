@@ -1,17 +1,21 @@
-# Test DecL — programs harvested from the pytest suite
-# =====================================================
-
-# This file extracts every DecL program embedded in the ``tests/`` tree so
-# the language coverage exercised by pytest is also available as a flat,
-# greppable corpus. It complements ``test_suite.agg`` (broad language
-# walkthrough) and ``test_suite2.agg`` (mixed/spliced severities). The
-# canonical source of each program is its Python module — this file is a
-# reference extraction, not the runtime contract.
+# ======================================================================
+# decl-testers.agg  --  DecL language stress library (shipped)
+# ======================================================================
 #
-# Numbering uses fresh letter prefixes (P..X) that do not collide with
-# anything in test_suite.agg (A..O) or test_suite2.agg (G splice
-# extension). The three files are intended to be combined into a single
-# ``test_suite.agg`` at v1.0 release, so the numbering is contiguous.
+# A flat, greppable corpus that exercises DecL *language* coverage rather
+# than building interesting aggregates: the feature surface the parser must
+# accept (every exposure/severity/frequency form, reinsurance, splicing,
+# signed / P&L, mv / multivariate, distortion constructors, hints, and
+# intentional parser-error fixtures). The companion `cookbook.agg` carries
+# the insurance-useful worked examples; `examples.agg` is the small curated
+# default set.
+#
+# KEPT IN SYNC WITH pytest: each program here mirrors one embedded in the
+# ``tests/`` tree (the Python module is the canonical source). When you add a
+# pytest case with a DecL program, append it here under the matching section.
+#
+# Letter prefixes P..X continue the A..O of `_test_suite.agg`, so the two do
+# not collide if loaded together.
 #
 # DecL syntax reminders honoured here:
 #   * ``port`` definitions are single-line (sub-agg clauses inlined).

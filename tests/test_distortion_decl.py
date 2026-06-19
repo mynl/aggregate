@@ -5,7 +5,7 @@ natural keyword arguments through ``Distortion.decl_spec`` (driven by each
 subclass's ``decl_params``); the parser holds no per-kind knowledge and the old
 ``_distortion_spec`` translation table is gone.
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg`` under the
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` under the
 W. distortion section.
 """
 

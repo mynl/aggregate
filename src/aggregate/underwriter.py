@@ -326,9 +326,9 @@ class Underwriter(object):
         to the database of curves, portfolios and aggregates.
 
         All arguments are **keyword-only**. This prevents the easy mistake of
-        ``Underwriter('test_suite')``, which previously bound the first
+        ``Underwriter('examples')``, which previously bound the first
         positional to ``name`` and silently *named* the underwriter after the
-        database you meant to load. Use ``Underwriter(databases='test_suite')``.
+        database you meant to load. Use ``Underwriter(databases='examples')``.
 
         ``update`` and ``log2`` default to the configured values in
         :mod:`aggregate.config` (the ``[build]`` section); pass an explicit
@@ -336,7 +336,7 @@ class Underwriter(object):
         split between a bare ``Underwriter`` and the module-level ``build``.
         ``databases`` is **not** config-driven: a bare ``Underwriter()`` loads
         **nothing** (``databases=None``). The module-level ``build`` is the one
-        that loads the configured ``build.databases`` (``test_suite`` by
+        that loads the configured ``build.databases`` (``examples`` by
         default), by passing it explicitly — so ``config.toml`` still controls
         what ``build`` knows, while ad-hoc underwriters start empty.
 
@@ -1647,7 +1647,7 @@ class Underwriter(object):
 # Module-level singleton — the canonical user-facing entry point. Importable
 # as `from aggregate import build`. log2 / update come from aggregate.config
 # ([build] section). Unlike a bare ``Underwriter()`` (which loads nothing),
-# ``build`` loads the configured ``build.databases`` (``test_suite`` by
+# ``build`` loads the configured ``build.databases`` (``examples`` by
 # default) by passing it explicitly — so config.toml still controls what
 # ``build`` knows out of the box.
 build = Underwriter(databases=list(get_settings().build.databases) or None, debug=False)

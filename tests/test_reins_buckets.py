@@ -11,7 +11,7 @@ Covers the ``reins-buckets`` change (1.0.0a18):
   the top of ``make_ceder_netter``.
 
 The DecL programs used here are mirrored in
-``src/aggregate/agg/test_decl.agg`` under the reinsurance section.
+``src/aggregate/agg/decl-testers.agg`` under the reinsurance section.
 """
 from __future__ import annotations
 

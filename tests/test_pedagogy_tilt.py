@@ -10,7 +10,7 @@ path, which is tilt-free (padding is the operational control). These tests pin:
 - a heavy tilt removes the coarse-grid aliasing, converging to the accurate
   high-resolution / exact value (the published-table behaviour).
 
-The DecL program is mirrored in ``src/aggregate/agg/test_decl.agg`` (section GH).
+The DecL program is mirrored in ``src/aggregate/agg/decl-testers.agg`` (section GH).
 """
 from __future__ import annotations
 

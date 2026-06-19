@@ -12,7 +12,7 @@ Covers:
   pedagogy density/bivariate panels) work without the legacy
   ``density_df['p_{unit}']`` columns.
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg``
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg``
 (section UD).
 """
 

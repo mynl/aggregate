@@ -84,7 +84,7 @@ Here is the full DecL Grammar and a `grammar railroad diagram <_static/diagram.x
 Test Suite Programs
 ===================
 
-The test suite (``aggregate/agg/test_suite.agg``) is exercised by the pytest
+The test suite (``aggregate/agg/_test_suite.agg``) is exercised by the pytest
 suite — each line of the file becomes its own parametrized test case (parse
 check + SLY-snapshot shape check). Run::
 
@@ -92,13 +92,13 @@ check + SLY-snapshot shape check). Run::
 
 The full ``.agg`` source:
 
-.. literalinclude:: ../aggregate/agg/test_suite.agg
+.. literalinclude:: ../aggregate/agg/_test_suite.agg
    :language: agg
 
 To only parse the file from Python::
 
     from aggregate import build
-    filename = build.default_dir / 'test_suite.agg'
+    filename = build.default_dir / '_test_suite.agg'
     assert filename.exists()
 
     build.logger_level(30)

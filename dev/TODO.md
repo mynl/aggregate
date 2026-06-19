@@ -28,6 +28,18 @@
 | **T** | Tests (suite consolidation) |
 | **W** | Windows & plotting |
 
+## NEW STEVE MANUAL ENTRIES
+
+H: Portfolio class should use unit not line. All refs to line replaced with unit! **carefully!**
+H: build.knowledge source col: just store the db name and not whole path in source. Yes, ambiguous. Prefix ~/ if from user's .aggregate store, full path if not built-in or home dir.
+N: distributions with no variance should refuse to estimate bs. how is that being done ATM? I think in the past it was an error. Now you can package hints with the program there are no excuses for not providing bs,log2.
+
+N/D: find examnple where padding has an impact
+
+
+
+
+
 ## Priorities & dependencies
 
 **Critical path (the spine):** the `N` spine is mostly shipped — `N2`, `N3`,
@@ -179,6 +191,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   Execution cadence: one stage per iteration, with a review + commit between each.
   - [x] **MV-1** `[a70]` — `balanced_window(ser, p, bs=None)` (utilities) +
     `Aggregate.focus(p)`; pure 1-D, no bv change. `tests/test_balanced_window.py`.
+  - [x] **MV-2** `[a72]` — measure-don't-guess copula axis sizing (deleted
+    `_size_axis`; standalone-marginal + `balanced_window`, `update(log2=)` total
+    budget, `[multivariate].total_log2`) + signed 2-D compound (`i0`/`j0`
+    wrap-and-roll in `update_work`). 54%-deficit book → <1e-6.
 
 ---
 

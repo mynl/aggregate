@@ -68,7 +68,7 @@ DENSITY_REGEX = r"p_|exeqa_"
 DEFAULT_ATOL = 1e-12
 
 # Default database load request: reproduces the imported ``build``.
-DEFAULT_DATABASES = ("test_suite",)
+DEFAULT_DATABASES = ("_test_suite",)
 
 MANIFEST_NAME = "_manifest.json"
 
@@ -177,7 +177,7 @@ def freeze_knowledge(databases=DEFAULT_DATABASES, root=None, atol=DEFAULT_ATOL) 
 
     Parameters
     ----------
-    databases : sequence of str, default ``("test_suite",)``
+    databases : sequence of str, default ``("_test_suite",)``
         Database load request(s). The default reproduces the imported ``build``.
     root : str or pathlib.Path, optional
         Snapshot root; a ``YYYY-MM-DD`` subdirectory is created underneath.
@@ -348,7 +348,7 @@ def _build_parser() -> argparse.ArgumentParser:
     pf = sub.add_parser("freeze", help="Snapshot every agg/port object to parquet.")
     pf.add_argument(
         "-d", "--database", dest="databases", action="append", metavar="NAME",
-        help="Database name to load (repeatable). Default: test_suite "
+        help="Database name to load (repeatable). Default: _test_suite "
              "(reproduces the imported `build`).",
     )
     pf.add_argument(

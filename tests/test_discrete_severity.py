@@ -8,7 +8,7 @@ limited, or layered) is now an exact finite sum over the atoms via
 ``_DiscreteRV.layer_moments``, replacing the numerical isf-integration that
 returned trailing-9s artifacts (e.g. ``3.4999999995`` for a mean of ``3.5``).
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg`` under the
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` under the
 DISC section.
 """
 

@@ -13,7 +13,7 @@ negative-x work:
   analytic moments.
 - **value_type** sign-convention member (inert for the distribution).
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg``
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg``
 (section P&L).
 """
 from __future__ import annotations

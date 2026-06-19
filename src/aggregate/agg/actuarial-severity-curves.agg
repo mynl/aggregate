@@ -1,5 +1,5 @@
 # ======================================================================
-# other-distributions.agg  --  severity distributions used in insurance
+# actuarial-severity-curves.agg  --  severity distributions used in insurance
 # ======================================================================
 #
 # Version: 1
@@ -20,8 +20,8 @@
 #
 # This is NOT loaded by default. Load it explicitly:
 #     from aggregate import Underwriter
-#     uw = Underwriter(databases='other-distributions')
-# or add "other-distributions" to [build] databases in config.toml.
+#     uw = Underwriter(databases='actuarial-severity-curves')
+# or add "actuarial-severity-curves" to [build] databases in config.toml.
 #
 # SELECTION -- what counts as "relevant", and why
 # -----------------------------------------------

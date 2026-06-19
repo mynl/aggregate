@@ -4,7 +4,7 @@ The unparser is the structural inverse of the parser. Its contract (see
 ``dev/done/plan-decl-unparser.md`` and the ``decl_writer`` module docstring) is
 **idempotence one step removed**: with ``f = spec_to_decl``,
 ``f(f(f(x))) == f(x)``. Concretely, for every program in the reference corpus
-(``test_suite.agg`` + ``test_suite2.agg`` + ``test_decl.agg``):
+(``_test_suite.agg`` + ``_test_suite2.agg`` + ``decl-testers.agg``):
 
 * **idempotence** --- rendering the spec, re-parsing, and rendering again yields
   byte-identical text (the universal gate); and
@@ -33,18 +33,18 @@ from aggregate.parser import UnderwritingLexer
 # ----------------------------------------------------------------------
 
 _AGG_DIR = Path(aggregate.__file__).parent / 'agg'
-_CORPUS_FILES = ['test_suite.agg', 'test_suite2.agg', 'test_decl.agg']
+_CORPUS_FILES = ['_test_suite.agg', '_test_suite2.agg', 'decl-testers.agg']
 
 # Genuinely lossy / non-canonical-spec constructs: idempotence holds, but the
 # first parse's spec is not a fixed point (tweedie discards its note and bakes a
 # CP-gamma spec that bypasses the sev_weighted defaults), so fidelity is exempt.
 _FIDELITY_EXEMPT = {'K.Tweedie2'}
 
-# The corpus is the test_suite family, whose programs reference builtins it
+# The corpus is the _test_suite family, whose programs reference builtins it
 # defines (e.g. ``sev.One``). Parse against an underwriter that loads it, NOT
 # the module-level ``build`` singleton -- ``build`` now defaults to the curated
 # ``examples`` library, which does not carry those builtins.
-_uw = Underwriter(databases='test_suite')
+_uw = Underwriter(databases='_test_suite')
 
 
 def _corpus_lines():

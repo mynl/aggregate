@@ -1,11 +1,11 @@
-"""Parametric tests for splice / splice-and-layer cases from test_suite2.agg.
+"""Parametric tests for splice / splice-and-layer cases from _test_suite2.agg.
 
 Twelve cases hand-curated by the user that exercise the `sev_lb` / `sev_ub`
 splice path with and without policy layers. Four of them describe
 measure-zero splices (the splice window does not intersect the underlying
 distribution's support) and must raise ``ValueError`` at construction time.
 
-Lives alongside (not inside) ``test_suite.agg`` so the established 134-line
+Lives alongside (not inside) ``_test_suite.agg`` so the established 134-line
 parametric test count doesn't move; the two files will be consolidated in
 a later pass.
 """
@@ -20,7 +20,7 @@ from aggregate.distributions import Aggregate, Severity
 from aggregate.parser import UnderwritingLexer
 from aggregate.underwriter import Underwriter
 
-SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "test_suite2.agg"
+SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test_suite2.agg"
 
 # Names of the four cases that describe measure-zero splices — the splice
 # window lies entirely outside the underlying distribution's support, so the
@@ -92,7 +92,7 @@ def _build_from_spec(kind: str, spec: dict):
     """Instantiate the appropriate top-level object from a parsed spec.
 
     Mirrors the dispatch in ``Underwriter._factory`` for the two kinds that
-    appear in ``test_suite2.agg``. We don't go through ``Underwriter.write``
+    appear in ``_test_suite2.agg``. We don't go through ``Underwriter.write``
     because the splice failures need to surface as a ``ValueError`` at the
     Severity layer; the Underwriter wraps errors and rebuilds.
     """

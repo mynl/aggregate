@@ -17,7 +17,7 @@ Covers ``dev/plan-negative-x-port.md`` -- the combine half of the P&L work:
 - **Instrumentation**: two-sided ``_limits`` so ``plot`` shows the negative
   tail; ``describe`` finite for a mean-near-zero P&L.
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg``
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg``
 (section PortPnL).
 """
 from __future__ import annotations

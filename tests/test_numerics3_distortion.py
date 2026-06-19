@@ -13,7 +13,7 @@ legacy zero-origin regression also lives in ``tests/test_baseline.py``
 (recaptured post-change; the linear price engine convention deliberately
 changed -- see CHANGELOG).
 
-DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg`` (N3.*).
+DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` (N3.*).
 """
 from __future__ import annotations
 

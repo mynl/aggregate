@@ -19,7 +19,7 @@
 #      (parsed by aggregate_api/examples.py via GET /v1/examples).
 #
 # It is deliberately NOT comprehensive -- it shows the IMPORTANT ideas,
-# not every DecL feature. Full feature coverage lives in `testers.agg`.
+# not every DecL feature. Full feature coverage lives in `cookbook.agg`.
 #
 # COMPOSITION (~32): 2 severities, 2 distortions (PH + a minimum of two
 # -- the minimum consumes a second leaf, so three `dist` lines), ~21

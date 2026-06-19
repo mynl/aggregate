@@ -255,11 +255,11 @@ Both are ``scope="session"``: built once and reused across the whole run (fast).
 
 
 ********************************
-6. Keeping ``test_decl.agg`` in sync
+6. Keeping ``decl-testers.agg`` in sync
 ********************************
 
 When a hand-written test (e.g. ``test_negative_x.py``) uses DecL programs, the
-*same* programs are mirrored into ``src/aggregate/agg/test_decl.agg`` under a
+*same* programs are mirrored into ``src/aggregate/agg/decl-testers.agg`` under a
 matching section. That file is a human-readable catalogue of "programs the tests
 rely on" — it is documentation, not itself auto-run, but it keeps the language
 examples discoverable and in one place. Add to it whenever you add DecL-driven

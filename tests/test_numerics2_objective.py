@@ -11,7 +11,7 @@ explicitly. The legacy zero-origin regression lives in
 ``tests/test_baseline.py`` (key columns) and
 ``tests/test_baseline_spotchecks.py`` (derived columns).
 
-DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg`` (N2.*).
+DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` (N2.*).
 """
 from __future__ import annotations
 

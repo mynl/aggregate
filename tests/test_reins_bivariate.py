@@ -11,7 +11,7 @@ occurrence aggregates already reported in ``reins_density_df`` /
 ``reins_stats_df`` / ``reins_describe``, and the anti-diagonal ``C + N``
 reproduces the gross aggregate -- exact targets from the same densities.
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg``
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg``
 (section Z).
 """
 from __future__ import annotations

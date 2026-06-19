@@ -15,7 +15,7 @@ Covers ``dev/reins-reporting.md``:
 - ``Portfolio.reins_{density,stats,describe}`` -- end-to-end gross/ceded/net;
   total means equal the sum of unit means per view; gross-only port -> None.
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg``
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg``
 (section Y).
 """
 from __future__ import annotations

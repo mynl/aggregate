@@ -107,13 +107,13 @@ def test_interpret_program_returns_list_fills_knowledge():
 
 def test_load_populates_knowledge():
     uw = Underwriter()
-    uw.load('test_suite')
+    uw.load('_test_suite')
     assert len(uw._knowledge) >= 140
 
 
 def test_load_is_idempotent():
     """The configured lazy load runs once; a second load() is a no-op."""
-    uw = Underwriter(databases='test_suite')
+    uw = Underwriter(databases='_test_suite')
     _ = uw.knowledge  # triggers first (configured) read
     n1 = len(uw._knowledge)
     assert uw.load() == []  # second call: already loaded
@@ -140,33 +140,33 @@ def test_load_glob_no_match_warns_not_raises(caplog):
 
 def test_databases_reports_loaded_paths():
     """`databases` is the list of resolved Paths actually read."""
-    uw = Underwriter(databases='test_suite')
+    uw = Underwriter(databases='_test_suite')
     _ = uw.knowledge
     assert len(uw.databases) == 1
     assert isinstance(uw.databases[0], Path)
-    assert uw.databases[0].name == 'test_suite.agg'
+    assert uw.databases[0].name == '_test_suite.agg'
 
 
 def test_resolve_databases_matches_load():
     """resolve_databases previews exactly what load reads (for files that exist)."""
     uw = Underwriter(databases=None)
-    preview = uw.resolve_databases('test_suite')
-    assert len(preview) == 1 and preview[0].name == 'test_suite.agg'
-    read = uw.load('test_suite')
+    preview = uw.resolve_databases('_test_suite')
+    assert len(preview) == 1 and preview[0].name == '_test_suite.agg'
+    read = uw.load('_test_suite')
     assert [p.name for p in read] == [p.name for p in preview]
 
 
 def test_available_databases_discovers_bundled():
-    """available_databases lists the bundled test_suite among on-disk files."""
+    """available_databases lists the bundled _test_suite among on-disk files."""
     uw = Underwriter(databases=None)
     df = uw.available_databases()
     assert 'name' in df.columns and 'where' in df.columns and 'path' in df.columns
-    assert 'test_suite' in set(df['name'])
+    assert '_test_suite' in set(df['name'])
 
 
 def test_reload_resets_to_as_created():
     """reload drops in-session builds and ad-hoc loads, restoring the request."""
-    uw = Underwriter(databases='test_suite')
+    uw = Underwriter(databases='_test_suite')
     _ = uw.knowledge
     n0 = len(uw._knowledge)
     uw.build('agg ReloadMe 1 claim sev lognorm 10 cv 1 fixed', update=False)
@@ -178,9 +178,9 @@ def test_reload_resets_to_as_created():
 
 def test_source_provenance():
     """Loaded entries carry their file Path; in-session builds carry 'session'."""
-    uw = Underwriter(databases='test_suite')
+    uw = Underwriter(databases='_test_suite')
     _ = uw.knowledge
-    # pick any loaded entry — its source is the test_suite file Path
+    # pick any loaded entry — its source is the _test_suite file Path
     loaded = next(iter(uw._knowledge.values()))
     assert isinstance(loaded.source, Path)
     uw.build('agg SessionSrc 1 claim sev lognorm 10 cv 1 fixed', update=False)
@@ -298,7 +298,7 @@ def test_repr_is_multiline_and_includes_identity():
 
 def test_repr_lazy_load_pending():
     """When databases are configured but not yet loaded, repr should say so."""
-    uw = Underwriter(databases='test_suite')
+    uw = Underwriter(databases='_test_suite')
     s = repr(uw)
     assert '0 loaded' in s
     # touch knowledge to trigger load
@@ -309,23 +309,23 @@ def test_repr_lazy_load_pending():
 
 
 def test_constructor_is_keyword_only():
-    """``Underwriter('test_suite')`` must fail, not silently name the uw."""
+    """``Underwriter('_test_suite')`` must fail, not silently name the uw."""
     with pytest.raises(TypeError):
-        Underwriter('test_suite')
+        Underwriter('_test_suite')
     # the keyword form is the supported way to ask for a database
-    uw = Underwriter(databases='test_suite')
-    assert uw._request == 'test_suite'
+    uw = Underwriter(databases='_test_suite')
+    assert uw._request == '_test_suite'
 
 
 def test_repr_reports_request():
     """repr carries a ``requested`` line distinct from resolved databases."""
-    uw = Underwriter(databases='test_suite')
-    assert 'requested          test_suite' in repr(uw)
+    uw = Underwriter(databases='_test_suite')
+    assert 'requested          _test_suite' in repr(uw)
     # a bare underwriter requests nothing
     assert 'requested          none' in repr(Underwriter())
     # an iterable request is rendered comma-joined
-    uw2 = Underwriter(databases=['test_suite', 'site'])
-    assert 'requested          test_suite, site' in repr(uw2)
+    uw2 = Underwriter(databases=['_test_suite', 'site'])
+    assert 'requested          _test_suite, site' in repr(uw2)
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ def test_repr_reports_request():
 # ---------------------------------------------------------------------------
 
 def test_interpret_file_runs_clean():
-    """interpret_file() with no args should parse the bundled test_suite.agg cleanly."""
+    """interpret_file() with no args should parse the bundled _test_suite.agg cleanly."""
     df = global_build.interpret_file()
     assert df.error.sum() == 0
     assert len(df) >= 140

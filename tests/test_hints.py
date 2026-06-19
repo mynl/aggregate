@@ -6,7 +6,7 @@ rules (explicit ``build()`` kwargs override in-program hints). The two clauses
 are optional and order-free, at most one of each.
 
 The DecL programs exercised here are mirrored in
-``src/aggregate/agg/test_decl.agg`` under the HINTS section.
+``src/aggregate/agg/decl-testers.agg`` under the HINTS section.
 """
 
 import logging

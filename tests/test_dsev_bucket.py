@@ -19,7 +19,7 @@ which reflects bucketing) rather than ``agg_m`` (the *theoretical* mean, which
 is computed from the exact severity moments and so is bias-free regardless of
 the placement scheme).
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg`` under the
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` under the
 DISC section.
 """
 

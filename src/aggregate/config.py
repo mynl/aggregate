@@ -57,8 +57,10 @@ __all__ = [
 USER_DIR_NAME = '.aggregate'
 # Subdirectory inside the installed `aggregate` package holding bundled .agg files.
 PACKAGE_DATA_DIR = 'agg'
-# The canonical bundled test suite filename (lives in PACKAGE_DATA_DIR).
-TEST_SUITE_FILENAME = 'test_suite.agg'
+# The canonical bundled test suite filename (lives in PACKAGE_DATA_DIR). The
+# leading underscore marks it temporary migration scaffolding (retired before
+# beta); see dev/done/plan-decl-newline.md and the agg-file rationalization.
+TEST_SUITE_FILENAME = '_test_suite.agg'
 
 # Name of the user config file (inside USER_DIR_NAME) and the shipped template.
 _CONFIG_FILENAME = 'config.toml'
@@ -89,7 +91,7 @@ class BuildSettings:
         Whether ``update`` renormalises the discretized severity.
     databases : tuple of str
         Database name(s) loaded on construction. ``"examples"`` is the shipped
-        default (the curated v1.0 example library); ``"test_suite"`` keeps the
+        default (the curated v1.0 example library); ``"_test_suite"`` keeps the
         historical ``build`` knowledge base; ``"default"`` would load every
         bundled file, ``"all"`` bundled plus user.
     update : bool
@@ -188,14 +190,21 @@ class MultivariateSettings:
     Parameters
     ----------
     window_nines : int
-        Number of nines for the per-axis 2-D sizing window. Independent of
+        Number of nines for the per-axis 2-D sizing window: the equal-tail
+        probability budget for :func:`~aggregate.utilities.balanced_window` is
+        ``10**-window_nines`` (the discarded mass off each tail when the bv
+        *measures* each realized marginal). Independent of
         :attr:`DiscretizationSettings.window_nines` because the 2-D per-axis
-        window may want fewer nines for memory. (The remaining 2-D axis sizing
-        knobs land here once the multivariate tuning settles them -- see
-        ``dev/plan-multivariate-punchup.md``.)
+        window may want fewer nines for memory.
+    total_log2 : int
+        Total 2-D grid budget in ``log2`` cells (``2**total_log2`` cells, split
+        between the two axes by measured support). The square-law memory lever:
+        raise/lower on :meth:`MultivariateAggregate.update`; the per-axis split
+        falls out of the measured marginals (see ``dev/plan-mv.md`` §5.3).
     """
 
     window_nines: int = 12
+    total_log2: int = 20
 
 
 @dataclass(frozen=True)

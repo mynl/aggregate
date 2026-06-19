@@ -1,10 +1,10 @@
 """Capture (kind, name, spec) output from the current SLY parser for every line
-of test_suite.agg, writing it to tests/data/expected_specs.json.
+of _test_suite.agg, writing it to tests/data/expected_specs.json.
 
 This script is a migration artifact: it produces the regression snapshot that
 the Lark-based parser is verified against. Once the migration is complete and
 the snapshot is in place, the script's only future use is regenerating the
-snapshot if test_suite.agg changes meaningfully.
+snapshot if _test_suite.agg changes meaningfully.
 
 Run with:
     uv run python tests/capture_sly_snapshot.py
@@ -20,7 +20,7 @@ from aggregate.parser import UnderwritingLexer
 from aggregate.underwriter import Underwriter
 
 REPO_ROOT = Path(__file__).parent.parent
-TEST_SUITE = REPO_ROOT / "src" / "aggregate" / "agg" / "test_suite.agg"
+TEST_SUITE = REPO_ROOT / "src" / "aggregate" / "agg" / "_test_suite.agg"
 OUT = REPO_ROOT / "tests" / "data" / "expected_specs.json"
 
 POS_INF_SENTINEL = "__inf__"

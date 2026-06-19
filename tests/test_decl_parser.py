@@ -1,7 +1,7 @@
-"""Parse tests for every line of aggregate/agg/test_suite.agg.
+"""Parse tests for every line of aggregate/agg/_test_suite.agg.
 
 These tests are the regression net for the SLY -> Lark parser migration.
-Each DecL line in test_suite.agg becomes its own parametrized test case so
+Each DecL line in _test_suite.agg becomes its own parametrized test case so
 a parser failure points at the specific offending line.
 
 Two test functions:
@@ -21,7 +21,7 @@ import pytest
 
 from aggregate.parser import UnderwritingLexer
 
-TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "test_suite.agg"
+TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test_suite.agg"
 SNAPSHOT_PATH = Path(__file__).parent / "data" / "expected_specs.json"
 
 VALID_KINDS = {"agg", "sev", "port", "distortion", "expr"}
@@ -111,7 +111,7 @@ SNAPSHOT = _from_sentinel(json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8")))
 
 @pytest.mark.parametrize("line", LINES, ids=[_line_id(ln) for ln in LINES])
 def test_line_parses(line: str, underwriter):
-    """Every DecL line in test_suite.agg must parse to a valid (kind, name, spec)."""
+    """Every DecL line in _test_suite.agg must parse to a valid (kind, name, spec)."""
     kind, name, spec = underwriter.parser.parse(underwriter.lexer.tokenize(line))
     assert kind in VALID_KINDS, f"Unexpected kind {kind!r} for line: {line}"
     assert isinstance(name, str) and name, f"Empty name for line: {line}"

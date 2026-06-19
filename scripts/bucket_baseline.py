@@ -55,7 +55,7 @@ import pandas as pd
 BAR_KINDS = ("agg", "port")
 
 # Default database load request: reproduces the imported ``build``.
-DEFAULT_DATABASES = ("test_suite",)
+DEFAULT_DATABASES = ("_test_suite",)
 
 # Canonical column order of ``_bs_window_df`` (shared by Aggregate/Portfolio).
 WINDOW_COLUMNS = ["x_min", "x_max", "W", "bs", "log2", "coverage", "note"]
@@ -149,7 +149,7 @@ def collect_bucket_baseline(databases=DEFAULT_DATABASES):
 
     Parameters
     ----------
-    databases : sequence of str, default ``("test_suite",)``
+    databases : sequence of str, default ``("_test_suite",)``
         Database load request(s). The default reproduces the imported ``build``.
 
     Returns
@@ -222,7 +222,7 @@ def write_bucket_baseline(databases=DEFAULT_DATABASES, out_dir=None):
 
     Parameters
     ----------
-    databases : sequence of str, default ``("test_suite",)``
+    databases : sequence of str, default ``("_test_suite",)``
         Database load request(s).
     out_dir : str or pathlib.Path, optional
         Destination directory. ``None`` uses :data:`DEFAULT_OUT_DIR`
@@ -260,7 +260,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "-d", "--database", dest="databases", action="append", metavar="NAME",
-        help="Database name to load (repeatable). Default: test_suite "
+        help="Database name to load (repeatable). Default: _test_suite "
              "(reproduces the imported `build`).",
     )
     p.add_argument(

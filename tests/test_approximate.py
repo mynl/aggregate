@@ -15,7 +15,7 @@ positive-mass case (must NOT be marked signed), occurrence-reinsurance rejection
 (parse-time and direct constructor) with aggregate reinsurance allowed, the
 ``pnl`` combination, the Portfolio combine, and the unknown-kind error.
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg`` (section P).
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` (section P).
 """
 from __future__ import annotations
 

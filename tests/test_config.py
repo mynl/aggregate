@@ -42,7 +42,14 @@ def test_defaults_no_file_no_env():
     assert s.discretization.window_nines == 12
     assert s.validation.eps == pytest.approx(1e-4)
     assert s.validation.noise == pytest.approx(1e-12)
+    assert s.validation.aliasing_ratio == 10
+    assert s.validation.exeqa_noise_floor == pytest.approx(1e-4)
+    assert s.validation.deficit_materiality == pytest.approx(1e-4)
+    assert s.discretization.window_log2_growth == 4
+    assert s.discretization.window_slack_thick == pytest.approx(0.75)
+    assert s.discretization.concentration_cv == pytest.approx(0.1)
     assert s.bivariate.window_nines == 9
+    assert s.bivariate.min_axis_log2 == 4
     # every source is 'default'
     assert all(src == 'default' for _, _, src in config.describe_settings(s))
 
@@ -86,6 +93,46 @@ def test_kwargs_override_env_end_to_end(monkeypatch):
     assert config.get_settings().build.log2 == 18
     a = global_build('agg KwTest 1 claim sev lognorm 10 cv 1 fixed', log2=8)
     assert a.log2 == 8  # the call kwarg beats the configured 18
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: numerics floors + gathered sizing knobs
+# ---------------------------------------------------------------------------
+
+def test_phase2_floors_and_knobs_override(tmp_path):
+    """One override per section touched in Phase 2 flows through load_settings."""
+    cfg = tmp_path / 'config.toml'
+    cfg.write_text(
+        '[validation]\naliasing_ratio = 20\n'
+        '[discretization]\nwindow_slack_thick = 0.6\n'
+        '[bivariate]\nmin_axis_log2 = 5\n')
+    s = config.load_settings(path=cfg, env={})
+    assert s.validation.aliasing_ratio == 20
+    assert s.sources['validation.aliasing_ratio'] == 'config'
+    assert s.discretization.window_slack_thick == pytest.approx(0.6)
+    assert s.sources['discretization.window_slack_thick'] == 'config'
+    assert s.bivariate.min_axis_log2 == 5
+    assert s.sources['bivariate.min_axis_log2'] == 'config'
+
+
+def test_dropped_floors_gone_from_constants():
+    """The migrated/dropped numerics floors no longer live in aggregate.constants."""
+    from aggregate import constants
+    for name in ('FT_NOISE_FLOOR', 'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR',
+                 'DEFICIT_MATERIALITY'):
+        assert not hasattr(constants, name), f'{name} should be gone from constants'
+
+
+def test_module_captures_track_settings():
+    """The module-level UPPERCASE captures read the resolved config values."""
+    from aggregate import distributions, portfolio, spectral, tail, bivariate
+    s = config.get_settings()
+    assert distributions.ALIASING_RATIO == s.validation.aliasing_ratio
+    assert portfolio.EXEQA_NOISE_FLOOR == s.validation.exeqa_noise_floor
+    assert spectral.DEFICIT_MATERIALITY == s.validation.deficit_materiality
+    assert distributions.WINDOW_SLACK_THICK == s.discretization.window_slack_thick
+    assert tail.CONCENTRATION_CV == s.discretization.concentration_cv
+    assert bivariate._MIN_AXIS_LOG2 == s.bivariate.min_axis_log2
 
 
 # ---------------------------------------------------------------------------

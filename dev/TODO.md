@@ -103,10 +103,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 > apply-distortion side, `N2`/`N3`/`N5`, shipped a36–a57.)
 
 - [ ] **N6 `[A]` Validation-calc review** (#49) — audit the algorithm vs the
-  published *Aggregate* paper; make docs match the actual algo; finish "all
-  switches → config" (`eps`/`noise` already moved in a30); fix the false-positive
+  published *Aggregate* paper; make docs match the actual algo; the "all
+  switches → config" sub-goal is **done** (`eps`/`noise` a30; `aliasing_ratio` /
+  `exeqa_noise_floor` / `deficit_materiality` a83); fix the false-positive
   *agg-mean-error ≫ sev-error / aliasing* failure (try larger `bs`; revisit the
-  too-tight tolerance). Independent of N8.
+  too-tight tolerance — now an `aliasing_ratio` config edit). Independent of N8.
 - [ ] **N8 `[A]` Input guards & semantic consistency** *(ported from README,
   2026-06-06)* — three small correctness/guard items:
   - Treatment of zero `lb` is not consistent with attachment equals zero.
@@ -371,7 +372,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - **Numerics program** (`dev/done/plan-numerics-0-meta.md` + `-1`…`-4`) → the
   N-track, **complete**: numerics-1/2/3 shipped (a55–a57 → N2/N3); numerics-4
   (windowed combine/bivariate) delivered via `plan-mv` MV-2/MV-3 (a72/a76 → W2/M).
-- `dev/plan-config.md` (Phase 2) → **F8**.
+- `dev/done/plan-config.md` (Phase 1 + Phase 2) → **F8**, shipped a30 / a83.
 - `dev/done/plan-mv.md` → **Track M** (bivariate firm-up, MV-1…7). Absorbs & replaces
   the deleted `plan-multivariate-punchup.md` (former M2).
 - `dev/done/` → shipped plans (tail-thickness, config Phase 1, pentagon, database
@@ -396,6 +397,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
   both premium legs (`plan-pnl-premium.md` §9).
 - [ ] extend reinsurance clauses to allow net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros (rate on subject = quota share)
-- [ ] **F8 `[B]` Config Phase 2 for graphics** — `dev/plan-config.md`: `[plotting]` +
-  `.mplstyle` override, the rest of the env matrix, and the numerics-pending
-  floors (`aliasing_ratio`, `exeqa_noise_floor`, `ft_noise_floor`). Ties Track W.
+- [x] **F8 `[B]` Config Phase 2** — **shipped a83** (`dev/done/plan-config.md`).
+  Numerics floors `aliasing_ratio` / `exeqa_noise_floor` / `deficit_materiality`
+  → `[validation]`; the half-migrated window knobs (`window_log2_growth`,
+  `window_slack_thick`, `concentration_cv`) → `[discretization]` and
+  `min_axis_log2` → `[bivariate]`; dead `FT_NOISE_FLOOR` dropped. `[plotting]` /
+  `.mplstyle` override **rejected** (`dev/done/plans-considered-and-rejected.md`);
+  the wider env matrix deferred (not needed).

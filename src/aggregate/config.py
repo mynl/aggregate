@@ -143,6 +143,27 @@ class DiscretizationSettings:
         where the priced tail lives; ``0.5 + Delta`` for a payoff). ``0`` centres
         the band exactly; the legacy behaviour was ``f = 0`` (all slack above).
         See ``dev/plan-bucket-window-2.md`` §1A (Q4).
+    window_log2_growth : int
+        How many powers of two the *windowed* sizing may grow ``log2`` past the
+        requested cap to preserve an exact integer-lattice ``bs`` (e.g. keep
+        ``bs=1`` for a high-mean ``dsev`` rather than coarsening to ``bs=2`` and
+        mis-placing atoms at half-integer buckets). Small and bounded because a
+        windowed band is provably narrow (``agg_cv < 1/z``); never fires for a
+        genuinely wide band, which coarsens ``bs`` as before.
+    window_slack_thick : float
+        For an *asymmetric* windowed band (one tail thick, one thin), the
+        fraction of the power-of-two slack placed on the **thick** side (the tail
+        that needs the room); the thin side gets ``1 - window_slack_thick``. The
+        loss/payoff convention does not apply when the tails are asymmetric (the
+        tail shape dictates placement); ``window_pad_skew`` is the tie-breaker for
+        a *symmetric* band only.
+    concentration_cv : float
+        Coefficient-of-variation gate for windowing eligibility: an aggregate
+        whose mass band clears 0 is windowed (left edge lifted) only when its CV
+        is ``<= concentration_cv`` -- the band then sits ``>= 1/concentration_cv``
+        standard deviations above 0. Tighter than the legacy ``1/z ~ 0.14`` gate;
+        lifting ``x_min`` when the band does not really clear 0 clips left-tail
+        mass, so the default errs toward *not* windowing when marginal.
     sbj_tail_floor : float
         Numerical-depth floor for the single-big-jump (SBJ) extent floor. To
         cover the aggregate to ``p*`` the severity is probed at the deeper
@@ -159,6 +180,9 @@ class DiscretizationSettings:
     window_nines: int = 12
     window_nines_trim: int = 6
     window_pad_skew: float = 0.1
+    window_log2_growth: int = 4
+    window_slack_thick: float = 0.75
+    concentration_cv: float = 0.1
     sbj_tail_floor: float = 1e-14
 
 
@@ -177,10 +201,35 @@ class ValidationSettings:
         not a coverage target -- the 12-nines coverage lives in
         ``discretization.window_nines`` (the two coincidentally both involve
         12). Sensible band 1e-12 .. 1e-14.
+    aliasing_ratio : int
+        The ``ALIASING`` validation flag fires when the relative error on the
+        aggregate mean exceeds ``aliasing_ratio`` times the relative error on the
+        severity mean: FFT wrap-around inflates the agg-mean error far above the
+        sev-mean error, while a clean discretisation keeps them comparable
+        (formerly ``ALIASING_RATIO``).
+    exeqa_noise_floor : float
+        Floor on the per-bucket ``exeqa_err`` (``Sum exeqa_i - loss``) below which
+        a bucket's conditional decomposition is treated as numerically resolved;
+        used by ``Portfolio._build_augmented`` to truncate the augmented frame
+        where exeqa-derived quantities become unreliable (formerly
+        ``EXEQA_NOISE_FLOOR``).
+    deficit_materiality : float
+        Economic-materiality floor on the pmf deficit ``1 - Sum p`` in the
+        exact-discrete Choquet helper (:func:`aggregate.spectral.choquet_weights`).
+        Below ``noise`` a deficit is fp dust and is renormalized away; between
+        ``noise`` and this value it is a small FFT-truncation loss already
+        advertised by ``DefectiveDistributionWarning`` and is parked; above it the
+        missing mass sits at unknown loss values and pricing raises
+        ``DefectiveDistributionError`` unless the caller passes ``allow_deficit``
+        (formerly ``DEFICIT_MATERIALITY``). The 1e-4 default is a judgment call
+        pending review (numerics-3).
     """
 
     eps: float = 1e-4
     noise: float = 1e-12
+    aliasing_ratio: int = 10
+    exeqa_noise_floor: float = 1e-4
+    deficit_materiality: float = 1e-4
 
 
 @dataclass(frozen=True)
@@ -204,10 +253,14 @@ class BivariateSettings:
         between the two axes by measured support). The square-law memory lever:
         raise/lower on :meth:`BivariateAggregate.update`; the per-axis split
         falls out of the measured marginals (see ``dev/plan-mv.md`` §5.3).
+    min_axis_log2 : int
+        Smallest per-axis ``log2`` the 2-D sizer will hand back, so a lopsided
+        support split still leaves each axis a usable grid.
     """
 
     window_nines: int = 9
     total_log2: int = 20
+    min_axis_log2: int = 4
 
 
 @dataclass(frozen=True)

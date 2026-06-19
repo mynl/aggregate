@@ -40,13 +40,15 @@ except ImportError:
 import hashlib
 
 from .config import get_settings
-from .constants import (DEFICIT_MATERIALITY, DefectiveDistributionError,
+from .constants import (DefectiveDistributionError,
                         FIG_H, FIG_W, INFO_NA, info_row)
 from .random_agg import RANDOM
 
-# Resolved once per session from config (validation.noise); the deficit /
-# fuzz materiality floor for the exact-discrete Choquet helper.
+# Resolved once per session from config. VALIDATION_NOISE is the absolute dust
+# floor; DEFICIT_MATERIALITY is the economic-materiality floor on the pmf
+# deficit gating the exact-discrete Choquet helper.
 VALIDATION_NOISE = get_settings().validation.noise
+DEFICIT_MATERIALITY = get_settings().validation.deficit_materiality
 
 
 def _short_hash(s):
@@ -151,7 +153,7 @@ def choquet_weights(x, p, g, *, S_calculation='forwards',
     allow_deficit : bool
         Explicit truncation policy for a *material* deficit
         (``1 - sum(p)`` above
-        :data:`~aggregate.constants.DEFICIT_MATERIALITY`): missing
+        :data:`~aggregate.config.ValidationSettings.deficit_materiality`): missing
         probability at unknown loss values is an economic error, and the
         default ``False`` raises
         :class:`~aggregate.constants.DefectiveDistributionError`.

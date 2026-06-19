@@ -58,6 +58,8 @@ from typing import NamedTuple, Optional
 import numpy as np
 import pandas as pd
 
+from .config import get_settings
+
 __all__ = [
     'TailClass', 'TailClasses', 'TailInfo', 'TailRow',
     'classify_frequency', 'classify_severity', 'combine',
@@ -76,7 +78,7 @@ __all__ = [
 # standard deviations above 0. Tighter than the legacy 1/z ~ 0.14 gate: lifting
 # x_min when the band does not really clear 0 clips left-tail mass, so we err
 # toward *not* windowing when marginal. See plan-univariate-bucket [tail-report].
-CONCENTRATION_CV = 0.1
+CONCENTRATION_CV = get_settings().discretization.concentration_cv
 
 
 # ----------------------------------------------------------------------------

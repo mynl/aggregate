@@ -7,9 +7,13 @@ reins plans). Goal: lift the "secret bits" currently hard-coded in
 hand-editable **TOML** file under `~/.aggregate/`, layered as an override on the
 shipped defaults — without violating the project's no-magic principle.
 
-**PHASE 2: Open — the numerics-pending validation floors only.** (Matplotlib
+**PHASE 2: SHIPPED (2026-06-19, v1.0.0a83).** Wired the surviving numerics floors
+(`aliasing_ratio`, `exeqa_noise_floor`, `deficit_materiality`) plus the stranded
+window/bivariate sizing knobs into config, and **dropped the dead `FT_NOISE_FLOOR`**.
+Exact constant list and file edits in the Phase 2 section below. (Matplotlib
 graphics into config was considered and **dropped** — see
-`dev/done/plans-considered-and-rejected.md`.)
+`dev/done/plans-considered-and-rejected.md`.) Both phases complete; plan retired
+to `dev/done/`.
 
 > **STATUS: PHASE 1 SHIPPED (2026-06-05, v1.0.0a30).** `config.py` +
 > annotated `data/config.default.toml` landed; `requires-python>=3.11` + stdlib
@@ -27,9 +31,14 @@ graphics into config was considered and **dropped** — see
 > graphics into config was considered and rejected (they are used in
 > default-argument expressions, and the surface duplicates matplotlib's own
 > `mplstyle`/`rcParams`; see `dev/done/plans-considered-and-rejected.md`). The
-> floors await the numerics review. **Phase 2 is now narrowed to those floors
-> only** (`aliasing_ratio`, `exeqa_noise_floor`, `ft_noise_floor`); this plan
-> stays in `dev/` until they ship.
+> floors awaited the numerics review (numerics-0…4, a55–a80 — **now complete**).
+> **Phase 2 (scoped 2026-06-19):** wire `aliasing_ratio`, `exeqa_noise_floor`,
+> and the post-Phase-1 `deficit_materiality` into `[validation]`; **drop**
+> `FT_NOISE_FLOOR` (dead — the experimental `min|ft|` switch was abandoned with
+> *zero accuracy benefit*, see `dev/audit-numerics-2-findings.md`); and gather
+> the stranded window-sizing trio (`window_log2_growth`, `window_slack_thick`,
+> `concentration_cv` → `[discretization]`) plus `min_axis_log2` → `[bivariate]`.
+> This plan stays in `dev/` until Phase 2 ships.
 >
 > **STATUS (original): NOT STARTED — plan for review.** Author confirmed (2026-06-04):
 > TOML format; location `~/.aggregate/` via `Path.home()` (option A — **no
@@ -148,9 +157,21 @@ as the `config.py` dataclass field defaults (their single source of truth); the
 | `[validation]` | `eps` | `1e-4` | `VALIDATION_EPS` |
 | `[validation]` | `noise` | `1e-12` | `VALIDATION_NOISE` (dust floor, **not** a coverage) |
 | `[validation]` | `aliasing_ratio` | `10` | `ALIASING_RATIO` |
-| `[validation]` | `exeqa_noise_floor` | `1e-4` | `EXEQA_NOISE_FLOOR` (numerics-pending) |
-| `[validation]` | `ft_noise_floor` | `1e-10` | `FT_NOISE_FLOOR` (numerics-pending) |
-| `[multivariate]` | `window_nines` | `12` | `multivariate._WINDOW_NINES` (per-axis 2-D window; was import-avoidance dup) |
+| `[validation]` | `exeqa_noise_floor` | `1e-4` | `EXEQA_NOISE_FLOOR` |
+| `[validation]` | `deficit_materiality` | `1e-4` | `DEFICIT_MATERIALITY` (added post-plan; 1e-4 value flagged for review, numerics-3) |
+| `[discretization]` | `window_log2_growth` | `4` | `WINDOW_LOG2_GROWTH` (`distributions.py`; window family) |
+| `[discretization]` | `window_slack_thick` | `0.75` | `WINDOW_SLACK_THICK` (`distributions.py`; window family) |
+| `[discretization]` | `concentration_cv` | `0.1` | `CONCENTRATION_CV` (`tail.py`; windowing-eligibility gate) |
+| `[bivariate]` | `min_axis_log2` | `4` | `_MIN_AXIS_LOG2` (`bivariate.py`; sibling of `total_log2`) |
+| `[bivariate]` | `window_nines` | `9` | `bivariate._WINDOW_NINES` (per-axis 2-D window; was import-avoidance dup) |
+
+*`FT_NOISE_FLOOR` (formerly `1e-10`) is **dropped**, not migrated — it has no live
+call site (the experimental `min|ft|` switch was abandoned with zero accuracy
+benefit, `dev/audit-numerics-2-findings.md`). `copula._PPF_CLIP` and
+`spectral._DISTORTION_DENSITY_N` stay module-internal (implementation details,
+not user knobs). Fields already shipped via sibling plans — `window_nines_trim`,
+`window_pad_skew`, `sbj_tail_floor` (discretization), `total_log2` (bivariate),
+the `[labels]` section — are in `config.py` already and are not re-listed here.*
 
 *(A `[plotting]` section — `fig_w`/`fig_h`, `font_size`, colours, mplstyle override —
 was considered and **rejected**; those constants stay in `constants.py`. See
@@ -288,12 +309,67 @@ settings, **fix the log2 split**,
 `Underwriter.info` config line, `show_settings()`, `write_default_config()`.
 Tests. (The numerics-pending floors wait for Phase 2; graphics dropped entirely.)
 
-**Phase 2 — remaining numerics-pending validation floors.**
-Wire the remaining `[validation]` floors (`aliasing_ratio`, `exeqa_noise_floor`,
-`ft_noise_floor`) through `get_settings()` now that the numerics review has
-settled their values (numerics-0…4 complete, a55–a80). Plus the rest of the
-env-var matrix if wanted. *(Graphics/`[plotting]` was considered and dropped —
-`dev/done/plans-considered-and-rejected.md`.)*
+**Phase 2 — surviving numerics floors + stranded sizing knobs (scoped 2026-06-19).**
+The numerics review (numerics-0…4, a55–a80) is complete, so the floor values are
+settled. Wiring follows the **established pattern**: a module-level UPPERCASE
+constant captured from `get_settings()` at import — exactly as `distributions.py:68`
+(`WINDOW_NINES = get_settings().discretization.window_nines`), `moments.py:15`,
+and `bivariate.py:73` already do. So the existing **call sites are untouched**;
+only the *source line* flips from a `constants.py` literal to a `get_settings()`
+read, and the literal is deleted from `constants.py`.
+
+Changes:
+
+- **Drop `FT_NOISE_FLOOR`.** Dead since numerics-2: the experimental
+  `min|ft| < FT_NOISE_FLOOR` switch was abandoned with zero accuracy benefit
+  (`dev/audit-numerics-2-findings.md`); grep finds no call site. Remove the
+  constant, its `__all__` entry, and its comment block from `constants.py`.
+
+- **`[validation]` += `aliasing_ratio` (10), `exeqa_noise_floor` (1e-4),
+  `deficit_materiality` (1e-4).** Add the three fields to `ValidationSettings`
+  (with docstrings). Repoint by module-level capture (names unchanged):
+  - `distributions.py` — `ALIASING_RATIO = get_settings().validation.aliasing_ratio`
+    (call site `:5650` / log string `:5651` untouched).
+  - `portfolio.py` — `ALIASING_RATIO` and `EXEQA_NOISE_FLOOR` captured the same
+    way (call sites `:2846`/`:2847`, `:3999` untouched).
+  - `spectral.py` — `DEFICIT_MATERIALITY = get_settings().validation.deficit_materiality`
+    (call sites `:219`/`:225`/`:236` untouched).
+  - Delete `ALIASING_RATIO`, `EXEQA_NOISE_FLOOR`, `DEFICIT_MATERIALITY` (and the
+    already-dropped `FT_NOISE_FLOOR`) from `constants.py` + `__all__`.
+  - *`deficit_materiality`'s 1e-4 value is an open author item (numerics-3 flags
+    it for review). Config exposure is what makes revisiting it a one-line edit.*
+
+- **`[discretization]` += `window_log2_growth` (4), `window_slack_thick` (0.75),
+  `concentration_cv` (0.1).** These window-sizing knobs sit literally between
+  fields already in `[discretization]` (`distributions.py:75`/`:93`, `tail.py:79`).
+  Add to `DiscretizationSettings`; `distributions.py` `WINDOW_LOG2_GROWTH` /
+  `WINDOW_SLACK_THICK` and `tail.py` `CONCENTRATION_CV` become `get_settings()`
+  captures. (`CONCENTRATION_CV` is the windowing-eligibility CV gate — same
+  machinery — so it lands in `[discretization]`, not `[validation]`.)
+
+- **`[bivariate]` += `min_axis_log2` (4).** Add to `BivariateSettings`;
+  `bivariate.py:79` `_MIN_AXIS_LOG2` becomes a `get_settings()` capture (sibling
+  of `total_log2` / `window_nines` already there).
+
+- **Template + tests.** Add the new keys to `data/config.default.toml` (commented,
+  annotated with range/units, matching the existing template style); extend
+  `tests/test_config.py` with an override case for one field per touched section
+  (`validation.aliasing_ratio`, `discretization.window_slack_thick`,
+  `bivariate.min_axis_log2`) and assert `FT_NOISE_FLOOR` is gone from
+  `aggregate.constants`.
+
+- **Left in `constants.py` on purpose:** plotting constants (config rejected),
+  `Validation` / `DefectiveDistributionWarning` / `DefectiveDistributionError`
+  (types), `REINS_LABEL_*` (structural keys), the `INFO_*` display convention.
+
+- **Left module-internal (not config):** `copula._PPF_CLIP` (masked scratch
+  guard) and `spectral._DISTORTION_DENSITY_N` (plot-density resolution) —
+  implementation details, not user knobs.
+
+- Version bump + `CHANGELOG.md` entry per the standing rules; README breaking-change
+  note (`FT_NOISE_FLOOR` removed; the four migrated `constants` names moved to
+  `aggregate.config`). *(Graphics/`[plotting]` was considered and dropped —
+  `dev/done/plans-considered-and-rejected.md`.)*
 
 ## Verification
 
@@ -360,6 +436,13 @@ env-var matrix if wanted. *(Graphics/`[plotting]` was considered and dropped —
   today's `build` behaviour. If the author later wants all three bundled files
   by default, it becomes a one-line config edit (`databases = ["default"]`) —
   no code change. Flagged, not decided here.
-- **Numerics-pending floors.** `exeqa_noise_floor` / `ft_noise_floor` (and
-  `aliasing_ratio`) are exposed in config but their *values* await the separate
-  numerics review; Phase 1 only plumbs `eps` and `noise`.
+- **Numerics floors (RESOLVED 2026-06-19).** The numerics review (numerics-0…4,
+  a55–a80) settled the values, so Phase 2 wires `aliasing_ratio`,
+  `exeqa_noise_floor`, and `deficit_materiality`; `ft_noise_floor` is **dropped**
+  (dead, no call site). The 1e-4 `deficit_materiality` level stays an open author
+  item (numerics-3) but is now a config edit, not a code change.
+- **Stranded sizing knobs (DECIDED 2026-06-19).** Gather the window-sizing trio
+  `window_log2_growth` / `window_slack_thick` / `concentration_cv` →
+  `[discretization]` and `min_axis_log2` → `[bivariate]` (they were half-migrated
+  siblings of already-config'd fields). `copula._PPF_CLIP` and
+  `spectral._DISTORTION_DENSITY_N` stay module-internal.

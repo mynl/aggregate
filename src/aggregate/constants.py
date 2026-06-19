@@ -13,9 +13,10 @@ The reinsurance labels are *structural* MultiIndex column / axis keys
 tests), so they are constants here, not user-tunable settings.
 
 All tunable defaults (grid sizing, databases, discretization schemes,
-validation tolerances) and the path names now live in :mod:`aggregate.config`.
-The plotting figure constants and the numerics-pending noise floors below are
-slated to move to :mod:`aggregate.config` in a later phase.
+validation tolerances — including the former numerics noise floors) and the
+path names now live in :mod:`aggregate.config`. The plotting figure constants
+below stay here permanently (used in default-argument expressions; user
+restyling goes through matplotlib's native ``mplstyle`` / ``rcParams``).
 """
 
 from enum import Flag, auto
@@ -23,17 +24,17 @@ from enum import Flag, auto
 
 __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
-           'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR', 'FT_NOISE_FLOOR',
            'Validation', 'DefectiveDistributionWarning',
            'DefectiveDistributionError',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
            'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row']
 
-# --- plotting figure defaults (move to config [plotting] in Phase 2) -------
+# --- plotting figure defaults (permanently here, not config) ---------------
 # These are used as module-level constants in default argument expressions
-# (e.g. ``figsize=(2 * FIG_W, FIG_H)``), so they stay literals until the
-# plotting/style work repoints those call sites.
+# (e.g. ``figsize=(2 * FIG_W, FIG_H)``); a config [plotting] section was
+# considered and rejected (see dev/done/plans-considered-and-rejected.md) --
+# users restyle via matplotlib's native mplstyle / rcParams.
 FIG_W = 3.5
 FIG_H = 2.45
 FONT_SIZE = 9
@@ -41,36 +42,6 @@ LEGEND_FONT = 'x-small'
 # see https://matplotlib.org/stable/gallery/color/named_colors.html
 PLOT_FACE_COLOR = 'lightsteelblue'
 FIGURE_BG_COLOR = 'aliceblue'
-
-# --- numerics-pending validation floors (values await the numerics review) --
-# Aliasing test ratio. The ALIASING flag fires when the relative error on the
-# aggregate mean exceeds ALIASING_RATIO times the relative error on the
-# severity mean: aliasing inflates the agg-mean error far above the sev-mean
-# error, while a clean discretisation keeps them comparable. 10 has carried
-# through the suite as the practical threshold.
-ALIASING_RATIO = 10
-# Floor on the per-bucket ``exeqa_err`` (``Σ exeqa_i − loss``) below which a
-# bucket's conditional decomposition is treated as numerically resolved, used
-# in ``Portfolio._build_augmented`` to truncate the augmented frame where
-# exeqa-derived quantities become unreliable.
-EXEQA_NOISE_FLOOR = 1e-4
-# Floor on ``|ft_line_density|`` below which the "build up the product"
-# branch is preferred over division in the per-unit FT decomposition (avoids
-# divide-by-near-zero).
-FT_NOISE_FLOOR = 1e-10
-# Economic-materiality floor on the pmf deficit ``1 - Σp`` in the Choquet
-# helper (``spectral.choquet_weights``). Below the validation noise floor a
-# deficit is fp dust and is renormalized away; between the noise floor and
-# this value it is a small FFT-truncation loss already advertised by
-# ``DefectiveDistributionWarning`` at construction and is parked per the
-# ``S_calculation`` direction; above it the missing probability sits at
-# unknown loss values and pricing raises ``DefectiveDistributionError``
-# unless the caller passes an explicit truncation policy
-# (``allow_deficit=True``). Calibration: everyday under-padded grids carry
-# 1e-8..1e-5 (parked; the price error is bounded by deficit x window
-# width), while genuinely defective laws (e.g. heavy-tail pareto on a
-# finite window without normalization) carry 1e-3+.
-DEFICIT_MATERIALITY = 1e-4
 
 # Column / view labels for reinsurance reporting (``describe``,
 # ``reins_describe``, ``reins_stats_df``). Centralised so the wording is

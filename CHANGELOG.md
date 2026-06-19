@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.0.0a83
+
+### config Phase 2 — numerics floors + stranded sizing knobs (breaking)
+
+Completes the `dev/plan-config.md` work: the last hard-coded numerics floors and
+a few half-migrated sizing knobs move out of `constants.py` into
+`aggregate.config`, and one dead constant is removed. Wiring follows the
+established pattern — a module-level `UPPERCASE` constant captured from
+`get_settings()` at import — so call sites are unchanged; only the *source* of
+each value moves.
+
+- **`FT_NOISE_FLOOR` removed.** It had no live call site: the experimental
+  `min|ft| < FT_NOISE_FLOOR` switch was abandoned during the numerics review with
+  zero accuracy benefit (`dev/audit-numerics-2-findings.md`). Dropped from
+  `constants.py` (constant + `__all__`), not migrated.
+- **`[validation]` gains `aliasing_ratio` (10), `exeqa_noise_floor` (1e-4),
+  `deficit_materiality` (1e-4).** Formerly `constants.ALIASING_RATIO` /
+  `EXEQA_NOISE_FLOOR` / `DEFICIT_MATERIALITY`. The `deficit_materiality` 1e-4
+  level is a judgment call still flagged for review (numerics-3); it is now a
+  config edit rather than a code change.
+- **`[discretization]` gains `window_log2_growth` (4), `window_slack_thick`
+  (0.75), `concentration_cv` (0.1).** These window-sizing knobs were literals
+  interleaved between fields already in `[discretization]` (`distributions.py`,
+  `tail.py`); gathered for consistency.
+- **`[bivariate]` gains `min_axis_log2` (4).** Formerly `bivariate._MIN_AXIS_LOG2`,
+  now a first-class sibling of `total_log2` / `window_nines`.
+- **Left module-internal (deliberately not config):** `copula._PPF_CLIP` (masked
+  scratch guard) and `spectral._DISTORTION_DENSITY_N` (plot resolution) —
+  implementation details, not user knobs.
+- **Breaking:** `aggregate.constants` no longer exposes `FT_NOISE_FLOOR`,
+  `ALIASING_RATIO`, `EXEQA_NOISE_FLOOR`, or `DEFICIT_MATERIALITY` (no re-export).
+  Read them from `aggregate.config.get_settings().validation.*`. The annotated
+  `config.default.toml` template documents all new keys; `tests/test_config.py`
+  covers the new defaults, an override per touched section, and the constants
+  removal.
+
+`constants.py` is now down to the plotting figure defaults (permanently here),
+the `Validation` / `DefectiveDistribution*` types, the structural `REINS_LABEL_*`
+keys, and the `INFO_*` display convention.
+
 ## 1.0.0a82
 
 ### Consistent naming on the narrative / reporting surface — partly breaking
@@ -910,7 +950,7 @@ Third plan of the numerics program
 (`dev/done/plan-numerics-3-distortion.md`). All distorted pricing routes
 through one exact-discrete Choquet helper; the linear and lifted
 allocations become one builder; the `T.*`/`M.*` column families are gone.
-Step-0 audit with measured verdicts in `dev/audit-numerics-3-findings.md`.
+Step-0 audit with measured verdicts in `dev/done/audit-numerics-3-findings.md`.
 
 - **One Choquet helper.** `spectral.choquet_weights(x, p, g)` computes the
   exact distorted atom weights `gp = g(T) − g(S)` (`T = P(X ≥ x)`, the
@@ -1010,7 +1050,7 @@ Second plan of the numerics program
 (`dev/done/plan-numerics-2-objective.md`). `Portfolio.add_exa` and the
 Aggregate objective columns rewritten on the exact-discrete, origin-carrying
 footing; signed (P&L) books now get the objective allocation columns. Step-0
-audit with measured verdicts in `dev/audit-numerics-2-findings.md`.
+audit with measured verdicts in `dev/done/audit-numerics-2-findings.md`.
 
 - **Shifted-support kappa.** `exeqa_{line}` is computed from each unit's
   **native** pmf: the first-moment density `x·p_i(x)` is built from true

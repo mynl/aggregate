@@ -9,7 +9,7 @@ code** (``tests/baseline/capture_spotchecks.py``) at rows sampled by total
 quantile, so the direct-sum rewrite has a measured target.
 
 Tolerances (measured on the numerics-2 rewrite, ``cumsum(S)·bs`` → direct
-sums; see ``dev/audit-numerics-2-findings.md``):
+sums; see ``dev/done/audit-numerics-2-findings.md``):
 
 * most columns drift ≤ 2.5e-14 relative → gate rtol = 1e-13;
 * ``exgta`` is ``(e − cum)/S`` — a genuine cancellation near the right

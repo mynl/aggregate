@@ -76,7 +76,8 @@ _WINDOW_NINES = get_settings().bivariate.window_nines
 # memory lever (see dev/plan-mv.md §5.3).
 _TOTAL_LOG2 = get_settings().bivariate.total_log2
 # Smallest per-axis log2 the sizer will hand back (keeps a usable grid).
-_MIN_AXIS_LOG2 = 4
+# First-class bivariate setting (see aggregate.config [bivariate]).
+_MIN_AXIS_LOG2 = get_settings().bivariate.min_axis_log2
 
 # View-pair plumbing for the occurrence netceded family (the ``netceded`` /
 # ``grossceded`` / ``grossnet`` DecL prefixes and ``occ_bivariate(views=...)``).

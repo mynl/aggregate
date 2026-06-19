@@ -22,7 +22,7 @@ from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize import NoConvergence  # noqa
 from textwrap import fill
 
-from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
+from .constants import (DefectiveDistributionWarning,
                         FIG_H, FIG_W, INFO_NA, info_row,
                         REINS_LABEL_GROSS, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT,
@@ -72,7 +72,7 @@ WINDOW_NINES = get_settings().discretization.window_nines
 # the atoms at half-integer buckets. Small and bounded because the windowed band
 # is provably narrow (a concentrated aggregate, agg_cv < 1/z); it never fires for
 # a genuinely wide band, which coarsens bs as before.
-WINDOW_LOG2_GROWTH = 4
+WINDOW_LOG2_GROWTH = get_settings().discretization.window_log2_growth
 # WINDOW_NINES_TRIM: coverage (number of nines) for the *unprotected* edge of a
 # windowed two-sided aggregate -- the cheap tail the sign convention does not
 # price (the left edge for a loss, the right for a payoff). Shallower than
@@ -90,7 +90,7 @@ WINDOW_PAD_SKEW = get_settings().discretization.window_pad_skew
 # (1 - WINDOW_SLACK_THICK). Hardwired 3/4; the loss/payoff convention does not
 # apply when the tails are asymmetric (the tail shape dictates placement),
 # only as a tie-breaker for a symmetric band (WINDOW_PAD_SKEW).
-WINDOW_SLACK_THICK = 0.75
+WINDOW_SLACK_THICK = get_settings().discretization.window_slack_thick
 # BUCKET_SIZING_P: percentile of the fitted distribution fed to
 # recommend_bucket to size bs (formerly BUCKET_SIZING_P). >1 is read as nines.
 BUCKET_SIZING_P = get_settings().discretization.bucket_sizing_p
@@ -102,6 +102,9 @@ SBJ_TAIL_FLOOR = get_settings().discretization.sbj_tail_floor
 # VALIDATION_NOISE: absolute dust floor below which a quantity is treated as
 # exact zero / numerical noise.
 VALIDATION_NOISE = get_settings().validation.noise
+# ALIASING_RATIO: the ALIASING flag fires when the agg-mean relative error
+# exceeds this multiple of the sev-mean relative error (FFT wrap-around).
+ALIASING_RATIO = get_settings().validation.aliasing_ratio
 
 
 def value_type_role(v):

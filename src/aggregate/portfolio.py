@@ -13,8 +13,8 @@ from scipy.spatial import ConvexHull
 from textwrap import fill
 import warnings
 
-from .constants import (ALIASING_RATIO, DefectiveDistributionWarning,
-                        EXEQA_NOISE_FLOOR, FIG_H, FIG_W, INFO_NA, info_row,
+from .constants import (DefectiveDistributionWarning,
+                        FIG_H, FIG_W, INFO_NA, info_row,
                         REINS_LABEL_OUTPUT, Validation)
 from .config import get_settings
 from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
@@ -22,8 +22,12 @@ from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
                             estimate_agg_window, value_type_label)
 
 # Resolved once per session from config (see aggregate.config). VALIDATION_NOISE
-# is the absolute dust floor used throughout validation.
+# is the absolute dust floor used throughout validation; ALIASING_RATIO is the
+# agg-vs-sev mean-error multiple for the ALIASING flag; EXEQA_NOISE_FLOOR is the
+# exeqa_err floor below which a bucket's conditional decomposition is reliable.
 VALIDATION_NOISE = get_settings().validation.noise
+ALIASING_RATIO = get_settings().validation.aliasing_ratio
+EXEQA_NOISE_FLOOR = get_settings().validation.exeqa_noise_floor
 
 __all__ = ['Portfolio', 'make_awkward', 'make_comonotonic_allocations',
            'swap_density_df']

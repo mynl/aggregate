@@ -87,6 +87,22 @@
 # 1e-14, ~ window_nines + 2 nines).
 # sbj_tail_floor = 1e-14
 
+# window_log2_growth: how many powers of 2 the windowed sizer may grow log2 past
+# the requested cap to keep an exact integer-lattice bs (e.g. bs=1 for a high-mean
+# dsev instead of coarsening to bs=2). Small and bounded; never fires for a wide
+# band. Integer, typical 2..6.
+# window_log2_growth = 4
+
+# window_slack_thick: for an ASYMMETRIC windowed band, the fraction of the
+# power-of-2 slack placed on the thick (room-needing) side; the thin side gets the
+# rest. Float in (0.5, 1); 0.75 = 3/4. window_pad_skew handles the symmetric case.
+# window_slack_thick = 0.75
+
+# concentration_cv: CV gate for windowing eligibility. A band that clears 0 is
+# windowed (left edge lifted) only when agg CV <= this (band sits >= 1/cv sd above
+# 0). Tighter than the legacy 0.14; lower = more conservative (window less often).
+# concentration_cv = 0.1
+
 
 # [validation] -- moment-matching tolerances.
 [validation]
@@ -97,6 +113,22 @@
 # This is a numerical floor, NOT a coverage target. aggregate's FFT arithmetic
 # is essentially exact, so keep this tight: sensible band 1e-12 .. 1e-14.
 # noise = 1e-12
+
+# aliasing_ratio: the ALIASING flag fires when the aggregate-mean relative error
+# exceeds this multiple of the severity-mean relative error (FFT wrap-around
+# inflates the former). Integer; 10 is the practical threshold. Raise to relax.
+# aliasing_ratio = 10
+
+# exeqa_noise_floor: floor on the per-bucket exeqa error (sum exeqa_i - loss)
+# below which a bucket's conditional (per-unit) decomposition is treated as
+# numerically resolved; the augmented frame is truncated past it. Typical 1e-5..1e-3.
+# exeqa_noise_floor = 1e-4
+
+# deficit_materiality: economic-materiality floor on the pmf deficit 1 - sum(p)
+# in the exact-discrete Choquet pricer. Below `noise` = fp dust (renormalized);
+# between `noise` and this = parked FFT-truncation loss; above this pricing raises
+# DefectiveDistributionError unless allow_deficit=True. 1e-4 is a judgment call.
+# deficit_materiality = 1e-4
 
 
 # [bivariate] -- defaults for the bivariate module.
@@ -111,6 +143,9 @@
 # total_log2: total 2-D grid budget in log2 cells (2**total_log2 cells, split
 # between axes by measured support). The square-law memory lever. Typical 18..22.
 # total_log2 = 20
+# min_axis_log2: smallest per-axis log2 the 2-D sizer will hand back, so a
+# lopsided support split still leaves each axis a usable grid. Typical 3..6.
+# min_axis_log2 = 4
 
 
 # [labels] -- display / semantic-convention labels for value_type.

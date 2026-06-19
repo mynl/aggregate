@@ -7,7 +7,9 @@ reins plans). Goal: lift the "secret bits" currently hard-coded in
 hand-editable **TOML** file under `~/.aggregate/`, layered as an override on the
 shipped defaults — without violating the project's no-magic principle.
 
-**PHASE 2: Open.** Matplotlib graphics into config - **optional**. 
+**PHASE 2: Open — the numerics-pending validation floors only.** (Matplotlib
+graphics into config was considered and **dropped** — see
+`dev/done/plans-considered-and-rejected.md`.)
 
 > **STATUS: PHASE 1 SHIPPED (2026-06-05, v1.0.0a30).** `config.py` +
 > annotated `data/config.default.toml` landed; `requires-python>=3.11` + stdlib
@@ -21,11 +23,13 @@ shipped defaults — without violating the project's no-magic principle.
 > deliberate deviation from the slim-everything wording:** `constants.py` still
 > holds the **plotting** constants (`FIG_*`, `FONT_SIZE`, …) and the
 > **numerics-pending floors** (`ALIASING_RATIO`, `EXEQA_NOISE_FLOOR`,
-> `FT_NOISE_FLOOR`) — the plotting ones are used in default-argument
-> expressions (must stay module-level until the Phase 2 plot repoint), and the
-> floors await the numerics review. **Phase 2 remains** (plotting/`[plotting]` +
-> mplstyle override, the rest of the env matrix, the floors); this plan stays in
-> `dev/` until it ships.
+> `FT_NOISE_FLOOR`). The plotting ones now stay there **permanently** — moving
+> graphics into config was considered and rejected (they are used in
+> default-argument expressions, and the surface duplicates matplotlib's own
+> `mplstyle`/`rcParams`; see `dev/done/plans-considered-and-rejected.md`). The
+> floors await the numerics review. **Phase 2 is now narrowed to those floors
+> only** (`aliasing_ratio`, `exeqa_noise_floor`, `ft_noise_floor`); this plan
+> stays in `dev/` until they ship.
 >
 > **STATUS (original): NOT STARTED — plan for review.** Author confirmed (2026-06-04):
 > TOML format; location `~/.aggregate/` via `Path.home()` (option A — **no
@@ -117,10 +121,11 @@ The directory split already exists and is correct — keep it:
     behaviour), they do not silently no-op.
 - **Bundled databases & default style stay in the package.** The default
   `aggregate.mplstyle` remains package data loaded via `importlib.resources`
-  (`style.py:31`); the config gains `[plotting] style = "..."` so a user *can*
-  drop their own `my.mplstyle` in `~/.aggregate` and point at it. Symmetric with
-  config (shipped template vs. active file) and databases (default_dir vs.
-  user_dir). Do **not** reuse matplotlib's own `stylelib`.
+  (`style.py:31`). (A config-level `[plotting] style` override was considered and
+  **rejected** — users restyle via matplotlib's native `mplstyle`/`rcParams`; see
+  `dev/done/plans-considered-and-rejected.md`.) The shipped-template vs. active-file
+  symmetry still holds for the **config** file and databases (default_dir vs.
+  user_dir).
 
 ## Settings inventory
 
@@ -146,16 +151,14 @@ as the `config.py` dataclass field defaults (their single source of truth); the
 | `[validation]` | `exeqa_noise_floor` | `1e-4` | `EXEQA_NOISE_FLOOR` (numerics-pending) |
 | `[validation]` | `ft_noise_floor` | `1e-10` | `FT_NOISE_FLOOR` (numerics-pending) |
 | `[multivariate]` | `window_nines` | `12` | `multivariate._WINDOW_NINES` (per-axis 2-D window; was import-avoidance dup) |
-| `[plotting]` | `fig_w` / `fig_h` | `3.5` / `2.45` | `FIG_W` / `FIG_H` |
-| `[plotting]` | `font_size` | `9` | `FONT_SIZE` |
-| `[plotting]` | `legend_font` | `"x-small"` | `LEGEND_FONT` |
-| `[plotting]` | `plot_face_color` | `"lightsteelblue"` | `PLOT_FACE_COLOR` |
-| `[plotting]` | `figure_bg_color` | `"aliceblue"` | `FIGURE_BG_COLOR` |
-| `[plotting]` | `style` | `""` (bundled) | `style.py` resource |
+
+*(A `[plotting]` section — `fig_w`/`fig_h`, `font_size`, colours, mplstyle override —
+was considered and **rejected**; those constants stay in `constants.py`. See
+`dev/done/plans-considered-and-rejected.md`.)*
 
 ## Module design — `src/aggregate/config.py` (new, leaf module)
 
-Duck-typed leaf, imported by `underwriter` / `distributions` / `style` /
+Duck-typed leaf, imported by `underwriter` / `distributions` /
 `multivariate`; imports only stdlib (and, for the non-tunable enums/labels, may
 import `constants`) so there is no cycle.
 
@@ -174,8 +177,7 @@ module. `REINS_LABEL_*` stay here (structural MultiIndex keys referenced by
 literal in `multivariate.py` / plot labels / tests — not user-settable), which
 also keeps the `constants.py` name honest. `WL` is **deleted** (legacy custom
 level → `logger.warning`). **No back-compat re-exports**: the internal sites that
-read tunables from `constants` today — `spectral`/`pedagogy`/`multivariate`/`ft`/
-`bounds` (`FIG_*`, Phase 2), `moments` (`VALIDATION_NOISE`), `underwriter`
+read tunables from `constants` today — `moments` (`VALIDATION_NOISE`), `underwriter`
 (`VALIDATION_EPS`/`bucket_sizing_p`), `distributions`/`portfolio`
 (`ALIASING_RATIO`, `*_BUCKET_DEFAULT`, `WINDOW_NINES`, …) — are repointed to
 `config`/`get_settings()`. Name left as `constants.py` per author (a `types.py`
@@ -267,9 +269,9 @@ cost, `noise` notes the `1e-12..1e-14` band.
   read its **own** `settings.multivariate.window_nines` (first-class field,
   default 12, independently tunable). The leaf `config` import replaces the
   import-avoidance hack.
-- `src/aggregate/style.py` *(Phase 2)* — if `settings.plotting.style` is set,
-  resolve it (relative to `user_dir()`) and load that `.mplstyle` instead of /
-  layered over the bundled one; other `[plotting]` values feed `_STYLE_PARAMS`.
+
+*(`src/aggregate/style.py` is untouched — the `[plotting]`/mplstyle-override work
+was rejected; see `dev/done/plans-considered-and-rejected.md`.)*
 
 ## Phases
 
@@ -284,14 +286,14 @@ BUCKET_SIZING_P` rename), `[multivariate].window_nines` (its own field,
 replacing the `_WINDOW_NINES` dup), and `[validation].eps` + `.noise` through
 settings, **fix the log2 split**,
 `Underwriter.info` config line, `show_settings()`, `write_default_config()`.
-Tests. (No plotting/style yet; the numerics-pending floors can wait.)
+Tests. (The numerics-pending floors wait for Phase 2; graphics dropped entirely.)
 
-**Phase 2 — plotting, style override, full env + remaining floors.**
-`[plotting]` section feeding `style.py` and the plot consumers; `~/.aggregate`
-`*.mplstyle` override resolution; the rest of the env-var matrix; the remaining
-`[validation]` floors (`aliasing_ratio`, `exeqa_noise_floor`, `ft_noise_floor`)
-once the numerics review settles their values. Tail-region/style polish that
-benefits from iteration.
+**Phase 2 — remaining numerics-pending validation floors.**
+Wire the remaining `[validation]` floors (`aliasing_ratio`, `exeqa_noise_floor`,
+`ft_noise_floor`) through `get_settings()` now that the numerics review has
+settled their values (numerics-0…4 complete, a55–a80). Plus the rest of the
+env-var matrix if wanted. *(Graphics/`[plotting]` was considered and dropped —
+`dev/done/plans-considered-and-rejected.md`.)*
 
 ## Verification
 

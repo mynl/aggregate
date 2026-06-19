@@ -1,5 +1,66 @@
 # Changelog
 
+## 1.0.0a72
+
+### Bivariate axis sizing: measure, don't guess (MV-2)
+
+Stage MV-2 of the bivariate firm-up (`dev/plan-mv.md`). Fixes the motivating
+aliasing bug — a signed (`ssev`) bivariate book that lost **54% of its mass** to
+wrap-around because each axis was sized for its *single-event* severity, not its
+*marginal* support.
+
+- **Axis sizing is now measured, not guessed.** `MultivariateAggregate._size_axis`
+  (the old moment-window guess, `cap_log2=11`) is gone. Each component's
+  standalone loss marginal is run first, an equal-tail `balanced_window` (MV-1)
+  reads its support straight off the realized pmf, and the per-axis
+  `(bs, log2, x_min)` is read off the measured window. The total grid budget is
+  a single `update(log2=...)` input (default **20** = 2²⁰ cells, config
+  `[multivariate].total_log2`); the per-axis split *falls out* of the measured
+  supports (allocated so the two bucket sizes come out comparable). The measured
+  window always covers the deep tail, so a smaller budget coarsens `bs` rather
+  than clipping support — mass is conserved regardless of budget.
+- **Signed axes no longer wrap.** `update_work` now lifts the 1-D
+  `_fft_aggregate` `i0`/`j0` machinery to 2-D: the per-claim severity is laid
+  into the padded buffer with physical 0 at index 0 (each axis's negative
+  severity buckets wrapped to the top), the shared frequency applied
+  elementwise, and the finished density rolled back onto each axis's output
+  window. A signed marginal gets a centred two-sided window; the all-non-negative
+  grid is byte-for-byte the original zero-pad path.
+- The motivating book's per-axis deficit drops from **0.54 → <1e-6**; each
+  marginal mean reproduces its standalone aggregate, and the marginal sd
+  converges to the standalone as the budget grows (resolution-limited, not
+  biased). New `[multivariate].total_log2` config knob (default 20).
+
+This stage touches the **copula** sizing path only; `netceded` axis sizing
+(`size_axis`) is unchanged here and is rerouted in MV-3.
+
+## 1.0.0a71
+
+### `.agg` library rationalization
+
+Split the bundled `src/aggregate/agg/*.agg` files into a clear shipped set and a
+temporary test-scaffold set, ahead of the alpha→beta cleanup.
+
+**Shipped at v1.0 (4):**
+- `examples.agg` — the curated default `build` library (also the 20-min intro and SPA dropdown). Unchanged.
+- `actuarial-severity-curves.agg` — **renamed** from `other-distributions.agg`; the severity-curve reference, cited in docs.
+- `decl-testers.agg` — **promoted** from `test_decl.agg`; the DecL *language*-stress corpus (kept in sync with the pytest tree).
+- `cookbook.agg` — **renamed** from `testers.agg`; the broad insurance-useful worked-examples library (DRAFT; still to be de-duplicated).
+
+**Temporary migration scaffolding (deleted before beta), now `_`-prefixed:**
+- `_test_suite.agg` (from `test_suite.agg`) — the SLY-parity regression corpus + snapshot.
+- `_test_suite2.agg` (from `test_suite2.agg`) — the splice/mixed-severity extension.
+
+**Deleted:** `spa_examples.agg` (superseded by `examples.agg` for the SPA; its
+content harvested into `cookbook.agg`) and `spa_examples-old.agg` (the legacy
+walkthrough that originally seeded `cookbook`).
+
+References updated across `tests/`, `src/aggregate/config.py`
+(`TEST_SUITE_FILENAME`), `config.default.toml`, and the `scripts/` defaults. New
+`tests/test_agg_libraries.py` is the permanent net that every shipped *user-facing*
+library loads (parses + cross-resolves), so the `_`-prefixed scaffolding can
+retire safely. Docs pending a rebuild.
+
 ## 1.0.0a70
 
 ### `balanced_window` + `Aggregate.focus` (bivariate sizing foundation)

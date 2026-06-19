@@ -27,6 +27,7 @@
 | **N** | Numerics & pricing core (incl. signed / negative-x) |
 | **T** | Tests (suite consolidation) |
 | **W** | Windows & plotting |
+| **β** | Pre-beta scaffold retirement (delete at the alpha→beta cut) |
 
 ## NEW STEVE MANUAL ENTRIES
 
@@ -76,6 +77,10 @@ and **`N8`** (input guards). **Current active block: `M`** (bivariate firm-up)
 |   | F7 | PMIR best-bucket + manual kappa | B | — |
 |   | W3 | Plot severity outside the agg window | B | — (approach TBD) |
 |   | D9 | Reinsurance structure diagrams | B | — |
+| **— β pre-beta scaffold retirement (do at the b1 cut; see Track β below) —** |
+|   | β1 | Delete `_test_suite.agg` + `_test_suite2.agg` (SLY-parity scaffold) | A | M-shipped, b1 |
+|   | β2 | Retire their dependents (snapshot, fixtures, config, scripts, docs) | A | β1 |
+|   | β3 | Confirm `test_agg_libraries.py` is the surviving net for shipped libs | A | β1 |
 
 **Status:** blank = untouched, X Done, P in Progress.
 
@@ -265,6 +270,41 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   *(flagged 2026-06-18; author wants this held until the first beta.)*
 - [ ] **D9 `[B]`** Reinsurance structure diagrams (PMIR code?) (#45).
   *(under-specified — confirm source/scope.)*
+
+---
+
+## Track β — Pre-beta scaffold retirement  `[A]` (do at the b1 cut)
+
+> The `.agg` libraries were split at a71 into a **shipped** set (`examples`,
+> `actuarial-severity-curves`, `decl-testers`, `cookbook`) and a **temporary**
+> SLY-parity scaffold (`_test_suite.agg`, `_test_suite2.agg`). The scaffold has
+> done its job (proving the Lark parser matches the retired SLY parser); delete
+> it and its dependents at the alpha→beta cut. **Supersedes the old T1 "merge the
+> three `.agg` libraries into one" / T2 plan** — they were split, not merged.
+> The surviving net is `tests/test_agg_libraries.py` (shipped libraries
+> parse + cross-resolve), so deleting the scaffold loses no live coverage.
+
+- [ ] **β1 `[A]` Delete the scaffold `.agg` files** — `src/aggregate/agg/_test_suite.agg`
+  and `_test_suite2.agg`.
+- [ ] **β2 `[A]` Retire the scaffold's dependents**, all of which only exist to
+  exercise it:
+  - SLY snapshot: `tests/data/expected_specs.json` + `tests/capture_sly_snapshot.py`.
+  - `tests/test_decl_parser.py` (parametrizes every `_test_suite` line vs the snapshot).
+  - `tests/test_splice_suite.py` (reads `_test_suite2.agg`).
+  - `tests/conftest.py` — the `test_suite_lines` / `underwriter` fixtures (and any
+    test still using the `underwriter` fixture).
+  - `src/aggregate/config.py` `TEST_SUITE_FILENAME`; `Underwriter.test_suite_file`
+    property; `Underwriter.interpret_file`'s default-to-test-suite behaviour.
+  - `scripts/freeze_knowledge.py` / `scripts/bucket_baseline.py` —
+    `DEFAULT_DATABASES = ("_test_suite",)`.
+  - `src/aggregate/data/config.default.toml` — the `_test_suite` databases line.
+  - `docs/4_dec_Language_Reference.rst` — the "Test Suite Programs" section
+    (`literalinclude` of `_test_suite.agg`); repoint or drop.
+- [ ] **β3 `[A]` Confirm the surviving net** — `tests/test_agg_libraries.py` covers
+  the shipped libraries (optionally extend it from parse-only to a build smoke
+  test). Decide whether `decl-testers.agg` needs its own permanent parse harness
+  once the `_test_suite` snapshot is gone (it currently rides `test_decl_unparser`
+  + the mirrored pytest cases).
 
 ---
 

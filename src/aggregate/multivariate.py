@@ -59,7 +59,7 @@ import scipy.fft as sfft
 from .constants import FIG_H, FIG_W
 from .config import get_settings
 from .moments import MomentAggregator, xsden_to_mwrangler
-from .utilities import round_bucket
+from .utilities import round_bucket, balanced_window
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,12 @@ logger = logging.getLogger(__name__)
 # independent of the 1-D distributions.WINDOW_NINES because the 2-D per-axis
 # grid may want fewer nines for memory. Resolved once per session.
 _WINDOW_NINES = get_settings().multivariate.window_nines
+# Total 2-D grid budget in log2 cells (2**_TOTAL_LOG2 cells), split between the
+# two axes by measured support; overridable via update(log2=...). Square-law
+# memory lever (see dev/plan-mv.md §5.3).
+_TOTAL_LOG2 = get_settings().multivariate.total_log2
+# Smallest per-axis log2 the sizer will hand back (keeps a usable grid).
+_MIN_AXIS_LOG2 = 4
 
 
 def size_axis(agg_density, xs, bs_model, bs=None, log2=None,
@@ -480,6 +486,10 @@ class MultivariateAggregate:
         # grid-independent, available at Aggregate.__init__)
         self.frequency = Frequency(freq_name, freq_a, freq_b, freq_zm, freq_p0)
         self.freq_name = freq_name
+        # the shared-frequency kwargs, retained so a standalone marginal
+        # aggregate can be rebuilt for measure-don't-guess axis sizing (§5).
+        self._freq_kwargs = dict(freq_name=freq_name, freq_a=freq_a,
+                                 freq_b=freq_b, freq_zm=freq_zm, freq_p0=freq_p0)
         self._sev_moms = [self._raw3(a.agg_m, a.agg_sd, a.agg_skew)
                           for a in self.lines]
         self.en = self._resolve_en(exp_en, exp_el, exp_premium, exp_lr)
@@ -564,26 +574,109 @@ class MultivariateAggregate:
         sd = (cv * m) if np.isfinite(cv) else float(np.sqrt(max(a2 - a1 * a1, 0.0)))
         return float(m), float(sd), float(skew)
 
-    def _size_axis(self, i, default_log2=9, cap_log2=11):
-        """Pick ``(bs, log2)`` for axis ``i`` covering its loss marginal support."""
-        from .distributions import estimate_agg_window
+    def _standalone_marginal(self, i):
+        """Build the standalone **loss** marginal aggregate for axis ``i``.
 
-        m, sd, skew = self._marginal_moments(i)
-        p = 1.0 - 10.0 ** -_WINDOW_NINES
-        if np.isfinite(sd) and sd > 0:
-            try:
-                _lo, hi, _W = estimate_agg_window(m, sd, skew, p)
-            except (ValueError, FloatingPointError):  # pragma: no cover
-                hi = m + 8.0 * sd
-            vmax = max(hi, m + 8.0 * sd)
-        else:  # pragma: no cover - degenerate
-            vmax = 2.0 * m if m > 0 else 1.0
-        vmax = max(vmax, 1e-9)
-        log2 = default_log2
-        bs = round_bucket(vmax / (1 << log2))
-        while bs * ((1 << log2) - 1) < vmax and log2 < cap_log2:
-            log2 += 1
-        return float(bs), int(log2)
+        The component-``i`` marginal is the shared outer frequency compounded
+        with that component's per-event severity, i.e. an ordinary 1-D
+        :class:`Aggregate` with the **shared** frequency and an expected count
+        ``en * (per-event trigger mean)``. This is the validation target the
+        joint marginal must reproduce (exact for Poisson / mixed-Poisson /
+        negative-binomial outer frequencies, where thinning preserves the
+        family). It is built but **not updated** here -- the caller sizes it.
+
+        Any ``pnl`` affine is *not* applied: the loss marginal is what the 2-D
+        FFT runs on, and the per-axis affine relabels it afterwards
+        (:func:`_affine_axis`), so the loss marginal is the correct thing to
+        size for both axis kinds.
+
+        Returns
+        -------
+        Aggregate
+            The unupdated standalone loss marginal.
+        """
+        from .distributions import Aggregate
+
+        spec = {k: v for k, v in self._line_specs[i].items()
+                if k.startswith('sev_') or k in ('name', 'note')}
+        spec['exp_en'] = float(self.en) * float(self.lines[i].n)
+        spec.update(self._freq_kwargs)
+        return Aggregate(**spec)
+
+    def _size_axes(self, total_log2, bs_in, log2_in):
+        """Measure each axis's grid from its realized standalone marginal (§5).
+
+        The bv's privilege is to *measure*, not guess. Each standalone loss
+        marginal is run once on a fine grid; an equal-tail
+        :func:`~aggregate.utilities.balanced_window` (discarded mass
+        ``10**-window_nines``) reads its **support window** directly off the
+        realized pmf. The total budget ``2**total_log2`` is then a pure
+        *resolution* choice: the per-axis ``log2`` split is allocated so the two
+        bucket sizes come out comparable (``L0 - L1 ~ log2(W0 / W1)``), and each
+        ``bs`` is fit to its window, ``bs_i = round_bucket(W_i / (2**L_i - 1))``.
+
+        Because the measured window always covers the deep (``window_nines``)
+        tail, the budget controls only *resolution*: a smaller budget coarsens
+        ``bs`` rather than clipping the support, so the joint mass is conserved
+        regardless of budget (copula axes have free ``bs``). Explicit ``bs`` /
+        ``log2`` overrides bypass the allocation.
+
+        Parameters
+        ----------
+        total_log2 : int
+            Total log2 cell budget (``2**total_log2`` cells across both axes).
+        bs_in : float
+            Explicit per-axis ``bs`` override (both axes); ``0`` to measure.
+        log2_in : int
+            Explicit per-axis ``log2`` override (both axes); ``0`` to measure.
+
+        Returns
+        -------
+        bss, log2s, x_mins : list of float, list of int, list of float
+            Per-axis bucket size, grid log2, and window origin (``x_min < 0`` on
+            a signed axis; ``0`` on a non-negative one).
+        clipped : bool
+            ``True`` if an explicit override pushed the two axes past the budget.
+        """
+        prob = 10.0 ** -_WINDOW_NINES
+        # 1. Measure each marginal's support window off the realized pmf.
+        los, his, widths = [], [], []
+        for i in range(2):
+            a = self._standalone_marginal(i)
+            a.update(log2=total_log2)
+            ser = a.density_df.query('p_total > 0').p_total
+            lo, hi = balanced_window(ser, prob)
+            lo = min(lo, 0.0) if lo < 0 else 0.0   # non-neg axis stays 0-based
+            los.append(lo)
+            his.append(hi)
+            widths.append(max(hi - lo, a.bs))
+
+        # 2. Allocate the log2 budget so the two bucket sizes come out similar.
+        if log2_in:
+            log2s = [int(log2_in), int(log2_in)]
+        else:
+            delta = np.log2(widths[0] / widths[1])
+            lo_cap = _MIN_AXIS_LOG2
+            hi_cap = total_log2 - _MIN_AXIS_LOG2
+            L0 = int(np.clip(round((total_log2 + delta) / 2.0), lo_cap, hi_cap))
+            log2s = [L0, total_log2 - L0]
+
+        # 3. Fit bs to each axis window, then snap the origin to the grid.
+        bss, x_mins = [], []
+        for i in range(2):
+            if bs_in:
+                bs_i = float(bs_in)
+            else:
+                bs_i = float(round_bucket(widths[i] / ((1 << log2s[i]) - 1)))
+            bss.append(bs_i)
+            x_mins.append(float(np.floor(los[i] / bs_i) * bs_i) if los[i] < 0 else 0.0)
+
+        clipped = log2s[0] + log2s[1] > total_log2
+        if clipped:
+            logger.warning(
+                'multivariate %s: explicit sizing needs log2 %d + %d > budget %d '
+                '(2-D memory is quadratic).', self.name, log2s[0], log2s[1], total_log2)
+        return bss, log2s, x_mins, clipped
 
     # ------------------------------------------------------------------
     # update
@@ -595,11 +688,15 @@ class MultivariateAggregate:
         Parameters
         ----------
         log2 : int, optional
-            Per-axis log2 grid length override (applied to both axes). ``0``
-            (default) auto-sizes each axis from its loss marginal support.
+            **Total** 2-D grid budget in log2 cells (``2**log2`` cells, split
+            between the two axes by measured support). ``0`` (default) uses the
+            :attr:`MultivariateSettings.total_log2` config value (20). The split
+            *falls out* of each realized marginal's measured support -- the bv
+            measures, it does not guess (``dev/plan-mv.md`` §5). Memory is
+            quadratic in the per-axis length, so raise only a little.
         bs : float, optional
             Per-axis bucket-size override (applied to both axes). ``0``
-            (default) auto-sizes.
+            (default) measures each axis's ``bs`` from its standalone marginal.
         padding : int, default 1
             FFT zero-padding factor per axis (mirrors the 1D aggregate; ``1``
             doubles each axis length for the transform).
@@ -608,32 +705,43 @@ class MultivariateAggregate:
 
         Notes
         -----
-        Each component loss twin is rebuilt on the chosen coarse axis grid so
-        ``g_i = agg_density`` is the per-event severity on that grid; the joint
-        is then assembled in :meth:`update_work`. In ``netceded`` mode the joint
-        is built from the single reinsured aggregate's comonotone scatter
+        Axis sizing is *measured*, not guessed: each component's standalone loss
+        marginal is run first, an equal-tail :func:`balanced_window` trims each
+        realized pmf, and the per-axis ``(bs, log2, x_min)`` is read off the
+        measured support (:meth:`_size_axes`). A signed (``ssev``) axis takes a
+        two-sided window with a negative origin; :meth:`update_work` then
+        compounds it with the same ``i0``/``j0`` wrap-and-roll the 1-D
+        :meth:`aggregate.distributions.Aggregate._fft_aggregate` uses, so its
+        negative tail no longer wraps. In ``netceded`` mode the joint is built
+        from the single reinsured aggregate's comonotone scatter
         (:func:`build_netceded_joint`) instead.
         """
         self.padding = int(padding)
         if self.mode == 'netceded':
             return self._update_netceded(log2=log2, bs=bs)
+        total_log2 = int(log2) if log2 else _TOTAL_LOG2
+        bss, log2s, x_mins, clipped = self._size_axes(total_log2, bs, 0)
+        self._clipped = clipped
         self._gs = []
+        self._i0 = []                    # per-event severity negative reach (lay-in wrap)
+        self._j0 = []                    # output-window origin in buckets (final roll)
+        self._nout = [1 << L for L in log2s]
         for i, a in enumerate(self.lines):
-            if bs and log2:
-                bs_i, log2_i = float(bs), int(log2)
-            else:
-                bs_i, log2_i = self._size_axis(i)
-                if log2:
-                    log2_i = int(log2)
-                if bs:
-                    bs_i = float(bs)
-            a.update(log2=log2_i, bs=bs_i)
-            self.bs[i] = float(a.bs)
-            self.axis_xs[i] = np.asarray(a.xs, dtype=float).copy()
+            # Build the per-event severity g_i on its OWN natural grid at the
+            # measured resolution (x_min='auto' so a signed component keeps its
+            # negative buckets). The output window is measured separately from
+            # the marginal -- the severity's negative reach (i0) and the output
+            # origin (j0) are independent, exactly as in the 1-D _fft_aggregate.
+            a.update(log2=log2s[i], bs=bss[i])
+            self.bs[i] = float(bss[i])
             self._gs.append(np.asarray(a.agg_density, dtype=float).copy())
-        # severity grids are the (0-based, loss) per-event grids, captured
-        # before any pnl affine relabels the aggregate axes in update_work.
-        self._sev_xs = [x.copy() for x in self.axis_xs]
+            self._i0.append(int(round(-a.x_min / a.bs)) if a.x_min else 0)
+            self._j0.append(int(round(x_mins[i] / bss[i])) if x_mins[i] else 0)
+            self.axis_xs[i] = (x_mins[i]
+                               + np.arange(self._nout[i], dtype=float) * bss[i])
+        # severity grids are the per-event grids (signed where the component is),
+        # captured for the severity panel of plot().
+        self._sev_xs = [np.asarray(a.xs, dtype=float).copy() for a in self.lines]
         self.update_work()
         return self
 
@@ -678,18 +786,52 @@ class MultivariateAggregate:
             out.append((m, cv * m, sk))
         return out
 
+    @staticmethod
+    def _lay_signed_2d(S, i0_0, i0_1, M0, M1):
+        """Lay per-claim severity ``S`` into an ``(M0, M1)`` FFT buffer, physical 0 at index 0.
+
+        The 2-D analogue of the signed/windowed lay-in of
+        :meth:`aggregate.distributions.Aggregate._fft_aggregate`: per axis the
+        ``i0`` negative-physical buckets of the severity (array indices
+        ``0..i0-1``) wrap to the top of the padded length ``M`` (period
+        ``M*bs``), so the FFT-PGF compound treats physical ``0`` as the additive
+        identity on each axis. Reduces to a plain zero-pad when both ``i0`` are 0.
+        """
+        n0, n1 = S.shape
+        out = np.zeros((M0, M1))
+        out[:n0 - i0_0, :n1 - i0_1] = S[i0_0:, i0_1:]
+        if i0_1:
+            out[:n0 - i0_0, M1 - i0_1:] = S[i0_0:, :i0_1]
+        if i0_0:
+            out[M0 - i0_0:, :n1 - i0_1] = S[:i0_0, i0_1:]
+        if i0_0 and i0_1:
+            out[M0 - i0_0:, M1 - i0_1:] = S[:i0_0, :i0_1]
+        return out
+
     def update_work(self):
         """Assemble the joint density from the per-event severities ``g_i``.
 
         Builds the copula joint per-claim severity ``S`` (discrete Sklar), runs
         the 2D compound FFT (``freq_pgf`` applied elementwise to ``rfft2(S)``),
-        then applies any per-axis ``pnl`` affine. The zero-risk and fixed-count-1
-        shortcuts mirror :meth:`aggregate.distributions.Aggregate._fft_aggregate`.
+        then applies any per-axis ``pnl`` affine.
+
+        The 2-D lift of the 1-D ``i0`` / ``j0`` machinery
+        (:meth:`aggregate.distributions.Aggregate._fft_aggregate`): the
+        per-claim severity is laid into the padded buffer with physical 0 at
+        index 0 (each axis's ``i0`` negative-severity buckets wrapped to the top,
+        :meth:`_lay_signed_2d`), the shared frequency is applied elementwise, and
+        the finished density is relabelled onto each axis's output window by an
+        ``np.roll`` of ``-j0``. Relabelling a finished array carries no ``N*s``
+        shift, so it is correct for random as well as fixed frequency. On the
+        all-non-negative grid (``i0 == j0 == 0``) the lay-in is a plain zero-pad
+        and the roll is a no-op, byte-for-byte the original path.
         """
         g0, g1 = self._gs
-        n0, n1 = len(g0), len(g1)
-        # marginal CDFs (jump at 0 from the Bernoulli zero-inflation handled
-        # automatically as a jump in G)
+        i0_0, i0_1 = getattr(self, '_i0', [0, 0])
+        j0_0, j0_1 = getattr(self, '_j0', [0, 0])
+        N0, N1 = getattr(self, '_nout', [len(g0), len(g1)])
+        # marginal CDFs in physical order (the copula couples ranks); the
+        # Bernoulli zero-inflation is automatic as a jump in G.
         G0 = np.cumsum(g0)
         G1 = np.cumsum(g1)
         # joint per-claim severity via the copula (marginals exact by
@@ -698,18 +840,20 @@ class MultivariateAggregate:
         self._S = S
 
         if self.en == 0:
-            density = np.zeros((n0, n1))
-            density[0, 0] = 1.0
-        elif np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
-            density = S.copy()
+            density = np.zeros((N0, N1))
+            density[-j0_0, -j0_1] = 1.0   # point mass at physical (0, 0)
         else:
             pad = self.padding
-            s_shape = (n0 << pad, n1 << pad)
-            z = sfft.rfft2(S, s=s_shape)
+            M0, M1 = N0 << pad, N1 << pad
+            buf = self._lay_signed_2d(S, i0_0, i0_1, M0, M1)
+            z = sfft.rfft2(buf)
             # freq_pgf is mathematically elementwise in z, but the empirical
             # implementation assumes a 1D argument -- flatten, apply, reshape.
             ftagg = self.frequency.freq_pgf(self.en, z.ravel()).reshape(z.shape)
-            density = np.real(sfft.irfft2(ftagg, s=s_shape))[:n0, :n1]
+            a = np.real(sfft.irfft2(ftagg, s=(M0, M1)))
+            # relabel physical 0 (buffer index 0) onto each axis output window
+            a = np.roll(a, (-j0_0, -j0_1), axis=(0, 1))
+            density = a[:N0, :N1]
 
         density[np.abs(density) < 1e-15] = 0.0
 

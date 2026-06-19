@@ -11,7 +11,7 @@ Covers ``dev/plan-multivariate.md`` Stage 1:
   ordering (corr increases with the copula parameter, mixed adds common shock),
   and the ``pnl`` axis (signed marginal + sign-flipped correlation).
 
-The DecL programs are mirrored in ``src/aggregate/agg/test_decl.agg`` under the
+The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` under the
 ``MV`` section.
 """
 
@@ -343,6 +343,88 @@ def test_netceded_reporting_and_plot():
     mv.plot()
     assert mv.figure.axes[0].get_title() == 'severity'
     plt.close('all')
+
+
+# ----------------------------------------------------------------------
+# MV-2: measure-don't-guess axis sizing + the signed-severity 2-D compound
+# ----------------------------------------------------------------------
+
+# The motivating bug (author, 2026-06-18): a signed ``ssev`` book whose grid was
+# sized for the single-event severity, not the 200-event marginal, so axis B's
+# negative tail wrapped -- a 54% deficit. See dev/plan-mv.md §0, §5.
+BUG_PROG = '''mv DISCRETE.2
+    200 claims
+    agg A dfreq[1] ssev uniform - .3
+    agg B dfreq[1] ssev uniform - .5
+    mixed gamma .5'''
+
+
+def test_mv_signed_bug_book_deficit_clean():
+    """The 54%-deficit signed book is now clean (DoD): deficit < 1e-6."""
+    mv = build(BUG_PROG)
+    assert mv.deficit < 1e-6, f'deficit {mv.deficit} not clean'
+    m0, m1 = mv.marginals()
+    assert m0.sum() == pytest.approx(1.0, abs=1e-6)
+    assert m1.sum() == pytest.approx(1.0, abs=1e-6)
+
+
+def test_mv_signed_axis_window_straddles_zero():
+    """The signed (mean-0) axis B gets a centred two-sided window, not a 0-based one.
+
+    The root-cause fix: a signed marginal is sized two-sided and compounded with
+    the 1-D ``i0``/``j0`` wrap-and-roll, so its negative half no longer wraps.
+    """
+    mv = build(BUG_PROG)
+    xb = mv.axis_xs[1]
+    assert xb[0] < 0 < xb[-1], f'axis B window [{xb[0]}, {xb[-1]}] does not straddle 0'
+    m1 = mv.marginals()[1]
+    below = float(m1[xb < 0].sum())
+    assert below > 0.4, f'expected ~half the mass below 0, got {below}'
+
+
+def test_mv_signed_marginal_means_match_standalone():
+    """Each marginal mean reproduces its standalone aggregate (means exact)."""
+    mv = build(BUG_PROG)
+    m0, m1 = mv.marginals()
+    for i, m in enumerate((m0, m1)):
+        emp = float((m * mv.axis_xs[i]).sum())
+        theory = mv._marg_theory[i][0]
+        assert emp == pytest.approx(theory, abs=0.05), f'axis {i} mean {emp} vs {theory}'
+
+
+def test_mv_signed_marginal_sd_converges_with_budget():
+    """The marginal sd is resolution-limited: it converges to the standalone as
+    the budget grows (the measured window is honest; only ``bs`` coarsens)."""
+    mv20 = build(BUG_PROG)
+    mv24 = build(BUG_PROG)
+    mv24.update(log2=24)
+    sd_theory = mv20._marg_theory[1][1]
+
+    def sd(mv):
+        m, x = mv.marginals()[1], mv.axis_xs[1]
+        mean = (m * x).sum()
+        return float(np.sqrt((m * x * x).sum() - mean ** 2))
+
+    err20, err24 = abs(sd(mv20) - sd_theory), abs(sd(mv24) - sd_theory)
+    assert err24 < err20, f'sd error did not shrink with budget: {err20} -> {err24}'
+    assert err24 / sd_theory < 0.01    # within 1% at log2=24
+
+
+def test_mv_budget_honoured_and_overridable():
+    """``update(log2=B)`` is the TOTAL cell budget; the split falls out of support."""
+    mv = build(BUG_PROG)
+    for B in (18, 20, 22):
+        mv.update(log2=B)
+        n0, n1 = mv.density.shape
+        assert np.log2(n0) + np.log2(n1) <= B + 1e-9, f'budget {B} exceeded: {n0}x{n1}'
+        assert mv.deficit < 1e-5
+
+
+def test_mv_bs_override_applies_to_both_axes():
+    """An explicit ``bs`` is used verbatim on both axes (measured log2 split)."""
+    mv = build(BUG_PROG)
+    mv.update(bs=0.5)
+    assert mv.bs[0] == 0.5 and mv.bs[1] == 0.5
 
 
 def test_mv_wrong_component_count_raises():

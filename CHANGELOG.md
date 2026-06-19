@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.0.0a76
+
+### Netceded axis sizing routes through `balanced_window` (MV-3)
+
+Stage MV-3 of the bivariate firm-up. The netceded ``(ceded, net)`` joint is now
+sized by the same *measure-don't-guess* primitive as the copula axes — the
+second private sizer is gone, so both regimes share one path.
+
+- **Deleted `multivariate.size_axis`** (the per-axis moment-quantile guesser,
+  `cap_log2=14`). Netceded axes are sized by `balanced_window` on the realized
+  occurrence margins (`reins_density_df['p_agg_ceded_occ']` / `['p_agg_net_occ']`,
+  produced in one gross pass) — pure window selection, ceded/net being
+  non-negative so the grids are 0-based.
+- **One common `bs`, sized from the budget.** The comonotone `(c, n)` curve
+  couples the axes, so they share a single `bs`; the linear scatter rebuckets
+  the gross-sampled points onto it. The common `bs` is sized to fit
+  `2**total_log2` (`~ sqrt(hi_c·hi_n)/2**(total_log2/2)`), **not pinned to the
+  gross `bs`** — the gross grid auto-sizes fine to resolve the cession layer
+  (e.g. 0.125), which is far too fine for the 2-D grid (it blew the budget and
+  lost ~55% of the mass). Sizing from the budget also makes `Aggregate.occ_bivariate`
+  and the DecL `netceded` form agree regardless of the gross grid each was built
+  on. When a caller pins `bs`/`log2` past the budget the wider axis is clipped
+  (a warned, reported deficit).
+
+Both private sizers (`_size_axis`, `size_axis`) are now gone; both bivariate
+regimes route through `balanced_window`.
+
 ## 1.0.0a75
 
 ### Bivariate windowing: honest, centred axis measurement

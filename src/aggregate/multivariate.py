@@ -11,8 +11,8 @@ This module is the first-class home of the joint-aggregate machinery. It hosts:
   :meth:`aggregate.distributions.Aggregate.occ_bivariate` (the joint law of
   occurrence ceded / net under a reinsurance program); kept here as the shared
   result container.
-* :func:`size_axis` / :func:`scatter_bivariate` -- the per-axis sizing and the
-  2D rebucketing scatter used by ``occ_bivariate``.
+* :func:`_netceded_window_hi` / :func:`scatter_bivariate` -- the (one common bs)
+  window measurement and the 2D rebucketing scatter used by ``occ_bivariate``.
 
 (The ``occ_bivariate`` facility and ``BivariateDistribution`` previously lived
 in ``aggregate/bivariate.py``; that module is now a thin back-compat re-export
@@ -50,13 +50,14 @@ becomes the correct profit-loss sign once the axis is reflected.
 """
 
 import logging
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.fft as sfft
 
-from .constants import FIG_H, FIG_W
+from .constants import FIG_H, FIG_W, DefectiveDistributionWarning
 from .config import get_settings
 from .moments import MomentAggregator, xsden_to_mwrangler
 from .utilities import round_bucket, balanced_window
@@ -76,73 +77,37 @@ _TOTAL_LOG2 = get_settings().multivariate.total_log2
 _MIN_AXIS_LOG2 = 4
 
 
-def size_axis(agg_density, xs, bs_model, bs=None, log2=None,
-              default_log2=10, cap_log2=14, quantile=1 - 1e-9):
-    """Choose a bucket size and grid length for one bivariate axis.
+def _netceded_window_hi(occ_density, xs, prob):
+    """Upper window edge of an occurrence-reins margin (``balanced_window``).
 
-    The joint grid must cover each aggregate margin's effective support (else
-    2D FFT wrap-around aliasing), while staying small enough that the dense 2D
-    array is feasible. This reads the effective support from the univariate
-    aggregate margin (computed on the model grid ``xs``) and returns a rounded
-    bucket size and a power-of-two grid length that covers it.
+    Netceded sizing is **window selection** on the realized occ margins -- a
+    column of ``reins_density_df`` (``p_agg_ceded_occ`` / ``p_agg_net_occ``,
+    computed in one gross pass) read with the same
+    :func:`~aggregate.utilities.balanced_window` primitive as the copula axes.
+    Ceded / net are non-negative, so the grid is 0-based and need only reach this
+    upper edge.
 
     Parameters
     ----------
-    agg_density : ndarray
-        Univariate aggregate density on the model grid (e.g.
-        ``reins_density_df['p_agg_ceded_occ']``). Need not be normalised.
+    occ_density : ndarray
+        The occ-reins aggregate margin on the gross grid ``xs`` (need not be
+        normalised).
     xs : ndarray
-        Model grid (``bs_model * arange``); the support of ``agg_density``.
-    bs_model : float
-        Model bucket size (``xs[1]``); used as a floor for the effective max.
-    bs : float, optional
-        Explicit bucket-size override. If given it is used verbatim.
-    log2 : int, optional
-        Explicit log2 grid-length override. If given the grid length is fixed
-        at ``1 << log2`` and no coverage growth is performed.
-    default_log2 : int, default 10
-        Target log2 grid length when ``log2`` is not supplied.
-    cap_log2 : int, default 14
-        Upper bound on the auto-grown log2 (memory guard).
-    quantile : float, default 1 - 1e-9
-        Upper quantile of the margin used as the effective support max.
+        The gross loss grid.
+    prob : float
+        Discarded equal-tail mass for ``balanced_window``.
 
     Returns
     -------
-    bs : float
-        Axis bucket size.
-    log2 : int
-        Axis log2 grid length (grid has ``1 << log2`` points).
-
-    Notes
-    -----
-    When neither override is supplied: the bucket is
-    ``round_bucket(vmax / 2**default_log2)`` and ``log2`` is grown from
-    ``default_log2`` until ``bs * (2**log2 - 1) >= vmax`` or ``cap_log2`` is
-    reached. Supplying ``bs`` alone keeps the rounded count search; supplying
-    ``log2`` alone derives ``bs`` from it; supplying both bypasses sizing.
+    float
+        The upper window edge ``q(1 - prob/2)`` of the margin.
     """
-    if bs is not None and log2 is not None:
-        return float(bs), int(log2)
-
-    tot = agg_density.sum()
-    if tot <= 0:
-        # Degenerate margin (no mass): a single-bucket grid at the model scale.
-        return (float(bs) if bs is not None else float(bs_model),
-                int(log2) if log2 is not None else 1)
-    cdf = np.cumsum(agg_density) / tot
-    k = int(np.searchsorted(cdf, quantile))
-    k = min(k, len(xs) - 1)
-    vmax = max(float(xs[k]), float(bs_model))
-
-    if log2 is None:
-        log2 = default_log2
-    if bs is None:
-        bs = round_bucket(vmax / (1 << log2))
-    # grow the grid until it covers the effective support, capped
-    while bs * ((1 << log2) - 1) < vmax and log2 < cap_log2:
-        log2 += 1
-    return float(bs), int(log2)
+    ser = pd.Series(np.asarray(occ_density, dtype=float), index=np.asarray(xs))
+    ser = ser[ser > 0]
+    if len(ser) == 0:        # degenerate margin (no mass)
+        return 0.0
+    _lo, hi = balanced_window(ser, prob)
+    return float(hi)
 
 
 def scatter_bivariate(cv, nv, mass, bs_c, bs_n, n_c, n_n, scheme='linear'):
@@ -206,7 +171,7 @@ def scatter_bivariate(cv, nv, mass, bs_c, bs_n, n_c, n_n, scheme='linear'):
 
 
 def build_netceded_joint(agg, bs_ceded=None, bs_net=None,
-                         log2_ceded=None, log2_net=None):
+                         log2_ceded=None, log2_net=None, total_log2=None):
     """Joint per-occurrence (ceded, net) density of one reinsured aggregate.
 
     The net/ceded severity builder for :class:`MultivariateAggregate`'s
@@ -222,9 +187,20 @@ def build_netceded_joint(agg, bs_ceded=None, bs_net=None,
     agg : Aggregate
         An **updated** aggregate carrying occurrence reinsurance.
     bs_ceded, bs_net : float, optional
-        Axis bucket sizes; auto-sized from the univariate occ margins if omitted.
+        Bucket-size override (a single common ``bs`` for both axes). Default
+        (``None``) sizes **one common ``bs`` from the budget** -- the comonotone
+        ``(c, n)`` curve is sampled at the gross grid and the linear scatter
+        rebuckets it onto the common grid, so the ``bs`` is chosen to fit
+        ``2**total_log2`` (``~ sqrt(hi_c*hi_n)/2**(total_log2/2)``), *not* pinned
+        to the (often far finer) gross ``bs`` (§5.2).
     log2_ceded, log2_net : int, optional
-        Axis log2 grid lengths; auto-sized if omitted.
+        Axis log2 grid-length overrides; measured from the realized occ margins
+        via :func:`balanced_window` if omitted.
+    total_log2 : int, optional
+        Total 2-D cell budget. The common ``bs`` is coarsened until the two
+        windows fit; if a caller pins ``bs``/``log2`` and they still overflow,
+        the wider axis is **clipped** (a reported deficit). ``None`` uses the
+        :attr:`MultivariateSettings.total_log2` default.
 
     Returns
     -------
@@ -233,11 +209,14 @@ def build_netceded_joint(agg, bs_ceded=None, bs_net=None,
     ceded_grid, net_grid : ndarray
         The two axis grids.
     bs_c, bs_n : float
-        The two axis bucket sizes.
+        The two axis bucket sizes (both the gross ``bs`` unless overridden).
     sev2 : ndarray
         The bivariate per-claim severity ``S`` (the comonotone scatter).
     deficit : float
         Tail mass lost beyond the grid.
+    clipped : bool
+        ``True`` if the pinned-``bs`` windows exceeded the budget and an axis was
+        clipped.
 
     Raises
     ------
@@ -259,12 +238,55 @@ def build_netceded_joint(agg, bs_ceded=None, bs_net=None,
         raise ValueError(
             'netceded requires an updated object (no severity densities '
             'present). Call update() first.')
+    if total_log2 is None:
+        total_log2 = _TOTAL_LOG2
 
     rd = agg.reins_density_df
-    bs_c, log2_c = size_axis(rd['p_agg_ceded_occ'].to_numpy(), agg.xs,
-                             agg.bs, bs=bs_ceded, log2=log2_ceded)
-    bs_n, log2_n = size_axis(rd['p_agg_net_occ'].to_numpy(), agg.xs,
-                             agg.bs, bs=bs_net, log2=log2_net)
+    prob = 10.0 ** -_WINDOW_NINES
+    # ONE common bs across both axes (the comonotone curve couples them). The
+    # window lengths are measured from the realized occ margins (balanced_window;
+    # ceded / net are non-negative so the grids are 0-based), and the common bs
+    # is sized straight from the budget -- NOT pinned to the gross bs. The gross
+    # bs auto-sizes fine to resolve the cession layer (e.g. 0.125), which is far
+    # too fine for the 2-D grid; the linear scatter rebuckets the gross-sampled
+    # (c, n) points onto whatever common bs the budget affords. Sizing from the
+    # budget (not gross) also makes occ_bivariate and the DecL `netceded` form
+    # agree regardless of the gross grid each was built on.
+    hi_c = _netceded_window_hi(rd['p_agg_ceded_occ'].to_numpy(), agg.xs, prob)
+    hi_n = _netceded_window_hi(rd['p_agg_net_occ'].to_numpy(), agg.xs, prob)
+
+    def _cov(hi, bs):
+        return max(int(np.ceil(np.log2(hi / bs + 1.0))), _MIN_AXIS_LOG2)
+
+    pinned = bool(bs_ceded or bs_net or (log2_ceded and log2_net))
+    if bs_ceded or bs_net:
+        bs = float(bs_ceded or bs_net)
+    else:
+        # finest common bs that fits 2**total_log2: n_c*n_n ~ (hi_c*hi_n)/bs**2,
+        # so bs ~ sqrt(hi_c*hi_n) / 2**(total_log2/2). round_bucket up, then fit.
+        floor_bs = max((hi_c * hi_n) ** 0.5 / (2.0 ** (0.5 * total_log2)), 1e-12)
+        bs = float(round_bucket(floor_bs))
+    log2_c = int(log2_ceded) if log2_ceded else _cov(hi_c, bs)
+    log2_n = int(log2_net) if log2_net else _cov(hi_n, bs)
+    if not pinned:
+        guard = 0
+        while log2_c + log2_n > total_log2 and guard < 8:
+            bs = float(round_bucket(bs * 2))
+            log2_c, log2_n = _cov(hi_c, bs), _cov(hi_n, bs)
+            guard += 1
+    clipped = log2_c + log2_n > total_log2
+    if clipped:
+        # bs pinned by the caller and still over budget -> clip the wider axis.
+        if log2_c >= log2_n:
+            log2_c = max(total_log2 - log2_n, _MIN_AXIS_LOG2)
+        else:
+            log2_n = max(total_log2 - log2_c, _MIN_AXIS_LOG2)
+        warnings.warn(
+            f'{agg.name}: netceded (ceded, net) windows need more than the budget '
+            f'2**{total_log2} at the pinned bs={bs:g}; the wider axis is clipped '
+            f'(a tail deficit). Raise update(log2=...) or relax the bs pin.',
+            DefectiveDistributionWarning, stacklevel=2)
+    bs_c = bs_n = bs
     n_c = 1 << log2_c
     n_n = 1 << log2_n
     ceded_grid = bs_c * np.arange(n_c)
@@ -290,7 +312,7 @@ def build_netceded_joint(agg, bs_ceded=None, bs_net=None,
 
     density[np.abs(density) < 1e-15] = 0.0
     deficit = float(1.0 - density.sum())
-    return density, ceded_grid, net_grid, bs_c, bs_n, sev2, deficit
+    return density, ceded_grid, net_grid, bs_c, bs_n, sev2, deficit, clipped
 
 
 def _affine_axis(density, axis, bs, n, reflect, shift, m_loss, sd, skew):
@@ -867,7 +889,7 @@ class MultivariateAggregate:
             if bs:
                 kw['bs'] = bs
             a.update(**kw)
-        density, cg, ng, bs_c, bs_n, sev2, deficit = build_netceded_joint(
+        density, cg, ng, bs_c, bs_n, sev2, deficit, clipped = build_netceded_joint(
             a, **self._nc_kwargs)
         self.density = density
         self.axis_xs = [cg, ng]
@@ -875,6 +897,7 @@ class MultivariateAggregate:
         self._S = sev2
         self._sev_xs = [cg, ng]   # severity panel = comonotone (c, n) scatter
         self.deficit = deficit
+        self._clipped = clipped
         self._marg_theory = self._netceded_theory(a)
         return self
 

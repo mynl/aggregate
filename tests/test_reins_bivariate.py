@@ -24,8 +24,9 @@ matplotlib.use('Agg')  # headless contour smoke test
 import matplotlib.pyplot as plt  # noqa: E402
 
 from aggregate import build  # noqa: E402
+from aggregate.constants import DefectiveDistributionWarning  # noqa: E402
 from aggregate.multivariate import (  # noqa: E402
-    BivariateDistribution, size_axis, scatter_bivariate)
+    BivariateDistribution, scatter_bivariate)
 
 
 # Lognormal occurrence cover: the general (deficit-carrying) path.
@@ -245,21 +246,42 @@ def test_explicit_overrides_respected():
     assert b.density.shape == (1 << 9, 1 << 10)
 
 
-def test_size_axis_covers_support():
-    """size_axis returns a grid whose top covers the margin's effective max."""
+def test_netceded_one_common_bs_no_finer_than_gross():
+    """MV-3: both axes share one bs, coarsened from gross to fit (never finer).
+
+    The legacy ``size_axis`` (per-axis moment-quantile sizer) is gone; netceded
+    now measures each occ margin with ``balanced_window`` and uses a single
+    common bs >= the gross bs.
+    """
     a = _build(OCC)
-    rd = a.reins_density_df
-    cdf = np.cumsum(rd['p_agg_ceded_occ'].to_numpy())
-    cdf /= cdf[-1]
-    vmax = a.xs[int(np.searchsorted(cdf, 1 - 1e-9))]
-    bs, log2 = size_axis(rd['p_agg_ceded_occ'].to_numpy(), a.xs, a.bs)
-    assert bs * ((1 << log2) - 1) >= vmax
+    b = a.occ_bivariate()
+    assert b.bs[0] == b.bs[1]              # one common bs
+    assert b.bs[0] >= a.bs - 1e-12         # never finer than gross
+    # the grid covers the margins -- mass is conserved
+    cd, nd = b.marginals()
+    assert float(cd.sum()) == pytest.approx(1.0, abs=1e-6)
+    assert float(nd.sum()) == pytest.approx(1.0, abs=1e-6)
 
 
-def test_size_axis_both_overrides_bypass():
-    bs, log2 = size_axis(np.array([1.0]), np.array([0.0, 1.0]), 1.0,
-                         bs=3.0, log2=7)
-    assert (bs, log2) == (3.0, 7)
+def test_netceded_marginals_match_occ_views():
+    """Each marginal reproduces the corresponding occurrence reins aggregate."""
+    a = _build(OCC)
+    b = a.occ_bivariate()
+    cd, nd = b.marginals()
+    rs = a.reins_stats_df
+    assert float((cd * b.axis_xs[0]).sum()) == pytest.approx(
+        rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=2e-3)
+    assert float((nd * b.axis_xs[1]).sum()) == pytest.approx(
+        rs.loc[('agg', 'mean'), ('occ', 'Net')], rel=2e-3)
+
+
+def test_netceded_clip_warns_when_pinned_over_budget():
+    """Pinning bs/log2 past the budget clips the wider axis and warns."""
+    a = _build(OCC)
+    with pytest.warns(DefectiveDistributionWarning, match='clipped'):
+        b = a.occ_bivariate(bs_ceded=a.bs, bs_net=a.bs,
+                            log2_ceded=14, log2_net=14)   # 14+14 > budget 20
+    assert b._clipped
 
 
 # ----------------------------------------------------------------------------

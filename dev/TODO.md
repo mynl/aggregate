@@ -212,6 +212,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
       `[multivariate].window_nines` 12→9 (off the FFT noise floor), and centre
       the window in the power-of-two grid (split slack). `round_bucket` stays
       round-up only (nearest can't tighten a pow2 grid — note at the call site).
+  - [x] **MV-3** `[a76]` — netceded axis sizing via `balanced_window` (deleted
+    `size_axis`); one common `bs` sized from the budget (not pinned to the too-fine
+    gross bs), clip+warn when a pinned grid overflows. Both private sizers gone.
+    *(Note: deviated from the plan's literal "pin to gross bs" — that lost ~55%
+    of the mass on the standard NC book; sized from the budget instead.)*
 
 ---
 

@@ -2984,12 +2984,14 @@ class Aggregate:
         Parameters
         ----------
         bs_ceded, bs_net : float, optional
-            Ceded- / net-axis bucket sizes. Default: auto-sized from the
-            univariate occurrence aggregate margins (``p_agg_ceded_occ`` /
-            ``p_agg_net_occ``) via :func:`aggregate.multivariate.size_axis`.
+            Bucket-size override (a single common ``bs`` for both axes). Default:
+            one common ``bs`` coarsened from the gross bucket to fit the budget
+            (never finer than gross).
         log2_ceded, log2_net : int, optional
             Ceded- / net-axis log2 grid lengths (grid has ``1 << log2`` points).
-            Default: auto-sized (target 10, grown to cover the margin, capped).
+            Default: measured from the occurrence aggregate margins
+            (``p_agg_ceded_occ`` / ``p_agg_net_occ``) via
+            :func:`~aggregate.utilities.balanced_window`.
 
         Returns
         -------

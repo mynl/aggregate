@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.0a70
+
+### `balanced_window` + `Aggregate.focus` (bivariate sizing foundation)
+
+Stage MV-1 of the bivariate firm-up (`dev/plan-mv.md`). A *measure-don't-guess*
+windowing primitive, pure 1-D — the foundation the bivariate axis sizing (MV-2/3)
+is built on. No bivariate behaviour changes yet.
+
+- **`aggregate.utilities.balanced_window(ser, p, bs=None)`** — given a realized
+  pmf series (`index = xs`, `values = ps`) and a discarded tail mass `p`, returns
+  the equal-tail window `[q(p/2), q(1 - p/2)]`, optionally snapped to `bs`. The
+  *post-calc* analogue of `estimate_agg_window`: it measures the window from an
+  already-computed marginal rather than guessing from moments. **Balanced** means
+  equal *probability* trimmed off each tail, so a signed P&L or skewed marginal
+  stays centred on its mass. Reuses `make_var_tvar` for the quantiles so the
+  convention matches `Aggregate.q` (`kind='lower'`). `p` is the literal discarded
+  mass (e.g. `1e-6`), not a coverage — no `>1 → nines` reading.
+- **`Aggregate.focus(p=1e-6)`** — a thin, no-recompute re-slicer: runs
+  `balanced_window` on the realized `p_total` and returns the central
+  `density_df` slice holding `1 - p` of the mass. Does not mutate the aggregate.
+
 ## 1.0.0a69
 
 ### DecL statement separation: blank line or `;`, no more `\`

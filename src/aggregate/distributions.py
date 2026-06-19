@@ -43,7 +43,7 @@ __all__ = [
 from .utilities import (ft, ift,
                         round_bucket,
                         nice_multiple,
-                        make_var_tvar,
+                        make_var_tvar, balanced_window,
                         agg_help, explain_validation, remove_fuzz)
 from .decl_writer import format_program
 import aggregate.random_agg as ar
@@ -7800,6 +7800,41 @@ class Aggregate:
         dict_ans['lower'] = qf.q_lower
         dict_ans['tvar'] = qf.tvar
         return dict_ans
+
+    def focus(self, p=1e-6):
+        """Return the central window of ``density_df`` holding ``1 - p`` of the mass.
+
+        A thin, no-recompute re-slicer over the finished aggregate: it runs
+        :func:`~aggregate.utilities.balanced_window` on the realized
+        ``p_total`` and returns the rows of :attr:`density_df` in the equal-tail
+        window ``[q(p/2), q(1 - p/2)]`` -- ``p/2`` of the mass trimmed off each
+        tail, ``1 - p`` kept and centred. Useful for tightening the display
+        window of any computed aggregate (and the post-calc primitive the
+        bivariate axis sizing is built on).
+
+        Parameters
+        ----------
+        p : float, default 1e-6
+            Total discarded tail mass, split equally between the two tails. Must
+            satisfy ``0 < p < 1``. The literal discarded mass, not a coverage --
+            see :func:`~aggregate.utilities.balanced_window`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            The slice ``density_df.loc[lo:hi]`` (a view onto the existing frame;
+            no recomputation). All columns are preserved.
+
+        Notes
+        -----
+        Edges are snapped to the bucket size ``bs`` so the window aligns with
+        the grid. Does not mutate the aggregate -- ``density_df`` is unchanged.
+        """
+        if self.density_df is None:
+            raise ValueError('Must update before calling focus.')
+        ser = self.density_df.query('p_total > 0').p_total
+        lo, hi = balanced_window(ser, p, bs=self.bs)
+        return self.density_df.loc[lo:hi]
 
     def q_sev(self, p):
         """

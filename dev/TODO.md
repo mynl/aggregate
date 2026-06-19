@@ -177,6 +177,8 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   one-bs sizing → reporting surface → netceded view-pairs → shuffle-of-Min+clash
   → rename to bivariate). Each a version bump; all seven block `1.0.0b1`.
   Execution cadence: one stage per iteration, with a review + commit between each.
+  - [x] **MV-1** `[a70]` — `balanced_window(ser, p, bs=None)` (utilities) +
+    `Aggregate.focus(p)`; pure 1-D, no bv change. `tests/test_balanced_window.py`.
 
 ---
 

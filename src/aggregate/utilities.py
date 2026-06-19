@@ -429,6 +429,69 @@ def make_var_tvar(ser):
     return QuantileFunctions(q_lower, q_lower, q_lower, q_upper, tvar)
 
 
+def balanced_window(ser, p, bs=None):
+    """Equal-tail window ``[q(p/2), q(1 - p/2)]`` of a realized pmf.
+
+    The *post-calc* analogue of :func:`aggregate.distributions.estimate_agg_window`:
+    where that places a window from method-of-moments fits *before* the FFT (a
+    guess), this measures the window directly from an already-computed marginal
+    pmf. A privileged consumer -- a bivariate aggregate, which runs its inner
+    marginals first, or :meth:`Aggregate.focus` on a finished aggregate -- can
+    therefore *measure* the support that matters rather than guess it.
+
+    The window trims ``p / 2`` of the probability mass off **each** tail and
+    keeps the central ``1 - p``. **Balanced** means equal *probability* each
+    side, not equal value: a signed P&L marginal stays centred on its mass, and
+    a skewed marginal trims more value off its heavy side but the same
+    probability either way. The kept window always contains at least ``1 - p``
+    of the mass (each discarded tail is at most ``p / 2``).
+
+    Parameters
+    ----------
+    ser : pandas.Series
+        A realized pmf: index = outcomes (``xs``), values = probabilities. The
+        index must be unique and monotonic increasing and the values should sum
+        to ~1 (the usual ``density_df.query('p_total > 0').p_total`` shape). The
+        equal-tail accounting assumes the values are non-negative.
+    p : float
+        Total discarded tail mass, split equally between the two tails (``p / 2``
+        each). Small, e.g. ``1e-6``; ``1 - p`` is the mass kept. Must satisfy
+        ``0 < p < 1``. Unlike the coverage ``p`` of ``estimate_agg_window`` this
+        is the *complementary* (discarded) mass, so there is no ``> 1 -> nines``
+        reading here -- pass the literal tail mass.
+    bs : float, optional
+        Bucket size to snap the window to. The lower edge is floored and the
+        upper edge ceiled to a multiple of ``bs`` so the window aligns with (and
+        slightly contains) the grid. When ``None`` (default) the edges are
+        returned exactly as the quantiles -- already grid points when ``ser``
+        comes from a bucketed ``density_df``.
+
+    Returns
+    -------
+    (lo, hi) : tuple of float
+        Lower and upper window edges. Both are **lower** quantiles
+        (:func:`make_var_tvar` ``q_lower``): ``lo = q(p/2)``,
+        ``hi = q(1 - p/2)``, matching :meth:`Aggregate.q` ``kind='lower'``.
+
+    Notes
+    -----
+    Reuses :func:`make_var_tvar` for the quantiles rather than re-deriving a
+    cumulative lookup, so the convention matches ``Aggregate.q`` exactly. With
+    lower quantiles on both edges the mass strictly below ``lo`` is ``< p/2`` and
+    the mass strictly above ``hi`` is ``<= p/2``, so the kept mass is
+    ``>= 1 - p`` -- the guarantee the docstring promises.
+    """
+    if not (0.0 < p < 1.0):
+        raise ValueError(f'p must be in (0, 1); got {p}.')
+    qf = make_var_tvar(ser)
+    lo = float(qf.q_lower(p / 2.0))
+    hi = float(qf.q_lower(1.0 - p / 2.0))
+    if bs:
+        lo = np.floor(lo / bs) * bs
+        hi = np.ceil(hi / bs) * bs
+    return lo, hi
+
+
 def kaplan_meier(df, loss='loss', closed='closed'):
     """
     Compute Kaplan Meier Product limit estimator based on a sample

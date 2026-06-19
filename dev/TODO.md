@@ -217,6 +217,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     gross bs), clip+warn when a pinned grid overflows. Both private sizers gone.
     *(Note: deviated from the plan's literal "pin to gross bs" — that lost ~55%
     of the mass on the standard NC book; sized from the budget instead.)*
+  - [x] **MV-4** `[a77]` — reporting surface: `info` rebuilt on
+    `info_row`/`INFO_NA` (fixed catalogue, Agg/Port convention; bivariate
+    section added to `dev/info-strings.rst`) + `explain`, `bs_window_df`/
+    `bs_description`, `tail_df`/`tail_description` (per-axis summaries).
 
 ---
 

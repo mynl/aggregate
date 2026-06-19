@@ -425,7 +425,7 @@ each** (each stage is a clean version-bump boundary).
   exclusion, transformer → solved triggers + independent copula + shared freq).
   Tests: solver identities; built clash bv marginals reproduce; `corr(mixed) >
   corr(poisson)` (common shock); parse-only tests.
-- **DoD:** shuffle-of-Min usable in Python; `clash` statement builds end-to-end.
+- **DoD:** shuffle-of-Min usable in Python; `clash` statement builds end-to-end. 
 
 ### Stage MV-7 — rename multivariate → bivariate `[~a76]`
 *Identity churn, last so it lands once over a settled surface (§2).*

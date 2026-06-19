@@ -119,31 +119,37 @@ prose to invent a synonym for a column the reader can see.
 `Portfolio.tail_df` (`portfolio.py:1053-1089`) builds the `total` row as
 `INFO_NA` and fills only the tail classes / concentration. Two fixes:
 
-a. **Complete `min` / `max` on the `total` row — reuse the existing derivation,
-   don't reinvent it.** The total's structural support is already worked out
-   carefully per unit: each unit's `tail_df` aggregate `min` / `max` comes from
-   `tail._agg_support`, which handles `inf`, signed (P&L) books, and limit/splice
-   caps. The total support is the additive combine of those ends, and that
-   additive combine (with the `0 * inf` / signed handling) is exactly what
-   `tail._agg_support` already implements. **Decision (author): read `min` / `max`
-   straight from the existing Portfolio call that already returns the combined
-   structural support** — do not hand-roll a fresh sum. *Source call: TBD — author
-   to name the specific method/attribute; the implementer wires the `total` row to
-   it.* (The realized-grid extent `density_df.index[0]` / `[-1]` and the `q()`
-   quantiles are **not** it — they are grid-bounded and report a finite max for an
-   unbounded total.)
+a. **Complete `min` / `max` on the `total` row — read the realised combine grid,
+   don't reinvent it. Source (author): `self.bs_window_df`, the `used` row.**
+   `Portfolio.bs_window_df` already carries the carefully-worked-out shared
+   combine grid with `x_min` / `x_max` columns; the `used` row is the realised
+   total extent. So `total['min'] = bs_window_df.loc['used', 'x_min']`,
+   `total['max'] = bs_window_df.loc['used', 'x_max']`. **Availability:** the grid
+   exists only after `update`, so before sizing `bs_window_df` is `None` — leave
+   the `total` `min` / `max` as `INFO_NA` in that case (the per-unit support rows
+   stay spec-only either way).
 
-b. **Tail class stays worst-of; the per-*side* label is not a blanket worst-of.**
-   The decay class of the total **is** the worst-of (`self.tail_class`, the
-   thickest summand under independence) — keep that. The bug is that today *both*
-   `left_tail` and `right_tail` get that single worst-of `decay` label, so a book
-   of non-negative units reports a `super-exponential` **left** tail when its
-   floor is finite. Apply the worst-of decay only where the corresponding support
-   end is infinite, and `bounded` where it is finite — the `_side_class` rule
-   (`left_tail = bounded if total min finite else worst-of decay`; same on the
-   right). With 5a giving a finite total `min`, the left side correctly reads
-   `bounded`. This is the "port reports left tail super-exp ⇒ should be bounded"
-   fix; it does **not** change `tail_class`.
+   *Note the column then mixes two things by design:* per-unit rows show
+   **structural** support (`inf` at an unbounded end, from `tail._agg_support`),
+   while the `total` row shows the **realised grid** extent (always finite). That
+   is intended — the grid is the operative support for the portfolio total — but
+   it is why the right-tail class below is **not** derived from `max` finiteness.
+
+b. **Tail class stays worst-of; split it per side.** The total's decay class is
+   the worst-of thickest summand under independence — keep that for the side that
+   is genuinely unbounded. The bug is that today *both* `left_tail` and
+   `right_tail` get the single overall worst-of label, so a non-negative book
+   reports a `super-exponential` **left** tail when its floor is plainly bounded.
+   **Do not** key bounded-ness off the realised-grid `min` / `max` (per 5a they
+   are always finite, so the right side would wrongly read `bounded`). Instead
+   compute the worst-of **separately for each side from the per-unit rows already
+   gathered** (`rows[*]['left_tail']`, `rows[*]['right_tail']`): the per-unit
+   `tail_df` already encodes `bounded` at a finite end, so for a non-negative book
+   every unit's `left_tail` is `bounded` ⇒ total left = `bounded` (the fix), while
+   the right side is the heaviest unit `right_tail` ⇒ the worst-of decay (or
+   `bounded` if all units are bounded). This is the "port reports left tail
+   super-exp ⇒ should be bounded" fix, and `tail_class` (the overall worst-of)
+   is unchanged.
 
 ### 6. Replace `concentration_p` with `cv` (Aggregate **and** Portfolio)
 
@@ -221,7 +227,7 @@ clip "increase log2" suggestion when truncated.
 | reins_description → property | `distributions.py` only (def + 2 call sites) | low (single file) but breaking for external arg callers |
 | bs workers (optional) | `distributions.py` only | low; deferred |
 | `top` → `x_max` label (item 4) | `distributions.py`, `portfolio.py` | low; pure label |
-| `Portfolio.tail_df` total row (item 5) | `portfolio.py` (reuse `tail._agg_support` / `_side_class`) | low; reuses existing support derivation, adds per-side label |
+| `Portfolio.tail_df` total row (item 5) | `portfolio.py` only (read `bs_window_df` `used` row; per-side worst-of from unit rows) | low; reuses existing grid, adds per-side label |
 | `concentration_p` → `cv` (item 6) | `tail.py`, `portfolio.py` | low-med; public column rename (breaking) |
 | `bs_explanation` rewrite (item 7) | `distributions.py`, `portfolio.py` | med; prose-heavy, both classes |
 
@@ -262,6 +268,8 @@ name historically; leave them or sweep in a final pass.
   renamed to `cv` / `x_max=`).
 - Build a 2-unit portfolio (`port USE.Port agg A 100 claims sev lognorm 100 cv 2
   poisson agg B 50 claims sev gamma 50 cv 1 poisson`), then check: `p.tail_df`
-  `total` row has finite `min`/`max` and `bounded` left tail (item 5), a `cv`
+  `total` row has `min`/`max` matching `p.bs_window_df.loc['used', ['x_min','x_max']]`
+  and a `bounded` left tail with the worst-of decay on the right (item 5), a `cv`
   column (item 6), and that `p.bs_description` / `p.bs_explanation` read with
-  `x_max` and the new window-width template (items 4, 7).
+  `x_max` and the new window-width template (items 4, 7). Also check `tail_df`
+  before `update` leaves the `total` `min`/`max` as `INFO_NA` (grid not sized).

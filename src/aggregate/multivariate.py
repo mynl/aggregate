@@ -57,7 +57,8 @@ import numpy as np
 import pandas as pd
 import scipy.fft as sfft
 
-from .constants import FIG_H, FIG_W, DefectiveDistributionWarning
+from .constants import (FIG_H, FIG_W, DefectiveDistributionWarning,
+                        info_row, INFO_NA)
 from .config import get_settings
 from .moments import MomentAggregator, xsden_to_mwrangler
 from .utilities import round_bucket, balanced_window
@@ -1174,33 +1175,201 @@ class MultivariateAggregate:
         df.index.name = 'component'
         return df
 
+    def _axis_kind(self, i):
+        """Per-axis kind label (``agg`` / ``pnl`` / ``ceded`` / ``net``)."""
+        if self.mode == 'netceded':
+            return ('ceded', 'net')[i]
+        reflect, shift = self._affine[i]
+        return 'pnl' if (reflect or shift) else 'agg'
+
+    def _bs_str(self, i):
+        """``bs`` of axis ``i`` in the Agg/Port display form (``1/n`` for < 1)."""
+        bs = self.bs[i]
+        return f'{bs:.6g}' if bs >= 1 else f'1/{int(round(1.0 / bs))}'
+
+    def _id(self):
+        """Display-only 8-hex hash of the structural fields (mirrors Agg ``id``)."""
+        import hashlib
+        en = float(self._nc_agg.n) if self.mode == 'netceded' else float(self.en)
+        key = repr((self.name, self.mode, tuple(self.line_names),
+                    str(self.copula), getattr(self, 'freq_name', ''), en))
+        return hashlib.md5(key.encode()).hexdigest()[:8]
+
     @property
     def info(self):
-        """Multi-line human-readable summary of the multivariate aggregate."""
-        self._require_density()
-        lines = [f'MultivariateAggregate {self.name!r} ({self.mode})',
-                 f'  components   {self.line_names[0]!r} x {self.line_names[1]!r}']
+        """Fixed-layout multi-line summary string.
+
+        Every row is always present, in the same order, for every
+        ``MultivariateAggregate``; a value that is not (yet) available -- e.g.
+        the grid block before :meth:`update` -- renders as ``n/a``. Shares the
+        label/value convention (:func:`aggregate.constants.info_row`) with
+        ``Aggregate`` / ``Portfolio``; the bivariate row catalogue is documented
+        in ``dev/info-strings.rst``.
+        """
+        updated = self.density is not None
         if self.mode == 'netceded':
-            lines.append(f'  source       {self._nc_agg.name!r}: '
-                         f'{self._nc_agg.frequency.freq_name}, '
-                         f'E[N] = {self._nc_agg.n:.6g}, occurrence reinsurance')
+            copula = 'comonotone (netceded)'
+            freq_name = self._nc_agg.frequency.freq_name
+            en = float(self._nc_agg.n)
+            tau = INFO_NA
         else:
-            lines.append(f'  shared freq  {self.freq_name}, E[N] = {self.en:.6g}')
-            lines.append(f'  copula       {self.copula!r}')
-        lines.append(
-            f'  grid         {self.density.shape[0]} x {self.density.shape[1]} '
-            f'(bs = {self.bs[0]:g}, {self.bs[1]:g})')
+            copula = repr(self.copula)
+            freq_name = self.freq_name
+            en = float(self.en)
+            tau = INFO_NA if self.copula is None else f'{self.copula.tau():.4f}'
+        rows = [
+            ('bivariate object name', self.name),
+            ('mode', self.mode),
+            ('components', f'{self.line_names[0]} x {self.line_names[1]}'),
+            ('copula', copula),
+            ('shared frequency', freq_name),
+            ('claim count', f'{en:,.3f}'),
+            ('padding', self.padding if updated else INFO_NA),
+        ]
+        for i in range(2):
+            lbl = f'axis {i}'
+            rows.append((f'{lbl} name', self.line_names[i]))
+            rows.append((f'{lbl} kind', self._axis_kind(i)))
+            if updated:
+                xs = self.axis_xs[i]
+                rows += [
+                    (f'{lbl} bs', self._bs_str(i)),
+                    (f'{lbl} log2', int(round(np.log2(len(xs))))),
+                    (f'{lbl} x_min', f'{float(xs[0]):,.6g}'),
+                    (f'{lbl} x_max', f'{float(xs[-1]):,.6g}'),
+                ]
+            else:
+                rows += [(f'{lbl} bs', INFO_NA), (f'{lbl} log2', INFO_NA),
+                         (f'{lbl} x_min', INFO_NA), (f'{lbl} x_max', INFO_NA)]
+        rows += [
+            ('correlation', f'{self.corr():.6f}' if updated else INFO_NA),
+            ('copula tau', tau),
+            ('tail deficit', f'{self.deficit:.2e}' if updated else INFO_NA),
+            ('validation', self._explain_oneline() if updated else INFO_NA),
+            ('id', self._id()),
+        ]
+        return '\n'.join(info_row(label, value) for label, value in rows)
+
+    @property
+    def explain(self):
+        """Validation: does each marginal reproduce its standalone aggregate?
+
+        The bivariate showpiece invariant -- marginalising the joint recovers
+        each standalone aggregate (mean exact, cv at the matched grid). Returns a
+        per-axis frame of theoretical vs realized ``mean`` / ``cv`` with relative
+        error; the joint tail ``deficit`` is on ``df.attrs['deficit']`` and in the
+        ``validation`` row of :attr:`info`.
+
+        Returns
+        -------
+        DataFrame
+            Index = component name; columns ``mean_theory`` / ``mean_empirical`` /
+            ``mean_error`` / ``cv_theory`` / ``cv_empirical`` / ``cv_error``.
+        """
+        self._require_density()
+        sd = self.stats_df
+
+        def _rel(emp, theory):
+            return abs(emp - theory) / abs(theory) if theory else abs(emp - theory)
+
+        rows = {}
+        for name in self.line_names:
+            tm = float(sd.loc[('theoretical', 'mean'), name])
+            em = float(sd.loc[('empirical', 'mean'), name])
+            tcv = float(sd.loc[('theoretical', 'cv'), name])
+            ecv = float(sd.loc[('empirical', 'cv'), name])
+            rows[name] = {
+                'mean_theory': tm, 'mean_empirical': em, 'mean_error': _rel(em, tm),
+                'cv_theory': tcv, 'cv_empirical': ecv, 'cv_error': _rel(ecv, tcv),
+            }
+        df = pd.DataFrame(rows).T
+        df.index.name = 'axis'
+        df.attrs['deficit'] = self.deficit
+        return df
+
+    def _explain_oneline(self):
+        """One-line validation summary for the ``info`` ``validation`` row.
+
+        The hard correctness gate is the joint **tail deficit** (< 1e-5): a
+        measured grid conserves mass, so a deficit means a clipped / aliased
+        window. The marginal-mean check is deliberately **loose** (rel error vs
+        the *analytic* standalone < 10%) -- it catches gross misplacement but not
+        the budget-dependent bs-discretization error, which is expected (the
+        marginal still reproduces the standalone *at the matched grid*). The
+        exact per-axis mean / cv errors are in :attr:`explain`.
+        """
+        df = self.explain
+        bad = []
+        if (df['mean_error'] > 0.10).any():
+            bad.append('marginal mean')
+        if self.deficit > 1e-5:
+            bad.append('tail deficit')
+        return 'not unreasonable' if not bad else 'check: ' + ', '.join(bad)
+
+    @property
+    def bs_window_df(self):
+        """Per-axis grid summary: the realized ``(kind, bs, log2, window)`` per axis.
+
+        The bivariate analogue of :attr:`Aggregate.bs_window_df`. The bv
+        *measures* its grid (it does not run the 1-D method ladder), so this is a
+        two-row summary -- one per axis -- of the chosen grid, not the per-method
+        decision journey. ``clipped`` flags a budget-forced window clip.
+        """
+        self._require_density()
+        rows = {}
         for i, name in enumerate(self.line_names):
-            reflect, shift = self._affine[i]
-            tag = ' [pnl]' if (reflect or shift) else ''
-            lo, hi = self.axis_xs[i][0], self.axis_xs[i][-1]
-            lines.append(
-                f'  axis {i} {name}{tag}: window [{lo:.6g}, {hi:.6g}], '
-                f'mass {self.density.sum(axis=1 - i).sum():.6f}')
-        tail = '' if self.copula is None else f' (copula tau = {self.copula.tau():.4f})'
-        lines.append(f'  correlation  {self.corr():.6f}{tail}')
-        lines.append(f'  tail deficit {self.deficit:.2e}')
-        return '\n'.join(lines)
+            xs = self.axis_xs[i]
+            rows[name] = {
+                'kind': self._axis_kind(i), 'bs': self.bs[i],
+                'log2': int(round(np.log2(len(xs)))),
+                'x_min': float(xs[0]), 'x_max': float(xs[-1]),
+                'clipped': bool(getattr(self, '_clipped', False)),
+            }
+        df = pd.DataFrame(rows).T
+        df.index.name = 'axis'
+        return df
+
+    @property
+    def bs_description(self) -> str:
+        """One-line summary of the chosen per-axis grids."""
+        parts = [f'{name} bs={self._bs_str(i)} log2={int(round(np.log2(len(self.axis_xs[i]))))}'
+                 for i, name in enumerate(self.line_names)]
+        return 'bivariate grid: ' + '; '.join(parts) + f' (deficit {self.deficit:.2e})'
+
+    @property
+    def tail_df(self):
+        """Per-axis tail / support summary of the realized marginals.
+
+        The bivariate analogue of :attr:`Aggregate.tail_df`: one row per axis
+        with the realized ``support_min`` / ``support_max`` (where the marginal
+        has mass), the theoretical ``mean`` / ``sd`` / ``skew``, and a
+        ``right_heavy`` flag (``skew > 1``). The full 1-D tail-class ladder lives
+        on each axis's standalone marginal aggregate.
+        """
+        self._require_density()
+        m0, m1 = self.marginals()
+        rows = {}
+        for i, (name, m) in enumerate(zip(self.line_names, (m0, m1))):
+            xs = self.axis_xs[i]
+            nz = np.flatnonzero(m > 1e-15)
+            mt, sdt, skt = self._axis_theory(i)
+            rows[name] = {
+                'support_min': float(xs[nz[0]]) if len(nz) else np.nan,
+                'support_max': float(xs[nz[-1]]) if len(nz) else np.nan,
+                'mean': mt, 'sd': sdt, 'skew': skt,
+                'right_heavy': bool(np.isfinite(skt) and skt > 1.0),
+            }
+        df = pd.DataFrame(rows).T
+        df.index.name = 'axis'
+        return df
+
+    @property
+    def tail_description(self) -> str:
+        """One-line per-axis support summary."""
+        df = self.tail_df
+        parts = [f'{name} [{r.support_min:.4g}, {r.support_max:.4g}]'
+                 for name, r in df.iterrows()]
+        return 'per-axis support: ' + '; '.join(parts)
 
     @staticmethod
     def _contourf(ax, xgrid, ygrid, Z, title, xlabel, ylabel, levels, log,

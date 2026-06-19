@@ -227,7 +227,7 @@ def test_mv_pnl_marginal_matches_standalone_pnl():
 
 def test_mv_reporting_smoke():
     mv = _mv()
-    assert 'MultivariateAggregate' in mv.info
+    assert 'bivariate object name' in mv.info
     df = mv.describe                      # property
     assert {'A', 'B', 'joint'}.issubset(set(df.index))
     assert np.isclose(float(df.loc['joint', 'corr']), mv.corr())
@@ -237,6 +237,76 @@ def test_mv_reporting_smoke():
     assert dd.shape == mv.density.shape
     assert np.isclose(dd.to_numpy().sum(), 1.0, atol=1e-6)
     np.testing.assert_array_equal(dd.to_numpy(), mv.density)
+
+
+# ----------------------------------------------------------------------
+# MV-4: the reporting surface (info catalogue, explain, bs_window_df, tail_df)
+# ----------------------------------------------------------------------
+
+def test_mv_info_row_catalogue_ordered():
+    """``info`` uses the fixed info_row catalogue (Agg/Port convention)."""
+    from aggregate.constants import INFO_LABEL_WIDTH
+    mv = _mv()
+    lines = mv.info.splitlines()
+    labels = [ln[:INFO_LABEL_WIDTH].strip() for ln in lines]
+    # the catalogue is present and in order (a representative spine)
+    spine = ['bivariate object name', 'mode', 'components', 'copula',
+             'shared frequency', 'claim count', 'padding',
+             'axis 0 name', 'axis 0 bs', 'axis 1 name', 'axis 1 bs',
+             'correlation', 'copula tau', 'tail deficit', 'validation', 'id']
+    idx = [labels.index(s) for s in spine]      # KeyError if any missing
+    assert idx == sorted(idx), 'info rows out of order'
+    # every line obeys the shared label width
+    assert all(len(ln) >= INFO_LABEL_WIDTH for ln in lines)
+
+
+def test_mv_info_netceded_catalogue():
+    """netceded emits the same catalogue, copula -> comonotone, tau n/a."""
+    from aggregate.constants import INFO_LABEL_WIDTH
+    mv = build(f'netceded {NC_PROG}')
+    d = {ln[:INFO_LABEL_WIDTH].strip(): ln[INFO_LABEL_WIDTH:].strip()
+         for ln in mv.info.splitlines()}
+    assert d['mode'] == 'netceded'
+    assert d['copula'] == 'comonotone (netceded)'
+    assert d['axis 0 kind'] == 'ceded'
+    assert d['axis 1 kind'] == 'net'
+    assert d['copula tau'] == 'n/a'
+
+
+def test_mv_explain_marginal_reproduces_standalone():
+    """``explain`` reports per-axis marginal moments; a clean book validates.
+
+    The mean error here is vs the *analytic* standalone, so it carries the
+    coarse-grid discretization (a few %); the invariant (marginal reproduces the
+    standalone at the matched grid) holds and the deficit is tiny, so the
+    one-line validation passes.
+    """
+    mv = _mv('gumbel 0.4', 'mixed gamma .5')
+    ex = mv.explain
+    assert set(ex.index) == {'A', 'B'}
+    assert (ex['mean_error'] < 0.10).all()   # within discretization at default budget
+    assert mv.deficit < 1e-6
+    assert mv._explain_oneline() == 'not unreasonable'
+
+
+def test_mv_explain_flags_clipped_book():
+    """A pinned (bs, log2) too small to cover clips the joint -> validation flags it."""
+    mv = _mv('gumbel 0.4', 'mixed gamma .5')
+    mv.update(bs=(1.0, 1.0), log2=(6, 6))    # 64x64 grid pinned far below support
+    assert mv.deficit > 1e-5
+    assert 'tail deficit' in mv._explain_oneline()
+
+
+def test_mv_bs_window_df_and_tail_df_per_axis():
+    """Both companion frames carry one row per axis with the right columns."""
+    mv = _mv()
+    bw = mv.bs_window_df
+    assert list(bw.index) == ['A', 'B']
+    assert {'kind', 'bs', 'log2', 'x_min', 'x_max', 'clipped'}.issubset(bw.columns)
+    td = mv.tail_df
+    assert list(td.index) == ['A', 'B']
+    assert {'support_min', 'support_max', 'mean', 'sd', 'skew',
+            'right_heavy'}.issubset(td.columns)
 
 
 def test_mv_plot_two_panels():

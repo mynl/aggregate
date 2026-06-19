@@ -124,6 +124,64 @@ Value enumerations:
 ``Aggregate``'s ``id`` is a display-only spec hash with no stored timestamp.
 
 
+Bivariate (MultivariateAggregate)
+---------------------------------
+
+The joint bivariate aggregate (copula and ``netceded`` modes). Two axes are
+always present, so the two per-axis blocks (``axis 0`` / ``axis 1``) always
+emit the same rows in the same order. Grid rows render ``n/a`` before
+:meth:`update`.
+
+===========================  =======================================================  =========================
+Row                          Source / meaning                                          n/a when
+===========================  =======================================================  =========================
+bivariate object name        ``self.name``
+mode                         ``copula`` or ``netceded``
+components                   ``{axis 0 name} x {axis 1 name}``
+copula                       ``repr(copula)``; ``comonotone (netceded)`` in
+                             netceded mode
+shared frequency             outer (shared) frequency name; the source agg's
+                             frequency in netceded mode
+claim count                  shared ``E[N]`` (source agg ``n`` in netceded),
+                             format ``,.3f``
+padding                      FFT zero-padding                                          not updated
+axis 0 name                  component-0 name
+axis 0 kind                  ``agg`` / ``pnl`` (copula) or ``ceded`` (netceded)
+axis 0 bs                    axis-0 bucket size (``1/n`` form for ``bs < 1``)          not updated
+axis 0 log2                  axis-0 log2 grid length                                   not updated
+axis 0 x_min                 axis-0 window lower edge                                  not updated
+axis 0 x_max                 axis-0 window upper edge                                  not updated
+axis 1 name                  component-1 name
+axis 1 kind                  ``agg`` / ``pnl`` (copula) or ``net`` (netceded)
+axis 1 bs                    axis-1 bucket size                                        not updated
+axis 1 log2                  axis-1 log2 grid length                                   not updated
+axis 1 x_min                 axis-1 window lower edge                                  not updated
+axis 1 x_max                 axis-1 window upper edge                                  not updated
+correlation                  realized output Pearson correlation                       not updated
+copula tau                   copula Kendall ``tau``                                    netceded / no copula
+tail deficit                 ``1 - sum(density)``                                      not updated
+validation                   one-line :attr:`explain` headline (marginal mean +
+                             deficit checks)                                           not updated
+id                           display-only 8-hex hash of the structural fields
+===========================  =======================================================  =========================
+
+Value enumerations:
+
+- ``mode`` ∈ ``{copula, netceded}``.
+- ``axis k kind`` ∈ ``{agg, pnl}`` (copula) or ``{ceded, net}`` (netceded).
+- ``validation`` ∈ ``{not unreasonable}`` or ``check: <marginal mean, tail
+  deficit>`` -- the showpiece invariant being *each marginal reproduces its
+  standalone aggregate* (full per-axis errors in :attr:`explain`).
+
+The companion frames mirror the 1-D surfaces as **per-axis summaries** (the bv
+*measures* its grid rather than running the 1-D method ladder): :attr:`explain`
+(per-axis marginal-vs-standalone mean / cv error), :attr:`bs_window_df` /
+:attr:`bs_description` (the realized per-axis grid), and :attr:`tail_df` /
+:attr:`tail_description` (per-axis realized support + moments). ``describe`` and
+``stats_df`` carry the per-component moment block (theoretical vs empirical) and
+the joint dependence footer (correlation, copula tau).
+
+
 Distortion
 ----------
 

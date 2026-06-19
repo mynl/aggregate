@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.0a77
+
+### Bivariate reporting surface (MV-4)
+
+Stage MV-4 of the bivariate firm-up: the `MultivariateAggregate` reporting now
+reads like `Aggregate` / `Portfolio`.
+
+- **`info` rebuilt to the shared catalogue.** Dropped the bespoke f-string blob
+  for the `aggregate.constants.info_row` / `INFO_NA` convention: a fixed row
+  catalogue, every row always present in the same order, `n/a` before `update`.
+  Mirrors the Agg/Port layout (name, mode, components, copula, shared frequency,
+  claim count, padding, a per-axis block — name/kind/bs/log2/x_min/x_max — then
+  correlation, copula tau, tail deficit, validation, id). Documented in a new
+  **Bivariate** section of `dev/info-strings.rst`.
+- **`explain`** (new) — the showpiece invariant: per-axis marginal moments
+  (theoretical vs realized `mean`/`cv` with relative error) and the joint tail
+  deficit. The `info` `validation` row is its one-line headline (deficit gate +
+  a loose marginal-mean sanity; the exact, resolution-dependent errors live in
+  `explain`).
+- **`bs_window_df` / `bs_description`** (new) — the realized per-axis grid
+  (`kind`, `bs`, `log2`, window, `clipped`), a two-row summary (the bv *measures*
+  its grid, so there is no 1-D method ladder to report).
+- **`tail_df` / `tail_description`** (new) — per-axis realized support + moments
+  + a `right_heavy` flag.
+
+`describe` / `stats_df` keep their per-component moment block (theoretical vs
+empirical) and joint dependence footer (correlation, copula tau).
+
 ## 1.0.0a76
 
 ### Netceded axis sizing routes through `balanced_window` (MV-3)

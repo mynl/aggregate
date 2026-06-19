@@ -224,7 +224,7 @@ def _row_stats(a, summary_cols):
         row.update(log2=a.log2, bs=a.bs,
                    agg_m=a.agg_m, agg_cv=a.agg_cv, agg_sd=a.agg_sd, agg_skew=a.agg_skew,
                    emp_m=a.est_m, emp_cv=a.est_cv, emp_sd=a.est_sd, emp_skew=a.est_skew,
-                   valid=a.explain_validation())
+                   valid=a.validation_explanation)
     elif isinstance(a, Severity):
         # theoretical moments only; severity has no discretization. Use the
         # project's own .moms(), which returns raw moments (E[X], E[X^2], E[X^3]);
@@ -1473,7 +1473,7 @@ class Underwriter(object):
         # build + plot/describe path: augment df with summary statistics.
         # Initialize as object dtype to avoid pandas LossySetitemError on the
         # mixed-type .loc assignment below (modern pandas refuses to coerce a
-        # non-bool result of explain_validation into a bool column).
+        # non-bool result of validation_explanation into a bool column).
         summary_cols = ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
                         'emp_m', 'emp_cv', 'emp_sd', 'emp_skew', 'valid']
         for col in summary_cols:

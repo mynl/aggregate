@@ -354,6 +354,7 @@ class Portfolio(object):
         # bucket/window reporting (set by best_window / update)
         self._bs_window_df = None
         self._bs_clip = None            # portfolio far-tail clip record or None
+        self._bs_raw = None             # pre-dyadic-round bs (auto-size only) or None
         self._combine_x_min = None      # windowed combine origin (Plan B) or None
 
         # for consistency with Aggregates
@@ -805,7 +806,7 @@ class Portfolio(object):
         _s = "" if _n <= 1 else "s"
         s.append(f'Portfolio contains {_n} aggregate component{_s}.')
         if self.bs > 0:
-            s.append(f'Updated with bucket size {self.bs:.6g}, log2 = {self.log2}, validation: {self.explain_validation()}')
+            s.append(f'Updated with bucket size {self.bs:.6g}, log2 = {self.log2}, validation: {self.validation_explanation}')
         df = self.describe
         return '\n'.join(s) + df.fillna('').to_html()
 
@@ -983,9 +984,9 @@ class Portfolio(object):
     def bs_description(self) -> str:
         """One-line summary of the shared portfolio combine grid (``[bs-reporting]``).
 
-        The realised ``(bs, log2, x_min)`` and grid top of the resolution + span
-        combine (``best_window``); ``'portfolio grid not sized yet'`` before the
-        grid is built.
+        The realised ``(bs, log2, x_min)`` and grid ``x_max`` of the resolution +
+        window-width combine (``best_window``); ``'portfolio grid not sized yet'``
+        before the grid is built.
         """
         df = getattr(self, '_bs_window_df', None)
         if df is None or 'used' not in df.index:
@@ -993,7 +994,7 @@ class Portfolio(object):
         u = df.loc['used']
         top = float(u['x_min']) + (1 << int(u['log2'])) * float(u['bs'])
         txt = (f'portfolio grid: bs={float(u["bs"]):g}, log2={int(u["log2"])}, '
-               f'x_min={float(u["x_min"]):g} (top={top:g})')
+               f'x_min={float(u["x_min"]):g} (x_max={top:g})')
         clip = getattr(self, '_bs_clip', None)
         if clip is not None:
             cm = clip.get('clipped_mass', float('nan'))
@@ -1005,49 +1006,85 @@ class Portfolio(object):
     def bs_explanation(self) -> str:
         """Verbose prose explaining the portfolio combine grid (``[bs-reporting]``).
 
-        Mirrors :attr:`Aggregate.bs_explanation` at the portfolio level: the
-        worst-of tail one-liner, the Portfolio MM bulk window vs the inspectable
-        ``mm <= rms <= sum`` reference ordering (the ``mm - rms`` gap is the
-        skewness/diversification adjustment the combine makes), whether the
-        single-big-jump look-through floored the extent, the realised shared
-        grid (windowed Plan B or 0-based Plan A), and any far-tail clip with how
-        to widen it. ``'portfolio grid not sized yet'`` before :meth:`update`.
+        Walks the grid choice in the reporting template: the portfolio's per-side
+        tail classes and log2 budget; the per-unit tails; the recommended
+        **window width** and the candidate widths it was chosen from (portfolio
+        method of moments, RMS-of-units, sum-of-units, single big jump); the
+        raw-to-dyadic ``bs`` rounding; any natural support bounds and the total
+        concentration; the realised ``x_min`` / ``x_max``; and a closing log2
+        suggestion when a far-tail clip occurred (raise). ``'portfolio grid not
+        sized yet'`` before :meth:`update`.
+
+        Notes
+        -----
+        "Window width" (the realised ``W = x_max - x_min`` and the ``mm`` / ``rms``
+        / ``sum`` / ``sbj`` candidates) replaces the older "span" wording -- the
+        candidates are all window widths the combine chooses between.
         """
         df = getattr(self, '_bs_window_df', None)
         if df is None or 'used' not in df.index:
             return 'Portfolio grid not sized yet (call update()).'
         u = df.loc['used']
-        top = float(u['x_min']) + (1 << int(u['log2'])) * float(u['bs'])
-        parts = [f'The portfolio is {self.tail_explanation}']
-        if {'mm', 'rms', 'sum'}.issubset(df.index):
-            mm_w = float(df.loc['mm', 'W'])
-            rms_w = float(df.loc['rms', 'W'])
-            sum_w = float(df.loc['sum', 'W'])
-            order = 'mm <= rms <= sum' if mm_w <= rms_w <= sum_w + 1e-9 \
-                else 'mm/rms/sum out of order (check moments)'
+        log2 = int(u['log2'])
+        bs = float(u['bs'])
+        x_min = float(u['x_min'])
+        x_max = float(u['x_max'])
+        W = float(u['W']) if 'W' in u.index and np.isfinite(float(u['W'])) \
+            else x_max - x_min
+
+        def _as_float(v):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return float('nan')
+
+        td = self.tail_df
+        tot = td.loc['total']
+        parts = [f'The portfolio tail is {tot["left_tail"]} left / '
+                 f'{tot["right_tail"]} right. Log2 is {log2}.']
+
+        unit_rows = [ix for ix in td.index if ix != 'total']
+        if unit_rows:
+            unit_txt = ' and '.join(
+                f'{ix} {td.loc[ix, "left_tail"]}/{td.loc[ix, "right_tail"]}'
+                for ix in unit_rows)
+            parts.append(f'The unit tails are: {unit_txt}.')
+
+        if {'mm', 'rms', 'sum', 'sbj'}.issubset(df.index):
             parts.append(
-                f'The bulk span is sized by Portfolio MM (width {mm_w:g}); the '
-                f'RMS-of-windows reference is {rms_w:g} and the legacy linear '
-                f'sum {sum_w:g} ({order}); the mm-rms gap {rms_w - mm_w:g} is '
-                f'the skewness/diversification adjustment.')
-        if 'sbj' in df.index and float(df.loc['sbj', 'x_max']) > float(df.loc['mm', 'x_max']):
+                f'The recommended window width {W:g} is based on portfolio method '
+                f'of moments {float(df.loc["mm", "W"]):g}, RMS(units) '
+                f'{float(df.loc["rms", "W"]):g}, sum(units) '
+                f'{float(df.loc["sum", "W"]):g}, and single big jump of '
+                f'{float(df.loc["sbj", "W"]):g}.')
+
+        raw = getattr(self, '_bs_raw', None)
+        if raw is not None:
             parts.append(
-                f'The single-big-jump look-through floored the upper extent at '
-                f'{float(df.loc["sbj", "x_max"]):g} (a heavy unit reaches past '
-                f'the MM bulk).')
-        placement = ('windowed (Plan B, mass clears 0)' if float(u['x_min']) > 0
-                     else '0-based (Plan A)')
-        parts.append(
-            f'Realised {placement} grid: bs={float(u["bs"]):g}, '
-            f'log2={int(u["log2"])}, x_min={float(u["x_min"]):g}, top={top:g}.')
+                f'The window produces a raw bs {raw:g} which dyadically rounds to '
+                f'{bs:g} producing a final {W:g} window width.')
+
+        lo, hi = _as_float(tot['min']), _as_float(tot['max'])
+        if tot['left_tail'] == 'bounded' and np.isfinite(lo):
+            parts.append(f'It has a natural lower support bound of {lo:g}.')
+        if tot['right_tail'] == 'bounded' and np.isfinite(hi):
+            parts.append(f'It has a natural upper support bound of {hi:g}.')
+
+        conc_flag, conc_cv = _tail.concentration(float(self.agg_m), float(self.agg_sd))
+        if conc_flag and conc_cv is not None and np.isfinite(conc_cv):
+            parts.append(f'The distribution is concentrated with a CV of {conc_cv:g}.')
+
+        parts.append(f'The recommended x_min is {x_min:g} resulting in '
+                     f'x_max of {x_max:g}.')
+
         clip = getattr(self, '_bs_clip', None)
         if clip is not None:
             cm = clip.get('clipped_mass', float('nan'))
             cm_txt = f'~{cm:.3g}' if np.isfinite(cm) else 'a sliver'
             parts.append(
-                f'The combined support exceeds the grid top {top:g}: {cm_txt} of '
-                f'the mass is clipped (a reported deficit, not normalized) -- '
-                f'raise log2 to {int(clip["need_log2"])} to capture it.')
+                f'The combined support exceeds the grid ({cm_txt} of the mass '
+                f'clipped, a reported deficit not normalized); the analysis '
+                f'suggests increasing log2 to {int(clip["need_log2"])}.')
         return ' '.join(parts)
 
     @property
@@ -1056,11 +1093,25 @@ class Portfolio(object):
 
         One row per unit -- that unit's aggregate-level
         :attr:`Aggregate.tail_df` row (support ``min`` / ``max``, ``left_tail`` /
-        ``right_tail`` classes, ``bounded``, ``concentrated`` /
-        ``concentration_p``) -- and a ``total`` row carrying the portfolio
-        worst-of :attr:`tail_class` and the total-moment concentration. Spec-only
+        ``right_tail`` classes, ``bounded``, ``concentrated`` / ``cv``) -- and a
+        ``total`` row carrying the portfolio worst-of decay (computed *per side*)
+        and the total-moment concentration. Spec-only for the per-unit rows
         (valid before :meth:`update`). See :attr:`tail_description` /
         :attr:`tail_explanation` for the narrative.
+
+        Notes
+        -----
+        The ``total`` row mixes two notions of support **by design**: per-unit
+        rows show *structural* support (``inf`` at an unbounded end), while the
+        ``total`` ``min`` / ``max`` show the *realised* combine grid extent (the
+        ``used`` row of :attr:`bs_window_df`, always finite) -- the grid is the
+        operative support for the portfolio total. Because that grid is finite on
+        both ends, the per-side tail classes are **not** derived from ``min`` /
+        ``max`` finiteness; each side's class is the worst-of (thickest) over the
+        units' per-side rungs. So a non-negative book reports a ``bounded`` left
+        tail (every unit's left is bounded) while the right side carries the
+        heaviest unit's right-tail decay. ``min`` / ``max`` stay ``INFO_NA``
+        before the grid is sized.
 
         Returns
         -------
@@ -1070,21 +1121,37 @@ class Portfolio(object):
         rows = {a.name: a.tail_df.loc['aggregate'] for a in self.agg_list}
         df = pd.DataFrame(rows).T
         worst = self.tail_class
-        conc_flag, conc_p = _tail.concentration(float(self.agg_m), float(self.agg_sd))
+        conc_flag, conc_cv = _tail.concentration(float(self.agg_m), float(self.agg_sd))
         total = pd.Series(INFO_NA, index=df.columns, dtype=object)
-        worst_label = _tail.tail_class_label(worst)
+
+        def _worst_side(col):
+            """Worst-of (thickest) per-side rung over the unit rows; UNKNOWN poisons."""
+            classes = [_tail.tail_class_from_label(v) for v in df[col]]
+            if any(c == TailClass.UNKNOWN for c in classes):
+                return _tail.tail_class_label(TailClass.UNKNOWN)
+            return _tail.tail_class_label(max(classes, default=TailClass.BOUNDED))
+
         if 'left_tail' in df.columns:
-            total['left_tail'] = worst_label
+            total['left_tail'] = _worst_side('left_tail')
         if 'right_tail' in df.columns:
-            total['right_tail'] = worst_label
+            total['right_tail'] = _worst_side('right_tail')
         if 'bounded' in df.columns:
             total['bounded'] = (worst == TailClass.BOUNDED)
         if 'concentrated' in df.columns:
             total['concentrated'] = bool(conc_flag)
-        if 'concentration_p' in df.columns:
-            total['concentration_p'] = float(conc_p)
+        if 'cv' in df.columns and conc_cv is not None:
+            total['cv'] = float(conc_cv)
         if 'note' in df.columns:
             total['note'] = 'portfolio worst-of (independence)'
+        # Complete min/max on the total row from the realised combine grid (the
+        # bs_window_df 'used' row) -- available only after update; leave INFO_NA
+        # otherwise so the total support reads honestly as not-yet-sized.
+        bwdf = self.bs_window_df
+        if bwdf is not None and 'used' in bwdf.index:
+            if 'min' in df.columns:
+                total['min'] = float(bwdf.loc['used', 'x_min'])
+            if 'max' in df.columns:
+                total['max'] = float(bwdf.loc['used', 'x_max'])
         df.loc['total'] = total
         return df
 
@@ -2164,7 +2231,7 @@ class Portfolio(object):
         x_lo_raw = min(mm_lo, sbj_lo) if signed else mm_lo
         # Concentration gate (same source as Aggregate._bs_window): only a
         # genuinely concentrated total that clears 0 is windowed (Plan B).
-        conc_flag, _conc_p = _tail.concentration(m, sd)
+        conc_flag, _conc_cv = _tail.concentration(m, sd)
         window_nonsigned = (not signed and bs_in <= 0 and bool(conc_flag)
                             and x_lo_raw > 0)
 
@@ -2179,6 +2246,7 @@ class Portfolio(object):
         W_ext = max(x_hi - x_lo, 0.0)
         if bs_in > 0:
             bs = float(bs_in)
+            self._bs_raw = None                      # pinned: no rounding to report
         else:
             span = W_ext / N_cap if N_cap else W_ext
             if signed:
@@ -2187,7 +2255,9 @@ class Portfolio(object):
                 # ``max_k W_k / N`` (the MM span is usually wider, but guard the
                 # one-dominant-unit case).
                 span = max(span, (max(W_ks) if W_ks else 0.0) / N_cap)
-            bs = round_bucket(max(resolution, span))
+            raw = float(max(resolution, span))
+            self._bs_raw = raw                       # for the bs_explanation narrative
+            bs = round_bucket(raw)
 
         # ---- origin and log2 ----------------------------------------------
         if signed:
@@ -2805,11 +2875,25 @@ class Portfolio(object):
         self._valid = rv
         return rv
 
-    def explain_validation(self):
+    @property
+    def validation_explanation(self):
         """
-        Explain the validation result. Can pass in if already calculated.
+        Long-narrative explanation of the validation result (str).
+
+        The consistent narrative surface, mirroring ``tail_explanation`` /
+        ``bs_explanation``.
         """
         return explain_validation(self.valid)
+
+    def explain_validation(self):
+        """
+        Deprecated alias for :attr:`validation_explanation`.
+
+        Retained for back-compat (the old documented mechanism). Prefer the
+        ``validation_explanation`` property; this alias will be removed in a
+        future release.
+        """
+        return self.validation_explanation
 
     def trim_df(self):
         """

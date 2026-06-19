@@ -662,7 +662,9 @@ def test_1p_reporting_surfaces():
                   'agg A 100 claims sev lognorm 100 cv 2 poisson '
                   'agg B 50 claims sev gamma 50 cv 1 poisson')
     expl = p.bs_explanation
-    assert 'Portfolio MM' in expl and 'skewness/diversification' in expl
+    # new reporting template: per-side tail, candidate window widths, x_min/x_max
+    assert 'portfolio method of moments' in expl and 'single big jump' in expl
+    assert 'window width' in expl and 'x_max' in expl
     td = p.tail_df
     assert 'total' in td.index
     assert {'A', 'B'}.issubset(set(td.index))

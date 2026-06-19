@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.0.0a82
+
+### Consistent naming on the narrative / reporting surface — partly breaking
+
+The narrative and reporting surface on `Aggregate` and `Portfolio` now follows
+one rule: **`<item>_<aspect>`, the aspect is a noun, and every short/long
+narrative is a property returning a string** (the `tail_class` /
+`tail_description` / `tail_explanation` / `tail_df` family is the template).
+
+- **Validation narrative** `explain_validation()` (verb-first, backwards from
+  every other family) → **`validation_explanation` property**. The old
+  `explain_validation()` method is **retained as a deprecated thin alias**
+  returning `validation_explanation`, so existing callers keep working; prefer
+  the property. The module-level worker `aggregate.utilities.explain_validation(rv)`
+  (takes a `Validation` flag) is unchanged. On both `Aggregate` and `Portfolio`.
+- **Reinsurance narrative** `reins_description(kind, width)` was a *method* with
+  arguments → now a bare **`reins_description` property** (str, the
+  `kind='both', width=0` text) for the consistent surface; the parameterized
+  worker moved to the private `_reins_description(kind, width)`. **Breaking** for
+  any external `a.reins_description('occ')` call (the property takes no args).
+- **`concentration_p` → `cv`** (Aggregate **and** Portfolio `tail_df`). The
+  opaque `concentration_p = Phi(mean/sd)` diagnostic (which saturated at ~1 for
+  any real book) is replaced by the directly interpretable **coefficient of
+  variation `cv = sd / mean`** (`inf` when `mean == 0`). The `tail_df` column,
+  the `TailRow.cv` field, and `tail.concentration()`'s second return value all
+  rename. The `concentrated` flag and its gate are unchanged. **Breaking**:
+  public `tail_df` column rename; the tail narratives now read `… (cv=…)` /
+  `It is concentrated: cv ~ …`.
+- **`Portfolio.tail_df` `total` row completed.** `min` / `max` are now filled
+  from the realised combine grid (`bs_window_df` `used` row) once sized (left as
+  `n/a` before `update`), and the per-side tail classes are computed **per side**
+  as the worst-of over the unit rows — so a non-negative book correctly reports a
+  `bounded` **left** tail (it previously inherited the overall worst-of label on
+  both sides, mislabelling the bounded floor).
+- **`top=` → `x_max=`** in the `bs_description` / `bs_explanation` one-liners and
+  prose (matching the `x_max` column already on `bs_window_df`). The internal
+  `_bs_grid_top` helper and `top` locals are unchanged.
+- **`bs_explanation` rewritten** to a single reporting template on both classes,
+  with **"window width" replacing "span"** throughout: per-side tail classes and
+  log2; (portfolio) per-unit tails and the candidate window widths (method of
+  moments / RMS / sum / single big jump); the raw→dyadic `bs` rounding
+  (portfolio only — the per-method aggregate sizer has no single pre-round `bs`);
+  natural support bounds and concentration; the realised `x_min` / `x_max`; and a
+  closing "increase log2" suggestion when the tail clipped.
+
 ## 1.0.0a81
 
 ### Rename portfolio sub-component `line` → `unit` — **breaking**

@@ -313,7 +313,7 @@ def test_tail_df_is_spec_only_and_schema():
     assert list(df.index) == ['frequency', 'comp0', 'aggregate']
     assert list(df.columns) == ['family', 'min', 'max', 'left_tail',
                                 'right_tail', 'bounded', 'concentrated',
-                                'concentration_p', 'note']
+                                'cv', 'note']
 
 
 def test_tail_df_per_side_tail_classes():
@@ -361,16 +361,15 @@ def test_tail_df_bounded_no_capped_note():
     assert a.tail_df.loc['comp0', 'note'] == ''
 
 
-def test_tail_df_concentration_is_p_value():
-    # concentration_p = Phi(mean/sd) in (0, 1). Large-E[N] low-cv book is
-    # concentrated (p ~ 1); an ordinary book is not. Cut is CONCENTRATION_CV.
+def test_tail_df_concentration_is_cv():
+    # cv = sd / mean. A large-E[N] low-cv book is concentrated (cv well below the
+    # CONCENTRATION_CV cut ~ 0.1); an ordinary book is not (cv ~ O(1)).
     conc = _agg('agg C 5000 claims sev gamma 100 cv 1 poisson').tail_df.loc['aggregate']
     assert conc['concentrated']
-    assert 0.0 < conc['concentration_p'] <= 1.0
-    assert conc['concentration_p'] == pytest.approx(1.0, abs=1e-6)
+    assert 0.0 < conc['cv'] < 0.1
     ordinary = _agg('agg O 5 claims sev lognorm 100 cv 2 poisson').tail_df.loc['aggregate']
     assert not ordinary['concentrated']
-    assert ordinary['concentration_p'] < 1.0
+    assert ordinary['cv'] > 0.1
 
 
 def test_tail_df_power_law_note_and_structural_support():
@@ -416,7 +415,7 @@ def test_tail_narrative_is_layered_and_support_based():
     assert 'subexponential right tail' in desc    # per-side class phrasing
     expl = a.tail_explanation
     assert 'single big jump' in expl              # the mechanism
-    assert 'P(aggregate > 0)' in expl             # concentration sentence
+    assert 'cv ~' in expl                         # concentration sentence (cv)
 
 
 def test_tail_narrative_multi_component_breakdown():
@@ -544,9 +543,9 @@ def test_asymmetric_two_sided_per_side():
 
 def test_concentration_helper():
     from aggregate.tail import concentration
-    c, p = concentration(100.0, 10.0)     # m/sd = 10 -> exactly the cut
-    assert p == pytest.approx(1.0, abs=1e-9)
-    assert not c                          # strict > 1/0.1, so 10 is not in
-    c2, p2 = concentration(0.0, 5.0)      # mean 0 -> Phi(0) = 0.5
-    assert p2 == pytest.approx(0.5) and not c2
+    c, cv = concentration(100.0, 10.0)    # m/sd = 10 -> exactly the cut
+    assert cv == pytest.approx(0.1)       # cv = sd / m
+    assert not c                          # strict z > 1/0.1, so 10 is not in
+    c2, cv2 = concentration(0.0, 5.0)     # mean 0 -> cv = inf, not concentrated
+    assert np.isinf(cv2) and not c2
     assert concentration(1.0, np.inf) == (None, None)   # infinite variance

@@ -305,7 +305,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
                 # object not updated
                 qd(x.describe.fillna(''), accuracy=accuracy, **kwargs)
             bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
-            vr = x.explain_validation()
+            vr = x.validation_explanation
             print(f'log2 = {x.log2}, bandwidth = {bss}, validation: {vr}.')
         elif isinstance(x, pd.DataFrame):
             # 100 line width matches rtd html format

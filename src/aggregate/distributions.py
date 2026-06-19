@@ -749,7 +749,7 @@ def bs_describe(agg, *, color: bool = False) -> str:
     Returns
     -------
     str
-        ``'<method> grid: bs=…, log2=…, x_min=… (top=…)'`` plus a clip note when
+        ``'<method> grid: bs=…, log2=…, x_min=… (x_max=…)'`` plus a clip note when
         the far tail is truncated.
     """
     df = agg._bs_window_df
@@ -760,7 +760,7 @@ def bs_describe(agg, *, color: bool = False) -> str:
     used = df.loc['used']
     top = _bs_grid_top(used)
     text = (f'{method} grid: bs={float(used["bs"]):g}, log2={int(used["log2"])}, '
-            f'x_min={float(used["x_min"]):g} (top={top:g})')
+            f'x_min={float(used["x_min"]):g} (x_max={top:g})')
     clip = agg._bs_clip
     if clip is not None:
         cm = clip.get('clipped_mass', float('nan'))
@@ -775,9 +775,11 @@ def bs_describe(agg, *, color: bool = False) -> str:
 def bs_explain(agg, *, color: bool = False) -> str:
     """Verbose prose explaining an aggregate's bucket-grid choice (``[bs-reporting]``).
 
-    Walks the decision: what the book is (the aggregate tail one-liner), which
-    methods applied and which won (and why, from its row note), the realized
-    grid, and any far-tail clip with how to widen it.
+    The aggregate mirror of :attr:`Portfolio.bs_explanation`, simpler (no unit
+    rows): the aggregate tail one-liner and log2; the winning method and its
+    **window width** against the candidate methods that applied; any natural
+    support bounds and the concentration; the realised ``x_min`` / ``x_max``;
+    and a closing "increase log2" suggestion when a far-tail clip occurred.
 
     Parameters
     ----------
@@ -789,6 +791,14 @@ def bs_explain(agg, *, color: bool = False) -> str:
     Returns
     -------
     str
+
+    Notes
+    -----
+    "Window width" (the realised ``W = x_max - x_min`` and the per-method
+    candidates) replaces the older "span" wording. The raw-to-dyadic ``bs``
+    sentence the portfolio narrative carries is omitted here: the per-method
+    aggregate sizer rounds each candidate independently, so there is no single
+    pre-round ``bs`` to report (``agg._bs_raw`` stays ``None``).
     """
     df = agg._bs_window_df
     if df is None:
@@ -796,31 +806,56 @@ def bs_explain(agg, *, color: bool = False) -> str:
     sel = df.index[df['selected'].astype(bool)]
     method = sel[0] if len(sel) else 'moment'
     used = df.loc['used']
-    top = _bs_grid_top(used)
+    log2 = int(used['log2'])
+    bs = float(used['bs'])
+    x_min = float(used['x_min'])
+    x_max = _bs_grid_top(used)
+    W = float(df.loc[method, 'W']) if method in df.index and 'W' in df.columns \
+        else x_max - x_min
     agg_line = _tail.describe_row(agg._tail_rows()[-1], color=color)
+    parts = [f'The aggregate is {agg_line}. Log2 is {log2}.']
+
     applied = [i for i in df.index
                if i not in ('used',) and bool(df.loc[i].get('applies'))]
     blurb = _METHOD_BLURB.get(method, method)
-    parts = [
-        f'The aggregate is {agg_line}.',
-        f'Of the methods that applied ({", ".join(applied) or "moment"}), '
-        f'the {method} method won -- {blurb}.',
-        f'Realized grid: bs={float(used["bs"]):g}, log2={int(used["log2"])}, '
-        f'x_min={float(used["x_min"]):g}, top={top:g}.',
-    ]
-    need = df.loc[method].get('log2_need')
-    if need is not None and np.isfinite(need) and need > int(used['log2']):
+    if applied:
+        cand_txt = ', '.join(f'{i} {float(df.loc[i, "W"]):g}' for i in applied)
         parts.append(
-            f'The window needs log2={int(need)} to hold its full reach at this '
-            f'bs but the budget is {int(used["log2"])}, so it was capped.')
+            f'Of the methods that applied ({cand_txt}), the {method} method won '
+            f'(window width {W:g}) -- {blurb}.')
+    else:
+        parts.append(f'The {method} method won (window width {W:g}) -- {blurb}.')
+
+    raw = getattr(agg, '_bs_raw', None)
+    if raw is not None:
+        parts.append(
+            f'The window produces a raw bs {raw:g} which dyadically rounds to '
+            f'{bs:g} producing a final {W:g} window width.')
+
+    # natural support bounds + concentration from the aggregate tail row
+    try:
+        trow = agg.tail_df.loc['aggregate']
+    except Exception:  # pragma: no cover - defensive
+        trow = None
+    if trow is not None:
+        if trow['left_tail'] == 'bounded' and np.isfinite(float(trow['min'])):
+            parts.append(f'It has a natural lower support bound of {float(trow["min"]):g}.')
+        if trow['right_tail'] == 'bounded' and np.isfinite(float(trow['max'])):
+            parts.append(f'It has a natural upper support bound of {float(trow["max"]):g}.')
+        cv = trow.get('cv')
+        if bool(trow.get('concentrated')) and cv is not None and np.isfinite(float(cv)):
+            parts.append(f'The distribution is concentrated with a CV of {float(cv):g}.')
+
+    parts.append(f'The recommended x_min is {x_min:g} resulting in x_max of {x_max:g}.')
+
     clip = agg._bs_clip
     if clip is not None:
         cm = clip.get('clipped_mass', float('nan'))
         cm_txt = f'~{cm:.3g}' if np.isfinite(cm) else 'a sliver'
         msg = (f'The heavy right tail reaches {float(clip["reach"]):g}, past the '
-               f'grid top {top:g}: {cm_txt} of the mass is clipped (a reported '
-               f'deficit, not normalized) -- raise log2 to {int(clip["need_log2"])} '
-               f'to capture it.')
+               f'grid x_max {x_max:g} ({cm_txt} of the mass clipped, a reported '
+               f'deficit not normalized); the analysis suggests increasing log2 '
+               f'to {int(clip["need_log2"])}.')
         if color:
             msg = f'{_tail._ANSI_THICK}{msg}{_tail._ANSI_RESET}'
         parts.append(msg)
@@ -2418,7 +2453,7 @@ class Aggregate:
 
             frequency tail           poisson, count [0, inf), super-exponential right tail
             severity tail            lognorm, [0, inf), subexponential right tail
-            aggregate tail           [0, inf), subexponential right tail; not concentrated (P>0=1.00)
+            aggregate tail           [0, inf), subexponential right tail; not concentrated (cv=1.5)
 
         The verbose form is :attr:`tail_explanation`; the lines are also appended
         to :meth:`info`.
@@ -2500,7 +2535,7 @@ class Aggregate:
         unbounded end), ``left_tail`` / ``right_tail`` (the per-side tail class --
         ``bounded`` at a finite end, else the family decay rung), ``bounded`` (the
         support finite both ends), and (aggregate row only) the conservative
-        ``concentrated`` flag and ``concentration_p = Phi(mean / sd)``. A
+        ``concentrated`` flag and ``cv = sd / mean``. A
         ``note`` carries power-law ``alpha`` / infinite-moment and capped-base
         annotations.
 
@@ -3924,6 +3959,7 @@ class Aggregate:
         self.xs_sev = None    # severity discretisation grid (may differ from xs)
         self._bs_window_df = None   # inspectable bucket/window estimator summary
         self._bs_clip = None        # structured far-tail clip report (item 6) or None
+        self._bs_raw = None         # pre-dyadic-round bs (unset for the multi-method agg sizer)
         # F1 opt-in: when True the severity keeps its negative support (the
         # layering clamp ``x<0 -> 0`` is bypassed). Default False preserves the
         # established non-negative behaviour. Opt-in wiring is pending a design
@@ -4538,9 +4574,9 @@ class Aggregate:
             ('P(loss)', p_loss),
             ('validation_eps', self.validation_eps),
             ('reinsurance', self.reins_kinds().lower()),
-            ('occurrence reinsurance', self.reins_description('occ').lower()),
-            ('aggregate reinsurance', self.reins_description('agg').lower()),
-            ('validation', self.explain_validation()),
+            ('occurrence reinsurance', self._reins_description('occ').lower()),
+            ('aggregate reinsurance', self._reins_description('agg').lower()),
+            ('validation', self.validation_explanation),
         ]
         s = [info_row(label, value) for label, value in rows]
         # Tail report summary (frequency / severity / aggregate -- support and
@@ -4550,11 +4586,25 @@ class Aggregate:
         s.append(info_row('id', self._spec_hash()))
         return '\n'.join(s)
 
-    def explain_validation(self):
+    @property
+    def validation_explanation(self):
         """
-        Explain validation result. Validation computed if needed.
+        Long-narrative explanation of the validation result (str).
+
+        The consistent narrative surface, mirroring ``tail_explanation`` /
+        ``bs_explanation``. Validation is computed if needed.
         """
         return explain_validation(self.valid)
+
+    def explain_validation(self):
+        """
+        Deprecated alias for :attr:`validation_explanation`.
+
+        Retained for back-compat (the old documented mechanism). Prefer the
+        ``validation_explanation`` property; this alias will be removed in a
+        future release.
+        """
+        return self.validation_explanation
 
     def _html_info_blob(self):
         """
@@ -4581,7 +4631,7 @@ class Aggregate:
                 s.append('<p>Validation: reinsurance; subject not unreasonable.</p>')
             else:
                 s.append('<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div><pre>\n'
-                         f'{self.explain_validation()}</pre></p>')
+                         f'{self.validation_explanation}</pre></p>')
 
         return '\n'.join(s)
 
@@ -5991,9 +6041,21 @@ class Aggregate:
         # update ft of agg
         self.ftagg_density = ft(self.agg_density, padding)
 
-    def reins_description(self, kind='both', width=0):
+    @property
+    def reins_description(self):
         """
-        Text description of the reinsurance.
+        Short narrative description of the reinsurance (str).
+
+        The consistent narrative surface, mirroring ``tail_description`` /
+        ``bs_description``: returns the ``kind='both', width=0`` text. For the
+        parameterized form (a single kind, or wrapped to a width) use the
+        private worker :meth:`_reins_description`.
+        """
+        return self._reins_description(kind='both', width=0)
+
+    def _reins_description(self, kind='both', width=0):
+        """
+        Text description of the reinsurance (parameterized worker).
 
         :param kind: both, occ, or agg
         :param width: width of text for textwrap.fill; omitted if width==0
@@ -7279,7 +7341,7 @@ class Aggregate:
         # floor below all share them.
         loss_left, loss_right = self._loss_tail_classes()
         sbj = self._single_big_jump_window(p)
-        conc_flag, _conc_p = _tail.concentration(m, sd)
+        conc_flag, _conc_cv = _tail.concentration(m, sd)
         if (x_min_in is None and not signed and not self._agg_affine_active()
                 and self.occ_reins is None
                 and np.isfinite(sd) and sd > 0

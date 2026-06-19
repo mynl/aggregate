@@ -115,7 +115,7 @@ def info_row(label, value):
 
 
 class Validation(Flag):
-    """Flag set of validation failures surfaced by ``Aggregate.explain_validation``.
+    """Flag set of validation failures surfaced by ``Aggregate.validation_explanation``.
 
     ``NOT_UNREASONABLE`` is the empty (passing) state; the remaining members
     are individual failure modes that combine via bitwise OR. ``SEV_*`` and

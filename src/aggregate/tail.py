@@ -51,7 +51,6 @@ Neyman-A) is a watch item, classified conservatively from the family table.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import NamedTuple, Optional
@@ -144,6 +143,18 @@ _LABELS = {
 def tail_class_label(tc: TailClass) -> str:
     """Human-readable label for a :class:`TailClass` (e.g. ``'power-law'``)."""
     return _LABELS[TailClass(tc)]
+
+
+_LABEL_TO_CLASS = {label: tc for tc, label in _LABELS.items()}
+
+
+def tail_class_from_label(label: str) -> TailClass:
+    """Inverse of :func:`tail_class_label`: map a label back to its :class:`TailClass`.
+
+    Used to recover the per-side rung from a rendered ``tail_df`` column (e.g. when
+    a portfolio recomputes a per-side worst-of from its unit rows).
+    """
+    return _LABEL_TO_CLASS[label]
 
 
 class TailClasses(NamedTuple):
@@ -719,9 +730,9 @@ def describe_rows(rows, *, color: bool = False) -> list[str]:
     if 'aggregate' in by:
         a = by['aggregate']
         phrase = f'{_support_text(a.min, a.max)}, {_sides_text(a.left_tail, a.right_tail, color)}'
-        if a.concentration_p is not None:
+        if a.cv is not None:
             tag = 'concentrated' if a.concentrated else 'not concentrated'
-            phrase += f'; {tag} (P>0={a.concentration_p:.2f})'
+            phrase += f'; {tag} (cv={a.cv:.3g})'
         if a.note:
             phrase += f' [{a.note}]'
         out.append(('aggregate tail', phrase))
@@ -790,9 +801,9 @@ def explain_rows(rows, info: Optional[TailInfo] = None, *, color: bool = False) 
                   'below 0); the grid must cover that reach.')
         if a.note:
             s += f' {a.note[0].upper()}{a.note[1:]}.'
-        if a.concentration_p is not None:
+        if a.cv is not None:
             tag = 'concentrated' if a.concentrated else 'not concentrated'
-            s += f' It is {tag}: P(aggregate > 0) ~ {a.concentration_p:.3f}.'
+            s += f' It is {tag}: cv ~ {a.cv:.3g}.'
         out.append(s)
 
     return ' '.join(out)
@@ -825,7 +836,7 @@ def thickness_label(rung: TailClass) -> str:
 
 
 def concentration(m: float, sd: float) -> tuple[Optional[bool], Optional[float]]:
-    """Conservative concentration flag and the ``P(aggregate > 0)`` diagnostic.
+    """Conservative concentration flag and the coefficient of variation.
 
     Parameters
     ----------
@@ -837,26 +848,29 @@ def concentration(m: float, sd: float) -> tuple[Optional[bool], Optional[float]]
     -------
     (bool or None, float or None)
         ``concentrated`` -- ``True`` iff the band clears 0 by a comfortable
-        margin, ``m / sd > 1 / CONCENTRATION_CV`` (i.e. ``cv < 0.1``), so the
-        windowed left-lift is eligible -- and ``concentration_p = Phi(m / sd)``,
-        the normal-approximation probability the aggregate is positive (the band
-        clears 0). ``(None, None)`` when ``sd`` is undefined; for a deterministic
-        ``sd == 0`` the point mass at ``m`` gives ``p = 1`` (``m > 0``) or ``0``.
+        margin, ``m / sd > 1 / CONCENTRATION_CV`` (equivalently ``cv <
+        CONCENTRATION_CV`` for a positive-mean book), so the windowed left-lift
+        is eligible -- and ``cv = sd / m``, the coefficient of variation
+        (``inf`` when ``m == 0``). ``(None, None)`` when ``sd`` is undefined;
+        a deterministic ``sd == 0`` point mass at ``m`` is maximally concentrated
+        (``cv = 0``) and clears 0 iff ``m > 0``.
 
     Notes
     -----
-    ``concentration_p`` saturates at ~1 for a strongly concentrated book
-    (``Phi(50) == 1``); its discrimination is in the marginal range (e.g.
-    ``Phi(1.8) = 0.96``). It is a reported diagnostic, not the gate -- the gate
-    is the conservative ``cv < CONCENTRATION_CV`` margin.
+    ``cv`` is directly interpretable, unlike the old ``Phi(mean / sd)``
+    diagnostic it replaced (which saturated at ~1 for any real book). It is a
+    reported diagnostic, not the gate -- the gate is the conservative
+    ``m / sd > 1 / CONCENTRATION_CV`` margin, computed here so the sign of the
+    mean is handled correctly (a net-negative-mean book is never concentrated).
     """
     if m is None or sd is None or not np.isfinite(sd):
         return None, None
     if sd <= 0:
-        return bool(m > 0), (1.0 if m > 0 else 0.0)
+        cv = 0.0 if m != 0 else float('inf')
+        return bool(m > 0), cv
     z = float(m / sd)
-    p = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-    return bool(z > 1.0 / CONCENTRATION_CV), float(p)
+    cv = float('inf') if m == 0 else float(sd / m)
+    return bool(z > 1.0 / CONCENTRATION_CV), cv
 
 
 def _side_class(end_finite: bool, decay: TailClass) -> TailClass:
@@ -978,9 +992,9 @@ class TailRow:
         end (a hard boundary, no tail), else the family decay rung.
     concentrated : bool or None
         Aggregate row only: the conservative "band clears 0" flag.
-    concentration_p : float or None
-        Aggregate row only: ``Phi(mean / sd)`` -- ``P(aggregate > 0)`` under a
-        normal approximation.
+    cv : float or None
+        Aggregate row only: the coefficient of variation ``sd / mean``
+        (``inf`` when ``mean == 0``).
     note : str
         Short structural note (e.g. ``'subexponential base, capped at 1,000'``,
         ``'power-law, alpha=1.5, infinite variance'``).
@@ -993,7 +1007,7 @@ class TailRow:
     left_tail: TailClass
     right_tail: TailClass
     concentrated: Optional[bool] = None
-    concentration_p: Optional[float] = None
+    cv: Optional[float] = None
     note: str = ''
 
 
@@ -1203,14 +1217,14 @@ def aggregate_tail_row(info: TailInfo, *, agg_min: float, agg_max: float,
     """
     left = _side_class(np.isfinite(agg_min), left_decay)
     right = _side_class(np.isfinite(agg_max), right_decay)
-    conc, conc_p = concentration(agg_m, agg_sd)
+    conc, conc_cv = concentration(agg_m, agg_sd)
     family = f'{info.driver}-driven' if info.driver != 'undetermined' else ''
     note = _power_note(info.alpha) if right == TailClass.POWER_LAW else ''
     return TailRow(
         component='aggregate', family=family,
         min=float(agg_min), max=float(agg_max),
         left_tail=left, right_tail=right,
-        concentrated=conc, concentration_p=conc_p, note=note,
+        concentrated=conc, cv=conc_cv, note=note,
     )
 
 
@@ -1329,8 +1343,7 @@ def tail_frame(rows) -> 'pd.DataFrame':
     pandas.DataFrame
         Indexed by ``component`` (frequency / comp* / severity / aggregate), with
         columns ``family, min, max, left_tail, right_tail, bounded, concentrated,
-        concentration_p, note``. ``bounded`` is derived as ``min`` and ``max``
-        both finite.
+        cv, note``. ``bounded`` is derived as ``min`` and ``max`` both finite.
     """
     data = [{
         'component': r.component, 'family': r.family,
@@ -1338,9 +1351,9 @@ def tail_frame(rows) -> 'pd.DataFrame':
         'left_tail': tail_class_label(r.left_tail),
         'right_tail': tail_class_label(r.right_tail),
         'bounded': bool(np.isfinite(r.min) and np.isfinite(r.max)),
-        'concentrated': r.concentrated, 'concentration_p': r.concentration_p,
+        'concentrated': r.concentrated, 'cv': r.cv,
         'note': r.note,
     } for r in rows]
     cols = ['component', 'family', 'min', 'max', 'left_tail', 'right_tail',
-            'bounded', 'concentrated', 'concentration_p', 'note']
+            'bounded', 'concentrated', 'cv', 'note']
     return pd.DataFrame(data, columns=cols).set_index('component')

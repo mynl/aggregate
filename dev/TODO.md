@@ -33,6 +33,8 @@
 ## NEW STEVE MANUAL ENTRIES
 
 H: Portfolio class should use unit not line. All refs to line replaced with unit! **carefully!** → **DONE (1.0.0a81, `dev/done/plan-line-to-unit.md`)**: clean break, no `line_names` alias (`AttributeError`); `'line'` index→`'unit'`; `line=`/`lines=` kwargs→`unit=`/`units=`; `BivariateAggregate` surface + `'lines'`→`'units'` spec key; pedagogy/results/bounds/pentagon swept; keep-table (matplotlib/rate-on-line/loss-on-line/line-search/source-line) preserved.
+H (naming): narrative/reporting surface made consistent — **DONE (1.0.0a82, `dev/done/plan-consistent-naming.md`)**: `explain_validation()` → `validation_explanation` property (deprecated alias kept); `reins_description(kind,width)` → bare property + private `_reins_description` worker; `concentration_p` → `cv` (tail_df col, `TailRow`, `concentration()` 2nd value); `Portfolio.tail_df` `total` row min/max from realised grid + per-side worst-of (bounded left for non-neg books); `top=` → `x_max=` labels; `bs_explanation` rewritten to one template, "window width" replaces "span". **Deferred (still open, see B5):** §3 bs-worker rename (`bs_describe`/`bs_explain` → non-homonyms).
+
 H: build.knowledge source col: just store the db name and not whole path in source. Yes, ambiguous. Prefix ~/ if from user's .aggregate store, full path if not built-in or home dir.
 N: distributions with no variance should refuse to estimate bs. how is that being done ATM? I think in the past it was an error. Now you can package hints with the program there are no excuses for not providing bs,log2.
 
@@ -146,7 +148,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   module functions in `distributions.py` (the `color=` workers behind
   `bs_description`/`bs_explanation`): purpose, the local-`line` accumulator, and
   whether they still earn their place / want reshaping. **Reconcile with
-  `dev/plan-consistent-naming.md` §3** — the *deferred* bs-worker rename (the
+  `dev/done/plan-consistent-naming.md` §3** — the *deferred* bs-worker rename (the
   `bs_describe`/`bs_explain` verb workers shadow the noun properties by one
   letter; that plan parks renaming them to non-homonyms like `_format_bs_grid`).
   Do these two together so the wart isn't fixed twice or lost. *(new,

@@ -1,5 +1,18 @@
 # Plan numerics-4 — integrating 1A + 1P windowing into multivariate
 
+> **STATUS: COMPLETE (2026-06-19) — delivered via `dev/done/plan-mv.md`.** This
+> plan's deliverable (Part B, bivariate per-axis windowing) was superseded and
+> shipped by the bivariate firm-up: MV-2/MV-3 (a72/a76) deleted both private
+> sizers (`_size_axis`, module `size_axis`) and route every axis through the
+> measured `balanced_window` primitive; Part A (windowed portfolio combine) had
+> already moved to 1P in `plan-bucket-window-2`; P0 (occ-reins × windowing) is
+> covered by netceded sizing on `reins_density_df` (MV-3). The marginal-
+> reproduces-standalone invariant is plan-mv §8. **One item deliberately deferred
+> post-1.0:** custom *per-axis `bs`* rebucketing (numerics-4's "ride `xs_sev`"
+> framing of P0) — netceded keeps the single gross `bs` for 1.0 (plan-mv §5.2);
+> windowing for occ-reins books is nonetheless re-enabled. Tracked as W2 (now
+> done). Moved to `dev/done`.
+>
 > Part of the numerics program; see `plan-numerics-0-meta.md`. **This plan
 > consumes the univariate windowing primitives built in
 > `plan-bucket-window-2.md` (Step 1: 1A Aggregate symmetric window, 1P Portfolio

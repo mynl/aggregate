@@ -56,7 +56,7 @@ guards), plus Track D docs.
 |   | H4 | Docstring style sweep → NumPy | A | — |
 |   | H5 | `pedagogy` figure-generator migrations | B | — |
 |   | B4 | ZT/ZM frequency broken + add shift helpers | A | — |
-|   | W2 | Window bounds for bivariate | B | M |
+| X | W2 | **Window bounds for bivariate** — shipped via MV-2/MV-3 (a72/a76) | B | M |
 |   | W10 | Retire `recommend_bucket` | A | — (W9 shipped) |
 | X | M | **Bivariate firm-up (MV-1…7, `dev/done/plan-mv.md`)** — shipped a70–a80 | A | — |
 |   | T1 | Merge the three `.agg` libraries into one | A | — |
@@ -174,8 +174,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Track W — Windows (range for output) & plotting
 
-- [ ] **W2 `[B]`** Window bounds for bivariate/multivariate per-axis sizing (#7).
-  Ties Track M (consumed by `plan-mv.md` §5).
+- [x] **W2 `[B]`** Window bounds for bivariate/multivariate per-axis sizing (#7).
+  **Done (a72/a76, MV-2/MV-3):** both private sizers deleted, every axis routed
+  through measured `balanced_window` (`plan-mv.md` §5; `dev/done/plan-numerics-4`).
 - [ ] **W3 `[B]`** Plot severity outside the aggregate window (#8) — inset,
   broken axis, or separate figure when grids don't overlap (`info` already warns).
   *(approach undecided.)*
@@ -365,9 +366,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Related plans
 
-- **Numerics program** (`dev/plan-numerics-0-meta.md` + `-1`…`-4`) → the N-track;
-  numerics-1/2/3 shipped (a55–a57 → N2/N3); numerics-4 (windowed combine/
-  bivariate) → W2/M-track.
+- **Numerics program** (`dev/done/plan-numerics-0-meta.md` + `-1`…`-4`) → the
+  N-track, **complete**: numerics-1/2/3 shipped (a55–a57 → N2/N3); numerics-4
+  (windowed combine/bivariate) delivered via `plan-mv` MV-2/MV-3 (a72/a76 → W2/M).
 - `dev/plan-config.md` (Phase 2) → **F8**.
 - `dev/done/plan-mv.md` → **Track M** (bivariate firm-up, MV-1…7). Absorbs & replaces
   the deleted `plan-multivariate-punchup.md` (former M2).

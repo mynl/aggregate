@@ -1,5 +1,11 @@
 # Numerics rationalization — meta-plan
 
+> **STATUS: COMPLETE (2026-06-19).** The whole program has landed: numerics-1/2/3
+> (a55–a57) and numerics-4 — re-homed into and shipped by the bivariate firm-up
+> `dev/done/plan-mv.md` (MV-2/MV-3, a72/a76). This file is retained as the
+> architecture record (the §1 target picture and §3 steering rules still govern
+> the numerics surface). Moved to `dev/done`.
+>
 > **What this is.** The plan for the plans. It does not write code. It fixes the
 > target architecture, carves the work into executable plans, sets the steering
 > rules they all obey, and reconciles them with what's already drafted/tracked.
@@ -330,7 +336,7 @@ only in numerics-4.)
 plan-numerics-1-unit-density   ✅ landed a55  (accessors + reader migration)
   └─ plan-numerics-2-objective    ✅ landed a56  (shifted kappa + direct-sum objective; drop p_unit write; kill EPD; Aggregate objective cols)
        └─ plan-numerics-3-distortion  ✅ landed a57  (Choquet helper + unified linear/lifted incl. bounds; kill T./M.; Aggregate distortion; plot_twelve adapter; view×value_type)
-            └─ plan-numerics-4-windowed-combine  ⏳ pending — integrate 1A/1P windowing into multivariate
+            └─ plan-numerics-4-windowed-combine  ✅ landed via plan-mv (MV-2 a72 / MV-3 a76) — per-axis windowing through balanced_window
 ```
 
 Each plan is independently shippable with green `pytest`, a version bump, and a

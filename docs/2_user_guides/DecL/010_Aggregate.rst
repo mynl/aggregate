@@ -22,10 +22,10 @@ To estimate the distribution of outcomes for this policy, the actuary must:
 
 A DecL program takes care of many of these details. The DecL program corresponding to the trucking policy is simply::
 
-    agg Trucking                      \
-        2000 premium at 0.675 lr      \
-        1000 xs 0                     \
-        sev lognorm 100 cv 1.75       \
+    agg Trucking
+        2000 premium at 0.675 lr
+        1000 xs 0
+        sev lognorm 100 cv 1.75
         poisson
 
 It specifies the loss ratio and distributions selected in steps 1, 2 and 5; these require actuarial judgment and cannot be automated. Based on this input, the ``aggregate`` package computes the rest of steps 1, 3, 4, and 6. The details of the program are explained in the rest of this chapter.
@@ -48,12 +48,12 @@ The trucking example hints at the complexity of specifying a realistic insurance
 
 DecL follows the same pattern::
 
-    agg name                   \
-        exposure <limit>       \
-        severity               \
-        <occurrence re>        \
-        <frequency>            \
-        <aggregate re>         \
+    agg name
+        exposure <limit>
+        severity
+        <occurrence re>
+        <frequency>
+        <aggregate re>
         <note>
 
 where ``<...>`` denotes an optional clause. All programs are one-line long and horizontal white space is ignored.

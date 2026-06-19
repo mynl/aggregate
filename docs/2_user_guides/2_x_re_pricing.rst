@@ -162,7 +162,7 @@ A **tower** of limits can be specified by giving the attachment points of each l
 
 is equivalent to::
 
-    occurrence ceded to 1 xs 0 and 1 xs 1 and 3 xs 2 \
+    occurrence ceded to 1 xs 0 and 1 xs 1 and 3 xs 2
     and 5 xs 5 and 10 xs 10 and 16 xs 20
 
 Here is a summary of these examples. ``reins_describe`` gives the whole-structure ceded aggregate loss. The plot is omitted; it is identical to gross since the tower covers all losses.

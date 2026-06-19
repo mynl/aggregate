@@ -89,7 +89,8 @@ is equivalent to:
     a = 1
     print(a)
 
-The Python line continuation ``\`` is used to create compact input.
+A DecL statement may span several lines; statements are separated by a blank
+line or by a semicolon at the end of a line, which keeps input compact.
 
 Numbers and Units
 ==================

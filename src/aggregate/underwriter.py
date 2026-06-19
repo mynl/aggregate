@@ -1613,7 +1613,10 @@ class Underwriter(object):
             out = self.user_dir / out.name
 
         stamp = f'{datetime.now():%Y-%m-%d %H:%M:%S}'
-        body = '\n'.join(_entry_to_decl(pp) for pp in selected)
+        # Blank line between entries: under the blank-line / `;` statement rule a
+        # single newline is a continuation, so entries must be paragraph-separated
+        # to re-load as distinct statements (a multi-line port stays one block).
+        body = '\n\n'.join(_entry_to_decl(pp) for pp in selected)
 
         if mode == 'x' and out.exists():
             raise FileExistsError(

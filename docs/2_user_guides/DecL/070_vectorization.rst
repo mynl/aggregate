@@ -88,9 +88,9 @@ There are two cases when this alternative is useful:
    200, one with a gamma mean 10 CV 1 severity and the other lognormal mean
    15 CV 1.5 and both share a gamma mixing variable::
 
-      agg MixedPremReserve                     \
-      [100 200] claims                         \
-      sev [gamma lognorm] [10 15] cv [1 1.5]   \
+      agg MixedPremReserve
+      [100 200] claims
+      sev [gamma lognorm] [10 15] cv [1 1.5]
       mixed gamma 0.4
 
    The result should be the two-way combination, not the four-way exposure and
@@ -101,10 +101,10 @@ There are two cases when this alternative is useful:
    once, rather than broadcasting limits and severities separately and then
    taking the outer product::
 
-      agg Eg4                                     \
-      [10 10 10] claims                           \
-      [1000 2000 5000] xs 0                       \
-      sev lognorm [50 100 150] cv [0.1 0.15 0.2]  \
+      agg Eg4
+      [10 10 10] claims
+      [1000 2000 5000] xs 0
+      sev lognorm [50 100 150] cv [0.1 0.15 0.2]
       poisson
 
 

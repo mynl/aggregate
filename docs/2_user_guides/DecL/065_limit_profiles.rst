@@ -11,10 +11,10 @@ one-another.
 
 **Example**::
 
-   agg Eg1                                  \
-   [1000 2000 4000 1000] premium at 0.65 lr \
-   [1000 2000 5000 4000] xs [0 0 0 1000]    \
-   sev lognorm 500 cv 1.25                  \
+   agg Eg1
+   [1000 2000 4000 1000] premium at 0.65 lr
+   [1000 2000 5000 4000] xs [0 0 0 1000]
+   sev lognorm 500 cv 1.25
    mixed gamma 0.6
 
 expresses a limit profile with 1000 of premium at 1000 xs 0; 2000 at 2000

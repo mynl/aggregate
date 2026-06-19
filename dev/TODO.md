@@ -1,16 +1,17 @@
 # TODO
 
-> The v1.0 backlog, organized into **tracks** with mnemonic codes. Two tables
-> first (tracks; priorities + dependencies), then the details, then post-v1.0
-> ideas. Snappy entries only — details live in the plan files (`dev/`,
-> `dev/done/`) and the git log. What's landed is in `CHANGELOG.md`.
+> The v1.0 backlog, organized into **tracks** with mnemonic codes. The priorities
+> table first, then the details per track, then post-v1.0 ideas. Snappy entries
+> only — details live in the plan files (`dev/`, `dev/done/`) and the git log.
+> **What's landed is in `CHANGELOG.md`** and is removed from here.
 >
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
-> `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
+> `[B]` early beta = fine just after the alpha→beta cut, does not block it.
 >
-> **Last updated: 2026-06-19** — Track M re-scoped & promoted to `[A]`
-> (beta-blocking); `dev/plan-mv.md` is the staged plan (MV-1…7). Multivariate →
-> bivariate; `t` copula dropped, ≥3-variate killed; +shuffle-of-Min, +`clash`.
+> **Last updated: 2026-06-19** — Cleanup pass: all shipped items pruned (they
+> live in `CHANGELOG.md`); priorities table reconciled against the track sections
+> and rebuilt; under-specified items moved to a flagged tail group. Current focus:
+> **Track M** (bivariate firm-up, `dev/plan-mv.md`, MV-1…7) — beta-blocking.
 
 ---
 
@@ -20,68 +21,51 @@
 |------|-------|
 | **B** | Bugs & investigations |
 | **D** | Docs & packaging |
-| **F** | Features (approximation, pricing, config) |
+| **F** | Features (approximation, pricing) |
 | **H** | Hygiene (module organization & dependencies) |
-| **M** | Multivariate |
+| **M** | Multivariate → bivariate |
 | **N** | Numerics & pricing core (incl. signed / negative-x) |
 | **T** | Tests (suite consolidation) |
 | **W** | Windows & plotting |
 
 ## Priorities & dependencies
 
-**Critical path (the spine):** `N1 → N2 → N3 → N4 → N5`, plus `N6` (validation)
-alongside. **Start at `N1`.**
+**Critical path (the spine):** the `N` spine is mostly shipped — `N2`, `N3`,
+`N5`, `N5b` landed (a36–a57). What remains: **`N6`** (validation-calc review)
+and **`N8`** (input guards). **Current active block: `M`** (bivariate firm-up)
+— beta-blocking.
 
-| Status | ID | Item | Phase | Depends on | Parallel-safe with |
-|:--|----|------|:-----:|------------|--------------------|
-|    | N1 | Aggregate `update` — base `density_df` calcs (+ neg-x) | A | — | H*, B*, F1–F3, D3, D5, W1 |
-|    | N2 | Portfolio `update` — kappa / exa / `add_exa` (+ neg-x) | A | N1 | (same) |
-|    | N3 | Portfolio apply-distortion calcs — columns, masses, `plot_twelve` | A | N2 | (same) |
-|    | N4 | Bounds numerics read-through | A | N2 | runs after the spine settles |
-| ✅ | N5 | `Portfolio.pricing_bounds` rewrite → `allocation_bounds` (a36) | A | N4 | — |
-| ✅ | N5b | `PricingBounds` — cross-pricing ranges + Gini lens (a37) | A | N5 | — |
-|    | N6 | Validation-calc review | A | — | independent of N1–N5 |
-|    | N7 | Negative-x deferred follow-ups | B | N1–N3 | — |
-|    | N8 | Input guards & semantic consistency (3, ex-README) | A | — | everything |
-|    | H1 | Relocate `make_ceder_netter` | A | — | everything |
-|    | H2 | Dedupe `make_var_tvar` | A | — | everything |
-|    | H3 | Import-dependency audit | A | — | everything |
-|    | H4 | Docstring style sweep → NumPy | A | — | everything |
-|    | H5 | `pedagogy` figure-generator migrations | B | — | everything |
-| ✅ | H6 | Underwriter database-loading rewrite | A | — | everything |
-|    | B1 | `10000 xs 0 lognorm` "sum sev<1" warning | A | — | everything |
-|    | B2 | "ugly histogram with spikes" (reconstruct) | A | — | everything |
-|    | B4 | ZT/ZM frequency broken + add shift helpers | A | — | everything |
-|    | F1 | `approximate()` — tail-aware family pick | A | tail (shipped) | H*, B*, N* |
-|    | F2 | G&H tilting DIY | A | — | H*, B*, N* |
-| ✅ | F3 | `pricing_at = P + Q` / Pentagon | A | — | H*, B* |
-|    | F4 | Gross → Subject in `describe` | A | — | H*, B* |
-|    | F5 | DecL `of` synonym | B | — | — |
-|    | F6 | Gross/ceded-premium reinsurance P&L | B | — | — |
-|    | F7 | PMIR best-bucket + manual kappa | B | — | pairs T3 |
-|    | F8 | Config **Phase 2** (plotting/style, env, floors) | B | — | ties W1–W3 |
-|    | W1 | Support-aware window bounds | A | — | N*, H*, B* |
-|    | W2 | Window bounds for bivariate | B | W1, W5 | ties M |
-|    | W3 | Plot severity outside the agg window | B | — | — |
-| ✅ | W5 | Non-zero output window (windowed sizing, a51) | A | — | W2/M, N* |
-|    | M | **Bivariate firm-up (MV-1…7, `plan-mv.md`)** — beta-blocking | A | — | ties W2 |
-| ✅ | M1 | ~~MV later stages~~ → folded into `plan-mv.md` | A | — | — |
-| ✅ | M2 | ~~MV punch-up~~ → superseded by `plan-mv.md` §5 | A | — | ties W2 |
-|    | T1 | Merge the three `.agg` libraries into one | A | — | — |
-|    | T2 | Rationalize tests / library coupling | A | T1 | after code churn |
-|    | T3 | Switcheroo `Port.Sample` regression case | B | — | pairs F7 |
-| ✅ | T4 | Knowledge-freeze regression harness (`scripts/freeze_knowledge.py`, a38) | B | — | N* (verifies them) |
-|    | D1 | New README + split CHANGELOG | A | — | docs parallel |
-|    | D2 | v1.0 Journey + statements of philosophy | A | — | docs parallel |
-|    | D3 | Grammar reference from `decl.lark` | A | — | ready now |
-|    | D4 | Tail-descriptor docs + tests | A | tail (shipped) | docs parallel |
-|    | D5 | Doc gaps (errors, ZT/ZM, splice, site refs…) | A | — | ready now |
-|    | D6 | API docstring coverage / rendering | A | H4 | docs parallel |
-|    | D7 | Reinsurance case-study docs rewrite | B | N2–N3 | — |
-|    | D8 | PUNCHUP `pedagogy` + integrate docs | B | H5 | — |
-|    | D9 | Reinsurance structure diagrams | B | — | — |
+| Status | ID | Item | Phase | Depends on |
+|:--|----|------|:-----:|------------|
+|   | N6 | Validation-calc review | A | — |
+|   | N8 | Input guards & semantic consistency (3, ex-README) | A | — |
+|   | H4 | Docstring style sweep → NumPy | A | — |
+|   | H5 | `pedagogy` figure-generator migrations | B | — |
+|   | B4 | ZT/ZM frequency broken + add shift helpers | A | — |
+|   | W2 | Window bounds for bivariate | B | M |
+|   | W10 | Retire `recommend_bucket` | A | — (W9 shipped) |
+|   | M | **Bivariate firm-up (MV-1…7, `plan-mv.md`)** — beta-blocking | A | — |
+|   | T1 | Merge the three `.agg` libraries into one | A | — |
+|   | T2 | Rationalize tests / library coupling | A | T1 |
+|   | T3 | Switcheroo `Port.Sample` regression case | B | — |
+|   | D1 | New README body for stable-v1.0 audience | A | — |
+|   | D2 | v1.0 Journey + statements of philosophy | A | — |
+|   | D3 | Grammar reference from `decl.lark` | A | — |
+|   | D4 | Tail-descriptor docs + tests | A | — |
+|   | D5 | Doc gaps (errors, ZT/ZM, splice, site refs…) | A | — |
+|   | D6 | API docstring coverage / rendering | A | H4 |
+|   | D7 | Reinsurance case-study docs rewrite | B | (N2–N3 shipped) |
+|   | D8 | PUNCHUP `pedagogy` + integrate docs | B | H5 |
+|   | D10 | Single keyword source of truth (`decl.lark` → mirrors) | B | — |
+|   | D11 | Sphinx docs → master `uber-library.bib` | B | — |
+|   | D12 | Cheat-sheet tweaks once UI settles | B | — (hold to beta) |
+| **— unclear / under-specified (revisit before scheduling) —** |
+|   | H9 | Public DataFrame members present (`None`) before compute | A | — (needs scoping) |
+|   | F7 | PMIR best-bucket + manual kappa | B | — |
+|   | W3 | Plot severity outside the agg window | B | — (approach TBD) |
+|   | D9 | Reinsurance structure diagrams | B | — |
 
-**Status:** blank = untouched, X Done, P in Progress
+**Status:** blank = untouched, X Done, P in Progress.
 
 **DOD mapping:** Docs updated → **D**; Numerical calculations checked +
 negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
@@ -95,74 +79,14 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 > no API change, ideally identical numbers — faster compute + trim unused
 > `density_df` columns) **except** where the negative-x angle deliberately
 > extends behaviour to signed support. **Separate the base `density_df` calcs
-> from the apply-distortion calcs — both have a negative-x angle.**
+> from the apply-distortion calcs — both have a negative-x angle.** (The
+> apply-distortion side, `N2`/`N3`/`N5`, shipped a36–a57.)
 
-- [ ] **N1 `[A]` Aggregate `update` — base `density_df` calcs.** Severity
-  numerical-moments review (#26) + the main compute loop, the P / M / Q
-  (Pentagon) elements (#27), with the **negative-x** angle on the Aggregate grid
-  (#31). Includes **BUG: `.plot` draws a baseline from 0 to the first `xs`**,
-  wrong for signed support *(new, 2026-06-05)*. The severity-moments and
-  agg-loop pieces can split into parallel sub-tasks.
-- [x] **N2 `[A]` Portfolio `update`.** — **done 1.0.0a56**
-  (`dev/done/plan-numerics-2-objective.md`): shifted-support kappa from
-  native unit pmfs (`ft_xp` captured at combine, prefix/suffix `ft_nots`
-  fallback); every objective column rewritten as direct sums carrying the
-  grid origin; the `loss_max`/`mult` blanking heuristic replaced by explicit
-  `F/S ≤ tol` guards; the `p_{unit}` write dropped; EPD family
-  (`add_exa_details`, `epd_*`, `Aggregate.density_df['epd']`) deleted;
-  signed (P&L) books now get the objective columns (share-based ones blanked
-  per steering 6). Step-0 audit + measured verdicts in
-  `dev/audit-numerics-2-findings.md`. `plot_twelve`'s needs audited at
-  numerics-1; the allocation panels ride with N3.
-  - [x] **numerics-1 pre-step — unit-density decoupling** — **done 1.0.0a55**
-    (`dev/done/plan-numerics-1-unit-density.md`): `unit_density` /
-    `unit_density_df` / `aligned_unit_density_df` accessors; all display
-    readers (`percentiles`, `_limits`, `plot`, pedagogy density/bivariate
-    panels) off `p_{unit}`; the only remaining readers were kappa in `add_exa`
-    (removed with the `p_{unit}` write at numerics-2) and the
-    sampling/switcheroo cluster (mechanically re-sourced at numerics-2;
-    redesign still its own future plan).
-- [x] **N3 `[A]` Portfolio apply-distortion calcs.** — **done 1.0.0a57**
-  (`dev/done/plan-numerics-3-distortion.md`): one exact-discrete Choquet
-  helper (`spectral.choquet_weights`, `gp = g(T) − g(S)`, capped dot
-  products carrying the origin) behind every price surface; unified
-  linear/lifted builder at `apply_distortion` (alpha vs beta tail share;
-  the `_collapsed_exeqa` linear engine deleted); `T.*`/`M.*` columns and
-  `efficient` removed (explicit `L/M/P/Q`, per-line capital on demand by
-  the layer-ROE construction); mass-on-unbounded guard moved into the
-  builder; tiered deficit policy (`DefectiveDistributionError` /
-  `DEFICIT_MATERIALITY`); `view × value_type` 2×2 on `_is_loss_value`;
-  signed totals price via `dot(kappa, gp)`; `allocation_diagnostics`
-  feeds `plot_twelve`; cache key widened. Step-0 audit + verdicts in
-  `dev/audit-numerics-3-findings.md`.
-- [ ] **N4 `[A]` Bounds numerics read-through** (#30 + #10) — `bounds.py`
-  (IME 2022, 513-point binary `s_grid`) end-to-end. **needs N2; prereq for N5.**
-- [x] **N5 `[A]` `Portfolio.pricing_bounds` rewrite** (#32 + #11) — **done
-  1.0.0a36** as `Portfolio.allocation_bounds` / `bounds.AllocationBounds`
-  (`dev/done/plan-allocation-bounds.md`): exact convex-hull slicing of the
-  `(TVaR_p, a_i(p))` curve, no `s_grid` interpolation needed. Bounded
-  totals (`a=` / `p=`, linear NA, tail collapse) landed in the same
-  release; the collapse idiom was factored into
-  `Portfolio._collapsed_exeqa`, shared with `price(allocation='linear')`
-  (absorbed into `AllocationBounds` itself at numerics-3, 1.0.0a57, when
-  the linear price engine moved onto the unified frame).
-- [x] **N5b `[A]` `PricingBounds` — cross-pricing ranges** — **done 1.0.0a37**
-  (`dev/done/plan-pricing-bounds.md`): given `X` priced to P, the range of the
-  price of another risk `Y` over the consistent family, by slicing the convex
-  hull of `(TVaR_p(X), TVaR_p(Y))` (union-of-breakpoints vertices, exact). The
-  `AllocationBounds` hull/slice core was extracted into a shared `_HullEngine`
-  base; TVaR-source adapters make either axis a risk or a closed-form pair, so
-  the uniform reference gives the Gini mean-Kusuoka-level lens. Entry point
-  `Portfolio.pricing_bounds`.
 - [ ] **N6 `[A]` Validation-calc review** (#49) — audit the algorithm vs the
   published *Aggregate* paper; make docs match the actual algo; finish "all
   switches → config" (`eps`/`noise` already moved in a30); fix the false-positive
   *agg-mean-error ≫ sev-error / aliasing* failure (try larger `bs`; revisit the
-  too-tight tolerance). Independent of N1–N5.
-- [ ] **N7 `[B]` Negative-x deferred follow-ups** (#3) — two-sided deficit
-  split; `ft.py` recentering helpers → call the core path; re-home
-  `estimate_agg_window` → `utilities.py`; occ-reins on a signed severity grid;
-  DecL keyword for `signed` / `value_type`. **needs N1–N3.**
+  too-tight tolerance). Independent of N8.
 - [ ] **N8 `[A]` Input guards & semantic consistency** *(ported from README,
   2026-06-06)* — three small correctness/guard items:
   - Treatment of zero `lb` is not consistent with attachment equals zero.
@@ -177,63 +101,27 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Track H — Hygiene (module organization & dependencies)  `[A]` (parallel)
 
-- [x] **H1 `[A]`** Relocate `make_ceder_netter` `utilities.py:276` → `distributions` (#35).
-- [x] **H2 `[A]`** Dedupe var/tvar: `utilities.make_var_tvar:498` vs
-  `distributions._make_var_tvar:6232` (#36).
-- [x] **H3 `[A]`** Audit imports for small non-standard deps (e.g. `cycler`) (#37).
 - [ ] **H4 `[A]`** Docstring sweep `iman_conover.py` / `moments.py` (and pockets
   elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
 - [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
   `tweedie.py` so those stay API-focused (#19).
-- [x] **H7 `[A]`** Public `reinsurance_*` methods → `reins_*` (a41) — surface made
-  uniformly abbreviated (`reins_kinds`/`reins_description`/`reins_occ_plot`);
-  `reins` canonized as the short form. `dev/done/plan-reins-rename.md`.
-- [x] **H8 `[A]`** Consolidate fuzz removal → `utilities.remove_fuzz` (a42) — one
-  vectorized two-sided helper replaces the per-cell `DataFrame.map` lambda (×2)
-  and four `np.where(abs<eps)` copies; `ft` keeps `2*eps` via arg; MMSE stray
-  `1e-16`→`eps`. Freeze/check on 146 objects: all match @1e-12.
-  `dev/done/plan-remove-fuzz.md`.
-- [x] **H6 `[A]` Underwriter database loading rewrite** — done in **1.0.0a32**
-  (`dev/done/plan-databases.md`). Loading made legible: dict-backed store (with a
-  DataFrame view) + `source` provenance; one glob-aware resolver; honest
-  `_loaded` flag; single `load(request=None)` verb + `reload` (reset to
-  as-created), `resolve_databases` (preview), `available_databases` (discover);
-  `databases` reports loaded paths; one preprocessing owner
-  (`UnderwritingLexer.preprocess`); **`to_agg(path, pattern, kind, source)`**
-  save/export (to user dir unless absolute). Renamed outright (no
-  `read_database(s)` aliases).
 - [ ] **H9 `[A]` Public DataFrame members present (`None`) before compute** —
-  moved out of the hygiene-3 batch (deferred at a52; needs scoping). Goal:
-  reading a documented `*_df` member on a freshly constructed (not-yet-`update`d)
-  object never raises `AttributeError`. Caveats found during review: the scope
-  list in the old plan named several non-members (`reins_audit_df`, public
-  `reins_df`/`report_df`/`statistics_df`/`bs_window_df` don't exist); the real
-  properties (`density_df`, `sev_density_df`) already raise an *informative*
-  `ValueError('Update … first')`, not `AttributeError`, and `reins_*_df` already
-  return `None`; `augmented_df` is a parameterised method (can't return `None`).
-  So the genuine work is narrow — enumerate the real members per class
-  (`Aggregate`/`Portfolio`/`Distortion`/`Underwriter`) and decide
-  informative-`ValueError`-vs-`None` before touching anything.
-- [x] **H10 `[A]` Promote `_bs_window_df` → public `bs_window_df`** — done in
-  `[bs-reporting]` (a65), but as a **curated view** rather than a rename: public
-  `bs_window_df` (read-only, user-facing columns) on both `Aggregate` and
-  `Portfolio`, with the private `_bs_window_df` retained for experts (the full
-  journey + `coverage` / `W`). Better than the rename-with-alias plan -- no
-  deprecation cycle, and the public surface stays curated.
-  (`dev/done/plan-univariate-bucket.md`).
+  *needs scoping* (deferred at a52). Goal: reading a documented `*_df` member on
+  a freshly constructed (not-yet-`update`d) object never raises `AttributeError`.
+  Caveats found during review: the scope list in the old plan named several
+  non-members (`reins_audit_df`, public `reins_df`/`report_df`/`statistics_df`/
+  `bs_window_df` don't exist); the real properties (`density_df`,
+  `sev_density_df`) already raise an *informative* `ValueError('Update … first')`,
+  not `AttributeError`, and `reins_*_df` already return `None`; `augmented_df` is
+  a parameterised method (can't return `None`). So the genuine work is narrow —
+  enumerate the real members per class (`Aggregate`/`Portfolio`/`Distortion`/
+  `Underwriter`) and decide informative-`ValueError`-vs-`None` before touching
+  anything.
 
 ---
 
 ## Track B — Bugs & investigations  `[A]` (small, parallel)
 
-- [x] **B1 `[A]`** `10000 xs 0 lognorm 120 cv 1.5` triggers a "sum sev < 1"
-  warning — is it firing for the **agg, not the sev**? (#43)
-- [x] **B2 `[A]`** "ugly continuous histogram with small spikes" — recover what
-  this was about; is it the `linear`/`nearest` discretization, and was it only
-  ever a stats/moment concern? (#48 — *forgotten; reconstruct on sight*)
-- [x] **B3 `[A]`** Zero-mean signed aggregate SD/var reported `NaN` (a40) — SD was
-  rebuilt as `mean*cv` (nan at mean 0); now derived from `ex2 - mean^2` /
-  `MomentWrangler.central`. `dev/done/plan-signed-sd.md`.
 - [ ] **B4 `[A]`** **Zero-truncated / zero-modified frequency is broken.**
   `poisson zt` raises `function value at x=0.0 is NaN; solver cannot continue`
   for every parameterization; `zm` builds but the *semantics* are wrong. The
@@ -247,129 +135,27 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ---
 
-## Track F — Features (approximation, pricing, config)
+## Track F — Features (approximation, pricing)
 
-- [x] **F1 `[A]` `approximate()` restored, tail-aware** (#33) — pick gamma vs
-  lognormal via the **tail-thickness classifier** (a very good application of
-  it). **needs** tail work (shipped, `dev/done/plan-tail-thickness.md`).
-  Removed in `6de20f2`.
-- [x] **F2 `[A]` G&H tilting DIY** (#34) — the `ft` exponential **tilt**
-  (Grübel–Hermesmeier aliasing reduction) was removed in `6de20f2`, breaking the
-  doc example. Replace it with a hands-on illustration of the mechanics;
-  consider exposing it as a small `Aggregate` method.
-- [x] **F3 `[A]` `pricing_at` = P + Q** (#63 + #64) — **done v1.0.0a31**
-  (`dev/done/plan-pentagon.md`). Canonical `pentagon.py` contract
-  (`PENTAGON_STATS`/`complete_pentagon`); all emitters routed through it;
-  `analyze_distortion` audit fixed; additive `Portfolio.pentagon_at` →
-  `Pentagon` object output.
-- [x] **F4 `[A]` Gross → Subject in `describe`** (#46) — relabel the first
-  describe column to *Subject* for agg-only covers (no occ reins). Uses the
-  `REINS_LABEL_*` constants.
-- [ ] **F5 `[B]` DecL `of`** (#44) — `of` in place of / alongside `po` / `so`;
-  maybe spell them out.
 - [ ] **F7 `[B]` PMIR best-bucket + manual kappa** (#47) — port the best-bucket
-  and clever manual kappa calc. Pairs **T3**.
-- [ ] **F8 `[B]` Config Phase 2** — `dev/plan-config.md`: `[plotting]` +
-  `.mplstyle` override, the rest of the env matrix, and the numerics-pending
-  floors (`aliasing_ratio`, `exeqa_noise_floor`, `ft_noise_floor`). Ties Track W.
-- [x] **F9 `[A]` `Portfolio.price_stand_alone`** — **done v1.0.0a33**. Restored
-  the deleted `stand_alone_pricing` (renamed to sort with `price`/`price_ccoc`):
-  per-unit stand-alone pricing via `Aggregate.price` + total via `pricing_at`,
-  canonical pentagon orientation (stats = columns), arg-checking, docstring.
-  Unblocks the 10-min guide (clears **doc-fix G4**).
+  and clever manual kappa calc. Pairs **T3**. *(vague — recover the PMIR code
+  first.)*
 
 ---
 
 ## Track W — Windows (range for output) & plotting
 
-- [ ] **W1 `[A]`** Support-aware window bounds (#6) — use `fz.support()`
-  endpoints; for finite frequency the support is exactly `[N·loc, N·ub]` (exact
-  window, not a MoM guess).
 - [ ] **W2 `[B]`** Window bounds for bivariate/multivariate per-axis sizing (#7).
-  **needs W1**; ties Track M.
+  Ties Track M (consumed by `plan-mv.md` §5).
 - [ ] **W3 `[B]`** Plot severity outside the aggregate window (#8) — inset,
   broken axis, or separate figure when grids don't overlap (`info` already warns).
-- [x] **W6 `[A]`** Bucket-window **1A** — convention-aware symmetric output
-  windowing (a58, `dev/plan-bucket-window-2.md` §1A). Per-edge window coverage
-  (`estimate_agg_window` `p_lo`/`p_hi`; `[discretization] window_nines_trim`),
-  balanced padding (`window_pad_skew`), convention from `value_type` with
-  `update(window_convention=…)` override, relaxed windowed-selection gate
-  (`<`→`≤`, placement-not-just-finer), and an explicit Regime-B (heavy
-  severity) branch with a `logger.info`. Ordinary + Regime-B books byte-stable.
-- [x] **W7 `[A]`** Bucket-window **1A-fix** — single-big-jump extent floor
-  (a59, `dev/plan-bucket-window-2.md` §1A-fix). Floors the selected window's
-  *extent* (not its resolution) by one big claim on a typical bulk
-  (`ES - μ_X + q_X(p**)`, `p** = 1 - (1-p*)/E[N]`, depth-guarded by
-  `[discretization] sbj_tail_floor`). **Signed** sevs always span the reach
-  (anti-alias correctness — the `100 - lognorm` 47% mass-loss case fixed at any
-  log2); **positive heavy** sevs extend up to the jump when it fits at the bulk
-  `bs` within the requested `log2` (the `5000 claims cv 2` clip is captured at a
-  generous log2), else keep the MoM window (no silent log2 growth, no bulk
-  coarsening). `_bs_window_df` gains an `sbj` row. The planned signed-kurtosis
-  diagnostic was dropped (the true-law kurtosis is modest; the 737 figure was an
-  aliasing artifact). Light/thin/bounded/concentrated/windowed books byte-stable.
-- [ ] **W9 `[A]`** Bucket **1A-bucket** — univariate tail intelligence + reporting
-  (`dev/done/plan-univariate-bucket.md`). A first-class thick/thin tail report for
-  freq/sev/agg (min/max/bounded/left/right + conservative concentration), exposed
-  as `tail_df` + `tail_description`/`tail_explanation`; wiring it into `bs`/`x_min`
-  selection (gate `sbj` on thickness, power-law `alpha` quantiles, thin-left-gated
-  `windowed`↔`sbj` asymmetric window, tail-aware padding/slack); and legible
-  reporting (full `_bs_window_df` journey, public `bs_window_df`,
-  `bs_description`/`bs_explanation`). Owns `dev/bucket-selection.rst`. Folds in
-  **H10**. Comes before W8.
-  - [x] `[tail-report]` — `Aggregate.tail_df`, the layered `TailRow` /
-    `build_tail_rows` / `tail_frame` machinery, thick/thin cut, claim-space
-    support, conservative concentration (a60; schema revised a61 — structural
-    support + per-side tail class + `Phi(mean/sd)`). Occ-re overlay row deferred
-    into `[use-selection]`.
-  - [x] `[tail-narrative]` — `tail_description` / `tail_explanation` over the
-    layered report (Aggregate + Severity + Frequency one-liners), ANSI option
-    (a62, byte-stable, +7 tests).
-  - [x] `[use-selection]` — wired the tail report into `_bs_window` (a64): six
-    items (thickness-gated SBJ floor; power-law honest truncation; thin-left
-    windowed left-lift reclaiming Regime B; tail-aware slack; concentration from
-    the report; clip→warning), plus the occ-re overlay row and signed-padding
-    verification. Borderline `cv` books revert to 0-based.
-  - [x] `[bs-reporting]` — `_bs_window_df` enriched; curated public
-    `bs_window_df` (Aggregate + Portfolio, folding in H10); `bs_description` /
-    `bs_explanation` narratives + `bs_describe` / `bs_explain` ANSI functions;
-    de-duplicated the clip vs deficit warning (a65). 1A-bucket plan complete.
+  *(approach undecided.)*
 - [ ] **W10 `[A]`** Retire `recommend_bucket` — replace the legacy one-shot
   sizer with a new (TBD) function that takes `log2` (and possibly `x_min`) as
   explicit arguments, then remove `recommend_bucket`. W9's honest-truncation path
-  (`[use-selection]` item 2: accept truncation, no-normalize, warn) removes its
-  last real job (the infinite-variance fallback), so this follows W9. See
-  `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`).
-- [x] **W8 `[A]`** Bucket-window **1P** — `Portfolio` windowed combine
-  (`best_window`/`update`), landed a66 (`dev/done/plan-bucket-window-2.md`
-  Round 3). Reconciled to **Portfolio MM** bulk (total moments, not a width sum)
-  + single-big-jump **look-through** (`max_k`, not Σ) + windowed non-signed
-  origin (Plan B) routed through the roll-combine; `Σ kappa_i == x` verified on
-  the windowed grid. Inherits 1A-bucket's reporting surfaces at the `Portfolio`
-  level (`bs_window_df` mm/rms/sbj/sum rows, `bs_explanation`, `tail_df`,
-  `_bs_clip`).
-- [x] **W4 `[A]`** Signed (P&L) Lee-plot artifact (a39) — `Aggregate.plot`'s
-  discrete zero-anchor row set `loss=0`, drawing a spurious vertical segment to
-  the first point on signed support; anchor `loss` now equals its index.
-- [x] **W5 `[A]`** Non-zero aggregate **output window** for high-mean / thin-tail
-  aggregates (a51, `dev/done/plan-bucket-window.md`) — the `windowed` sizing
-  method in `_bs_window`: a concentrated aggregate (`agg_cv < 1/z`) is computed
-  on a two-sided window far from 0 via benign FFT wrap; resolves the 10M-claim
-  `dsev` case at `bs=1`. Self-limiting (only fires when the band clears 0),
-  severity-fit guarded, occ-reins suppressed, `x_min=0` opts out. This is the
-  1-D enabler Track M / W2 consume for per-axis bivariate windowing.
-  **Deferred follow-ups:** (a) occ-reins **with** windowing — needs the
-  occ-reins severity rebucketing / `reins_density_df` to ride `xs_sev` not `xs`
-  (currently suppressed); (b) the from-0 severity overlay on a windowed grid is
-  unavailable — ties **W3**; (c) reconcile with W1's exact `fz.support()` bounds
-  (windowed uses a MoM `estimate_agg_window`).
-
-### Ergonomic tweaks (a39)
-
-- [x] Keyword-only `Underwriter(*, …)` (kills `Underwriter('db')` silently naming
-  the underwriter); `repr` gains a `requested` line for `self._request`.
-- [x] New `density` property on `Aggregate`/`Portfolio` =
-  `density_df.query('p_total > 0')` (the live support).
+  (`[use-selection]` item 2: accept truncation, no-normalize, warn) removed its
+  last real job (the infinite-variance fallback), so this follows the shipped W9.
+  See `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`).
 
 ---
 
@@ -384,16 +170,13 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 > **`t` copula dropped** (flaky + footgun); add shuffle-of-Min + a `clash`
 > statement; sizing reframed to *measure-don't-guess* (`balanced_window` on the
 > realized marginals, `update(log2=)` budget); netceded → three occurrence
-> view-pairs (`netceded`/`grossceded`/`grossnet`). M1/M2 below are subsumed.
+> view-pairs (`netceded`/`grossceded`/`grossnet`).
 
 - [ ] **M (the block) `[A]`** — execute `dev/plan-mv.md` stages **MV-1…MV-7**
   (`balanced_window`+`focus` → measure-don't-guess copula sizing → netceded
   one-bs sizing → reporting surface → netceded view-pairs → shuffle-of-Min+clash
-  → rename to bivariate). Each a version bump (`a68`+); all seven block `1.0.0b1`.
-- [x] ~~**M1** later stages~~ — folded into `dev/plan-mv.md` (`t` dropped, ≥3
-  killed, reporting/netceded-DecL in scope; `MultivariatePortfolio` deferred).
-- [x] ~~**M2** punch-up~~ — **superseded** by `dev/plan-mv.md` §5 (one sizing
-  notion: `balanced_window` on the realized marginals). Ties **W2**.
+  → rename to bivariate). Each a version bump; all seven block `1.0.0b1`.
+  Execution cadence: one stage per iteration, with a review + commit between each.
 
 ---
 
@@ -417,19 +200,15 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 ## Track D — Docs & packaging
 
 - [ ] **D1 `[A]`** New `README.md` for the stable-v1.0 audience (what / who /
-  install / one-liner DecL) (#39, #13, #14).
-  - [x] **Split done (2026-06-06):** `README.rst` → markdown `README.md`
-    (intro / install / getting-started / badges) **+ `CHANGELOG.md`** (full
-    version history, keyed by version); `dev/PROGRESS.md` removed, subsumed by
-    `CHANGELOG.md` + git log; `pyproject.toml` `readme` repointed.
-  - [ ] Remaining: rewrite the README body for the stable-v1.0 audience (it is
-    currently the verbatim moved content).
+  install / one-liner DecL) (#39, #13, #14). The `README.rst`→`README.md` +
+  `CHANGELOG.md` split is done (2026-06-06); **remaining:** rewrite the README
+  body for the stable-v1.0 audience (currently the verbatim moved content).
 - [ ] **D2 `[A]`** v1.0 intro / "Journey" page **+ statements of philosophy**
   (user manages logging / warnings / matplotlib; the distribution **is** `p_i`
   at `x_i`, no jump detection; `qd` is the doc-only fixed-font exception); cover
   the v1.0 shift (linear allocation default, bounded detection, forwards-`S`,
   pentagon columns, `DefectiveDistributionWarning`) (#15 + DOD).
-- [x] **D3 `[A]`** Grammar reference from `decl.lark` / `grammar(add_to_doc=True)`
+- [ ] **D3 `[A]`** Grammar reference from `decl.lark` / `grammar(add_to_doc=True)`
   — `docs/4_agg_language_reference/` still describes the SLY-era grammar (#17).
   *No code dependency — ready now.*
 - [ ] **D4 `[A]`** Tail-descriptor docs **+ tests** (bounded / log-concave /
@@ -443,15 +222,21 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   "Docs updated" DOD bullet, doc side of **H4**).
 - [ ] **D7 `[B]`** Reinsurance case-study docs rewrite — `bahnemann`,
   `enterprise risk`, `other_misc`: rebuild per-layer exhibits from
-  `reins_stats_df`, verify vs published (#16). **needs N2–N3** (stable numerics).
+  `reins_stats_df`, verify vs published (#16). N2–N3 numerics now stable.
 - [ ] **D8 `[B]`** PUNCHUP `pedagogy` and integrate with docs; possible minor
   renamings (#40). **needs H5.**
-- [ ] **D9 `[B]`** Reinsurance structure diagrams (PMIR code?) (#45).
 - [ ] **D10 `[B]`** Single keyword source of truth — derive `decl_pygments.AggLexer`,
   `parser_errors._TERMINAL_LABELS`, and the web app's `decl-keywords.json` from
   the `decl.lark` terminals (five hand-maintained mirrors today). Independent of
   the unparser (`decl_writer` reuses `AggLexer` as-is, shipped a53); ties the
   parked DecL colorization (#22).
+- [ ] **D11 `[B]`** Transition the Sphinx docs' bibliography to the master
+  `C:/s/TELOS/Biblio/uber-library.bib` (per the CLAUDE.md "Citations and
+  bibliography" standing order, added 2026-06-11). The docs currently use an
+  older biblio file with slightly different keys — sweep the `.rst` citations,
+  map old keys → uber keys, and point the docs' bibtex config at the master
+  file (or an exported subset) so the docs and the `dev/*.qmd` artifacts cite
+  identically.
 - [ ] **D12 `[B]` Cheat-sheet tweaks once the UI settles** — the six class / DecL
   cheat sheets (`cheat-sheets/`) were rebuilt for the v1.0 API on the
   tectonic + `make.ps1` / `combine.ps1` build with auto-`\aggversion` stamping
@@ -460,31 +245,21 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   re-run `introspect` per class, reconcile any renames/removals, and apply
   pending wording/layout tweaks (incl.\ whether to densify DecL pages 2–3).
   *(flagged 2026-06-18; author wants this held until the first beta.)*
-- [ ] **D11 `[B]`** Transition the Sphinx docs' bibliography to the master
-  `C:/s/TELOS/Biblio/uber-library.bib` (per the CLAUDE.md "Citations and
-  bibliography" standing order, added 2026-06-11). The docs currently use an
-  older biblio file with slightly different keys — sweep the `.rst` citations,
-  map old keys → uber keys, and point the docs' bibtex config at the master
-  file (or an exported subset) so the docs and the `dev/*.qmd` artifacts cite
-  identically.
+- [ ] **D9 `[B]`** Reinsurance structure diagrams (PMIR code?) (#45).
+  *(under-specified — confirm source/scope.)*
 
 ---
 
 ## Related plans
 
-- **Numerics program** (`dev/plan-numerics-0-meta.md` + `-1`…`-4`) → the N-track:
-  numerics-1 (unit-density) + numerics-2 (objective spine) → **N2**; numerics-3
-  (distortion spine, incl. `AllocationBounds`) → **N3** (+ **N4** bounds read-through);
-  numerics-4 (windowed combine/bivariate) → **W2/M-track**. Absorbs the former
-  `plan-portfolio-neg-x-pricing` and `plan-window-port-bv` drafts (removed; git history).
+- **Numerics program** (`dev/plan-numerics-0-meta.md` + `-1`…`-4`) → the N-track;
+  numerics-1/2/3 shipped (a55–a57 → N2/N3); numerics-4 (windowed combine/
+  bivariate) → W2/M-track.
 - `dev/plan-config.md` (Phase 2) → **F8**.
 - `dev/plan-mv.md` → **Track M** (bivariate firm-up, MV-1…7). Absorbs & replaces
   the deleted `plan-multivariate-punchup.md` (former M2).
-- `dev/done/plan-decl-unparser.md` → shipped a53: `decl_writer` unparser +
-  `format_program`; `decl_pprint` removed. Follow-on **D10**.
-- `dev/done/` → shipped: tail-thickness (**F1**, **D4**), config Phase 1,
-  pentagon pricing contract (**F3**, `plan-pentagon.md`), database loading
-  (**H6**, `plan-databases.md`), multivariate stages 0–1, etc.
+- `dev/done/` → shipped plans (tail-thickness, config Phase 1, pentagon, database
+  loading, bucket-window 1A/1P, allocation/pricing bounds, decl-unparser, …).
 
 ---
 
@@ -502,4 +277,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   identity. Wait for a clearer use case.
 - [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
   both premium legs (`plan-pnl-premium.md` §9).
-- [ ] extend reinsurance clauses to allow net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros (rate on subject = quota share)  
+- [ ] extend reinsurance clauses to allow net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros (rate on subject = quota share)
+- [ ] **F8 `[B]` Config Phase 2 for graphics** — `dev/plan-config.md`: `[plotting]` +
+  `.mplstyle` override, the rest of the env matrix, and the numerics-pending
+  floors (`aliasing_ratio`, `exeqa_noise_floor`, `ft_noise_floor`). Ties Track W.

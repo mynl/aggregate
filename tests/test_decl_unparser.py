@@ -26,6 +26,7 @@ import pytest
 import aggregate
 from aggregate import Underwriter, build, format_program
 from aggregate.decl_writer import spec_to_decl, _split_statements
+from aggregate.parser import UnderwritingLexer
 
 # ----------------------------------------------------------------------
 # Corpus collection
@@ -33,7 +34,6 @@ from aggregate.decl_writer import spec_to_decl, _split_statements
 
 _AGG_DIR = Path(aggregate.__file__).parent / 'agg'
 _CORPUS_FILES = ['test_suite.agg', 'test_suite2.agg', 'test_decl.agg']
-_COMMENT = re.compile(r'\s*(#|//).*$')
 
 # Genuinely lossy / non-canonical-spec constructs: idempotence holds, but the
 # first parse's spec is not a fixed point (tweedie discards its note and bakes a
@@ -48,14 +48,17 @@ _uw = Underwriter(databases='test_suite')
 
 
 def _corpus_lines():
-    """Yield ``(id, program_text)`` for every parseable corpus program."""
+    """Yield ``(id, program_text)`` for every parseable corpus program.
+
+    Routes the file text through :meth:`UnderwritingLexer.preprocess` (the single
+    owner of the blank-line / ``;`` statement-splitting rule) rather than
+    splitting on physical lines, so multi-line statements and ``;``-terminated
+    dense lists are handled the same way the parser sees them.
+    """
     seen = set()
     for fn in _CORPUS_FILES:
         path = _AGG_DIR / fn
-        for physical in path.read_text(encoding='utf-8').splitlines():
-            line = _COMMENT.sub('', physical).strip()
-            if not line:
-                continue
+        for line in UnderwritingLexer.preprocess(path.read_text(encoding='utf-8')):
             # second token is the object name (agg NAME ..., port NAME ...,
             # distortion NAME ...); fall back to the raw line for an id.
             parts = line.split()

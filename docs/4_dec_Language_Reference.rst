@@ -17,13 +17,35 @@ The DecL :ref:`introduction <design and purpose>` describes its design and purpo
 Pre-Processing
 ==============
 
-Programs are processed one line at a time. Before passing to the lexer, the following pre-processing occurs.
+A program holds one or more statements. Two statements are separated either by
+a **blank line** (a line that is empty or only whitespace — the markdown
+paragraph model) or by a **semicolon at the end of a line** (the Python model,
+so dense one-statement-per-line lists stay legal). Every other newline is just
+whitespace, so a single statement may be laid out across as many lines, with
+whatever indentation, as you like — a multi-line portfolio needs no trailing
+markers, only that its units share one paragraph (no blank line between them).
 
-1. Remove Python and C++ style  ``#`` or ``//`` comments, through end of line
-2. Remove \\n in [ ] (vectors) that appear from  using ``f'{np.linspace(...)}'``
-3. Map backslash newline (Python line continuations) to space
-4. Replace \\n\\t  with space, to support the tabbed indented Portfolio layout
-5. Split on remaining newlines
+Python and C++ style ``#`` / ``//`` comments are **transparent**: they never
+separate statements. A full-line comment between the clause-lines of one
+statement (e.g. a commented-out reinsurance clause) simply vanishes; the lines
+around it stay in the same statement. The corollary is that a comment cannot
+separate two statements — use a blank line or a ``;``.
+
+Before passing to the lexer, the following pre-processing occurs.
+
+1. Remove full-line ``#`` / ``//`` comments entirely, including their newline,
+   so they leave no blank-line ghost
+2. Strip trailing (inline) ``#`` / ``//`` comments through end of line
+3. Remove ``\n`` inside ``[ ]`` (vectors) that appear from using ``f'{np.linspace(...)}'``
+4. Turn a semicolon at the end of a line into a statement break
+5. Split into statements on blank lines
+6. Flatten each statement: its newlines and indentation collapse to spaces
+
+.. note::
+
+   The earlier ``\`` line-continuation has been removed. A statement now spans
+   multiple lines for free, so a stray backslash is a lexer error rather than
+   silently ignored.
 
 Lexing
 ======

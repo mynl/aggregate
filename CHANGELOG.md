@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.0.0a69
+
+### DecL statement separation: blank line or `;`, no more `\`
+
+How a DecL *program* splits into individual *statements* changed. The old rule —
+"one statement per line; an indented or `\`-continued line folds onto the
+previous one" — is replaced by a markdown/Python hybrid:
+
+- **A blank line** (empty or whitespace-only) separates two statements (the
+  markdown paragraph model). A statement may now span as many lines, with
+  whatever indentation, as you like — a multi-line `port` just needs its units
+  in one paragraph (no blank line between them).
+- **A `;` at the end of a line** also ends a statement (the Python model), so
+  dense one-statement-per-line lists stay legal. The `;` inside
+  `hints{key=value;}` / `note{...}` is untouched (those end a line with `}`).
+- **Comments are transparent** — a `#` / `//` comment never separates
+  statements, so you can comment out or annotate a clause inside a multi-line
+  statement (e.g. a reinsurance line) and the statement stays intact. The
+  corollary: a comment alone no longer separates two statements; use a blank
+  line or a `;`.
+
+**Breaking changes:**
+
+- **The `\` line-continuation is removed.** A statement spans multiple lines for
+  free, so a stray backslash is now a **lexer error** (dropped from the
+  `decl.lark` `%ignore` class) rather than silently ignored — it surfaces the
+  copy/paste confusion the old behavior hid.
+- Two statements on adjacent lines with **neither** a blank line **nor** a `;`
+  between them now fold into one statement (usually a loud parse error). Insert a
+  blank line or a trailing `;`.
+- `Underwriter.to_agg` now writes entries blank-line separated; files written by
+  older versions that packed statements one-per-line with no separator must be
+  re-exported or hand-separated to re-load.
+
+The single owner of the rule is `UnderwritingLexer.preprocess`
+(`aggregate.parser`); `decl_writer._split_statements` mirrors it. Comments are
+stripped before the vector-bracket step, so a stray bracket in a comment no
+longer unbalances preprocessing. The bundled `.agg` libraries and the DecL
+documentation were migrated. Docs pending a rebuild.
+
 ## 1.0.0a68
 
 ### `approximate()`: one fit core, symmetric guard, honest reflected-fit errors

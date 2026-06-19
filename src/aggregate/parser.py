@@ -90,21 +90,39 @@ class UnderwritingLexer:
 
     @staticmethod
     def preprocess(program: str) -> list[str]:
-        """Split a multi-line DecL program into clean single-line statements.
+        """Split a multi-line DecL program into individual statements.
+
+        Two statements are separated either by a **blank line** (the markdown
+        paragraph model — a line that is empty or whitespace-only) or by a
+        **semicolon at end of line** (the Python model, so dense
+        one-statement-per-line lists stay legal). Every other newline is just
+        whitespace, so a single statement may be laid out across as many
+        physical lines, with whatever indentation, as the author likes. The
+        former ``\\`` line-continuation has been removed; a stray backslash is
+        now a lexer error (it was dropped from ``decl.lark``'s ``%ignore``).
+
+        Comments are **transparent**: they never separate statements. A
+        full-line comment between the clause-lines of one statement (e.g. a
+        commented-out reinsurance clause) simply vanishes; the lines around it
+        stay in the same statement. The corollary is that a comment cannot
+        separate two statements — use a blank line or a ``;`` for that.
 
         The preprocessor performs six steps:
 
-        1. Newlines inside ``[ ]`` (e.g., from formatted numpy arrays) are
-           collapsed to spaces.
-        2. ``//`` and ``#`` comments are removed through end of line.
-        3. ``\\\\n`` line continuation is mapped to a space.
-        4. A newline followed by **any** indentation (a tab or one or more
-           spaces) is collapsed to a space. This is the single owner of the
-           continuation/indent rule — it folds the tabbed and space-indented
-           Portfolio layouts alike, so ``.agg`` files need no separate
-           whitespace munging when read by :meth:`Underwriter.load`.
-        5. The result is split on newlines.
-        6. Empty lines are dropped.
+        1. Full-line comments (optional indent, then ``#`` / ``//``) are removed
+           **entirely, including their newline**, so they leave no blank-line
+           ghost and a comment inside a multi-line statement folds away. Done
+           first so a stray bracket in a comment can never unbalance step 3.
+        2. Trailing (inline) comments are stripped to end of line, keeping the
+           line's own newline.
+        3. Newlines inside ``[ ]`` (e.g., from formatted numpy arrays) are
+           collapsed to spaces, so a vector never reads as a paragraph break.
+        4. A ``;`` at end of line is turned into a blank-line break. Only a
+           line-final ``;`` fires, so the ``;`` inside ``hints{key=value;}`` /
+           ``note{...}`` (which always end a line with ``}``) is untouched.
+        5. The text is split into paragraphs on runs of blank lines.
+        6. Each paragraph is flattened: its newlines, indentation, and repeated
+           spaces collapse to single spaces. Empty paragraphs are dropped.
 
         Parameters
         ----------
@@ -114,9 +132,18 @@ class UnderwritingLexer:
         Returns
         -------
         list[str]
-            Non-empty, stripped DecL statements ready for parsing.
+            Non-empty, whitespace-normalised DecL statements ready for parsing.
         """
-        # Collapse newlines inside [...] (which can appear when a vector is
+        # 1. Remove full-line comments ENTIRELY (line + its newline), so a
+        # comment is transparent: it never separates statements and never
+        # masquerades as a blank line. Done before the bracket step so a stray
+        # bracket in a comment can't unbalance it.
+        program = re.sub(r"(?m)^[ \t]*(?://|#)[^\n]*\n?", "", program)
+
+        # 2. Strip trailing (inline) comments to end of line, keeping the newline.
+        program = re.sub(r"(//|#)[^\n]*", "", program)
+
+        # 3. Collapse newlines inside [...] (which can appear when a vector is
         # formatted with f'{np.linspace(...)}').
         out_in = re.split(r"\[|\]", program)
         assert len(out_in) % 2  # must be odd
@@ -124,15 +151,20 @@ class UnderwritingLexer:
         even = out_in[0::2]
         program = " ".join([even[0]] + [f"[{o}] {e}" for o, e in zip(odd, even[1:])])
 
-        # Strip // and # comments through end of line.
-        program = re.sub(r"(//|#)[^\n]*$", r"\n", program, flags=re.MULTILINE)
+        # 4. A line-final ``;`` terminates a statement -> turn it into a blank
+        # line. ``;`` inside hints{}/note{} is never line-final (those end in
+        # ``}``), so it is left alone.
+        program = re.sub(r";[ \t]*(\r?\n|$)", "\n\n", program)
 
-        # Line continuation, then collapse any indented continuation line (a
-        # newline followed by a tab or one-or-more spaces) into its predecessor.
-        program = program.replace("\\\n", " ")
-        program = re.sub(r"\n[ \t]+", " ", program)
-
-        return [i.strip() for i in program.split("\n") if len(i.strip()) > 0]
+        # 5 + 6. Split on blank-line runs and flatten each paragraph: a newline
+        # plus the whitespace around it (an indented continuation line) folds to
+        # a single space, but existing intra-line spacing is preserved -- the
+        # lexer ignores it, and keeping it leaves the statement text stable for
+        # the snapshot regression (which captured aligned columns verbatim).
+        # Empty paragraphs are dropped.
+        statements = (re.sub(r"\s*\n\s*", " ", p).strip()
+                      for p in re.split(r"\n\s*\n", program))
+        return [s for s in statements if s]
 
     def tokenize(self, text: str) -> _TokenizedText:
         """Tokenize a single DecL line.

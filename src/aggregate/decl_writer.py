@@ -49,29 +49,34 @@ import numpy as np
 
 __all__ = ['spec_to_decl', 'format_program']
 
-# Comment / continuation stripping for the text path of format_program. Mirrors
+# Comment stripping for the text path of format_program. Mirrors
 # UnderwritingLexer.preprocess EXCEPT for the leading bracket-newline-collapse
 # step: that step unconditionally inserts a space after every ``]`` (to fold
 # multiline numpy-array vectors), which silently rewrites ``[`` inside a
 # ``note{...}`` and so is non-idempotent on bracketed notes. format_program's
 # inputs (a stored single-line program, a spec) never carry multiline vectors,
 # so omitting that step keeps re-rendering idempotent.
-_COMMENT_RE = re.compile(r"(//|#)[^\n]*$", re.MULTILINE)
-_INDENT_RE = re.compile(r"\n[ \t]+")
+_FULL_LINE_COMMENT_RE = re.compile(r"(?m)^[ \t]*(?://|#)[^\n]*\n?")
+_COMMENT_RE = re.compile(r"(//|#)[^\n]*")
+_SEMICOLON_RE = re.compile(r";[ \t]*(\r?\n|$)")
 
 
 def _split_statements(text: str) -> list[str]:
-    """Split program text into logical statements, comment- and indent-aware.
+    """Split program text into logical statements under the blank-line / ``;`` rule.
 
-    Strips ``//`` / ``#`` comments, folds line continuations and indented
-    continuation lines (so a tab-indented portfolio collapses to one statement),
-    then splits on the remaining newlines. Unlike the parser's full
-    ``preprocess`` it does not reformat bracketed text, so notes survive intact.
+    Removes full-line comments transparently (so they never separate
+    statements), strips trailing comments, turns a line-final ``;`` into a
+    paragraph break, then splits on runs of blank lines and flattens each
+    paragraph (newlines and indentation collapse to single spaces, so a
+    tab-indented portfolio folds into one statement). Mirrors
+    :meth:`UnderwritingLexer.preprocess` minus its bracket-newline step, so
+    bracketed notes survive intact.
     """
+    text = _FULL_LINE_COMMENT_RE.sub("", text)
     text = _COMMENT_RE.sub("", text)
-    text = text.replace("\\\n", " ")
-    text = _INDENT_RE.sub(" ", text)
-    return [ln.strip() for ln in text.split("\n") if ln.strip()]
+    text = _SEMICOLON_RE.sub("\n\n", text)
+    statements = (re.sub(r"\s*\n\s*", " ", p).strip() for p in re.split(r"\n\s*\n", text))
+    return [s for s in statements if s]
 
 # Direct frequency families (the FREQ terminal in decl.lark). A spec whose
 # ``freq_name`` is NOT in this set (and is not 'empirical') came from a

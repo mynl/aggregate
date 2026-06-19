@@ -55,7 +55,7 @@ def test_build_distortion_returns_distortion():
 def test_build_multi_output_contract():
     """build() raises ValueError for multi-output, directing to build_many."""
     program = (
-        'agg PhaseZero:Multi1 1 claim sev lognorm 10 cv 1 fixed\n'
+        'agg PhaseZero:Multi1 1 claim sev lognorm 10 cv 1 fixed\n\n'
         'agg PhaseZero:Multi2 1 claim sev lognorm 20 cv 1 fixed'
     )
     with pytest.raises(ValueError, match='build_many'):
@@ -65,7 +65,7 @@ def test_build_multi_output_contract():
 def test_build_many_returns_list():
     """build_many always returns the full list of ParsedProgram, regardless of count."""
     program = (
-        'agg PhaseZero:Many1 1 claim sev lognorm 10 cv 1 fixed\n'
+        'agg PhaseZero:Many1 1 claim sev lognorm 10 cv 1 fixed\n\n'
         'agg PhaseZero:Many2 1 claim sev lognorm 20 cv 1 fixed'
     )
     rv = global_build.build_many(program)

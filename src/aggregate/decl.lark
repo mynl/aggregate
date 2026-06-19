@@ -423,5 +423,7 @@ INHOMOG_MULTIPLY: "@"
 EQUAL_WEIGHT:     "="
 RANGE:            ":"
 
-// Whitespace + noise. Mirrors SLY's `ignore = ' \t,\\|'`.
-%ignore /[ \t,\\|]+/
+// Whitespace + noise: space, tab, comma, pipe. The backslash was dropped when
+// `\`-continuation was removed (blank-line / `;` statement separation), so a
+// stray backslash now raises a clear lexer error instead of vanishing.
+%ignore /[ \t,|]+/

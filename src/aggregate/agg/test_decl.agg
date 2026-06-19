@@ -37,13 +37,13 @@
 # specific path through the FFT pipeline; together they fence the v1.0
 # core-compute refactor. See tests/baseline/corpus.py for the grids
 # (log2/bs/padding/normalize) bound to each program.
-agg P.Base.FixedOne 1 claim sev lognorm 100 cv 0.5 fixed                                                                 note{fixed-1 shortcut path}
-agg P.Base.DfreqOne dfreq [1] sev lognorm 100 cv 0.5                                                                     note{full-FFT path equivalent to FixedOne}
-agg P.Sym.Dice     dfreq [1] dsev [1:6]                                                                                  note{symmetric discrete; skew dust regression}
-agg P.Tail.LN      5 claims sev lognorm 100 cv 3 poisson                                                                 note{thick tail; tail accuracy on wide grid}
-agg P.Re.Both    100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate reinsurance}
-agg ReBucket      10 claims sev lognorm 100 cv 2 occurrence net of 0.8 so 250 xs 175 poisson                              note{off-grid excess attach; reins_bucket linear/nearest rebucketing}
-agg P.Def.Pareto   1 claim sev 1000 * pareto 1.5 - 1000 fixed                                                            note{defective; no finite 2nd moment} hints{normalize=False}
+agg P.Base.FixedOne 1 claim sev lognorm 100 cv 0.5 fixed                                                                 note{fixed-1 shortcut path};
+agg P.Base.DfreqOne dfreq [1] sev lognorm 100 cv 0.5                                                                     note{full-FFT path equivalent to FixedOne};
+agg P.Sym.Dice     dfreq [1] dsev [1:6]                                                                                  note{symmetric discrete; skew dust regression};
+agg P.Tail.LN      5 claims sev lognorm 100 cv 3 poisson                                                                 note{thick tail; tail accuracy on wide grid};
+agg P.Re.Both    100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate reinsurance};
+agg ReBucket      10 claims sev lognorm 100 cv 2 occurrence net of 0.8 so 250 xs 175 poisson                              note{off-grid excess attach; reins_bucket linear/nearest rebucketing};
+agg P.Def.Pareto   1 claim sev 1000 * pareto 1.5 - 1000 fixed                                                            note{defective; no finite 2nd moment} hints{normalize=False};
 agg P.Mix         [10 20] claims [100 400] xs 0 sev lognorm [20 40 100] cv [.5 .6 .7] wts=3 mixed gamma .2                note{bounded mixture, mixed gamma frequency}
 
 
@@ -53,8 +53,8 @@ agg P.Mix         [10 20] claims [100 400] xs 0 sev lognorm [20 40 100] cv [.5 .
 # (ii) bounded beta mixture, (iii) bounded discrete (Bodoff). Used to pin
 # linear/lifted allocation and the bounded-detection refusal of
 # ``allocation='lifted'`` on unbounded + mass distortions.
-port Q.Port.CNC     agg CNC.NonCat 25 claim sev gamma 80 cv 0.15 mixed gamma .2 agg CNC.Cat 5 claim 200 xs 0 sev lognorm 40 cv 1.50 mixed ig .2
-port Q.Port.Bounded agg A dfreq [1:3] sev 500 * beta 5 2 agg B dfreq [1:5] sev 800 * beta 7 2
+port Q.Port.CNC     agg CNC.NonCat 25 claim sev gamma 80 cv 0.15 mixed gamma .2 agg CNC.Cat 5 claim 200 xs 0 sev lognorm 40 cv 1.50 mixed ig .2;
+port Q.Port.Bounded agg A dfreq [1:3] sev 500 * beta 5 2 agg B dfreq [1:5] sev 800 * beta 7 2;
 port Q.Port.Bodoff  agg wind 1 claim sev dhistogram xps [0, 99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
 
@@ -84,10 +84,10 @@ port S.BDD agg A 1 claim sev 10 * beta 2 3 fixed agg B 1 claim sev 15 * beta 4 2
 # (tests/test_splice_suite.py). T.Splice01/02 are bare spliced severities;
 # T.SpliceLayer01/02 wrap them in layer-and-attachment policies whose
 # conditional moments are computable by hand.
-sev T.Splice01      lognorm 10 cv .5 splice [20 30]                                           note{single-segment splice; mean and moms finite}
-sev T.Splice02 10 * uniform + 5 splice [8 12]                                                 note{shift+scale splice; fz.sf(9) ~ 0.75 splice-only survival}
-agg T.SpliceLayer01 1 claim 5 xs 3 sev 10 * uniform + 5 splice [8 12] fixed                   note{full-limit; E[claim^k] = 5^k}
-agg T.SpliceLayer02 1 claim 2 xs 8 sev 10 * uniform + 5 splice [8 12] fixed                   note{proper excess; E[claim] = 1.5, E[claim^2] = 8/3, E[claim^3] = 5}
+sev T.Splice01      lognorm 10 cv .5 splice [20 30]                                           note{single-segment splice; mean and moms finite};
+sev T.Splice02 10 * uniform + 5 splice [8 12]                                                 note{shift+scale splice; fz.sf(9) ~ 0.75 splice-only survival};
+agg T.SpliceLayer01 1 claim 5 xs 3 sev 10 * uniform + 5 splice [8 12] fixed                   note{full-limit; E[claim^k] = 5^k};
+agg T.SpliceLayer02 1 claim 2 xs 8 sev 10 * uniform + 5 splice [8 12] fixed                   note{proper excess; E[claim] = 1.5, E[claim^2] = 8/3, E[claim^3] = 5};
 agg T.SpliceUnbounded 5 claims sev lognorm 40 cv .65 splice [1 100] poisson                   note{splice on unbounded base; window must be finite}
 
 
@@ -96,8 +96,8 @@ agg T.SpliceUnbounded 5 claims sev lognorm 40 cv .65 splice [1 100] poisson     
 # Symmetric distributions whose analytic skew is exactly 0. The validation
 # code must not flag empirical skew dust as a CV/skew failure
 # (tests/test_validation.py).
-agg U.Die     dfreq [1] dsev [1:6]                                                            note{fair die; analytic skew = 0}
-agg U.LN     25 claims sev lognorm 50 cv 0.75 poisson                                         note{genuinely skewed; skew > 0.1 preserved}
+agg U.Die     dfreq [1] dsev [1:6]                                                            note{fair die; analytic skew = 0};
+agg U.LN     25 claims sev lognorm 50 cv 0.75 poisson                                         note{genuinely skewed; skew > 0.1 preserved};
 port U.TestSym agg A dfreq [1] dsev [1:6] agg B dfreq [1] dsev [1:6]
 
 
@@ -106,19 +106,19 @@ port U.TestSym agg A dfreq [1] dsev [1:6] agg B dfreq [1] dsev [1:6]
 # Single-output / multi-output / kind-dispatch coverage for ``build()`` and
 # the knowledge base (tests/test_underwriter.py). PhaseZero: names match
 # the pre-refactor pin so renaming is detectable.
-agg V.PhaseZero:Dice  dfreq [3] dsev [1:6]                                                    note{build() returns Aggregate}
-sev V.PhaseZero:S     lognorm 100 cv 1                                                        note{build() returns Severity}
-port V.PhaseZero:P agg A1 1 claim sev lognorm 10 cv 1 fixed agg A2 1 claim sev lognorm 20 cv 1 fixed
-distortion V.PhaseZero:D ph 0.5                                       # build() returns Distortion
-agg V.PhaseZero:IP    1 claim sev lognorm 10 cv 1 fixed                                       note{_interpret_program: knowledge filled, object None}
+agg V.PhaseZero:Dice  dfreq [3] dsev [1:6]                                                    note{build() returns Aggregate};
+sev V.PhaseZero:S     lognorm 100 cv 1                                                        note{build() returns Severity};
+port V.PhaseZero:P agg A1 1 claim sev lognorm 10 cv 1 fixed agg A2 1 claim sev lognorm 20 cv 1 fixed;
+distortion V.PhaseZero:D ph 0.5;  # build() returns Distortion
+agg V.PhaseZero:IP    1 claim sev lognorm 10 cv 1 fixed                                       note{_interpret_program: knowledge filled, object None};
 # Multi-output: build() raises ValueError, build_many returns the list.
-agg V.PhaseZero:Multi1 1 claim sev lognorm 10 cv 1 fixed
-agg V.PhaseZero:Multi2 1 claim sev lognorm 20 cv 1 fixed
+agg V.PhaseZero:Multi1 1 claim sev lognorm 10 cv 1 fixed;
+agg V.PhaseZero:Multi2 1 claim sev lognorm 20 cv 1 fixed;
 # discover()/describe()/plot() smoke fixtures — exercise the kind-dispatch
 # in Underwriter.discover for sev and distortion.
-sev        V.DiscSevTest   lognorm 100 cv 1
-distortion V.DiscDistTest  ph 0.3
-sev        V.DiscPlotSev   lognorm 100 cv 1
+sev        V.DiscSevTest   lognorm 100 cv 1;
+distortion V.DiscDistTest  ph 0.3;
+sev        V.DiscPlotSev   lognorm 100 cv 1;
 distortion V.DiscPlotDist  ph 0.3
 
 
@@ -134,14 +134,14 @@ distortion V.DiscPlotDist  ph 0.3
 # already registered, which only happens through a sequential file load
 # (Underwriter.load). They are listed verbatim for reference; uncomment when
 # loading via Underwriter.load.
-dist W.tcc       ccoc .25
-dist W.tdu       dual 2.5
-dist W.tph       ph   0.7
+dist W.tcc       ccoc .25;
+dist W.tdu       dual 2.5;
+dist W.tph       ph   0.7;
 # Multi-parameter kinds take a FLAT number list (no brackets); the kind ->
 # parameter-name mapping lives on the Distortion subclass (decl_params), applied
 # by Distortion.decl_spec. See tests/test_distortion_decl.py.
-dist W.tbi       bitvar 0.9 0.99 0.5
-dist W.tpw       power 0.01 1.0 2
+dist W.tbi       bitvar 0.9 0.99 0.5;
+dist W.tpw       power 0.01 1.0 2;
 dist W.tbe       beta 0.5 2
 # dist W.tMIN      minimum dist.W.tcc dist.W.tdu                            # MinimumDistortion of two
 # dist W.tMIX      mixture dist.W.tcc dist.W.tdu wts [0.6 0.4]              # explicit weights
@@ -172,18 +172,18 @@ dist W.tbe       beta 0.5 2
 #
 # Structural cases (consistent columns, mass, describe shape) on lognormal
 # books -- one per stage combination.
-agg RR.Occ  10 claims sev lognorm 100 cv 2 occurrence net of 0.8 so 250 xs 175 poisson                       note{occurrence only; off-grid excess attach}
-agg RR.Agg  10 claims sev lognorm 100 cv 2 poisson aggregate net of 500 xs 750                                note{aggregate only}
-agg RR.Both 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate}
+agg RR.Occ  10 claims sev lognorm 100 cv 2 occurrence net of 0.8 so 250 xs 175 poisson                       note{occurrence only; off-grid excess attach};
+agg RR.Agg  10 claims sev lognorm 100 cv 2 poisson aggregate net of 500 xs 750                                note{aggregate only};
+agg RR.Both 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate};
 # Bounded severities for the EX-vs-Est numeric checks: a bounded aggregate has
 # a negligible FFT deficit, so linear preserves the rebucketed mean exactly and
 # nearest stays within bs/2. Fractional-share off-grid cessions exercise the
 # rebucketing scatter.
-agg RR.OccB 10 claims sev 500 * beta 2 3 occurrence net of 0.8 so 150 xs 100 poisson                          note{bounded; off-grid occ cession}
-agg RR.AggB 10 claims sev 200 * beta 2 3 poisson aggregate net of 0.7 so 300 xs 400                           note{bounded; off-grid agg cession}
+agg RR.OccB 10 claims sev 500 * beta 2 3 occurrence net of 0.8 so 150 xs 100 poisson                          note{bounded; off-grid occ cession};
+agg RR.AggB 10 claims sev 200 * beta 2 3 poisson aggregate net of 0.7 so 300 xs 400                           note{bounded; off-grid agg cession};
 # Portfolio end-to-end gcn: a ceding port (occ on A, agg on B, gross C) and a
 # gross-only control (reins objects return None).
-port RR.Port agg A 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 2000 xs 1000 poisson agg B 50 claims sev lognorm 100 cv 2 poisson aggregate net of 1000 xs 2000 agg C 20 claims sev lognorm 30 cv 1 poisson
+port RR.Port agg A 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 2000 xs 1000 poisson agg B 50 claims sev lognorm 100 cv 2 poisson aggregate net of 1000 xs 2000 agg C 20 claims sev lognorm 30 cv 1 poisson;
 port RR.Gross agg A 10 claims sev lognorm 100 cv 2 poisson agg B 5 claims sev lognorm 50 cv 1 poisson
 
 
@@ -194,9 +194,9 @@ port RR.Gross agg A 10 claims sev lognorm 100 cv 2 poisson agg B 5 claims sev lo
 # reinsurance; the bivariate marginals reproduce the reins_density_df occ
 # ceded/net aggregates and the anti-diagonal reproduces the gross aggregate.
 # See tests/test_reins_bivariate.py and dev/done/reins-bivariate.md.
-agg BV.Occ  10 claims sev lognorm 50 cv 1.5 occurrence net of 50 xs 50 poisson                               note{lognormal; general deficit-carrying path}
-agg BV.OccB 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson                            note{bounded; tightest marginal match; positive corr}
-agg BV.Fix  dfreq [4] dsev [1:20] occurrence net of 6 xs 6                                                    note{fixed count; empirical-freq PGF on the 2D grid}
+agg BV.Occ  10 claims sev lognorm 50 cv 1.5 occurrence net of 50 xs 50 poisson                               note{lognormal; general deficit-carrying path};
+agg BV.OccB 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson                            note{bounded; tightest marginal match; positive corr};
+agg BV.Fix  dfreq [4] dsev [1:20] occurrence net of 6 xs 6                                                    note{fixed count; empirical-freq PGF on the 2D grid};
 agg BV.Ced  8 claims sev 300 * beta 2 3 occurrence ceded to 0.7 so 60 xs 40 poisson                          note{ceded-to output view; bivariate ignores the view}
 
 
@@ -207,11 +207,11 @@ agg BV.Ced  8 claims sev 300 * beta 2 3 occurrence ceded to 0.7 so 60 xs 40 pois
 # sibling of sev). A signed aggregate auto-windows from build/update (x_min
 # defaults to 'auto' -> a two-sided window); a number forces the origin. See
 # tests/test_negative_x.py and dev/plan-negative-x-agg.md.
-agg PnL.Fix  dfreq [3] dsev [-2 5] [.5 .5]                                                                   note{fixed-3; closed form support (-6,1,8,15)}
-agg PnL.SD   dfreq [3] dsev [-1 1]                                                                           note{zero-mean signed; sev SD 1, agg SD sqrt(3) -- derived from ex2, not mean*cv}
-agg PnL.Sym  20 claims dsev [-1 1] [.5 .5] poisson                                                           note{symmetric P&L; mean 0}
-agg PnL.Lump 1e6 claims dsev [-1 10] [15/16 1/16] poisson                                                    note{near-Gaussian lump at a negative mean ~ -312500; auto window}
-agg PnL.Norm 100 claims ssev 50 * norm + 10 poisson                                                          note{continuous signed (ssev) P&L severity; never clamps}
+agg PnL.Fix  dfreq [3] dsev [-2 5] [.5 .5]                                                                   note{fixed-3; closed form support (-6,1,8,15)};
+agg PnL.SD   dfreq [3] dsev [-1 1]                                                                           note{zero-mean signed; sev SD 1, agg SD sqrt(3) -- derived from ex2, not mean*cv};
+agg PnL.Sym  20 claims dsev [-1 1] [.5 .5] poisson                                                           note{symmetric P&L; mean 0};
+agg PnL.Lump 1e6 claims dsev [-1 10] [15/16 1/16] poisson                                                    note{near-Gaussian lump at a negative mean ~ -312500; auto window};
+agg PnL.Norm 100 claims ssev 50 * norm + 10 poisson                                                          note{continuous signed (ssev) P&L severity; never clamps};
 agg PnL.PmL  5 claims ssev 100 - lognorm 80 cv .2 poisson                                                    note{premium minus loss: constant - dist reflects the severity (sev mean 20)}
 
 
@@ -223,7 +223,7 @@ agg PnL.PmL  5 claims ssev 100 - lognorm 80 cv .2 poisson                       
 # share one bs so the combine is exact (means add, variances add). A signed +
 # ordinary mix straddles 0. Pricing columns (add_exa) are deferred -> F/S only.
 # See tests/test_negative_x_port.py and dev/plan-negative-x-port.md.
-port PortPnL.Pair  agg A 50 claims ssev 10 * norm + 5 poisson agg B 50 claims ssev 10 * norm - 5 poisson
+port PortPnL.Pair  agg A 50 claims ssev 10 * norm + 5 poisson agg B 50 claims ssev 10 * norm - 5 poisson;
 port PortPnL.Mixed agg Loss 30 claims sev lognorm 20 cv 0.8 poisson agg PnL 50 claims ssev 10 * norm poisson
 
 # ============================================================
@@ -237,16 +237,16 @@ port PortPnL.Mixed agg Loss 30 claims sev lognorm 20 cv 0.8 poisson agg PnL 50 c
 # N loss. The premium vectorises like an agg exposure (total pnl only). A pnl
 # line goes anywhere an agg does, including as a port unit. See tests/test_pnl.py
 # and dev/done/plan-pnl-premium.md.
-pnl PnLprem.LR     1000 prem - 70% lr sev lognorm 100 cv 2 poisson                                           note{loss ratio form: E[loss]=700, margin 300}
-pnl PnLprem.Claims 100 prem - 10 claims sev lognorm 8 cv 1.5 poisson                                         note{claims form: premium independent of the loss model}
-pnl PnLprem.Loss   100 prem - 85 loss sev lognorm 8 cv 1.5 poisson                                           note{expected-loss form: E[loss]=85, margin 15}
-pnl PnLprem.Vec    [100 200 100] prem - .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson             note{vector premium: shift 400, mean 80 = sum premium_i (1-lr)}
-port PnLprem.Book  pnl Cat 2000 prem - 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem - 65% lr sev lognorm 100 cv 2 poisson
+pnl PnLprem.LR     1000 prem - 70% lr sev lognorm 100 cv 2 poisson                                           note{loss ratio form: E[loss]=700, margin 300};
+pnl PnLprem.Claims 100 prem - 10 claims sev lognorm 8 cv 1.5 poisson                                         note{claims form: premium independent of the loss model};
+pnl PnLprem.Loss   100 prem - 85 loss sev lognorm 8 cv 1.5 poisson                                           note{expected-loss form: E[loss]=85, margin 15};
+pnl PnLprem.Vec    [100 200 100] prem - .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson             note{vector premium: shift 400, mean 80 = sum premium_i (1-lr)};
+port PnLprem.Book  pnl Cat 2000 prem - 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem - 65% lr sev lognorm 100 cv 2 poisson;
 # Signed loss severity (dsev negative atom / ssev) under pnl (1.0.0a45): the
 # loss convolves on its genuine signed grid before the affine relabel. See
 # tests/test_pnl.py and dev/done/plan-pnl-signed-severity.md.
-pnl PnLsigned.Dsev   5 premium - dfreq[3] dsev[-1 1]                                                          note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3}
-pnl PnLsigned.Asym   10 premium - dfreq[2] dsev[-2 1 3] [.5 .3 .2]                                            note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2}
+pnl PnLsigned.Dsev   5 premium - dfreq[3] dsev[-1 1]                                                          note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3};
+pnl PnLsigned.Asym   10 premium - dfreq[2] dsev[-2 1 3] [.5 .3 .2]                                            note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2};
 pnl PnLsigned.Ssev   100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson                              note{continuous signed severity: E[loss]=50, margin 50}
 
 # ============================================================
@@ -264,11 +264,11 @@ pnl PnLsigned.Ssev   100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson 
 # (Spearman rho_s), independent; t is deferred. See tests/test_multivariate.py
 # and dev/plan-multivariate.md.
 # Programs are one-per-line (DecL is whitespace-insensitive within a program).
-multivariate MV.Gumbel 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson
-multivariate MV.ClaytonMixed 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula clayton 0.3 mixed gamma .2
-multivariate MV.Normal 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula normal 0.5
-multivariate MV.PnLAxis 25 claims agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson
-multivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson
+multivariate MV.Gumbel 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
+multivariate MV.ClaytonMixed 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula clayton 0.3 mixed gamma .2;
+multivariate MV.Normal 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula normal 0.5;
+multivariate MV.PnLAxis 25 claims agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
+multivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson;
 # netceded MODE: the joint (ceded, net) occurrence law of one reinsured aggregate
 # (same object as Aggregate.occ_bivariate()). Body is an ordinary agg carrying
 # occurrence reinsurance; the two axes are Ceded and Net.
@@ -283,12 +283,12 @@ netceded agg MV.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60
 # both optional and order-free, at most one of each. Unknown hint keys warn and
 # are dropped; a duplicate key warns and the last value wins; `=`-bearing prose
 # in a note no longer crashes the build. See tests/test_hints.py.
-agg HINT.LogTwo  5 claims sev lognorm 10 cv 2 poisson hints{log2=12}
-agg HINT.Frac    1 claim sev gamma 50 cv 0.1 fixed hints{bs=1/64; log2=10}
-agg HINT.Both    5 claims sev lognorm 10 cv 2 poisson note{just prose} hints{log2=12}
-agg HINT.HintsFirst 5 claims sev lognorm 10 cv 2 poisson hints{log2=12} note{just prose}
-agg HINT.ProseEq dfreq [3] dsev [-2 5] [.5 .5] note{closed form support -6,1,8,15; needs x_min<=-6}
-agg HINT.Unknown 5 claims sev lognorm 10 cv 2 poisson hints{frobnicate=3}
+agg HINT.LogTwo  5 claims sev lognorm 10 cv 2 poisson hints{log2=12};
+agg HINT.Frac    1 claim sev gamma 50 cv 0.1 fixed hints{bs=1/64; log2=10};
+agg HINT.Both    5 claims sev lognorm 10 cv 2 poisson note{just prose} hints{log2=12};
+agg HINT.HintsFirst 5 claims sev lognorm 10 cv 2 poisson hints{log2=12} note{just prose};
+agg HINT.ProseEq dfreq [3] dsev [-2 5] [.5 .5] note{closed form support -6,1,8,15; needs x_min<=-6};
+agg HINT.Unknown 5 claims sev lognorm 10 cv 2 poisson hints{frobnicate=3};
 agg HINT.Dup     1 claim sev gamma 50 cv 0.1 fixed hints{bs=1; bs=2}
 
 # ============================================================
@@ -299,8 +299,8 @@ agg HINT.Dup     1 claim sev gamma 50 cv 0.1 fixed hints{bs=1; bs=2}
 # Every discrete moment -- unlimited, limited, or layered -- is an exact finite
 # sum over the atoms, so a discrete severity never routes its moments through
 # numerical isf-integration. See tests/test_discrete_severity.py.
-agg DISC.Dice  dfreq [1] dsev [1:6]
-agg DISC.Layer 3 claims 5 xs 3 dsev [1 4 8] [.5 .3 .2] fixed
+agg DISC.Dice  dfreq [1] dsev [1:6];
+agg DISC.Layer 3 claims 5 xs 3 dsev [1 4 8] [.5 .3 .2] fixed;
 # Off-grid atoms: with a non-integer bs these miss the grid, so the
 # `dsev_bucket` placement scheme matters. `dsev_bucket='linear'` (default,
 # a build/update kwarg -- not DecL syntax) splits each atom's mass across its
@@ -318,11 +318,11 @@ agg DISC.OffGrid dfreq [1] dsev [0.3 1.7 2.4] [.5 .3 .2]
 # aggregate tail class is BOUNDED). The aggregate rung is `max(freq, sev)`.
 # See tests/test_tail.py and src/aggregate/tail.py (Phase 1; numeric estimator
 # for histogram/meta/spliced families is deferred to Phase 2).
-agg TAIL.Subexp   100 claims sev lognorm 100 cv 2 poisson
-agg TAIL.Expon    100 claims sev gamma 100 cv 0.5 poisson
-agg TAIL.PowerLaw 100 claims sev 100 * pareto 3 poisson
-agg TAIL.FreqDriven 100 claims sev 100 * uniform poisson
-agg TAIL.Bounded  dfreq [2] dsev [1 2 3]
+agg TAIL.Subexp   100 claims sev lognorm 100 cv 2 poisson;
+agg TAIL.Expon    100 claims sev gamma 100 cv 0.5 poisson;
+agg TAIL.PowerLaw 100 claims sev 100 * pareto 3 poisson;
+agg TAIL.FreqDriven 100 claims sev 100 * uniform poisson;
+agg TAIL.Bounded  dfreq [2] dsev [1 2 3];
 agg TAIL.Mixed    10 claims sev [100 200] * [lognorm pareto] [2 3] wts [.5 .5] poisson
 
 # ============================================================
@@ -346,10 +346,10 @@ agg GH.PoissonLevy 20 claim sev levy poisson                                    
 # occurrence reinsurance (the fit bypasses the per-occurrence convolution);
 # aggregate reinsurance rides along. See tests/test_approximate.py and
 # dev/done/plan-approximate.md.
-agg APX.RightSgamma 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma
-agg APX.RightSlognorm 5000 claim sev lognorm 100 cv 2 poisson approximate slognorm
-agg APX.LeftReflect 1 claim sev 100 * beta 5 1.3 fixed approximate sgamma
-agg APX.AggReins 100 claim sev lognorm 100 cv 2 poisson aggregate net of 100 xs 0 approximate sgamma
+agg APX.RightSgamma 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma;
+agg APX.RightSlognorm 5000 claim sev lognorm 100 cv 2 poisson approximate slognorm;
+agg APX.LeftReflect 1 claim sev 100 * beta 5 1.3 fixed approximate sgamma;
+agg APX.AggReins 100 claim sev lognorm 100 cv 2 poisson aggregate net of 100 xs 0 approximate sgamma;
 pnl APX.PnL 600000 prem - 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma
 
 # ============================================================
@@ -361,8 +361,8 @@ pnl APX.PnL 600000 prem - 5000 claim sev lognorm 100 cv 2 poisson approximate sg
 # signed-combine bug (RMS gave bs=2 for two bs=1 units); BucketTinyDisc is an
 # all-integer book that RMS mis-sized to ~1/4096 over the full log2 cap.
 # See tests/test_bucket_sizing.py and dev/done/plan-bucket-combine.md.
-port BucketMotiv agg M1 dfreq[4] dsev[3] agg M2 dfreq[3] dsev[-1 1]
-port BucketTinyDisc agg D1 dfreq[2] dsev[1 2] agg D2 dfreq[3] dsev[1 2 3]
+port BucketMotiv agg M1 dfreq[4] dsev[3] agg M2 dfreq[3] dsev[-1 1];
+port BucketTinyDisc agg D1 dfreq[2] dsev[1 2] agg D2 dfreq[3] dsev[1 2 3];
 port BucketFat agg F1 100 claims sev lognorm 100 cv 2 poisson agg F2 80 claims sev lognorm 120 cv 1.5 poisson
 
 # ============================================================
@@ -374,7 +374,7 @@ port BucketFat agg F1 100 claims sev lognorm 100 cv 2 poisson agg F2 80 claims s
 # is the headline 10M-claim integer case (resolves at bs=1); WinCts is the
 # continuous analogue. See tests/test_bucket_sizing.py and
 # dev/done/plan-bucket-window.md.
-agg Window 10000000 claims dsev [1 2] poisson
+agg Window 10000000 claims dsev [1 2] poisson;
 agg WinCts 100000 claims sev lognorm 100 cv 0.5 poisson
 
 # ============================================================
@@ -388,8 +388,8 @@ agg WinCts 100000 claims sev lognorm 100 cv 0.5 poisson
 # SBJ.Heavy is a positive heavy unlimited sev (window extends when log2 allows);
 # SBJ.Small is the constrained-log2 guard (keep the MoM window, honor log2).
 # See tests/test_bucket_sizing.py and dev/plan-bucket-window-2.md (1A-fix).
-agg SBJ.Signed 10 claims sev 100 - lognorm 10 cv 2.5 poisson                                                 note{signed heavy-left; grid must span the reach or the FFT aliases}
-agg SBJ.Heavy  5000 claims sev lognorm 100 cv 2 poisson                                                      note{positive heavy unlimited; far tail ~8e5, extends when log2 allows}
+agg SBJ.Signed 10 claims sev 100 - lognorm 10 cv 2.5 poisson                                                 note{signed heavy-left; grid must span the reach or the FFT aliases};
+agg SBJ.Heavy  5000 claims sev lognorm 100 cv 2 poisson                                                      note{positive heavy unlimited; far tail ~8e5, extends when log2 allows};
 agg SBJ.Small  5 claims sev lognorm 10 cv 2 poisson                                                          note{small heavy book, tail ~47k; constrained log2 keeps the MoM window}
 
 # ============================================================
@@ -402,11 +402,11 @@ agg SBJ.Small  5 claims sev lognorm 10 cv 2 poisson                             
 # windowed slack split is tail-aware (symmetric vs thick-skewed); occurrence
 # reinsurance adds a `severity (net occ)` overlay row to `tail_df`. See
 # tests/test_bucket_sizing.py, tests/test_tail.py and dev/done/plan-univariate-bucket.md.
-agg USE.PowerLaw   10 claims sev 100 * pareto 1.5 poisson                                                     note{infinite variance; reachable-bulk sizing + honest truncation}
-agg USE.SymWindow  100000 claims sev gamma 100 cv 0.5 poisson                                                 note{concentrated thin-tailed; symmetric slack split, convention tie-breaker}
-agg USE.SignedTwoSided 20 claims dsev [-50 -10 200 5000] poisson                                              note{signed two-sided reach; padding sits between the wrapped tails}
-agg USE.OccNetCapped 100 claims sev lognorm 50 cv 1.5 occurrence net of inf xs 1000 poisson                  note{unlimited 100% cession caps the net per-occurrence tail}
-agg USE.OccNetFinite 100 claims sev lognorm 50 cv 1.5 occurrence net of 500 xs 1000 poisson                  note{finite occ layer retains the heavy net tail}
+agg USE.PowerLaw   10 claims sev 100 * pareto 1.5 poisson                                                     note{infinite variance; reachable-bulk sizing + honest truncation};
+agg USE.SymWindow  100000 claims sev gamma 100 cv 0.5 poisson                                                 note{concentrated thin-tailed; symmetric slack split, convention tie-breaker};
+agg USE.SignedTwoSided 20 claims dsev [-50 -10 200 5000] poisson                                              note{signed two-sided reach; padding sits between the wrapped tails};
+agg USE.OccNetCapped 100 claims sev lognorm 50 cv 1.5 occurrence net of inf xs 1000 poisson                  note{unlimited 100% cession caps the net per-occurrence tail};
+agg USE.OccNetFinite 100 claims sev lognorm 50 cv 1.5 occurrence net of 500 xs 1000 poisson                  note{finite occ layer retains the heavy net tail};
 port USE.Port agg A 100 claims sev lognorm 100 cv 2 poisson agg B 50 claims sev gamma 50 cv 1 poisson         # [bs-reporting] portfolio bs_window_df / bs_description
 
 # ============================================================
@@ -416,9 +416,9 @@ port USE.Port agg A 100 claims sev lognorm 100 cv 2 poisson agg B 50 claims sev 
 # underscore-free forms). Item 4: `of` as a natural-language share synonym for
 # `so` / `po` in a reinsurance clause (`90% of` == `90% so`). See
 # tests/test_hygiene3.py and dev/done/plan-hygiene-3.md.
-agg HY3.Sep   10_000_000 claims dsev [1 2] poisson                                                          note{underscore digit separators == 10000000}
-agg HY3.SepFl 1_000.5 claims sev lognorm 100 cv 1 poisson                                                   note{underscore in the integer part of a float}
-agg HY3.OfPct 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 90% of 6000 xs 4000 poisson       note{'of' percentage share == 'so'}
+agg HY3.Sep   10_000_000 claims dsev [1 2] poisson                                                          note{underscore digit separators == 10000000};
+agg HY3.SepFl 1_000.5 claims sev lognorm 100 cv 1 poisson                                                   note{underscore in the integer part of a float};
+agg HY3.OfPct 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 90% of 6000 xs 4000 poisson       note{'of' percentage share == 'so'};
 agg HY3.OfAmt 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 3000 of 6000 xs 4000 poisson      note{'of' bare amount -> amount/limit share}
 
 # ============================================================
@@ -429,7 +429,7 @@ agg HY3.OfAmt 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 3000 o
 # present: the `exposure at rate` exposure head (which canonicalizes to the
 # equivalent `premium at lr` form) and a `picks` severity. See
 # dev/done/plan-decl-unparser.md.
-agg DW.ExpRate 1000 exposure at 0.05 rate sev lognorm 100 cv 2 poisson                                       note{exposure/rate head; renders as premium/lr}
+agg DW.ExpRate 1000 exposure at 0.05 rate sev lognorm 100 cv 2 poisson                                       note{exposure/rate head; renders as premium/lr};
 agg DW.Picks   100 claims sev lognorm 100 cv 2 picks [1000 5000 10000] [600 1500 900] poisson                note{picks severity layering}
 
 
@@ -439,12 +439,12 @@ agg DW.Picks   100 claims sev lognorm 100 cv 2 picks [1000 5000 10000] [600 1500
 # derived from its units (mixed books rejected), fixed-layout info rows, and
 # the stats_df ('meta','prem')/('meta','lr') backfill from the pnl premium
 # (GROSS basis under reinsurance). See dev/done/plan-hygiene-4.md.
-agg H4.Loss 5 claims sev lognorm 50 cv 1 poisson                                                             note{loss unit for value_type derivation}
-pnl H4.Pay1 100 prem - 2 claims sev lognorm 30 cv 1 poisson                                                  note{payoff unit for value_type derivation}
-pnl H4.Prem 1000 prem - 10 claims sev lognorm 80 cv 1 poisson                                                note{pnl premium backfills meta prem/lr}
-pnl H4.PremLR 1000 prem - 65% lr sev lognorm 80 cv 1 poisson                                                 note{bare-lr pnl; exposure clause carries premium}
-agg H4.ExpPrem 100 prem at 0.65 lr sev lognorm 80 cv 1 poisson                                               note{exposure-clause premium; regression guard}
-pnl H4.Reins 1000 prem - 10 claims sev lognorm 80 cv 1 occurrence net of 100 xs 100 poisson                  note{prem/lr meta stay GROSS under reinsurance}
+agg H4.Loss 5 claims sev lognorm 50 cv 1 poisson                                                             note{loss unit for value_type derivation};
+pnl H4.Pay1 100 prem - 2 claims sev lognorm 30 cv 1 poisson                                                  note{payoff unit for value_type derivation};
+pnl H4.Prem 1000 prem - 10 claims sev lognorm 80 cv 1 poisson                                                note{pnl premium backfills meta prem/lr};
+pnl H4.PremLR 1000 prem - 65% lr sev lognorm 80 cv 1 poisson                                                 note{bare-lr pnl; exposure clause carries premium};
+agg H4.ExpPrem 100 prem at 0.65 lr sev lognorm 80 cv 1 poisson                                               note{exposure-clause premium; regression guard};
+pnl H4.Reins 1000 prem - 10 claims sev lognorm 80 cv 1 occurrence net of 100 xs 100 poisson                  note{prem/lr meta stay GROSS under reinsurance};
 port H4.Book agg A1 5 claims sev lognorm 50 cv 1 poisson agg A2 3 claims sev gamma 20 cv .5 poisson          note{homogeneous loss book; portfolio value_type}
 
 
@@ -454,7 +454,7 @@ port H4.Book agg A1 5 claims sev lognorm 50 cv 1 poisson agg A2 3 claims sev gam
 # pmf accessors and the aligned display adapter. UD.PnLpair in the tests
 # reuses the PortPnL.Pair program above (not repeated here). See
 # dev/done/plan-numerics-1-unit-density.md.
-port UD.Plain    agg P 50 claims sev lognorm 100 cv 1 poisson agg Q 30 claims sev lognorm 80 cv 1 poisson    note{zero-origin book; aligned grid=total legacy parity}
+port UD.Plain    agg P 50 claims sev lognorm 100 cv 1 poisson agg Q 30 claims sev lognorm 80 cv 1 poisson    note{zero-origin book; aligned grid=total legacy parity};
 port UD.Disjoint agg Hi 100 claims ssev 1 * norm + 100 poisson agg Lo 100 claims ssev 1 * norm - 100 poisson note{disjoint unit windows near +/-10000}
 
 
@@ -464,12 +464,12 @@ port UD.Disjoint agg Hi 100 claims ssev 1 * norm + 100 poisson agg Lo 100 claims
 # support kappa (exeqa_*) and the direct-sum objective columns on signed /
 # zero-spectrum / legacy books, plus the Aggregate-side direct sums. See
 # dev/done/plan-numerics-2-objective.md.
-port N2.SignedD  agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed discrete; exact brute-force kappa incl negative origins}
-port N2.ZeroSpec agg S dfreq [1] dsev [-1 1] agg T dfreq [1] dsev [1 2] agg U dfreq [1 2] dsev [2 3]              note{symmetric line zeroes FFT bins; prefix/suffix ft_nots branch}
-port N2.Legacy   agg A dfreq [0 1 2] dsev [1 2 3] agg B dfreq [1] dsev [2 4] [.6 .4]                              note{zero-origin book; sum exa_i == exa_total; F/S guards}
-port N2.PosOrigin agg A dfreq [1] dsev [10 11] agg B dfreq [1] dsev [20 22] [.6 .4]                               note{base for the hand-built positive-origin add_exa frame}
-port N2.SignedLN agg A 8 claims ssev 20 * lognorm 0.4 - 25 poisson agg L 4 claims sev lognorm 30 cv 0.4 poisson   note{signed continuous; exeqa vs Monte Carlo incl a<0}
-agg N2.Dice dfreq [1] dsev [1:6]                                                                                  note{hand checks: lev(3)=2.5 exlea(3)=2 exgta(3)=5}
+port N2.SignedD  agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed discrete; exact brute-force kappa incl negative origins};
+port N2.ZeroSpec agg S dfreq [1] dsev [-1 1] agg T dfreq [1] dsev [1 2] agg U dfreq [1 2] dsev [2 3]              note{symmetric line zeroes FFT bins; prefix/suffix ft_nots branch};
+port N2.Legacy   agg A dfreq [0 1 2] dsev [1 2 3] agg B dfreq [1] dsev [2 4] [.6 .4]                              note{zero-origin book; sum exa_i == exa_total; F/S guards};
+port N2.PosOrigin agg A dfreq [1] dsev [10 11] agg B dfreq [1] dsev [20 22] [.6 .4]                               note{base for the hand-built positive-origin add_exa frame};
+port N2.SignedLN agg A 8 claims ssev 20 * lognorm 0.4 - 25 poisson agg L 4 claims sev lognorm 30 cv 0.4 poisson   note{signed continuous; exeqa vs Monte Carlo incl a<0};
+agg N2.Dice dfreq [1] dsev [1:6]                                                                                  note{hand checks: lev(3)=2.5 exlea(3)=2 exgta(3)=5};
 pnl N2.PnL 10 prem - dfreq [1] dsev [2 5] [.5 .5]                                                                 note{signed Aggregate direct sums carry the origin}
 
 
@@ -479,11 +479,11 @@ pnl N2.PnL 10 prem - dfreq [1] dsev [2 5] [.5 .5]                               
 # discrete Choquet helper, the view x value_type 2x2, the unified linear/
 # lifted builder, builder-level mass guard, signed total pricing, and the
 # on-demand per-line capital. See dev/done/plan-numerics-3-distortion.md.
-agg N3.Dice dfreq [1:6] dsev [1:6]                                                                                note{six-surface consistency target; choquet hand checks}
-port N3.OneDice agg D dfreq [1:6] dsev [1:6]                                                                      note{one-line port: line == total}
-port N3.Bodoff agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed note{bounded discrete; linear vs lifted; mass distortion exact}
-port N3.SignedD agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed totals price via dot(kappa, gp); shares NaN}
-port N3.PayPair pnl P1 10 prem - dfreq [1] dsev [2 5] [.5 .5] pnl P2 8 prem - dfreq [1] dsev [1 3]                note{homogeneous payoff book prices through the dual}
+agg N3.Dice dfreq [1:6] dsev [1:6]                                                                                note{six-surface consistency target; choquet hand checks};
+port N3.OneDice agg D dfreq [1:6] dsev [1:6]                                                                      note{one-line port: line == total};
+port N3.Bodoff agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed note{bounded discrete; linear vs lifted; mass distortion exact};
+port N3.SignedD agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed totals price via dot(kappa, gp); shares NaN};
+port N3.PayPair pnl P1 10 prem - dfreq [1] dsev [2 5] [.5 .5] pnl P2 8 prem - dfreq [1] dsev [1 3]                note{homogeneous payoff book prices through the dual};
 port N3.Unb agg U 5 claims sev lognorm 10 cv 1 poisson                                                            note{mass-on-unbounded refused in the lifted builder (G6)}
 
 # ============================================================
@@ -493,7 +493,7 @@ port N3.Unb agg U 5 claims sev lognorm 10 cv 1 poisson                          
 # reconciled to Portfolio MM (bulk span from the total moments, not a width
 # sum) + single-big-jump look-through (max_k, not sum) + windowed non-signed
 # origin (Plan B). See dev/done/plan-bucket-window-2.md Round 3.
-port BW.DivIID agg U1 200 claims sev gamma 100 cv 1.2 poisson agg U2 200 claims sev gamma 100 cv 1.2 poisson agg U3 200 claims sev gamma 100 cv 1.2 poisson agg U4 200 claims sev gamma 100 cv 1.2 poisson note{diversified iid: MM sits ~sqrt(k) tighter than the legacy linear sum}
-port BW.Heavy agg HU 100 claims sev lognorm 100 cv 2 poisson agg LU 50 claims sev gamma 50 cv 1 poisson         note{heavy unit drives the SBJ look-through extent floor}
-port BW.Windowed agg H1 5000 claims sev lognorm 10 cv 0.5 poisson agg H2 4000 claims sev gamma 10 cv 0.5 poisson note{concentrated total clears 0: windowed Plan B origin x_min>0}
+port BW.DivIID agg U1 200 claims sev gamma 100 cv 1.2 poisson agg U2 200 claims sev gamma 100 cv 1.2 poisson agg U3 200 claims sev gamma 100 cv 1.2 poisson agg U4 200 claims sev gamma 100 cv 1.2 poisson note{diversified iid: MM sits ~sqrt(k) tighter than the legacy linear sum};
+port BW.Heavy agg HU 100 claims sev lognorm 100 cv 2 poisson agg LU 50 claims sev gamma 50 cv 1 poisson         note{heavy unit drives the SBJ look-through extent floor};
+port BW.Windowed agg H1 5000 claims sev lognorm 10 cv 0.5 poisson agg H2 4000 claims sev gamma 10 cv 0.5 poisson note{concentrated total clears 0: windowed Plan B origin x_min>0};
 port BW.Mixed agg M1 dfreq [4] dsev [3] agg M2 dfreq [3] dsev [-1 1]                                            note{signed combine; resolution floor keeps bs=1, no wrap}

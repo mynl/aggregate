@@ -75,7 +75,7 @@ def disjoint():
 
 def test_unit_density_native(plain):
     """pmf is the unit's own ``agg_density`` on the unit's own grid."""
-    for u in plain.line_names:
+    for u in plain.unit_names:
         ser = plain.unit_density(u)
         agg = plain[u]
         assert ser.name == f'p_{u}'
@@ -106,7 +106,7 @@ def test_unit_density_df_long(plain):
     assert list(df.index.names) == ['unit', 'loss']
     assert list(df.columns) == ['unit', 'loss', 'p', 'F', 'S', 'bs',
                                 'x_min', 'x_max', 'mass']
-    for u in plain.line_names:
+    for u in plain.unit_names:
         block = df.loc[u]
         agg = plain[u]
         assert np.array_equal(block.p.to_numpy(),
@@ -137,7 +137,7 @@ def test_disjoint_windows(disjoint):
     # the premise: the mass-bearing supports genuinely do not overlap
     assert float(hi_support.min()) > float(lo_support.max())
     df = disjoint.unit_density_df()
-    for u in disjoint.line_names:
+    for u in disjoint.unit_names:
         block = df.loc[u]
         agg = disjoint[u]
         assert np.array_equal(block.index.to_numpy(), np.asarray(agg.xs))
@@ -161,7 +161,7 @@ def test_aligned_total_legacy_parity(plain):
         aligned = plain.aligned_unit_density_df(grid='total')
     assert np.array_equal(aligned.index.to_numpy(),
                           plain.density_df.index.to_numpy())
-    for u in plain.line_names:
+    for u in plain.unit_names:
         assert f'p_{u}' not in plain.density_df.columns
         assert np.array_equal(aligned[f'p_{u}'].to_numpy(),
                               plain.unit_density(u).to_numpy())
@@ -172,7 +172,7 @@ def test_aligned_union_and_zero(plain):
     total = plain.aligned_unit_density_df(grid='total')
     union = plain.aligned_unit_density_df(grid='union')
     zero = plain.aligned_unit_density_df(grid='zero')
-    for u in plain.line_names:
+    for u in plain.unit_names:
         assert np.array_equal(union[f'p_{u}'].to_numpy(),
                               total[f'p_{u}'].to_numpy())
         assert np.array_equal(zero[f'p_{u}'].to_numpy(),
@@ -190,7 +190,7 @@ def test_aligned_total_windowed_warns(pnl):
         clipped = pnl.aligned_unit_density_df(
             grid='total', allow_window_mismatch=True)
     # physical placement: each unit's mode lands at the same loss
-    for u in pnl.line_names:
+    for u in pnl.unit_names:
         native = pnl.unit_density(u)
         assert float(clipped[f'p_{u}'].idxmax()) == pytest.approx(
             float(native.idxmax()), abs=pnl.bs / 2)
@@ -198,7 +198,7 @@ def test_aligned_total_windowed_warns(pnl):
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         union = pnl.aligned_unit_density_df(grid='union')
-    for u in pnl.line_names:
+    for u in pnl.unit_names:
         assert float(union[f'p_{u}'].sum()) == pytest.approx(
             float(pnl.unit_density(u).sum()), abs=1e-12)
 
@@ -223,7 +223,7 @@ def stripped():
     unit pmfs on the total frame."""
     port = build(PLAIN_PROGRAM)
     assert not [c for c in port.density_df.columns
-                if c in (f'p_{u}' for u in port.line_names)]
+                if c in (f'p_{u}' for u in port.unit_names)]
     return port
 
 
@@ -263,7 +263,7 @@ def test_plot_twelve_off_p_unit():
     port = build(PLAIN_PROGRAM)
     d = Distortion('ph', 0.6)
     port.apply_distortion(d)
-    assert f'p_{port.line_names[0]}' not in port.density_df.columns
+    assert f'p_{port.unit_names[0]}' not in port.density_df.columns
     fig, axs = plt.subplots(4, 3, figsize=(12, 16))
     plot_twelve(port, fig, axs, d)
     plt.close('all')

@@ -55,7 +55,7 @@ ALIASING_RATIO = 10
 # exeqa-derived quantities become unreliable.
 EXEQA_NOISE_FLOOR = 1e-4
 # Floor on ``|ft_line_density|`` below which the "build up the product"
-# branch is preferred over division in the per-line FT decomposition (avoids
+# branch is preferred over division in the per-unit FT decomposition (avoids
 # divide-by-near-zero).
 FT_NOISE_FLOOR = 1e-10
 # Economic-materiality floor on the pmf deficit ``1 - Σp`` in the Choquet

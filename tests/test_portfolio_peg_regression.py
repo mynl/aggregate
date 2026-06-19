@@ -124,10 +124,10 @@ def test_price_stand_alone_shape_and_identities(peg):
     assert list(a.columns) == ['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']
 
     flat = a.droplevel('method')
-    assert len(flat) == len(port.line_names) + 2
+    assert len(flat) == len(port.unit_names) + 2
     assert {'sum', 'total'}.issubset(flat.index)
     units = [u for u in flat.index if u not in ('sum', 'total')]
-    assert units == port.line_names
+    assert units == port.unit_names
 
     # amounts add: the sum row is the column-wise total of the stand-alone units
     for stat in ['L', 'M', 'P', 'Q', 'a']:

@@ -87,7 +87,7 @@ def test_returns_canonical_one_row_total(port):
     df = port.price_pentagon(p=0.99, ROE=0.1)
     assert list(df.columns) == list(PENTAGON_STATS)
     assert df.index.tolist() == ['total']
-    assert df.index.name == 'line'
+    assert df.index.name == 'unit'
 
 
 # ---------------------------------------------------------------- Aggregate

@@ -38,7 +38,7 @@ def bodoff_exhibit(port, reg_p):
     Parameters
     ----------
     port : Portfolio
-        The portfolio whose lines we're allocating across.
+        The portfolio whose units we're allocating across.
     reg_p : float
         Regulatory probability — the asset level is ``port.q(reg_p, 'lower')``.
 
@@ -46,7 +46,7 @@ def bodoff_exhibit(port, reg_p):
     -------
     pandas.DataFrame
         Rows: ``EX``, ``sa VaR``, ``sa TVaR``, ``pct EX``, ``coVaR``, ``alt
-        coVaR``, ``naive coTVaR``, ``coTVaR``, ``plc``. Columns: per-line plus
+        coVaR``, ``naive coTVaR``, ``coTVaR``, ``plc``. Columns: per-unit plus
         ``total``.
 
     Notes
@@ -59,32 +59,32 @@ def bodoff_exhibit(port, reg_p):
         index=pd.Index(['EX', 'sa VaR', 'sa TVaR', 'pct EX',
                         'coVaR', 'alt coVaR', 'naive coTVaR', 'coTVaR'],
                        name='method'),
-        columns=port.line_names_ex, dtype=float)
+        columns=port.unit_names_ex, dtype=float)
 
     basic.loc['EX'] = [
         float(port.stats_df.loc[('agg', 'mean'), name])
-        for name in port.line_names
+        for name in port.unit_names
     ] + [float(port.stats_df.loc[('agg', 'mean'), 'total'])]
     basic.loc['sa VaR'] = port.var_dict(reg_p, 'lower').values()
     basic.loc['sa TVaR'] = port.var_dict(reg_p, 'tvar').values()
     a = port.q(reg_p, 'lower')
 
     basic.loc['pct EX'] = basic.loc['EX'] / basic.loc['EX', 'total'] * a
-    basic.loc['coVaR'] = (port.density_df.loc[a, [f'exeqa_{i}' for i in port.line_names_ex]]
+    basic.loc['coVaR'] = (port.density_df.loc[a, [f'exeqa_{i}' for i in port.unit_names_ex]]
                          / port.density_df.at[a, 'exeqa_total']).values * a
     basic.loc['alt coVaR'] = (port.density_df.loc[
         a - port.bs,
-        [f'exi_xgta_{i}' for i in port.line_names] + ['exi_xgta_sum']] * a).values
+        [f'exi_xgta_{i}' for i in port.unit_names] + ['exi_xgta_sum']] * a).values
     basic.loc['naive coTVaR'] = (port.density_df.loc[
-        a - port.bs, [f'exgta_{i}' for i in port.line_names_ex]]
+        a - port.bs, [f'exgta_{i}' for i in port.unit_names_ex]]
         / port.density_df.at[a - port.bs, 'exgta_total']).values * a
 
     pt = port.tvar_threshold(reg_p, 'lower')
     av = port.q(pt)
     basic.loc['coTVaR'] = port.density_df.loc[
-        av, [f'exgta_{l}' for l in port.line_names_ex]].values
+        av, [f'exgta_{l}' for l in port.unit_names_ex]].values
 
-    bit = port.density_df[[f'exi_xgta_{i}' for i in port.line_names]].shift(1).cumsum() * port.bs
+    bit = port.density_df[[f'exi_xgta_{i}' for i in port.unit_names]].shift(1).cumsum() * port.bs
     bit['total'] = bit.sum(1)
     basic.loc['plc'] = bit.loc[a].values
 
@@ -669,19 +669,19 @@ class ClassicalPremium:
         self.ports = ports
         self.calibration_premium = calibration_premium
 
-    def distribution(self, port_name, line_name):
-        """Pull the per-line marginal and basic moment stats out of ``ports[port_name]``.
+    def distribution(self, port_name, unit_name):
+        """Pull the per-unit marginal and basic moment stats out of ``ports[port_name]``.
 
         The total reads ``density_df.p_total``; units read their native
         pmf via :meth:`~aggregate.portfolio.Portfolio.unit_density`.
         """
         port = self.ports[port_name]
-        if line_name == 'total':
+        if unit_name == 'total':
             ser = port.density_df.p_total
             ob = port
         else:
-            ser = port.unit_density(line_name)
-            ob = port[line_name]
+            ser = port.unit_density(unit_name)
+            ob = port[unit_name]
         df = pd.DataFrame({'loss': np.asarray(ser.index, dtype=float),
                            'p': ser.to_numpy()}, index=ser.index)
         df['F'] = df.p.cumsum()
@@ -691,16 +691,16 @@ class ClassicalPremium:
         ex2 = float((df.loss ** 2 * df.p).sum())
         var = ex2 - mn ** 2
         sd = var ** 0.5
-        stats = pd.Series({'EmpEX1': mn, 'EmpEX2': ex2}, name=line_name)
+        stats = pd.Series({'EmpEX1': mn, 'EmpEX2': ex2}, name=unit_name)
         return df, ob, stats, mn, var, sd
 
-    def calibrate(self, port_name, line_name, calibration_premium,
+    def calibrate(self, port_name, unit_name, calibration_premium,
                   df=None, ob=None, stats=None, mn=None, var=None, sd=None):
         """Calibrate each classical method to reproduce ``calibration_premium``."""
         from scipy.optimize import newton
         self.calibration_premium = calibration_premium
         if df is None:
-            df, ob, stats, mn, var, sd = self.distribution(port_name, line_name)
+            df, ob, stats, mn, var, sd = self.distribution(port_name, unit_name)
 
         ans = {}
         ans['Expected Value'] = calibration_premium / mn - 1
@@ -718,27 +718,27 @@ class ClassicalPremium:
                     x0 = 0.5
                 try:
                     a = newton(lambda x: self.price(
-                        x, port_name, line_name, method, df, ob, stats, mn, var, sd
+                        x, port_name, unit_name, method, df, ob, stats, mn, var, sd
                     ) - calibration_premium, x0=x0)
                     ans[method] = float(a)
                 except RuntimeError as e:
                     print(method, e)
         return ans
 
-    def prices(self, port_name, line_name, method_dict):
-        """Apply each calibrated method to ``port_name``/``line_name``."""
-        df, ob, stats, mn, var, sd = self.distribution(port_name, line_name)
+    def prices(self, port_name, unit_name, method_dict):
+        """Apply each calibrated method to ``port_name``/``unit_name``."""
+        df, ob, stats, mn, var, sd = self.distribution(port_name, unit_name)
         ans = {}
         for method, param in method_dict.items():
-            ans[method] = self.price(param, port_name, line_name, method,
+            ans[method] = self.price(param, port_name, unit_name, method,
                                      df, ob, stats, mn, var, sd)
         return ans
 
-    def price(self, param, port_name, line_name, method,
+    def price(self, param, port_name, unit_name, method,
               df=None, ob=None, stats=None, mn=None, var=None, sd=None):
-        """Price ``port_name``/``line_name`` under one classical method."""
+        """Price ``port_name``/``unit_name`` under one classical method."""
         if df is None:
-            df, ob, stats, mn, var, sd = self.distribution(port_name, line_name)
+            df, ob, stats, mn, var, sd = self.distribution(port_name, unit_name)
         if method == 'Expected Value':
             return mn * (1 + param)
         if method == 'VaR':
@@ -766,7 +766,7 @@ class ClassicalPremium:
             excess = np.sum(np.maximum(df.loss - mn, 0) ** self.p * df.p) ** (1 / self.p)
             return mn + param * excess
 
-    def illustrate(self, port_name, line_name, ax, margin,
+    def illustrate(self, port_name, unit_name, ax, margin,
                    *, p=0, K=0, n_big=10000, n_sample=25, show_bounds=True,
                    padding=2):
         """Simulate ``n_sample`` surplus paths over ``n_big`` policies and plot to ``ax``.
@@ -774,9 +774,9 @@ class ClassicalPremium:
         Capital ``K`` is supplied directly, or implicitly via ``p`` (an eventual
         ruin probability) using the Cramér-Lundberg interpolation.
         """
-        if line_name == 'total':
+        if unit_name == 'total':
             raise ValueError('Cannot use total in ClassicalPremium.illustrate.')
-        ag = self.ports[port_name][line_name]
+        ag = self.ports[port_name][unit_name]
         if p and K == 0:
             self.ruin, self.u, self.mean, self._dfi = ag.cramer_lundberg(
                 margin, kind='interpolate', padding=padding)
@@ -828,16 +828,16 @@ def fig_9_1(port):
     :class:`ClassicalPremium` in this module.
     """
     port_name = 'gross'
-    line_names = ['Limit1', 'Limit10']
+    unit_names = ['Limit1', 'Limit10']
     margin = 0.1
     ruins = {}
     find_us = {}
     dfis = {}
-    for line_name in line_names:
-        ag = port[line_name]
-        ruins[line_name], find_us[line_name], mean, dfi = ag.cramer_lundberg(
+    for unit_name in unit_names:
+        ag = port[unit_name]
+        ruins[unit_name], find_us[unit_name], mean, dfi = ag.cramer_lundberg(
             margin, kind='interpolate')
-        dfis[line_name] = pd.Series(dfi, index=ruins[line_name].index)
+        dfis[unit_name] = pd.Series(dfi, index=ruins[unit_name].index)
     xmaxs = {'Limit1': 10e6, 'Limit10': 50e6}
     limit_dict = {f'Limit{n}': n * 1e6 for n in [1, 10]}
     n_big_dict = {'Limit1': 10000, 'Limit10': 50000}
@@ -845,24 +845,24 @@ def fig_9_1(port):
     fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45),
                             constrained_layout=True)
     axi = iter(axs.flat)
-    for line_name in line_names:
+    for unit_name in unit_names:
         ax0 = next(axi)
         ax1 = next(axi)
         ax_ = ax0.twinx()
-        xmax = xmaxs[line_name]
-        ruins[line_name].index.name = 'Starting capital'
-        ruins[line_name].plot(ax=ax0)
+        xmax = xmaxs[unit_name]
+        ruins[unit_name].index.name = 'Starting capital'
+        ruins[unit_name].plot(ax=ax0)
         ax0.axhline(1 / (1 + margin), lw=1)
-        ruins[line_name].plot(ax=ax_, ls='--', lw=1)
+        ruins[unit_name].plot(ax=ax_, ls='--', lw=1)
         ax_.set(ylim=[0.5e-6, 2], ylabel='log probability', yscale='log')
         ax_.yaxis.set_minor_locator(ticker.LogLocator(subs='all', numticks=20))
         ax0.set(xlim=[-xmax / 50, xmax], ylim=[-0.05, 1.05],
                 ylabel='Probability of eventual default',
-                title=f'Limit {limit_dict[line_name] / 1e6:.0f}M, margin {margin}')
+                title=f'Limit {limit_dict[unit_name] / 1e6:.0f}M, margin {margin}')
         ax_.set(xlim=[-xmax / 50, xmax])
         p_default = 0.05
-        cp.illustrate(port_name, line_name, ax1, margin,
-                      p=p_default, n_big=n_big_dict[line_name], n_sample=100)
+        cp.illustrate(port_name, unit_name, ax1, margin,
+                      p=p_default, n_big=n_big_dict[unit_name], n_sample=100)
         ax1.set(xlabel='Volume or time')
 
 
@@ -879,8 +879,8 @@ def natural_scale(port):
                       dtype=float)
     limit_dict = {f'Limit{n}': n * 1e6 for n in [1, 5, 10]}
     counter = count(0, 1)
-    for line_name in port.line_names[:3]:
-        ag = port[line_name]
+    for unit_name in port.unit_names[:3]:
+        ag = port[unit_name]
         ag_ex = ag.agg_m
         for margin in margins:
             try:
@@ -894,7 +894,7 @@ def natural_scale(port):
                 for p_default, i in zip(p_defaults, counter):
                     u = find_u(p_default)
                     n_lambda = roe * u / (margin * ag_ex)
-                    df.loc[i] = [limit_dict[line_name], p_default, margin, roe,
+                    df.loc[i] = [limit_dict[unit_name], p_default, margin, roe,
                                  ex, cv, n_lambda, u, mean_g, ruin.index[-1]]
             except IndexError as e:
                 print(e)
@@ -1218,20 +1218,20 @@ def plot_bivariate(port, fig, ax, min_loss, max_loss, jump,
                    log=True, cmap='Greys', min_density=1e-15, levels=30,
                    lines=None, linecolor='w', colorbar=False, normalize=False,
                    **kwargs):
-    """Contour plot of the bivariate density of two-line ``port``.
+    """Contour plot of the bivariate density of two-unit ``port``.
 
     Provenance: originally ``biv_contour_plot`` in ``portfolio_pir``.
 
-    Assumes ``port`` has exactly two lines. Samples ``density_df`` at
+    Assumes ``port`` has exactly two units. Samples ``density_df`` at
     ``np.arange(min_loss, max_loss, jump)`` for the outer-product evaluation —
     pick ``jump`` carefully so the grid stays manageable (``100 * bs`` is a
     reasonable default).
     """
     npts = np.arange(min_loss, max_loss, jump)
-    ps = [f'p_{i}' for i in port.line_names]
+    ps = [f'p_{i}' for i in port.unit_names]
     # native unit pmfs scattered onto the sample points (numerics-1);
     # zero where a unit has no bucket at the sampled loss.
-    bit = pd.concat([port.unit_density(line) for line in port.line_names],
+    bit = pd.concat([port.unit_density(unit) for unit in port.unit_names],
                     axis=1).reindex(npts).fillna(0.0)
     n = len(bit)
     Z = bit[ps[1]].to_numpy().reshape(n, 1) @ bit[ps[0]].to_numpy().reshape(1, n)
@@ -1270,8 +1270,8 @@ def plot_bivariate(port, fig, ax, min_loss, max_loss, jump,
         if log
         else f'Bivariate Density Contour Plot\n{port.name.replace("_", " ")}'
     )
-    ax.set(xlabel=f'Line {port.line_names[0]}',
-           ylabel=f'Line {port.line_names[1]}',
+    ax.set(xlabel=f'Unit {port.unit_names[0]}',
+           ylabel=f'Unit {port.unit_names[1]}',
            xlim=[-max_loss / 50, max_loss],
            ylim=[-max_loss / 50, max_loss],
            title=title, aspect=1)
@@ -1296,15 +1296,15 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
 
     - (1,1) density, (1,2) log density, (1,3) bivariate density
     - (2,1) κ, (2,2) α, (2,3) β
-    - (3,1)/(4,1) per-line S, gS, αS, βgS
+    - (3,1)/(4,1) per-unit S, gS, αS, βgS
     - (3,2) margin density M_i, (4,2) cumulative margin M̄_i
     - (3,3) stand-alone M, (4,3) natural M
 
-    ``sort_order`` reorders the line indices for plotting; defaults to ``[1, 2, 0]``.
+    ``sort_order`` reorders the unit indices for plotting; defaults to ``[1, 2, 0]``.
     """
     # local renamer
     def _short_renamer(port, prefix='', postfix=''):
-        """Map ``f'{prefix}_{line}_{postfix}'`` columns to title-cased line names.
+        """Map ``f'{prefix}_{unit}_{postfix}'`` columns to title-cased unit names.
 
         Private helper for :func:`plot_twelve` (and any other figure that
         pretty-prints per-unit columns out of ``density_df``).
@@ -1314,7 +1314,7 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
         if postfix:
             postfix = '_' + postfix
         knobble = lambda x: 'Total' if x == 'total' else x  # noqa: E731
-        return {f'{prefix}{i}{postfix}': knobble(i).title() for i in port.line_names_ex}
+        return {f'{prefix}{i}{postfix}': knobble(i).title() for i in port.unit_names_ex}
 
     a11, a12, a13, a21, a22, a23, a31, a32, a33, a41, a42, a43 = axs.flat
     col_list = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -1330,7 +1330,7 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
     # the grids coincide and this matches the old p_{unit} columns.
     temp = (
         pd.concat([port.density_df.p_total] +
-                  [port.unit_density(line) for line in port.line_names],
+                  [port.unit_density(unit) for unit in port.unit_names],
                   axis=1)
         .rename(columns=_short_renamer(port, 'p'))
         .sort_index(axis=1).loc[:xmax]
@@ -1353,11 +1353,11 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
         min_density = 1e-15
         levels = 30
         color_bar = False
-        ps = [f'p_{i}' for i in port.line_names]
+        ps = [f'p_{i}' for i in port.unit_names]
         title = 'Bivariate density'
         # native unit pmfs on the union of their grids (numerics-1)
-        biv = pd.concat([port.unit_density(line)
-                         for line in port.line_names], axis=1).fillna(0.0)
+        biv = pd.concat([port.unit_density(unit)
+                         for unit in port.unit_names], axis=1).fillna(0.0)
         nz = (biv[ps] > 0).any(axis=1)
         if int(nz.sum()) < 512:
             logger.info('Contour plot has few points...going discrete...')
@@ -1404,8 +1404,8 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
             a13.plot([0, x], [x, 0], ls='solid', lw=.35, c='k',
                      alpha=0.5, label=f'Sum = {x:,.0f}')
 
-        a13.set(xlabel=f'Line {port.line_names[0]}',
-                ylabel=f'Line {port.line_names[1]}',
+        a13.set(xlabel=f'Unit {port.unit_names[0]}',
+                ylabel=f'Unit {port.unit_names[1]}',
                 title=title, aspect=1)
     else:
         l1 = (1 - temp.cumsum()).plot(ax=a13, lw=1)
@@ -1413,7 +1413,7 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
         a13.set(title='Survival Function')
         a13.legend()
 
-    bit = port.density_df.loc[:xmax].filter(regex=f'^exeqa_({port.line_name_pipe})$')
+    bit = port.density_df.loc[:xmax].filter(regex=f'^exeqa_({port.unit_name_pipe})$')
     bit = bit.iloc[:, sort_order]
     bit.rename(columns=_short_renamer(port, 'exeqa')).replace(0, np.nan). \
         sort_index(axis=1).iloc[:, sort_order].plot(ax=a21, lw=1)
@@ -1424,7 +1424,7 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
     # layer-curve diagnostic frame (kappa/alpha/beta + layer margin and
     # cumulative margin); the core pricing frame no longer carries these.
     aug_df = port.allocation_diagnostics(distortion_name, surface='lifted')
-    aug_df.filter(regex=f'exi_xgta_({port.line_name_pipe})'). \
+    aug_df.filter(regex=f'exi_xgta_({port.unit_name_pipe})'). \
         rename(columns=_short_renamer(port, 'exi_xgta')). \
         sort_index(axis=1).plot(ylim=[-0.05, 1.05], ax=a22, lw=1)
     for ln, ls in zip(a22.lines, lss[1:]):
@@ -1432,10 +1432,10 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
     a22.legend()
     a22.set(xlim=[0, xmax], title=r'$\alpha_i(x)=E[X_i/X\mid X>x]$')
 
-    bit = aug_df.query(f'loss < {xmax}').filter(regex=f'exi_xgtag?_({port.line_name_pipe})')
+    bit = aug_df.query(f'loss < {xmax}').filter(regex=f'exi_xgtag?_({port.unit_name_pipe})')
     bit.rename(columns=_short_renamer(port, 'exi_xgtag')). \
         sort_index(axis=1).plot(ylim=[-0.05, 1.05], ax=a23)
-    for i, l in enumerate(a23.lines[len(port.line_names):]):
+    for i, l in enumerate(a23.lines[len(port.unit_names):]):
         if l.get_label()[0:3] == 'exi':
             a23.lines[i].set(linewidth=2, ls=lss[1 + i])
             l.set(color=f'C{i}', linestyle=lss[1 + i], linewidth=1,
@@ -1455,18 +1455,18 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
 
     adf = aug_df.loc[:xmax]
     if kind == 'two':
-        zipper = zip(range(2), sorted(port.line_names), [a31, a41])
+        zipper = zip(range(2), sorted(port.unit_names), [a31, a41])
     else:
-        zipper = zip(range(3), sorted(port.line_names), [a31, a41, a33])
-    for i, line, a in zipper:
+        zipper = zip(range(3), sorted(port.unit_names), [a31, a41, a33])
+    for i, unit, a in zipper:
         a.plot(adf.loss, adf.S, c=col_list[2], ls=lss[1], lw=1, alpha=0.5, label='$S$')
         a.plot(adf.loss, adf.gS, c=col_list[2], ls=lss[0], lw=1, alpha=0.5, label='$g(S)$')
-        a.plot(adf.loss, adf.S * adf[f'exi_xgta_{line}'], c=col_list[i],
-               ls=lss[1], lw=1, label=fr'$\alpha S$ {line}')
-        a.plot(adf.loss, adf.gS * adf[f'exi_xgtag_{line}'], c=col_list[i],
-               ls=lss[0], lw=1, label=fr'$\beta g(S)$ {line}')
+        a.plot(adf.loss, adf.S * adf[f'exi_xgta_{unit}'], c=col_list[i],
+               ls=lss[1], lw=1, label=fr'$\alpha S$ {unit}')
+        a.plot(adf.loss, adf.gS * adf[f'exi_xgtag_{unit}'], c=col_list[i],
+               ls=lss[0], lw=1, label=fr'$\beta g(S)$ {unit}')
         a.set(xlim=[0, ymax])
-        a.set(title=f'Line = {line}')
+        a.set(title=f'Unit = {unit}')
         a.legend()
         a.set(xlim=[0, ymax])
         a.legend(loc='upper right')
@@ -1476,12 +1476,12 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
         ymax = ymax2 if ymax2 > 0 else port.q(p2)
         p2 = port.cdf(ymax)
         for cn, ln in enumerate(sort_order):
-            line = sorted(port.line_names_ex)[ln]
+            unit = sorted(port.unit_names_ex)[ln]
             c = col_list[cn]
             s = lss[cn]
             # total from the portfolio frame; units native (numerics-1)
-            ser = (port.density_df.p_total if line == 'total'
-                   else port.unit_density(line))
+            ser = (port.density_df.p_total if unit == 'total'
+                   else port.unit_density(unit))
             f1 = ser.cumsum()
             idx = (f1 < p2) & (f1 > 1.0 - p2)
             f1 = f1[idx]
@@ -1489,7 +1489,7 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
             x = f1.index
             a33.plot(gf, x, c=c, ls=s, lw=1, label=None)
             a33.plot(f1, x, ls=s, c=c, lw=1, label=None)
-            a33.fill_betweenx(x, gf, f1, color=c, alpha=alpha, label=line.title())
+            a33.fill_betweenx(x, gf, f1, color=c, alpha=alpha, label=unit.title())
         a33.set(ylim=[0, ymax], title='Stand-alone $M$')
         a33.legend(loc='upper left')
 
@@ -1498,21 +1498,21 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
     F = bit['F']
     gF = bit['gF']
     for cn, ln in enumerate(sort_order):
-        line = sorted(port.line_names_ex)[ln]
+        unit = sorted(port.unit_names_ex)[ln]
         c = col_list[cn]
         s = lss[cn]
-        ser = bit[f'exeqa_{line}']
+        ser = bit[f'exeqa_{unit}']
         if kind == 'three':
             a43.plot(1 / (1 - F), ser, lw=1, ls=lss[1], c=c)
             a43.plot(1 / (1 - gF), ser, lw=1, c=c)
             a43.set(xlim=[1, 1e4], xscale='log')
             a43.fill_betweenx(ser, 1 / (1 - gF), 1 / (1 - F),
-                              color=c, alpha=alpha, lw=0.5, label=line.title())
+                              color=c, alpha=alpha, lw=0.5, label=unit.title())
         else:
             a43.plot(F, ser, lw=1, ls=s, c=c)
             a43.plot(gF, ser, lw=1, ls=s, c=c)
             a43.fill_betweenx(ser, gF, F,
-                              color=c, alpha=alpha, lw=0.5, label=line.title())
+                              color=c, alpha=alpha, lw=0.5, label=unit.title())
     a43.set(ylim=[0, ymax], title='Natural $M$')
     a43.legend(loc='upper left')
 

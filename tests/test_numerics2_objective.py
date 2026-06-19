@@ -240,7 +240,7 @@ def test_share_columns_blanked_on_signed(signed_port):
 def test_e_native_reconciles_kappa(signed_port):
     """e_i (native pmf) == Σ kappa_i · p_total within represented tol."""
     df = signed_port.density_df
-    for nm in signed_port.line_names:
+    for nm in signed_port.unit_names:
         e_native = df[f'e_{nm}'].iloc[0]
         e_kappa = float((df[f'exeqa_{nm}'] * df.p_total).sum())
         assert np.isclose(e_native, e_kappa, rtol=1e-12), nm
@@ -250,7 +250,7 @@ def test_lev_native_capped_sum(signed_port):
     """Stand-alone lev_i(a) == exact capped native sum below / inside /
     above the unit support, independent of total-window overlap."""
     df = signed_port.density_df
-    for nm in signed_port.line_names:
+    for nm in signed_port.unit_names:
         xs_n, p_n = _native(signed_port[nm], tol=0.0)
         for a in [df.loss.iloc[0], -2.0, 0.0, 3.0, df.loss.iloc[-1]]:
             ref = float(np.sum(np.minimum(xs_n, a) * p_n)
@@ -262,9 +262,9 @@ def test_lev_native_capped_sum(signed_port):
 def test_unit_windows_differ_no_p_unit(signed_port):
     """Units live on their own windows; no p_{unit} on the total frame."""
     origins = {nm: float(signed_port[nm].x_min)
-               for nm in signed_port.line_names}
+               for nm in signed_port.unit_names}
     assert len(set(origins.values())) > 1  # genuinely different windows
-    for nm in signed_port.line_names:
+    for nm in signed_port.unit_names:
         ser = signed_port.unit_density(nm)
         assert np.isclose(ser.sum(), 1.0, rtol=0, atol=1e-10)
         assert float(ser.index[0]) == origins[nm]
@@ -373,7 +373,7 @@ def test_signed_apply_distortion_prices_totals(signed_port):
     from aggregate.spectral import Distortion
     aug = signed_port.apply_distortion(Distortion('tvar', 0.8))
     assert np.isfinite(aug.exag_total.to_numpy()).all()
-    assert aug[f'exag_{signed_port.line_names[0]}'].isna().all()
+    assert aug[f'exag_{signed_port.unit_names[0]}'].isna().all()
     signed_port._augmented_dfs.clear()
 
 

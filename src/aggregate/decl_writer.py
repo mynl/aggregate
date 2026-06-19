@@ -560,7 +560,7 @@ def _render_bvagg(name: str, spec: dict) -> str:
         # component renders as its limit + severity (the solved Bernoulli dfreq
         # is implied by the counts, so it is not emitted).
         cl = spec['clash']
-        (_, _, sa), (_, _, sb) = spec['lines']
+        (_, _, sa), (_, _, sb) = spec['units']
         return _join([
             f'clash {_fmt_name(name)}',
             f"{_fmt_num(cl['na'])} {_fmt_num(cl['nb'])} {_fmt_num(cl['nc'])} claims",
@@ -576,10 +576,10 @@ def _render_bvagg(name: str, spec: dict) -> str:
                    ('gross', 'net'): 'grossnet'}
         views = tuple(spec.get('nc_views') or ('net', 'ceded'))
         kw = _kw_for.get(views, 'netceded')
-        kind, sub_name, sub_spec = spec['lines'][0]
+        kind, sub_name, sub_spec = spec['units'][0]
         return kw + ' ' + _render_agg_or_pnl(kind, sub_name, sub_spec)
 
-    components = [_render_agg_or_pnl(k, n, s) for k, n, s in spec['lines']]
+    components = [_render_agg_or_pnl(k, n, s) for k, n, s in spec['units']]
     return _join([
         f'bivariate {name}',
         _render_exposure(spec),

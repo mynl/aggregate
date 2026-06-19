@@ -759,7 +759,7 @@ def bs_describe(agg, *, color: bool = False) -> str:
     method = sel[0] if len(sel) else 'moment'
     used = df.loc['used']
     top = _bs_grid_top(used)
-    line = (f'{method} grid: bs={float(used["bs"]):g}, log2={int(used["log2"])}, '
+    text = (f'{method} grid: bs={float(used["bs"]):g}, log2={int(used["log2"])}, '
             f'x_min={float(used["x_min"]):g} (top={top:g})')
     clip = agg._bs_clip
     if clip is not None:
@@ -768,8 +768,8 @@ def bs_describe(agg, *, color: bool = False) -> str:
         msg = f'; clips {cm_txt} of the tail (raise log2 to {int(clip["need_log2"])})'
         if color:
             msg = f'{_tail._ANSI_THICK}{msg}{_tail._ANSI_RESET}'
-        line += msg
-    return line
+        text += msg
+    return text
 
 
 def bs_explain(agg, *, color: bool = False) -> str:
@@ -8141,7 +8141,7 @@ class Aggregate:
 
     def var_dict(self, p, kind='lower', snap=False):
         """
-        Make a dictionary of value at risks for the line, mirrors Portfolio.var_dict.
+        Make a dictionary of value at risks for the aggregate, mirrors Portfolio.var_dict.
         Here is just marshals calls to the appropriate var or tvar function.
 
         Allows the price function to run consistently with Portfolio version.
@@ -8213,7 +8213,7 @@ class Aggregate:
         # one-row canonical pentagon (pentagon.py owns the identities + order)
         df = pd.DataFrame(
             [[el, M, P, Q]], columns=['L', 'M', 'P', 'Q'],
-            index=pd.Index([self.name], name='line'),
+            index=pd.Index([self.name], name='unit'),
         )
         return complete_pentagon(df)
 
@@ -8265,7 +8265,7 @@ class Aggregate:
                 f'(one of P, M, Q, LR, PQ, ROE); got {n_targets}.')
         pent = Pentagon(obj=self)
         pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=LR, pq=PQ, roe=ROE)
-        return pent.as_frame(line='total')
+        return pent.as_frame(unit='total')
 
 
 

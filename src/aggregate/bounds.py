@@ -96,7 +96,7 @@ logger = logging.getLogger(__name__)
 __all__ = ['AllocationBounds', 'Bounds', 'PricingBounds']
 
 
-def _resolve_obj(obj, line):
+def _resolve_obj(obj, unit):
     """
     Coerce *obj* into ``(tvar_x, F, name)`` where
 
@@ -115,12 +115,12 @@ def _resolve_obj(obj, line):
     from .utilities import make_var_tvar
 
     if isinstance(obj, Portfolio):
-        if line == 'total':
+        if unit == 'total':
             return obj.tvar, obj.cdf, f'{obj.name}.total'
-        if line not in obj.line_names_ex:
-            raise ValueError(f'line {line!r} not in portfolio {obj.name!r}')
-        ag = getattr(obj, line)
-        return ag.tvar, ag.cdf, f'{obj.name}.{line}'
+        if unit not in obj.unit_names_ex:
+            raise ValueError(f'unit {unit!r} not in portfolio {obj.name!r}')
+        ag = getattr(obj, unit)
+        return ag.tvar, ag.cdf, f'{obj.name}.{unit}'
 
     if isinstance(obj, Aggregate):
         return obj.tvar, obj.cdf, obj.name
@@ -166,7 +166,7 @@ class Bounds:
         Target premium. Required: ``E[X] < premium <= a``.
     a : float, default ``np.inf``
         Asset cap. The class bounds prices of ``min(X, a)``.
-    line : str, default ``'total'``
+    unit : str, default ``'total'``
         Only used when ``obj`` is a ``Portfolio``.
     n_p : int, default ``256``
         Base p-grid size. Adaptive refinement adds a handful of knots
@@ -200,16 +200,16 @@ class Bounds:
         minimum, plus that bracket's convex-combo weight.
     """
 
-    def __init__(self, obj, premium, *, a=np.inf, line='total',
+    def __init__(self, obj, premium, *, a=np.inf, unit='total',
                  n_p=256, n_s=513):
         self._obj = obj
         self.premium = float(premium)
         self.a = float(a) if not np.isinf(a) else np.inf
-        self.line = line
+        self.unit = unit
         self.n_p = int(n_p)
         self.n_s = int(n_s)
 
-        tvar_x_unb, F, name = _resolve_obj(obj, line)
+        tvar_x_unb, F, name = _resolve_obj(obj, unit)
         self._tvar_x_unb = tvar_x_unb
         self._F = F
         self.name = name
@@ -1119,7 +1119,7 @@ class AllocationBounds(_HullEngine):
         built here from the ``exi_xgta_*`` columns.  ``a`` is snapped to
         the loss grid.  Default ``np.inf`` is the unbounded total.
     units : list of str, optional
-        Unit (line) names to include.  Default: all of ``port.line_names``.
+        Unit names to include.  Default: all of ``port.unit_names``.
     s_floor : float, default 1e-14
         Drop curve vertices with tail probability ``S < s_floor``.  Deep in
         the tail both the tail sums and ``exeqa`` are dominated by FFT noise
@@ -1222,7 +1222,7 @@ class AllocationBounds(_HullEngine):
         self.a = float(a)
 
         if units is None:
-            units = list(port.line_names)
+            units = list(port.unit_names)
         self.units = list(units)
 
         df = getattr(port, 'density_df', None)

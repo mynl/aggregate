@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.0.0a81
+
+### Rename portfolio sub-component `line` → `unit` — **breaking**
+
+The oldest naming wart in the library is gone. *Pricing Insurance Risk*
+(Mildenhall & Major, 2022) settled on **unit** as the generic term for a
+portfolio sub-component (a line of business, geography, segment, account, or
+reinsurance layer all read naturally as a "unit"). The half-renamed `unit_* →
+line_*` pass-throughs are deleted and `unit` is now canonical throughout; the
+`line_*` names are removed outright (no deprecation alias — this is a pre-release).
+
+- **`Portfolio` storage / accessors** `line_names`, `line_names_ex`,
+  `line_name_pipe`, `line_renamer` → **`unit_names`, `unit_names_ex`,
+  `unit_name_pipe`, `unit_renamer`**. Accessing `line_names` now raises
+  `AttributeError`. The thin `unit_names`/`unit_names_ex` pass-through properties
+  were deleted (the names now belong to the real attributes); `n_units` stays.
+- **Output-frame index/column label** `name='line'` → **`name='unit'`** on every
+  pricing/quantile frame (`pricing_at`, `pentagon_at`, `price`, `var_dict`,
+  `Pentagon.as_frame`, the single-`Aggregate` price frame). Any downstream
+  `groupby('line')` / `.loc['line']` / `index.name == 'line'` must move to
+  `'unit'`.
+- **Keyword arguments** `line=` / `lines=` → **`unit=` / `units=`**:
+  `Portfolio.pentagon_at(unit='total')`, `Bounds(unit='total')`,
+  `Pentagon.as_frame(unit=)` / `from_row(unit=)`, and the private
+  `_line_capital_at` → `_unit_capital_at(units=)`.
+- **`BivariateAggregate`** follows suit: ctor `lines=` → `units=`, attributes
+  `line_names`/`lines`/`_line_specs` → `unit_names`/`units`/`_unit_specs`, and the
+  internal DecL spec key `'lines'` → `'units'` (parser producer + `decl_writer`
+  round-trip moved together).
+- Swept `pedagogy.py`, `results.py`, `bounds.py`, `pentagon.py`, and the test
+  suite. Matplotlib (`linewidth`, `ax.lines`), plotly line specs, the actuarial
+  *rate-on-line* / *loss on line* terms, optimisation *line search*, and
+  source-text *line* machinery are deliberately untouched.
+- Docs reference no renamed symbols, so no `:attr:`/`:meth:` cross-refs broke;
+  LOB prose in `docs/` ("line of business" → "unit") is a pending author doc pass.
+
 ## 1.0.0a80
 
 ### Rename multivariate → bivariate (MV-7) — **breaking**

@@ -313,7 +313,7 @@ def test_view_pair_marginals_match_named_views(views, labels):
     """
     a = _build(OCC)
     b = a.occ_bivariate(views=views)
-    assert b.line_names == list(labels)
+    assert b.unit_names == list(labels)
     m0, m1 = b.marginals()
     rs = a.reins_stats_df
     assert float((m0 * b.axis_xs[0]).sum()) == pytest.approx(

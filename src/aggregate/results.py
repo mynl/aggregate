@@ -30,8 +30,8 @@ class AnalyzeDistortionResult:
     distortion : Distortion
         The pricing distortion this row pertains to.
     pricing_df : pandas.DataFrame
-        Per-line pricing readout at the chosen asset level, indexed by
-        line (units + ``'total'``); columns are the canonical pentagon octet
+        Per-unit pricing readout at the chosen asset level, indexed by
+        unit (units + ``'total'``); columns are the canonical pentagon octet
         ``['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']`` (see
         :data:`aggregate.pentagon.PENTAGON_STATS`). Lifted from
         :meth:`Portfolio.pricing_at`.
@@ -56,7 +56,7 @@ class AnalyzeDistortionsResult:
         The distortions analysed, keyed by name.
     pricing_df : pandas.DataFrame
         Concatenated per-distortion exhibit, MultiIndex
-        ``(distortion, stat)`` on rows, line names on columns. ``stat`` is an
+        ``(distortion, stat)`` on rows, unit names on columns. ``stat`` is an
         ordered categorical over the canonical pentagon octet
         ``['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']``
         (:data:`aggregate.pentagon.PENTAGON_STATS`).
@@ -78,7 +78,7 @@ class PricingResult:
     Attributes
     ----------
     df : pandas.DataFrame
-        Per-(distortion, line) pricing readout. MultiIndex
+        Per-(distortion, unit) pricing readout. MultiIndex
         ``(distortion, unit)`` on rows; columns are the canonical pentagon
         octet ``['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']``
         (:data:`aggregate.pentagon.PENTAGON_STATS`). ``M/Q`` is named ``ROE``

@@ -251,7 +251,7 @@ def test_identity_distortion_invariants(bod):
     for allocation in ('lifted', 'linear'):
         aug = bod.apply_distortion(IDENT, allocation=allocation)
         sel = aug.gS > 0
-        for line in bod.line_names:
+        for line in bod.unit_names:
             # beta == alpha under the identity distortion
             assert np.allclose(aug.loc[sel, f'exi_xgtag_{line}'],
                                aug.loc[sel, f'exi_xgta_{line}'],
@@ -361,10 +361,10 @@ def test_signed_total_pricing(signed_port):
         rho, DUAL.price(signed_port.density_df.p_total).ask, rtol=REL)
     # sum_i dot(kappa_i, gp) prices the signed total additively
     tot = sum(float(np.dot(aug[f'exeqa_{ln}'].to_numpy(), gp))
-              for ln in signed_port.line_names)
+              for ln in signed_port.unit_names)
     assert np.isclose(tot, rho, rtol=1e-10)
     # equal-priority share columns are refused (NaN), not divided
-    for ln in signed_port.line_names:
+    for ln in signed_port.unit_names:
         assert aug[f'exi_xgtag_{ln}'].isna().all()
         assert aug[f'exag_{ln}'].isna().all()
     signed_port._augmented_dfs.clear()
@@ -398,7 +398,7 @@ def test_efficient_removed(dice_port):
 def test_line_capital_reconciles(bod):
     for dist in (DUAL, TVAR, CCOC):
         pa = bod.pricing_at(dist, p=0.99)
-        lines = list(bod.line_names)
+        lines = list(bod.unit_names)
         assert np.isclose(pa.loc[lines, 'Q'].sum(), pa.loc['total', 'Q'],
                           rtol=1e-9, atol=1e-9)
         bod._augmented_dfs.clear()
@@ -408,11 +408,11 @@ def test_pricing_at_matches_price_and_pentagon(bod):
     pa = bod.pricing_at(DUAL, p=0.99)
     pr = bod.price(0.99, DUAL, allocation='lifted')
     dfm = pr.df.droplevel(0)
-    for ln in list(bod.line_names) + ['total']:
+    for ln in list(bod.unit_names) + ['total']:
         for c in 'LMPQ':
             assert np.isclose(pa.loc[ln, c], dfm.loc[ln, c],
                               rtol=1e-12, atol=1e-12)
-        peg = bod.pentagon_at(DUAL, p=0.99, line=ln)
+        peg = bod.pentagon_at(DUAL, p=0.99, unit=ln)
         for c in 'LMPQ':
             assert np.isclose(getattr(peg, c), pa.loc[ln, c],
                               rtol=1e-12, atol=1e-12)
@@ -430,7 +430,7 @@ def test_allocation_diagnostics_layer_identities(bod):
     assert np.allclose(diag.layer_loss_total, S, rtol=0, atol=1e-15)
     assert np.allclose(diag.layer_premium_total, gS, rtol=0, atol=1e-15)
     assert np.allclose(diag.layer_margin_total, gS - S, rtol=0, atol=1e-15)
-    for ln in bod.line_names:
+    for ln in bod.unit_names:
         assert np.allclose(diag[f'layer_loss_{ln}'],
                            S * diag[f'exi_xgta_{ln}'], rtol=0, atol=1e-15)
         assert np.allclose(diag[f'layer_premium_{ln}'],
@@ -481,7 +481,7 @@ def test_precapture_lifted_surfaces_survive(case):
                                       atol=rel * port.q(0.99)), \
                         f'{case} {label} pricing_at {ln}.{c}'
             for ln, vals in entry['pentagon_at'].items():
-                peg = port.pentagon_at(dist, p=0.99, line=ln)
+                peg = port.pentagon_at(dist, p=0.99, unit=ln)
                 for c, v in vals.items():
                     assert np.isclose(getattr(peg, c), v, rtol=rel,
                                       atol=rel * port.q(0.99)), \

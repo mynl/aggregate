@@ -32,7 +32,7 @@
 
 ## NEW STEVE MANUAL ENTRIES
 
-H: Portfolio class should use unit not line. All refs to line replaced with unit! **carefully!** → planned: `dev/plan-line-to-unit.md` (staged; clean break, no `line_names` alias; `'line'` index→`'unit'`; `line=`/`lines=` kwargs→`unit=`/`units=`; DoD = `rg line -g *.py` only keep-table hits).
+H: Portfolio class should use unit not line. All refs to line replaced with unit! **carefully!** → **DONE (1.0.0a81, `dev/done/plan-line-to-unit.md`)**: clean break, no `line_names` alias (`AttributeError`); `'line'` index→`'unit'`; `line=`/`lines=` kwargs→`unit=`/`units=`; `BivariateAggregate` surface + `'lines'`→`'units'` spec key; pedagogy/results/bounds/pentagon swept; keep-table (matplotlib/rate-on-line/loss-on-line/line-search/source-line) preserved.
 H: build.knowledge source col: just store the db name and not whole path in source. Yes, ambiguous. Prefix ~/ if from user's .aggregate store, full path if not built-in or home dir.
 N: distributions with no variance should refuse to estimate bs. how is that being done ATM? I think in the past it was an error. Now you can package hints with the program there are no excuses for not providing bs,log2.
 
@@ -307,8 +307,8 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **D10 `[B]`** Single keyword source of truth — derive `decl_pygments.AggLexer`,
   `parser_errors._TERMINAL_LABELS`, and the web app's `decl-keywords.json` from
   the `decl.lark` terminals (five hand-maintained mirrors today). Independent of
-  the unparser (`decl_writer` reuses `AggLexer` as-is, shipped a53); ties the
-  parked DecL colorization (#22).
+  the unparser (`decl_writer` reuses `AggLexer` as-is, shipped a53). (Was tied to
+  the now-rejected DecL colorization, #22 — D10 stands on its own merit.)
 - [ ] **D11 `[B]`** Transition the Sphinx docs' bibliography to the master
   `C:/s/TELOS/Biblio/uber-library.bib` (per the CLAUDE.md "Citations and
   bibliography" standing order, added 2026-06-11). The docs currently use an
@@ -386,9 +386,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **General premium/loss algebra in DecL (v2.0)** (#21) — constant
   aggregates, full aggregate arithmetic (`agg.A - agg.B`, `agg.A + c`); `pnl`
   covers the common case for v1.0.
-- [ ] **DecL colorization** (#22) — design parked 2026-05-27
-  (`dev/tentative-plan-decl-colorization.md`); payoff mostly Sphinx-docs
-  identity. Wait for a clearer use case.
+- [x] **DecL colorization** (#22) — **rejected 2026-06-19**
+  (`dev/done/plans-considered-and-rejected.md`): payoff is aesthetic only and the
+  headline wins are structurally weak (Jupyter `_repr_html_` doesn't fire from
+  IPython tracebacks; Sphinx `pygments_style` is global). If docs identity ever
+  becomes a priority, do only the minimal palette + Pygments-style slice.
 - [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
   both premium legs (`plan-pnl-premium.md` §9).
 - [ ] extend reinsurance clauses to allow net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros (rate on subject = quota share)

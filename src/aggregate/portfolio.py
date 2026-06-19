@@ -160,7 +160,7 @@ PRICING_STAT_DTYPE = PENTAGON_DTYPE
 # Canonical row MultiIndex for ``Portfolio.stats_df``. Parallels
 # ``aggregate.distributions._STATS_ROW_INDEX`` (meta + freq + sev + agg
 # moment blocks). Kept as its own constant so future Portfolio-only
-# rows (e.g. between-line copula moments) do not bleed into
+# rows (e.g. between-unit copula moments) do not bleed into
 # Aggregate's surface. All-float: ``self.name`` lives on the attribute.
 _PORT_STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
     [
@@ -184,7 +184,7 @@ class Portfolio(object):
     unit of business. Applications include
 
     - Model a book of insurance
-    - Model a large account with several sub lines
+    - Model a large account with several sub units
     - Model a reinsurance portfolio or large treaty
 
     """
@@ -207,7 +207,7 @@ class Portfolio(object):
         """
         self.name = name
         self.agg_list = []
-        self.line_names = []
+        self.unit_names = []
         self._valid = None
         self.sample_df = None
         logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name}')
@@ -280,17 +280,17 @@ class Portfolio(object):
             if a is not None:
                 # deals with total in DataFrame intput mode
                 self.agg_list.append(a)
-                self.line_names.append(agg_name)
+                self.unit_names.append(agg_name)
                 self.__setattr__(agg_name, a)
                 mixed = a.stats_df['mixed']
                 ma.add_fs(mixed[('freq', 'ex1')], mixed[('freq', 'ex2')], mixed[('freq', 'ex3')],
                           mixed[('sev',  'ex1')], mixed[('sev',  'ex2')], mixed[('sev',  'ex3')])
                 max_limit = max(max_limit, np.max(np.array(a.limit)))
 
-        self.line_names_ex = self.line_names + ['total']
-        self.line_name_pipe = "|".join(self.line_names_ex)
-        for n in self.line_names:
-            # line names cannot equal total
+        self.unit_names_ex = self.unit_names + ['total']
+        self.unit_name_pipe = "|".join(self.unit_names_ex)
+        for n in self.unit_names:
+            # unit names cannot equal total
             if n == 'total':
                 raise ValueError('Line names cannot equal total, it is reserved for...total')
 
@@ -344,7 +344,7 @@ class Portfolio(object):
         self._remove_fuzz = 0
         self.discretization_calc = ''
         self.normalize = None
-        self._line_renamer = None
+        self._unit_renamer = None
         # if created by uw it stores the program here
         self.program = ''
         self.distortions = None
@@ -385,7 +385,7 @@ class Portfolio(object):
         total is then aligned to the bucket size self.bs using (total/bs).round(0)*bs.
         The other loss columns are then scaled so they sum to the adjusted total
 
-        Next, group by total, sum p_total and average the lines to create E[Xi|X]
+        Next, group by total, sum p_total and average the units to create E[Xi|X]
 
         This sample is merged into a stripped down density_df. Then
         the other ex... columns are added. Excludes eta mu columns.
@@ -440,7 +440,7 @@ class Portfolio(object):
 
         # Group by X values, aggregate probs and compute E[Xi  | X]
         exeqa_sample = sample_in.groupby(by='total').agg(
-            **{f'exeqa_{i}': (i, np.mean) for i in self.line_names})
+            **{f'exeqa_{i}': (i, np.mean) for i in self.unit_names})
         # need to do this after rescaling to get correct (rounded) total values
         probs = sample_in.groupby(by='total').p_total.sum()
         # want all probs to be positive
@@ -453,7 +453,7 @@ class Portfolio(object):
         # deferred to the sampling redesign plan (numerics-2 deliverable 4
         # keeps this path mechanically working only).
         df = self.density_df.filter(
-            regex=f'^(loss|e_({self.line_name_pipe})|(e|p)_total)$').copy()
+            regex=f'^(loss|e_({self.unit_name_pipe})|(e|p)_total)$').copy()
         df = df.join(self.aligned_unit_density_df(grid='total',
                                                   allow_window_mismatch=True))
 
@@ -509,13 +509,13 @@ class Portfolio(object):
         # check exeqa sums to correct total. note this only happens ae, ie when
         # p_total > 0
         assert np.allclose(df.query('p_total > 0').loss,
-                           df.query('p_total > 0')[[f'exeqa_{i}' for i in self.line_names]].sum(axis=1))
+                           df.query('p_total > 0')[[f'exeqa_{i}' for i in self.unit_names]].sum(axis=1))
 
         assert df.index.is_unique
         df['exeqa_total'] = df.loss
 
         # add additional variables via loop
-        for col in self.line_names_ex:
+        for col in self.unit_names_ex:
             # ### Additional Variables
             # * exeqa_line = $E(X_i \mid X=a)$
             # * exlea_line = $E(X_i \mid X\le a)$
@@ -681,7 +681,7 @@ class Portfolio(object):
             Probability level: resolves ``a = q(p)`` when ``a`` is
             unspecified. Both zero gives the unbounded total.
         units : list of str, optional
-            Unit names to include. Default: all of ``line_names``.
+            Unit names to include. Default: all of ``unit_names``.
         s_floor : float, default 1e-14
             Tail-probability floor below which curve vertices are dropped
             as FFT noise; see :class:`~aggregate.bounds.AllocationBounds`.
@@ -874,7 +874,7 @@ class Portfolio(object):
         :return:
         """
         if type(item) == str:
-            return self.agg_list[self.line_names.index(item)]
+            return self.agg_list[self.unit_names.index(item)]
         return self.agg_list[item]
 
     @property
@@ -992,14 +992,14 @@ class Portfolio(object):
             return 'portfolio grid not sized yet (call update())'
         u = df.loc['used']
         top = float(u['x_min']) + (1 << int(u['log2'])) * float(u['bs'])
-        line = (f'portfolio grid: bs={float(u["bs"]):g}, log2={int(u["log2"])}, '
-                f'x_min={float(u["x_min"]):g} (top={top:g})')
+        txt = (f'portfolio grid: bs={float(u["bs"]):g}, log2={int(u["log2"])}, '
+               f'x_min={float(u["x_min"]):g} (top={top:g})')
         clip = getattr(self, '_bs_clip', None)
         if clip is not None:
             cm = clip.get('clipped_mass', float('nan'))
             cm_txt = f'~{cm:.3g}' if np.isfinite(cm) else 'a sliver'
-            line += f'; clips {cm_txt} of the tail (raise log2 to {int(clip["need_log2"])})'
-        return line
+            txt += f'; clips {cm_txt} of the tail (raise log2 to {int(clip["need_log2"])})'
+        return txt
 
     @property
     def bs_explanation(self) -> str:
@@ -1163,7 +1163,7 @@ class Portfolio(object):
         rows = [
             ('portfolio object name', self.name),
             ('value_type', self.value_type),
-            ('aggregate objects', f'{len(self.line_names):d}'),
+            ('aggregate objects', f'{len(self.unit_names):d}'),
             ('allocation_method', self.allocation_method),
             ('bs', bss),
             ('log2', self.log2 if updated else INFO_NA),
@@ -1882,30 +1882,30 @@ class Portfolio(object):
 
     def percentiles(self, pvalues=None):
         """
-        Per-line percentiles (interpolated) of the FFT-derived
+        Per-unit percentiles (interpolated) of the FFT-derived
         ``density_df`` distribution.
 
         :param pvalues: optional vector of log values to use. If None sensible defaults provided
-        :return: DataFrame of percentiles indexed by line and log
+        :return: DataFrame of percentiles indexed by unit and log
         """
-        df = pd.DataFrame(columns=['line', 'log', 'Agg Quantile'])
-        df = df.set_index(['line', 'log'])
+        df = pd.DataFrame(columns=['unit', 'log', 'Agg Quantile'])
+        df = df.set_index(['unit', 'log'])
         # df.columns.name = 'perspective'
         if pvalues is None:
             pvalues = [0.5, 0.75, 0.8, 0.85, 0.9, 0.95, 0.98, 0.99, 0.994, 0.995, 0.999, 0.9999]
-        for line in self.line_names_ex:
+        for unit in self.unit_names_ex:
             # total from the portfolio frame; units from their native pmfs
             # (numerics-1) -- deliberately interpolated, unlike the exact
             # step-function q.
-            if line == 'total':
+            if unit == 'total':
                 ser = self.density_df.p_total
             else:
-                ser = self.unit_density(line)
+                ser = self.unit_density(unit)
             q_agg = interpolate.interp1d(ser.cumsum(), ser.index,
                                          kind='linear', bounds_error=False, fill_value='extrapolate')
             for p in pvalues:
                 qq = q_agg(p)
-                df.loc[(line, p), :] = [float(qq)]
+                df.loc[(unit, p), :] = [float(qq)]
         df = df.unstack(level=1)
         return df
 
@@ -1915,8 +1915,8 @@ class Portfolio(object):
 
         :return:
         """
-        df = pd.DataFrame(columns=['line', 'bs10'])
-        df = df.set_index('line')
+        df = pd.DataFrame(columns=['unit', 'bs10'])
+        df = df.set_index('unit')
         for a in self.agg_list:
             df.loc[a.name, :] = [a.recommend_bucket(10)]
         df['bs11'] = df['bs10'] / 2
@@ -2074,7 +2074,7 @@ class Portfolio(object):
         - **signed** (P&L): the origin is the windowed low edge ``x_lo`` floored;
           ``update`` recomputes the realised origin from the units' post-snap
           ``x_min``. ``log2`` stays at the cap and the span is floored at the
-          conservative ``max_k W_k / N`` so no per-line marginal wraps.
+          conservative ``max_k W_k / N`` so no per-unit marginal wraps.
 
         Parameters
         ----------
@@ -2182,7 +2182,7 @@ class Portfolio(object):
         else:
             span = W_ext / N_cap if N_cap else W_ext
             if signed:
-                # Wrap safety: every per-line marginal is driven on the shared
+                # Wrap safety: every per-unit marginal is driven on the shared
                 # grid, so N*bs must hold the widest unit too. Floor the span at
                 # ``max_k W_k / N`` (the MM span is usually wider, but guard the
                 # one-dominant-unit case).
@@ -2338,7 +2338,7 @@ class Portfolio(object):
         num buckets and max loss from bucket size
 
         Aggregate reinsurance in parser has replaced the aggregate_cession_function (a function of a Portfolio object
-        that adjusts individual line densities; applied after line aggs created but before creating not-lines;
+        that adjusts individual unit densities; applied after unit aggs created but before creating not-units;
         actual statistics do not reflect impact.) Agg re by unit is now applied in the Aggregate object.
 
         TODO: consider aggregate covers at the portfolio level...Where in parse - at the top!
@@ -2417,7 +2417,7 @@ class Portfolio(object):
         # persist, on the Aggregate objects themselves.
         unit_state = {}
 
-        # Build the grid and the per-line densities, accumulating their
+        # Build the grid and the per-unit densities, accumulating their
         # product in Fourier space to get ``p_total``.
         N = 1 << log2
         # The roll-combine path serves both a signed (P&L) book and a windowed
@@ -2457,7 +2457,7 @@ class Portfolio(object):
                     ft_all *= agg.ftagg_density
             # Realised portfolio origin. Signed: the support min of the
             # independent sum is Sigma x_min_k; floored by min_k x_min_k so no
-            # per-line marginal wraps (safety floor on the plan's sum-of-
+            # per-unit marginal wraps (safety floor on the plan's sum-of-
             # windows). Windowed non-signed (Plan B): the Portfolio MM windowed
             # origin from best_window (each unit sits at its own 0-origin; the
             # *total* mass is what clears 0). Snapped to bs.
@@ -2583,7 +2583,7 @@ class Portfolio(object):
         ``empirical`` and ``error`` are left as NaN here; ``update``
         populates them after the FFT.
         """
-        cols = list(self.line_names) + [
+        cols = list(self.unit_names) + [
             'total', 'after_occ', 'empirical',
             'occ_impact', 'agg_impact', 'gross_empirical', 'error',
         ]
@@ -2603,7 +2603,7 @@ class Portfolio(object):
 
         # Portfolio totals: ``total`` = running totals across units
         # (``remix=False``, preserves each agg's freq mixing).
-        unit_cols = list(self.line_names)
+        unit_cols = list(self.unit_names)
         _flat_names = MomentAggregator.column_names()
 
         def _collect(meta_key):
@@ -2889,7 +2889,7 @@ class Portfolio(object):
         elif stat == 'density':
             # total + native unit pmfs (numerics-1)
             pmfs = [self.density_df.p_total] + \
-                   [self.unit_density(line) for line in self.line_names]
+                   [self.unit_density(unit) for unit in self.unit_names]
             mx = max(float(s.max()) for s in pmfs)
             mxx0 = max(float(s.iloc[1:].max()) for s in pmfs)
             if kind == 'linear':
@@ -2901,7 +2901,7 @@ class Portfolio(object):
                 return [eps, mx * 1.5]
         elif stat == 'logy':
             pmfs = [self.density_df.p_total] + \
-                   [self.unit_density(line) for line in self.line_names]
+                   [self.unit_density(unit) for unit in self.unit_names]
             mx = min(1, max(float(s.max()) for s in pmfs))
             return [1e-12, mx * 2]
         else:
@@ -2941,7 +2941,7 @@ class Portfolio(object):
         Parameters
         ----------
         unit : str
-            Unit (line) name; one of :attr:`line_names`.
+            Unit name; one of :attr:`unit_names`.
         view : {'agg', 'sev'}
             ``'agg'`` reads the unit's aggregate pmf
             (``Aggregate.density_df.p_total`` on grid ``xs``); ``'sev'``
@@ -2953,9 +2953,9 @@ class Portfolio(object):
         pandas.Series
             pmf named ``p_{unit}``, indexed by the unit's native loss grid.
         """
-        if unit not in self.line_names:
+        if unit not in self.unit_names:
             raise KeyError(
-                f'unknown unit {unit!r}; expected one of {self.line_names}')
+                f'unknown unit {unit!r}; expected one of {self.unit_names}')
         agg = self[unit]
         if view == 'agg':
             ser = agg.density_df['p_total'].copy()
@@ -3114,7 +3114,7 @@ class Portfolio(object):
         # (numerics-1); on a legacy zero-origin book the grids coincide.
         bit = pd.concat(
             [self.density_df.p_total] +
-            [self.unit_density(line) for line in self.line_names], axis=1)
+            [self.unit_density(unit) for unit in self.unit_names], axis=1)
         bit.plot(ax=ax, xlim=xl, ylim=yl)
         ax.set(xlabel='Loss', ylabel='Density')
         ax.legend()
@@ -3143,44 +3143,44 @@ class Portfolio(object):
         return ax
 
     @staticmethod
-    def _ft_nots(ft_lines):
-        """Per-line "everything except this line" FT products.
+    def _ft_nots(ft_units):
+        """Per-unit "everything except this unit" FT products.
 
-        ``ft_lines`` maps line name to the (padded) rfft of that line's
+        ``ft_units`` maps unit name to the (padded) rfft of that unit's
         pmf laid into the physical-zero FFT buffer. Returns
         ``(ft_all, ft_nots)`` where ``ft_all`` is the product over all
-        lines and ``ft_nots[i]`` is the product over ``j != i``.
+        units and ``ft_nots[i]`` is the product over ``j != i``.
 
         Spectral division ``ft_all / ft_i`` is the fast path and is
         per-bin well-conditioned — ``(a·b)/a = b·(1+O(eps))`` — even on
         deeply underflowed spectra (the Step-0 audit measured division
         and prefix/suffix both at ~2e-9 against an untrimmed brute-force
         reference on tight thin-CV units). It fails only on **exactly
-        zero** bins (symmetric severities zero bins exactly): those lines
+        zero** bins (symmetric severities zero bins exactly): those units
         use prefix/suffix partial products instead — ``O(m·M)`` total,
         no division, replacing the legacy ``O(m²·M)`` rebuild.
 
         Single owner of this construction, shared by ``add_exa`` callers
         (``update`` via ``add_exa`` and :func:`swap_density_df`).
         """
-        names = list(ft_lines)
+        names = list(ft_units)
         ft_all = None
         for nm in names:
-            ft_all = (np.copy(ft_lines[nm]) if ft_all is None
-                      else ft_all * ft_lines[nm])
+            ft_all = (np.copy(ft_units[nm]) if ft_all is None
+                      else ft_all * ft_units[nm])
         nots = {}
         if len(names) == 1:
             nots[names[0]] = np.ones_like(ft_all)
             return ft_all, nots
         prefix = suffix = None
         for i, nm in enumerate(names):
-            f = ft_lines[nm]
+            f = ft_units[nm]
             if not np.any(f == 0):
                 nots[nm] = ft_all / f
                 continue
             if prefix is None:
                 # prefix[i] = prod(arrs[:i]), suffix[i] = prod(arrs[i:])
-                arrs = [ft_lines[n2] for n2 in names]
+                arrs = [ft_units[n2] for n2 in names]
                 m = len(arrs)
                 prefix = [np.ones_like(ft_all)]
                 for k in range(m - 1):
@@ -3195,13 +3195,13 @@ class Portfolio(object):
     def add_exa(self, df, unit_state):
         r"""Add the objective (conditional-expectation) allocation columns to ``df``.
 
-        Per-line and total: ``exeqa_*`` = ``E[X_i | X=a]`` (kappa),
+        Per-unit and total: ``exeqa_*`` = ``E[X_i | X=a]`` (kappa),
         ``exlea_*`` = ``E[X_i | X≤a]``, ``exgta_*`` = ``E[X_i | X>a]``,
         ``exi_x_*`` = ``E[X_i / X]``, ``exi_xlea_*`` / ``exi_xgta_*`` /
         ``exi_xeqa_*`` = conditional-share variants (``exi_xgta`` is
         alpha, the objective tail share), ``e_*`` = unconditional mean,
         ``lev_*`` = stand-alone ``E[X_i ∧ a]``, ``exa_*`` = equal-priority
-        expected loss allocated to line ``i``. Also writes ``F``, ``S``,
+        expected loss allocated to unit ``i``. Also writes ``F``, ``S``,
         ``exa_total``, ``lev_total``.
 
         Names with a leading ``t`` clash with the ``total`` regex
@@ -3215,7 +3215,7 @@ class Portfolio(object):
             ``p_total``. ``update`` passes ``self.density_df``;
             :func:`swap_density_df` passes its own frame.
         unit_state : dict[str, dict]
-            Per-line native-grid state captured at combine time (transient
+            Per-unit native-grid state captured at combine time (transient
             — the caller frees it after this returns): ``xs`` the unit's
             native loss grid, ``p`` the unit's pmf on it, and ``ft_p`` the
             (padded) rfft of the pmf laid into the physical-zero FFT
@@ -3242,7 +3242,7 @@ class Portfolio(object):
 
         On a signed (P&L) grid the equal-priority share ``kappa/x`` is
         not a recovery share, so the share-based columns (``exi_x*_*``,
-        ``exa_{line}``) are left NaN rather than divided through zero;
+        ``exa_{unit}``) are left NaN rather than divided through zero;
         the conditional means (``exeqa/exlea/exgta``), ``lev_*`` and the
         total columns are valid on any signed window.
         """
@@ -3288,19 +3288,19 @@ class Portfolio(object):
         df['exgta_total'] = exgta_total
         df['exeqa_total'] = loss  # E[X | X=a] = a
 
-        # kappa numerators: not-line FT products plus the native
+        # kappa numerators: not-unit FT products plus the native
         # first-moment FTs, all in the physical-zero buffer convention
         # (transient — freed with unit_state when the caller returns).
         ft_all, ft_nots = self._ft_nots(
             {nm: st['ft_p'] for nm, st in unit_state.items()})
         m_buf = 2 * (len(ft_all) - 1)
 
-        for col in self.line_names:
+        for col in self.unit_names:
             st = unit_state[col]
             xs_n = np.asarray(st['xs'], dtype=float)
             p_n = np.asarray(st['p'], dtype=float)
 
-            # exeqa_{line} = E[X_i | X=a] = ift(ft_xp_i · ft_not_i) / p_total,
+            # exeqa_{unit} = E[X_i | X=a] = ift(ft_xp_i · ft_not_i) / p_total,
             # ft_xp_i from the native physical values (shifted-support method);
             # rebased onto the output window by the same roll as p_total.
             # j_native: signed bucket numbers; the % m_buf wrap places
@@ -3587,7 +3587,7 @@ class Portfolio(object):
         calibration_df = complete_pentagon(
             pd.DataFrame([[coc, p_val, self.cdf(a), exa, P - exa, P, a - P]],
                          columns=['coc', 'p', 'F(a)', 'L', 'M', 'P', 'Q'],
-                         index=pd.Index(['calibration'], name='line')))
+                         index=pd.Index(['calibration'], name='unit')))
 
         self.distortion_df = distortion_df
         self.calibration_df = calibration_df
@@ -3621,7 +3621,7 @@ class Portfolio(object):
             :func:`~aggregate.spectral.choquet_weights`. Equivalent on a
             clean (normalized) law.
         allocation : {'lifted', 'linear'}
-            Tail-share choice for the per-line ``exag_*`` columns: lifted
+            Tail-share choice for the per-unit ``exag_*`` columns: lifted
             uses the distorted tail share ``exi_xgtag_*`` (beta), linear
             the objective ``exi_xgta_*`` (alpha). Identical column schema;
             the total columns do not depend on the choice.
@@ -3674,7 +3674,7 @@ class Portfolio(object):
         return self._augmented_dfs
 
     def pricing_at(self, distortion, *, p=None, a=None, allocation='lifted'):
-        """Pentagon pricing readout per line at probability ``p`` or asset ``a``.
+        """Pentagon pricing readout per unit at probability ``p`` or asset ``a``.
 
         Warms the augmented_df cache for ``distortion`` and pulls the
         ``L M P Q a | LR PQ ROE`` row at the requested asset level.
@@ -3690,22 +3690,22 @@ class Portfolio(object):
             Asset level; snapped to the index. Exactly one of ``p`` or ``a``
             must be provided.
         allocation : {'lifted', 'linear'}
-            Tail-share choice for the per-line premium allocation; passed
+            Tail-share choice for the per-unit premium allocation; passed
             through to :meth:`apply_distortion`.
 
         Returns
         -------
         pandas.DataFrame
-            Rows indexed by line (units + 'total'), columns
-            ``['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']``. Per-line
+            Rows indexed by unit (units + 'total'), columns
+            ``['L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']``. Per-unit
             ``a = P + Q`` (allocated assets); on ``total`` it equals the
             requested portfolio asset level.
 
         Notes
         -----
-        ``L = exa``, ``P = exag``, ``M = P - L``; per-line capital ``Q`` is
+        ``L = exa``, ``P = exag``, ``M = P - L``; per-unit capital ``Q`` is
         computed on demand by the layer-ROE construction
-        (:meth:`_line_capital_at` -- no persistent per-line ``Q`` column).
+        (:meth:`_unit_capital_at` -- no persistent per-unit ``Q`` column).
         Total ``Q`` uses the exact row identity ``a - exag_total``.
         """
         if (p is None) == (a is None):
@@ -3726,18 +3726,18 @@ class Portfolio(object):
                 f'pricing_at: asset level {a} not in augmented_df.index; using last row.')
             row = aug.iloc[-1]
             a = float(row['loss'])
-        lines = list(self.line_names_ex)
+        units = list(self.unit_names_ex)
         out = pd.DataFrame(
-            index=lines,
+            index=units,
             columns=['L', 'M', 'P', 'Q'],
             dtype=float,
         )
-        out.index.name = 'line'
-        line_q = self._line_capital_at(aug, a, distortion)
-        for line in self.line_names:
-            out.loc[line, 'L'] = row[f'exa_{line}']
-            out.loc[line, 'P'] = row[f'exag_{line}']
-            out.loc[line, 'Q'] = line_q[line]
+        out.index.name = 'unit'
+        unit_q = self._unit_capital_at(aug, a, distortion)
+        for unit in self.unit_names:
+            out.loc[unit, 'L'] = row[f'exa_{unit}']
+            out.loc[unit, 'P'] = row[f'exag_{unit}']
+            out.loc[unit, 'Q'] = unit_q[unit]
         out.loc['total', 'L'] = row['exa_total']
         out.loc['total', 'P'] = row['exag_total']
         out['M'] = out.P - out.L
@@ -3748,14 +3748,14 @@ class Portfolio(object):
         out = complete_pentagon(out)
         return out
 
-    def pentagon_at(self, distortion, *, p=None, a=None, line='total',
+    def pentagon_at(self, distortion, *, p=None, a=None, unit='total',
                     allocation='lifted'):
-        """Single-line pentagon as a :class:`~aggregate.pentagon.Pentagon` object.
+        """Single-unit pentagon as a :class:`~aggregate.pentagon.Pentagon` object.
 
         The object-flavored analogue of :meth:`pricing_at`: returns one fully
         solved :class:`Pentagon` (an eight-vector with named attributes and
-        provenance) for ``line`` at probability ``p`` or asset level ``a``,
-        rather than a DataFrame of all lines. The natural entry point for the
+        provenance) for ``unit`` at probability ``p`` or asset level ``a``,
+        rather than a DataFrame of all units. The natural entry point for the
         "complete a partial input" workflow — the returned object carries the
         accounting identities and can be re-solved.
 
@@ -3768,10 +3768,10 @@ class Portfolio(object):
             one of ``p`` or ``a`` must be provided.
         a : float, optional
             Asset level; snapped to the index.
-        line : str, default 'total'
+        unit : str, default 'total'
             Which unit to read (``'total'`` for the portfolio total).
         allocation : {'lifted', 'linear'}
-            Tail-share choice for the per-line premium allocation; passed
+            Tail-share choice for the per-unit premium allocation; passed
             through to :meth:`apply_distortion`.
 
         Returns
@@ -3783,8 +3783,8 @@ class Portfolio(object):
         -----
         Reads the same augmented-distortion row as :meth:`pricing_at`; the
         total ``Q`` uses the exact ``a - exag_total`` (matching ``pricing_at``),
-        per-line ``Q`` the on-demand layer-ROE construction
-        (:meth:`_line_capital_at`), so the two agree.
+        per-unit ``Q`` the on-demand layer-ROE construction
+        (:meth:`_unit_capital_at`), so the two agree.
         """
         if (p is None) == (a is None):
             raise ValueError(
@@ -3803,13 +3803,13 @@ class Portfolio(object):
             row = aug.iloc[-1]
             a = float(row['loss'])
         peg = Pentagon(obj=self)
-        L = row[f'exa_{line}']
-        P = row[f'exag_{line}']
-        if line == 'total':
+        L = row[f'exa_{unit}']
+        P = row[f'exag_{unit}']
+        if unit == 'total':
             # exact total Q, matching pricing_at
             Q = a - row['exag_total']
         else:
-            Q = self._line_capital_at(aug, a, distortion, lines=[line])[line]
+            Q = self._unit_capital_at(aug, a, distortion, units=[unit])[unit]
         # L, P, Q are the three independent amounts; M = P - L, a = P + Q follow.
         peg.solve(L=L, P=P, Q=Q)
         peg.distortion = distortion
@@ -3851,10 +3851,10 @@ class Portfolio(object):
           stable; with a mass on an unbounded support the linear frame
           is built with the beta columns blanked.
         * **Signed support.** The total columns (``gS``, ``gp_total``,
-          ``exag_total``) are exact on any signed window. The per-line
+          ``exag_total``) are exact on any signed window. The per-unit
           ``exag_*`` columns require the equal-priority share
           ``kappa/x`` -- not a recovery share on a signed grid
-          (steering 6) -- and are left NaN; price signed line variables
+          (steering 6) -- and are left NaN; price signed unit variables
           directly via ``dot(exeqa_i, gp_total)``.
         * The frame is truncated at the last reliable ``exeqa`` row
           (FFT-noise cut, positional); the tail sums feeding beta are
@@ -3893,20 +3893,20 @@ class Portfolio(object):
 
         if signed:
             # equal-priority kappa/x is not a recovery share on a signed
-            # grid (steering 6): blank the per-line distorted allocation;
+            # grid (steering 6): blank the per-unit distorted allocation;
             # totals above are exact.
-            for line in self.line_names:
-                df[f'exi_xgtag_{line}'] = np.nan
-                df[f'exag_{line}'] = np.nan
+            for unit in self.unit_names:
+                df[f'exi_xgtag_{unit}'] = np.nan
+                df[f'exag_{unit}'] = np.nan
             return df
 
         # Truncate where the exeqa decomposition breaks down (FFT noise;
         # discrete "gaps" in p_total are ignored — error is only
         # meaningful on support). Positional indexing: no zero-origin
-        # assumption. Truncate BEFORE the per-line sweep: beyond the cut
-        # the shares are FFT junk, so the per-line tail sums close with a
+        # assumption. Truncate BEFORE the per-unit sweep: beyond the cut
+        # the shares are FFT junk, so the per-unit tail sums close with a
         # collapsed atom at the cut (below) rather than integrating noise.
-        lnp = '|'.join(self.line_names)
+        lnp = '|'.join(self.unit_names)
         idx_pne0 = df.query(' p_total > 0 ').index
         exeqa_err = np.abs(
             (df.loc[idx_pne0].filter(regex=f'exeqa_({lnp})').sum(axis=1) - df.loc[idx_pne0].loss) /
@@ -3923,36 +3923,36 @@ class Portfolio(object):
             gS = gS[:idx]
             gp = gp[:idx]
 
-        # Per-line distorted tail shares (beta) and allocations. The share
+        # Per-unit distorted tail shares (beta) and allocations. The share
         # columns are exi_xeqa = kappa/x with the origin-row 0 convention
         # (add_exa). The distorted tail mass beyond the cut, g(S_cut) in
         # total, collapses onto the cut row at its share -- the exact
         # analogue of the old fill-value closure; it vanishes when the
         # frame runs to the end of the support (gS_cut == 0).
         gSeq0 = gS == 0
-        for line in self.line_names:
-            share = df[f'exi_xeqa_{line}'].to_numpy()
-            kappa = df[f'exeqa_{line}'].to_numpy()
+        for unit in self.unit_names:
+            share = df[f'exi_xeqa_{unit}'].to_numpy()
+            kappa = df[f'exeqa_{unit}'].to_numpy()
             sgp = share * gp
             # strict tail sum Σ_{j>k} share_j gp_j + the collapsed closure
             closure = share[-1] * gS[-1]
             tail_g_share = (np.cumsum(sgp[::-1])[::-1] - sgp) + closure
             with np.errstate(divide='ignore', invalid='ignore'):
                 beta = np.where(gSeq0, 0.0, tail_g_share / gS)
-            df[f'exi_xgtag_{line}'] = beta
-            tail = beta if allocation == 'lifted' else df[f'exi_xgta_{line}'].to_numpy()
+            df[f'exi_xgtag_{unit}'] = beta
+            tail = beta if allocation == 'lifted' else df[f'exi_xgta_{unit}'].to_numpy()
             if mass_unbounded:
                 # linear frame under a mass distortion on an unbounded
                 # support: beta inherits the top-bucket artifact -- blank
                 # it; the alpha-based allocation below is stable.
-                df[f'exi_xgtag_{line}'] = np.nan
-            df[f'exag_{line}'] = (
+                df[f'exi_xgtag_{unit}'] = np.nan
+            df[f'exag_{unit}'] = (
                 np.cumsum(kappa * gp)
                 + np.where(gSeq0, 0.0, loss * gS * tail))
         return df
 
-    def _line_capital_at(self, aug, a, dist, *, view='ask', lines=None):
-        r"""Per-line allocated capital ``Q_i(a)`` by the layer-ROE construction.
+    def _unit_capital_at(self, aug, a, dist, *, view='ask', units=None):
+        r"""Per-unit allocated capital ``Q_i(a)`` by the layer-ROE construction.
 
         .. math::
 
@@ -3960,10 +3960,10 @@ class Portfolio(object):
                 \left(gS_k\,\beta_{i,k} - S_k\,\alpha_{i,k}\right)
                 \frac{1 - gS_k}{gS_k - S_k}\,\Delta x_k
 
-        -- line layer margin divided by total layer ROE, integrated. This
+        -- unit layer margin divided by total layer ROE, integrated. This
         is the one legitimately layer-based quantity (capital *is*
         allocated by layer); it is computed on demand at the requested
-        ``a`` (D7: no persistent per-line ``Q`` column). A ``gS == S``
+        ``a`` (D7: no persistent per-unit ``Q`` column). A ``gS == S``
         layer has zero margin and contributes zero capital (the ratio is
         guarded). The layer margin is taken as the exact first difference
         of the frame's cumulative margin ``exag_i - exa_i``, which equals
@@ -3980,17 +3980,17 @@ class Portfolio(object):
         dist : Distortion
             The distortion that built ``aug``; supplies ``g'(1)`` for the
             L'Hôpital ROE limit at ``gS == 1`` layers (the fully
-            loss-funded bottom, where line margins may offset with zero
+            loss-funded bottom, where unit margins may offset with zero
             total layer capital).
         view : {'ask', 'bid'}
             View used to build ``aug`` (resolves the effective ``g'``).
-        lines : list of str, optional
-            Subset of unit names; default all ``line_names``.
+        units : list of str, optional
+            Subset of unit names; default all ``unit_names``.
 
         Returns
         -------
         dict[str, float]
-            ``{line: Q_i(a)}``.
+            ``{unit: Q_i(a)}``.
 
         Notes
         -----
@@ -3998,8 +3998,8 @@ class Portfolio(object):
         scale-aware) whenever no layer hit the zero-margin guard; the
         identity carries the origin through ``exag_total``.
         """
-        if lines is None:
-            lines = list(self.line_names)
+        if units is None:
+            units = list(self.unit_names)
         loss = aug.loss.to_numpy()
         pos = int(np.searchsorted(loss, a))
         # layers [x_k, x_{k+1}) for k < pos lie below a
@@ -4010,7 +4010,7 @@ class Portfolio(object):
         # reciprocal layer ROE = (1 - gS)/(gS - S). At gS == 1 (fully
         # loss-funded layers, 0/0) use the L'Hôpital limit
         # 1/ROE(1) = g'(1)/(1 - g'(1)); when g'(1) == 1 (identity) the
-        # line margins are zero there and the fill is moot (guarded to 0
+        # unit margins are zero there and the fill is moot (guarded to 0
         # below). A genuine zero-total-margin layer (gS == S with
         # gS < 1) has zero margin and contributes zero capital.
         _, g_prime, _ = dist.effective_g(view,
@@ -4030,21 +4030,21 @@ class Portfolio(object):
                 one_minus_gS == 0, inv_fill,
                 np.where(denom != 0, one_minus_gS / np.where(denom == 0, 1.0, denom), 0.0))
         out = {}
-        for line in lines:
+        for unit in units:
             # layer margin·Δx as the exact first difference of the frame's
             # cumulative margin: for the lifted frame this telescopes to
             # (gS·beta - S·alpha)·Δx identically; for the linear frame it
             # is the frame-consistent (alpha-based) margin, which stays
             # stable under a mass distortion on an unbounded support
             # (where beta is blanked).
-            cum_margin = (aug[f'exag_{line}']
-                          - aug[f'exa_{line}']).to_numpy()
+            cum_margin = (aug[f'exag_{unit}']
+                          - aug[f'exa_{unit}']).to_numpy()
             m_dx = np.diff(cum_margin)[:pos]
             # zero-margin layers contribute zero even when ratio is the
             # inf fill (0·inf guard)
-            out[line] = float(np.sum(np.where(m_dx == 0, 0.0, m_dx * ratio)))
+            out[unit] = float(np.sum(np.where(m_dx == 0, 0.0, m_dx * ratio)))
         guarded = (denom == 0) & (one_minus_gS != 0)
-        if (len(lines) == len(self.line_names) and pos
+        if (len(units) == len(self.unit_names) and pos
                 and not guarded.any()):
             total = sum(out.values())
             target = a - float(aug['exag_total'].to_numpy()[pos])
@@ -4052,7 +4052,7 @@ class Portfolio(object):
             rec_tol = max(1e-9, 64 * pos * np.finfo(float).eps)
             if abs(total - target) > rec_tol * scale:
                 logger.warning(
-                    f'line capital reconciliation: sum Q_i = {total:.10g} vs '
+                    f'unit capital reconciliation: sum Q_i = {total:.10g} vs '
                     f'a - exag_total = {target:.10g} '
                     f'(rel {abs(total - target) / scale:.3e})')
         return out
@@ -4080,9 +4080,9 @@ class Portfolio(object):
         -------
         pandas.DataFrame
             Indexed like the augmented frame. Carries ``loss``, ``F``,
-            ``gF``, ``S``, ``gS``, ``gp_total``; per line ``exeqa_*``
+            ``gF``, ``S``, ``gS``, ``gp_total``; per unit ``exeqa_*``
             (kappa), ``exi_xgta_*`` (alpha), ``exi_xgtag_*`` (beta); and
-            the layer curves, per line and total:
+            the layer curves, per unit and total:
 
             * ``layer_loss_*`` = ``S·alpha`` (total: ``S``)
             * ``layer_premium_*`` = ``gS·beta`` (total: ``gS``)
@@ -4101,10 +4101,10 @@ class Portfolio(object):
                                     S_calculation=S_calculation,
                                     allocation=surface)
         cols = ['loss', 'F', 'S', 'gS', 'gF', 'gp_total']
-        cols += [c for line in self.line_names_ex
-                 for c in (f'exeqa_{line}', f'exi_xgta_{line}',
-                           f'exi_xgtag_{line}', f'exa_{line}',
-                           f'exag_{line}')
+        cols += [c for unit in self.unit_names_ex
+                 for c in (f'exeqa_{unit}', f'exi_xgta_{unit}',
+                           f'exi_xgtag_{unit}', f'exa_{unit}',
+                           f'exag_{unit}')
                  if c in aug.columns]
         df = aug[cols].copy()
 
@@ -4130,20 +4130,20 @@ class Portfolio(object):
             return np.concatenate(([0.0], np.cumsum(layer[:-1] * dx)))
 
         with np.errstate(divide='ignore', invalid='ignore'):
-            for line in self.line_names:
-                alpha = aug[f'exi_xgta_{line}'].to_numpy()
-                beta = aug[f'exi_xgtag_{line}'].to_numpy()
+            for unit in self.unit_names:
+                alpha = aug[f'exi_xgta_{unit}'].to_numpy()
+                beta = aug[f'exi_xgtag_{unit}'].to_numpy()
                 ll = S * alpha
                 lp = gS * beta
                 lm = lp - ll
-                df[f'layer_loss_{line}'] = ll
-                df[f'layer_premium_{line}'] = lp
-                df[f'layer_margin_{line}'] = lm
+                df[f'layer_loss_{unit}'] = ll
+                df[f'layer_premium_{unit}'] = lp
+                df[f'layer_margin_{unit}'] = lm
                 lq = np.where(layer_roe != 0, lm / layer_roe, np.nan)
-                df[f'layer_capital_{line}'] = lq
-                df[f'cum_margin_{line}'] = (
-                    aug[f'exag_{line}'] - aug[f'exa_{line}'])
-                df[f'cum_capital_{line}'] = cum_int(np.nan_to_num(lq))
+                df[f'layer_capital_{unit}'] = lq
+                df[f'cum_margin_{unit}'] = (
+                    aug[f'exag_{unit}'] - aug[f'exa_{unit}'])
+                df[f'cum_capital_{unit}'] = cum_int(np.nan_to_num(lq))
         df['layer_loss_total'] = S
         df['layer_premium_total'] = gS
         df['layer_margin_total'] = gS - S
@@ -4155,9 +4155,9 @@ class Portfolio(object):
 
     def var_dict(self, p, kind='lower', total='total', snap=False):
         """
-        make a dictionary of value at risks for each line and the whole portfolio.
+        make a dictionary of value at risks for each unit and the whole portfolio.
 
-         Returns: {line : var(p, kind)} and includes the total as self.name line
+         Returns: {unit : var(p, kind)} and includes the total as self.name unit
 
         Example:
 
@@ -4218,7 +4218,7 @@ class Portfolio(object):
         Returns
         -------
         PricingResult
-            Per-line ``df`` (pentagon columns), the total price scalar,
+            Per-unit ``df`` (pentagon columns), the total price scalar,
             ``price_dict`` keyed by distortion, and ``a_reg`` / ``reg_p``.
         """
         if allocation is None:
@@ -4258,15 +4258,15 @@ class Portfolio(object):
                 a_eff = float(aug_row['loss'])
 
             df = pd.DataFrame(
-                index=pd.Index(list(self.line_names_ex), name='line'),
+                index=pd.Index(list(self.unit_names_ex), name='unit'),
                 columns=['L', 'M', 'P', 'Q'],
                 dtype=float,
             )
-            line_q = self._line_capital_at(aug_df, a_eff, v, view=view)
-            for line in self.line_names:
-                df.loc[line, 'L'] = aug_row[f'exa_{line}']
-                df.loc[line, 'P'] = aug_row[f'exag_{line}']
-                df.loc[line, 'Q'] = line_q[line]
+            unit_q = self._unit_capital_at(aug_df, a_eff, v, view=view)
+            for unit in self.unit_names:
+                df.loc[unit, 'L'] = aug_row[f'exa_{unit}']
+                df.loc[unit, 'P'] = aug_row[f'exag_{unit}']
+                df.loc[unit, 'Q'] = unit_q[unit]
             df.loc['total', 'L'] = aug_row['exa_total']
             df.loc['total', 'P'] = aug_row['exag_total']
             df['M'] = df.P - df.L
@@ -4283,7 +4283,7 @@ class Portfolio(object):
         """
         Price each unit on a stand-alone basis and compare to the diversified whole.
 
-        Every unit is priced *as if it were the only line in the book*: its
+        Every unit is priced *as if it were the only unit in the book*: its
         capital standard is its own VaR at level ``p`` (no diversification
         credit), and the distortion ``dist`` is applied to its own loss
         distribution. This is contrasted with the ``total`` column — the whole
@@ -4366,7 +4366,7 @@ class Portfolio(object):
 
         # ---- sum of the stand-alone parts: amounts add, ratios re-derive --
         sop = parts[['L', 'M', 'P', 'Q']].sum().to_frame('sum').T
-        sop.index.name = 'line'
+        sop.index.name = 'unit'
         sop = complete_pentagon(sop)
 
         # ---- assemble in canonical orientation: stats are the columns, one
@@ -4425,7 +4425,7 @@ class Portfolio(object):
                 f'(one of P, M, Q, LR, PQ, ROE); got {n_targets}.')
         pent = Pentagon(obj=self)
         pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=LR, pq=PQ, roe=ROE)
-        return pent.as_frame(line='total')
+        return pent.as_frame(unit='total')
 
     def price_ccoc(self, ccoc, *, p):
         """
@@ -4461,7 +4461,7 @@ class Portfolio(object):
         Returns
         -------
         AnalyzeDistortionResult
-            Holds the per-line pricing DataFrame (from :meth:`pricing_at`)
+            Holds the per-unit pricing DataFrame (from :meth:`pricing_at`)
             and a one-row ``audit_df`` for the total: descriptor columns
             ``dname``, ``dshape`` first, then the canonical pentagon octet
             (:data:`~aggregate.pentagon.PENTAGON_STATS`) as the trailing eight.
@@ -4485,7 +4485,7 @@ class Portfolio(object):
              'M': pricing_df.loc['total', 'M'],
              'P': pricing_df.loc['total', 'P'],
              'Q': pricing_df.loc['total', 'Q']},
-            index=pd.Index(['total'], name='line'),
+            index=pd.Index(['total'], name='unit'),
         )
         audit_df = complete_pentagon(audit_df)
         return AnalyzeDistortionResult(
@@ -4514,7 +4514,7 @@ class Portfolio(object):
         -------
         AnalyzeDistortionsResult
             ``pricing_df`` is the concatenated exhibit with MultiIndex
-            ``(distortion, stat)`` on rows and line names on columns;
+            ``(distortion, stat)`` on rows and unit names on columns;
             ``stat`` runs over ``['L', 'LR', 'M', 'P', 'PQ', 'Q', 'ROE', 'a']``.
             ``augmented_dfs`` is a snapshot of the cache for the analysed
             distortions.
@@ -4524,7 +4524,7 @@ class Portfolio(object):
         Replaces both the legacy ``analyze_distortions(a=0, p=0, ...)`` and
         ``analyze_distortions2(p, dists=None)``. The output shape matches the
         legacy ``analyze_distortions2``: rows are ``(distortion, stat)``,
-        columns are line names.
+        columns are unit names.
 
         A mass distortion on an unbounded portfolio cannot build the
         lifted frame (the mass lands on the last represented bucket); such
@@ -4556,13 +4556,13 @@ class Portfolio(object):
                     f'refused). Price it explicitly with '
                     f"allocation='linear'.")
                 continue
-            # pricing_at returns lines × canonical pentagon columns; transpose
-            # so stats are rows and lines are columns. The transpose drops the
+            # pricing_at returns units × canonical pentagon columns; transpose
+            # so stats are rows and units are columns. The transpose drops the
             # categorical column dtype, so work in plain string labels here and
             # reapply the canonical stat order/dtype after concat.
             exhibit = self.pricing_at(d, a=a_cal).T
             exhibit.index = exhibit.index.astype(str)
-            # 'a' row: P + Q per line, rescaled so totals sum to a_cal.
+            # 'a' row: P + Q per unit, rescaled so totals sum to a_cal.
             a_row = exhibit.loc['P'] + exhibit.loc['Q']
             a_row = a_row * a_cal / a_row['total']
             exhibit.loc['a'] = a_row
@@ -4600,7 +4600,7 @@ class Portfolio(object):
 
 
     @property
-    def line_renamer(self):
+    def unit_renamer(self):
         """
         plausible defaults for nicer looking names
 
@@ -4623,15 +4623,15 @@ class Portfolio(object):
                 return ln.replace('.', ' ').title()
             if ln.find(':') > 0:
                 return ln.replace(':', ' ').title()
-            # numbered lines
+            # numbered units
             ln = re.sub('([A-Z])m([0-9]+)', r'$\1_{-\2}$', ln)
             ln = re.sub('([A-Z])([0-9]+)', r'$\1_{\2}$', ln)
             return ln
 
-        if self._line_renamer is None:
-            self._line_renamer = { ln: rename(ln) for ln in self.line_names_ex}
+        if self._unit_renamer is None:
+            self._unit_renamer = { ln: rename(ln) for ln in self.unit_names_ex}
 
-        return self._line_renamer
+        return self._unit_renamer
 
     def nice_program(self, wrap_col=90):
         """
@@ -4673,7 +4673,7 @@ class Portfolio(object):
 
         """
         df = pd.DataFrame(index=range(n))
-        for c in self.line_names:
+        for c in self.unit_names:
             # native unit pmf via the accessor (the p_{unit} columns left
             # density_df at numerics-2); same draw mechanics as before.
             pc = f'p_{c}'
@@ -4692,18 +4692,8 @@ class Portfolio(object):
         return df
 
     @property
-    def unit_names(self):
-        # what these should have been called!
-        return self.line_names
-
-    @property
-    def unit_names_ex(self):
-        # what these should have been called!
-        return self.line_names_ex
-
-    @property
     def n_units(self):
-        return len(self.line_names)
+        return len(self.unit_names)
 
     def make_comonotonic_allocations(self, max_loss=-1):
         """
@@ -4738,7 +4728,7 @@ class Portfolio(object):
 def swap_density_df(port, new_df, padding=1):
     """Swap a Portfolio's ``density_df`` for one with new marginal densities.
 
-    Recombine the per-line densities (``p_{line}`` columns) by FFT,
+    Recombine the per-unit densities (``p_{unit}`` columns) by FFT,
     recompute the ``add_exa`` derivatives, and refresh the empirical
     rows of ``port.stats_df`` via :func:`xsden_to_mwrangler`. The
     swapped object has **no** ``mixed`` / ``independent`` columns —
@@ -4758,10 +4748,10 @@ def swap_density_df(port, new_df, padding=1):
     Parameters
     ----------
     port : Portfolio
-        Target object. ``port.agg_list`` and ``port.line_names`` set
-        which ``p_{line}`` columns are read from ``new_df``.
+        Target object. ``port.agg_list`` and ``port.unit_names`` set
+        which ``p_{unit}`` columns are read from ``new_df``.
     new_df : pandas.DataFrame
-        Indexed by the loss grid; carries ``loss`` and one ``p_{line}``
+        Indexed by the loss grid; carries ``loss`` and one ``p_{unit}``
         column per unit. ``p_total`` is recomputed by FFT convolution.
     padding : int
         FFT padding for the recombination (default 1).
@@ -4772,16 +4762,16 @@ def swap_density_df(port, new_df, padding=1):
     port.bs = float(new_df['loss'].iloc[1] - new_df['loss'].iloc[0])
 
     # Recombine via FFT and build the per-unit state ``add_exa`` needs:
-    # the user-supplied ``p_{line}`` columns ARE the native unit pmfs
+    # the user-supplied ``p_{unit}`` columns ARE the native unit pmfs
     # here, on the frame's own (zero-origin) grid.
     xs = port.density_df['loss'].to_numpy()
     ft_all = None
     unit_state = {}
     for agg in port.agg_list:
         raw_nm = agg.name
-        p_line = port.density_df[f'p_{raw_nm}'].to_numpy()
-        ft_p = ft(p_line, padding)
-        unit_state[raw_nm] = dict(xs=xs, p=p_line, ft_p=ft_p)
+        p_unit = port.density_df[f'p_{raw_nm}'].to_numpy()
+        ft_p = ft(p_unit, padding)
+        unit_state[raw_nm] = dict(xs=xs, p=p_unit, ft_p=ft_p)
         if ft_all is None:
             ft_all = np.copy(ft_p)
         else:
@@ -4796,13 +4786,13 @@ def swap_density_df(port, new_df, padding=1):
     # columns at NaN. xsden_to_mwrangler tolerates a deficit if the
     # marginals don't sum to 1.
     xs = port.density_df['loss'].to_numpy()
-    for line in port.line_names:
-        mw = xsden_to_mwrangler(xs, port.density_df[f'p_{line}'].to_numpy())
+    for unit in port.unit_names:
+        mw = xsden_to_mwrangler(xs, port.density_df[f'p_{unit}'].to_numpy())
         ex1, ex2, ex3 = mw.noncentral
         m, cv, skew = mw.mcvsk
         for measure, value in [('ex1', ex1), ('ex2', ex2), ('ex3', ex3),
                                ('mean', m), ('cv', cv), ('skew', skew)]:
-            port.stats_df.loc[('agg', measure), line] = value
+            port.stats_df.loc[('agg', measure), unit] = value
             port.stats_df.loc[('agg', measure), 'empirical'] = np.nan  # no longer valid
     mw_total = xsden_to_mwrangler(xs, port.density_df['p_total'].to_numpy())
     ex1, ex2, ex3 = mw_total.noncentral

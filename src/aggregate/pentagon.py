@@ -266,18 +266,18 @@ class Pentagon():
         """Return the eight values as a ``pandas.Series`` (canonical order)."""
         return pd.Series(self.values, index=pd.Index(self.index, name='stat'))
 
-    def as_frame(self, line='total'):
+    def as_frame(self, unit='total'):
         """Return a canonical one-row ``DataFrame``.
 
-        Row indexed by ``line`` (name ``'line'``); columns are the eight
+        Row indexed by ``unit`` (name ``'unit'``); columns are the eight
         :data:`PENTAGON_STATS` with :data:`PENTAGON_DTYPE`.
 
         Parameters
         ----------
-        line : str, default 'total'
+        unit : str, default 'total'
             Index label for the single row.
         """
-        df = pd.DataFrame([self.values], index=pd.Index([line], name='line'),
+        df = pd.DataFrame([self.values], index=pd.Index([unit], name='unit'),
                           columns=self.index)
         df.columns = pd.CategoricalIndex(
             df.columns, dtype=PENTAGON_DTYPE, name='stat')
@@ -308,13 +308,13 @@ class Pentagon():
             assert np.allclose(self.ROE, self.M / self.Q, atol=1e-14, rtol=1e-14), f'{self.ROE} != {self.M / self.Q}'
 
     @classmethod
-    def from_row(cls, row, line='total', *, distortion=None, obj=None):
+    def from_row(cls, row, unit='total', *, distortion=None, obj=None):
         """Build a solved ``Pentagon`` from an augmented-distortion row.
 
-        Pulls the core amounts for ``line`` off a single row of an
-        ``apply_distortion`` augmented frame (``exa_{line}``/``exag_{line}``,
+        Pulls the core amounts for ``unit`` off a single row of an
+        ``apply_distortion`` augmented frame (``exa_{unit}``/``exag_{unit}``,
         with ``M = P - L``; the unsuffixed ``exa``/``exag`` for a bare
-        ``Aggregate``), solves, and attaches optional provenance. Per-line
+        ``Aggregate``), solves, and attaches optional provenance. Per-unit
         capital ``Q`` is a layer-integral quantity not derivable from one
         row -- use :meth:`Portfolio.pentagon_at` when ``Q`` is needed.
 
@@ -322,7 +322,7 @@ class Pentagon():
         ----------
         row : pandas.Series
             One row of an augmented ``density_df`` (e.g. ``aug.loc[a_reg]``).
-        line : str, default 'total'
+        unit : str, default 'total'
             Which unit to read. ``'total'`` for the portfolio total.
         distortion : Distortion, optional
             Provenance, stored on ``.distortion`` (and ``.shape``).
@@ -337,18 +337,18 @@ class Pentagon():
         Notes
         -----
         A bare ``Aggregate`` augmented row exposes ``exa``/``exag`` without a
-        line suffix; a ``Portfolio`` exposes ``exa_{line}`` etc. This reads
+        unit suffix; a ``Portfolio`` exposes ``exa_{unit}`` etc. This reads
         whichever is present.
         """
         p = cls(obj=obj)
-        if f'exa_{line}' in row.index:
-            L = row[f'exa_{line}']
-            P = row[f'exag_{line}']
+        if f'exa_{unit}' in row.index:
+            L = row[f'exa_{unit}']
+            P = row[f'exag_{unit}']
         else:
             # bare Aggregate row
             L = row['exa']
             P = row['exag']
-        # M = P - L; per-line Q needs the layer integral (pentagon_at)
+        # M = P - L; per-unit Q needs the layer integral (pentagon_at)
         p.solve(L=L, P=P, M=P - L)
         if distortion is not None:
             p.distortion = distortion

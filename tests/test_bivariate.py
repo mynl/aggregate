@@ -369,7 +369,7 @@ def test_netceded_via_decl():
     mv = build(f'netceded {NC_PROG}')
     assert isinstance(mv, BivariateAggregate)
     assert mv.mode == 'netceded'
-    assert mv.line_names == ['Net', 'Ceded']    # x=net, y=ceded convention
+    assert mv.unit_names == ['Net', 'Ceded']    # x=net, y=ceded convention
     nd, cd = mv.marginals()
     assert np.isclose(nd.sum(), 1.0, atol=1e-6)
     assert np.isclose(cd.sum(), 1.0, atol=1e-6)
@@ -387,7 +387,7 @@ def test_view_pair_decl_builds_and_labels(kw, views):
     mv = build(f'{kw} {NC_PROG}')
     assert isinstance(mv, BivariateAggregate)
     assert mv.mode == 'netceded'
-    assert mv.line_names == list(views)
+    assert mv.unit_names == list(views)
     m0, m1 = mv.marginals()
     assert np.isclose(m0.sum(), 1.0, atol=1e-6)
     assert np.isclose(m1.sum(), 1.0, atol=1e-6)
@@ -758,7 +758,7 @@ def test_clash_builds_and_derives_shared_count():
     mv = build(CLASH_PROG)
     assert isinstance(mv, BivariateAggregate)
     assert mv.mode == 'copula'
-    assert mv.line_names == ['Cat.A', 'Cat.B']
+    assert mv.unit_names == ['Cat.A', 'Cat.B']
     sol = solve_clash_model(8, 5, 2)
     assert mv.en == pytest.approx(sol.n)
     assert mv.clash['pa'] == pytest.approx(sol.pa)

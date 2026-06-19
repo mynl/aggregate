@@ -104,8 +104,29 @@ user code (and in `tests/test_price_pentagon.py:90`) must move to `'unit'`.
   (and its ~33 internal `line` refs; classify against the keep-table first).
 - `Pentagon.as_frame(line='total')` (`pentagon.py:269`) and
   `from_row(..., line='total')` (311) → `unit=`.
-- `multivariate` ctor `lines=None` (`multivariate.py:458`) → `units=None` (and
-  its ~47 internal refs — but check how many are the `linear`/text-line keepers).
+- `BivariateAggregate` (`bivariate.py`, formerly `multivariate.py` — renamed at
+  MV-7/a80) carries a **full LOB-sense surface** that must rename as a coupled set
+  (none of it is keep-table — no matplotlib / source-line / `linear` coincidences):
+  - ctor `BivariateAggregate.__init__(name, lines=None, …)` (`bivariate.py:564`)
+    → `units=None`; same for the `_init_netceded(self, name, lines, …)` param
+    (630, 638, 665, 667) → `units`.
+  - real storage `self.line_names` (set at 602 and 658) → `self.unit_names`;
+    `self._line_specs` (601, 607, 737) → `self._unit_specs`; `self.lines` (list
+    of `Aggregate`, set 615; read 626, 739, 963, 986) → `self.units`.
+  - ~20 internal `self.line_names` reads (1146, 1189–1190, 1214, 1276, 1310,
+    1339, 1347, 1392, 1436, 1452, 1468, 1484, 1544, 1562, 1564) → `unit_names`;
+    the `lines=…` text in the two `__repr__`/log strings (1562–1564) is the LOB
+    sense → `units=…`.
+  - docstring attrs `lines` / `line_names` (524, 546, 549) and the prose
+    "for that line" (518, 705) / "three or more correlated lines" (4) → unit form
+    (Stage G prose, but in this file so do it here).
+  - **spec key `'lines'` → `'units'` (coupled producer/consumer set):** produced
+    in `parser.py` at 551, 564, 586, 642 (`bv_out_copula`, `_nofreq`,
+    `_bv_out_viewpair`, `_clash_spec`); consumed by `decl_writer._render_bvagg`
+    at 563, 579, 582 and by the ctor via `BivariateAggregate(**spec)`
+    (`underwriter.py:858`). Rename all together or the bivariate round-trip
+    breaks. `Aggregate.occ_bivariate` (`distributions.py:3043`) builds via
+    `nc_agg=`/`nc_views=` and passes **no** `lines=` kwarg — unaffected.
 
 `allocation_bounds(..., units=None)` (`portfolio.py:652`) is **already** `units`
 — leave it; it confirms the target spelling.
@@ -129,7 +150,8 @@ covered in A.
 Update LOB references so the suite passes:
 - `.line_names` → `.unit_names` (~30 refs): `test_unit_density.py` (8),
   `test_numerics3_distortion.py` (6), `test_numerics2_objective.py` (5),
-  `test_multivariate.py:370`, `test_portfolio_peg_regression.py:127,130`.
+  `test_bivariate.py` (`.line_names`/`kind=='bvagg'` LOB refs),
+  `test_portfolio_peg_regression.py:127,130`.
 - `'line'` index assertions → `'unit'`: `test_price_pentagon.py:90`.
 - **Leave** the text-line parametrize machinery (`LINES`, `_line_id`,
   `parametrize("line", …)` in `test_decl_parser.py`, `test_splice_suite.py`) and
@@ -165,15 +187,18 @@ and the test text-line parametrize helpers. Each is explainable in one phrase.
 |---|---|---|
 | Core storage + accessors + delete pass-throughs (A) | `portfolio.py` | **high** — hottest file, ~30 sites, attribute-shadow hazard |
 | `'line'` index label (B) | `portfolio.py`, `pentagon.py`, `distributions.py` | **med-high** — breaking output; producer/consumer must move together |
-| `line=`/`lines=` kwargs (C) | `portfolio.py`, `bounds.py`, `pentagon.py`, `multivariate.py` | med — breaking for keyword callers |
+| `line=`/`lines=` kwargs + bivariate surface (C) | `portfolio.py`, `bounds.py`, `pentagon.py`, `bivariate.py`, `parser.py`, `decl_writer.py` | med — breaking for keyword callers; bivariate `'lines'` spec key is a coupled producer/consumer set |
 | `line_renamer` (D) | `portfolio.py` | low |
 | other modules (E) | `spectral.py`, `pedagogy.py`, `decl_writer.py`, `iman_conover.py`, … | low (after keep-table filter) |
 | tests (F) | ~6 LOB test files + baselines | med — baselines may need regen |
 | docs (G) | ~a dozen `.rst` after filter | med — volume, pending rebuild |
 
 DecL grammar (`decl.lark`) needs **no** change — it already uses "unit" in
-comments and never had a `line` token. Confirmed: no `line` spec key, no
-`build()` surface change.
+comments and never had a `line` token; no `build()`-language surface change. The
+**one** spec-key rename is internal: the `BivariateAggregate` spec carries a
+`'lines'` key (set by the parser, read by the ctor and `decl_writer`) → `'units'`
+(see C). It is not a DecL keyword and persisted bivariate specs are pre-1.0, so
+this is a safe internal rename, but producer and consumer must move together.
 
 ## Sequencing
 

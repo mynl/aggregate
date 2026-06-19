@@ -1,7 +1,7 @@
 """Bivariate aggregate distributions via copula + 2D FFT.
 
 This module is the first-class home of the joint-aggregate machinery. It is
-strictly **two-axis** by design: for three or more correlated lines the right
+strictly **two-axis** by design: for three or more correlated units the right
 path is independent components coupled by Iman--Conover and read back as a
 sample (the "switcheroo"), not a native shared-frequency ``rfftn`` convolution.
 It hosts:
@@ -515,13 +515,13 @@ class BivariateAggregate:
     copula (here gumbel upper-tail dependence), and the per-event trigger
     probabilities come from the inner ``dfreq [0 1] [p0 p1]`` Bernoulli forms.
     The result is the joint law ``(A_Wind, A_Flood)``; either marginal reproduces
-    the standalone aggregate for that line.
+    the standalone aggregate for that unit.
 
     Parameters
     ----------
     name : str
         Object name.
-    lines : list of tuple
+    units : list of tuple
         Exactly two ``('agg', name, spec)`` tuples (the component severity
         factories), as produced by the DecL transformer. A component may be a
         ``pnl`` (its spec then carries ``agg_reflect`` / ``agg_shift``); the
@@ -543,10 +543,10 @@ class BivariateAggregate:
 
     Attributes
     ----------
-    lines : list of Aggregate
+    units : list of Aggregate
         The two component **loss** aggregates (the per-event severity factories;
         any ``pnl`` affine is stripped here and reapplied per-axis after the FFT).
-    line_names : list of str
+    unit_names : list of str
         Component names.
     copula : Copula
     frequency : Frequency
@@ -561,7 +561,7 @@ class BivariateAggregate:
         Per-axis bucket sizes.
     """
 
-    def __init__(self, name, lines=None, copula=None, note='', hints='', mode='copula',
+    def __init__(self, name, units=None, copula=None, note='', hints='', mode='copula',
                  nc_agg=None, nc_kwargs=None, nc_views=None, clash=None,
                  exp_en=None, exp_el=None, exp_premium=None, exp_lr=None,
                  freq_name='poisson', freq_a=0.0, freq_b=0.0,
@@ -589,22 +589,22 @@ class BivariateAggregate:
         self.figure = None                 # set by plot()
 
         if mode == 'netceded':
-            self._init_netceded(name, lines, nc_agg, nc_kwargs, nc_views)
+            self._init_netceded(name, units, nc_agg, nc_kwargs, nc_views)
             return
 
-        if lines is None or len(lines) != 2:
+        if units is None or len(units) != 2:
             raise ValueError(
                 'bivariate (copula) requires exactly two components; '
-                f'got {0 if lines is None else len(lines)}')
+                f'got {0 if units is None else len(units)}')
         self.copula = copula
 
-        self._line_specs = [t[2] for t in lines]
-        self.line_names = [t[1] for t in lines]
+        self._unit_specs = [t[2] for t in units]
+        self.unit_names = [t[1] for t in units]
 
         # split off any per-axis pnl affine; build the loss twins
         self._affine = []
         loss_specs = []
-        for s in self._line_specs:
+        for s in self._unit_specs:
             reflect = bool(s.get('agg_reflect', False))
             shift = float(s.get('agg_shift', 0.0))
             self._affine.append((reflect, shift))
@@ -612,7 +612,7 @@ class BivariateAggregate:
                   if k not in ('agg_reflect', 'agg_shift',
                                'agg_premium', 'value_type')}
             loss_specs.append(ls)
-        self.lines = [Aggregate(**s) for s in loss_specs]
+        self.units = [Aggregate(**s) for s in loss_specs]
 
         # shared outer frequency + per-event severity raw moments (theoretical,
         # grid-independent, available at Aggregate.__init__)
@@ -623,11 +623,11 @@ class BivariateAggregate:
         self._freq_kwargs = dict(freq_name=freq_name, freq_a=freq_a,
                                  freq_b=freq_b, freq_zm=freq_zm, freq_p0=freq_p0)
         self._sev_moms = [self._raw3(a.agg_m, a.agg_sd, a.agg_skew)
-                          for a in self.lines]
+                          for a in self.units]
         self.en = self._resolve_en(exp_en, exp_el, exp_premium, exp_lr)
         self._gs = None
 
-    def _init_netceded(self, name, lines, nc_agg, nc_kwargs, nc_views):
+    def _init_netceded(self, name, units, nc_agg, nc_kwargs, nc_views):
         """Initialise the ``netceded`` mode: one reinsured aggregate split into
         the joint per-occurrence law of a chosen view-pair of {gross, ceded, net}.
 
@@ -635,7 +635,7 @@ class BivariateAggregate:
         ----------
         name : str
             Object name.
-        lines : list of tuple or None
+        units : list of tuple or None
             Either ``None`` (when ``nc_agg`` is supplied directly, the
             :meth:`aggregate.distributions.Aggregate.occ_bivariate` path) or a
             single ``('agg', name, spec)`` tuple (the DecL prefix path), from
@@ -655,16 +655,16 @@ class BivariateAggregate:
 
         self.copula = None
         self._views = tuple(nc_views) if nc_views else ('net', 'ceded')
-        self.line_names = [v.capitalize() for v in self._views]
+        self.unit_names = [v.capitalize() for v in self._views]
         self._affine = [(False, 0.0), (False, 0.0)]
         self._nc_kwargs = dict(nc_kwargs or {})
         if nc_agg is not None:
             self._nc_agg = nc_agg
             self._nc_built_here = False
         else:
-            if not lines:
+            if not units:
                 raise ValueError('netceded requires one component aggregate.')
-            self._nc_agg = Aggregate(**lines[0][2])
+            self._nc_agg = Aggregate(**units[0][2])
             self._nc_built_here = True
 
     # ------------------------------------------------------------------
@@ -702,7 +702,7 @@ class BivariateAggregate:
         """Analytic ``(mean, sd, skew)`` of component ``i``'s **loss** marginal.
 
         The outer compound of the per-event severity ``g_i`` -- the standalone
-        aggregate for that line in loss terms (before any ``pnl`` affine).
+        aggregate for that unit in loss terms (before any ``pnl`` affine).
         """
         f1, f2, f3 = self.frequency.freq_moms(self.en)
         s1, s2, s3 = self._sev_moms[i]
@@ -734,9 +734,9 @@ class BivariateAggregate:
         """
         from .distributions import Aggregate
 
-        spec = {k: v for k, v in self._line_specs[i].items()
+        spec = {k: v for k, v in self._unit_specs[i].items()
                 if k.startswith('sev_') or k in ('name', 'note')}
-        spec['exp_en'] = float(self.en) * float(self.lines[i].n)
+        spec['exp_en'] = float(self.en) * float(self.units[i].n)
         spec.update(self._freq_kwargs)
         return Aggregate(**spec)
 
@@ -960,7 +960,7 @@ class BivariateAggregate:
         self._j0 = []                    # output-window origin in buckets (final roll)
         self._mlog2 = []                 # log2 FFT buffer length per axis
         self._nout = [1 << L for L in log2s]
-        for i, a in enumerate(self.lines):
+        for i, a in enumerate(self.units):
             # Build the per-event severity g_i on its OWN natural grid at the
             # measured resolution (x_min='auto' so a signed component keeps its
             # negative buckets). The output window is measured separately from
@@ -983,7 +983,7 @@ class BivariateAggregate:
             self._mlog2.append(max(need, log2s[i]) + self.padding)
         # severity grids are the per-event grids (signed where the component is),
         # captured for the severity panel of plot().
-        self._sev_xs = [np.asarray(a.xs, dtype=float).copy() for a in self.lines]
+        self._sev_xs = [np.asarray(a.xs, dtype=float).copy() for a in self.units]
         self.update_work()
         return self
 
@@ -1143,7 +1143,7 @@ class BivariateAggregate:
             en, fname, cop = float(self.en), self.freq_name, str(self.copula)
         meta = {'name': self.name, 'en': en, 'freq_name': fname,
                 'copula': cop, 'deficit': self.deficit,
-                'axis_names': tuple(self.line_names)}
+                'axis_names': tuple(self.unit_names)}
         return BivariateDistribution(self.density, self.axis_xs[0],
                                      self.axis_xs[1], self.bs[0], self.bs[1],
                                      meta)
@@ -1186,8 +1186,8 @@ class BivariateAggregate:
         self._require_density()
         return pd.DataFrame(
             self.density,
-            index=pd.Index(self.axis_xs[0], name=self.line_names[0]),
-            columns=pd.Index(self.axis_xs[1], name=self.line_names[1]))
+            index=pd.Index(self.axis_xs[0], name=self.unit_names[0]),
+            columns=pd.Index(self.axis_xs[1], name=self.unit_names[1]))
 
     @property
     def stats_df(self):
@@ -1211,7 +1211,7 @@ class BivariateAggregate:
         self._require_density()
         m0, m1 = self.marginals()
         cols = {}
-        for i, (name, dens) in enumerate(zip(self.line_names, (m0, m1))):
+        for i, (name, dens) in enumerate(zip(self.unit_names, (m0, m1))):
             mt, sdt, skt = self._axis_theory(i)
             cvt = sdt / mt if mt else np.nan
             mw = xsden_to_mwrangler(self.axis_xs[i], dens)
@@ -1273,7 +1273,7 @@ class BivariateAggregate:
         self._require_density()
         rows = {}
         cols = ['kind', 'mean', 'sd', 'cv', 'skew', 'corr', 'copula_tau']
-        for i, name in enumerate(self.line_names):
+        for i, name in enumerate(self.unit_names):
             mt, sdt, skt = self._axis_theory(i)
             reflect, shift = self._affine[i]
             kind = 'netceded' if self.mode == 'netceded' else (
@@ -1307,13 +1307,13 @@ class BivariateAggregate:
         """Display-only 8-hex hash of the structural fields (mirrors Agg ``id``)."""
         import hashlib
         en = float(self._nc_agg.n) if self.mode == 'netceded' else float(self.en)
-        key = repr((self.name, self.mode, tuple(self.line_names),
+        key = repr((self.name, self.mode, tuple(self.unit_names),
                     str(self.copula), getattr(self, 'freq_name', ''), en))
         return hashlib.md5(key.encode()).hexdigest()[:8]
 
     @property
     def info(self):
-        """Fixed-layout multi-line summary string.
+        """Fixed-layout multi-unit summary string.
 
         Every row is always present, in the same order, for every
         ``BivariateAggregate``; a value that is not (yet) available -- e.g.
@@ -1336,7 +1336,7 @@ class BivariateAggregate:
         rows = [
             ('bivariate object name', self.name),
             ('mode', self.mode),
-            ('components', f'{self.line_names[0]} x {self.line_names[1]}'),
+            ('components', f'{self.unit_names[0]} x {self.unit_names[1]}'),
             ('copula', copula),
             ('shared frequency', freq_name),
             ('claim count', f'{en:,.3f}'),
@@ -1344,7 +1344,7 @@ class BivariateAggregate:
         ]
         for i in range(2):
             lbl = f'axis {i}'
-            rows.append((f'{lbl} name', self.line_names[i]))
+            rows.append((f'{lbl} name', self.unit_names[i]))
             rows.append((f'{lbl} kind', self._axis_kind(i)))
             if updated:
                 xs = self.axis_xs[i]
@@ -1389,7 +1389,7 @@ class BivariateAggregate:
             return abs(emp - theory) / abs(theory) if theory else abs(emp - theory)
 
         rows = {}
-        for name in self.line_names:
+        for name in self.unit_names:
             tm = float(sd.loc[('theoretical', 'mean'), name])
             em = float(sd.loc[('empirical', 'mean'), name])
             tcv = float(sd.loc[('theoretical', 'cv'), name])
@@ -1404,7 +1404,7 @@ class BivariateAggregate:
         return df
 
     def _explain_oneline(self):
-        """One-line validation summary for the ``info`` ``validation`` row.
+        """One-unit validation summary for the ``info`` ``validation`` row.
 
         The hard correctness gate is the joint **tail deficit** (< 1e-5): a
         measured grid conserves mass, so a deficit means a clipped / aliased
@@ -1433,7 +1433,7 @@ class BivariateAggregate:
         """
         self._require_density()
         rows = {}
-        for i, name in enumerate(self.line_names):
+        for i, name in enumerate(self.unit_names):
             xs = self.axis_xs[i]
             rows[name] = {
                 'kind': self._axis_kind(i), 'bs': self.bs[i],
@@ -1447,9 +1447,9 @@ class BivariateAggregate:
 
     @property
     def bs_description(self) -> str:
-        """One-line summary of the chosen per-axis grids."""
+        """One-unit summary of the chosen per-axis grids."""
         parts = [f'{name} bs={self._bs_str(i)} log2={int(round(np.log2(len(self.axis_xs[i]))))}'
-                 for i, name in enumerate(self.line_names)]
+                 for i, name in enumerate(self.unit_names)]
         return 'bivariate grid: ' + '; '.join(parts) + f' (deficit {self.deficit:.2e})'
 
     @property
@@ -1465,7 +1465,7 @@ class BivariateAggregate:
         self._require_density()
         m0, m1 = self.marginals()
         rows = {}
-        for i, (name, m) in enumerate(zip(self.line_names, (m0, m1))):
+        for i, (name, m) in enumerate(zip(self.unit_names, (m0, m1))):
             xs = self.axis_xs[i]
             nz = np.flatnonzero(m > 1e-15)
             mt, sdt, skt = self._axis_theory(i)
@@ -1481,7 +1481,7 @@ class BivariateAggregate:
 
     @property
     def tail_description(self) -> str:
-        """One-line per-axis support summary."""
+        """One-unit per-axis support summary."""
         df = self.tail_df
         parts = [f'{name} [{r.support_min:.4g}, {r.support_max:.4g}]'
                  for name, r in df.iterrows()]
@@ -1541,7 +1541,7 @@ class BivariateAggregate:
         else:
             self.figure = np.asarray(axs).flat[0].figure
         ax0, ax1 = np.asarray(axs).flat[:2]
-        n0, n1 = self.line_names
+        n0, n1 = self.unit_names
         self._contourf(ax0, self._sev_xs[0], self._sev_xs[1], self._S,
                        'severity', n0, n1, levels, log, **kwargs)
         self._contourf(ax1, self.axis_xs[0], self.axis_xs[1], self.density,
@@ -1559,9 +1559,9 @@ class BivariateAggregate:
         tag = self.mode if self.copula is None else repr(self.copula)
         if self.density is None:
             return (f'BivariateAggregate(name={self.name!r}, '
-                    f'lines={self.line_names!r}, {tag}, not updated)')
+                    f'units={self.unit_names!r}, {tag}, not updated)')
         return (f'BivariateAggregate(name={self.name!r}, '
-                f'lines={self.line_names!r}, {tag}, '
+                f'units={self.unit_names!r}, {tag}, '
                 f'shape={self.density.shape}, corr={self.corr():.4f})')
 
     def _repr_html_(self):

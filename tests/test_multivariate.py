@@ -427,6 +427,74 @@ def test_mv_bs_override_applies_to_both_axes():
     assert mv.bs[0] == 0.5 and mv.bs[1] == 0.5
 
 
+# A non-negative book whose mass lives far from 0 (low CV): 500-claim compound
+# of 10*uniform (mean 2500, sd ~129) and 20*uniform (mean 5000, sd ~258). The
+# window must NOT be pinned to a 0-based grid -- it must focus on the mass.
+FAR_FROM_ZERO_PROG = '''mv MV 500 claims
+    agg AL 1 claim  sev 10 * uniform fixed
+    agg GL 1 claim  sev 20 * uniform fixed
+    poisson'''
+
+
+def test_mv_far_from_zero_window_not_pinned_to_origin():
+    """A non-negative low-CV axis windows on its mass, not from 0 (no artificial pin)."""
+    mv = build(FAR_FROM_ZERO_PROG)
+    assert mv.deficit < 1e-6
+    for i, mean in enumerate((2500.0, 5000.0)):
+        x = mv.axis_xs[i]
+        # origin sits well above 0 (mass is ~20 sd from 0), not pinned to 0
+        assert x[0] > 0.5 * mean, f'axis {i} origin {x[0]} should be near the mass, not 0'
+        # the window brackets the mean
+        assert x[0] < mean < x[-1]
+        # marginal mean reproduces the standalone
+        m = mv.marginals()[i]
+        assert float((m * x).sum()) == pytest.approx(mean, rel=1e-3)
+
+
+def test_mv_per_axis_log2_tuple():
+    """``log2=(x, y)`` pins the per-axis split; the budget is their sum."""
+    mv = build(BUG_PROG, log2=(9, 11))
+    assert mv.density.shape == (1 << 9, 1 << 11)
+    # the auto split for this book is (11, 9); the tuple overrides it
+    auto = build(BUG_PROG)
+    assert auto.density.shape == (1 << 11, 1 << 9)
+    assert mv.deficit < 1e-6
+
+
+def test_mv_per_axis_bs_tuple():
+    """``bs=(x, y)`` pins the per-axis bucket size verbatim."""
+    mv = build(BUG_PROG, bs=(0.5, 0.0625))
+    assert mv.bs[0] == 0.5 and mv.bs[1] == 0.0625
+    assert mv.deficit < 1e-5
+
+
+def test_mv_split_changes_marginal_resolution():
+    """Giving the hard signed axis more log2 improves its sd (equal budget)."""
+    sd_theory = build(BUG_PROG)._marg_theory[1][1]
+
+    def sd_err(split):
+        mv = build(BUG_PROG, log2=split)
+        m, x = mv.marginals()[1], mv.axis_xs[1]
+        mean = (m * x).sum()
+        return abs(float(np.sqrt((m * x * x).sum() - mean ** 2)) - sd_theory)
+
+    # axis B (mean-0 signed) is resolution-starved; (9, 11) gives it the finer
+    # grid than (11, 9) -- both 2**20 cells total.
+    assert sd_err((9, 11)) < sd_err((11, 9))
+
+
+def test_mv_far_from_zero_resolution_beats_zero_based():
+    """Focusing on the mass buys finer resolution than a 0-based grid at equal budget.
+
+    Pinning to 0 would force ``bs ~ hi / 2**log2``; focusing on the measured
+    window gives ``bs ~ width / 2**log2`` -- here roughly half as coarse.
+    """
+    mv = build(FAR_FROM_ZERO_PROG)
+    # 10*uniform: mass in ~[1700, 3450]. A 0-based grid at log2=10 would need
+    # bs ~ 3450/1024 ~ 3.4; the focused grid fits the ~1733-wide window instead.
+    assert mv.bs[0] <= 3.0
+
+
 def test_mv_wrong_component_count_raises():
     prog = '''multivariate Bad 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2

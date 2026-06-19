@@ -200,6 +200,13 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     `_size_axis`; standalone-marginal + `balanced_window`, `update(log2=)` total
     budget, `[multivariate].total_log2`) + signed 2-D compound (`i0`/`j0`
     wrap-and-roll in `update_work`). 54%-deficit book → <1e-6.
+    - `[a73]` follow-up: use the **measured** lower edge for `x_min` (no
+      artificial 0-pin on non-negative far-from-0 axes; pnl stays 0-based);
+      FFT buffer `M` decoupled from output `N` (reach physical 0 without
+      aliasing).
+    - `[a74]` follow-up: per-axis `log2=(x,y)` / `bs=(x,y)` tuples on
+      `update`/`build` (explore the split); `round_bucket` ladder →
+      `{1,2,4,5,8}` (no >2x jumps, fixes the 2→5 overshoot, library-wide).
 
 ---
 

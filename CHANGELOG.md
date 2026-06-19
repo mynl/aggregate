@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.0.0a74
+
+### `round_bucket` ladder: no more 2.5x jumps
+
+`round_bucket` (the library-wide "nice bucket size" rounder) used a 1-2-5 decade
+ladder, so a raw `bs` of 3.4 jumped to **5** (a 2.5x overshoot; the `2→5` and
+`20→50` gaps). It now rounds **up** to the denser ladder `{1, 2, 4, 5, 8} * 10**k`
+for `bs ≥ 1` — every consecutive gap is ≤ 2x, so 3.4 → **4**, 5.5 → 8, 9 → 10.
+`bs < 1` keeps the powers-of-two ladder (binary-exact for the FFT grid; already
+≤ 2x). This is a blast-radius-wide change: any auto-sized `bs ≥ 1` may now land
+on a finer/closer value (4 and 8 are reachable; the overshoot is bounded < 2x).
+
+### Bivariate: per-axis `log2` / `bs` via `(x, y)` tuples
+
+`MultivariateAggregate.update` (and therefore `build(..., log2=…, bs=…)`) now
+accepts a 2-tuple to pin the axes independently:
+
+- `log2=(log2_x, log2_y)` pins the per-axis grid `log2` (budget = their sum);
+  a scalar remains the *total* budget split automatically.
+- `bs=(bs_x, bs_y)` pins the per-axis bucket size; a scalar applies to both.
+
+This lets you explore the split the auto-sizer doesn't — e.g. for the signed
+`DISCRETE.2` book at a 2²⁰ budget, the auto split `(11, 9)` (which equalizes
+`bs`) leaves the hard mean-0 axis under-resolved; `build(prog, log2=(9, 11))`
+gives that axis the finer grid and its sd error drops ~3x at identical memory.
+Tuples pass straight through `build`; they are bivariate-only (a tuple on a 1-D
+`agg`/`port` is unsupported).
+
+## 1.0.0a73
+
+### Bivariate windowing: use the measured lower edge (no artificial 0-pin)
+
+Follow-up to MV-2. `_size_axes` was pinning every non-negative axis origin to
+`x_min = 0`, discarding the lower edge `balanced_window` had measured. For a book
+whose mass lives far from 0 (low CV — e.g. a 500-claim compound of `10 * uniform`,
+mean 2500, sd 129) that stranded the mass in the upper third of the grid and
+wasted ~⅔ of each axis (≈89% of the 2-D cells).
+
+- The axis origin is now the **measured** lower edge (snapped down to `bs`):
+  negative on a signed axis, positive when the mass genuinely lives far from 0,
+  and 0 only when the mass reaches the origin. The sole deliberate 0-pin is a
+  `pnl` axis, whose loss has a known lower bound of 0 *and* whose `_affine_axis`
+  relabel assumes a 0-based loss grid (the affine owns the tight P&L window).
+- The FFT working buffer length `M` is now **decoupled** from the output length
+  `N`: a compound is anchored at physical 0 (non-negative severity) or wraps its
+  negatives (signed), so `M` is sized to reach from `min(0, x_min)` up to the
+  window top, independent of the stored window `N`. This lets a tight far-from-0
+  window shrink the stored grid without aliasing the upper tail.
+- Example: the `10 * uniform` axis window tightens from `[0, 5115]` to
+  `[1716, 3762]` with `bs` 5 → 2 (2.5× finer resolution at the same memory),
+  deficit ~1e-10. The MV-2 signed bug book is unchanged.
+
 ## 1.0.0a72
 
 ### Bivariate axis sizing: measure, don't guess (MV-2)

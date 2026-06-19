@@ -603,7 +603,7 @@ class MultivariateAggregate:
         spec.update(self._freq_kwargs)
         return Aggregate(**spec)
 
-    def _size_axes(self, total_log2, bs_in, log2_in):
+    def _size_axes(self, total_log2, bs_axes, log2_axes):
         """Measure each axis's grid from its realized standalone marginal (§5).
 
         The bv's privilege is to *measure*, not guess. Each standalone loss
@@ -618,25 +618,30 @@ class MultivariateAggregate:
         Because the measured window always covers the deep (``window_nines``)
         tail, the budget controls only *resolution*: a smaller budget coarsens
         ``bs`` rather than clipping the support, so the joint mass is conserved
-        regardless of budget (copula axes have free ``bs``). Explicit ``bs`` /
-        ``log2`` overrides bypass the allocation.
+        regardless of budget (copula axes have free ``bs``).
 
         Parameters
         ----------
         total_log2 : int
-            Total log2 cell budget (``2**total_log2`` cells across both axes).
-        bs_in : float
-            Explicit per-axis ``bs`` override (both axes); ``0`` to measure.
-        log2_in : int
-            Explicit per-axis ``log2`` override (both axes); ``0`` to measure.
+            Total log2 cell budget (``2**total_log2`` cells across both axes)
+            for the auto split; ignored for an axis with an explicit ``log2``.
+        bs_axes : list of (float or None)
+            Per-axis explicit ``bs``; ``None`` to measure that axis.
+        log2_axes : list of (int or None)
+            Per-axis explicit ``log2``; ``None`` to allocate that axis from the
+            budget. With one axis pinned the other takes the rest of the budget.
 
         Returns
         -------
-        bss, log2s, x_mins : list of float, list of int, list of float
-            Per-axis bucket size, grid log2, and window origin (``x_min < 0`` on
-            a signed axis; ``0`` on a non-negative one).
+        bss, log2s, x_mins, his : list of float/int/float/float
+            Per-axis bucket size, output grid log2, window origin, and window
+            top. ``x_min`` is the *measured* lower edge -- negative on a signed
+            axis, positive on a non-negative book whose mass lives far from 0
+            (no artificial 0-pin), and 0 only when the mass genuinely reaches the
+            origin or the axis is a ``pnl`` loss (see below). ``his`` lets the
+            caller size the FFT buffer to reach physical 0.
         clipped : bool
-            ``True`` if an explicit override pushed the two axes past the budget.
+            ``True`` if explicit per-axis ``log2`` overrides exceed the budget.
         """
         prob = 10.0 ** -_WINDOW_NINES
         # 1. Measure each marginal's support window off the realized pmf.
@@ -646,37 +651,60 @@ class MultivariateAggregate:
             a.update(log2=total_log2)
             ser = a.density_df.query('p_total > 0').p_total
             lo, hi = balanced_window(ser, prob)
-            lo = min(lo, 0.0) if lo < 0 else 0.0   # non-neg axis stays 0-based
+            # Use the MEASURED lower edge -- do not pin to 0. The only 0-pin is a
+            # pnl axis, whose loss has a known lower bound of 0 *and* whose
+            # _affine_axis relabel assumes a 0-based loss grid; there the affine
+            # owns the (tight) P&L windowing, so the loss axis stays 0-based.
+            reflect, shift = self._affine[i]
+            if reflect or shift:
+                lo = 0.0
             los.append(lo)
             his.append(hi)
             widths.append(max(hi - lo, a.bs))
 
-        # 2. Allocate the log2 budget so the two bucket sizes come out similar.
-        if log2_in:
-            log2s = [int(log2_in), int(log2_in)]
-        else:
+        # 2. Budget split: only when BOTH axes are fully auto does the total
+        #    budget get balanced across them (comparable bs). The moment either
+        #    axis is overridden, each axis is sized independently to honour its
+        #    override and cover its measured window; a free axis then takes half
+        #    the budget.
+        def _cover_log2(width, bs):
+            return max(int(np.ceil(np.log2(width / bs + 1.0))), _MIN_AXIS_LOG2)
+
+        free = [log2_axes[i] is None and bs_axes[i] is None for i in range(2)]
+        if free[0] and free[1]:
             delta = np.log2(widths[0] / widths[1])
-            lo_cap = _MIN_AXIS_LOG2
-            hi_cap = total_log2 - _MIN_AXIS_LOG2
-            L0 = int(np.clip(round((total_log2 + delta) / 2.0), lo_cap, hi_cap))
-            log2s = [L0, total_log2 - L0]
+            cap = total_log2 - _MIN_AXIS_LOG2
+            L0 = int(np.clip(round((total_log2 + delta) / 2.0), _MIN_AXIS_LOG2, cap))
+            alloc = [L0, total_log2 - L0]
+        else:
+            alloc = [total_log2 // 2, total_log2 // 2]
 
-        # 3. Fit bs to each axis window, then snap the origin to the grid.
-        bss, x_mins = [], []
+        # 3. Per-axis (bs, log2): a pinned bs grows log2 to cover the window; a
+        #    pinned log2 fits bs to the window; pinning both is the user's call.
+        bss, log2s, x_mins = [], [], []
         for i in range(2):
-            if bs_in:
-                bs_i = float(bs_in)
+            if log2_axes[i] is not None:
+                L_i = int(log2_axes[i])
+                bs_i = (float(bs_axes[i]) if bs_axes[i] is not None
+                        else float(round_bucket(widths[i] / ((1 << L_i) - 1))))
+            elif bs_axes[i] is not None:
+                bs_i = float(bs_axes[i])
+                L_i = _cover_log2(widths[i], bs_i)
             else:
-                bs_i = float(round_bucket(widths[i] / ((1 << log2s[i]) - 1)))
+                L_i = alloc[i]
+                bs_i = float(round_bucket(widths[i] / ((1 << L_i) - 1)))
+            log2s.append(L_i)
             bss.append(bs_i)
-            x_mins.append(float(np.floor(los[i] / bs_i) * bs_i) if los[i] < 0 else 0.0)
+            x_mins.append(float(np.floor(los[i] / bs_i) * bs_i))
 
-        clipped = log2s[0] + log2s[1] > total_log2
+        # Coverage can only fail when BOTH bs and log2 are pinned too small.
+        clipped = any(((1 << log2s[i]) - 1) * bss[i] < widths[i] - bss[i]
+                      for i in range(2))
         if clipped:
             logger.warning(
-                'multivariate %s: explicit sizing needs log2 %d + %d > budget %d '
-                '(2-D memory is quadratic).', self.name, log2s[0], log2s[1], total_log2)
-        return bss, log2s, x_mins, clipped
+                'multivariate %s: pinned (bs, log2) does not cover the measured '
+                'window on an axis -- expect a tail deficit.', self.name)
+        return bss, log2s, x_mins, his, clipped
 
     # ------------------------------------------------------------------
     # update
@@ -687,16 +715,21 @@ class MultivariateAggregate:
 
         Parameters
         ----------
-        log2 : int, optional
-            **Total** 2-D grid budget in log2 cells (``2**log2`` cells, split
-            between the two axes by measured support). ``0`` (default) uses the
-            :attr:`MultivariateSettings.total_log2` config value (20). The split
+        log2 : int or (int, int), optional
+            A **scalar** is the *total* 2-D grid budget in log2 cells
+            (``2**log2`` cells, split between the axes by measured support);
+            ``0`` (default) uses the :attr:`MultivariateSettings.total_log2`
+            config value (20). A **2-tuple ``(log2_x, log2_y)``** pins the
+            per-axis log2 directly (the budget is then their sum) -- use it to
+            explore a split (e.g. ``(11, 9)`` vs ``(10, 10)``). The auto split
             *falls out* of each realized marginal's measured support -- the bv
             measures, it does not guess (``dev/plan-mv.md`` §5). Memory is
             quadratic in the per-axis length, so raise only a little.
-        bs : float, optional
-            Per-axis bucket-size override (applied to both axes). ``0``
-            (default) measures each axis's ``bs`` from its standalone marginal.
+        bs : float or (float, float), optional
+            A **scalar** is applied to both axes; a **2-tuple ``(bs_x, bs_y)``**
+            pins the per-axis bucket size. ``0`` (default) measures each axis's
+            ``bs`` from its standalone marginal. (Both ``log2`` and ``bs`` tuple
+            forms pass straight through ``build(..., log2=(a, b), bs=(x, y))``.)
         padding : int, default 1
             FFT zero-padding factor per axis (mirrors the 1D aggregate; ``1``
             doubles each axis length for the transform).
@@ -719,12 +752,27 @@ class MultivariateAggregate:
         self.padding = int(padding)
         if self.mode == 'netceded':
             return self._update_netceded(log2=log2, bs=bs)
-        total_log2 = int(log2) if log2 else _TOTAL_LOG2
-        bss, log2s, x_mins, clipped = self._size_axes(total_log2, bs, 0)
+        # Parse scalar-or-(x, y) sizing args into per-axis overrides + budget.
+        # Tuple entries may be None/0 to leave that axis auto.
+        if isinstance(log2, (tuple, list)):
+            log2_axes = [int(v) if v else None for v in log2]
+            total_log2 = sum(int(v) for v in log2 if v) or _TOTAL_LOG2
+        else:
+            log2_axes = [None, None]
+            total_log2 = int(log2) if log2 else _TOTAL_LOG2
+        if isinstance(bs, (tuple, list)):
+            bs_axes = [float(v) if v else None for v in bs]
+        elif bs:
+            bs_axes = [float(bs), float(bs)]
+        else:
+            bs_axes = [None, None]
+        bss, log2s, x_mins, his, clipped = self._size_axes(
+            total_log2, bs_axes, log2_axes)
         self._clipped = clipped
         self._gs = []
         self._i0 = []                    # per-event severity negative reach (lay-in wrap)
         self._j0 = []                    # output-window origin in buckets (final roll)
+        self._mlog2 = []                 # log2 FFT buffer length per axis
         self._nout = [1 << L for L in log2s]
         for i, a in enumerate(self.lines):
             # Build the per-event severity g_i on its OWN natural grid at the
@@ -739,6 +787,13 @@ class MultivariateAggregate:
             self._j0.append(int(round(x_mins[i] / bss[i])) if x_mins[i] else 0)
             self.axis_xs[i] = (x_mins[i]
                                + np.arange(self._nout[i], dtype=float) * bss[i])
+            # The compound is anchored at physical 0 (non-negative severity) or
+            # wraps the negatives (signed), so the FFT buffer must reach from
+            # min(0, x_min) up to the window top -- DECOUPLED from the output
+            # length so a tight window far from 0 doesn't alias the upper tail.
+            reach = his[i] - min(0.0, x_mins[i])
+            need = int(np.ceil(np.log2(max(reach / bss[i], 2.0))))
+            self._mlog2.append(max(need, log2s[i]) + self.padding)
         # severity grids are the per-event grids (signed where the component is),
         # captured for the severity panel of plot().
         self._sev_xs = [np.asarray(a.xs, dtype=float).copy() for a in self.lines]
@@ -822,14 +877,18 @@ class MultivariateAggregate:
         :meth:`_lay_signed_2d`), the shared frequency is applied elementwise, and
         the finished density is relabelled onto each axis's output window by an
         ``np.roll`` of ``-j0``. Relabelling a finished array carries no ``N*s``
-        shift, so it is correct for random as well as fixed frequency. On the
-        all-non-negative grid (``i0 == j0 == 0``) the lay-in is a plain zero-pad
-        and the roll is a no-op, byte-for-byte the original path.
+        shift, so it is correct for random as well as fixed frequency. The FFT
+        buffer length ``M`` (:attr:`_mlog2`) is sized to reach physical 0 from
+        the window, *decoupled* from the output length ``N`` so a tight window
+        far from 0 does not alias. On a mass-at-0, 0-based grid (``i0 == j0 ==
+        0``) the lay-in is a plain zero-pad and the roll is a no-op.
         """
         g0, g1 = self._gs
         i0_0, i0_1 = getattr(self, '_i0', [0, 0])
         j0_0, j0_1 = getattr(self, '_j0', [0, 0])
         N0, N1 = getattr(self, '_nout', [len(g0), len(g1)])
+        mlog2 = getattr(self, '_mlog2', [int(np.log2(N0)) + self.padding,
+                                         int(np.log2(N1)) + self.padding])
         # marginal CDFs in physical order (the copula couples ranks); the
         # Bernoulli zero-inflation is automatic as a jump in G.
         G0 = np.cumsum(g0)
@@ -843,8 +902,7 @@ class MultivariateAggregate:
             density = np.zeros((N0, N1))
             density[-j0_0, -j0_1] = 1.0   # point mass at physical (0, 0)
         else:
-            pad = self.padding
-            M0, M1 = N0 << pad, N1 << pad
+            M0, M1 = 1 << mlog2[0], 1 << mlog2[1]
             buf = self._lay_signed_2d(S, i0_0, i0_1, M0, M1)
             z = sfft.rfft2(buf)
             # freq_pgf is mathematically elementwise in z, but the empirical

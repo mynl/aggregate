@@ -157,14 +157,40 @@ def remove_fuzz(data, eps=None):
     return np.where(np.abs(data) < eps, 0.0, data)
 
 
+#: Mantissa ladder for ``bs >= 1``: the "nice" bucket sizes within each decade.
+#: Consecutive ratios (1, 2, 4, 5, 8, 10) are all <= 2, so rounding *up* to the
+#: next rung overshoots the requested ``bs`` by less than 2x -- no 2.5x jumps
+#: (the old 2 -> 5 / 20 -> 50 gaps). ``10`` rolls into the next decade's ``1``.
+_BUCKET_LADDER = (1, 2, 4, 5, 8, 10)
+
+
 def round_bucket(bs):
-    """
-    Compute a decent rounded bucket from an input float ``bs``. ::
+    """Round ``bs`` *up* to a "nice" bucket size.
 
-        if bs > 1 round to 2, 5, 10, ...
+    The grid step ``bs`` is chosen to **cover** the support, so this rounds up
+    (never down) to the next nice value. Two regimes, both with <= 2x gaps so
+    the overshoot is bounded below 2x:
 
-        elif bs < 1 find the smallest power of two greater than bs
+    - ``bs >= 1`` -- the smallest member of the decade ladder
+      ``{1, 2, 4, 5, 8} * 10**k`` that is ``>= bs`` (so 3.4 -> 4, not 5; 5.5 ->
+      8; 9 -> 10). See :data:`_BUCKET_LADDER`.
+    - ``bs < 1`` -- the smallest power of two ``>= bs`` (``..., 1/4, 1/2, 1``).
+      Kept binary-exact: a sub-unit ``bs`` divides the FFT grid, and powers of
+      two are exact in floating point (0.2 / 0.4 / 0.8 are not), while still
+      honouring the <= 2x-gap rule.
 
+    Parameters
+    ----------
+    bs : float
+        Raw (un-rounded) bucket size; must be finite and non-zero.
+
+    Returns
+    -------
+    float
+        The rounded bucket size, ``>= bs``.
+
+    Examples
+    --------
     Test cases: ::
 
         test_cases = [1, 1.1, 2, 2.5, 4, 5, 5.5, 8.7, 9.9, 10, 13,
@@ -175,46 +201,25 @@ def round_bucket(bs):
             print(i, round_bucket(i))
         for i in test_cases:
             print(1/i, round_bucket(1/i))
-
     """
     if bs == 0 or np.isinf(bs):
         raise ValueError(f'Inadmissible value passed to round_bucket, {bs}')
 
-    if bs == 1:
-        return bs
+    if bs >= 1:
+        # smallest {1,2,4,5,8}*10**k >= bs (round up within the decade)
+        exp = int(np.floor(np.log10(bs)))
+        base = 10.0 ** exp
+        m = bs / base                       # mantissa in [1, 10)
+        for rung in _BUCKET_LADDER:
+            if m <= rung * (1 + 1e-9):       # tolerance for fp dust on exact rungs
+                return float(rung * base)
+        return 10.0 * base                   # m ~ 10 -> next decade (defensive)
 
-    if bs > 1:
-        # rounded bs, to an integer
-        rbs = np.round(bs, 0)
-        if rbs == 1:
-            return 2.0
-        elif rbs == 2:
-            return 2
-        elif rbs <= 5:
-            return 5.0
-        elif rbs <= 10:
-            return 10.0
-        else:
-            rbs = np.round(bs, -int(np.log10(bs)))
-            if rbs < bs:
-                rbs *= 2
-            return rbs
-
-    if bs < 1:
-        # inverse bs
-        # originally
-        # bsi = 1 / bs
-        # nbs = 1
-        # while nbs < bsi:
-        #     nbs <<= 1
-        # nbs >>= 1
-        # return 1. / nbs
-        # same answer but ? clearer and slightly quicker
-        x = 1. / bs
-        x = bin(int(x))
-        x = '0b1' + "0" * (len(x) -3)
-        x = int(x[2:], 2)
-        return 1./ x
+    # bs < 1: smallest power of two >= bs (binary-exact small buckets). 1/bs > 1,
+    # so floor it and take the largest power of two <= that via int.bit_length;
+    # the reciprocal is the smallest power of two >= bs.
+    n = int(1.0 / bs)
+    return 1.0 / (1 << (n.bit_length() - 1))
 
 
 # Logger configuration is controlled by the user of the package, not the package itself.

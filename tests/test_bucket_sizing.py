@@ -284,8 +284,12 @@ def test_window_asymmetric_skews_to_thick_tail():
     right tail) -- so there is more room above than below under *both* the loss
     and the payoff reading. The tail shape, not the convention, dictates the
     split (contrast the symmetric book, where the payoff reading flips it).
+
+    The book needs a *materially skewed* aggregate (here ``agg_skew ~ 0.26``):
+    too many claims and the CLT makes the aggregate near-symmetric, where the
+    convention tie-breaker dominates instead (the symmetric test above).
     """
-    prog = 'agg HM 100000 claims sev lognorm 100 cv 0.5 poisson'
+    prog = 'agg HM 500 claims sev lognorm 100 cv 1.5 poisson'
     lo_below, lo_above = _window_placement_fracs(prog, 'loss')
     pay_below, pay_above = _window_placement_fracs(prog, 'payoff')
     assert lo_above > lo_below                      # thick right: room above (loss)

@@ -169,6 +169,15 @@ These are standing rules — follow them without being re-asked:
 - **Keep `dev/TODO.md` current.** When a tracked item lands, mark it done (and
   note the version / `dev/done/plan-*.md`); when scope shifts, edit the entry.
   Move a completed plan from `dev/` to `dev/done/`.
+- **The author does the commits — frequently, without announcing them. Run
+  `git status` / `git log` before writing anything about what is or isn't
+  committed.** Do not commit unless explicitly asked. The author commits each
+  task themselves, often immediately, so a "still uncommitted, want me to
+  commit?" note written from memory is routinely *wrong* by the time it is read.
+  So: never assert commit state from what happened earlier in the session —
+  check the actual git status first, and only mention uncommitted work if the
+  working tree really is dirty (e.g. an *expected* commit is missing). When in
+  doubt, stay silent about commits rather than nag.
 
 ## TODO
 

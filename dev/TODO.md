@@ -8,7 +8,9 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it. 
 >
-> **Last updated: 2026-06-18** — added D12 (cheat-sheet refresh, held for `1.0.0b1`).
+> **Last updated: 2026-06-19** — Track M re-scoped & promoted to `[A]`
+> (beta-blocking); `dev/plan-mv.md` is the staged plan (MV-1…7). Multivariate →
+> bivariate; `t` copula dropped, ≥3-variate killed; +shuffle-of-Min, +`clash`.
 
 ---
 
@@ -62,8 +64,9 @@ alongside. **Start at `N1`.**
 |    | W2 | Window bounds for bivariate | B | W1, W5 | ties M |
 |    | W3 | Plot severity outside the agg window | B | — | — |
 | ✅ | W5 | Non-zero output window (windowed sizing, a51) | A | — | W2/M, N* |
-|    | M1 | Multivariate later stages (2–5) | B | — | — |
-|    | M2 | Multivariate punch-up (sizing/coverage) | B | — | ties W2 |
+|    | M | **Bivariate firm-up (MV-1…7, `plan-mv.md`)** — beta-blocking | A | — | ties W2 |
+| ✅ | M1 | ~~MV later stages~~ → folded into `plan-mv.md` | A | — | — |
+| ✅ | M2 | ~~MV punch-up~~ → superseded by `plan-mv.md` §5 | A | — | ties W2 |
 |    | T1 | Merge the three `.agg` libraries into one | A | — | — |
 |    | T2 | Rationalize tests / library coupling | A | T1 | after code churn |
 |    | T3 | Switcheroo `Port.Sample` regression case | B | — | pairs F7 |
@@ -370,13 +373,27 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ---
 
-## Track M — Multivariate `[B]` (early beta)
+## Track M — Multivariate → **bivariate** `[A]` (now beta-blocking)
 
-- [ ] **M1 `[B]`** Multivariate later stages (#4) — Stage 2 `t` copula; Stage 3
-  reporting/plot polish; Stage 4 ≥3-variate `rfftn` shared frequency; Stage 5
-  `MultivariatePortfolio` / `netceded` DecL form (`dev/done/plan-multivariate.md`).
-- [ ] **M2 `[B]`** Multivariate punch-up — axis sizing / coverage reconciliation
-  (`dev/plan-multivariate-punchup.md`). Ties **W2**.
+> **Re-scoped & promoted to `[A]` (2026-06-19, `dev/plan-mv.md`).** The "firm up
+> multivariate" block is the **last major work before `1.0.0b1`** and now *blocks*
+> the beta (author: no post-beta API scope creep — land the whole bivariate
+> surface in v1.0). `dev/plan-mv.md` is the fully-staged execution plan (MV-1…7).
+> Decisions: rename `multivariate`/`mv` → `bivariate`/`bv` (dropped outright,
+> no synonyms); ≥3-variate `rfftn` **killed** (use Iman–Conover + switcheroo);
+> **`t` copula dropped** (flaky + footgun); add shuffle-of-Min + a `clash`
+> statement; sizing reframed to *measure-don't-guess* (`balanced_window` on the
+> realized marginals, `update(log2=)` budget); netceded → three occurrence
+> view-pairs (`netceded`/`grossceded`/`grossnet`). M1/M2 below are subsumed.
+
+- [ ] **M (the block) `[A]`** — execute `dev/plan-mv.md` stages **MV-1…MV-7**
+  (`balanced_window`+`focus` → measure-don't-guess copula sizing → netceded
+  one-bs sizing → reporting surface → netceded view-pairs → shuffle-of-Min+clash
+  → rename to bivariate). Each a version bump (`a68`+); all seven block `1.0.0b1`.
+- [x] ~~**M1** later stages~~ — folded into `dev/plan-mv.md` (`t` dropped, ≥3
+  killed, reporting/netceded-DecL in scope; `MultivariatePortfolio` deferred).
+- [x] ~~**M2** punch-up~~ — **superseded** by `dev/plan-mv.md` §5 (one sizing
+  notion: `balanced_window` on the realized marginals). Ties **W2**.
 
 ---
 
@@ -461,7 +478,8 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   numerics-4 (windowed combine/bivariate) → **W2/M-track**. Absorbs the former
   `plan-portfolio-neg-x-pricing` and `plan-window-port-bv` drafts (removed; git history).
 - `dev/plan-config.md` (Phase 2) → **F8**.
-- `dev/plan-multivariate-punchup.md` → **M2**.
+- `dev/plan-mv.md` → **Track M** (bivariate firm-up, MV-1…7). Absorbs & replaces
+  the deleted `plan-multivariate-punchup.md` (former M2).
 - `dev/done/plan-decl-unparser.md` → shipped a53: `decl_writer` unparser +
   `format_program`; `decl_pprint` removed. Follow-on **D10**.
 - `dev/done/` → shipped: tail-thickness (**F1**, **D4**), config Phase 1,

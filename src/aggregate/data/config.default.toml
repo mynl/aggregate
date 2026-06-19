@@ -103,10 +103,11 @@
 [multivariate]
 # window_nines: nines for the per-axis 2-D sizing window -- the equal-tail
 # probability budget 10**-window_nines that balanced_window trims off each tail
-# when the bv measures each realized marginal. Independent of
-# [discretization].window_nines because the 2-D per-axis grid may want fewer
-# nines to control memory (memory ~ grid squared). Typical 8..12.
-# window_nines = 12
+# when the bv measures each realized marginal. Kept a few nines shallower than
+# [discretization].window_nines (9 vs 12): the realized marginal's far tail is
+# FFT numerical dust below ~1e-10, so measuring deeper reads noise (and biases a
+# symmetric axis). 9 stays above the floor; per-axis deficit ~1e-9. Typical 8..10.
+# window_nines = 9
 # total_log2: total 2-D grid budget in log2 cells (2**total_log2 cells, split
 # between axes by measured support). The square-law memory lever. Typical 18..22.
 # total_log2 = 20

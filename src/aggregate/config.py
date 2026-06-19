@@ -193,9 +193,12 @@ class MultivariateSettings:
         Number of nines for the per-axis 2-D sizing window: the equal-tail
         probability budget for :func:`~aggregate.utilities.balanced_window` is
         ``10**-window_nines`` (the discarded mass off each tail when the bv
-        *measures* each realized marginal). Independent of
-        :attr:`DiscretizationSettings.window_nines` because the 2-D per-axis
-        window may want fewer nines for memory.
+        *measures* each realized marginal). Kept a few nines shallower than the
+        1-D :attr:`DiscretizationSettings.window_nines` (9 vs 12): the realized
+        marginal's far tail is FFT numerical dust below ~``1e-10``, so measuring
+        equal-tail quantiles deeper than that reads noise (and biases a symmetric
+        axis). 9 nines stays above the floor while keeping the per-axis deficit
+        (~``1e-9``) far below the bivariate target.
     total_log2 : int
         Total 2-D grid budget in ``log2`` cells (``2**total_log2`` cells, split
         between the two axes by measured support). The square-law memory lever:
@@ -203,7 +206,7 @@ class MultivariateSettings:
         falls out of the measured marginals (see ``dev/plan-mv.md`` §5.3).
     """
 
-    window_nines: int = 12
+    window_nines: int = 9
     total_log2: int = 20
 
 

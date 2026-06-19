@@ -603,6 +603,41 @@ class MultivariateAggregate:
         spec.update(self._freq_kwargs)
         return Aggregate(**spec)
 
+    def _measure_marginal_window(self, i, prob, log2):
+        """Equal-tail support window of component ``i``'s realized loss marginal.
+
+        Runs the standalone loss marginal and reads its
+        :func:`~aggregate.utilities.balanced_window` at tail probability
+        ``prob``. A **signed** marginal needs care: the 1-D sizer places its grid
+        origin at the window's lower edge, so all the power-of-2 slack lands
+        *above* the band and the cheap lower tail clips -- which biases the
+        equal-tail measurement upward (a symmetric axis comes out off-centre). So
+        a signed marginal is rebuilt on a *centred* grid (slack both sides, sized
+        from the SBJ-aware first build's realized extent so a heavy tail is still
+        covered) before measuring. Non-negative axes are bounded at 0 and need no
+        recentre.
+
+        Returns
+        -------
+        (lo, hi, bs) : tuple of float
+            The measured window edges and the marginal's bucket size (the latter
+            a resolution floor for the width).
+        """
+        a = self._standalone_marginal(i)
+        a.update(log2=log2)
+        ser = a.density_df.query('p_total > 0').p_total
+        reflect, shift = self._affine[i]
+        if a.x_min < 0 and not (reflect or shift):
+            nz = ser.index[ser.values > 1e-13]
+            mlo, mhi = float(nz.min()), float(nz.max())
+            margin = 0.5 * (mhi - mlo)        # slack on both sides
+            lo_box, hi_box = mlo - margin, mhi + margin
+            bs0 = float(round_bucket((hi_box - lo_box) / (1 << log2)))
+            a.update(log2=log2, bs=bs0, x_min=float(np.floor(lo_box / bs0) * bs0))
+            ser = a.density_df.query('p_total > 0').p_total
+        lo, hi = balanced_window(ser, prob)
+        return lo, hi, float(a.bs)
+
     def _size_axes(self, total_log2, bs_axes, log2_axes):
         """Measure each axis's grid from its realized standalone marginal (§5).
 
@@ -647,10 +682,7 @@ class MultivariateAggregate:
         # 1. Measure each marginal's support window off the realized pmf.
         los, his, widths = [], [], []
         for i in range(2):
-            a = self._standalone_marginal(i)
-            a.update(log2=total_log2)
-            ser = a.density_df.query('p_total > 0').p_total
-            lo, hi = balanced_window(ser, prob)
+            lo, hi, bs0 = self._measure_marginal_window(i, prob, total_log2)
             # Use the MEASURED lower edge -- do not pin to 0. The only 0-pin is a
             # pnl axis, whose loss has a known lower bound of 0 *and* whose
             # _affine_axis relabel assumes a 0-based loss grid; there the affine
@@ -660,7 +692,7 @@ class MultivariateAggregate:
                 lo = 0.0
             los.append(lo)
             his.append(hi)
-            widths.append(max(hi - lo, a.bs))
+            widths.append(max(hi - lo, bs0))
 
         # 2. Budget split: only when BOTH axes are fully auto does the total
         #    budget get balanced across them (comparable bs). The moment either
@@ -681,6 +713,13 @@ class MultivariateAggregate:
 
         # 3. Per-axis (bs, log2): a pinned bs grows log2 to cover the window; a
         #    pinned log2 fits bs to the window; pinning both is the user's call.
+        #    bs is rounded UP (round_bucket), never to nearest, even though grid
+        #    size is at a premium here: the grid length N is a power of two, so a
+        #    measured window of (say) width 78 lands on a 128-wide grid whatever
+        #    bs is -- rounding bs *down* to the nearest rung cannot tighten that,
+        #    it only fails to cover the window (clip) or forces a larger log2
+        #    (more memory). The dead space is split symmetrically by the centred
+        #    placement below instead.
         bss, log2s, x_mins = [], [], []
         for i in range(2):
             if log2_axes[i] is not None:
@@ -695,7 +734,17 @@ class MultivariateAggregate:
                 bs_i = float(round_bucket(widths[i] / ((1 << L_i) - 1)))
             log2s.append(L_i)
             bss.append(bs_i)
-            x_mins.append(float(np.floor(los[i] / bs_i) * bs_i))
+            # Centre the measured window in the (power-of-two) grid: split the
+            # unavoidable slack ``N*bs - width`` equally either side rather than
+            # piling it above (which left a symmetric axis looking off-centre).
+            # A non-negative axis is clamped at 0 (no mass below, no point wasting
+            # grid there). Snap the origin down to the grid so physical 0 stays
+            # an integer index (the signed compound's j0 roll needs that).
+            slack = (1 << L_i) * bs_i - (his[i] - los[i])
+            xc = los[i] - 0.5 * slack
+            if los[i] >= 0:
+                xc = max(0.0, xc)
+            x_mins.append(float(np.floor(xc / bs_i) * bs_i))
 
         # Coverage can only fail when BOTH bs and log2 are pinned too small.
         clipped = any(((1 << log2s[i]) - 1) * bss[i] < widths[i] - bss[i]
@@ -789,9 +838,10 @@ class MultivariateAggregate:
                                + np.arange(self._nout[i], dtype=float) * bss[i])
             # The compound is anchored at physical 0 (non-negative severity) or
             # wraps the negatives (signed), so the FFT buffer must reach from
-            # min(0, x_min) up to the window top -- DECOUPLED from the output
+            # min(0, x_min) up to the grid top -- DECOUPLED from the output
             # length so a tight window far from 0 doesn't alias the upper tail.
-            reach = his[i] - min(0.0, x_mins[i])
+            grid_top = x_mins[i] + self._nout[i] * bss[i]
+            reach = grid_top - min(0.0, x_mins[i])
             need = int(np.ceil(np.log2(max(reach / bss[i], 2.0))))
             self._mlog2.append(max(need, log2s[i]) + self.padding)
         # severity grids are the per-event grids (signed where the component is),

@@ -451,6 +451,28 @@ def test_mv_far_from_zero_window_not_pinned_to_origin():
         assert float((m * x).sum()) == pytest.approx(mean, rel=1e-3)
 
 
+def test_mv_symmetric_axis_window_centered():
+    """A symmetric (mean-0) axis gets a grid centred on its mass.
+
+    Axis B (``ssev uniform`` symmetric) used to be measured against the 1-D
+    loss-convention grid (deep upper, trimmed/clipped lower) and placed with all
+    the power-of-two slack above 0 -- so a symmetric axis came out badly
+    off-centre (e.g. ``[-29, +99]``). The measurement now recentres a signed
+    marginal, the depth backs off the FFT noise floor, and the window is centred
+    in the grid (slack split). The grid centre should sit near 0.
+    """
+    mv = build(BUG_PROG)
+    x = mv.axis_xs[1]
+    center = 0.5 * (x[0] + x[-1])
+    span = x[-1] - x[0]
+    assert abs(center) < 0.1 * span, f'axis B grid not centred: [{x[0]}, {x[-1]}]'
+    # mass is symmetric about 0 and well inside the grid
+    m = mv.marginals()[1]
+    mean = float((m * x).sum())
+    assert abs(mean) < 1e-3
+    assert mv.deficit < 1e-6
+
+
 def test_mv_per_axis_log2_tuple():
     """``log2=(x, y)`` pins the per-axis split; the budget is their sum."""
     mv = build(BUG_PROG, log2=(9, 11))

@@ -168,8 +168,8 @@ def round_bucket(bs):
     """Round ``bs`` *up* to a "nice" bucket size.
 
     The grid step ``bs`` is chosen to **cover** the support, so this rounds up
-    (never down) to the next nice value. Two regimes, both with <= 2x gaps so
-    the overshoot is bounded below 2x:
+    (never down) to the next nice value. Two regimes, both with <= 2x rung gaps
+    so the overshoot is bounded below 2x:
 
     - ``bs >= 1`` -- the smallest member of the decade ladder
       ``{1, 2, 4, 5, 8} * 10**k`` that is ``>= bs`` (so 3.4 -> 4, not 5; 5.5 ->
@@ -177,7 +177,13 @@ def round_bucket(bs):
     - ``bs < 1`` -- the smallest power of two ``>= bs`` (``..., 1/4, 1/2, 1``).
       Kept binary-exact: a sub-unit ``bs`` divides the FFT grid, and powers of
       two are exact in floating point (0.2 / 0.4 / 0.8 are not), while still
-      honouring the <= 2x-gap rule.
+      honouring the <= 2x rule.
+
+    There is deliberately no "round to nearest" mode. Rounding *down* would
+    leave ``bs`` failing to cover the support, and it cannot tighten a grid
+    anyway: the grid length is a power of two, so a power-of-two ``bs`` rounded
+    down just forces a larger ``log2`` to recover coverage (more memory) or
+    clips the tail.
 
     Parameters
     ----------

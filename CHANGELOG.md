@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.0.0a75
+
+### Bivariate windowing: honest, centred axis measurement
+
+Three fixes so a symmetric axis windows symmetrically (motivating case: the
+mean-0 `ssev` axis of `DISCRETE.2`, which came out as `[-29, +99]`).
+
+- **Measure each marginal on an honest grid, decoupled from the loss/payoff
+  trim.** The 1-D sizer protects one tail and trims the other (a *pricing*
+  convention) — for a signed axis that clipped the cheap tail, biasing the
+  equal-tail measurement up. A signed marginal is now rebuilt on a *centred*
+  grid (slack both sides, sized from the SBJ-aware first build's realized extent
+  so a heavy tail is still covered) before `balanced_window` reads it.
+  Non-negative axes are unchanged (`MultivariateAggregate._measure_marginal_window`).
+- **Back the measurement depth off the FFT noise floor:** `[multivariate].window_nines`
+  12 → **9**. A 2-D marginal's far tail is numerical dust below ~`1e-10`, so
+  measuring equal-tail quantiles deeper read noise (and skewed a symmetric axis).
+  Per-axis deficit stays ~`1e-9`, far below target.
+- **Centre the measured window in the (power-of-two) grid.** The grid width is
+  quantised to a power of two, so a window leaves unavoidable slack; that slack
+  is now split either side instead of piled above (which left a symmetric axis
+  off-centre). A non-negative axis stays clamped at 0.
+
+Net: `DISCRETE.2` axis B is now `[-64, +64]` centred on 0 (deficit ~3e-11). The
+bivariate fit rounds `bs` *up* (`round_bucket`) for guaranteed coverage, never
+to nearest: the grid length is a power of two, so a window lands on a
+power-of-two-wide grid whatever `bs` is — rounding `bs` down can't tighten that,
+it only clips or forces a larger `log2`. The dead space is split by the centred
+placement instead.
+
 ## 1.0.0a74
 
 ### `round_bucket` ladder: no more 2.5x jumps

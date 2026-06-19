@@ -207,6 +207,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     - `[a74]` follow-up: per-axis `log2=(x,y)` / `bs=(x,y)` tuples on
       `update`/`build` (explore the split); `round_bucket` ladder →
       `{1,2,4,5,8}` (no >2x jumps, fixes the 2→5 overshoot, library-wide).
+    - `[a75]` follow-up: symmetric axes now window centred — measure signed
+      marginals on a recentred grid (decoupled from the loss/payoff trim),
+      `[multivariate].window_nines` 12→9 (off the FFT noise floor), and centre
+      the window in the power-of-two grid (split slack). `round_bucket` stays
+      round-up only (nearest can't tighten a pow2 grid — note at the call site).
 
 ---
 

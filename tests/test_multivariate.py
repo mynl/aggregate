@@ -657,3 +657,138 @@ def test_mv_default_freq_is_poisson():
     mv = build(prog)
     assert mv.freq_name == 'poisson'
     assert np.isclose(mv.density.sum(), 1.0, atol=1e-6)
+
+
+# ----------------------------------------------------------------------
+# MV-6a: shuffle-of-Min copula (programmatic, App. A)
+# ----------------------------------------------------------------------
+
+from aggregate.copula import ShuffleOfMin, CopulaShuffle  # noqa: E402
+from scipy.stats import kendalltau  # noqa: E402
+
+
+def test_shuffle_tau_limits():
+    """n=1 recovers M (tau=1) / W (tau=-1); identity perm is comonotone."""
+    assert CopulaShuffle(perm=[0]).tau() == pytest.approx(1.0)
+    assert CopulaShuffle(perm=[0], flip=[True]).tau() == pytest.approx(-1.0)
+    assert CopulaShuffle(perm=[0, 1, 2, 3]).tau() == pytest.approx(1.0)
+    assert CopulaShuffle(perm=[3, 2, 1, 0]).tau() == pytest.approx(-0.5)
+
+
+@pytest.mark.parametrize('perm,flip', [
+    ([2, 0, 3, 1], [False, True, False, True]),
+    ([0, 1, 2, 3], None),
+    ([3, 2, 1, 0], None),
+    ([1, 0], None),
+])
+def test_shuffle_analytic_tau_matches_empirical(perm, flip):
+    """The exact perm/flip tau formula matches the sampled Kendall tau."""
+    cop = CopulaShuffle(perm=perm, flip=flip)
+    xy = cop.sample(200_000, rng=0)
+    assert cop.tau() == pytest.approx(kendalltau(xy[:, 0], xy[:, 1]).statistic, abs=0.01)
+
+
+def test_shuffle_boundary_and_marginals():
+    """The base-class boundary conditions hold and rectangle_pmf reproduces marginals."""
+    cop = CopulaShuffle(perm=[2, 0, 3, 1], flip=[False, True, False, True])
+    assert float(cop.C(0.0, 0.7)) == pytest.approx(0.0)
+    assert float(cop.C(1.0, 0.7)) == pytest.approx(0.7)
+    assert float(cop.C(0.7, 1.0)) == pytest.approx(0.7)
+    g1 = np.cumsum([0.1, 0.2, 0.3, 0.4])
+    g2 = np.cumsum([0.25, 0.25, 0.25, 0.25])
+    S = cop.rectangle_pmf(g1, g2)
+    assert np.allclose(S.sum(axis=1), [0.1, 0.2, 0.3, 0.4])
+    assert np.allclose(S.sum(axis=0), 0.25)
+    assert S.sum() == pytest.approx(1.0)
+
+
+def test_shuffle_perm_validation():
+    with pytest.raises(ValueError, match='permutation'):
+        ShuffleOfMin(perm=[0, 0, 1])
+    with pytest.raises(ValueError, match='programmatic-only'):
+        CopulaShuffle()
+
+
+def test_shuffle_plugs_into_bivariate_and_reproduces():
+    """A shuffle copula swapped onto a built bivariate reproduces the marginals."""
+    mv = build('''multivariate Shuf 25 claims
+        agg A dfreq [0 1] [.4 .6] sev lognorm 40 cv 1.2
+        agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+        poisson''')
+    mv.copula = CopulaShuffle(perm=[3, 2, 1, 0])
+    mv.update()
+    assert isinstance(mv.copula, CopulaShuffle)
+    assert (mv.explain['mean_error'] < 0.10).all()
+    assert mv.deficit < 1e-6
+    # the reverse-strip shuffle (tau=-0.5) offsets the shared-count coupling
+    assert str(mv.copula) == 'shuffle(n=4)'
+
+
+# ----------------------------------------------------------------------
+# MV-6b: clash statement (independent-trigger shared-event model, App. B)
+# ----------------------------------------------------------------------
+
+from aggregate.multivariate import solve_clash_model  # noqa: E402
+
+CLASH_PROG = ('clash Cat 8 5 2 claims sev lognorm 50 cv 1.2 '
+              'sev lognorm 60 cv 1.5 poisson')
+
+
+def test_solve_clash_model_identities():
+    """The solver satisfies the independent-trigger 2x2 table identities."""
+    sol = solve_clash_model(30, 20, 5)
+    assert sol.n0 == pytest.approx(30 * 20 / 5)            # nc*n0 == na*nb
+    assert sol.n == pytest.approx(30 + 20 + 5 + sol.n0)
+    assert sol.pa == pytest.approx((30 + 5) / sol.n)
+    assert sol.pb == pytest.approx((20 + 5) / sol.n)
+
+
+def test_solve_clash_model_guards():
+    with pytest.raises(ValueError, match='nc'):
+        solve_clash_model(10, 10, 0)
+    with pytest.raises(ValueError):
+        solve_clash_model(-1, 10, 2)
+
+
+def test_clash_builds_and_derives_shared_count():
+    """The clash statement builds a bivariate with the derived shared count n."""
+    from aggregate.multivariate import MultivariateAggregate
+    mv = build(CLASH_PROG)
+    assert isinstance(mv, MultivariateAggregate)
+    assert mv.mode == 'copula'
+    assert mv.line_names == ['Cat.A', 'Cat.B']
+    sol = solve_clash_model(8, 5, 2)
+    assert mv.en == pytest.approx(sol.n)
+    assert mv.clash['pa'] == pytest.approx(sol.pa)
+    assert mv.copula.kind == 'independent'
+
+
+def test_clash_marginals_reproduce_standalone():
+    """Each clash marginal reproduces its standalone aggregate (the invariant)."""
+    mv = build(CLASH_PROG)
+    assert (mv.explain['mean_error'] < 0.10).all()
+    assert mv.deficit < 1e-6
+    assert mv._explain_oneline() == 'not unreasonable'
+
+
+def test_clash_mixed_adds_common_shock():
+    """A gamma-mixed shared frequency gives higher corr than plain poisson."""
+    pois = build(CLASH_PROG)
+    mix = build('clash Cat 8 5 2 claims sev lognorm 50 cv 1.2 '
+                'sev lognorm 60 cv 1.5 mixed gamma 0.3')
+    assert mix.corr() > pois.corr() > 0
+
+
+def test_clash_roundtrips_through_unparser():
+    """The clash statement round-trips through the DecL unparser."""
+    from aggregate import Underwriter
+    from aggregate.decl_writer import spec_to_decl
+    uw = Underwriter()
+    prog = ('clash Cat 8 5 2 claims 500 xs 0 sev lognorm 50 cv 1.2 '
+            'sev lognorm 60 cv 1.5 mixed gamma 0.3')
+    kind, name, spec = uw.parser.parse(prog)
+    assert kind == 'mvagg' and 'clash' in spec
+    text = spec_to_decl(spec, kind, name)
+    assert text.startswith('clash Cat 8 5 2 claims ')
+    kind2, name2, spec2 = uw.parser.parse(text)
+    assert spec_to_decl(spec2, kind2, name2) == text

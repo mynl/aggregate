@@ -123,6 +123,13 @@
           | NETCEDED agg_out                                              -> mv_out_netceded
           | GROSSCEDED agg_out                                            -> mv_out_grossceded
           | GROSSNET agg_out                                              -> mv_out_grossnet
+          | CLASH name expr expr expr CLAIMS clash_comp clash_comp freq trailer  -> clash_out
+          | CLASH name expr expr expr CLAIMS clash_comp clash_comp trailer        -> clash_out_nofreq
+    
+    // A clash component is a limit (optional layers) plus a severity clause; the
+    // shared event count and the two per-event Bernoulli triggers are derived from
+    // the (na, nb, nc) claim counts by the solver (dev/plan-mv.md S7.3, App. B).
+    clash_comp: layers sev_clause   -> clash_comp
     
     mv_body: mv_body mv_item   -> mv_body_cons
            | mv_item           -> mv_body_one
@@ -352,6 +359,7 @@
     NETCEDED.2:   /netceded(?![a-zA-Z0-9._:~\-])/
     GROSSCEDED.2: /grossceded(?![a-zA-Z0-9._:~\-])/
     GROSSNET.2:   /grossnet(?![a-zA-Z0-9._:~\-])/
+    CLASH.2:      /clash(?![a-zA-Z0-9._:~\-])/
     COPULA.2:     /copula(?![a-zA-Z0-9._:~\-])/
     EXPOSURE.2:   /exposure(?![a-zA-Z0-9._:~\-])/
     TWEEDIE.2:    /tweedie(?![a-zA-Z0-9._:~\-])/
@@ -425,7 +433,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|approximate|approx|at|bernoulli|binomial|ceded|claim|claims|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|approximate|approx|at|bernoulli|binomial|ceded|claim|claims|clash|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

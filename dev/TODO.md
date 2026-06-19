@@ -139,12 +139,17 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Track B — Bugs & investigations  `[A]` (small, parallel)
 
-- [ ] **B5 `[B]` Investigate `bs_describe`.** Flagged during `plan-line-to-unit`
-  (author: "not sure about that!"). Scope TBD — review the
-  `bs_describe`/`bs_explain` module functions in `distributions.py` (the
-  `color=` workers behind `bs_description`/`bs_explanation`): purpose, the
-  local-`line` accumulator, and whether they still earn their place / want
-  reshaping. *(new, 2026-06-19; just a marker — scope before scheduling.)*
+- [ ] **B5 `[B]` Investigate `bs_describe` (the "bs_describe wart").** Flagged
+  during `plan-line-to-unit` (author: "not sure about that!" — and "keep
+  bothering me about it"). Scope TBD — review the `bs_describe`/`bs_explain`
+  module functions in `distributions.py` (the `color=` workers behind
+  `bs_description`/`bs_explanation`): purpose, the local-`line` accumulator, and
+  whether they still earn their place / want reshaping. **Reconcile with
+  `dev/plan-consistent-naming.md` §3** — the *deferred* bs-worker rename (the
+  `bs_describe`/`bs_explain` verb workers shadow the noun properties by one
+  letter; that plan parks renaming them to non-homonyms like `_format_bs_grid`).
+  Do these two together so the wart isn't fixed twice or lost. *(new,
+  2026-06-19; standing reminder — surface it periodically until scoped.)*
 - [ ] **B4 `[A]`** **Zero-truncated / zero-modified frequency is broken.**
   `poisson zt` raises `function value at x=0.0 is NaN; solver cannot continue`
   for every parameterization; `zm` builds but the *semantics* are wrong. The
@@ -234,6 +239,15 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     reads the matching `Gross`/`Ceded`/`Net` occ columns. **Axis order fixed to the
     keyword's x-then-y convention** (breaking: `netceded`/`occ_bivariate` axis 0 was
     Ceded, now Net). Override signature `occ_bivariate(views, bs, log2_x, log2_y)`.
+  - [x] **MV-6** `[a79]` — modelling features: **shuffle-of-Min copula**
+    (`ShuffleOfMin` + `CopulaShuffle`, programmatic-only, exact perm/flip `tau`,
+    dense in copula space) and the **`clash` statement** (`CLASH.2` terminal;
+    `solve_clash_model` independent-trigger 2×2 solver → shared count + two
+    Bernoulli triggers under the independent copula; unparser round-trip).
+    *(Known limit: heavy components at large shared `n` can exceed the 2-D budget
+    — one `bs` must resolve severity + aggregate; flagged by the `validation`
+    row, raise `update(log2=…)`. A possible later improvement: bound the 2-D axis
+    `bs` by the severity scale like the 1-D `_bs_window`.)*
 
 ---
 

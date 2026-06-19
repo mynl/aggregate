@@ -51,6 +51,7 @@ becomes the correct profit-loss sign once the axis is reflected.
 
 import logging
 import warnings
+from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -106,6 +107,73 @@ def _view_image_fn(agg, view):
     if view == 'net':
         return agg.occ_netter
     raise ValueError(f'unknown reinsurance view {view!r}')
+
+
+class ClashSolution(NamedTuple):
+    """Solution of the independent-trigger clash model (see :func:`solve_clash_model`)."""
+
+    n: float
+    na: float
+    nb: float
+    nc: float
+    n0: float
+    pa: float
+    pb: float
+
+
+def solve_clash_model(na, nb, nc):
+    """Derive the shared event count and per-event triggers of a clash model.
+
+    The natural cat-clash baseline: a **shared** event drives two perils, each
+    triggered within the event by an independent Bernoulli, and ``clash`` is the
+    expected count of events that trigger *both*. Given the interpretable counts
+
+    * ``na`` -- expected count of events triggering **A only**,
+    * ``nb`` -- expected count triggering **B only**,
+    * ``nc`` -- expected **clash** count (both A and B),
+
+    the missing cell of the independent-trigger 2x2 table (neither peril) is fixed
+    by the independence constraint ``nc * n0 = na * nb`` as ``n0 = na nb / nc``.
+    The shared event count and the two per-event trigger probabilities are then
+
+    .. math::
+
+        n = na + nb + nc + n0, \\quad
+        pa = (na + nc) / n, \\quad
+        pb = (nb + nc) / n.
+
+    These feed the two components as Bernoulli factories ``dfreq [0 1] [1-pa pa]``
+    / ``[1-pb pb]`` coupled by the **independent** copula; the dependence between
+    the two aggregates comes entirely from the shared frequency (plus any
+    common-shock mixing on the outer frequency).
+
+    Parameters
+    ----------
+    na, nb : float
+        A-only and B-only expected event counts (non-negative).
+    nc : float
+        Clash (both) expected event count; must be positive for a finite,
+        non-degenerate solution.
+
+    Returns
+    -------
+    ClashSolution
+        Named tuple ``(n, na, nb, nc, n0, pa, pb)``.
+
+    Raises
+    ------
+    ValueError
+        If ``nc <= 0`` or ``na`` / ``nb`` is negative.
+    """
+    na, nb, nc = float(na), float(nb), float(nc)
+    if nc <= 0:
+        raise ValueError('clash: nc (the clash count) must be positive.')
+    if na < 0 or nb < 0:
+        raise ValueError('clash: na and nb must be non-negative.')
+    n0 = na * nb / nc
+    n = na + nb + nc + n0
+    return ClashSolution(n=n, na=na, nb=nb, nc=nc, n0=n0,
+                         pa=(na + nc) / n, pb=(nb + nc) / n)
 
 
 def _netceded_window_hi(occ_density, xs, prob):
@@ -494,7 +562,7 @@ class MultivariateAggregate:
     """
 
     def __init__(self, name, lines=None, copula=None, note='', hints='', mode='copula',
-                 nc_agg=None, nc_kwargs=None, nc_views=None,
+                 nc_agg=None, nc_kwargs=None, nc_views=None, clash=None,
                  exp_en=None, exp_el=None, exp_premium=None, exp_lr=None,
                  freq_name='poisson', freq_a=0.0, freq_b=0.0,
                  freq_zm=False, freq_p0=np.nan, **kwargs):
@@ -507,6 +575,9 @@ class MultivariateAggregate:
         self.note = note
         self.hints = hints
         self.program = ''
+        # clash provenance (na, nb, nc, n0, pa, pb) when built from a `clash`
+        # statement; None for an ordinary copula / netceded bivariate.
+        self.clash = dict(clash) if clash else None
         # filled by update() (both modes)
         self.density = None
         self.axis_xs = [None, None]

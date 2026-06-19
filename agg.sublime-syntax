@@ -61,7 +61,7 @@ contexts:
       scope: support.type.builtin.distortion.decl
 
   keywords:
-    - match: '\b(?:occurrence|aggregate|netceded|grossceded|grossnet|copula|exposure|tweedie|tower|mixed|picks|splice|ceded|dfreq|dsev|ssev|loss|pnl|port|rate|net|sev|agg|xps|wts|and|exp|at|cv|lr|xs|of|to|po|so|zm|zt){{keyword_boundary}}'
+    - match: '\b(?:occurrence|aggregate|netceded|grossceded|grossnet|clash|copula|exposure|tweedie|tower|mixed|picks|splice|ceded|dfreq|dsev|ssev|loss|pnl|port|rate|net|sev|agg|xps|wts|and|exp|at|cv|lr|xs|of|to|po|so|zm|zt){{keyword_boundary}}'
       scope: keyword.control.decl
 
     - match: '\b(?:multivariate|mv){{keyword_boundary}}'
@@ -105,7 +105,7 @@ contexts:
   identifiers:
     # Mirrors the Lark ID token. Placing this before numbers prevents
     # names such as mydist.1 from splitting and coloring .1 as a number.
-    - match: '\b(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][._:~a-zA-Z0-9\-]*'
+    - match: '\b(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|clash|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][._:~a-zA-Z0-9\-]*'
       scope: variable.other.identifier.decl
 
   numbers:

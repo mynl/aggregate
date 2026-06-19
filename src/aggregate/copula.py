@@ -24,7 +24,15 @@ kind             natural parameter      internal
 ``gumbel``       Kendall ``tau``        ``theta = 1 / (1 - tau)``
 ``clayton``      Kendall ``tau``        ``theta = 2 tau / (1 - tau)``
 ``fgm``          Spearman ``rho_s``     ``alpha = 3 rho_s``
+``shuffle``      permutation + flips    -- (singular, programmatic-only)
 ================ ====================== ============================
+
+The ``shuffle`` kind (:class:`CopulaShuffle` over a :class:`ShuffleOfMin`) is
+**programmatic-only** -- its "parameter" is a strip permutation, not a scalar, so
+it is built directly (``CopulaShuffle(perm=[...], flip=[...])``) rather than
+through the ``Copula(name, param)`` factory, and has no DecL keyword. Shuffles of
+Min are dense in the space of copulas, so they double as a flexible
+non-parametric dependence stress-test.
 
 Nothing here is re-exported at the top-level package namespace (submodule access
 only, per the project layout convention): reach it as
@@ -389,3 +397,222 @@ class CopulaFGM(Copula):
     def tau(self):
         """Kendall's tau ``= 2 alpha / 9``."""
         return float(2.0 * self.alpha / 9.0)
+
+
+# ---------------------------------------------------------------------------
+# Shuffle-of-Min: a singular, programmatic-only copula
+# ---------------------------------------------------------------------------
+
+class ShuffleOfMin:
+    """Shuffle of Min copula on the unit square.
+
+    Built from the comonotone copula ``M(u, v) = min(u, v)`` by cutting
+    ``[0, 1]`` into ``n`` equal vertical strips, permuting them by ``perm``, and
+    optionally reflecting (flipping) the strips flagged in ``flip``. The mass
+    lives on ``n`` segments of slope ``+/-1`` -- the graph of a
+    measure-preserving bijection ``S`` -- so the copula is **singular** (no
+    density). Shuffles of Min are dense in the space of copulas: *any* copula can
+    be approximated arbitrarily well by one, which makes them a useful
+    programmatic stress-test of dependence beyond the smooth parametric families.
+
+    Parameters
+    ----------
+    perm : array_like of int
+        Permutation of ``range(n)``; ``perm[i]`` is the destination v-slot of
+        source strip ``i``.
+    flip : array_like of bool, optional
+        Per-strip reflection flags; ``flip[i] = True`` gives strip ``i`` slope
+        ``-1`` (countermonotone within the strip) instead of ``+1``. Default: no
+        flips (all comonotone).
+
+    Attributes
+    ----------
+    perm : ndarray of int
+    flip : ndarray of bool
+    n : int
+        Number of strips.
+    w : float
+        Common strip width ``1 / n``.
+
+    Notes
+    -----
+    ``n = 1`` recovers the comonotone copula ``M`` (``flip=False``) or the
+    countermonotone copula ``W`` (``flip=True``). :meth:`cdf` is exactly the
+    interface :meth:`Copula.rectangle_pmf` consumes, so a :class:`CopulaShuffle`
+    wrapper plugs straight into the discrete-Sklar bivariate severity builder.
+    """
+
+    def __init__(self, perm, flip=None):
+        self.perm = np.asarray(perm, dtype=int)
+        self.n = int(self.perm.size)
+        if self.n == 0 or sorted(self.perm.tolist()) != list(range(self.n)):
+            raise ValueError(
+                f'perm must be a permutation of range(n); got {self.perm.tolist()}')
+        self.flip = (np.zeros(self.n, bool) if flip is None
+                     else np.asarray(flip, bool))
+        if self.flip.size != self.n:
+            raise ValueError('flip must have the same length as perm')
+        self.w = 1.0 / self.n                  # common strip width
+        self.u0 = np.arange(self.n) * self.w   # source u-interval [i*w, (i+1)*w]
+        self.v0 = self.perm * self.w           # destination v-interval start
+
+    def S(self, u):
+        """Apply the measure-preserving map ``V = S(U)``.
+
+        Parameters
+        ----------
+        u : array_like
+            Points in ``[0, 1]``.
+
+        Returns
+        -------
+        ndarray
+            ``S(u)`` -- the v-coordinate of the copula support at ``u``.
+        """
+        u = np.asarray(u, float)
+        i = np.clip((u / self.w).astype(int), 0, self.n - 1)   # strip index
+        local = u - self.u0[i]                                 # offset in strip
+        local = np.where(self.flip[i], self.w - local, local)  # reflect if flagged
+        return self.v0[i] + local
+
+    def cdf(self, u, v):
+        """Copula CDF ``C(u, v) = mass of the S-graph inside [0, u] x [0, v]``.
+
+        Parameters
+        ----------
+        u, v : array_like
+            Broadcastable arrays of values in ``[0, 1]``.
+
+        Returns
+        -------
+        ndarray
+            ``C(u, v)``, the shape of ``np.broadcast(u, v)``.
+        """
+        u = np.asarray(u, float)[..., None]    # broadcast over strips
+        v = np.asarray(v, float)[..., None]
+        a = np.clip(u - self.u0, 0.0, self.w)  # source sub-interval left of u
+        # v-extent of each strip's image segment (reflected strips run downward)
+        lo = np.where(self.flip, self.v0 + self.w - a, self.v0)
+        hi = np.where(self.flip, self.v0 + self.w, self.v0 + a)
+        overlap = np.clip(np.minimum(hi, v) - np.maximum(lo, 0.0), 0.0, None)
+        contrib = np.where(a > 0, overlap, 0.0)  # only strips reached by u count
+        return contrib.sum(axis=-1)
+
+    def sample(self, m, rng=None):
+        """Draw ``m`` exact samples ``(U, V) = (U, S(U))`` with ``U`` uniform.
+
+        Parameters
+        ----------
+        m : int
+            Sample size.
+        rng : int or numpy Generator, optional
+            Seed or generator for reproducibility.
+
+        Returns
+        -------
+        ndarray
+            Shape ``(m, 2)`` array of ``(u, v)`` draws on the unit square.
+        """
+        rng = np.random.default_rng(rng)
+        u = rng.random(m)
+        return np.column_stack([u, self.S(u)])
+
+    def __repr__(self):
+        return f'ShuffleOfMin(perm={self.perm.tolist()}, flip={self.flip.tolist()})'
+
+
+class CopulaShuffle(Copula):
+    """Shuffle-of-Min copula wrapper -- a :class:`Copula` over a :class:`ShuffleOfMin`.
+
+    A **programmatic-only** copula (no DecL keyword): build it in Python and hand
+    it to a :class:`aggregate.multivariate.MultivariateAggregate` (e.g.
+    ``mv.copula = CopulaShuffle(perm=[...]); mv.update()``). Singular by nature,
+    which suits the discrete-Sklar rectangle machinery exactly -- its
+    :meth:`Copula.rectangle_pmf` reproduces the two marginals like any other
+    copula.
+
+    Parameters
+    ----------
+    perm : array_like of int, optional
+        Permutation of ``range(n)`` (the strip shuffle). Required unless ``som``
+        is given.
+    flip : array_like of bool, optional
+        Per-strip reflection flags (see :class:`ShuffleOfMin`).
+    som : ShuffleOfMin, optional
+        A pre-built shuffle, used in place of ``perm`` / ``flip``.
+    display_name : str, optional
+        Override label for ``str(self)``.
+
+    Notes
+    -----
+    Not reachable through the ``Copula('name', param)`` float-parameter factory
+    (its parameter is a permutation, not a scalar); construct it directly.
+    """
+
+    kind = 'shuffle'
+    param_name = None
+    long_name = 'Shuffle-of-Min'
+
+    def __init__(self, perm=None, flip=None, *, som=None, display_name=''):
+        # Programmatic-only: bypass the base float-parameter __init__. Tolerate a
+        # leaked kind name from an accidental Copula('shuffle', ...) factory call.
+        if isinstance(perm, str):
+            perm = None
+        if som is None:
+            if perm is None:
+                raise ValueError(
+                    'shuffle copula is programmatic-only: construct it as '
+                    'CopulaShuffle(perm=[...], flip=[...]) or pass '
+                    'som=ShuffleOfMin(...)')
+            som = ShuffleOfMin(perm, flip)
+        self.som = som
+        self._name = 'shuffle'
+        self.param = None
+        self.display_name = display_name
+        self.n = som.n
+
+    def _C_interior(self, u, v):
+        return self.som.cdf(u, v)
+
+    def sample(self, m, rng=None):
+        """Draw ``m`` exact ``(U, V)`` samples (passthrough to the wrapped
+        :meth:`ShuffleOfMin.sample`)."""
+        return self.som.sample(m, rng)
+
+    def tau(self):
+        """Kendall's tau of the shuffle, computed exactly from ``perm`` / ``flip``.
+
+        Notes
+        -----
+        For independent draws ``U1, U2 ~ Unif(0, 1)`` with ``V = S(U)``, the
+        strips are disjoint on both axes, so the concordance sign is constant on
+        each strip-pair:
+
+        * same strip ``i``: ``+1`` (comonotone segment) or ``-1`` (flipped);
+        * strips ``i != j``: ``sign(i - j) * sign(perm[i] - perm[j])`` (the u- and
+          v-orders of the two image segments).
+
+        Averaging over the uniform strip masses ``w^2 = 1 / n^2`` gives
+        ``tau = (sum_i (+/-1) + sum_{i!=j} sign(i-j) sign(perm[i]-perm[j])) / n^2``.
+        ``n = 1`` returns ``+1`` (M) or ``-1`` (W); the identity permutation
+        returns ``+1``.
+        """
+        n = self.som.n
+        if n == 0:
+            return 0.0
+        perm = self.som.perm.astype(float)
+        diag = float(np.where(self.som.flip, -1.0, 1.0).sum())
+        idx = np.arange(n)
+        si = np.sign(idx[:, None] - idx[None, :])
+        sp = np.sign(perm[:, None] - perm[None, :])
+        off = float((si * sp).sum())           # i == j terms vanish (sign 0)
+        return (diag + off) / (n * n)
+
+    def __str__(self):
+        if self.display_name:
+            return self.display_name
+        return f'shuffle(n={self.som.n})'
+
+    def __repr__(self):
+        return (f'CopulaShuffle(perm={self.som.perm.tolist()}, '
+                f'flip={self.som.flip.tolist()} -> tau={self.tau():.4f})')

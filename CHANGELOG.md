@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.0a79
+
+### Bivariate modelling features: shuffle-of-Min copula + clash statement (MV-6)
+
+Stage MV-6 of the bivariate firm-up — the two modelling wins.
+
+- **Shuffle-of-Min copula** (`aggregate.copula.ShuffleOfMin` +
+  `CopulaShuffle`). A singular copula built by cutting the unit square into `n`
+  equal vertical strips, permuting them, and optionally reflecting some — the
+  graph of a measure-preserving bijection. Shuffles of Min are *dense* in the
+  space of copulas, so they double as a flexible non-parametric dependence
+  stress-test. **Programmatic-only** (no DecL keyword): build it as
+  `CopulaShuffle(perm=[...], flip=[...])` and hand it to a bivariate
+  (`mv.copula = CopulaShuffle(...); mv.update()`). Its `cdf` is exactly the
+  `Copula.rectangle_pmf` interface, so marginals reproduce like any copula.
+  Kendall's `tau` is computed **exactly** from the permutation/flips (`n=1`
+  recovers M, `tau=1`, or W, `tau=-1`); a `sample` method gives exact draws.
+- **`clash` statement** — `clash NAME na nb nc claims <A limit+sev> <B limit+sev>
+  <freq>`. The natural cat-clash baseline: a shared event drives two perils, each
+  triggered by an independent per-event Bernoulli, and `nc` is the expected count
+  of joint-trigger (clash) events. `solve_clash_model(na, nb, nc)`
+  (`aggregate.multivariate`) closes the independent-trigger 2×2 table
+  (`n0 = na·nb/nc`) to derive the shared event count `n` and the two triggers
+  `pa = (na+nc)/n`, `pb = (nb+nc)/n`; the two components become
+  `dfreq [0 1] [1-p p]` factories under the **independent** copula on the shared
+  frequency. New `CLASH.2` terminal (+ `ID` exclusion); round-trips through the
+  DecL unparser as the `clash` form.
+
+Note: a clash with **heavy** components (e.g. cv 2–3 lognormals) at a **large**
+shared count can exceed the 2-D memory budget — one common `bs` per axis must
+resolve both the severity and the much wider aggregate, so a coarse `bs` can
+under-resolve the severity. This is the existing budget tension (not a clash
+bug); the MV-4 `validation` row flags it (`check: marginal mean`). Raise
+`update(log2=…)` or use lighter/bounded severities.
+
 ## 1.0.0a78
 
 ### Netceded view-pairs (MV-5)

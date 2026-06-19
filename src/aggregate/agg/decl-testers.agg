@@ -279,7 +279,11 @@ multivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 
 # netceded -> (Net, Ceded); grossceded -> (Gross, Ceded); grossnet -> (Gross, Net).
 netceded agg MV.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson;
 grossceded agg MV.GrossCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson;
-grossnet agg MV.GrossNet 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson
+grossnet agg MV.GrossNet 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson;
+# CLASH statement: shared-event clash model. (na, nb, nc) = A-only / B-only /
+# both; the solver derives the shared count n and the per-event triggers, so the
+# two components are independent-copula Bernoulli factories on a shared frequency.
+clash MV.Clash 8 5 2 claims sev lognorm 50 cv 1.2 sev lognorm 60 cv 1.5 mixed gamma 0.2
 
 # ============================================================
 # HINTS. note{} is pure text; hints{} carries key=value; build settings (1.0.0a25)

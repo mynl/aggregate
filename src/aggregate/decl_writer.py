@@ -548,13 +548,28 @@ def _render_copula(copula) -> str:
 def _render_mvagg(name: str, spec: dict) -> str:
     """Render a multivariate (copula-coupled) aggregate or a ``netceded`` agg.
 
-    Inverts ``mv_out_copula`` / ``mv_out_copula_nofreq`` and the three
-    occurrence view-pair prefixes (``mv_out_netceded`` / ``mv_out_grossceded`` /
-    ``mv_out_grossnet``). The two components are rendered inline
-    (whitespace-insensitive within a program); the shared frequency is always
-    emitted (the no-freq source form defaults to ``poisson``, which re-parses to
-    the same spec).
+    Inverts ``mv_out_copula`` / ``mv_out_copula_nofreq``, the three occurrence
+    view-pair prefixes (``mv_out_netceded`` / ``mv_out_grossceded`` /
+    ``mv_out_grossnet``), and the ``clash`` statement (``clash_out``). The two
+    components are rendered inline (whitespace-insensitive within a program); the
+    shared frequency is always emitted (the no-freq source form defaults to
+    ``poisson``, which re-parses to the same spec).
     """
+    if 'clash' in spec:
+        # Re-derive the clash surface from the stored (na, nb, nc); each
+        # component renders as its limit + severity (the solved Bernoulli dfreq
+        # is implied by the counts, so it is not emitted).
+        cl = spec['clash']
+        (_, _, sa), (_, _, sb) = spec['lines']
+        return _join([
+            f'clash {_fmt_name(name)}',
+            f"{_fmt_num(cl['na'])} {_fmt_num(cl['nb'])} {_fmt_num(cl['nc'])} claims",
+            _join([_render_layers(sa), _render_sev_clause(sa)]),
+            _join([_render_layers(sb), _render_sev_clause(sb)]),
+            _render_freq(spec),
+            _render_trailer(spec),
+        ])
+
     if spec.get('mode') == 'netceded':
         # the keyword is the (x, y) view pair, names x-then-y
         _kw_for = {('net', 'ceded'): 'netceded', ('gross', 'ceded'): 'grossceded',

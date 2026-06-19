@@ -600,6 +600,66 @@ class UnderwritingTransformer(Transformer):
         """``grossnet <agg>`` -> joint (x=gross, y=net) occurrence aggregate."""
         return self._mv_out_viewpair(c, ('gross', 'net'))
 
+    # ----- clash (independent-trigger shared-event model) ------------
+    def clash_comp(self, c):
+        """A clash component body: ``layers sev_clause`` -> a partial spec dict."""
+        layers, sev_clause = c
+        return {**layers, **sev_clause}
+
+    def _clash_spec(self, name, na, nb, nc, comp_a, comp_b, freq, trailer):
+        """Build the clash bivariate spec from the (na, nb, nc) counts.
+
+        The solver (:func:`aggregate.multivariate.solve_clash_model`) turns the
+        three counts into the shared event count ``n`` and the two per-event
+        trigger probabilities ``pa`` / ``pb``; the two components become
+        ``dfreq [0 1] [1-p p]`` Bernoulli factories wrapping the given
+        limit/severity clauses, coupled by the **independent** copula on the
+        shared frequency ``freq``.
+        """
+        from .multivariate import solve_clash_model
+        from .copula import Copula
+
+        sol = solve_clash_model(na, nb, nc)
+
+        def _component(suffix, body, p):
+            spec = {
+                "name": f"{name}.{suffix}",
+                "freq_name": "empirical",
+                "freq_a": np.array([0.0, 1.0]),
+                "freq_b": np.array([1.0 - p, p]),
+                "exp_en": -1,
+                **body,
+                "note": "",
+                "hints": "",
+            }
+            return ("agg", spec["name"], spec)
+
+        spec = {
+            "name": name,
+            "mode": "copula",
+            **freq,
+            "exp_en": sol.n,
+            "lines": [_component("A", comp_a, sol.pa),
+                      _component("B", comp_b, sol.pb)],
+            "copula": Copula("independent"),
+            "clash": {"na": sol.na, "nb": sol.nb, "nc": sol.nc,
+                      "n0": sol.n0, "pa": sol.pa, "pb": sol.pb},
+            "note": trailer["note"],
+            "hints": trailer["hints"],
+        }
+        return ("mvagg", name, spec)
+
+    def clash_out(self, c):
+        """``clash NAME na nb nc claims <A> <B> <freq>`` -> clash bivariate."""
+        _clash, name, na, nb, nc, _claims, comp_a, comp_b, freq, trailer = c
+        return self._clash_spec(name, na, nb, nc, comp_a, comp_b, freq, trailer)
+
+    def clash_out_nofreq(self, c):
+        """``clash`` with no trailing frequency clause -> shared poisson."""
+        _clash, name, na, nb, nc, _claims, comp_a, comp_b, trailer = c
+        return self._clash_spec(name, na, nb, nc, comp_a, comp_b,
+                                {"freq_name": "poisson"}, trailer)
+
     # ----- severity output ------------------------------------------
     def sev_out_sev(self, c):
         _, name, sev, trailer = c

@@ -202,11 +202,17 @@ comments and never had a `line` token. Confirmed: no `line` spec key, no
   explainable in a phrase (source lines, matplotlib, `linear`/`newline`, loss on
   line, prose). Capture that residual list in the PR summary as evidence.
 
-## Open decisions for the author
+## Resolved decisions (author, 2026-06-19)
 
-1. **Back-compat alias** for `line_names` — recommend *no* (clean break); confirm.
-2. **`'line'` index-label rename is output-breaking** — confirm it's wanted now
-   (it is the right end state, but any saved analysis keyed on the `'line'` index
-   shifts).
-3. Optional cosmetic tidies (`bs_describe` local `line`→`text`, test
-   `LINES`→`PROGRAMS`) — do them, or leave to keep the diff focused?
+1. **Back-compat alias for `line_names` — NO. Clean break.** `line_names` and the
+   other `line_*` names are removed outright; accessing them raises
+   `AttributeError`. No reverse pass-through.
+2. **`'line'` index-label rename → `'unit'` — approved**, output-breaking and
+   intended. Any saved analysis keyed on the `'line'` index moves to `'unit'`.
+3. **Cosmetic tidy — `bs_describe` local `line`→`text`: include** it in Stage E.
+   `LINES`→`PROGRAMS` in the test parametrizers: **leave** (optional, not done —
+   keeps the diff focused; the `LINES` symbol is an explainable keep-table hit).
+
+> Separately flagged: the author wants a standalone **"investigate `bs_describe`"**
+> item (Track B in `dev/TODO.md`) — independent of this rename; the `line`→`text`
+> tidy here does not pre-empt that review.

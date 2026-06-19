@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.0.0a78
+
+### Netceded view-pairs (MV-5)
+
+Stage MV-5 of the bivariate firm-up: the occurrence netceded decomposition
+generalises from the single `(ceded, net)` pair to **any two of {gross, ceded,
+net}**. The three views satisfy `ceded + net = gross`, so exactly three
+unordered pairs exist, each named by one DecL prefix.
+
+- **Two new DecL prefixes** — `grossceded` and `grossnet`, siblings of the
+  existing `netceded` (priority-2 terminals with the word-boundary lookahead,
+  added to the `ID` exclusion list). Each takes one ordinary `agg` carrying
+  occurrence reinsurance and builds the joint per-occurrence aggregate of the
+  named pair.
+- **`Aggregate.occ_bivariate(views=…)`** — grows a `views=('net', 'ceded')`
+  parameter (each entry one of `'gross'` / `'ceded'` / `'net'`); the override
+  signature is now `occ_bivariate(views, bs, log2_x, log2_y)` (one common `bs`
+  + per-axis log2), replacing the view-named `bs_ceded`/`bs_net`/`log2_ceded`/
+  `log2_net`.
+- **Axis-order convention fixed.** The keyword names the pair **x-then-y**, so
+  `netceded` → axis 0 = Net, axis 1 = Ceded; `grossceded` → (Gross, Ceded);
+  `grossnet` → (Gross, Net). **Breaking:** the previous `netceded` /
+  `occ_bivariate` axis 0 was Ceded; it is now Net (gross leads when present).
+- **`build_netceded_joint(views=…)`** parameterised by the view pair — `gross`
+  uses the identity image map (the gross loss itself), `ceded`/`net` use
+  `occ_ceder`/`occ_netter`; all three rebucket onto the common-`bs` grid via the
+  linear scatter (mean-preserving). `_netceded_theory` reads the matching
+  `Gross` / `Ceded` / `Net` occurrence columns of `reins_stats_df`. `info`,
+  `describe`, axis labels, and the contour plot follow the chosen pair.
+
+The validation invariant holds for every pair: each marginal reproduces the
+named standalone occurrence aggregate (means exact), and `gross − net` recovers
+`ceded`.
+
+Also: docs / syntax artifacts updated for the new keywords (the language
+reference `ref_include.rst`, the reinsurance user guide, `dev/info-strings.rst`,
+the Sublime syntax, `decl-testers.agg`), and a latent path bug in
+`parser.grammar(add_to_doc=True)` fixed (it wrote `ref_include.rst` to
+`src/docs/` instead of the repo-root `docs/` under the `src/` layout).
+
 ## 1.0.0a77
 
 ### Bivariate reporting surface (MV-4)

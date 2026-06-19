@@ -113,58 +113,63 @@ def test_marginals_sum_to_one(prog):
 
 @pytest.mark.parametrize('prog', [OCC, OCC_BOUNDED, OCC_FIXED])
 def test_marginal_means_match_stats_df(prog):
-    """Ceded / net marginal means match reins_stats_df occ totals.
+    """Net / ceded marginal means match reins_stats_df occ totals.
 
-    Means are reproduced exactly (the linear scatter preserves the first
-    moment), independent of the auto-chosen bucket sizes.
+    Axis order is the (x=net, y=ceded) convention, so axis 0 is Net and axis 1
+    is Ceded. Means are reproduced exactly (the linear scatter preserves the
+    first moment), independent of the auto-chosen bucket sizes.
     """
     a = _build(prog)
     b = a.occ_bivariate()
-    cd, nd = b.marginals()
+    net_d, ced_d = b.marginals()
     rs = a.reins_stats_df
-    c_mean, _, _ = _marginal_moments(b.axis_xs[0], cd)
-    n_mean, _, _ = _marginal_moments(b.axis_xs[1], nd)
-    assert c_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=2e-3)
-    assert n_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Net')], rel=2e-3)
+    net_mean, _, _ = _marginal_moments(b.axis_xs[0], net_d)
+    ced_mean, _, _ = _marginal_moments(b.axis_xs[1], ced_d)
+    assert net_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Net')], rel=2e-3)
+    assert ced_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=2e-3)
 
 
 @pytest.mark.parametrize('prog', [OCC_BOUNDED, OCC_FIXED])
 def test_matched_grid_reproduces_univariate_cv(prog):
-    """On the model grid (``bs_ceded == bs_net == self.bs``) the marginals
-    reproduce the univariate occurrence aggregate cv, not just the mean.
+    """On the model grid (``bs == self.bs``) the marginals reproduce the
+    univariate occurrence aggregate cv, not just the mean.
 
-    Auto-sizing picks a *finer* ceded bucket than the model grid, so the
-    auto-sized cv is more accurate than (and legitimately differs from) the
-    coarse ``reins_stats_df`` value -- the rigorous identity holds only when
-    the bivariate grid matches the model grid. Bounded / fixed books are used
-    so the FFT deficit is negligible.
+    Auto-sizing picks a *coarser* common bucket than the model grid, so the
+    auto-sized cv legitimately differs from the model-grid ``reins_stats_df``
+    value -- the rigorous identity holds only when the bivariate grid matches
+    the model grid. Axis 0 is Net, axis 1 is Ceded (x=net, y=ceded), so the net
+    cover sizes ``log2_x`` and the ceded cover sizes ``log2_y``. Bounded / fixed
+    books are used so the FFT deficit is negligible.
     """
     a = _build(prog)
     rd = a.reins_density_df
     l2c = _cover_log2(rd['p_agg_ceded_occ'].to_numpy(), a.xs, a.bs)
     l2n = _cover_log2(rd['p_agg_net_occ'].to_numpy(), a.xs, a.bs)
-    b = a.occ_bivariate(bs_ceded=a.bs, bs_net=a.bs, log2_ceded=l2c, log2_net=l2n)
-    cd, nd = b.marginals()
+    b = a.occ_bivariate(bs=a.bs, log2_x=l2n, log2_y=l2c)
+    net_d, ced_d = b.marginals()
     rs = a.reins_stats_df
-    c_mean, c_cv, _ = _marginal_moments(b.axis_xs[0], cd)
-    n_mean, n_cv, _ = _marginal_moments(b.axis_xs[1], nd)
-    assert c_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=1e-3)
-    assert n_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Net')], rel=1e-3)
-    assert c_cv == pytest.approx(rs.loc[('agg', 'cv'), ('occ', 'Ceded')], rel=1e-3)
-    assert n_cv == pytest.approx(rs.loc[('agg', 'cv'), ('occ', 'Net')], rel=1e-3)
+    net_mean, net_cv, _ = _marginal_moments(b.axis_xs[0], net_d)
+    ced_mean, ced_cv, _ = _marginal_moments(b.axis_xs[1], ced_d)
+    assert net_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Net')], rel=1e-3)
+    assert ced_mean == pytest.approx(rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=1e-3)
+    assert net_cv == pytest.approx(rs.loc[('agg', 'cv'), ('occ', 'Net')], rel=1e-3)
+    assert ced_cv == pytest.approx(rs.loc[('agg', 'cv'), ('occ', 'Ceded')], rel=1e-3)
 
 
 @pytest.mark.parametrize('prog', [OCC, OCC_BOUNDED])
 def test_marginals_match_describe(prog):
-    """Ceded / net marginal means match the reins_describe occ Est cells."""
+    """Net / ceded marginal means match the reins_describe occ Est cells.
+
+    Axis 0 is Net, axis 1 is Ceded (x=net, y=ceded convention).
+    """
     a = _build(prog)
     b = a.occ_bivariate()
-    cd, nd = b.marginals()
+    net_d, ced_d = b.marginals()
     rd = a.reins_describe
-    c_mean, _, _ = _marginal_moments(b.axis_xs[0], cd)
-    n_mean, _, _ = _marginal_moments(b.axis_xs[1], nd)
-    assert c_mean == pytest.approx(rd.loc[('occ', 'ceded', 'agg'), 'Est EX'], rel=2e-3)
-    assert n_mean == pytest.approx(rd.loc[('occ', 'net', 'agg'), 'Est EX'], rel=2e-3)
+    net_mean, _, _ = _marginal_moments(b.axis_xs[0], net_d)
+    ced_mean, _, _ = _marginal_moments(b.axis_xs[1], ced_d)
+    assert net_mean == pytest.approx(rd.loc[('occ', 'net', 'agg'), 'Est EX'], rel=2e-3)
+    assert ced_mean == pytest.approx(rd.loc[('occ', 'ceded', 'agg'), 'Est EX'], rel=2e-3)
 
 
 # ----------------------------------------------------------------------------
@@ -240,7 +245,7 @@ def test_poisson_count_increases_correlation():
 
 def test_explicit_overrides_respected():
     a = _build(OCC_BOUNDED)
-    b = a.occ_bivariate(bs_ceded=2, bs_net=2, log2_ceded=9, log2_net=10)
+    b = a.occ_bivariate(bs=2, log2_x=9, log2_y=10)
     assert b.bs[0] == 2
     assert b.bs[1] == 2
     assert b.density.shape == (1 << 9, 1 << 10)
@@ -264,24 +269,79 @@ def test_netceded_one_common_bs_no_finer_than_gross():
 
 
 def test_netceded_marginals_match_occ_views():
-    """Each marginal reproduces the corresponding occurrence reins aggregate."""
+    """Each marginal reproduces the corresponding occurrence reins aggregate.
+
+    Axis 0 is Net, axis 1 is Ceded (x=net, y=ceded convention).
+    """
     a = _build(OCC)
     b = a.occ_bivariate()
-    cd, nd = b.marginals()
+    net_d, ced_d = b.marginals()
     rs = a.reins_stats_df
-    assert float((cd * b.axis_xs[0]).sum()) == pytest.approx(
-        rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=2e-3)
-    assert float((nd * b.axis_xs[1]).sum()) == pytest.approx(
+    assert float((net_d * b.axis_xs[0]).sum()) == pytest.approx(
         rs.loc[('agg', 'mean'), ('occ', 'Net')], rel=2e-3)
+    assert float((ced_d * b.axis_xs[1]).sum()) == pytest.approx(
+        rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=2e-3)
 
 
 def test_netceded_clip_warns_when_pinned_over_budget():
     """Pinning bs/log2 past the budget clips the wider axis and warns."""
     a = _build(OCC)
     with pytest.warns(DefectiveDistributionWarning, match='clipped'):
-        b = a.occ_bivariate(bs_ceded=a.bs, bs_net=a.bs,
-                            log2_ceded=14, log2_net=14)   # 14+14 > budget 20
+        b = a.occ_bivariate(bs=a.bs, log2_x=14, log2_y=14)   # 14+14 > budget 20
     assert b._clipped
+
+
+# ----------------------------------------------------------------------------
+# View-pairs (MV-5): netceded / grossceded / grossnet via occ_bivariate(views=)
+# ----------------------------------------------------------------------------
+
+# (view name in reins_stats_df, axis index, occ_bivariate views tuple)
+_VIEW_PAIRS = {
+    'netceded':   (('net', 'ceded'),   ('Net', 'Ceded')),
+    'grossceded': (('gross', 'ceded'), ('Gross', 'Ceded')),
+    'grossnet':   (('gross', 'net'),   ('Gross', 'Net')),
+}
+
+
+@pytest.mark.parametrize('views,labels', list(_VIEW_PAIRS.values()),
+                         ids=list(_VIEW_PAIRS))
+def test_view_pair_marginals_match_named_views(views, labels):
+    """occ_bivariate(views=...) marginals reproduce the named occ aggregates.
+
+    Axis 0 is ``views[0]``, axis 1 is ``views[1]`` (keyword names x-then-y).
+    Means are exact (linear scatter preserves the first moment).
+    """
+    a = _build(OCC)
+    b = a.occ_bivariate(views=views)
+    assert b.line_names == list(labels)
+    m0, m1 = b.marginals()
+    rs = a.reins_stats_df
+    assert float((m0 * b.axis_xs[0]).sum()) == pytest.approx(
+        rs.loc[('agg', 'mean'), ('occ', labels[0])], rel=2e-3)
+    assert float((m1 * b.axis_xs[1]).sum()) == pytest.approx(
+        rs.loc[('agg', 'mean'), ('occ', labels[1])], rel=2e-3)
+    assert m0.sum() == pytest.approx(1.0, abs=1e-6)
+    assert m1.sum() == pytest.approx(1.0, abs=1e-6)
+
+
+@pytest.mark.parametrize('views', [p[0] for p in _VIEW_PAIRS.values()],
+                         ids=list(_VIEW_PAIRS))
+def test_view_pair_axis_order_x_then_y(views):
+    """The keyword names the pair x-then-y: axis kinds follow ``views``."""
+    a = _build(OCC)
+    b = a.occ_bivariate(views=views)
+    assert (b._axis_kind(0), b._axis_kind(1)) == views
+
+
+def test_grossnet_anti_diagonal_is_ceded():
+    """gross - net == ceded: E[Gross] - E[Net] reproduces E[Ceded]."""
+    a = _build(OCC)
+    b = a.occ_bivariate(views=('gross', 'net'))
+    m0, m1 = b.marginals()
+    e_g = float((m0 * b.axis_xs[0]).sum())
+    e_n = float((m1 * b.axis_xs[1]).sum())
+    e_ceded = a.reins_stats_df.loc[('agg', 'mean'), ('occ', 'Ceded')]
+    assert e_g - e_n == pytest.approx(e_ceded, rel=2e-2)
 
 
 # ----------------------------------------------------------------------------

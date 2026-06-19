@@ -31,7 +31,7 @@
 
 ## NEW STEVE MANUAL ENTRIES
 
-H: Portfolio class should use unit not line. All refs to line replaced with unit! **carefully!**
+H: Portfolio class should use unit not line. All refs to line replaced with unit! **carefully!** → planned: `dev/plan-line-to-unit.md` (staged; clean break, no `line_names` alias; `'line'` index→`'unit'`; `line=`/`lines=` kwargs→`unit=`/`units=`; DoD = `rg line -g *.py` only keep-table hits).
 H: build.knowledge source col: just store the db name and not whole path in source. Yes, ambiguous. Prefix ~/ if from user's .aggregate store, full path if not built-in or home dir.
 N: distributions with no variance should refuse to estimate bs. how is that being done ATM? I think in the past it was an error. Now you can package hints with the program there are no excuses for not providing bs,log2.
 
@@ -139,6 +139,12 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ## Track B — Bugs & investigations  `[A]` (small, parallel)
 
+- [ ] **B5 `[B]` Investigate `bs_describe`.** Flagged during `plan-line-to-unit`
+  (author: "not sure about that!"). Scope TBD — review the
+  `bs_describe`/`bs_explain` module functions in `distributions.py` (the
+  `color=` workers behind `bs_description`/`bs_explanation`): purpose, the
+  local-`line` accumulator, and whether they still earn their place / want
+  reshaping. *(new, 2026-06-19; just a marker — scope before scheduling.)*
 - [ ] **B4 `[A]`** **Zero-truncated / zero-modified frequency is broken.**
   `poisson zt` raises `function value at x=0.0 is NaN; solver cannot continue`
   for every parameterization; `zm` builds but the *semantics* are wrong. The
@@ -221,6 +227,13 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     `info_row`/`INFO_NA` (fixed catalogue, Agg/Port convention; bivariate
     section added to `dev/info-strings.rst`) + `explain`, `bs_window_df`/
     `bs_description`, `tail_df`/`tail_description` (per-axis summaries).
+  - [x] **MV-5** `[a78]` — netceded view-pairs: new DecL prefixes `grossceded`
+    / `grossnet` (siblings of `netceded`; `GROSSCEDED.2`/`GROSSNET.2` terminals
+    + `ID` exclusion) and `Aggregate.occ_bivariate(views=…)`. `build_netceded_joint`
+    parameterised by the `(x, y)` view pair (gross = identity image), `_netceded_theory`
+    reads the matching `Gross`/`Ceded`/`Net` occ columns. **Axis order fixed to the
+    keyword's x-then-y convention** (breaking: `netceded`/`occ_bivariate` axis 0 was
+    Ceded, now Net). Override signature `occ_bivariate(views, bs, log2_x, log2_y)`.
 
 ---
 

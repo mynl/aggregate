@@ -273,10 +273,13 @@ multivariate MV.ClaytonMixed 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 
 multivariate MV.Normal 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula normal 0.5;
 multivariate MV.PnLAxis 25 claims agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
 multivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson;
-# netceded MODE: the joint (ceded, net) occurrence law of one reinsured aggregate
-# (same object as Aggregate.occ_bivariate()). Body is an ordinary agg carrying
-# occurrence reinsurance; the two axes are Ceded and Net.
-netceded agg MV.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson
+# netceded MODE: the joint occurrence law of one reinsured aggregate (same object
+# as Aggregate.occ_bivariate()). Body is an ordinary agg carrying occurrence
+# reinsurance. The three view-pair prefixes name the (x, y) axes x-then-y:
+# netceded -> (Net, Ceded); grossceded -> (Gross, Ceded); grossnet -> (Gross, Net).
+netceded agg MV.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson;
+grossceded agg MV.GrossCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson;
+grossnet agg MV.GrossNet 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson
 
 # ============================================================
 # HINTS. note{} is pure text; hints{} carries key=value; build settings (1.0.0a25)

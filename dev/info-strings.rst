@@ -132,6 +132,10 @@ always present, so the two per-axis blocks (``axis 0`` / ``axis 1``) always
 emit the same rows in the same order. Grid rows render ``n/a`` before
 :meth:`update`.
 
+In ``netceded`` mode the keyword names the axis pair **x-then-y**: ``netceded``
+→ (axis 0 ``net``, axis 1 ``ceded``); ``grossceded`` → (``gross``, ``ceded``);
+``grossnet`` → (``gross``, ``net``).
+
 ===========================  =======================================================  =========================
 Row                          Source / meaning                                          n/a when
 ===========================  =======================================================  =========================
@@ -146,13 +150,15 @@ claim count                  shared ``E[N]`` (source agg ``n`` in netceded),
                              format ``,.3f``
 padding                      FFT zero-padding                                          not updated
 axis 0 name                  component-0 name
-axis 0 kind                  ``agg`` / ``pnl`` (copula) or ``ceded`` (netceded)
+axis 0 kind                  ``agg`` / ``pnl`` (copula) or the axis-0 view
+                             ``net`` / ``gross`` (netceded)
 axis 0 bs                    axis-0 bucket size (``1/n`` form for ``bs < 1``)          not updated
 axis 0 log2                  axis-0 log2 grid length                                   not updated
 axis 0 x_min                 axis-0 window lower edge                                  not updated
 axis 0 x_max                 axis-0 window upper edge                                  not updated
 axis 1 name                  component-1 name
-axis 1 kind                  ``agg`` / ``pnl`` (copula) or ``net`` (netceded)
+axis 1 kind                  ``agg`` / ``pnl`` (copula) or the axis-1 view
+                             ``ceded`` / ``net`` (netceded)
 axis 1 bs                    axis-1 bucket size                                        not updated
 axis 1 log2                  axis-1 log2 grid length                                   not updated
 axis 1 x_min                 axis-1 window lower edge                                  not updated
@@ -168,7 +174,9 @@ id                           display-only 8-hex hash of the structural fields
 Value enumerations:
 
 - ``mode`` ∈ ``{copula, netceded}``.
-- ``axis k kind`` ∈ ``{agg, pnl}`` (copula) or ``{ceded, net}`` (netceded).
+- ``axis k kind`` ∈ ``{agg, pnl}`` (copula) or ``{gross, ceded, net}``
+  (netceded; the pair is set by the keyword — ``netceded`` / ``grossceded`` /
+  ``grossnet``).
 - ``validation`` ∈ ``{not unreasonable}`` or ``check: <marginal mean, tail
   deficit>`` -- the showpiece invariant being *each marginal reproduces its
   standalone aggregate* (full per-axis errors in :attr:`explain`).

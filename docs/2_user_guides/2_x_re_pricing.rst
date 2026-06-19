@@ -1312,11 +1312,23 @@ ceded :math:`c(X)` and net :math:`n(X) = X - c(X)`, but the **aggregate** ceded
 :math:`C = \sum c(X_i)` and net :math:`N = \sum n(X_i)` are *not* deterministic
 functions of one another --- the random claim count decouples them. The
 univariate margins are available as
-``reins_density_df['p_agg_ceded_occ' | 'p_agg_net_occ']``; the *joint* law of
-:math:`(C, N)` --- and hence their correlation and co-moments --- is computed by
-:meth:`~aggregate.distributions.Aggregate.occ_bivariate`, which returns a
-:class:`aggregate.multivariate.MultivariateAggregate` in ``netceded`` mode (the
-same object produced by the DecL ``netceded <agg>`` statement).
+``reins_density_df['p_agg_gross' | 'p_agg_ceded_occ' | 'p_agg_net_occ']``; the
+*joint* law of any two of them --- and hence their correlation and co-moments ---
+is computed by :meth:`~aggregate.distributions.Aggregate.occ_bivariate`, which
+returns a :class:`aggregate.multivariate.MultivariateAggregate` in ``netceded``
+mode (the same object produced by the DecL view-pair statements).
+
+The three views satisfy :math:`C + N = G`, so any two determine the third; there
+are three unordered pairs, each named by one DecL prefix (and selectable via the
+``views`` argument). The keyword names the pair **x-then-y**:
+
+==============  =========  ============  ==================================
+DecL prefix     x (axis 0)  y (axis 1)    ``occ_bivariate(views=…)``
+==============  =========  ============  ==================================
+``netceded``    net        ceded         ``('net', 'ceded')`` (default)
+``grossceded``  gross      ceded         ``('gross', 'ceded')``
+``grossnet``    gross      net           ``('gross', 'net')``
+==============  =========  ============  ==================================
 
 The method is the ordinary compound-distribution FFT with the one-dimensional
 transforms replaced by two-dimensional transforms: placing the gross severity
@@ -1336,11 +1348,11 @@ because the frequency PGF is elementwise in its argument.
     biv.moments(2)
     biv.corr()
 
-The marginals reproduce the univariate occurrence ceded / net aggregates and the
-anti-diagonal :math:`C + N` reproduces the gross aggregate. Only occurrence
-reinsurance is supported (the aggregate-cover bivariate is degenerate). Per-axis
-bucket and window sizes are auto-derived from the univariate margins, with
-``bs_ceded`` / ``bs_net`` / ``log2_ceded`` / ``log2_net`` overrides;
+Each marginal reproduces the corresponding univariate occurrence aggregate, and
+``gross - net`` reproduces ceded. Only occurrence reinsurance is supported (the
+aggregate-cover bivariate is degenerate). Per-axis bucket and window sizes are
+auto-derived from the univariate margins, with a single common ``bs`` plus
+``log2_x`` / ``log2_y`` overrides;
 :meth:`~aggregate.multivariate.MultivariateAggregate.plot` shows the joint
 per-claim severity and aggregate density side by side.
 

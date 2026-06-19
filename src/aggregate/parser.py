@@ -568,18 +568,37 @@ class UnderwritingTransformer(Transformer):
         }
         return ("mvagg", name, spec)
 
-    def mv_out_netceded(self, c):
-        """``netceded <agg with occurrence reinsurance>`` -> the joint
-        (ceded, net) occurrence aggregate as a netceded MultivariateAggregate."""
+    @staticmethod
+    def _mv_out_viewpair(c, views):
+        """Shared builder for the three occurrence view-pair prefixes.
+
+        ``<keyword> <agg with occurrence reinsurance>`` -> the joint
+        per-occurrence aggregate of the named pair of {gross, ceded, net} as a
+        ``netceded``-mode MultivariateAggregate. ``views`` is the ``(x, y)`` axis
+        pair the keyword names (e.g. ``('net', 'ceded')`` for ``netceded``).
+        """
         _kw, agg_tuple = c          # agg_tuple = ("agg", name, spec)
         _, name, spec = agg_tuple
         return ("mvagg", name, {
             "name": name,
             "mode": "netceded",
+            "nc_views": views,
             "lines": [agg_tuple],
             "note": spec.get("note", ""),
             "hints": spec.get("hints", ""),
         })
+
+    def mv_out_netceded(self, c):
+        """``netceded <agg>`` -> joint (x=net, y=ceded) occurrence aggregate."""
+        return self._mv_out_viewpair(c, ('net', 'ceded'))
+
+    def mv_out_grossceded(self, c):
+        """``grossceded <agg>`` -> joint (x=gross, y=ceded) occurrence aggregate."""
+        return self._mv_out_viewpair(c, ('gross', 'ceded'))
+
+    def mv_out_grossnet(self, c):
+        """``grossnet <agg>`` -> joint (x=gross, y=net) occurrence aggregate."""
+        return self._mv_out_viewpair(c, ('gross', 'net'))
 
     # ----- severity output ------------------------------------------
     def sev_out_sev(self, c):
@@ -1226,8 +1245,10 @@ def grammar(add_to_doc: bool = False, save_to_fn: str | Path = "") -> str:
     text = GRAMMAR_FILE.read_text(encoding="utf-8")
 
     if add_to_doc:
+        # repo root is three levels up from src/aggregate/parser.py
+        # (src/aggregate -> src -> repo root); the docs tree lives at the root.
         out = (
-            Path(__file__).parent.parent
+            Path(__file__).parent.parent.parent
             / "docs"
             / "4_agg_language_reference"
             / "ref_include.rst"

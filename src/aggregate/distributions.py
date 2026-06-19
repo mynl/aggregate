@@ -2968,39 +2968,46 @@ class Aggregate:
         ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
         ax1.legend()
 
-    def occ_bivariate(self, bs_ceded=None, bs_net=None,
-                      log2_ceded=None, log2_net=None):
-        """Joint law of aggregate occurrence ceded ``C`` and net ``N`` via 2D FFT.
+    def occ_bivariate(self, views=('net', 'ceded'), bs=None,
+                      log2_x=None, log2_y=None):
+        """Joint law of two of the occurrence {gross, ceded, net} aggregates via 2D FFT.
 
-        Computes the *joint* distribution of the aggregate occurrence ceded
-        ``C = sum c(X_i)`` and net ``N = sum n(X_i)`` losses, where each gross
-        claim ``X_i`` is split deterministically by the occurrence cession map.
-        The two are **not** deterministic functions of one another -- the random
-        claim count decouples them -- so the joint law carries genuine
+        Computes the *joint* distribution of two aggregate occurrence views --
+        e.g. ceded ``C = sum c(X_i)`` and net ``N = sum n(X_i)`` -- where each
+        gross claim ``X_i`` is split deterministically by the occurrence cession
+        map. The two are **not** deterministic functions of one another -- the
+        random claim count decouples them -- so the joint law carries genuine
         information (their correlation, co-moments, reinsurer-vs-cedent
         dependency) beyond the two univariate margins already in
-        :attr:`reins_density_df`.
+        :attr:`reins_density_df`. The three views satisfy ``ceded + net = gross``,
+        so any *two* determine the third; the pick of which two is ``views``.
 
         Parameters
         ----------
-        bs_ceded, bs_net : float, optional
+        views : (str, str), default ``('net', 'ceded')``
+            The ``(x, y)`` axis view pair, each one of ``'gross'`` / ``'ceded'``
+            / ``'net'``. Axis 0 (x) is ``views[0]``, axis 1 (y) is ``views[1]``.
+            The default ``('net', 'ceded')`` matches the DecL ``netceded`` form;
+            ``('gross', 'ceded')`` matches ``grossceded`` and ``('gross', 'net')``
+            matches ``grossnet``.
+        bs : float, optional
             Bucket-size override (a single common ``bs`` for both axes). Default:
-            one common ``bs`` coarsened from the gross bucket to fit the budget
-            (never finer than gross).
-        log2_ceded, log2_net : int, optional
-            Ceded- / net-axis log2 grid lengths (grid has ``1 << log2`` points).
-            Default: measured from the occurrence aggregate margins
-            (``p_agg_ceded_occ`` / ``p_agg_net_occ``) via
-            :func:`~aggregate.utilities.balanced_window`.
+            one common ``bs`` sized from the budget (coarser than the gross
+            bucket -- the gross grid is far finer than a 2-D grid affords).
+        log2_x, log2_y : int, optional
+            Axis-0 / axis-1 log2 grid lengths (grid has ``1 << log2`` points).
+            Default: measured from the two views' occurrence aggregate margins
+            via :func:`~aggregate.utilities.balanced_window`.
 
         Returns
         -------
         MultivariateAggregate
             A first-class joint object in ``netceded`` mode, with the joint
             ``density``, the two axis grids (``axis_xs``), ``marginals`` /
-            ``moments`` (``E[C^i N^j]``) / ``corr`` / ``describe`` / ``stats_df``
+            ``moments`` (``E[X^i Y^j]``) / ``corr`` / ``describe`` / ``stats_df``
             / ``info`` and a two-panel ``plot`` (comonotone per-claim severity
-            and joint aggregate). Equivalent to the DecL ``netceded <agg>`` form.
+            and joint aggregate). Equivalent to the DecL ``netceded`` /
+            ``grossceded`` / ``grossnet`` ``<agg>`` prefix forms.
 
         Raises
         ------
@@ -3034,9 +3041,8 @@ class Aggregate:
         from .multivariate import MultivariateAggregate
 
         mv = MultivariateAggregate(
-            self.name, mode='netceded', nc_agg=self,
-            nc_kwargs=dict(bs_ceded=bs_ceded, bs_net=bs_net,
-                           log2_ceded=log2_ceded, log2_net=log2_net))
+            self.name, mode='netceded', nc_agg=self, nc_views=views,
+            nc_kwargs=dict(bs=bs, log2_x=log2_x, log2_y=log2_y))
         # build eagerly so preconditions (occ reins present, object updated)
         # raise here, and the returned object is ready to query.
         mv.update()

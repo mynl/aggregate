@@ -268,8 +268,8 @@ def test_mv_info_netceded_catalogue():
          for ln in mv.info.splitlines()}
     assert d['mode'] == 'netceded'
     assert d['copula'] == 'comonotone (netceded)'
-    assert d['axis 0 kind'] == 'ceded'
-    assert d['axis 1 kind'] == 'net'
+    assert d['axis 0 kind'] == 'net'        # x=net, y=ceded convention
+    assert d['axis 1 kind'] == 'ceded'
     assert d['copula tau'] == 'n/a'
 
 
@@ -367,11 +367,62 @@ def test_netceded_via_decl():
     mv = build(f'netceded {NC_PROG}')
     assert isinstance(mv, MultivariateAggregate)
     assert mv.mode == 'netceded'
-    assert mv.line_names == ['Ceded', 'Net']
-    cd, nd = mv.marginals()
-    assert np.isclose(cd.sum(), 1.0, atol=1e-6)
+    assert mv.line_names == ['Net', 'Ceded']    # x=net, y=ceded convention
+    nd, cd = mv.marginals()
     assert np.isclose(nd.sum(), 1.0, atol=1e-6)
+    assert np.isclose(cd.sum(), 1.0, atol=1e-6)
     assert mv.corr() > 0
+
+
+@pytest.mark.parametrize('kw,views', [
+    ('netceded', ('Net', 'Ceded')),
+    ('grossceded', ('Gross', 'Ceded')),
+    ('grossnet', ('Gross', 'Net')),
+])
+def test_view_pair_decl_builds_and_labels(kw, views):
+    """Each view-pair prefix parses, builds, and labels its axes x-then-y."""
+    from aggregate.multivariate import MultivariateAggregate
+    mv = build(f'{kw} {NC_PROG}')
+    assert isinstance(mv, MultivariateAggregate)
+    assert mv.mode == 'netceded'
+    assert mv.line_names == list(views)
+    m0, m1 = mv.marginals()
+    assert np.isclose(m0.sum(), 1.0, atol=1e-6)
+    assert np.isclose(m1.sum(), 1.0, atol=1e-6)
+    assert mv.deficit < 1e-6
+
+
+@pytest.mark.parametrize('kw,views', [
+    ('netceded', ('net', 'ceded')),
+    ('grossceded', ('gross', 'ceded')),
+    ('grossnet', ('gross', 'net')),
+])
+def test_view_pair_decl_matches_occ_bivariate(kw, views):
+    """The DecL prefix and occ_bivariate(views=...) agree on the joint corr."""
+    decl = build(f'{kw} {NC_PROG}')
+    method = build(NC_PROG, bs=1, log2=16).occ_bivariate(views=views)
+    assert method.corr() == pytest.approx(decl.corr(), abs=0.02)
+
+
+@pytest.mark.parametrize('kw', ['netceded', 'grossceded', 'grossnet'])
+def test_view_pair_decl_roundtrips_through_unparser(kw):
+    """Each view-pair prefix round-trips through the DecL unparser."""
+    from aggregate import Underwriter
+    from aggregate.decl_writer import spec_to_decl
+
+    uw = Underwriter()
+    kind, name, spec = uw.parser.parse(f'{kw} {NC_PROG}')
+    assert kind == 'mvagg'
+    assert tuple(spec['nc_views']) == {
+        'netceded': ('net', 'ceded'),
+        'grossceded': ('gross', 'ceded'),
+        'grossnet': ('gross', 'net'),
+    }[kw]
+    text = spec_to_decl(spec, kind, name)
+    assert text.startswith(kw + ' ')
+    # idempotent: re-parse + re-render is a fixed point
+    kind2, name2, spec2 = uw.parser.parse(text)
+    assert spec_to_decl(spec2, kind2, name2) == text
 
 
 def test_netceded_via_occ_bivariate_matches_decl():

@@ -548,14 +548,21 @@ def _render_copula(copula) -> str:
 def _render_mvagg(name: str, spec: dict) -> str:
     """Render a multivariate (copula-coupled) aggregate or a ``netceded`` agg.
 
-    Inverts ``mv_out_copula`` / ``mv_out_copula_nofreq`` / ``mv_out_netceded``.
-    The two components are rendered inline (whitespace-insensitive within a
-    program); the shared frequency is always emitted (the no-freq source form
-    defaults to ``poisson``, which re-parses to the same spec).
+    Inverts ``mv_out_copula`` / ``mv_out_copula_nofreq`` and the three
+    occurrence view-pair prefixes (``mv_out_netceded`` / ``mv_out_grossceded`` /
+    ``mv_out_grossnet``). The two components are rendered inline
+    (whitespace-insensitive within a program); the shared frequency is always
+    emitted (the no-freq source form defaults to ``poisson``, which re-parses to
+    the same spec).
     """
     if spec.get('mode') == 'netceded':
+        # the keyword is the (x, y) view pair, names x-then-y
+        _kw_for = {('net', 'ceded'): 'netceded', ('gross', 'ceded'): 'grossceded',
+                   ('gross', 'net'): 'grossnet'}
+        views = tuple(spec.get('nc_views') or ('net', 'ceded'))
+        kw = _kw_for.get(views, 'netceded')
         kind, sub_name, sub_spec = spec['lines'][0]
-        return 'netceded ' + _render_agg_or_pnl(kind, sub_name, sub_spec)
+        return kw + ' ' + _render_agg_or_pnl(kind, sub_name, sub_spec)
 
     components = [_render_agg_or_pnl(k, n, s) for k, n, s in spec['lines']]
     return _join([

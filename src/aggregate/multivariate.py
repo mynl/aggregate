@@ -77,6 +77,36 @@ _TOTAL_LOG2 = get_settings().multivariate.total_log2
 # Smallest per-axis log2 the sizer will hand back (keeps a usable grid).
 _MIN_AXIS_LOG2 = 4
 
+# View-pair plumbing for the occurrence netceded family (the ``netceded`` /
+# ``grossceded`` / ``grossnet`` DecL prefixes and ``occ_bivariate(views=...)``).
+# Each view of {gross, ceded, net} maps to its realized occ margin column in
+# ``reins_density_df`` (for the balanced_window measurement), its layering-summary
+# column in ``reins_stats_df`` (for the theoretical moments), and its per-claim
+# cession image map. ``gross`` is the identity map (no cession). The keyword
+# names the pair x-then-y, so axis 0 is the first view, axis 1 the second
+# (dev/plan-mv.md S3).
+_VIEW_AGG_COL = {'gross': 'p_agg_gross',
+                 'ceded': 'p_agg_ceded_occ',
+                 'net': 'p_agg_net_occ'}
+_VIEW_STAT_COL = {'gross': 'Gross', 'ceded': 'Ceded', 'net': 'Net'}
+
+
+def _view_image_fn(agg, view):
+    """Per-claim cession image map for an occurrence ``view`` of an aggregate.
+
+    ``gross`` -> identity (the gross loss itself); ``ceded`` -> ``occ_ceder``;
+    ``net`` -> ``occ_netter``. The image is sampled on the gross grid and
+    scattered onto the (common-``bs``) view axis, so the gross axis rebuckets
+    like the others rather than being special-cased.
+    """
+    if view == 'gross':
+        return lambda x: x
+    if view == 'ceded':
+        return agg.occ_ceder
+    if view == 'net':
+        return agg.occ_netter
+    raise ValueError(f'unknown reinsurance view {view!r}')
+
 
 def _netceded_window_hi(occ_density, xs, prob):
     """Upper window edge of an occurrence-reins margin (``balanced_window``).
@@ -171,15 +201,18 @@ def scatter_bivariate(cv, nv, mass, bs_c, bs_n, n_c, n_n, scheme='linear'):
     return out
 
 
-def build_netceded_joint(agg, bs_ceded=None, bs_net=None,
-                         log2_ceded=None, log2_net=None, total_log2=None):
-    """Joint per-occurrence (ceded, net) density of one reinsured aggregate.
+def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
+                         log2_x=None, log2_y=None, total_log2=None):
+    """Joint per-occurrence density of two of {gross, ceded, net} for one aggregate.
 
-    The net/ceded severity builder for :class:`MultivariateAggregate`'s
-    ``netceded`` mode (and the engine behind
+    The severity builder for :class:`MultivariateAggregate`'s ``netceded`` mode
+    (and the engine behind
     :meth:`aggregate.distributions.Aggregate.occ_bivariate`). Per claim the
-    cession map sends a gross loss ``X`` to ``(c(X), n(X))`` on the line
-    ``c + n = X``; placing the gross severity mass there (rebucketed by the
+    cession map sends a gross loss ``X`` to a point ``(v0(X), v1(X))`` on the
+    comonotone curve, where ``v0`` / ``v1`` are the chosen views' image maps
+    (gross = identity, ceded = ``occ_ceder``, net = ``occ_netter``); the three
+    views satisfy ``ceded + net = gross``, so any two determine the third.
+    Placing the gross severity mass at ``(v0(x_k), v1(x_k))`` (rebucketed by the
     object's :attr:`reins_bucket` scheme) builds a **comonotone** bivariate
     severity ``S``, and the joint aggregate is ``iFFT2(freq_pgf(N, FFT2(S)))``.
 
@@ -187,16 +220,20 @@ def build_netceded_joint(agg, bs_ceded=None, bs_net=None,
     ----------
     agg : Aggregate
         An **updated** aggregate carrying occurrence reinsurance.
-    bs_ceded, bs_net : float, optional
+    views : (str, str), default ``('net', 'ceded')``
+        The ``(x, y)`` axis view pair, each one of ``'gross'`` / ``'ceded'`` /
+        ``'net'``. The keyword that selected this pair names it x-then-y, so axis
+        0 is ``views[0]`` and axis 1 is ``views[1]``.
+    bs : float, optional
         Bucket-size override (a single common ``bs`` for both axes). Default
         (``None``) sizes **one common ``bs`` from the budget** -- the comonotone
-        ``(c, n)`` curve is sampled at the gross grid and the linear scatter
-        rebuckets it onto the common grid, so the ``bs`` is chosen to fit
-        ``2**total_log2`` (``~ sqrt(hi_c*hi_n)/2**(total_log2/2)``), *not* pinned
-        to the (often far finer) gross ``bs`` (§5.2).
-    log2_ceded, log2_net : int, optional
-        Axis log2 grid-length overrides; measured from the realized occ margins
-        via :func:`balanced_window` if omitted.
+        curve is sampled at the gross grid and the linear scatter rebuckets it
+        onto the common grid, so the ``bs`` is chosen to fit ``2**total_log2``
+        (``~ sqrt(hi0*hi1)/2**(total_log2/2)``), *not* pinned to the (often far
+        finer) gross ``bs`` (§5.2).
+    log2_x, log2_y : int, optional
+        Axis-0 / axis-1 log2 grid-length overrides; measured from the realized
+        occ margins of the two views via :func:`balanced_window` if omitted.
     total_log2 : int, optional
         Total 2-D cell budget. The common ``bs`` is coarsened until the two
         windows fit; if a caller pins ``bs``/``log2`` and they still overflow,
@@ -206,11 +243,11 @@ def build_netceded_joint(agg, bs_ceded=None, bs_net=None,
     Returns
     -------
     density : ndarray
-        Joint ``(ceded, net)`` aggregate density, shape ``(n_c, n_n)``.
-    ceded_grid, net_grid : ndarray
+        Joint ``(views[0], views[1])`` aggregate density, shape ``(n0, n1)``.
+    grid_x, grid_y : ndarray
         The two axis grids.
-    bs_c, bs_n : float
-        The two axis bucket sizes (both the gross ``bs`` unless overridden).
+    bs_x, bs_y : float
+        The two axis bucket sizes (one common ``bs`` unless overridden).
     sev2 : ndarray
         The bivariate per-claim severity ``S`` (the comonotone scatter).
     deficit : float
@@ -245,75 +282,76 @@ def build_netceded_joint(agg, bs_ceded=None, bs_net=None,
     rd = agg.reins_density_df
     prob = 10.0 ** -_WINDOW_NINES
     # ONE common bs across both axes (the comonotone curve couples them). The
-    # window lengths are measured from the realized occ margins (balanced_window;
-    # ceded / net are non-negative so the grids are 0-based), and the common bs
-    # is sized straight from the budget -- NOT pinned to the gross bs. The gross
-    # bs auto-sizes fine to resolve the cession layer (e.g. 0.125), which is far
-    # too fine for the 2-D grid; the linear scatter rebuckets the gross-sampled
-    # (c, n) points onto whatever common bs the budget affords. Sizing from the
-    # budget (not gross) also makes occ_bivariate and the DecL `netceded` form
-    # agree regardless of the gross grid each was built on.
-    hi_c = _netceded_window_hi(rd['p_agg_ceded_occ'].to_numpy(), agg.xs, prob)
-    hi_n = _netceded_window_hi(rd['p_agg_net_occ'].to_numpy(), agg.xs, prob)
+    # window lengths are measured from the realized occ margins of the chosen
+    # views (balanced_window; gross / ceded / net are all non-negative so the
+    # grids are 0-based), and the common bs is sized straight from the budget --
+    # NOT pinned to the gross bs. The gross bs auto-sizes fine to resolve the
+    # cession layer (e.g. 0.125), which is far too fine for the 2-D grid; the
+    # linear scatter rebuckets the gross-sampled view points onto whatever common
+    # bs the budget affords. Sizing from the budget (not gross) also makes
+    # occ_bivariate and the DecL prefix forms agree regardless of the gross grid.
+    hi0 = _netceded_window_hi(rd[_VIEW_AGG_COL[views[0]]].to_numpy(), agg.xs, prob)
+    hi1 = _netceded_window_hi(rd[_VIEW_AGG_COL[views[1]]].to_numpy(), agg.xs, prob)
 
     def _cov(hi, bs):
         return max(int(np.ceil(np.log2(hi / bs + 1.0))), _MIN_AXIS_LOG2)
 
-    pinned = bool(bs_ceded or bs_net or (log2_ceded and log2_net))
-    if bs_ceded or bs_net:
-        bs = float(bs_ceded or bs_net)
+    pinned = bool(bs or (log2_x and log2_y))
+    if bs:
+        bs = float(bs)
     else:
-        # finest common bs that fits 2**total_log2: n_c*n_n ~ (hi_c*hi_n)/bs**2,
-        # so bs ~ sqrt(hi_c*hi_n) / 2**(total_log2/2). round_bucket up, then fit.
-        floor_bs = max((hi_c * hi_n) ** 0.5 / (2.0 ** (0.5 * total_log2)), 1e-12)
+        # finest common bs that fits 2**total_log2: n0*n1 ~ (hi0*hi1)/bs**2,
+        # so bs ~ sqrt(hi0*hi1) / 2**(total_log2/2). round_bucket up, then fit.
+        floor_bs = max((hi0 * hi1) ** 0.5 / (2.0 ** (0.5 * total_log2)), 1e-12)
         bs = float(round_bucket(floor_bs))
-    log2_c = int(log2_ceded) if log2_ceded else _cov(hi_c, bs)
-    log2_n = int(log2_net) if log2_net else _cov(hi_n, bs)
+    log2_0 = int(log2_x) if log2_x else _cov(hi0, bs)
+    log2_1 = int(log2_y) if log2_y else _cov(hi1, bs)
     if not pinned:
         guard = 0
-        while log2_c + log2_n > total_log2 and guard < 8:
+        while log2_0 + log2_1 > total_log2 and guard < 8:
             bs = float(round_bucket(bs * 2))
-            log2_c, log2_n = _cov(hi_c, bs), _cov(hi_n, bs)
+            log2_0, log2_1 = _cov(hi0, bs), _cov(hi1, bs)
             guard += 1
-    clipped = log2_c + log2_n > total_log2
+    clipped = log2_0 + log2_1 > total_log2
     if clipped:
         # bs pinned by the caller and still over budget -> clip the wider axis.
-        if log2_c >= log2_n:
-            log2_c = max(total_log2 - log2_n, _MIN_AXIS_LOG2)
+        if log2_0 >= log2_1:
+            log2_0 = max(total_log2 - log2_1, _MIN_AXIS_LOG2)
         else:
-            log2_n = max(total_log2 - log2_c, _MIN_AXIS_LOG2)
+            log2_1 = max(total_log2 - log2_0, _MIN_AXIS_LOG2)
         warnings.warn(
-            f'{agg.name}: netceded (ceded, net) windows need more than the budget '
-            f'2**{total_log2} at the pinned bs={bs:g}; the wider axis is clipped '
-            f'(a tail deficit). Raise update(log2=...) or relax the bs pin.',
+            f'{agg.name}: netceded ({views[0]}, {views[1]}) windows need more '
+            f'than the budget 2**{total_log2} at the pinned bs={bs:g}; the wider '
+            f'axis is clipped (a tail deficit). Raise update(log2=...) or relax '
+            f'the bs pin.',
             DefectiveDistributionWarning, stacklevel=2)
-    bs_c = bs_n = bs
-    n_c = 1 << log2_c
-    n_n = 1 << log2_n
-    ceded_grid = bs_c * np.arange(n_c)
-    net_grid = bs_n * np.arange(n_n)
+    bs_x = bs_y = bs
+    n0 = 1 << log2_0
+    n1 = 1 << log2_1
+    grid_x = bs_x * np.arange(n0)
+    grid_y = bs_y * np.arange(n1)
 
-    cv = np.asarray(agg.occ_ceder(agg.xs), dtype=float)
-    nv = np.asarray(agg.occ_netter(agg.xs), dtype=float)
+    x0 = np.asarray(_view_image_fn(agg, views[0])(agg.xs), dtype=float)
+    x1 = np.asarray(_view_image_fn(agg, views[1])(agg.xs), dtype=float)
     mass = np.asarray(agg.sev_density_gross, dtype=float)
-    sev2 = scatter_bivariate(cv, nv, mass, bs_c, bs_n, n_c, n_n,
+    sev2 = scatter_bivariate(x0, x1, mass, bs_x, bs_y, n0, n1,
                              scheme=agg.reins_bucket)
 
     if agg.n == 0:
-        density = np.zeros((n_c, n_n))
+        density = np.zeros((n0, n1))
         density[0, 0] = 1.0
     elif np.sum(agg.en) == 1 and agg.frequency.freq_name == 'fixed':
         density = sev2.copy()
     else:
         pad = agg.padding
-        s_shape = (n_c << pad, n_n << pad)
+        s_shape = (n0 << pad, n1 << pad)
         z = _sfft.rfft2(sev2, s=s_shape)
         ftagg = agg.frequency.freq_pgf(agg.n, z.ravel()).reshape(z.shape)
-        density = np.real(_sfft.irfft2(ftagg, s=s_shape))[:n_c, :n_n]
+        density = np.real(_sfft.irfft2(ftagg, s=s_shape))[:n0, :n1]
 
     density[np.abs(density) < 1e-15] = 0.0
     deficit = float(1.0 - density.sum())
-    return density, ceded_grid, net_grid, bs_c, bs_n, sev2, deficit, clipped
+    return density, grid_x, grid_y, bs_x, bs_y, sev2, deficit, clipped
 
 
 def _affine_axis(density, axis, bs, n, reflect, shift, m_loss, sd, skew):
@@ -456,7 +494,7 @@ class MultivariateAggregate:
     """
 
     def __init__(self, name, lines=None, copula=None, note='', hints='', mode='copula',
-                 nc_agg=None, nc_kwargs=None,
+                 nc_agg=None, nc_kwargs=None, nc_views=None,
                  exp_en=None, exp_el=None, exp_premium=None, exp_lr=None,
                  freq_name='poisson', freq_a=0.0, freq_b=0.0,
                  freq_zm=False, freq_p0=np.nan, **kwargs):
@@ -480,7 +518,7 @@ class MultivariateAggregate:
         self.figure = None                 # set by plot()
 
         if mode == 'netceded':
-            self._init_netceded(name, lines, nc_agg, nc_kwargs)
+            self._init_netceded(name, lines, nc_agg, nc_kwargs, nc_views)
             return
 
         if lines is None or len(lines) != 2:
@@ -518,9 +556,9 @@ class MultivariateAggregate:
         self.en = self._resolve_en(exp_en, exp_el, exp_premium, exp_lr)
         self._gs = None
 
-    def _init_netceded(self, name, lines, nc_agg, nc_kwargs):
+    def _init_netceded(self, name, lines, nc_agg, nc_kwargs, nc_views):
         """Initialise the ``netceded`` mode: one reinsured aggregate split into
-        its joint per-occurrence (ceded, net) law.
+        the joint per-occurrence law of a chosen view-pair of {gross, ceded, net}.
 
         Parameters
         ----------
@@ -529,19 +567,24 @@ class MultivariateAggregate:
         lines : list of tuple or None
             Either ``None`` (when ``nc_agg`` is supplied directly, the
             :meth:`aggregate.distributions.Aggregate.occ_bivariate` path) or a
-            single ``('agg', name, spec)`` tuple (the DecL ``netceded`` path),
-            from which the inner aggregate is built.
+            single ``('agg', name, spec)`` tuple (the DecL prefix path), from
+            which the inner aggregate is built.
         nc_agg : Aggregate or None
             A pre-built (already updated) aggregate carrying occurrence
             reinsurance; if given it is used as-is.
         nc_kwargs : dict or None
-            Axis-sizing overrides (``bs_ceded`` / ``bs_net`` / ``log2_ceded`` /
-            ``log2_net``) forwarded to :func:`build_netceded_joint`.
+            Axis-sizing overrides (``bs`` / ``log2_x`` / ``log2_y``) forwarded
+            to :func:`build_netceded_joint`.
+        nc_views : (str, str) or None
+            The ``(x, y)`` axis view pair, each one of ``'gross'`` / ``'ceded'``
+            / ``'net'``. ``None`` defaults to ``('net', 'ceded')`` (the
+            ``netceded`` keyword). Axis 0 is ``views[0]``, axis 1 is ``views[1]``.
         """
         from .distributions import Aggregate
 
         self.copula = None
-        self.line_names = ['Ceded', 'Net']
+        self._views = tuple(nc_views) if nc_views else ('net', 'ceded')
+        self.line_names = [v.capitalize() for v in self._views]
         self._affine = [(False, 0.0), (False, 0.0)]
         self._nc_kwargs = dict(nc_kwargs or {})
         if nc_agg is not None:
@@ -890,28 +933,30 @@ class MultivariateAggregate:
             if bs:
                 kw['bs'] = bs
             a.update(**kw)
-        density, cg, ng, bs_c, bs_n, sev2, deficit, clipped = build_netceded_joint(
-            a, **self._nc_kwargs)
+        density, gx, gy, bs_x, bs_y, sev2, deficit, clipped = build_netceded_joint(
+            a, views=self._views, **self._nc_kwargs)
         self.density = density
-        self.axis_xs = [cg, ng]
-        self.bs = [bs_c, bs_n]
+        self.axis_xs = [gx, gy]
+        self.bs = [bs_x, bs_y]
         self._S = sev2
-        self._sev_xs = [cg, ng]   # severity panel = comonotone (c, n) scatter
+        self._sev_xs = [gx, gy]   # severity panel = comonotone view scatter
         self.deficit = deficit
         self._clipped = clipped
-        self._marg_theory = self._netceded_theory(a)
+        self._marg_theory = self._netceded_theory(a, self._views)
         return self
 
     @staticmethod
-    def _netceded_theory(agg):
-        """Per-axis ``(mean, sd, skew)`` of the ceded / net occ aggregates,
-        read from the inner aggregate's :attr:`reins_stats_df`."""
+    def _netceded_theory(agg, views):
+        """Per-axis ``(mean, sd, skew)`` of the chosen occ view aggregates,
+        read from the inner aggregate's :attr:`reins_stats_df` (the matching
+        ``Gross`` / ``Ceded`` / ``Net`` occurrence column for each view)."""
         rs = agg.reins_stats_df
         out = []
-        for view in ('Ceded', 'Net'):
-            m = float(rs.loc[('agg', 'mean'), ('occ', view)])
-            cv = float(rs.loc[('agg', 'cv'), ('occ', view)])
-            sk = float(rs.loc[('agg', 'skew'), ('occ', view)])
+        for view in views:
+            col = ('occ', _VIEW_STAT_COL[view])
+            m = float(rs.loc[('agg', 'mean'), col])
+            cv = float(rs.loc[('agg', 'cv'), col])
+            sk = float(rs.loc[('agg', 'skew'), col])
             out.append((m, cv * m, sk))
         return out
 
@@ -1176,9 +1221,9 @@ class MultivariateAggregate:
         return df
 
     def _axis_kind(self, i):
-        """Per-axis kind label (``agg`` / ``pnl`` / ``ceded`` / ``net``)."""
+        """Per-axis kind label (``agg`` / ``pnl`` / ``gross`` / ``ceded`` / ``net``)."""
         if self.mode == 'netceded':
-            return ('ceded', 'net')[i]
+            return self._views[i]
         reflect, shift = self._affine[i]
         return 'pnl' if (reflect or shift) else 'agg'
 

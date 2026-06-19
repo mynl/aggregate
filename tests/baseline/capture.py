@@ -157,7 +157,7 @@ def capture_agg_case(name: str, program: str, grid: dict) -> dict:
         if frame_name == "density_df":
             df = obj.density_df
         elif frame_name == "describe":
-            df = obj.describe
+            df = obj.summary_df
         elif frame_name == "stats_df":
             df = obj.stats_df
         else:
@@ -187,7 +187,7 @@ def capture_port_case(name: str, program: str, grid: dict) -> dict:
         if frame_name == "density_df":
             df = obj.density_df
         elif frame_name == "describe":
-            df = obj.describe
+            df = obj.summary_df
         elif frame_name == "stats_df":
             df = obj.stats_df
         else:

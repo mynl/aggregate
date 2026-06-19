@@ -119,7 +119,7 @@ def test_mass_conserved_and_window_brackets_mean():
 # ----------------------------------------------------------------------
 def test_describe_signed_sd_columns():
     a = build('pnl X 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
-    cols = list(a.describe.columns)
+    cols = list(a.summary_df.columns)
     assert 'SD' in cols and 'Est SD' in cols and 'Err SD' in cols
     assert 'CV' not in cols and 'Est CV' not in cols
 
@@ -129,7 +129,7 @@ def test_describe_finite_for_mean_zero_pnl():
     # premium == E[loss] (lr 100%) -> margin ~ 0
     a = build('pnl X 700 prem - 100% lr sev gamma 100 cv 0.5 poisson')
     assert abs(a.est_m) < 5.0          # mean near zero
-    df = a.describe
+    df = a.summary_df
     assert np.isfinite(df.to_numpy().astype(float)).all() or \
         np.isfinite(df['SD'].to_numpy().astype(float)).all()
     # Agg SD is finite and positive regardless of the near-zero mean
@@ -139,7 +139,7 @@ def test_describe_finite_for_mean_zero_pnl():
 def test_non_pnl_describe_unchanged():
     """An ordinary aggregate still shows the CV trio (byte-for-byte path)."""
     a = build('agg N 100 claims sev gamma 100 cv 0.5 poisson')
-    cols = list(a.describe.columns)
+    cols = list(a.summary_df.columns)
     assert 'CV' in cols and 'Est CV' in cols and 'SD' not in cols
 
 

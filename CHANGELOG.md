@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.0a84
+
+### `describe` → `summary_df`; deprecated alias `explain_validation` removed (breaking)
+
+Two naming corrections for the v1.0 surface. **No deprecated aliases** — clean
+breaks, since pre-1.0 is the one chance to make the names right.
+
+- **`describe` property renamed to `summary_df`** on `Aggregate`, `Portfolio`,
+  `Distortion`, and `BivariateAggregate`. The old name was the lone exception to
+  the universal `<noun>_df` convention for DataFrame-returning members
+  (`stats_df`, `density_df`, `tail_df`, `bs_window_df`, `reins_stats_df`,
+  `tvar_info_df`, …) **and** it shadowed pandas' famous `DataFrame.describe()` —
+  worse, as a *property* (no parens), so `a.describe()` raised `TypeError`.
+  `summary_df` joins the `_df` family and removes the collision. The daily-driver
+  table shown by `qd(obj)` / `_repr_html_` is unchanged; only the attribute name
+  moves. Private workers (`_describe`, `_describe_signed`, `_compute_describe`)
+  keep their names (internal). **Breaking**: `obj.describe` → `obj.summary_df`.
+  *(`FourierTools.describe()` — a string method, not a DataFrame — is unrelated
+  and unchanged.)*
+- **`Aggregate.explain_validation()` / `Portfolio.explain_validation()` removed.**
+  These were deprecated thin aliases (added in a82) for the
+  `validation_explanation` property; per the no-alias policy they are deleted.
+  Use the **`validation_explanation`** property. The module-level worker
+  `aggregate.utilities.explain_validation(flag)` (takes a `Validation` flag) is a
+  different function and is unchanged.
+- Docs updated throughout (user guides, problem sets) to `summary_df`; the
+  pandas `df.describe()` / `ft_obj.describe()` examples are untouched.
+
 ## 1.0.0a83
 
 ### config Phase 2 — numerics floors + stranded sizing knobs (breaking)

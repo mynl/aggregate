@@ -2323,14 +2323,14 @@ class Aggregate:
     via :func:`build` parsing DecL.
 
     **Public surface that Portfolio and Bounds depend on.** Three stats
-    surfaces — ``info`` for text, ``describe`` for the daily moment audit,
+    surfaces — ``info`` for text, ``summary_df`` for the daily moment audit,
     and ``stats_df`` for everything else — plus the compute and risk-measure
     surface:
 
     Stats / display
         - ``info``: one-screen textual summary (frequency, severity, layer,
           grid, validation flag). Not stats.
-        - ``describe``: 3-row Freq / Sev / Agg moment table with theoretical
+        - ``summary_df``: 3-row Freq / Sev / Agg moment table with theoretical
           and (post-``update``) empirical estimates plus relative errors.
           The daily-driver display.
         - ``stats_df``: ``MultiIndex (component, measure)`` × per-component
@@ -3042,7 +3042,7 @@ class Aggregate:
         BivariateAggregate
             A first-class joint object in ``netceded`` mode, with the joint
             ``density``, the two axis grids (``axis_xs``), ``marginals`` /
-            ``moments`` (``E[X^i Y^j]``) / ``corr`` / ``describe`` / ``stats_df``
+            ``moments`` (``E[X^i Y^j]``) / ``corr`` / ``summary_df`` / ``stats_df``
             / ``info`` and a two-panel ``plot`` (comonotone per-claim severity
             and joint aggregate). Equivalent to the DecL ``netceded`` /
             ``grossceded`` / ``grossnet`` ``<agg>`` prefix forms.
@@ -3165,7 +3165,7 @@ class Aggregate:
         acts on the aggregate directly). Frequency: the ``EX`` reference is the
         gross full moments for every view (the count is unchanged by occurrence
         reinsurance). On the ``Est`` (model-output) basis the gross view is left
-        ``NaN`` (mirroring ``describe``, which never re-estimates the input
+        ``NaN`` (mirroring ``summary_df``, which never re-estimates the input
         frequency); occ ceded / net carry the *unconditional* mean ``E[N]`` only
         (so ``freq * sev == agg`` per view), cv / skew ``NaN``. The aggregate
         stage has no sev rows and a degenerate freq row (all ``NaN``).
@@ -3212,7 +3212,7 @@ class Aggregate:
             # -- no division by ``P(attach)`` -- so ``freq * sev == agg`` within
             # each view; only the mean is meaningful (the per-view count is the
             # gross count), so cv / skew stay ``NaN``. The gross ``Est``
-            # frequency is left ``NaN`` to mirror ``describe`` exactly (the
+            # frequency is left ``NaN`` to mirror ``summary_df`` exactly (the
             # validation view never re-estimates the input frequency).
             f1, f2, f3 = self.frequency.freq_moms(n)
             freq_gross = (f1, f2, f3,
@@ -3232,7 +3232,7 @@ class Aggregate:
                     self._reins_agg6_from_sev_raw(s1, s2, s3))
 
             # Est: moments of the rebucketed densities; unconditional freq
-            # (gross frequency left NaN to mirror describe).
+            # (gross frequency left NaN to mirror summary_df).
             for view, scol, acol, freq6 in [
                     ('gross', 'p_sev_gross', 'p_agg_gross', nan6),
                     ('ceded', 'p_sev_ceded', 'p_agg_ceded_occ', freq_est_uncond),
@@ -3582,7 +3582,7 @@ class Aggregate:
         self._reins_stats_df = out
         return self._reins_stats_df
 
-    # Column layout shared with ``describe`` (see :meth:`_describe`): exact
+    # Column layout shared with ``summary_df`` (see :meth:`_describe`): exact
     # (``EX``) value, rebucketed (``Est``) value, and ``Change`` for the mean
     # and CV; skew omits the change column (it is the hardest moment to
     # estimate). ``EX``/``Est`` here are the reins bases, not theory/empirical.
@@ -3594,11 +3594,11 @@ class Aggregate:
     def reins_describe(self):
         """Per-stage reinsurance summary -- the daily driver.
 
-        Mirrors the **economic view** of :meth:`describe`: compare the theoretic
+        Mirrors the **economic view** of :attr:`summary_df`: compare the theoretic
         reference (the leading view -- ``Gross`` for occurrence, ``Subject`` for
         aggregate) against the model output of each view. One block per
         applicable stage; each block is a ``view x component`` table sharing the
-        **same eight columns as** :meth:`describe`:
+        **same eight columns as** :attr:`summary_df`:
 
         * ``EX`` / ``Est EX`` / ``Change EX`` -- the **theoretic reference** mean
           (constant down each component), the per-view model-output mean, and
@@ -3612,7 +3612,7 @@ class Aggregate:
         view, so it is the **numerical validation / rebucketing error** (~0 under
         ``linear``); on the ceded / net rows it is the **% impact of the
         cession** on that moment. This is the per-view, per-component analogue of
-        the single ``Change`` column in :meth:`describe`.
+        the single ``Change`` column in :attr:`summary_df`.
 
         Layout (per the gross/subject convention; ``view`` and ``component``
         labels are lower-case to match the other frames):
@@ -3627,7 +3627,7 @@ class Aggregate:
         *unconditionally* (mean ``E[N]`` only, so ``freq * sev == agg`` within a
         view; cv / skew ``NaN``) -- consistent with :meth:`reins_stats_df`. The
         leading ``gross`` row's ``Est`` frequency is left ``NaN`` to mirror
-        :meth:`describe` exactly. (Only the per-layer ``layer.k`` columns of
+        :attr:`summary_df` exactly. (Only the per-layer ``layer.k`` columns of
         :meth:`reins_stats_df` are *conditional*; ``reins_describe`` is always
         unconditional.)
 
@@ -3651,7 +3651,7 @@ class Aggregate:
 
     def _reins_describe_block(self, stage, views, comps):
         """One :meth:`reins_describe` block: theoretic reference vs model output
-        by view x component, mirroring the eight-column :meth:`describe` layout.
+        by view x component, mirroring the eight-column :attr:`summary_df` layout.
 
         The ``EX`` / ``CV`` / ``Sk`` columns hold the **theoretic reference** --
         the leading view's exact (pre-bucket) moments: ``Gross`` for the
@@ -4465,7 +4465,7 @@ class Aggregate:
                                'display.max_columns', 15,
                                'display.float_format', lambda x: f'{x:,.5g}'):
             # get it on one row
-            s.append(str(self.describe))
+            s.append(str(self.summary_df))
         # s.append(super().__repr__())
         return '\n'.join(s)
 
@@ -4599,16 +4599,6 @@ class Aggregate:
         """
         return explain_validation(self.valid)
 
-    def explain_validation(self):
-        """
-        Deprecated alias for :attr:`validation_explanation`.
-
-        Retained for back-compat (the old documented mechanism). Prefer the
-        ``validation_explanation`` property; this alias will be removed in a
-        future release.
-        """
-        return self.validation_explanation
-
     def _html_info_blob(self):
         """
         Text top of _repr_html_
@@ -4643,7 +4633,7 @@ class Aggregate:
         For IPython.display
 
         """
-        return self._html_info_blob() + self.describe.to_html()
+        return self._html_info_blob() + self.summary_df.to_html()
 
     # ================================================================
     # Discretization, snap, update, FFT convolution
@@ -4705,7 +4695,7 @@ class Aggregate:
         active (:meth:`_agg_affine_active` -- the ``pnl`` premium-minus-loss
         form, whose loss severity is non-negative but whose result straddles 0).
         This is the gate read by plotting, two-sided quantiles, the
-        signed-aware ``describe`` (SD instead of CV), and the
+        signed-aware ``summary_df`` (SD instead of CV), and the
         :class:`Portfolio` combine.
 
         Returns
@@ -5000,7 +4990,7 @@ class Aggregate:
         See discretize for sev_calc, discretization_calc and normalize.
 
         Empirical-moment note: the aggregate raw moments -- and hence the
-        empirical CV/skew shown in ``stats_df`` and ``describe`` -- are taken
+        empirical CV/skew shown in ``stats_df`` and ``summary_df`` -- are taken
         from a de-fuzzed *copy* of the FFT density (values below machine
         epsilon zeroed). Without this, sub-eps floating-point fuzz in far-tail
         buckets is amplified by ``x**3`` in the third moment and corrupts the
@@ -5429,7 +5419,7 @@ class Aggregate:
         else:
             self.est_m = self._agg_shift + self.est_m
         # est_sd / est_var unchanged; cv = sd/mean is unstable near mean 0 and
-        # deliberately not relied upon (describe shows SD when signed).
+        # deliberately not relied upon (summary_df shows SD when signed).
         self.est_cv = self.est_sd / self.est_m if self.est_m else np.inf
 
     def _fft_aggregate(self, sev_density, padding):
@@ -5595,7 +5585,7 @@ class Aggregate:
         setting the ``validation_eps`` variable.
 
         All reads come from ``stats_df`` -- the single source of truth -- not
-        ``describe`` (display).
+        ``summary_df`` (display).
 
         The CV and skew tests are applied only when the theoretical value is
         finite and its magnitude exceeds ``VALIDATION_NOISE`` -- a
@@ -6463,7 +6453,7 @@ class Aggregate:
         return format_program(self.program, fmt='html')
 
     @property
-    def describe(self):
+    def summary_df(self):
         """Moment table for Freq / Sev / Agg, dense ``EX``/``CV``/``Sk`` headings.
 
         The daily-driver display used by ``qd(agg)`` and ``_repr_html_``.
@@ -6492,33 +6482,33 @@ class Aggregate:
         return self._describe()
 
     def _describe(self, force_reins_label=None, force_sd=False):
-        """Build the ``describe`` frame, optionally forced into reins view.
+        """Build the ``summary_df`` frame, optionally forced into reins view.
 
         Parameters
         ----------
         force_reins_label : str or None
-            When ``None`` (the default, used by the ``describe`` property)
+            When ``None`` (the default, used by the ``summary_df`` property)
             the column format is chosen from this unit's own reinsurance:
             the economic Gross/Net/Ceded/Output view if a treaty is
             present, else the plain theory/empirical validation view.
 
             When a non-``None`` label is supplied, the economic view is
             forced and that label is used for the after-reins column,
-            regardless of this unit's own cession. ``Portfolio.describe``
+            regardless of this unit's own cession. ``Portfolio.summary_df``
             passes a portfolio-wide label here so that every unit block —
             including units with no reinsurance — shares one column
             layout and aligns with the ``total`` block.
         force_sd : bool, default False
             Force the **SD** spread trio (instead of CV) even when this unit
             is not itself signed. A signed unit always uses SD; this flag lets
-            ``Portfolio.describe`` push the whole table into SD when *any* unit
+            ``Portfolio.summary_df`` push the whole table into SD when *any* unit
             is signed, so the unit blocks and the ``total`` block share one
             column layout (CV and SD cannot be mixed in one frame).
 
         Returns
         -------
         pandas.DataFrame
-            Three-row Freq / Sev / Agg frame; see :meth:`describe`.
+            Three-row Freq / Sev / Agg frame; see :attr:`summary_df`.
         """
         if self._signed() or force_sd:
             return self._describe_signed(force_reins_label)
@@ -6576,7 +6566,7 @@ class Aggregate:
         return df
 
     def _describe_signed(self, force_reins_label=None):
-        """``describe`` for a signed aggregate -- **SD** trio instead of CV.
+        """``summary_df`` for a signed aggregate -- **SD** trio instead of CV.
 
         Same 8-column shape and column arithmetic as :meth:`_describe`, but the
         ``CV`` trio is replaced by an ``SD`` trio. The coefficient of variation
@@ -6584,7 +6574,7 @@ class Aggregate:
         (a P&L straddling break-even), so for any signed object -- a ``ssev`` /
         negative-``dsev`` aggregate **or** a ``pnl`` -- the spread is reported as
         the standard deviation, which is finite and informative regardless of
-        the mean. (This also cleans up the 1.0.0a22 signed-portfolio describe.)
+        the mean. (This also cleans up the 1.0.0a22 signed-portfolio summary_df.)
 
         For a ``pnl`` aggregate the **Agg** row is additionally the affine
         (premium-minus-loss) view: ``EX -> agg_shift - E[A]``, ``SD`` unchanged,
@@ -6670,7 +6660,7 @@ class Aggregate:
         return df
 
     def _reins_after_label(self):
-        """Heading for the model-output column in ``describe``.
+        """Heading for the model-output column in ``summary_df``.
 
         ``Net`` when every cession passes the net; ``Ceded`` when every
         cession passes the ceded; ``Output`` when occ and agg pass

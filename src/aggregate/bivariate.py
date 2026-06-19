@@ -1117,7 +1117,7 @@ class BivariateAggregate:
 
         self.density = density
         self.deficit = float(1.0 - density.sum())
-        # cache per-axis loss-marginal theory (pre-affine); describe / stats_df
+        # cache per-axis loss-marginal theory (pre-affine); summary_df / stats_df
         # apply any pnl affine on top.
         self._marg_theory = [self._marginal_moments(0), self._marginal_moments(1)]
 
@@ -1170,7 +1170,7 @@ class BivariateAggregate:
         This is the **realised output** correlation, which is *not* the copula
         parameter: compounding by the shared frequency attenuates the per-claim
         dependence (and a shared mixing frequency adds common-shock dependence on
-        top). Compare with :meth:`Copula.tau` via :meth:`describe`.
+        top). Compare with :meth:`Copula.tau` via :attr:`summary_df`.
         """
         return self.bivariate.corr()
 
@@ -1257,7 +1257,7 @@ class BivariateAggregate:
         return mt, sdt, skt
 
     @property
-    def describe(self):
+    def summary_df(self):
         """Compact per-component summary frame with the realised dependence.
 
         Returns

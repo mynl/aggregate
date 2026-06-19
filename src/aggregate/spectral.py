@@ -962,7 +962,7 @@ class Distortion:
         self._name = value
 
     # ------------------------------------------------------------------
-    # Quartet: info / describe / stats_df / density_df
+    # Quartet: info / summary_df / stats_df / density_df
     # ------------------------------------------------------------------
     #
     # Each is a lazy ``cached_property``. The cached value lands in
@@ -985,7 +985,7 @@ class Distortion:
         return self._compute_info()
 
     @cached_property
-    def describe(self):
+    def summary_df(self):
         """Compact pair-column DataFrame (D_g, D_g_inv) plus checks (lazy)."""
         return self._compute_describe()
 
@@ -1004,7 +1004,7 @@ class Distortion:
 
     def _invalidate_cache(self):
         """Drop cached quartet values; called by ``_build``."""
-        for k in ('info', 'describe', 'stats_df', 'density_df',
+        for k in ('info', 'summary_df', 'stats_df', 'density_df',
                   '_grid_moments'):
             self.__dict__.pop(k, None)
 
@@ -1223,7 +1223,7 @@ class Distortion:
 
     def _ensure_grid_moments(self):
         """Compute and cache the trapezoidal integrals used by both
-        ``describe`` and ``stats_df``. One pass over ``density_df``."""
+        ``summary_df`` and ``stats_df``. One pass over ``density_df``."""
         if '_grid_moments' in self.__dict__:
             return self.__dict__['_grid_moments']
         df = self.density_df

@@ -56,7 +56,7 @@ def test_info_is_str(kind, kw):
 @pytest.mark.parametrize('kind,kw', SCALAR_SPECS, ids=[s[0] for s in SCALAR_SPECS])
 def test_describe_is_dataframe(kind, kw):
     d = Distortion(kind, **kw)
-    df = d.describe
+    df = d.summary_df
     assert isinstance(df, pd.DataFrame)
     for col in ('D_g', 'D_g_inv', 'closed_form', 'error'):
         assert col in df.columns
@@ -79,7 +79,7 @@ def test_stats_df_is_dataframe(kind, kw):
 @pytest.mark.parametrize('kind,kw', SCALAR_SPECS, ids=[s[0] for s in SCALAR_SPECS])
 def test_describe_has_kusuoka_summary(kind, kw):
     d = Distortion(kind, **kw)
-    df = d.describe
+    df = d.summary_df
     for row in ('mean_mass', 'max_mass', 'interior_atoms'):
         assert row in df.index
 
@@ -104,7 +104,7 @@ def test_density_df_has_expected_columns(kind, kw):
 @pytest.mark.parametrize('kind,kw', SCALAR_SPECS, ids=[s[0] for s in SCALAR_SPECS])
 def test_mean_partition_identity(kind, kw):
     d = Distortion(kind, **kw)
-    df = d.describe
+    df = d.summary_df
     sum_means = df.loc['E[D_g]+E[D_g_inv]', 'D_g']
     # Smooth kinds reach 1e-5 at n=101; kinked kinds (tvar, bitvar, wtdtvar)
     # match the identity to machine precision because knots align with the
@@ -234,12 +234,12 @@ def test_kusuoka_continuous_kinds_have_no_interior_atoms():
     for kind, kw in [('ph', {'a': 0.7}), ('wang', {'lam': 0.3}),
                      ('dual', {'b': 2.0}), ('beta', {'a': 0.7, 'b': 1.5})]:
         d = Distortion(kind, **kw)
-        assert not d.describe.loc['interior_atoms', 'D_g']
+        assert not d.summary_df.loc['interior_atoms', 'D_g']
 
 
 def test_kusuoka_tvar_interior_atom():
     d = Distortion('tvar', p=0.7)
-    assert d.describe.loc['interior_atoms', 'D_g']
+    assert d.summary_df.loc['interior_atoms', 'D_g']
     # And the atom shows up in stats_df with label mu_0.700, mass 1.0
     assert d.stats_df.loc['mu_0.700', 'D_g'] == pytest.approx(1.0)
     assert d.stats_df.loc['mu_0.700', 'closed_form'] == pytest.approx(0.7)
@@ -248,7 +248,7 @@ def test_kusuoka_tvar_interior_atom():
 def test_kusuoka_ccoc_atoms():
     d = Distortion('ccoc', r=0.1)
     s = d.stats_df
-    desc = d.describe
+    desc = d.summary_df
     # mu({0}) = 1-d (mean component); mu({1}) = d (max component)
     expected_d = 0.1 / 1.1
     assert desc.loc['mean_mass', 'D_g'] == pytest.approx(1 - expected_d)
@@ -265,7 +265,7 @@ def test_kusuoka_ph_atom_at_zero():
     a = 0.7
     d = Distortion('ph', a=a)
     s = d.stats_df
-    desc = d.describe
+    desc = d.summary_df
     assert s.loc['mu_0.000', 'D_g'] == pytest.approx(a)
     assert 'mu_1.000' not in s.index
     assert desc.loc['mean_mass', 'D_g'] == pytest.approx(a)
@@ -288,7 +288,7 @@ def test_kusuoka_minimum_picks_up_transition_atom():
     interior_atoms = [ix for ix in s.index
                       if ix.startswith('mu_') and ix not in ('mu_0.000', 'mu_1.000')]
     assert len(interior_atoms) >= 1
-    assert mn.describe.loc['interior_atoms', 'D_g']
+    assert mn.summary_df.loc['interior_atoms', 'D_g']
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ def test_mixture_quartet():
     # have a valid g_inv column.
     assert np.isfinite(mx.density_df['g_inv'].iloc[50])
     # Mean partition identity
-    sum_means = mx.describe.loc['E[D_g]+E[D_g_inv]', 'D_g']
+    sum_means = mx.summary_df.loc['E[D_g]+E[D_g_inv]', 'D_g']
     assert sum_means == pytest.approx(1.0, abs=1e-3)
 
 
@@ -314,5 +314,5 @@ def test_minimum_quartet():
     mn = Distortion('minimum', distortions=[d1, d2])
     assert isinstance(mn.info, str)
     # mean is well-defined and partition identity holds
-    sum_means = mn.describe.loc['E[D_g]+E[D_g_inv]', 'D_g']
+    sum_means = mn.summary_df.loc['E[D_g]+E[D_g_inv]', 'D_g']
     assert sum_means == pytest.approx(1.0, abs=1e-3)

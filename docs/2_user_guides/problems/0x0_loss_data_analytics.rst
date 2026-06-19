@@ -141,7 +141,7 @@ A collection of insurance policies consists of two types. 25% of policies are Ty
         print(f'mean     = {m:.6g}\n'
               f'variance = {v:.7g}')
 
-Create the :class:`Aggregate` object, display its ``describe`` dataframe and compare the cdf with the exact computation.
+Create the :class:`Aggregate` object, display its ``summary_df`` dataframe and compare the cdf with the exact computation.
 
 .. ipython:: python
     :okwarning:
@@ -265,7 +265,7 @@ The ground up loss random variable for a health insurance policy in 2006 is mode
 
     a06 = build('agg X06 1 claim 500 xs 100 sev 1000 * expon fixed', update=False)
     a07 = build('agg X07 1 claim 500 xs 100 sev 1050 * expon fixed', update=False)
-    ans = pd.concat((a06.describe, a07.describe), keys=['2006', '2007'])
+    ans = pd.concat((a06.summary_df, a07.summary_df), keys=['2006', '2007'])
     qd(ans)
     ans.iloc[5, 0] / ans.iloc[2, 0] - 1
 

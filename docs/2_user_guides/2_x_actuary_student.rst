@@ -48,7 +48,7 @@ You model aggregate losses using the collective risk model.
 **Answers.**
 
 Build an aggregate object using simple DecL program.
-The dataframe ``a01.describe`` gives the answers to questions 1 and 2. It printed and formatted automatically by ``qd(a01)``. Note the validation report in the last line.
+The dataframe ``a01.summary_df`` gives the answers to questions 1 and 2. It printed and formatted automatically by ``qd(a01)``. Note the validation report in the last line.
 
 .. ipython:: python
     :okwarning:

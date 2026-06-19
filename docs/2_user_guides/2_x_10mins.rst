@@ -47,7 +47,7 @@ A Ten Minute Guide to ``aggregate``
 #. :ref:`10 min common`
 
     - :ref:`10 min info`
-    - :ref:`10 min describe`
+    - :ref:`10 min summary_df`
     - :ref:`10 min density_df`
     - :ref:`10 min stats`
     - :ref:`10 min report`
@@ -448,7 +448,7 @@ This example uses :meth:`build` to make an :class:`Aggregate` with a Poisson fre
                 'poisson')
     qd(a02)
 
-``qd`` displays the dataframe ``a.describe``. This example fails the aliasing validation test because the aggregate mean error is suspiciously greater than the severity. (Run with logger level 20 for more diagnostics.) However, it passes both the severity mean and aggregate mean tests.
+``qd`` displays the dataframe ``a.summary_df``. This example fails the aliasing validation test because the aggregate mean error is suspiciously greater than the severity. (Run with logger level 20 for more diagnostics.) However, it passes both the severity mean and aggregate mean tests.
 
 .. _10 min quick diagnostics:
 
@@ -716,7 +716,7 @@ Apply 3 xs 7 occurrence reinsurance to cap individual losses at 7. ``a05no`` is 
 
 .. warning::
 
-   Under reinsurance the ``describe`` dataframe shows the gross theoretical (``Subject EX``, ``Subject CV``, ``Subject Sk``) alongside the requested net / ceded / after view (``Net EX`` / ``Ceded EX`` / ``After EX`` depending on the cession kinds, similarly for CV / Sk) and a ``Change`` column reading ``(after - subject) / subject``. With no reinsurance the headings stay ``EX`` / ``Est EX`` / ``Err EX`` (and similarly for CV / Sk); the column arithmetic is identical to ``Change`` so the validation eyeball degenerates cleanly. Look at the gross object first to check computational accuracy; the ``Change`` (or ``Err``) column under reinsurance reports the cession impact, not numerical error.
+   Under reinsurance the ``summary_df`` dataframe shows the gross theoretical (``Subject EX``, ``Subject CV``, ``Subject Sk``) alongside the requested net / ceded / after view (``Net EX`` / ``Ceded EX`` / ``After EX`` depending on the cession kinds, similarly for CV / Sk) and a ``Change`` column reading ``(after - subject) / subject``. With no reinsurance the headings stay ``EX`` / ``Est EX`` / ``Err EX`` (and similarly for CV / Sk); the column arithmetic is identical to ``Change`` so the validation eyeball degenerates cleanly. Look at the gross object first to check computational accuracy; the ``Change`` (or ``Err``) column under reinsurance reports the cession impact, not numerical error.
 
 Add an aggregate 4 xs 8 reinsurance cover on the net of occurrence distribution. ``a05n`` is the final net distribution.
 
@@ -804,7 +804,7 @@ Here is a three-unit portfolio built using a DecL program. The line breaks and h
                , padding=2)
     qd(p07)
 
-The portfolio units are called A, B and Cat. Printing using ``qd`` shows ``p07.describe``, which concatenates each unit's ``describe`` and adds the same statistics for the total.
+The portfolio units are called A, B and Cat. Printing using ``qd`` shows ``p07.summary_df``, which concatenates each unit's ``summary_df`` and adds the same statistics for the total.
 
 * Unit A has 100 (expected) claims, each pulled from a lognormal distribution with mean of 30 and coefficient of variation 1.25 within the layer 100 xs 0 (i.e., losses are limited at 100). The frequency distribution is Poisson.
 * Unit B is similar.
@@ -883,7 +883,7 @@ six doublings of the input bucket. If no bucket is input, it models three
 doublings up and down from the rounded :meth:`recommend_bucket` suggestion.
 The output table shows:
 
-* The actual ``(agg, m)`` and estimated ``(est, m)`` means, from the ``describe`` dataframe.
+* The actual ``(agg, m)`` and estimated ``(est, m)`` means, from the ``summary_df`` dataframe.
 * The implied absolute ``(abs, m)``  and relative ``(rel, m)`` errors in the mean.
 * ``(rel, h)`` shows the maximum relative severity discretization error, which equals ``bs / 2`` divided by the average severity.
 * ``(rel, total)``, equal to the sum of ``(rel, h)`` and ``rel m``.
@@ -941,7 +941,7 @@ Methods and Properties Common To :class:`Aggregate` and :class:`Portfolio` Class
 
 :class:`Aggregate` and :class:`Portfolio` both have the following methods and properties. See :ref:`Aggregate Class` and :ref:`Portfolio Class` for full lists.
 
-- ``info`` and  ``describe`` are dataframes with statistics and other information; they are printed with the object.
+- ``info`` and  ``summary_df`` are dataframes with statistics and other information; they are printed with the object.
 
 - ``density_df`` a dataframe containing estimated probability distributions and other expected value information.
 
@@ -987,20 +987,20 @@ The ``info`` dataframe contains information about the frequency and severity sto
     print(a05n.info)
     print(p07.info)
 
-.. _10 min describe:
+.. _10 min summary_df:
 
-The ``describe`` Dataframe
+The ``summary_df`` Dataframe
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``describe`` dataframe contains gross analytic and estimated (net or ceded) statistics. When there is no reinsurance, comparison of analytic and estimated moments provides a test of computational accuracy (first case). It should always be reviewed after updating. When there is reinsurance, empirical is net (second case).
+The ``summary_df`` dataframe contains gross analytic and estimated (net or ceded) statistics. When there is no reinsurance, comparison of analytic and estimated moments provides a test of computational accuracy (first case). It should always be reviewed after updating. When there is reinsurance, empirical is net (second case).
 
 .. ipython:: python
     :okwarning:
 
-    qd(a05g.describe)
+    qd(a05g.summary_df)
     with pd.option_context('display.max_columns', 15):
-        print(a05n.describe)
-    qd(p07.describe)
+        print(a05n.summary_df)
+    qd(p07.summary_df)
 
 Printing the object using ``qd`` add ``log2``, ``bs``, and validation information.
 
@@ -1046,7 +1046,7 @@ The ``stats_df`` dataframe shows analytically and FFT computed mean, variance, C
 moments — theoretical and (after ``update``) empirical. It has a MultiIndex on
 ``(component, measure)`` rows and one column per mixture component plus
 ``mixed``, ``independent``, ``empirical``, and ``error`` (relative). It is
-an expanded version of ``describe``.
+an expanded version of ``summary_df``.
 
 - component (``meta``, ``freq``, ``sev`` or ``agg``) and measure
 - ``ex1, ex2, ex3`` non-central frequency moments, and

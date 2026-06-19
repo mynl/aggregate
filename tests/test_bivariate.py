@@ -230,7 +230,7 @@ def test_mv_pnl_marginal_matches_standalone_pnl():
 def test_mv_reporting_smoke():
     mv = _mv()
     assert 'bivariate object name' in mv.info
-    df = mv.describe                      # property
+    df = mv.summary_df                      # property
     assert {'A', 'B', 'joint'}.issubset(set(df.index))
     assert np.isclose(float(df.loc['joint', 'corr']), mv.corr())
     sd = mv.stats_df                      # property
@@ -458,7 +458,7 @@ def test_netceded_reporting_and_plot():
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     mv = build(f'netceded {NC_PROG}')
-    df = mv.describe
+    df = mv.summary_df
     assert {'Ceded', 'Net', 'joint'}.issubset(set(df.index))
     assert df.loc['Ceded', 'kind'] == 'netceded'
     assert np.isnan(df.loc['joint', 'copula_tau'])   # no copula in netceded

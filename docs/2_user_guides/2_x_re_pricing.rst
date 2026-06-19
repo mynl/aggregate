@@ -699,9 +699,9 @@ Here is a summary of the different methods, compare Bear and Nemlick Table 1, ro
     :okwarning:
 
     bit = pd.DataFrame([a10.agg_m,
-        a11.describe.iloc[-1, 1],
-        a12.describe.iloc[-1, 1],
-        a13.describe.iloc[-1, 1],
+        a11.summary_df.iloc[-1, 1],
+        a12.summary_df.iloc[-1, 1],
+        a13.summary_df.iloc[-1, 1],
         a11.agg_m - elim_approx],
         columns=['Loss cost'],
         index=pd.Index(['Gross', 'NB', 'Poisson', 'c=0.05', 'lognorm'],

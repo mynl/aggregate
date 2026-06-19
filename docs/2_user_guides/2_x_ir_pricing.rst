@@ -163,7 +163,7 @@ answer is returned in a ``namedtuple``.
 Finally, apply the new function to create some tables.
 
 #. A small account with 25 expected claims, about 621K limited losses, and a
-   low 50K occurrence limit. The output shows the usual ``describe``
+   low 50K occurrence limit. The output shows the usual ``summary_df``
    diagnostics for the underlying :class:`Aggregate` object, followed by a
    small Table across different entry ratios. The Table is indexed by entry
    ratio(aggregate attachment as a proportion of limited losses) and shows

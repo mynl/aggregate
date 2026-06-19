@@ -1446,7 +1446,7 @@ class Underwriter(object):
         :param regex: filter on the knowledge index (name); '' matches all.
         :param kind: optional filter ('agg', 'sev', 'port', 'distortion'); '' matches all.
         :param plot: build each match and call its ``.plot()``.
-        :param describe: build each match and ``qd()`` its describe table.
+        :param describe: build each match and ``qd()`` its summary table.
         :param return_objects: when building, also return the list of built
             objects alongside the DataFrame.
         :param kwargs: passed to :meth:`build` for each match.
@@ -1494,8 +1494,8 @@ class Underwriter(object):
                 pp = getattr(a, 'pprogram', None)
                 if pp is not None:
                     print(pp)
-                # only Aggregate / Portfolio have a `.describe` table
-                if hasattr(a, 'describe'):
+                # only Aggregate / Portfolio have a `.summary_df` table
+                if hasattr(a, 'summary_df'):
                     qd(a)
                 else:
                     print(repr(a))

@@ -404,7 +404,7 @@ def test_plot_smoke():
 def test_describe_and_info_netceded():
     a = _build(OCC_BOUNDED)
     b = a.occ_bivariate()
-    df = b.describe
+    df = b.summary_df
     assert {'Ceded', 'Net', 'joint'}.issubset(set(df.index))
     assert (df.loc['Ceded', 'kind'], df.loc['Net', 'kind']) == ('netceded', 'netceded')
     assert np.isclose(float(df.loc['joint', 'corr']), b.corr())

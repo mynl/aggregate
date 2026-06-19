@@ -172,7 +172,7 @@ The employer purchases aggregate stop-loss coverage that limits the employer’s
                     'aggregate net of inf xs 5')
     qd(kpw_9_24)
 
-    net = kpw_9_24.describe.iloc[-1, 1]
+    net = kpw_9_24.summary_df.iloc[-1, 1]
     print(f'\ngross loss    {kpw_9_24.agg_m:.5g}\nretained loss {net:.5g}\n'
           f'premium       {net + 1.472:.5g}')
 
@@ -471,13 +471,13 @@ The covered layer is 18 xs 6, in which the insured pays 25% because of the coins
                      'occurrence net of 0.25 so inf xs 0 '
                      'poisson')
     qd(kpw_9_14)
-    print(f'variance = {kpw_9_14.describe.iloc[-1,[1, 4]].prod()**2:.6g}\ncomputed with bs=1/{1/kpw_9_14.bs:.0f} and log2={kpw_9_14.log2}')
+    print(f'variance = {kpw_9_14.summary_df.iloc[-1,[1, 4]].prod()**2:.6g}\ncomputed with bs=1/{1/kpw_9_14.bs:.0f} and log2={kpw_9_14.log2}')
     qd(kpw_9_14.density_df.loc[[0, 1, 2, 3], ['p', 'F', 'S']])
     @savefig kpw_9_14.png
     kpw_9_14.plot()
 
 
-Under reinsurance ``describe`` returns gross under ``Subject EX`` and the requested net or ceded under ``Net EX`` (or ``Ceded EX`` / ``After EX``). The print statement computes net variance from the product of estimated mean and cv. The spikes on the density corresponds to the possibility of only limit claims.
+Under reinsurance ``summary_df`` returns gross under ``Subject EX`` and the requested net or ceded under ``Net EX`` (or ``Ceded EX`` / ``After EX``). The print statement computes net variance from the product of estimated mean and cv. The spikes on the density corresponds to the possibility of only limit claims.
 
 .. **TODO** harmonize with their answer for probabilities.
 

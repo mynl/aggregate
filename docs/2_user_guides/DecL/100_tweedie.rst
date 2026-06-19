@@ -78,7 +78,7 @@ Three different ways of specifying the same Tweedie distribution.
     tweedies = build_many(program)
     for a in tweedies:
         print(a.program)
-        qd(a.object.describe)
+        qd(a.object.summary_df)
         print()
 
 Convert from reproductive form:

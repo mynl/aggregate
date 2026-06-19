@@ -811,7 +811,7 @@ class Portfolio(object):
         s.append(f'Portfolio contains {_n} aggregate component{_s}.')
         if self.bs > 0:
             s.append(f'Updated with bucket size {self.bs:.6g}, log2 = {self.log2}, validation: {self.validation_explanation}')
-        df = self.describe
+        df = self.summary_df
         return '\n'.join(s) + df.fillna('').to_html()
 
     def __str__(self):
@@ -852,7 +852,7 @@ class Portfolio(object):
             s.append('')
             with pd.option_context('display.width', 140, 'display.float_format', lambda x: f'{x:,.5g}'):
                 # get it on one row
-                s.append(str(self.describe))
+                s.append(str(self.summary_df))
         # s.append(super(Portfolio, self).__repr__())
         return '\n'.join(s)
 
@@ -1259,7 +1259,7 @@ class Portfolio(object):
         return '\n'.join(s)
 
     def _reins_after_label(self):
-        """Portfolio-wide heading for the after-reins column in ``describe``.
+        """Portfolio-wide heading for the after-reins column in ``summary_df``.
 
         Aggregates the per-unit :meth:`Aggregate._reins_after_label`
         across the book. Returns ``None`` when **no** unit carries
@@ -1278,12 +1278,12 @@ class Portfolio(object):
         return REINS_LABEL_OUTPUT
 
     @property
-    def describe(self):
+    def summary_df(self):
         """Theoretic-and-empirical stats. Used in ``_repr_html_``.
 
         Reads from the canonical ``stats_df``: theoretical moments from
         the ``total`` column, empirical from ``empirical``, errors from
-        ``error``. The output shape mirrors ``Aggregate.describe`` — one
+        ``error``. The output shape mirrors ``Aggregate.summary_df`` — one
         ``Freq``/``Sev``/``Agg`` row block per unit + ``total``.
 
         Two display modes, chosen at the **portfolio** level so the unit
@@ -1351,7 +1351,7 @@ class Portfolio(object):
         # Post-update? Empirical agg moments live in stats_df['empirical'].
         # After the punch-up: portfolio-level sev empirical is also
         # populated (via MomentAggregator off per-unit empirical sev);
-        # surface it in the describe table too. Under reinsurance the
+        # surface it in the summary_df table too. Under reinsurance the
         # ``total`` column is the (gross) Subject view and ``empirical``
         # the realised after-reins view, exactly mirroring Aggregate.
         emp_agg_m = emp.get(('agg', 'mean'), np.nan)
@@ -1521,9 +1521,9 @@ class Portfolio(object):
         """Portfolio end-to-end reinsurance loss summary.
 
         One block per unit plus a ``total`` block, concatenated with
-        ``unit`` / ... keys (the :meth:`describe` assembly pattern). Each
+        ``unit`` / ... keys (the :attr:`summary_df` assembly pattern). Each
         block is a ``view x component`` table of **mean loss** on the
-        eight :meth:`Aggregate.describe` columns (``EX | Est EX | Change EX |
+        eight :attr:`Aggregate.summary_df` columns (``EX | Est EX | Change EX |
         CV | Est CV | Change CV | Sk | Est Sk``) for the unit's own per-stage
         cession (from :meth:`Aggregate.reins_describe`); units without
         reinsurance are omitted from their own blocks. The ``total`` block is
@@ -1550,7 +1550,7 @@ class Portfolio(object):
                 keys.append(a.name)
         # total block: end-to-end gcn, eight columns matching the unit blocks.
         # Reference (EX/CV/Sk) is the gross end-to-end moment, held constant down
-        # each view (the economic view of describe): Est is the per-view output
+        # each view (the economic view of summary_df): Est is the per-view output
         # and Change = (output - gross) / gross. The gross row compares gross to
         # gross, so its Change is 0 (no exact pre-bucket reference exists for the
         # convolved portfolio marginals); the ceded / net rows read as the %
@@ -2311,7 +2311,7 @@ class Portfolio(object):
 
         Mirrors :attr:`Aggregate._bs_window_df`'s idiom but swaps *method*
         rows for *unit* rows -- the Portfolio convention of one row per unit
-        plus a summary line (cf. ``stats_df`` / ``describe``, which carry
+        plus a summary line (cf. ``stats_df`` / ``summary_df``, which carry
         per-unit columns and a ``total``). Each unit row is that unit's
         selected window; then four **candidate** combine rows -- ``mm`` (the
         Portfolio MM bulk, the live span), ``rms`` (the RMS-of-windows
@@ -2501,7 +2501,7 @@ class Portfolio(object):
             # ---- roll combine on a shared (signed or windowed) grid --------
             # Drive each unit on its OWN window [x_min_k, ...) sharing the
             # portfolio bs/log2/padding, so the unit object stays internally
-            # correct (no false deficit, right moments, right describe/plot --
+            # correct (no false deficit, right moments, right summary_df/plot --
             # plan 2c). The combine reads each unit's ftagg_density, which is
             # origin-at-0 *regardless* of the unit's x_min (the output roll hits
             # the density, never ftagg), so the units' FFTs still multiply
@@ -2782,7 +2782,7 @@ class Portfolio(object):
         False means it is definitely suspect. (Similar to the null hypothesis in a statistical test).
         Called and reported automatically by qd for Aggregate objects.
 
-        Checks the relative errors (from ``self.describe``) for:
+        Checks the relative errors (from ``self.summary_df``) for:
 
         * severity mean < eps
         * severity cv < 10 * eps
@@ -2830,7 +2830,7 @@ class Portfolio(object):
 
         # apply validation to the Portfolio total. SSoT: relative errors
         # come straight off ``stats_df['error']`` (noise-aware diff of
-        # ``empirical`` vs ``total``) -- no detour through ``describe``.
+        # ``empirical`` vs ``total``) -- no detour through ``summary_df``.
         err = self.stats_df['error'].abs()
         eps = self.validation_eps
         sev_err_mean = float(err.get(('sev', 'mean'), 0.0))
@@ -2888,16 +2888,6 @@ class Portfolio(object):
         ``bs_explanation``.
         """
         return explain_validation(self.valid)
-
-    def explain_validation(self):
-        """
-        Deprecated alias for :attr:`validation_explanation`.
-
-        Retained for back-compat (the old documented mechanism). Prefer the
-        ``validation_explanation`` property; this alias will be removed in a
-        future release.
-        """
-        return self.validation_explanation
 
     def trim_df(self):
         """

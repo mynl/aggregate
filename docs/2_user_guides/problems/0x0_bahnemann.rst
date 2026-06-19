@@ -248,7 +248,7 @@ Poisson-Lognormal Layer Statistics, Example 5.13
 
 Consider an aggregate distribution with mean 15 Poisson frequency and lognormal claim size with parameters :math:`(\mu, \sigma) = (5.9809, 1.8)`. What are the distribution characteristics for random variable S for claims in the layer 5,000 excess of 3,000?
 
-The exact and FFT-estimated mean, cv, and skewness are reported in the ``describe`` dataframe, for frequency and severity. The values reported agree with the text, up to rounding.
+The exact and FFT-estimated mean, cv, and skewness are reported in the ``summary_df`` dataframe, for frequency and severity. The values reported agree with the text, up to rounding.
 
  .. ipython:: python
     :okwarning:
@@ -414,7 +414,7 @@ First, we compute all the aggregates.
                , bs=50, log2=18,
                normalize=False,
               )
-    qd(pd.concat([i.describe[['Subject EX', 'Subject CV', 'Subject Sk']]
+    qd(pd.concat([i.summary_df[['Subject EX', 'Subject CV', 'Subject Sk']]
                   for i in b.values()],
         keys=b.keys(), names=['Occ limit', 'X']),
         accuracy=4)

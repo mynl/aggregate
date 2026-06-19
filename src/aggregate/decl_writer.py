@@ -545,12 +545,12 @@ def _render_copula(copula) -> str:
     return f'copula {kind} {_fmt_num(param)}'
 
 
-def _render_mvagg(name: str, spec: dict) -> str:
-    """Render a multivariate (copula-coupled) aggregate or a ``netceded`` agg.
+def _render_bvagg(name: str, spec: dict) -> str:
+    """Render a bivariate (copula-coupled) aggregate or a ``netceded`` agg.
 
-    Inverts ``mv_out_copula`` / ``mv_out_copula_nofreq``, the three occurrence
-    view-pair prefixes (``mv_out_netceded`` / ``mv_out_grossceded`` /
-    ``mv_out_grossnet``), and the ``clash`` statement (``clash_out``). The two
+    Inverts ``bv_out_copula`` / ``bv_out_copula_nofreq``, the three occurrence
+    view-pair prefixes (``bv_out_netceded`` / ``bv_out_grossceded`` /
+    ``bv_out_grossnet``), and the ``clash`` statement (``clash_out``). The two
     components are rendered inline (whitespace-insensitive within a program); the
     shared frequency is always emitted (the no-freq source form defaults to
     ``poisson``, which re-parses to the same spec).
@@ -581,7 +581,7 @@ def _render_mvagg(name: str, spec: dict) -> str:
 
     components = [_render_agg_or_pnl(k, n, s) for k, n, s in spec['lines']]
     return _join([
-        f'multivariate {name}',
+        f'bivariate {name}',
         _render_exposure(spec),
         ' '.join(components),
         _render_copula(spec['copula']),
@@ -618,7 +618,7 @@ _KIND_RENDERERS = {
     'agg': lambda name, spec: _render_agg_or_pnl('agg', name, spec),
     'sev': _render_sev_out,
     'port': _render_port,
-    'mvagg': _render_mvagg,
+    'bvagg': _render_bvagg,
     'distortion': _render_distortion,
 }
 
@@ -635,7 +635,7 @@ def spec_to_decl(spec: dict, kind: str = 'agg', name: str | None = None) -> str:
         ``pp.spec``. *Not* the dense ``Aggregate._spec`` constructor-argument
         dict (which is a different, defaulted shape; see the module docstring).
     kind : str, default 'agg'
-        One of ``'agg'``, ``'sev'``, ``'port'``, ``'mvagg'``, ``'distortion'``
+        One of ``'agg'``, ``'sev'``, ``'port'``, ``'bvagg'``, ``'distortion'``
         --- the first element of the parser's ``(kind, name, spec)`` tuple.
     name : str, optional
         The object name. Defaults to ``spec['name']`` when present; required for

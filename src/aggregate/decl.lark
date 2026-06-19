@@ -21,7 +21,7 @@ answer: sev_out          -> answer_sev
       | agg_out          -> answer_agg
       | pnl_out          -> answer_pnl
       | port_out         -> answer_port
-      | mv_out           -> answer_mv
+      | bv_out           -> answer_bv
       | distortion_out   -> answer_distortion
       | expr             -> answer_expr
 
@@ -99,14 +99,13 @@ pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
              | numbers LR       -> pnl_exp_lr
 
 // ======================================================================
-// Multivariate aggregate (copula-coupled bivariate)
+// Bivariate aggregate (copula-coupled, strictly two-axis)
 // ----------------------------------------------------------------------
-// ``multivariate NAME <shared-count> <two component aggs> copula KIND P
+// ``bivariate NAME <shared-count> <two component aggs> copula KIND P
 //   [freq]`` couples the two components' per-claim severities by a copula and
 // accumulates them with a shared outer frequency via a 2D FFT. The body is
 // exactly TWO ``agg`` / ``pnl`` declarations (validated in the class). The
-// trailing ``freq`` is optional (defaults to poisson). See
-// dev/plan-multivariate.md.
+// trailing ``freq`` is optional (defaults to poisson). See dev/plan-mv.md.
 //
 // The three view-pair prefixes ``netceded`` / ``grossceded`` / ``grossnet``
 // take one ordinary ``agg`` carrying occurrence reinsurance and build the joint
@@ -114,13 +113,16 @@ pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
 // keyword names the pair x-then-y, so ``netceded`` -> x=net, y=ceded;
 // ``grossceded`` -> x=gross, y=ceded; ``grossnet`` -> x=gross, y=net (gross
 // leads when present). See dev/plan-mv.md S3.
+//
+// The ``clash`` statement derives the shared event count and the two per-event
+// Bernoulli triggers from interpretable claim counts (na, nb, nc). See S7.3.
 // ======================================================================
 
-mv_out: MULTIVARIATE name exposures mv_body copula_clause freq trailer  -> mv_out_copula
-      | MULTIVARIATE name exposures mv_body copula_clause trailer        -> mv_out_copula_nofreq
-      | NETCEDED agg_out                                              -> mv_out_netceded
-      | GROSSCEDED agg_out                                            -> mv_out_grossceded
-      | GROSSNET agg_out                                              -> mv_out_grossnet
+bv_out: BIVARIATE name exposures bv_body copula_clause freq trailer  -> bv_out_copula
+      | BIVARIATE name exposures bv_body copula_clause trailer        -> bv_out_copula_nofreq
+      | NETCEDED agg_out                                              -> bv_out_netceded
+      | GROSSCEDED agg_out                                            -> bv_out_grossceded
+      | GROSSNET agg_out                                              -> bv_out_grossnet
       | CLASH name expr expr expr CLAIMS clash_comp clash_comp freq trailer  -> clash_out
       | CLASH name expr expr expr CLAIMS clash_comp clash_comp trailer        -> clash_out_nofreq
 
@@ -129,12 +131,12 @@ mv_out: MULTIVARIATE name exposures mv_body copula_clause freq trailer  -> mv_ou
 // the (na, nb, nc) claim counts by the solver (dev/plan-mv.md S7.3, App. B).
 clash_comp: layers sev_clause   -> clash_comp
 
-mv_body: mv_body mv_item   -> mv_body_cons
-       | mv_item           -> mv_body_one
+bv_body: bv_body bv_item   -> bv_body_cons
+       | bv_item           -> bv_body_one
 
 // A component is an ordinary loss aggregate (``agg``) or a premium-minus-loss
 // aggregate (``pnl``); both transform to an ("agg", name, spec) tuple.
-?mv_item: agg_out
+?bv_item: agg_out
         | pnl_out
 
 // The copula clause is optional: omitted (or ``copula independent``) means the
@@ -353,7 +355,7 @@ atom: NUMBER                    -> atom_number
 OCCURRENCE.2: /occurrence(?![a-zA-Z0-9._:~\-])/
 AGGREGATE.2:  /aggregate(?![a-zA-Z0-9._:~\-])/
 APPROXIMATE.2: /(?:approximate|approx)(?![a-zA-Z0-9._:~\-])/
-MULTIVARIATE.2: /(?:multivariate|mv)(?![a-zA-Z0-9._:~\-])/
+BIVARIATE.2: /(?:bivariate|bv)(?![a-zA-Z0-9._:~\-])/
 NETCEDED.2:   /netceded(?![a-zA-Z0-9._:~\-])/
 GROSSCEDED.2: /grossceded(?![a-zA-Z0-9._:~\-])/
 GROSSNET.2:   /grossnet(?![a-zA-Z0-9._:~\-])/
@@ -431,7 +433,7 @@ NUMBER.2: /-?(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|approximate|approx|at|bernoulli|binomial|ceded|claim|claims|clash|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|approximate|approx|at|bernoulli|binomial|bivariate|bv|ceded|claim|claims|clash|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

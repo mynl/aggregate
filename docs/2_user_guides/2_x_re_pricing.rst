@@ -1315,7 +1315,7 @@ univariate margins are available as
 ``reins_density_df['p_agg_gross' | 'p_agg_ceded_occ' | 'p_agg_net_occ']``; the
 *joint* law of any two of them --- and hence their correlation and co-moments ---
 is computed by :meth:`~aggregate.distributions.Aggregate.occ_bivariate`, which
-returns a :class:`aggregate.multivariate.MultivariateAggregate` in ``netceded``
+returns a :class:`aggregate.bivariate.BivariateAggregate` in ``netceded``
 mode (the same object produced by the DecL view-pair statements).
 
 The three views satisfy :math:`C + N = G`, so any two determine the third; there
@@ -1353,7 +1353,7 @@ Each marginal reproduces the corresponding univariate occurrence aggregate, and
 aggregate-cover bivariate is degenerate). Per-axis bucket and window sizes are
 auto-derived from the univariate margins, with a single common ``bs`` plus
 ``log2_x`` / ``log2_y`` overrides;
-:meth:`~aggregate.multivariate.MultivariateAggregate.plot` shows the joint
+:meth:`~aggregate.bivariate.BivariateAggregate.plot` shows the joint
 per-claim severity and aggregate density side by side.
 
 .. _re summary:

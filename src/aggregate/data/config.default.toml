@@ -99,8 +99,8 @@
 # noise = 1e-12
 
 
-# [multivariate] -- defaults for the multivariate module.
-[multivariate]
+# [bivariate] -- defaults for the bivariate module.
+[bivariate]
 # window_nines: nines for the per-axis 2-D sizing window -- the equal-tail
 # probability budget 10**-window_nines that balanced_window trims off each tail
 # when the bv measures each realized marginal. Kept a few nines shallower than

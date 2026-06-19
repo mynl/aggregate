@@ -44,7 +44,7 @@ _UNSET = _Unset()
 # (sev.X, agg.X, dist.X) must resolve as each line is parsed, so a definition
 # must precede anything that references it. Severities and distortions come
 # before the aggregates that use them; aggregates before portfolios.
-_KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'mvagg': 3, 'port': 4}
+_KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'bvagg': 3, 'port': 4}
 
 
 def _entry_to_decl(pp):
@@ -177,7 +177,7 @@ def _resolve_hints(spec, log2, bs, bucket_sizing_p, kwargs):
     Returns
     -------
     (log2, bs, bucket_sizing_p, kwargs) : tuple
-        Ready for ``Aggregate`` / ``Portfolio`` / ``MultivariateAggregate``
+        Ready for ``Aggregate`` / ``Portfolio`` / ``BivariateAggregate``
         update.
     """
     note = spec.get('note', '') or ''
@@ -853,9 +853,9 @@ class Underwriter(object):
             if getattr(obj, '_approx_fit', None):
                 _desc = obj._approx_description()
                 obj.note = f"{obj.note}; {_desc}" if obj.note else _desc
-        elif kind == 'mvagg':
-            from .multivariate import MultivariateAggregate
-            obj = MultivariateAggregate(**spec)
+        elif kind == 'bvagg':
+            from .bivariate import BivariateAggregate
+            obj = BivariateAggregate(**spec)
             obj.program = program
         elif kind == 'port':
             # Portfolio expects name, agg_list, uw. agg_list is a list of specs
@@ -894,7 +894,7 @@ class Underwriter(object):
         Parameters
         ----------
         kind : str
-            One of ``'sev'``, ``'agg'``, ``'port'``, ``'distortion'``, ``'mvagg'``.
+            One of ``'sev'``, ``'agg'``, ``'port'``, ``'distortion'``, ``'bvagg'``.
         name : str
             The declaration name.
         spec : dict
@@ -1152,21 +1152,21 @@ class Underwriter(object):
 
         # in this loop bs_ and log2_ are the values actually used for each
         # update; they do not overwrite the input default values
-        from .multivariate import MultivariateAggregate
+        from .bivariate import BivariateAggregate
 
         for answer in rv:
             if answer.object is None:
                 # object not created (named-mixed-severity case)
                 logger.info('Object %s of kind %s returned as a spec; no further processing.',
                             answer.name, answer.kind)
-            elif isinstance(answer.object, MultivariateAggregate) and update is True:
-                # per-axis auto-sizing lives in MultivariateAggregate.update;
+            elif isinstance(answer.object, BivariateAggregate) and update is True:
+                # per-axis auto-sizing lives in BivariateAggregate.update;
                 # pass log2/bs through (0 => auto), drop agg-only kwargs.
                 d = answer.spec
                 log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
                     d, log2, bs, bucket_sizing_p, kwargs)
                 log2_ = 0 if log2 == 0 else log2
-                logger.info('(%s, %s): multivariate update(log2=%s, bs=%s)',
+                logger.info('(%s, %s): bivariate update(log2=%s, bs=%s)',
                             answer.kind, answer.name, log2_, bs)
                 answer.object.update(log2=log2_, bs=bs, **kwargs)
             elif isinstance(answer.object, Aggregate) and update is True:
@@ -1539,7 +1539,7 @@ class Underwriter(object):
             filters on). Default matches all names.
         kind : str, default 'all'
             Filter by kind: ``'all'`` (default), ``'agg'``, ``'sev'``,
-            ``'port'``, ``'distortion'``, or ``'mvagg'``. Mirrors
+            ``'port'``, ``'distortion'``, or ``'bvagg'``. Mirrors
             ``discover(kind=...)``.
         source : str, pathlib.Path, or None, default 'session'
             Provenance filter. Default ``'session'`` exports only the entries

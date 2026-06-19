@@ -124,8 +124,8 @@ Value enumerations:
 ``Aggregate``'s ``id`` is a display-only spec hash with no stored timestamp.
 
 
-Bivariate (MultivariateAggregate)
----------------------------------
+Bivariate (BivariateAggregate)
+------------------------------
 
 The joint bivariate aggregate (copula and ``netceded`` modes). Two axes are
 always present, so the two per-axis blocks (``axis 0`` / ``axis 1``) always

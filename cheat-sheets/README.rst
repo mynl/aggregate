@@ -9,7 +9,7 @@ same layout reads consistently across classes.
 PDFs (rebuild with ``make.ps1``; combined into ``Cheat_Sheets.pdf`` by
 ``combine.ps1``):
 
-* `DecL <DecL_Cheat_Sheet.pdf>`_ (the language; 3 pages: agg+pnl, port+mv+netceded, distortion)
+* `DecL <DecL_Cheat_Sheet.pdf>`_ (the language; 3 pages: agg+pnl, port+bv+netceded, distortion)
 * `Underwriter <Underwriter_Cheat_Sheet.pdf>`_
 * `Severity <Severity_Cheat_Sheet.pdf>`_
 * `Aggregate <Aggregate_Cheat_Sheet.pdf>`_
@@ -103,7 +103,7 @@ Iterate. Then ``.\combine.ps1``.
 * **agg + pnl** -- the compound-distribution clauses (name, exposure, limit,
   severity incl. ``dsev``/``xps``/``picks``/``ssev``, frequency, occ/agg
   reinsurance, ``approximate``, ``pnl``, trailer/vectors/math).
-* **port + mv + netceded** -- ``port`` units, the ``multivariate``/``mv`` copula
+* **port + bv + netceded** -- ``port`` units, the ``bivariate``/``bv`` copula
   bivariate, ``netceded``.
 * **distortion** -- declaration, kind/parameter table (from each ``Distortion``
   subclass's ``decl_params``), ``minimum``/``mixture`` combinators, usage.

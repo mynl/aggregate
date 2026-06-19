@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     'BuildSettings', 'DiscretizationSettings', 'ValidationSettings',
-    'MultivariateSettings', 'LabelSettings', 'Settings',
+    'BivariateSettings', 'LabelSettings', 'Settings',
     'get_settings', 'load_settings', 'reload_settings',
     'config_path', 'user_dir', 'write_default_config', 'describe_settings',
     'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME',
@@ -184,8 +184,8 @@ class ValidationSettings:
 
 
 @dataclass(frozen=True)
-class MultivariateSettings:
-    """Defaults for :mod:`aggregate.multivariate`.
+class BivariateSettings:
+    """Defaults for :mod:`aggregate.bivariate`.
 
     Parameters
     ----------
@@ -202,7 +202,7 @@ class MultivariateSettings:
     total_log2 : int
         Total 2-D grid budget in ``log2`` cells (``2**total_log2`` cells, split
         between the two axes by measured support). The square-law memory lever:
-        raise/lower on :meth:`MultivariateAggregate.update`; the per-axis split
+        raise/lower on :meth:`BivariateAggregate.update`; the per-axis split
         falls out of the measured marginals (see ``dev/plan-mv.md`` §5.3).
     """
 
@@ -247,7 +247,7 @@ class Settings:
     build: BuildSettings = field(default_factory=BuildSettings)
     discretization: DiscretizationSettings = field(default_factory=DiscretizationSettings)
     validation: ValidationSettings = field(default_factory=ValidationSettings)
-    multivariate: MultivariateSettings = field(default_factory=MultivariateSettings)
+    bivariate: BivariateSettings = field(default_factory=BivariateSettings)
     labels: LabelSettings = field(default_factory=LabelSettings)
     sources: dict = field(default_factory=dict, compare=False, repr=False)
 
@@ -258,7 +258,7 @@ _SECTIONS = {
     'build': BuildSettings,
     'discretization': DiscretizationSettings,
     'validation': ValidationSettings,
-    'multivariate': MultivariateSettings,
+    'bivariate': BivariateSettings,
     'labels': LabelSettings,
 }
 

@@ -1,11 +1,15 @@
-"""Multivariate (bivariate) aggregate distributions via copula + 2D FFT.
+"""Bivariate aggregate distributions via copula + 2D FFT.
 
-This module is the first-class home of the joint-aggregate machinery. It hosts:
+This module is the first-class home of the joint-aggregate machinery. It is
+strictly **two-axis** by design: for three or more correlated lines the right
+path is independent components coupled by Iman--Conover and read back as a
+sample (the "switcheroo"), not a native shared-frequency ``rfftn`` convolution.
+It hosts:
 
-* :class:`MultivariateAggregate` -- the modelled object declared in DecL with
-  the ``multivariate`` keyword. Two component ``agg`` / ``pnl`` severity
-  factories are coupled per-claim by a :class:`aggregate.copula.Copula`, then
-  accumulated by a **shared** outer frequency through a 2D FFT.
+* :class:`BivariateAggregate` -- the modelled object declared in DecL with the
+  ``bivariate`` keyword. Two component ``agg`` / ``pnl`` severity factories are
+  coupled per-claim by a :class:`aggregate.copula.Copula`, then accumulated by a
+  **shared** outer frequency through a 2D FFT.
 * :class:`BivariateDistribution` -- the lightweight joint-density container
   (marginals, mixed moments, correlation, contour). Originally introduced for
   :meth:`aggregate.distributions.Aggregate.occ_bivariate` (the joint law of
@@ -14,13 +18,9 @@ This module is the first-class home of the joint-aggregate machinery. It hosts:
 * :func:`_netceded_window_hi` / :func:`scatter_bivariate` -- the (one common bs)
   window measurement and the 2D rebucketing scatter used by ``occ_bivariate``.
 
-(The ``occ_bivariate`` facility and ``BivariateDistribution`` previously lived
-in ``aggregate/bivariate.py``; that module is now a thin back-compat re-export
-of the names here.)
-
 Nothing here is re-exported at the top-level package namespace (submodule
 access only, per the project layout convention): reach it as
-``from aggregate.multivariate import MultivariateAggregate``.
+``from aggregate.bivariate import BivariateAggregate``.
 
 Notes
 -----
@@ -67,14 +67,14 @@ from .utilities import round_bucket, balanced_window
 logger = logging.getLogger(__name__)
 
 # Coverage of the per-axis sizing window: 1 - 10**-_WINDOW_NINES per tail.
-# First-class multivariate setting (see aggregate.config [multivariate]);
+# First-class bivariate setting (see aggregate.config [bivariate]);
 # independent of the 1-D distributions.WINDOW_NINES because the 2-D per-axis
 # grid may want fewer nines for memory. Resolved once per session.
-_WINDOW_NINES = get_settings().multivariate.window_nines
+_WINDOW_NINES = get_settings().bivariate.window_nines
 # Total 2-D grid budget in log2 cells (2**_TOTAL_LOG2 cells), split between the
 # two axes by measured support; overridable via update(log2=...). Square-law
 # memory lever (see dev/plan-mv.md §5.3).
-_TOTAL_LOG2 = get_settings().multivariate.total_log2
+_TOTAL_LOG2 = get_settings().bivariate.total_log2
 # Smallest per-axis log2 the sizer will hand back (keeps a usable grid).
 _MIN_AXIS_LOG2 = 4
 
@@ -273,7 +273,7 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
                          log2_x=None, log2_y=None, total_log2=None):
     """Joint per-occurrence density of two of {gross, ceded, net} for one aggregate.
 
-    The severity builder for :class:`MultivariateAggregate`'s ``netceded`` mode
+    The severity builder for :class:`BivariateAggregate`'s ``netceded`` mode
     (and the engine behind
     :meth:`aggregate.distributions.Aggregate.occ_bivariate`). Per claim the
     cession map sends a gross loss ``X`` to a point ``(v0(X), v1(X))`` on the
@@ -306,7 +306,7 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
         Total 2-D cell budget. The common ``bs`` is coarsened until the two
         windows fit; if a caller pins ``bs``/``log2`` and they still overflow,
         the wider axis is **clipped** (a reported deficit). ``None`` uses the
-        :attr:`MultivariateSettings.total_log2` default.
+        :attr:`BivariateSettings.total_log2` default.
 
     Returns
     -------
@@ -499,12 +499,12 @@ def _affine_axis(density, axis, bs, n, reflect, shift, m_loss, sd, skew):
     return out, xs_new
 
 
-class MultivariateAggregate:
+class BivariateAggregate:
     """Joint (bivariate) aggregate of two copula-coupled component aggregates.
 
-    Declared in DecL with the ``multivariate`` keyword::
+    Declared in DecL with the ``bivariate`` keyword::
 
-        multivariate Cat 25 claims
+        bivariate Cat 25 claims
             agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
             agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
             copula gumbel 0.4
@@ -594,7 +594,7 @@ class MultivariateAggregate:
 
         if lines is None or len(lines) != 2:
             raise ValueError(
-                'multivariate (copula) requires exactly two components; '
+                'bivariate (copula) requires exactly two components; '
                 f'got {0 if lines is None else len(lines)}')
         self.copula = copula
 
@@ -695,8 +695,8 @@ class MultivariateAggregate:
             if mean_per_event > 0:
                 return el / mean_per_event
         raise ValueError(
-            'multivariate: cannot determine the shared event count; supply a '
-            'claim count (e.g. "25 claims") on the multivariate statement.')
+            'bivariate: cannot determine the shared event count; supply a '
+            'claim count (e.g. "25 claims") on the bivariate statement.')
 
     def _marginal_moments(self, i):
         """Analytic ``(mean, sd, skew)`` of component ``i``'s **loss** marginal.
@@ -888,7 +888,7 @@ class MultivariateAggregate:
                       for i in range(2))
         if clipped:
             logger.warning(
-                'multivariate %s: pinned (bs, log2) does not cover the measured '
+                'bivariate %s: pinned (bs, log2) does not cover the measured '
                 'window on an axis -- expect a tail deficit.', self.name)
         return bss, log2s, x_mins, his, clipped
 
@@ -904,7 +904,7 @@ class MultivariateAggregate:
         log2 : int or (int, int), optional
             A **scalar** is the *total* 2-D grid budget in log2 cells
             (``2**log2`` cells, split between the axes by measured support);
-            ``0`` (default) uses the :attr:`MultivariateSettings.total_log2`
+            ``0`` (default) uses the :attr:`BivariateSettings.total_log2`
             config value (20). A **2-tuple ``(log2_x, log2_y)``** pins the
             per-axis log2 directly (the budget is then their sum) -- use it to
             explore a split (e.g. ``(11, 9)`` vs ``(10, 10)``). The auto split
@@ -1126,7 +1126,7 @@ class MultivariateAggregate:
 
     def _require_density(self):
         if self.density is None:
-            raise ValueError('MultivariateAggregate not updated; call update().')
+            raise ValueError('BivariateAggregate not updated; call update().')
 
     @property
     def bivariate(self):
@@ -1316,7 +1316,7 @@ class MultivariateAggregate:
         """Fixed-layout multi-line summary string.
 
         Every row is always present, in the same order, for every
-        ``MultivariateAggregate``; a value that is not (yet) available -- e.g.
+        ``BivariateAggregate``; a value that is not (yet) available -- e.g.
         the grid block before :meth:`update` -- renders as ``n/a``. Shares the
         label/value convention (:func:`aggregate.constants.info_row`) with
         ``Aggregate`` / ``Portfolio``; the bivariate row catalogue is documented
@@ -1558,9 +1558,9 @@ class MultivariateAggregate:
     def __repr__(self):
         tag = self.mode if self.copula is None else repr(self.copula)
         if self.density is None:
-            return (f'MultivariateAggregate(name={self.name!r}, '
+            return (f'BivariateAggregate(name={self.name!r}, '
                     f'lines={self.line_names!r}, {tag}, not updated)')
-        return (f'MultivariateAggregate(name={self.name!r}, '
+        return (f'BivariateAggregate(name={self.name!r}, '
                 f'lines={self.line_names!r}, {tag}, '
                 f'shape={self.density.shape}, corr={self.corr():.4f})')
 
@@ -1576,7 +1576,7 @@ class BivariateDistribution(object):
     A lightweight container for a 2D density (e.g. the joint occurrence ceded
     ``C`` / net ``N`` returned by
     :meth:`aggregate.distributions.Aggregate.occ_bivariate`, or the joint of two
-    copula-coupled components from :class:`MultivariateAggregate`), with
+    copula-coupled components from :class:`BivariateAggregate`), with
     marginals, mixed moments, correlation, and a contour plot.
 
     Parameters

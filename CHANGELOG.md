@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.0.0a80
+
+### Rename multivariate → bivariate (MV-7) — **breaking**
+
+The final stage of the bivariate firm-up: the code is, and will remain, strictly
+two-axis, so the public surface now says so. For three or more correlated lines
+the path is independent components coupled by Iman–Conover and read back as a
+sample (the "switcheroo"), not a native shared-frequency `rfftn` convolution.
+
+- **DecL keyword** `multivariate` / `mv` → **`bivariate` / `bv`**, dropped
+  outright (no deprecation alias). The old words now raise a parse error with a
+  "Did you mean: bivariate?" suggestion.
+- **Class** `MultivariateAggregate` → **`BivariateAggregate`**;
+  `__repr__` / `info` say *bivariate*. `BivariateDistribution` keeps its name.
+- **Module** `aggregate.multivariate` → **`aggregate.bivariate`** (reach it as
+  `from aggregate.bivariate import BivariateAggregate`); internal transformer
+  kind string `mvagg` → `bvagg`; grammar rules `mv_out`/`mv_body` → `bv_out`/
+  `bv_body`.
+- **Config** section `[multivariate]` → **`[bivariate]`**; `MultivariateSettings`
+  → `BivariateSettings`; `get_settings().multivariate` → `.bivariate`.
+- Swept `decl-testers.agg` / `cookbook.agg` / `examples.agg`, the reinsurance
+  user guide, `dev/info-strings.rst`, the DecL cheat sheet, the Sublime syntax,
+  and the regenerated grammar reference. The `5_x_multivariate.rst` technical
+  guide is **unchanged** — it documents genuinely multivariate (t-dimensional)
+  *frequency* theory, not the bivariate aggregate class.
+- `BivariateDistribution` and the `occ_bivariate` engine were already named
+  bivariate; no change there.
+
+This is the last stage before the `1.0.0b1` candidate: the beta's public API
+*is* the v1.0 bivariate API.
+
 ## 1.0.0a79
 
 ### Bivariate modelling features: shuffle-of-Min copula + clash statement (MV-6)

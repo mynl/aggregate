@@ -505,14 +505,14 @@ class UnderwritingTransformer(Transformer):
         lr, _lr = c
         return {"_pnl_lr": _check_vectorizable(lr)}
 
-    # ----- multivariate (copula-coupled bivariate) ------------------
-    def answer_mv(self, c):
+    # ----- bivariate (copula-coupled) -------------------------------
+    def answer_bv(self, c):
         return c[0]
 
-    def mv_body_one(self, c):
+    def bv_body_one(self, c):
         return [c[0]]
 
-    def mv_body_cons(self, c):
+    def bv_body_cons(self, c):
         lst, item = c
         lst.append(item)
         return lst
@@ -542,7 +542,7 @@ class UnderwritingTransformer(Transformer):
 
         return Copula('independent')
 
-    def mv_out_copula(self, c):
+    def bv_out_copula(self, c):
         _mv, name, exposures, body, copula, freq, trailer = c
         spec = {
             "name": name,
@@ -553,9 +553,9 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
-        return ("mvagg", name, spec)
+        return ("bvagg", name, spec)
 
-    def mv_out_copula_nofreq(self, c):
+    def bv_out_copula_nofreq(self, c):
         _mv, name, exposures, body, copula, trailer = c
         spec = {
             "name": name,
@@ -566,20 +566,20 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
-        return ("mvagg", name, spec)
+        return ("bvagg", name, spec)
 
     @staticmethod
-    def _mv_out_viewpair(c, views):
+    def _bv_out_viewpair(c, views):
         """Shared builder for the three occurrence view-pair prefixes.
 
         ``<keyword> <agg with occurrence reinsurance>`` -> the joint
         per-occurrence aggregate of the named pair of {gross, ceded, net} as a
-        ``netceded``-mode MultivariateAggregate. ``views`` is the ``(x, y)`` axis
+        ``netceded``-mode BivariateAggregate. ``views`` is the ``(x, y)`` axis
         pair the keyword names (e.g. ``('net', 'ceded')`` for ``netceded``).
         """
         _kw, agg_tuple = c          # agg_tuple = ("agg", name, spec)
         _, name, spec = agg_tuple
-        return ("mvagg", name, {
+        return ("bvagg", name, {
             "name": name,
             "mode": "netceded",
             "nc_views": views,
@@ -588,17 +588,17 @@ class UnderwritingTransformer(Transformer):
             "hints": spec.get("hints", ""),
         })
 
-    def mv_out_netceded(self, c):
+    def bv_out_netceded(self, c):
         """``netceded <agg>`` -> joint (x=net, y=ceded) occurrence aggregate."""
-        return self._mv_out_viewpair(c, ('net', 'ceded'))
+        return self._bv_out_viewpair(c, ('net', 'ceded'))
 
-    def mv_out_grossceded(self, c):
+    def bv_out_grossceded(self, c):
         """``grossceded <agg>`` -> joint (x=gross, y=ceded) occurrence aggregate."""
-        return self._mv_out_viewpair(c, ('gross', 'ceded'))
+        return self._bv_out_viewpair(c, ('gross', 'ceded'))
 
-    def mv_out_grossnet(self, c):
+    def bv_out_grossnet(self, c):
         """``grossnet <agg>`` -> joint (x=gross, y=net) occurrence aggregate."""
-        return self._mv_out_viewpair(c, ('gross', 'net'))
+        return self._bv_out_viewpair(c, ('gross', 'net'))
 
     # ----- clash (independent-trigger shared-event model) ------------
     def clash_comp(self, c):
@@ -609,14 +609,14 @@ class UnderwritingTransformer(Transformer):
     def _clash_spec(self, name, na, nb, nc, comp_a, comp_b, freq, trailer):
         """Build the clash bivariate spec from the (na, nb, nc) counts.
 
-        The solver (:func:`aggregate.multivariate.solve_clash_model`) turns the
+        The solver (:func:`aggregate.bivariate.solve_clash_model`) turns the
         three counts into the shared event count ``n`` and the two per-event
         trigger probabilities ``pa`` / ``pb``; the two components become
         ``dfreq [0 1] [1-p p]`` Bernoulli factories wrapping the given
         limit/severity clauses, coupled by the **independent** copula on the
         shared frequency ``freq``.
         """
-        from .multivariate import solve_clash_model
+        from .bivariate import solve_clash_model
         from .copula import Copula
 
         sol = solve_clash_model(na, nb, nc)
@@ -647,7 +647,7 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
-        return ("mvagg", name, spec)
+        return ("bvagg", name, spec)
 
     def clash_out(self, c):
         """``clash NAME na nb nc claims <A> <B> <freq>`` -> clash bivariate."""

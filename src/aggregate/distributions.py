@@ -3001,7 +3001,7 @@ class Aggregate:
 
         Returns
         -------
-        MultivariateAggregate
+        BivariateAggregate
             A first-class joint object in ``netceded`` mode, with the joint
             ``density``, the two axis grids (``axis_xs``), ``marginals`` /
             ``moments`` (``E[X^i Y^j]``) / ``corr`` / ``describe`` / ``stats_df``
@@ -3035,12 +3035,12 @@ class Aggregate:
         univariate occurrence ceded / net aggregate (exact validation targets;
         see the ``Cross-check`` notes in ``dev/done/reins-bivariate.md``).
 
-        This wraps the object as a :class:`aggregate.multivariate.MultivariateAggregate`
-        in ``netceded`` mode (the engine is :func:`aggregate.multivariate.build_netceded_joint`).
+        This wraps the object as a :class:`aggregate.bivariate.BivariateAggregate`
+        in ``netceded`` mode (the engine is :func:`aggregate.bivariate.build_netceded_joint`).
         """
-        from .multivariate import MultivariateAggregate
+        from .bivariate import BivariateAggregate
 
-        mv = MultivariateAggregate(
+        mv = BivariateAggregate(
             self.name, mode='netceded', nc_agg=self, nc_views=views,
             nc_kwargs=dict(bs=bs, log2_x=log2_x, log2_y=log2_y))
         # build eagerly so preconditions (occ reins present, object updated)

@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from aggregate import build  # noqa: E402
 from aggregate.constants import DefectiveDistributionWarning  # noqa: E402
-from aggregate.multivariate import (  # noqa: E402
+from aggregate.bivariate import (  # noqa: E402
     BivariateDistribution, scatter_bivariate)
 
 
@@ -383,7 +383,7 @@ def test_moments_table_shape_and_total():
 def test_repr_and_html():
     a = _build(OCC_BOUNDED)
     b = a.occ_bivariate()
-    assert 'MultivariateAggregate' in repr(b)
+    assert 'BivariateAggregate' in repr(b)
     assert b.mode == 'netceded'
     assert '<table' in b._repr_html_()
 

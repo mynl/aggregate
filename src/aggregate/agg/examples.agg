@@ -217,7 +217,7 @@ agg G.Signed dfreq [3] dsev [-2 5] [.5 .5] note{Signed severity -- negative outc
 # Couple two perils' per-claim severities with a copula and accumulate
 # them under a shared frequency (a 2D FFT). Marginalizing one axis
 # recovers that peril's standalone aggregate.
-multivariate H.Copula 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson note{Gumbel-copula dependence between Wind and Flood.}
+bivariate H.Copula 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson note{Gumbel-copula dependence between Wind and Flood.}
 
 
 # ----------------------------------------------------------------------

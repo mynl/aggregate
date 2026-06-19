@@ -42,7 +42,7 @@ def test_defaults_no_file_no_env():
     assert s.discretization.window_nines == 12
     assert s.validation.eps == pytest.approx(1e-4)
     assert s.validation.noise == pytest.approx(1e-12)
-    assert s.multivariate.window_nines == 9
+    assert s.bivariate.window_nines == 9
     # every source is 'default'
     assert all(src == 'default' for _, _, src in config.describe_settings(s))
 

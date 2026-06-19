@@ -9,7 +9,7 @@ This module is deliberately tiny and import-free so it can sit *below*
 are types, not user settings, so they do not belong in :mod:`aggregate.config`.
 
 The reinsurance labels are *structural* MultiIndex column / axis keys
-(referenced by literal in ``multivariate`` and asserted across the reins
+(referenced by literal in ``bivariate`` and asserted across the reins
 tests), so they are constants here, not user-tunable settings.
 
 All tunable defaults (grid sizing, databases, discretization schemes,

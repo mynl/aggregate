@@ -10,8 +10,9 @@
 >
 > **Last updated: 2026-06-19** — Cleanup pass: all shipped items pruned (they
 > live in `CHANGELOG.md`); priorities table reconciled against the track sections
-> and rebuilt; under-specified items moved to a flagged tail group. Current focus:
-> **Track M** (bivariate firm-up, `dev/plan-mv.md`, MV-1…7) — beta-blocking.
+> and rebuilt; under-specified items moved to a flagged tail group. **Track M
+> (bivariate firm-up, MV-1…7) shipped a70–a80; plan in `dev/done/plan-mv.md`.**
+> Next focus: `N6` / `N8` (numerics + guards) and Track D docs toward `1.0.0b1`.
 
 ---
 
@@ -44,9 +45,9 @@ N/D: find examnple where padding has an impact
 ## Priorities & dependencies
 
 **Critical path (the spine):** the `N` spine is mostly shipped — `N2`, `N3`,
-`N5`, `N5b` landed (a36–a57). What remains: **`N6`** (validation-calc review)
-and **`N8`** (input guards). **Current active block: `M`** (bivariate firm-up)
-— beta-blocking.
+`N5`, `N5b` landed (a36–a57). **Track `M` (bivariate firm-up) shipped a70–a80.**
+What remains on the spine: **`N6`** (validation-calc review) and **`N8`** (input
+guards), plus Track D docs.
 
 | Status | ID | Item | Phase | Depends on |
 |:--|----|------|:-----:|------------|
@@ -57,7 +58,7 @@ and **`N8`** (input guards). **Current active block: `M`** (bivariate firm-up)
 |   | B4 | ZT/ZM frequency broken + add shift helpers | A | — |
 |   | W2 | Window bounds for bivariate | B | M |
 |   | W10 | Retire `recommend_bucket` | A | — (W9 shipped) |
-|   | M | **Bivariate firm-up (MV-1…7, `plan-mv.md`)** — beta-blocking | A | — |
+| X | M | **Bivariate firm-up (MV-1…7, `dev/done/plan-mv.md`)** — shipped a70–a80 | A | — |
 |   | T1 | Merge the three `.agg` libraries into one | A | — |
 |   | T2 | Rationalize tests / library coupling | A | T1 |
 |   | T3 | Switcheroo `Port.Sample` regression case | B | — |
@@ -187,23 +188,20 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ---
 
-## Track M — Multivariate → **bivariate** `[A]` (now beta-blocking)
+## Track M — Multivariate → **bivariate** ✅ DONE (`a70`–`a80`)
 
-> **Re-scoped & promoted to `[A]` (2026-06-19, `dev/plan-mv.md`).** The "firm up
-> multivariate" block is the **last major work before `1.0.0b1`** and now *blocks*
-> the beta (author: no post-beta API scope creep — land the whole bivariate
-> surface in v1.0). `dev/plan-mv.md` is the fully-staged execution plan (MV-1…7).
-> Decisions: rename `multivariate`/`mv` → `bivariate`/`bv` (dropped outright,
-> no synonyms); ≥3-variate `rfftn` **killed** (use Iman–Conover + switcheroo);
-> **`t` copula dropped** (flaky + footgun); add shuffle-of-Min + a `clash`
-> statement; sizing reframed to *measure-don't-guess* (`balanced_window` on the
-> realized marginals, `update(log2=)` budget); netceded → three occurrence
-> view-pairs (`netceded`/`grossceded`/`grossnet`).
+> **COMPLETE (2026-06-19, `dev/done/plan-mv.md`).** All seven stages landed
+> (MV-1 `a70` … MV-7 `a80`); the bivariate surface is the v1.0 API and no longer
+> blocks `1.0.0b1`. Delivered: rename `multivariate`/`mv` → `bivariate`/`bv`
+> (dropped outright); ≥3-variate `rfftn` **killed** (Iman–Conover + switcheroo);
+> **`t` copula dropped**; shuffle-of-Min copula + `clash` statement; sizing
+> reframed to *measure-don't-guess* (`balanced_window` + `update(log2=)` budget);
+> netceded → three occurrence view-pairs (`netceded`/`grossceded`/`grossnet`).
 
-- [ ] **M (the block) `[A]`** — execute `dev/plan-mv.md` stages **MV-1…MV-7**
-  (`balanced_window`+`focus` → measure-don't-guess copula sizing → netceded
-  one-bs sizing → reporting surface → netceded view-pairs → shuffle-of-Min+clash
-  → rename to bivariate). Each a version bump; all seven block `1.0.0b1`.
+- [x] **M (the block) `[A]`** — executed `dev/done/plan-mv.md` stages
+  **MV-1…MV-7** (`balanced_window`+`focus` → measure-don't-guess copula sizing →
+  netceded one-bs sizing → reporting surface → netceded view-pairs →
+  shuffle-of-Min+clash → rename to bivariate). Each a version bump; all shipped.
   Execution cadence: one stage per iteration, with a review + commit between each.
   - [x] **MV-1** `[a70]` — `balanced_window(ser, p, bs=None)` (utilities) +
     `Aggregate.focus(p)`; pure 1-D, no bv change. `tests/test_balanced_window.py`.
@@ -248,6 +246,15 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     — one `bs` must resolve severity + aggregate; flagged by the `validation`
     row, raise `update(log2=…)`. A possible later improvement: bound the 2-D axis
     `bs` by the severity scale like the 1-D `_bs_window`.)*
+  - [x] **MV-7** `[a80]` — rename multivariate → bivariate (**breaking**, no
+    alias): keyword `multivariate`/`mv` → `bivariate`/`bv`; class
+    `MultivariateAggregate` → `BivariateAggregate`; module `aggregate.multivariate`
+    → `aggregate.bivariate`; kind `mvagg` → `bvagg`; config `[multivariate]` /
+    `MultivariateSettings` → `[bivariate]` / `BivariateSettings`. Swept .agg /
+    docs / cheat sheet / Sublime / grammar ref; `test_multivariate.py` →
+    `test_bivariate.py`. The `5_x_multivariate.rst` theory page (multivariate
+    *frequency* distributions) is correctly left unchanged. **Plan complete;
+    moved to `dev/done/`. M-block done — bivariate surface is beta-ready.**
 
 ---
 
@@ -362,7 +369,7 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   numerics-1/2/3 shipped (a55–a57 → N2/N3); numerics-4 (windowed combine/
   bivariate) → W2/M-track.
 - `dev/plan-config.md` (Phase 2) → **F8**.
-- `dev/plan-mv.md` → **Track M** (bivariate firm-up, MV-1…7). Absorbs & replaces
+- `dev/done/plan-mv.md` → **Track M** (bivariate firm-up, MV-1…7). Absorbs & replaces
   the deleted `plan-multivariate-punchup.md` (former M2).
 - `dev/done/` → shipped plans (tail-thickness, config Phase 1, pentagon, database
   loading, bucket-window 1A/1P, allocation/pricing bounds, decl-unparser, …).

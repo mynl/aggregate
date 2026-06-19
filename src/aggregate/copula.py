@@ -1,4 +1,4 @@
-"""Bivariate copulas for coupling per-claim severities in multivariate aggregates.
+"""Bivariate copulas for coupling per-claim severities in bivariate aggregates.
 
 Provides :class:`Copula`, a small family of two-dimensional copulas built in the
 same registry / factory style as :class:`aggregate.spectral.Distortion`: each
@@ -9,7 +9,7 @@ matching subclass instance.
 A copula :math:`C(u, v)` is a joint CDF on the unit square with uniform
 marginals; by Sklar's theorem it is exactly the dependence structure that can be
 glued onto any pair of marginal distributions. Here the marginals are the two
-per-claim severities of a :class:`aggregate.multivariate.MultivariateAggregate`,
+per-claim severities of a :class:`aggregate.bivariate.BivariateAggregate`,
 and the copula sets how the two perils move together within a single event
 (e.g. gumbel = both large together, clayton = both small together).
 
@@ -525,7 +525,7 @@ class CopulaShuffle(Copula):
     """Shuffle-of-Min copula wrapper -- a :class:`Copula` over a :class:`ShuffleOfMin`.
 
     A **programmatic-only** copula (no DecL keyword): build it in Python and hand
-    it to a :class:`aggregate.multivariate.MultivariateAggregate` (e.g.
+    it to a :class:`aggregate.bivariate.BivariateAggregate` (e.g.
     ``mv.copula = CopulaShuffle(perm=[...]); mv.update()``). Singular by nature,
     which suits the discrete-Sklar rectangle machinery exactly -- its
     :meth:`Copula.rectangle_pmf` reproduces the two marginals like any other

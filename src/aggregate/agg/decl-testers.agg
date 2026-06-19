@@ -5,7 +5,7 @@
 # A flat, greppable corpus that exercises DecL *language* coverage rather
 # than building interesting aggregates: the feature surface the parser must
 # accept (every exposure/severity/frequency form, reinsurance, splicing,
-# signed / P&L, mv / multivariate, distortion constructors, hints, and
+# signed / P&L, bivariate (bv), distortion constructors, hints, and
 # intentional parser-error fixtures). The companion `cookbook.agg` carries
 # the insurance-useful worked examples; `examples.agg` is the small curated
 # default set.
@@ -254,9 +254,9 @@ pnl PnLsigned.Asym   10 premium - dfreq[2] dsev[-2 1 3] [.5 .3 .2]              
 pnl PnLsigned.Ssev   100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson                              note{continuous signed severity: E[loss]=50, margin 50}
 
 # ============================================================
-# MV. The multivariate keyword: copula-coupled bivariate aggregates (1.0.0a24)
+# MV. The bivariate keyword: copula-coupled aggregates (1.0.0a24)
 # ============================================================
-# multivariate NAME <shared-count> <two agg/pnl components> copula KIND P [freq]
+# bivariate NAME <shared-count> <two agg/pnl components> copula KIND P [freq]
 # couples the two components' per-claim severities by a copula and accumulates
 # them with a shared outer frequency via a 2D FFT. Each component's dfreq [0 1]
 # [p0 p1] is the per-event trigger; its aggregate is the per-event severity
@@ -265,14 +265,14 @@ pnl PnLsigned.Ssev   100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson 
 # severity and applies the premium as a per-axis affine after the FFT (the
 # loss-loss copula dependence becomes profit-loss). Copulas (aggregate.copula):
 # normal (Pearson rho), gumbel (Kendall tau), clayton (Kendall tau), fgm
-# (Spearman rho_s), independent; t is deferred. See tests/test_multivariate.py
-# and dev/plan-multivariate.md.
+# (Spearman rho_s), independent; t is deferred. See tests/test_bivariate.py
+# and dev/plan-mv.md.
 # Programs are one-per-line (DecL is whitespace-insensitive within a program).
-multivariate MV.Gumbel 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
-multivariate MV.ClaytonMixed 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula clayton 0.3 mixed gamma .2;
-multivariate MV.Normal 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula normal 0.5;
-multivariate MV.PnLAxis 25 claims agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
-multivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson;
+bivariate MV.Gumbel 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
+bivariate MV.ClaytonMixed 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula clayton 0.3 mixed gamma .2;
+bivariate MV.Normal 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula normal 0.5;
+bivariate MV.PnLAxis 25 claims agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
+bivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson;
 # netceded MODE: the joint occurrence law of one reinsured aggregate (same object
 # as Aggregate.occ_bivariate()). Body is an ordinary agg carrying occurrence
 # reinsurance. The three view-pair prefixes name the (x, y) axes x-then-y:

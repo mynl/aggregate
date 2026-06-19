@@ -8,9 +8,9 @@
 %   * grammar source of truth is aggregate/decl.lark (Lark Earley)
 %   * split into 3 pages:
 %       p1  agg + pnl  (the compound-distribution language)
-%       p2  port + multivariate (mv) + netceded
+%       p2  port + bivariate (bv) + netceded
 %       p3  distortion
-%   * new clauses: approximate, pnl, multivariate/copula, netceded;
+%   * new clauses: approximate, pnl, bivariate/copula, netceded;
 %     severity gains ssev, xps, picks
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -192,10 +192,10 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 \clearpage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PAGE 2 : port + multivariate + netceded
+% PAGE 2 : port + bivariate + netceded
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-{\huge{\bf DecL Cheat Sheet \textnormal{(2/3)}: \texttt{port}, \texttt{mv}, \texttt{netceded}}}
+{\huge{\bf DecL Cheat Sheet \textnormal{(2/3)}: \texttt{port}, \texttt{bv}, \texttt{netceded}}}
 
 \raggedright These declarations build collections and couplings of aggregates. Each component is an ordinary \texttt{agg} (or \texttt{pnl}) declaration.
 
@@ -228,18 +228,18 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 
 \columnbreak
 
-%--- Multivariate ---
+%--- Bivariate ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{mv <NAME> <SHARED-EXPOSURE>} \\
+\texttt{bivariate <NAME> <SHARED-EXPOSURE>} \\
 \hspace*{1em}\texttt{agg <A> ...} \\
 \hspace*{1em}\texttt{agg <B> ...} \\
 \hspace*{1em}\texttt{copula <KIND> <P*>} \\
 \hspace*{1em}\texttt{<FREQUENCY*>}
 
-\medskip\it Alias \texttt{multivariate}. Couples \rm exactly two\it{} component severities by a copula and accumulates them with a \rm shared\it{} outer frequency via a 2D FFT. Frequency optional (default poisson).
+\medskip\it Abbreviation \texttt{bv}. Couples \rm exactly two\it{} component severities by a copula and accumulates them with a \rm shared\it{} outer frequency via a 2D FFT. Frequency optional (default poisson).
 \end{minipage}};
-\node[fancytitle] at (box.north west) {3. Multivariate (\texttt{mv})};
+\node[fancytitle] at (box.north west) {3. Bivariate (\texttt{bv})};
 \end{tikzpicture}
 
 %--- Copula clause ---
@@ -251,7 +251,7 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 
 \medskip\texttt{KIND = normal|gumbel|clayton|fgm|independent}
 
-\medskip\rm\texttt{mv M 100 claims agg A ... agg B ... copula gumbel 0.4}
+\medskip\rm\texttt{bivariate M 100 claims agg A ... agg B ... copula gumbel 0.4}
 \end{minipage}};
 \node[fancytitle] at (box.north west) {4. Copula clause};
 \end{tikzpicture}

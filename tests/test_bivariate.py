@@ -1,15 +1,17 @@
-"""Tests for copula-coupled multivariate aggregates (1.0.0a24).
+"""Tests for copula-coupled bivariate aggregates.
 
-Covers ``dev/plan-multivariate.md`` Stage 1:
+Covers the bivariate firm-up (``dev/plan-mv.md``, stages MV-1..7):
 
 - :class:`aggregate.copula.Copula` -- the registry/factory copula hierarchy
-  (independent / normal / gumbel / clayton / fgm): CDF boundary conditions,
-  monotonicity, natural-parameter -> Kendall tau identities, the discrete-Sklar
-  ``rectangle_pmf`` (marginals exact, independence factorises).
-- :class:`aggregate.multivariate.MultivariateAggregate` -- the ``multivariate``
-  DecL statement: marginals reproduce the standalone outer compound, dependence
+  (independent / normal / gumbel / clayton / fgm / shuffle): CDF boundary
+  conditions, monotonicity, natural-parameter -> Kendall tau identities, the
+  discrete-Sklar ``rectangle_pmf`` (marginals exact, independence factorises).
+- :class:`aggregate.bivariate.BivariateAggregate` -- the ``bivariate`` DecL
+  statement: marginals reproduce the standalone outer compound, dependence
   ordering (corr increases with the copula parameter, mixed adds common shock),
-  and the ``pnl`` axis (signed marginal + sign-flipped correlation).
+  the ``pnl`` axis (signed marginal + sign-flipped correlation), the measured
+  axis sizing + reporting surface, the shuffle-of-Min copula, and the ``clash``
+  statement.
 
 The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` under the
 ``MV`` section.
@@ -123,11 +125,11 @@ def test_rectangle_pmf_independence_factorises():
 
 
 # ----------------------------------------------------------------------
-# MultivariateAggregate
+# BivariateAggregate
 # ----------------------------------------------------------------------
 
 def _mv(copula='gumbel 0.4', freq='poisson'):
-    prog = f'''multivariate MV 25 claims
+    prog = f'''bivariate MV 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
         agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
         copula {copula}
@@ -136,9 +138,9 @@ def _mv(copula='gumbel 0.4', freq='poisson'):
 
 
 def test_mv_builds_and_mass_conserved():
-    from aggregate.multivariate import MultivariateAggregate
+    from aggregate.bivariate import BivariateAggregate
     mv = _mv()
-    assert isinstance(mv, MultivariateAggregate)
+    assert isinstance(mv, BivariateAggregate)
     assert np.isclose(mv.density.sum(), 1.0, atol=1e-6)
     assert mv.density.shape[0] >= 256 and mv.density.shape[1] >= 256
 
@@ -195,7 +197,7 @@ def test_mv_clayton_lower_tail_less_agg_corr_than_gumbel():
 
 
 def test_mv_pnl_axis_signed_marginal_and_sign_flip():
-    prog = '''multivariate PL 25 claims
+    prog = '''bivariate PL 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
         pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
         copula gumbel 0.4
@@ -212,7 +214,7 @@ def test_mv_pnl_axis_signed_marginal_and_sign_flip():
 
 
 def test_mv_pnl_marginal_matches_standalone_pnl():
-    prog = '''multivariate PL 25 claims
+    prog = '''bivariate PL 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
         pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
         copula gumbel 0.4
@@ -334,7 +336,7 @@ def test_mv_help_runs(capsys):
 
 def test_mv_no_copula_defaults_independent():
     # copula clause omitted -> independence copula
-    prog = '''multivariate MV 25 claims
+    prog = '''bivariate MV 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
         agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
         poisson'''
@@ -346,7 +348,7 @@ def test_mv_no_copula_defaults_independent():
 
 def test_mv_copula_independent_no_param():
     # 'copula independent' with no parameter must parse
-    prog = '''multivariate MV 25 claims
+    prog = '''bivariate MV 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
         agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
         copula independent'''
@@ -363,9 +365,9 @@ NC_PROG = ('agg NC 8 claims sev 300 * beta 2 3 '
 
 
 def test_netceded_via_decl():
-    from aggregate.multivariate import MultivariateAggregate
+    from aggregate.bivariate import BivariateAggregate
     mv = build(f'netceded {NC_PROG}')
-    assert isinstance(mv, MultivariateAggregate)
+    assert isinstance(mv, BivariateAggregate)
     assert mv.mode == 'netceded'
     assert mv.line_names == ['Net', 'Ceded']    # x=net, y=ceded convention
     nd, cd = mv.marginals()
@@ -381,9 +383,9 @@ def test_netceded_via_decl():
 ])
 def test_view_pair_decl_builds_and_labels(kw, views):
     """Each view-pair prefix parses, builds, and labels its axes x-then-y."""
-    from aggregate.multivariate import MultivariateAggregate
+    from aggregate.bivariate import BivariateAggregate
     mv = build(f'{kw} {NC_PROG}')
-    assert isinstance(mv, MultivariateAggregate)
+    assert isinstance(mv, BivariateAggregate)
     assert mv.mode == 'netceded'
     assert mv.line_names == list(views)
     m0, m1 = mv.marginals()
@@ -412,7 +414,7 @@ def test_view_pair_decl_roundtrips_through_unparser(kw):
 
     uw = Underwriter()
     kind, name, spec = uw.parser.parse(f'{kw} {NC_PROG}')
-    assert kind == 'mvagg'
+    assert kind == 'bvagg'
     assert tuple(spec['nc_views']) == {
         'netceded': ('net', 'ceded'),
         'grossceded': ('gross', 'ceded'),
@@ -429,7 +431,7 @@ def test_netceded_via_occ_bivariate_matches_decl():
     a = build(NC_PROG, bs=1, log2=16)
     mv_method = a.occ_bivariate()
     mv_decl = build(f'netceded {NC_PROG}')
-    # both are netceded MultivariateAggregates; corr in the same ballpark
+    # both are netceded BivariateAggregates; corr in the same ballpark
     assert mv_method.mode == mv_decl.mode == 'netceded'
     assert mv_method.corr() == pytest.approx(mv_decl.corr(), abs=0.02)
 
@@ -473,7 +475,7 @@ def test_netceded_reporting_and_plot():
 # The motivating bug (author, 2026-06-18): a signed ``ssev`` book whose grid was
 # sized for the single-event severity, not the 200-event marginal, so axis B's
 # negative tail wrapped -- a 54% deficit. See dev/plan-mv.md §0, §5.
-BUG_PROG = '''mv DISCRETE.2
+BUG_PROG = '''bivariate DISCRETE.2
     200 claims
     agg A dfreq[1] ssev uniform - .3
     agg B dfreq[1] ssev uniform - .5
@@ -551,7 +553,7 @@ def test_mv_bs_override_applies_to_both_axes():
 # A non-negative book whose mass lives far from 0 (low CV): 500-claim compound
 # of 10*uniform (mean 2500, sd ~129) and 20*uniform (mean 5000, sd ~258). The
 # window must NOT be pinned to a 0-based grid -- it must focus on the mass.
-FAR_FROM_ZERO_PROG = '''mv MV 500 claims
+FAR_FROM_ZERO_PROG = '''bivariate MV 500 claims
     agg AL 1 claim  sev 10 * uniform fixed
     agg GL 1 claim  sev 20 * uniform fixed
     poisson'''
@@ -639,18 +641,18 @@ def test_mv_far_from_zero_resolution_beats_zero_based():
 
 
 def test_mv_wrong_component_count_raises():
-    prog = '''multivariate Bad 25 claims
+    prog = '''bivariate Bad 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
         copula gumbel 0.4
         poisson'''
-    # one component -> mv_body has a single child, MultivariateAggregate rejects
+    # one component -> bv_body has a single child, BivariateAggregate rejects
     with pytest.raises(Exception):
         build(prog)
 
 
 def test_mv_default_freq_is_poisson():
     # the trailing freq line is optional (defaults to poisson)
-    prog = '''multivariate MV 25 claims
+    prog = '''bivariate MV 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
         agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
         copula gumbel 0.4'''
@@ -711,7 +713,7 @@ def test_shuffle_perm_validation():
 
 def test_shuffle_plugs_into_bivariate_and_reproduces():
     """A shuffle copula swapped onto a built bivariate reproduces the marginals."""
-    mv = build('''multivariate Shuf 25 claims
+    mv = build('''bivariate Shuf 25 claims
         agg A dfreq [0 1] [.4 .6] sev lognorm 40 cv 1.2
         agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
         poisson''')
@@ -728,7 +730,7 @@ def test_shuffle_plugs_into_bivariate_and_reproduces():
 # MV-6b: clash statement (independent-trigger shared-event model, App. B)
 # ----------------------------------------------------------------------
 
-from aggregate.multivariate import solve_clash_model  # noqa: E402
+from aggregate.bivariate import solve_clash_model  # noqa: E402
 
 CLASH_PROG = ('clash Cat 8 5 2 claims sev lognorm 50 cv 1.2 '
               'sev lognorm 60 cv 1.5 poisson')
@@ -752,9 +754,9 @@ def test_solve_clash_model_guards():
 
 def test_clash_builds_and_derives_shared_count():
     """The clash statement builds a bivariate with the derived shared count n."""
-    from aggregate.multivariate import MultivariateAggregate
+    from aggregate.bivariate import BivariateAggregate
     mv = build(CLASH_PROG)
-    assert isinstance(mv, MultivariateAggregate)
+    assert isinstance(mv, BivariateAggregate)
     assert mv.mode == 'copula'
     assert mv.line_names == ['Cat.A', 'Cat.B']
     sol = solve_clash_model(8, 5, 2)
@@ -787,7 +789,7 @@ def test_clash_roundtrips_through_unparser():
     prog = ('clash Cat 8 5 2 claims 500 xs 0 sev lognorm 50 cv 1.2 '
             'sev lognorm 60 cv 1.5 mixed gamma 0.3')
     kind, name, spec = uw.parser.parse(prog)
-    assert kind == 'mvagg' and 'clash' in spec
+    assert kind == 'bvagg' and 'clash' in spec
     text = spec_to_decl(spec, kind, name)
     assert text.startswith('clash Cat 8 5 2 claims ')
     kind2, name2, spec2 = uw.parser.parse(text)

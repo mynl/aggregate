@@ -199,7 +199,7 @@ claim.
                      'occurrence ceded to inf xs 100 '
                      'poisson')
     qd(kpw_9_31)
-    qd(kpw_9_31.reins_describe)
+    qd(kpw_9_31.reins_summary_df)
 
 Could also compute impact of aggregate reinsurance structures.
 

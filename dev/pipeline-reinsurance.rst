@@ -55,8 +55,8 @@ Object                        Shape      One-line role
 ============================  =========  ====================================================
 ``reins_density_df``          DataFrame  all gcn densities, severity **and** aggregate, on the grid
 ``reins_stats_df``            DataFrame  **per-layer** layering view (Gross / layer.k / Ceded / Net)
-``reins_describe``            DataFrame  per-stage **economic view** — the daily driver
-``_reins_view_stats``         DataFrame  *(private)* per-stage/view/basis EX-vs-Est moments → feeds ``reins_describe``
+``reins_summary_df``            DataFrame  per-stage **economic view** — the daily driver
+``_reins_view_stats``         DataFrame  *(private)* per-stage/view/basis EX-vs-Est moments → feeds ``reins_summary_df``
 ``reinsurance_kinds()``       str        "None / Occurrence only / Aggregate only / both"
 ``reinsurance_description()`` str        human sentence ("Net of 88% share of 4,000 xs 1,000…")
 ``reinsurance_occ_plot()``    figure     occ log-density + aggregate quantile plot
@@ -74,7 +74,7 @@ Vocabulary used throughout:
 * **gcn** — the gross / ceded / net triple. **fsa** — freq / sev / agg.
 * **conditional vs unconditional** — only the per-layer ``layer.k`` columns of
   ``reins_stats_df`` are *conditional* on a loss reaching the layer. Every
-  total (``Gross`` / ``Ceded`` / ``Net``) and the whole of ``reins_describe``
+  total (``Gross`` / ``Ceded`` / ``Net``) and the whole of ``reins_summary_df``
   is **unconditional**. The gross/subject/net/ceded/output words are centralised
   as ``REINS_LABEL_*`` constants in ``constants.py``.
 
@@ -192,7 +192,7 @@ densities-of-record (rebucketed) frame the other objects are computed from.
 The per-stage/view/**basis** moment frame, shaped like ``stats_df`` but indexed
 by stage/view/basis instead of components. Lazily built, cached in
 ``_reins_view_stats_cache``, invalidated by the ``reins_bucket`` setter and on
-``update``. Its **only** consumer is ``reins_describe``.
+``update``. Its **only** consumer is ``reins_summary_df``.
 
 ::
 
@@ -274,7 +274,7 @@ dynamic). This object supersedes the removed ``reinsurance_audit_df`` /
 rebuilt against ``a.reins_stats_df['occ']`` directly.
 
 
-4. ``reins_describe`` (≈ 2461) — the per-stage economic view
+4. ``reins_summary_df`` (≈ 2461) — the per-stage economic view
 ============================================================
 
 The daily driver. One block per applicable stage, sharing the **same eight
@@ -316,7 +316,7 @@ Portfolio level — end-to-end gcn (all new)
 Per-stage detail is only meaningful per unit (units may carry different
 programs), so the **Portfolio objects are end-to-end** (final gross / ceded /
 net of the *portfolio* aggregate); the per-stage breakdown stays in each unit's
-``reins_describe``. All three gate on "any unit cedes" (reuse
+``reins_summary_df``. All three gate on "any unit cedes" (reuse
 ``_reins_after_label``) and return ``None`` for a gross-only portfolio.
 
 * **``Portfolio.reins_density_df``** — portfolio gross/ceded/net *aggregate*
@@ -329,8 +329,8 @@ net of the *portfolio* aggregate); the per-stage breakdown stays in each unit's
   rows ``(view, measure)`` with ``view ∈ gross|ceded|net``. End-to-end gcn (no
   per-stage / per-layer split at the portfolio level). Total means equal the sum
   of unit end-to-end means per view (means add under convolution).
-* **``Portfolio.reins_describe``** — the ``Portfolio.describe`` assembly:
-  ``pd.concat([u.reins_describe for u in self] + [total], keys=names+['total'],
+* **``Portfolio.reins_summary_df``** — the ``Portfolio.describe`` assembly:
+  ``pd.concat([u.reins_summary_df for u in self] + [total], keys=names+['total'],
   names=['unit', …])``. Units without reinsurance are omitted from their own
   blocks. The ``total`` block follows the same economic view: ``EX/CV/Sk`` = the
   gross end-to-end moment held constant, ``Est`` = per-view output, ``Change`` =
@@ -370,7 +370,7 @@ Text and plot helpers (unchanged)
 * :meth:`reinsurance_description` — walks ``occ_reins`` / ``agg_reins`` building
   a human sentence ("Net of 88% share of 4,000 xs 1,000 per occurrence then net
   of 100% share of 2,000 xs 3,000 in the aggregate."). The ``net of`` / ``ceded
-  to`` wording is the requested view; ``reins_stats_df`` / ``reins_describe``
+  to`` wording is the requested view; ``reins_stats_df`` / ``reins_summary_df``
   label the agg subject consistently with this (and the ``output`` flag).
 * :meth:`reinsurance_occ_plot` — occ log-density plus an aggregate quantile plot,
   reading the ``p_*`` columns of ``reins_density_df`` (cumsumming inline for the
@@ -384,10 +384,10 @@ Notes to remember
 * **The mass-split identity is on moments, not buckets.** "Ceded + Net mean ==
   Gross/Subject mean" is the *first-moment* identity ``'linear'`` rebucketing
   preserves exactly (``'nearest'`` only to ``bs/2``) — *not* a per-bucket
-  ``p_net + p_ceded == p_subject``. It surfaces as ``reins_describe``'s
+  ``p_net + p_ceded == p_subject``. It surfaces as ``reins_summary_df``'s
   ``Change`` on the leading row.
 * **Conditional basis is confined to ``reins_stats_df``'s ``layer.k`` columns.**
-  Every total and the whole of ``reins_describe`` is unconditional. Layer freq is
+  Every total and the whole of ``reins_summary_df`` is unconditional. Layer freq is
   ``n·P(>attach)`` and layer sev is divided by the same probability, so the
   layer aggregate mean is unchanged and layer means sum to ``Ceded``.
 * **``pr_attach`` / ``pr_detach`` are ground-up.** They come from the underlying

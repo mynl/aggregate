@@ -900,6 +900,7 @@ class Distortion:
                                  np.ones_like(p),
                                  np.minimum(s / (1 - p), 1)))
 
+    @cached_property
     def tvar_info_df(self):
         """
         Return a DataFrame describing the affine pieces of a weighted-TVaR
@@ -1005,7 +1006,7 @@ class Distortion:
     def _invalidate_cache(self):
         """Drop cached quartet values; called by ``_build``."""
         for k in ('info', 'summary_df', 'stats_df', 'density_df',
-                  '_grid_moments'):
+                  'tvar_info_df', '_grid_moments'):
             self.__dict__.pop(k, None)
 
     # --- subclass hooks (defaults return empty / no overrides) -----------
@@ -2740,6 +2741,7 @@ class WtdTVaRDistortion(Distortion):
         return (self._name, tuple(self._ps), tuple(self._wts),
                 self.display_name)
 
+    @cached_property
     def tvar_info_df(self):
         p = np.array(self._ps)
         wts = np.array(self._wts)
@@ -2817,7 +2819,7 @@ class WtdTVaRDistortion(Distortion):
                     marker='o', marker_size=4):
         ax = self.plot(both=False)
         ps = np.linspace(0, 1, n_pts)
-        df = self.tvar_info_df()
+        df = self.tvar_info_df
         n_lines = len(df)
         cmap = colormaps.get_cmap(cmap_name)
         colors = [cmap(i / max(1, n_lines - 1)) for i in range(n_lines)]

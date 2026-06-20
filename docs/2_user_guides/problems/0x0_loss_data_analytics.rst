@@ -489,7 +489,7 @@ The number of projects and the number of overtime hours are independent. You wil
 Example 5.3.7 uses a recursive calculation in steps of 5. We can replicate that
 using an aggregate excess cover. The cumulative excess (overtime) at attachment
 ``A`` is the ceded mean of an ``aggregate ceded to inf xs A`` cover, read from
-:meth:`reins_describe` (the ``('agg', 'Ceded', 'Agg')`` row).
+:meth:`reins_summary_df` (the ``('agg', 'Ceded', 'Agg')`` row).
 
 .. ipython:: python
     :okwarning:
@@ -500,14 +500,14 @@ using an aggregate excess cover. The cumulative excess (overtime) at attachment
         aA = build('agg Projects.1 2 claims '
                    'dsev [5 10 20] [.2 .3 .5] geometric '
                    f'aggregate ceded to inf xs {A}')
-        rows.append([A, aA.reins_describe.loc[('agg', 'Ceded', 'Agg'), 'Est']])
+        rows.append([A, aA.reins_summary_df.loc[('agg', 'Ceded', 'Agg'), 'Est']])
     b = pd.DataFrame(rows, columns=['attach', 'cumul ex']).set_index('attach')
     qd(b, accuracy=4)
 
 .. note::
 
    This example previously used the per-layer ``reinsurance_audit_df``, removed
-   in 1.0.0a19 in favour of the whole-structure ``reins_describe`` /
+   in 1.0.0a19 in favour of the whole-structure ``reins_summary_df`` /
    ``reins_stats_df`` / ``reins_density_df`` objects. The excess at each
    attachment is recovered above by building one ``ceded to inf xs A`` cover
    per attachment and reading its ceded aggregate mean.

@@ -61,11 +61,11 @@ severity limited expected values in ``make_table`` below.
 
    This step previously displayed the per-layer ``reinsurance_occ_layer_df``
    dataframe, removed in 1.0.0a19 in favour of the whole-structure
-   ``reins_describe`` / ``reins_stats_df`` / ``reins_density_df`` objects. The
+   ``reins_summary_df`` / ``reins_stats_df`` / ``reins_density_df`` objects. The
    per-layer layer-loss-cost exhibit is produced from the severity LEV
    differences in ``make_table`` (next cell), which does not need the removed
    object; for a per-layer split via the new API, build each tower layer as its
-   own occurrence cover and read its ``reins_describe``.
+   own occurrence cover and read its ``reins_summary_df``.
 
 ZE provided function to make the exhibit table. The column ``pct`` shows the relative loading.
 

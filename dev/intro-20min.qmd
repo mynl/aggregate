@@ -255,7 +255,7 @@ qd(re.describe)   # economic view: gross vs net, cession impact per moment
 The dedicated reporting goes deeper — per-stage and per-layer:
 
 ```{python}
-qd(re.reins_describe)
+qd(re.reins_summary_df)
 ```
 
 An aggregate stop loss is the same idea at the year level:

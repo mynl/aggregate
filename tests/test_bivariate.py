@@ -149,7 +149,7 @@ def test_mv_marginals_reproduce_standalone_outer_compound():
     # Poisson outer: peril i marginal is the thinned standalone aggregate; at
     # the (coarse) matched grid the means agree to a few percent.
     mv = _mv()
-    m0, m1 = mv.marginals()
+    m0, m1 = mv.marginals
     assert np.isclose(m0.sum(), 1.0, atol=1e-6)
     assert np.isclose(m1.sum(), 1.0, atol=1e-6)
     mean0 = float((m0 * mv.axis_xs[0]).sum())
@@ -163,7 +163,7 @@ def test_mv_marginal_exact_at_matched_grid():
     # The joint marginal equals the 1D outer compound of the SAME discretised
     # per-event severity g_i (Fourier identity); compare to the inner agg.
     mv = _mv()
-    m1 = mv.marginals()[1]
+    m1 = mv.marginals[1]
     joint_mean = float((m1 * mv.axis_xs[1]).sum())
     inner = build('agg Bev dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5',
                   bs=mv.bs[1], log2=int(np.log2(len(mv.axis_xs[1]))))
@@ -171,29 +171,29 @@ def test_mv_marginal_exact_at_matched_grid():
 
 
 def test_mv_dependence_ordering():
-    c0 = _mv('gumbel 0.2').corr()
-    c1 = _mv('gumbel 0.4').corr()
-    c2 = _mv('gumbel 0.7').corr()
+    c0 = _mv('gumbel 0.2').corr
+    c1 = _mv('gumbel 0.4').corr
+    c2 = _mv('gumbel 0.7').corr
     assert c0 < c1 < c2
 
 
 def test_mv_independence_baseline_from_shared_count():
     # Independence copula does NOT make the aggregates independent: the shared
     # frequency drives both perils, so the output corr is a positive baseline.
-    rho = _mv('fgm 0').corr()
+    rho = _mv('fgm 0').corr
     assert 0.0 < rho < 0.4
 
 
 def test_mv_mixed_adds_common_shock():
-    poi = _mv('gumbel 0.4', 'poisson').corr()
-    mix = _mv('gumbel 0.4', 'mixed gamma .5').corr()
+    poi = _mv('gumbel 0.4', 'poisson').corr
+    mix = _mv('gumbel 0.4', 'mixed gamma .5').corr
     assert mix > poi
 
 
 def test_mv_clayton_lower_tail_less_agg_corr_than_gumbel():
     # Same Kendall tau, but Clayton's lower-tail dependence yields lower
     # aggregate correlation than Gumbel's upper-tail dependence.
-    assert _mv('clayton 0.4').corr() < _mv('gumbel 0.4').corr()
+    assert _mv('clayton 0.4').corr < _mv('gumbel 0.4').corr
 
 
 def test_mv_pnl_axis_signed_marginal_and_sign_flip():
@@ -203,14 +203,14 @@ def test_mv_pnl_axis_signed_marginal_and_sign_flip():
         copula gumbel 0.4
         poisson'''
     mv = build(prog)
-    m0, m1 = mv.marginals()
+    m0, m1 = mv.marginals
     assert np.isclose(mv.density.sum(), 1.0, atol=1e-6)
     # B is premium - loss: mean ~ 900 - 750 = 150, two-sided window
     mean_b = float((m1 * mv.axis_xs[1]).sum())
     assert abs(mean_b - 150) / 150 < 0.08
     assert mv.axis_xs[1][0] < 0  # signed window
     # loss-loss positive copula dependence -> negative loss-A vs profit-B corr
-    assert mv.corr() < -0.3
+    assert mv.corr < -0.3
 
 
 def test_mv_pnl_marginal_matches_standalone_pnl():
@@ -220,7 +220,7 @@ def test_mv_pnl_marginal_matches_standalone_pnl():
         copula gumbel 0.4
         poisson'''
     mv = build(prog)
-    mean_b = float((mv.marginals()[1] * mv.axis_xs[1]).sum())
+    mean_b = float((mv.marginals[1] * mv.axis_xs[1]).sum())
     # standalone pnl (Poisson thinning 25*.5 = 12.5 claims), premium 900.
     # est_m carries the P&L (premium - loss) mean; agg_m stays in loss terms.
     std = build('pnl Bstd 900 prem - 12.5 claims sev lognorm 60 cv 1.5 poisson')
@@ -230,11 +230,21 @@ def test_mv_pnl_marginal_matches_standalone_pnl():
 def test_mv_reporting_smoke():
     mv = _mv()
     assert 'bivariate object name' in mv.info
-    df = mv.summary_df                      # property
-    assert {'A', 'B', 'joint'}.issubset(set(df.index))
-    assert np.isclose(float(df.loc['joint', 'corr']), mv.corr())
-    sd = mv.stats_df                      # property
-    assert 'joint' in sd.columns
+    df = mv.summary_df                      # property: Portfolio-shape validation
+    assert ('shared', 'Freq') in df.index
+    assert {('A', 'Agg'), ('B', 'Agg'),
+            ('total', 'Agg')}.issubset(set(df.index))
+    assert set(df.columns) == {'EX', 'Est EX', 'Err EX', 'CV', 'Est CV',
+                               'Err CV', 'Sk', 'Est Sk'}
+    # total agg theory mean is the additive E[X] + E[Y]
+    assert np.isclose(float(df.loc[('total', 'Agg'), 'EX']),
+                      float(df.loc[('A', 'Agg'), 'EX'])
+                      + float(df.loc[('B', 'Agg'), 'EX']))
+    dep = mv.dependency_df                # property: dependence structure
+    assert list(dep.index) == ['Sev', 'Agg']
+    assert np.isclose(float(dep.loc['Agg', 'corr']), mv.corr)
+    sd = mv.stats_df                      # property: marginal moments only
+    assert set(sd.columns) == {'A', 'B'}   # joint block moved to dependency_df
     dd = mv.density_df                    # property: wrapper around density
     assert dd.shape == mv.density.shape
     assert np.isclose(dd.to_numpy().sum(), 1.0, atol=1e-6)
@@ -242,7 +252,7 @@ def test_mv_reporting_smoke():
 
 
 # ----------------------------------------------------------------------
-# MV-4: the reporting surface (info catalogue, explain, bs_window_df, tail_df)
+# MV-4: the reporting surface (info catalogue, summary_df, bs_window_df, tail_df)
 # ----------------------------------------------------------------------
 
 def test_mv_info_row_catalogue_ordered():
@@ -275,8 +285,8 @@ def test_mv_info_netceded_catalogue():
     assert d['copula tau'] == 'n/a'
 
 
-def test_mv_explain_marginal_reproduces_standalone():
-    """``explain`` reports per-axis marginal moments; a clean book validates.
+def test_mv_marginal_reproduces_standalone():
+    """The Agg rows of ``summary_df`` validate each marginal vs its standalone.
 
     The mean error here is vs the *analytic* standalone, so it carries the
     coarse-grid discretization (a few %); the invariant (marginal reproduces the
@@ -284,9 +294,9 @@ def test_mv_explain_marginal_reproduces_standalone():
     one-line validation passes.
     """
     mv = _mv('gumbel 0.4', 'mixed gamma .5')
-    ex = mv.explain
-    assert set(ex.index) == {'A', 'B'}
-    assert (ex['mean_error'] < 0.10).all()   # within discretization at default budget
+    df = mv.summary_df
+    for name in ('A', 'B'):
+        assert abs(float(df.loc[(name, 'Agg'), 'Err EX'])) < 0.10
     assert mv.deficit < 1e-6
     assert mv._explain_oneline() == 'not unreasonable'
 
@@ -343,7 +353,7 @@ def test_mv_no_copula_defaults_independent():
     mv = build(prog)
     assert mv.copula.kind == 'independent'
     # baseline positive corr from the shared count only
-    assert 0.0 < mv.corr() < 0.4
+    assert 0.0 < mv.corr < 0.4
 
 
 def test_mv_copula_independent_no_param():
@@ -370,10 +380,10 @@ def test_netceded_via_decl():
     assert isinstance(mv, BivariateAggregate)
     assert mv.mode == 'netceded'
     assert mv.unit_names == ['Net', 'Ceded']    # x=net, y=ceded convention
-    nd, cd = mv.marginals()
+    nd, cd = mv.marginals
     assert np.isclose(nd.sum(), 1.0, atol=1e-6)
     assert np.isclose(cd.sum(), 1.0, atol=1e-6)
-    assert mv.corr() > 0
+    assert mv.corr > 0
 
 
 @pytest.mark.parametrize('kw,views', [
@@ -388,7 +398,7 @@ def test_view_pair_decl_builds_and_labels(kw, views):
     assert isinstance(mv, BivariateAggregate)
     assert mv.mode == 'netceded'
     assert mv.unit_names == list(views)
-    m0, m1 = mv.marginals()
+    m0, m1 = mv.marginals
     assert np.isclose(m0.sum(), 1.0, atol=1e-6)
     assert np.isclose(m1.sum(), 1.0, atol=1e-6)
     assert mv.deficit < 1e-6
@@ -403,7 +413,7 @@ def test_view_pair_decl_matches_occ_bivariate(kw, views):
     """The DecL prefix and occ_bivariate(views=...) agree on the joint corr."""
     decl = build(f'{kw} {NC_PROG}')
     method = build(NC_PROG, bs=1, log2=16).occ_bivariate(views=views)
-    assert method.corr() == pytest.approx(decl.corr(), abs=0.02)
+    assert method.corr == pytest.approx(decl.corr, abs=0.02)
 
 
 @pytest.mark.parametrize('kw', ['netceded', 'grossceded', 'grossnet'])
@@ -433,14 +443,14 @@ def test_netceded_via_occ_bivariate_matches_decl():
     mv_decl = build(f'netceded {NC_PROG}')
     # both are netceded BivariateAggregates; corr in the same ballpark
     assert mv_method.mode == mv_decl.mode == 'netceded'
-    assert mv_method.corr() == pytest.approx(mv_decl.corr(), abs=0.02)
+    assert mv_method.corr == pytest.approx(mv_decl.corr, abs=0.02)
 
 
 def test_netceded_additivity_mean():
     # E[Ceded] + E[Net] == E[gross aggregate]
     a = build(NC_PROG, bs=1, log2=16)
     mv = a.occ_bivariate()
-    cd, nd = mv.marginals()
+    cd, nd = mv.marginals
     e_c = float((cd * mv.axis_xs[0]).sum())
     e_n = float((nd * mv.axis_xs[1]).sum())
     gross = a.reins_stats_df.loc[('agg', 'mean'), ('occ', 'Gross')]
@@ -459,9 +469,10 @@ def test_netceded_reporting_and_plot():
     import matplotlib.pyplot as plt
     mv = build(f'netceded {NC_PROG}')
     df = mv.summary_df
-    assert {'Ceded', 'Net', 'joint'}.issubset(set(df.index))
-    assert df.loc['Ceded', 'kind'] == 'netceded'
-    assert np.isnan(df.loc['joint', 'copula_tau'])   # no copula in netceded
+    assert {('Ceded', 'Agg'), ('Net', 'Agg'),
+            ('total', 'Agg')}.issubset(set(df.index))
+    dep = mv.dependency_df
+    assert np.isnan(dep.loc['Sev', 'tau'])           # no copula in netceded
     assert 'netceded' in mv.info
     mv.plot()
     assert mv.figure.axes[0].get_title() == 'severity'
@@ -486,7 +497,7 @@ def test_mv_signed_bug_book_deficit_clean():
     """The 54%-deficit signed book is now clean (DoD): deficit < 1e-6."""
     mv = build(BUG_PROG)
     assert mv.deficit < 1e-6, f'deficit {mv.deficit} not clean'
-    m0, m1 = mv.marginals()
+    m0, m1 = mv.marginals
     assert m0.sum() == pytest.approx(1.0, abs=1e-6)
     assert m1.sum() == pytest.approx(1.0, abs=1e-6)
 
@@ -500,7 +511,7 @@ def test_mv_signed_axis_window_straddles_zero():
     mv = build(BUG_PROG)
     xb = mv.axis_xs[1]
     assert xb[0] < 0 < xb[-1], f'axis B window [{xb[0]}, {xb[-1]}] does not straddle 0'
-    m1 = mv.marginals()[1]
+    m1 = mv.marginals[1]
     below = float(m1[xb < 0].sum())
     assert below > 0.4, f'expected ~half the mass below 0, got {below}'
 
@@ -508,7 +519,7 @@ def test_mv_signed_axis_window_straddles_zero():
 def test_mv_signed_marginal_means_match_standalone():
     """Each marginal mean reproduces its standalone aggregate (means exact)."""
     mv = build(BUG_PROG)
-    m0, m1 = mv.marginals()
+    m0, m1 = mv.marginals
     for i, m in enumerate((m0, m1)):
         emp = float((m * mv.axis_xs[i]).sum())
         theory = mv._marg_theory[i][0]
@@ -524,7 +535,7 @@ def test_mv_signed_marginal_sd_converges_with_budget():
     sd_theory = mv20._marg_theory[1][1]
 
     def sd(mv):
-        m, x = mv.marginals()[1], mv.axis_xs[1]
+        m, x = mv.marginals[1], mv.axis_xs[1]
         mean = (m * x).sum()
         return float(np.sqrt((m * x * x).sum() - mean ** 2))
 
@@ -570,7 +581,7 @@ def test_mv_far_from_zero_window_not_pinned_to_origin():
         # the window brackets the mean
         assert x[0] < mean < x[-1]
         # marginal mean reproduces the standalone
-        m = mv.marginals()[i]
+        m = mv.marginals[i]
         assert float((m * x).sum()) == pytest.approx(mean, rel=1e-3)
 
 
@@ -590,7 +601,7 @@ def test_mv_symmetric_axis_window_centered():
     span = x[-1] - x[0]
     assert abs(center) < 0.1 * span, f'axis B grid not centred: [{x[0]}, {x[-1]}]'
     # mass is symmetric about 0 and well inside the grid
-    m = mv.marginals()[1]
+    m = mv.marginals[1]
     mean = float((m * x).sum())
     assert abs(mean) < 1e-3
     assert mv.deficit < 1e-6
@@ -619,7 +630,7 @@ def test_mv_split_changes_marginal_resolution():
 
     def sd_err(split):
         mv = build(BUG_PROG, log2=split)
-        m, x = mv.marginals()[1], mv.axis_xs[1]
+        m, x = mv.marginals[1], mv.axis_xs[1]
         mean = (m * x).sum()
         return abs(float(np.sqrt((m * x * x).sum() - mean ** 2)) - sd_theory)
 
@@ -720,7 +731,9 @@ def test_shuffle_plugs_into_bivariate_and_reproduces():
     mv.copula = CopulaShuffle(perm=[3, 2, 1, 0])
     mv.update()
     assert isinstance(mv.copula, CopulaShuffle)
-    assert (mv.explain['mean_error'] < 0.10).all()
+    df = mv.summary_df
+    assert all(abs(float(df.loc[(n, 'Agg'), 'Err EX'])) < 0.10
+               for n in mv.unit_names)
     assert mv.deficit < 1e-6
     # the reverse-strip shuffle (tau=-0.5) offsets the shared-count coupling
     assert str(mv.copula) == 'shuffle(n=4)'
@@ -768,7 +781,9 @@ def test_clash_builds_and_derives_shared_count():
 def test_clash_marginals_reproduce_standalone():
     """Each clash marginal reproduces its standalone aggregate (the invariant)."""
     mv = build(CLASH_PROG)
-    assert (mv.explain['mean_error'] < 0.10).all()
+    df = mv.summary_df
+    assert all(abs(float(df.loc[(n, 'Agg'), 'Err EX'])) < 0.10
+               for n in mv.unit_names)
     assert mv.deficit < 1e-6
     assert mv._explain_oneline() == 'not unreasonable'
 
@@ -778,7 +793,7 @@ def test_clash_mixed_adds_common_shock():
     pois = build(CLASH_PROG)
     mix = build('clash Cat 8 5 2 claims sev lognorm 50 cv 1.2 '
                 'sev lognorm 60 cv 1.5 mixed gamma 0.3')
-    assert mix.corr() > pois.corr() > 0
+    assert mix.corr > pois.corr > 0
 
 
 def test_clash_roundtrips_through_unparser():

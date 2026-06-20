@@ -170,7 +170,7 @@ dist W.tbe       beta 0.5 2
 # ====================================
 # Drive the rationalized reins reporting surface (1.0.0a19): the consistent-
 # column reins_density_df, the per-stage/per-view/per-basis reins_stats_df
-# (EX exact vs Est rebucketed), and the per-stage reins_describe (occurrence
+# (EX exact vs Est rebucketed), and the per-stage reins_summary_df (occurrence
 # leads Gross, aggregate leads Subject). See tests/test_reins_reporting.py and
 # dev/reins-reporting.md.
 #

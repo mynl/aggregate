@@ -90,24 +90,24 @@ Requesting ``net of`` propagates losses net of the cover through to the aggregat
 
 ``[1:6]`` is shorthand for ``[1,2,3,4,5,6]``. The net severity equals 3 = (1 + 2 + 3 + 4 + 4 + 4) / 6.
 
-The ``reins_describe`` dataframe shows mean loss by gross/ceded/net view for
+The ``reins_summary_df`` dataframe shows mean loss by gross/ceded/net view for
 frequency, severity, and aggregate. The ceded severity ``Sev`` mean equals
 (0 + 0 + 0 + 0 + 1 + 2) / 6 = 0.5 (the 1 xs 4 and 1 xs 5 layers cede 1 at a
 roll of 5 and 2 at a roll of 6), and the ceded aggregate ``Agg`` mean — the
 expected loss to the cover — equals 0.5 × 3.5 = 1.75. The whole-structure view
 combines both layers; for a per-layer breakdown build each layer as its own
-aggregate and read its ``reins_describe``.
+aggregate and read its ``reins_summary_df``.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a02.reins_describe)
+    qd(a02.reins_summary_df)
 
 An **aggregate excess of loss** reinsurance layer, 12 xs 24, is specified after the frequency clause (you need to know frequency)::
 
     aggregate ceded to 12 xs 34.
 
-Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Refer to ``agg.Re:01`` by name as a shorthand. ``reins_describe`` reports expected loss to the aggregate cover (the aggregate block, leading with Subject).
+Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Refer to ``agg.Re:01`` by name as a shorthand. ``reins_summary_df`` reports expected loss to the aggregate cover (the aggregate block, leading with Subject).
 
 .. ipython:: python
     :okwarning:
@@ -117,7 +117,7 @@ Requesting ``ceded to`` propagates the ceded losses through to the aggregate. Re
     a03.plot()
     @savefig DD_12x24a.png
     qd(a03)
-    qd(a03.reins_describe)
+    qd(a03.reins_summary_df)
 
 Occurrence and aggregate programs can both be applied. The ``ceded to`` and ``net of`` clauses can be mixed. You cannot refer to ``agg.Re:01`` by name because you need to see into the object to apply the occurrence reinsurance.
 
@@ -130,7 +130,7 @@ Occurrence and aggregate programs can both be applied. The ``ceded to`` and ``ne
     @savefig DD_nn.png
     a04.plot()
     qd(a04)
-    qd(a04.reins_describe)
+    qd(a04.reins_summary_df)
 
 Layers can be specified as a **share of**  or **part of** to account for coinsurance (partial placement) of the layer:
 
@@ -154,7 +154,7 @@ These concepts are illustrated in the next example. Note the bucket size.
     @savefig DD_nn2.png
     a05.plot()
     qd(a05)
-    qd(a05.reins_describe)
+    qd(a05.reins_summary_df)
 
 A **tower** of limits can be specified by giving the attachment points of each layer. The shorthand::
 
@@ -165,7 +165,7 @@ is equivalent to::
     occurrence ceded to 1 xs 0 and 1 xs 1 and 3 xs 2
     and 5 xs 5 and 10 xs 10 and 16 xs 20
 
-Here is a summary of these examples. ``reins_describe`` gives the whole-structure ceded aggregate loss. The plot is omitted; it is identical to gross since the tower covers all losses.
+Here is a summary of these examples. ``reins_summary_df`` gives the whole-structure ceded aggregate loss. The plot is omitted; it is identical to gross since the tower covers all losses.
 
 .. ipython:: python
     :okwarning:
@@ -175,7 +175,7 @@ Here is a summary of these examples. ``reins_describe`` gives the whole-structur
                 'aggregate ceded to tower [0 1 2 5 10 20 36]')
     a06.plot()
     qd(a06)
-    qd(a06.reins_describe)
+    qd(a06.reins_summary_df)
 
 See :ref:`re functions` for more about the reinsurance functions.
 
@@ -198,12 +198,12 @@ Reinsurance Functions
 
 This section demonstrates :class:`Aggregate` methods and properties for reinsurance analysis. These are:
 
-* :meth:`reins_kinds` a text description of the kinds (occurrence and/or aggregate) of reinsurance applied.
-* :meth:`reins_description` a text description of the layers and shares, by kind.
+* :attr:`reins_kinds` a text description of the kinds (occurrence and/or aggregate) of reinsurance applied.
+* :attr:`reins_description` a text description of the layers and shares, by kind.
 * :meth:`reins_occ_plot` plots subject (usually gross), ceded, and net severity, and aggregates created from each. Does not consider aggregate reinsurance.
 * ``reins_density_df`` dataframe of all gross/ceded/net densities, with **consistent columns** regardless of which stages are present: severity (``p_sev_gross``, ``p_sev_ceded``, ``p_sev_net``), the aggregate of each occurrence severity view (``p_agg_gross`` is the true gross aggregate, plus ``p_agg_ceded_occ``, ``p_agg_net_occ``), and the aggregate-cover views (``p_agg_subject`` is the input to the aggregate cover, plus ``p_agg_ceded``, ``p_agg_net``).
 * ``reins_stats_df`` dataframe of per-stage moments. Columns are ``(stage, view, basis)`` with ``stage`` occurrence and/or aggregate, occurrence views gross/ceded/net, aggregate views subject/ceded/net, and ``basis`` either ``EX`` (exact, pre-bucket image moment) or ``Est`` (rebucketed, model-grid). The EX vs Est difference isolates the :attr:`reins_bucket` rebucketing error.
-* ``reins_describe`` the daily-driver per-stage loss summary: one block per stage of mean loss by view × component on ``EX | Est | Change`` bases. Following the gross/subject convention, the occurrence block leads with **Gross** and the aggregate block leads with **Subject**.
+* ``reins_summary_df`` the daily-driver per-stage loss summary: one block per stage of mean loss by view × component on ``EX | Est | Change`` bases. Following the gross/subject convention, the occurrence block leads with **Gross** and the aggregate block leads with **Subject**.
 
 .. note::
 
@@ -213,7 +213,7 @@ This section demonstrates :class:`Aggregate` methods and properties for reinsura
     whole-structure objects above (``reinsurance_df`` was renamed
     ``reins_density_df``, with ``p_agg_gross`` → ``p_agg_gross`` and the
     old ``p_agg_gross`` → ``p_agg_subject``). For a by-layer analysis, build
-    each layer as its own aggregate and read its ``reins_describe``.
+    each layer as its own aggregate and read its ``reins_summary_df``.
 
 
 These are illustrated using the a more realistic example that includes occurrence and aggregate reinsurance. Notice that the occurrence program just layers gross (subject) losses. Gross losses are then passed through to the aggregate program. This is done to illustrate the functions below. In a real-world application is is likely the bottom few occurrence layers would be dropped and you would pass the net of through to the aggregate.
@@ -232,8 +232,8 @@ These are illustrated using the a more realistic example that includes occurrenc
               'aggregate ceded to 250 xs 750 and 1500 xs 1000 '
              )
     qd(a)
-    print(a.reins_kinds())
-    print(a.reins_description())
+    print(a.reins_kinds)
+    print(a.reins_description)
 
 ``'plot`` shows the impact of occurrence reinsurance on severity and aggregate losses, and the ceded severity and aggregate.
 
@@ -243,7 +243,7 @@ These are illustrated using the a more realistic example that includes occurrenc
     @savefig reins_oa.png scale=20
     a.reins_occ_plot()
 
-The ``reins_describe`` dataframe is the per-stage loss summary. The occurrence
+The ``reins_summary_df`` dataframe is the per-stage loss summary. The occurrence
 block leads with **Gross** and shows the gross/ceded/net mean loss for each of
 frequency, severity, and aggregate; the aggregate block leads with **Subject**
 (the aggregate input to the cover) and shows the subject/ceded/net aggregate
@@ -254,10 +254,10 @@ rebucketed (model-grid) value, and ``Change`` their relative difference.
 .. ipython:: python
     :okwarning:
 
-    qd(a.reins_describe)
+    qd(a.reins_summary_df)
 
 The ``reins_stats_df`` dataframe carries the full per-stage moments behind
-``reins_describe`` — every ``(stage, view, basis)`` column with the six
+``reins_summary_df`` — every ``(stage, view, basis)`` column with the six
 ``(ex1, ex2, ex3, mean, cv, skew)`` rows for frequency, severity, and
 aggregate. Slice it to inspect a single basis or measure.
 
@@ -321,12 +321,12 @@ There are special options in ``build`` because the claim count is high: 292.7. R
 
 shows aliasing, i.e., there is not enough space in the answer. Adjust by increasing ``log2`` from 16 to 18 and leaving ``bs=1/2``.
 
-The ``reins_describe`` dataframe shows the whole-structure ceded loss for the tower. The per-layer layering (layer expected loss, CV, counts, conditional severity) that earlier versions reported via ``reinsurance_occ_layer_df`` is obtained by building each tower layer as its own occurrence cover and reading its ``reins_describe``.
+The ``reins_summary_df`` dataframe shows the whole-structure ceded loss for the tower. The per-layer layering (layer expected loss, CV, counts, conditional severity) that earlier versions reported via ``reinsurance_occ_layer_df`` is obtained by building each tower layer as its own occurrence cover and reading its ``reins_summary_df``.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a07.reins_describe)
+    qd(a07.reins_summary_df)
 
 
 .. _re property exposure:
@@ -444,12 +444,12 @@ The shared mixing increases the frequency and aggregate CV and skewness.
          ('agg', 'cv'), ('agg', 'skew')],
         ['independent', 'mixed']])
 
-Look at ``reins_describe`` to summarize the analysis (whole-structure ceded; build per-layer covers for a per-layer layering).
+Look at ``reins_summary_df`` to summarize the analysis (whole-structure ceded; build per-layer covers for a per-layer layering).
 
 .. ipython:: python
     :okwarning:
 
-    qd(a08.reins_describe)
+    qd(a08.reins_summary_df)
 
 Add plots of gross, ceded, and net severity with the placed program, 4000 xs 1000 and 5000 xs 5000. (The net is zero with the ``tower`` clause, so we have to recompute.) The left and right plots differ only in the x-axis scale.
 
@@ -1190,16 +1190,16 @@ Use an ``occurrence net of`` clause to apply the two excess of loss reinsurance 
           f'Ceded expected loss {a19.est_m - a19n.est_m:,.1f}\n'
           f'Net expected loss   {a19n.est_m:,.1f}')
 
-The ``reins_describe`` dataframe summarizes the occurrence cover loss by
+The ``reins_summary_df`` dataframe summarizes the occurrence cover loss by
 gross/ceded/net view (severity and aggregate). Earlier versions reported a
 per-layer ground-up layering via ``reinsurance_audit_df`` /
 ``reinsurance_occ_layer_df``; obtain that by building each layer as its own
-occurrence cover and reading its ``reins_describe``.
+occurrence cover and reading its ``reins_summary_df``.
 
 .. ipython:: python
     :okwarning:
 
-    qd(a19n.reins_describe)
+    qd(a19n.reins_summary_df)
 
 The whole-structure ceded severities differ slightly from Mata et al. Table 3. The ``aggregate`` computation is closest to Method 3.
 

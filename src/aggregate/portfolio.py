@@ -1410,7 +1410,7 @@ class Portfolio(object):
         aggregate cover is present the final aggregate-cover net/ceded; else
         the occurrence net/ceded. The ``ceded`` view of a unit carrying
         *both* covers is the final (aggregate-stage) cession; the per-stage
-        chain lives in the unit's own ``reins_describe``.
+        chain lives in the unit's own ``reins_summary_df``.
         """
         zero = np.zeros_like(a.xs, dtype=float)
         zero[0] = 1.0
@@ -1517,7 +1517,7 @@ class Portfolio(object):
         return self._reins_stats_df
 
     @property
-    def reins_describe(self):
+    def reins_summary_df(self):
         """Portfolio end-to-end reinsurance loss summary.
 
         One block per unit plus a ``total`` block, concatenated with
@@ -1525,7 +1525,7 @@ class Portfolio(object):
         block is a ``view x component`` table of **mean loss** on the
         eight :attr:`Aggregate.summary_df` columns (``EX | Est EX | Change EX |
         CV | Est CV | Change CV | Sk | Est Sk``) for the unit's own per-stage
-        cession (from :meth:`Aggregate.reins_describe`); units without
+        cession (from :meth:`Aggregate.reins_summary_df`); units without
         reinsurance are omitted from their own blocks. The ``total`` block is
         the end-to-end gross / ceded / net portfolio aggregate moments from
         :meth:`reins_stats_df`; the ``EX`` / ``CV`` / ``Sk`` reference is the
@@ -1544,7 +1544,7 @@ class Portfolio(object):
         blocks = []
         keys = []
         for a in self:
-            rdesc = a.reins_describe
+            rdesc = a.reins_summary_df
             if rdesc is not None:
                 blocks.append(rdesc)
                 keys.append(a.name)
@@ -2400,7 +2400,7 @@ class Portfolio(object):
 
     def update(self, log2, bs, remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1,
-               trim_df=False, add_exa=True, force_severity=True, bucket_sizing_p=BUCKET_SIZING_P,
+               trim_density_df=False, add_exa=True, force_severity=True, bucket_sizing_p=BUCKET_SIZING_P,
                debug=False):
         """
 
@@ -2425,7 +2425,7 @@ class Portfolio(object):
         :param discretization_calc:  survival or distribution (accurate on right or left tails)
         :param normalize: if true, normalize the severity so sum probs = 1. This is generally what you want; but
         :param padding: for fft 1 = double, 2 = quadruple
-        :param trim_df: remove unnecessary columns from density_df before returning
+        :param trim_density_df: remove unnecessary columns from density_df before returning
         :param add_exa: run add_exa to append the objective allocation columns needed for pricing
         :param force_severity: force computation of severities for aggregate components even when approximating
         :param bucket_sizing_p: percentile to use for bucket recommendation.
@@ -2633,8 +2633,8 @@ class Portfolio(object):
 
         self.last_update = np.datetime64('now')
         self.hash_rep_at_last_update = hash(self)
-        if trim_df:
-            self.trim_df()
+        if trim_density_df:
+            self.trim_density_df()
         # invalidate stored functions
         self._var_tvar_function = None
         self._cdf = None
@@ -2889,7 +2889,7 @@ class Portfolio(object):
         """
         return explain_validation(self.valid)
 
-    def trim_df(self):
+    def trim_density_df(self):
         """
         Trim out unwanted columns from density_df
 

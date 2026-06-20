@@ -61,7 +61,8 @@ import scipy.fft as sfft
 from .constants import (FIG_H, FIG_W, DefectiveDistributionWarning,
                         info_row, INFO_NA)
 from .config import get_settings
-from .moments import MomentAggregator, xsden_to_mwrangler
+from .moments import (MomentAggregator, xsden_to_mwrangler,
+                      _noise_aware_rel_error, _snap_noise)
 from .utilities import round_bucket, balanced_window
 
 logger = logging.getLogger(__name__)
@@ -586,6 +587,7 @@ class BivariateAggregate:
         self.deficit = np.nan
         self._S = None
         self._sev_xs = [None, None]
+        self._sev_moms = [None, None]      # per-axis per-event severity raw moms
         self._marg_theory = [None, None]   # per-axis (mean, sd, skew)
         self.figure = None                 # set by plot()
 
@@ -1149,6 +1151,7 @@ class BivariateAggregate:
                                      self.axis_xs[1], self.bs[0], self.bs[1],
                                      meta)
 
+    @property
     def marginals(self):
         """Return the two marginal densities ``(density.sum(1), density.sum(0))``.
 
@@ -1162,6 +1165,7 @@ class BivariateAggregate:
         """Mixed raw moments ``E[A0^i A1^j]`` (delegates to the bivariate view)."""
         return self.bivariate.moments(max_order)
 
+    @property
     def corr(self):
         """Pearson correlation of the two component aggregates.
 
@@ -1170,7 +1174,7 @@ class BivariateAggregate:
         This is the **realised output** correlation, which is *not* the copula
         parameter: compounding by the shared frequency attenuates the per-claim
         dependence (and a shared mixing frequency adds common-shock dependence on
-        top). Compare with :meth:`Copula.tau` via :attr:`summary_df`.
+        top). Compare with :meth:`Copula.tau` via :attr:`dependency_df`.
         """
         return self.bivariate.corr()
 
@@ -1192,25 +1196,26 @@ class BivariateAggregate:
 
     @property
     def stats_df(self):
-        """Per-component marginal moments (theoretical vs empirical) + joint block.
+        """Per-component marginal moments (theoretical vs empirical).
 
         Returns
         -------
         DataFrame
-            Columns: the two component names plus ``joint``. Rows: ``mean``,
-            ``sd``, ``cv``, ``skew`` per component (theoretical ``T`` and
-            empirical ``E`` from the realised marginal), and a joint block
-            (``cov``, ``corr``, ``copula_tau``, ``E[A0 A1]``).
+            Columns: the two component names. Rows: ``mean`` / ``sd`` / ``cv`` /
+            ``skew`` per component on a ``theoretical`` and an ``empirical``
+            basis (the realised marginal).
 
         Notes
         -----
         Theoretical moments are the analytic loss-marginal moments, P&L-adjusted
         for a ``pnl`` axis (``mean -> shift - E[A]``, ``sd`` unchanged,
         ``skew -> -skew``). Empirical moments come from the realised marginal
-        density on the (possibly P&L-relabelled) axis grid.
+        density on the (possibly P&L-relabelled) axis grid. The joint dependence
+        (cov / corr / tau) lives in :attr:`dependency_df`; the ``total`` aggregate
+        and the validation errors are in :attr:`summary_df`.
         """
         self._require_density()
-        m0, m1 = self.marginals()
+        m0, m1 = self.marginals
         cols = {}
         for i, (name, dens) in enumerate(zip(self.unit_names, (m0, m1))):
             mt, sdt, skt = self._axis_theory(i)
@@ -1224,21 +1229,6 @@ class BivariateAggregate:
                 ('empirical', 'mean'): me, ('empirical', 'sd'): sde,
                 ('empirical', 'cv'): cve, ('empirical', 'skew'): ske,
             })
-        # joint block
-        mom = self.moments(2).to_numpy()
-        tot = mom[0, 0]
-        e0, e1 = mom[1, 0] / tot, mom[0, 1] / tot
-        cov = mom[1, 1] / tot - e0 * e1
-        joint = pd.Series({
-            ('theoretical', 'mean'): np.nan, ('theoretical', 'sd'): np.nan,
-            ('theoretical', 'cv'): np.nan, ('theoretical', 'skew'): np.nan,
-            ('empirical', 'cov'): cov,
-            ('empirical', 'corr'): self.corr(),
-            ('empirical', 'copula_tau'): (np.nan if self.copula is None
-                                          else self.copula.tau()),
-            ('empirical', 'E[A0A1]'): mom[1, 1] / tot,
-        })
-        cols['joint'] = joint
         df = pd.DataFrame(cols)
         df.index = pd.MultiIndex.from_tuples(df.index, names=['basis', 'stat'])
         return df
@@ -1258,39 +1248,220 @@ class BivariateAggregate:
 
     @property
     def summary_df(self):
-        """Compact per-component summary frame with the realised dependence.
+        """Two-unit ``Portfolio``-shape validation summary (theory vs realised).
+
+        A bivariate is a two-unit portfolio plus a dependency structure, so this
+        frame mirrors :attr:`Portfolio.summary_df`: a shared ``Freq`` block on
+        top, a ``Sev`` / ``Agg`` block per component, then a ``total`` ``Sev`` /
+        ``Agg`` block (the genuine ``X + Y`` aggregate). The eight columns are the
+        portfolio validation view -- ``EX | Est EX | Err EX | <spread> | Est
+        <spread> | Err <spread> | Sk | Est Sk`` -- with ``Est`` the realised
+        (model-output) value and ``Err`` the noise-aware relative error.
+
+        ``Est`` is populated only where it is observable from the joint density --
+        the per-component and ``total`` **Agg** rows. ``Freq`` and ``Sev`` rows
+        are theory-only (the 2-D convolution yields the joint aggregate, never an
+        independent frequency or severity sample), and the shared ``Freq`` is
+        reported once. The ``total Agg`` theory carries only the additive mean
+        ``E[X] + E[Y]``; its spread and skew are emergent from the modeled
+        dependence, so they appear on the ``Est`` side only. The spread column is
+        **CV**, or **SD** when any component is a signed (``pnl``) axis whose mean
+        can sit near zero -- the choice is frame-wide, as in ``Portfolio``.
+
+        Dependence (cov / corr / tau) is **not** here -- see
+        :attr:`dependency_df`. The raw per-component marginal moments are in
+        :attr:`stats_df`.
 
         Returns
         -------
         DataFrame
-            One row per component (``kind``, theoretical ``mean`` / ``sd`` /
-            ``cv`` / ``skew``) plus a ``joint`` footer row carrying the realised
-            output correlation and (copula mode) the copula's Kendall tau -- the
-            realised corr is *not* the copula parameter (compounding attenuates
-            it, shared mixing adds common shock). A ``pnl`` component is shown in
-            P&L terms (``mean -> premium - E[loss]``, ``skew`` sign flipped); in
-            ``netceded`` mode the rows are the Ceded / Net occurrence aggregates.
+            ``MultiIndex (component, part)`` rows; eight validation columns.
+        """
+        self._require_density()
+        use_sd = self._signed()
+        spread = 'SD' if use_sd else 'CV'
+
+        def _spread(m, sd):
+            return sd if use_sd else (sd / m if m else np.nan)
+
+        def _row(mt, sdt, skt, me, sde, ske):
+            spt, spe = _spread(mt, sdt), _spread(me, sde)
+            return {
+                'EX': mt, 'Est EX': me, 'Err EX': _noise_aware_rel_error(me, mt),
+                spread: spt, f'Est {spread}': spe,
+                f'Err {spread}': _noise_aware_rel_error(spe, spt),
+                'Sk': skt, 'Est Sk': ske}
+
+        nan3 = (np.nan, np.nan, np.nan)
+        rows, index = [], []
+
+        # shared frequency block (theory only -- count is an input, not sampled)
+        fm, fcv, fsk = MomentAggregator.static_moments_to_mcvsk(
+            *self._shared_freq_moms())
+        rows.append(_row(fm, fcv * fm if np.isfinite(fcv) else np.nan, fsk, *nan3))
+        index.append(('shared', 'Freq'))
+
+        # per-component Sev (theory) + Agg (theory vs realised marginal)
+        m0, m1 = self.marginals
+        for i, (name, dens) in enumerate(zip(self.unit_names, (m0, m1))):
+            sm, scv, ssk = self._sev_mcvsk(i)
+            rows.append(_row(sm, scv * sm if np.isfinite(scv) else np.nan,
+                             ssk, *nan3))
+            index.append((name, 'Sev'))
+            mt, sdt, skt = self._axis_theory(i)
+            me, cve, ske = xsden_to_mwrangler(self.axis_xs[i], dens).mcvsk
+            sde = cve * me if np.isfinite(cve) else np.nan
+            rows.append(_row(mt, sdt, skt, me, sde, ske))
+            index.append((name, 'Agg'))
+
+        # total Sev (theory) + total Agg (additive-mean theory vs realised)
+        tsm, tscv, tssk = self._total_sev_mcvsk()
+        rows.append(_row(tsm, tscv * tsm if np.isfinite(tscv) else np.nan,
+                         tssk, *nan3))
+        index.append(('total', 'Sev'))
+        em, esd, esk = self._total_agg_empirical()
+        tmean = sum(self._axis_theory(i)[0] for i in range(2))
+        rows.append(_row(tmean, np.nan, np.nan, em, esd, esk))
+        index.append(('total', 'Agg'))
+
+        df = pd.DataFrame(rows, index=pd.MultiIndex.from_tuples(
+            index, names=['component', 'part']))
+        df = df[['EX', 'Est EX', 'Err EX', spread, f'Est {spread}',
+                 f'Err {spread}', 'Sk', 'Est Sk']]
+        # snap display dust in the value columns (Err columns keep their dust)
+        for c in ('EX', 'Est EX', spread, f'Est {spread}', 'Sk', 'Est Sk'):
+            df[c] = _snap_noise(df[c])
+        return df
+
+    @property
+    def dependency_df(self):
+        """Joint dependence structure: ``cov`` / ``corr`` / ``tau`` by level.
+
+        Two rows -- ``Sev`` (the per-claim joint severity) and ``Agg`` (the
+        realised joint aggregate) -- and three columns:
+
+        * ``cov`` -- covariance of the two components at that level;
+        * ``corr`` -- linear (Pearson) correlation;
+        * ``tau`` -- the input copula's Kendall tau (a per-claim property, so it
+          sits on the ``Sev`` row; the realised aggregate ``tau`` is not computed
+          -- it is an expensive concordance sum on the joint PMF).
+
+        The ``Sev`` row is read from the modeled per-claim severity matrix
+        ``self._S``; the ``Agg`` row from the realised joint mixed moments
+        (:meth:`moments`). Higher mixed comoments are not tabulated -- they are a
+        short user-side calc off :meth:`moments` (aggregate) or ``_S`` (severity).
+
+        Returns
+        -------
+        DataFrame
+            Index ``level`` in ``['Sev', 'Agg']``; columns ``cov`` / ``corr`` /
+            ``tau``.
         """
         self._require_density()
         rows = {}
-        cols = ['kind', 'mean', 'sd', 'cv', 'skew', 'corr', 'copula_tau']
-        for i, name in enumerate(self.unit_names):
-            mt, sdt, skt = self._axis_theory(i)
-            reflect, shift = self._affine[i]
-            kind = 'netceded' if self.mode == 'netceded' else (
-                'pnl' if (reflect or shift) else 'agg')
-            rows[name] = {'kind': kind, 'mean': mt, 'sd': sdt,
-                          'cv': (sdt / mt if mt else np.nan), 'skew': skt,
-                          'corr': np.nan, 'copula_tau': np.nan}
-        # joint footer: realised output correlation + (copula) Kendall tau
-        rows['joint'] = {
-            'kind': self.mode if self.copula is None else str(self.copula),
-            'mean': np.nan, 'sd': np.nan, 'cv': np.nan, 'skew': np.nan,
-            'corr': self.corr(),
-            'copula_tau': np.nan if self.copula is None else self.copula.tau()}
-        df = pd.DataFrame(rows).T[cols]
-        df.index.name = 'component'
+        # Agg level: realised joint aggregate
+        mom = self.moments(2).to_numpy()
+        tot = mom[0, 0]
+        eX, eY = mom[1, 0] / tot, mom[0, 1] / tot
+        vX, vY = mom[2, 0] / tot - eX ** 2, mom[0, 2] / tot - eY ** 2
+        covA = mom[1, 1] / tot - eX * eY
+        corrA = covA / np.sqrt(vX * vY) if vX > 0 and vY > 0 else np.nan
+        rows['Agg'] = {'cov': covA, 'corr': corrA, 'tau': np.nan}
+        # Sev level: per-claim joint severity (the FFT2 input matrix)
+        if self._S is not None and self._sev_xs[0] is not None:
+            S = self._S
+            x0 = np.asarray(self._sev_xs[0], dtype=float)
+            x1 = np.asarray(self._sev_xs[1], dtype=float)
+            s0, s1 = S.sum(axis=1), S.sum(axis=0)
+            eA, eB = x0 @ s0, x1 @ s1
+            vA, vB = (x0 ** 2) @ s0 - eA ** 2, (x1 ** 2) @ s1 - eB ** 2
+            covS = x0 @ (S @ x1) - eA * eB
+            corrS = covS / np.sqrt(vA * vB) if vA > 0 and vB > 0 else np.nan
+            tau = self.copula.tau() if self.copula is not None else np.nan
+            rows['Sev'] = {'cov': covS, 'corr': corrS, 'tau': tau}
+        else:
+            rows['Sev'] = {'cov': np.nan, 'corr': np.nan, 'tau': np.nan}
+        df = pd.DataFrame(rows).T.reindex(['Sev', 'Agg'])[['cov', 'corr', 'tau']]
+        df.index.name = 'level'
         return df
+
+    def _signed(self):
+        """Any component is a signed (``pnl``) axis -> the frame uses SD not CV."""
+        if self.mode == 'netceded':
+            return False
+        return any(r or s for r, s in self._affine)
+
+    def _shared_freq_moms(self):
+        """Raw moments ``(f1, f2, f3)`` of the shared outer frequency."""
+        if self.mode == 'netceded':
+            return self._nc_agg.frequency.freq_moms(float(self._nc_agg.n))
+        return self.frequency.freq_moms(self.en)
+
+    def _sev_mcvsk(self, i):
+        """Per-event severity ``(mean, cv, skew)`` for component ``i``.
+
+        Uses the analytic per-event severity raw moments (copula mode); falls
+        back to the per-event severity marginal of the joint severity matrix
+        ``self._S`` (e.g. ``netceded``, where the net / ceded per-claim severity
+        is read off the comonotone scatter).
+        """
+        sm = self._sev_moms[i] if self._sev_moms else None
+        if sm is not None:
+            return MomentAggregator.static_moments_to_mcvsk(*sm)
+        if self._S is not None and self._sev_xs[i] is not None:
+            x = np.asarray(self._sev_xs[i], dtype=float)
+            g = self._S.sum(axis=1 - i)
+            return MomentAggregator.static_moments_to_mcvsk(
+                x @ g, (x ** 2) @ g, (x ** 3) @ g)
+        return np.nan, np.nan, np.nan
+
+    def _total_sev_mcvsk(self):
+        """``(mean, cv, skew)`` of the total per-event severity ``S0 + S1``.
+
+        From the modeled joint per-claim severity ``self._S`` (exact). The cross
+        moments ``E[S0^p S1^q]`` are formed as ``x0**p @ S @ x1**q`` so no dense
+        ``n x n`` grid of pairwise sums is materialised. Returns ``nan`` when the
+        severity matrix is unavailable.
+        """
+        S = self._S
+        if S is None or self._sev_xs[0] is None:
+            return np.nan, np.nan, np.nan
+        x0 = np.asarray(self._sev_xs[0], dtype=float)
+        x1 = np.asarray(self._sev_xs[1], dtype=float)
+        s0, s1 = S.sum(axis=1), S.sum(axis=0)
+        eA, eA2, eA3 = x0 @ s0, (x0 ** 2) @ s0, (x0 ** 3) @ s0
+        eB, eB2, eB3 = x1 @ s1, (x1 ** 2) @ s1, (x1 ** 3) @ s1
+        sx1, sx1_2 = S @ x1, S @ (x1 ** 2)
+        eAB, eA2B, eAB2 = x0 @ sx1, (x0 ** 2) @ sx1, x0 @ sx1_2
+        m1 = eA + eB
+        m2 = eA2 + 2 * eAB + eB2
+        m3 = eA3 + 3 * eA2B + 3 * eAB2 + eB3
+        return MomentAggregator.static_moments_to_mcvsk(m1, m2, m3)
+
+    def _total_agg_empirical(self):
+        """Realised ``(mean, sd, skew)`` of the total ``X + Y`` aggregate.
+
+        From the joint mixed moments ``E[X^i Y^j]`` (:meth:`moments`), so the
+        ``X + Y`` grid is never formed -- the central moments of the sum follow
+        from the marginal and cross raw moments.
+        """
+        mom = self.moments(3).to_numpy()
+        tot = mom[0, 0]
+        eX, eY = mom[1, 0] / tot, mom[0, 1] / tot
+        eX2, eY2, eXY = mom[2, 0] / tot, mom[0, 2] / tot, mom[1, 1] / tot
+        eX3, eY3 = mom[3, 0] / tot, mom[0, 3] / tot
+        eX2Y, eXY2 = mom[2, 1] / tot, mom[1, 2] / tot
+        m1 = eX + eY
+        m2 = eX2 + 2 * eXY + eY2
+        m3 = eX3 + 3 * eX2Y + 3 * eXY2 + eY3
+        var = m2 - m1 * m1
+        sd = float(np.sqrt(var)) if var > 0 else np.nan
+        if sd and np.isfinite(sd) and sd > 0:
+            mu3 = m3 - 3 * m1 * m2 + 2 * m1 ** 3
+            skew = float(mu3 / sd ** 3)
+        else:
+            skew = np.nan
+        return float(m1), sd, skew
 
     def _axis_kind(self, i):
         """Per-axis kind label (``agg`` / ``pnl`` / ``gross`` / ``ceded`` / ``net``)."""
@@ -1359,50 +1530,13 @@ class BivariateAggregate:
                 rows += [(f'{lbl} bs', INFO_NA), (f'{lbl} log2', INFO_NA),
                          (f'{lbl} x_min', INFO_NA), (f'{lbl} x_max', INFO_NA)]
         rows += [
-            ('correlation', f'{self.corr():.6f}' if updated else INFO_NA),
+            ('correlation', f'{self.corr:.6f}' if updated else INFO_NA),
             ('copula tau', tau),
             ('tail deficit', f'{self.deficit:.2e}' if updated else INFO_NA),
             ('validation', self._explain_oneline() if updated else INFO_NA),
             ('id', self._id()),
         ]
         return '\n'.join(info_row(label, value) for label, value in rows)
-
-    @property
-    def explain(self):
-        """Validation: does each marginal reproduce its standalone aggregate?
-
-        The bivariate showpiece invariant -- marginalising the joint recovers
-        each standalone aggregate (mean exact, cv at the matched grid). Returns a
-        per-axis frame of theoretical vs realized ``mean`` / ``cv`` with relative
-        error; the joint tail ``deficit`` is on ``df.attrs['deficit']`` and in the
-        ``validation`` row of :attr:`info`.
-
-        Returns
-        -------
-        DataFrame
-            Index = component name; columns ``mean_theory`` / ``mean_empirical`` /
-            ``mean_error`` / ``cv_theory`` / ``cv_empirical`` / ``cv_error``.
-        """
-        self._require_density()
-        sd = self.stats_df
-
-        def _rel(emp, theory):
-            return abs(emp - theory) / abs(theory) if theory else abs(emp - theory)
-
-        rows = {}
-        for name in self.unit_names:
-            tm = float(sd.loc[('theoretical', 'mean'), name])
-            em = float(sd.loc[('empirical', 'mean'), name])
-            tcv = float(sd.loc[('theoretical', 'cv'), name])
-            ecv = float(sd.loc[('empirical', 'cv'), name])
-            rows[name] = {
-                'mean_theory': tm, 'mean_empirical': em, 'mean_error': _rel(em, tm),
-                'cv_theory': tcv, 'cv_empirical': ecv, 'cv_error': _rel(ecv, tcv),
-            }
-        df = pd.DataFrame(rows).T
-        df.index.name = 'axis'
-        df.attrs['deficit'] = self.deficit
-        return df
 
     def _explain_oneline(self):
         """One-unit validation summary for the ``info`` ``validation`` row.
@@ -1413,12 +1547,17 @@ class BivariateAggregate:
         the *analytic* standalone < 10%) -- it catches gross misplacement but not
         the budget-dependent bs-discretization error, which is expected (the
         marginal still reproduces the standalone *at the matched grid*). The
-        exact per-axis mean / cv errors are in :attr:`explain`.
+        per-axis mean / cv errors are surfaced in the ``Agg`` rows of
+        :attr:`summary_df`.
         """
-        df = self.explain
         bad = []
-        if (df['mean_error'] > 0.10).any():
-            bad.append('marginal mean')
+        m0, m1 = self.marginals
+        for i, dens in enumerate((m0, m1)):
+            mt = self._axis_theory(i)[0]
+            me = xsden_to_mwrangler(self.axis_xs[i], dens).mcvsk[0]
+            if mt and abs(me - mt) / abs(mt) > 0.10:
+                bad.append('marginal mean')
+                break
         if self.deficit > 1e-5:
             bad.append('tail deficit')
         return 'not unreasonable' if not bad else 'check: ' + ', '.join(bad)
@@ -1464,7 +1603,7 @@ class BivariateAggregate:
         on each axis's standalone marginal aggregate.
         """
         self._require_density()
-        m0, m1 = self.marginals()
+        m0, m1 = self.marginals
         rows = {}
         for i, (name, m) in enumerate(zip(self.unit_names, (m0, m1))):
             xs = self.axis_xs[i]
@@ -1563,7 +1702,7 @@ class BivariateAggregate:
                     f'units={self.unit_names!r}, {tag}, not updated)')
         return (f'BivariateAggregate(name={self.name!r}, '
                 f'units={self.unit_names!r}, {tag}, '
-                f'shape={self.density.shape}, corr={self.corr():.4f})')
+                f'shape={self.density.shape}, corr={self.corr:.4f})')
 
     def _repr_html_(self):
         if self.density is None:

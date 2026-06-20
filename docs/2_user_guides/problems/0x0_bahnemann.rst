@@ -423,16 +423,16 @@ First, we compute all the aggregates.
 Next, determine the layer loss costs. The cumulative ceded loss to an aggregate
 limit ``L`` is the limited expected value ``E[S ∧ L]``, which equals the
 whole-structure ceded mean of an ``aggregate ceded to L xs 0`` cover. Read it
-from :meth:`reins_describe` (the ``('agg', 'Ceded', 'Agg')`` row).
+from :meth:`reins_summary_df` (the ``('agg', 'Ceded', 'Agg')`` row).
 
 .. note::
 
    This example previously used the per-layer ``reinsurance_audit_df``
    dataframe, removed in 1.0.0a19 in favour of the whole-structure
-   ``reins_describe`` / ``reins_stats_df`` / ``reins_density_df`` objects.
+   ``reins_summary_df`` / ``reins_stats_df`` / ``reins_density_df`` objects.
    To rebuild the per-agg-limit ILF table, loop over the aggregate breakpoints
    ``L`` and the per-claim occurrence limits, build ``aggregate ceded to L xs
-   0`` for each, and collect the ceded aggregate mean from ``reins_describe``;
+   0`` for each, and collect the ceded aggregate mean from ``reins_summary_df``;
    normalise by the ``500000`` per-claim, unlimited-aggregate cell for the ILF.
 
 Here is a reconciliation to Table 6.4 of the 2M per claim and 2M aggregate limit expected loss, using the shifted gamma approximation. The limited aggregate loss is computed using the integral of the survival function ``fz.sf``.  ``quad`` is a general purpose numerical integration routine. It returns the integral and estimated error.

@@ -6,7 +6,7 @@ Covers ``dev/reins-reporting.md``:
   stages are configured; ``p_agg_subject`` present; mass conserved.
 - ``Aggregate.reins_stats_df`` -- per-stage / per-view / per-basis (EX vs Est)
   moments; columns track the applied stages.
-- ``Aggregate.reins_describe`` -- per-stage blocks; occurrence leads with
+- ``Aggregate.reins_summary_df`` -- per-stage blocks; occurrence leads with
   ``Gross``, aggregate leads with ``Subject``; economic view (``EX``/``CV``/``Sk``
   hold the leading-view theoretic reference, ``Est`` is the per-view output,
   ``Change`` = impact / validation). The per-view EX-vs-Est rebucketing error
@@ -88,7 +88,7 @@ def test_no_reins_returns_none():
     a = build('agg RR.None 10 claims sev lognorm 100 cv 2 poisson')
     assert a.reins_density_df is None
     assert a.reins_stats_df is None
-    assert a.reins_describe is None
+    assert a.reins_summary_df is None
 
 
 # ----------------------------------------------------------------------------
@@ -247,7 +247,7 @@ def test_stats_df_agg_layer_means_add_to_ceded_total():
 
 
 # ----------------------------------------------------------------------------
-# reins_describe: per-stage layout; gross/subject lead
+# reins_summary_df: per-stage layout; gross/subject lead
 # ----------------------------------------------------------------------------
 
 DESCRIBE_COLS = ['EX', 'Est EX', 'Change EX',
@@ -255,7 +255,7 @@ DESCRIBE_COLS = ['EX', 'Est EX', 'Change EX',
 
 
 def test_describe_occ_leads_gross():
-    d = build(OCC_ONLY).reins_describe
+    d = build(OCC_ONLY).reins_summary_df
     occ = d.xs('occ', level='stage')
     # view / component index labels are lower-case (match the other frames)
     assert occ.index.get_level_values('view')[0] == 'gross'
@@ -266,7 +266,7 @@ def test_describe_occ_leads_gross():
 
 
 def test_describe_agg_leads_subject():
-    d = build(AGG_ONLY).reins_describe
+    d = build(AGG_ONLY).reins_summary_df
     agg = d.xs('agg', level='stage')
     assert agg.index.get_level_values('view')[0] == 'subject'
     # aggregate block is agg only (sev N/A, freq degenerate)
@@ -274,7 +274,7 @@ def test_describe_agg_leads_subject():
 
 
 def test_describe_both_has_both_stages():
-    d = build(BOTH).reins_describe
+    d = build(BOTH).reins_summary_df
     assert set(d.index.get_level_values('stage')) == {'occ', 'agg'}
 
 
@@ -282,7 +282,7 @@ def test_describe_reference_constant_down_component():
     """``EX`` / ``CV`` / ``Sk`` hold the leading-view (Gross / Subject) theoretic
     reference, so they are identical across the views of a given stage+component
     (the economic view of ``describe``)."""
-    d = build(BOTH).reins_describe
+    d = build(BOTH).reins_summary_df
     for stage in ('occ', 'agg'):
         blk = d.xs(stage, level='stage')
         for comp in blk.index.get_level_values('component').unique():
@@ -300,7 +300,7 @@ def test_describe_change_is_impact_vs_gross():
     cession's impact relative to the gross/subject reference; the leading-view
     row's Change is the validation/rebucketing error (~0 under linear)."""
     a = build(OCC_BOUNDED, reins_bucket='linear')
-    occ = a.reins_describe.xs('occ', level='stage')
+    occ = a.reins_summary_df.xs('occ', level='stage')
     # gross/agg row: Est is the model gross, reference is theoretic gross ->
     # Change is the validation error, ~0 for a bounded book under linear.
     g = occ.loc[('gross', 'agg')]
@@ -318,7 +318,7 @@ def test_describe_freq_unconditional_and_gross_nan():
     (mirrors describe), ceded / net carry the unconditional mean E[N] only
     (so freq * sev == agg per view), and cv / skew stay NaN."""
     a = build(OCC_BOUNDED, reins_bucket='linear')
-    occ = a.reins_describe.xs('occ', level='stage')
+    occ = a.reins_summary_df.xs('occ', level='stage')
     # gross freq Est entirely NaN
     g = occ.loc[('gross', 'freq')]
     assert np.isnan(float(g['Est EX']))
@@ -341,13 +341,13 @@ def test_describe_freq_unconditional_and_gross_nan():
 
 
 # ----------------------------------------------------------------------------
-# EX vs Est rebucketing error, surfaced via the public reins_describe columns:
+# EX vs Est rebucketing error, surfaced via the public reins_summary_df columns:
 # linear preserves the directly-rebucketed mean; nearest is within bs/2.
 # ----------------------------------------------------------------------------
 
 def _ex_est(a, stage, view, comp):
     """Per-view exact (EX) vs rebucketed (Est) mean from the internal
-    ``_reins_view_stats`` frame -- the rebucketing-error source. (``reins_describe``
+    ``_reins_view_stats`` frame -- the rebucketing-error source. (``reins_summary_df``
     itself now holds the *gross/subject* reference in its ``EX`` column, so its
     EX-vs-Est is an economic change, not a per-view bucketing error.)"""
     rs = a._reins_view_stats
@@ -427,7 +427,7 @@ def test_port_total_means_sum_of_units():
 
 def test_port_describe_alignment():
     p = build(PORT_RE)
-    d = p.reins_describe
+    d = p.reins_summary_df
     units = set(d.index.get_level_values('unit'))
     # ceding units A, B and the total block are present; non-ceding C is not
     assert 'total' in units
@@ -440,4 +440,4 @@ def test_port_gross_only_returns_none():
     g = build(PORT_GROSS)
     assert g.reins_density_df is None
     assert g.reins_stats_df is None
-    assert g.reins_describe is None
+    assert g.reins_summary_df is None

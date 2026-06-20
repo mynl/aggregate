@@ -51,7 +51,7 @@ expected loss                empirical: ``est_m`` (loss) or
 loss ratio                   expected loss / premium, format ``.1%``                   no premium or not updated
 P(loss)                      ``P(PnL < 0)`` off the signed density                     not a pnl, or not updated
 validation_eps               moment-validation tolerance
-reinsurance                  ``reins_kinds()``
+reinsurance                  ``reins_kinds``
 occurrence reinsurance       ``reins_description('occ')``
 aggregate reinsurance        ``reins_description('agg')``
 validation                   ``explain_validation()`` (single line)
@@ -72,7 +72,7 @@ Value enumerations:
 - ``sev_calc`` ∈ ``{discrete (= round), forward (= continuous), backward,
   moment}``.
 - ``reinsurance`` ∈ ``{none, occurrence only, aggregate only, occurrence and
-  aggregate}`` (lower-cased ``reins_kinds()``).
+  aggregate}`` (lower-cased ``reins_kinds``).
 - tail classes (each of the three tail rows) ∈ ``{bounded <
   super-exponential < exponential < subexponential < power-law}``, plus the
   ``unknown`` sentinel; frequency rows carry a log-concavity flag, severity /

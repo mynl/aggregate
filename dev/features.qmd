@@ -41,7 +41,7 @@ but not exampled.
 | Kusuoka atom rows in `Distortion` stats | a16 | Pricing & the pentagon | — |
 | `so`/`po` by number; linear allocation default; `bounded`; forwards-`S`; `DefectiveDistributionWarning`; `EX`/`CV`/`Sk` headings | a17 | New DecL elements / Reporting quartet / Pricing | `reins`, `defective` |
 | `reins_bucket` linear/nearest rebucketing | a18 | Reporting quartet | `reins` |
-| reins reporting trio (`reins_describe` / `reins_stats_df` / `reins_density_df`), incl. Portfolio | a19 | Reporting quartet | `reins`, `book_w_re` |
+| reins reporting trio (`reins_summary_df` / `reins_stats_df` / `reins_density_df`), incl. Portfolio | a19 | Reporting quartet | `reins`, `book_w_re` |
 | `occ_bivariate` — joint (ceded, net) via 2D FFT | a20 | New DecL elements | `netceded` |
 | signed severity (`ssev`, signed `dsev`); output window | a21 | New DecL elements / Grids & windows | `signed_d`, `signed_s` |
 | signed `Portfolio` combine; `shift - dist` severity | a22 | New DecL elements | `signed_s` |
@@ -139,7 +139,7 @@ multivariate CatC 25 claims
 
 # 5. Reinsurance ─────────────────────────────────────────────────────────────
 # 5.a reins — occurrence reinsurance; describe now reports gross/net.
-#     Drives reins_describe / reins_stats_df. (Note: the occ clause comes BEFORE freq.)
+#     Drives reins_summary_df / reins_stats_df. (Note: the occ clause comes BEFORE freq.)
 reins = build('agg Re 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
               'occurrence net of 50% po 300 xs 200 and 100% po 500 xs 500 '
               'poisson')
@@ -491,7 +491,7 @@ qd(signed_d.density)
 Reinsurance reporting was rebuilt end to end. Three objects on `Aggregate`
 *and* (new) `Portfolio`:
 
-- `reins_describe` — the daily driver: per-stage gross/ceded/net with the same
+- `reins_summary_df` — the daily driver: per-stage gross/ceded/net with the same
   eight columns as `describe`, where `Change` reads as validation error on the
   gross row and as the cession impact on the ceded/net rows;
 - `reins_stats_df` — the per-layer layering summary (occurrence layers
@@ -508,13 +508,13 @@ qd(reins.describe)
 ```
 
 ```{python}
-qd(reins.reins_describe)
+qd(reins.reins_summary_df)
 ```
 
 The portfolio version convolves the per-unit gross/ceded/net marginals:
 
 ```{python}
-qd(book_w_re.reins_describe)
+qd(book_w_re.reins_summary_df)
 ```
 
 Net/ceded distributions are rebucketed onto the model grid mean-preservingly

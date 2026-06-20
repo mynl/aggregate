@@ -53,7 +53,7 @@ from . import tail as _tail
 # Re-export the bounded tables for back-compat; tail.py is the source of truth.
 # (Unused here, but tests/external code import them via this module -- see
 # tests/test_tail.py; keep the noqa so ruff doesn't strip the re-export.)
-from .tail import _BOUNDED_FREQS, _BOUNDED_SCIPY_SEVS, TailClass  # noqa: F401
+from .tail import TailClass
 
 logger = logging.getLogger(__name__)
 
@@ -2304,9 +2304,6 @@ _STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
 )
 
 
-# ``_BOUNDED_FREQS`` / ``_BOUNDED_SCIPY_SEVS`` are imported from ``tail.py``
-# (the single source of truth) at the top of this module and re-exported here.
-
 
 class Aggregate:
     """Compound (aggregate) probability distribution.
@@ -3133,7 +3130,7 @@ class Aggregate:
     def _reins_view_stats(self):
         """Per-stage reinsurance moments on two bases: exact and rebucketed.
 
-        Internal frame feeding :meth:`reins_describe` (which surfaces the
+        Internal frame feeding :meth:`reins_summary_df` (which surfaces the
         ``EX`` exact vs ``Est`` rebucketed comparison as its ``Change``
         column). The public per-layer summary is :meth:`reins_stats_df`.
         Shaped like ``stats_df`` but indexed by stage / view / basis instead
@@ -3591,7 +3588,7 @@ class Aggregate:
                             'Sk', 'Est Sk']
 
     @property
-    def reins_describe(self):
+    def reins_summary_df(self):
         """Per-stage reinsurance summary -- the daily driver.
 
         Mirrors the **economic view** of :attr:`summary_df`: compare the theoretic
@@ -3628,7 +3625,7 @@ class Aggregate:
         view; cv / skew ``NaN``) -- consistent with :meth:`reins_stats_df`. The
         leading ``gross`` row's ``Est`` frequency is left ``NaN`` to mirror
         :attr:`summary_df` exactly. (Only the per-layer ``layer.k`` columns of
-        :meth:`reins_stats_df` are *conditional*; ``reins_describe`` is always
+        :meth:`reins_stats_df` are *conditional*; ``reins_summary_df`` is always
         unconditional.)
 
         Index is ``MultiIndex (stage, view, component)``. Derived from
@@ -3650,7 +3647,7 @@ class Aggregate:
         return self._reins_describe
 
     def _reins_describe_block(self, stage, views, comps):
-        """One :meth:`reins_describe` block: theoretic reference vs model output
+        """One :meth:`reins_summary_df` block: theoretic reference vs model output
         by view x component, mirroring the eight-column :attr:`summary_df` layout.
 
         The ``EX`` / ``CV`` / ``Sk`` columns hold the **theoretic reference** --
@@ -4027,7 +4024,7 @@ class Aggregate:
         # Reinsurance state (set by apply_occ_reins / apply_agg_reins).
         # The exact (EX) reporting path reads the ceder/netter step
         # functions retained here; the per-stage reins frames
-        # (``reins_density_df``, ``reins_stats_df``, ``reins_describe``)
+        # (``reins_density_df``, ``reins_stats_df``, ``reins_summary_df``)
         # are rebuilt lazily and cached in the underscore members below.
         self.occ_netter = None
         self.occ_ceder = None
@@ -4576,7 +4573,7 @@ class Aggregate:
              if prem > 0 and e_loss is not None else INFO_NA),
             ('P(loss)', p_loss),
             ('validation_eps', self.validation_eps),
-            ('reinsurance', self.reins_kinds().lower()),
+            ('reinsurance', self.reins_kinds.lower()),
             ('occurrence reinsurance', self._reins_description('occ').lower()),
             ('aggregate reinsurance', self._reins_description('agg').lower()),
             ('validation', self.validation_explanation),
@@ -5677,7 +5674,7 @@ class Aggregate:
         # checks above ran against the SUBJECT moments and remain
         # meaningful; mark the result with REINSURANCE so callers know the
         # public surface (``agg_density`` etc.) is the after-reins view.
-        if self.reins_kinds() != 'None':
+        if self.reins_kinds != 'None':
             rv |= Validation.REINSURANCE
 
         if rv == Validation.NOT_UNREASONABLE:
@@ -6094,11 +6091,15 @@ class Aggregate:
             reins = fill(reins, width)
         return reins
 
+    @property
     def reins_kinds(self):
-        """
-        Text desciption of kinds of reinsurance applied: None, Occurrence, Aggergate, both.
+        """Text description of kinds of reinsurance applied.
 
-        :return:
+        Returns
+        -------
+        str
+            One of ``'None'``, ``'Occurrence only'``, ``'Aggregate only'``, or
+            ``'Occurrence and aggregate'``.
         """
         n = 1 if self.occ_reins is not None else 0
         n += 2 if self.agg_reins is not None else 0

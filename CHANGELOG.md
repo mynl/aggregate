@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.0.0a85
+
+### Accessor-name rationalization + bivariate reporting redesign (breaking)
+
+Finishes the `<noun>_df` / noun-property convention sweep across the four main
+classes and rebuilds the `BivariateAggregate` reporting surface. **No deprecated
+aliases** — clean breaks (pre-1.0).
+
+Renames / decorator changes:
+
+- **`reins_describe` → `reins_summary_df`** on `Aggregate` and `Portfolio` (the
+  last `describe`-verb property left after a84; it returns a DataFrame). Private
+  workers `_reins_describe` / `_reins_describe_block` keep their names.
+- **`Aggregate.reins_kinds()` → property `reins_kinds`** (a no-arg narrative
+  accessor; now a noun property like every other narrative member).
+- **`Distortion.tvar_info_df()` → `cached_property tvar_info_df`** (base and the
+  `DistortionWtdTVaR` override), joining the `info` / `summary_df` / `stats_df` /
+  `density_df` cached-property quartet; added to the cache-invalidation list.
+- **`Portfolio.trim_df()` → `trim_density_df()`** and the `update(trim_df=…)`
+  kwarg → `update(trim_density_df=…)` in lockstep (it is a mutator returning
+  `None`, so the `_df` suffix was misleading).
+- **`BivariateAggregate.corr()` / `marginals()` → properties** `corr` /
+  `marginals` (no-arg accessors; `moments(max_order)` stays a method). The
+  lower-level `BivariateDistribution` methods are unchanged.
+- Removed the internal `_BOUNDED_FREQS` / `_BOUNDED_SCIPY_SEVS` re-export from
+  `distributions.py`; import them from `aggregate.tail` (the single source).
+
+Bivariate reporting redesign:
+
+- **`BivariateAggregate.explain` deleted.** Its per-axis theory-vs-empirical
+  validation is now carried by the `Agg` rows of `summary_df`.
+- **`summary_df` rebuilt to the `Portfolio.summary_df` shape**: a shared `Freq`
+  block, a `Sev` / `Agg` block per component, and a `total` `Sev` / `Agg` block
+  (the genuine `X + Y` aggregate), with the eight-column validation view
+  (`EX | Est EX | Err EX | <spread> | … | Sk | Est Sk`) and the same CV→SD switch
+  when a component is a signed (`pnl`) axis. `Est` is populated only where it is
+  observable from the joint density (the `Agg` rows); the `total Agg` empirical
+  comes from the realised mixed moments.
+- **New `dependency_df` property** owning the joint dependence: `cov` / `corr` /
+  `tau` at `Sev` (per-claim joint severity) and `Agg` (realised aggregate) level.
+  `tau` is the input copula's Kendall tau (a per-claim property).
+- **`stats_df` slimmed** to pure per-component marginal moments; its old `joint`
+  dependence block (`cov` / `corr` / `copula_tau` / `E[A0 A1]`) moved to
+  `dependency_df`.
+
+Docs pending a manual rebuild (per `CLAUDE.md`).
+
 ## 1.0.0a84
 
 ### `describe` → `summary_df`; deprecated alias `explain_validation` removed (breaking)

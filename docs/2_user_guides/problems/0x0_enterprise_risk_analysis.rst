@@ -154,9 +154,9 @@ the lowest.
 
    This summary previously used the per-unit, per-layer
    ``reinsurance_occ_layer_df`` dataframe, removed in 1.0.0a19 in favour of the
-   whole-structure ``reins_describe`` / ``reins_stats_df`` / ``reins_density_df``
+   whole-structure ``reins_summary_df`` / ``reins_stats_df`` / ``reins_density_df``
    objects. To rebuild it, take each unit's ceded occurrence aggregate mean
-   (``reins_describe`` row ``('occ', 'Ceded', 'Agg')``) and CV
+   (``reins_summary_df`` row ``('occ', 'Ceded', 'Agg')``) and CV
    (``reins_stats_df`` ``('agg', 'cv')`` at ``('occ', 'ceded', 'Est')``) as the
    layer loss cost ``ex`` and ``cv``; the ceded count is
    ``unit.n * unit.sev.sf(attach)``. Combine with the given premium to form the

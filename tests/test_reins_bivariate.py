@@ -8,7 +8,7 @@ Covers ``dev/done/reins-bivariate.md``:
 
 The central validation is that the two marginals reproduce the univariate
 occurrence aggregates already reported in ``reins_density_df`` /
-``reins_stats_df`` / ``reins_describe``, and the anti-diagonal ``C + N``
+``reins_stats_df`` / ``reins_summary_df``, and the anti-diagonal ``C + N``
 reproduces the gross aggregate -- exact targets from the same densities.
 
 The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg``
@@ -105,7 +105,7 @@ def test_requires_updated():
 def test_marginals_sum_to_one(prog):
     a = _build(prog)
     b = a.occ_bivariate()
-    cd, nd = b.marginals()
+    cd, nd = b.marginals
     assert cd.sum() == pytest.approx(1.0, abs=1e-6)
     assert nd.sum() == pytest.approx(1.0, abs=1e-6)
     assert b.deficit < 1e-6
@@ -121,7 +121,7 @@ def test_marginal_means_match_stats_df(prog):
     """
     a = _build(prog)
     b = a.occ_bivariate()
-    net_d, ced_d = b.marginals()
+    net_d, ced_d = b.marginals
     rs = a.reins_stats_df
     net_mean, _, _ = _marginal_moments(b.axis_xs[0], net_d)
     ced_mean, _, _ = _marginal_moments(b.axis_xs[1], ced_d)
@@ -146,7 +146,7 @@ def test_matched_grid_reproduces_univariate_cv(prog):
     l2c = _cover_log2(rd['p_agg_ceded_occ'].to_numpy(), a.xs, a.bs)
     l2n = _cover_log2(rd['p_agg_net_occ'].to_numpy(), a.xs, a.bs)
     b = a.occ_bivariate(bs=a.bs, log2_x=l2n, log2_y=l2c)
-    net_d, ced_d = b.marginals()
+    net_d, ced_d = b.marginals
     rs = a.reins_stats_df
     net_mean, net_cv, _ = _marginal_moments(b.axis_xs[0], net_d)
     ced_mean, ced_cv, _ = _marginal_moments(b.axis_xs[1], ced_d)
@@ -158,14 +158,14 @@ def test_matched_grid_reproduces_univariate_cv(prog):
 
 @pytest.mark.parametrize('prog', [OCC, OCC_BOUNDED])
 def test_marginals_match_describe(prog):
-    """Net / ceded marginal means match the reins_describe occ Est cells.
+    """Net / ceded marginal means match the reins_summary_df occ Est cells.
 
     Axis 0 is Net, axis 1 is Ceded (x=net, y=ceded convention).
     """
     a = _build(prog)
     b = a.occ_bivariate()
-    net_d, ced_d = b.marginals()
-    rd = a.reins_describe
+    net_d, ced_d = b.marginals
+    rd = a.reins_summary_df
     net_mean, _, _ = _marginal_moments(b.axis_xs[0], net_d)
     ced_mean, _, _ = _marginal_moments(b.axis_xs[1], ced_d)
     assert net_mean == pytest.approx(rd.loc[('occ', 'net', 'agg'), 'Est EX'], rel=2e-3)
@@ -216,7 +216,7 @@ def test_anti_diagonal_variance(prog):
 @pytest.mark.parametrize('prog', [OCC, OCC_BOUNDED, OCC_FIXED])
 def test_corr_in_range(prog):
     a = _build(prog)
-    rho = a.occ_bivariate().corr()
+    rho = a.occ_bivariate().corr
     assert np.isfinite(rho)
     assert -1.0 <= rho <= 1.0
 
@@ -224,7 +224,7 @@ def test_corr_in_range(prog):
 def test_corr_positive_for_random_count():
     """Random (Poisson) count couples ceded and net -> positive correlation."""
     a = _build(OCC_BOUNDED)
-    assert a.occ_bivariate().corr() > 0
+    assert a.occ_bivariate().corr > 0
 
 
 def test_poisson_count_increases_correlation():
@@ -236,7 +236,7 @@ def test_poisson_count_increases_correlation():
                   'occurrence net of 0.7 so 60 xs 40 poisson')
     fixed = _build('agg BV.CF dfreq [8] sev 300 * beta 2 3 '
                    'occurrence net of 0.7 so 60 xs 40')
-    assert pois.occ_bivariate().corr() > fixed.occ_bivariate().corr() > 0
+    assert pois.occ_bivariate().corr > fixed.occ_bivariate().corr > 0
 
 
 # ----------------------------------------------------------------------------
@@ -263,7 +263,7 @@ def test_netceded_one_common_bs_no_finer_than_gross():
     assert b.bs[0] == b.bs[1]              # one common bs
     assert b.bs[0] >= a.bs - 1e-12         # never finer than gross
     # the grid covers the margins -- mass is conserved
-    cd, nd = b.marginals()
+    cd, nd = b.marginals
     assert float(cd.sum()) == pytest.approx(1.0, abs=1e-6)
     assert float(nd.sum()) == pytest.approx(1.0, abs=1e-6)
 
@@ -275,7 +275,7 @@ def test_netceded_marginals_match_occ_views():
     """
     a = _build(OCC)
     b = a.occ_bivariate()
-    net_d, ced_d = b.marginals()
+    net_d, ced_d = b.marginals
     rs = a.reins_stats_df
     assert float((net_d * b.axis_xs[0]).sum()) == pytest.approx(
         rs.loc[('agg', 'mean'), ('occ', 'Net')], rel=2e-3)
@@ -314,7 +314,7 @@ def test_view_pair_marginals_match_named_views(views, labels):
     a = _build(OCC)
     b = a.occ_bivariate(views=views)
     assert b.unit_names == list(labels)
-    m0, m1 = b.marginals()
+    m0, m1 = b.marginals
     rs = a.reins_stats_df
     assert float((m0 * b.axis_xs[0]).sum()) == pytest.approx(
         rs.loc[('agg', 'mean'), ('occ', labels[0])], rel=2e-3)
@@ -337,7 +337,7 @@ def test_grossnet_anti_diagonal_is_ceded():
     """gross - net == ceded: E[Gross] - E[Net] reproduces E[Ceded]."""
     a = _build(OCC)
     b = a.occ_bivariate(views=('gross', 'net'))
-    m0, m1 = b.marginals()
+    m0, m1 = b.marginals
     e_g = float((m0 * b.axis_xs[0]).sum())
     e_n = float((m1 * b.axis_xs[1]).sum())
     e_ceded = a.reins_stats_df.loc[('agg', 'mean'), ('occ', 'Ceded')]
@@ -405,7 +405,10 @@ def test_describe_and_info_netceded():
     a = _build(OCC_BOUNDED)
     b = a.occ_bivariate()
     df = b.summary_df
-    assert {'Ceded', 'Net', 'joint'}.issubset(set(df.index))
-    assert (df.loc['Ceded', 'kind'], df.loc['Net', 'kind']) == ('netceded', 'netceded')
-    assert np.isclose(float(df.loc['joint', 'corr']), b.corr())
+    assert {('Ceded', 'Agg'), ('Net', 'Agg'),
+            ('total', 'Agg')}.issubset(set(df.index))
+    assert np.isclose(float(df.loc[('total', 'Agg'), 'EX']),
+                      float(df.loc[('Ceded', 'Agg'), 'EX'])
+                      + float(df.loc[('Net', 'Agg'), 'EX']))
+    assert np.isclose(float(b.dependency_df.loc['Agg', 'corr']), b.corr)
     assert 'netceded' in b.info

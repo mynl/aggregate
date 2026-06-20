@@ -284,13 +284,6 @@ def test_portfolio_tail_text_smoke():
     assert 'aggregate tail' in p.info
 
 
-def test_tables_match_legacy():
-    # The bounded tables moved to tail.py; the distributions re-export must match.
-    from aggregate import distributions as d
-    assert d._BOUNDED_FREQS is _BOUNDED_FREQS
-    assert d._BOUNDED_SCIPY_SEVS is _BOUNDED_SCIPY_SEVS
-
-
 # ---------------------------------------------------------------------------
 # Layered thick/thin tail report (tail_df).
 # ---------------------------------------------------------------------------

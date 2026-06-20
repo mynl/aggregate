@@ -1,0 +1,110 @@
+---
+title: "<Paper short title> — <example name>"
+subtitle: "Reproduced in aggregate"
+author: "Stephen J. Mildenhall"
+date: last-modified
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+jupyter: python3
+execute:
+  warning: false
+  cache: true
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: false
+---
+
+<!--
+Fill-in template for a published-example reproduction. See README.md for the
+process and house style. Replace every <...> placeholder and delete this comment
+and any unused section. Cite the source paper with @Key throughout.
+-->
+
+## Overview
+
+State the business problem, name the source paper [@Key], and say exactly what
+this page reproduces. One short paragraph.
+
+## Published Model
+
+Transcribe the model exactly as the paper states it: frequency, severity,
+exposure, contract terms, assumptions. Parameters in a table:
+
+| Component | Specification |
+|---|---|
+| Frequency | <e.g. Poisson, mean 20> |
+| Severity | <e.g. lognormal, mean 100, CV 2> |
+| Exposure / terms | <limits, attachment, aggregate features> |
+| Assumptions | <independence, currency, etc.> |
+
+<!-- Optional original spec exhibit (you supply the crop):
+![Original model specification, @Key.](img/<paper>_model.png){width=80%}
+-->
+
+## Aggregate Implementation
+
+```{python}
+from aggregate import build, qd
+
+a = build('''
+agg <Name>
+    <frequency clause>
+    <severity clause>
+    <reinsurance / aggregate clauses>
+''')
+qd(a)
+```
+
+## Reproduction
+
+Published values versus aggregate, side by side. Transcribe the paper's numbers
+into `published`; aggregate's land beside them.
+
+```{python}
+import pandas as pd
+
+published = pd.Series(
+    {'<stat 1>': 0.0, '<stat 2>': 0.0},   # <-- paper's values
+    name='published')
+
+computed = pd.Series(
+    {'<stat 1>': a.<...>, '<stat 2>': a.<...>},
+    name='aggregate')
+
+cmp = pd.concat([published, computed], axis=1)
+cmp['error'] = cmp['aggregate'] / cmp['published'] - 1
+qd(cmp, accuracy=5)
+```
+
+State the result plainly — e.g. "These match the values in the paper."
+
+<!-- Optional original results exhibit (you supply the crop):
+![Original results table, @Key.](img/<paper>_table.png){width=80%}
+-->
+
+## Distributional Analysis
+
+`aggregate` returns the full distribution, not just the published point answers.
+Show gross, ceded, and net where applicable.
+
+```{python}
+a.plot()
+```
+
+## Extensions
+
+Structures the paper did not compute but the model now makes free: alternative
+limits/attachments, sensitivities, risk measures (VaR, TVaR), distortion pricing,
+or capital allocation. Keep each extension short and motivated.
+
+## Conclusions
+
+What this example demonstrates about `aggregate`: the a priori problem solved,
+the match achieved, and the additional analysis unlocked.
+
+## References
+
+::: {#refs}
+:::

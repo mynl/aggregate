@@ -545,16 +545,39 @@ def _render_copula(copula) -> str:
     return f'copula {kind} {_fmt_num(param)}'
 
 
+def _render_dbvsev(spec: dict) -> str:
+    """Render a discrete bivariate severity as the canonical dense form.
+
+    ``dbvsev [xs] [ys] [[row] [row] ...]`` --- ``S[i][j] = P(X=xs[i], Y=ys[j])``.
+    The sparse / uniform / range surface forms all normalise to the same dense
+    ``dbv_*`` spec, so they canonicalise to this dense rendering (which re-parses
+    to the same matrix).
+    """
+    xs, ys = spec['dbv_xs'], spec['dbv_ys']
+    S = np.atleast_2d(np.asarray(spec['dbv_S'], dtype=float))
+    rows = ' '.join('[' + ' '.join(_fmt_num(v) for v in row) + ']' for row in S)
+    return f'dbvsev {_fmt_seq(xs)} {_fmt_seq(ys)} [{rows}]'
+
+
 def _render_bvagg(name: str, spec: dict) -> str:
     """Render a bivariate (copula-coupled) aggregate or a ``netceded`` agg.
 
-    Inverts ``bv_out_copula`` / ``bv_out_copula_nofreq``, the three occurrence
+    Inverts ``bv_out_copula`` / ``bv_out_copula_nofreq`` / ``bv_out_copula_dfreq``,
+    the discrete ``dbvsev`` forms (``bv_out_discrete*``), the three occurrence
     view-pair prefixes (``bv_out_netceded`` / ``bv_out_grossceded`` /
     ``bv_out_grossnet``), and the ``clash`` statement (``clash_out``). The two
     components are rendered inline (whitespace-insensitive within a program); the
     shared frequency is always emitted (the no-freq source form defaults to
     ``poisson``, which re-parses to the same spec).
     """
+    if spec.get('mode') == 'discrete':
+        return _join([
+            f'bivariate {name}',
+            _render_exposure(spec),
+            _render_dbvsev(spec),
+            _render_freq(spec),
+            _render_trailer(spec),
+        ])
     if 'clash' in spec:
         # Re-derive the clash surface from the stored (na, nb, nc); each
         # component renders as its limit + severity (the solved Bernoulli dfreq

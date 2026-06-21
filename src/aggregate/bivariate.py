@@ -501,6 +501,43 @@ def _affine_axis(density, axis, bs, n, reflect, shift, m_loss, sd, skew):
     return out, xs_new
 
 
+def _lattice_bs(xs):
+    """Largest bucket size that places every atom of ``xs`` exactly on the grid.
+
+    The discrete bivariate severity (``dbvsev``) is exact only if each lattice
+    value is an integer multiple of the per-axis ``bs`` -- then the joint matrix
+    scatters onto the FFT grid with no rebucketing. This returns the greatest
+    such ``bs`` (the gcd of the non-zero atoms): ``1`` for an integer lattice,
+    the natural step for a uniform one, a common divisor otherwise.
+
+    Parameters
+    ----------
+    xs : array-like
+        The axis outcomes (a 1-D lattice; ``0`` is ignored, negatives by
+        magnitude).
+
+    Returns
+    -------
+    float
+        The largest exact bucket size; ``1.0`` for an empty / all-zero lattice.
+    """
+    vals = np.abs(np.asarray(xs, dtype=float))
+    vals = vals[vals > 0]
+    if len(vals) == 0:
+        return 1.0
+
+    def _fgcd(a, b):
+        # float Euclid: stop when the remainder is rounding noise relative to a.
+        while b > 1e-9 * max(a, 1.0):
+            a, b = b, a - np.floor(a / b) * b
+        return a
+
+    g = vals[0]
+    for v in vals[1:]:
+        g = _fgcd(g, v)
+    return float(g)
+
+
 class BivariateAggregate:
     """Joint (bivariate) aggregate of two copula-coupled component aggregates.
 
@@ -565,6 +602,7 @@ class BivariateAggregate:
 
     def __init__(self, name, units=None, copula=None, note='', hints='', mode='copula',
                  nc_agg=None, nc_kwargs=None, nc_views=None, clash=None,
+                 dbv_xs=None, dbv_ys=None, dbv_S=None,
                  exp_en=None, exp_el=None, exp_premium=None, exp_lr=None,
                  freq_name='poisson', freq_a=0.0, freq_b=0.0,
                  freq_zm=False, freq_p0=np.nan, **kwargs):
@@ -586,6 +624,9 @@ class BivariateAggregate:
         self.bs = [None, None]
         self.deficit = np.nan
         self._S = None
+        # given joint per-claim severity matrix (discrete mode); None otherwise,
+        # so update_work falls back to the copula rectangle_pmf.
+        self._S_given = None
         self._sev_xs = [None, None]
         self._sev_moms = [None, None]      # per-axis per-event severity raw moms
         self._marg_theory = [None, None]   # per-axis (mean, sd, skew)
@@ -593,6 +634,17 @@ class BivariateAggregate:
 
         if mode == 'netceded':
             self._init_netceded(name, units, nc_agg, nc_kwargs, nc_views)
+            return
+
+        if mode == 'discrete':
+            if units is not None or any(
+                    k in kwargs for k in ('agg_reflect', 'agg_shift', 'agg_premium')):
+                raise ValueError(
+                    'pnl / premium axes are not supported with dbvsev; use the '
+                    "copula form 'bv ... agg/pnl ... agg/pnl ...'.")
+            self._init_discrete(name, dbv_xs, dbv_ys, dbv_S,
+                                freq_name, freq_a, freq_b, freq_zm, freq_p0,
+                                exp_en, exp_el, exp_premium, exp_lr)
             return
 
         if units is None or len(units) != 2:
@@ -670,6 +722,88 @@ class BivariateAggregate:
             self._nc_agg = Aggregate(**units[0][2])
             self._nc_built_here = True
 
+    def _init_discrete(self, name, dbv_xs, dbv_ys, dbv_S,
+                       freq_name, freq_a, freq_b, freq_zm, freq_p0,
+                       exp_en, exp_el, exp_premium, exp_lr):
+        """Initialise ``discrete`` mode: the joint per-claim severity given directly.
+
+        A ``dbvsev`` lattice supplies the joint per-claim probability matrix
+        ``S`` (rows = X outcomes, columns = Y outcomes) on the explicit lattice
+        ``(dbv_xs, dbv_ys)``. The discrete analogue of copula mode: everything is
+        reused except the *formation* of ``S`` -- here it is given, not built from
+        a copula. The two per-axis marginal units are 1-claim discrete aggregates
+        whose per-event severity is the row / column sum of ``S``; they play the
+        same role the copula-mode component aggregates do (axis sizing + the
+        standalone validation targets). Loss / loss only -- no ``pnl`` axes.
+
+        Parameters
+        ----------
+        name : str
+            Object name.
+        dbv_xs, dbv_ys : array-like
+            The X / Y axis outcomes (the lattice).
+        dbv_S : ndarray
+            The ``len(xs) x len(ys)`` joint per-claim probability matrix,
+            ``S[i, j] = P(X = xs[i], Y = ys[j])`` (already validated /
+            normalised by the transformer).
+        freq_name, freq_a, freq_b, freq_zm, freq_p0
+            The shared outer frequency (a ``dfreq`` empirical count, or a named
+            distribution with a count from the exposure clause).
+        exp_en, exp_el, exp_premium, exp_lr
+            Outer (shared-count) exposure for a non-empirical frequency.
+        """
+        from .distributions import Aggregate, Frequency
+
+        if dbv_xs is None or dbv_ys is None or dbv_S is None:
+            raise ValueError('discrete bivariate requires dbv_xs, dbv_ys, dbv_S.')
+        xs = np.asarray(dbv_xs, dtype=float)
+        ys = np.asarray(dbv_ys, dtype=float)
+        S = np.asarray(dbv_S, dtype=float)
+        if S.shape != (len(xs), len(ys)):
+            raise ValueError(
+                f'discrete bivariate: S shape {S.shape} does not match the '
+                f'lattice {(len(xs), len(ys))}.')
+
+        self.copula = None
+        self._S_given = S
+        self._dbv_xs = xs
+        self._dbv_ys = ys
+        self._affine = [(False, 0.0), (False, 0.0)]
+
+        # per-event marginal severities = row / column sums of S
+        g0 = S.sum(axis=1)
+        g1 = S.sum(axis=0)
+        self.unit_names = ['X', 'Y']
+        # dsev-shaped partial specs, so _standalone_marginal rebuilds each axis's
+        # marginal (shared freq compounded with g_i) for measure-don't-guess sizing.
+        self._unit_specs = [
+            {'name': 'X', 'sev_name': 'dhistogram', 'sev_xs': xs, 'sev_ps': g0},
+            {'name': 'Y', 'sev_name': 'dhistogram', 'sev_xs': ys, 'sev_ps': g1},
+        ]
+        # 1-claim discrete aggregates whose aggregate density IS the per-event
+        # severity g_i (units[i].n == 1); supply the per-event severity moments
+        # and the per-axis sizing inputs, exactly as the copula-mode units do.
+        self.units = [
+            Aggregate(name='X', freq_name='fixed', exp_en=1,
+                      sev_name='dhistogram', sev_xs=xs, sev_ps=g0),
+            Aggregate(name='Y', freq_name='fixed', exp_en=1,
+                      sev_name='dhistogram', sev_xs=ys, sev_ps=g1),
+        ]
+
+        self.frequency = Frequency(freq_name, freq_a, freq_b, freq_zm, freq_p0)
+        self.freq_name = freq_name
+        self._freq_kwargs = dict(freq_name=freq_name, freq_a=freq_a,
+                                 freq_b=freq_b, freq_zm=freq_zm, freq_p0=freq_p0)
+        self._sev_moms = [self._raw3(a.agg_m, a.agg_sd, a.agg_skew)
+                          for a in self.units]
+        # shared event count (an empirical dfreq carries its own mean; see
+        # _resolve_en).
+        self.en = self._resolve_en(exp_en, exp_el, exp_premium, exp_lr)
+        # per-axis exact bucket size: the lattice gcd, so S scatters onto the
+        # FFT grid with no rebucketing (the discrete analogue of dsev exactness).
+        self._lattice_bs = [_lattice_bs(xs), _lattice_bs(ys)]
+        self._gs = None
+
     # ------------------------------------------------------------------
     # moment / sizing helpers
     # ------------------------------------------------------------------
@@ -683,7 +817,15 @@ class BivariateAggregate:
         return (float(m), float(s2), float(s3))
 
     def _resolve_en(self, exp_en, exp_el, exp_premium, exp_lr):
-        """Expected outer event count from the parsed exposure clause."""
+        """Expected outer event count from the parsed exposure clause.
+
+        An empirical (``dfreq``) shared frequency carries its own count (the
+        mean of the empirical pmf); the ``exp_en`` sentinel is ``-1`` there, so
+        read the count off the frequency moments instead of the exposure clause.
+        """
+        if getattr(self, 'frequency', None) is not None \
+                and self.frequency.freq_name == 'empirical':
+            return float(self.frequency.freq_moms(0)[0])
         if exp_en is not None and np.sum(np.asarray(exp_en, dtype=float)) > 0:
             return float(np.sum(np.asarray(exp_en, dtype=float)))
         # fall back to a loss/premium exposure: events = loss / per-event mean
@@ -955,6 +1097,13 @@ class BivariateAggregate:
             bs_axes = [float(bs), float(bs)]
         else:
             bs_axes = [None, None]
+        # discrete mode: default each axis's bs to the lattice gcd so the given
+        # joint matrix scatters onto the grid exactly (a pinned bs lets _size_axes
+        # grow log2 to cover the measured aggregate window). An explicit override
+        # still wins.
+        if self.mode == 'discrete':
+            bs_axes = [bs_axes[i] if bs_axes[i] is not None else self._lattice_bs[i]
+                       for i in range(2)]
         bss, log2s, x_mins, his, clipped = self._size_axes(
             total_log2, bs_axes, log2_axes)
         self._clipped = clipped
@@ -1084,11 +1233,21 @@ class BivariateAggregate:
                                          int(np.log2(N1)) + self.padding])
         # marginal CDFs in physical order (the copula couples ranks); the
         # Bernoulli zero-inflation is automatic as a jump in G.
-        G0 = np.cumsum(g0)
-        G1 = np.cumsum(g1)
-        # joint per-claim severity via the copula (marginals exact by
-        # construction); retained for the severity panel of plot().
-        S = self.copula.rectangle_pmf(G0, G1)
+        if self._S_given is not None:
+            # discrete mode: scatter the given joint per-claim matrix onto the
+            # (N0, N1) output grid at each lattice point's bucket index. The
+            # lattice bs divides every atom (gcd), so the indices are exact and
+            # the per-event-severity row/column sums reproduce g0 / g1 on the grid.
+            S = np.zeros((N0, N1))
+            ix = np.round(self._dbv_xs / self.bs[0]).astype(int)
+            iy = np.round(self._dbv_ys / self.bs[1]).astype(int)
+            S[np.ix_(ix, iy)] = self._S_given
+        else:
+            G0 = np.cumsum(g0)
+            G1 = np.cumsum(g1)
+            # joint per-claim severity via the copula (marginals exact by
+            # construction); retained for the severity panel of plot().
+            S = self.copula.rectangle_pmf(G0, G1)
         self._S = S
 
         if self.en == 0:
@@ -1499,6 +1658,11 @@ class BivariateAggregate:
             copula = 'comonotone (netceded)'
             freq_name = self._nc_agg.frequency.freq_name
             en = float(self._nc_agg.n)
+            tau = INFO_NA
+        elif self.mode == 'discrete':
+            copula = 'discrete (dbvsev)'
+            freq_name = self.freq_name
+            en = float(self.en)
             tau = INFO_NA
         else:
             copula = repr(self.copula)

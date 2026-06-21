@@ -285,6 +285,21 @@ grossnet agg MV.GrossNet 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60
 # two components are independent-copula Bernoulli factories on a shared frequency.
 clash MV.Clash 8 5 2 claims sev lognorm 50 cv 1.2 sev lognorm 60 cv 1.5 mixed gamma 0.2
 
+# DBVSEV. Discrete bivariate severity: the joint per-claim probability matrix
+# given directly on an explicit lattice (mode='discrete'), the 2-D analogue of
+# dsev. Row index = X outcome, column index = Y outcome; matrix[i][j] =
+# P(X=xs[i], Y=ys[j]). Four forms: dfreq + dbvsev (headline), exposure-count +
+# dbvsev + freq, dfreq + agg/agg copula, and the sparse-triples / uniform-default
+# / range variants. Marginals reproduce the standalone dsev compounds exactly.
+# See dev/done/plan-bv-discrete.md.
+bivariate MV.DBV4 dfreq [1 2 3] [.5 .3 .2] dbvsev [0 1 2] [0 5 10] [[.4 .1 .0] [.1 .1 .1] [.0 .05 .15]];
+bivariate MV.DBV3 5 claims dbvsev [10 20] [1 2 3] [[.4 .1 .0] [.2 .1 .2]] mixed gamma 0.1;
+bivariate MV.DBVPoi 5 claims dbvsev [10 20] [1 2 3] [[.4 .1 .0] [.2 .1 .2]];
+bivariate MV.DBVSparse 5 claims dbvsev [[10 1 .4] [10 2 .1] [20 1 .2] [20 2 .1] [20 3 .2]];
+bivariate MV.DBVUniform 5 claims dbvsev [0 1 2] [0 5 10];
+bivariate MV.DBVRange 5 claims dbvsev [0:2] [0:2];
+bivariate MV.DBV2 dfreq [1 2] [.7 .3] agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula gumbel 0.4
+
 # ============================================================
 # HINTS. note{} is pure text; hints{} carries key=value; build settings (1.0.0a25)
 # ============================================================

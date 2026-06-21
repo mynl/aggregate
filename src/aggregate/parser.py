@@ -48,7 +48,8 @@ from typing import Iterator
 
 import numpy as np
 from lark import Lark, Transformer
-from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
+from lark.exceptions import (UnexpectedCharacters, UnexpectedInput,
+                             UnexpectedToken, VisitError)
 
 from .parser_errors import format_error
 
@@ -144,12 +145,38 @@ class UnderwritingLexer:
         program = re.sub(r"(//|#)[^\n]*", "", program)
 
         # 3. Collapse newlines inside [...] (which can appear when a vector is
-        # formatted with f'{np.linspace(...)}').
-        out_in = re.split(r"\[|\]", program)
-        assert len(out_in) % 2  # must be odd
-        odd = [t.replace("\n", " ") for t in out_in[1::2]]
-        even = out_in[0::2]
-        program = " ".join([even[0]] + [f"[{o}] {e}" for o, e in zip(odd, even[1:])])
+        # formatted with f'{np.linspace(...)}'). The flat split below assumes
+        # brackets do not nest -- true for every form except the dbvsev dense /
+        # sparse matrices (``[[ ... ]]``). When nesting is present, fall back to a
+        # depth-aware scan that only turns interior newlines into spaces and
+        # leaves the bracket structure untouched. The non-nested path is kept
+        # byte-for-byte so the captured spec snapshot (keyed on this text) is
+        # unaffected.
+        depth = max_depth = 0
+        for ch in program:
+            if ch == "[":
+                depth += 1
+                max_depth = max(max_depth, depth)
+            elif ch == "]":
+                depth = max(0, depth - 1)
+        if max_depth <= 1:
+            out_in = re.split(r"\[|\]", program)
+            assert len(out_in) % 2  # must be odd
+            odd = [t.replace("\n", " ") for t in out_in[1::2]]
+            even = out_in[0::2]
+            program = " ".join(
+                [even[0]] + [f"[{o}] {e}" for o, e in zip(odd, even[1:])])
+        else:
+            chars, depth = [], 0
+            for ch in program:
+                if ch == "[":
+                    depth += 1
+                elif ch == "]":
+                    depth = max(0, depth - 1)
+                elif ch == "\n" and depth > 0:
+                    ch = " "
+                chars.append(ch)
+            program = "".join(chars)
 
         # 4. A line-final ``;`` terminates a statement -> turn it into a blank
         # line. ``;`` inside hints{}/note{} is never line-final (those end in
@@ -563,6 +590,75 @@ class UnderwritingTransformer(Transformer):
             "freq_name": "poisson",
             "units": body,
             "copula": copula,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
+        }
+        return ("bvagg", name, spec)
+
+    def bv_out_copula_dfreq(self, c):
+        """``bivariate NAME dfreq [...] [...] <two aggs> copula ...`` (form 2).
+
+        The ``dfreq`` clause carries both the shared event count and its
+        distribution (an empirical frequency), replacing the ``exposures ...
+        freq`` head exactly as in ``agg_out_dfreq``; the rest is the copula
+        builder.
+        """
+        _bv, name, dfreq, body, copula, trailer = c
+        spec = {
+            "name": name,
+            **dfreq,
+            "units": body,
+            "copula": copula,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
+        }
+        return ("bvagg", name, spec)
+
+    def bv_out_discrete(self, c):
+        """``bivariate NAME <count> dbvsev ... <freq>`` (form 3).
+
+        A discrete bivariate severity (the joint per-claim matrix given directly)
+        with the full frequency vocabulary after it (bare count -> Poisson, or any
+        named distribution); ``mode='discrete'``.
+        """
+        _bv, name, exposures, dbv, freq, trailer = c
+        spec = {
+            "name": name,
+            "mode": "discrete",
+            **exposures,
+            **freq,
+            **dbv,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
+        }
+        return ("bvagg", name, spec)
+
+    def bv_out_discrete_nofreq(self, c):
+        """``bivariate NAME <count> dbvsev ...`` with no trailing freq -> Poisson."""
+        _bv, name, exposures, dbv, trailer = c
+        spec = {
+            "name": name,
+            "mode": "discrete",
+            **exposures,
+            "freq_name": "poisson",
+            **dbv,
+            "note": trailer["note"],
+            "hints": trailer["hints"],
+        }
+        return ("bvagg", name, spec)
+
+    def bv_out_discrete_dfreq(self, c):
+        """``bivariate NAME dfreq [...] [...] dbvsev ...`` (form 4, the headline).
+
+        Both the shared frequency and the joint per-claim severity are discrete:
+        a ``dfreq`` empirical count and a ``dbvsev`` lattice; ``mode='discrete'``.
+        """
+        _bv, name, dfreq, dbv, trailer = c
+        spec = {
+            "name": name,
+            "mode": "discrete",
+            **dfreq,
+            **dbv,
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
@@ -986,6 +1082,89 @@ class UnderwritingTransformer(Transformer):
             "exp_en": -1,
         }
 
+    # ----- dbvsev (discrete bivariate severity) ---------------------
+    # Every dbvsev surface form (dense / dense-uniform / sparse) normalises to
+    # the SAME partial spec ``{dbv_xs, dbv_ys, dbv_S}`` -- the joint per-claim
+    # probability matrix on an explicit lattice -- so BivariateAggregate sees one
+    # shape regardless of how it was written. See dev/done/plan-bv-discrete.md.
+    @staticmethod
+    def _finalize_dbv(xs, ys, S):
+        """Validate / renormalise a dbvsev lattice into ``{dbv_xs, dbv_ys, dbv_S}``.
+
+        Checks the matrix shape against the axis lengths and non-negativity, then
+        renormalises to sum 1 (warning if off by more than rounding noise), the
+        2-D analogue of ``dsev``'s pmf handling.
+        """
+        xs = np.asarray(xs, dtype=float)
+        ys = np.asarray(ys, dtype=float)
+        S = np.asarray(S, dtype=float)
+        if S.shape != (len(xs), len(ys)):
+            raise ValueError(
+                f"dbvsev: probability matrix shape {S.shape} does not match the "
+                f"lattice ({len(xs)} x outcomes, {len(ys)} y outcomes); expected "
+                f"{(len(xs), len(ys))}.")
+        if np.any(S < 0):
+            raise ValueError("dbvsev: probability matrix has negative entries.")
+        total = float(S.sum())
+        if total <= 0:
+            raise ValueError("dbvsev: probability matrix sums to zero.")
+        if abs(total - 1.0) > 1e-6:
+            logger.warning(
+                "dbvsev: probabilities sum to %.6g, renormalising to 1.", total)
+        return {"dbv_xs": xs, "dbv_ys": ys, "dbv_S": S / total}
+
+    def drow(self, c):
+        return _check_vectorizable(c[0])
+
+    def dmatrix_rows_one(self, c):
+        return [c[0]]
+
+    def dmatrix_rows_cons(self, c):
+        rows, row = c
+        rows.append(row)
+        return rows
+
+    def dprob_matrix(self, c):
+        # c[0] is the list of 1-D row arrays; ragged rows raise in _finalize_dbv.
+        return np.array([np.asarray(r, dtype=float) for r in c[0]])
+
+    def dbvsev_dense(self, c):
+        _dbvsev, xs, ys, matrix = c
+        return self._finalize_dbv(xs, ys, matrix)
+
+    def dbvsev_dense_uniform(self, c):
+        _dbvsev, xs, ys = c
+        xs = _check_vectorizable(xs)
+        ys = _check_vectorizable(ys)
+        nx, ny = len(xs), len(ys)
+        return self._finalize_dbv(xs, ys, np.full((nx, ny), 1.0 / (nx * ny)))
+
+    def dtriple(self, c):
+        x, y, p = c
+        return (float(x), float(y), float(p))
+
+    def dtriples_one(self, c):
+        return [c[0]]
+
+    def dtriples_cons(self, c):
+        lst, t = c
+        lst.append(t)
+        return lst
+
+    def dtriple_list(self, c):
+        return c[0]
+
+    def dbvsev_sparse(self, c):
+        _dbvsev, triples = c
+        xs = sorted({t[0] for t in triples})
+        ys = sorted({t[1] for t in triples})
+        ix = {v: i for i, v in enumerate(xs)}
+        iy = {v: j for j, v in enumerate(ys)}
+        S = np.zeros((len(xs), len(ys)))
+        for x, y, p in triples:
+            S[ix[x], iy[y]] += p          # collisions summed
+        return self._finalize_dbv(xs, ys, S)
+
     def picks(self, c):
         _picks, attachments, losses = c
         return {"sev_pick_attachments": attachments, "sev_pick_losses": losses}
@@ -1276,7 +1455,13 @@ class UnderwritingParser:
             err = ValueError(report.summary)
             err.report = report
             raise err from None
-        return UnderwritingTransformer(self.safe_lookup, self.debug).transform(tree)
+        try:
+            return UnderwritingTransformer(
+                self.safe_lookup, self.debug).transform(tree)
+        except VisitError as e:
+            # Surface a transformer-raised error (e.g. dbvsev validation) as the
+            # original exception rather than Lark's wrapper.
+            raise e.orig_exc from None
 
 
 # ======================================================================

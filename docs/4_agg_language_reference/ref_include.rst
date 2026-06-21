@@ -122,11 +122,36 @@
     
     bv_out: BIVARIATE name exposures bv_body copula_clause freq trailer  -> bv_out_copula
           | BIVARIATE name exposures bv_body copula_clause trailer        -> bv_out_copula_nofreq
+          | BIVARIATE name dfreq bv_body copula_clause trailer            -> bv_out_copula_dfreq
+          | BIVARIATE name exposures dbvsev freq trailer                  -> bv_out_discrete
+          | BIVARIATE name exposures dbvsev trailer                       -> bv_out_discrete_nofreq
+          | BIVARIATE name dfreq dbvsev trailer                           -> bv_out_discrete_dfreq
           | NETCEDED agg_out                                              -> bv_out_netceded
           | GROSSCEDED agg_out                                            -> bv_out_grossceded
           | GROSSNET agg_out                                              -> bv_out_grossnet
           | CLASH name expr expr expr CLAIMS clash_comp clash_comp freq trailer  -> clash_out
           | CLASH name expr expr expr CLAIMS clash_comp clash_comp trailer        -> clash_out_nofreq
+    
+    // A discrete bivariate severity: the joint per-claim probability matrix given
+    // directly on an explicit lattice, the 2-D analogue of ``dsev``. Three surface
+    // forms, auto-detected (Earley + dynamic lexer): a dense contingency table
+    // ``dbvsev [xs] [ys] [[row] [row] ...]`` (matrix[i][j] = P(X=xs[i], Y=ys[j])),
+    // the same with the matrix omitted (uniform over the lattice), or a sparse list
+    // of ``[x y p]`` triples. ``doutcomes`` is ``[numbers]`` (never ``[[...]]``), so
+    // the dense / sparse forms never compete. See dev/done/plan-bv-discrete.md.
+    dbvsev: DBVSEV doutcomes doutcomes dprob_matrix   -> dbvsev_dense
+          | DBVSEV doutcomes doutcomes                -> dbvsev_dense_uniform
+          | DBVSEV dtriple_list                       -> dbvsev_sparse
+    
+    dprob_matrix: "[" dmatrix_rows "]"
+    dmatrix_rows: dmatrix_rows drow   -> dmatrix_rows_cons
+                | drow                -> dmatrix_rows_one
+    drow: "[" numberl "]"            -> drow
+    
+    dtriple_list: "[" dtriples "]"
+    dtriples: dtriples dtriple        -> dtriples_cons
+            | dtriple                 -> dtriples_one
+    dtriple: "[" expr expr expr "]"   -> dtriple
     
     // A clash component is a limit (optional layers) plus a severity clause; the
     // shared event count and the two per-event Bernoulli triggers are derived from
@@ -372,6 +397,7 @@
     CLAIMS.2:     /(?:claims|claim)(?![a-zA-Z0-9._:~\-])/
     SPLICE.2:     /splice(?![a-zA-Z0-9._:~\-])/
     CEDED.2:      /ceded(?![a-zA-Z0-9._:~\-])/
+    DBVSEV.2:     /dbvsev(?![a-zA-Z0-9._:~\-])/
     DFREQ.2:      /dfreq(?![a-zA-Z0-9._:~\-])/
     DSEV.2:       /dsev(?![a-zA-Z0-9._:~\-])/
     SSEV.2:       /ssev(?![a-zA-Z0-9._:~\-])/
@@ -435,7 +461,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|approximate|approx|at|bernoulli|binomial|bivariate|bv|ceded|claim|claims|clash|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|approximate|approx|at|bernoulli|binomial|bivariate|bv|ceded|claim|claims|clash|copula|cv|dbvsev|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

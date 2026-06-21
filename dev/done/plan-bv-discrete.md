@@ -7,8 +7,12 @@ be declared **directly from discrete data** — a shared discrete frequency
 aggregate. One new keyword (`DBVSEV`), a small grammar addition, and a third
 construction `mode='discrete'` in `BivariateAggregate`.
 
-> **STATUS: NOT STARTED — plan for review.** Design settled with the author
-> 2026-06-20:
+> **STATUS: DONE (1.0.0a86).** Shipped: `dbvsev` keyword (dense / dense-uniform
+> / sparse), the four `bv` forms, `mode='discrete'` on `BivariateAggregate`,
+> nesting-aware preprocessor, unparser support, and `tests/test_bv_discrete.py`.
+> Note: the validation surface uses the as-built `summary_df` / `stats_df` /
+> `dependency_df` (there is no `validation_df`); component names are `X` / `Y`.
+> Design settled with the author 2026-06-20:
 > - **Dense contingency-table form** `dbvsev [xs] [ys] [matrix]` (Option A),
 >   whitespace-native (no commas — that was a typo in the original ask), missing
 >   probability matrix ⇒ uniform over the lattice. Clincher: `dbvsev` is for

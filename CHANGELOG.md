@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.0.0a86
+
+### Discrete bivariate severity (`dbvsev`) + discrete-frequency `bv` forms
+
+New DecL feature: a `bivariate` (`bv`) object can be declared **directly from
+discrete data** — a shared discrete frequency (`dfreq`) and/or a discrete
+bivariate severity (`dbvsev`) — the 2-D analogue of `agg NAME dfreq [...] dsev
+[...]`. One new keyword (`dbvsev`), a new `mode='discrete'` on
+`BivariateAggregate`, and no new dependencies.
+
+- **`dbvsev` keyword** — the joint per-claim probability matrix given directly on
+  an explicit lattice (`S[i][j] = P(X=xs[i], Y=ys[j])`, rows = X, columns = Y).
+  Three auto-detected surface forms:
+  - dense contingency table `dbvsev [xs] [ys] [[row] [row] ...]`;
+  - dense with the matrix omitted ⇒ **uniform** over the lattice;
+  - sparse triples `dbvsev [[x y p] [x y p] ...]` (collisions summed).
+
+  Ranges (`dbvsev [0:2] [0:2]`) are accepted; probabilities are renormalised to
+  sum 1 (with a warning) and validated for shape / non-negativity.
+- **Four `bv` forms** now build, the 2×2 of {`exposures … freq`, `dfreq`} ×
+  {two `agg`/`pnl` + copula, `dbvsev`}:
+  - `bv N dfreq [...] [...] dbvsev [...]` (headline);
+  - `bv N <count> claims dbvsev [...] <freq>`;
+  - `bv N dfreq [...] [...] agg A … agg B … copula …`;
+  - the existing `bv N <count> claims agg … agg … copula …`.
+- **`mode='discrete'`** reuses the whole copula 2-D compound FFT path; only the
+  formation of the joint per-claim matrix `S` changes (given directly instead of
+  built from a copula). Per-axis sizing uses the lattice gcd as the bucket size,
+  so `S` scatters onto the grid with no rebucketing and the marginals reproduce
+  the standalone discrete compounds **exactly**. Loss/loss only — a `pnl` axis
+  raises a clear error.
+- **Reporting** — a discrete `bv` reports `kind = discrete (dbvsev)`, `copula tau
+  = n/a`; `summary_df` / `stats_df` show exact marginal reproduction;
+  `dependency_df` reports the per-claim and aggregate cov / corr (tau is `nan`,
+  no copula).
+
+Supporting changes:
+
+- **Nesting-aware preprocessor** — `UnderwritingLexer.preprocess` now collapses
+  newlines inside `[ ]` with a depth counter so the `dbvsev` `[[ ... ]]` matrices
+  survive; the non-nested path is unchanged (byte-for-byte, so the parser
+  snapshot is unaffected).
+- **Clean transformer errors** — a `ValueError` raised in the transformer (e.g.
+  `dbvsev` validation) now surfaces directly instead of wrapped in Lark's
+  `VisitError`.
+- The unparser (`decl_writer`) renders discrete `bv` objects back to the
+  canonical dense `dbvsev` form.
+
 ## 1.0.0a85
 
 ### Accessor-name rationalization + bivariate reporting redesign (breaking)

@@ -1,0 +1,27 @@
+---
+title: "aggregate Example Library"
+listing:
+  contents: posts
+  type: default
+  sort: "date desc"
+  categories: true
+  fields: [title, subtitle, description, categories, date]
+  sort-ui: true
+  filter-ui: true
+---
+
+A library of small, focused, **executable** examples for
+[`aggregate`](https://github.com/mynl/aggregate). Each post states a problem,
+its setup and assumptions, the DecL and Python that solve it, and the output —
+computed live, not pasted.
+
+Two flavors share one format:
+
+- **Cookbook examples** — illustrate a feature or technique.
+- **Paper reproductions** — reproduce a published worked example. These are the
+  same atom plus a citation: an a priori problem with a known answer that
+  `aggregate` matches.
+
+Assumptions are defined once in a shared DecL knowledge base
+(`example_library.agg`) and referenced by name across posts, so they never drift.
+See `README.md` for how to add an example.

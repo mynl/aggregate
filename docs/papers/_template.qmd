@@ -1,36 +1,35 @@
 ---
-title: "<Paper short title> — <example name>"
-subtitle: "Reproduced in aggregate"
+title: "<Short example title>"
+# subtitle: only for paper reproductions — name the source, e.g.
+# subtitle: "Reproducing Wang (2000), Table 1"
+description: "<One line for the listing page>"
 author: "Stephen J. Mildenhall"
 date: last-modified
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
-jupyter: python3
-execute:
-  warning: false
-  cache: true
-format:
-  html:
-    toc: true
-    toc-depth: 2
-    code-fold: false
+categories: [cookbook]   # tags drive the listing; add e.g. reinsurance, allocation,
+                         # frequency, severity. Use [paper, ...] for reproductions.
+# bibliography/csl are inherited from _quarto.yml; no need to repeat them.
 ---
 
 <!--
-Fill-in template for a published-example reproduction. See README.md for the
-process and house style. Replace every <...> placeholder and delete this comment
-and any unused section. Cite the source paper with @Key throughout.
+Fill-in template for an Example Library post. See README.md for process and
+house style. Replace every <...> placeholder and delete this comment and any
+unused section.
+
+This one template serves both flavors:
+  * cookbook example  -> delete the "Reproduction" section and any @Key citations.
+  * paper reproduction -> set the subtitle, add categories: [paper, ...], cite
+    the source with @Key, and fill the "Reproduction" section.
 -->
 
-## Overview
+## Problem
 
-State the business problem, name the source paper [@Key], and say exactly what
-this page reproduces. One short paragraph.
+State the problem in plain English: what question are we answering? For a paper
+reproduction, name the source ([@Key]) and say exactly what we reproduce.
 
-## Published Model
+## Setup and assumptions
 
-Transcribe the model exactly as the paper states it: frequency, severity,
-exposure, contract terms, assumptions. Parameters in a table:
+The model: frequency, severity, exposure, contract terms, assumptions. For a
+paper reproduction, transcribe the published model *exactly*; a table helps:
 
 | Component | Specification |
 |---|---|
@@ -39,32 +38,54 @@ exposure, contract terms, assumptions. Parameters in a table:
 | Exposure / terms | <limits, attachment, aggregate features> |
 | Assumptions | <independence, currency, etc.> |
 
-<!-- Optional original spec exhibit (you supply the crop):
-![Original model specification, @Key.](img/<paper>_model.png){width=80%}
+<!-- Optional original spec exhibit (you supply the crop into img/):
+![Original model specification, @Key.](img/<slug>_model.png){width=80%}
 -->
 
-## Aggregate Implementation
+## Implementation
+
+Every post starts with an empty `Underwriter` that loads the shared knowledge
+base, so canonical assumptions are available by name (see README.md).
 
 ```{python}
-from aggregate import build, qd
+from aggregate import Underwriter, qd
+import pandas as pd
 
-a = build('''
+uw = Underwriter(databases=None)     # start empty
+uw.load('example_library.agg')       # shared assumptions, resolved from project root
+
+a = uw.build('''
 agg <Name>
     <frequency clause>
-    <severity clause>
+    <severity clause>          # or reference a shared object: sev.<Shared>
     <reinsurance / aggregate clauses>
 ''')
 qd(a)
 ```
 
+<!-- If you reference a shared object, surface its assumptions so the page stays
+self-describing (DRY in source, explicit in render):
+```{python}
+qd(uw.build('agg.<Shared>'))
+```
+-->
+
+## Output
+
+```{python}
+a.plot()
+```
+
+Describe what the output shows.
+
+<!-- ===== Paper reproductions only: delete for cookbook examples ===== -->
+
 ## Reproduction
 
 Published values versus aggregate, side by side. Transcribe the paper's numbers
-into `published`; aggregate's land beside them.
+into `published`; aggregate's land beside them. Comparison is visual — no asserts.
 
 ```{python}
-import pandas as pd
-
 published = pd.Series(
     {'<stat 1>': 0.0, '<stat 2>': 0.0},   # <-- paper's values
     name='published')
@@ -80,30 +101,23 @@ qd(cmp, accuracy=5)
 
 State the result plainly — e.g. "These match the values in the paper."
 
-<!-- Optional original results exhibit (you supply the crop):
-![Original results table, @Key.](img/<paper>_table.png){width=80%}
+<!-- Optional original results exhibit (you supply the crop into img/):
+![Original results table, @Key.](img/<slug>_table.png){width=80%}
 -->
 
-## Distributional Analysis
-
-`aggregate` returns the full distribution, not just the published point answers.
-Show gross, ceded, and net where applicable.
-
-```{python}
-a.plot()
-```
+<!-- ===== end paper-only section ===== -->
 
 ## Extensions
 
-Structures the paper did not compute but the model now makes free: alternative
-limits/attachments, sensitivities, risk measures (VaR, TVaR), distortion pricing,
-or capital allocation. Keep each extension short and motivated.
+Structures the base case did not compute but the model now makes free:
+alternative limits/attachments, sensitivities, risk measures (VaR, TVaR),
+distortion pricing, or capital allocation. Keep each extension short and motivated.
 
 ## Conclusions
 
-What this example demonstrates about `aggregate`: the a priori problem solved,
-the match achieved, and the additional analysis unlocked.
+What this example demonstrates about `aggregate`.
 
+<!-- References block: keep only if the post cites anything. -->
 ## References
 
 ::: {#refs}

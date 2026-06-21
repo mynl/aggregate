@@ -1,0 +1,28 @@
+# example_library.agg
+# ---------------------------------------------------------------------------
+# Shared DecL knowledge base for the aggregate Example Library.
+#
+# Define canonical, reusable objects here ONCE; reference them from posts by
+# name (sev.Name, agg.Name). Change an assumption here and every example that
+# references it updates -- a single source of truth for shared assumptions.
+#
+# Posts load this file into their own Underwriter:
+#     uw = Underwriter(databases=None)
+#     uw.load('example_library.agg')
+#     a = uw.build('agg MyBook agg.SampleBook occurrence net of 50 xs 50')
+#
+# Principle: DRY in the source, explicit in the render. Reuse the definition by
+# name, but qd() the referenced object on the page so the reader still sees the
+# assumptions (see README.md).
+#
+# Naming: PascalCase, descriptive. Keep this file small and curated -- only
+# objects genuinely shared across posts belong here; one-off models live inline
+# in their post.
+# ---------------------------------------------------------------------------
+
+# --- canonical severities --------------------------------------------------
+sev Unit          dsev [1]            note{degenerate severity, always 1; handy for pure frequency studies};
+sev MedLognorm    lognorm 100 cv 2    note{medium-tailed reference severity, mean 100 CV 2};
+
+# --- canonical aggregates --------------------------------------------------
+agg SampleBook    100 claims sev.MedLognorm poisson    note{reference Poisson x lognormal book};

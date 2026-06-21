@@ -347,11 +347,12 @@ too.
 computational twin of the single-big-jump principle the classifier names, so it
 is gated on a thick (SUBEXPONENTIAL-or-heavier) tail via ``_loss_tail_classes``
 (a no-op for lighter classes, but explicit). A POWER_LAW / infinite-variance tail
-has **no finite deep quantile to size to**, so the sizer does *not* chase one
-(no ``alpha``-quantile, no :meth:`recommend_bucket` fallback -- the latter crashed
-on infinite cv): ``_reachable_bulk_high`` sizes the reachable bulk to a moderate
-``bucket_sizing_p`` from the severity's actual quantile, **accepts the truncation
-without normalising**, and warns (exact below the truncation, deficit reported).
+has **no finite deep quantile to size to**, so there is no basis to guess ``bs``:
+when ``bs`` is not supplied, the sizer raises
+:class:`~aggregate.constants.InfiniteVarianceError` (a ``ValueError``) rather than
+inventing a grid -- the user must pass an explicit ``bs`` (a86; this replaced the
+earlier reachable-bulk fallback, which sized the bulk from the severity's actual
+quantile and warned). An explicit ``bs`` pins the grid and builds normally.
 The classifier carries a left-tail rung and classifies non-family severities
 **structurally** (base family + limit / splice / attachment), with no numeric
 density estimator -- a genuinely unknown *and* unlimited family is treated

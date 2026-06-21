@@ -25,6 +25,7 @@ import numpy as np
 import pytest
 
 from aggregate import build
+from aggregate.constants import InfiniteVarianceError
 
 
 def test_motivating_signed_port_uses_unit_resolution():
@@ -421,29 +422,23 @@ def test_sbj_thin_tail_gated_off():
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
 
 
-def test_infinite_variance_honest_truncation():
-    """Item 2: a power-law (infinite-variance) book sizes the reachable bulk.
+def test_infinite_variance_requires_explicit_bs():
+    """Item 2: a power-law (infinite-variance) book has no basis to size ``bs``.
 
     ``10 claims sev 100 * pareto 1.5`` has a finite mean (3000) but infinite
-    variance, so there is no finite deep quantile to size to. The sizer must
-    NOT crash (the old ``recommend_bucket`` path re-raised on infinite cv); it
-    sizes the reachable bulk to ``bucket_sizing_p`` coverage, warns, and accepts
-    the far tail as an honest truncation: the probability mass is ~1 but the
-    estimated mean falls short of the analytic mean (the truncated power-law
-    tail carries mean), and the deficit is NOT normalized back in.
+    variance, so there is no finite deep quantile to size the grid to. With no
+    explicit ``bs`` there is nothing to guess from, so the sizer raises
+    :class:`InfiniteVarianceError` rather than inventing a grid. An explicit
+    ``bs`` pins the grid and builds normally.
     """
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter('always')
-        a = build('agg PL 10 claims sev 100 * pareto 1.5 poisson')
+    with pytest.raises(InfiniteVarianceError):
+        build('agg PL 10 claims sev 100 * pareto 1.5 poisson')
+    # any pareto shape <= 2 (no finite variance) is equally unsizable
+    with pytest.raises(InfiniteVarianceError):
+        build('agg PL 10 claims sev 100 * pareto 1.9 poisson')
+    # explicit bs pins the grid -> builds
+    a = build('agg PL 10 claims sev 100 * pareto 1.5 poisson', bs=2)
     assert np.isfinite(a.bs) and a.bs > 0
-    msgs = [str(w.message) for w in caught if 'power-law' in str(w.message)]
-    assert msgs, 'expected an infinite-variance truncation warning'
-    assert float(a.agg_density.sum()) == pytest.approx(1.0, abs=1e-5)
-    # honest truncation: the far tail is dropped, not smeared back -- so the
-    # estimated mean is strictly below the (finite) analytic mean.
-    assert a.est_m < a.agg_m
-    assert a.est_m == pytest.approx(a.agg_m, rel=0.05)
-    assert 'sbj floor' not in str(a._bs_window_df.loc['moment', 'note'])
 
 
 def test_signed_two_sided_reach_no_collision():

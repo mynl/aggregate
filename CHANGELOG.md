@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.0.0a87
+
+### Infinite-variance aggregates now error without an explicit `bs`
+
+Sizing the FFT grid relies on a method-of-moments tail estimate, which needs a
+finite variance. An aggregate whose severity has no finite second moment (a
+power law such as `pareto` with shape `alpha <= 2`) gives no basis to guess
+`bs`, so building one without an explicit `bs` now raises the new
+`InfiniteVarianceError` (a `ValueError` subclass, exported from
+`aggregate.constants`) instead of silently sizing a "reachable bulk" and
+warning. Pass an explicit `bs` to build these:
+
+```python
+build('agg IMP 3 claims sev 100 * pareto 1.5 - 100 poisson', bs=1)
+```
+
+This reverts the earlier reachable-bulk fallback (and removes the internal
+`Aggregate._reachable_bulk_high` helper). Finite-variance heavy-tailed
+aggregates (e.g. `pareto` shape `> 2`, or any layered/limited severity) are
+unaffected and still auto-size.
+
+### `knowledge` DataFrame shows readable `source` provenance
+
+The `source` column of `build.knowledge` no longer prints the full resolved
+path of every database. It now collapses by location: a built-in database
+shows just its name (no directory, no `.agg` suffix, e.g. `test_suite`); a user
+database under `~/.aggregate` shows `~/<name>` with the suffix dropped and any
+sub-directory kept (e.g. `~/mylib`, `~/sub/mylib`); any other loaded file shows
+its full path; the `session` sentinel passes through unchanged.
+
 ## 1.0.0a86
 
 ### Discrete bivariate severity (`dbvsev`) + discrete-frequency `bv` forms

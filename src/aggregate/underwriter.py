@@ -758,6 +758,47 @@ class Underwriter(object):
         except ValueError:
             return str(path.resolve())
 
+    def _format_source(self, source) -> str:
+        """Render a knowledge entry's ``source`` provenance for display.
+
+        The dict store tags every entry with its origin: ``'session'`` (an
+        in-session build) or the resolved :class:`~pathlib.Path` of the ``.agg``
+        file it was read from. Full paths print badly in the ``knowledge``
+        DataFrame, so collapse them by location:
+
+        - a **built-in** database (under :attr:`default_dir`) shows just its
+          name — no directory, no ``.agg`` suffix (e.g. ``test_suite``);
+        - a **user** database (under :attr:`user_dir`, ``~/.aggregate``) shows
+          ``~/<name>`` with the suffix dropped, keeping any sub-directory
+          (e.g. ``~/mylib``, ``~/sub/mylib``);
+        - any **other** loaded file shows its full path unchanged.
+
+        Non-path sources (e.g. the ``'session'`` sentinel) pass through as-is.
+
+        Parameters
+        ----------
+        source : pathlib.Path or str
+            The stored provenance value.
+
+        Returns
+        -------
+        str
+            The display form.
+        """
+        if not isinstance(source, Path):
+            return source
+        p = source.resolve()
+        try:
+            p.relative_to(self.default_dir.resolve())
+            return p.stem
+        except ValueError:
+            pass
+        try:
+            rel = p.relative_to(self.user_dir.resolve())
+            return f'~/{rel.with_suffix("")}'
+        except ValueError:
+            return str(p)
+
     def _format_request(self) -> str:
         """Render the load *request* (``self._request``) for :meth:`__repr__`.
 
@@ -923,7 +964,7 @@ class Underwriter(object):
         df = pd.DataFrame(
             {'program': [pp.program for pp in self._knowledge.values()],
              'spec': [pp.spec for pp in self._knowledge.values()],
-             'source': [pp.source for pp in self._knowledge.values()]},
+             'source': [self._format_source(pp.source) for pp in self._knowledge.values()]},
             index=index)
         return df.sort_index()
 

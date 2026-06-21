@@ -61,7 +61,7 @@ guards), plus Track D docs.
 | X | W2 | **Window bounds for bivariate** — shipped via MV-2/MV-3 (a72/a76) | B | M |
 |   | W10 | Retire `recommend_bucket` | A | — (W9 shipped) |
 | X | M | **Bivariate firm-up (MV-1…7, `dev/done/plan-mv.md`)** — shipped a70–a80 | A | — |
-|   | T1 | Merge the three `.agg` libraries into one | A | — |
+| X  | T1 | Merge the three `.agg` libraries into one | A | — |
 |   | T2 | Rationalize tests / library coupling | A | T1 |
 |   | T3 | Switcheroo `Port.Sample` regression case | B | — |
 |   | D1 | New README body for stable-v1.0 audience | A | — |

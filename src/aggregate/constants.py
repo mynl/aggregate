@@ -25,7 +25,7 @@ from enum import Flag, auto
 __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
            'Validation', 'DefectiveDistributionWarning',
-           'DefectiveDistributionError',
+           'DefectiveDistributionError', 'InfiniteVarianceError',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
            'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row']
@@ -136,4 +136,18 @@ class DefectiveDistributionError(ValueError):
     policy (``allow_deficit=True``: forwards parks the deficit at the top
     atom, backwards at the bottom atom). See
     ``dev/../math/docs/choquet-calc-method.md``.
+    """
+
+
+class InfiniteVarianceError(ValueError):
+    """Raised when ``bs`` must be estimated for an infinite-variance aggregate.
+
+    Sizing the FFT grid (``bs``) relies on a method-of-moments tail estimate,
+    which needs a finite variance. A power-law / heavy-tailed severity with no
+    finite second moment (e.g. ``pareto`` shape ``alpha <= 2``) gives no basis
+    to place the grid, so an aggregate that uses one **must** be built with an
+    explicit ``bs`` -- there is no sensible default to guess.
+
+    Subclasses :class:`ValueError` so existing broad ``except ValueError``
+    handlers continue to treat it as a build failure.
     """

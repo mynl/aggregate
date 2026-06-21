@@ -24,6 +24,7 @@ from textwrap import fill
 
 from .constants import (DefectiveDistributionWarning,
                         FIG_H, FIG_W, INFO_NA, info_row,
+                        InfiniteVarianceError,
                         REINS_LABEL_GROSS, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT,
                         Validation)
@@ -6892,73 +6893,6 @@ class Aggregate:
             return None
         return float(sbj_lo), float(sbj_hi)
 
-    def _reachable_bulk_high(self, p):
-        """Upper window edge for an infinite-variance (power-law) aggregate.
-
-        A power-law / infinite-variance tail has no finite deep quantile to
-        size to, so the moment window (and ``recommend_bucket``) cannot place a
-        sensible grid (``_estimate_agg_percentile`` raises). Instead size the
-        *reachable bulk* to a **moderate** coverage ``p`` -- the
-        ``bucket_sizing_p`` knob, default ``1 - 1e-5`` -- from the severity's
-        **actual** quantile (``fz.ppf``, which is finite for any ``p < 1`` even
-        when the moment-based estimate is not) via the single-big-jump relation
-        ``ES - mu_X + q_X(p**)``, ``p** = 1 - (1 - p)/E[N]``. The far tail
-        beyond this edge is then an honest truncation -- the aggregate is exact
-        below it and the missing mass is a reported deficit, never normalized
-        back in; the caller (:meth:`_bs_window`) warns.
-
-        Parameters
-        ----------
-        p : float
-            Moderate bulk coverage (``> 1`` is read as a number of nines).
-
-        Returns
-        -------
-        float
-            The reachable-bulk upper edge. ``q_X(p**)`` alone when the
-            aggregate mean is itself infinite (``alpha <= 1``); ``inf`` only if
-            no severity quantile can be evaluated (the caller then falls back).
-
-        Notes
-        -----
-        Deliberately does **not** chase the power-law ``alpha`` quantile: a
-        deeper ``p`` would push ``q_X`` arbitrarily far out and coarsen ``bs``
-        to uselessness for no real coverage gain. ``alpha`` is reported in the
-        tail report; it does not drive sizing.
-        """
-        en = float(self.n)
-        if not (np.isfinite(en) and en >= 1.0):
-            return np.inf
-        try:
-            sev_m = float(self.stats_df['mixed'][('sev', 'mean')])
-        except (KeyError, ValueError, TypeError):
-            sev_m = np.nan
-        es = float(self.agg_m)
-        p = float(np.where(p > 1, 1.0 - 10.0 ** -p, p))
-        tail = max((1.0 - p) / en, SBJ_TAIL_FLOOR)
-        p2 = 1.0 - tail
-        # actual severity quantile (valid for infinite cv), widest component,
-        # capped by any finite policy limit.
-        q_his = []
-        for s in (self.sevs if self.sevs is not None else []):
-            try:
-                q_his.append(float(s.fz.ppf(p2)))
-            except Exception:  # pragma: no cover - defensive
-                q_his.append(np.inf)
-        if not q_his:
-            return np.inf
-        q_hi = max(q_his)
-        lim = (float(self.limit.max())
-               if self.limit is not None and len(self.limit) else np.inf)
-        if np.isfinite(lim):
-            q_hi = min(q_hi, lim)
-        if not np.isfinite(q_hi):
-            return np.inf
-        if np.isfinite(es) and np.isfinite(sev_m):
-            return float(es - sev_m + q_hi)
-        # no finite aggregate mean (alpha <= 1): size to one big claim.
-        return float(q_hi)
-
     def _clipped_mass_estimate(self, grid_top):
         """Estimate the aggregate mass above ``grid_top`` via the single big jump.
 
@@ -7255,25 +7189,17 @@ class Aggregate:
             x_lo = 0.0
             try:
                 x_hi = float(_estimate_agg_percentile(m, self.agg_cv, skew, p))
-            except ValueError:
-                # No finite variance (power-law / infinite-variance severity):
-                # there is no finite deep quantile to size to (item 2). Size the
-                # REACHABLE BULK to a moderate coverage (``bucket_sizing_p``)
-                # from the severity's actual quantile and accept the far tail as
-                # an honest truncation -- the aggregate is exact below ``x_hi``
-                # and the missing mass is a reported deficit (never normalized
-                # back in, no ``recommend_bucket`` fudge, no ``alpha``-quantile
-                # chase). Warn so the user can raise ``log2`` if it matters.
-                x_hi = self._reachable_bulk_high(bucket_sizing_p)
-                if np.isfinite(x_hi):
-                    warnings.warn(
-                        f'{self.name}: infinite-variance (power-law) aggregate '
-                        f'-- no finite tail quantile to size to. Sizing the '
-                        f'reachable bulk to ~{bucket_sizing_p} coverage '
-                        f'(x_hi={x_hi:.6g}); the far tail beyond the grid is '
-                        f'truncated and reported as a deficit (not normalized). '
-                        f'Raise log2 to push the truncation deeper.',
-                        DefectiveDistributionWarning, stacklevel=2)
+            except ValueError as e:
+                # No finite variance (power-law / infinite-variance severity,
+                # e.g. pareto shape alpha <= 2) and no explicit ``bs``: there is
+                # no finite tail quantile to size the grid to, so there is no
+                # basis to guess ``bs``. Refuse to build rather than invent one
+                # -- the user must pass an explicit ``bs`` (item 2).
+                raise InfiniteVarianceError(
+                    f'{self.name}: infinite-variance (power-law) aggregate '
+                    f'(no finite second moment) -- cannot estimate a bucket '
+                    f'size. Pass an explicit bs, e.g. build(..., bs=...).'
+                ) from e
             if not np.isfinite(x_hi):
                 # deterministic (sd ~ 0) or undefined skew (NaN): a few sd above
                 # the mean (collapses to the mean for a point mass).

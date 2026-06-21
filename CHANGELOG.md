@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.0a89
+
+### Pedagogy figures renamed off the legacy PIR `fig_<ch>_<num>` names
+
+The five remaining book-figure helpers in `aggregate.pedagogy` carried opaque
+`fig_4_1`-style names tied to *Pricing Insurance Risk* chapter/figure numbers.
+They now have descriptive names; the original name and PIR figure number are
+recorded in each docstring:
+
+- `fig_4_1` → `plot_quantile_illustration`
+- `fig_4_5` → `plot_discrete_distribution_quantile`
+- `fig_4_6` → `plot_continuous_distribution_quantile`
+- `fig_4_8` → `plot_tvar_quantile`
+- `fig_9_1` → `plot_ruin_surplus_paths`
+
+**Breaking:** the old names are gone (submodule-only helpers, never core API).
+The citing technical-guide docs (`5_x_quantiles`, `5_x_nm_discrete_rep`,
+`5_x_pk`, `2_x_10mins`) now import the new names. `natural_scale` is unchanged.
+
 ## 1.0.0a88
 
 ### DecL syntax colourer + error labels resynced with the grammar (D10)
@@ -3202,13 +3221,16 @@ top-level modules or migrated out:
 
 - New: `aggregate.pedagogy` absorbs all doc-cited figure helpers
   (`adjusting_layer_losses`, `savings_charge`, `mixing_convergence`,
-  `power_variance_family`, `fig_4_1`, `fig_4_5`, `fig_4_6`,
-  `fig_4_8`, `fig_9_1`, `natural_scale`) plus four curated, renamed
-  PIR figures: `plot_distortion_and_ins_stats` (was `fig_10_3`),
-  `plot_spectral_three_panel` (was `fig_10_5`), `plot_twelve` (was
-  `twelve_plot`), `plot_bivariate` (was `biv_contour_plot`). Also
+  `power_variance_family`, `plot_quantile_illustration` (was `fig_4_1`),
+  `plot_discrete_distribution_quantile` (was `fig_4_5`),
+  `plot_continuous_distribution_quantile` (was `fig_4_6`),
+  `plot_tvar_quantile` (was `fig_4_8`),
+  `plot_ruin_surplus_paths` (was `fig_9_1`), `natural_scale`) plus four
+  curated, renamed PIR figures: `plot_distortion_and_ins_stats` (was
+  `fig_10_3`), `plot_spectral_three_panel` (was `fig_10_5`), `plot_twelve`
+  (was `twelve_plot`), `plot_bivariate` (was `biv_contour_plot`). Also
   `bodoff_exhibit` (now takes `port` as first arg, not `self`).
-  `ClassicalPremium` pulled in to keep `fig_9_1` working.
+  `ClassicalPremium` pulled in to keep `plot_ruin_surplus_paths` working.
 - New: `aggregate.pentagon` (was `extensions.pentagon`). Class plus
   the `mapper` / `make_possible_pentagons` helpers. Not re-exported
   from top-level `aggregate`; reach as

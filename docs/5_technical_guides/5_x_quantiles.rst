@@ -71,9 +71,9 @@ Here's an example of the problems that can occur.
 .. ipython:: python
    :okwarning:
 
-   from aggregate.pedagogy import fig_4_1
+   from aggregate.pedagogy import plot_quantile_illustration
    @savefig quantiles2.png scale=20
-   fig = fig_4_1()
+   fig = plot_quantile_illustration()
 
 
 The distribution :math:`F` has a flat spot between 0.9 and 1.5 at height
@@ -322,9 +322,9 @@ The default aggregate TVaR function ignores this slight non-linearity and just i
 .. ipython:: python
     :okwarning:
 
-    from aggregate.pedagogy import fig_4_8
+    from aggregate.pedagogy import plot_tvar_quantile
     @savefig quan_48.png scale=20
-    fig_4_8()
+    plot_tvar_quantile()
 
 CTE, and WCE: Alternatives to TVaR
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -892,7 +892,7 @@ with tempfile.TemporaryDirectory() as td:
 The deleted `extensions/` package's doc-cited figure machinery lives on in
 `aggregate.pedagogy` (a12): `bodoff_exhibit`, `plot_twelve`,
 `plot_bivariate`, `plot_distortion_and_ins_stats`, `plot_spectral_three_panel`,
-`ClassicalPremium`, the book figures (`fig_4_1` …), `plot_lee`,
+`ClassicalPremium`, the book figures (`plot_quantile_illustration` …), `plot_lee`,
 `plot_max_min`, and the similar-risks plots. Submodule access only — none of
 it is core API.
 

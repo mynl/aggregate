@@ -1569,7 +1569,7 @@ explicit submodule import (no top-level re-export):
 
 * :mod:`aggregate.pedagogy` — figure and exhibit generators cited in the
   technical-guide docs, papers, and blog posts (``adjusting_layer_losses``,
-  ``fig_4_1``…, ``plot_distortion_and_ins_stats``, ``plot_twelve``,
+  ``plot_quantile_illustration``…, ``plot_distortion_and_ins_stats``, ``plot_twelve``,
   ``bodoff_exhibit``, ``ClassicalPremium``, etc.).
 * :mod:`aggregate.pentagon` — :class:`Pentagon`, algebra over the
   ``(L, P, M, a, Q, lr, pq, coc)`` accounting identities.

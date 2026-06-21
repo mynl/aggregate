@@ -29,9 +29,10 @@ First, a discrete approximation, which results in a step-function, piecewise con
 .. ipython:: python
     :okwarning:
 
-    from aggregate.pedagogy import fig_4_5, fig_4_6
+    from aggregate.pedagogy import (plot_discrete_distribution_quantile,
+                                    plot_continuous_distribution_quantile)
     @savefig num_discrete_approx.png scale=20
-    fig_4_5()
+    plot_discrete_distribution_quantile()
 
 Second, a piecewise linear continuous approximation, which results in a step-function pdf (not shown).
 
@@ -39,7 +40,7 @@ Second, a piecewise linear continuous approximation, which results in a step-fun
     :okwarning:
 
     @savefig num_cts_approx.png scale=20
-    fig_4_6()
+    plot_continuous_distribution_quantile()
 
 The second approach assumes the aggregate has a continuous distribution, which is often not the case. For example, the Tweedie and all other compound Poisson distributions are mixed (they have a mass at zero). An aggregate whose severity has a limit will have a mass at multiples of the limit caused by the non-zero probability of limit-only claims. When :math:`X` is mixed it is impossible to distinguish the jump and continuous parts using a numerical approximation. The large jumps may be obvious but the small ones are not.
 

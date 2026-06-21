@@ -272,9 +272,9 @@ a fixed time or a combination. Scale indicates cumulative exposure-years.
 .. ipython:: python
     :okwarning:
 
-    from aggregate.pedagogy import fig_9_1
+    from aggregate.pedagogy import plot_ruin_surplus_paths
     @savefig pz.png scale=20
-    fig_9_1(port)
+    plot_ruin_surplus_paths(port)
 
 The right hand plots are computed here with only 100 samples, vs. 500 used in the book, and so the approximation is not as accurate.
 

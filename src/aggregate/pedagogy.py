@@ -467,10 +467,11 @@ def power_variance_family():
     ax.set(title='Power Variance Exponential Family Distributions')
 
 
-def fig_4_1():
-    """PIR Figure 4.1: illustrating quantiles.
+def plot_quantile_illustration():
+    """Illustrate the definition of quantiles when ``F`` has a flat spot and a jump.
 
-    Used by ``docs/5_technical_guides/5_x_quantiles.rst``.
+    Originally ``fig_4_1`` (PIR Figure 4.1). Used by
+    ``docs/5_technical_guides/5_x_quantiles.rst``.
     """
     fz = ss.lognorm(.5)
     xs = np.linspace(0, 5, 501)[1:]
@@ -513,8 +514,9 @@ def fig_4_1():
 def _discrete_example():
     """Shared discrete sample (PIR Example 4.9): ten equiprobable atoms with ties.
 
-    Returns ``(ps, cps, xs, df)`` used by :func:`fig_4_5`, :func:`fig_4_6`,
-    :func:`fig_4_8`.
+    Returns ``(ps, cps, xs, df)`` used by
+    :func:`plot_discrete_distribution_quantile`,
+    :func:`plot_continuous_distribution_quantile`, :func:`plot_tvar_quantile`.
     """
     ps = np.ones(10) / 10
     cps = np.hstack((0, np.cumsum(ps)))
@@ -526,10 +528,11 @@ def _discrete_example():
     return ps, cps, xs, df
 
 
-def fig_4_5():
-    """PIR Figure 4.5: distribution function and lower-quantile VaR (discrete).
+def plot_discrete_distribution_quantile():
+    """Discrete (step) distribution function and lower-quantile VaR.
 
-    Used by ``docs/5_technical_guides/5_x_nm_discrete_rep.rst``.
+    Originally ``fig_4_5`` (PIR Figure 4.5). Used by
+    ``docs/5_technical_guides/5_x_nm_discrete_rep.rst``.
     """
     ps, cps, xs, df = _discrete_example()
     fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W + .2))
@@ -561,10 +564,11 @@ def fig_4_5():
            xlabel='$F(x)$', ylabel='Outcome, $x$')
 
 
-def fig_4_6():
-    """PIR Figure 4.6: distribution function and lower-quantile VaR (filled-in).
+def plot_continuous_distribution_quantile():
+    """Continuous (piecewise-linear, filled-in) distribution function and lower-quantile VaR.
 
-    Used by ``docs/5_technical_guides/5_x_nm_discrete_rep.rst``.
+    Originally ``fig_4_6`` (PIR Figure 4.6). Used by
+    ``docs/5_technical_guides/5_x_nm_discrete_rep.rst``.
     """
     ps, cps, xs, df = _discrete_example()
     fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W + .2))
@@ -598,10 +602,11 @@ def fig_4_6():
            xlabel='$F(x)$', ylabel='Outcome, $x$')
 
 
-def fig_4_8():
-    """PIR Figure 4.8: TVaR overlaid on quantile VaR, discrete and continuous samples.
+def plot_tvar_quantile():
+    """TVaR overlaid on quantile VaR, discrete and continuous samples.
 
-    Used by ``docs/5_technical_guides/5_x_quantiles.rst``.
+    Originally ``fig_4_8`` (PIR Figure 4.8). Used by
+    ``docs/5_technical_guides/5_x_quantiles.rst``.
     """
     ps, cps, xs, df = _discrete_example()
     ad = build(f'agg Empirical 1 claim sev dhistogram xps {df.x.values} {df.p.values} fixed', bs=1)
@@ -657,8 +662,8 @@ class ClassicalPremium:
     semi-variance (Artzner p. 210), exponential (zero-utility, convex),
     Esscher, Dutch, Fischer.
 
-    Used by :func:`fig_9_1` for the surplus-path illustration in
-    ``docs/5_technical_guides/5_x_pk.rst``. Originally in ``hack.py`` then the
+    Used by :func:`plot_ruin_surplus_paths` for the surplus-path illustration
+    in ``docs/5_technical_guides/5_x_pk.rst``. Originally in ``hack.py`` then the
     PIR ``CaseStudy`` machinery.
     """
 
@@ -821,10 +826,11 @@ class ClassicalPremium:
         return pd.DataFrame(ans, columns=['n', 'ea', 'min'])
 
 
-def fig_9_1(port):
-    """PIR Figure 9.1: Cramér-Lundberg ruin and sampled surplus paths.
+def plot_ruin_surplus_paths(port):
+    """Cramér-Lundberg ruin probability and sampled surplus paths.
 
-    Used by ``docs/5_technical_guides/5_x_pk.rst``. Depends on
+    Originally ``fig_9_1`` (PIR Figure 9.1). Used by
+    ``docs/5_technical_guides/5_x_pk.rst``. Depends on
     :class:`ClassicalPremium` in this module.
     """
     port_name = 'gross'

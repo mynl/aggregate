@@ -8,11 +8,11 @@
 > **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
 > `[B]` early beta = fine just after the alpha→beta cut, does not block it.
 >
-> **Last updated: 2026-06-19** — Cleanup pass: all shipped items pruned (they
-> live in `CHANGELOG.md`); priorities table reconciled against the track sections
-> and rebuilt; under-specified items moved to a flagged tail group. **Track M
-> (bivariate firm-up, MV-1…7) shipped a70–a80; plan in `dev/done/plan-mv.md`.**
-> Next focus: `N6` / `N8` (numerics + guards) and Track D docs toward `1.0.0b1`.
+> **Last updated: 2026-06-21** — Cleanup pass: pruned all shipped/done items
+> (they live in `CHANGELOG.md`) — the completed Steve-manual entries, Track M
+> (bivariate, shipped a70–a80), Track F, and the done `W2` / `T1`; dropped `H9`
+> and `F7`. Next focus: `N6` / `N8` (numerics + guards) and Track D docs toward
+> `1.0.0b1`.
 
 ---
 
@@ -22,34 +22,17 @@
 |------|-------|
 | **B** | Bugs & investigations |
 | **D** | Docs & packaging |
-| **F** | Features (approximation, pricing) |
 | **H** | Hygiene (module organization & dependencies) |
-| **M** | Multivariate → bivariate |
 | **N** | Numerics & pricing core (incl. signed / negative-x) |
 | **T** | Tests (suite consolidation) |
 | **W** | Windows & plotting |
 | **β** | Pre-beta scaffold retirement (delete at the alpha→beta cut) |
 
-## NEW STEVE MANUAL ENTRIES
-
-H: Portfolio class should use unit not line. All refs to line replaced with unit! **carefully!** → **DONE (1.0.0a81, `dev/done/plan-line-to-unit.md`)**: clean break, no `line_names` alias (`AttributeError`); `'line'` index→`'unit'`; `line=`/`lines=` kwargs→`unit=`/`units=`; `BivariateAggregate` surface + `'lines'`→`'units'` spec key; pedagogy/results/bounds/pentagon swept; keep-table (matplotlib/rate-on-line/loss-on-line/line-search/source-line) preserved.
-H (naming): narrative/reporting surface made consistent — **DONE (1.0.0a82, `dev/done/plan-consistent-naming.md`)**: `explain_validation()` → `validation_explanation` property (deprecated alias kept); `reins_description(kind,width)` → bare property + private `_reins_description` worker; `concentration_p` → `cv` (tail_df col, `TailRow`, `concentration()` 2nd value); `Portfolio.tail_df` `total` row min/max from realised grid + per-side worst-of (bounded left for non-neg books); `top=` → `x_max=` labels; `bs_explanation` rewritten to one template, "window width" replaces "span". **Deferred (still open, see B5):** §3 bs-worker rename (`bs_describe`/`bs_explain` → non-homonyms).
-
-H: build.knowledge source col: just store the db name and not whole path in source. Yes, ambiguous. Prefix ~/ if from user's .aggregate store, full path if not built-in or home dir.
-N: distributions with no variance should refuse to estimate bs. how is that being done ATM? I think in the past it was an error. Now you can package hints with the program there are no excuses for not providing bs,log2.
-
-N/D: find examnple where padding has an impact
-
-
-
-
-
 ## Priorities & dependencies
 
 **Critical path (the spine):** the `N` spine is mostly shipped — `N2`, `N3`,
-`N5`, `N5b` landed (a36–a57). **Track `M` (bivariate firm-up) shipped a70–a80.**
-What remains on the spine: **`N6`** (validation-calc review) and **`N8`** (input
-guards), plus Track D docs.
+`N5`, `N5b` landed (a36–a57). What remains on the spine: **`N6`**
+(validation-calc review) and **`N8`** (input guards), plus Track D docs.
 
 | Status | ID | Item | Phase | Depends on |
 |:--|----|------|:-----:|------------|
@@ -58,11 +41,8 @@ guards), plus Track D docs.
 |   | H4 | Docstring style sweep → NumPy | A | — |
 |   | H5 | `pedagogy` figure-generator migrations | B | — |
 |   | B4 | ZT/ZM frequency broken + add shift helpers | A | — |
-| X | W2 | **Window bounds for bivariate** — shipped via MV-2/MV-3 (a72/a76) | B | M |
 |   | W10 | Retire `recommend_bucket` | A | — (W9 shipped) |
-| X | M | **Bivariate firm-up (MV-1…7, `dev/done/plan-mv.md`)** — shipped a70–a80 | A | — |
-| X  | T1 | Merge the three `.agg` libraries into one | A | — |
-|   | T2 | Rationalize tests / library coupling | A | T1 |
+|   | T2 | Rationalize tests / library coupling | A | — |
 |   | T3 | Switcheroo `Port.Sample` regression case | B | — |
 |   | D1 | New README body for stable-v1.0 audience | A | — |
 |   | D2 | v1.0 Journey + statements of philosophy | A | — |
@@ -72,16 +52,13 @@ guards), plus Track D docs.
 |   | D6 | API docstring coverage / rendering | A | H4 |
 |   | D7 | Reinsurance case-study docs rewrite | B | (N2–N3 shipped) |
 |   | D8 | PUNCHUP `pedagogy` + integrate docs | B | H5 |
-|   | D10 | Single keyword source of truth (`decl.lark` → mirrors) | B | — |
 |   | D11 | Sphinx docs → master `uber-library.bib` | B | — |
 |   | D12 | Cheat-sheet tweaks once UI settles | B | — (hold to beta) |
 | **— unclear / under-specified (revisit before scheduling) —** |
-|   | H9 | Public DataFrame members present (`None`) before compute | A | — (needs scoping) |
-|   | F7 | PMIR best-bucket + manual kappa | B | — |
 |   | W3 | Plot severity outside the agg window | B | — (approach TBD) |
 |   | D9 | Reinsurance structure diagrams | B | — |
 | **— β pre-beta scaffold retirement (do at the b1 cut; see Track β below) —** |
-|   | β1 | Delete `_test_suite.agg` + `_test_suite2.agg` (SLY-parity scaffold) | A | M-shipped, b1 |
+|   | β1 | Delete `_test_suite.agg` + `_test_suite2.agg` (SLY-parity scaffold) | A | b1 |
 |   | β2 | Retire their dependents (snapshot, fixtures, config, scripts, docs) | A | β1 |
 |   | β3 | Confirm `test_agg_libraries.py` is the surviving net for shipped libs | A | β1 |
 
@@ -126,18 +103,6 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
 - [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
   `tweedie.py` so those stay API-focused (#19).
-- [ ] **H9 `[A]` Public DataFrame members present (`None`) before compute** —
-  *needs scoping* (deferred at a52). Goal: reading a documented `*_df` member on
-  a freshly constructed (not-yet-`update`d) object never raises `AttributeError`.
-  Caveats found during review: the scope list in the old plan named several
-  non-members (`reins_audit_df`, public `reins_df`/`report_df`/`statistics_df`/
-  `bs_window_df` don't exist); the real properties (`density_df`,
-  `sev_density_df`) already raise an *informative* `ValueError('Update … first')`,
-  not `AttributeError`, and `reins_*_df` already return `None`; `augmented_df` is
-  a parameterised method (can't return `None`). So the genuine work is narrow —
-  enumerate the real members per class (`Aggregate`/`Portfolio`/`Distortion`/
-  `Underwriter`) and decide informative-`ValueError`-vs-`None` before touching
-  anything.
 
 ---
 
@@ -167,98 +132,17 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 ---
 
-## Track F — Features (approximation, pricing)
-
-- [ ] **F7 `[B]` PMIR best-bucket + manual kappa** (#47) — port the best-bucket
-  and clever manual kappa calc. Pairs **T3**. *(vague — recover the PMIR code
-  first.)*
-
----
-
 ## Track W — Windows (range for output) & plotting
 
-- [x] **W2 `[B]`** Window bounds for bivariate/multivariate per-axis sizing (#7).
-  **Done (a72/a76, MV-2/MV-3):** both private sizers deleted, every axis routed
-  through measured `balanced_window` (`plan-mv.md` §5; `dev/done/plan-numerics-4`).
 - [ ] **W3 `[B]`** Plot severity outside the aggregate window (#8) — inset,
   broken axis, or separate figure when grids don't overlap (`info` already warns).
   *(approach undecided.)*
 - [ ] **W10 `[A]`** Retire `recommend_bucket` — replace the legacy one-shot
   sizer with a new (TBD) function that takes `log2` (and possibly `x_min`) as
-  explicit arguments, then remove `recommend_bucket`. W9's honest-truncation path
-  (`[use-selection]` item 2: accept truncation, no-normalize, warn) removed its
-  last real job (the infinite-variance fallback), so this follows the shipped W9.
-  See `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`).
-
----
-
-## Track M — Multivariate → **bivariate** ✅ DONE (`a70`–`a80`)
-
-> **COMPLETE (2026-06-19, `dev/done/plan-mv.md`).** All seven stages landed
-> (MV-1 `a70` … MV-7 `a80`); the bivariate surface is the v1.0 API and no longer
-> blocks `1.0.0b1`. Delivered: rename `multivariate`/`mv` → `bivariate`/`bv`
-> (dropped outright); ≥3-variate `rfftn` **killed** (Iman–Conover + switcheroo);
-> **`t` copula dropped**; shuffle-of-Min copula + `clash` statement; sizing
-> reframed to *measure-don't-guess* (`balanced_window` + `update(log2=)` budget);
-> netceded → three occurrence view-pairs (`netceded`/`grossceded`/`grossnet`).
-
-- [x] **M (the block) `[A]`** — executed `dev/done/plan-mv.md` stages
-  **MV-1…MV-7** (`balanced_window`+`focus` → measure-don't-guess copula sizing →
-  netceded one-bs sizing → reporting surface → netceded view-pairs →
-  shuffle-of-Min+clash → rename to bivariate). Each a version bump; all shipped.
-  Execution cadence: one stage per iteration, with a review + commit between each.
-  - [x] **MV-1** `[a70]` — `balanced_window(ser, p, bs=None)` (utilities) +
-    `Aggregate.focus(p)`; pure 1-D, no bv change. `tests/test_balanced_window.py`.
-  - [x] **MV-2** `[a72]` — measure-don't-guess copula axis sizing (deleted
-    `_size_axis`; standalone-marginal + `balanced_window`, `update(log2=)` total
-    budget, `[multivariate].total_log2`) + signed 2-D compound (`i0`/`j0`
-    wrap-and-roll in `update_work`). 54%-deficit book → <1e-6.
-    - `[a73]` follow-up: use the **measured** lower edge for `x_min` (no
-      artificial 0-pin on non-negative far-from-0 axes; pnl stays 0-based);
-      FFT buffer `M` decoupled from output `N` (reach physical 0 without
-      aliasing).
-    - `[a74]` follow-up: per-axis `log2=(x,y)` / `bs=(x,y)` tuples on
-      `update`/`build` (explore the split); `round_bucket` ladder →
-      `{1,2,4,5,8}` (no >2x jumps, fixes the 2→5 overshoot, library-wide).
-    - `[a75]` follow-up: symmetric axes now window centred — measure signed
-      marginals on a recentred grid (decoupled from the loss/payoff trim),
-      `[multivariate].window_nines` 12→9 (off the FFT noise floor), and centre
-      the window in the power-of-two grid (split slack). `round_bucket` stays
-      round-up only (nearest can't tighten a pow2 grid — note at the call site).
-  - [x] **MV-3** `[a76]` — netceded axis sizing via `balanced_window` (deleted
-    `size_axis`); one common `bs` sized from the budget (not pinned to the too-fine
-    gross bs), clip+warn when a pinned grid overflows. Both private sizers gone.
-    *(Note: deviated from the plan's literal "pin to gross bs" — that lost ~55%
-    of the mass on the standard NC book; sized from the budget instead.)*
-  - [x] **MV-4** `[a77]` — reporting surface: `info` rebuilt on
-    `info_row`/`INFO_NA` (fixed catalogue, Agg/Port convention; bivariate
-    section added to `dev/info-strings.rst`) + `explain`, `bs_window_df`/
-    `bs_description`, `tail_df`/`tail_description` (per-axis summaries).
-  - [x] **MV-5** `[a78]` — netceded view-pairs: new DecL prefixes `grossceded`
-    / `grossnet` (siblings of `netceded`; `GROSSCEDED.2`/`GROSSNET.2` terminals
-    + `ID` exclusion) and `Aggregate.occ_bivariate(views=…)`. `build_netceded_joint`
-    parameterised by the `(x, y)` view pair (gross = identity image), `_netceded_theory`
-    reads the matching `Gross`/`Ceded`/`Net` occ columns. **Axis order fixed to the
-    keyword's x-then-y convention** (breaking: `netceded`/`occ_bivariate` axis 0 was
-    Ceded, now Net). Override signature `occ_bivariate(views, bs, log2_x, log2_y)`.
-  - [x] **MV-6** `[a79]` — modelling features: **shuffle-of-Min copula**
-    (`ShuffleOfMin` + `CopulaShuffle`, programmatic-only, exact perm/flip `tau`,
-    dense in copula space) and the **`clash` statement** (`CLASH.2` terminal;
-    `solve_clash_model` independent-trigger 2×2 solver → shared count + two
-    Bernoulli triggers under the independent copula; unparser round-trip).
-    *(Known limit: heavy components at large shared `n` can exceed the 2-D budget
-    — one `bs` must resolve severity + aggregate; flagged by the `validation`
-    row, raise `update(log2=…)`. A possible later improvement: bound the 2-D axis
-    `bs` by the severity scale like the 1-D `_bs_window`.)*
-  - [x] **MV-7** `[a80]` — rename multivariate → bivariate (**breaking**, no
-    alias): keyword `multivariate`/`mv` → `bivariate`/`bv`; class
-    `MultivariateAggregate` → `BivariateAggregate`; module `aggregate.multivariate`
-    → `aggregate.bivariate`; kind `mvagg` → `bvagg`; config `[multivariate]` /
-    `MultivariateSettings` → `[bivariate]` / `BivariateSettings`. Swept .agg /
-    docs / cheat sheet / Sublime / grammar ref; `test_multivariate.py` →
-    `test_bivariate.py`. The `5_x_multivariate.rst` theory page (multivariate
-    *frequency* distributions) is correctly left unchanged. **Plan complete;
-    moved to `dev/done/`. M-block done — bivariate surface is beta-ready.**
+  explicit arguments, then remove `recommend_bucket`. Its last real job (the
+  infinite-variance fallback) is gone — `_bs_window` now raises
+  `InfiniteVarianceError` instead of guessing a grid (a87) — so nothing left
+  depends on it. See `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`).
 
 ---
 
@@ -269,13 +153,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 > snapshot regression) — consolidating the data is only half the job; the test
 > code's coupling to it is the other half.
 
-- [ ] **T1 `[A]`** Merge the three `.agg` libraries (`test_suite`,
-  `test_suite2`, `test_decl`) into **one** without breaking tests (#50).
 - [ ] **T2 `[A]`** Rationalize tests — needed vs no-longer-needed; untangle and
   re-wire how the suite *consumes* the single library without losing
-  effectiveness (#51). **needs T1.**
+  effectiveness (#51).
 - [ ] **T3 `[B]`** Switcheroo harness `Port.Sample` regression case (#12) — guards
-  the kappa-replacement path. Pairs **F7**.
+  the kappa-replacement path.
 
 ---
 
@@ -307,11 +189,6 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   `reins_stats_df`, verify vs published (#16). N2–N3 numerics now stable.
 - [ ] **D8 `[B]`** PUNCHUP `pedagogy` and integrate with docs; possible minor
   renamings (#40). **needs H5.**
-- [ ] **D10 `[B]`** Single keyword source of truth — derive `decl_pygments.AggLexer`,
-  `parser_errors._TERMINAL_LABELS`, and the web app's `decl-keywords.json` from
-  the `decl.lark` terminals (five hand-maintained mirrors today). Independent of
-  the unparser (`decl_writer` reuses `AggLexer` as-is, shipped a53). (Was tied to
-  the now-rejected DecL colorization, #22 — D10 stands on its own merit.)
 - [ ] **D11 `[B]`** Transition the Sphinx docs' bibliography to the master
   `C:/s/TELOS/Biblio/uber-library.bib` (per the CLAUDE.md "Citations and
   bibliography" standing order, added 2026-06-11). The docs currently use an
@@ -338,10 +215,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 > `actuarial-severity-curves`, `decl-testers`, `cookbook`) and a **temporary**
 > SLY-parity scaffold (`_test_suite.agg`, `_test_suite2.agg`). The scaffold has
 > done its job (proving the Lark parser matches the retired SLY parser); delete
-> it and its dependents at the alpha→beta cut. **Supersedes the old T1 "merge the
-> three `.agg` libraries into one" / T2 plan** — they were split, not merged.
-> The surviving net is `tests/test_agg_libraries.py` (shipped libraries
-> parse + cross-resolve), so deleting the scaffold loses no live coverage.
+> it and its dependents at the alpha→beta cut. The surviving net is
+> `tests/test_agg_libraries.py` (shipped libraries parse + cross-resolve), so
+> deleting the scaffold loses no live coverage.
 
 - [ ] **β1 `[A]` Delete the scaffold `.agg` files** — `src/aggregate/agg/_test_suite.agg`
   and `_test_suite2.agg`.
@@ -371,10 +247,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 
 - **Numerics program** (`dev/done/plan-numerics-0-meta.md` + `-1`…`-4`) → the
   N-track, **complete**: numerics-1/2/3 shipped (a55–a57 → N2/N3); numerics-4
-  (windowed combine/bivariate) delivered via `plan-mv` MV-2/MV-3 (a72/a76 → W2/M).
-- `dev/done/plan-config.md` (Phase 1 + Phase 2) → **F8**, shipped a30 / a83.
-- `dev/done/plan-mv.md` → **Track M** (bivariate firm-up, MV-1…7). Absorbs & replaces
-  the deleted `plan-multivariate-punchup.md` (former M2).
+  (windowed combine/bivariate) delivered via `plan-mv` MV-2/MV-3 (a72/a76).
+- `dev/done/plan-config.md` (Phase 1 + Phase 2) → config, shipped a30 / a83.
+- `dev/done/plan-mv.md` → bivariate firm-up (MV-1…7, shipped a70–a80). Absorbs &
+  replaces the deleted `plan-multivariate-punchup.md`.
 - `dev/done/` → shipped plans (tail-thickness, config Phase 1, pentagon, database
   loading, bucket-window 1A/1P, allocation/pricing bounds, decl-unparser, …).
 
@@ -397,10 +273,3 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
   both premium legs (`plan-pnl-premium.md` §9).
 - [ ] extend reinsurance clauses to allow net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros (rate on subject = quota share)
-- [x] **F8 `[B]` Config Phase 2** — **shipped a83** (`dev/done/plan-config.md`).
-  Numerics floors `aliasing_ratio` / `exeqa_noise_floor` / `deficit_materiality`
-  → `[validation]`; the half-migrated window knobs (`window_log2_growth`,
-  `window_slack_thick`, `concentration_cv`) → `[discretization]` and
-  `min_axis_log2` → `[bivariate]`; dead `FT_NOISE_FLOOR` dropped. `[plotting]` /
-  `.mplstyle` override **rejected** (`dev/done/plans-considered-and-rejected.md`);
-  the wider env matrix deferred (not needed).

@@ -115,8 +115,8 @@ class AggLexer(RegexLexer):
             ),
                 suffix=r'\b'
             ), Name.Namespace),
-            # historgram
-            (words(('dhistogram', 'chistogram', 'dsev',
+            # discrete / histogram severity declarations
+            (words(('dhistogram', 'chistogram', 'dsev', 'dbvsev',
                     ),
                    suffix=r'\b'
                    ), Name.Label),
@@ -124,14 +124,19 @@ class AggLexer(RegexLexer):
             # built in sev or agg dists pattern
             (r'(sev|agg)\.[a-zA-Z][a-zA-Z0-9._:~]*', Name.Builtin),
 
-            # all IDs from the parser.py file
+            # keyword terminals from decl.lark (kept in sync by
+            # tests/test_grammar_sync.py — every reserved word in the grammar's
+            # ID-exclusion list must be coloured by this lexer).
             (words(
-                ('occurrence', 'distortion', 'unlimited', 'aggregate', 'exposure', 'tweedie',
-                    'premium', 'tower', 'unlim', 'picks', 'prem',
+                ('occurrence', 'aggregate', 'distortion', 'exposure', 'tweedie',
+                    'premium', 'tower', 'picks', 'prem', 'pnl',
+                    'bivariate', 'bv', 'clash', 'copula',
+                    'netceded', 'grossceded', 'grossnet',
+                    'approximate', 'approx', 'ssev',
                     'claims', 'ceded', 'claim', 'loss', 'dist',
                     'port', 'rate', 'net', 'sev', 'agg', 'xps', 'wts',
-                    'inf', 'and', 'exp', 'wt', 'at', 'cv', 'lr', 'xs',
-                    'of', 'to', 'po', 'so', 'zm', 'zt', 'x', ),
+                    'inf', 'and', 'exp', 'at', 'cv', 'lr', 'xs',
+                    'of', 'to', 'po', 'so', 'zm', 'zt', ),
                 suffix=r'\b'
             ), Keyword),
         ],

@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.0.0a88
+
+### DecL syntax colourer + error labels resynced with the grammar (D10)
+
+The Pygments lexer (`decl_pygments.AggLexer`) and the parse-error terminal
+labels (`parser_errors._TERMINAL_LABELS`) had drifted from `decl.lark` as
+keywords were added. Both are now up to date and a new test keeps them honest:
+
+- **Colourer** now recognises the keywords added since the last sync —
+  `pnl`, `ssev`, `approximate`/`approx`, `bivariate`/`bv`, `clash`, `copula`,
+  `dbvsev`, `netceded`, `grossceded`, `grossnet` — and drops four stale words
+  that are no longer DecL keywords (`unlimited`, `unlim`, `wt`, `x`).
+- **Error labels** gained friendly entries for the same ten new terminals
+  (`APPROXIMATE`, `BIVARIATE`, `NETCEDED`, `GROSSCEDED`, `GROSSNET`, `CLASH`,
+  `COPULA`, `DBVSEV`, `SSEV`, `PNL`).
+- **`tests/test_grammar_sync.py`** derives the canonical keyword set directly
+  from `decl.lark` (the `ID` terminal's exclusion list) and the priority-tagged
+  terminal names, then asserts the colourer colours every reserved word and the
+  label table covers every keyword terminal. Adding a keyword to the grammar
+  now fails this test until the mirrors are updated.
+
+The web app's `decl-keywords.json` lives in a separate repo and is out of scope
+here; the remaining `D10` work is to drive that and the two now-synced mirrors
+from a single generated source.
+
 ## 1.0.0a87
 
 ### Infinite-variance aggregates now error without an explicit `bs`

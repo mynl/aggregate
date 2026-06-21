@@ -103,6 +103,16 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
 - [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
   `tweedie.py` so those stay API-focused (#19).
+- [ ] **H6 `[B]`** **God-module refactor track** — four sequenced plans, see
+  **`dev/plan-README.md`** for the map and the regret-guard. Order: **P1**
+  `plan-grid-distribution.md` (new `GridDistribution` value type; `make_var_tvar`
+  moves in from `utilities.py`; every consumer adopts) → **P2**
+  `plan-plots-subsystem.md` (one `plots/` package + global matplotlib defer) →
+  **P3** `plan-split-distributions.md` (kind split behind a façade) → **P4**
+  `plan-split-portfolio.md`. Deferred/conditional (post-beta, gated by the
+  two-file rule): Agg 2B `ReinsuranceProgram`, Port 4B `PricingEngine` + dependence
+  unit, Bounds & Bivariate structural splits. *(new, 2026-06-21; drafted not
+  executed — P1 is a pure addition and valuable standalone.)*
 
 ---
 

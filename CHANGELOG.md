@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.0.0a94
+
+### `portfolio.py` split into a façade + three subsystems (Plan P4, Phase 4A)
+
+The ~4,750-line `portfolio.py` god module is split behind a re-export façade,
+mirroring the P3 `distributions.py` split. `Portfolio` stays one public class;
+its body is divided along **how the joint loss distribution is built**. Every
+import path is unchanged (`aggregate.Portfolio`,
+`aggregate.portfolio.Portfolio`, `from aggregate.portfolio import …`).
+
+- **`portfolio.py` is now a thin façade.** The `Portfolio` class lives in
+  `aggregate._portfolio`; the façade re-exports the historical public surface
+  (`Portfolio`, `make_awkward`, `make_comonotonic_allocations`,
+  `swap_density_df`) plus the qualified-path attributes
+  (`check01` / `make_array` / `convex_points`,
+  `VALIDATION_NOISE` / `ALIASING_RATIO` / `EXEQA_NOISE_FLOOR`).
+- **`aggregate._portfolio_density`** — the density-based (independence) path:
+  the `add_exa` / `exeqa_*` independent-sum kernel and the `_ft_nots`
+  spectral-division helper, lifted to free functions taking `port`.
+  `Portfolio.add_exa` is now a thin wrapper.
+- **`aggregate._portfolio_common`** — the common exeqa numerics, agnostic to
+  FFT-vs-sample origin (the switcheroo invariant): `build_augmented` (the
+  apply-distortion / linear-vs-lifted allocation engine), `unit_capital_at`
+  (layer-ROE capital allocation), `allocation_diagnostics`, `bodoff`, and the
+  convex-hull helpers. The corresponding `Portfolio` methods delegate.
+- **`aggregate._portfolio_sample`** — the sample-based (dependence) path:
+  `sample` (Iman–Conover), `add_exa_sample` (the switcheroo's exeqa-from-sample
+  kernel), `swap_density_df`, and the `make_comonotonic_allocations_work`
+  majorization. **Behaviour-frozen relocation** — the substantive review of the
+  dependence machinery is a later plan.
+- **Consumes the P3 shared concerns:** `Portfolio.price_pentagon` now delegates
+  to `aggregate._pricing.price_pentagon` (was a duplicated body), joining
+  `calibrate_distortions` / `price_ccoc` which already routed through `_pricing`
+  (a93).
+- **New `tests/test_portfolio_subsystems.py`** exercises the extracted kernels
+  directly (reachable now without a full `update()` / `sample()`); the full
+  baseline is unmoved (behaviour-frozen extraction, numbers identical).
+
+**Breaking (pre-1.0): `Portfolio.percentiles` removed.** The interpolated
+per-unit percentile table (no `Aggregate` analogue) is superseded by the exact
+vector-valued `q`. Use `port.q(p)` / `port['unit'].q(p)` for quantiles.
+
+### Deferred within P4
+
+- The intricate, author-sensitive **bucket/window sizers**
+  (`recommend_bucket` / `best_bucket` / `best_window` / `bs_window_df` and
+  helpers) and the **validation** bodies (`valid` / `validation_explanation`)
+  stay on `Portfolio` for now rather than being dropped into the shared
+  `_bucket_window` / `_validation` modules — matching P3 Phase 1b, which
+  likewise deferred extracting the same-shaped `Aggregate.valid` body. They land
+  alongside the Aggregate-side extraction so the two sizers/validators can be
+  read side by side safely.
+- The **sample-subsystem review** and the **4B composition** seam remain
+  post-beta, conditional, each its own later plan.
+
 ## 1.0.0a93
 
 ### Distortion calibration on a single distribution — `Aggregate`/`Portfolio` parity

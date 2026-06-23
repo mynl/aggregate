@@ -8,8 +8,8 @@ Covers:
 - ``Portfolio.aligned_unit_density_df`` -- the explicitly-named display
   adapter: exact legacy parity on a zero-origin book, a window-mismatch
   warning on a windowed (signed) book.
-- The migrated display readers (``percentiles``, ``_limits``, ``plot``,
-  pedagogy density/bivariate panels) work without the legacy
+- The migrated display readers (``_limits``, ``plot``, pedagogy
+  density/bivariate panels) work without the legacy
   ``density_df['p_{unit}']`` columns.
 
 The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg``
@@ -225,14 +225,6 @@ def stripped():
     assert not [c for c in port.density_df.columns
                 if c in (f'p_{u}' for u in port.unit_names)]
     return port
-
-
-def test_percentiles_off_p_unit(stripped):
-    df = stripped.percentiles()
-    assert df.notna().all().all()
-    # interpolated unit percentile sits near the exact step quantile
-    p50 = float(df.loc['P'].iloc[0])
-    assert abs(p50 - stripped['P'].q(0.5)) <= 2 * stripped.bs
 
 
 def test_limits_and_plot_off_p_unit(stripped):

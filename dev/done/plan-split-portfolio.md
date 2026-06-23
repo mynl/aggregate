@@ -1,10 +1,16 @@
 # Plan P4 — split `portfolio.py` (three subsystems under one `Portfolio` class)
 
-> **Status: DRAFT — not executed.** See `plan-README.md`. Sequenced **after** P1
-> (GridDistribution adopted), P2 (plotting lifted out), and P3 (distributions split
-> **and the shared concerns `_validation`/`_bucket_window`/`_pricing` born**) — by then
-> `Portfolio` already delegates its accessors, has no plotting, and the shared
-> concern modules already exist for it to drop its implementations into.
+> **Status: Phase 4A LANDED (1.0.0a94).** The façade + three-subsystem split
+> (`_portfolio` / `_portfolio_density` / `_portfolio_common` / `_portfolio_sample`),
+> `price_pentagon` → `_pricing`, `percentiles` removed, and
+> `tests/test_portfolio_subsystems.py` are in; baseline unmoved. **Deferred
+> carryover** (recorded in `dev/TODO.md` H6): the §3 drops of the intricate
+> bucket/window sizers (`recommend_bucket`/`best_bucket`/`best_window`/
+> `bs_window_df`) and validation bodies (`valid`/`validation_explanation`) into
+> the shared `_bucket_window`/`_validation` modules are held to land beside the
+> Aggregate-side extraction P3 1b also deferred (so the two read side by side).
+> Phase 4B composition + the sample-subsystem review (§4/§5) stay post-beta,
+> conditional. See `plan-README.md`.
 >
 > **Release mechanics (CLAUDE.md).** The façade / relocation phases are *pure moves*
 > (tidying, no bump). The compute-extraction phase adds tests / touches behaviour

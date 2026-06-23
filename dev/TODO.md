@@ -179,6 +179,24 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     `Severity` objects, not plain arrays). **P3 is COMPLETE** (Phases 1/1b/1c/2A);
     Phase 2B (`ReinsuranceProgram` composition) remains deferred/conditional. Next: **P4**
     `plan-split-portfolio.md` (consumes the P3 shared concerns).
+  - **P4 Phase 4A landed (1.0.0a94), `dev/done/plan-split-portfolio.md`:**
+    `portfolio.py` (≈4.75k lines) split behind a re-export façade into
+    `_portfolio` (the `Portfolio` class + `make_awkward`) plus the three
+    subsystems — `_portfolio_density` (`add_exa`/`_ft_nots` independent-sum
+    kernel), `_portfolio_common` (the FFT-vs-sample-agnostic exeqa numerics:
+    `build_augmented`, `unit_capital_at`, `allocation_diagnostics`, `bodoff`,
+    convex-hull helpers), `_portfolio_sample` (`sample`/`add_exa_sample`/
+    `swap_density_df`/`make_comonotonic_allocations_work`, behaviour-frozen). The
+    matching `Portfolio` methods are thin delegators; `price_pentagon` now routes
+    through `_pricing`. `Portfolio.percentiles` **removed** (breaking, superseded
+    by vector-`q`). `tests/test_portfolio_subsystems.py` added; baseline unmoved.
+    **Deferred carryover (P4 §3):** dropping the intricate, author-sensitive
+    **bucket/window sizers** (`recommend_bucket`/`best_bucket`/`best_window`/
+    `bs_window_df`) and **validation** bodies (`valid`/`validation_explanation`)
+    into the shared `_bucket_window` / `_validation` modules — held to land beside
+    the Aggregate-side extraction P3 1b also deferred, so the two read side by
+    side. Phase 4B composition + the sample-subsystem review stay post-beta,
+    conditional.
 
 ---
 

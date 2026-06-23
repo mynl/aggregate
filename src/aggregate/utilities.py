@@ -14,7 +14,6 @@ import scipy.fft as sft
 # `agg_help`, so it is imported lazily inside that function instead. (Program
 # pretty-printing/colorization moved to aggregate.decl_writer at 1.0.0a53.)
 
-from .constants import Validation
 from ._grid_distribution import make_var_tvar
 
 
@@ -585,45 +584,8 @@ def introspect(ob):
         columns=['name', 'kind', 'value', 'type', 'signature', 'help', 'length'])
     df = df.sort_values(['kind', 'length', 'name']).reset_index(drop=True)
     return df
-
-
-def explain_validation(rv):
-    """
-    Explain the validation result rv.
-    Don't over report: if you fail CV don't need to be told you fail Skew too.
-
-    Under reinsurance the realised view has no independent theoretical and
-    cannot be validated, but the SUBJECT (gross) view was validated under
-    the hood (§1.3 of the aggregate refactor plan). The message reports
-    that subject status alongside the ``reinsurance`` marker, so the user
-    can tell whether the underlying gross object is sound.
-    """
-    if rv == Validation.NOT_UNREASONABLE:
-        return "not unreasonable"
-    if rv & Validation.NOT_UPDATED:
-        return "n/a, not updated"
-    # Collect failures from the SEV/AGG/ALIASING flags (suppressing higher
-    # moments once a lower-order moment already failed).
-    parts = []
-    if rv & Validation.SEV_MEAN:
-        parts.append('sev mean')
-    if rv & Validation.AGG_MEAN:
-        parts.append('agg mean')
-    if rv & Validation.ALIASING:
-        parts.append('agg mean error >> sev, possible aliasing; try larger bs')
-    if not (rv & Validation.SEV_MEAN) and (rv & Validation.SEV_CV):
-        parts.append('sev cv')
-    if not (rv & Validation.AGG_MEAN) and (rv & Validation.AGG_CV):
-        parts.append('agg cv')
-    if not (rv & Validation.SEV_CV) and (rv & Validation.SEV_SKEW):
-        parts.append('sev skew')
-    if not (rv & Validation.AGG_CV) and (rv & Validation.AGG_SKEW):
-        parts.append('agg skew')
-    explanation = ', '.join(parts)
-    if rv & Validation.REINSURANCE:
-        if explanation:
-            return f'reinsurance; subject fails {explanation}'
-        return 'reinsurance; subject not unreasonable'
-    return f'fails {explanation}'
+# explain_validation relocated to _validation.py (Phase 1b); re-exported
+# here for back-compat (mirrors make_var_tvar in _grid_distribution).
+from ._validation import explain_validation  # noqa: F401
 
 

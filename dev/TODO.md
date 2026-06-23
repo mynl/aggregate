@@ -132,6 +132,35 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     quantile semantics are a design question) and Bivariate's structural split is
     already deferred. `cdf/sf/pdf/pmf` on Agg/Port left on `interp1d` (used directly
     as callables by plotting). Plan moved to `dev/done/`.
+  - **P2 landed (1.0.0a92, Pass A):** `aggregate.plots` subpackage (Layer-0
+    `_style`, the per-class compositors); all `.plot()` methods reduced to one-line
+    stubs; `import aggregate` is matplotlib-free; `tests/test_plots_boundary.py`
+    enforces the boundary. Pass B (visual refresh) deferred to the author.
+  - **P3 Phase 1 landed (pure move, no bump):** `distributions.py` (9.8k lines)
+    kind-split into `_fits` / `_frequency` / `_severity` / `_aggregate` behind
+    a thin re-export façade (`distributions.py` → ~50 lines). Subclass dispatch is
+    registry-based (`__init_subclass__`) so the move is dispatch-safe; three
+    function-local imports break the `_fits`/`_severity` → `_aggregate` cycles; the
+    façade re-exports the exact historical surface (vetted against every
+    `from …distributions import` in src + tests). Behaviour-identical (full suite
+    matches baseline).
+  - **P3 Phase 1b landed (pure move, no bump):** birthed the shared/Agg-only
+    concerns out of `_aggregate` (now ~6.2k): `_bucket_window.py` (bucket/window
+    sizing + the 7 window/bucket constants), `_reinsurance.py` (`make_ceder_netter`
+    / `_validate_reins_layers`), `_validation.py` (`explain_validation` **relocated
+    from `utilities.py`** with a back-compat re-import there, à la `make_var_tvar`;
+    + `VALIDATION_NOISE`/`ALIASING_RATIO`), `_pricing.py` (`price` / `price_pentagon`
+    as `agg`-param functions; the methods are thin delegators). All leaf/near-leaf
+    (never import `_aggregate`/`_portfolio`) so **P4 can drop the Portfolio side in
+    beside them**. Façade re-exports updated to the new homes. Full suite matches
+    baseline. **Deferred within 1b** (high-risk / low-reward now, revisit when P4
+    needs the side-by-side or in 2A): extracting the `Aggregate.valid` body (intricate,
+    `stats_df`-coupled, author-sensitive noise logic) and `_apply_reins_work` into
+    their concern modules — the modules exist and house the clean pieces; the method
+    bodies stay on `Aggregate` for now.
+  - **P3 Phases 1c (distortion calibration on a GD; bumps), 2A (Aggregate compute
+    extraction; bumps) pending** — capability phases, paused for author sign-off
+    (1c drops `Portfolio.calibrate_distortion`, adds `Aggregate.calibrate_distortions`).
 
 ---
 

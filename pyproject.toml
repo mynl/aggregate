@@ -96,6 +96,10 @@ select = ["F"]
 [tool.ruff.lint.per-file-ignores]
 # The package __init__ intentionally re-exports submodule surfaces via `import *`.
 "__init__.py" = ["F401", "F403"]
+# distributions.py is a thin public facade over the underscore-prefixed kind
+# modules (_fits / _frequency / _severity / _aggregate); it re-exports their
+# surfaces via `import *`, so the star-import findings are expected, not bugs.
+"distributions.py" = ["F401", "F403", "F405"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

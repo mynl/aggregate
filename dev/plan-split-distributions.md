@@ -1,6 +1,18 @@
 # Plan P3 — split `distributions.py` (kind-keyed module set)
 
-> **Status: DRAFT — not executed.** See `plan-README.md` for the four-plan map.
+> **Status: Phases 1 + 1b DONE (pure moves, no bump) — Phases 1c/2A pending.**
+> `distributions.py` is now a thin façade over `_fits` / `_frequency` / `_severity`
+> / `_aggregate`, and the shared concerns are born as leaf/near-leaf modules
+> `_bucket_window` / `_reinsurance` / `_validation` / `_pricing` (each takes plain
+> data or an `agg` object, never imports `_aggregate`/`_portfolio`, so P4 reuses
+> them). `explain_validation` was relocated out of `utilities.py` (back-compat
+> re-import kept). The full suite matches the pre-split baseline at each step
+> (registry dispatch made the kind split dispatch-safe; function-local imports break
+> the `_fits`/`_severity` → `_aggregate` cycles). **Deferred within 1b** (revisit in
+> P4 / 2A): extracting the `Aggregate.valid` body and `_apply_reins_work` into their
+> concern modules — too intricate/author-sensitive for a now-move; the modules exist
+> and house the clean pieces. **Paused before the capability phases (1c/2A)** for
+> author sign-off (1c changes the public surface). See `plan-README.md` for the map.
 > This is a *structural* refactor: it moves code and adds a façade, with **zero
 > behaviour change** and **zero public import-path breakage**. The frozen numeric
 > baseline must not move.

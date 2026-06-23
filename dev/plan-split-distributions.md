@@ -37,6 +37,13 @@ back). That's the opposite of the path that leads to regret.
 
 **Goals**
 - One class taxonomy per file, split on the existing `Base<Kind>` axis.
+- **Birth the cross-cutting shared concerns** — `_validation`, `_bucket_window` (bucket /
+  window sizing), and `_pricing` (single-GD: pentagon completion + distortion
+  calibration), plus the Agg-only `_reinsurance` — as standalone modules, seeded
+  here from the `Aggregate` implementations. P4 then drops the `Portfolio`
+  implementations into the *same* `_validation`/`_bucket_window`/`_pricing` files, so the
+  two are read **side by side** (they are similar, not identical — co-locating
+  surfaces the commonality without forcing a premature merge).
 - No file over ~6k lines after Phase 1; the real win (shrinking `Aggregate`) is
   staged separately in Phase 2A.
 - Public surface unchanged: `aggregate.Aggregate`, `aggregate.Severity`,
@@ -105,15 +112,25 @@ numbers).
 | **`_fits.py`** | 184–385 (`lognorm_fit`, `sln_fit`, `sgamma_fit`, `gamma_fit`, `beta_fit`, `invgamma_fit`, `invgauss_fit`, `lognorm_lev`, `lognorm_approx`, `approximate_from_mcvsk`) + the `_sev_kwargs_*` / `_approximate_sev_kwargs` helpers 386–551 | ~370 | **True leaf** (numpy/scipy only). Consumed by `_severity` and by `Aggregate.approximate`. |
 | **`_frequency.py`** | 1429–2268 (`Frequency` + 21 subclasses), plus `_logarithmic_theta` (1219), `_normalize_freq_name` (1275) | ~900 | Near-leaf: `moments` + small numeric helpers only. |
 | **`_severity.py`** | 8832–9954 (`Severity` + subclasses, `_DiscreteRV`*), **plus** the severity support functions: `make_conditional_*`/`make_layer_attachment_*` (8254–8505), `_classify_sev`/`_cv_to_shape`/`_mean_to_scale`/`_safe_integrate`/`_numerical_moms` (8506–8830), `_partial_e*`/`_moms_analytic` (874–1025), `validate_discrete_distribution` (1231) | ~1,900 | `Severity(ss.rv_continuous)` keeps its scipy coupling. Imports `_fits`. *`_DiscreteRV` may have moved to the grid-distribution module in P1 — check. |
-| **`_aggregate.py`** | 2309–8253 (`Aggregate`), plus its private support: bucket sizing `estimate_agg_window`/`bs_describe`/`bs_explain`/`_bs_grid_top`/`_estimate_agg_percentile` (552–873), `_picks_work` (1026), reins helpers `_validate_reins_layers`/`make_ceder_netter` (1288–1428), `_flat_col_to_stats_index` (2269) | ~6,300 | The monolith; Phase 2A shrinks it (and P1 already thinned its accessors). Imports `_frequency`, `_severity`, `_fits`, `spectral.Distortion`, and the P1 `GridDistribution`. |
+| **`_aggregate.py`** | 2309–8253 (`Aggregate`) minus the shared-concern blocks below, plus its genuinely Agg-private support: `_picks_work` (1026), `_flat_col_to_stats_index` (2269) | ~5,200 | The monolith; Phase 2A shrinks it further (and P1 already thinned its accessors). Imports `_frequency`, `_severity`, `_fits`, `_validation`, `_bucket_window`, `_pricing`, `_reinsurance`, `spectral.Distortion`, and the P1 `GridDistribution`. |
+| **`_bucket_window.py`** *(shared)* | bucket / window sizing `estimate_agg_window`/`bs_describe`/`bs_explain`/`_bs_grid_top`/`_estimate_agg_percentile` (552–873) | ~320 | Bucket-and-window-selection concern. Seeded from `Aggregate`; P4 adds the `Portfolio` sizers (`recommend_bucket`/`best_bucket`/`best_window`/`bs_window_df`) here so the two sit side by side. Near-leaf (numpy/scipy). |
+| **`_reinsurance.py`** *(Agg-only)* | reins helpers `_validate_reins_layers`/`make_ceder_netter` (1288–1428) + the Aggregate ceder/netter application | ~200 | Agg-only carve-out (Portfolio has no reinsurance). The 2B `ReinsuranceProgram` collaborator, if it ever lands, grows from here. |
+| **`_validation.py`** *(shared)* | the `Aggregate` validation / `explain_validation` machinery and aliasing/moment-match checks (exact symbols resolved by `rg` at execution) | ~250 | Validation concern. Seeded from `Aggregate`; P4 adds `Portfolio.valid`/`validation_explanation` here. Similar-not-identical — co-located to expose the commonality. |
+| **`_pricing.py`** *(shared)* | the single-GD pricing surface: `Aggregate.price`/`price_ccoc`, pentagon completion, and `Aggregate.calibrate_distortions` (the P1 Phase L free win); flavor (b)'s set-loop relocated here from `spectral.py` | ~300 | Single-GD pricing concern (pentagon completion + distortion calibration). Thin orchestration — pentagon algebra stays in `pentagon.py`, Newton calibration on `Distortion` in `spectral.py`. P4 routes `Portfolio`-total pricing through it. See `plan-README.md` pricing↔allocation boundary. |
 | **`distributions.py`** | — | ~10 | Façade only (§1). |
 | **shared tiny helpers** | `value_type_role`/`value_type_label` (111–162), `max_log2` (163) | small | Put in whichever module uses them; if used by >1, a `_dist_common.py` leaf. Decide at execution. |
 
 **Dependency direction is clean.** `spectral` does **not** import `distributions`
 (verified one-way), so `_aggregate.py` importing `Distortion` from `spectral`
 creates no cycle. The split DAG is
-`_fits` → `_severity`; `_frequency`; (`_severity`, `_frequency`, `spectral`,
-`GridDistribution`) → `_aggregate` → façade. No new circular risk.
+`_fits` → `_severity`; `_frequency`; `_validation`, `_bucket_window`, `_reinsurance`
+(near-leaves: numpy/scipy + `GridDistribution`); `_pricing` → (`spectral`,
+`pentagon`, `GridDistribution`); then
+(`_severity`, `_frequency`, `_validation`, `_bucket_window`, `_reinsurance`, `_pricing`,
+`spectral`, `GridDistribution`) → `_aggregate` → façade. The shared concern modules
+must **not** import `_aggregate`/`_portfolio` (they take a GD and plain data), which
+is exactly what lets P4 reuse them — same leaf discipline as `GridDistribution`. No
+new circular risk.
 
 Split axis = the `Base<Kind>` convention: all `Frequency*` together, all
 `Severity*` together, so the alphabetical-sort rationale carries to file level.
@@ -137,7 +154,28 @@ Each numbered step is a standalone commit that **only relocates code** and leave
   `aggregate.Aggregate`, `aggregate.distributions.Aggregate`, and a representative
   `from aggregate.distributions import Severity` all resolve.
 
-After Phase 1: four readable files, nothing over ~6.3k, public surface identical.
+After Phase 1: four readable files, nothing over ~5.2k, public surface identical.
+**Shippable unit.** Phase 1b can follow later.
+
+### Phase 1b — birth the shared concerns (pure move, no bump)
+
+Lift the cross-cutting blocks out of `_aggregate.py` into their own modules,
+**seeded from the `Aggregate` code only** (P4 adds the `Portfolio` side later). Each
+is a standalone commit, `uv run pytest` green, no logic change:
+
+- **1b.1** `_bucket_window.py` — the bucket / window sizing helpers.
+- **1b.2** `_reinsurance.py` — the ceder/netter helpers + Aggregate application
+  (Agg-only; no Portfolio counterpart will join it).
+- **1b.3** `_validation.py` — the `explain_validation` / aliasing-and-moment-match
+  machinery (`rg` the exact symbols at execution).
+- **1b.4** `_pricing.py` — the single-GD pricing surface; also **relocate flavor
+  (b)'s set-loop here from `spectral.py`** (it was authored there in P1 Phase L —
+  this is the one accepted move-twice, flagged in P1). The per-distortion Newton
+  iteration stays on `Distortion`; only the orchestration moves.
+
+These modules are leaves/near-leaves (they take a GD + plain data, never import
+`_aggregate`), which is what lets **P4 consume them unchanged**. After 1b:
+`_aggregate.py` is ~5.2k and the shared concerns are visible in one place each.
 **Shippable unit.** Phase 2A can follow later.
 
 ### Phase 2A — extract pure functions out of `Aggregate` (high value, low risk; bumps)
@@ -216,6 +254,8 @@ dependency loads.
 - This is **P3** in the four-plan track (`plan-README.md`): P1 GridDistribution →
   P2 plots subsystem → **P3 split distributions** → P4 split portfolio.
 - Within P3: **Phase 1** (kind split, pure move) is independently shippable;
-  **Phase 2A** (Aggregate compute extraction, bumps) follows; **Phase 2B**
-  (composition) is post-beta and conditional, gated by the two-file rule.
+  **Phase 1b** (birth the shared concerns `_validation`/`_bucket_window`/`_pricing` +
+  Agg-only `_reinsurance`, pure move) follows and is what P4 consumes; **Phase 2A**
+  (Aggregate compute extraction, bumps) next; **Phase 2B** (composition) is
+  post-beta and conditional, gated by the two-file rule.
 - File a `dev/TODO.md` entry pointing at this plan and the README.

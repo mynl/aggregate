@@ -108,11 +108,16 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   `plan-grid-distribution.md` (new `GridDistribution` value type; `make_var_tvar`
   moves in from `utilities.py`; every consumer adopts) → **P2**
   `plan-plots-subsystem.md` (one `plots/` package + global matplotlib defer) →
-  **P3** `plan-split-distributions.md` (kind split behind a façade) → **P4**
-  `plan-split-portfolio.md`. Deferred/conditional (post-beta, gated by the
-  two-file rule): Agg 2B `ReinsuranceProgram`, Port 4B `PricingEngine` + dependence
-  unit, Bounds & Bivariate structural splits. *(new, 2026-06-21; drafted not
-  executed — P1 is a pure addition and valuable standalone.)*
+  **P3** `plan-split-distributions.md` (kind split behind a façade; **births the
+  shared concerns** `_validation`/`_bucket_window`/`_pricing` + Agg-only `_reinsurance`) →
+  **P4** `plan-split-portfolio.md` (**three-subsystem split** `_portfolio_density` /
+  `_portfolio_sample` / `_portfolio_common`; consumes the P3 shared concerns).
+  Deferred/conditional (post-beta, gated by the two-file rule): Agg 2B
+  `ReinsuranceProgram`, the **sample-subsystem review** (correlation/switcheroo —
+  extracted in P4, reviewed in its own later plan), relaxing pentagon completion to
+  not require `a`/`p`, Bounds & Bivariate structural splits. *(new, 2026-06-21;
+  updated 2026-06-23 for the pricing/portfolio pivot; drafted not executed — P1 is a
+  pure addition and valuable standalone.)*
 
 ---
 

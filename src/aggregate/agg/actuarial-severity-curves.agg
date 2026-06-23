@@ -163,3 +163,60 @@ agg E.Beta 1 claim sev 100000 * beta 2 5 fixed note{Beta on [0, 100000] -- bound
 # continuous rv, so it has no `sev mbbefd ...` form here; the bounded
 # beta above is the closest in-vocabulary stand-in. Exposure-curve
 # support is tracked separately.
+
+
+# ----------------------------------------------------------------------
+# F. Severity curves from cited papers (example-library review, batch 1)
+# ----------------------------------------------------------------------
+# Explicit published severity curves harvested from the batch-1 paper
+# assessment (docs/example_library/batch-1.md). Unlike sections A-E these
+# are reusable `sev` OBJECTS, named <CitationKey>.<Curve>, so a post can
+# plug one into any frequency/limit, e.g. Bodoff's XPL mixture:
+#     agg X [n1 n2] claims [inf 1000000] xs 0 sev.Bodoff2017.Pareto ...
+# To inspect one on its own:  qd(build('agg t 1 claim sev.<Name> fixed')).
+# note{} carries the citation key. Pareto naming follows the section C
+# European = Type I (`pareto`) / American = Type II (`lomax`) split.
+# Heavy members (alpha < 2 infinite variance, alpha < 1 infinite mean)
+# are fine as definitions; when built they need a limit or explicit grid.
+
+# Berens, R. M., "Reinsurance contracts with a multi-year aggregate limit" (1997)
+# Lognormal severity, mean 150,000, sd 37,500 (cv = 0.25).
+sev Berens1997.Lognorm lognorm 150000 cv 0.25 note{Berens1997};
+# Single-parameter (European / Type I) Pareto, shape alpha = 1.5, threshold
+# theta = 50,000 (support from 50,000; mean 150,000). Infinite variance.
+# Paper also uses a 300,000-mean variant (theta = 100,000).
+sev Berens1997.Pareto 50000 * pareto 1.5 note{Berens1997};
+
+# Mack, T. & Fackler, M., "Exposure-rating in liability reinsurance" (2003)
+# Lognormal baseline, sigma = 1.8 (cv ~ 4.953); mean nominal 10,000.
+sev Mack2003.Lognorm lognorm 10000 cv 4.953 note{Mack2003};
+# Riebesell tail Pareto, z = 20% => alpha = 0.737 (Lomax). alpha < 1 =>
+# infinite mean; meaningful only inside a finite layer/limit.
+sev Mack2003.RiebesellPareto 10000 * lomax 0.737 note{Mack2003};
+# "American" (Type II / Lomax) Pareto, alpha = 1.5; infinite variance.
+sev Mack2003.AmericanPareto 10000 * lomax 1.5 note{Mack2003};
+
+# Mata, A. J. & Verheyen, M. A., "An Improved Method for Experience Rating
+# Excess of Loss Treaties using Exposure Rating Techniques" (2005)
+# Lognormal severity (2005 level), mu = 9.31, sigma = 2.29
+# (scale = exp(9.31) ~ 11,048; mean ~ 152,000, cv ~ 13.7).
+sev Mata2005.Lognorm 11048 * lognorm 2.29 note{Mata2005};
+
+# Bodoff, N. M., "An Actuarial Model of Excess of Policy Limits Losses" (2017)
+# Two-parameter (Type II / Lomax) Pareto, theta = 50,000, alpha = 1.5
+# (mean 100,000). Infinite variance; the XPL model conditions the severity
+# *before* the policy limit, then mixes over the limit profile.
+sev Bodoff2017.Pareto 50000 * lomax 1.5 note{Bodoff2017};
+
+# Jin, T., Provost, S. B. & Ren, J., "Moment-based density approximations
+# for aggregate losses" (2016)
+# Gamma test severity, shape 3, scale 2 (mean 6, cv = 1/sqrt(3)).
+sev Jin2016.Gamma gamma 6 cv 0.5774 note{Jin2016};
+# Two-parameter (Type II / Lomax) Pareto test severity, alpha = 20,
+# theta = 100 (the lighter Pareto(5, 100) variant also appears in the paper).
+sev Jin2016.Pareto 100 * lomax 20 note{Jin2016};
+
+# Kang, J. S. J., Provost, S. B. & Ren, J., "Moment-Based Density Approximation
+# Techniques as Applied to Heavy-tailed Distributions" (2019)
+# Pareto Type II (Lomax), shape alpha = 3.5, scale beta = 3.5 (mean 1.4).
+sev Kang2019.Pareto 3.5 * lomax 3.5 note{Kang2019};

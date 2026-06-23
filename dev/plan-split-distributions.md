@@ -1,6 +1,8 @@
 # Plan P3 — split `distributions.py` (kind-keyed module set)
 
-> **Status: Phases 1 + 1b + 1c DONE — Phase 2A pending.**
+> **Status: COMPLETE — Phases 1 + 1b + 1c + 2A all done (a93).** Phase 2B
+> (composition / `ReinsuranceProgram`) remains explicitly deferred and conditional.
+> Move this plan to `dev/done/` once committed.
 > `distributions.py` is now a thin façade over `_fits` / `_frequency` / `_severity`
 > / `_aggregate`, and the shared concerns are born as leaf/near-leaf modules
 > `_bucket_window` / `_reinsurance` / `_validation` / `_pricing` (each takes plain

@@ -35,6 +35,23 @@ a one-unit `Portfolio`.
   `price`/`price_pentagon`/`price_ccoc`) now lives in the shared
   `aggregate._pricing` module born in the structural split below.
 
+### Aggregate FFT convolution core extracted as a pure function (Phase 2A)
+
+- **New `aggregate._aggregate_compute.freq_sev_convolution(sev_density,
+  freq_pgf, n, *, N, bs, i0, x_min, en, freq_name, padding)`** — the
+  FFT-PGF-iFFT kernel (`iFFT(freq_pgf(n, FFT(sev)))`) lifted out of
+  `Aggregate._fft_aggregate`, which is now a thin wrapper passing its array /
+  scalar state explicitly. The kernel is reachable and testable **without** a
+  full `Aggregate.update()` and is notebook-inspectable. Behavior is unchanged
+  (byte-for-byte: the wrapper reproduces the prior `agg_density`).
+- New `tests/test_aggregate_compute.py` drives the kernel directly: fixed count
+  vs repeated `np.convolve`, the zero-risk point mass, compound-Poisson mean /
+  variance identities, and byte-for-byte parity with a built `Aggregate`
+  (fixed and Poisson frequency).
+- `Aggregate.discretize` was **not** extracted — it orchestrates the per-
+  component `Severity` objects (`sev.cdf`/`sf`/`fz`, `_rebucket_to_grid`) rather
+  than transforming plain arrays, so it stays a method.
+
 ### `distributions.py` split into kind modules + shared concerns (structural)
 
 Phases 1 and 1b of the same plan — pure code relocation, **no behavior change**

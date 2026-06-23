@@ -170,8 +170,15 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     Aggregate's filtered (`p_total>0`) grid (≈15% low at q99 in a smoke test), so the
     Agg calibration sources `el` from the full `density_df['p_total']`; the GD.lev
     filtered-grid behavior is worth review (P1 follow-up / 2A).
-  - **P3 Phase 2A (Aggregate compute extraction; bumps) pending** — paused for author
-    sign-off; extract the FFT/discretization core into testable pure functions.
+  - **P3 Phase 2A landed (1.0.0a93):** the FFT convolution core lifted out of
+    `Aggregate._fft_aggregate` into `aggregate._aggregate_compute.freq_sev_convolution`
+    (a leaf pure function — `iFFT(freq_pgf(n, FFT(sev)))`); the method is now a thin
+    wrapper. Reachable/testable without a full `update()`; `tests/test_aggregate_compute.py`
+    pins it vs `np.convolve` (fixed count), the compound-Poisson moments, and byte-for-byte
+    parity with a built `Aggregate`. `discretize` left on the class (it orchestrates the
+    `Severity` objects, not plain arrays). **P3 is COMPLETE** (Phases 1/1b/1c/2A);
+    Phase 2B (`ReinsuranceProgram` composition) remains deferred/conditional. Next: **P4**
+    `plan-split-portfolio.md` (consumes the P3 shared concerns).
 
 ---
 

@@ -54,6 +54,7 @@ from ._bucket_window import (
 )
 from ._validation import VALIDATION_NOISE, ALIASING_RATIO, explain_validation
 from ._reinsurance import make_ceder_netter
+from ._aggregate_compute import freq_sev_convolution
 from . import _pricing
 
 logger = logging.getLogger(__name__)
@@ -3503,45 +3504,13 @@ class Aggregate:
           aggregate support width ``W < M*bs``; a window narrower than the
           support shows up as a two-sided deficit.
         """
-        N = len(self.xs)
-        i0 = self.i0
-        j0 = int(round(self.x_min / self.bs)) if self.bs else 0
-        if i0 == 0 and j0 == 0:
-            # ---- default non-negative, zero-based path (unchanged) ----
-            if self.n == 0:
-                out = np.zeros_like(self.xs)
-                out[0] = 1.0
-                return out, ft(out, padding)
-            z = ft(sev_density, padding)
-            ftagg = self.frequency.freq_pgf(self.n, z)
-            if np.sum(self.en) == 1 and self.frequency.freq_name == 'fixed':
-                return sev_density.copy(), ftagg
-            return np.real(ift(ftagg, padding)), ftagg
-
-        # ---- signed / windowed path (F1 negative-x + F2 output window) ----
-        M = N << padding
-        if self.n == 0:
-            # Zero-risk: point mass at physical 0, placed at FFT index 0 so the
-            # output-window roll below sends it to the correct output bucket.
-            a = np.zeros(M)
-            a[0] = 1.0
-            ftagg = sfft.rfft(a)
-        else:
-            # Lay the severity into the length-M buffer: physical 0..(N-1-i0)*bs
-            # at indices 0..N-1-i0; the i0 negative buckets wrap to the very top
-            # of M (indices M-i0..M-1). Equivalent to np.roll(sev, -i0) but into
-            # the padded length so the period is M*bs, not N*bs.
-            g = np.zeros(M)
-            g[:N - i0] = sev_density[i0:]
-            if i0:
-                g[M - i0:] = sev_density[:i0]
-            z = sfft.rfft(g)
-            ftagg = self.frequency.freq_pgf(self.n, z)
-            a = sfft.irfft(ftagg, M)
-        # F2: relabel onto the output window. Roll so x_min lands at output
-        # index 0 (j0 may be negative when x_min < 0), then keep the first N.
-        agg = np.roll(a, -j0)[:N]
-        return agg, ftagg
+        # Thin wrapper over the extracted pure kernel (Phase 2A); all the
+        # self-state it needs is passed explicitly so the core is testable
+        # without a full update(). See aggregate._aggregate_compute.
+        return freq_sev_convolution(
+            sev_density, self.frequency.freq_pgf, self.n,
+            N=len(self.xs), bs=self.bs, i0=self.i0, x_min=self.x_min,
+            en=self.en, freq_name=self.frequency.freq_name, padding=padding)
 
     def _write_stage_moments(self, col, sev_mom, agg_mom, copy_freq_from=None):
         """Write a moment tuple into a single ``stats_df`` column.

@@ -1893,6 +1893,85 @@ class Distortion:
                 f'convergence, target {premium_target} error {fx}')
         self._build()
 
+    @classmethod
+    def calibrate_set(cls, S, bs, premium_target, *, ess_sup=0.0, assets=0.0,
+                      el=None, r0=0.05,
+                      names=('ccoc', 'ph', 'wang', 'dual', 'tvar')):
+        """Calibrate a set of pricing distortions to one premium target on one S.
+
+        The family-loop home for distortion calibration: for each kind in
+        ``names`` it constructs the uncalibrated distortion from the subclass's
+        :attr:`_calibration_init_shape` and runs that subclass's
+        :meth:`calibrate` Newton iteration against the shared
+        ``(S, bs, premium_target, ess_sup, assets, el)`` datum, returning
+        ``{name: calibrated Distortion}``.
+
+        This is pure ``Distortion`` knowledge -- the family registry, each
+        kind's initial shape and parameter name -- so it lives here rather than
+        in the caller. The caller (an ``Aggregate`` or a ``Portfolio`` total,
+        via :mod:`aggregate._pricing`) resolves ``S`` / ``el`` / ``assets`` /
+        ``premium_target`` from its own distribution and hands the data in
+        (**GD -> Distortion**): a ``GridDistribution`` never imports
+        ``Distortion``.
+
+        Parameters
+        ----------
+        S : ndarray
+            Survival vector on the bs-grid up to the asset limit; strictly
+            positive and weakly decreasing. See :meth:`calibrate`.
+        bs : float
+            Bucket size (integration step).
+        premium_target : float
+            Premium the distorted integral ``∫ g(S) dx`` must hit.
+        ess_sup : float, optional
+            Essential supremum (mass-at-zero kinds ``ly`` / ``clin`` / ``lep``).
+        assets : float, optional
+            Asset level; used by the closed-form ``ccoc`` calibration and
+            recorded on each distortion.
+        el : float, optional
+            Expected loss at ``assets``; required by ``ccoc``.
+        r0 : float, optional
+            Mass-at-zero intercept for ``cll`` / ``clin`` / ``lep`` / ``ly``;
+            ignored by the other kinds. Default 0.05.
+        names : sequence of str, optional
+            Distortion kinds to calibrate, in order. Default the standard
+            pricing set ``('ccoc', 'ph', 'wang', 'dual', 'tvar')``.
+
+        Returns
+        -------
+        dict[str, Distortion]
+            One calibrated distortion per requested name, insertion-ordered.
+
+        Notes
+        -----
+        Faithful extraction of the per-name dispatch that lived inline in
+        ``Portfolio.calibrate_distortion``; resolving the survival datum once
+        and looping here (rather than re-resolving per name) is the only
+        behavioural difference, and it does not move the calibrated shapes.
+        """
+        out = {}
+        for name in names:
+            lookup = 'ccoc' if name == 'roe' else name
+            subclass = cls._registry.get(lookup)
+            if subclass is None or subclass._calibration_init_shape is None:
+                raise ValueError(f'calibrate_set not implemented for {name!r}')
+            init_shape = subclass._calibration_init_shape
+            # natural-kwarg construction; calibrate then mutates self.shape.
+            if lookup == 'ccoc':
+                dist = cls('ccoc', r=init_shape)
+            elif lookup in ('cll', 'clin', 'lep', 'ly'):
+                pn = subclass.param_name or {
+                    'cll': 'b', 'clin': 'slope', 'lep': 'r', 'ly': 'r',
+                }[lookup]
+                dist = cls(name=lookup, r0=r0, **{pn: init_shape})
+            else:
+                pn = subclass.param_name
+                dist = cls(name=lookup, **{pn: init_shape})
+            dist.calibrate(S=S, bs=bs, premium_target=premium_target,
+                           ess_sup=ess_sup, assets=assets, el=el)
+            out[name] = dist
+        return out
+
 
 # ===========================================================================
 # Concrete distortion kinds. Order of declaration is the order that

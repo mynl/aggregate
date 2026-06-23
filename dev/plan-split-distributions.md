@@ -1,18 +1,23 @@
 # Plan P3 — split `distributions.py` (kind-keyed module set)
 
-> **Status: Phases 1 + 1b DONE (pure moves, no bump) — Phases 1c/2A pending.**
+> **Status: Phases 1 + 1b + 1c DONE — Phase 2A pending.**
 > `distributions.py` is now a thin façade over `_fits` / `_frequency` / `_severity`
 > / `_aggregate`, and the shared concerns are born as leaf/near-leaf modules
 > `_bucket_window` / `_reinsurance` / `_validation` / `_pricing` (each takes plain
 > data or an `agg` object, never imports `_aggregate`/`_portfolio`, so P4 reuses
 > them). `explain_validation` was relocated out of `utilities.py` (back-compat
-> re-import kept). The full suite matches the pre-split baseline at each step
-> (registry dispatch made the kind split dispatch-safe; function-local imports break
-> the `_fits`/`_severity` → `_aggregate` cycles). **Deferred within 1b** (revisit in
-> P4 / 2A): extracting the `Aggregate.valid` body and `_apply_reins_work` into their
-> concern modules — too intricate/author-sensitive for a now-move; the modules exist
-> and house the clean pieces. **Paused before the capability phases (1c/2A)** for
-> author sign-off (1c changes the public surface). See `plan-README.md` for the map.
+> re-import kept). **Phase 1c (a93, bumps):** distortion-set calibration factored
+> onto `Distortion.calibrate_set`; `Aggregate.calibrate_distortions` + `price_ccoc`
+> added (Agg/Port parity, verified bit-for-bit vs the 1-unit-Portfolio path); the
+> unused singular `Portfolio.calibrate_distortion` dropped. The full suite matches
+> the pre-split baseline at each step (registry dispatch made the kind split
+> dispatch-safe; function-local imports break the `_fits`/`_severity` → `_aggregate`
+> cycles). **Deferred within 1b** (revisit in P4 / 2A): extracting the
+> `Aggregate.valid` body and `_apply_reins_work` into their concern modules.
+> **Known caveat surfaced in 1c:** `GridDistribution.lev` undercounts on the
+> Aggregate's filtered (`p_total>0`) grid, so the Agg calibration sources `el` from
+> the full contiguous `density_df['p_total']` instead — worth a look during 2A.
+> **Paused before Phase 2A** (Aggregate compute extraction). See `plan-README.md`.
 > This is a *structural* refactor: it moves code and adds a façade, with **zero
 > behaviour change** and **zero public import-path breakage**. The frozen numeric
 > baseline must not move.

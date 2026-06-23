@@ -12,10 +12,14 @@ The distortion-calibration capability (``Distortion.calibrate_set`` + the
 pentagon->target glue) is **not** here yet -- it lands in Phase 1c.
 """
 
+import numpy as np
 import pandas as pd
 
-from .spectral import Distortion
+from .spectral import Distortion, DISTORTION_DTYPE
 from .pentagon import complete_pentagon, Pentagon
+
+# The standard pricing distortion set calibrated by ``calibrate_distortions``.
+DEFAULT_CALIBRATION_DISTORTIONS = ('ccoc', 'ph', 'wang', 'dual', 'tvar')
 
 
 def price(agg, p, g, kind='var'):
@@ -123,3 +127,131 @@ def price_pentagon(agg, *, p=None, a=None, P=None, M=None, Q=None,
     pent = Pentagon(obj=agg)
     pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=LR, pq=PQ, roe=ROE)
     return pent.as_frame(unit='total')
+
+
+def price_ccoc(obj, ccoc, *, p):
+    """Price ``obj`` (an Aggregate or a Portfolio total) at a constant cost of
+    capital ``ccoc`` and VaR level ``p``. No distortion involved -- a thin alias
+    for ``obj.price_pentagon(p=p, ROE=ccoc)``, returning the canonical one-row
+    (``'total'``) pentagon ``DataFrame``. Delegating to ``obj.price_pentagon``
+    keeps each class's own completion semantics.
+    """
+    return obj.price_pentagon(p=p, ROE=ccoc)
+
+
+# ---------------------------------------------------------------------------
+# Distortion-set calibration (flavor (b): pentagon target -> Distortion).
+#
+# The pentagon->target glue: resolve the asset level ``a`` and premium target
+# ``P`` from the object's distribution and a cost-of-capital input, then hand
+# the survival datum to ``Distortion.calibrate_set`` (which owns the family
+# loop). Both an ``Aggregate`` and a ``Portfolio`` total calibrate through here
+# -- single-distribution pricing, no per-unit allocation (that stays a
+# Portfolio concern). ``GridDistribution`` is never imported; the object hands
+# its survival/loss data in.
+# ---------------------------------------------------------------------------
+
+def _calibration_survival(density, bs, assets):
+    """Resolve the calibration survival vector ``S`` over ``[0, assets]`` and the
+    essential supremum from a 0-based ``p_total`` density (the full contiguous
+    bs-grid). Faithful extraction of the default (``S_calc='cumsum'``) path of
+    the former ``Portfolio.calibrate_distortion``; ``S`` is strictly positive
+    and weakly decreasing.
+    """
+    Splus = (1 - density.loc[0:assets].cumsum()).values
+    last_non_zero = np.argwhere(Splus)
+    ess_sup = 0.0
+    if len(last_non_zero) == 0:
+        last_non_zero = len(Splus) + 1
+    else:
+        last_non_zero = last_non_zero.max()
+    if last_non_zero + 1 < len(Splus):
+        # truncate at first zero; record where the mass runs out
+        S = Splus[:last_non_zero + 1]
+        ess_sup = density.index[last_non_zero + 1]
+    else:
+        S = (1 - density.loc[0:assets - bs].cumsum()).values
+    assert np.all(S > 0) and np.all(S[:-1] >= S[1:])
+    return S, ess_sup
+
+
+def _limited_ev(density, bs, assets):
+    """``E[min(X, assets)] = bs · Σ_{x < assets} S(x)`` on the full contiguous
+    bs-grid -- the ``add_exa`` / ``exa_total`` convention. Used for the expected
+    loss when the object has no ``exa_total`` column (an ``Aggregate``); matches
+    a one-unit ``Portfolio``'s ``exa_total`` to floating-point dust.
+    """
+    S = 1.0 - density.cumsum()
+    return float(bs * S[S.index < assets].sum())
+
+
+def _calibration_frames(dists, coc, p_val, Fa, exa, P, a):
+    """Build the ``(distortion_df, calibration_df)`` receipt for a calibrated set
+    -- the per-distortion shapes/errors and the shared one-row pentagon target.
+    Schema identical to the former ``Portfolio.calibrate_distortions``.
+    """
+    names = list(dists)
+    rows = []
+    for dname in names:
+        dist = dists[dname]
+        # param_name is the family's natural parameter ('a', 'lam', 'b', 'p');
+        # ccoc has none -> 'r'. gini_p = 2∫g - 1 (= p_equiv); area = ∫g.
+        param_name = getattr(dist, 'param_name', None) or 'r'
+        rows.append([param_name, dist.shape, dist.error, dist.gini_p,
+                     (dist.gini_p + 1) / 2])
+    distortion_df = pd.DataFrame(
+        rows,
+        columns=['param_name', 'param', 'error', 'gini_p', 'area'],
+        index=pd.CategoricalIndex(names, dtype=DISTORTION_DTYPE, name='distortion'),
+    )
+    calibration_df = complete_pentagon(
+        pd.DataFrame([[coc, p_val, Fa, exa, P - exa, P, a - P]],
+                     columns=['coc', 'p', 'F(a)', 'L', 'M', 'P', 'Q'],
+                     index=pd.Index(['calibration'], name='unit')))
+    return distortion_df, calibration_df
+
+
+def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
+                          names=DEFAULT_CALIBRATION_DISTORTIONS):
+    """Calibrate the standard pricing distortion set to a cost-of-capital target
+    on a single distribution (an ``Aggregate`` or a ``Portfolio`` total).
+
+    Resolves the asset level ``a`` (from ``p`` or given), the expected loss
+    ``exa = E[min(X, a)]`` and the premium target ``P`` (from ``coc`` via the
+    ROE -> LR -> P inversion), then calls :meth:`Distortion.calibrate_set` once.
+    Stores ``obj.distortions`` / ``obj.distortion_df`` / ``obj.calibration_df``
+    (mirroring the legacy ``Portfolio`` behaviour) and returns ``distortion_df``.
+
+    The expected loss is read from the object's ``exa_total`` column when it has
+    one (a ``Portfolio``, byte-for-byte the legacy value) and otherwise computed
+    on the full grid via :func:`_limited_ev` (an ``Aggregate``).
+    """
+    if (p is None) == (a is None):
+        raise ValueError(
+            'calibrate_distortions requires exactly one of p= (probability) '
+            'or a= (asset level).')
+    if a is None:
+        a = obj.q(p, kind)
+        p_val = p
+    else:
+        a = obj.snap(a)
+        p_val = obj.cdf(a)
+    density = obj.density_df['p_total']
+    if 'exa_total' in obj.density_df.columns:
+        exa = obj.density_df.loc[a, 'exa_total']
+    else:
+        exa = _limited_ev(density, obj.bs, a)
+    # invert COC -> LR -> P (matches the legacy ROE -> LR -> P path).
+    delta = coc / (1 + coc)
+    nu = 1 - delta
+    P = nu * exa + delta * a
+    S, ess_sup = _calibration_survival(density, obj.bs, a)
+    dists = Distortion.calibrate_set(
+        S=S, bs=obj.bs, premium_target=P, ess_sup=ess_sup, assets=a, el=exa,
+        names=names)
+    distortion_df, calibration_df = _calibration_frames(
+        dists, coc, p_val, obj.cdf(a), exa, P, a)
+    obj.distortions = dists
+    obj.distortion_df = distortion_df
+    obj.calibration_df = calibration_df
+    return distortion_df

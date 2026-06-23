@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from aggregate import Distortion
+from aggregate import Distortion, build
 
 
 # --- shared fixtures --------------------------------------------------------
@@ -130,3 +130,65 @@ def test_calibration_init_shape_present_for_pricing_kinds():
         subclass = Distortion._registry[kind]
         assert subclass._calibration_init_shape is not None, \
             f'{kind} has no _calibration_init_shape'
+
+
+# --- Distortion.calibrate_set: the family-loop classmethod (Phase 1c) -------
+
+def test_calibrate_set_matches_individual(synthetic_S):
+    """``calibrate_set`` returns one calibrated distortion per name, each
+    identical to the individual ``calibrate`` call and hitting the target."""
+    S, bs, el = synthetic_S['S'], synthetic_S['bs'], synthetic_S['el']
+    assets = synthetic_S['assets']
+    prem = el * 1.20
+
+    dset = Distortion.calibrate_set(S=S, bs=bs, premium_target=prem,
+                                    assets=assets, el=el)
+    assert list(dset) == ['ccoc', 'ph', 'wang', 'dual', 'tvar']
+    for name, d in dset.items():
+        assert abs(d.error) < 1e-4, f'{name} residual {d.error}'
+        assert abs(_achieved_premium(d, S, bs) - prem) < 1e-3
+
+    # set member equals the stand-alone calibrate for a representative kind
+    sub = Distortion._registry['ph']
+    d_ph = Distortion(name='ph', **{sub.param_name: sub._calibration_init_shape})
+    d_ph.calibrate(S=S, bs=bs, premium_target=prem, assets=assets, el=el)
+    assert dset['ph'].shape == pytest.approx(d_ph.shape)
+
+
+def test_calibrate_set_unknown_kind_raises(synthetic_S):
+    """A non-calibratable kind in ``names`` raises ValueError."""
+    with pytest.raises(ValueError, match='calibrate_set not implemented'):
+        Distortion.calibrate_set(S=synthetic_S['S'], bs=synthetic_S['bs'],
+                                 premium_target=1.0, names=('minimum',))
+
+
+# --- Aggregate / Portfolio calibration parity (Phase 1c) --------------------
+
+def test_aggregate_calibrate_distortions_parity():
+    """``Aggregate.calibrate_distortions`` matches the legacy one-unit-Portfolio
+    path bit-for-bit (same grid), and stores the standard receipts."""
+    prog = 'agg Solo 80 claims sev lognorm 50 cv 2 poisson'
+    agg = build(prog)
+    agg.update(log2=18, bs=1)
+    port = build('port Wrap ' + prog)
+    port.update(log2=18, bs=1, add_exa=True)
+
+    a = agg.q(0.99)
+    add = agg.calibrate_distortions(0.1, a=a)
+    pdf = port.calibrate_distortions(0.1, a=a)
+
+    assert list(add.index) == ['ccoc', 'ph', 'wang', 'dual', 'tvar']
+    np.testing.assert_allclose(add['param'].values, pdf['param'].values,
+                               rtol=1e-6, atol=1e-8)
+    # side effects: calibrated set + receipts stored on the Aggregate
+    assert set(agg.distortions) == {'ccoc', 'ph', 'wang', 'dual', 'tvar'}
+    assert agg.calibration_df.loc['calibration', 'ROE'] == pytest.approx(0.1)
+
+
+def test_aggregate_price_ccoc_matches_pentagon():
+    """``Aggregate.price_ccoc`` is the cost-of-capital alias of price_pentagon."""
+    agg = build('agg Solo 50 claims sev lognorm 40 cv 1.8 poisson')
+    agg.update(log2=18, bs=1)
+    import pandas.testing as pdt
+    pdt.assert_frame_equal(agg.price_ccoc(0.1, p=0.99),
+                           agg.price_pentagon(p=0.99, ROE=0.1))

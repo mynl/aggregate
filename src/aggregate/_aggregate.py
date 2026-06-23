@@ -6159,3 +6159,52 @@ class Aggregate:
         # Thin delegator to the shared single-distribution pricing concern.
         return _pricing.price_pentagon(
             self, p=p, a=a, P=P, M=M, Q=Q, LR=LR, PQ=PQ, ROE=ROE)
+
+    def price_ccoc(self, ccoc, *, p):
+        """Price at a constant cost of capital ``ccoc`` and VaR level ``p``.
+
+        No distortion is involved -- a thin alias for
+        ``self.price_pentagon(p=p, ROE=ccoc)`` returning the canonical one-row
+        (``'total'``) pentagon ``DataFrame``. Parity with
+        :meth:`Portfolio.price_ccoc`.
+        """
+        return _pricing.price_ccoc(self, ccoc, p=p)
+
+    def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower'):
+        """Calibrate the standard pricing distortion set to a cost-of-capital target.
+
+        The ``Aggregate`` counterpart of :meth:`Portfolio.calibrate_distortions`
+        -- calibration to **this** distribution (the aggregate is its own
+        total), with no per-unit allocation (that stays a ``Portfolio``
+        concern). Calibrating directly here means no more wrapping a single
+        ``Aggregate`` in a one-unit ``Portfolio`` to obtain a calibrated
+        distortion set.
+
+        Parameters
+        ----------
+        coc : float
+            Target cost of capital ``COC = (P - L) / Q``.
+        p : float, optional
+            Probability at which the calibration applies; converted to an asset
+            level via ``self.q(p, kind)``. Exactly one of ``p`` or ``a``.
+        a : float, optional
+            Asset level; snapped to the grid. Exactly one of ``p`` or ``a``.
+        kind : {'lower', 'upper'}, optional
+            VaR kind when ``p`` is provided. Default ``'lower'``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``distortion_df`` (also stored on ``self.distortion_df``): one row
+            per distortion in ``[ccoc, ph, wang, dual, tvar]``. The shared
+            calibration target is stored once on ``self.calibration_df`` and the
+            calibrated objects on ``self.distortions`` keyed by name -- same
+            schema as :meth:`Portfolio.calibrate_distortions`.
+
+        Notes
+        -----
+        The expected loss anchoring the premium target is computed on the full
+        aggregate grid (the ``E[min(X, a)]`` / ``add_exa`` convention), matching
+        a one-unit ``Portfolio``'s ``exa_total``.
+        """
+        return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind)

@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.0.0a93
+
+### Distortion calibration on a single distribution — `Aggregate`/`Portfolio` parity
+
+Phase 1c of the `distributions.py` split (`dev/plan-split-distributions.md`).
+The pricing-distortion *family calibration loop* moves onto `Distortion`, and an
+`Aggregate` can now calibrate a distortion set directly — no more wrapping it in
+a one-unit `Portfolio`.
+
+- **New `Distortion.calibrate_set(...)` classmethod** — the permanent home for
+  the family loop. Given a survival vector and a premium target it constructs
+  and calibrates each kind in `names` (default `('ccoc', 'ph', 'wang', 'dual',
+  'tvar')`) and returns `{name: calibrated Distortion}`. Pure `Distortion`
+  knowledge (the family registry / per-kind initial shape); the caller hands in
+  the GD-derived data (**GD → Distortion**; `GridDistribution` never imports
+  `Distortion`). Extracted faithfully from the per-name dispatch that lived
+  inline in `Portfolio.calibrate_distortion`.
+- **New `Aggregate.calibrate_distortions(coc, *, p=None, a=None, kind='lower')`**
+  — the `Aggregate` counterpart of `Portfolio.calibrate_distortions`, same
+  receipts (`distortion_df` / `calibration_df` / `distortions`). Calibrates to
+  the aggregate's own distribution; per-unit allocation stays a `Portfolio`
+  concern. Verified bit-for-bit against the legacy one-unit-`Portfolio` path on a
+  shared grid.
+- **New `Aggregate.price_ccoc(ccoc, *, p)`** — parity with
+  `Portfolio.price_ccoc`; the cost-of-capital alias of `price_pentagon`.
+- **Breaking (internal): `Portfolio.calibrate_distortion` (singular) removed.**
+  It was only ever called by the plural `calibrate_distortions`; the plural is
+  unchanged in signature and numerics but now resolves the survival datum once
+  and drives `Distortion.calibrate_set`. The singular's unused
+  `S_column`/`S_calc`/`r0`/`kind` options (the plural always used defaults) are
+  gone. No public caller existed.
+- The single-distribution pricing glue (pentagon-target → `calibrate_set`, plus
+  `price`/`price_pentagon`/`price_ccoc`) now lives in the shared
+  `aggregate._pricing` module born in the structural split below.
+
+### `distributions.py` split into kind modules + shared concerns (structural)
+
+Phases 1 and 1b of the same plan — pure code relocation, **no behavior change**
+(full suite matches the pre-split baseline at each step), so not separately
+version-bumped; recorded here for orientation.
+
+- `distributions.py` is now a thin re-export **façade** over `_fits` /
+  `_frequency` / `_severity` / `_aggregate`. Every historical import path
+  (`aggregate.Aggregate`, `aggregate.distributions.X`,
+  `from aggregate.distributions import …`) is unchanged.
+- The cross-cutting concerns are born as leaf/near-leaf modules reusable by both
+  `Aggregate` and `Portfolio`: `_bucket_window` (grid sizing), `_reinsurance`
+  (Agg-only ceder/netter), `_validation`, and `_pricing`.
+- **`explain_validation` relocated** from `utilities.py` to `_validation.py`,
+  with a back-compat re-import kept in `utilities` (mirrors the P1 `make_var_tvar`
+  move); all existing import paths keep working.
+
 ## 1.0.0a92
 
 ### Plotting subsystem — single matplotlib boundary (Pass A)

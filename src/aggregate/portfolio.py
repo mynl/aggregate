@@ -44,6 +44,7 @@ from .utilities import (ft, ift,
                         agg_help, explain_validation,
                         remove_fuzz as remove_fuzz_util)
 from ._grid_distribution import GridDistribution
+from . import _pricing
 import aggregate.random_agg as ar
 
 # Optional numba acceleration for ``make_comonotonic_allocations_work``.
@@ -3407,115 +3408,6 @@ class Portfolio(object):
             df[metric + 'sum'] = df.filter(regex=metric + '[^η]').sum(axis=1)
 
 
-    def calibrate_distortion(self, name, r0=0.05, premium_target=0.0,
-                             roe=0.0, assets=0.0, p=0.0, kind='lower', S_column='S',
-                             S_calc='cumsum'):
-        """
-        Find a distortion transform to hit a premium target at the given
-        asset level.
-
-        Portfolio.calibrate_distortion has been reduced to (a) resolving
-        the asset level / premium target / S vector / ``ess_sup`` from the
-        Portfolio state and (b) dispatching to the appropriate
-        ``Distortion`` subclass, whose ``calibrate`` method runs the
-        Newton iteration. The per-distortion math (the Newton ``f``
-        closures) now lives on each subclass in :mod:`aggregate.spectral`.
-
-        Parameters
-        ----------
-        name : str
-            Distortion kind (``ph``, ``wang``, ``dual``, ``tvar``,
-            ``ccoc`` / ``roe``, ``ly``, ``clin``, ``lep``, ``cll``).
-        r0 : float, optional
-            Mass-at-zero intercept for ``cll``, ``clin``, ``lep``, ``ly``.
-            Ignored by the other kinds. Default 0.05.
-        premium_target : float, optional
-            Target premium. If 0, derived from ``roe`` and ``assets``.
-        roe : float, optional
-            Used to derive ``premium_target`` when not supplied.
-        assets : float, optional
-            Asset level. If 0, derived from ``p`` via ``self.q``.
-        p : float, optional
-            Probability used to derive ``assets`` via the quantile.
-        kind : str
-            Quantile interpolation kind for ``self.q``.
-        S_column, S_calc : str
-            Which column / method to use to construct ``S``; see existing
-            callers.
-
-        Returns
-        -------
-        Distortion
-            Calibrated distortion with ``shape``, ``error``, ``assets``,
-            and ``premium_target`` set.
-        """
-        assert S_calc in ('S', 'cumsum')
-
-        if S_column == 'S':
-            if assets == 0:
-                assert (p > 0)
-                assets = self.q(p, kind)
-            el = self.density_df.loc[assets, 'exa_total']
-            if premium_target == 0:
-                assert (roe > 0)
-                premium_target = (el + roe * assets) / (1 + roe)
-        else:
-            # calibrating to unlimited premium; let code trim S at max loss
-            if assets == 0:
-                assets = self.density_df.loss.iloc[-1]
-            el = self.density_df.loc[assets, 'exa_total']
-
-        # extract S over [0, assets]; integration is inclusive of endpoint
-        if S_calc == 'S':
-            Splus = self.density_df.loc[0:assets, S_column].values
-        else:
-            Splus = (1 - self.density_df.loc[0:assets, 'p_total'].cumsum()).values
-
-        last_non_zero = np.argwhere(Splus)
-        ess_sup = 0
-        if len(last_non_zero) == 0:
-            last_non_zero = len(Splus) + 1
-        else:
-            last_non_zero = last_non_zero.max()
-        if last_non_zero + 1 < len(Splus):
-            # truncate at first zero
-            S = Splus[:last_non_zero + 1]
-            ess_sup = self.density_df.index[last_non_zero + 1]
-            logger.info(
-                'Portfolio.calibrate_distortion | Mass issues in calibrate_distortion...'
-                f'{name} at {last_non_zero}, loss = {ess_sup}')
-        else:
-            if S_calc == 'original':
-                S = self.density_df.loc[0:assets - self.bs, S_column].values
-            else:
-                S = (1 - self.density_df.loc[0:assets - self.bs, 'p_total'].cumsum()).values
-
-        # S must be strictly positive and weakly decreasing
-        assert np.all(S > 0) and np.all(S[:-1] >= S[1:])
-
-        # dispatch to the subclass that owns this kind's calibration
-        lookup = 'ccoc' if name == 'roe' else name
-        subclass = Distortion._registry.get(lookup)
-        if subclass is None or subclass._calibration_init_shape is None:
-            raise ValueError(
-                f'calibrate_distortion not implemented for {name}')
-        init_shape = subclass._calibration_init_shape
-        # natural-kwarg construction; the calibration loop then mutates
-        # ``self.shape`` in place via ``_newton_iterate``.
-        if lookup == 'ccoc':
-            dist = Distortion('ccoc', r=init_shape)
-        elif lookup in ('cll', 'clin', 'lep', 'ly'):
-            pn = subclass.param_name or {
-                'cll': 'b', 'clin': 'slope', 'lep': 'r', 'ly': 'r',
-            }[lookup]
-            dist = Distortion(name=lookup, r0=r0, **{pn: init_shape})
-        else:
-            pn = subclass.param_name
-            dist = Distortion(name=lookup, **{pn: init_shape})
-        dist.calibrate(S=S, bs=self.bs, premium_target=premium_target,
-                       ess_sup=ess_sup, assets=assets, el=el)
-        return dist
-
     def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower'):
         """
         Calibrate the standard pricing distortion set to a cost-of-capital target.
@@ -3561,53 +3453,7 @@ class Portfolio(object):
         ``calibrate_distortions(LRs=, COCs=, ROEs=, As=, Ps=, ...)`` and
         ``calibrate_distortions2(coc, reg_p)``.
         """
-        if (p is None) == (a is None):
-            raise ValueError(
-                'calibrate_distortions requires exactly one of p= (probability) '
-                'or a= (asset level).')
-        if a is None:
-            a = self.q(p, kind)
-            p_val = p
-        else:
-            a = self.snap(a)
-            p_val = self.cdf(a)
-        exa = self.density_df.loc[a, 'exa_total']
-        # invert COC -> LR -> P (matches the legacy ROE -> LR -> P path).
-        delta = coc / (1 + coc)
-        nu = 1 - delta
-        P = nu * exa + delta * a
-        d_list = ['ccoc', 'ph', 'wang', 'dual', 'tvar']
-        rows = []
-        distortions = {}
-        for dname in d_list:
-            dist = self.calibrate_distortion(
-                name=dname, premium_target=P, assets=a)
-            distortions[dname] = dist
-            # param_name is the family's natural parameter ('a', 'lam', 'b',
-            # 'p'); ccoc has none -> 'r'. gini_p = 2*int(g) - 1 (= p_equiv);
-            # area = int(g) = (gini_p + 1)/2.
-            param_name = getattr(dist, 'param_name', None) or 'r'
-            rows.append([param_name, dist.shape, dist.error, dist.gini_p,
-                         (dist.gini_p + 1) / 2])
-        distortion_df = pd.DataFrame(
-            rows,
-            columns=['param_name', 'param', 'error', 'gini_p', 'area'],
-            index=pd.CategoricalIndex(
-                d_list, dtype=DISTORTION_DTYPE, name='distortion'),
-        )
-
-        # the shared calibration target, shown once: the inputs coc, p enter as
-        # leading descriptor columns and complete_pentagon trails the canonical
-        # octet (a is the octet's a, not duplicated as a lead column).
-        calibration_df = complete_pentagon(
-            pd.DataFrame([[coc, p_val, self.cdf(a), exa, P - exa, P, a - P]],
-                         columns=['coc', 'p', 'F(a)', 'L', 'M', 'P', 'Q'],
-                         index=pd.Index(['calibration'], name='unit')))
-
-        self.distortion_df = distortion_df
-        self.calibration_df = calibration_df
-        self.distortions = distortions
-        return distortion_df
+        return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind)
 
     def apply_distortion(self, distortion, *, view='ask', S_calculation='forwards',
                          allocation='lifted', allow_deficit=False):
@@ -4453,7 +4299,7 @@ class Portfolio(object):
 
             self.price_pentagon(p=p, ROE=ccoc)
         """
-        return self.price_pentagon(p=p, ROE=ccoc)
+        return _pricing.price_ccoc(self, ccoc, p=p)
 
     def analyze_distortion(self, distortion, *, p=None, a=None, kind='lower'):
         """

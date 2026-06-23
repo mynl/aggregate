@@ -158,9 +158,20 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     `stats_df`-coupled, author-sensitive noise logic) and `_apply_reins_work` into
     their concern modules — the modules exist and house the clean pieces; the method
     bodies stay on `Aggregate` for now.
-  - **P3 Phases 1c (distortion calibration on a GD; bumps), 2A (Aggregate compute
-    extraction; bumps) pending** — capability phases, paused for author sign-off
-    (1c drops `Portfolio.calibrate_distortion`, adds `Aggregate.calibrate_distortions`).
+  - **P3 Phase 1c landed (1.0.0a93, bumps):** distortion-set calibration factored
+    onto `Distortion.calibrate_set` (the permanent family-loop home; GD → Distortion);
+    added `Aggregate.calibrate_distortions` + `Aggregate.price_ccoc` (Agg/Port parity,
+    verified bit-for-bit vs the legacy 1-unit-Portfolio path); the single-GD pricing
+    glue (`calibrate_distortions`, `price_ccoc`) lives in `_pricing`. **Dropped** the
+    unused singular `Portfolio.calibrate_distortion` (plural unchanged in signature,
+    now resolves the survival datum once via `calibrate_set`). Tests added to
+    `test_distortion_calibrate.py`; `test_portfolio_peg_regression.py` (the calibration
+    pin) stays green. **Caveat surfaced:** `GridDistribution.lev` undercounts on the
+    Aggregate's filtered (`p_total>0`) grid (≈15% low at q99 in a smoke test), so the
+    Agg calibration sources `el` from the full `density_df['p_total']`; the GD.lev
+    filtered-grid behavior is worth review (P1 follow-up / 2A).
+  - **P3 Phase 2A (Aggregate compute extraction; bumps) pending** — paused for author
+    sign-off; extract the FFT/discretization core into testable pure functions.
 
 ---
 

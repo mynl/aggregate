@@ -118,6 +118,18 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   not require `a`/`p`, Bounds & Bivariate structural splits. *(new, 2026-06-21;
   updated 2026-06-23 for the pricing/portfolio pivot; drafted not executed — P1 is a
   pure addition and valuable standalone.)*
+  - **P1 landed (1.0.0a90–a91), Bivariate deferred:** Phase 1 (a90) built
+    `aggregate._grid_distribution.GridDistribution`, relocated `make_var_tvar` out of
+    `utilities`, reshaped `_DiscreteRV` as a thin adapter, added
+    `tests/test_grid_distribution.py`. Phases 2–5 (a91) adopted it in **Aggregate**
+    (q/tvar/q_sev/tvar_sev — incl. a called-out `tvar_sev` bug fix), **Portfolio**
+    (q/var/tvar/tvar_threshold), and **Bounds** (`_resolve_obj` hands a GD;
+    `_tvar_x_a` → `GridDistribution.tvar_of_limited`). All behaviour-guarded by
+    `test_baseline.py` (numbers identical bar the `tvar_sev` fix). **Phase 6
+    (Bivariate) deferred** — purely additive (no existing q/tvar; joint-vs-marginal
+    quantile semantics are a design question) and Bivariate's structural split is
+    already deferred. `cdf/sf/pdf/pmf` on Agg/Port left on `interp1d` (used directly
+    as callables by plotting). Plan moved to `dev/done/`.
 
 ---
 

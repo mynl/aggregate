@@ -8,7 +8,6 @@ from pandas.plotting import scatter_matrix
 from pathlib import Path
 import re
 from scipy import interpolate
-from scipy.optimize import bisect
 from scipy.spatial import ConvexHull
 from textwrap import fill
 import warnings
@@ -44,8 +43,9 @@ from .iman_conover import iman_conover
 from .decl_writer import format_program
 from .utilities import (ft, ift,
                         round_bucket,
-                        make_var_tvar, agg_help, explain_validation,
+                        agg_help, explain_validation,
                         remove_fuzz as remove_fuzz_util)
+from ._grid_distribution import GridDistribution
 import aggregate.random_agg as ar
 
 # Optional numba acceleration for ``make_comonotonic_allocations_work``.
@@ -330,7 +330,9 @@ class Portfolio(object):
         self._certified_bounded: bool = False
         self.independent_stats_df = None
         self.padding = 0
-        self._var_tvar_function = None
+        # GridDistribution view over the portfolio total grid; owns the var/tvar
+        # kernel cache. Rebuilt (set None -> lazily) when the density changes.
+        self._dist = None
         self._cdf = None
         self._pdf = None
         self.bs = 0
@@ -502,7 +504,7 @@ class Portfolio(object):
         Seq0 = (df.S == 0)
 
         # invalidate quantile functions
-        self._var_tvar_function = None
+        self._dist = None
 
         # E[X_i | X=a], E(xi eq a)
         # all in one go (outside loop)
@@ -1744,22 +1746,20 @@ class Portfolio(object):
 
         assert kind in ['lower', 'upper'], 'kind must be lower or upper'
 
-        if self._var_tvar_function is None:
-            # revised June 2023
+        return self._grid_distribution().q(p, kind)
+
+    def _grid_distribution(self):
+        """The :class:`GridDistribution` view over the portfolio ``p_total`` grid.
+
+        Lazily built and cached on first use (invalidated to ``None`` whenever
+        the density changes). Owns the var/tvar kernel; the positive-mass subset
+        matches the historic ``query('p_total > 0')`` filter. Replaces the old
+        ``_var_tvar_function`` dict and the mutating ``_make_var_tvar`` wrapper.
+        """
+        if self._dist is None:
             ser = self.density_df.query('p_total > 0').p_total
-            self._make_var_tvar(ser)
-
-        return self._var_tvar_function[kind](p)
-
-    def _make_var_tvar(self, ser):
-        """
-        There is no severity version here, so this knows where to store the answer, cf Aggregate version.
-        """
-        self._var_tvar_function = {}
-        qf = make_var_tvar(ser)
-        self._var_tvar_function['upper'] = qf.q_upper
-        self._var_tvar_function['lower'] = qf.q_lower
-        self._var_tvar_function['tvar'] = qf.tvar
+            self._dist = GridDistribution.from_series(ser, bs=self.bs, name=self.name)
+        return self._dist
 
     def cdf(self, x):
         """
@@ -1851,40 +1851,14 @@ class Portfolio(object):
 
         assert self.density_df is not None, 'Must recompute prior to computing tail value at risk.'
 
-        if self._var_tvar_function is None:
-            # revised June 2023
-            ser = self.density_df.query('p_total > 0').p_total
-            self._make_var_tvar(ser)
-
-        return self._var_tvar_function['tvar'](p)
+        return self._grid_distribution().tvar(p)
 
     def tvar_threshold(self, p, kind):
         """
         Find the value pt such that TVaR(pt) = VaR(p) using Bisection method.
         Will fail if p=0 because signs are the same.
         """
-        # target value
-        a = self.q(p, kind)
-
-        if p == 0:
-            # mean is mean
-            return 0
-
-        def f(p):
-            return self.tvar(p) - a
-        p1 = bisect(f, 0, 1)
-        # loop = 0
-        # p1 = max(.1, 1 - 2 * (1 - p))
-        # fp1 = f(p1)
-        # delta = 1e-5
-        # while abs(fp1) > 1e-6 and loop < 20:
-        #     df1 = (f(p1 + delta / 2) - f(p1 - delta / 2)) / delta
-        #     p1 = p1 - fp1 / df1
-        #     fp1 = f(p1)
-        #     loop += 1
-        # if loop == 20:
-        #     raise ValueError(f'Difficulty computing TVaR to match VaR at p={p}; last guess {p1}')
-        return p1
+        return self._grid_distribution().tvar_threshold(p, kind)
 
     def as_severity(self, limit=np.inf, attachment=0, conditional=False):
         """
@@ -2474,7 +2448,7 @@ class Portfolio(object):
             logger.warning(f'Nothing has changed since last update at {self.last_update}')
             return
 
-        self._var_tvar_function = None
+        self._dist = None
         # density changes invalidate the augmented_df cache
         self._augmented_dfs = {}
         self._last_applied_distortion_name = None
@@ -2636,7 +2610,7 @@ class Portfolio(object):
         if trim_density_df:
             self.trim_density_df()
         # invalidate stored functions
-        self._var_tvar_function = None
+        self._dist = None
         self._cdf = None
 
     def _build_stats_df(self, ma, max_limit):

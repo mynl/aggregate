@@ -1,5 +1,80 @@
 # Changelog
 
+## 1.0.0a91
+
+### `GridDistribution` adopted by Aggregate, Portfolio, and Bounds (P1, Phases 2–5)
+
+The duplicated, drifted var/tvar plumbing is replaced by the `GridDistribution`
+value type from 1.0.0a90. Same kernel ⇒ numerically identical (the frozen
+`test_baseline.py` does not move) — **except one called-out bug fix**:
+
+- **`Aggregate`** — `_var_tvar_function` / `_sev_var_tvar_function` caches and the
+  `_make_var_tvar` wrapper are gone; `q` / `tvar` delegate to a lazily-built
+  `GridDistribution` over the aggregate grid, and `q_sev` / `tvar_sev` to one over
+  the severity grid (`sev_density_df`).
+  - **Bug fix:** `tvar_sev(p)` previously read the *aggregate* tvar cache
+    (`_var_tvar_function['tvar']` built from `p_total`) rather than the severity
+    grid, so it returned the aggregate TVaR. It now correctly returns the
+    severity-grid TVaR — **this number changes** (e.g. for a lognormal-severity
+    book it dropped from the aggregate's ~141 to the severity's ~17).
+- **`Portfolio`** — same swap; the mutate-vs-return `_make_var_tvar` divergence is
+  gone, and `tvar_threshold` now delegates to `GridDistribution.tvar_threshold`
+  (the scattered `_var_tvar_function = None` resets become `_dist = None`).
+- **`Bounds`** — the hand-rolled `make_var_tvar(pd.Series(...))` calls in
+  `_resolve_obj` and `_RiskSource` are replaced by `GridDistribution`; `_resolve_obj`
+  now hands `Bounds` a `GridDistribution` (reusing the `Aggregate` / `Portfolio`
+  object's own view), and the capped-TVaR formula `TVaR_p(min(X, a))` moved onto
+  the value type as `GridDistribution.tvar_of_limited(p, a)` — `Bounds._tvar_x_a`
+  delegates to it (O(1), no grid rebuild, so the `p_star` root-find stays cheap).
+
+`cdf` / `sf` / `pdf` / `pmf` on `Aggregate` / `Portfolio` are left on their existing
+`interp1d` mechanism for now (those objects are used directly by the plotting code
+as `interp1d` callables, so they are not pure var/tvar plumbing). **Phase 6
+(Bivariate)** is deferred: it is a purely *additive* exposure (Bivariate has no
+existing `q` / `tvar`), the joint-vs-marginal quantile semantics are a design
+question, and Bivariate's structural treatment is already deferred per
+`dev/plan-README.md`.
+
+## 1.0.0a90
+
+### `GridDistribution` — the shared discrete-grid distribution value type (P1, Phase 1)
+
+New leaf module `aggregate._grid_distribution` introduces `GridDistribution`, a
+small read-only value type holding a probability vector `p` over a loss index
+`x` with an optional bucket size `bs`. It is the single home for the
+marginal-vector accessors that `Aggregate`, `Portfolio`, `Severity`, `Bounds`
+and `Bivariate` all need:
+
+- **Spacing-agnostic probability accessors** (no equal-spacing assumption):
+  `q`/`var` (lower & upper quantile), `tvar`, `tvar_threshold`, `cdf`, `sf`,
+  `pmf`, `mean`, and the new `lev(a)` (limited expected value `E[min(X, a)]`,
+  matching the `Portfolio.add_exa` `bs · Σ_{x<a} S` convention) and
+  `tvar_of_limited(p, a)` (the analytic `TVaR_p(min(X, a))` composite, O(1) — no
+  grid rebuild).
+- **Width-dependent ops** (`pdf` = mass / `bs`, `snap` to the regular grid)
+  require `bs` and raise a clear error when it is `None`.
+- `cap(a)` returns a fresh `GridDistribution` for `min(X, a)`.
+
+The `make_var_tvar` kernel **relocated** from `aggregate.utilities` into the new
+module (it is no longer in `utilities.__all__`); `balanced_window` and all
+internal callers import it from its new home. Per the pre-1.0 no-deprecated-alias
+rule this is a clean move with no shim.
+
+`_DiscreteRV` (the discrete-severity frozen RV) is now a thin scipy-naming
+adapter over a held `GridDistribution`: it shares the cumulative-step core
+(`cdf`/`sf`/`mean`/lower-quantile `ppf`/`isf`) and keeps only the
+severity-specific bits (`pdf ≡ 0`, raw `moment`, `stats`, `var`, `rvs`,
+`layer_moments`). Behaviour is identical (same kernel) — `test_discrete_severity`
+is unchanged.
+
+New `tests/test_grid_distribution.py` brute-force / analytic-checks every
+accessor (fair-die and skewed grids, a non-uniform grid, and cross-checks of
+`tvar_of_limited` against `cap(a).tvar` and `Bounds._tvar_x_a`).
+
+This is a **pure addition**: no consumer behaviour changes yet. Per-consumer
+adoption (Severity → Bounds → Aggregate → Portfolio → Bivariate) follows in
+later, behaviour-guarded phases.
+
 ## 1.0.0a89
 
 ### Pedagogy figures renamed off the legacy PIR `fig_<ch>_<num>` names

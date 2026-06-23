@@ -44,8 +44,9 @@ __all__ = [
 from .utilities import (ft, ift,
                         round_bucket,
                         nice_multiple,
-                        make_var_tvar, balanced_window,
+                        balanced_window,
                         agg_help, explain_validation, remove_fuzz)
+from ._grid_distribution import GridDistribution
 from .decl_writer import format_program
 import aggregate.random_agg as ar
 from .spectral import Distortion, choquet_weights
@@ -2361,7 +2362,7 @@ class Aggregate:
     Methods / attributes with a leading underscore are internal —
     ``_init_stats_df``, ``_record_component``, ``_freq_sev_convolution``,
     ``_apply_reins_work``, ``_limits``, ``_html_info_blob``,
-    ``_make_var_tvar``, … . The legacy ``audit_df`` / ``report_df`` /
+    ``_grid_distribution``, … . The legacy ``audit_df`` / ``report_df`` /
     ``report_ser`` / ``statistics`` / ``statistics_df`` /
     ``statistics_total_df`` surface has been removed; consult ``stats_df``
     instead.
@@ -4016,8 +4017,10 @@ class Aggregate:
 
         # Cached lazy functions (built on demand)
         self._valid = None
-        self._var_tvar_function = None
-        self._sev_var_tvar_function = None
+        # GridDistribution views over the aggregate and severity grids; own the
+        # var/tvar kernel cache. Rebuilt (set None -> lazily) when update runs.
+        self._dist = None
+        self._sev_dist = None
         self._cdf = None
         self._pdf = None
         self._sev = None
@@ -5031,8 +5034,8 @@ class Aggregate:
         self._reins_stats_df = None
         self._reins_view_stats_cache = None
         self._reins_describe = None
-        self._var_tvar_function = None
-        self._sev_var_tvar_function = None
+        self._dist = None
+        self._sev_dist = None
         self._valid = None
         self.sev_calc = sev_calc
         self.discretization_calc = discretization_calc
@@ -7773,23 +7776,34 @@ class Aggregate:
 
         assert kind in ['lower', 'upper'], 'kind must be lower or upper'
 
-        if self._var_tvar_function is None:
-            # revised June 2023
-            ser = self.density_df.query('p_total > 0').p_total
-            self._var_tvar_function = self._make_var_tvar(ser)
-
-        return self._var_tvar_function[kind](p)
+        return self._grid_distribution().q(p, kind)
 
     # for consistency with scipy
     ppf = q
 
-    def _make_var_tvar(self, ser):
-        dict_ans = {}
-        qf = make_var_tvar(ser)
-        dict_ans['upper'] = qf.q_upper
-        dict_ans['lower'] = qf.q_lower
-        dict_ans['tvar'] = qf.tvar
-        return dict_ans
+    def _grid_distribution(self):
+        """The :class:`GridDistribution` view over the aggregate ``p_total`` grid.
+
+        Lazily built and cached on first use (and after :meth:`update`, which
+        resets the cache to ``None``). Owns the var/tvar kernel; the positive-mass
+        subset is taken to match the historic ``query('p_total > 0')`` filter.
+        """
+        if self._dist is None:
+            ser = self.density_df.query('p_total > 0').p_total
+            self._dist = GridDistribution.from_series(ser, bs=self.bs, name=self.name)
+        return self._dist
+
+    def _sev_grid_distribution(self):
+        """The :class:`GridDistribution` view over the severity ``p_sev`` grid.
+
+        Severity has its own grid (``sev_density_df``); this is the discretised
+        *output* severity PMF (the uniform ``bs``-grid fed to the FFT), distinct
+        from the input ``self.fz``. Lazily built and cached.
+        """
+        if self._sev_dist is None:
+            ser = self.sev_density_df.query('p_sev > 0').p_sev
+            self._sev_dist = GridDistribution.from_series(ser, bs=self.bs, name=f'{self.name} sev')
+        return self._sev_dist
 
     def focus(self, p=1e-6):
         """Return the central window of ``density_df`` holding ``1 - p`` of the mass.
@@ -7835,24 +7849,20 @@ class Aggregate:
         :return:
         """
 
-        if self._sev_var_tvar_function is None:
-            # revised June 2023; severity now on its own grid (sev_density_df)
-            ser = self.sev_density_df.query('p_sev > 0').p_sev
-            self._sev_var_tvar_function = self._make_var_tvar(ser)
-
-        return self._sev_var_tvar_function['lower'](p)
+        return self._sev_grid_distribution().q(p, 'lower')
 
     def tvar_sev(self, p):
         """
         TVaR of severity - now available for free!
 
         added June 2023
-        """
-        if self._var_tvar_function is None:
-            ser = self.density_df.query('p_total > 0').p_total
-            self._sev_var_tvar_function = self._make_var_tvar(ser)
 
-        return self._var_tvar_function['tvar'](p)
+        Fixed 1.0.0a91: previously this read the *aggregate* var/tvar cache
+        (``_var_tvar_function['tvar']`` built from ``p_total``) rather than the
+        severity grid, so it returned the aggregate TVaR. It now correctly uses
+        the severity grid (``sev_density_df.p_sev``) -- the numbers move.
+        """
+        return self._sev_grid_distribution().tvar(p)
 
     def tvar(self, p, kind=''):
         """
@@ -7893,12 +7903,7 @@ class Aggregate:
 
         assert self.density_df is not None, 'Must recompute prior to computing tail value at risk.'
 
-        if self._var_tvar_function is None:
-            # revised June 2023
-            ser = self.density_df.query('p_total > 0').p_total
-            self._var_tvar_function = self._make_var_tvar(ser)
-
-        return self._var_tvar_function['tvar'](p)
+        return self._grid_distribution().tvar(p)
 
     def sample(self, n, replace=True):
         """
@@ -9661,22 +9666,25 @@ class _DiscreteRV:
         self.pk = ps[order]
         self.cum = np.cumsum(self.pk)        # P(X <= xk_i)
         self.n = self.xk.size
+        # Share the spacing-agnostic cumulative-step kernel: the cdf / sf / mean
+        # / lower-quantile core is GridDistribution's, this class adds only the
+        # scipy-naming + severity-specific bits (pdf == 0, moments, layered
+        # moments, rvs). bs is None -- a genuine discrete law has no density.
+        self._gd = GridDistribution(self.xk, self.pk)
 
     @staticmethod
     def _unwrap(out):
         """Return a numpy scalar for 0-d results, else the array unchanged."""
+        out = np.asarray(out)
         return out[()] if out.ndim == 0 else out
 
     def cdf(self, x):
-        """Right-continuous CDF ``P(X <= x)``."""
-        x = np.asarray(x, dtype=float)
-        idx = np.searchsorted(self.xk, x, side='right')   # count of atoms <= x
-        out = np.where(idx == 0, 0.0, self.cum[np.clip(idx - 1, 0, self.n - 1)])
-        return self._unwrap(out)
+        """Right-continuous CDF ``P(X <= x)`` (delegates to the shared core)."""
+        return self._gd.cdf(x)
 
     def sf(self, x):
-        """Survival function ``P(X > x) = 1 - cdf(x)``."""
-        return self._unwrap(1.0 - np.asarray(self.cdf(x), dtype=float))
+        """Survival function ``P(X > x) = 1 - cdf(x)`` (shared core)."""
+        return self._gd.sf(x)
 
     def pdf(self, x):
         """Density of a discrete law: identically ``0`` (mass lives in atoms)."""
@@ -9684,10 +9692,8 @@ class _DiscreteRV:
         return self._unwrap(out)
 
     def ppf(self, q):
-        """Quantile: the smallest atom ``xk`` with ``cdf(xk) >= q``."""
-        q = np.asarray(q, dtype=float)
-        idx = np.clip(np.searchsorted(self.cum, q, side='left'), 0, self.n - 1)
-        return self._unwrap(self.xk[idx])
+        """Quantile: the smallest atom ``xk`` with ``cdf(xk) >= q`` (shared lower-q)."""
+        return self._unwrap(self._gd.q(q, 'lower'))
 
     def isf(self, q):
         """Inverse survival: ``ppf(1 - q)``."""
@@ -9720,7 +9726,8 @@ class _DiscreteRV:
         return tuple(out)
 
     def mean(self):
-        return float(np.sum(self.xk * self.pk))
+        """Exact mean ``E[X] = Σ x p`` (shared core)."""
+        return self._gd.mean()
 
     def var(self):
         m = self.mean()

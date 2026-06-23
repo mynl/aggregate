@@ -120,7 +120,7 @@ shrinks the next.
 
 | # | Plan | One line | Risk | Independently shippable? |
 |---|---|---|---|---|
-| **P1** | `plan-grid-distribution.md` | New spacing-agnostic `GridDistribution` value type owns the marginal-vector accessors (`q/var/tvar/cdf/sf/pmf/lev/…`); the `make_var_tvar` kernel **moves into it** from `utilities.py`; `_DiscreteRV` becomes an adapter over it; it exposes the `sf`/`lev` data `Distortion` calibration will consume (GD→Distortion; the calibration rewire itself is P3 §1c); every consumer adopts it | low (pure add + guarded swaps) | yes |
+| **P1 ✅ done (a90–a91)** | `done/plan-grid-distribution.md` | New spacing-agnostic `GridDistribution` value type owns the marginal-vector accessors (`q/var/tvar/cdf/sf/pmf/lev/…`); the `make_var_tvar` kernel **moves into it** from `utilities.py`; `_DiscreteRV` becomes an adapter over it; it exposes the `sf`/`lev` data `Distortion` calibration will consume (GD→Distortion; the calibration rewire itself is P3 §1c); consumers adopt it (Agg/Port/Bounds done; Bivariate deferred) | low (pure add + guarded swaps) | yes |
 | **P2** | `plan-plots-subsystem.md` | One `plots/` package, per-class modules, `_style.py`, **global matplotlib defer** (the real import-time win) | low (mechanical moves) | yes |
 | **P3** | `plan-split-distributions.md` | Kind split → `_fits`/`_frequency`/`_severity`/`_aggregate` + façade; **births the shared concerns** (`_validation`, `_bucket_window`, `_pricing`, and Agg-only `_reinsurance`); **distortion calibration on a GD** (Phase 1c — `Distortion.calibrate_set` + `Aggregate.calibrate_distortions` for Agg/Port parity); Aggregate pure-compute extraction; `pollaczeck_khinchine`→`pedagogy` | low→med | yes (Phase 1 alone) |
 | **P4** | `plan-split-portfolio.md` | `portfolio.py` façade + **three-subsystem split** of the one `Portfolio` class — `_portfolio_density` (independent-sum combine), `_portfolio_sample` (sample/switcheroo/dependence; extracted now, reviewed later), `_portfolio_common` (exeqa-based augmented-df / distortion / allocation); **consumes** the P3 shared concerns (`_validation`/`_bucket_window`/`_pricing`) | low→med | yes |
@@ -219,6 +219,6 @@ need the usual `rg`-against-the-surface vetting before they are fixed.
 
 1. Re-read `plan-split-distributions.md` §-1 (the regret guard) and decide if the
    bet still holds.
-2. If yes: execute **P1** (`plan-grid-distribution.md`) — it is the lowest-risk,
+2. If yes: execute **P1** (`done/plan-grid-distribution.md` — **done at a90–a91**) — it is the lowest-risk,
    highest-concept piece and is valuable even if you never do P2–P4.
 3. Reassess after P1 with the two-file rule before committing to the splits.

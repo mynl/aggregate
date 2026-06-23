@@ -1,4 +1,3 @@
-from collections import namedtuple
 import inspect
 import itertools
 import logging
@@ -16,6 +15,7 @@ import scipy.fft as sft
 # pretty-printing/colorization moved to aggregate.decl_writer at 1.0.0a53.)
 
 from .constants import Validation
+from ._grid_distribution import make_var_tvar
 
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ __all__ = [
     'round_bucket',
     'nice_multiple',
     'qd', 'mv',
-    'make_var_tvar', 'kaplan_meier', 'kaplan_meier_np',
+    'kaplan_meier', 'kaplan_meier_np',
     'agg_help', 'explain_validation', 'introspect',
     'silence_warnings',
 ]
@@ -361,85 +361,6 @@ def mv(x, y=None):
         print(f'std dev  = {y**.5:.6g}')
 
 
-def make_var_tvar(ser):
-    """
-    Make var (lower quantile), upper quantile, and tvar functions from a ``pd.Series`` ``ser``, which
-    has index given by losses and p_total values.
-
-    ``ser`` must have a unique monotonic increasing index and all p_totals > 0.
-
-    Such a series comes from ``a.density_df.query('p_total > 0').p_total``, for example.
-
-    Tested using numpy vs pd.Series lookup functions, and this version is much
-    faster. See ``var_tvar_test_suite`` function below for testers (obviously
-    run before this code was integrated).
-
-    Changed in v. 0.13.0
-
-    """
-
-    # audits
-    assert ser.index.is_unique, 'index values must be unique'
-    assert ser.index.is_monotonic_increasing, 'index values must be increasing'
-
-    # detach from the outside scope
-    ser = ser.copy()
-
-    # create needed arrays
-    x_np = np.array(ser.index)
-    # better not to cumulate array when all elements are equal (because of
-    # floating point issues). This does make some difference. 
-    if np.all(np.isclose(ser, ser.iloc[0], atol=2**-53)):
-        d = 1 / len(ser)
-        cser = pd.Series(np.linspace(d, 1, len(ser)), index=ser.index)
-    else:
-        cser = ser.cumsum()
-    cser_F_np = cser.to_numpy()
-    # detach the index values
-    # cser_idx = pd.Index(cser.values)
-    tvar_unconditional = ((ser * ser.index)[::-1].cumsum()[::-1]).to_numpy()
-
-    # these last three are annoyting because np.where does not short circuit
-    tvar_unconditional = np.hstack((tvar_unconditional, np.inf, np.inf))
-    cser_F_np2 = np.hstack((cser_F_np, 1))
-    x_np2l = np.hstack((x_np, x_np[-1]))
-    x_np2u = np.hstack((x_np, np.inf))
-    # x_max = cser_F_np[-2]
-
-    # tests show this is about 6 times faster than
-    # q = interp1d(cser, ser.index, kind='next', bounds_error=False, fill_value=(ser.index.min(), ser.index.max()))
-    def q_lower(p):
-        nonlocal x_np2l, cser_F_np
-        return x_np2l[np.searchsorted(cser_F_np, p, side='left')]
-
-    def q_upper(p):
-        nonlocal x_np2u, cser_F_np
-        return x_np2u[np.searchsorted(cser_F_np, p, side='right')]
-
-    def tvar(p):
-        """
-        Vectorized TVaR computation.
-        """
-        nonlocal cser_F_np, x_np, tvar_unconditional
-        if isinstance(p, (float, int)):
-            # easy
-            if p >= cser_F_np[-2]:
-                return x_np[-1]
-            else:
-                idx = np.searchsorted(cser_F_np, p, side='right')
-                return ((cser_F_np[idx] - p) * x_np[idx] + tvar_unconditional[idx + 1]) / (1 - p)
-        else:
-            # vectorized
-            p = np.array(p)
-            idx = np.searchsorted(cser_F_np, p, side='right')
-            return np.where(idx >= len(cser_F_np) - 1,
-                            x_np[-1],
-                           ((cser_F_np2[idx] - p) * x_np2u[idx] + tvar_unconditional[idx + 1]) / (1 - p))
-
-    QuantileFunctions = namedtuple("QuantileFUnctions", 'q q_lower var q_upper tvar')
-    return QuantileFunctions(q_lower, q_lower, q_lower, q_upper, tvar)
-
-
 def balanced_window(ser, p, bs=None):
     """Equal-tail window ``[q(p/2), q(1 - p/2)]`` of a realized pmf.
 
@@ -481,12 +402,12 @@ def balanced_window(ser, p, bs=None):
     -------
     (lo, hi) : tuple of float
         Lower and upper window edges. Both are **lower** quantiles
-        (:func:`make_var_tvar` ``q_lower``): ``lo = q(p/2)``,
+        (:func:`~aggregate._grid_distribution.make_var_tvar` ``q_lower``): ``lo = q(p/2)``,
         ``hi = q(1 - p/2)``, matching :meth:`Aggregate.q` ``kind='lower'``.
 
     Notes
     -----
-    Reuses :func:`make_var_tvar` for the quantiles rather than re-deriving a
+    Reuses :func:`~aggregate._grid_distribution.make_var_tvar` for the quantiles rather than re-deriving a
     cumulative lookup, so the convention matches ``Aggregate.q`` exactly. With
     lower quantiles on both edges the mass strictly below ``lo`` is ``< p/2`` and
     the mass strictly above ``hi`` is ``<= p/2``, so the kept mass is

@@ -1,9 +1,20 @@
 # Plan P1 — `GridDistribution` value type (the shared discrete-grid distribution)
 
-> **Status: DRAFT — not executed.** This is the **keystone** plan and goes first;
-> see `plan-README.md`. Unlike P3/P4 it is a *pure addition* followed by guarded
-> swaps — not a module split — so it stands on its own even if no splitting ever
-> happens.
+> **Status: DONE (1.0.0a90–a91), Phase 6 deferred.** Phase 1 (a90) built the
+> primitive, relocated `make_var_tvar`, reshaped `_DiscreteRV`, added
+> `tests/test_grid_distribution.py`. Phases 2–5 (a91) adopted it in Aggregate,
+> Portfolio, and Bounds — all behaviour-guarded by `test_baseline.py` (numbers
+> identical except the called-out `tvar_sev` bug fix). **Phase 6 (Bivariate)
+> deferred:** purely additive (no existing q/tvar; joint-vs-marginal quantile
+> semantics are a design question) and Bivariate's structural split is already
+> deferred. `cdf`/`sf`/`pdf`/`pmf` on Aggregate/Portfolio were intentionally left on
+> their `interp1d` mechanism (those `interp1d` objects are consumed directly by the
+> plotting code, so they are not pure var/tvar plumbing). See `CHANGELOG.md`.
+
+> **Original status: DRAFT — not executed.** This is the **keystone** plan and goes
+> first; see `plan-README.md`. Unlike P3/P4 it is a *pure addition* followed by
+> guarded swaps — not a module split — so it stands on its own even if no splitting
+> ever happens.
 >
 > **Release mechanics (CLAUDE.md).** Phase 1 (new primitive + tests) bumps
 > `1.0.0a*` and adds a `CHANGELOG.md` section. Each adoption phase is

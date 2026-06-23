@@ -90,6 +90,7 @@ from scipy.optimize import brentq
 
 from .constants import FIG_W
 from .spectral import Distortion
+from ._grid_distribution import GridDistribution
 
 logger = logging.getLogger(__name__)
 
@@ -98,32 +99,35 @@ __all__ = ['AllocationBounds', 'Bounds', 'PricingBounds']
 
 def _resolve_obj(obj, unit):
     """
-    Coerce *obj* into ``(tvar_x, F, name)`` where
+    Coerce *obj* into ``(gd, name)`` where
 
-    - ``tvar_x(p)`` returns ``TVaR_p(X)`` (unbounded — capping at ``a`` is
-      applied separately in :meth:`Bounds._tvar_x_a`).
-    - ``F(x)`` returns ``P(X <= x)``.
+    - ``gd`` is a :class:`~aggregate._grid_distribution.GridDistribution` over
+      the risk ``X``. The (unbounded) ``TVaR_p(X)`` is ``gd.tvar(p)``, ``P(X <=
+      x)`` is ``gd.cdf(x)``, and the capped ``TVaR_p(min(X, a))`` is
+      ``gd.tvar_of_limited(p, a)`` (used by :meth:`Bounds._tvar_x_a`).
     - ``name`` is a display string.
 
     Accepted obj types: ``Portfolio``, ``Aggregate``, ``pd.Series``,
     ``pd.DataFrame``. For Series/DataFrame the index is interpreted as outcomes
     and values as the pmf; for DataFrame the first column is the pmf.
+
+    For ``Aggregate`` / ``Portfolio`` the object's own ``GridDistribution`` view
+    is reused (the same value type the risk measures already flow through).
     """
     # Local imports to keep this module decoupled at import time.
     from .distributions import Aggregate
     from .portfolio import Portfolio
-    from .utilities import make_var_tvar
 
     if isinstance(obj, Portfolio):
         if unit == 'total':
-            return obj.tvar, obj.cdf, f'{obj.name}.total'
+            return obj._grid_distribution(), f'{obj.name}.total'
         if unit not in obj.unit_names_ex:
             raise ValueError(f'unit {unit!r} not in portfolio {obj.name!r}')
         ag = getattr(obj, unit)
-        return ag.tvar, ag.cdf, f'{obj.name}.{unit}'
+        return ag._grid_distribution(), f'{obj.name}.{unit}'
 
     if isinstance(obj, Aggregate):
-        return obj.tvar, obj.cdf, obj.name
+        return obj._grid_distribution(), obj.name
 
     if isinstance(obj, pd.DataFrame):
         ser = obj.iloc[:, 0]
@@ -141,17 +145,7 @@ def _resolve_obj(obj, unit):
     if not ser.index.is_monotonic_increasing:
         raise ValueError('pmf index must be monotonic increasing')
     ser = ser[ser > 0]
-    qf = make_var_tvar(ser)
-    cdf_ser = ser.cumsum()
-
-    def F(x):
-        if x >= cdf_ser.index[-1]:
-            return 1.0
-        if x < cdf_ser.index[0]:
-            return 0.0
-        return float(cdf_ser.loc[:x].iloc[-1])
-
-    return qf.tvar, F, str(name)
+    return GridDistribution.from_series(ser, name=str(name)), str(name)
 
 
 class Bounds:
@@ -209,13 +203,12 @@ class Bounds:
         self.n_p = int(n_p)
         self.n_s = int(n_s)
 
-        tvar_x_unb, F, name = _resolve_obj(obj, unit)
-        self._tvar_x_unb = tvar_x_unb
-        self._F = F
+        gd, name = _resolve_obj(obj, unit)
+        self._dist = gd
         self.name = name
-        self.Fb = 1.0 if np.isinf(self.a) else float(F(self.a))
+        self.Fb = 1.0 if np.isinf(self.a) else float(gd.cdf(self.a))
 
-        mean = float(tvar_x_unb(0))
+        mean = float(gd.tvar(0))
         if self.premium < mean:
             raise ValueError(
                 f'premium {self.premium} below mean {mean}; pricing bound undefined')
@@ -228,16 +221,14 @@ class Bounds:
     # ------------------------------------------------------------------
 
     def _tvar_x_a(self, p):
-        """TVaR_p of min(X, a). Scalar or array p."""
-        tvar = self._tvar_x_unb(p)
-        if np.isinf(self.a):
-            return tvar
-        # For p >= F(a) the conditional tail of min(X, a) is exactly a.
-        # For p < F(a), TVaR_p(min(X,a)) = TVaR_p(X) - (1-F(a))(TVaR_{F(a)}(X) - a) / (1-p).
-        gap = (1.0 - self.Fb) * (self._tvar_x_unb(self.Fb) - self.a)
-        return np.where(np.asarray(p) < self.Fb,
-                        tvar - gap / (1.0 - p),
-                        self.a)
+        """TVaR_p of min(X, a). Scalar or array p.
+
+        Delegates to :meth:`GridDistribution.tvar_of_limited` -- the analytic
+        composite ``TVaR_p(X) - (1-F(a))(TVaR_{F(a)}(X) - a)/(1-p)`` (for
+        ``p < F(a)``, else ``a``) now lives in one place on the value type. O(1),
+        no grid rebuild, so it stays cheap inside the ``p_star`` root-find.
+        """
+        return self._dist.tvar_of_limited(p, self.a)
 
     # ------------------------------------------------------------------
     # p_star — root of TVaR_p(min(X, a)) = premium
@@ -741,7 +732,6 @@ class _RiskSource(_TVaRSource):
     """A :class:`_TVaRSource` backed by a discrete risk's pmf."""
 
     def __init__(self, x, prob, name):
-        from .utilities import make_var_tvar
         self.name = name
         self._x = np.asarray(x, dtype=float)
         self._prob = np.asarray(prob, dtype=float)
@@ -750,7 +740,9 @@ class _RiskSource(_TVaRSource):
         self._F = F
         # Interior breakpoints: p where the VaR steps to the next atom.
         self.breakpoints = F[:-1]
-        self._tvar = make_var_tvar(pd.Series(self._prob, index=self._x)).tvar
+        # var/tvar via the shared GridDistribution kernel (zero-mass atoms are
+        # filtered internally but leave tvar unchanged -- a property of X).
+        self._tvar = GridDistribution(self._x, self._prob).tvar
         # Own-grid vertices for exact tvar inversion (p_star).
         S = np.cumsum(self._prob[::-1])[::-1]            # S_m = Pr(X >= x_m)
         self._S_own = S

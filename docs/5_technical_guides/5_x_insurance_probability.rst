@@ -22,9 +22,9 @@ Insurance Probability
 Helpful References
 --------------------
 
-* :cite:t:`LM`
+* :cite:t:`Klugman2019`
 * :cite:t:`Panjer1992`
-* :cite:t:`PIR`
+* :cite:t:`Mildenhall2022a`
 * :cite:t:`Woo2002`
 
 

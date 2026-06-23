@@ -31,7 +31,7 @@ Helpful References
 * :cite:t:`Mildenhall2005a`
 * :cite:t:`Puccetti2012`
 * :cite:t:`Embrechts2013`
-* :cite:t:`PIR`, Section 4.2.5.
+* :cite:t:`Mildenhall2022a`, Section 4.2.5.
 
 
 .. include:: 5_x_samples.rst

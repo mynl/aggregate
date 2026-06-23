@@ -23,7 +23,7 @@ Capital Modeling and Risk Management
 Helpful References
 --------------------
 
-* :cite:t:`PIR`, especially chapter 14.
+* :cite:t:`Mildenhall2022a`, especially chapter 14.
 
 .. Portfolio level probability of default, EPD, Var and TVaR statistics
 

@@ -22,7 +22,7 @@ Strategy and Portfolio Management
 Helpful References
 --------------------
 
-* :cite:t:`PIR` chapters 14 and 15 and references therein.
+* :cite:t:`Mildenhall2022a` chapters 14 and 15 and references therein.
 
 .. _strat margin alloc:
 

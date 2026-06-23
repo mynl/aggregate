@@ -31,53 +31,14 @@ It delivers the speed and accuracy of parametric distributions to situations tha
 
 This help document is in six parts plus a bibliography.
 
-.. grid:: 2 2 3 3
-   :gutter: 2
+#. :doc:`Getting Started <1_Getting_Started>`: get up and running: installation, :mod:`aggregate` "hello world", and a glimpse into the functionality.
 
-   .. grid-item-card::
-      :img-top: _static/gs.png
-      :link: 1_Getting_Started
-      :link-type: doc
-      :text-align: left
+#. :doc:`User Guides <2_User_Guides>`: how to solve real-world actuarial problems using :mod:`aggregate`.
 
-      Get up and running: installation, :mod:`aggregate` "hello world", and a glimpse into the functionality.
+#. :doc:`Reference <3_Reference>`: documentation for every class and function, for developers and more advanced users.
 
-   .. grid-item-card::
-      :img-top: _static/ug.png
-      :link: 2_User_Guides
-      :link-type: doc
-      :text-align: left
+#. :doc:`Dec Language Reference <4_dec_Language_Reference>`: the Dec Language (DecL) for specifying aggregate distributions.
 
-      How to solve real-world actuarial problems using :mod:`aggregate`.
+#. :doc:`Technical Guides <5_Technical_Guides>`: probability theory background and the numerical implementation methods employed by :mod:`aggregate`.
 
-   .. grid-item-card::
-      :img-top: _static/api.png
-      :link: 3_Reference
-      :link-type: doc
-      :text-align: left
-
-      Documentation for every class and function, for developers and more advanced users.
-
-   .. grid-item-card::
-      :img-top: _static/decl.png
-      :link: 4_dec_Language_Reference
-      :link-type: doc
-      :text-align: left
-
-      The Dec Language (DecL) for specifying aggregate distributions.
-
-   .. grid-item-card::
-      :img-top: _static/tg.png
-      :link: 5_Technical_Guides
-      :link-type: doc
-      :text-align: left
-
-      Probability theory background and the numerical implementation methods employed by :mod:`aggregate`.
-
-   .. grid-item-card::
-      :img-top: _static/dev.png
-      :link: 6_Development
-      :link-type: doc
-      :text-align: left
-
-      Design philosophy, competing products, future development ideas, and historical perspective.
+#. :doc:`Development <6_Development>`: design philosophy, competing products, future development ideas, and historical perspective.

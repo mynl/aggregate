@@ -31,7 +31,7 @@ Actuarial and operational risk books and papers
 * :cite:t:`Gerber1982`
 * :cite:t:`Buhlmann1984`
 * :cite:t:`Embrechts1993`
-* :cite:t:`WangS1998`
+* :cite:t:`Wang1998a`
 * :cite:t:`Grubel1999`
 * :cite:t:`Mildenhall2005a`
 * :cite:t:`Schaller2008`
@@ -43,20 +43,20 @@ Books on probability covering characteristic functions,
 :math:`t\mapsto \mathsf E[e^{itX}]`
 
 * :cite:t:`Loeve1955`
-* :cite:t:`feller71`
+* :cite:t:`Feller1971`
 * :cite:t:`Lukacs1970bk`
-* :cite:t:`billingsley`
-* :cite:t:`Malliavin1995bk`
+* :cite:t:`Billingsley2012`
+* :cite:t:`Malliavin2012`
 * :cite:t:`McKean2014bk`
 
 Books on Fourier analysis and Fourier transforms,
 :math:`t\mapsto \mathsf E[e^{-2\pi itX}]`, the same concept with slightly different notation. Malliavin is a sophisticated treatment of both Fourier analysis and probability.
 
-* :cite:t:`Stein1971bk`
-* :cite:t:`Stein2011bk`
-* :cite:t:`Strang1986am`
+* :cite:t:`Stein1971`
+* :cite:t:`Stein2003a`
+* :cite:t:`Strang1986`
 * :cite:t:`Terras2013`
-* :cite:t:`Korner2022`
+* :cite:t:`Korner1988`
 
 
 .. include:: 5_x_nm_overview.rst

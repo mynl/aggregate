@@ -31,7 +31,7 @@ Helpful References
 --------------------
 
 * :cite:t:`Bodoff2007`
-* :cite:t:`PIR`
+* :cite:t:`Mildenhall2022a`
 
 .. _bodoff intro:
 

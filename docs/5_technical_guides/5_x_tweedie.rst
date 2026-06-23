@@ -4,7 +4,7 @@ The Tweedie Distribution
 --------------------------
 
 
-The Tweedie distribution is a Poisson mixture of gammas. It is an exponential family distribution :cite:p:`Jorgensen1997`. Tweedie distributions are a suitable model for pure premiums and are used as unit distributions in GLMs :cite:p:`Mccullagh2019`. Tweedie distributions do not have a closed form density, but estimating the density is easy using ``aggregate``.
+The Tweedie distribution is a Poisson mixture of gammas. It is an exponential family distribution :cite:p:`Jorgensen1997`. Tweedie distributions are a suitable model for pure premiums and are used as unit distributions in GLMs :cite:p:`McCullagh1989`. Tweedie distributions do not have a closed form density, but estimating the density is easy using ``aggregate``.
 
 The **Tweedie** family of distributions is a three-parameter exponential family. A variable :math:`X \sim \mathrm{Tw}_p(\mu, \sigma^2)` when
 :math:`\mathsf E[X] = \mu` and

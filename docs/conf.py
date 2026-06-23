@@ -86,7 +86,6 @@ extensions = [
     'IPython.sphinxext.ipython_directive',
     'IPython.sphinxext.ipython_console_highlighting',
     'nbsphinx',
-    'sphinx_design',
     # 'sphinx_panels',
     'sphinxcontrib.bibtex',
     'sphinx_multitoc_numbering',
@@ -130,7 +129,7 @@ todo_include_todos = True
 toggleprompt_offset_right = 35
 
 # bibtex options
-bibtex_bibfiles = ['extract.bib', 'books.bib']
+bibtex_bibfiles = ['extract.bib', 'manual.bib']
 bibtex_reference_style = 'author_year'
 
 # user starts in light mode

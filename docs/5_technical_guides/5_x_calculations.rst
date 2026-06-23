@@ -22,7 +22,7 @@ Calculations For Each ``aggregate`` Class
 Helpful References
 --------------------
 
-* :cite:t:`PIR`
+* :cite:t:`Mildenhall2022a`
 * :cite:t:`Wang1995`
 * :cite:t:`Wang1996`
 * :cite:t:`Mildenhall2022`

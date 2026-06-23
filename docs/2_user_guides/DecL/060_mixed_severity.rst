@@ -276,7 +276,7 @@ Severity Mixtures and Mixed Frequency
 
 All severity components in an aggregate share the same frequency mixing value,
 inducing correlation between the parts. An Aon
-study, :cite:t:`AonBenfield2015f`, shows that commercial auto has parameter
+study, :cite:t:`AonBenfield2015e`, shows that commercial auto has parameter
 uncertainty CV around 25%. Building with
 
 .. ipython:: python

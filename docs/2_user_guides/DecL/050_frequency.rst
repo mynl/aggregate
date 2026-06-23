@@ -45,7 +45,7 @@ The following parametric frequency distributions are supported. Remember that th
 * ``binomial SHAPE``, the shape parameter sets :math:`p` and :math:`n=\mathsf{E}[N]/p`.
 * ``neyman SHAPE`` (or ``neymana`` or ``neymanA``), the Neyman A
   Poisson-compound Poisson. The shape variable gives the average number of
-  claimants per claim. See JKK and :cite:t:`Consul1973`.
+  claimants per claim. See JKK and :cite:t:`Consul1973a`.
 * ``pascal SHAPE1 SHAPE2`` (the generalized Poisson-Pascal, see REF), where ``SHAPE1``
   gives the cv and ``SHAPE2`` the number of claims per occurrence.
 

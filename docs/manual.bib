@@ -1,0 +1,131 @@
+% docs/manual.bib — hand-maintained bibliography entries.
+%
+% These references are intentionally NOT sourced from the author's master
+% library (C:/S/TELOS/Biblio/uber-library.bib). They fall into two groups:
+%
+%   1. Academic works absent from the master library. If any of these are later
+%      added to the master library via archivum, delete the entry here and
+%      re-run docs/update_extract_bib.py — it will then flow into extract.bib.
+%
+%   2. Software citations (Python, SciPy, pandas, matplotlib, SLY, ...) and a
+%      few utility references that belong with the docs, not the research
+%      library.
+%
+% docs/extract.bib is GENERATED and must not be edited by hand; this file is the
+% place for manual entries. Both are listed in conf.py's bibtex_bibfiles.
+
+% --- Academic works not (yet) in the master library ---------------------------
+
+@inproceedings{Bertram1983,
+  title={Calculations of aggregate claims distributions in case of negative risk sums},
+  author={Bertram, J},
+  booktitle={17th ASTIN Colloquium, Lindau, Germany},
+  year={1983}
+}
+@book{Panjer1992,
+  title={Insurance risk models},
+  author={Panjer, Harry H and Willmot, Gordon E},
+  publisher={Society of Actuaries},
+  year={1992}
+}
+@book{Lukacs1970bk,
+  title={Characteristic Functions},
+  author={Lukacs, Eugene},
+  year={1970},
+  edition={2},
+  publisher={Griffin, London}
+}
+@book{McKean2014bk,
+  title={Probability: the classical limit theorems},
+  author={McKean, Henry},
+  year={2014},
+  publisher={Cambridge University Press}
+}
+@article{Bertram1981,
+  title={Numerische Berechnung von Gesamtschadenverteilungen},
+  author={Bertram, J{\"u}rgen},
+  journal={Bl{\"a}tter der DGVFM},
+  volume={15},
+  number={2},
+  pages={175--194},
+  year={1981},
+  publisher={Springer}
+}
+
+% --- Software and utility references -------------------------------------------
+
+@book{Python3,
+ author = {Van Rossum, Guido and Drake, Fred L.},
+ title = {Python 3 Reference Manual},
+ year = {2009},
+ isbn = {1441412697},
+ publisher = {CreateSpace},
+ address = {Scotts Valley, CA}
+}
+@book{Levine1992,
+  title={lex \& yacc},
+  author={Levine, John R. and Mason, Tony and Brown, Doug},
+  year={1992},
+  publisher={O'Reilly}
+}
+@misc{sly,
+author={Beazely, David},
+title={SLY (Sly Lex-Yacc)},
+url={https://github.com/dabeaz/sly},
+version={0.5},
+date={2022-10-25},
+year={2022}
+}
+@article{Scipy,
+  author  = {Virtanen, Pauli and Gommers, Ralf and Oliphant, Travis E. and
+            Haberland, Matt and Reddy, Tyler and Cournapeau, David and
+            Burovski, Evgeni and Peterson, Pearu and Weckesser, Warren and
+            Bright, Jonathan and {van der Walt}, St{\'e}fan J. and
+            Brett, Matthew and Wilson, Joshua and Millman, K. Jarrod and
+            Mayorov, Nikolay and Nelson, Andrew R. J. and Jones, Eric and
+            Kern, Robert and Larson, Eric and Carey, C J and
+            Polat, {\.I}lhan and Feng, Yu and Moore, Eric W. and
+            {VanderPlas}, Jake and Laxalde, Denis and Perktold, Josef and
+            Cimrman, Robert and Henriksen, Ian and Quintero, E. A. and
+            Harris, Charles R. and Archibald, Anne M. and
+            Ribeiro, Ant{\^o}nio H. and Pedregosa, Fabian and
+            {van Mulbregt}, Paul and {SciPy 1.0 Contributors}},
+  title   = {{{SciPy} 1.0: Fundamental Algorithms for Scientific
+            Computing in Python}},
+  journal = {Nature Methods},
+  year    = {2020},
+  volume  = {17},
+  pages   = {261--272},
+  adsurl  = {https://rdcu.be/b08Wh},
+  doi     = {10.1038/s41592-019-0686-2},
+}
+@misc{pandas,
+    author       = {The pandas development team},
+    title        = {pandas-dev/pandas: Pandas},
+    month        = feb,
+    year         = 2020,
+    publisher    = {Zenodo},
+    version      = {latest},
+    doi          = {10.5281/zenodo.3509134},
+    url          = {https://doi.org/10.5281/zenodo.3509134}
+}
+@article{Hunter2007,
+  Author    = {Hunter, J. D.},
+  Title     = {Matplotlib: A 2D graphics environment},
+  Journal   = {Computing in Science \& Engineering},
+  Volume    = {9},
+  Number    = {3},
+  Pages     = {90--95},
+  abstract  = {Matplotlib is a 2D graphics package used for Python for
+  application development, interactive scripting, and publication-quality
+  image generation across user interfaces and operating systems.},
+  publisher = {IEEE COMPUTER SOC},
+  doi       = {10.1109/MCSE.2007.55},
+  year      = 2007
+}
+@misc{DOCS,
+    author       = {Mildenhall, Stephen J.},
+    title        = {aggregate Documentation},
+    year         = 2023,
+    url          = {https://aggregate.readthedocs.io/_/downloads/en/latest/pdf/}
+}

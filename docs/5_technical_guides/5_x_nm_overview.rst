@@ -134,8 +134,8 @@ Explicit use of the FFT appears first in :cite:`Bertram1983`. It has subsequentl
 
 :cite:t:`Embrechts1993` describes the  FFT algorithm and considers Richardson extrapolation to estimate the density.
 
-:cite:t:`WangS1998` describes the FFT algorithm, using padding to control aliasing (wrapping) error. The first edition of
-:cite:t:`LM`, published in 1998, describes the algorithm, although it no longer appears in the fifth edition.
+:cite:t:`Wang1998a` describes the FFT algorithm, using padding to control aliasing (wrapping) error. The first edition of
+:cite:t:`Klugman2019`, published in 1998, describes the algorithm, although it no longer appears in the fifth edition.
 :cite:t:`Grubel1999` describes the use of exponential tilting to reduce aliasing error and :cite:t:`Grubel2000` explains how to use Richardson extrapolation to improve density estimates. Exponential tilting is the same process used in GLM exponential families to adjust the mean, and it is also used in large deviation theory.
 :cite:t:`Mildenhall2005a` describes the FFT algorithm.
 
@@ -163,7 +163,7 @@ is not best fit by a gamma.
 Other Applications
 ~~~~~~~~~~~~~~~~~~~~
 
-The FFT algorithm is applied to model operational risk in :cite:t:`Schaller2008`, :cite:t:`Temnov2008`, :cite:t:`Luo2009`, :cite:t:`Luo2010`, and :cite:t:`Shevchenko2010`. These applications mirror the actuarial approach, using either padding or exponential tilting (exponential window) to control aliasing error. They are interesting because they include modeling with a very high expected claim counts and a very thick tailed severity (no mean). See :ref:`num truncation example`.
+The FFT algorithm is applied to model operational risk in :cite:t:`Schaller2008`, :cite:t:`Temnov2008`, :cite:t:`Luo2009`, :cite:t:`Luo2011`, and :cite:t:`Shevchenko2010`. These applications mirror the actuarial approach, using either padding or exponential tilting (exponential window) to control aliasing error. They are interesting because they include modeling with a very high expected claim counts and a very thick tailed severity (no mean). See :ref:`num truncation example`.
 
 In finance, FFTs are used in option pricing,  :cite:t:`Carr1999`. These applications can use distributions derived from stable-:math:`\alpha` and Levy process families that have a closed for characteristic function but no analytic density. :cite:t:`Duan2012` describe more recent innovations. FFTs are also used as a general purpose convolution routine, :cite:t:`Cerny2004`
 

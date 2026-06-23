@@ -33,7 +33,7 @@ Distortions and Spectral Risk Measures
 Helpful References
 --------------------
 
-* :cite:t:`PIR`
+* :cite:t:`Mildenhall2022a`
 * The text in this section is derived from :cite:t:`Major2020`.
 * :cite:t:`Mildenhall2022`
 
@@ -631,7 +631,7 @@ total loss.
 
 
 It is an important to know when the natural allocation premium is unique. It is so when :math:`Z` is the only contact function (i.e., there are no others).
-If :math:`X` has a strictly increasing quantile function or is injective then :math:`\mathsf Q` is unique and therefore given by :math:`g'S(X)` and hence :math:`X` measurable, see :cite:p:`Carlier2003` and :cite:t:`Marinacci2004b`. More generally, we can replace :math:`\mathsf Q` with its expectation given :math:`X` to make a canonical choice, resulting in the linear natural allocation :cite:p:`Cherny2011`.
+If :math:`X` has a strictly increasing quantile function or is injective then :math:`\mathsf Q` is unique and therefore given by :math:`g'S(X)` and hence :math:`X` measurable, see :cite:p:`Carlier2003` and :cite:t:`Marinacci2004a`. More generally, we can replace :math:`\mathsf Q` with its expectation given :math:`X` to make a canonical choice, resulting in the linear natural allocation :cite:p:`Cherny2011`.
 
 The problem that can occur when :math:`\mathsf Q` is not unique, but
 that can be circumvented when :math:`\rho` is a SRM, can be illustrated
@@ -654,7 +654,7 @@ that for :math:`\mathsf{Q}`. The theorem isolates a specific
 :math:`\mathsf Q` from other, non-TVaR, :math:`\rho`: you can always
 shuffle part of the contact function within :math:`C` to generate
 non-unique allocations.
-See :cite:t:`PIR` Example 239 for an illustration.
+See :cite:t:`Mildenhall2022a` Example 239 for an illustration.
 
 When :math:`\mathsf Q` is :math:`X` measurable, then
 :math:`\mathsf E_{\mathsf Q}[X_i \mid X]=\mathsf E[X_i \mid X]`, which enables explicit calculation. In this case there is no risk adjusted version of :math:`\kappa_i`. If :math:`\mathsf Q` is not :math:`X` measurable, then there can be risk adjusted :math:`\kappa_i` because
@@ -680,7 +680,7 @@ When :math:`\mathsf Q` is :math:`X` measurable, then
 The proof writes the price of a limited liability cover as the price of
 default-free protection minus the value of the default put. This is the
 standard starting point for allocation in a perfect competitive market
-taken by :cite:t:`Phillips1998`, :cite:t:`Myers2001`, :cite:t:`Sherris2006a`, and :cite:t:`Ibragimov2010`.
+taken by :cite:t:`Phillips1998`, :cite:t:`Myers2001`, :cite:t:`Sherris2006`, and :cite:t:`Ibragimov2010`.
 They then allocate the default put rather than the value of insurance
 payments directly.
 
@@ -1090,7 +1090,7 @@ Prices exclude all expenses. The risk free interest rate is zero. These
 are standard simplifying assumptions, e.g. :cite:t:`Ibragimov2010`.
 
 The terminology describing risk measures is standard, and follows
-:cite:t:`Follmer2011`. We work on a standard probability space, :cite:t:`Svindland2009`,
+:cite:t:`Follmer2011`. We work on a standard probability space, :cite:t:`Svindland2010a`,
 Appendix. It can be taken as :math:`\Omega=[0,1]`, with the Borel
 sigma-algebra and :math:`\mathsf P` Lebesgue measure. The indicator
 function on a set :math:`A` is :math:`1_A`, meaning :math:`1_A(x)=1` if

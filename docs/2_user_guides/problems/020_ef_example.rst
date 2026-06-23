@@ -43,7 +43,7 @@ The last dataframe shows poor accuracy. Try different ways to compute the aggreg
 
 The last dataframe shows a good approximation.
 
-The next figure (compare Figure 1 in the paper, shown below) shows that padding, as recommended in :cite:t:`WangS1998`, removes aliasing as effectively as padding, albeit at the expense of a longer FFT computation. The log density shows the aliasing is completely removed.
+The next figure (compare Figure 1 in the paper, shown below) shows that padding, as recommended in :cite:t:`Wang1998a`, removes aliasing as effectively as padding, albeit at the expense of a longer FFT computation. The log density shows the aliasing is completely removed.
 
 .. ipython:: python
     :okwarning:

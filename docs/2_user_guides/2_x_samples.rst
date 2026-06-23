@@ -24,7 +24,7 @@ Working With Samples
 Helpful References
 --------------------
 
-* :cite:t:`PIR` chapter 14 and 15
+* :cite:t:`Mildenhall2022a` chapter 14 and 15
 * :cite:t:`Puccetti2012`
 * :cite:t:`Conover1999`
 * :cite:t:`Mildenhall2005a`

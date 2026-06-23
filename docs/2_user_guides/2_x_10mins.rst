@@ -192,14 +192,14 @@ It is indexed by object kind (severity, aggregate, portfolio) and name, and acce
 
     qd(build.knowledge.head(), justify="left", max_colwidth=60)
 
-A row in the knowledge can be accessed by name using ``build``. This example models the roll of a single die.
+A row in the knowledge can be accessed by name using ``build``. This example models the roll of three single dice.
 
 .. ipython:: python
     :okwarning:
 
-    print(build['A.Dice00'])
+    print(build['A.ThreeDice'])
 
-The argument ``'A.Dice00'`` is passed through to the underlying dataframe's ``getitem``.
+The argument ``'A.ThreeDice'`` is passed through to the underlying dataframe's ``getitem``.
 
 .. _10 min create from knowledge:
 
@@ -208,10 +208,10 @@ A row in the knowledge can be created as a Python object using:
 .. ipython:: python
     :okwarning:
 
-    aDice = build('A.Dice00')
+    aDice = build('A.ThreeDice')
     qd(aDice)
 
-The argument in this case is passed through to the method :meth:`Underwriter.build`, which first looks for ``A.Dice00`` in the knowledge. If it fails, it tries to interpret its argument as a DecL program.
+The argument in this case is passed through to the method :meth:`Underwriter.build`, which first looks for ``A.ThreeDice`` in the knowledge. If it fails, it tries to interpret its argument as a DecL program.
 
 The method :meth:`build.discover` searches the knowledge using a regex (regular expression) applied to the names and returns a dataframe of matching programs. By default it does no building or plotting — pass ``plot=True`` or ``describe=True`` to also build each match.
 

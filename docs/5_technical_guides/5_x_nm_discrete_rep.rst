@@ -4,7 +4,7 @@
 Digital Representation of Distributions
 ----------------------------------------
 
-    "We come now to reality. The truth is that the digital computer has totally defeated the analog computer. The input is a sequence of numbers and not a continuous function. The output is another sequence of numbers." :cite:p:`Strang1986am`
+    "We come now to reality. The truth is that the digital computer has totally defeated the analog computer. The input is a sequence of numbers and not a continuous function. The output is another sequence of numbers." :cite:p:`Strang1986`
 
 How ``aggregate`` Represents a Distribution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -128,7 +128,7 @@ There are four common methods to create an infinite discretization.
                  &= F(kb) - F((k - 1)b) \\
              p_0 &= F(0).
 
-#. The **moment** difference method :cite:p:`LM` assigns
+#. The **moment** difference method :cite:p:`Klugman2019` assigns
 
    .. math::
 
@@ -182,7 +182,7 @@ This decision is based in part on the following observations about the moment me
 
 .. LM on moment matching p. 182. careful here
 
-:cite:t:`LM` report that :cite:t:`Panjer1983` found two moments were usually sufficient and that adding a third moment requirement adds only marginally to the accuracy. Furthermore, they report that the **rounding method and the first-moment method had similar errors**, while the second-moment method provided significant improvement but at the cost of no longer guaranteeing that the resulting probabilities are  **nonnegative**.
+:cite:t:`Klugman2019` report that :cite:t:`Panjer1983` found two moments were usually sufficient and that adding a third moment requirement adds only marginally to the accuracy. Furthermore, they report that the **rounding method and the first-moment method had similar errors**, while the second-moment method provided significant improvement but at the cost of no longer guaranteeing that the resulting probabilities are  **nonnegative**.
 
 .. LM go on: The methods described here are qualitatively similar to numerical methods used to solve Volterra integral equations such as (9.26) developed in numerical analysis (see, e.g. Baker [10]).
   Ex 9.41 gives the formulas for weights in terms of LEVs.

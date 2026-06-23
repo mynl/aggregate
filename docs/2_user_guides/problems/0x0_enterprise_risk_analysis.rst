@@ -351,7 +351,7 @@ families
 #. TVaR.
 
 They are sorted from most tail-centric (expensive for tail risk) to cheapest. See
-:cite:t:`PIR`.
+:cite:t:`Mildenhall2022a`.
 
 The next dataframe shows the asset level and implied loss ratio,
 distortion name, survival probability (0.5%), expected loss, premium, premium

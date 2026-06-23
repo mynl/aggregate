@@ -102,7 +102,7 @@ class GridDistribution:
     def pmf(self, x): ...
     def mean(self): ...
     def lev(self, a): ...                # E[min(X, a)] = ∫₀ᵃ S dx (limited EV)
-    def limited_tvar(self, p, a): ...    # TVaR_p(min(X, a)); analytic composite of
+    def tvar_of_limited(self, p, a): ...    # TVaR_p(min(X, a)); analytic composite of
                                          #   tvar/cdf — O(1), no grid rebuild (Bounds)
     # --- width-dependent: require bs (raise if bs is None) ---
     def pdf(self, x): ...                # mass / width — a continuous reading
@@ -119,14 +119,15 @@ dropped (see P4); resurrecting it as a blessed primitive would re-introduce a
 deprecated, semantically-different accessor. Vector-`q` supersedes it.
 
 **`lev(a)` is new and load-bearing** — it is the limited-expected-value datum a
-`Distortion` needs to calibrate (see Phase L below). Calibration does **not** move
-onto the value type: the dependency runs **GD → Distortion** (the caller passes its
-GD to the `Distortion`, which already owns the Newton iteration), so GD stays a leaf
-and never imports `Distortion`. `lev` is a width-aware integral
+`Distortion` needs to calibrate (consumed by the calibration rewire, which lands in
+**P3 §1c** — see the moved-Phase-L note below). Calibration does **not** move onto
+the value type: the dependency runs **GD → Distortion** (the caller passes its GD to
+the `Distortion`, which already owns the Newton iteration), so GD stays a leaf and
+never imports `Distortion`. `lev` is a width-aware integral
 (`bs · Σ_{x<a} S`), so it lives with the probability accessors but degrades to
 local `np.diff(x)` widths when `bs is None`.
 
-**`limited_tvar(p, a)` is new and load-bearing for Bounds** — it is `TVaR_p(min(X,
+**`tvar_of_limited(p, a)` is new and load-bearing for Bounds** — it is `TVaR_p(min(X,
 a))`, the **analytic composite** of GD quantities that `Bounds._tvar_x_a`
 (`bounds.py:230`) already computes today: `TVaR_p(X) − (1−F(a))(TVaR_{F(a)}(X) −
 a)/(1−p)` for `p < F(a)`, else `a`. It reads `tvar`/`cdf` only and is **O(1) — no
@@ -138,10 +139,10 @@ stored on the GD, which stays cap-agnostic), and `Bounds` delegates to it (Phase
 **`cap(a)` is the general transform** (kept, but distinct): `min(X, a)` is itself a
 grid distribution (pool all mass ≥ a onto the atom at `a`), so `gd.cap(a)` returns a
 fresh `GridDistribution` and *any* accessor on the capped law follows —
-`gd.cap(a).tvar(p)` ≡ `gd.limited_tvar(p, a)`, `gd.cap(a).var(p)`, etc. `cap`
+`gd.cap(a).tvar(p)` ≡ `gd.tvar_of_limited(p, a)`, `gd.cap(a).var(p)`, etc. `cap`
 rebuilds the grid, so it is the convenience path for one-off capped views, **not**
-the root-find hot loop, which uses the analytic `limited_tvar`. (The two share a
-test: `cap(a).tvar(p)` cross-checks `limited_tvar(p, a)`.)
+the root-find hot loop, which uses the analytic `tvar_of_limited`. (The two share a
+test: `cap(a).tvar(p)` cross-checks `tvar_of_limited(p, a)`.)
 
 **Invalidation becomes trivial:** there is nothing to reset — when the density
 changes, the holder builds a *new* `GridDistribution`. The scattered
@@ -209,14 +210,14 @@ def tvar(self, p, kind=''):  return self._dist.tvar(p, kind)
 
 - **1.1** Create `aggregate/_grid_distribution.py`; move the `make_var_tvar` body
   in as `_make_var_tvar`; implement `GridDistribution` (spacing-agnostic
-  accessors + `lev` + `limited_tvar`; `bs`-guarded `pdf`/`snap`; optional `cap`) +
+  accessors + `lev` + `tvar_of_limited`; `bs`-guarded `pdf`/`snap`; optional `cap`) +
   `from_series`.
 - **1.2** Drop `make_var_tvar` from `utilities.__all__`; relocate
   `var_tvar_test_suite` to target the new home.
 - **1.3** New `tests/test_grid_distribution.py`: brute-force / analytic checks on
   the kernel and every accessor (small hand-checkable grids; fair-die style),
   plus `kind='lower'/'upper'`, `tvar_threshold`, `lev` against `∫S`,
-  `limited_tvar(p, a)` against a brute-force `TVaR_p(min(X, a))` (and against
+  `tvar_of_limited(p, a)` against a brute-force `TVaR_p(min(X, a))` (and against
   `cap(a).tvar(p)`, and against `Bounds._tvar_x_a` on a shared case), and an
   explicit **non-uniform-grid** case (asserting the probability accessors match a
   direct cumulative computation while `pdf`/`snap` raise when `bs is None`).
@@ -244,7 +245,7 @@ Each is a standalone commit, `test_baseline.py` green (numbers identical):
   GD.** The capped TVaR `TVaR_p(min(X, a))` (`Bounds._tvar_x_a`, `bounds.py:230`) is
   a pure function of the distribution and `(p, a)` — the analytic composite of
   `tvar(p)`, `tvar(F(a))`, `cdf(a)`, and the scalar `a` — so it **becomes
-  `GridDistribution.limited_tvar(p, a)`**, and `Bounds._tvar_x_a` delegates to it,
+  `GridDistribution.tvar_of_limited(p, a)`**, and `Bounds._tvar_x_a` delegates to it,
   passing its asset cap `a`. The scalar `a` is an argument *to* the accessor, not
   stored on the GD (the GD stays cap-agnostic); only the formula moves. This keeps
   the O(1) cost — no `cap()` rebuild — inside Bounds' `p_star` root-find while giving
@@ -254,6 +255,9 @@ Each is a standalone commit, `test_baseline.py` green (numbers identical):
 - **4 — Aggregate.** Replace `_var_tvar_function` *and* the second
   `_sev_var_tvar_function` copy; `q`/`var`/`tvar`/`tvar_threshold`/`cdf`/`sf`/`pmf`
   delegate to `self._dist`. Removes the `= None` resets in `__init__`/`update`.
+  **Heads-up:** `tvar_sev` (`distributions.py:7845`) is currently buggy (see §4) —
+  the clean delegation *fixes* it, so expect that one number to move; commit it
+  separately with a `CHANGELOG.md` note rather than folding it into the swap.
 - **5 — Portfolio.** Same swap; also unifies the *mutate-vs-return*
   `_make_var_tvar` divergence noted in §0.
 - **6 — Bivariate.** Expose its marginal/total densities *as* `GridDistribution`
@@ -262,57 +266,28 @@ Each is a standalone commit, `test_baseline.py` green (numbers identical):
 Order = ascending blast radius (Severity → Bounds → Aggregate → Portfolio →
 Bivariate), so the pattern is proven on small consumers before the god classes.
 
-### Phase L — feed distortion calibration from a `GridDistribution` (new capability; bumps version)
+### Phase L — moved to P3 §1c
 
-This is a *payoff* phase, not a guarded swap: it adds capability, so it bumps the
-version and gets a `CHANGELOG.md` entry (and is **not** numerics-frozen in the
-swap sense — though the calibrated shapes must match the old path bit-for-bit).
-
-**Dependency direction.** Calibration already lives on `Distortion`
-(`spectral.py`) — `Distortion.calibrate` owns the Newton iteration. This phase does
-**not** move calibration onto GD; it makes the *data* `Distortion.calibrate`
-consumes come from a `GridDistribution`. The caller hands its GD (or the
-GD-extracted `S`/`lev`/`bs`) to the `Distortion`; **GD never imports `Distortion`**
-(leaf preserved).
-
-**The finding.** `Portfolio.calibrate_distortions` (plural) is the only public
-entry the author uses; it computes the asset level `a`, the premium target `P`
-(from `coc`), then loops `['ccoc','ph','wang','dual','tvar']` calling the
-**singular** `calibrate_distortion` once per name — and the singular *re-resolves
-the whole S-vector / `ess_sup` / `el` from `density_df` on every call* even though
-`a` and `P` are already fixed. Its entire data dependency is grid-distribution
-data: `a = q(p)`, `S = sf` over `[0, a]`, `el = lev(a)`, `bs`, `ess_sup` (first
-zero of `S`) — none of it Portfolio-specific *for the total* (per-unit `exa_*`
-conditional columns from `add_exa` are genuine Portfolio machinery and stay).
-
-**The change.**
-- **Drop the public singular `Portfolio.calibrate_distortion`.** The author never
-  calls it; it is at best a private worker. Inline its dispatch (the per-family
-  `init_shape` / `param_name` construction → `subclass.calibrate(...)`) into the
-  plural's loop, resolving the GD data **once** before the loop instead of per
-  name. This also lets the singular's unused `S_column`/`S_calc`/`r0`/`kind`
-  option surface (the plural always used defaults) be dropped.
-- **Source the calibration data from a `GridDistribution`.** The set-calibration
-  helper that loops `['ccoc','ph','wang','dual','tvar']` (resolving `init_shape`/
-  `param_name` and calling `Distortion.calibrate`) takes a GD + `(premium_target,
-  assets)` and extracts `S`/`el = lev(a)`/`bs`/`ess_sup` from the GD. `Portfolio`
-  resolves `a`/`P` from its pentagon state and hands its **total** GD to that helper.
-  **Home:** this helper is **flavor (b) of the shared `_pricing` concern** (see
-  `plan-README.md` and P3). P1 authors it next to `Distortion` in `spectral.py`
-  (where the Newton math it drives already lives); **P3 relocates it into
-  `_pricing.py`** when it births that module — the one accepted move-twice, called
-  out so it is not a surprise. The per-distortion Newton iteration stays on
-  `Distortion` either way; only the set-loop *orchestration* migrates.
-- **Free win: `Aggregate.calibrate_distortions`.** Because the helper needs only a
-  `GridDistribution` + a premium target, an `Aggregate` (or a unit, or a distorted
-  density) can calibrate directly — **no more wrapping in a 1-unit Portfolio.**
-  Expose `Aggregate.calibrate_distortions` handing its own GD to the same helper.
-  (Calibration to the **total** only; per-unit allocation stays a Portfolio
-  concern in `_portfolio`.)
-
-**Tests.** `tests/test_distortion_calibrate.py` currently targets the singular —
-re-point it at the plural / the GD worker, pinning identical calibrated shapes
-(the Newton iterations are unchanged, only their inputs are sourced differently).
+> **Moved.** Feeding distortion calibration from a `GridDistribution` — dropping the
+> singular `Portfolio.calibrate_distortion`, sourcing the calibration data from a GD,
+> and adding `Aggregate.calibrate_distortions` so a distortion set calibrates on an
+> `Aggregate` as well as a `Portfolio` — was originally staged here as "Phase L." It
+> has been **moved into P3 (`plan-split-distributions.md`, Phase 1c)**, where
+> `_pricing.py` is born. Two reasons:
+>
+> 1. **No double-move.** The per-family set-loop is pure `Distortion` knowledge
+>    (the family registry, `_calibration_init_shape`, `param_name`), so it becomes a
+>    `Distortion.calibrate_set(...)` classmethod beside the singular `calibrate` and
+>    **stays on `Distortion` permanently**. There is no author-in-`spectral`-then-
+>    relocate-to-`_pricing` relay — the one accepted move-twice is gone.
+> 2. **Keystone purity.** With the rewire in P3, P1 is honestly a *pure addition +
+>    guarded swaps*: its only obligation toward calibration is to expose the **leaf
+>    accessors it consumes** — `sf` (the S vector) and `lev(a)` — which §1.1–§1.2 and
+>    Phase 1 already deliver.
+>
+> The dependency direction is fixed here and unchanged: **GD → Distortion** (the
+> caller hands its GD's data to the `Distortion`); **`GridDistribution` never imports
+> `Distortion`**. See P3 §1c for the full finding, change, and tests.
 
 ---
 
@@ -324,11 +299,11 @@ re-point it at the plural / the GD worker, pinning identical calibrated shapes
 - A **discretised Severity** grid → a `GridDistribution` ⇒ kills Aggregate's second
   copy.
 - A **Bounds** envelope source → a `GridDistribution` ⇒ no hand-rolled kernel, and
-  the capped TVaR `TVaR_p(min(X, a))` is `gd.limited_tvar(p, a)` (Bounds delegates;
+  the capped TVaR `TVaR_p(min(X, a))` is `gd.tvar_of_limited(p, a)` (Bounds delegates;
   the formula lives in one place).
 - **Distortion calibration on anything** ⇒ `Aggregate.calibrate_distortions`
-  without the 1-unit-Portfolio wrap (Phase L), because calibration is a function of
-  `(S, lev, bs, premium_target)` — all `GridDistribution` data.
+  without the 1-unit-Portfolio wrap (delivered in P3 §1c), because calibration is a
+  function of `(S, lev, bs, premium_target)` — all `GridDistribution` data.
 
 The same small type expresses "an Aggregate as a distribution," "a Portfolio
 total," "a unit allocation," "a distorted density," "a discretised severity" —
@@ -340,16 +315,25 @@ which is how these are already reasoned about.
 
 - **Leaf discipline.** `_grid_distribution.py` imports only numpy/pandas. If it
   ever needs `distributions`/`portfolio`, the design is wrong — stop.
-- **Behaviour-guarded swaps.** Same kernel ⇒ identical numbers; `test_baseline.py`
-  must not regenerate on any adoption commit. A diff means the swap is wrong.
+- **Behaviour-guarded swaps — with one carve-out.** Same kernel ⇒ identical
+  numbers; `test_baseline.py` must not regenerate on a *clean* adoption commit, and
+  a diff there means the swap is wrong. **Exception: latent bugs in the drifted
+  plumbing.** The duplicated caches have already diverged into at least one genuine
+  bug — `Aggregate.tvar_sev` (`distributions.py:7845`) guards `_var_tvar_function`
+  but writes `_sev_var_tvar_function`, and builds from `p_total` (the aggregate
+  density), not severity — so a faithful `GridDistribution` swap will *fix* it and
+  **change that number**. Such fixes are expected, are **not** covered by the
+  identical-numbers guard, and each gets its **own** called-out commit +
+  `CHANGELOG.md` line (never silently folded into a "pure swap"). Audit each
+  adoption site for this drift before assuming the baseline should hold.
 - **No "two ways."** `self._dist` is private; the class methods stay the public API
   and merely delegate.
 - **Name vetting (CLAUDE.md).** `rg` `GridDistribution` / `_dist` / `from_series` /
-  `lev` / `limited_tvar` / `cap` against the existing surface before fixing names;
+  `lev` / `tvar_of_limited` / `cap` against the existing surface before fixing names;
   confirm no collision with an existing attribute/method on the adopting classes.
   (`lev` is an actuarial term of art — limited expected value — check it is free;
-  `limited_tvar` is provisional, chosen to parallel `lev` for the *limited* TVaR —
-  confirm the name with the author before fixing it.)
+  `tvar_of_limited` is the chosen name — TVaR of the limited loss `min(X, a)`,
+  paralleling `lev` — but still `rg` it for collisions before fixing.)
 - **`_DiscreteRV` resolved (§1.3):** one cumulative core, two faces — never a
   forced merge (the `pdf` semantics conflict) and never two parallel kernels.
 - **Spacing-agnostic invariant:** probability accessors must never divide by `bs`;

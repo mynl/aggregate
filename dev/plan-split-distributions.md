@@ -15,9 +15,10 @@
 > pre-1.0 behind a re-export façade costs zero compatibility; doing it after is a
 > breaking-change conversation. This is the natural window.
 >
-> **Release mechanics (CLAUDE.md).** Pure-move phases (the kind split) are tidying
-> and need no version bump; the compute-extraction phase (new tests, touched
-> behaviour) bumps `1.0.0a*` + adds a `CHANGELOG.md` section. `uv run pytest` green
+> **Release mechanics (CLAUDE.md).** Pure-move phases (the kind split, Phase 1b) are
+> tidying and need no version bump; the capability phases — **Phase 1c** (distortion
+> calibration on a GD) and **Phase 2A** (compute extraction) — touch behaviour / add
+> tests, so they bump `1.0.0a*` + add a `CHANGELOG.md` section. `uv run pytest` green
 > before every commit. Move this plan to `dev/done/` when its phases land.
 
 ---
@@ -115,10 +116,18 @@ numbers).
 | **`_aggregate.py`** | 2309–8253 (`Aggregate`) minus the shared-concern blocks below, plus its genuinely Agg-private support: `_picks_work` (1026), `_flat_col_to_stats_index` (2269) | ~5,200 | The monolith; Phase 2A shrinks it further (and P1 already thinned its accessors). Imports `_frequency`, `_severity`, `_fits`, `_validation`, `_bucket_window`, `_pricing`, `_reinsurance`, `spectral.Distortion`, and the P1 `GridDistribution`. |
 | **`_bucket_window.py`** *(shared)* | bucket / window sizing `estimate_agg_window`/`bs_describe`/`bs_explain`/`_bs_grid_top`/`_estimate_agg_percentile` (552–873) | ~320 | Bucket-and-window-selection concern. Seeded from `Aggregate`; P4 adds the `Portfolio` sizers (`recommend_bucket`/`best_bucket`/`best_window`/`bs_window_df`) here so the two sit side by side. Near-leaf (numpy/scipy). |
 | **`_reinsurance.py`** *(Agg-only)* | reins helpers `_validate_reins_layers`/`make_ceder_netter` (1288–1428) + the Aggregate ceder/netter application | ~200 | Agg-only carve-out (Portfolio has no reinsurance). The 2B `ReinsuranceProgram` collaborator, if it ever lands, grows from here. |
-| **`_validation.py`** *(shared)* | the `Aggregate` validation / `explain_validation` machinery and aliasing/moment-match checks (exact symbols resolved by `rg` at execution) | ~250 | Validation concern. Seeded from `Aggregate`; P4 adds `Portfolio.valid`/`validation_explanation` here. Similar-not-identical — co-located to expose the commonality. |
-| **`_pricing.py`** *(shared)* | the single-GD pricing surface: `Aggregate.price`/`price_ccoc`, pentagon completion, and `Aggregate.calibrate_distortions` (the P1 Phase L free win); flavor (b)'s set-loop relocated here from `spectral.py` | ~300 | Single-GD pricing concern (pentagon completion + distortion calibration). Thin orchestration — pentagon algebra stays in `pentagon.py`, Newton calibration on `Distortion` in `spectral.py`. P4 routes `Portfolio`-total pricing through it. See `plan-README.md` pricing↔allocation boundary. |
+| **`_validation.py`** *(shared)* | the per-class `valid` checks + aliasing/moment-match machinery (exact symbols resolved by `rg` at execution) | ~250 | Validation concern. **The shared core already exists** — `explain_validation` is a free function in `utilities.py:669` (in `utilities.__all__`), already called by *both* classes' `validation_explanation`. So `_validation.py` **pulls `explain_validation` out of `utilities`** (a public-surface move, exactly like `make_var_tvar` in P1) and houses the per-class `valid` checks beside it; the classes keep `validation_explanation` as thin delegators. P4 adds `Portfolio.valid` here. Similar-not-identical — co-located to expose the commonality. |
+| **`_pricing.py`** *(shared)* | the single-GD pricing surface: `Aggregate.price`, `price_ccoc`, pentagon completion, and the flavor-(b) **pentagon→target glue** + new `Aggregate.calibrate_distortions` (Phase 1c) | ~300 | Single-GD pricing concern (pentagon completion + distortion calibration). `price_ccoc` is genuinely single-GD — it acts on **one** GD (a `Portfolio` total *or* an `Aggregate` unit) — but **today exists only on `Portfolio` (`portfolio.py:4508`)**; relocating it here is what gives `Aggregate` the same entry. Thin orchestration — pentagon algebra stays in `pentagon.py`; the **distortion-set loop is `Distortion.calibrate_set` in `spectral.py`** (Phase 1c — `_pricing` only resolves the pentagon target and calls it, no set-loop lives here); per-distortion Newton stays on `Distortion`; **result dataclasses (`PricingResult`/`AnalyzeDistortion*Result`) stay in `results.py`** (reuse, don't reinvent). P4 routes `Portfolio`-total pricing through it. See `plan-README.md` pricing↔allocation boundary. |
 | **`distributions.py`** | — | ~10 | Façade only (§1). |
 | **shared tiny helpers** | `value_type_role`/`value_type_label` (111–162), `max_log2` (163) | small | Put in whichever module uses them; if used by >1, a `_dist_common.py` leaf. Decide at execution. |
+
+**Prior extractions already exist — the line ranges above are net of them.**
+`moments.py` (`MomentAggregator`/`MomentWrangler` + the `xsden_*` helpers),
+`tail.py` (`TailClass*`), and `results.py` (`PricingResult` /
+`AnalyzeDistortion*Result`) were split out of the god files earlier and are imported
+by both. `_severity`/`_aggregate` keep importing them unchanged, and `_pricing`
+**reuses `results.py`'s dataclasses** rather than minting new ones. Do not
+re-extract or duplicate these.
 
 **Dependency direction is clean.** `spectral` does **not** import `distributions`
 (verified one-way), so `_aggregate.py` importing `Distortion` from `spectral`
@@ -163,19 +172,84 @@ Lift the cross-cutting blocks out of `_aggregate.py` into their own modules,
 **seeded from the `Aggregate` code only** (P4 adds the `Portfolio` side later). Each
 is a standalone commit, `uv run pytest` green, no logic change:
 
-- **1b.1** `_bucket_window.py` — the bucket / window sizing helpers.
+- **1b.1** `_bucket_window.py` — the bucket / window sizing helpers. The
+  `bs_describe`/`bs_explain` *worker functions* it relocates (`distributions.py:743`
+  / `779`) are the subject of open TODO **B5** (verb workers shadowing the
+  `bs_description`/`bs_explanation` noun properties). The public properties are
+  already correctly named; this step is a **pure relocation of the workers only** —
+  do not entrench them, and cross-reference B5 so the eventual rename knows their
+  new home.
 - **1b.2** `_reinsurance.py` — the ceder/netter helpers + Aggregate application
   (Agg-only; no Portfolio counterpart will join it).
 - **1b.3** `_validation.py` — the `explain_validation` / aliasing-and-moment-match
   machinery (`rg` the exact symbols at execution).
-- **1b.4** `_pricing.py` — the single-GD pricing surface; also **relocate flavor
-  (b)'s set-loop here from `spectral.py`** (it was authored there in P1 Phase L —
-  this is the one accepted move-twice, flagged in P1). The per-distortion Newton
-  iteration stays on `Distortion`; only the orchestration moves.
+- **1b.4** `_pricing.py` — birth the single-GD pricing surface by relocating
+  `Aggregate`'s **existing** single-GD pricing methods (`price`, `price_pentagon`,
+  pentagon completion) as the seed. This step is a **pure move** — the distortion-
+  calibration capability (`Distortion.calibrate_set`, the pentagon→target glue,
+  `price_ccoc` on `Aggregate`, `Aggregate.calibrate_distortions`) is **not** here; it
+  bumps and lands in **Phase 1c** below.
 
 These modules are leaves/near-leaves (they take a GD + plain data, never import
 `_aggregate`), which is what lets **P4 consume them unchanged**. After 1b:
 `_aggregate.py` is ~5.2k and the shared concerns are visible in one place each.
+**Shippable unit.** Phase 1c can follow later.
+
+### Phase 1c — distortion calibration on a GD (the former P1 Phase L; bumps)
+
+A **capability** phase, not a pure move: it drops a public method, adds new ones,
+and re-sources calibration data — so it bumps `1.0.0a*` + adds a `CHANGELOG.md`
+section. It depends on `_pricing.py` (1b.4) and the P1 GD accessors (`sf`/`lev`).
+**Goal: calibrate a distortion set on an `Aggregate` as well as a `Portfolio`**
+(today only `Portfolio` can).
+
+**The finding.** `Portfolio.calibrate_distortions` (plural, `portfolio.py:3582`) is
+the only public entry the author uses; it computes assets `a` and premium target `P`
+(from `coc`), then loops `['ccoc','ph','wang','dual','tvar']` calling the **singular**
+`calibrate_distortion` (`portfolio.py:3473`) once per name — and the singular
+*re-resolves the whole S-vector / `ess_sup` / `el` from `density_df` on every call*
+even though `a` and `P` are already fixed. The per-name dispatch
+(`portfolio.py:3562–3577`: read `subclass._calibration_init_shape` / `param_name`,
+build the `Distortion`, call `subclass.calibrate`) reads **only `Distortion` class
+state** plus `(S, bs, premium_target, ess_sup)` — i.e. GD data plus one pricing
+scalar. It contains no Portfolio knowledge.
+
+**The change.**
+- **`Distortion.calibrate_set(...)` — the family loop's permanent home.** Factor the
+  per-name dispatch out of `Portfolio.calibrate_distortion` into a `Distortion`
+  classmethod, beside the singular `calibrate` (`spectral.py:1866`+) and
+  `available_distortions` — it is pure `Distortion` knowledge (the family registry,
+  `_calibration_init_shape`, `param_name`). It takes GD-derived data
+  (`S`/`lev`/`bs`/`ess_sup`) + `(premium_target, assets)` + the name list and returns
+  the calibrated set. **It stays on `Distortion` permanently** — no
+  author-in-`spectral`-then-move-to-`_pricing` relay (the double-move the old P1
+  Phase L carried is gone). **GD → Distortion**: the caller hands the GD's data in;
+  `GridDistribution` never imports `Distortion`. (`rg`-vet the name `calibrate_set`
+  against `Distortion`'s surface before fixing.)
+- **`_pricing` flavor (b) = the thin pentagon glue.** `_pricing` resolves
+  `(premium_target P, assets a)` from pentagon state and calls
+  `Distortion.calibrate_set` with the caller's GD. That glue is all of calibration
+  that lives in `_pricing`; the loop itself is on `Distortion`.
+- **Drop the public singular `Portfolio.calibrate_distortion`.** The author never
+  calls it; reimplement the plural over `Distortion.calibrate_set`, resolving the GD
+  data **once** before the loop. The singular's unused `S_column`/`S_calc`/`r0`/`kind`
+  options (the plural always used defaults) are dropped. *(Public removal —
+  `CHANGELOG.md` line.)*
+- **Bring `price_ccoc` to `Aggregate`.** Move `price_ccoc` (today Portfolio-only,
+  `portfolio.py:4508`) into `_pricing` as a single-GD method so an `Aggregate` gets
+  it too.
+- **Add `Aggregate.calibrate_distortions`.** Because the glue needs only a GD + a
+  premium target, an `Aggregate` (or a unit, or a distorted density) calibrates
+  directly — **no more 1-unit-Portfolio wrap.** This is the headline: `Aggregate` /
+  `Portfolio` parity. (Calibration to the **total** only; per-unit allocation stays a
+  Portfolio concern in `_portfolio_common`.)
+
+**Tests.** `tests/test_distortion_calibrate.py` currently targets the singular —
+re-point it at the plural / `Distortion.calibrate_set`, pinning identical calibrated
+shapes (the Newton iterations are unchanged; only their inputs are sourced
+differently). Add an `Aggregate.calibrate_distortions` case asserting it matches the
+old 1-unit-Portfolio path.
+
 **Shippable unit.** Phase 2A can follow later.
 
 ### Phase 2A — extract pure functions out of `Aggregate` (high value, low risk; bumps)
@@ -255,7 +329,9 @@ dependency loads.
   P2 plots subsystem → **P3 split distributions** → P4 split portfolio.
 - Within P3: **Phase 1** (kind split, pure move) is independently shippable;
   **Phase 1b** (birth the shared concerns `_validation`/`_bucket_window`/`_pricing` +
-  Agg-only `_reinsurance`, pure move) follows and is what P4 consumes; **Phase 2A**
-  (Aggregate compute extraction, bumps) next; **Phase 2B** (composition) is
-  post-beta and conditional, gated by the two-file rule.
+  Agg-only `_reinsurance`, pure move) follows and is what P4 consumes; **Phase 1c**
+  (distortion calibration on a GD — `Distortion.calibrate_set` +
+  `Aggregate.calibrate_distortions` for Agg/Port parity; the former P1 Phase L;
+  bumps) next; **Phase 2A** (Aggregate compute extraction, bumps) next; **Phase 2B**
+  (composition) is post-beta and conditional, gated by the two-file rule.
 - File a `dev/TODO.md` entry pointing at this plan and the README.

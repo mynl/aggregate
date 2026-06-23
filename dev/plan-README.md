@@ -75,9 +75,11 @@ independent-sum combine + `add_exa` allocation.
 	  `Distortion`), so `GridDistribution` stays a numpy/pandas **leaf** and never
 	  imports `Distortion`.
   `_pricing.py` is **thin orchestration only**: the pentagon algebra stays on
-  `Pentagon` (`pentagon.py`), the Newton calibration stays on `Distortion`
-  (`spectral.py`); `_pricing` just drives the two flavors over a GD. Both
-  `Aggregate` and `Portfolio`-total price through it.
+  `Pentagon` (`pentagon.py`); both the per-distortion Newton calibration **and the
+  family set-loop (`Distortion.calibrate_set`) live on `Distortion` (`spectral.py`)**;
+  `_pricing` just resolves the pentagon target and drives the two flavors over a GD.
+  Both `Aggregate` and `Portfolio`-total price (and calibrate) through it — the
+  calibration rewire lands in P3 §1c (see "Why P1 is the keystone").
 - **Allocation** = splitting the total's distorted price across **units** (linear α
   / lifted β). **Portfolio-only**; lives in the Portfolio **common-numerics** module
   (`_portfolio_common`, exeqa-based) — *the distinguishing feature of a portfolio*,
@@ -118,9 +120,9 @@ shrinks the next.
 
 | # | Plan | One line | Risk | Independently shippable? |
 |---|---|---|---|---|
-| **P1** | `plan-grid-distribution.md` | New spacing-agnostic `GridDistribution` value type owns the marginal-vector accessors (`q/var/tvar/cdf/sf/pmf/lev/…`); the `make_var_tvar` kernel **moves into it** from `utilities.py`; `_DiscreteRV` becomes an adapter over it; it feeds `Distortion` calibration (GD→Distortion); every consumer adopts it | low (pure add + guarded swaps) | yes |
+| **P1** | `plan-grid-distribution.md` | New spacing-agnostic `GridDistribution` value type owns the marginal-vector accessors (`q/var/tvar/cdf/sf/pmf/lev/…`); the `make_var_tvar` kernel **moves into it** from `utilities.py`; `_DiscreteRV` becomes an adapter over it; it exposes the `sf`/`lev` data `Distortion` calibration will consume (GD→Distortion; the calibration rewire itself is P3 §1c); every consumer adopts it | low (pure add + guarded swaps) | yes |
 | **P2** | `plan-plots-subsystem.md` | One `plots/` package, per-class modules, `_style.py`, **global matplotlib defer** (the real import-time win) | low (mechanical moves) | yes |
-| **P3** | `plan-split-distributions.md` | Kind split → `_fits`/`_frequency`/`_severity`/`_aggregate` + façade; **births the shared concerns** (`_validation`, `_bucket_window`, `_pricing`, and Agg-only `_reinsurance`); Aggregate pure-compute extraction; `pollaczeck_khinchine`→`pedagogy` | low→med | yes (Phase 1 alone) |
+| **P3** | `plan-split-distributions.md` | Kind split → `_fits`/`_frequency`/`_severity`/`_aggregate` + façade; **births the shared concerns** (`_validation`, `_bucket_window`, `_pricing`, and Agg-only `_reinsurance`); **distortion calibration on a GD** (Phase 1c — `Distortion.calibrate_set` + `Aggregate.calibrate_distortions` for Agg/Port parity); Aggregate pure-compute extraction; `pollaczeck_khinchine`→`pedagogy` | low→med | yes (Phase 1 alone) |
 | **P4** | `plan-split-portfolio.md` | `portfolio.py` façade + **three-subsystem split** of the one `Portfolio` class — `_portfolio_density` (independent-sum combine), `_portfolio_sample` (sample/switcheroo/dependence; extracted now, reviewed later), `_portfolio_common` (exeqa-based augmented-df / distortion / allocation); **consumes** the P3 shared concerns (`_validation`/`_bucket_window`/`_pricing`) | low→med | yes |
 
 **Deferred bucket** (TODO entries, *not* plans yet — promote only when the seam is
@@ -177,18 +179,20 @@ cumulative core** (no equal-spacing assumption in the risk measures; `bs` option
 needed only by `pdf`/`snap`); the existing `_DiscreteRV(xs, ps)` becomes a thin
 scipy-naming adapter over it rather than a parallel abstraction (one kernel, two
 faces — the `pdf` semantics differ, so no forced merge). P1 also folds in three
-payoffs the audit surfaced: a `lev(a)` accessor (limited expected value), a
-`limited_tvar(p, a)` accessor (capped TVaR `TVaR_p(min(X, a))`, which `Bounds`
-delegates to instead of its hand-rolled `_tvar_x_a`), and
-**feeding distortion calibration from a GD** — the Newton calibration stays on
-`Distortion` (`spectral.py`); the singular `Portfolio.calibrate_distortion` is
-dropped and inlined into the plural, whose set-calibration helper now takes a
-`GridDistribution` (GD→Distortion, GD stays a leaf), giving
-`Aggregate.calibrate_distortions` with no 1-unit-Portfolio wrap. That set-helper is
-the **seed of the shared `_pricing` concern** (flavor (b)); P1 authors it next to
-`Distortion`, and P3 relocates it into `_pricing.py` when it births that module. The
-name itself still needs the usual `rg`-against-the-surface vetting (incl.
-`lev`/`limited_tvar`/`cap`) before it is fixed.
+payoffs the audit surfaced: a `lev(a)` accessor (limited expected value) and a
+`tvar_of_limited(p, a)` accessor (capped TVaR `TVaR_p(min(X, a))`, which `Bounds`
+delegates to instead of its hand-rolled `_tvar_x_a`). P1 also exposes the **leaf
+data distortion calibration consumes** (`sf`, `lev`) — but the calibration *rewire
+itself* is **deferred to P3 §1c**, not done here, so P1 stays a clean
+pure-addition + guarded-swaps keystone. In P3: the per-family set-loop becomes a
+`Distortion.calibrate_set` classmethod and **stays on `Distortion` permanently**
+(it is pure `Distortion` knowledge), `_pricing` holds only the pentagon→target
+glue, the singular `Portfolio.calibrate_distortion` is dropped, and
+`Aggregate.calibrate_distortions` is added — giving **`Aggregate`/`Portfolio`
+parity** with no 1-unit-Portfolio wrap. **GD → Distortion** throughout (GD stays a
+leaf). This kills the old "author next to `Distortion`, relocate into `_pricing`"
+double-move entirely. Names (`calibrate_set`, `lev`, `tvar_of_limited`, `cap`) still
+need the usual `rg`-against-the-surface vetting before they are fixed.
 
 ---
 

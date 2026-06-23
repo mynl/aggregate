@@ -13,8 +13,6 @@ from enum import Enum
 import logging
 from typing import Optional, Tuple
 
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
@@ -899,6 +897,8 @@ class Tweedie:
 
 def tweedie_illustration():
     """Make the usual graph of Tweedie distributions."""
+    from .plots import plt, ticker
+
     # redo with Jorg sign for alpha
     alpha = np.linspace(-4, 2, 101)
     p = (-alpha+2) / (-alpha+1)

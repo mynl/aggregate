@@ -107,8 +107,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   **`dev/plan-README.md`** for the map and the regret-guard. Order: **P1**
   `plan-grid-distribution.md` (new `GridDistribution` value type; `make_var_tvar`
   moves in from `utilities.py`; every consumer adopts) → **P2**
-  `plan-plots-subsystem.md` (one `plots/` package + global matplotlib defer) →
-  **P3** `plan-split-distributions.md` (kind split behind a façade; **births the
+  `plan-plots-subsystem.md` (one `plots/` package + global matplotlib defer)
+  — **Pass A landed** (structural port + matplotlib defer; `import aggregate` is
+  matplotlib-free, hygiene test added; no bump); **Pass B** (visual refresh,
+  author-driven) pending → **P3** `plan-split-distributions.md` (kind split behind a façade; **births the
   shared concerns** `_validation`/`_bucket_window`/`_pricing` + Agg-only `_reinsurance`) →
   **P4** `plan-split-portfolio.md` (**three-subsystem split** `_portfolio_density` /
   `_portfolio_sample` / `_portfolio_common`; consumes the P3 shared concerns).

@@ -78,17 +78,13 @@ The "hinge family" is the set of TVaR distortions parameterised by p:
 distortion argument.
 """
 from functools import cached_property
-from itertools import cycle
 import logging
 
-import matplotlib.pyplot as plt
-import matplotlib as mpl
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 
-from .constants import FIG_W
 from .spectral import Distortion
 from ._grid_distribution import GridDistribution
 
@@ -480,74 +476,10 @@ class Bounds:
         -------
         fig, axs : matplotlib figure and array of three Axes.
         """
-        if axs is None:
-            fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_W),
-                                    constrained_layout=True, squeeze=False)
-            axs = axs[0]
-        else:
-            axs = np.atleast_1d(axs).flatten()
-            fig = axs[0].get_figure()
-
-        norm = mpl.colors.Normalize(0, 1)
-        cm = mpl.cm.ScalarMappable(norm=norm, cmap='viridis_r')
-        mapper = cm.get_cmap()
-        s_eval = np.linspace(0, 1, 1001)
-
-        def _band(ax):
-            ax.fill_between(self.cloud_df.index, self.cloud_df.min(1),
-                            self.cloud_df.max(1), facecolor='C7', alpha=.15)
-            self.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=1, c='k')
-            self.cloud_df.max(1).plot(ax=ax, label='_nolegend_', lw=1, c='k')
-
-        if distortions == 'ordered':
-            from .portfolio import Portfolio
-            if not isinstance(self._obj, Portfolio):
-                raise ValueError("distortions='ordered' requires a Portfolio")
-            distortions = [
-                {k: self._obj.distortions[k] for k in ['ccoc', 'tvar']},
-                {k: self._obj.distortions[k] for k in ['ph', 'wang', 'dual']},
-            ]
-
-        ax = axs[0]
-        if n_resamples > 0:
-            bit = self.weight_df.xs(0, drop_level=False) \
-                                .sample(n=n_resamples, replace=True) \
-                                .reset_index()
-            for _, row in bit.iterrows():
-                pl, pu = row['p_lower'], row['p_upper']
-                w = row['weight']
-                self.cloud_df[(pl, pu)].plot(ax=ax, lw=1, c=mapper(w),
-                                             alpha=alpha, label=None)
-            fig.colorbar(cm, ax=ax, shrink=.5, aspect=16,
-                         label='Weight to upper threshold')
-        _band(ax)
-        ax.plot([0, 1], [0, 1], c='k', lw=.25)
-        ax.set(xlim=lim, ylim=lim, aspect='equal')
-
-        if isinstance(distortions, dict):
-            distortions = [distortions]
-        if isinstance(distortions, list):
-            name_mapper = {'ccoc': 'CCoC', 'tvar': 'TVaR(p*)',
-                           'ph': 'PH', 'wang': 'Wang', 'dual': 'Dual'}
-            ls_cycle = list(mpl.lines.lineStyles.keys())
-            for ax, dist_dict in zip(axs[1:], distortions):
-                lssi = iter(cycle(ls_cycle))
-                for k, d in dist_dict.items():
-                    ax.plot(s_eval, d.g(s_eval), lw=1, ls=next(lssi),
-                            label=name_mapper.get(k, k))
-                _band(ax)
-                ax.plot([0, 1], [0, 1], c='k', lw=.25)
-                ax.legend(loc='lower right', ncol=3, fontsize='large')
-                ax.set(xlim=lim, ylim=lim, aspect='equal')
-            # Average extreme overlay on the last panel
-            self.cloud_df.mean(1).plot(ax=axs[-1], c=f'C{len(distortions[-1])}',
-                                        ls='-.', lw=.5, label='Avg extreme')
-
-        if title:
-            for ax in axs:
-                ax.set(title=title)
-
-        return fig, axs
+        from .plots import plot_bounds_envelope
+        return plot_bounds_envelope(self, axs=axs, n_resamples=n_resamples,
+                                    alpha=alpha, distortions=distortions,
+                                    title=title, lim=lim)
 
     def plot_weights(self, ax=None, *, levels=20, colorbar=True):
         """
@@ -562,18 +494,8 @@ class Bounds:
         colorbar : bool, default True
             Attach a colorbar.
         """
-        if ax is None:
-            _, ax = plt.subplots(figsize=(FIG_W, FIG_W),
-                                 constrained_layout=True)
-        bit = self.weight_df['weight'].unstack()
-        img = ax.contourf(bit.columns, bit.index, bit,
-                          cmap='viridis_r', levels=levels)
-        ax.set(xlabel='p_upper', ylabel='p_lower',
-               title='Weight for p_upper', aspect='equal')
-        if colorbar:
-            ax.get_figure().colorbar(img, ax=ax, shrink=.5, aspect=16,
-                                     label='Weight to p_upper')
-        return ax
+        from .plots import plot_bounds_weights
+        return plot_bounds_weights(self, ax=ax, levels=levels, colorbar=colorbar)
 
 
 def _monotone_hull(t, y, side):
@@ -1050,38 +972,8 @@ class _HullEngine:
         -------
         array of Axes
         """
-        if items is None:
-            items = self._y_names
-        if axs is None:
-            n = len(items)
-            ncols = min(n, 3)
-            nrows = -(-n // ncols)
-            fig, axs = plt.subplots(nrows, ncols, figsize=(3.5 * ncols, 2.8 * nrows),
-                                    constrained_layout=True, squeeze=False)
-            axs = axs.flat
-        for ax, u in zip(axs, items):
-            j = self._y_names.index(u) + 1
-            t, y = self._T, self._A[:, j]
-            if max_t is not None:
-                mask = t <= max_t
-                t, y = t[mask], y[mask]
-            ax.plot(t, y, lw=0.75, c='C0', label=self._curve_label)
-            for side, c in (('lower', 'C2'), ('upper', 'C3')):
-                h = self._hulls[u][side]
-                th, yh = self._T[h], self._A[h, j]
-                if max_t is not None:
-                    m = th <= max_t
-                    th, yh = th[m], yh[m]
-                ax.plot(th, yh, lw=1.25, c=c, ls='--', label=side)
-            if P is not None:
-                lo, *_ = self._slice(u, 'lower', np.array([float(P)]))
-                hi, *_ = self._slice(u, 'upper', np.array([float(P)]))
-                ax.axvline(P, lw=0.5, c='k')
-                ax.plot([P, P], [lo[0], hi[0]], lw=2.5, c='k', solid_capstyle='butt')
-                ax.plot([P, P], [lo[0], hi[0]], 'o', ms=4, c='k')
-            ax.set(title=u, xlabel=self._xlabel, ylabel=self._ylabel)
-            ax.legend(fontsize='x-small')
-        return axs
+        from .plots import plot_hull_bounds
+        return plot_hull_bounds(self, items=items, P=P, axs=axs, max_t=max_t)
 
 
 class AllocationBounds(_HullEngine):

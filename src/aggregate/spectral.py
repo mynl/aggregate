@@ -13,8 +13,6 @@ from functools import cached_property
 from io import StringIO
 import logging
 
-import matplotlib.pyplot as plt
-from matplotlib import colormaps
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
@@ -1498,55 +1496,10 @@ class Distortion:
         knot splicing (TVaR kink, BiTVaR/WtdTVaR knots, mass-at-0 epsilon)
         is reflected directly in the plot.
         """
-        assert scale in ['linear', 'return']
-
-        if scale == 'return':
-            xs = 10 ** np.linspace(-10, 0, n)
-            y1 = self.g(xs)
-            y2 = self.g_dual(xs) if both else None
-        else:
-            if xs is None:
-                df = self.density_df
-                xs = df.index.to_numpy()
-                y1 = df['g'].to_numpy()
-                y2 = df['g_dual'].to_numpy() if both else None
-            else:
-                y1 = self.g(xs)
-                y2 = self.g_dual(xs) if both else None
-
-        if ax is None:
-            if size == 'small':
-                sz = FIG_H
-            elif isinstance(size, (float, int)):
-                sz = size
-            else:
-                sz = FIG_W
-            fig, ax = plt.subplots(1, 1, figsize=(sz, sz), layout="constrained")
-
-        if c is None:
-            c = 'C0'
-        if c_dual is None:
-            c_dual = 'C1'
-        if scale == 'linear':
-            ax.plot(xs, y1, c=c, label=self.name, **kwargs)
-            if both:
-                ax.plot(xs, y2, c=c_dual, label='$g\\check$', **kwargs)
-            ax.plot(xs, xs, color='k', lw=0.5, alpha=0.5)
-        elif scale == 'return':
-            ax.plot(xs, y1, c=c, label=self.name, **kwargs)
-            if both:
-                ax.plot(xs, y2, c=c_dual, label=f'Dual {self.name}', **kwargs)
-            ax.set(xscale='log', yscale='log',
-                   xlim=[1 / 5_000, 1], ylim=[1 / 5_000, 1])
-            ax.plot(xs, xs, color='k', lw=0.5, alpha=0.5)
-
-        ax.set(title=self.name, aspect='equal')
-        if scale == 'linear':
-            ax.set(xticks=np.linspace(0, 1, 6),
-                   yticks=np.linspace(0, 1, 6))
-        if both:
-            ax.legend(loc='upper left', fontsize='x-small')
-        return ax
+        from .plots import plot_distortion
+        return plot_distortion(self, xs=xs, n=n, both=both, ax=ax,
+                               plot_points=plot_points, scale=scale,
+                               c=c, c_dual=c_dual, size=size, **kwargs)
 
     # ------------------------------------------------------------------
     # Static factory shortcuts
@@ -2817,22 +2770,11 @@ class WtdTVaRDistortion(Distortion):
     def plot_affine(self, ax=None, n_pts=101,
                     cmap_name='viridis', alpha=1.,
                     marker='o', marker_size=4):
-        ax = self.plot(both=False)
-        ps = np.linspace(0, 1, n_pts)
-        df = self.tvar_info_df
-        n_lines = len(df)
-        cmap = colormaps.get_cmap(cmap_name)
-        colors = [cmap(i / max(1, n_lines - 1)) for i in range(n_lines)]
-        for c, (n, r) in zip(colors, df.iterrows()):
-            if np.isnan(r.slope):
-                continue
-            line = r.intercept + r.slope * ps
-            line = np.where((line >= 0) & (line <= 1), line, np.nan)
-            ax.plot(ps, line, lw=0.5, color=c, alpha=alpha)
-        if len(df) < 20:
-            ax.scatter(df.s, df.gs, color=colors,
-                       marker=marker, s=marker_size, zorder=3)
-        return ax
+        """Render the upper affine envelope of a ``wtdtvar`` distortion."""
+        from .plots import plot_distortion_affine
+        return plot_distortion_affine(self, ax=ax, n_pts=n_pts,
+                                      cmap_name=cmap_name, alpha=alpha,
+                                      marker=marker, marker_size=marker_size)
 
 
 class MinimumDistortion(Distortion):

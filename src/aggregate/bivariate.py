@@ -53,7 +53,6 @@ import logging
 import warnings
 from typing import NamedTuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.fft as sfft
@@ -1791,20 +1790,6 @@ class BivariateAggregate:
                  for name, r in df.iterrows()]
         return 'per-axis support: ' + '; '.join(parts)
 
-    @staticmethod
-    def _contourf(ax, xgrid, ygrid, Z, title, xlabel, ylabel, levels, log,
-                  **kwargs):
-        """Single filled-contour panel of a 2D density on ``(xgrid, ygrid)``."""
-        xx, yy = np.meshgrid(xgrid, ygrid)
-        z = Z.T   # density indexed [axis0, axis1]; contourf wants Z[row=y, col=x]
-        if log:
-            pos = z[z > 0]
-            floor = pos.min() if pos.size else 1e-300
-            z = np.log10(np.maximum(z, floor))
-        ax.contourf(xx, yy, z, levels=levels, **kwargs)
-        ax.set(title=title, xlabel=xlabel, ylabel=ylabel)
-        return ax
-
     def plot(self, axs=None, levels=14, log=False, **kwargs):
         """Two-panel contour plot: per-claim severity (left), aggregate (right).
 
@@ -1838,18 +1823,8 @@ class BivariateAggregate:
         **aggregate** density (on the output grids, P&L-relabelled for any
         ``pnl`` axis).
         """
-        self._require_density()
-        if axs is None:
-            self.figure, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_H),
-                                            constrained_layout=True)
-        else:
-            self.figure = np.asarray(axs).flat[0].figure
-        ax0, ax1 = np.asarray(axs).flat[:2]
-        n0, n1 = self.unit_names
-        self._contourf(ax0, self._sev_xs[0], self._sev_xs[1], self._S,
-                       'severity', n0, n1, levels, log, **kwargs)
-        self._contourf(ax1, self.axis_xs[0], self.axis_xs[1], self.density,
-                       'aggregate', n0, n1, levels, log, **kwargs)
+        from .plots import plot_bivariate
+        return plot_bivariate(self, axs=axs, levels=levels, log=log, **kwargs)
 
     def help(self, regex):
         """Lookup help on methods and properties matching ``regex``.
@@ -1998,21 +1973,8 @@ class BivariateDistribution(object):
         matplotlib Axes
             The axes drawn on.
         """
-        if ax is None:
-            fig, ax = plt.subplots(1, 1, figsize=(FIG_W, FIG_H),
-                                   constrained_layout=True)
-        # density is indexed [ceded, net]; meshgrid wants Z[row=net, col=ceded]
-        cc, nn = np.meshgrid(self.ceded, self.net)
-        z = self.density.T
-        if log:
-            pos = z[z > 0]
-            floor = pos.min() if pos.size else 1e-300
-            z = np.log10(np.maximum(z, floor))
-        ax.contourf(cc, nn, z, levels=levels, **kwargs)
-        names = self.meta.get('axis_names', ('ceded', 'net'))
-        ax.set(xlabel=f'Aggregate {names[0]}', ylabel=f'Aggregate {names[1]}',
-               title=f'Joint density\n{self.meta.get("name", "")}')
-        return ax
+        from .plots import plot_bivariate_distribution
+        return plot_bivariate_distribution(self, ax=ax, levels=levels, log=log, **kwargs)
 
     def _summary(self):
         """Return ``(E[C], E[N], corr, deficit)`` for the repr builders."""

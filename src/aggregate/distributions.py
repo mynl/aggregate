@@ -7,8 +7,6 @@ import inspect
 import logging
 import math
 import warnings
-import matplotlib.ticker as ticker
-from matplotlib import pyplot as plt
 import numpy as np
 from numpy.linalg import inv
 import pandas as pd
@@ -2970,40 +2968,8 @@ class Aggregate:
         Plots for occurrence reinsurance: occurrence log density and aggregate
         quantile plot. Reads the gross/ceded/net views from ``reins_density_df``.
         """
-        if self.occ_reins is None:
-            logger.warning('reins_occ_plot called with no occurrence reinsurance.')
-            return
-        if axs is None:
-            fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_H), constrained_layout=True)
-            self.figure = fig
-        ax0, ax1 = axs.flat
-
-        rd = self.reins_density_df
-        rd[['p_sev_gross', 'p_sev_ceded', 'p_sev_net']].rename(
-            columns={'p_sev_gross': 'gross', 'p_sev_ceded': 'ceded',
-                     'p_sev_net': 'net'}).plot(ax=ax0, logy=True)
-        xl = ax0.get_xlim()
-        l = self.spec['exp_limit']
-        if type(l) != float:
-            l = np.max(l)
-        if l < np.inf:
-            xl = [-l / 50, l * 1.025]
-        ax0.set(xlim=xl, xlabel='Loss', ylabel='Occurrence log density', title='Occurrence')
-
-        y = rd.loss.values
-        for c, col in [('gross', 'p_agg_gross'), ('ceded', 'p_agg_ceded_occ'),
-                       ('net', 'p_agg_net_occ')]:
-            # Plot-cosmetic de-fuzz: deliberate carve-out from the shared
-            # ``remove_fuzz`` -- a looser 1e-15 threshold plus the 0 -> nan step
-            # below so empty buckets drop out of the survival line.
-            s = rd[col].to_numpy().copy()
-            s[np.abs(s) < 1e-15] = 0
-            s_values = s[::-1].cumsum()[::-1]
-            s_values = np.where(np.abs(s_values) < 1e-15, 0, s_values)
-            s_values = np.where(s_values == 0, np.nan, s_values)
-            ax1.plot(1 - s_values, y, label=c)
-        ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
-        ax1.legend()
+        from .plots import plot_reins_occ
+        return plot_reins_occ(self, axs=axs)
 
     def occ_bivariate(self, views=('net', 'ceded'), bs=None,
                       log2_x=None, log2_y=None):
@@ -5925,9 +5891,12 @@ class Aggregate:
             return ceder, netter, reins_df
 
         logger.debug('making re graphs.')
-        # quick debug; need to know kind=occ|agg here
-        f = plt.figure(constrained_layout=True, figsize=(12, 9))
-        axd = f.subplot_mosaic('AB\nCD')
+        # quick debug; need to know kind=occ|agg here. Throwaway debug plot
+        # bound to ephemeral internals -- stays on the class (see the §2
+        # exception in dev/plan-plots-subsystem.md); matplotlib is reached
+        # lazily through the Layer-0 canvas helper.
+        from .plots import make_mosaic
+        f, axd = make_mosaic('AB\nCD', figsize=(12, 9))
         xlim = self._limits()
         # scale??
         x = np.linspace(0, xlim[1], 201)
@@ -6259,108 +6228,8 @@ class Aggregate:
         :param kwargs: passed to ``plt.subplot_mosaic``
         :return:
         """
-        if axd is None:
-            if 'figsize' not in kwargs:
-                kwargs['figsize'] = (3 * FIG_W, FIG_H)
-            self.figure, axd = plt.subplot_mosaic('ABC', layout='constrained', **kwargs)
-        else:
-            self.figure = axd['A'].figure
-
-        if self.bs == 1 and abs(self.est_m) < 1025:
-            # treat as discrete
-            if xmax > 0:
-                mx = xmax
-            else:
-                mx = self.q(1) * 1.05
-            # Window-aware left edge: an ordinary 0-based aggregate anchors at 0
-            # (unchanged); a windowed grid anchors below the mass instead of
-            # clipping at ~0 or padding empty space. Signed P&L keeps its exact
-            # ``min(q(0), 0)`` floor; a thin-tailed window (origin > 0) anchors at
-            # the true support minimum.
-            if self.xs is not None and self.xs[0] < 0:
-                mn = min(float(self.q(0)), 0.0)
-            elif self.xs is not None and self.xs[0] > 0:
-                mn = float(self.q(0))
-            else:
-                mn = 0.0
-            span = nice_multiple(mx - mn)
-            left = mn - (mx - mn) / 25
-
-            # Aggregate from density_df; severity from its own grid
-            # (sev_density_df), which may differ from the aggregate window.
-            df = self.density_df[['p_total', 'F', 'loss']].copy()
-            # anchor a zero-mass row just left of the support so the steps/stems
-            # start from the baseline (at mn - 0.5, not a fixed -0.5). ``loss``
-            # must equal the row's own index, not 0: the Lee plot (panel C) plots
-            # ``loss`` against ``F``, so a stray ``loss=0`` here would draw a
-            # spurious vertical segment from 0 down to the first (signed) point.
-            df.loc[mn - 0.5, :] = (0, 0, mn - 0.5)
-            df = df.sort_index()
-            sdf = self.sev_density_df
-            if mx <= 60:
-                # stem plot for small means
-                axd['A'].stem(df.index, df.p_total, basefmt='none', linefmt='C0-', markerfmt='C0.', label='Aggregate')
-                axd['A'].stem(sdf.loss, sdf.p_sev, basefmt='none', linefmt='C1-', markerfmt='C1,', label='Severity')
-            else:
-                df.p_total.plot(ax=axd['A'], drawstyle='steps-mid', lw=2, label='Aggregate')
-                sdf.p_sev.plot(ax=axd['A'], drawstyle='steps-mid', lw=1, label='Severity')
-
-            axd['A'].set(xlim=[left, mx + 1], title='Probability mass functions')
-            axd['A'].legend()
-            if span > 0:
-                axd['A'].xaxis.set_major_locator(ticker.MultipleLocator(span))
-            # for discrete plot F next
-            df.F.plot(ax=axd['B'], drawstyle='steps-post', lw=2, label='Aggregate')
-            sdf.F_sev.plot(ax=axd['B'], drawstyle='steps-post', lw=1, label='Severity')
-            axd['B'].set(xlim=[left, mx + 1], title='Distribution functions')
-            axd['B'].legend().set(visible=False)
-            if span > 0:
-                axd['B'].xaxis.set_major_locator(ticker.MultipleLocator(span))
-
-            # for Lee diagrams
-            ax = axd['C']
-            # trim so that the Lee plot doesn't spuriously tend up to infinity
-            # little care: may not exaclty equal 1
-            idx = (df.F == df.F.max()).idxmax()
-            dft = df.loc[:idx]
-            ax.plot(dft.F, dft.loss, drawstyle='steps-pre', lw=3, label='Aggregate')
-            # same trim for severity (on its own grid)
-            sidx = (sdf.F_sev >= 1).idxmax()
-            sdft = sdf.loc[:sidx]
-            ax.plot(sdft.F_sev, sdft.loss, drawstyle='steps-pre', lw=1, label='Severity')
-            ax.set(xlim=[-0.025, 1.025], ylim=[left, mx + 1], title='Quantile (Lee) plot')
-            ax.legend().set(visible=False)
-        else:
-            # continuous
-            df = self.density_df
-            sdf = self.sev_density_df       # severity on its own grid
-            if xmax > 0:
-                xlim = [-xmax / 50, xmax * 1.025]
-            else:
-                xlim = self._limits(stat='range', kind='linear')
-            xlim2 = self._limits(stat='range', kind='log')
-            ylim = self._limits(stat='density')
-
-            ax = axd['A']
-            # divide by bucket size...approximating the density
-            (df.p_total / self.bs).plot(ax=ax, lw=2, label='Aggregate')
-            (sdf.p_sev / self.bs).plot(ax=ax, lw=1, label='Severity')
-            ax.set(xlim=xlim, ylim=ylim, title='Probability density')
-            ax.legend()
-
-            (df.p_total / self.bs).plot(ax=axd['B'], lw=2, label='Aggregate')
-            (sdf.p_sev / self.bs).plot(ax=axd['B'], lw=1, label='Severity')
-            ylim = axd['B'].get_ylim()
-            ylim = [1e-15, ylim[1] * 2]
-            axd['B'].set(xlim=xlim2, ylim=ylim, title='Log density', yscale='log')
-            axd['B'].legend().set(visible=False)
-
-            ax = axd['C']
-            # to do: same trimming for p-->1 needed?
-            ax.plot(df.F, df.loss, lw=2, label='Aggregate')
-            ax.plot(sdf.F_sev, sdf.loss, lw=1, label='Severity')
-            ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot', xlabel='Non-exceeding probability p')
-            ax.legend().set(visible=False)
+        from .plots import plot_aggregate
+        return plot_aggregate(self, axd=axd, xmax=xmax, **kwargs)
 
     def _limits(self, stat='range', kind='linear', zero_mass='include'):
         """
@@ -9476,39 +9345,8 @@ class Severity(ss.rv_continuous):
         :param layout: the subplot_mosaic layout of the figure. Default is 'AB\nCD'.
         :return:
         """
-        # TODO better coordination of figsize! Better axis formats and ranges.
-
-        xs = np.linspace(0, self._isf(1e-4), n)
-        xs2 = np.linspace(0, self._isf(1e-12), n)
-
-        if axd is None:
-            f = plt.figure(constrained_layout=True, figsize=figsize)
-            axd = f.subplot_mosaic(layout)
-
-        # ``fixed`` is a degenerate dhistogram (single point mass); both
-        # benefit from the step-post draw style. Continuous histograms and
-        # the scipy zoo use ordinary line plots.
-        ds = 'steps-post' if isinstance(self, SeverityDHistogram) else 'default'
-
-        ax = axd['A']
-        ys = self._pdf(xs)
-        ax.plot(xs, ys, drawstyle=ds)
-        ax.set(title='Probability density', xlabel='Loss')
-        yl = ax.get_ylim()
-
-        ax = axd['B']
-        ys2 = self._pdf(xs2)
-        ax.plot(xs2, ys2, drawstyle=ds)
-        ax.set(title='Log density', xlabel='Loss', yscale='log', ylim=[1e-14, 2 * yl[1]])
-
-        ax = axd['C']
-        ys = self._cdf(xs)
-        ax.plot(xs, ys, drawstyle=ds)
-        ax.set(title='Probability distribution', xlabel='Loss', ylim=[-0.025, 1.025])
-
-        ax = axd['D']
-        ax.plot(ys, xs, drawstyle=ds)
-        ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability $p$', xlim=[-0.025, 1.025])
+        from .plots import plot_severity
+        return plot_severity(self, n=n, axd=axd, figsize=figsize, layout=layout)
 
 
 # ---------------------------------------------------------------------------

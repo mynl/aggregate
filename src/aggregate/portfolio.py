@@ -1,10 +1,8 @@
 from copy import deepcopy
 import json
 import logging
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pandas.plotting import scatter_matrix
 from pathlib import Path
 import re
 from scipy import interpolate
@@ -631,19 +629,8 @@ class Portfolio(object):
         post-switcheroo ``stats_df`` against the pre-switcheroo
         snapshot stored in ``independent_stats_df``.
         """
-        if self.independent_density_df is None:
-            raise ValueError('No independent_density_df, cannot compare')
-
-        if ax is not None:
-            ax.plot(self.independent_density_df.index, self.independent_density_df['S'], lw=1, label='independent')
-            ax.plot(self.density_df.index, self.density_df['S'], lw=1, label='sample')
-            ax.legend()
-
-        return pd.concat(
-            (self.independent_stats_df[['total', 'empirical']],
-             self.stats_df[['total', 'empirical']]),
-            keys=['independent', 'sample'], axis=1,
-        )
+        from .plots import plot_sample_compare
+        return plot_sample_compare(self, ax=ax)
 
     def sample_density_compare(self, fuzz=0):
         """
@@ -3155,31 +3142,8 @@ class Portfolio(object):
         :param figsize: figure size used by ``plt.subplot_mosaic`` if ``axd`` is not provided
         :return:
         """
-
-        if axd is None:
-            self.figure, axd = plt.subplot_mosaic('AB', figsize=figsize, layout='constrained')
-
-        ax = axd['A']
-        xl = self._limits()
-        yl = self._limits(stat='density', zero_mass='exclude')
-        # total first = Book standard, then each unit on its native grid
-        # (numerics-1); on a legacy zero-origin book the grids coincide.
-        bit = pd.concat(
-            [self.density_df.p_total] +
-            [self.unit_density(unit) for unit in self.unit_names], axis=1)
-        bit.plot(ax=ax, xlim=xl, ylim=yl)
-        ax.set(xlabel='Loss', ylabel='Density')
-        ax.legend()
-
-        ax = axd['B']
-        xl = self._limits(kind='log')
-        yl = self._limits(stat='logy')
-        bit.plot(ax=ax, logy=True, xlim=xl, ylim=yl)
-        ax.set(xlabel='Loss', ylabel='Log density')
-        ax.legend().set(visible=False)
-
-        # ax = axd['C']
-        # self.density_df.filter(regex='p_[a-zA-Z]')[::-1].cumsum().plot(ax=ax, xlim=xl, logy=True)
+        from .plots import plot_portfolio
+        return plot_portfolio(self, axd=axd, figsize=figsize)
 
     def scatter(self, marker='.', s=5, alpha=1, figsize=(10, 10), diagonal='kde', **kwargs):
         """
@@ -3189,10 +3153,9 @@ class Portfolio(object):
 
 
         """
-        bit = self.density_df.query('p_total > 0').filter(regex='exeqa_[a-zA-Z]')
-        ax = scatter_matrix(bit, marker='.', s=5, alpha=1,
-                            figsize=(10, 10), diagonal='kde', **kwargs)
-        return ax
+        from .plots import plot_scatter
+        return plot_scatter(self, marker=marker, s=s, alpha=alpha,
+                            figsize=figsize, diagonal=diagonal, **kwargs)
 
     @staticmethod
     def _ft_nots(ft_units):

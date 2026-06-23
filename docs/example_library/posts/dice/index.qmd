@@ -20,24 +20,30 @@ frequency of 3 and a discrete uniform severity on `[1:6]`.
 
 ## Implementation
 
-Every post starts the same way: an empty `Underwriter`, then load the shared
-`example_library.agg` so canonical objects are available by name.
+Every post starts the same way: an empty `Underwriter`, then load any libraries.
+The built-in `build` underwriter loads the `example.agg`, so canonical objects
+are available by name. The [SPA](http://agg.mynl.com) also loads `example.agg`.
 
 ```{python}
 from aggregate import Underwriter, qd
 
 uw = Underwriter(databases=None)     # start empty
-uw.load('example_library.agg')       # shared assumptions, resolved from project root
+uw.load('example')                   # shared assumptions, resolved from project root
 
 a = uw.build('agg ThreeDice dfreq [3] dsev [1:6]')
 qd(a)
 ```
 
-Referencing a shared object by name, and surfacing its assumptions on the page
-(DRY in the source, explicit in the render):
+Referencing a built-in object by name, and surfacing its assumptions on the page
 
 ```{python}
-qd(uw.build('agg.SampleBook'))
+qd(uw.build('A.ThreeDice'))
+```
+
+Look up the object in the `knowledge`.
+
+```{python}
+uw.build['A.ThreeDice']
 ```
 
 ## Output

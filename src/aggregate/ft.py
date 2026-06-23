@@ -12,9 +12,6 @@ nothing here is re-exported at the top-level package namespace.
 
 import logging
 
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 from scipy.fft import irfft, rfft, ifft as ift
@@ -41,6 +38,7 @@ def poisson_example(en, small2):
 
     """
     from scipy.stats import poisson
+    from .plots import plt, ticker
 
     B = 1 << small2
     z = np.zeros(B); z[1] = 1
@@ -83,6 +81,8 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0, cmap='plasm
     (moved from figures.py)
 
     """
+    from .plots import plt, mpl
+
     fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_H + 0.3), constrained_layout=True)
     ax0, ax1, ax2 = axs.flat
 
@@ -195,6 +195,8 @@ def recentering_convolution_example(sev_clause, en, log2, agg_log2=0, bs=1,
     :param ps: array of x values for dsev
 
     """
+    from .plots import plt
+
     df, ag = recentering_convolution(sev_clause, freq_clause, en, log2, bs, remove_fuzz)
 
     # update the ag object if agg_log2
@@ -620,109 +622,8 @@ class FourierTools:
 
         :param suptitle: super title for the plot.
         """
-        assert self._df is not None, 'Must recompute first. Run invert() and compute_exact().'
-        has_exact = self._df_exact is not None
-        if not has_exact:
-            logger.warning('No exact! Maybe run compute_exact().')
-
-        # plot four graphs per invert()
-        if verbose:
-            self.last_fig, axs = plt.subplots(2, 3, figsize=(3 * 2.5, 2 * 2), constrained_layout=True)
-            ax0, ax1, ax2, ax3, ax4, ax5 = axs.flat
-        else:
-            self.last_fig, axs = plt.subplots(1, 2, figsize=(2 * 2.5, 1 * 2.5), constrained_layout=True)
-            ax0, ax1 = axs.flat
-
-        x = np.array(self._df.index)
-        p = self._df.p.values
-        b = x[1] - x[0]
-        if has_exact:
-            xe = np.array(self._df_exact.index)
-            pe = self._df_exact.p.values
-            be = xe[1] - xe[0]
-        else:
-            # avoid an error below when no exact
-            pe = self.df.p.values
-        if xlim is None:
-            if x[0] == 0:
-                lower = -x[-1] / 25
-            else:
-                lower = x[0]
-            xlim = [lower, x[-1]]
-
-        for ax in [ax0, ax1]:
-            ax.plot(x, p / b, label='Fourier', lw=1)
-            if has_exact:
-                ax.plot(xe, pe, ls='--', c='C3', label='exact', lw=1)
-            ax.legend(fontsize='x-small')
-        ax0.set(xlim=xlim, title='Density', xlabel='Outcome, x')
-        # mn = min(np.log10(exact).min(), np.log10(x).min())
-        mn0 = np.log10(p / b).min() * 1.25
-        mn = 10 ** np.floor(mn0)
-        mx = max(np.log10(pe).max(), np.log10(x).max())
-        mx = 10 ** np.ceil(mx)
-        if np.isnan(mn):
-            mn = 1e-17
-        if np.isnan(mx):
-            mx = 1
-        ax1.set(yscale='log', ylim=[mn, mx], xlim=xlim, title='Log density', xlabel='Outcome, x')
-        if not verbose:
-            if suptitle != '':
-                self.last_fig.suptitle(suptitle)
-            return
-
-        # else: verbose mode: full monty with six plots
-        if self.discrete and len(self._df) <= 64:
-            drawstyle = 'steps-post'
-        else:
-            drawstyle = 'default'
-        for ax in [ax2, ax5]:
-            ax.plot(x, np.cumsum(p), label='cdf Fourier', lw=1,
-                    c='C0', drawstyle=drawstyle)
-            if has_exact:
-                ax.plot(xe, np.cumsum(pe * be), label='cdf exact', ls='--', lw=.5,
-                    c='C3', drawstyle=drawstyle)
-            ax.plot(x, np.cumsum(p[::-1])[::-1], label='sf Fourier', lw=1,
-                    c='C2', drawstyle=drawstyle)
-            if has_exact:
-                ax.plot(xe, np.cumsum(pe[::-1] * be)[::-1], label='sf exact', ls='--', lw=.5,
-                    c='C4', drawstyle=drawstyle)
-
-        ax2.set(title='sf and cdf', xlabel='Outcome, x', xlim=xlim)
-        ax2.legend()
-        ax5.set(yscale='log', title='log sf and cdf', ylim=[mn, 10],
-                xlim=xlim, xlabel='Outcome, x')
-
-        # ft on ax3, probably should inline this
-        self._plot_fourier1d(ax3)
-
-        # amplitude and phase both on ax4
-        ax4r = ax4.twinx()
-        ax4.plot(self._ts, np.abs(self._fourier), '-', lw=1.5, c='C4', label='Amplidude')
-        # for amplitude, only look at nonzero fts, find index of non-zero (inz) items
-        inz = np.abs(self._fourier) > 0
-        tnz = self._ts[inz]
-        fnz = self._fourier[inz]
-        anz = np.angle(fnz)
-        uw = np.unwrap(anz)
-        if len(self._df) <= 256:
-            kw = {'ls': '-', 'marker': '.', 'ms': 3, 'lw': 1}
-        else:
-            kw = {'lw': 1}
-        ax4r.plot(tnz, uw, c='C2', **kw, label='phase, unwrapped')
-        kw['lw'] = 0.5
-        kw['marker'] = None
-        kw['ls'] = ':'
-        ax4r.plot(tnz, anz, c='C2', **kw, label='phase, wrapped')
-        ax4r.legend(loc='upper right')
-        ax4.legend(loc='center right')
-        ax4.set(ylabel='Amplitude |ft|', yscale='log', xlabel='frequency', xlim=[-.05, 0.5 / self.bs + 0.05])
-        if self.bs == 1:
-            ax4.set(xticks=[0, .25, .5])
-        ax4r.set(title='Amplitude and phase',
-                 ylabel='Phase / 2π', xlabel='frequency / 2π')
-        if suptitle != '':
-            self.last_fig.suptitle(suptitle)
+        from .plots import plot_fourier
+        return plot_fourier(self, suptitle=suptitle, xlim=xlim, verbose=verbose)
 
     def plot_wraps(self, wraps=None, calc='survival', add_tail=False):
         """
@@ -733,135 +634,18 @@ class FourierTools:
         :param calc: how to estimate the density outside the base range, same ``compute_exact``.
         :param add_tail: plot the shifted exact densities in plots 2 and 4.
         """
-        assert self._df is not None, 'Must recompute first. Run invert().'
-        assert self._df_exact is not None, "Must run compute_exact() first."
-        # extract values
-        x = np.array(self._df.index)
-        b = x[1] - x[0]
-        p = self._df['p'].values / b    # here and below divide by b to convert to a density
-        xe = np.array(self._df_exact.index)
-        be = xe[1] - xe[0]
-        pe = self._df_exact.p.values
-        x_range = self.x_max - self.x_min
-        rt = pe.copy()
-
-        # duplicated...
-        mn0 = np.log10(x).min() * 1.25
-        mn = 10 ** np.floor(mn0)
-        mx = max(np.log10(p).max(), np.log10(x).max())
-        mx = 10 ** np.ceil(mx)
-        if np.isnan(mn):
-            mn = 1e-17
-        if np.isnan(mx):
-            mx = 1
-
-        # report answer
-        ans = []
-        self.last_fig, axs = plt.subplots(2, 2, figsize=(2 * 2.5, 2 * 2.), constrained_layout=True)
-        ax0, ax1, ax2, ax3 = axs.flat
-        for ax in axs.flat:
-            ax.plot(x, p, label='Fourier', lw=2)
-        lw = .5
-        if calc == 'density':
-            if hasattr(self.fz, 'pdf'):
-                pdf = self.fz.pdf
-            elif hasattr(self.fz, 'pmf'):
-                pdf = self.fz.pmf
-            else:
-                raise ValueError('fz must have pdf or pmf method for density method')
-        for i, b_wrap in enumerate(wraps):
-            if type(b_wrap) == int:
-                bl = f'{b_wrap:d}'
-            else:
-                bl = f'{b_wrap:.3f}'
-            xs2 = b_wrap * x_range + xe
-            if calc == 'survival':
-                # for computing probs using survival method
-                xs2d = np.hstack((xs2 - be / 2, xs2[-1] + be / 2))
-                adj = -np.diff(self.fz.sf(xs2d)) / be
-                rt += adj
-            elif calc == 'density':
-                adj = pdf(xs2)
-                rt += adj
-            else:
-                raise ValueError('calc must be "survival" or "density"')
-            c = f'C{i+1}'
-            ax0.plot(xe, rt, label=bl, lw=lw, c=c)
-            ax1.plot(xe, adj, label=bl, lw=lw, c=c)
-            if add_tail:
-                ax1.plot(xs2, adj, label=bl, lw=lw, c=c, ls=':')
-                ax3.plot(xs2, adj, label=bl, lw=lw, c=c, ls=':')
-            ax2.plot(xe, rt, label=bl, lw=lw, c=c)
-            ax3.plot(xe, adj, label=bl, lw=lw, c=c)
-            ans.append([b_wrap, xs2[0], xs2[-1], self.fz.cdf(xs2[-1]), self.fz.cdf(xs2[0]),
-                        self.fz.cdf(xs2[-1]) - self.fz.cdf(xs2[0])])
-        for ax in axs.flat:
-            ax.plot(xe, pe, label='exact', ls='--', lw=1, c='C3')
-        ax0.set(yscale='linear',
-                title='Cumulative aliasing',
-                xlabel='Outcome, x',
-                ylabel='Density')
-        ax2.set(yscale='log',
-                title='Cumulative - log scale',
-                xlabel='Outcome, x',
-                ylabel='Log density')
-        ax1.set(yscale='linear',
-                title='Incremental aliasing',
-                xlabel='Outcome, x',
-                ylabel='Density')
-        ax3.set(yscale='log',
-                title='Incremental - log scale',
-                xlabel='Outcome, x',
-                ylabel='Log density')
-        ax2.legend(fontsize='x-small', ncol=2)
-        if add_tail:
-            ax1.legend(fontsize='x-small', ncol=2)
-        if add_tail:
-            if 0 not in wraps:
-                wraps.append(0)
-            if 1 not in wraps:
-                wraps.append(1)
-            wraps.append(max(wraps) + 1)
-            wraps = sorted(wraps)
-            for b_wrap in wraps:
-                ax1.axvline(x[0] + b_wrap * x_range, lw=.25, c='k', ls=':')
-                ax3.axvline(x[0] + b_wrap * x_range, lw=.25, c='k', ls=':')
-            for ax in [ax1, ax3]:
-              ax.set(xticks=self.x_min + np.arange(0, max(wraps), 2) * self.x_max)
-              ax.xaxis.set_minor_locator(ticker.AutoMinorLocator(n=2))
-        df = pd.DataFrame(ans, columns=['Wrap', 'x0', 'x1', 'Pr(X≤x1)', 'Pr(X≤x0)', 'Pr(X in Wrap)'])
-        df = df.set_index('Wrap')
-        return df
+        from .plots import plot_fourier_wraps
+        return plot_fourier_wraps(self, wraps=wraps, calc=calc, add_tail=add_tail)
 
     def plot_simpson(self, ylim=1e-16):
         """Plot Simpson's approximation."""
-        fig, ax = plt.subplots(1, 1, figsize=(5, 3.25), constrained_layout=True)
-        if self._df_exact is not None:
-            self.df_exact.p.plot(ax=ax, lw=1, c='C1')
-        xs = np.array(self.df.index)
-        if 'p' in self.df:
-            ax.plot(xs, self.df.p / self.bs, label='basic', c='C0', lw=1)
-        ax.plot(xs, self.df.simpson / self.bs, label='simpson', c='C3', ls=':')
-        ax.set(yscale='log', ylim=ylim)
-        ax.legend()
+        from .plots import plot_fourier_simpson
+        return plot_fourier_simpson(self, ylim=ylim)
 
     def _plot_fourier1d(self, ax, min_abs=1e-20):
         """Create simple plot of Fourier transform on one axis."""
-        fhat = self._fourier.copy()
-        c = np.abs(fhat)
-        num_large = np.sum(c > min_abs)
-        fhat = fhat[:num_large]
-        c = c[:num_large]
-
-        ax.plot(np.real(fhat), np.imag(fhat), '-o', ms=2, lw=.5, label='ft')
-        fhat = fhat[c > 0] / c[c > 0]
-        ax.plot(np.real(fhat), np.imag(fhat), '-o', ms=1, lw=.5, label='ft / |ft|')
-        lim = [-1.05, 1.05]
-        ax.set(xlim=lim, ylim=lim, aspect='equal', xlabel='real(ft)',
-               ylabel='imag(ft)', title='Fourier transform')
-        ax.legend(loc='upper left')
-        ax.axhline(0, c='k', alpha=.5, lw=.5)
-        ax.axvline(0, c='k', alpha=.5, lw=.5)
+        from .plots import plot_fourier1d
+        return plot_fourier1d(self, ax, min_abs=min_abs)
 
     def plot_fourier3d(self, scale=True):
         """Three dimensional line plot of the Fourier transform using mayavi."""

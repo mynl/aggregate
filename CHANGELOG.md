@@ -2,6 +2,36 @@
 
 ## 1.0.0a92
 
+### Plotting subsystem — single matplotlib boundary (Pass A)
+
+The library-wide plotting refactor (`dev/plan-plots-subsystem.md`), **Pass A**:
+a behavior-preserving port of every plot body into a new `aggregate.plots`
+subpackage organized as canvas × content × class. No version bump (pure moves
+plus a behavior-adjacent import-timing change); figure output is unchanged.
+
+- **New `aggregate/plots/` subpackage** — the single matplotlib entry point for
+  the whole library. Three layers: `_style.py` (Layer 0 — canvas creators
+  `make_mosaic`/`make_grid`, the house style absorbed from the old `style.py`,
+  and the shared figure constants); `_quantile.py` (Layer 1 — the shared Lee /
+  quantile content worker); and per-class Layer-2 compositors `_aggregate`,
+  `_severity`, `_distortion`, `_portfolio`, `_bounds`, `_bivariate`, `_fourier`.
+- **`import aggregate` no longer imports matplotlib.** Each class `.plot()` is
+  now a one-line stub delegating to its compositor via a function-local import,
+  so matplotlib is loaded only on the first plot. Confirmed by
+  `tests/test_plots_boundary.py`, which also asserts no module outside `plots/`
+  imports matplotlib at top level (the figure-generator module `pedagogy.py` is
+  a documented exemption; the paper-figure helpers in `ft.py`/`tweedie.py` use
+  function-local imports).
+- **`aggregate.style` is now a thin backward-compat shim** re-exporting `use` /
+  `context` / `rc_params` from `aggregate.plots._style`; `import aggregate.style`
+  and the docs/apiweb callers are unchanged.
+- Moved bodies: `Aggregate.plot` / `reins_occ_plot`, `Severity.plot`,
+  `Distortion.plot` / `plot_affine`, `Portfolio.plot` / `scatter` /
+  `sample_compare`, `Bounds.plot_envelope` / `plot_weights` /
+  `_HullEngine.plot`, `BivariateAggregate.plot` / `BivariateDistribution.contour`,
+  and the matplotlib `FourierTools` plots. The public method signatures are
+  unchanged. (Pass B — the deliberate visual refresh — is tracked separately.)
+
 ### Docs bibliography re-sourced from the author's master library
 
 The Sphinx bibliography is now generated from the author's master BibTeX

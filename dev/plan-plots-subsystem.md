@@ -1,6 +1,15 @@
 # Plan P2 — library-wide plotting subsystem
 
-> **Status: DRAFT — not executed.** Cross-cutting and mechanical; see
+> **Status: Pass A COMPLETE (2026-06-23) — Pass B pending.** §3.1–§3.4 landed:
+> the `aggregate.plots` subpackage (Layer 0 `_style`, Layer 1 `_quantile`, the
+> seven Layer-2 compositors), all `.plot()` methods reduced to one-line stubs,
+> `import aggregate` is matplotlib-free, and `tests/test_plots_boundary.py`
+> enforces the boundary (`pedagogy.py` is the documented exemption). No version
+> bump (pure moves + import-timing). **§3.5 (Pass B — the deliberate visual
+> refresh) is deferred to the author**, who drives the styling/layout choices
+> by visual review.
+>
+> Cross-cutting and mechanical; see
 > `plan-README.md`. Independent of the other plans but cleanest *after* P1 and
 > *before* the P3/P4 splits (it lifts plotting out of the god files so they are
 > smaller and matplotlib-free when reorganised).

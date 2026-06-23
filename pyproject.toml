@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a89"
+version = "1.0.0a92"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -51,7 +51,6 @@ dev = [
     "docutils>=0.20,<0.22",
     "nbsphinx>=0.9.4",
     "jupyter-sphinx>=0.5.3",
-    "sphinx-design>=0.6",
     "sphinx-copybutton>=0.5",
     "sphinx-toggleprompt>=0.6",
     "pickleshare",
@@ -62,7 +61,6 @@ dev = [
     "sphinx_rtd_theme>=2.0",
     "sphinxcontrib-bibtex",
     "sphinx-multitoc-numbering",
-    "sphinx-design",
     "pytest>=7",
     "pyarrow>=15",
     "ruff>=0.6",

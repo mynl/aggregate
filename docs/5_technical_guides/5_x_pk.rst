@@ -25,7 +25,7 @@ Helpful References
 --------------------
 
 * :cite:t:`Embrechts1997` Section 1.2
-* :cite:t:`PIR` sections 8.4.2 and 9.3 and references therein (largely reproduced here).
+* :cite:t:`Mildenhall2022a` sections 8.4.2 and 9.3 and references therein (largely reproduced here).
 
 .. _pz intro:
 

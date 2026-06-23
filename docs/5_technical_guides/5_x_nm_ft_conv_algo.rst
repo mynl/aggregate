@@ -5,7 +5,7 @@ Fourier Transform Convolution Algorithm
 ----------------------------------------------
 
 
-  We come now to reality. The truth is that the digital computer has totally defeated the analog computer. The input is a sequence of numbers and not a continuous function. The output is another sequence of numbers, whether it comes from a digital filter or a finite element stress analysis or an image processor. **The question is whether the special ideas of Fourier analysis still have a part to play, and the answer is absolutely yes.**  :cite:p:`Strang1986am`
+  We come now to reality. The truth is that the digital computer has totally defeated the analog computer. The input is a sequence of numbers and not a continuous function. The output is another sequence of numbers, whether it comes from a digital filter or a finite element stress analysis or an image processor. **The question is whether the special ideas of Fourier analysis still have a part to play, and the answer is absolutely yes.**  :cite:p:`Strang1986`
 
 The previous section quoted Strang in support of discrete models. Here we complete his quote in support of using Fourier analysis, born in application to continuous functions, in a discrete setting.
 
@@ -465,7 +465,7 @@ The next figure illustrates more extreme FFT wrapping. It shows an attempt to mo
     fft_wrapping_illustration(ez=10, en=8)
 
 
-It is not necessary to understand the details of FTs to use ``aggregate`` although they are fascinating, see for example :cite:t:`Korner2022`. In probability, the moment generating functions and characteristic function are based on FTs. They are discussed in any serious probability text.
+It is not necessary to understand the details of FTs to use ``aggregate`` although they are fascinating, see for example :cite:t:`Korner1988`. In probability, the moment generating functions and characteristic function are based on FTs. They are discussed in any serious probability text.
 
 
 .. _num fft routines:

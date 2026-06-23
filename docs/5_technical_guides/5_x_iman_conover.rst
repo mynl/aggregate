@@ -720,7 +720,7 @@ there are some important differences to bear in mind. Comparing and
 contrasting the two methods should help clarify how the two algorithms
 are different.
 
-#. :cite:t:`WangS1998` shows the normal copula method
+#. :cite:t:`Wang1998a` shows the normal copula method
    corresponds to the IC method when the latter is computed using normal
    scores and the Choleski trick.
 

@@ -33,7 +33,7 @@ any reasonable question about a large account program.
 Helpful References
 --------------------
 
-* :cite:t:`Fisher2019`
+* :cite:t:`Fisher2017`
 * :cite:t:`Bahnemann2015`
 * Other CAS Part 8 readings.
 

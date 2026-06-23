@@ -52,7 +52,7 @@
 |   | D6 | API docstring coverage / rendering | A | H4 |
 |   | D7 | Reinsurance case-study docs rewrite | B | (N2–N3 shipped) |
 |   | D8 | PUNCHUP `pedagogy` + integrate docs | B | H5 |
-|   | D11 | Sphinx docs → master `uber-library.bib` | B | — |
+| ✅ | D11 | Sphinx docs → master `uber-library.bib` (a92) | B | — |
 |   | D12 | Cheat-sheet tweaks once UI settles | B | — (hold to beta) |
 | **— unclear / under-specified (revisit before scheduling) —** |
 |   | W3 | Plot severity outside the agg window | B | — (approach TBD) |
@@ -204,13 +204,13 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   `reins_stats_df`, verify vs published (#16). N2–N3 numerics now stable.
 - [ ] **D8 `[B]`** PUNCHUP `pedagogy` and integrate with docs; possible minor
   renamings (#40). **needs H5.**
-- [ ] **D11 `[B]`** Transition the Sphinx docs' bibliography to the master
-  `C:/s/TELOS/Biblio/uber-library.bib` (per the CLAUDE.md "Citations and
-  bibliography" standing order, added 2026-06-11). The docs currently use an
-  older biblio file with slightly different keys — sweep the `.rst` citations,
-  map old keys → uber keys, and point the docs' bibtex config at the master
-  file (or an exported subset) so the docs and the `dev/*.qmd` artifacts cite
-  identically.
+- [x] **D11 `[B]`** Transition the Sphinx docs' bibliography to the master
+  `C:/s/TELOS/Biblio/uber-library.bib` — **shipped a92** (`dev/done/plan-bibliography.md`).
+  `docs/update_extract_bib.py` extracts the cited entries from uber into the
+  committed `docs/extract.bib` (RTD has no access to `C:/S/...`, so the bibtex
+  config lists only repo-local files); `.rst` keys mapped to canonical uber
+  keys; non-uber/software refs moved to the hand-maintained `docs/manual.bib`;
+  `books.bib` retired.
 - [ ] **D12 `[B]` Cheat-sheet tweaks once the UI settles** — the six class / DecL
   cheat sheets (`cheat-sheets/`) were rebuilt for the v1.0 API on the
   tectonic + `make.ps1` / `combine.ps1` build with auto-`\aggversion` stamping

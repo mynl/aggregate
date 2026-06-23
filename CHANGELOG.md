@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.0.0a92
+
+### Docs bibliography re-sourced from the author's master library
+
+The Sphinx bibliography is now generated from the author's master BibTeX
+library (`uber-library.bib`, ~7,100 entries) instead of two ad-hoc local files.
+
+- **New** `docs/update_extract_bib.py` — scans every `:cite:` key in
+  `docs/**/*.rst`, pulls the matching entries from the master library by
+  brace-balanced extraction, and writes `docs/extract.bib`. It exits non-zero
+  and names the offenders if any cited key is missing from both the master
+  library and `manual.bib`, so broken citations are caught before commit. The
+  library path is configurable (`--uber` / `UBER_LIBRARY`) and only ever read.
+- **New** `docs/manual.bib` — hand-maintained entries for the few academic
+  works absent from the master library (Bertram1983, Panjer1992, Lukacs1970bk,
+  McKean2014bk, Bertram1981) plus software citations (Python, SciPy, pandas,
+  matplotlib, SLY, ...).
+- **New** `docs/README.md` — documents the workflow.
+- **Retired** `docs/books.bib`; `extract.bib` is now generated, not hand-rolled.
+  `conf.py` lists `['extract.bib', 'manual.bib']`; `docs/bib.bat` runs the new
+  script.
+- **Cite-key renames** across ~28 `.rst` files to canonical `AuthorYYYY` keys
+  (e.g. `PIR` → `Mildenhall2022a`, `LM`/`KPW`/`kpw5` → `Klugman2019`,
+  `JKK` → `Johnson2005`, `feller71` → `Feller1971`, `WangS1998` → `Wang1998a`).
+  The previously cited-but-undefined `KPW` is now resolved.
+
+Docs need a manual rebuild (not run in the iteration loop).
+
+### Landing-page intro simplified
+
+The `index.rst` introduction replaced its six-panel `sphinx_design` card grid
+(with per-section graphics) with a plain numbered list mirroring the chapter
+numbers (1–6). The six `_static/*.png` card images were removed, and the now
+unused `sphinx_design` extension was dropped from `conf.py` and the `dev`
+dependencies.
+
 ## 1.0.0a89
 
 ### Pedagogy figures renamed off the legacy PIR `fig_<ch>_<num>` names

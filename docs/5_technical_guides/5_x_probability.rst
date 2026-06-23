@@ -31,12 +31,12 @@ Probability Background
 Helpful References
 --------------------
 
-* :cite:t:`LM`
+* :cite:t:`Klugman2019`
 * :cite:t:`Panjer1992`
 * :cite:t:`Williams1991`
-* :cite:t:`feller71`
-* :cite:t:`Loeve2017`
-* :cite:t:`JKK`
+* :cite:t:`Feller1971`
+* :cite:t:`Loeve1955`
+* :cite:t:`Johnson2005`
 * :cite:t:`Mildenhall2017b`
 
 .. _p types:
@@ -189,7 +189,7 @@ for :math:`k \ge 0`.
 Neyman (A) Distribution
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Neyman distribution is a Poisson stopped-sum distribution of Poisson variables, see :cite:t:`JKK`.
+The Neyman distribution is a Poisson stopped-sum distribution of Poisson variables, see :cite:t:`Johnson2005`.
 
 
 Fixed Distribution
@@ -219,7 +219,7 @@ that
 
 for all positive integers :math:`n` provided the differential exists.
 
-Let :math:`F` be the distribution function of :math:`X`. :cite:t:`feller71` Section XVII.2a shows that if :math:`F` has
+Let :math:`F` be the distribution function of :math:`X`. :cite:t:`Feller1971` Section XVII.2a shows that if :math:`F` has
 expectation :math:`\mu` then :math:`\phi`, the characteristic function
 of :math:`F`, has a derivative :math:`\phi'` and :math:`\phi'(0)=i\mu`.
 However the converse is false. Pitman proved that the following are equivalent.
@@ -388,7 +388,7 @@ parameterizations. The main ones are shown in the next three tables.
     - :math:`\alpha\theta^2`
 
 
-Model (a) is used by Microsoft Excel, :cite:t:`WangS1998`, and :cite:t:`JKK` Chapter 17. Model (b) is used by :cite:t:`Bowers1997`. Model (c) is used by :cite:t:`KPW`. Obviously model (c) is just model (a) with a change of notation.
+Model (a) is used by Microsoft Excel, :cite:t:`Wang1998a`, and :cite:t:`Johnson2005` Chapter 17. Model (b) is used by :cite:t:`Bowers1997`. Model (c) is used by :cite:t:`Klugman2019`. Obviously model (c) is just model (a) with a change of notation.
 
 
 .. list-table:: Parameterizations of the Negative Binomial Distribution
@@ -612,7 +612,7 @@ Poisson Inverse Gaussian Distribution
 The :math:`(a,b,0)` and :math:`(a,b,1)` Classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See :cite:t:`LM`.
+See :cite:t:`Klugman2019`.
 
 
 .. _p aggregate:
@@ -735,7 +735,7 @@ they also provide a very good approximation to aggregate loss
 distributions. The shifted gamma approximation to an aggregate is
 discussed in :cite:t:`Bowers1997`. Properties of
 the shifted gamma and lognormal distributions, including the method of
-moments fit parameters, are also shown in :cite:t:`Daykin1993` chapter 3.
+moments fit parameters, are also shown in :cite:t:`Daykin1994` chapter 3.
 
 Let :math:`L` have a lognormal distribution. Then :math:`S=s\pm L` is a
 shifted lognormal, where :math:`s` is a real number. Since :math:`s` can

@@ -26,8 +26,8 @@ Quantiles and Related Risk Measures
 Helpful References
 --------------------
 
-* :cite:t:`LM`
-* :cite:t:`PIR`, Chapter 4
+* :cite:t:`Klugman2019`
+* :cite:t:`Mildenhall2022a`, Chapter 4
 * :cite:t:`Hyndman1996`
 
 ..  Quantiles are the fundamental building block risk measure.

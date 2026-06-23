@@ -94,7 +94,7 @@ entries into a committed local file*, not reference the external path.
   | `Stein1971bk` | `Stein1971` | |
   | `Stein2011bk` | `Stein2003a` | same book, 2003 Princeton ed. |
   | `Loeve2017` | `Loeve1955` | merges with existing `Loeve1955` cite |
-  | `Grandell1997` | `Grandell1977` | only uber candidate — **verify year** (book is 1997) |
+  | `Grandell1997` | `Grandell1997` | author corrected the uber year typo (1977→1997) during execution; key unchanged |
   | `Daykin1993` | `Daykin1994` | |
   | `Carter2013` | `Carter1979a` | only uber candidate (1979 ed.) |
   | `Malliavin1995bk` | `Malliavin2012` | |

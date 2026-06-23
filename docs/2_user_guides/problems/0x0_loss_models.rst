@@ -1,7 +1,7 @@
 Loss Models Book
 --------------------
 
-Examples from the text :cite:t:`LM`, Loss Models: from data to decisions. The Loss models book is used as a text for several actuarial society exams and many college courses. KPW is shorthand for Loss Models.
+Examples from the text :cite:t:`Klugman2019`, Loss Models: from data to decisions. The Loss models book is used as a text for several actuarial society exams and many college courses. KPW is shorthand for Loss Models.
 
 Contents
 ~~~~~~~~~

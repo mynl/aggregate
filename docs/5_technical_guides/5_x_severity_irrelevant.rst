@@ -40,7 +40,7 @@ probability.
 It is a fact that :math:`X_n` converges to :math:`X` if the MGFs
 :math:`M_n` of :math:`X_n` converge to the MFG of :math:`M` of :math:`X`
 for all :math:`t`: :math:`M_n(t)\to M(t)` as :math:`n\to\infty`. See
-:cite:t:`feller71` for more details. We can now prove the
+:cite:t:`Feller1971` for more details. We can now prove the
 following result.
 
 .. container:: prop

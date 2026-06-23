@@ -24,7 +24,7 @@ Helpful References
 --------------------
 
 * :cite:t:`Meyers2019`
-* :cite:t:`PIR`, chapter 17
+* :cite:t:`Mildenhall2022a`, chapter 17
 
 .. Solvency II Cost of Capital Risk Margin.
 

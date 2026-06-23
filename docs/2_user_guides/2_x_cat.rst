@@ -396,7 +396,7 @@ and proportional hazard (PH)
 
 .. math:: g(s) = s^p, \ p<1
 
-parametric families (see :cite:t:`PIR`). In both cases, a higher parameter corresponds to a higher risk load. The dual is body-risk centric and the PH is tail-risk centric. The indicated parameters are quite high, consistent with the expense of bearing cat risk. (The parameters are incomparable between distortions.)
+parametric families (see :cite:t:`Mildenhall2022a`). In both cases, a higher parameter corresponds to a higher risk load. The dual is body-risk centric and the PH is tail-risk centric. The indicated parameters are quite high, consistent with the expense of bearing cat risk. (The parameters are incomparable between distortions.)
 
 .. ipython:: python
     :okwarning:

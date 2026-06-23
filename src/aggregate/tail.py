@@ -47,6 +47,48 @@ severity class; when severity is light, the compound decay is set by the heavier
 of the severity and frequency decay rates. This holds while the frequency PGF is
 analytic at 1 (all standard frequencies); genuinely heavy mixing (PIG / Sichel /
 Neyman-A) is a watch item, classified conservatively from the family table.
+
+Tail Classification
+-------------------
+
+Let :math:`\\overline F(x)=1-F(x)` denote the survival function and let
+:math:`H(x)=-\\log\\overline F(x)` denote the cumulative hazard.  We use the
+following five-class description of right-tail thickness.  A distribution is
+``bounded`` when it has a finite right endpoint :math:`x_F`; in this case
+:math:`H(x)\\to\\infty` as :math:`x\\uparrow x_F`.  For an unbounded distribution,
+it is ``superexponential`` when :math:`H(x)/x\\to\\infty`, ``exponential`` when
+:math:`H(x)/x\\to\\lambda` for some :math:`0<\\lambda<\\infty`, ``subexponential``
+when
+
+.. math::
+
+   \\frac{H(x)}{x}\\longrightarrow 0
+   \\qquad\\text{and}\\qquad
+   \\frac{H(x)}{\\log x}\\longrightarrow\\infty,
+
+and ``power`` when :math:`H(x)/\\log x\\to\\alpha` for some
+:math:`0<\\alpha<\\infty`.  Thus the ``subexponential`` category comprises regular
+tails lying strictly between exponential and power decay, including the
+lognormal and Weibull distributions with shape parameter strictly below one.
+
+Strictly speaking, *subexponential distribution* has the standard convolutional
+meaning
+
+.. math::
+
+   \\overline{F*F}(x)\\sim 2\\overline F(x),
+
+which expresses the principle that a large sum is produced asymptotically by one
+large summand.  Slower-than-exponential decay alone does not imply this property
+for arbitrary irregular tails.  We nevertheless use ``subexponential`` as a
+tail-thickness label because, for the regular analytic distribution families
+classified here, the intermediate tails satisfy the usual regularity conditions
+and are convolution-subexponential.  The classification is therefore intended
+for standard named families, not for arbitrary survival functions with
+oscillating, discontinuous, or otherwise pathological asymptotics.  See Foss,
+Korshunov, and Zachary, *An Introduction to Heavy-Tailed and Subexponential
+Distributions*, 2nd ed., Springer, 2013, especially the discussion of
+long-tailed and subexponential distributions.
 """
 
 from __future__ import annotations

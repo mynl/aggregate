@@ -1,11 +1,16 @@
 # Refactor planning — README / reorientation
 
 > **Read this first when you come back.** It is the map for a set of structural
-> refactor plans drafted June 2026. **P1 (GridDistribution, a90–a91) and P2 (plots
-> subsystem, a92) are done; P3/P4 remain.** The detail lives in the four `plan-*.md`
-> files below; this page is just the bird's-eye view and the *why*, so you can decide
-> with fresh eyes whether the remaining splits are still a good idea before more code
-> moves.
+> refactor plans drafted June 2026. **All four splits have landed: P1
+> (GridDistribution, a90–a91), P2 (plots subsystem, a92, Pass A), P3 (distributions
+> split, a93), P4 (portfolio split, a94, Phase 4A).** The detail lives in the four
+> `plan-*.md` files (now all in `done/`); this page is the bird's-eye view and the
+> *why*. **What remains is one finishing step + the conditional composition work:**
+> `dev/plan-finish-shared-concerns.md` (drop both classes' bucket/window +
+> validation *bodies* into `_bucket_window`/`_validation` — P4 §3 / P3 1b deferred
+> this for the side-by-side, P4 landing is the trigger; sequence after **W10**), and
+> the post-beta/conditional **4B** (Portfolio composition) / **2B**
+> (`ReinsuranceProgram`) / sample-subsystem review / Pass B visual refresh.
 
 ---
 
@@ -122,9 +127,10 @@ shrinks the next.
 | # | Plan | One line | Risk | Independently shippable? |
 |---|---|---|---|---|
 | **P1 ✅ done (a90–a91)** | `done/plan-grid-distribution.md` | New spacing-agnostic `GridDistribution` value type owns the marginal-vector accessors (`q/var/tvar/cdf/sf/pmf/lev/…`); the `make_var_tvar` kernel **moves into it** from `utilities.py`; `_DiscreteRV` becomes an adapter over it; it exposes the `sf`/`lev` data `Distortion` calibration will consume (GD→Distortion; the calibration rewire itself is P3 §1c); consumers adopt it (Agg/Port/Bounds done; Bivariate deferred) | low (pure add + guarded swaps) | yes |
-| **P2 ✅ done (a92, Pass A)** | `plan-plots-subsystem.md` | One `plots/` package, per-class modules, `_style.py`, **global matplotlib defer** achieved (`import aggregate` is matplotlib-free; `tests/test_plots_boundary.py` enforces it). **Pass B (the deliberate visual refresh, §3.5) is deferred to the author** | low (mechanical moves) | yes |
-| **P3** | `plan-split-distributions.md` | Kind split → `_fits`/`_frequency`/`_severity`/`_aggregate` + façade; **births the shared concerns** (`_validation`, `_bucket_window`, `_pricing`, and Agg-only `_reinsurance`); **distortion calibration on a GD** (Phase 1c — `Distortion.calibrate_set` + `Aggregate.calibrate_distortions` for Agg/Port parity); Aggregate pure-compute extraction; `pollaczeck_khinchine`→`pedagogy` | low→med | yes (Phase 1 alone) |
-| **P4** | `plan-split-portfolio.md` | `portfolio.py` façade + **three-subsystem split** of the one `Portfolio` class — `_portfolio_density` (independent-sum combine), `_portfolio_sample` (sample/switcheroo/dependence; extracted now, reviewed later), `_portfolio_common` (exeqa-based augmented-df / distortion / allocation); **consumes** the P3 shared concerns (`_validation`/`_bucket_window`/`_pricing`) | low→med | yes |
+| **P2 ✅ done (a92, Pass A)** | `done/plan-plots-subsystem.md` | One `plots/` package, per-class modules, `_style.py`, **global matplotlib defer** achieved (`import aggregate` is matplotlib-free; `tests/test_plots_boundary.py` enforces it). **Pass B (the deliberate visual refresh, §3.5) is deferred to the author** | low (mechanical moves) | yes |
+| **P3 ✅ done (a93)** | `done/plan-split-distributions.md` | Kind split → `_fits`/`_frequency`/`_severity`/`_aggregate` + façade; **births the shared concerns** (`_validation`, `_bucket_window`, `_pricing`, and Agg-only `_reinsurance`); **distortion calibration on a GD** (Phase 1c — `Distortion.calibrate_set` + `Aggregate.calibrate_distortions` for Agg/Port parity); Aggregate pure-compute extraction; `pollaczeck_khinchine`→`pedagogy` | low→med | yes (Phase 1 alone) |
+| **P4 ✅ done (a94, Phase 4A)** | `done/plan-split-portfolio.md` | `portfolio.py` façade + **three-subsystem split** of the one `Portfolio` class — `_portfolio_density` (independent-sum combine), `_portfolio_sample` (sample/switcheroo/dependence; extracted now, reviewed later), `_portfolio_common` (exeqa-based augmented-df / distortion / allocation). **Consumed** the P3 `_pricing`; the `_validation`/`_bucket_window` *body* drops were deferred → `plan-finish-shared-concerns.md` | low→med | yes |
+| **Finish** (approved) | `plan-finish-shared-concerns.md` | The carryover P3 1b + P4 §3 deferred — finishing the **thin-shell** concern modules, **all three phases approved**. **A: reinsurance** (`_reinsurance.py` 152 ln; ~400–600 ln of Agg-only reins code on `_aggregate` — `_apply_reins_work`/`reins_*_df`/`reins_description`… → real ~750-ln module). **B: bucket/window** (`_bs_window`/`best_window`/`bs_window_df`) **with W10 folded in** (retire `recommend_bucket`/`best_bucket`, confirmed off the live path → behaviour-neutral). **C: validation** (`valid`/`validation_explanation` bodies, author-sensitive). Behaviour-frozen | low→med | yes |
 
 **Deferred bucket** (TODO entries, *not* plans yet — promote only when the seam is
 proven by the two-file rule, post-beta):
@@ -217,12 +223,17 @@ need the usual `rg`-against-the-surface vetting before they are fixed.
 
 ## Suggested next session
 
-P1 (a90–a91) and P2 (a92, Pass A) are done. The keystone primitive and the plotting
-subsystem are in place, so the god files are already smaller and matplotlib-free.
+All four splits have landed (P1 a90–91, P2 a92, P3 a93, P4 a94). The god files are
+split behind façades, matplotlib-free, with the shared concerns born and consumed.
+The remaining work is the **finish step** and the deferred composition:
 
-1. Re-read `plan-split-distributions.md` §-1 (the regret guard) and decide if the
-   split bet still holds now that P1/P2 have shrunk the targets.
-2. If yes: execute **P3** (`plan-split-distributions.md`) — Phase 1 (kind split) is
-   the lowest-risk, independently shippable unit; then 1b/1c/2A.
-3. Reassess after P3 with the two-file rule before committing to **P4**
-   (`plan-split-portfolio.md`).
+1. **`plan-finish-shared-concerns.md`** (approved, all three phases) — finish the
+   thin-shell concern modules so each subsystem lives in one place. **A:
+   reinsurance** (`_reinsurance.py` is a 152-line shell; the ~400–600-line Agg-only
+   reins body on `_aggregate` moves in). **B: bucket/window** with **W10 folded in**
+   (retire `recommend_bucket`/`best_bucket` — confirmed off the live path, so
+   behaviour-neutral). **C: validation** (author-sensitive, byte-identical).
+   Behaviour-frozen; two-file rule is the retrospective check on each seam.
+2. **Post-beta / conditional** (each its own later plan, gated by the two-file
+   rule): 4B Portfolio composition, 2B `ReinsuranceProgram`, the sample-subsystem
+   review (correlation/switcheroo), P2 Pass B visual refresh.

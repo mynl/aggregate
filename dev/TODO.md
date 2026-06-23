@@ -190,13 +190,18 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     matching `Portfolio` methods are thin delegators; `price_pentagon` now routes
     through `_pricing`. `Portfolio.percentiles` **removed** (breaking, superseded
     by vector-`q`). `tests/test_portfolio_subsystems.py` added; baseline unmoved.
-    **Deferred carryover (P4 §3):** dropping the intricate, author-sensitive
-    **bucket/window sizers** (`recommend_bucket`/`best_bucket`/`best_window`/
-    `bs_window_df`) and **validation** bodies (`valid`/`validation_explanation`)
-    into the shared `_bucket_window` / `_validation` modules — held to land beside
-    the Aggregate-side extraction P3 1b also deferred, so the two read side by
-    side. Phase 4B composition + the sample-subsystem review stay post-beta,
-    conditional.
+    **Deferred carryover → `dev/plan-finish-shared-concerns.md` (finish the
+    thin-shell concern modules):** **lead = reinsurance** — `_reinsurance.py` is a
+    152-line shell while ~400–600 lines of Agg-only reins code (`_apply_reins_work`,
+    `reins_density_df`/`reins_stats_df`/`reins_summary_df`, the `_reins_*6` moment
+    kernels, `reins_description`/`reins_kinds`, the `_describe` reins-label logic)
+    still sit on `_aggregate.py`; move them in → a real ~750-line module. Then
+    **bucket/window** (`_bs_window`/`best_window`/`bs_window_df`, with **W10
+    folded in** as Phase B0 — retire `recommend_bucket`/`best_bucket`, behaviour-
+    neutral) and **validation** (`valid`/`validation_explanation` bodies,
+    author-sensitive, byte-identical). **All three approved for execution**
+    (behaviour-frozen). Phase 4B composition + the sample-subsystem review stay
+    post-beta, conditional.
 
 ---
 
@@ -237,6 +242,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   infinite-variance fallback) is gone — `_bs_window` now raises
   `InfiniteVarianceError` instead of guessing a grid (a87) — so nothing left
   depends on it. See `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`).
+  **Folded into `dev/plan-finish-shared-concerns.md` Phase B0** — confirmed off
+  the live path (both classes' `update(bs=0)` route through `_bs_window`), so the
+  removal is behaviour-neutral; the only ripples are the diagnostic
+  `aggregate_error_analysis` (repoint or drop), `test_best_bucket_retained_for_comparison`,
+  `tests/peg.py`, and a stale underwriter comment.
 
 ---
 

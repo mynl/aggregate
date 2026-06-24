@@ -523,3 +523,17 @@ port BW.DivIID agg U1 200 claims sev gamma 100 cv 1.2 poisson agg U2 200 claims 
 port BW.Heavy agg HU 100 claims sev lognorm 100 cv 2 poisson agg LU 50 claims sev gamma 50 cv 1 poisson         note{heavy unit drives the SBJ look-through extent floor};
 port BW.Windowed agg H1 5000 claims sev lognorm 10 cv 0.5 poisson agg H2 4000 claims sev gamma 10 cv 0.5 poisson note{concentrated total clears 0: windowed Plan B origin x_min>0};
 port BW.Mixed agg M1 dfreq [4] dsev [3] agg M2 dfreq [3] dsev [-1 1]                                            note{signed combine; resolution floor keeps bs=1, no wrap}
+
+# ============================================================
+# SC. Signed / payoff distortion calibration (1.0.0a99)
+# ============================================================
+# Programs behind tests/test_signed_calibrate.py: calibrate_distortions runs
+# every subclass calibrate on the canonical non-negative loss frame Z (reverse
+# a payoff, then shift by c = max(0, -min support)); the receipt un-shifts back
+# to the caller's loss convention. Shift-exactness (Base0 vs Signed), the payoff
+# dual round-trip (Pnl), and the per-kind sweep on a signed grid. See
+# dev/plan-signed-distortion-calibration.md.
+agg SC.Base0  dfreq [1] dsev [0 10 20] [.5 .3 .2]                                                                 note{non-negative base anchored at 0: classic c=0 path};
+agg SC.Signed dfreq [1] dsev [-10 0 10] [.5 .3 .2]                                                                note{Base0 slid -10: signed loss, shift-exact twin};
+pnl SC.Pnl    10 prem - dfreq [1] dsev [2 5 12] [.4 .4 .2]                                                        note{payoff: reversed then shifted; ask price = -P via g_dual};
+agg SC.Classic 50 claims sev lognorm 40 cv 1.5 poisson                                                            note{classic non-negative loss: transform branch never entered}

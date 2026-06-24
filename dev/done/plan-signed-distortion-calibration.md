@@ -1,5 +1,13 @@
 # Plan — calibrate (and price) distortions on signed distributions
 
+> **Status: LANDED (1.0.0a99).** Implemented in `_pricing.calibrate_distortions`
+> + `_pricing._canonical_loss_frame`; per-kind `Distortion.<kind>.calibrate` math
+> unchanged. Receipt convention (author-approved): un-shift only — `M`/`Q`/`coc`
+> shift-invariant, `L`/`P`/`a` may go negative together when net-beneficial; the
+> accounting identities hold with `M, Q >= 0`. `names=` added to both class
+> delegators. Tests: `tests/test_signed_calibrate.py`; DecL `SC.*` in
+> `decl-testers.agg`. Classic non-negative path byte-for-byte unchanged.
+>
 > **Status: DRAFT — not executed.** Caller-side bookkeeping only; the per-kind
 > `Distortion.<kind>.calibrate` math stays pure and 0-based. No new numerics, no
 > change to any existing non-negative path (must stay byte-for-byte).

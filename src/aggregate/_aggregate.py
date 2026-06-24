@@ -4893,7 +4893,8 @@ class Aggregate:
         return _pricing.price_pentagon_ex(
             self, p=p, a=a, L=L, M=M, P=P, Q=Q, LR=LR, PQ=PQ, ROE=ROE)
 
-    def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower'):
+    def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower',
+                              names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS):
         """Calibrate the standard pricing distortion set to a cost-of-capital target.
 
         The ``Aggregate`` counterpart of :meth:`Portfolio.calibrate_distortions`
@@ -4929,5 +4930,10 @@ class Aggregate:
         The expected loss anchoring the premium target is computed on the full
         aggregate grid (the ``E[min(X, a)]`` / ``add_exa`` convention), matching
         a one-unit ``Portfolio``'s ``exa_total``.
+
+        ``names`` selects the distortion families to calibrate (default the
+        standard set); signed / payoff supports are handled transparently (see
+        :func:`aggregate._pricing.calibrate_distortions`).
         """
-        return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind)
+        return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind,
+                                              names=names)

@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.0a99
+
+### Distortion calibration on signed and payoff supports
+
+`calibrate_distortions` (on `Aggregate` and `Portfolio`) now calibrates
+correctly for **every** support — non-negative loss, signed loss (straddles 0,
+via `ssev` or a negative `dsev` atom), and payoff (`pnl`, more-is-better) — not
+just `X >= 0`. The layer / Lee integral `∫₀^∞ g(S) dx` that each subclass
+`calibrate` evaluates is valid only on a non-negative axis, so the caller now
+maps the object onto a **canonical non-negative loss frame** `Z`:
+
+- **reverse** a payoff (`X -> -X`) so its bad tail lands on the right where a
+  concave `g` loads it — the matched half of the `g_dual` flip `effective_g`
+  already applies when *pricing* a payoff (the two cancel on price);
+- **shift** by `c = max(0, -min(support))` onto `[0, ∞)`.
+
+By translation-equivariance the shift is exact, not an approximation: the
+calibrated distortion *shapes* are frame-free and identical to the unshifted
+law's. The per-kind subclass math is **unchanged** (still pure and 0-based); all
+of the new bookkeeping lives in `_pricing.calibrate_distortions` /
+`_pricing._canonical_loss_frame`. The classic `X >= 0` path (`c = 0`, no
+reverse) is byte-for-byte unchanged and provably never enters the transform
+branch.
+
+The `calibration_df` receipt is reported in the caller's loss convention
+(un-shifted): `M`, `Q`, `coc` are shift-invariant; only `L`, `P`, `a` slide by
+`-c`, going negative *together* exactly when the position is net-beneficial (a
+payoff that is really a profit — "Loss" then reads as a negative number). The
+accounting identities `P = L + M` and `a = P + Q` always hold with `M, Q >= 0`.
+
+`calibrate_distortions` also gains a `names=` argument (both classes) to select
+the distortion families to calibrate; default is the standard set.
+
+Tests: `tests/test_signed_calibrate.py` (shift-exactness, payoff dual
+round-trip, per-kind sweep incl. mass-at-zero `ly`/`clin`/`lep`, classic
+no-op); DecL mirrored as `SC.*` in `decl-testers.agg`.
+
 ## 1.0.0a98
 
 ### `agg_help` / `.help` — finer control over detail (`lod`, `output`)

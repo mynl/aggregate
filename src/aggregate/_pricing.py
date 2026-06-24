@@ -17,7 +17,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from .spectral import Distortion, DISTORTION_DTYPE
+from .spectral import Distortion, DISTORTION_DTYPE, VALIDATION_NOISE
 from .pentagon import complete_pentagon, Pentagon
 
 # The standard pricing distortion set calibrated by ``calibrate_distortions``.
@@ -308,6 +308,72 @@ def _limited_ev(density, bs, assets):
     return float(bs * S[S.index < assets].sum())
 
 
+def _canonical_loss_frame(obj):
+    """Slide (and, for a payoff, reverse) an object's outcome onto the canonical
+    non-negative loss axis on which the layer-integral calibration is exact.
+
+    The layer / Lee form ``∫₀^∞ g(S(x)) dx`` that every subclass ``calibrate``
+    integrates is valid only for ``X ≥ 0``. Distortion risk measures are
+    translation-equivariant and comonotone-additive, so for a signed outcome the
+    correct two-sided measure equals the one-sided integral over the shifted,
+    non-negative variable ``Z`` -- with the shift recovered afterwards. The two
+    transforms are orthogonal:
+
+    * **reverse** (``not obj._is_loss_value``) -- a payoff is "more is better",
+      so its bad tail is on the *left*; the physical reverse ``X -> -X`` puts the
+      bad tail back on the right where a concave ``g`` loads it. This is the
+      matched half of the ``g_dual`` flip that ``Distortion.effective_g`` applies
+      when *pricing* a payoff; the two cancel on price (see ``spectral.py:772``).
+    * **shift** ``c = max(0, -min(support))`` -- slide the (optionally reversed)
+      loss-convention outcome so its least value carrying mass sits at 0.
+
+    The FFT zero-padding is trimmed (mass below :data:`VALIDATION_NOISE` is dust)
+    so ``c`` keys off the genuine support, not the padded grid extent, and the
+    returned grid is a clean contiguous ``bs``-lattice starting at 0.
+
+    Parameters
+    ----------
+    obj : Aggregate or Portfolio
+        The distribution-bearing object; reads ``density_df['p_total']``,
+        ``_is_loss_value`` and ``bs``.
+
+    Returns
+    -------
+    (dz, c, reverse) : (pandas.Series, float, bool)
+        ``dz`` -- the canonical 0-based loss density on a contiguous ``bs``-grid;
+        ``c`` -- the shift applied (``L_canonical = L_rv + c``); ``reverse`` --
+        whether the outcome was reversed (payoff role).
+
+    Notes
+    -----
+    Caller un-shifts the receipt (``L``, ``P``, ``a`` move by ``-c``; ``M``,
+    ``Q``, ``coc`` are shift-invariant) so the pentagon reports in the user's
+    loss-convention units -- ``L``/``P``/``a`` go negative together only when the
+    position is genuinely beneficial (a payoff that is really a profit). The
+    stored ``Distortion`` shapes are frame-free.
+    """
+    bs = obj.bs
+    s = obj.density_df['p_total']
+    x = s.index.to_numpy(dtype=float)
+    p = s.to_numpy(dtype=float)
+    reverse = not obj._is_loss_value
+    if reverse:
+        x = -x
+        order = np.argsort(x, kind='stable')
+        x, p = x[order], p[order]
+    # trim FFT padding to the genuine mass support so c keys off real support
+    mass = p > VALIDATION_NOISE
+    if not mass.any():
+        mass = np.ones_like(p, dtype=bool)
+    lo = int(np.argmax(mass))
+    hi = len(mass) - int(np.argmax(mass[::-1]))
+    x, p = x[lo:hi], p[lo:hi]
+    c = max(0.0, -float(x[0]))
+    # snap onto a clean bs-lattice from 0 (kills the x + c floating dust)
+    z = np.round((x + c) / bs) * bs
+    return pd.Series(p, index=z), c, reverse
+
+
 def _calibration_frames(dists, coc, p_val, Fa, exa, P, a):
     """Build the ``(distortion_df, calibration_df)`` receipt for a calibrated set
     -- the per-distortion shapes/errors and the shared one-row pentagon target.
@@ -348,32 +414,89 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
     The expected loss is read from the object's ``exa_total`` column when it has
     one (a ``Portfolio``, byte-for-byte the legacy value) and otherwise computed
     on the full grid via :func:`_limited_ev` (an ``Aggregate``).
+
+    Signed and payoff supports
+    --------------------------
+    When the outcome straddles 0 (an ``ssev`` severity, a negative ``dsev`` atom)
+    or is a payoff (``pnl``, ``_is_loss_value`` False) the layer integral is run
+    on the canonical non-negative loss frame ``Z`` built by
+    :func:`_canonical_loss_frame` -- physically reversing a payoff and shifting by
+    ``c = max(0, -min(support))``. The subclass ``calibrate`` math stays pure and
+    0-based; only this caller does the in-/out-of-frame bookkeeping. The receipt
+    is un-shifted back to the caller's loss convention (``L``, ``P``, ``a`` slide
+    by ``-c``; ``M``, ``Q``, ``coc`` are shift-invariant), so ``L``/``P``/``a``
+    read negative together exactly when the position is net-beneficial. The
+    classic ``X >= 0`` loss path (``c = 0``, no reverse) is byte-for-byte
+    unchanged. For a signed/payoff object the asset anchor is resolved as the
+    lower quantile on ``Z`` (``kind`` is honoured only on the classic path).
     """
     if (p is None) == (a is None):
         raise ValueError(
             'calibrate_distortions requires exactly one of p= (probability) '
             'or a= (asset level).')
-    if a is None:
-        a = obj.q(p, kind)
-        p_val = p
+
+    transform = (not obj._is_loss_value
+                 or float(obj.density_df.index.min()) < 0)
+    if not transform:
+        # ---- classic non-negative loss frame (c = 0): legacy path verbatim ---
+        if a is None:
+            a = obj.q(p, kind)
+            p_val = p
+        else:
+            a = obj.snap(a)
+            p_val = obj.cdf(a)
+        density = obj.density_df['p_total']
+        if 'exa_total' in obj.density_df.columns:
+            exa = obj.density_df.loc[a, 'exa_total']
+        else:
+            exa = _limited_ev(density, obj.bs, a)
+        # invert COC -> LR -> P (matches the legacy ROE -> LR -> P path).
+        delta = coc / (1 + coc)
+        nu = 1 - delta
+        P = nu * exa + delta * a
+        S, ess_sup = _calibration_survival(density, obj.bs, a)
+        dists = Distortion.calibrate_set(
+            S=S, bs=obj.bs, premium_target=P, ess_sup=ess_sup, assets=a,
+            el=exa, names=names)
+        distortion_df, calibration_df = _calibration_frames(
+            dists, coc, p_val, obj.cdf(a), exa, P, a)
     else:
-        a = obj.snap(a)
-        p_val = obj.cdf(a)
-    density = obj.density_df['p_total']
-    if 'exa_total' in obj.density_df.columns:
-        exa = obj.density_df.loc[a, 'exa_total']
-    else:
-        exa = _limited_ev(density, obj.bs, a)
-    # invert COC -> LR -> P (matches the legacy ROE -> LR -> P path).
-    delta = coc / (1 + coc)
-    nu = 1 - delta
-    P = nu * exa + delta * a
-    S, ess_sup = _calibration_survival(density, obj.bs, a)
-    dists = Distortion.calibrate_set(
-        S=S, bs=obj.bs, premium_target=P, ess_sup=ess_sup, assets=a, el=exa,
-        names=names)
-    distortion_df, calibration_df = _calibration_frames(
-        dists, coc, p_val, obj.cdf(a), exa, P, a)
+        # ---- signed / payoff: calibrate on the canonical loss frame Z --------
+        bs = obj.bs
+        dz, c, reverse = _canonical_loss_frame(obj)
+        cz = dz.cumsum()                       # raw (deficit treated as classic)
+        zi = dz.index.to_numpy()
+        snap = lambda v: float(zi[int(np.abs(zi - v).argmin())])
+        if a is None:
+            if not reverse:
+                # signed loss: reuse the object's robust quantile, then shift.
+                a_z = snap(float(obj.q(p, kind)) + c)
+            else:
+                # payoff: lower quantile on the reversed law (no classic analog),
+                # via a normalized cumsum so the PMF deficit can't skip an atom.
+                czn = (dz / dz.sum()).cumsum().to_numpy()
+                j = min(int(np.searchsorted(czn, p - VALIDATION_NOISE,
+                                            side='left')), len(dz) - 1)
+                a_z = float(zi[j])
+            p_val = p
+        else:
+            # caller's a is in loss-convention units; snap a + c onto Z's grid
+            a_z = snap(a + c)
+            p_val = float(cz.loc[a_z])
+        Fa = float(cz.loc[a_z])
+        exa_z = _limited_ev(dz, bs, a_z)
+        S, ess_sup = _calibration_survival(dz, bs, a_z)
+        # in-frame COC -> P inversion (shift-covariant: P, exa, a all carry +c).
+        delta = coc / (1 + coc)
+        nu = 1 - delta
+        P_z = nu * exa_z + delta * a_z
+        dists = Distortion.calibrate_set(
+            S=S, bs=bs, premium_target=P_z, ess_sup=ess_sup, assets=a_z,
+            el=exa_z, names=names)
+        # un-shift the receipt into the caller's loss convention.
+        distortion_df, calibration_df = _calibration_frames(
+            dists, coc, p_val, Fa, exa_z - c, P_z - c, a_z - c)
+
     obj.distortions = dists
     obj.distortion_df = distortion_df
     obj.calibration_df = calibration_df

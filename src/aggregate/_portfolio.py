@@ -2414,7 +2414,8 @@ class Portfolio(object):
         """
         return _density.add_exa(self, df, unit_state)
 
-    def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower'):
+    def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower',
+                              names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS):
         """
         Calibrate the standard pricing distortion set to a cost-of-capital target.
 
@@ -2458,8 +2459,12 @@ class Portfolio(object):
         both the legacy batch
         ``calibrate_distortions(LRs=, COCs=, ROEs=, As=, Ps=, ...)`` and
         ``calibrate_distortions2(coc, reg_p)``.
+
+        ``names`` selects the distortion families to calibrate (default the
+        standard set).
         """
-        return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind)
+        return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind,
+                                              names=names)
 
     def apply_distortion(self, distortion, *, view='ask', S_calculation='forwards',
                          allocation='lifted', allow_deficit=False):

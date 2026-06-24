@@ -76,6 +76,8 @@ extensions = [
     'myst_parser',
     # 'sphinx_rtd_theme',
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
@@ -94,6 +96,45 @@ extensions = [
 
 source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 myst_enable_extensions = ["dollarmath", "amsmath", "deflist", "colon_fence"]
+
+# ---------------------------------------------------------------------------
+# autodoc / autosummary / napoleon
+# ---------------------------------------------------------------------------
+# Global autodoc defaults so the API-reference pages (``docs/3_reference/``)
+# stay declarative: each page lists *what* to document, not the repeated
+# ``:members:`` / ``:special-members:`` boilerplate. Per-directive options add
+# to (or, for ``private-members``, switch on) these defaults -- e.g. the
+# internal-architecture page turns private members on locally.
+autodoc_default_options = {
+    'members': True,
+    'special-members': '__init__',
+    'show-inheritance': True,
+    'undoc-members': False,
+}
+# Source order (not alphabetical) keeps each class's methods in the author's
+# logical grouping, which the docstrings are written to follow.
+autodoc_member_order = 'bysource'
+# The class docstring is the narrative; ``__init__`` is documented as a member
+# (via ``special-members`` above) so its long parameter list renders once.
+autoclass_content = 'class'
+# Keep signatures readable: defer annotation rendering to the description.
+autodoc_typehints = 'description'
+
+# Napoleon: the project uses NumPy-style docstrings (Parameters / Returns /
+# Notes). Older docstrings still use reST ``:param:`` fields, which autodoc
+# renders natively -- the two coexist. Google style is off to avoid
+# mis-parsing the occasional ``Note:`` line.
+napoleon_numpy_docstring = True
+napoleon_google_docstring = False
+napoleon_use_param = True
+napoleon_use_rtype = False
+napoleon_preprocess_types = True
+
+# autosummary is used for the per-page *overview tables* only (``.. autosummary::``
+# without ``:toctree:``): they link to the full ``automodule`` / ``autoclass``
+# entries on the same page, so no stub pages are generated and nothing is
+# documented twice.
+autosummary_generate = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

@@ -14,10 +14,15 @@
 >   are deferred** (book-level / joint P&L needs net-then-combine, which loses
 >   per-unit attribution) and now raise `NotImplementedError`; a payoff book uses
 >   `agg … payoff` orientation. Constant **and** callable consideration supported.
-> - Stages C–E (signed additive `summary_df`, `PnL.plot()`, `evaluate` panel,
->   reins GCN, DecL swing/slide builder) and the deferred `PortPnL` — pending.
+> - **Stage C — signed additive `summary_df` + `PnL.plot()` — DONE (1.0.0a104).**
+>   `summary_df` = Consideration / Obligation / Margin (EX adds; SD not CV;
+>   constant consideration certain, callable carries SD/Sk; buying flips both
+>   signs). `plot()` = Margin density + distribution, break-even line, no sev
+>   panel (`plot_pnl` compositor).
+> - Stages D–E (Cherny–Madan `evaluate` panel, reins-aware GCN view, DecL
+>   swing/slide builder) and the deferred `PortPnL` — pending.
 >
-> **Status: DRAFT — partially executed (Stages A, B landed).** Re-architects the `pnl` concept. **`pnl` is
+> **Status: DRAFT — partially executed (Stages A, B, C landed).** Re-architects the `pnl` concept. **`pnl` is
 > new and nothing external depends on it — this is a free *internal* change**, not
 > a compat-constrained migration; the return type of `build('pnl …')` changes
 > (`Aggregate` → `PnL`) and we update our own consumers freely. Version bump,

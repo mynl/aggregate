@@ -145,17 +145,27 @@ class PnL:
         return self._pnl_df
 
     # ------------------------------------------------------------------
-    # Moments of the net (from the derived density; exact for discrete)
+    # Moments (all on the shared loss grid (x, p), so the summary EX column
+    # adds exactly: Consideration + Obligation = Margin)
     # ------------------------------------------------------------------
-    def _moments(self):
-        df = self.pnl_df
-        y = df.index.to_numpy(dtype=float)
-        p = df['p_total'].to_numpy(dtype=float)
-        m = float((y * p).sum())
-        var = float((y * y * p).sum()) - m * m
+    def _xp(self):
+        """The loss grid ``(x, p)`` from the obligation's density."""
+        dd = self.agg.density_df
+        return dd['loss'].to_numpy(dtype=float), dd['p_total'].to_numpy(dtype=float)
+
+    @staticmethod
+    def _moms(vals, p):
+        """``(mean, sd, skew)`` of ``vals`` under weights ``p``."""
+        m = float((vals * p).sum())
+        var = float((vals * vals * p).sum()) - m * m
         sd = var ** 0.5 if var > 0 else 0.0
-        skew = float((((y - m) ** 3) * p).sum()) / sd ** 3 if sd > 0 else 0.0
+        skew = float((((vals - m) ** 3) * p).sum()) / sd ** 3 if sd > 0 else 0.0
         return m, sd, skew
+
+    def _moments(self):
+        """``(mean, sd, skew)`` of the net P&L."""
+        x, p = self._xp()
+        return self._moms(self._net_values(x), p)
 
     @property
     def mean(self):
@@ -180,10 +190,53 @@ class PnL:
     @property
     def prob_loss(self):
         """``P(net < 0)`` -- the probability the position loses money."""
-        df = self.pnl_df
-        y = df.index.to_numpy(dtype=float)
-        p = df['p_total'].to_numpy(dtype=float)
+        x, p = self._xp()
+        y = self._net_values(x)
         return float(p[y < 0].sum())
+
+    # ------------------------------------------------------------------
+    # Reporting: the signed, additive P&L summary
+    # ------------------------------------------------------------------
+    @property
+    def summary_df(self):
+        """Signed, additive P&L rows: ``Consideration + Obligation = Margin``.
+
+        Three rows, each its **signed contribution** to the net P&L (so the
+        ``EX`` column *adds*), reported with the **SD** spread, *not* CV -- the
+        margin sits near break-even where ``CV = sd / mean`` is meaningless:
+
+        - **Consideration** -- the amount changing hands at inception
+          (``+`` received, ``-`` paid).
+        - **Obligation** -- the risky leg's signed contribution (``-`` a loss
+          borne, ``+`` a payoff held).
+        - **Margin** -- the net position (``= Consideration + Obligation``).
+
+        A sold cover shows Consideration ``+``, Obligation ``-``, Margin their
+        sum; **buying flips both signs** (you pay at inception *and* hold the
+        payoff). Freq / Sev / Agg detail lives on ``pnl.agg.summary_df`` (the
+        honest obligation table) -- not here. See dev/plan-pnl.md S3.1.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Rows ``Consideration`` / ``Obligation`` / ``Margin``; columns
+            ``EX`` / ``SD`` / ``Sk``.
+        """
+        x, p = self._xp()
+        # consideration leg (constant -> certain, SD 0; callable -> f(X))
+        if callable(self.consideration):
+            cm, csd, csk = self._moms(np.asarray(self.consideration(x), dtype=float), p)
+        else:
+            cm, csd, csk = self._consideration_at(x), 0.0, 0.0
+        # obligation = the risky leg's SIGNED contribution to the net
+        sign = -1.0 if self.agg._is_loss_value else 1.0
+        om, osd, osk = self._moms(sign * x, p)
+        mm, msd, msk = self._moms(self._net_values(x), p)
+        df = pd.DataFrame(
+            {'EX': [cm, om, mm], 'SD': [csd, osd, msd], 'Sk': [csk, osk, msk]},
+            index=['Consideration', 'Obligation', 'Margin'])
+        df.index.name = 'P&L'
+        return df
 
     # ------------------------------------------------------------------
     # Distribution functions (read the net frame)
@@ -208,6 +261,33 @@ class PnL:
     def sf(self, x):
         """``P(net > x)`` -- the survival function of the net."""
         return 1.0 - self.cdf(x)
+
+    # ------------------------------------------------------------------
+    # Plot: the net (Margin) density + distribution, no severity panel
+    # ------------------------------------------------------------------
+    def plot(self, axd=None, **kwargs):
+        """Plot the net P&L (Margin) density and distribution.
+
+        A P&L is an **affine of its aggregate**, not a compound of a severity,
+        so there is **no severity / density-derivative panel** (that belongs to
+        an :class:`Aggregate` -- use ``pnl.agg.plot()`` for the bare risky leg).
+        Two panels: the Margin density (A) and distribution (B), with the
+        break-even line at 0 marked.
+
+        Parameters
+        ----------
+        axd : dict of str to Axes, optional
+            Mosaic with keys ``'A'`` (density) and ``'B'`` (distribution); a new
+            figure is created if omitted and stored on ``pnl.figure``.
+        **kwargs
+            Passed to the canvas creator (e.g. ``figsize``).
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+        """
+        from .plots import plot_pnl
+        return plot_pnl(self, axd=axd, **kwargs)
 
     # ------------------------------------------------------------------
     # Display

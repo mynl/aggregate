@@ -145,6 +145,55 @@ def plot_aggregate(agg, axd=None, xmax=0, **kwargs):
         ax.legend().set(visible=False)
 
 
+def plot_pnl(pnl, axd=None, **kwargs):
+    """Net P&L (Margin) density and distribution for a :class:`PnL`.
+
+    Two panels -- the Margin density (A) and distribution (B) -- read from
+    ``pnl.pnl_df``. There is **no severity panel**: a P&L is an affine of its
+    aggregate, not a compound of a severity (that ``d/dx`` panel belongs to an
+    :class:`Aggregate`; plot the bare risky leg via ``pnl.agg.plot()``). The
+    break-even line at 0 is marked.
+
+    Parameters
+    ----------
+    pnl : PnL
+        The (updated) position to plot.
+    axd : dict of str to Axes, optional
+        Mosaic with keys ``'A'`` (density) and ``'B'`` (distribution). A new
+        figure is created if omitted and stored on ``pnl.figure``.
+    **kwargs
+        Passed to the canvas creator (e.g. ``figsize``).
+    """
+    if axd is None:
+        if 'figsize' not in kwargs:
+            kwargs['figsize'] = (2 * FIG_W, FIG_H)
+        pnl.figure, axs = make_grid(1, 2, **kwargs)
+        axd = {'A': axs[0], 'B': axs[1]}
+    else:
+        pnl.figure = axd['A'].figure
+
+    df = pnl.pnl_df
+    bs = pnl.agg.bs
+    ax = axd['A']
+    if bs == 1 and abs(pnl.mean) < 1025:
+        # discrete: stems for the mass, a step cdf
+        ax.stem(df.index, df.p_total, basefmt='none', linefmt='C0-',
+                markerfmt='C0.', label='Margin')
+        ax.set(title='Probability mass function', xlabel='Net P&L')
+        df.F.plot(ax=axd['B'], drawstyle='steps-post', lw=2, label='Margin')
+    else:
+        # continuous: density (mass / bs) and the cdf
+        (df.p_total / bs).plot(ax=ax, lw=2, label='Margin')
+        ax.set(title='Probability density', xlabel='Net P&L')
+        df.F.plot(ax=axd['B'], lw=2, label='Margin')
+    # break-even reference (a P&L can be a loss)
+    for a in (ax, axd['B']):
+        a.axvline(0.0, lw=0.75, color='C7', ls='--')
+    ax.legend()
+    axd['B'].set(title='Distribution function', xlabel='Net P&L')
+    return pnl.figure
+
+
 def plot_reins_occ(agg, axs=None):
     """Occurrence-reinsurance plot: occurrence log density and aggregate Lee.
 

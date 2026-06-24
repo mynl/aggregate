@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0a104
+
+### Signed additive `PnL.summary_df` and `PnL.plot()` (Stage C of `PnL`)
+
+- **`PnL.summary_df`** — a signed, **additive** three-row P&L table where the
+  `EX` column adds: **Consideration + Obligation = Margin**. Each row is its
+  signed contribution to the net (`+` received / `-` paid for Consideration;
+  `-` a loss borne / `+` a payoff held for Obligation), reported with the **SD**
+  spread (not CV — the margin sits near break-even). A constant consideration is
+  certain (SD 0); a callable (loss-sensitive) consideration carries a real
+  SD/Sk. Buying flips both signs (Consideration `< 0` *and* Obligation `> 0`).
+  Freq/Sev/Agg detail stays on `pnl.agg.summary_df`.
+- **`PnL.plot()`** — its own two-panel exhibit (Margin density + distribution)
+  with the break-even line at 0; **no severity panel** (a P&L is an affine of its
+  aggregate, not a compound of a severity — plot the bare leg via
+  `pnl.agg.plot()`).
+
 ## 1.0.0a103
 
 ### First-class `PnL` veneer; the in-place `pnl` affine removed (Stage B of `PnL`)

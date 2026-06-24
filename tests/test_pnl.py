@@ -227,3 +227,62 @@ def test_bivariate_with_pnl_component_rejected():
               'agg A 1 claim sev lognorm 10 cv 1 poisson '
               'pnl B 100 prem - 1 claim sev lognorm 10 cv 1 poisson '
               'copula gumbel 0.4', update=False)
+
+
+# ----------------------------------------------------------------------
+# Signed, additive summary_df (Consideration / Obligation / Margin)
+# ----------------------------------------------------------------------
+def test_summary_df_signed_additive():
+    """A sold cover: Consideration +, Obligation -, Margin = their sum; SD not CV."""
+    a = build('pnl B 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
+    df = a.summary_df
+    assert list(df.index) == ['Consideration', 'Obligation', 'Margin']
+    assert list(df.columns) == ['EX', 'SD', 'Sk']        # SD trio, no CV
+    assert df.loc['Consideration', 'EX'] == pytest.approx(1000.0)
+    assert df.loc['Consideration', 'SD'] == 0.0          # a constant is certain
+    assert df.loc['Obligation', 'EX'] == pytest.approx(-700.0, rel=TOL)  # loss subtracts
+    # rows add (the defining property): Consideration + Obligation = Margin
+    assert (df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX']
+            == pytest.approx(df.loc['Margin', 'EX'], abs=1e-6))
+    # the margin SD is the obligation SD (constant consideration adds no spread)
+    assert df.loc['Margin', 'SD'] == pytest.approx(df.loc['Obligation', 'SD'])
+
+
+def test_summary_df_bought_flips_both_signs():
+    """Buying a payoff: Consideration < 0 (paid) AND Obligation > 0 (held)."""
+    b = build('agg P 5 claims sev gamma 8 cv .5 poisson payoff').make_pnl(-100)
+    df = b.summary_df
+    assert df.loc['Consideration', 'EX'] == pytest.approx(-100.0)
+    assert df.loc['Obligation', 'EX'] > 0                 # payoff held adds
+    assert (df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX']
+            == pytest.approx(df.loc['Margin', 'EX'], abs=1e-6))
+
+
+def test_summary_df_function_consideration_has_spread():
+    """A loss-sensitive (callable) consideration carries a real SD/Sk."""
+    base = build('agg L 5 claims sev gamma 100 cv 0.5 poisson')
+    swing = base.make_pnl(lambda x: 100.0 + 0.5 * x)
+    df = swing.summary_df
+    assert df.loc['Consideration', 'SD'] > 0              # f(X) varies
+    assert (df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX']
+            == pytest.approx(df.loc['Margin', 'EX'], abs=1e-6))
+
+
+# ----------------------------------------------------------------------
+# PnL.plot(): Margin density + distribution, no severity panel
+# ----------------------------------------------------------------------
+def test_plot_has_two_panels_no_sev():
+    import matplotlib
+    matplotlib.use('Agg')
+    a = build('pnl B 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
+    fig = a.plot()
+    # exactly two panels (density + distribution); no severity / Lee panel
+    assert len(fig.axes) == 2
+
+
+def test_plot_discrete_runs():
+    import matplotlib
+    matplotlib.use('Agg')
+    a = build('pnl GP 5 premium - dfreq[3] dsev[-1 1]', bs=1)
+    fig = a.plot()
+    assert len(fig.axes) == 2

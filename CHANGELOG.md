@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.0a103
+
+### First-class `PnL` veneer; the in-place `pnl` affine removed (Stage B of `PnL`)
+
+`pnl` is now a first-class **`PnL`** composition over a *pure-loss* `Aggregate`,
+replacing the old in-place affine on `Aggregate`. `build('pnl ...')` returns a
+`PnL` (was an `Aggregate`-with-affine). **Breaking** for the new `pnl` surface
+(nothing external depends on it).
+
+- **`PnL`** (composition): `pnl.agg` is the untouched loss obligation (honest
+  density / moments / plot in loss terms); the net is the derived `pnl.pnl_df`
+  (`consideration - X` for a loss leg, `consideration + X` for a payoff leg) — a
+  cheap 1-D relabel, no FFT/window/dropped-mass machinery. Exposes `mean`, `sd`,
+  `var`, `skew`, `prob_loss`, `q`/`cdf`/`sf`, and `value_type == 'payoff'`
+  (a P&L is always payoff). Consideration may be a **signed scalar/vector**
+  (sums to one book amount) **or a callable** `f(x)` (loss-sensitive
+  swing/slide, passed by hand).
+- **`Aggregate.make_pnl(consideration)`** — the canonical constructor (no `sign`
+  argument; the combine sign is read from `value_type`). `build('pnl NAME C prem
+  - <body>')` == `build('agg NAME <body>').make_pnl(consideration=C)`.
+- **The in-place affine is gone.** `Aggregate` no longer carries
+  `agg_premium`/`agg_reflect`/`agg_shift` or `_apply_agg_affine`/`_pnl_window`/
+  `_agg_affine_active`; `update()` no longer reflects/shifts. `Aggregate` is a
+  pure loss (or payoff-oriented) distribution again. The signed-*severity*
+  (`ssev` / negative-`dsev`) path is unchanged.
+- **Portfolios and bivariates of `pnl` units are deferred** (book-level / joint
+  P&L: a loss-sensitive consideration must be netted per unit *before*
+  combining, which the shared combine does not preserve). They raise a clear
+  `NotImplementedError`. A **payoff book** is now expressed with payoff-oriented
+  aggregates (`agg ... payoff`), not `pnl` units.
+
+The signed additive `summary_df` (Consideration / Obligation / Margin),
+`PnL.plot()`, the Cherny–Madan `evaluate` panel, the reinsurance-aware GCN view,
+and a DecL swing/slide builder land in later stages.
+
 ## 1.0.0a102
 
 ### DecL `payoff` / `loss` orientation suffix on `agg` (Stage A of `PnL`)

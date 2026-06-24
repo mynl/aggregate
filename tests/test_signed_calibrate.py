@@ -84,7 +84,7 @@ def test_payoff_dual_round_trip():
     pricing it back through apply_distortion(view='ask') -- which applies g_dual
     for a payoff -- reproduces the (negated) canonical premium target. This is
     the test that fails if reverse and effective_g ever double-flip."""
-    pay = build('pnl SC.Pnl 10 prem - dfreq [1] dsev [2 5 12] [.4 .4 .2]', **GRID)
+    pay = build('agg SC.Pay dfreq [1] dsev [-2 5 8] [.2 .4 .4] payoff', **GRID)
     assert pay._is_loss_value is False
     pay.calibrate_distortions(0.1, p=0.9)
     P_report = _cal(pay)['P']
@@ -98,7 +98,7 @@ def test_payoff_dual_round_trip():
 def test_payoff_receipt_in_loss_convention():
     """A profitable payoff reports a negative L (the 'loss' is really a profit);
     M, Q stay non-negative and the accounting identities hold."""
-    pay = build('pnl SC.Pnl 10 prem - dfreq [1] dsev [2 5 12] [.4 .4 .2]', **GRID)
+    pay = build('agg SC.Pay dfreq [1] dsev [-2 5 8] [.2 .4 .4] payoff', **GRID)
     pay.calibrate_distortions(0.1, p=0.9)
     c = _cal(pay)
     assert c['L'] < 0                       # profit reported as negative loss

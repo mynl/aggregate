@@ -34,12 +34,13 @@ from ._reinsurance import make_ceder_netter, _validate_reins_layers  # noqa: F40
 from ._aggregate import (  # noqa: F401
     value_type_role, value_type_label, max_log2, _flat_col_to_stats_index,
 )
+from ._pnl import PnL  # noqa: F401
 # Back-compat re-export; tail.py is the source of truth (see tests/test_tail.py).
 from .tail import TailClass  # noqa: F401
 
 # The public ``*`` surface, unchanged from the pre-split module.
 __all__ = [
-    'Frequency', 'Severity', 'Aggregate',
+    'Frequency', 'Severity', 'Aggregate', 'PnL',
     'lognorm_fit', 'sln_fit', 'sgamma_fit', 'gamma_fit', 'beta_fit',
     'invgamma_fit', 'invgauss_fit',
     'lognorm_lev', 'lognorm_approx',

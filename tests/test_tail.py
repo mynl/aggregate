@@ -381,16 +381,6 @@ def test_tail_df_signed_support_is_two_sided():
     assert df.loc['aggregate', 'max'] == 10.0    # 2 x 5
 
 
-def test_tail_df_pnl_affine_support_and_tails():
-    # pnl = premium - loss: support [-inf, premium]; right is the premium cap
-    # (bounded), left mirrors the loss right tail (subexponential).
-    row = _agg('pnl X 1000 prem - 100 claims sev lognorm 30 cv 1 poisson').tail_df.loc['aggregate']
-    assert np.isneginf(row['min']) and row['max'] == 1000.0
-    assert row['right_tail'] == 'bounded'
-    assert row['left_tail'] == 'subexponential'
-    assert not row['bounded']
-
-
 def test_severity_support_layered():
     # claim-space support of the layered loss: 0 .. limit (finite) or .. inf.
     a = _agg('agg A 10 claims 1000 xs 0 sev lognorm 100 cv 2 poisson')
@@ -423,14 +413,6 @@ def test_tail_narrative_power_law_reports_moments():
     a = _agg('agg P 10 claims sev 1 * pareto 1.5 poisson')
     assert 'infinite variance' in a.tail_explanation
     assert 'power-law' in a.tail_description
-
-
-def test_tail_narrative_pnl_heavy_left():
-    a = _agg('pnl X 1000 prem - 100 claims sev lognorm 30 cv 1 poisson')
-    desc = a.tail_description
-    assert '(-inf, 1,000]' in desc                # support through the affine
-    assert 'subexponential left tail' in desc
-    assert 'left tail is heavy' in a.tail_explanation
 
 
 def test_tail_narrative_color_emphasises_thick():

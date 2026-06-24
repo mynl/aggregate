@@ -452,21 +452,23 @@ class UnderwritingTransformer(Transformer):
         return c[0]
 
     def _attach_pnl(self, spec, premium):
-        """Attach the premium-minus-loss affine wrapper to a loss ``spec``.
+        """Record the consideration on a loss ``spec`` (the ``pnl`` marker).
 
-        ``pnl`` builds the same spec an ``agg`` would for the loss body, then
-        records an aggregate-level affine transform: reflect (a profit is a
-        negative loss) and a single deterministic shift equal to the total
-        premium. The premium is subtracted **once for the book**, in contrast
-        to a constant inside ``sev``/``dsev``/``ssev`` which is per-claim.
+        ``pnl`` builds the same loss-aggregate spec an ``agg`` would, plus a
+        single ``consideration`` entry (the stated premium). The underwriter
+        builds the pure-loss :class:`Aggregate` from the body and wraps it via
+        :meth:`Aggregate.make_pnl`; the net P&L (``consideration - loss``) is
+        derived on the resulting :class:`PnL`. The premium is a single
+        deterministic amount for the book, in contrast to a constant inside
+        ``sev``/``dsev``/``ssev`` which is per-claim.
 
         Parameters
         ----------
         spec : dict
             The loss-aggregate spec (mutated in place).
         premium : float or list
-            The stated premium (scalar or per-component vector). The shift is
-            the sum; ``value_type`` is set to ``'payoff'`` (more is better).
+            The stated premium (scalar or per-component vector), recorded as
+            ``consideration``.
 
         Notes
         -----
@@ -480,11 +482,7 @@ class UnderwritingTransformer(Transformer):
             spec["exp_premium"] = premium
             spec["exp_lr"] = lr
             spec["exp_el"] = np.array(premium) * np.array(lr)
-        shift = float(np.sum(np.asarray(_check_vectorizable(premium), dtype=float)))
-        spec["agg_premium"] = premium
-        spec["agg_reflect"] = True
-        spec["agg_shift"] = shift
-        spec["value_type"] = "payoff"
+        spec["consideration"] = premium
 
     def pnl_out_full(self, c):
         (_pnl, name, premium, _prem, _minus, exposures, layers, sev_clause,
@@ -502,7 +500,7 @@ class UnderwritingTransformer(Transformer):
             "hints": trailer["hints"],
         }
         self._attach_pnl(spec, premium)
-        return ("agg", name, spec)
+        return ("pnl", name, spec)
 
     def pnl_out_dfreq(self, c):
         (_pnl, name, premium, _prem, _minus, dfreq, layers, sev_clause,
@@ -519,7 +517,7 @@ class UnderwritingTransformer(Transformer):
             "hints": trailer["hints"],
         }
         self._attach_pnl(spec, premium)
-        return ("agg", name, spec)
+        return ("pnl", name, spec)
 
     def pnl_exp_claims(self, c):
         numbers, _claims = c

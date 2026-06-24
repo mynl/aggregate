@@ -1,15 +1,23 @@
-"""Tests for the ``pnl`` keyword -- premium-minus-loss aggregates.
+"""Tests for the ``pnl`` keyword and the first-class :class:`PnL` veneer.
 
-``pnl NAME <premium> prem - <loss body>`` is a sibling of ``agg`` that builds an
-ordinary loss aggregate and applies an aggregate-level affine wrapper
-``PnL = premium - A`` (reflect + a single shift by the total premium). The
-premium is subtracted **once for the book**, in contrast to a constant inside
-``sev``/``dsev``/``ssev`` which is per-claim. See dev/done/plan-pnl-premium.md.
+``pnl NAME <consideration> prem - <loss body>`` builds a pure-loss
+:class:`Aggregate` X (the obligation) and wraps it in a :class:`PnL` whose net
+is ``consideration - X`` (a profit is a negative loss). The consideration is a
+single amount for the book, in contrast to a constant inside ``sev``/``dsev``/
+``ssev`` which is per-claim. ``build('pnl ...')`` and
+``build('agg ...').make_pnl(consideration=...)`` coincide. See dev/plan-pnl.md.
 
-Covers: the three exposure forms (lr / claims / loss), vectorised premium,
-moment closed forms (mean shift, sd invariant, skew sign flip), P(loss), the
-per-claim-vs-once distinction, the signed-aware SD describe, the payoff
-value_type, and the Portfolio combine of a book of pnl units.
+The risky leg is left untouched: ``pnl.agg`` is the honest obligation (density,
+moments, plot in loss terms); the net is the derived ``pnl.pnl_df``. A ``pnl``
+is **always payoff** (more net money is better). Portfolios / bivariates of
+``pnl`` units are deferred (book-level P&L), and rejected with a clear error.
+
+Covers: the PnL return type, value_type, the three exposure forms (lr / claims /
+loss), the moment closed forms (mean shift, sd invariant, skew sign flip),
+vector consideration, P(loss), the per-claim-vs-once distinction, mass
+conservation of the net, the untouched obligation, make_pnl equivalence, signed
+loss severity under pnl, function-valued consideration, and the collection
+rejections.
 """
 from __future__ import annotations
 
@@ -18,7 +26,7 @@ import warnings
 import numpy as np
 import pytest
 
-from aggregate import build
+from aggregate import build, PnL
 from aggregate.constants import DefectiveDistributionWarning
 
 # severities chosen light enough that the 12-nines window is well-resolved, so
@@ -27,210 +35,166 @@ TOL = 5e-3
 
 
 # ----------------------------------------------------------------------
-# Parse / spec
+# Type / orientation
 # ----------------------------------------------------------------------
-def test_value_type_payoff():
-    """A pnl aggregate is tagged payoff and is signed via the affine."""
+def test_build_pnl_returns_pnl():
+    """``build('pnl ...')`` returns a PnL whose net is always payoff."""
     a = build('pnl B 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
+    assert isinstance(a, PnL)
     assert a.value_type == 'payoff'
-    assert a._agg_affine_active()
-    assert a._agg_reflect is True
-    assert a._agg_shift == 1000.0
-    assert a._signed()
-    # the loss severity itself is NOT signed (non-negative loss)
-    assert not a._signed_severity()
+    # the risky leg is an ordinary loss aggregate, untouched
+    assert a.agg.value_type == 'loss'
+    assert not a.agg._signed()                 # loss severity is non-negative
+
+
+def test_obligation_is_untouched():
+    """``pnl.agg`` is the honest loss obligation (E[X]=700), not the net."""
+    a = build('pnl B 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
+    assert a.agg.agg_m == pytest.approx(700.0, rel=TOL)
+    # net = 1000 - 700 = 300
+    assert a.mean == pytest.approx(300.0, rel=TOL, abs=2.0)
 
 
 # ----------------------------------------------------------------------
 # Moment closed forms across the three exposure forms
 # ----------------------------------------------------------------------
-@pytest.mark.parametrize('program,premium,e_loss', [
+@pytest.mark.parametrize('program,consid,e_loss', [
     ('pnl X 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson', 1000.0, 700.0),
     ('pnl X 100 prem - 7 claims sev gamma 100 cv 0.5 poisson', 100.0, 700.0),
     ('pnl X 100 prem - 700 loss sev gamma 100 cv 0.5 poisson', 100.0, 700.0),
 ])
-def test_mean_across_exposure_forms(program, premium, e_loss):
-    """mean = premium - E[loss] for lr / claims / loss exposure heads."""
+def test_mean_across_exposure_forms(program, consid, e_loss):
+    """net mean = consideration - E[loss] for lr / claims / loss heads."""
     a = build(program)
-    assert a.est_m == pytest.approx(premium - e_loss, rel=TOL, abs=TOL)
+    assert a.mean == pytest.approx(consid - e_loss, rel=TOL, abs=TOL)
 
 
 def test_sd_invariant_skew_flips():
     """sd unchanged, skew sign-flipped relative to the bare loss aggregate."""
     pnl = build('pnl X 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
     loss = build('agg L 1000 prem at 0.7 lr sev gamma 100 cv 0.5 poisson')
-    # mean = premium - E[loss]
-    assert pnl.est_m == pytest.approx(1000 - loss.est_m, rel=TOL, abs=TOL)
-    # spread invariant under reflect + shift
-    assert pnl.est_sd == pytest.approx(loss.est_sd, rel=TOL)
+    assert pnl.mean == pytest.approx(1000 - loss.est_m, rel=TOL, abs=TOL)
+    # spread invariant under the consideration shift + reflection
+    assert pnl.sd == pytest.approx(loss.est_sd, rel=TOL)
     # reflection flips the skew sign
-    assert pnl.est_skew == pytest.approx(-loss.est_skew, rel=2e-2, abs=1e-3)
+    assert pnl.skew == pytest.approx(-loss.est_skew, rel=2e-2, abs=1e-3)
+
+
+def test_make_pnl_equivalence():
+    """``build('pnl ...')`` == ``build('agg ...').make_pnl(consideration=...)``."""
+    direct = build('pnl X 100 prem - 7 claims sev gamma 100 cv 0.5 poisson')
+    via = build('agg L 7 claims sev gamma 100 cv 0.5 poisson').make_pnl(100)
+    assert via.value_type == 'payoff'
+    assert via.mean == pytest.approx(direct.mean, rel=TOL, abs=TOL)
+    assert via.sd == pytest.approx(direct.sd, rel=TOL)
 
 
 # ----------------------------------------------------------------------
-# Vectorised premium (mirrors agg)
+# Vector consideration sums to one book amount
 # ----------------------------------------------------------------------
-def test_vector_premium():
-    """Shift = sum(premium); mean = sum(premium_i * (1 - lr))."""
+def test_vector_consideration():
+    """A vector premium sums to one book consideration; mean follows."""
     a = build('pnl X [100 200 100] prem - .8 lr [1000 2000 5000] xs 0 '
               'sev lognorm 500 cv 2 poisson')
-    assert a._agg_shift == pytest.approx(400.0)
-    # mean = 400 - 0.8 * 400 = 80
-    assert a.est_m == pytest.approx(80.0, rel=TOL, abs=0.5)
+    # consideration = sum = 400; mean = 400 - 0.8 * 400 = 80
+    assert a.mean == pytest.approx(80.0, rel=TOL, abs=0.5)
 
 
 # ----------------------------------------------------------------------
-# P(loss) = P(PnL < 0) = loss survival at the premium
+# P(loss) = P(net < 0) = loss survival at the consideration
 # ----------------------------------------------------------------------
-def test_p_loss_matches_loss_survival():
+def test_prob_loss_matches_loss_survival():
     pnl = build('pnl X 100 prem - 7 claims sev gamma 100 cv 0.5 poisson')
     loss = build('agg L 7 claims sev gamma 100 cv 0.5 poisson')
-    p_loss = float(pnl.agg_density[pnl.xs < 0].sum())
-    assert p_loss == pytest.approx(float(loss.sf(100)), rel=2e-2, abs=2e-3)
+    assert pnl.prob_loss == pytest.approx(float(loss.sf(100)), rel=2e-2, abs=2e-3)
 
 
 # ----------------------------------------------------------------------
 # Per-claim (ssev) vs once-for-the-book (pnl) distinction
 # ----------------------------------------------------------------------
 def test_per_claim_vs_once_distinction():
-    """``pnl 100 prem - 5 claims`` (premium once) differs from
-    ``5 claims ssev 100 - sev`` (constant per claim)."""
+    """``pnl 100 prem - 5 claims`` (once) differs from a per-claim constant."""
     once = build('pnl P 100 prem - 5 claims sev gamma 8 cv 0.5 poisson')
-    # per-claim: mean ~ 5 * (100 - 8) = 460, far from the pnl mean 100 - 40 = 60
     per_claim = build('agg S 5 claims ssev 100 - gamma 8 cv 0.5 poisson')
-    assert once.est_m == pytest.approx(100 - 5 * 8, rel=TOL, abs=0.5)
+    assert once.mean == pytest.approx(100 - 5 * 8, rel=TOL, abs=0.5)
     assert per_claim.est_m == pytest.approx(5 * (100 - 8), rel=2e-2, abs=1.0)
-    assert abs(once.est_m - per_claim.est_m) > 100
+    assert abs(once.mean - per_claim.est_m) > 100
 
 
 # ----------------------------------------------------------------------
-# Mass conservation + signed window brackets the mean
+# Mass conservation + the net grid straddles 0
 # ----------------------------------------------------------------------
-def test_mass_conserved_and_window_brackets_mean():
+def test_mass_conserved_and_grid_straddles_zero():
     a = build('pnl X 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
-    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
-    assert a.xs[0] < a.est_m < a.xs[-1]
-    # the grid straddles 0 (a P&L can be a loss)
-    assert a.xs[0] < 0 < a.xs[-1]
+    df = a.pnl_df
+    assert df.p_total.sum() == pytest.approx(1.0, abs=1e-6)
+    net = df.index.to_numpy(float)
+    assert net.min() < a.mean < net.max()
+    assert net.min() < 0 < net.max()           # a P&L can be a loss
 
 
 # ----------------------------------------------------------------------
-# Signed-aware describe: SD trio (not CV), finite even for a mean-zero P&L
+# Distribution functions on the net
 # ----------------------------------------------------------------------
-def test_describe_signed_sd_columns():
+def test_cdf_q_sf_consistent():
     a = build('pnl X 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
-    cols = list(a.summary_df.columns)
-    assert 'SD' in cols and 'Est SD' in cols and 'Err SD' in cols
-    assert 'CV' not in cols and 'Est CV' not in cols
-
-
-def test_describe_finite_for_mean_zero_pnl():
-    """When premium == E[loss] the mean is ~0; SD describe stays finite."""
-    # premium == E[loss] (lr 100%) -> margin ~ 0
-    a = build('pnl X 700 prem - 100% lr sev gamma 100 cv 0.5 poisson')
-    assert abs(a.est_m) < 5.0          # mean near zero
-    df = a.summary_df
-    assert np.isfinite(df.to_numpy().astype(float)).all() or \
-        np.isfinite(df['SD'].to_numpy().astype(float)).all()
-    # Agg SD is finite and positive regardless of the near-zero mean
-    assert df.loc['Agg', 'SD'] > 0
-
-
-def test_non_pnl_describe_unchanged():
-    """An ordinary aggregate still shows the CV trio (byte-for-byte path)."""
-    a = build('agg N 100 claims sev gamma 100 cv 0.5 poisson')
-    cols = list(a.summary_df.columns)
-    assert 'CV' in cols and 'Est CV' in cols and 'SD' not in cols
+    # sf is exactly 1 - cdf
+    assert a.sf(50.0) == pytest.approx(1 - a.cdf(50.0), abs=1e-12)
+    # prob_loss = P(net<0); cdf(0) = P(net<=0): equal up to the atom at 0 (one bucket)
+    assert a.prob_loss == pytest.approx(a.cdf(0.0), abs=5e-3)
+    # median bracketed by the grid; cdf at the median ~ 0.5
+    med = a.q(0.5)
+    assert a.cdf(med) >= 0.5 - 1e-9
 
 
 # ----------------------------------------------------------------------
-# info readout
+# Function-valued (loss-sensitive) consideration -- passed by hand
 # ----------------------------------------------------------------------
-def test_info_pnl_readout():
-    a = build('pnl X 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
-    info = a.info
-    assert 'premium' in info and 'expected loss' in info and 'P(loss)' in info
-    assert 'value_type               payoff' in info
+def test_function_valued_consideration():
+    """A callable consideration f(x) nets bucket-wise: net = f(x) - x.
 
-
-# ----------------------------------------------------------------------
-# Portfolio: a book of pnl units combines (means add, variances add)
-# ----------------------------------------------------------------------
-def test_portfolio_of_pnl_combines():
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        port = build('''port Book
-            pnl A 1000 prem - 80% lr sev gamma 100 cv 0.3 poisson
-            pnl B 1000 prem - 80% lr sev gamma 100 cv 0.3 poisson
-        ''')
-        unit = build('pnl A 1000 prem - 80% lr sev gamma 100 cv 0.3 poisson')
-    d = port.density_df
-    assert d.p_total.sum() == pytest.approx(1.0, abs=1e-5)
-    mean = float((d.loss * d.p_total).sum())
-    assert mean == pytest.approx(2 * 200.0, rel=TOL, abs=2.0)
-    # per-line means from the native unit pmfs (numerics-2)
-    for u in ('A', 'B'):
-        ser = port.unit_density(u)
-        mu = float((ser.index * ser).sum())
-        assert mu == pytest.approx(200.0, rel=TOL, abs=1.0)
-    # variances add under independence: sd_total = sqrt(2) * unit sd
-    var = float((d.loss ** 2 * d.p_total).sum()) - mean ** 2
-    assert var ** 0.5 == pytest.approx(np.sqrt(2) * unit.est_sd, rel=1e-2)
-
-
-def test_portfolio_pnl_mixed_with_loss_line():
-    """A pnl margin line composes with a pnl *cost* line (0 premium).
-
-    A bare ``agg`` loss line would enter the convolution with a positive mean
-    (it adds); to carry a pure cost in a P&L book, declare it as a 0-premium
-    ``pnl`` so it enters as ``-loss``. Margin 200 + cost (-200) -> ~0.
+    A profit-commission style slide: keep 80% of the premium plus a 20%
+    rebate on low losses. Here use a simple swing ``f(x) = 100 + 0.5*x`` so
+    the net is ``100 - 0.5*x`` -- still comonotone, SD scaled by 0.5.
     """
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        port = build('''port Mixed
-            pnl P 1000 prem - 80% lr sev gamma 100 cv 0.3 poisson
-            pnl C 0 prem - 200 loss sev gamma 100 cv 0.3 poisson
-        ''')
-    d = port.density_df
-    assert d.p_total.sum() == pytest.approx(1.0, abs=1e-5)
-    mean = float((d.loss * d.p_total).sum())
-    # margin 200 plus cost line mean (0 - 200) = -200 -> ~0
-    assert mean == pytest.approx(0.0, abs=2.0)
+    base = build('agg L 5 claims sev gamma 100 cv 0.5 poisson')
+    flat = base.make_pnl(100.0)
+    swing = base.make_pnl(lambda x: 100.0 + 0.5 * x)
+    # net mean: flat = 100 - E[X]; swing = 100 - 0.5 E[X]
+    assert swing.mean == pytest.approx(100.0 - 0.5 * base.agg_m, rel=TOL, abs=1.0)
+    # the swing absorbs half the loss volatility -> SD halved
+    assert swing.sd == pytest.approx(0.5 * flat.sd, rel=1e-2)
+    assert swing.pnl_df.p_total.sum() == pytest.approx(1.0, abs=1e-6)
 
 
 # ----------------------------------------------------------------------
 # Signed loss severity (dsev with a negative atom / ssev) under pnl
 # ----------------------------------------------------------------------
-# A ``pnl`` whose *loss severity* is itself signed convolves the loss on its
-# genuine signed grid before the affine relabel onto the P&L window. Previously
-# the affine path hard-coded a 0-based loss grid, wrapping the negative atoms to
-# the top of the FFT buffer: half the mass dropped and the empirical moments
-# read +/-2**15 grid-index garbage. See dev/done/plan-pnl-signed-severity.md.
 def test_signed_dsev_pnl_exact():
-    """``pnl 5 prem - dfreq[3] dsev[-1 1]`` -> P&L in {2,4,6,8}, mean 5, sd sqrt3."""
+    """``pnl 5 prem - dfreq[3] dsev[-1 1]`` -> net in {2,4,6,8}, mean 5, sd sqrt3."""
     with warnings.catch_warnings():
-        # a correctly-sized signed-loss pnl must not warn (no dropped mass)
         warnings.simplefilter('error', category=DefectiveDistributionWarning)
         a = build('pnl GP 5 premium - dfreq[3] dsev[-1 1]', bs=1)
-    m = a.agg_density > 1e-12
-    support = a.xs[m]
-    probs = a.agg_density[m]
-    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-12)
+    df = a.pnl_df
+    m = df.p_total.to_numpy() > 1e-12
+    support = df.index.to_numpy(float)[m]
+    probs = df.p_total.to_numpy()[m]
+    assert df.p_total.sum() == pytest.approx(1.0, abs=1e-12)
     np.testing.assert_allclose(support, [2.0, 4.0, 6.0, 8.0])
     np.testing.assert_allclose(probs, [0.125, 0.375, 0.375, 0.125], atol=1e-12)
-    assert a.est_m == pytest.approx(5.0, abs=1e-9)
-    assert a.est_sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
-    assert a.est_skew == pytest.approx(0.0, abs=1e-9)
+    assert a.mean == pytest.approx(5.0, abs=1e-9)
+    assert a.sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
+    assert a.skew == pytest.approx(0.0, abs=1e-9)
 
 
 def test_signed_dsev_pnl_asymmetric_mean():
-    """Mean closed form holds for a non-symmetric signed dsev: E[PnL]=shift-2 E[X]."""
+    """Mean closed form for a non-symmetric signed dsev: E[net]=C - 2 E[X]."""
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         a = build('pnl Y 10 premium - dfreq[2] dsev[-2 1 3] [.5 .3 .2]', bs=1)
     # per-claim E[X] = -2(.5) + 1(.3) + 3(.2) = -0.1; two claims -> E[L] = -0.2
-    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-12)
-    assert a.est_m == pytest.approx(10.0 - 2 * (-0.1), abs=1e-9)
+    assert a.pnl_df.p_total.sum() == pytest.approx(1.0, abs=1e-12)
+    assert a.mean == pytest.approx(10.0 - 2 * (-0.1), abs=1e-9)
 
 
 def test_signed_ssev_pnl_mass_and_mean():
@@ -238,20 +202,28 @@ def test_signed_ssev_pnl_mass_and_mean():
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         a = build('pnl Z 100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson')
-    assert a._signed_severity()
-    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-5)
+    assert a.agg._signed_severity()
+    assert a.pnl_df.p_total.sum() == pytest.approx(1.0, abs=1e-5)
     # loss sev = 20 - lognorm(mean 10) -> per-claim mean 10; 5 claims -> E[L]=50
-    assert a.est_m == pytest.approx(100 - 50, abs=0.5)
+    assert a.mean == pytest.approx(100 - 50, abs=0.5)
 
 
-def test_signed_pnl_unit_in_portfolio_conserves_mass():
-    """A signed-loss pnl placed in a book keeps its own unit density mass-conserving."""
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        port = build('''port SignedBook
-            pnl S 5 premium - dfreq[3] dsev[-1 1]
-            pnl T 1000 prem - 80% lr sev gamma 100 cv 0.3 poisson
-        ''', bs=1)
-    # the signed-loss unit's own marginal is intact (no +/-2**15 garbage,
-    # full mass); read off the unit's native window (numerics-2)
-    assert port.unit_density('S').sum() == pytest.approx(1.0, abs=1e-6)
+# ----------------------------------------------------------------------
+# Portfolios / bivariates of pnl units are deferred -> clear rejection
+# ----------------------------------------------------------------------
+def test_portfolio_of_pnl_rejected():
+    """A book-level P&L (pnl units in a port) is deferred -> NotImplementedError."""
+    with pytest.raises(NotImplementedError, match='pnl units in a portfolio'):
+        build('''port Book
+            pnl A 1000 prem - 80% lr sev gamma 100 cv 0.3 poisson
+            pnl B 1000 prem - 80% lr sev gamma 100 cv 0.3 poisson
+        ''', update=False)
+
+
+def test_bivariate_with_pnl_component_rejected():
+    """A pnl component in a bivariate (joint P&L) is deferred -> NotImplementedError."""
+    with pytest.raises(NotImplementedError, match='pnl components in a bivariate'):
+        build('bivariate BV 5 claims '
+              'agg A 1 claim sev lognorm 10 cv 1 poisson '
+              'pnl B 100 prem - 1 claim sev lognorm 10 cv 1 poisson '
+              'copula gumbel 0.4', update=False)

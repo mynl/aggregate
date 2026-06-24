@@ -225,9 +225,10 @@ def test_payoff_round_trip_survives_relabel():
 
 
 def test_homogeneous_payoff_book_prices_through_dual():
+    # a payoff book = payoff-orientation aggregates (the supported payoff unit).
     p = build('port N3.PayPair '
-              'pnl P1 10 prem - dfreq [1] dsev [2 5] [.5 .5] '
-              'pnl P2 8 prem - dfreq [1] dsev [1 3]', update=False)
+              'agg P1 dfreq [1] dsev [5 8] [.5 .5] payoff '
+              'agg P2 dfreq [1] dsev [5 7] [.5 .5] payoff', update=False)
     p.update(log2=8, bs=1, padding=1)
     assert p._is_loss_value is False
     aug = p.apply_distortion(DUAL)
@@ -240,7 +241,7 @@ def test_mixed_value_type_book_still_raises():
     with pytest.raises(ValueError, match='mixed value_type'):
         build('port N3.Mixed '
               'agg L1 dfreq [1] dsev [1 2] '
-              'pnl P1 10 prem - dfreq [1] dsev [2 5] [.5 .5]', update=False)
+              'agg P1 dfreq [1] dsev [5 8] [.5 .5] payoff', update=False)
 
 
 # ---------------------------------------------------------------------------

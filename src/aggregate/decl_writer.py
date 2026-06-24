@@ -578,17 +578,16 @@ def _render_agg(name: str, spec: dict) -> _Block:
 def _render_pnl(name: str, spec: dict) -> _Block:
     """Render a profit-and-loss aggregate (``pnl NAME <premium> premium - ...``).
 
-    Inverts ``pnl_out_*`` / ``_attach_pnl``. The premium is ``agg_premium``; the
-    exposure head after ``premium -`` is ``claims`` (``exp_en``), ``lr``
+    Inverts ``pnl_out_*`` / ``_attach_pnl``. The premium is ``consideration``;
+    the exposure head after ``premium -`` is ``claims`` (``exp_en``), ``lr``
     (``exp_lr``, the bare loss-ratio form that binds to the premium) or ``loss``
-    (``exp_el``). The synthesized ``agg_reflect`` / ``agg_shift`` / ``value_type``
-    keys are reconstructed by ``_attach_pnl`` on re-parse and are not rendered.
+    (``exp_el``).
 
     Returns a :class:`_Block` whose head keeps ``pnl NAME <premium> premium -``
-    intact (so the affine wrapper re-parses); the loss-head fragment is the first
-    child clause.
+    intact (so it re-parses to a :class:`aggregate.PnL`); the loss-head fragment
+    is the first child clause.
     """
-    premium = _fmt_seq(spec['agg_premium'])
+    premium = _fmt_seq(spec['consideration'])
 
     if spec.get('freq_name') == 'empirical':
         head = _render_dfreq(spec)
@@ -614,12 +613,12 @@ def _render_pnl(name: str, spec: dict) -> _Block:
 
 
 def _render_agg_or_pnl(kind: str, name: str, spec: dict) -> _Block:
-    """Render an aggregate, dispatching to ``pnl`` when the affine wrapper is set.
+    """Render an aggregate, dispatching to ``pnl`` when a consideration is set.
 
-    Both ``agg`` and ``pnl`` declarations transform to ``("agg", name, spec)``;
-    the ``agg_premium`` key (set only by ``_attach_pnl``) distinguishes a pnl.
+    A ``pnl`` declaration transforms to ``("pnl", name, spec)`` with a
+    ``consideration`` key (set by ``_attach_pnl``); an ``agg`` has neither.
     """
-    if 'agg_premium' in spec:
+    if kind == 'pnl' or 'consideration' in spec:
         return _render_pnl(name, spec)
     return _render_agg(name, spec)
 
@@ -752,6 +751,7 @@ def _render_distortion(name: str, spec: dict) -> str:
 
 _KIND_RENDERERS = {
     'agg': lambda name, spec: _render_agg_or_pnl('agg', name, spec),
+    'pnl': lambda name, spec: _render_agg_or_pnl('pnl', name, spec),
     'sev': _render_sev_out,
     'port': _render_port,
     'bvagg': _render_bvagg,

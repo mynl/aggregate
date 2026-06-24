@@ -107,6 +107,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "DSEV": "'dsev'",
     "SSEV": "'ssev'",
     "LOSS": "'loss'",
+    "PAYOFF": "'payoff'",
     "PNL": "'pnl'",
     "PORT": "'port'",
     "RATE": "'rate'",

@@ -142,17 +142,16 @@ def test_unknown_kind_rejected():
 # pnl + approximate, portfolio combine, surfacing
 # ----------------------------------------------------------------------
 def test_pnl_approximate_loss_part_fitted():
-    """``pnl ... approximate`` fits the loss part; the premium affine rides along."""
+    """``pnl ... approximate`` fits the loss leg; the PnL nets the consideration."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         approx = build("pnl PA 600000 prem - 5000 claims sev lognorm 100 cv 2 "
                        "poisson approximate sgamma")
-    assert approx.approximation == "sgamma"
-    assert approx._agg_reflect is True
-    assert approx._agg_shift == 600000.0
-    # E[margin] = premium - E[loss] = 600000 - 500000
-    assert approx.est_m == pytest.approx(100000.0, rel=1e-3)
-    assert approx.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
+    # the approximation lives on the (loss) risky leg
+    assert approx.agg.approximation == "sgamma"
+    # E[margin] = consideration - E[loss] = 600000 - 500000
+    assert approx.mean == pytest.approx(100000.0, rel=1e-3)
+    assert approx.pnl_df.p_total.sum() == pytest.approx(1.0, abs=1e-6)
 
 
 def test_portfolio_combine_conserves_mass():

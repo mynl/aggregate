@@ -39,14 +39,10 @@ standalone aggregate (the exact validation target), because the zero-frequency
 slice of ``FFT2(S)`` along an axis is just ``FFT`` of that axis's marginal
 ``g_i``.
 
-**P&L axes.** A ``pnl`` component contributes its *loss* severity ``g_i`` to the
-copula+FFT exactly like an ``agg`` (the aggregate-level affine never touches the
-severity). Its premium becomes a **per-axis affine** -- reflect + shift -- applied
-to that tensor axis *after* the 2D FFT (:func:`_affine_axis`), the 1D
-``_apply_agg_affine`` relabel lifted to one axis. Because the affine is a pure
-per-axis grid relabel it commutes with marginalisation, so the affine axis's
-marginal reproduces the standalone ``pnl`` and the loss-loss copula dependence
-becomes the correct profit-loss sign once the axis is reflected.
+**P&L axes are not supported here.** A ``pnl`` component (book-level / joint
+P&L) is rejected at construction: a loss-sensitive consideration must be netted
+per unit *before* the joint combine, which the 2D FFT does not preserve. Use
+plain ``agg`` components, or build a standalone :class:`aggregate.PnL`.
 """
 
 import logging
@@ -423,83 +419,6 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
     return density, grid_x, grid_y, bs_x, bs_y, sev2, deficit, clipped
 
 
-def _affine_axis(density, axis, bs, n, reflect, shift, m_loss, sd, skew):
-    """Relabel one tensor axis of a joint density to ``shift - A`` (the ``pnl`` form).
-
-    Lifts the 1D :meth:`aggregate.distributions.Aggregate._apply_agg_affine`
-    grid relabel to a single axis of a multi-dimensional density: reflect (a
-    profit is a negative loss) and shift by the premium, placing the result on a
-    tight, mass-centred P&L window for that axis. A pure reverse-and-roll of the
-    finished density -- no new convolution -- so it commutes with
-    marginalisation: the affine axis's marginal becomes the standalone ``pnl``,
-    the other axis is untouched.
-
-    Parameters
-    ----------
-    density : ndarray
-        Joint loss density.
-    axis : int
-        Axis to transform.
-    bs : float
-        Bucket size of ``axis``.
-    n : int
-        Length of ``axis`` (``density.shape[axis]``).
-    reflect : bool
-        Reflect the axis (always ``True`` for ``pnl``; a profit is ``-loss``).
-    shift : float
-        Premium shift added after reflection.
-    m_loss, sd, skew : float
-        Analytic **loss** mean, standard deviation and skewness of the axis
-        marginal (used to size the tight P&L window via
-        :func:`aggregate.distributions.estimate_agg_window`).
-
-    Returns
-    -------
-    out : ndarray
-        Joint density with ``axis`` relabelled onto the P&L window.
-    xs_new : ndarray
-        New 1D grid for ``axis`` (``pnl_lo + arange(n) * bs``).
-
-    Notes
-    -----
-    The loss grid origin is 0 (the inner loss aggregate is non-negative), so
-    with ``s0 = round(shift / bs)`` and ``j_pnl = round(pnl_lo / bs)`` the map
-    ``t = (s0 - j_pnl) - k`` (reflect) is a one-to-one reverse-and-roll; buckets
-    outside the window are dropped (a negligible far-tail deficit).
-    """
-    # local import: estimate_agg_window lives in the heavy distributions module
-    from .distributions import estimate_agg_window
-
-    s0 = int(round(shift / bs)) if bs else 0
-    m = (shift - m_loss) if reflect else (shift + m_loss)
-    sk = -skew if reflect else skew
-    p = 1.0 - 10.0 ** -_WINDOW_NINES
-    if np.isfinite(sd) and sd > 0:
-        try:
-            lo, hi, _W = estimate_agg_window(m, sd, sk, p)
-        except (ValueError, FloatingPointError):  # pragma: no cover - defensive
-            lo, hi = m - 8.0 * sd, m + 8.0 * sd
-    else:  # pragma: no cover - defensive (point mass)
-        lo, hi = m, m
-    if (hi - lo) <= n * bs:
-        pnl_lo = float(np.floor(lo / bs) * bs) if bs else float(lo)
-    else:
-        pnl_lo = (float(np.floor((m - 0.5 * n * bs) / bs) * bs) if bs
-                  else float(m - 0.5 * n * bs))
-    j_pnl = int(round(pnl_lo / bs)) if bs else 0
-
-    k = np.arange(n)
-    t = (s0 - j_pnl) - k if reflect else (s0 - j_pnl) + k
-    valid = (t >= 0) & (t < n)
-
-    dm = np.moveaxis(density, axis, 0)
-    out = np.zeros_like(dm)
-    out[t[valid]] = dm[k[valid]]
-    out = np.moveaxis(out, 0, axis)
-    xs_new = pnl_lo + np.arange(n, dtype=float) * bs
-    return out, xs_new
-
-
 def _lattice_bs(xs):
     """Largest bucket size that places every atom of ``xs`` exactly on the grid.
 
@@ -636,11 +555,10 @@ class BivariateAggregate:
             return
 
         if mode == 'discrete':
-            if units is not None or any(
-                    k in kwargs for k in ('agg_reflect', 'agg_shift', 'agg_premium')):
+            if units is not None:
                 raise ValueError(
-                    'pnl / premium axes are not supported with dbvsev; use the '
-                    "copula form 'bv ... agg/pnl ... agg/pnl ...'.")
+                    'component axes are not supported with dbvsev; use the '
+                    "copula form 'bv ... agg ... agg ...'.")
             self._init_discrete(name, dbv_xs, dbv_ys, dbv_S,
                                 freq_name, freq_a, freq_b, freq_zm, freq_p0,
                                 exp_en, exp_el, exp_premium, exp_lr)
@@ -654,19 +572,19 @@ class BivariateAggregate:
 
         self._unit_specs = [t[2] for t in units]
         self.unit_names = [t[1] for t in units]
-
-        # split off any per-axis pnl affine; build the loss twins
-        self._affine = []
-        loss_specs = []
-        for s in self._unit_specs:
-            reflect = bool(s.get('agg_reflect', False))
-            shift = float(s.get('agg_shift', 0.0))
-            self._affine.append((reflect, shift))
-            ls = {k: v for k, v in s.items()
-                  if k not in ('agg_reflect', 'agg_shift',
-                               'agg_premium', 'value_type')}
-            loss_specs.append(ls)
-        self.units = [Aggregate(**s) for s in loss_specs]
+        # pnl components (book-level / joint P&L) are deferred -- a loss-sensitive
+        # consideration must be netted per unit before the joint combine, which
+        # the 2D FFT does not preserve. Reject with a clear message.
+        pnl_units = [t[1] for t in units if t[0] == 'pnl']
+        if pnl_units:
+            raise NotImplementedError(
+                "pnl components in a bivariate are not supported (joint P&L is "
+                f"deferred). Offending component(s): {', '.join(pnl_units)}. "
+                "Use plain agg components, or build a standalone PnL.")
+        self.units = [Aggregate(**s) for s in self._unit_specs]
+        # No per-axis affine: pnl components are rejected above, so both axes are
+        # plain loss aggregates (inert affine, as the netceded path also sets).
+        self._affine = [(False, 0.0), (False, 0.0)]
 
         # shared outer frequency + per-event severity raw moments (theoretical,
         # grid-independent, available at Aggregate.__init__)
@@ -1266,19 +1184,9 @@ class BivariateAggregate:
 
         density[np.abs(density) < 1e-15] = 0.0
 
-        # per-axis pnl affine (reflect + premium shift) applied post-FFT
-        for i, (reflect, shift) in enumerate(self._affine):
-            if reflect or shift != 0.0:
-                m, sd, skew = self._marginal_moments(i)
-                density, xs_new = _affine_axis(
-                    density, i, self.bs[i], density.shape[i],
-                    reflect, shift, m, sd, skew)
-                self.axis_xs[i] = xs_new
-
         self.density = density
         self.deficit = float(1.0 - density.sum())
-        # cache per-axis loss-marginal theory (pre-affine); summary_df / stats_df
-        # apply any pnl affine on top.
+        # cache per-axis loss-marginal theory.
         self._marg_theory = [self._marginal_moments(0), self._marginal_moments(1)]
 
     # ------------------------------------------------------------------

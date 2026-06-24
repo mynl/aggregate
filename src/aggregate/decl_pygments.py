@@ -133,7 +133,7 @@ class AggLexer(RegexLexer):
                     'bivariate', 'bv', 'clash', 'copula',
                     'netceded', 'grossceded', 'grossnet',
                     'approximate', 'approx', 'ssev',
-                    'claims', 'ceded', 'claim', 'loss', 'dist',
+                    'claims', 'ceded', 'claim', 'loss', 'payoff', 'dist',
                     'port', 'rate', 'net', 'sev', 'agg', 'xps', 'wts',
                     'inf', 'and', 'exp', 'at', 'cv', 'lr', 'xs',
                     'of', 'to', 'po', 'so', 'zm', 'zt', ),

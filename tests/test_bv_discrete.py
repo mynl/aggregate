@@ -190,15 +190,6 @@ def test_dbvsev_unnormalised_renormalises(caplog):
     assert np.isclose(mv.density.sum(), 1.0, atol=1e-9)
 
 
-def test_dbvsev_pnl_axis_rejected():
-    # the dbvsev grammar has no premium slot; a hand-built discrete spec carrying
-    # a pnl affine raises a clear error.
-    with pytest.raises(ValueError, match='pnl / premium axes are not supported'):
-        BivariateAggregate(name='P', mode='discrete',
-                           dbv_xs=[0, 1], dbv_ys=[0, 1],
-                           dbv_S=np.full((2, 2), 0.25), agg_shift=100.0)
-
-
 # ----------------------------------------------------------------------
 # lattice bucket helper
 # ----------------------------------------------------------------------

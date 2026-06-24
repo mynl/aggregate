@@ -196,35 +196,15 @@ def test_mv_clayton_lower_tail_less_agg_corr_than_gumbel():
     assert _mv('clayton 0.4').corr < _mv('gumbel 0.4').corr
 
 
-def test_mv_pnl_axis_signed_marginal_and_sign_flip():
+def test_mv_pnl_component_rejected():
+    """A pnl component in a bivariate (joint P&L) is deferred -> clear error."""
     prog = '''bivariate PL 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
         pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
         copula gumbel 0.4
         poisson'''
-    mv = build(prog)
-    m0, m1 = mv.marginals
-    assert np.isclose(mv.density.sum(), 1.0, atol=1e-6)
-    # B is premium - loss: mean ~ 900 - 750 = 150, two-sided window
-    mean_b = float((m1 * mv.axis_xs[1]).sum())
-    assert abs(mean_b - 150) / 150 < 0.08
-    assert mv.axis_xs[1][0] < 0  # signed window
-    # loss-loss positive copula dependence -> negative loss-A vs profit-B corr
-    assert mv.corr < -0.3
-
-
-def test_mv_pnl_marginal_matches_standalone_pnl():
-    prog = '''bivariate PL 25 claims
-        agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
-        pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
-        copula gumbel 0.4
-        poisson'''
-    mv = build(prog)
-    mean_b = float((mv.marginals[1] * mv.axis_xs[1]).sum())
-    # standalone pnl (Poisson thinning 25*.5 = 12.5 claims), premium 900.
-    # est_m carries the P&L (premium - loss) mean; agg_m stays in loss terms.
-    std = build('pnl Bstd 900 prem - 12.5 claims sev lognorm 60 cv 1.5 poisson')
-    assert abs(mean_b - std.est_m) / abs(std.est_m) < 0.08
+    with pytest.raises(NotImplementedError, match='pnl components in a bivariate'):
+        build(prog)
 
 
 def test_mv_reporting_smoke():

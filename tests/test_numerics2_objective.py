@@ -339,16 +339,15 @@ def test_removals(legacy_port):
 
 def test_aggregate_direct_sums_signed():
     """Aggregate density_df lev/exlea/exgta carry the origin on a signed
-    grid; hand-checkable two-atom law."""
-    a = build('pnl N2.PnL 10 prem - dfreq [1] dsev [2 5] [.5 .5]',
-              update=False)
+    grid; hand-checkable two-atom law on a negative-atom severity."""
+    a = build('agg N2.Sgn dfreq [1] dsev [-2 5] [.5 .5]', update=False)
     a.update(log2=6, bs=1/4)
     df = a.density_df
-    # atoms at 10-5=5 and 10-2=8 ... payoff: prem - loss: 10-2=8, 10-5=5
-    # E[X] = 6.5; E[X ∧ 6] = .5·5 + .5·6 = 5.5
-    assert np.isclose(df.at[6.0, 'lev'], 5.5, rtol=1e-14)
-    assert np.isclose(df.at[6.0, 'exlea'], 5.0, rtol=1e-14)
-    assert np.isclose(df.at[6.0, 'exgta'], 8.0, rtol=1e-12)
+    # atoms at -2 and 5, p .5 each; E[X] = 1.5. At a = 0 (a genuinely signed
+    # attach): E[X ∧ 0] = .5·(-2) + .5·0 = -1; E[X|X<=0] = -2; E[X|X>0] = 5.
+    assert np.isclose(df.at[0.0, 'lev'], -1.0, rtol=1e-14)
+    assert np.isclose(df.at[0.0, 'exlea'], -2.0, rtol=1e-14)
+    assert np.isclose(df.at[0.0, 'exgta'], 5.0, rtol=1e-12)
     assert 'epd' not in df.columns
 
 

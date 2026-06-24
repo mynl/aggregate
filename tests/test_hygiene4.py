@@ -56,9 +56,11 @@ def test_portfolio_value_type_loss_book():
 
 
 def test_portfolio_value_type_payoff_book():
-    a1 = build('pnl H4.Pay1 100 prem - 2 claims sev lognorm 30 cv 1 poisson',
+    # payoff-orientation aggregates (the supported payoff unit); pnl positions
+    # are a separate PnL veneer and not portfolio units.
+    a1 = build('agg H4.Pay1 2 claims sev lognorm 30 cv 1 poisson payoff',
                update=False)
-    a2 = build('pnl H4.Pay2 200 prem - 3 claims sev lognorm 40 cv 1 poisson',
+    a2 = build('agg H4.Pay2 3 claims sev lognorm 40 cv 1 poisson payoff',
                update=False)
     p = Portfolio('PayBook', [a1, a2])
     assert p.value_type == 'payoff'
@@ -68,7 +70,7 @@ def test_portfolio_value_type_payoff_book():
 def test_portfolio_value_type_mixed_raises():
     loss = build('agg H4.Loss 5 claims sev lognorm 50 cv 1 poisson',
                  update=False)
-    pay = build('pnl H4.Pay1 100 prem - 2 claims sev lognorm 30 cv 1 poisson',
+    pay = build('agg H4.Pay1 2 claims sev lognorm 30 cv 1 poisson payoff',
                 update=False)
     with pytest.raises(ValueError, match=r"mixed value_type.*H4\.Loss.*H4\.Pay1"):
         Portfolio('Mixed', [loss, pay])
@@ -171,21 +173,6 @@ def test_distortion_info_values():
 # Item 3 -- stats_df prem/lr meta backfill (GROSS)
 # ---------------------------------------------------------------------------
 
-def test_pnl_prem_lr_meta_populated():
-    p = build('pnl H4.Prem 1000 prem - 10 claims sev lognorm 80 cv 1 poisson',
-              update=False)
-    assert p.stats_df.loc[('meta', 'prem'), 'mixed'] == 1000
-    el = p.stats_df.loc[('meta', 'el'), 'mixed']
-    assert p.stats_df.loc[('meta', 'lr'), 'mixed'] == pytest.approx(el / 1000)
-
-
-def test_pnl_bare_lr_meta_populated():
-    p = build('pnl H4.PremLR 1000 prem - 65% lr sev lognorm 80 cv 1 poisson',
-              update=False)
-    assert p.stats_df.loc[('meta', 'prem'), 'mixed'] == 1000
-    assert p.stats_df.loc[('meta', 'lr'), 'mixed'] == pytest.approx(0.65)
-
-
 def test_exposure_clause_prem_lr_unchanged():
     a = build('agg H4.ExpPrem 100 prem at 0.65 lr sev lognorm 80 cv 1 poisson',
               update=False)
@@ -193,22 +180,10 @@ def test_exposure_clause_prem_lr_unchanged():
     assert a.stats_df.loc[('meta', 'lr'), 'mixed'] == pytest.approx(0.65)
 
 
-def test_pnl_reins_prem_lr_gross():
-    p = build('pnl H4.Reins 1000 prem - 10 claims sev lognorm 80 cv 1 '
-              'occurrence net of 100 xs 100 poisson', update=False)
-    # GROSS: lr is the theoretical (pre-reinsurance) el over premium
-    gross_el = p.stats_df.loc[('meta', 'el'), 'mixed']
-    assert gross_el == pytest.approx(800)
-    assert p.stats_df.loc[('meta', 'prem'), 'mixed'] == 1000
-    assert p.stats_df.loc[('meta', 'lr'), 'mixed'] == pytest.approx(0.8)
-
-
-def test_pnl_info_premium_rows_populated():
-    p = build('pnl H4.Prem 1000 prem - 10 claims sev lognorm 80 cv 1 poisson')
-    info = p.info
-    assert 'premium                  1,000' in info
-    assert 'loss ratio               80.0%' in info
-    assert 'P(loss)' in info and 'P(loss)                  n/a' not in info
+# NOTE: the old pnl premium/lr/P(loss) meta-backfill tests were removed when the
+# in-place affine was ripped out (1.0.0a103). A pnl is now the PnL veneer: the
+# consideration lives on the PnL, not the loss aggregate, and premium / loss
+# ratio / P(loss) reporting moves to the signed PnL summary (a later stage).
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +194,7 @@ def test_default_labels_unchanged():
     a = build('agg H4.Loss 5 claims sev lognorm 50 cv 1 poisson',
               update=False)
     assert a.value_type == 'loss'
-    p = build('pnl H4.Pay1 100 prem - 2 claims sev lognorm 30 cv 1 poisson',
+    p = build('agg H4.Pay1 2 claims sev lognorm 30 cv 1 poisson payoff',
               update=False)
     assert p.value_type == 'payoff'
     a.value_type = 'payoff'
@@ -229,7 +204,7 @@ def test_default_labels_unchanged():
 
 
 def test_relabel_changes_display_not_role(relabeled):
-    p = build('pnl H4.Pay1 100 prem - 2 claims sev lognorm 30 cv 1 poisson',
+    p = build('agg H4.Pay1 2 claims sev lognorm 30 cv 1 poisson payoff',
               update=False)
     # the configured label is reported...
     assert p.value_type == 'asset'
@@ -247,7 +222,7 @@ def test_relabel_changes_display_not_role(relabeled):
 
 
 def test_role_stable_across_relabel():
-    p = build('pnl H4.Pay1 100 prem - 2 claims sev lognorm 30 cv 1 poisson',
+    p = build('agg H4.Pay1 2 claims sev lognorm 30 cv 1 poisson payoff',
               update=False)
     assert p.value_type == 'payoff'
     old = cfg._settings

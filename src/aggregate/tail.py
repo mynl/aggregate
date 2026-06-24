@@ -1296,8 +1296,7 @@ def _agg_support(n_lo: float, n_hi: float,
 def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
                     freq_max: float = np.inf, freq_zero_truncated: bool = False,
                     agg_m: float = np.nan, agg_sd: float = np.nan,
-                    agg_reflect: bool = False,
-                    agg_shift: float = 0.0, occ_reins=None) -> list[TailRow]:
+                    occ_reins=None) -> list[TailRow]:
     """Assemble the layered tail report as an ordered list of :class:`TailRow`.
 
     Rows, bottom-up: frequency; one per severity mix component (``comp0`` ...);
@@ -1306,10 +1305,8 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
     ``occ_reins`` is given); the aggregate. Spec-only -- valid before ``update``.
 
     The aggregate's **structural support** is built from the count and combined
-    severity extents (:func:`_agg_support`) and then mapped through any ``pnl``
-    affine (``agg_reflect`` / ``agg_shift``); its per-side decay rungs combine the
-    frequency rung with the combined severity's per-side rungs (single big jump),
-    swapped under a reflecting ``pnl``.
+    severity extents (:func:`_agg_support`); its per-side decay rungs combine the
+    frequency rung with the combined severity's per-side rungs (single big jump).
 
     Parameters
     ----------
@@ -1323,9 +1320,6 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
         Genuine zero-truncation flag for the frequency note.
     agg_m, agg_sd : float
         Loss-space aggregate mean / sd (drive concentration).
-    agg_reflect, agg_shift : bool, float
-        The ``pnl`` affine (``PnL = agg_shift - A`` when reflecting, else
-        ``agg_shift + A``); inert defaults for an ordinary aggregate.
     occ_reins : sequence of (share, limit, attach), optional
         The occurrence-reinsurance layers (``Aggregate.occ_reins``). When given,
         an informational ``severity (net occ)`` overlay row is appended after the
@@ -1359,13 +1353,7 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
     left_decay = combine(freq_rung, sev_left)
     right_decay = combine(freq_rung, sev_right)
 
-    if agg_reflect:
-        agg_min, agg_max = agg_shift - loss_hi, agg_shift - loss_lo
-        left_decay, right_decay = right_decay, left_decay
-    elif agg_shift != 0.0:
-        agg_min, agg_max = agg_shift + loss_lo, agg_shift + loss_hi
-    else:
-        agg_min, agg_max = loss_lo, loss_hi
+    agg_min, agg_max = loss_lo, loss_hi
 
     rows.append(aggregate_tail_row(
         info, agg_min=agg_min, agg_max=agg_max,

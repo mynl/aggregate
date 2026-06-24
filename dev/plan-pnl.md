@@ -7,10 +7,17 @@
 >   path. Grammar (`decl.lark` `orientation` rule + `PAYOFF` terminal), parser
 >   (`orientation_*`), unparser round-trip (`decl_writer._render_orientation`),
 >   tests (`tests/test_negative_x.py`), corpus (`decl-testers.agg` `Orient.*`).
-> - Stages B–F (the `PnL` veneer, signed summary, `evaluate` panel, plot, reins
->   GCN, function-valued consideration, `PortPnL`) — pending.
+> - **Stage B — first-class `PnL` veneer; in-place affine removed — DONE (1.0.0a103).**
+>   `PnL` composition over a pure-loss `.agg`; `make_pnl`; `build('pnl')` → `PnL`;
+>   derived `pnl_df` (no FFT/window); affine ripped out of `Aggregate` /
+>   `_bucket_window` / `tail` / `bivariate`. **Portfolios & bivariates of `pnl`
+>   are deferred** (book-level / joint P&L needs net-then-combine, which loses
+>   per-unit attribution) and now raise `NotImplementedError`; a payoff book uses
+>   `agg … payoff` orientation. Constant **and** callable consideration supported.
+> - Stages C–E (signed additive `summary_df`, `PnL.plot()`, `evaluate` panel,
+>   reins GCN, DecL swing/slide builder) and the deferred `PortPnL` — pending.
 >
-> **Status: DRAFT — partially executed (Stage A landed).** Re-architects the `pnl` concept. **`pnl` is
+> **Status: DRAFT — partially executed (Stages A, B landed).** Re-architects the `pnl` concept. **`pnl` is
 > new and nothing external depends on it — this is a free *internal* change**, not
 > a compat-constrained migration; the return type of `build('pnl …')` changes
 > (`Aggregate` → `PnL`) and we update our own consumers freely. Version bump,

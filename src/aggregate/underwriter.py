@@ -15,7 +15,7 @@ from .config import (get_settings, reload_settings as _reload_settings,
                      describe_settings, config_path,
                      USER_DIR_NAME, PACKAGE_DATA_DIR, TEST_SUITE_FILENAME)
 from .portfolio import Portfolio
-from .distributions import Aggregate, Severity, BUCKET_SIZING_P
+from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .spectral import Distortion
 from .parser import UnderwritingLexer, UnderwritingParser
 from .utilities import (qd, agg_help)
@@ -894,6 +894,18 @@ class Underwriter(object):
             if getattr(obj, '_approx_fit', None):
                 _desc = obj._approx_description()
                 obj.note = f"{obj.note}; {_desc}" if obj.note else _desc
+        elif kind == 'pnl':
+            # A ``pnl`` is a first-class PnL veneer over a pure-loss Aggregate:
+            # build the loss body, then wrap with the consideration. The net
+            # (consideration - loss) is derived on the PnL.
+            consideration = spec.pop('consideration')
+            inner = Aggregate(**spec)
+            inner.program = program
+            if getattr(inner, '_approx_fit', None):
+                _desc = inner._approx_description()
+                inner.note = f"{inner.note}; {_desc}" if inner.note else _desc
+            obj = inner.make_pnl(consideration)
+            obj.program = program
         elif kind == 'bvagg':
             from .bivariate import BivariateAggregate
             obj = BivariateAggregate(**spec)
@@ -902,6 +914,15 @@ class Underwriter(object):
             # Portfolio expects name, agg_list, uw. agg_list is a list of specs
             # that can be passed to Aggregate. Drop the leading ('agg', name)
             # from each spec entry returned by the parser.
+            pnl_units = [j for i, j, k in spec['spec'] if i == 'pnl']
+            if pnl_units:
+                raise NotImplementedError(
+                    f"{name}: pnl units in a portfolio are not supported "
+                    "(book-level P&L is deferred: a loss-sensitive consideration "
+                    "must be netted per unit before combining, which loses unit "
+                    f"premium attribution). Offending unit(s): "
+                    f"{', '.join(pnl_units)}. Build a standalone PnL, or declare "
+                    "the unit as a plain agg.")
             agg_list = [k for i, j, k in spec['spec']]
             obj = Portfolio(name, agg_list, uw=self)
             obj.program = program
@@ -1222,6 +1243,21 @@ class Underwriter(object):
                 # here -- no back doors around the estimator.
                 log2_ = self.log2 if log2 == 0 else log2
                 logger.info('(%s, %s): update(log2=%s, bs=%s) -> _bs_window',
+                            answer.kind, answer.name, log2_, bs)
+                try:
+                    answer.object.update(
+                        log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
+                        debug=self.debug, force_severity=True, **kwargs)
+                except (ZeroDivisionError, AttributeError) as e:
+                    logger.error(e)
+            elif isinstance(answer.object, PnL) and update is True:
+                # A PnL delegates bucket/window selection to its loss leg's
+                # Aggregate.update (single source of truth); the net is derived.
+                d = answer.spec
+                log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
+                    d, log2, bs, bucket_sizing_p, kwargs)
+                log2_ = self.log2 if log2 == 0 else log2
+                logger.info('(%s, %s): pnl update(log2=%s, bs=%s)',
                             answer.kind, answer.name, log2_, bs)
                 try:
                     answer.object.update(

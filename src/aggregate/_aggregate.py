@@ -600,8 +600,6 @@ class Aggregate:
             self.frequency, self.sevs,
             freq_min=freq_min, freq_max=freq_max, freq_zero_truncated=freq_zt,
             agg_m=self.agg_m, agg_sd=self.agg_sd,
-            agg_reflect=bool(getattr(self, '_agg_reflect', False)),
-            agg_shift=float(getattr(self, '_agg_shift', 0.0)),
             occ_reins=self.occ_reins,
         )
 
@@ -1327,7 +1325,7 @@ class Aggregate:
                  freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
                  agg_reins=None, agg_kind='',
                  reins_bucket=None, dsev_bucket=None,
-                 agg_premium=None, agg_reflect=False, agg_shift=0.0, value_type='loss',
+                 value_type='loss',
                  approximate='exact',
                  note='', hints=''):
         """
@@ -1374,20 +1372,14 @@ class Aggregate:
         :param freq_p0:         if freq_zm, provides the modified value of p0; default is nan
         :param agg_reins:       layers
         :param agg_kind:        ceded to or net of
-        :param agg_premium:     for a ``pnl`` (premium-minus-loss) aggregate, the
-                                stated premium (scalar or per-component vector);
-                                ``None`` for an ordinary loss aggregate. Retained
-                                for the P&L ``info`` readout.
-        :param agg_reflect:     if True, reflect the finished aggregate (``A -> -A``);
-                                set by ``pnl`` (a profit is a negative loss).
-        :param agg_shift:       deterministic shift applied to the finished
-                                aggregate **once for the book** (the total premium
-                                for ``pnl``); 0 for an ordinary aggregate. Together
-                                with ``agg_reflect`` this is the ``pnl`` affine
-                                ``PnL = agg_shift - A``.
-        :param value_type:      ``'loss'`` (default) or ``'payoff'``; ``pnl`` sets
-                                ``'payoff'`` (more is better). Inert for the
-                                distribution, consumed at the pricing layer.
+        :param value_type:      ``'loss'`` (default) or ``'payoff'``; the DecL
+                                orientation suffix sets ``'payoff'`` (more is
+                                better) for an asset-return / direct-payoff
+                                primitive. Inert for the distribution, consumed
+                                at the pricing layer (the dual distortion). A
+                                premium-minus-loss position is the separate
+                                :class:`PnL` veneer (see ``make_pnl``), not a
+                                value on the aggregate.
         :param approximate:     ``'exact'`` (default), ``'sgamma'`` or ``'slognorm'``.
                                 When not ``'exact'``, the freq x sev convolution is
                                 replaced at construction by a single continuous
@@ -1535,16 +1527,6 @@ class Aggregate:
         # established non-negative behaviour. Opt-in wiring is pending a design
         # decision (DecL keyword vs flag vs dsev auto-detect).
         self._signed_sev = False
-        # Aggregate-level affine wrapper (the ``pnl`` premium-minus-loss form):
-        # a deterministic relabel of the finished loss aggregate -- reflect
-        # (a profit is a negative loss) and shift by the total premium. Applied
-        # at the end of ``update_work`` (see ``_apply_agg_affine``). Defaults
-        # (reflect False, shift 0) leave every ordinary aggregate byte-for-byte
-        # unchanged. ``agg_premium`` is retained for the P&L ``info`` readout.
-        # See dev/done/plan-pnl-premium.md.
-        self._agg_premium = agg_premium
-        self._agg_reflect = bool(agg_reflect)
-        self._agg_shift = float(agg_shift)
         # Sign convention: how the variable is read. Inert for the
         # distribution itself; consumed at the pricing/distortion layer
         # (actuarial loss orientation). ``pnl`` sets ``payoff``. See plan §5.5.
@@ -1867,14 +1849,9 @@ class Aggregate:
         # store answer for total
         tot_prem = float(self.stats_df.loc[('meta', 'prem'), _comp_cols].sum())
         tot_loss = float(self.stats_df.loc[('meta', 'el'), _comp_cols].sum())
-        # Backfill from the pnl premium when the exposure clause supplied
-        # none: ``pnl X prem - ...`` routes premium through ``agg_premium``,
-        # not ``exp_premium``, so the meta rows would stay blank. GROSS
-        # basis: ``tot_loss`` here is the theoretical loss before
-        # ``update_work`` applies any reinsurance, so ``lr`` is a gross
-        # loss ratio -- do not recompute it against a net/ceded loss.
-        if tot_prem == 0 and self._agg_premium is not None:
-            tot_prem = float(np.sum(np.asarray(self._agg_premium, dtype=float)))
+        # GROSS basis: ``tot_loss`` here is the theoretical loss before
+        # ``update_work`` applies any reinsurance, so ``lr`` is a gross loss
+        # ratio -- do not recompute it against a net/ceded loss.
         if tot_prem > 0:
             lr = tot_loss / tot_prem
         else:
@@ -2114,20 +2091,14 @@ class Aggregate:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1 / self.bs)}'
         else:
             bss = INFO_NA
-        # premium / expected loss / loss ratio / P(loss): populated when a
-        # premium is known (a ``pnl``, or the DecL exposure clause states
-        # one) and the object is updated. ``P(loss) = P(PnL < 0)`` is read
-        # straight off the signed density, so it needs the pnl affine form.
+        # premium / expected loss / loss ratio: populated when a premium is
+        # known (the DecL exposure clause states one) and the object is updated.
+        # ``P(loss)`` is a P&L concept and lives on the :class:`PnL` veneer.
         prem = float(self.stats_df.loc[('meta', 'prem'), 'mixed'])
         e_loss = None
         p_loss = INFO_NA
         if updated and self.agg_density is not None:
-            if self._agg_affine_active():
-                # PnL mean = premium - E[loss]
-                e_loss = float(self._agg_shift) - float(self.est_m)
-                p_loss = f'{float(self.agg_density[self.xs < 0].sum()):.4g}'
-            else:
-                e_loss = float(self.est_m)
+            e_loss = float(self.est_m)
         rows = [
             ('aggregate object name', self.name),
             ('value_type', self.value_type),
@@ -2215,21 +2186,6 @@ class Aggregate:
     # ``_freq_sev_convolution`` below.
     # ================================================================
 
-    def _agg_affine_active(self):
-        """Whether the aggregate-level affine (``pnl``) wrapper is active.
-
-        ``True`` when the finished aggregate is reflected and/or shifted -- the
-        ``pnl`` premium-minus-loss form (``PnL = agg_shift - A``). The defaults
-        (reflect ``False``, shift ``0``) are inert, so an ordinary aggregate
-        returns ``False`` and every affine code path is bypassed.
-
-        Returns
-        -------
-        bool
-        """
-        return bool(getattr(self, '_agg_reflect', False)) or \
-            float(getattr(self, '_agg_shift', 0.0)) != 0.0
-
     def _signed_severity(self):
         """Whether the aggregate has signed (negative-support) severity.
 
@@ -2265,18 +2221,17 @@ class Aggregate:
         """Whether the aggregate is signed (straddles 0) for display / combine.
 
         ``True`` when the severity itself reaches below 0
-        (:meth:`_signed_severity`) **or** the aggregate-level affine wrapper is
-        active (:meth:`_agg_affine_active` -- the ``pnl`` premium-minus-loss
-        form, whose loss severity is non-negative but whose result straddles 0).
-        This is the gate read by plotting, two-sided quantiles, the
-        signed-aware ``summary_df`` (SD instead of CV), and the
-        :class:`Portfolio` combine.
+        (:meth:`_signed_severity`) -- a ``ssev`` continuous severity or a
+        ``dsev`` with a negative atom. This is the gate read by plotting,
+        two-sided quantiles, the signed-aware ``summary_df`` (SD instead of CV),
+        and the :class:`Portfolio` combine. (A premium-minus-loss position is
+        now the separate :class:`PnL` veneer, not a signed aggregate.)
 
         Returns
         -------
         bool
         """
-        return self._signed_severity() or self._agg_affine_active()
+        return self._signed_severity()
 
     def _severity_negative_buckets(self, bs):
         """Number of negative buckets the severity reaches (index of physical 0).
@@ -2503,6 +2458,34 @@ class Aggregate:
     def value_type(self, v):
         self._is_loss_value = value_type_role(v)
 
+    def make_pnl(self, consideration):
+        """Wrap this aggregate as the risky leg of a :class:`PnL` position.
+
+        The net P&L is ``consideration - X`` when ``X`` is a loss and
+        ``consideration + X`` when ``X`` is a payoff -- the combine sign is read
+        from :attr:`value_type`, so there is **no** ``sign`` argument. The
+        aggregate itself is left untouched (it is the obligation); the net is
+        derived lazily on the :class:`PnL`.
+
+        Parameters
+        ----------
+        consideration : float, array-like, or callable
+            The amount changing hands at inception, **signed** (``+`` received,
+            ``-`` paid). A callable ``f(x)`` is an increasing (loss-sensitive)
+            consideration applied bucket-wise on this aggregate's grid.
+
+        Returns
+        -------
+        PnL
+
+        Notes
+        -----
+        ``build('pnl NAME C prem - <body>')`` is sugar for
+        ``build('agg NAME <body>').make_pnl(consideration=C)``.
+        """
+        from ._pnl import PnL
+        return PnL(self, consideration)
+
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, window_convention=None, **kwargs):
         """
@@ -2544,13 +2527,10 @@ class Aggregate:
         bs, log2, x_min = self._bs_window(log2, bs, x_min_arg, bucket_sizing_p,
                                           window_convention=window_convention)
         N = 1 << log2
-        # ``x_min`` is the loss-convolution origin chosen by ``_bs_window``: 0 for
-        # an ordinary aggregate or a non-negative-loss ``pnl``; a negative origin
-        # when the severity is signed -- including a signed-loss ``pnl``, whose
-        # loss convolves on its genuine signed grid before ``_apply_agg_affine``
-        # relabels it onto the P&L window. The affine path no longer hard-codes a
-        # 0-based grid (which silently wrapped a signed loss's negative atoms to
-        # the top of the FFT buffer and dropped half the mass).
+        # ``x_min`` is the convolution origin chosen by ``_bs_window``: 0 for an
+        # ordinary aggregate; a negative origin when the severity is signed
+        # (``ssev`` / negative-``dsev``), so the loss convolves on its genuine
+        # signed grid.
         xs = x_min + np.arange(0, N, dtype=float) * bs
         return self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
                                 **kwargs)
@@ -2842,159 +2822,8 @@ class Aggregate:
         self.stats_df['error'] = _noise_aware_rel_error(
             self.stats_df['gross_empirical'], self.stats_df['mixed'])
 
-        # Aggregate affine (``pnl``): relabel the finished loss aggregate to the
-        # P&L distribution ``agg_shift - A``. Inert (no-op) for every ordinary
-        # aggregate; applied after the loss validation above so ``valid`` still
-        # checks the loss FFT. See ``_apply_agg_affine``.
-        if self._agg_affine_active():
-            self._apply_agg_affine()
-
         # invalidate stored functions
         self._cdf = None
-
-    def _pnl_window(self, bs, N):
-        """Lower edge of the tight, mass-centred P&L output window.
-
-        The ``pnl`` affine reflects + shifts the loss aggregate; the resulting
-        P&L distribution lives around ``agg_shift - E[A]`` with the loss
-        spread. ``estimate_agg_window`` on the **affine moments** gives a tight
-        two-sided window ``[lo, hi]`` (mean possibly < 0); this returns ``lo``
-        snapped down to ``bs`` and fitted to the ``N``-bucket grid. Centring the
-        window on the mass (rather than reversing the full loss grid, whose
-        empty far tail would push the origin far below the mass) is what lets a
-        :class:`Portfolio` of ``pnl`` units position the shared grid correctly.
-
-        Parameters
-        ----------
-        bs : float
-            Bucket size.
-        N : int
-            Number of grid buckets (``2**log2``).
-
-        Returns
-        -------
-        float
-            The snapped P&L window origin ``x_min``.
-        """
-        reflect = self._agg_reflect
-        shift = self._agg_shift
-        m = (shift - self.agg_m) if reflect else (shift + self.agg_m)
-        sd = self.agg_sd
-        skew = -self.agg_skew if reflect else self.agg_skew
-        p = 1.0 - 10.0 ** -WINDOW_NINES
-        if np.isfinite(sd) and sd > 0:
-            try:
-                lo, hi, _W = estimate_agg_window(m, sd, skew, p)
-            except (ValueError, FloatingPointError):  # pragma: no cover - defensive
-                lo, hi = m - 8.0 * sd, m + 8.0 * sd
-        else:
-            # No finite spread (point mass or undefined variance): fall back to
-            # the full reversed-grid window (origin a whole grid below shift).
-            s0 = int(round(shift / bs)) if bs else 0
-            return float((s0 - N + 1) * bs)
-        if hi - lo <= N * bs:
-            pnl_lo = float(np.floor(lo / bs) * bs) if bs else float(lo)
-        else:
-            # Support wider than the grid: centre on the mean, accept a small
-            # two-sided deficit (the heavy-tail residual, documented).
-            pnl_lo = float(np.floor((m - 0.5 * N * bs) / bs) * bs) if bs else float(m - 0.5 * N * bs)
-        return pnl_lo
-
-    def _apply_agg_affine(self):
-        """Relabel the finished loss aggregate to ``agg_shift - A`` (the ``pnl`` form).
-
-        ``pnl`` premium-minus-loss aggregates are an aggregate-level affine
-        transform of an ordinary loss aggregate: reflect (a profit is a negative
-        loss) and a single deterministic shift by the total premium. This is a
-        pure grid relabel of the finished density -- **no new convolution** --
-        so the loss FFT, its validation, and every ordinary aggregate are
-        untouched.
-
-        Notes
-        -----
-        The loss density ``a`` lives on the non-negative grid ``self.xs``
-        (origin ``loss_x0``, index ``j_loss = round(loss_x0/bs)``). With the
-        shift snapped to the bucket (``s0 = round(agg_shift/bs)``) the P&L value
-        of loss bucket ``k`` is ``(s0 - j_loss - k)*bs`` (reflect) and is placed
-        onto the tight P&L grid ``xs = pnl_lo + arange(N)*bs`` (see
-        :meth:`_pnl_window`). The map ``t = (s0 - j_loss - j_pnl) - k`` is a
-        one-to-one reverse-and-roll; buckets falling outside the window are
-        dropped (a negligible far-tail deficit).
-
-        - **ftagg_density** is rebuilt as the rfft of the length-``M`` P&L buffer
-          (physical 0 at index 0, negatives wrapped to the top) by scattering
-          the P&L density at indices ``(j_pnl + arange(N)) mod M``. This is the
-          exact convention the :class:`Portfolio` signed combine multiplies, so
-          a book of ``pnl`` units convolves correctly with no combine-side
-          change.
-        - **moments (closed form):** ``mean -> shift - E[A]``, ``sd`` unchanged,
-          ``skew -> -skew``. Applied to the empirical scalars (``est_*``); the
-          theoretical ``stats_df`` columns are deliberately left in loss terms
-          (so ``valid`` / ``_bs_window`` stay loss-correct) and the P&L view is
-          formed at display time in :meth:`_describe_signed`.
-
-        Idempotent across re-updates: ``_freq_sev_convolution`` regenerates the
-        loss density / ft fresh each ``update_work`` before this runs.
-        """
-        N = len(self.xs)
-        bs = self.bs
-        padding = self.padding
-        reflect = self._agg_reflect
-        shift = self._agg_shift
-        loss_d = self.agg_density
-        loss_x0 = float(self.xs[0])
-        j_loss = int(round(loss_x0 / bs)) if bs else 0
-        s0 = int(round(shift / bs)) if bs else 0
-
-        pnl_lo = self._pnl_window(bs, N)
-        j_pnl = int(round(pnl_lo / bs)) if bs else 0
-
-        # ---- density + output grid (tight signed P&L window) ------------
-        # one-to-one reverse-and-roll; out-of-window buckets dropped.
-        k = np.arange(N)
-        if reflect:
-            t = (s0 - j_loss - j_pnl) - k
-        else:
-            t = (s0 + j_loss - j_pnl) + k
-        valid = (t >= 0) & (t < N)
-        pnl_d = np.zeros(N)
-        pnl_d[t[valid]] = loss_d[k[valid]]
-        # The reverse-and-roll drops buckets that fall outside the tight P&L
-        # window (``_pnl_window``). For an ordinary or correctly-sized signed
-        # ``pnl`` this sheds only far-tail dust; a *material* deficit means the
-        # window cannot represent the spread (e.g. log2 too small for a wide
-        # signed loss) -- surface it the same way the loss FFT deficit is flagged
-        # at construction, rather than letting one answer silently differ.
-        dropped = float(loss_d.sum() - pnl_d.sum())
-        if dropped > VALIDATION_NOISE:
-            warnings.warn(
-                f'{self.name}: P&L affine dropped mass {dropped:.3e} outside the '
-                f'output window [{pnl_lo}, {pnl_lo + (N - 1) * bs}]; widen log2 or '
-                f'set bs/x_min to cover the signed P&L spread.',
-                DefectiveDistributionWarning, stacklevel=2)
-        self.agg_density = pnl_d
-        self.xs = pnl_lo + np.arange(N, dtype=float) * bs
-        self.x_min = float(self.xs[0])
-        self.x_max = float(self.xs[-1])
-
-        # ---- ftagg_density: rfft of the P&L length-M buffer -------------
-        # (physical 0 at index 0, negatives wrapped to the top -- the combine
-        # convention). Scatter the P&L density at indices (j_pnl + k) mod M.
-        M = N << padding
-        h = np.zeros(M)
-        h[(j_pnl + np.arange(N)) % M] = pnl_d
-        self.ftagg_density = sfft.rfft(h)
-
-        # ---- empirical moment scalars (closed-form affine) --------------
-        # mean -> shift - E[A]; sd unchanged; skew sign flips under reflection.
-        if reflect:
-            self.est_m = self._agg_shift - self.est_m
-            self.est_skew = -self.est_skew
-        else:
-            self.est_m = self._agg_shift + self.est_m
-        # est_sd / est_var unchanged; cv = sd/mean is unstable near mean 0 and
-        # deliberately not relied upon (summary_df shows SD when signed).
-        self.est_cv = self.est_sd / self.est_m if self.est_m else np.inf
 
     def _fft_aggregate(self, sev_density, padding):
         """Run one FFT convolution: severity density -> aggregate density.
@@ -3788,17 +3617,13 @@ class Aggregate:
         Same 8-column shape and column arithmetic as :meth:`_describe`, but the
         ``CV`` trio is replaced by an ``SD`` trio. The coefficient of variation
         ``CV = sd / mean`` is unstable and meaningless when the mean can be ~0
-        (a P&L straddling break-even), so for any signed object -- a ``ssev`` /
-        negative-``dsev`` aggregate **or** a ``pnl`` -- the spread is reported as
-        the standard deviation, which is finite and informative regardless of
-        the mean. (This also cleans up the 1.0.0a22 signed-portfolio summary_df.)
+        (a signed aggregate straddling 0), so for any signed object -- a
+        ``ssev`` / negative-``dsev`` aggregate -- the spread is reported as the
+        standard deviation, which is finite and informative regardless of the
+        mean. (This also cleans up the 1.0.0a22 signed-portfolio summary_df.)
 
-        For a ``pnl`` aggregate the **Agg** row is additionally the affine
-        (premium-minus-loss) view: ``EX -> agg_shift - E[A]``, ``SD`` unchanged,
-        ``Sk -> -Sk``. The Freq / Sev rows describe the underlying loss process
-        and are unchanged. The theoretical (Gross) column is sourced from the
-        loss ``stats_df`` and transformed here at display time, so the stored
-        validation columns stay in loss terms (see :meth:`_apply_agg_affine`).
+        The Freq / Sev / Agg rows are in their native (signed) frame; the
+        theoretical (Gross) column is sourced from the loss ``stats_df``.
 
         Parameters
         ----------
@@ -3813,29 +3638,19 @@ class Aggregate:
         emp = self.stats_df['empirical']
         rlabel = force_reins_label if force_reins_label is not None \
             else self._reins_after_label()
-        affine = self._agg_affine_active()
-        reflect = self._agg_reflect
-        shift = self._agg_shift
 
-        def _agg_mean(m):
-            if not affine:
-                return m
-            return (shift - m) if reflect else (shift + m)
-
-        def _agg_skew(sk):
-            return -sk if (affine and reflect) else sk
-
-        # Theoretical (loss stats_df; Agg row affine-transformed for display).
+        # Theoretical (loss stats_df). The signed severity already straddles 0,
+        # so the moments are in their native frame -- no display transform.
         freq_sd = st[('freq', 'mean')] * st[('freq', 'cv')]
         sev_sd = self.sev_sd
-        agg_sd = self.agg_sd  # spread is invariant under reflect + shift
+        agg_sd = self.agg_sd
         df = pd.DataFrame(
             {
                 'EX': [st[('freq', 'mean')], st[('sev', 'mean')],
-                       _agg_mean(st[('agg', 'mean')])],
+                       st[('agg', 'mean')]],
                 'SD': [freq_sd, sev_sd, agg_sd],
                 'Sk': [st[('freq', 'skew')], st[('sev', 'skew')],
-                       _agg_skew(st[('agg', 'skew')])],
+                       st[('agg', 'skew')]],
             },
             index=['Freq', 'Sev', 'Agg'],
         )
@@ -3843,8 +3658,7 @@ class Aggregate:
         post_update = pd.notna(emp.get(('agg', 'mean'), np.nan))
         if post_update:
             mid_label = rlabel or 'Est'
-            # Empirical: Freq/Sev from the stats_df; Agg from the affine-aware
-            # scalars (est_m / est_sd / est_skew are already the P&L view).
+            # Empirical: Freq/Sev from the stats_df; Agg from the scalars.
             emp_freq_sd = emp[('freq', 'mean')] * emp[('freq', 'cv')]
             df.loc['Sev', f'{mid_label} EX'] = self.est_sev_m
             df.loc['Agg', f'{mid_label} EX'] = self.est_m
@@ -4011,11 +3825,8 @@ class Aggregate:
 
         The single-big-jump floor and the tail-aware slack split key off the
         *loss* convolution's tail thickness -- the grid is sized on the loss
-        FFT, before any ``pnl`` reflect/shift. So this returns the aggregate's
-        per-side decay rungs from the shared tail report (:meth:`_tail_rows`),
-        undoing the affine swap ``tail_df`` applies for a reflecting ``pnl`` so
-        the rungs are oriented in loss space (the positive single-big-jump tail
-        is always ``right``, the signed reflected tail ``left``).
+        FFT. Returns the aggregate's per-side decay rungs from the shared tail
+        report (:meth:`_tail_rows`), oriented in loss space.
 
         Returns
         -------
@@ -4024,8 +3835,6 @@ class Aggregate:
             :meth:`update`); fed to :func:`aggregate.tail.is_thick`.
         """
         agg = self._tail_rows()[-1]
-        if bool(getattr(self, '_agg_reflect', False)):
-            return agg.right_tail, agg.left_tail
         return agg.left_tail, agg.right_tail
 
     def _single_big_jump_window(self, p_star):

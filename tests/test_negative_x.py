@@ -227,10 +227,9 @@ def test_orientation_suffix_sets_value_type(program, expected):
     """The trailing ``payoff``/``loss`` keyword sets value_type, nothing else."""
     a = build(program, update=False)
     assert a.value_type == expected
-    # Pure orientation: NO affine (that is the pnl wrapper, not this suffix).
-    assert not a._agg_reflect
-    assert a._agg_shift == 0.0
-    assert not a._agg_affine_active()
+    # Pure orientation: it sets the sign-convention role only -- it is NOT the
+    # premium-minus-loss pnl veneer (that is the separate PnL class).
+    assert a._is_loss_value == (expected == 'loss')
 
 
 def test_orientation_does_not_collide_with_loss_exposure():

@@ -464,11 +464,8 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     except Exception:  # pragma: no cover - defensive
         sd = agg.agg_sd
     skew = agg.agg_skew
-    # Convolution-grid signedness: a ``pnl`` aggregate has a non-negative
-    # loss severity, so the loss FFT is sized here on the ordinary
-    # non-negative grid; the affine relabel onto the signed P&L window is a
-    # post-step (below + in ``_apply_agg_affine``). Hence ``_signed_severity``
-    # not ``_signed`` -- the latter also reports ``True`` for the affine.
+    # Convolution-grid signedness: the loss FFT is sized on the two-sided grid
+    # only when the severity itself is signed (``ssev`` / negative-``dsev``).
     signed = agg._signed_severity()
     # Sign convention orienting the windowed placement: loss -> protect the
     # right (priced) tail and trim/balance toward it; payoff mirrors. From
@@ -643,7 +640,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     loss_left, loss_right = agg._loss_tail_classes()
     sbj = agg._single_big_jump_window(p)
     conc_flag, _conc_cv = _tail.concentration(m, sd)
-    if (x_min_in is None and not signed and not agg._agg_affine_active()
+    if (x_min_in is None and not signed
             and agg.occ_reins is None
             and np.isfinite(sd) and sd > 0
             and bool(conc_flag)):
@@ -869,8 +866,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     # also pins the origin. The shift is clamped so the grid still covers the
     # window top and never crosses the 0 floor, so the benign FFT wrap stays
     # valid (and is in fact safer -- margin both sides).
-    if (selected == 'windowed' and x_min_in is None
-            and not agg._agg_affine_active()):
+    if selected == 'windowed' and x_min_in is None:
         w_lo = float(rows['windowed']['x_min'])   # snapped band-bottom origin
         w_hi = float(rows['windowed']['x_max'])
         N = 1 << sel_l2
@@ -892,51 +888,19 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
             sel_x0 = origin
     grid_x_max = sel_x0 + (1 << sel_l2) * sel_bs
 
-    # ---- aggregate affine (pnl): tight, mass-centred P&L window ------
-    # The loss FFT runs on the non-negative grid sized above; the finished
-    # aggregate is then reflected and shifted (``_apply_agg_affine``). The
-    # *display* window is a tight two-sided window around the P&L mean
-    # (``estimate_agg_window`` on the affine moments), not the full reversed
-    # loss grid -- so the mass sits in the window (and the Portfolio combine,
-    # which positions the shared grid from the per-unit origins, places a
-    # book of ``pnl`` units correctly).
-    affine = agg._agg_affine_active()
-    if affine:
-        N = 1 << sel_l2
-        x0_pnl = agg._pnl_window(sel_bs, N)
-        x_max_pnl = float(x0_pnl + N * sel_bs)
-        # Hand ``update`` the *loss-convolution* origin, not the P&L display
-        # origin: 0 for an ordinary (non-negative) loss -- byte-for-byte the
-        # legacy 0-based grid -- and the signed loss origin ``sel_x0`` when the
-        # loss severity is itself signed (a ``pnl`` over a negative-atom
-        # ``dsev`` / ``ssev``). The P&L display window ``x0_pnl`` is recomputed
-        # independently in ``_apply_agg_affine`` and reported in the ``used``
-        # row below.
-        ret_x0 = sel_x0 if agg._signed_severity() else 0.0
-    else:
-        ret_x0 = sel_x0
+    ret_x0 = sel_x0
 
     df = pd.DataFrame(rows).T
     # the winning method is flagged; the ``used`` row is the realized grid.
     df['selected'] = df.index == selected
     # The ``used`` row converts the selected method's window into the actual
     # power-of-2 grid: x_max = x_min + 2**log2 * bs (so a 701-point support
-    # padded to 1024 reads x_max = grid top, W = the full grid width). For a
-    # ``pnl`` aggregate the ``used`` row reports the reflected+shifted P&L
-    # window (the loss method rows keep their non-negative loss windows).
-    if affine:
-        df.loc['used'] = dict(
-            applies=True, x_min=x0_pnl, x_max=x_max_pnl,
-            W=float(x_max_pnl - x0_pnl), bs=sel_bs, log2=sel_l2,
-            coverage=rows[selected]['coverage'],
-            note=f'realized P&L grid ({selected}, reflect+shift)',
-            selected=False)
-    else:
-        df.loc['used'] = dict(
-            applies=True, x_min=sel_x0, x_max=float(grid_x_max),
-            W=float(grid_x_max - sel_x0), bs=sel_bs, log2=sel_l2,
-            coverage=rows[selected]['coverage'],
-            note=f'realized grid ({selected})', selected=False)
+    # padded to 1024 reads x_max = grid top, W = the full grid width).
+    df.loc['used'] = dict(
+        applies=True, x_min=sel_x0, x_max=float(grid_x_max),
+        W=float(grid_x_max - sel_x0), bs=sel_bs, log2=sel_l2,
+        coverage=rows[selected]['coverage'],
+        note=f'realized grid ({selected})', selected=False)
 
     # ---- journey columns (bs-reporting item 1) ----------------------
     # Purely derived reporting -- no effect on the grid. ``log2_need`` is the

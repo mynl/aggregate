@@ -91,3 +91,34 @@ def test_skewed_model_still_validates_and_keeps_skew():
     assert b.valid == Validation.NOT_UNREASONABLE
     # real, non-trivial skew preserved (guards against over-snapping)
     assert float(b.summary_df.loc["Agg", "Sk"]) > 0.1
+
+
+def test_valid_relocation_to_validation_module():
+    """Phase C relocation guard: the moved free functions
+    ``_validation.valid_aggregate`` / ``valid_portfolio`` /
+    ``validation_explanation`` reproduce the class-property results exactly
+    (clean, reinsurance, and portfolio cases). A relocation bug surfaces as a
+    flag/explanation mismatch independent of the rest of the suite.
+    """
+    from aggregate import _validation
+
+    a = build("agg RC 10 claims sev lognorm 100 cv 2 poisson")
+    v_prop = a.valid
+    assert v_prop == Validation.NOT_UNREASONABLE
+    a._valid = None
+    assert _validation.valid_aggregate(a) == v_prop
+    assert a.validation_explanation == _validation.validation_explanation(a)
+
+    r = build("agg RR 10 claims sev lognorm 100 cv 2 "
+              "occurrence net of 50 xs 50 poisson")
+    assert r.valid & Validation.REINSURANCE
+    assert "reinsurance" in r.validation_explanation
+    r._valid = None
+    assert _validation.valid_aggregate(r) == r.valid
+
+    p = build("port RP agg A 10 claims sev lognorm 100 cv 2 poisson "
+              "agg B 5 claims sev gamma 50 cv 1 poisson")
+    v_pprop = p.valid
+    p._valid = None
+    assert _validation.valid_portfolio(p) == v_pprop
+    assert p.validation_explanation == _validation.validation_explanation(p)

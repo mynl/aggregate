@@ -243,7 +243,7 @@ Each object has a kind property and a name property, and it can be manifest as a
 
 The primary user-facing entry points are :meth:`Underwriter.build` and :meth:`Underwriter.build_many`:
 
-* :meth:`Underwriter.build` parses a DecL program producing exactly one top-level output (or looks up an existing entry by name in the knowledge base), constructs the corresponding object, smart-updates its discrete distribution (detecting discrete severities to pick ``bs=1``, otherwise calling :meth:`recommend_bucket`), and returns the constructed object. If the program produces zero or more than one output, it raises :class:`ValueError` and points the user at :meth:`build_many`.
+* :meth:`Underwriter.build` parses a DecL program producing exactly one top-level output (or looks up an existing entry by name in the knowledge base), constructs the corresponding object, smart-updates its discrete distribution (detecting discrete severities to pick ``bs=1``, otherwise sizing from the analytic moment window), and returns the constructed object. If the program produces zero or more than one output, it raises :class:`ValueError` and points the user at :meth:`build_many`.
 * :meth:`Underwriter.build_many` is the explicit-batch counterpart: it parses a (possibly multi-output) DecL program and returns the full ``list[ParsedProgram]`` regardless of count. Use ``update=False`` to skip the smart-update step (useful when you intend to call :meth:`update` yourself with chosen bucket parameters).
 
 For interactive parser debugging, :meth:`Underwriter.interpret_file` runs every DecL program in a ``.agg`` or ``.csv`` file through the parser without creating output, returning a DataFrame with per-line parse-error info. Call it with no arguments to run the bundled test suite (at :attr:`Underwriter.test_suite_file`).
@@ -860,14 +860,18 @@ equals the bucket size. These values are printed by ``qd``.
 Estimating and Testing ``bs`` For :class:`Aggregate` Objects
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For an :class:`Aggregate`, :meth:`recommend_bucket` uses a shifted lognormal
-method of moments fit and takes the ``recommend_p`` percentile as the
-right-hand end of the discretization. By default ``recommend_p=0.999``, but
-for thick tailed distributions it may be necessary to use a value closer to
-1. :meth:`recommend_bucket` also considers any limits: ideally limits are
-multiples of the bucket size.
+For an :class:`Aggregate`, ``update`` with ``bs=0`` sizes ``bs``
+automatically. For a non-negative aggregate it uses a shifted lognormal /
+shifted gamma method-of-moments fit and takes the ``bucket_sizing_p``
+percentile as the right-hand end of the discretization. By default
+``bucket_sizing_p`` is close to 1, but for thick tailed distributions it may
+be necessary to use a value closer still. The sizer also considers any
+limits: ideally limits are multiples of the bucket size. The chosen grid, the
+candidate sizing methods, and the realized window are reported in
+:attr:`Aggregate.bs_window_df`, narrated by :attr:`Aggregate.bs_description`
+(one line) and :attr:`Aggregate.bs_explanation` (prose).
 
-The recommended value of ``bs`` should rounded up to a binary fraction
+The recommended value of ``bs`` is rounded up to a binary fraction
 (denominator is a power of 2) using :meth:`utilities.round_bucket`.
 
 :class:`Aggregate` also includes two functions for assessing ``bs``,
@@ -880,7 +884,7 @@ absolute error) and relative error as well as an upper bound ``bs/2`` on
 the absolute value of the discretization error. ``log2`` must be input and,
 optionally, the log base 2 of the smallest bucket to model. It then models
 six doublings of the input bucket. If no bucket is input, it models three
-doublings up and down from the rounded :meth:`recommend_bucket` suggestion.
+doublings up and down from the rounded moment-window suggestion.
 The output table shows:
 
 * The actual ``(agg, m)`` and estimated ``(est, m)`` means, from the ``summary_df`` dataframe.
@@ -919,17 +923,24 @@ Generally there is either discretization or truncation error. Look for one of th
 Estimating and Testing ``bs`` For :class:`Portfolio` Objects
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For a :class:`Portfolio`, the right hand end of the distribution is estimated using the square root of sum of squares (proxy independent sum) of the right hand ends of each unit.
-
-The method :meth:`port.recommend_bucket` suggests a reasonable bucket size.
+For a :class:`Portfolio`, the shared grid is sized to hold the convolved book:
+:meth:`Portfolio.best_window` combines the units' per-unit choices by taking the
+finer of each unit's resolution and the no-wrap span floor (``W_tot / N``), then
+rounds to a binary fraction. (This replaced the legacy root-sum-square combine,
+which coarsened the grid as units were added.)
 
 .. ipython:: python
     :okwarning:
 
-    print(p07.recommend_bucket().iloc[:, [0,3,6,10]])
-    p07.best_bucket(16)
+    p07.best_window(16)
+    qd(p07.bs_window_df)
 
-The column ``bsN`` corresponds to discretizing with 2**N buckets. The rows show suggested bucket sizes by unit and in total. For example with ``N=16`` (i.e., 65,536 buckets) the suggestion is 2.19. It is best the bucket size is a divisor of any limits or attachment points. :meth:`best_bucket` takes this into account and suggests 2.
+:attr:`Portfolio.bs_window_df` reports, per unit and combined, the candidate
+bucket from each sizing method and the value finally used; the combined ``bs``
+sits at or above each unit's resolution and divides cleanly into the grid. It is
+best the bucket size is a divisor of any limits or attachment points.
+:attr:`Portfolio.bs_description` and :attr:`Portfolio.bs_explanation` narrate the
+choice.
 
 To test ``bs``, run the tests above on each unit.
 
@@ -959,7 +970,7 @@ Methods and Properties Common To :class:`Aggregate` and :class:`Portfolio` Class
 
 - :meth:`update` a method to run the numerical calculation of probability distributions.
 
-- :meth:`recommend_bucket` to recommend the value of ``bs``.
+- :attr:`bs_window_df` to inspect the automatically chosen value of ``bs``.
 - Common statistical functions including pmf, cdf, sf, the quantile function (value at risk) and tail value at risk.
 
 - Statistical functions: pdf, cdf, sf, quantile, value at risk, tail value at risk, and so on.
@@ -1116,7 +1127,7 @@ It is blank if the object was not created using DecL. The helper function :func:
 The :meth:`update` Method
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After an :class:`Aggregate` or a :class:`Portfolio` object has been created it needs to be updated to populate its ``density_df`` dataframe. :meth:`build` automatically updates the objects it creates with default hyper-parameter values. Sometimes it is necessary to re-update with different hyper-parameters. The :meth:`update` method takes arguments ``log2=13``, ``bs=0``, and ``recommend_p=0.999``. The first two control the number and size of buckets. When ``bs==0`` it is estimated using the method :meth:`recommend_bucket`. If ``bs!=0`` then ``recommend_p`` is ignored.
+After an :class:`Aggregate` or a :class:`Portfolio` object has been created it needs to be updated to populate its ``density_df`` dataframe. :meth:`build` automatically updates the objects it creates with default hyper-parameter values. Sometimes it is necessary to re-update with different hyper-parameters. The :meth:`update` method takes arguments ``log2=13``, ``bs=0``, and ``bucket_sizing_p``. The first two control the number and size of buckets. When ``bs==0`` it is estimated automatically from the analytic moment window. If ``bs!=0`` then ``bucket_sizing_p`` is ignored.
 
 Further control over updating is available, as described in REF.
 

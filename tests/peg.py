@@ -49,7 +49,7 @@ def build_peg(*, update=True, calibrate=True, p=0.995, coc=0.15,
     log2 : int
         FFT grid size = ``2**log2`` (default 16).
     bs : float or None
-        Bucket size. If None, picked via ``port.best_bucket(log2)``.
+        Bucket size. If None, picked via ``port.best_window(log2)``.
 
     Returns
     -------
@@ -66,7 +66,7 @@ def build_peg(*, update=True, calibrate=True, p=0.995, coc=0.15,
     port = build(PEG_PROGRAM)
     if update:
         if bs is None:
-            bs = port.best_bucket(log2)
+            bs, _, _ = port.best_window(log2)
         port.update(log2=log2, bs=bs, remove_fuzz=True)
         if calibrate:
             port.calibrate_distortions(coc, p=p)

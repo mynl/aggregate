@@ -41,7 +41,7 @@
 |   | H4 | Docstring style sweep → NumPy | A | — |
 |   | H5 | `pedagogy` figure-generator migrations | B | — |
 |   | B4 | ZT/ZM frequency broken + add shift helpers | A | — |
-|   | W10 | Retire `recommend_bucket` | A | — (W9 shipped) |
+| ✓ | W10 | Retire `recommend_bucket`/`best_bucket` | A | done a95 (plan-finish-shared-concerns B0) |
 |   | T2 | Rationalize tests / library coupling | A | — |
 |   | T3 | Switcheroo `Port.Sample` regression case | B | — |
 |   | D1 | New README body for stable-v1.0 audience | A | — |
@@ -202,6 +202,20 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     author-sensitive, byte-identical). **All three approved for execution**
     (behaviour-frozen). Phase 4B composition + the sample-subsystem review stay
     post-beta, conditional.
+  - **Finish-shared-concerns landed (1.0.0a95), `dev/done/plan-finish-shared-concerns.md`:**
+    the three thin-shell concern modules filled in — reinsurance bodies →
+    `_reinsurance.py` (Agg-only, now a real ~900-line module), bucket/window
+    bodies → `_bucket_window.py` (`Aggregate._bs_window` + the Portfolio sizers
+    `best_window`/`_bs_window`/`bs_window_df`/`_single_big_jump_window`/
+    `_build_bs_window_df` as free functions; `value_type_role` relocated to
+    `utilities.py` to keep the leaf cycle-free), validation bodies →
+    `_validation.py` (`valid_aggregate`/`valid_portfolio` side by side, shared
+    `validation_explanation`). **W10 done:** `recommend_bucket` / `best_bucket`
+    removed (breaking, off the live path); `aggregate_error_analysis` repointed
+    to `estimate_agg_window`; docs/user-guide updated to `best_window` /
+    `bs_window_df`. Behaviour-frozen (byte-identical relocations; baseline
+    unmoved). The H6 god-module track is now closed bar the post-beta /
+    conditional items (P2 Pass B, Phase 4B, Agg 2B, the sample-subsystem review).
 
 ---
 
@@ -236,17 +250,16 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [ ] **W3 `[B]`** Plot severity outside the aggregate window (#8) — inset,
   broken axis, or separate figure when grids don't overlap (`info` already warns).
   *(approach undecided.)*
-- [ ] **W10 `[A]`** Retire `recommend_bucket` — replace the legacy one-shot
-  sizer with a new (TBD) function that takes `log2` (and possibly `x_min`) as
-  explicit arguments, then remove `recommend_bucket`. Its last real job (the
-  infinite-variance fallback) is gone — `_bs_window` now raises
-  `InfiniteVarianceError` instead of guessing a grid (a87) — so nothing left
-  depends on it. See `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`).
-  **Folded into `dev/plan-finish-shared-concerns.md` Phase B0** — confirmed off
-  the live path (both classes' `update(bs=0)` route through `_bs_window`), so the
-  removal is behaviour-neutral; the only ripples are the diagnostic
-  `aggregate_error_analysis` (repoint or drop), `test_best_bucket_retained_for_comparison`,
-  `tests/peg.py`, and a stale underwriter comment.
+- [x] **W10 `[A]`** Retire `recommend_bucket` — **DONE (1.0.0a95)**, executed as
+  `dev/done/plan-finish-shared-concerns.md` Phase B0. `recommend_bucket` and
+  `best_bucket` removed from both `Aggregate` and `Portfolio` (confirmed off the
+  live path — `update(bs=0)` routes through `_bs_window` / `best_window`), so the
+  removal was behaviour-neutral. The diagnostic `aggregate_error_analysis` was
+  repointed to `estimate_agg_window`; `test_best_bucket_retained_for_comparison`
+  removed; `tests/peg.py`, the underwriter comments, `config.py`, the default toml,
+  and the `2_x_10mins` user guide updated to the `best_window` / `bs_window_df`
+  surface. See `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`) for the
+  original framing.
 
 ---
 

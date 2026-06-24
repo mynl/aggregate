@@ -35,7 +35,7 @@ from .moments import (MomentAggregator, MomentWrangler,
 from .utilities import (ft, ift,
                         round_bucket,
                         balanced_window,
-                        agg_help, remove_fuzz)
+                        agg_help, remove_fuzz, value_type_role)
 from ._grid_distribution import GridDistribution
 from .decl_writer import format_program
 import aggregate.random_agg as ar
@@ -52,8 +52,10 @@ from ._bucket_window import (
     WINDOW_SLACK_THICK, BUCKET_SIZING_P, SBJ_TAIL_FLOOR,
     _estimate_agg_percentile, estimate_agg_window, bs_describe, bs_explain,
 )
+from . import _bucket_window
 from ._validation import VALIDATION_NOISE, ALIASING_RATIO, explain_validation
-from ._reinsurance import make_ceder_netter
+from . import _validation
+from . import _reinsurance
 from ._aggregate_compute import freq_sev_convolution
 from . import _pricing
 
@@ -62,41 +64,6 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'Aggregate',
 ]
-
-
-def value_type_role(v):
-    """Map a ``value_type`` token to the is-loss boolean role.
-
-    Parameters
-    ----------
-    v : str
-        Either a canonical token (``'loss'`` / ``'payoff'``) or the
-        currently-configured label (``settings.labels``).
-
-    Returns
-    -------
-    bool
-        ``True`` for the loss convention, ``False`` for payoff.
-
-    Raises
-    ------
-    ValueError
-        If ``v`` is outside the accepted pair.
-
-    Notes
-    -----
-    The role is the canonical, never-reconfigured spec field
-    (``_is_loss_value``); the label strings are display/spelling settings
-    (``[labels]`` in the config). Read at call time, not import time, so a
-    :func:`~aggregate.config.reload_settings` is honoured.
-    """
-    labels = get_settings().labels
-    if v in ('loss', labels.loss):
-        return True
-    if v in ('payoff', labels.payoff):
-        return False
-    raise ValueError(
-        f"value_type must be {labels.loss!r} or {labels.payoff!r}, not {v!r}")
 
 
 def value_type_label(is_loss_value):
@@ -425,7 +392,7 @@ class Aggregate:
         - ``approximate``, ``entropy_fit``: parametric fits to the FFT output.
         - ``apply_distortion``, ``pollaczeck_khinchine``: distortion / ruin.
         - ``plot``: single plotting entry point.
-        - ``snap``, ``picks``, ``unwrap``, ``recommend_bucket``,
+        - ``snap``, ``picks``, ``unwrap``,
           ``aggregate_error_analysis``, ``severity_error_analysis``: utilities.
 
     Methods / attributes with a leading underscore are internal —
@@ -979,60 +946,7 @@ class Aggregate:
         old ``p_agg_gross`` (the agg-cover input) ``-> p_agg_subject``.
         Returns ``None`` when no reinsurance is configured.
         """
-        if self.occ_reins is None and self.agg_reins is None:
-            logger.warning('Asking for reins_density_df, but no reinsurance specified. Returning None.')
-            return None
-
-        if self._reins_density_df is None:
-            xs = self.xs
-            has_occ = self.occ_reins is not None
-            has_agg = self.agg_reins is not None
-            # point mass at 0 == the "no cession" density (ceded 0 w.p. 1)
-            zero = np.zeros_like(xs, dtype=float)
-            zero[0] = 1.0
-
-            # --- severity (occurrence-level) views -----------------------
-            sev_gross = np.asarray(
-                self.sev_density_gross if self.sev_density_gross is not None
-                else self.sev_density, dtype=float)
-            sev_ceded = np.asarray(self.sev_density_ceded, dtype=float) if has_occ else zero
-            sev_net = np.asarray(self.sev_density_net, dtype=float) if has_occ else sev_gross
-            df = pd.DataFrame({
-                'loss': xs,
-                'p_sev_gross': sev_gross,
-                'p_sev_ceded': sev_ceded,
-                'p_sev_net': sev_net,
-            }, index=pd.Index(xs, name='loss'))
-
-            # --- aggregate of each occurrence severity view --------------
-            # p_agg_gross is the TRUE gross aggregate (FFT of gross sev).
-            agg_gross, _ = self._fft_aggregate(sev_gross, self.padding)
-            df['p_agg_gross'] = agg_gross
-            if has_occ:
-                logger.info('Computing aggregates with gcn severities')
-                agg_ceded_occ, _ = self._fft_aggregate(sev_ceded, self.padding)
-                agg_net_occ, _ = self._fft_aggregate(sev_net, self.padding)
-                df['p_agg_ceded_occ'] = agg_ceded_occ
-                df['p_agg_net_occ'] = agg_net_occ
-            else:
-                df['p_agg_ceded_occ'] = zero
-                df['p_agg_net_occ'] = agg_gross
-
-            # --- aggregate-cover views -----------------------------------
-            # subject = the aggregate input to the agg cover = aggregate of
-            # the requested occ output (== p_agg_gross when no occ stage).
-            if has_agg:
-                df['p_agg_subject'] = np.asarray(self.agg_density_gross, dtype=float)
-                df['p_agg_ceded'] = np.asarray(self.agg_density_ceded, dtype=float)
-                df['p_agg_net'] = np.asarray(self.agg_density_net, dtype=float)
-            else:
-                df['p_agg_subject'] = np.asarray(self.agg_density, dtype=float)
-                df['p_agg_ceded'] = zero
-                df['p_agg_net'] = np.asarray(self.agg_density, dtype=float)
-
-            self._reins_density_df = df
-
-        return self._reins_density_df
+        return _reinsurance.reins_density_df(self)
 
     def reins_occ_plot(self, axs=None):
         """
@@ -1127,9 +1041,7 @@ class Aggregate:
     @staticmethod
     def _reins_moments6_from_raw(e1, e2, e3):
         """``(ex1, ex2, ex3, mean, cv, skew)`` from raw moments."""
-        mw = MomentWrangler()
-        mw.noncentral = (e1, e2, e3)
-        return (e1, e2, e3, *mw.mcvsk)
+        return _reinsurance.reins_moments6_from_raw(e1, e2, e3)
 
     def _reins_exact_image_raw(self, image_fn, p_subject):
         """Raw moments ``E[g(X)^j]``, ``j=1..3``, of an exact loss image
@@ -1147,23 +1059,16 @@ class Aggregate:
         scatter (plus, for a gross aggregate carried through an FFT, the grid
         deficit -- negligible on an adequate grid).
         """
-        g = np.asarray(image_fn(self.xs), dtype=float)
-        p = np.asarray(p_subject, dtype=float)
-        return (float(np.sum(g * p)),
-                float(np.sum(g * g * p)),
-                float(np.sum(g * g * g * p)))
+        return _reinsurance.reins_exact_image_raw(self, image_fn, p_subject)
 
     def _reins_agg6_from_sev_raw(self, s1, s2, s3):
         """Compound exact severity raw moments into aggregate
         ``(ex1, ex2, ex3, mean, cv, skew)`` via the frequency."""
-        f1, f2, f3 = self.frequency.freq_moms(self.n)
-        a1, a2, a3 = MomentAggregator.agg_from_fs(f1, f2, f3, s1, s2, s3)
-        return (a1, a2, a3, *MomentAggregator.static_moments_to_mcvsk(a1, a2, a3))
+        return _reinsurance.reins_agg6_from_sev_raw(self, s1, s2, s3)
 
     def _reins_density6(self, p):
         """``(ex1, ex2, ex3, mean, cv, skew)`` of a density on the grid."""
-        mw = xsden_to_mwrangler(self.xs, np.asarray(p, dtype=float))
-        return (*mw.noncentral, *mw.mcvsk)
+        return _reinsurance.reins_density6(self, p)
 
     @property
     def _reins_view_stats(self):
@@ -1217,99 +1122,7 @@ class Aggregate:
         Lazily built; invalidated by the ``reins_bucket`` setter and on
         ``update``. Returns ``None`` when no reinsurance is configured.
         """
-        if self.occ_reins is None and self.agg_reins is None:
-            return None
-        if self._reins_view_stats_cache is not None:
-            return self._reins_view_stats_cache
-
-        measures = ['ex1', 'ex2', 'ex3', 'mean', 'cv', 'skew']
-        components = ['freq', 'sev', 'agg']
-        row_index = pd.MultiIndex.from_product(
-            [components, measures], names=['component', 'measure'])
-        nan6 = (np.nan,) * 6
-
-        rd = self.reins_density_df
-        data = {}  # (stage, view, basis) -> Series over row_index
-
-        def put(stage, view, basis, freq6, sev6, agg6):
-            s = pd.Series(np.nan, index=row_index)
-            for comp, six in zip(components, (freq6, sev6, agg6)):
-                for m, v in zip(measures, six):
-                    s[(comp, m)] = v
-            data[(stage, view, basis)] = s
-
-        # ---- occurrence stage -------------------------------------------
-        if self.occ_reins is not None:
-            p_gross = rd['p_sev_gross'].to_numpy()
-            n = self.n
-            # Frequency is unchanged by occurrence reinsurance, so the gross
-            # full moments are the theoretic reference (``EX``) for every view.
-            # The model-output (``Est``) frequency is reported *unconditionally*
-            # -- no division by ``P(attach)`` -- so ``freq * sev == agg`` within
-            # each view; only the mean is meaningful (the per-view count is the
-            # gross count), so cv / skew stay ``NaN``. The gross ``Est``
-            # frequency is left ``NaN`` to mirror ``summary_df`` exactly (the
-            # validation view never re-estimates the input frequency).
-            f1, f2, f3 = self.frequency.freq_moms(n)
-            freq_gross = (f1, f2, f3,
-                          *MomentAggregator.static_moments_to_mcvsk(f1, f2, f3))
-            freq_est_uncond = (np.nan, np.nan, np.nan, f1, np.nan, np.nan)
-
-            # EX: exact image moments of the gross severity, compounded; the
-            # frequency reference is the gross full moments for every view.
-            identity = lambda x: x
-            for view, image_fn in [('gross', identity),
-                                   ('ceded', self.occ_ceder),
-                                   ('net', self.occ_netter)]:
-                s1, s2, s3 = self._reins_exact_image_raw(image_fn, p_gross)
-                put('occ', view, 'EX',
-                    freq_gross,
-                    self._reins_moments6_from_raw(s1, s2, s3),
-                    self._reins_agg6_from_sev_raw(s1, s2, s3))
-
-            # Est: moments of the rebucketed densities; unconditional freq
-            # (gross frequency left NaN to mirror summary_df).
-            for view, scol, acol, freq6 in [
-                    ('gross', 'p_sev_gross', 'p_agg_gross', nan6),
-                    ('ceded', 'p_sev_ceded', 'p_agg_ceded_occ', freq_est_uncond),
-                    ('net', 'p_sev_net', 'p_agg_net_occ', freq_est_uncond)]:
-                put('occ', view, 'Est',
-                    freq6,
-                    self._reins_density6(rd[scol].to_numpy()),
-                    self._reins_density6(rd[acol].to_numpy()))
-
-        # ---- aggregate stage --------------------------------------------
-        if self.agg_reins is not None:
-            p_subject = rd['p_agg_subject'].to_numpy()
-            identity = lambda x: x
-            for view, image_fn in [('subject', identity),
-                                   ('ceded', self.agg_ceder),
-                                   ('net', self.agg_netter)]:
-                a1, a2, a3 = self._reins_exact_image_raw(image_fn, p_subject)
-                put('agg', view, 'EX', nan6, nan6,
-                    self._reins_moments6_from_raw(a1, a2, a3))
-            for view, acol in [('subject', 'p_agg_subject'),
-                              ('ceded', 'p_agg_ceded'),
-                              ('net', 'p_agg_net')]:
-                put('agg', view, 'Est', nan6, nan6,
-                    self._reins_density6(rd[acol].to_numpy()))
-
-        # Canonical column order: occ before agg; within a stage the views
-        # gross/subject, ceded, net (never alphabetical); EX before Est.
-        ordered = []
-        if self.occ_reins is not None:
-            for view in ('gross', 'ceded', 'net'):
-                for basis in ('EX', 'Est'):
-                    ordered.append(('occ', view, basis))
-        if self.agg_reins is not None:
-            for view in ('subject', 'ceded', 'net'):
-                for basis in ('EX', 'Est'):
-                    ordered.append(('agg', view, basis))
-        out = pd.DataFrame(data)[ordered]
-        out.columns = pd.MultiIndex.from_tuples(
-            ordered, names=['stage', 'view', 'basis'])
-        self._reins_view_stats_cache = out
-        return self._reins_view_stats_cache
+        return _reinsurance.reins_view_stats(self)
 
     @property
     def reins_stats_df(self):
@@ -1380,251 +1193,7 @@ class Aggregate:
         Lazily built; invalidated by the ``reins_bucket`` setter and on
         ``update``. Returns ``None`` when no reinsurance is configured.
         """
-        if self.occ_reins is None and self.agg_reins is None:
-            return None
-        if self._reins_stats_df is not None:
-            return self._reins_stats_df
-
-        measures = ['ex1', 'ex2', 'ex3', 'mean', 'cv', 'skew']
-        components = ['freq', 'sev', 'agg']
-        meta_rows = ['share', 'limit', 'attach', 'pr_attach', 'pr_detach',
-                     'pr_loss', 'lol', 'output']
-        row_index = pd.MultiIndex.from_tuples(
-            [('meta', m) for m in meta_rows]
-            + [(c, m) for c in components for m in measures],
-            names=['component', 'measure'])
-        nan6 = (np.nan,) * 6
-        rd = self.reins_density_df
-        xs = self.xs
-        n = self.n
-        data = {}
-
-        def col(share=np.nan, limit=np.nan, attach=np.nan, pr_attach=np.nan,
-                pr_detach=np.nan, pr_loss=np.nan, lol=np.nan, output=0.0,
-                freq6=nan6, sev6=nan6, agg6=nan6):
-            s = pd.Series(np.nan, index=row_index)
-            for mk, mv in zip(meta_rows, (share, limit, attach, pr_attach,
-                                          pr_detach, pr_loss, lol, output)):
-                s[('meta', mk)] = mv
-            for comp, six in zip(components, (freq6, sev6, agg6)):
-                for m, v in zip(measures, six):
-                    s[(comp, m)] = v
-            return s
-
-        def moments6(raw):
-            """(ex1, ex2, ex3, mean, cv, skew) from raw moments ``raw``."""
-            return (*raw, *MomentAggregator.static_moments_to_mcvsk(*raw))
-
-        def _raw3(density):
-            d = np.asarray(density, dtype=float)
-            return (float(np.sum(xs * d)),
-                    float(np.sum(xs * xs * d)),
-                    float(np.sum(xs * xs * xs * d)))
-
-        def _pr_pos(density):
-            """P(loss > 0) = 1 - mass in the zero bucket."""
-            return float(1.0 - np.asarray(density, dtype=float)[0])
-
-        def _sf(a):
-            try:
-                return float(self.sev.sf(a))
-            except Exception:  # pragma: no cover - exotic severities
-                return np.nan
-
-        def _ge(density, t):
-            """P(loss >= t) from a density, ``NaN`` if ``t`` is not finite.
-            Used for the *aggregate*-level attach/detach probabilities (the
-            modeled aggregate density is exact)."""
-            if not np.isfinite(t):
-                return np.nan
-            return float(np.sum(np.asarray(density, dtype=float)[xs >= t]))
-
-        # Claim-count weights and the ground-up severity survival, used for the
-        # occurrence attach/detach probabilities. The modeled ``sev_density``
-        # is *conditional* (claims to the policy layer, ``n`` the conditional
-        # count), so the unconditional exposure probabilities -- P(a ground-up
-        # claim's subject loss exceeds a threshold) -- come from the underlying
-        # frozen severity ``fz`` with each component's policy attachment as the
-        # offset. The limited ``self.sev.sf`` would report 0 at the policy cap
-        # by definition; the ground-up ``fz`` gives the true detachment prob.
-        en = np.asarray(self.en, dtype=float)
-        ws = (en / en.sum() if en.sum() > 0
-              else np.full(len(self.sevs), 1.0 / max(len(self.sevs), 1)))
-
-        def _gsf(t, inclusive=False):
-            """Weighted P(subject loss > t) (``>= t`` if ``inclusive``).
-
-            ``subject_i = layer(X_i; attach_i, limit_i)``, so subject > t iff
-            the ground-up ``X_i > attach_i + t`` (and t below the cap)."""
-            try:
-                tot = 0.0
-                for i, sev in enumerate(self.sevs):
-                    lim = float(sev.limit)
-                    if t < lim or (inclusive and t <= lim):
-                        tot += ws[i] * float(sev.fz.sf(float(sev.attachment) + t))
-                return float(tot)
-            except Exception:  # pragma: no cover - exotic severities
-                return np.nan
-
-        def _gross_detach():
-            """Weighted P(policy detaches) = P(ground-up >= attach + limit)
-            over finite-limit components; ``NaN`` if every component unlimited."""
-            fin = [i for i, sev in enumerate(self.sevs)
-                   if np.isfinite(float(sev.limit))]
-            if not fin:
-                return np.nan
-            try:
-                return float(sum(
-                    ws[i] * float(self.sevs[i].fz.sf(
-                        float(self.sevs[i].attachment) + float(self.sevs[i].limit)))
-                    for i in fin))
-            except Exception:  # pragma: no cover - exotic severities
-                return np.nan
-
-        def _lol(mean, placed_limit):
-            """Loss on line: expected layer aggregate loss / placed limit."""
-            if placed_limit is None or np.isnan(placed_limit):
-                return np.nan
-            if np.isinf(placed_limit):
-                return 0.0
-            return mean / placed_limit if placed_limit > 0 else np.nan
-
-        def _layer_ceded(ceder, subject):
-            """Rebucketed ceded density: subject mass through one layer."""
-            return self._rebucket_to_grid(
-                np.asarray(ceder(xs), dtype=float),
-                np.asarray(subject, dtype=float))
-
-        # Full gross frequency (count unchanged by reinsurance).
-        f1, f2, f3 = self.frequency.freq_moms(n)
-        freq_full = moments6((f1, f2, f3))
-
-        # Claim-count-weighted gross policy limit / attachment (mixtures);
-        # ``en`` / ``ws`` were set with the ground-up survival helpers above.
-        lim = np.asarray(self.limit, dtype=float)
-        att = np.asarray(self.attachment, dtype=float)
-        if en.sum() > 0:
-            gross_limit = float(np.average(lim, weights=en))
-            gross_attach = float(np.average(att, weights=en))
-        else:  # zero-risk fallback
-            gross_limit = float(np.mean(lim))
-            gross_attach = float(np.mean(att))
-
-        # Which view carries each stage's output=1 flag.
-        occ_out = (REINS_LABEL_NET if self.occ_kind == 'net of'
-                   else REINS_LABEL_CEDED) if self.occ_reins is not None else None
-        agg_out = (REINS_LABEL_NET if self.agg_kind == 'net of'
-                   else REINS_LABEL_CEDED) if self.agg_reins is not None else None
-        # Gross is the aggregate subject (output=1) only when there is an
-        # aggregate program but no occurrence program.
-        gross_output = 1.0 if (self.agg_reins is not None
-                               and self.occ_reins is None) else 0.0
-
-        # ----- gross book (always present) -----
-        p_sev_gross = rd['p_sev_gross'].to_numpy()
-        gross_agg6 = self._reins_density6(rd['p_agg_gross'].to_numpy())
-        data[('occ', REINS_LABEL_GROSS)] = col(
-            share=1.0, limit=gross_limit, attach=gross_attach,
-            # exposure probabilities from the underlying ground-up severity
-            pr_attach=_gsf(0.0),            # P(a ground-up claim hits the policy)
-            pr_detach=_gross_detach(),      # P(it exhausts the policy limit)
-            pr_loss=_pr_pos(rd['p_agg_gross'].to_numpy()),
-            lol=_lol(gross_agg6[3], gross_limit),
-            output=gross_output,
-            freq6=freq_full,
-            sev6=self._reins_density6(p_sev_gross),
-            agg6=gross_agg6)
-
-        # ----- occurrence layering (conditional layers; unconditional totals) -----
-        if self.occ_reins is not None:
-            p_gross = rd['p_sev_gross'].to_numpy()
-            for k, (s, y, a) in enumerate(self.occ_reins, 1):
-                ceder_k, _ = make_ceder_netter([(s, y, a)])
-                ceded_k = _layer_ceded(ceder_k, p_gross)
-                # Conditioning for the layer freq / sev is relative to the
-                # *policy* claims (the modeled count ``n``): P(subject > a |
-                # policy loss) = self.sev.sf(a). The displayed pr_attach /
-                # pr_detach are the absolute ground-up exposure probabilities.
-                pr = _sf(a)
-                u1, u2, u3 = _raw3(ceded_k)              # raw (conditional on policy)
-                if pr and not np.isnan(pr):              # condition on the layer
-                    cond = (u1 / pr, u2 / pr, u3 / pr)
-                else:
-                    cond = (np.nan, np.nan, np.nan)
-                lf = self.frequency.freq_moms(n * pr)    # conditional count n'
-                agg_k, _ = self._fft_aggregate(ceded_k, self.padding)
-                agg6 = self._reins_density6(agg_k)
-                data[('occ', f'layer.{k}')] = col(
-                    share=s, limit=y, attach=a,
-                    pr_attach=_gsf(a),
-                    pr_detach=_gsf(a + y, inclusive=True) if np.isfinite(y) else np.nan,
-                    pr_loss=_pr_pos(agg_k),
-                    lol=_lol(agg6[3], s * y),
-                    freq6=moments6(lf), sev6=moments6(cond), agg6=agg6)
-            placed = float(sum(s * y for (s, y, _a) in self.occ_reins))
-            min_attach = float(min(a for (_s, _y, a) in self.occ_reins))
-            ceded_agg6 = self._reins_density6(rd['p_agg_ceded_occ'].to_numpy())
-            data[('occ', REINS_LABEL_CEDED)] = col(
-                limit=placed, attach=min_attach,
-                pr_attach=_gsf(min_attach),   # P(any ceding) = P(hit lowest layer)
-                pr_loss=_pr_pos(rd['p_agg_ceded_occ'].to_numpy()),
-                lol=_lol(ceded_agg6[3], placed),
-                output=1.0 if occ_out == REINS_LABEL_CEDED else 0.0,
-                freq6=freq_full,
-                sev6=self._reins_density6(rd['p_sev_ceded'].to_numpy()),
-                agg6=ceded_agg6)
-            data[('occ', REINS_LABEL_NET)] = col(
-                pr_attach=_gsf(0.0),          # P(any subject loss retained)
-                pr_loss=_pr_pos(rd['p_agg_net_occ'].to_numpy()),
-                output=1.0 if occ_out == REINS_LABEL_NET else 0.0,
-                freq6=freq_full,
-                sev6=self._reins_density6(rd['p_sev_net'].to_numpy()),
-                agg6=self._reins_density6(rd['p_agg_net_occ'].to_numpy()))
-
-        # ----- aggregate layering (freq/sev left NaN -- they don't combine) -----
-        if self.agg_reins is not None:
-            p_subject = rd['p_agg_subject'].to_numpy()
-            pr_subject = _pr_pos(p_subject)              # P(subject > 0)
-
-            def _pr_agg(a):
-                return float(np.sum(p_subject[xs > a]))
-
-            for k, (s, y, a) in enumerate(self.agg_reins, 1):
-                ceder_k, _ = make_ceder_netter([(s, y, a)])
-                ceded_k = _layer_ceded(ceder_k, p_subject)
-                agg6 = self._reins_density6(ceded_k)
-                data[('agg', f'layer.{k}')] = col(
-                    share=s, limit=y, attach=a, pr_attach=_pr_agg(a),
-                    pr_detach=_ge(p_subject, a + y), pr_loss=_pr_pos(ceded_k),
-                    lol=_lol(agg6[3], s * y), agg6=agg6)
-            placed = float(sum(s * y for (s, y, _a) in self.agg_reins))
-            min_attach = float(min(a for (_s, _y, a) in self.agg_reins))
-            ceded_agg6 = self._reins_density6(rd['p_agg_ceded'].to_numpy())
-            data[('agg', REINS_LABEL_CEDED)] = col(
-                limit=placed, attach=min_attach, pr_attach=pr_subject,
-                pr_loss=_pr_pos(rd['p_agg_ceded'].to_numpy()),
-                lol=_lol(ceded_agg6[3], placed),
-                output=1.0 if agg_out == REINS_LABEL_CEDED else 0.0,
-                agg6=ceded_agg6)
-            data[('agg', REINS_LABEL_NET)] = col(
-                pr_attach=pr_subject,
-                pr_loss=_pr_pos(rd['p_agg_net'].to_numpy()),
-                output=1.0 if agg_out == REINS_LABEL_NET else 0.0,
-                agg6=self._reins_density6(rd['p_agg_net'].to_numpy()))
-
-        ordered = list(data.keys())  # gross, occ block, agg block (insertion)
-        out = pd.DataFrame(data)[ordered]
-        out.columns = pd.MultiIndex.from_tuples(ordered, names=['view', 'layer'])
-        self._reins_stats_df = out
-        return self._reins_stats_df
-
-    # Column layout shared with ``summary_df`` (see :meth:`_describe`): exact
-    # (``EX``) value, rebucketed (``Est``) value, and ``Change`` for the mean
-    # and CV; skew omits the change column (it is the hardest moment to
-    # estimate). ``EX``/``Est`` here are the reins bases, not theory/empirical.
-    _REINS_DESCRIBE_COLS = ['EX', 'Est EX', 'Change EX',
-                            'CV', 'Est CV', 'Change CV',
-                            'Sk', 'Est Sk']
+        return _reinsurance.reins_stats_df(self)
 
     @property
     def reins_summary_df(self):
@@ -1671,19 +1240,7 @@ class Aggregate:
         :meth:`reins_stats_df` / the internal view-stats frame. Returns ``None``
         when no reinsurance is configured.
         """
-        if self.occ_reins is None and self.agg_reins is None:
-            return None
-        if self._reins_describe is not None:
-            return self._reins_describe
-        blocks = []
-        if self.occ_reins is not None:
-            blocks.append(self._reins_describe_block(
-                'occ', ['gross', 'ceded', 'net'], ['freq', 'sev', 'agg']))
-        if self.agg_reins is not None:
-            blocks.append(self._reins_describe_block(
-                'agg', ['subject', 'ceded', 'net'], ['agg']))
-        self._reins_describe = pd.concat(blocks)
-        return self._reins_describe
+        return _reinsurance.reins_summary_df(self)
 
     def _reins_describe_block(self, stage, views, comps):
         """One :meth:`reins_summary_df` block: theoretic reference vs model output
@@ -1699,33 +1256,7 @@ class Aggregate:
         validation error (~0 under ``linear``); on the ceded / net rows it reads
         as the % impact of the cession on that moment.
         """
-        rs = self._reins_view_stats
-        ref_view = views[0]  # Gross (occ) / Subject (agg) -- theoretic reference
-        rows = []
-        idx = []
-        for view in views:
-            for comp in comps:
-                def _ref_est(measure):
-                    ref = float(rs.loc[(comp, measure), (stage, ref_view, 'EX')])
-                    est = float(rs.loc[(comp, measure), (stage, view, 'Est')])
-                    return ref, est
-                ref_m, est_m = _ref_est('mean')
-                ref_cv, est_cv = _ref_est('cv')
-                ref_sk, est_sk = _ref_est('skew')
-                rows.append([
-                    ref_m, est_m, float(_noise_aware_rel_error(est_m, ref_m)),
-                    ref_cv, est_cv, float(_noise_aware_rel_error(est_cv, ref_cv)),
-                    ref_sk, est_sk,
-                ])
-                idx.append((stage, view, comp))
-        mi = pd.MultiIndex.from_tuples(idx, names=['stage', 'view', 'component'])
-        df = pd.DataFrame(rows, index=mi, columns=self._REINS_DESCRIBE_COLS)
-        # Snap fp dust to 0 in the value columns (skew of a symmetric view);
-        # the Change columns keep their dust as the rebucketing eyeball.
-        for c in df.columns:
-            if not c.startswith('Change'):
-                df[c] = _snap_noise(df[c])
-        return df
+        return _reinsurance.reins_describe_block(self, stage, views, comps)
 
     def rescale(self, scale, kind='homog'):
         """
@@ -2635,7 +2166,7 @@ class Aggregate:
         The consistent narrative surface, mirroring ``tail_explanation`` /
         ``bs_explanation``. Validation is computed if needed.
         """
-        return explain_validation(self.valid)
+        return _validation.validation_explanation(self)
 
     def _html_info_blob(self):
         """
@@ -2975,7 +2506,7 @@ class Aggregate:
 
         :param log2:
         :param bs:
-        :param bucket_sizing_p: p value passed to recommend_bucket. If > 1 converted to 1 - 10**-p in rec bucket.
+        :param bucket_sizing_p: p value passed to the moment-window bucket sizer. If > 1 converted to 1 - 10**-p.
         :param debug:
         :param x_min: lower edge of the output window. ``'auto'`` (default)
           resolves to ``0`` for an ordinary non-negative aggregate (today's
@@ -3002,8 +2533,8 @@ class Aggregate:
         # ``x_min='auto'`` lets the selected method choose the origin (0 for a
         # non-negative aggregate, a negative origin only when signed); a number
         # forces it; ``log2`` is a cap. The legacy non-negative ``moment`` path
-        # reproduces ``recommend_bucket`` exactly, so ordinary aggregates are
-        # unchanged.
+        # reproduces the legacy 3-moment bucket sizing exactly, so ordinary
+        # aggregates are unchanged.
         x_min_arg = None if (isinstance(x_min, str) and x_min == 'auto') else x_min
         bs, log2, x_min = self._bs_window(log2, bs, x_min_arg, bucket_sizing_p,
                                           window_convention=window_convention)
@@ -3614,82 +3145,7 @@ class Aggregate:
         :return: True (interpreted as not unreasonable) if all tests are passed, else False.
 
         """
-        if self._valid is not None:
-            return self._valid
-
-        rv = Validation.NOT_UNREASONABLE
-        # Not yet updated → no empirical moments to validate against.
-        if pd.isna(self.stats_df['empirical'].get(('agg', 'mean'), np.nan)):
-            self._valid = Validation.NOT_UPDATED
-            return Validation.NOT_UPDATED
-        # Mean / aliasing reads come straight off ``stats_df['error']`` --
-        # the canonical noise-aware relative error of ``gross_empirical``
-        # vs ``mixed``. Under no reinsurance ``gross_empirical ==
-        # empirical`` and this is the classical theoretical-vs-empirical
-        # check; under reinsurance it is the subject-validation hook from
-        # §1.3 of the plan, the only apples-to-apples check available.
-        err = self.stats_df['error'].abs()
-        eps = self.validation_eps
-        sev_err_mean = float(err.get(('sev', 'mean'), 0.0))
-        agg_err_mean = float(err.get(('agg', 'mean'), 0.0))
-        if sev_err_mean > eps:
-            logger.info('FAIL: Sev mean error > eps')
-            rv |= Validation.SEV_MEAN
-
-        if agg_err_mean > eps:
-            logger.info('FAIL: Agg mean error > eps')
-            rv |= Validation.AGG_MEAN
-
-        # Aliasing fingerprint: the agg-mean error sits well above the sev-
-        # mean error (the FFT amplifies sev-discretisation error during
-        # convolution when ``bs`` is too small). Silenced under the
-        # ``VALIDATION_NOISE`` floor where the agg error is genuine dust.
-        if (agg_err_mean > VALIDATION_NOISE
-                and sev_err_mean > 0
-                and agg_err_mean > ALIASING_RATIO * sev_err_mean):
-            logger.info('FAIL: Agg mean error > %d * sev error', ALIASING_RATIO)
-            rv |= Validation.ALIASING
-
-        # CV and skew: compare subject empirical vs theoretical directly
-        # from the canonical stats_df. The test is applied only when the
-        # *theoretical* value is meaningfully non-zero (``abs(theo) >
-        # VALIDATION_NOISE``): a theoretically-zero skew (symmetric
-        # severity) or CV (deterministic severity) cannot be validated
-        # against the FFT's empirical estimate, whose noise floor is grid-
-        # dependent and unbounded (it can be far larger than the analytic
-        # dust). ``isfinite`` skips an undefined moment (e.g. infinite CV
-        # with no second moment). When the test applies, ``np.isclose``
-        # with rtol 10*eps / 100*eps (skewness is harder to estimate, hence
-        # looser) measures relative agreement.
-        mixed = self.stats_df['mixed']
-        emp = self.stats_df['gross_empirical']
-        for comp, flag in (('sev', Validation.SEV_CV), ('agg', Validation.AGG_CV)):
-            theo = float(mixed[(comp, 'cv')])
-            est = float(emp[(comp, 'cv')])
-            if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
-                    and not np.isclose(est, theo, rtol=10 * eps, atol=VALIDATION_NOISE)):
-                logger.info('FAIL: %s CV error > eps', comp)
-                rv |= flag
-        for comp, flag in (('sev', Validation.SEV_SKEW), ('agg', Validation.AGG_SKEW)):
-            theo = float(mixed[(comp, 'skew')])
-            est = float(emp[(comp, 'skew')])
-            if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
-                    and not np.isclose(est, theo, rtol=100 * eps, atol=VALIDATION_NOISE)):
-                logger.info('FAIL: %s skew error > eps', comp)
-                rv |= flag
-
-        # Reinsurance: the realised (after-reins) object has no independent
-        # theoretical, so its sev/agg moments cannot be validated. The
-        # checks above ran against the SUBJECT moments and remain
-        # meaningful; mark the result with REINSURANCE so callers know the
-        # public surface (``agg_density`` etc.) is the after-reins view.
-        if self.reins_kinds != 'None':
-            rv |= Validation.REINSURANCE
-
-        if rv == Validation.NOT_UNREASONABLE:
-            logger.info('Aggregate %s does not fail any validation: not unreasonable', self.name)
-        self._valid = rv
-        return rv
+        return _validation.valid_aggregate(self)
 
     def unwrap(self, p=1e-7, audit=True):
         """
@@ -3901,77 +3357,7 @@ class Aggregate:
         :param debug:
         :return: ceder, netter,
         """
-        ans = make_ceder_netter(reins_list, debug)
-        if debug:
-            # debug xs and ys are the knot points of the interpolation function; good for plotting
-            ceder, netter, xs, ys = ans
-        else:
-            ceder, netter = ans
-        # assemble df for answers
-        reins_df = pd.DataFrame(
-            {'loss': self.xs, 'p_subject': base_density}).set_index('loss', drop=False)
-        reins_df['loss_net'] = netter(reins_df.loss)
-        reins_df['loss_ceded'] = ceder(reins_df.loss)
-        # Rebucket the off-grid net/ceded values back onto the uniform model
-        # grid (self.xs == bs * arange, xs[0] == 0) via the selected
-        # ``reins_bucket`` scheme. See _rebucket_to_grid for the mass identity.
-        p_subject = np.asarray(base_density, dtype=float)
-        p_net = self._rebucket_to_grid(reins_df['loss_net'].to_numpy(), p_subject)
-        p_ceded = self._rebucket_to_grid(reins_df['loss_ceded'].to_numpy(), p_subject)
-        reins_df['p_net'] = p_net
-        reins_df['p_ceded'] = p_ceded
-        # F_* columns were vestigial from the old interp1d-of-CDF algorithm;
-        # the scatter computes p_net / p_ceded directly. The debug CDF panel
-        # below cumsums inline.
-        reins_df = reins_df[['loss', 'p_subject', 'loss_net',
-                             'loss_ceded', 'p_net', 'p_ceded']]
-
-        if debug is False:
-            return ceder, netter, reins_df
-
-        logger.debug('making re graphs.')
-        # quick debug; need to know kind=occ|agg here. Throwaway debug plot
-        # bound to ephemeral internals -- stays on the class (see the §2
-        # exception in dev/plan-plots-subsystem.md); matplotlib is reached
-        # lazily through the Layer-0 canvas helper.
-        from .plots import make_mosaic
-        f, axd = make_mosaic('AB\nCD', figsize=(12, 9))
-        xlim = self._limits()
-        # scale??
-        x = np.linspace(0, xlim[1], 201)
-        y = ceder(x)
-        n = x - y
-        nxs = netter(x)
-
-        ax = axd['A']
-        ax.plot(x, y, 'o')
-        ax.plot(x, y)
-        ax.plot(x, x, lw=.5, c='C7')
-        ax.set(aspect='equal', xlim=xlim, ylim=xlim,
-               xlabel='Subject', ylabel='Ceded',
-               title=f'Subject and ceded\nMax ceded loss {y[-1]:,.1f}')
-
-        ax = axd['B']
-        ax.plot(x, nxs, 'o')
-        ax.plot(x, n)
-        ax.plot(x, x, lw=.5, c='C7')
-        ax.set(aspect='equal', ylim=xlim,
-               xlabel='Subject', ylabel='Net',
-               title=f'Subject and net\nMax net loss {n[-1]:,.1f}')
-
-        ax = axd['C']
-        cdf = reins_df[['p_subject', 'p_net', 'p_ceded']].cumsum()
-        cdf.columns = ['F_subject', 'F_net', 'F_ceded']
-        cdf.plot(xlim=xlim, ax=ax)
-        ax.set(title='Subject, net and ceded\ndistributions')
-        ax.legend()
-
-        ax = axd['D']
-        reins_df.filter(regex='p_').plot(xlim=xlim, drawstyle='steps-post', ax=ax)
-        ax.set(title='Subject, net and ceded\ndensities')
-        ax.legend()
-
-        return ceder, netter, reins_df
+        return _reinsurance.apply_reins_work(self, reins_list, base_density, debug)
 
     def apply_occ_reins(self, debug=False):
         """
@@ -3984,28 +3370,7 @@ class Aggregate:
         :param debug: More verbose.
         :return:
         """
-        # generic function makes netter and ceder functions
-        if self.occ_reins is None:
-            return
-        logger.info('running apply_occ_reins')
-        occ_ceder, occ_netter, occ_reins_df = self._apply_reins_work(self.occ_reins, self.sev_density, debug)
-        # Retain the ceder/netter step functions for the exact (EX) reporting
-        # path; the rebucketed densities go straight onto the gcn members and
-        # into ``reins_density_df`` (no persistent per-stage frame).
-        self.occ_ceder = occ_ceder
-        self.occ_netter = occ_netter
-        self.sev_density_gross = self.sev_density
-        self.sev_density_net = occ_reins_df['p_net'].to_numpy()
-        self.sev_density_ceded = occ_reins_df['p_ceded'].to_numpy()
-        if self.occ_kind == 'ceded to':
-            self.sev_density = self.sev_density_ceded
-        elif self.occ_kind == 'net of':
-            self.sev_density = self.sev_density_net
-        else:
-            raise ValueError(f'Unexpected kind of occ reinsurance, {self.occ_kind}')
-        # ``est_sev_*`` is written by ``update_work`` from the post-reins
-        # severity (the same density set above) using ``xsden_to_mwrangler``
-        # -- no intermediate write needed here.
+        return _reinsurance.apply_occ_reins(self, debug)
 
     def apply_agg_reins(self, debug=False, padding=1):
         """
@@ -4020,28 +3385,7 @@ class Aggregate:
 
         :return:
         """
-        # generic function makes netter and ceder functions
-        if self.agg_reins is None:
-            return
-        logger.info('Applying aggregate reinsurance for %s', self.name)
-
-        agg_ceder, agg_netter, agg_reins_df = self._apply_reins_work(self.agg_reins, self.agg_density, debug)
-        # Retain the ceder/netter for the exact (EX) reporting path; the
-        # rebucketed densities go onto the gcn members / ``reins_density_df``.
-        self.agg_ceder = agg_ceder
-        self.agg_netter = agg_netter
-        self.agg_density_gross = self.agg_density
-        self.agg_density_net = agg_reins_df['p_net'].to_numpy()
-        self.agg_density_ceded = agg_reins_df['p_ceded'].to_numpy()
-        if self.agg_kind == 'ceded to':
-            self.agg_density = self.agg_density_ceded
-        elif self.agg_kind == 'net of':
-            self.agg_density = self.agg_density_net
-        else:
-            raise ValueError(f'Unexpected kind of agg reinsurance, {self.agg_kind}')
-
-        # update ft of agg
-        self.ftagg_density = ft(self.agg_density, padding)
+        return _reinsurance.apply_agg_reins(self, debug, padding)
 
     @property
     def reins_description(self):
@@ -4062,46 +3406,7 @@ class Aggregate:
         :param kind: both, occ, or agg
         :param width: width of text for textwrap.fill; omitted if width==0
         """
-        ans = []
-        if self.occ_reins is not None and kind in ['occ', 'both']:
-            ans.append(self.occ_kind)
-            ra = []
-            for (s, y, a) in self.occ_reins:
-                if np.isinf(y):
-                    ra.append(f'{s:,.0%} share of unlimited xs {a:,.0f}')
-                else:
-                    if s == y:
-                        ra.append(f'{y:,.0f} xs {a:,.0f}')
-                    else:
-                        ra.append(f'{s:,.0%} share of {y:,.0f} xs {a:,.0f}')
-            ans.append(' and '.join(ra))
-            ans.append('per occurrence')
-        if self.agg_reins is not None and kind in ['agg', 'both']:
-            if len(ans):
-                ans.append('then')
-            ans.append(self.agg_kind)
-            ra = []
-            for (s, y, a) in self.agg_reins:
-                if np.isinf(y):
-                    ra.append(f'{s:,.0%} share of unlimited xs {a:,.0f}')
-                else:
-                    if s == y:
-                        ra.append(f'{y:,.0f} xs {a:,.0f}')
-                    else:
-                        ra.append(f'{s:,.0%} share of {y:,.0f} xs {a:,.0f}')
-            ans.append(' and '.join(ra))
-            ans.append('in the aggregate.')
-        if len(ans):
-            # capitalize
-            s = ans[0]
-            s = s[0].upper() + s[1:]
-            ans[0] = s
-            reins = ' '.join(ans)
-        else:
-            reins = 'No reinsurance'
-        if width:
-            reins = fill(reins, width)
-        return reins
+        return _reinsurance.reins_description(self, kind, width)
 
     @property
     def reins_kinds(self):
@@ -4113,16 +3418,7 @@ class Aggregate:
             One of ``'None'``, ``'Occurrence only'``, ``'Aggregate only'``, or
             ``'Occurrence and aggregate'``.
         """
-        n = 1 if self.occ_reins is not None else 0
-        n += 2 if self.agg_reins is not None else 0
-        if n == 0:
-            return "None"
-        elif n == 1:
-            return 'Occurrence only'
-        elif n == 2:
-            return 'Aggregate only'
-        else:
-            return 'Occurrence and aggregate'
+        return _reinsurance.reins_kinds(self)
 
     # ================================================================
     # Distortion, ruin theory, plotting
@@ -4581,19 +3877,7 @@ class Aggregate:
         output). Returns ``None`` when no reinsurance is configured (legacy
         validation-view headings apply).
         """
-        kinds = []
-        if self.occ_reins is not None:
-            kinds.append(self.occ_kind)
-        if self.agg_reins is not None:
-            kinds.append(self.agg_kind)
-        if not kinds:
-            return None
-        uniq = set(kinds)
-        if uniq == {'net of'}:
-            return REINS_LABEL_NET
-        if uniq == {'ceded to'}:
-            return REINS_LABEL_CEDED
-        return REINS_LABEL_OUTPUT
+        return _reinsurance.reins_after_label(self)
 
     def _severity_lattice(self):
         """Integer-lattice step of the severity, or ``None`` if not on a lattice.
@@ -4764,7 +4048,7 @@ class Aggregate:
             The single-big-jump window edges (``sbj_lo == 0`` for a non-signed
             severity). ``None`` when ``E[N]``, the severity mean, or the
             ``p**`` quantile is unavailable (e.g. no finite variance) -- the
-            caller then keeps the existing window / recommend_bucket path.
+            caller then keeps the existing window / moment-sizer path.
 
         Notes
         -----
@@ -4932,607 +4216,23 @@ class Aggregate:
                    window_convention=None):
         """Decide ``(bs, log2, x_min)`` for ``update`` and build ``_bs_window_df``.
 
-        Runs up to three sizing methods and records each in the expert-
-        inspectable ``self._bs_window_df``, then selects per the documented
-        priority. ``log2`` is a **cap** (the input value, default 16): the exact
-        discrete method may use fewer buckets but never more; the other methods
-        fill the cap. The 0-origin convention is preserved -- ``x_min = 0``
-        whenever the support is non-negative; a negative origin is used only for
-        a genuinely signed aggregate.
-
-        Parameters
-        ----------
-        log2 : int
-            Bucket-count cap, ``2**log2`` buckets.
-        bs_in : float
-            ``0`` to estimate the bucket; ``>0`` to force it (honoured, D4).
-        x_min_in : float or None
-            ``None`` lets the selected method choose the origin; a number forces
-            it (snapped to ``bs``, D4).
-        bucket_sizing_p : float
-            Tail probability for the moment / bounded windows.
-        window_convention : {'loss', 'payoff'}, optional
-            Override the sign convention that orients the windowed placement
-            (per-edge coverage + padding skew). ``None`` (default) derives it
-            from ``self.value_type`` (``_is_loss_value``). See
-            ``dev/plan-bucket-window-2.md`` §1A (Q9).
-
-        Returns
-        -------
-        (bs, log2, x_min) : tuple
-            Final grid parameters; ``self._bs_window_df`` is also populated.
-
-        Methods (rows of ``_bs_window_df``)
-        -----------------------------------
-        - ``moment`` -- always; the legacy 3-moment sizing for non-negative
-          aggregates (reproduces ``recommend_bucket`` exactly), two-sided
-          ``estimate_agg_window`` for signed ones.
-        - ``exact_discrete`` -- ``dfreq``/``fixed`` x ``dsev`` on an integer
-          lattice: exact finite support, ``bs=1``, minimal ``log2`` (<= cap).
-        - ``bounded_small`` -- bounded severity: ``[0, N_hi·s_max]`` from a high
-          frequency quantile; selected only when tighter than ``moment``.
-        - ``windowed`` -- non-signed high-mean / thin-spread aggregate
-          (``agg_cv < 1/z``): a convention-skewed two-sided window far from 0,
-          computed via benign FFT wrap. Auto-origin only; selected when the
-          severity fits the windowed extent and it is **no coarser** than the
-          0-based pick (it then reclaims the empty space below the band and
-          balances the power-of-2 slack). Gives the windowed grid a non-zero
-          ``x_min`` (so ``q`` / ``F`` / plots are defined on the window, not
-          from 0); pass ``x_min=0`` to force the legacy grid.
-
-        Selection: ``exact_discrete`` > ``bounded_small`` (if tighter) >
-        ``moment``; ``windowed`` then overrides when it applies and is no
-        coarser. The selected windowed origin is then balance-padded
-        (``window_pad_skew``) so the band sits sensibly in the grid (R2/R5).
+        Orchestrator delegated to :func:`_bucket_window.bs_window`; see there
+        for the full method / selection documentation. Runs the sizing methods,
+        populates ``self._bs_window_df``, and returns the chosen grid.
         """
-        N0 = 1 << log2
-        self._bs_clip = None    # cleared each sizing; set only if the tail clips
-        m = self.agg_m
-        try:
-            ex2 = float(self.stats_df['mixed'][('agg', 'ex2')])
-            sd = float(np.sqrt(max(ex2 - m * m, 0.0)))
-        except Exception:  # pragma: no cover - defensive
-            sd = self.agg_sd
-        skew = self.agg_skew
-        # Convolution-grid signedness: a ``pnl`` aggregate has a non-negative
-        # loss severity, so the loss FFT is sized here on the ordinary
-        # non-negative grid; the affine relabel onto the signed P&L window is a
-        # post-step (below + in ``_apply_agg_affine``). Hence ``_signed_severity``
-        # not ``_signed`` -- the latter also reports ``True`` for the affine.
-        signed = self._signed_severity()
-        # Sign convention orienting the windowed placement: loss -> protect the
-        # right (priced) tail and trim/balance toward it; payoff mirrors. From
-        # ``value_type`` unless explicitly overridden (Q9; branch on the boolean
-        # role, never the label string -- house rule).
-        if window_convention is None:
-            is_loss = bool(self._is_loss_value)
-        else:
-            is_loss = value_type_role(window_convention)
-        # Window coverage: WINDOW_NINES nines (default 12) -- far tighter than
-        # the legacy bucket p, so the window captures essentially all the mass.
-        # Per-edge coverage for the windowed two-sided placement: deep on the
-        # protected edge (anti-clip), shallow on the cheap edge (anti-waste).
-        p = 1.0 - 10.0 ** -WINDOW_NINES
-        p_protect = 1.0 - 10.0 ** -WINDOW_NINES
-        p_trim = 1.0 - 10.0 ** -WINDOW_NINES_TRIM
-        p_lo_w, p_hi_w = (p_trim, p_protect) if is_loss else (p_protect, p_trim)
-        lattice = self._severity_lattice()
-
-        def _size(x_lo, x_hi, lattice_bs, force_origin=False, grow_cap=None):
-            """Origin ``x0`` and grid ``(bs, log2)`` for a window ``[x_lo, x_hi]``.
-
-            Returns ``(x0, bs, log2)`` only -- the *window* edges stay the
-            method's own ``[x_lo, x_hi]``; the realized grid extent
-            (``x0 + 2**log2 * bs``, which power-of-2 padding makes wider than the
-            window) is reported separately in the ``used`` row.
-
-            bs: forced ``bs_in`` if given; else the integer lattice step (so an
-            integer-valued aggregate uses ``bs=1`` not a fine fraction); else a
-            resolution ``round_bucket(W / 2**cap)``. ``log2`` is shrunk to just
-            cover the window (<= cap) when bs is free, keeping the realized grid
-            sensible; if the user pinned bs they control the grid so the cap
-            ``log2`` is honoured; if the window needs more than the cap, bs is
-            coarsened to fit.
-
-            ``force_origin`` makes the origin follow ``x_lo`` (snapped down to a
-            multiple of ``bs``) even for a non-signed aggregate -- used by the
-            ``windowed`` method, whose mass band sits far from 0 and is computed
-            via the benign FFT wrap in ``_fft_aggregate``. The default
-            (``signed`` only) keeps the 0-based convention for every legacy
-            method.
-
-            ``grow_cap`` (windowed only) is an *absolute* log2 ceiling above the
-            requested cap: when an integer lattice is present and the band needs
-            more than the cap to hold ``bs = lattice_bs``, grow ``log2`` up to
-            ``grow_cap`` rather than coarsening below the lattice (which would
-            mis-place the atoms). Only coarsen if even ``grow_cap`` is too small.
-            """
-            use_origin = signed or force_origin
-            W = max(x_hi - x_lo, 0.0)
-            if bs_in > 0:
-                bs = float(bs_in)
-            elif lattice_bs is not None:
-                bs = float(lattice_bs)
-            else:
-                bs = round_bucket(W / N0) if W > 0 else 1.0
-            x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
-            span = x_hi - x0
-            need = int(np.ceil(np.log2(max(span / bs + 1.0, 1.0)))) if span > 0 else 0
-            if bs_in > 0:
-                l2 = log2
-            elif need <= log2:
-                # at least 1 (>= 2 buckets) so a degenerate / point-mass window
-                # never collapses to a single bucket.
-                l2 = min(log2, max(need, 1))
-            elif (grow_cap is not None and lattice_bs is not None
-                  and need <= grow_cap):
-                # windowed lattice case: keep the exact lattice bs and grow log2
-                # past the cap (the band is narrow, so a small bounded bump) so
-                # an integer-atom severity is not coarsened off its lattice.
-                l2 = need
-            else:
-                bs = round_bucket(span / N0)
-                x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
-                l2 = log2
-            return x0, float(bs), int(l2)
-
-        def _row(x_lo, x_hi, lattice_bs, coverage, note, force_origin=False,
-                 grow_cap=None):
-            # ``x_max`` is the method's own computed window top (e.g. the exact
-            # support max), NOT the padded grid extent -- the ``used`` row shows
-            # the realized grid.
-            x0, bs_, l2_ = _size(x_lo, x_hi, lattice_bs, force_origin, grow_cap)
-            return dict(applies=True, x_min=float(x0), x_max=float(x_hi),
-                        W=float(x_hi - x0), bs=bs_, log2=l2_,
-                        coverage=coverage, note=note)
-
-        rows = {}
-
-        # ---- moment (always) --------------------------------------------
-        if bs_in > 0 and not (signed and np.isfinite(sd)):
-            # bs is pinned -> the grid is the user's; the moment "window" is
-            # just the realized extent. Avoids estimating a window (and the
-            # infinite-variance raise) when we don't need one.
-            x_lo, x_hi = 0.0, float(N0 * bs_in)
-        elif signed and np.isfinite(sd):
-            x_lo, x_hi, _W = estimate_agg_window(m, sd, skew, p)
-        else:
-            x_lo = 0.0
-            try:
-                x_hi = float(_estimate_agg_percentile(m, self.agg_cv, skew, p))
-            except ValueError as e:
-                # No finite variance (power-law / infinite-variance severity,
-                # e.g. pareto shape alpha <= 2) and no explicit ``bs``: there is
-                # no finite tail quantile to size the grid to, so there is no
-                # basis to guess ``bs``. Refuse to build rather than invent one
-                # -- the user must pass an explicit ``bs`` (item 2).
-                raise InfiniteVarianceError(
-                    f'{self.name}: infinite-variance (power-law) aggregate '
-                    f'(no finite second moment) -- cannot estimate a bucket '
-                    f'size. Pass an explicit bs, e.g. build(..., bs=...).'
-                ) from e
-            if not np.isfinite(x_hi):
-                # deterministic (sd ~ 0) or undefined skew (NaN): a few sd above
-                # the mean (collapses to the mean for a point mass).
-                x_hi = m + 8.0 * sd
-        rows['moment'] = _row(x_lo, x_hi, lattice, f'1-1e-{WINDOW_NINES}',
-                              '3-moment MoM window')
-
-        # ---- exact_discrete ---------------------------------------------
-        ed = self._exact_discrete_window()
-        if ed is not None:
-            a_lo, a_hi, bs_lat = ed
-            r = _row(a_lo, a_hi, bs_lat, 'exact', 'dfreq/fixed x dsev integer lattice')
-            if not np.isclose(r['bs'], bs_lat):
-                r['coverage'] = 'support exact, bs coarsened'
-            rows['exact_discrete'] = r
-
-        # ---- bounded_small ----------------------------------------------
-        bw = self._bounded_severity_window(p)
-        if bw is not None:
-            a_lo, a_hi = bw
-            rows['bounded_small'] = _row(a_lo, a_hi, lattice, f'freq 1-1e-{WINDOW_NINES}',
-                                         'bounded severity x freq quantile')
-
-        # ---- windowed (non-signed high-mean / thin relative spread) -----
-        # A concentrated aggregate -- ``agg_cv = sd/m < 1/z`` with
-        # ``z = norm.isf(1e-WINDOW_NINES)`` -- has its whole mass band sitting a
-        # long way above 0. Compute it on the two-sided window
-        # ``[m - z*sd, m + z*sd]`` (``estimate_agg_window``) far from 0 and let
-        # the periodic FFT wrap: ``_fft_aggregate`` lays the severity at period
-        # ``M*bs`` and relabels the finished aggregate by ``round(x_min/bs)``
-        # (modular ``np.roll``, so a 15M-bucket roll and any period straddle are
-        # handled automatically). The relabel carries no ``N*s`` shift, so it is
-        # exact for random frequency. Eligibility is deliberately narrow:
-        #   - auto origin only (``x_min_in is None``); an explicit ``x_min`` --
-        #     including ``x_min=0`` to force the legacy grid back -- keeps the
-        #     0-based methods;
-        #   - non-signed, non-affine, finite positive sd;
-        #   - no *occurrence* reinsurance: the occ-reins severity rebucketing and
-        #     ``reins_density_df`` carry the severity on the *output* grid
-        #     (``xs == xs_sev``), which windowing breaks (the output window sits
-        #     far above the severity grid). Aggregate reinsurance is fine -- it
-        #     operates on the aggregate, on the windowed ``xs``/``x_min``.
-        #   - the book is **concentrated** -- the tail report's conservative
-        #     ``concentrated`` flag (``agg_cv < CONCENTRATION_CV``, i.e. ~0.1),
-        #     the single source of truth (item 5). This replaces the looser
-        #     geometric ``w_lo > 0`` (~``cv < 0.21``) gate: a band that merely
-        #     grazes 0 is no longer windowed, so a borderline book reverts to the
-        #     0-based grid. The ``w_lo > 0`` geometry is still required below (the
-        #     band must actually clear 0 to be placed), but is now a necessary
-        #     condition under the stricter concentration gate, not the gate.
-        # The edges use *per-edge* coverage (``p_lo_w, p_hi_w``), deep on the
-        # protected tail and shallow on the cheap one, so the convention skews
-        # the placement (Q1/Q2). Selection then takes it when the severity fits
-        # the windowed extent and it is **no coarser** than the 0-based pick
-        # (below) -- reclaiming the empty space below the band even when ``bs``
-        # is unchanged; the only quiet fall back is a coarser bucket.
-        # Tail report and single-big-jump reach, computed once here so the
-        # windowed left-lift (item 3), the thickness gate (item 1) and the SBJ
-        # floor below all share them.
-        loss_left, loss_right = self._loss_tail_classes()
-        sbj = self._single_big_jump_window(p)
-        conc_flag, _conc_cv = _tail.concentration(m, sd)
-        if (x_min_in is None and not signed and not self._agg_affine_active()
-                and self.occ_reins is None
-                and np.isfinite(sd) and sd > 0
-                and bool(conc_flag)):
-            try:
-                w_lo, w_hi, _Ww = estimate_agg_window(
-                    m, sd, skew, p, p_lo=p_lo_w, p_hi=p_hi_w)
-            except ValueError:
-                w_lo = -1.0  # no finite window (e.g. infinite variance)
-            if w_lo > 0:
-                # Thin-left-gated upper floor (item 3, the asymmetric window). A
-                # thick right tail (subexponential severity) reaches past the
-                # moment window; floor the windowed upper edge by the single-big-
-                # jump reach so the grid -- and with it the severity discretisation
-                # extent ``N*bs`` -- grows enough to (a) capture that tail and
-                # (b) let a single heavy occurrence fit the window (the
-                # severity-fit guard below then passes where the un-floored
-                # window failed -> Regime B is reclaimed). Lifting ``x_min`` off 0
-                # is only safe when the *left* tail is thin (no mass below
-                # ``w_lo`` to clip); a non-signed aggregate is bounded-left, so
-                # this holds, but gate on it explicitly for correctness and for a
-                # future signed windowing.
-                thin_left = not _tail.is_thick(loss_left)
-                w_hi_eff = w_hi
-                floored_up = False
-                if (thin_left and _tail.is_thick(loss_right)
-                        and sbj is not None and sbj[1] > w_hi):
-                    w_hi_eff = float(sbj[1])
-                    floored_up = True
-                r = _row(w_lo, w_hi_eff, lattice,
-                         f'lo 1-1e-{WINDOW_NINES_TRIM if is_loss else WINDOW_NINES}'
-                         f' / hi 1-1e-{WINDOW_NINES if is_loss else WINDOW_NINES_TRIM}',
-                         'two-sided window, benign FFT wrap',
-                         force_origin=True, grow_cap=log2 + WINDOW_LOG2_GROWTH)
-                # Severity-fit guard: the severity discretises on [0, N*bs]; a
-                # single occurrence must fit the windowed extent or its mass
-                # overflows (the fixed-1 / approximate trap). Record the row
-                # either way (inspectable) but mark it inapplicable -> not
-                # selected -> quiet fall back to the 0-based grid.
-                extent = float((1 << int(r['log2'])) * r['bs'])
-                sev_hi = self._severity_high_estimate(p)
-                r['applies'] = bool(np.isfinite(sev_hi) and sev_hi < extent)
-                r['note'] += f'; sev_hi={sev_hi:.6g}, extent={extent:.6g}'
-                if floored_up:
-                    r['note'] += '; upper floored by sbj'
-                rows['windowed'] = r
-                if not r['applies']:
-                    # Regime B (heavy severity): the mass band clears 0 but a
-                    # single severity overflows the window, so the origin cannot
-                    # move -- the book keeps the floor-anchored grid (empty space
-                    # below the band is the price of the 0-containing severity
-                    # invariant). Discoverability only -- expected, not defective.
-                    logger.info(
-                        '%s: mass band clears 0 (w_lo=%.6g) but severity '
-                        'overflows the window (sev_hi=%.6g >= extent=%.6g); '
-                        'keeping the 0-based grid (heavy-severity, non-windowable).',
-                        self.name, w_lo, sev_hi, extent)
-
-        # ---- selection (D1/D2) ------------------------------------------
-        # bounded_small is selected a bit permissively -- it is a hard support
-        # bound, so accept it even when modestly wider (1.5x) than the moment
-        # window. With high coverage it is typically the tighter of the two.
-        if 'exact_discrete' in rows:
-            selected = 'exact_discrete'
-        elif ('bounded_small' in rows
-              and rows['bounded_small']['W'] <= 1.5 * rows['moment']['W']):
-            selected = 'bounded_small'
-        else:
-            selected = 'moment'
-        # windowed overrides the 0-based pick when it is applicable (the
-        # severity fits the windowed extent) and EITHER
-        #   - it is **no coarser** than that pick (``bs <= sel bs``) -- a band
-        #     that clears 0 wins on *placement* alone, reclaiming the empty
-        #     ``[0, x_lo)`` region and balancing the slack even when ``bs`` is
-        #     unchanged; OR
-        #   - the 0-based pick **clips** the single-big-jump reach while the
-        #     windowed grid (upper-floored by ``sbj``, item 3) **captures** it --
-        #     a coarser windowed bulk ``bs`` is the price of not clipping the
-        #     thick right tail (the asymmetric-window reclaim of Regime B).
-        # Self-limiting: ``applies`` can only hold when the mass band clears 0
-        # *and* a single severity fits the (possibly floored) window.
-        win = rows.get('windowed')
-        if win is not None and win['applies']:
-            sel_top = (float(rows[selected]['x_min'])
-                       + (1 << int(rows[selected]['log2'])) * float(rows[selected]['bs']))
-            win_top = (float(win['x_min'])
-                       + (1 << int(win['log2'])) * float(win['bs']))
-            reach = float(sbj[1]) if sbj is not None else float(win['x_max'])
-            sel_clips = sel_top < reach
-            win_covers = win_top >= reach
-            if (win['bs'] <= rows[selected]['bs']
-                    or (sel_clips and win_covers)):
-                selected = 'windowed'
-
-        # ---- single-big-jump extent floor (1A-fix) ----------------------
-        # A subexponential / signed severity can carry a far tail the 3-moment
-        # window misses (``P(S>x) ~ E[N]·P(X>x)``); the moment window then either
-        # clips the priced right tail (heavy positive sev) or -- for a signed sev
-        # whose positive skew hides a heavy reflected tail -- lets the severity
-        # wrap the FFT buffer (aliasing). Floor the SELECTED window's extent by
-        # one big claim on a typical bulk so the grid covers it; the resolution
-        # (``bs``) still follows the bulk/window. Self-activating: a light /
-        # thin / bounded / concentrated book has ``sbj`` inside the window (the
-        # ``max``/``min`` are no-ops) -> byte-stable. Only ``moment`` and
-        # ``windowed`` are floored -- ``exact_discrete`` and ``bounded_small``
-        # carry hard support bounds the SBJ moment estimate must not widen.
-        # (``sbj`` and ``loss_left``/``loss_right`` were computed above, before
-        # the windowed block, which now also consumes them.)
-        if sbj is not None:
-            # Record the grid the single-big-jump extent *alone* implies (sized
-            # like any other method row, via ``_size``), so the row is directly
-            # comparable to ``moment`` / ``windowed`` and never reads NaN. For a
-            # non-signed sev this is the 0-based ``[0, sbj_hi]`` grid; for a
-            # signed sev it carries the negative origin.
-            sx0, sbs, sl2 = _size(sbj[0], sbj[1], lattice)
-            rows['sbj'] = dict(
-                applies=True, x_min=float(sx0), x_max=float(sbj[1]),
-                W=float(sbj[1] - sx0), bs=float(sbs), log2=int(sl2),
-                coverage=f'E[N]-adj 1-1e-{WINDOW_NINES}',
-                note='single big jump: ES - mu_X + q_X(p**)')
-        else:
-            rows['sbj'] = dict(
-                applies=False, x_min=np.nan, x_max=np.nan, W=np.nan,
-                bs=np.nan, log2=np.nan, coverage=f'E[N]-adj 1-1e-{WINDOW_NINES}',
-                note='single big jump: n/a (no finite E[N] / variance)')
-        # Thickness gate (item 1): the single-big-jump mechanism only governs a
-        # *thick* (subexponential-or-heavier) tail -- the loss aggregate's right
-        # tail for a positive sev, its (reflected) left tail for a signed one.
-        # For a thin tail the MoM window already covers the reach, so the floor
-        # is a no-op; gating on the tail report makes that explicit and cheaper
-        # and stops the deep ``p**`` severity quantile firing where it should not.
-        if sbj is not None and bs_in <= 0 and selected in ('moment', 'windowed'):
-            sbj_lo, sbj_hi = sbj
-            win_lo = float(rows[selected]['x_min'])
-            win_hi = float(rows[selected]['x_max'])
-            keep_bs = float(rows[selected]['bs'])
-            sel_l2 = int(rows[selected]['log2'])
-
-            def _apply_floor(x0, hi, bs, l2):
-                floored = dict(rows[selected])
-                floored.update(x_min=float(x0), x_max=float(hi),
-                               W=float(hi - x0), bs=float(bs), log2=int(l2),
-                               note=rows[selected]['note'] + '; sbj floor')
-                rows[selected] = floored
-
-            if signed and _tail.is_thick(loss_left) and sbj_lo < win_lo:
-                # SIGNED -- correctness, non-negotiable. The severity discretises
-                # on the same N-bucket grid; if its full negative reach does not
-                # fit, the FFT *wraps* and corrupts the whole law (the LNS 47%
-                # mass-loss / aliasing failure). So the grid MUST cover
-                # [sbj_lo, sbj_hi] at any log2 -- keep the bulk ``bs`` if it fits
-                # the (hard) log2 budget, else coarsen ``bs`` to fit. Coarsening
-                # the bulk is the lesser evil vs. an aliased law.
-                floor_lo = min(win_lo, sbj_lo)
-                floor_hi = max(win_hi, sbj_hi)
-                x0 = float(np.floor(floor_lo / keep_bs) * keep_bs)
-                span = floor_hi - x0
-                need = int(np.ceil(np.log2(max(span / keep_bs + 1.0, 1.0))))
-                if need <= log2:
-                    _apply_floor(x0, floor_hi, keep_bs, max(need, sel_l2))
-                else:
-                    bs_f = round_bucket(span / (1 << log2))
-                    x0_f = float(np.floor(floor_lo / bs_f) * bs_f)
-                    _apply_floor(x0_f, floor_hi, bs_f, log2)
-            elif not signed and _tail.is_thick(loss_right) and sbj_hi > win_hi:
-                # POSITIVE -- a refinement, NOT a correctness fix. A heavy
-                # unlimited severity's MoM window under-reaches the true tail, so
-                # extend the (non-negative) window up to the single big jump --
-                # but only when it fits at the bulk ``bs`` within the requested
-                # log2 budget (grow ``log2`` up to the cap, no further, no
-                # ``bs`` coarsening). If it does not fit, keep the MoM window:
-                # clipping a tiny far tail is the lesser evil vs. coarsening the
-                # bulk to uselessness (e.g. a 5-claim, mean-50 book whose tail
-                # reaches 47k). The DefectiveDistribution warning already tells
-                # the user to raise log2 when the clipped mass is material.
-                x0 = win_lo if selected == 'windowed' else 0.0
-                span = sbj_hi - x0
-                need = int(np.ceil(np.log2(max(span / keep_bs + 1.0, 1.0))))
-                if need <= log2:
-                    _apply_floor(x0, sbj_hi, keep_bs, max(need, sel_l2))
-                else:
-                    # Doesn't fit at the bulk ``bs`` within the requested log2;
-                    # keep the MoM window (clip the far tail) rather than coarsen
-                    # the bulk. This is a visible warning (item 6), not a silent
-                    # log: the user should know a heavy tail is clipped and how
-                    # to widen the grid. The clipped-mass estimate is also stashed
-                    # in ``self._bs_clip`` for the validation report / bs report.
-                    grid_top = x0 + (1 << sel_l2) * keep_bs
-                    clipped = self._clipped_mass_estimate(grid_top)
-                    self._bs_clip = dict(
-                        reach=float(sbj_hi), grid_top=float(grid_top),
-                        log2=int(sel_l2), bs=float(keep_bs),
-                        need_log2=int(need), clipped_mass=float(clipped))
-                    cm = (f'~{clipped:.3g} of the aggregate mass'
-                          if np.isfinite(clipped) else 'a sliver')
-                    warnings.warn(
-                        f'{self.name}: heavy right tail reaches {sbj_hi:.6g} but '
-                        f'the grid top is {grid_top:.6g} at log2={sel_l2}, '
-                        f'bs={keep_bs:.6g}; {cm} is clipped. Raise log2 to '
-                        f'~{need} (keeping this bs) to capture it.',
-                        DefectiveDistributionWarning, stacklevel=2)
-
-        # ---- realized grid (the ``used`` row) ---------------------------
-        sel_bs = float(rows[selected]['bs'])
-        sel_l2 = int(rows[selected]['log2'])
-        sel_x0 = float(rows[selected]['x_min'])
-        if x_min_in is not None:           # explicit origin override (D4)
-            sel_x0 = float(round(x_min_in / sel_bs) * sel_bs)
-        # ---- tail-aware padding / slack (item 4) ------------------------
-        # A windowed band is placed band-bottom by ``_size`` (all power-of-2
-        # slack above it). Redistribute the slack so the band sits sensibly in
-        # the grid, with the split driven by the **tail report**, not a fixed
-        # convention skew. ``f`` is the fraction of slack below the band:
-        #   - asymmetric tails (one side thick, one thin) -> ~3/4 of the slack
-        #     goes to the *thick* side (the tail that needs room): ``f = 1/4``
-        #     for a thick right tail, ``f = 3/4`` for a thick left tail. The
-        #     loss/payoff convention does NOT enter here -- the tail shape does.
-        #   - symmetric tails (both thick or both thin) -> centre the band, with
-        #     the loss/payoff convention demoted to a tie-breaker
-        #     (``f = 0.5 -/+ window_pad_skew``: a loss leaves more room on the
-        #     priced right, a payoff mirrors).
-        # Only the *windowed* row is rebalanced -- ordinary, exact, and bounded
-        # rows keep their band-bottom origin (byte-stable); an explicit ``x_min``
-        # also pins the origin. The shift is clamped so the grid still covers the
-        # window top and never crosses the 0 floor, so the benign FFT wrap stays
-        # valid (and is in fact safer -- margin both sides).
-        if (selected == 'windowed' and x_min_in is None
-                and not self._agg_affine_active()):
-            w_lo = float(rows['windowed']['x_min'])   # snapped band-bottom origin
-            w_hi = float(rows['windowed']['x_max'])
-            N = 1 << sel_l2
-            slack = N * sel_bs - (w_hi - w_lo)
-            if slack > 0:
-                thick_l = _tail.is_thick(loss_left)
-                thick_r = _tail.is_thick(loss_right)
-                if thick_r and not thick_l:
-                    f = 1.0 - WINDOW_SLACK_THICK     # thick right: room above
-                elif thick_l and not thick_r:
-                    f = WINDOW_SLACK_THICK           # thick left: room below
-                else:                                # symmetric: convention tie-break
-                    f = 0.5 - WINDOW_PAD_SKEW if is_loss else 0.5 + WINDOW_PAD_SKEW
-                target = w_lo - f * slack
-                origin = float(np.floor(target / sel_bs) * sel_bs)
-                # keep the band: origin in [x_hi - N*bs, w_lo], and >= 0 floor.
-                lo_bound = max(0.0, float(np.ceil((w_hi - N * sel_bs) / sel_bs) * sel_bs))
-                origin = min(max(origin, lo_bound), w_lo)
-                sel_x0 = origin
-        grid_x_max = sel_x0 + (1 << sel_l2) * sel_bs
-
-        # ---- aggregate affine (pnl): tight, mass-centred P&L window ------
-        # The loss FFT runs on the non-negative grid sized above; the finished
-        # aggregate is then reflected and shifted (``_apply_agg_affine``). The
-        # *display* window is a tight two-sided window around the P&L mean
-        # (``estimate_agg_window`` on the affine moments), not the full reversed
-        # loss grid -- so the mass sits in the window (and the Portfolio combine,
-        # which positions the shared grid from the per-unit origins, places a
-        # book of ``pnl`` units correctly).
-        affine = self._agg_affine_active()
-        if affine:
-            N = 1 << sel_l2
-            x0_pnl = self._pnl_window(sel_bs, N)
-            x_max_pnl = float(x0_pnl + N * sel_bs)
-            # Hand ``update`` the *loss-convolution* origin, not the P&L display
-            # origin: 0 for an ordinary (non-negative) loss -- byte-for-byte the
-            # legacy 0-based grid -- and the signed loss origin ``sel_x0`` when the
-            # loss severity is itself signed (a ``pnl`` over a negative-atom
-            # ``dsev`` / ``ssev``). The P&L display window ``x0_pnl`` is recomputed
-            # independently in ``_apply_agg_affine`` and reported in the ``used``
-            # row below.
-            ret_x0 = sel_x0 if self._signed_severity() else 0.0
-        else:
-            ret_x0 = sel_x0
-
-        df = pd.DataFrame(rows).T
-        # the winning method is flagged; the ``used`` row is the realized grid.
-        df['selected'] = df.index == selected
-        # The ``used`` row converts the selected method's window into the actual
-        # power-of-2 grid: x_max = x_min + 2**log2 * bs (so a 701-point support
-        # padded to 1024 reads x_max = grid top, W = the full grid width). For a
-        # ``pnl`` aggregate the ``used`` row reports the reflected+shifted P&L
-        # window (the loss method rows keep their non-negative loss windows).
-        if affine:
-            df.loc['used'] = dict(
-                applies=True, x_min=x0_pnl, x_max=x_max_pnl,
-                W=float(x_max_pnl - x0_pnl), bs=sel_bs, log2=sel_l2,
-                coverage=rows[selected]['coverage'],
-                note=f'realized P&L grid ({selected}, reflect+shift)',
-                selected=False)
-        else:
-            df.loc['used'] = dict(
-                applies=True, x_min=sel_x0, x_max=float(grid_x_max),
-                W=float(grid_x_max - sel_x0), bs=sel_bs, log2=sel_l2,
-                coverage=rows[selected]['coverage'],
-                note=f'realized grid ({selected})', selected=False)
-
-        # ---- journey columns (bs-reporting item 1) ----------------------
-        # Purely derived reporting -- no effect on the grid. ``log2_need`` is the
-        # log2 a method's own window needs at its own ``bs`` (so a row whose
-        # ``log2_need > log2`` was capped/coarsened to fit the budget);
-        # ``clipped`` carries the estimated far-tail mass dropped, on the ``used``
-        # row, when the positive sbj floor clipped (``self._bs_clip``).
-        def _need(r):
-            w = float(r['x_max']) - float(r['x_min'])
-            b = float(r['bs'])
-            if not (np.isfinite(w) and np.isfinite(b) and b > 0 and w > 0):
-                return np.nan
-            return float(np.ceil(np.log2(w / b + 1.0)))
-        df['log2_need'] = df.apply(_need, axis=1)
-        df['clipped'] = np.nan
-        if self._bs_clip is not None:
-            df.loc['used', 'clipped'] = float(self._bs_clip.get('clipped_mass', np.nan))
-        self._bs_window_df = df
-
-        return sel_bs, sel_l2, ret_x0
-
-    def recommend_bucket(self, log2=10, p=BUCKET_SIZING_P, verbose=False):
-        """
-        Recommend a bucket size given 2**N buckets. Not rounded.
-
-        For thick tailed distributions need higher p, try p=1-1e-8.
-
-        If no second moment, throws a ValueError. You just can't guess
-        in that situation.
-
-        :param log2: log2 of number of buckets. log2=10 is default.
-        :param p: percentile to use to determine needed range. Default is BUCKET_SIZING_P. if > 1 converted to 1-10**-n.
-        :param verbose: print out recommended bucket sizes for 2**n for n in {log2, 16, 13, 10}
-        :return:
-        """
-        N = 1 << log2
-        if not verbose:
-            limit_est = self.limit.max() / N
-            if limit_est == np.inf:
-                limit_est = 0
-                p = max(p, 1 - 10 ** -8)
-            moment_est = _estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, p=p) / N
-            logger.debug('Agg.recommend_bucket | %s moment: %s, limit %s',
-                         self.name, moment_est, limit_est)
-            recommended = max(moment_est, limit_est)
-        else:
-            for n in sorted({log2, 16, 13, 10}):
-                rb = self.recommend_bucket(n)
-                if n == log2:
-                    rbr = rb
-                print(f'Recommended bucket size with {2 ** n} buckets: {rb:,.3f}')
-            if self.bs != 0:
-                print(f'Bucket size set with {N} buckets at {self.bs:,.3f}')
-            recommended = rbr # noqa
-        # can fail when distribution is constant
-        return 1 if np.isnan(recommended) else recommended
+        return _bucket_window.bs_window(self, log2, bs_in, x_min_in,
+                                        bucket_sizing_p, window_convention)
 
     def aggregate_error_analysis(self, log2, bs2_from=None, **kwargs):
         """
         Analysis of aggregate error across a range of bucket sizes. If ``bs2_from
-        is None`` use recommend_bucket plus/mins 3. Note: if distribution does
-        not have a second moment, you must enter bs2_from.
+        is None`` size a starting bs from the analytic moment window
+        (``estimate_agg_window``) and scan plus/minus 3 doublings. Note: if the
+        distribution does not have a second moment, you must enter bs2_from.
 
         :param log2:
-        :param bs2_from: lower bound on bs to use, in log2 terms; estimate using
-          ``recommend_bucket`` if not input.
+        :param bs2_from: lower bound on bs to use, in log2 terms; estimated from
+          the analytic moment window if not input.
         :param kwargs: passed to ``update``
 
         """
@@ -5543,8 +4243,11 @@ class Aggregate:
             if cself.agg_cv == np.inf:
                 raise ValueError('Distribution must have variance to guess bucket size. '
                                  'Input bs2_from')
-            bs = self.recommend_bucket(log2)
-            bs = round_bucket(bs)
+            # ``recommend_bucket`` retired (W10); size a starting bs from the
+            # analytic 3-moment output window (``estimate_agg_window``) instead.
+            _, _, _w = estimate_agg_window(
+                self.agg_m, self.agg_m * self.agg_cv, self.agg_skew)
+            bs = round_bucket(_w / (1 << log2))
             bs2 = int(np.log2(bs))
             bss = 2. ** np.arange(bs2 - 3, bs2 + 4)
         else:

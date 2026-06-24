@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.0a95
+
+### Concern modules filled in; legacy bucket sizers retired (Plan: finish shared concerns)
+
+The closing step of the god-module refactor. P3/P4 birthed three concern
+modules — `_reinsurance.py`, `_validation.py`, `_bucket_window.py` — but left
+them as thin shells: only the leaf math + constants had moved, while the
+per-class orchestration bodies stayed on `Aggregate` / `Portfolio`. This
+iteration moves those bodies in, so each concern lives in one place, and retires
+the legacy `recommend_bucket` / `best_bucket` sizers. **Behaviour-frozen:** no
+numbers change; the relocations are byte-identical and the frozen baseline
+(`test_baseline.py`) is unmoved.
+
+- **Reinsurance bodies → `_reinsurance.py`** (Agg-only). The apply engine
+  (`apply_reins_work` and its occ/agg drivers), the reporting frames
+  (`reins_density_df`, `reins_stats_df`, `reins_summary_df`, the view-stats and
+  moment kernels), and the narrative (`reins_description`, `reins_kinds`,
+  `reins_after_label`, the describe block) are now free functions taking the
+  `Aggregate`; the methods/properties delegate. `reins_occ_plot` continues to
+  route through `plots/`.
+- **Bucket/window bodies → `_bucket_window.py`.** `Aggregate._bs_window` and the
+  Portfolio sizers (`best_window`, `_bs_window`, `bs_window_df`,
+  `_single_big_jump_window`, `_build_bs_window_df`) are now free functions
+  (`bs_window`, `port_best_window`, …) sitting beside their
+  `estimate_agg_window` / `_estimate_agg_percentile` leaves; the methods
+  delegate. `value_type_role` moved to `utilities.py` (a leaf) so both
+  `_aggregate` and `_bucket_window` can share it without a cycle.
+- **Validation bodies → `_validation.py`.** `Aggregate.valid` /
+  `Portfolio.valid` become `valid_aggregate` / `valid_portfolio` (similar but
+  not identical — kept side by side, not merged); the two `validation_explanation`
+  properties share one free function. The classes' properties delegate.
+- **Breaking: `recommend_bucket` and `best_bucket` removed** (both `Aggregate`
+  and `Portfolio`). They were off the live path since 1.0.0a49 — `update`
+  routes `bs==0` through `_bs_window` / `best_window`. `aggregate_error_analysis`
+  now seeds its starting `bs` from `estimate_agg_window` instead. Docs and the
+  user guide updated to the `best_window` / `bs_window_df` surface.
+
 ## 1.0.0a94
 
 ### `portfolio.py` split into a façade + three subsystems (Plan P4, Phase 4A)

@@ -57,7 +57,7 @@
 # dsev_bucket = "linear"
 
 # bucket_sizing_p: percentile of the fitted distribution used to size bs in
-# recommend_bucket. Values > 1 are read as a number of nines (p -> 1 - 10**-p),
+# the moment-window bucket sizer. Values > 1 are read as a number of nines (p -> 1 - 10**-p),
 # so e.g. 6 means 0.999999. Raise toward 1 for thick-tailed distributions.
 # bucket_sizing_p = 0.99999
 

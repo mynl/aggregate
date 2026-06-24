@@ -120,9 +120,9 @@ class DiscretizationSettings:
         Scheme for placing discrete-severity atoms (``dsev`` / ``dhistogram``
         / ``fixed``) onto the grid. Same meaning as ``reins_bucket``.
     bucket_sizing_p : float
-        Percentile of the fitted distribution used by ``recommend_bucket`` to
-        size ``bs`` (formerly ``RECOMMEND_P`` / the ``recommend_p`` kwarg). If
-        ``> 1`` it is read as a number of nines, i.e. ``1 - 10**-p``.
+        Percentile of the fitted distribution used by the moment-window bucket
+        sizer to size ``bs`` (formerly ``RECOMMEND_P`` / the ``recommend_p``
+        kwarg). If ``> 1`` it is read as a number of nines, i.e. ``1 - 10**-p``.
     window_nines : int
         Number of nines defining the automatic 1-D aggregate output window:
         it spans roughly the ``10**-window_nines .. 1 - 10**-window_nines``

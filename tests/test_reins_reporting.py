@@ -441,3 +441,29 @@ def test_port_gross_only_returns_none():
     assert g.reins_density_df is None
     assert g.reins_stats_df is None
     assert g.reins_summary_df is None
+
+
+# ----------------------------------------------------------------------------
+# apply engine: direct free-function check (Phase A relocation guard)
+# ----------------------------------------------------------------------------
+
+def test_apply_reins_work_layer_math():
+    """Direct, hand-checkable test of the moved apply engine.
+
+    A single ``5 xs 5`` layer images subject loss ``x`` to ceded
+    ``min(max(x - 5, 0), 5)`` and net ``x - ceded``. Exercises the free
+    function ``_reinsurance.apply_reins_work(agg, ...)`` (relocated from
+    ``Aggregate._apply_reins_work`` in Phase A) on the model grid, so a
+    relocation bug surfaces here independent of the build pipeline.
+    """
+    from aggregate import _reinsurance
+    a = build('agg RR.Eng 5 claims dsev [0:20] poisson')
+    a.update()
+    ceder, netter, df = _reinsurance.apply_reins_work(a, [(1, 5, 5)], a.sev_density)
+    x = df['loss'].to_numpy()
+    expected_ceded = np.clip(x - 5, 0, 5)
+    assert np.allclose(df['loss_ceded'].to_numpy(), expected_ceded)
+    assert np.allclose(df['loss_net'].to_numpy(), x - expected_ceded)
+    # the returned ceder / netter callables agree with the frame
+    assert np.allclose(ceder(x), expected_ceded)
+    assert np.allclose(netter(x), x - expected_ceded)

@@ -223,17 +223,19 @@ need the usual `rg`-against-the-surface vetting before they are fixed.
 
 ## Suggested next session
 
-All four splits have landed (P1 a90–91, P2 a92, P3 a93, P4 a94). The god files are
-split behind façades, matplotlib-free, with the shared concerns born and consumed.
-The remaining work is the **finish step** and the deferred composition:
+All four splits have landed (P1 a90–91, P2 a92, P3 a93, P4 a94), **and the finish
+step (a95)**. The god files are split behind façades, matplotlib-free, with the
+shared concerns born, consumed, and now **filled in** — each subsystem lives in one
+place. The only remaining work is the deferred composition:
 
-1. **`plan-finish-shared-concerns.md`** (approved, all three phases) — finish the
-   thin-shell concern modules so each subsystem lives in one place. **A:
-   reinsurance** (`_reinsurance.py` is a 152-line shell; the ~400–600-line Agg-only
-   reins body on `_aggregate` moves in). **B: bucket/window** with **W10 folded in**
-   (retire `recommend_bucket`/`best_bucket` — confirmed off the live path, so
-   behaviour-neutral). **C: validation** (author-sensitive, byte-identical).
-   Behaviour-frozen; two-file rule is the retrospective check on each seam.
+1. **`plan-finish-shared-concerns.md`** — **DONE (1.0.0a95), moved to `dev/done/`.**
+   All three phases landed: **A: reinsurance** bodies → `_reinsurance.py` (now a real
+   ~900-line module). **B: bucket/window** bodies → `_bucket_window.py`
+   (`Aggregate._bs_window` + the Portfolio sizers as free functions; `value_type_role`
+   relocated to `utilities.py`), with **W10** done — `recommend_bucket`/`best_bucket`
+   removed (off the live path, behaviour-neutral). **C: validation** bodies →
+   `_validation.py` (`valid_aggregate`/`valid_portfolio`, side by side). All
+   byte-identical; baseline unmoved.
 2. **Post-beta / conditional** (each its own later plan, gated by the two-file
    rule): 4B Portfolio composition, 2B `ReinsuranceProgram`, the sample-subsystem
    review (correlation/switcheroo), P2 Pass B visual refresh.

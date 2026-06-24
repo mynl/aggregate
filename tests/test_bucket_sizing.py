@@ -2,7 +2,7 @@
 
 The portfolio auto-sizer combines its units' per-unit window choices into one
 shared ``(bs, log2)`` grid. Through 1.0.0a48 this used a root-sum-square
-combine (:meth:`Portfolio.best_bucket`) that scaled the wrong way -- adding
+combine (the legacy ``best_bucket``, since removed) that scaled the wrong way -- adding
 units *coarsened* the grid -- and ignored the integer lattice entirely, so an
 all-integer discrete book got a fine continuous ``bs`` over the full ``log2``
 cap. 1.0.0a49 replaced it with :meth:`Portfolio.best_window`, the
@@ -82,22 +82,6 @@ def test_fat_tailed_multiline_port_coarsens_via_span():
     assert p.bs >= 1.0, f'a wide fat-tailed book should not size absurdly fine: {p.bs}'
     # no aliasing/wrap: total probability is conserved
     assert float(np.sum(p.density_df['p_total'])) > 1.0 - 1e-6
-
-
-def test_best_bucket_retained_for_comparison():
-    """``best_bucket`` (the deprecated RMS combine) is kept but off the live path.
-
-    It is retained only as a side-by-side comparison aid (``DELETE BEFORE
-    BETA``); ``build`` now routes through ``best_window``. On the integer
-    discrete book the two visibly disagree -- RMS returns a fine continuous
-    bucket, ``best_window`` returns ``1`` -- which is the whole point.
-    """
-    p = build('port BucketCmp agg C1 dfreq[2] dsev[1 2] agg C2 dfreq[3] dsev[1 2 3]')
-    rms = p.best_bucket(16)
-    assert rms < p.bs, f'RMS ({rms}) should be finer than the live best_window bs ({p.bs})'
-    bs, log2, x_min = p.best_window(16, 0)
-    assert (bs, x_min) == (1.0, 0.0)
-    assert log2 < 16
 
 
 # ---------------------------------------------------------------------------

@@ -227,6 +227,42 @@ def round_bucket(bs):
     return 1.0 / (1 << (n.bit_length() - 1))
 
 
+def value_type_role(v):
+    """Map a ``value_type`` token to the is-loss boolean role.
+
+    Parameters
+    ----------
+    v : str
+        Either a canonical token (``'loss'`` / ``'payoff'``) or the
+        currently-configured label (``settings.labels``).
+
+    Returns
+    -------
+    bool
+        ``True`` for the loss convention, ``False`` for payoff.
+
+    Raises
+    ------
+    ValueError
+        If ``v`` is outside the accepted pair.
+
+    Notes
+    -----
+    The role is the canonical, never-reconfigured spec field
+    (``_is_loss_value``); the label strings are display/spelling settings
+    (``[labels]`` in the config). Read at call time, not import time, so a
+    :func:`~aggregate.config.reload_settings` is honoured.
+    """
+    from .config import get_settings
+    labels = get_settings().labels
+    if v in ('loss', labels.loss):
+        return True
+    if v in ('payoff', labels.payoff):
+        return False
+    raise ValueError(
+        f"value_type must be {labels.loss!r} or {labels.payoff!r}, not {v!r}")
+
+
 # Logger configuration is controlled by the user of the package, not the package itself.
 
 

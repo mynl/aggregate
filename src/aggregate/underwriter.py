@@ -1167,16 +1167,16 @@ class Underwriter(object):
         Use :meth:`build` instead when you expect a single output.
 
         Smart-update logic: discrete severities pick ``bs=1`` with a log2 sized
-        to the max possible loss; continuous ones call :meth:`recommend_bucket`;
-        portfolios use :meth:`best_bucket`. A ``hints{}`` clause in the program
-        can override these (explicit ``build()`` kwargs always win).
+        to the max possible loss; continuous ones size from the analytic moment
+        window; portfolios use :meth:`Portfolio.best_window`. A ``hints{}`` clause
+        in the program can override these (explicit ``build()`` kwargs always win).
 
         :param program: a DecL program producing one or more top-level outputs.
         :param update: override the class-level ``self.update`` default.
         :param log2: 0 (default) estimates log2 for discrete severities and
             uses ``self.log2`` for everything else.
         :param bs: bucket size; 0 lets the object recommend one.
-        :param bucket_sizing_p: passed to :meth:`recommend_bucket`; raise (closer
+        :param bucket_sizing_p: passed to the bucket / window sizer; raise (closer
             to 1) for thick-tailed distributions.
         :param kwargs: passed to each ``update`` call. ``force_severity=True``
             is always applied.
@@ -1243,7 +1243,7 @@ class Underwriter(object):
                 else:
                     log2_ = log2
                 # Pass bs through (0 => auto). No back doors: Portfolio.update
-                # routes bs==0 through best_bucket (non-signed) or _bs_window
+                # routes bs==0 through best_window (non-signed) or _bs_window
                 # (signed coarsen-to-fit) itself, so do NOT pre-compute the
                 # bucket here -- mirrors the Aggregate branch above (plan 3.4).
                 logger.info('(%s, %s): bs=%s and log2=%s', answer.kind, answer.name, bs, log2_)
@@ -1271,7 +1271,7 @@ class Underwriter(object):
         :param log2: 0 (default) estimates log2 for discrete severities and
             uses ``self.log2`` for everything else.
         :param bs: bucket size; 0 lets the object recommend one.
-        :param bucket_sizing_p: passed to :meth:`recommend_bucket`; raise (closer
+        :param bucket_sizing_p: passed to the bucket / window sizer; raise (closer
             to 1) for thick-tailed distributions.
         :param kwargs: passed to ``update`` (e.g. ``padding``). ``force_severity=True``
             is always applied.

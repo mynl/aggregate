@@ -2038,15 +2038,18 @@ class Aggregate:
         # s.append(super().__repr__())
         return '\n'.join(s)
 
-    def help(self, regex):
+    def help(self, regex, lod='short', output='short'):
         """
         Lookup help on methods and properties matching ``regex``.
 
         Thin wrapper over :func:`aggregate.utilities.agg_help` — the free
         function is prefixed to avoid shadowing Python's builtin ``help`` at
-        module / package scope.
+        module / package scope. ``lod`` (``'terse'|'short'|'all'``) controls
+        how much docstring is shown; ``output`` (``'none'|'short'|'all'``) how
+        much of each value or no-argument call result (a ``DataFrame`` /
+        ``Series`` is headed to 5 rows under ``'short'``).
         """
-        agg_help(self, regex)
+        agg_help(self, regex, lod=lod, output=output)
 
     def _approx_description(self):
         """One-line description of the method-of-moments fit, or ``''`` if none.

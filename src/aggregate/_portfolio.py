@@ -281,11 +281,16 @@ class Portfolio(object):
 
         self.validation_eps = get_settings().validation.eps
 
-    def help(self, regex):
+    def help(self, regex, lod='short', output='short'):
         """
         Lookup help on methods and properties matching ``regex``.
+
+        ``lod`` (``'terse'|'short'|'all'``) controls how much docstring is
+        shown; ``output`` (``'none'|'short'|'all'``) how much of each value or
+        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
+        rows under ``'short'``). See :func:`aggregate.utilities.agg_help`.
         """
-        agg_help(self, regex)
+        agg_help(self, regex, lod=lod, output=output)
 
     def add_exa_sample(self, sample, S_calculation='forwards'):
         """Compute a sample-based ``density_df`` with ``E[X_i | X]`` from a sample.

@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.0a98
+
+### `agg_help` / `.help` — finer control over detail (`lod`, `output`)
+
+`agg_help` (and the `.help(regex)` method on `Aggregate`, `Portfolio`,
+`Underwriter`, and the bivariate classes) gains two orthogonal knobs:
+
+- **`lod`** (`'terse'|'short'|'all'`, default `'short'`) — level of
+  *documentation* detail: `'terse'` shows the name and method signature only,
+  `'short'` the first few lines of the docstring, `'all'` the full docstring.
+- **`output`** (`'none'|'short'|'all'`, default `'short'`) — how much of each
+  *value* (attribute value or no-argument call result) to show: `'none'` shows
+  none, `'short'` shows values but truncates a `DataFrame`/`Series` to
+  `.head(5)`, `'all'` shows them in full.
+
+Methods now display their bound signature in the header, properties show their
+docstring, and invalid `lod`/`output` values raise `ValueError`. The default
+(`lod='short', output='short'`) gives a compact, scannable readout in place of
+the former full-docstring-and-full-value dump.
+
 ## 1.0.0a97
 
 ### `prob_loss_assets` / `pla` — free choice of capital anchor; `price_pentagon_ex` (Plan: plan-pla)

@@ -1826,13 +1826,17 @@ class BivariateAggregate:
         from .plots import plot_bivariate
         return plot_bivariate(self, axs=axs, levels=levels, log=log, **kwargs)
 
-    def help(self, regex):
+    def help(self, regex, lod='short', output='short'):
         """Lookup help on methods and properties matching ``regex``.
 
         Thin wrapper over :func:`aggregate.utilities.agg_help` (prefixed to
-        avoid shadowing the builtin ``help``)."""
+        avoid shadowing the builtin ``help``). ``lod``
+        (``'terse'|'short'|'all'``) controls how much docstring is shown;
+        ``output`` (``'none'|'short'|'all'``) how much of each value or
+        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
+        rows under ``'short'``)."""
         from .utilities import agg_help
-        agg_help(self, regex)
+        agg_help(self, regex, lod=lod, output=output)
 
     def __repr__(self):
         tag = self.mode if self.copula is None else repr(self.copula)

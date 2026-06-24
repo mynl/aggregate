@@ -518,32 +518,103 @@ def kaplan_meier_np(loss, closed):
     return kaplan_meier(df)
 
 
-def agg_help(self, regex):
+def agg_help(self, regex, lod='short', output='short'):
     """
-    Investigate self for matches to the regex. If callable, try calling with no args, else display.
+    Investigate ``self`` for public names matching ``regex`` and display each
+    one's documentation and (optionally) its value or no-argument call result.
 
-    Fka ``more``.
+    Module-level free function backing the ``.help(regex, ...)`` method on
+    :class:`Aggregate`, :class:`Portfolio`, :class:`Underwriter`, and the
+    bivariate classes. Named ``agg_help`` (not ``help``) to avoid shadowing
+    Python's builtin ``help`` at module / package scope. Fka ``more``.
 
-    Module-level free function backing the ``.help(regex)`` method on
-    :class:`Aggregate`, :class:`Portfolio`, and :class:`Underwriter`. Named
-    ``agg_help`` (not ``help``) to avoid shadowing Python's builtin ``help``
-    at module / package scope.
+    Parameters
+    ----------
+    self : object
+        The instance to introspect.
+    regex : str
+        Regular expression; names matching it (via :func:`re.search`) are shown.
+    lod : {'short', 'terse', 'all'}, default 'short'
+        Level of *documentation* detail per match:
+
+        * ``'terse'`` -- name (and method signature) only, no docstring;
+        * ``'short'`` -- the first few lines of the docstring;
+        * ``'all'`` -- the full docstring.
+    output : {'short', 'none', 'all'}, default 'short'
+        How much of each name's *value* to display -- the attribute value, or a
+        method's no-argument call result (methods needing arguments are
+        skipped):
+
+        * ``'none'`` -- show no values;
+        * ``'short'`` -- show values, but a :class:`pandas.DataFrame` or
+          :class:`pandas.Series` is truncated to ``.head(5)``;
+        * ``'all'`` -- show values in full.
+
+    Notes
+    -----
+    ``lod`` and ``output`` are orthogonal: ``lod`` governs the docstring,
+    ``output`` governs the value / call result. ``lod='terse', output='none'``
+    is a bare name listing. Documentation is shown for methods and properties
+    only (a plain field carries no useful docstring).
     """
+    if lod not in ('terse', 'short', 'all'):
+        raise ValueError(f"lod must be 'terse', 'short', or 'all'; got {lod!r}")
+    if output not in ('none', 'short', 'all'):
+        raise ValueError(
+            f"output must be 'none', 'short', or 'all'; got {output!r}")
+
     # IPython imported lazily to keep it off the `import aggregate` path
     # (it is ~1s to import); see module note below.
     from IPython.display import Markdown, display
-    for i in dir(self):
-        if re.search(regex, i):
-            ob = getattr(self, i)
-            if not callable(ob):
-                display(Markdown(f'### Attribute: {i}\n'))
-                display(ob)
-            else:
-                display(Markdown(f'### Callable: {i}\n'))
+
+    short_doc_lines = 4   # 'short' lod: first few lines of the docstring
+    head_n = 5            # 'short' output: rows of a DataFrame/Series to show
+
+    for name in dir(self):
+        if not re.search(regex, name):
+            continue
+        # classify off the *class* so a raising property does not abort the walk
+        class_attr = getattr(type(self), name, None)
+        is_property = isinstance(class_attr, property)
+        try:
+            ob = getattr(self, name)
+        except Exception as e:  # noqa: BLE001 - report, don't propagate
+            display(Markdown(f'### Error: {name}\n'))
+            print(f'{type(e).__name__}: {e}')
+            continue
+
+        is_method = callable(ob) and not is_property
+
+        # header, with the bound signature for methods
+        header = f'### {"Callable" if is_method else "Attribute"}: {name}'
+        if is_method:
+            try:
+                header += str(inspect.signature(ob))
+            except (TypeError, ValueError):
+                pass
+        display(Markdown(header + '\n'))
+
+        # documentation (methods and properties only), governed by lod
+        if lod != 'terse' and (is_method or is_property):
+            doc = inspect.getdoc(ob if is_method else class_attr) or ''
+            if doc:
+                if lod == 'short':
+                    doc = '\n'.join(doc.split('\n')[:short_doc_lines])
+                display(Markdown(doc))
+
+        # value / no-arg call result, governed by output
+        if output != 'none':
+            if is_method:
                 try:
-                    print(ob())
-                except Exception:
-                    help(ob)
+                    value = ob()
+                except Exception:  # noqa: BLE001 - needs args or has side effects
+                    continue
+            else:
+                value = ob
+            if output == 'short' and isinstance(value, (pd.DataFrame, pd.Series)):
+                display(value.head(head_n))
+            else:
+                display(value)
 
 
 def introspect(ob):

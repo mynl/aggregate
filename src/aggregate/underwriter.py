@@ -1460,11 +1460,16 @@ class Underwriter(object):
             logger.error('%d parse error(s) in %s', n_errors, filename)
         return df_out
 
-    def help(self, regex):
+    def help(self, regex, lod='short', output='short'):
         """
         Lookup help on methods and properties matching ``regex``.
+
+        ``lod`` (``'terse'|'short'|'all'``) controls how much docstring is
+        shown; ``output`` (``'none'|'short'|'all'``) how much of each value or
+        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
+        rows under ``'short'``). See :func:`aggregate.utilities.agg_help`.
         """
-        agg_help(self, regex)
+        agg_help(self, regex, lod=lod, output=output)
 
     def discover(self, regex='', kind='', plot=False, describe=False,
                  return_objects=False, **kwargs):

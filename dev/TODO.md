@@ -368,6 +368,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - `dev/done/plan-config.md` (Phase 1 + Phase 2) → config, shipped a30 / a83.
 - `dev/done/plan-mv.md` → bivariate firm-up (MV-1…7, shipped a70–a80). Absorbs &
   replaces the deleted `plan-multivariate-punchup.md`.
+- `dev/done/plan-pla.md` → `prob_loss_assets` / `pla` (free choice of capital
+  anchor over `{p, L, a}`) + `price_pentagon_ex`, shipped a97. Also fixed
+  `GridDistribution.lev` (cached grid view now built on the full `bs` grid, not
+  the `p_total > 0` subset) so `lev` matches the `exa` / `add_exa` datum.
 - `dev/done/` → shipped plans (tail-thickness, config Phase 1, pentagon, database
   loading, bucket-window 1A/1P, allocation/pricing bounds, decl-unparser, …).
 

@@ -30,10 +30,15 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import bisect
 
-__all__ = ['GridDistribution', 'make_var_tvar']
+__all__ = ['GridDistribution', 'make_var_tvar', 'ProbLossAssets']
 
 
 QuantileFunctions = namedtuple("QuantileFunctions", 'q q_lower var q_upper tvar')
+
+#: The three mutually-determining views of one point on the distribution:
+#: VaR probability ``p``, limited expected loss ``L = E[min(X, a)]``, and asset
+#: level ``a``. Returned by :meth:`GridDistribution.prob_loss_assets`.
+ProbLossAssets = namedtuple('ProbLossAssets', 'p L a')
 
 
 def make_var_tvar(ser):
@@ -349,6 +354,125 @@ class GridDistribution:
             return tvar
         gap = (1.0 - Fb) * (float(self.tvar(Fb)) - a)
         return np.where(np.asarray(p) < Fb, tvar - gap / (1.0 - np.asarray(p)), a)
+
+    # ------------------------------------------------------------------
+    # capital anchor: free choice over {p, L, a}
+    # ------------------------------------------------------------------
+    def _invert_lev(self, L):
+        """Solve ``lev(a) = L`` for ``a`` by safeguarded Newton (bisection fallback).
+
+        The limited expected value ``L(a) = ∫₀ᵃ S(x) dx`` is monotone
+        increasing with continuous-model slope ``dL/da = S(a) = sf(a)``, so a
+        Newton step ``a ← a − (lev(a) − L) / S(a)`` is taken whenever it stays
+        inside the running bracket and ``S(a) > 0``; otherwise the step bisects.
+        The far tail (``S(a) → 0``) makes Newton ill-conditioned, so the
+        bisection fallback carries the solve there. The bracket starts at
+        ``[0, q(1)]`` (``L`` feasibility -- ``L < mean()`` -- is the caller's
+        responsibility, guaranteeing a root in range).
+
+        Returns the (unsnapped) root location; :meth:`prob_loss_assets` snaps it
+        to the grid and recomputes ``L`` so the returned triple is exact.
+        """
+        lo, hi = 0.0, float(self.q(1))
+        # Pin the bracket far tighter than one bucket so the midpoint snaps
+        # unambiguously to the intended grid point.
+        tol = (self.bs * 1e-3) if self.bs is not None else (hi - lo) * 1e-12
+        a = 0.5 * (lo + hi)
+        for _ in range(200):
+            f = self.lev(a) - L
+            if f > 0:
+                hi = a
+            else:
+                # f <= 0: lev is a left-continuous step, so the flat lev == L
+                # plateau (just below the target grid point) reads as f == 0 and
+                # is pushed up toward the jump.
+                lo = a
+            if hi - lo <= tol:
+                break
+            s = float(self.sf(a))
+            step = (a - f / s) if s > 0 else None
+            if f != 0 and step is not None and lo < step < hi:
+                a = step
+            else:
+                a = 0.5 * (lo + hi)
+        return 0.5 * (lo + hi)
+
+    def prob_loss_assets(self, *, p=None, L=None, a=None):
+        """Given any one of ``p``, ``L``, ``a``, return all three (capital anchor).
+
+        ``{p, L, a}`` are three views of the same point on the distribution --
+        the VaR probability ``p``, the limited expected loss
+        ``L = E[min(X, a)] =`` :meth:`lev`, and the asset level ``a`` -- and any
+        one determines the other two. Pass **exactly one** keyword (all others
+        ``None``); the result is snapped to the grid so the returned ``a`` is an
+        exact grid point and the triple is mutually consistent
+        (``L == lev(a)``, ``p == cdf(a)``).
+
+        Parameters
+        ----------
+        p : float, optional
+            VaR probability; ``a = q(p)``.
+        L : float, optional
+            Limited expected loss ``E[min(X, a)]``; ``a`` is root-found from
+            ``lev(a) = L``. Must satisfy ``L < mean()`` (a LEV is bounded above
+            by ``E[X]``, attained only as ``a → ∞``); raises otherwise.
+        a : float, optional
+            Asset level; snapped to the grid.
+
+        Returns
+        -------
+        ProbLossAssets
+            Namedtuple ``(p, L, a)``.
+
+        Raises
+        ------
+        ValueError
+            If the number of supplied (non-None) arguments is not exactly one,
+            or if ``L >= mean()`` (infeasible).
+
+        Notes
+        -----
+        The ``L`` anchor is the fragile case: ``L`` near ``E[X]`` is
+        ill-conditioned because ``dL/da = S(a) → 0`` in the far tail. The
+        feasibility guard and the safeguarded root-find (:meth:`_invert_lev`,
+        Newton with a bisection fallback) keep that failure mode explicit.
+
+        Conventions assume the **zero-based** grid (``x[0] == 0``, the
+        aggregate / portfolio convention) that :meth:`lev` and :meth:`q` are
+        built for; signed / payoff distributions are out of scope.
+        """
+        n = sum(v is not None for v in (p, L, a))
+        if n != 1:
+            raise ValueError(
+                'prob_loss_assets: pass exactly one of p=, L=, a= '
+                f'(got {n} non-None).')
+        if a is not None:
+            # snap to a grid point self-consistent with p
+            p = float(self.cdf(a))
+            a = float(self.q(p))
+            L = self.lev(a)
+        elif p is not None:
+            a = float(self.q(p))      # already a grid point
+            L = self.lev(a)
+        else:
+            mean = self.mean()
+            if not (L < mean):
+                raise ValueError(
+                    f'prob_loss_assets: L={L:.6g} is infeasible. The limited '
+                    f'expected value E[min(X, a)] is bounded above by '
+                    f'E[X]={mean:.6g} (attained only as a -> infinity).')
+            a_root = self._invert_lev(L)
+            # snap to the grid, then recompute so the returned triple is exact
+            if self.bs is not None:
+                a = float(self.snap(a_root))
+            else:
+                a = float(self.q(self.cdf(a_root)))
+            p = float(self.cdf(a))
+            L = self.lev(a)
+        return ProbLossAssets(float(p), float(L), float(a))
+
+    # alias
+    pla = prob_loss_assets
 
     # ------------------------------------------------------------------
     # width-dependent ops: require bs (raise if bs is None)

@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.0.0a97
+
+### `prob_loss_assets` / `pla` — free choice of capital anchor; `price_pentagon_ex` (Plan: plan-pla)
+
+A new distributional primitive and a full-power pentagon front door built on it.
+
+- **`prob_loss_assets` (alias `pla`)** on `GridDistribution`, with thin
+  delegators on `Aggregate` and `Portfolio`. Given any **one** of the VaR
+  probability `p`, the limited expected loss `L = E[min(X, a)]`, or the asset
+  level `a`, it returns the consistent grid-snapped triple `(p, L, a)` — three
+  views of the same point on the distribution. The `L`-anchor inverts `lev(a) =
+  L` by a safeguarded Newton step (`a ← a − (lev(a) − L)/S(a)`) with a bisection
+  fallback for the ill-conditioned far tail (`S(a) → 0`); a feasibility guard
+  rejects `L ≥ E[X]`. Returns the module-level `ProbLossAssets` namedtuple.
+
+- **`price_pentagon_ex`** on `Aggregate` / `Portfolio` — the full-power front
+  door over `price_pentagon`. Accepts the full pentagon vocabulary
+  (`{p, a, L, M, P, Q, LR, PQ, ROE}`), free over the capital anchor (now
+  including the expected loss `L`). `Pentagon.solve` remains the gatekeeper
+  (insoluble configs such as `{PQ, ROE, LR}` raise); the distribution supplies
+  the single extra equation `L = lev(a)` via `pla`, injected only when the
+  accounting is one equation short. A uniform post-check warns
+  (`UserWarning`, a pricing-time advisory, **not** routed through
+  `explain_validation`) when an accounting-determined `L` does not reconcile
+  with `E[min(X, a)]` at the solved assets. Output is one `'total'` row with a
+  leading `p` column followed by the eight canonical pentagon stats.
+  `price_pentagon` / `solve_obj` / `price_ccoc` are unchanged underneath.
+
+- **Fixed `GridDistribution.lev` on the cached grid view.** `Aggregate` /
+  `Portfolio` `_grid_distribution()` now builds on the **full** contiguous `bs`
+  grid instead of the `p_total > 0` subset. The var/tvar kernel already filters
+  to the positive-mass subset internally, so `q` / `tvar` / `mean` are
+  byte-identical (frozen baseline unmoved), but the width-summing `lev` / `cdf`
+  / `sf` need the full grid: the subset dropped the empty low buckets (where
+  `S == 1`), which made `lev` silently undercount `E[min(X, a)]` by the missing
+  slab. `lev` now matches the `exa` / `exa_total` / `add_exa` datum to
+  floating-point dust — which is what lets `pla` and `price_pentagon_ex` use
+  `GridDistribution.lev` as the single LEV source.
+
 ## 1.0.0a96
 
 ### Rationalize the `xsden_*` / `ser_to_mwrangler` moment helpers

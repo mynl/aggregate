@@ -12,6 +12,8 @@ The distortion-calibration capability (``Distortion.calibrate_set`` + the
 pentagon->target glue) is **not** here yet -- it lands in Phase 1c.
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -127,6 +129,127 @@ def price_pentagon(agg, *, p=None, a=None, P=None, M=None, Q=None,
     pent = Pentagon(obj=agg)
     pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=LR, pq=PQ, roe=ROE)
     return pent.as_frame(unit='total')
+
+
+def price_pentagon_ex(agg, *, p=None, a=None, L=None,
+                      M=None, P=None, Q=None, LR=None, PQ=None, ROE=None):
+    """Complete the pricing octet over the *full* pentagon vocabulary, free over
+    the capital anchor.
+
+    The full-power front door to pentagon pricing: it accepts any soluble
+    configuration of ``{p, a, L, M, P, Q, LR, PQ, ROE}``, errors on the
+    impossible ones, and **warns** when the solve leaned on accounting losses
+    that the distribution does not reconcile. ``price_pentagon`` / ``solve_obj``
+    are unchanged underneath; this is :meth:`Pentagon.solve` plus the ``pla``
+    distributional bridge (``L = lev(a)``) and a ``p`` readout.
+
+    The :class:`~aggregate.pentagon.Pentagon` engine is the gatekeeper:
+    :meth:`Pentagon.solve` completes any soluble triple and raises
+    ``ValueError`` on the rest (e.g. ``{PQ, ROE, LR}`` -- three scale-free
+    ratios -- cannot pin the level). The distribution supplies exactly one extra
+    equation, ``L = E[min(X, a)] =`` :meth:`~aggregate._grid_distribution.GridDistribution.lev`,
+    injected only when the accounting is one equation short of a soluble triple.
+
+    Parameters
+    ----------
+    agg : Aggregate or Portfolio
+        The distribution-bearing object whose limited expected loss anchors the
+        octet (routes through its :meth:`_grid_distribution`).
+    p : float, optional
+        VaR probability fixing the capital level (``a = q(p)``); not a pentagon
+        variable, so it is translated to ``a`` up front. Mutually exclusive with
+        ``a``.
+    a : float, optional
+        Asset level (capital anchor), snapped to the grid.
+    L : float, optional
+        Limited-expected-loss anchor; ``a`` is root-found from ``lev(a) = L``
+        via :meth:`~aggregate._grid_distribution.GridDistribution.prob_loss_assets`.
+    M, P, Q, LR, PQ, ROE : float, optional
+        Pentagon targets (margin, premium, capital, loss ratio,
+        premium-to-capital, cost of capital).
+
+    Returns
+    -------
+    pandas.DataFrame
+        One ``'total'`` row; a leading ``p`` descriptor column followed by the
+        eight canonical pentagon stats (mirrors the ``calibration_df`` layout).
+
+    Warns
+    -----
+    UserWarning
+        When the solved ``L`` (e.g. an accounting ``P - M``) disagrees with the
+        limited expected loss ``E[min(X, a)]`` at the solved assets, beyond the
+        bucket tolerance. A pricing-time advisory only -- deliberately **not**
+        routed through ``explain_validation`` / the ``constants.py`` flags.
+
+    Raises
+    ------
+    ValueError
+        If both ``p`` and ``a`` are given, or the configuration is insoluble
+        (propagated from :meth:`Pentagon.solve`).
+
+    Notes
+    -----
+    The injection rule, after translating ``p -> a``: count the supplied
+    pentagon quantities. If exactly two are supplied and one anchors a capital
+    level (``a`` known, or ``L`` given), inject the curve equation -- resolve
+    the consistent ``(p, L, a)`` via ``pla`` -- to complete the triple. If three
+    are already supplied, hand straight to :meth:`Pentagon.solve` (``L`` is
+    whatever the accounting yields). Fewer than three with no determinable level
+    is under-determined and ``solve`` raises.
+
+    The uniform post-check -- ``|L_solved - lev(a_solved)|`` against the bucket
+    size -- classifies every config without mode tracking: curve-anchored solves
+    (``p``/``a``/``L``) match by construction and stay silent; only an
+    accounting-determined ``L`` can diverge and warn. ``price_ccoc`` (anchors on
+    ``p``) therefore never warns.
+
+    Signed / payoff distributions are out of scope (``lev``/``q`` assume the
+    zero-based grid); see :meth:`~aggregate._grid_distribution.GridDistribution.prob_loss_assets`.
+    """
+    if p is not None and a is not None:
+        raise ValueError('price_pentagon_ex: pass at most one of p= or a=.')
+    gd = agg._grid_distribution()
+
+    # 1. translate the probability spelling (p is not a pentagon variable).
+    if p is not None:
+        a = float(gd.q(p))
+
+    # 2. inject L = lev(a) only when the accounting is one equation short and a
+    #    capital level is anchorable.
+    quantities = (L, M, P, Q, a, LR, PQ, ROE)
+    n = sum(v is not None for v in quantities)
+    if n == 2 and (a is not None or L is not None):
+        if a is not None:
+            res = gd.prob_loss_assets(a=a)
+        else:
+            res = gd.prob_loss_assets(L=L)
+        a, L = res.a, res.L
+
+    # 3. solve via the existing engine (raises on insoluble configs).
+    pent = Pentagon(obj=agg)
+    pent.solve(L=L, M=M, P=P, Q=Q, a=a, lr=LR, pq=PQ, roe=ROE)
+
+    # 4. uniform post-check + warn: compare the solved L to the curve's lev(a).
+    a_solved = float(pent.a)
+    L_solved = float(pent.L)
+    lev_a = float(gd.lev(a_solved))
+    tol = gd.bs if gd.bs is not None else 0.0
+    if abs(L_solved - lev_a) > tol:
+        warnings.warn(
+            f'price_pentagon_ex: solved by accounting identities; L = '
+            f'{L_solved:.6g} does not match the limited expected loss '
+            f'E[min(X,a)] = {lev_a:.6g} at assets a = {a_solved:.6g} '
+            f'(gap {L_solved - lev_a:.3g}). The accounting loss ignores the '
+            f'limit/default haircut E[(X-a)+].', UserWarning)
+
+    # 5. report p alongside the octet (calibration_df precedent: p as a leading
+    #    descriptor next to the eight stats).
+    p_solved = float(gd.cdf(a_solved))
+    return complete_pentagon(pd.DataFrame(
+        [[p_solved, pent.L, pent.M, pent.P, pent.Q]],
+        columns=['p', 'L', 'M', 'P', 'Q'],
+        index=pd.Index(['total'], name='unit')))
 
 
 def price_ccoc(obj, ccoc, *, p):

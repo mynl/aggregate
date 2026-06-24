@@ -4396,12 +4396,19 @@ class Aggregate:
         """The :class:`GridDistribution` view over the aggregate ``p_total`` grid.
 
         Lazily built and cached on first use (and after :meth:`update`, which
-        resets the cache to ``None``). Owns the var/tvar kernel; the positive-mass
-        subset is taken to match the historic ``query('p_total > 0')`` filter.
+        resets the cache to ``None``). Built on the **full** contiguous ``bs``
+        grid (zero-mass buckets included): the var/tvar kernel filters to the
+        positive-mass subset internally (:meth:`GridDistribution._funcs`), so
+        ``q``/``tvar`` are unchanged, while the width-summing ``lev`` /
+        ``cdf`` / ``sf`` need the full grid to match the ``exa`` / ``add_exa``
+        convention -- dropping the empty low buckets (where ``S == 1``) would
+        make ``lev`` undercount. (Pre-1.0.0a97 this filtered ``p_total > 0`` up
+        front, which silently broke ``lev`` on the subset grid; the filter moved
+        inside the kernel where it belongs.)
         """
         if self._dist is None:
-            ser = self.density_df.query('p_total > 0').p_total
-            self._dist = GridDistribution.from_series(ser, bs=self.bs, name=self.name)
+            self._dist = GridDistribution.from_series(
+                self.density_df.p_total, bs=self.bs, name=self.name)
         return self._dist
 
     def _sev_grid_distribution(self):
@@ -4841,6 +4848,47 @@ class Aggregate:
         :meth:`Portfolio.price_ccoc`.
         """
         return _pricing.price_ccoc(self, ccoc, p=p)
+
+    def prob_loss_assets(self, *, p=None, L=None, a=None):
+        """Given any one of ``p``, ``L``, ``a``, return the consistent triple.
+
+        Free choice over the capital anchor: pass exactly one of the VaR
+        probability ``p``, the limited expected loss ``L = E[min(X, a)]``, or
+        the asset level ``a`` -- any one determines the other two. Thin
+        delegator to
+        :meth:`~aggregate._grid_distribution.GridDistribution.prob_loss_assets`
+        over this aggregate's ``p_total`` grid (the single ``lev`` source).
+        Aliased :meth:`pla`.
+
+        Returns
+        -------
+        ProbLossAssets
+            Namedtuple ``(p, L, a)``, grid-snapped and mutually consistent
+            (``L == lev(a)``, ``p == cdf(a)``).
+        """
+        return self._grid_distribution().prob_loss_assets(p=p, L=L, a=a)
+
+    pla = prob_loss_assets
+
+    def price_pentagon_ex(self, *, p=None, a=None, L=None,
+                          M=None, P=None, Q=None, LR=None, PQ=None, ROE=None):
+        """Complete the pricing octet over the full pentagon vocabulary.
+
+        The full-power front door over :meth:`price_pentagon`: free over the
+        capital anchor (``p``, ``a``, **or** the limited expected loss ``L``)
+        and accepting any soluble pentagon configuration, warning when an
+        accounting-determined ``L`` does not reconcile with ``E[min(X, a)]``.
+        Thin delegator to the shared single-distribution pricing concern; see
+        :func:`aggregate._pricing.price_pentagon_ex` for the full contract.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One ``'total'`` row: a leading ``p`` column then the eight canonical
+            pentagon stats.
+        """
+        return _pricing.price_pentagon_ex(
+            self, p=p, a=a, L=L, M=M, P=P, Q=Q, LR=LR, PQ=PQ, ROE=ROE)
 
     def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower'):
         """Calibrate the standard pricing distortion set to a cost-of-capital target.

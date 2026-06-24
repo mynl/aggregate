@@ -1,8 +1,16 @@
 # Plan — `prob_loss_assets` / `pla` (free choice of capital anchor)
 
-> **Status: DRAFT — not executed.** New capability + tests → version bump +
-> `CHANGELOG.md` at close. `uv run pytest` green before any commit; the frozen
-> baseline must not move. No change to existing non-negative / `p`-or-`a` paths.
+> **Status: SHIPPED 1.0.0a97.** New capability + tests landed; version bumped
+> and `CHANGELOG.md` updated. `uv run pytest` green; the frozen baseline is
+> unmoved. **Deviation from §2:** the cached `_grid_distribution()` handle's
+> `lev` was *wrong* on the `p_total > 0` subset (it drops the empty low buckets
+> where `S == 1`, so `E[min(X,a)]` undercounts by the missing slab — e.g.
+> `lev(a)=682` vs `exa=999.6`). Rather than read the `exa`/`exa_total` column,
+> the handle is now built on the **full** contiguous `bs` grid; the var/tvar
+> kernel filters `p>0` internally so `q`/`tvar`/`mean` are byte-identical, while
+> `lev`/`cdf`/`sf` are now correct and match `add_exa` to dust. `pla` and
+> `price_pentagon_ex` then use `GridDistribution.lev` as the single LEV source,
+> as the plan intended. Tests in `tests/test_prob_loss_assets.py`.
 
 ---
 

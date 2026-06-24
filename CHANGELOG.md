@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.0a105
+
+### `PnL.evaluate()` — the Cherny–Madan breakeven acceptability panel (Stage D of `PnL`)
+
+A `PnL` is **evaluated, not priced**. `PnL.evaluate()` finds, per distortion
+family, the breakeven stress that drives the risk-adjusted net to zero — i.e. it
+calibrates `g(loss-version of the risky leg) = the held consideration` over the
+**full** support (no asset cap, no cost-of-capital inversion), reusing
+`Distortion.calibrate_set`.
+
+- Returns an **acceptability panel**: one row per family (`ph`, `wang`, `dual`,
+  `tvar` — `ccoc` excluded, it needs an asset level), with the family-specific
+  breakeven `param`, the calibration `error`, and the family-agnostic
+  **`gini_p`** (`= 2∫g − 1`) acceptability index (`@Cherny2009a`), plus
+  `area = (gini_p+1)/2`.
+- `gini_p` is **monotone in loading**: a more profitable position survives a
+  larger stress and scores a larger `gini_p`. (We report the index in full —
+  never abbreviated "AI".)
+- Constant consideration only; function-valued (loss-sensitive) evaluation is
+  deferred (raises a clear `NotImplementedError`).
+
 ## 1.0.0a104
 
 ### Signed additive `PnL.summary_df` and `PnL.plot()` (Stage C of `PnL`)

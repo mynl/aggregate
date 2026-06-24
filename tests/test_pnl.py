@@ -286,3 +286,36 @@ def test_plot_discrete_runs():
     a = build('pnl GP 5 premium - dfreq[3] dsev[-1 1]', bs=1)
     fig = a.plot()
     assert len(fig.axes) == 2
+
+
+# ----------------------------------------------------------------------
+# evaluate(): the Cherny-Madan breakeven acceptability panel
+# ----------------------------------------------------------------------
+def test_evaluate_panel_shape_and_breakeven():
+    """The panel has the default families minus ccoc; breakeven is solved."""
+    a = build('pnl B 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
+    ev = a.evaluate()
+    assert list(ev.index) == ['ph', 'wang', 'dual', 'tvar']    # ccoc excluded
+    assert list(ev.columns) == ['param_name', 'param', 'error', 'gini_p', 'area']
+    # gini_p is the family-agnostic acceptability index in [0, 1]
+    assert (ev.gini_p >= 0).all() and (ev.gini_p <= 1).all()
+    # area = (gini_p + 1) / 2 = integral g
+    assert np.allclose(ev.area, (ev.gini_p + 1) / 2)
+    # every family hit its breakeven target (calibration residual ~ 0)
+    assert (ev.error.abs() < 1e-2).all()
+
+
+def test_evaluate_gini_p_monotone_in_profit():
+    """A more profitable position survives a larger stress -> larger gini_p."""
+    lo = build('pnl L 800 prem - 70% lr sev gamma 100 cv 0.5 poisson')
+    hi = build('pnl H 1200 prem - 70% lr sev gamma 100 cv 0.5 poisson')
+    for fam in ('ph', 'wang', 'dual', 'tvar'):
+        assert lo.evaluate().loc[fam, 'gini_p'] < hi.evaluate().loc[fam, 'gini_p']
+
+
+def test_evaluate_function_consideration_deferred():
+    """Function-valued (loss-sensitive) evaluation is deferred -> clear error."""
+    pnl = build('agg L 5 claims sev gamma 100 cv 0.5 poisson').make_pnl(
+        lambda x: 100.0 + 0.5 * x)
+    with pytest.raises(NotImplementedError, match='constant consideration'):
+        pnl.evaluate()

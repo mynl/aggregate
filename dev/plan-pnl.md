@@ -19,10 +19,15 @@
 >   constant consideration certain, callable carries SD/Sk; buying flips both
 >   signs). `plot()` = Margin density + distribution, break-even line, no sev
 >   panel (`plot_pnl` compositor).
-> - Stages D–E (Cherny–Madan `evaluate` panel, reins-aware GCN view, DecL
->   swing/slide builder) and the deferred `PortPnL` — pending.
+> - **Stage D — Cherny–Madan `evaluate` panel — DONE (1.0.0a105).**
+>   `PnL.evaluate()` calibrates `g(loss-version) = held consideration` over the
+>   full support (reuses `Distortion.calibrate_set`); returns the acceptability
+>   panel (ph/wang/dual/tvar, ccoc excluded) with breakeven `param` + `gini_p`
+>   (monotone in profit). Constant consideration only.
+> - Stage E (reins-aware GCN view, DecL swing/slide builder) and the deferred
+>   `PortPnL` — pending.
 >
-> **Status: DRAFT — partially executed (Stages A, B, C landed).** Re-architects the `pnl` concept. **`pnl` is
+> **Status: DRAFT — partially executed (Stages A, B, C, D landed).** Re-architects the `pnl` concept. **`pnl` is
 > new and nothing external depends on it — this is a free *internal* change**, not
 > a compat-constrained migration; the return type of `build('pnl …')` changes
 > (`Aggregate` → `PnL`) and we update our own consumers freely. Version bump,

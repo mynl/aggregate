@@ -263,6 +263,85 @@ class PnL:
         return 1.0 - self.cdf(x)
 
     # ------------------------------------------------------------------
+    # Evaluation: the Cherny--Madan breakeven acceptability panel
+    # ------------------------------------------------------------------
+    def evaluate(self, names=None):
+        """Evaluate the position: the Cherny--Madan breakeven acceptability panel.
+
+        A P&L is **evaluated, not priced**. You never price the net; you price
+        the risky leg ``X`` and ask: which distortion drives the risk-adjusted
+        net to **zero** -- the breakeven stress the position survives? With
+        translation and duality both orientations reduce to the *same* equation,
+
+            ``P = g(loss-version of the risky leg)``
+
+        -- exactly the ``rho_g(S) = premium_target`` calibration
+        :meth:`Distortion.calibrate_set` already solves, with
+        ``premium_target = the held consideration P`` over the **full** support
+        (no asset cap, no cost-of-capital inversion). Hence a ``PnL`` exposes
+        ``evaluate``, not the ``coc`` price methods, and ``ccoc`` (which needs an
+        asset level) is **excluded** from the panel.
+
+        The raw breakeven parameter is family-specific (``wang`` lambda is not
+        ``tvar`` p), but ``gini_p = 2 integral g - 1`` is family-agnostic,
+        comparable, and monotone in loading -- so the breakeven ``gini_p`` is the
+        single **acceptability index** (Cherny & Madan; do not abbreviate it
+        "AI"): a more profitable position survives a larger stress and so scores a
+        larger ``gini_p``. The ``calibrate_set`` family loop therefore yields one
+        acceptability panel in a common currency.
+
+        Parameters
+        ----------
+        names : sequence of str, optional
+            Distortion families to evaluate. Defaults to the standard set minus
+            ``ccoc`` (``ph``, ``wang``, ``dual``, ``tvar``).
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per family, columns ``param_name`` / ``param`` (the
+            family-specific breakeven parameter), ``error`` (calibration
+            residual), ``gini_p`` (the acceptability index), and ``area``
+            (``= (gini_p + 1) / 2 = integral g``).
+
+        Notes
+        -----
+        Constant consideration only in this release; function-valued
+        (loss-sensitive) evaluation is deferred. See dev/plan-pnl.md S1.
+        """
+        if callable(self.consideration):
+            raise NotImplementedError(
+                'evaluate requires a constant consideration; function-valued '
+                '(loss-sensitive) evaluation is deferred.')
+        from .spectral import Distortion
+        from ._pricing import (_canonical_loss_frame, _calibration_survival,
+                               _limited_ev, DEFAULT_CALIBRATION_DISTORTIONS)
+        if names is None:
+            names = tuple(n for n in DEFAULT_CALIBRATION_DISTORTIONS
+                          if n != 'ccoc')
+        # Canonical 0-based loss frame of the risky leg (reverses a payoff).
+        dz, c, _reverse = _canonical_loss_frame(self.agg)
+        bs = self.agg.bs
+        a_full = float(dz.index[-1])               # full support: no asset cap
+        S, ess_sup = _calibration_survival(dz, bs, a_full)
+        el = _limited_ev(dz, bs, a_full + bs)      # E[loss-version] (uncapped)
+        # breakeven g(loss-version) = P  <=>  g(Z) = P + c  (translation by c).
+        P = float(self._consideration_at(0.0))
+        target = P + c
+        dists = Distortion.calibrate_set(
+            S=S, bs=bs, premium_target=target, ess_sup=ess_sup,
+            assets=ess_sup or a_full, el=el, names=names)
+        rows = []
+        for nm in names:
+            d = dists[nm]
+            param_name = getattr(d, 'param_name', None) or 'param'
+            rows.append([param_name, d.shape, d.error, d.gini_p,
+                         (d.gini_p + 1) / 2])
+        return pd.DataFrame(
+            rows, columns=['param_name', 'param', 'error', 'gini_p', 'area'],
+            index=pd.Index(list(names), name='distortion'))
+
+    # ------------------------------------------------------------------
     # Plot: the net (Margin) density + distribution, no severity panel
     # ------------------------------------------------------------------
     def plot(self, axd=None, **kwargs):

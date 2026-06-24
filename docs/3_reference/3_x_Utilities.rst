@@ -20,10 +20,8 @@ converts between central, non-central, and (mean, CV, skew) representations.
    MomentAggregator
    MomentWrangler
    xsden_to_mwrangler
-   ser_to_mwrangler
    xsden_to_meancv
    xsden_to_meancvskew
-   xsden_to_noncentral
 
 .. autoclass:: aggregate.moments.MomentAggregator
 

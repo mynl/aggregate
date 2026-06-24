@@ -16,8 +16,8 @@ VALIDATION_NOISE = get_settings().validation.noise
 
 __all__ = [
     'MomentAggregator', 'MomentWrangler',
-    'xsden_to_mwrangler', 'ser_to_mwrangler',
-    'xsden_to_meancv', 'xsden_to_meancvskew', 'xsden_to_noncentral',
+    'xsden_to_mwrangler',
+    'xsden_to_meancv', 'xsden_to_meancvskew',
 ]
 
 
@@ -418,10 +418,11 @@ def xsden_to_mwrangler(xs, den):
     populates a :class:`MomentWrangler` with the non-central moments, from
     which the caller reads ``.noncentral`` (raw moments), ``.mcvsk`` (mean,
     CV, skew), ``.central``, or ``.factorial`` as needed -- computing the
-    sums only once. The convenience wrappers :func:`xsden_to_meancv`,
-    :func:`xsden_to_meancvskew`, and :func:`xsden_to_noncentral` all route
-    through here, so every caller treats the tail mass identically. Prefer
-    this directly when more than one view of the moments is needed.
+    sums only once. The convenience wrappers :func:`xsden_to_meancv` and
+    :func:`xsden_to_meancvskew` route through here, so every caller treats the
+    tail mass identically -- **prefer them when you need only the single
+    ``(m, cv)`` or ``(m, cv, skew)`` view**, and use this function directly when
+    you need more than one view (or the raw ``.noncentral`` moments).
 
     Parameters
     ----------
@@ -529,54 +530,6 @@ def xsden_to_meancvskew(xs, den):
     """
     mw = xsden_to_mwrangler(xs, den)
     return mw.mcvsk
-
-
-def xsden_to_noncentral(xs, den):
-    """
-    Compute the first three non-central moments from a discretized density.
-
-    Parameters
-    ----------
-    xs : array-like
-        Bucket left-endpoints of the discretized support.
-    den : array-like
-        Probability mass on each bucket of ``xs``.
-
-    Returns
-    -------
-    tuple
-        The non-central (raw) moments ``(E[X], E[X^2], E[X^3])``.
-
-    Notes
-    -----
-    Delegates to :func:`xsden_to_mwrangler`; see its Notes for the defective
-    distribution (``den.sum() < 1``) tail-mass convention.
-    """
-    mw = xsden_to_mwrangler(xs, den)
-    return mw.noncentral
-
-
-def ser_to_mwrangler(ser):
-    """
-    Build a :class:`MomentWrangler` from a Series indexed by its support.
-
-    Convenience wrapper around :func:`xsden_to_mwrangler` for the common case
-    where the x values are the Series index and the probability mass is the
-    Series values (e.g. ``density_df.p_total``), so callers need not unpack
-    ``ser.index`` / ``ser.values`` by hand.
-
-    Parameters
-    ----------
-    ser : pandas.Series
-        Probability mass indexed by the (evenly spaced) support points.
-
-    Returns
-    -------
-    MomentWrangler
-        See :func:`xsden_to_mwrangler` for what it carries and the defective
-        distribution (``ser.sum() < 1``) tail-mass convention.
-    """
-    return xsden_to_mwrangler(ser.index.to_numpy(), ser.to_numpy())
 
 
 def _noise_aware_rel_error(est, ref):

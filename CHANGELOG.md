@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.0a96
+
+### Rationalize the `xsden_*` / `ser_to_mwrangler` moment helpers
+
+The `aggregate.moments` discretized-density helpers were a core function plus
+four thin wrappers — too many near-identical options. Two had **zero** source
+callers and appeared in no public example, so they are removed (breaking, but
+dead surface):
+
+- **Removed `xsden_to_noncentral`** — the raw-moments need is met by
+  `xsden_to_mwrangler(xs, den).noncentral` (what the live callers already use).
+- **Removed `ser_to_mwrangler`** — a one-line Series adapter no caller used;
+  `xsden_to_mwrangler(ser.index.to_numpy(), ser.to_numpy())` is the direct form.
+
+Kept: `xsden_to_mwrangler` (the core; returns a `MomentWrangler` with every
+view) and the two reductions with real callers, `xsden_to_meancv` (→ `(m, cv)`)
+and `xsden_to_meancvskew` (→ `(m, cv, skew)`), both also demonstrated in the
+reinsurance-pricing user guide. `xsden_to_mwrangler`'s docstring now spells out
+when to prefer the reductions (single view) vs. the core (more than one view).
+`bivariate.py` was switched from the inline `xsden_to_mwrangler(...).mcvsk`
+idiom to `xsden_to_meancvskew(...)` so there is one obvious way.
+
 ## 1.0.0a95
 
 ### Concern modules filled in; legacy bucket sizers retired (Plan: finish shared concerns)

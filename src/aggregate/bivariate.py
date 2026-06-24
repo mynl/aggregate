@@ -60,7 +60,7 @@ import scipy.fft as sfft
 from .constants import (FIG_H, FIG_W, DefectiveDistributionWarning,
                         info_row, INFO_NA)
 from .config import get_settings
-from .moments import (MomentAggregator, xsden_to_mwrangler,
+from .moments import (MomentAggregator, xsden_to_mwrangler, xsden_to_meancvskew,
                       _noise_aware_rel_error, _snap_noise)
 from .utilities import round_bucket, balanced_window
 
@@ -1467,7 +1467,7 @@ class BivariateAggregate:
                              ssk, *nan3))
             index.append((name, 'Sev'))
             mt, sdt, skt = self._axis_theory(i)
-            me, cve, ske = xsden_to_mwrangler(self.axis_xs[i], dens).mcvsk
+            me, cve, ske = xsden_to_meancvskew(self.axis_xs[i], dens)
             sde = cve * me if np.isfinite(cve) else np.nan
             rows.append(_row(mt, sdt, skt, me, sde, ske))
             index.append((name, 'Agg'))
@@ -1717,7 +1717,7 @@ class BivariateAggregate:
         m0, m1 = self.marginals
         for i, dens in enumerate((m0, m1)):
             mt = self._axis_theory(i)[0]
-            me = xsden_to_mwrangler(self.axis_xs[i], dens).mcvsk[0]
+            me = xsden_to_meancvskew(self.axis_xs[i], dens)[0]
             if mt and abs(me - mt) / abs(mt) > 0.10:
                 bad.append('marginal mean')
                 break

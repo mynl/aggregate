@@ -1,10 +1,10 @@
 """Tests for the discretized-density moment helpers in ``aggregate.moments``.
 
-These helpers (``xsden_to_meancv`` / ``xsden_to_meancvskew`` /
-``xsden_to_noncentral``) are used on every ``update`` of an ``Aggregate`` or
-``Portfolio``, so they get a dedicated regression suite. The shared worker
-``_xsden_work`` also handles defective distributions (``sum(p) < 1``) by
-placing the missing mass at the implied maximum loss.
+These helpers (``xsden_to_mwrangler`` and its ``xsden_to_meancv`` /
+``xsden_to_meancvskew`` reductions) are used on every ``update`` of an
+``Aggregate`` or ``Portfolio``, so they get a dedicated regression suite. The
+core also handles defective distributions (``sum(p) < 1``) by placing the
+missing mass at the implied maximum loss.
 """
 from __future__ import annotations
 
@@ -17,10 +17,8 @@ import pytest
 from aggregate.config import get_settings
 from aggregate.moments import (
     xsden_to_mwrangler,
-    ser_to_mwrangler,
     xsden_to_meancv,
     xsden_to_meancvskew,
-    xsden_to_noncentral,
     _noise_aware_rel_error,
     _snap_noise,
 )
@@ -39,8 +37,8 @@ DIE_CV = DIE_SD / DIE_EX1
 
 
 def test_noncentral_matches_die():
-    """``xsden_to_noncentral`` returns the exact raw moments of a fair die."""
-    ex1, ex2, ex3 = xsden_to_noncentral(DIE_XS, DIE_PS)
+    """The ``.noncentral`` view returns the exact raw moments of a fair die."""
+    ex1, ex2, ex3 = xsden_to_mwrangler(DIE_XS, DIE_PS).noncentral
     assert np.isclose(ex1, DIE_EX1, rtol=1e-12)
     assert np.isclose(ex2, DIE_EX2, rtol=1e-12)
     assert np.isclose(ex3, DIE_EX3, rtol=1e-12)
@@ -55,26 +53,16 @@ def test_meancvskew_die_symmetric():
 
 
 def test_helpers_are_consistent():
-    """All three wrappers share ``xsden_to_mwrangler`` so they agree on mean/cv."""
+    """Both wrappers share ``xsden_to_mwrangler`` so they agree on mean/cv."""
     m1, cv1 = xsden_to_meancv(DIE_XS, DIE_PS)
     m2, cv2, _ = xsden_to_meancvskew(DIE_XS, DIE_PS)
     assert (m1, cv1) == (m2, cv2)
 
 
-def test_ser_to_mwrangler_matches_xsden():
-    """The Series wrapper (index=xs, values=density) matches the xs/den form."""
-    ser = pd.Series(DIE_PS, index=DIE_XS)
-    m, cv, skew = ser_to_mwrangler(ser).mcvsk
-    assert np.isclose(m, DIE_EX1, rtol=1e-12)
-    assert np.isclose(cv, DIE_CV, rtol=1e-12)
-    assert abs(skew) < VALIDATION_NOISE
-    assert ser_to_mwrangler(ser).noncentral == xsden_to_mwrangler(DIE_XS, DIE_PS).noncentral
-
-
 def test_defective_distribution_places_mass_at_implied_max():
     """Deficit mass goes to the implied max loss xs[-1] + bs."""
     ps = np.full(6, 0.15)  # sums to 0.90 -> deficit 0.10
-    ex1, _, _ = xsden_to_noncentral(DIE_XS, ps)
+    ex1, _, _ = xsden_to_mwrangler(DIE_XS, ps).noncentral
     # implied max = 6 + bs(=1) = 7; ex1 = sum(xs*ps) + 0.10 * 7
     expected = float(np.sum(DIE_XS * ps)) + 0.10 * 7.0
     assert np.isclose(ex1, expected, rtol=1e-12)
@@ -84,14 +72,14 @@ def test_defective_logs_info(caplog):
     """A genuinely defective distribution logs at INFO."""
     ps = np.full(6, 0.15)  # deficit 0.10 >> VALIDATION_NOISE
     with caplog.at_level(logging.INFO, logger="aggregate.moments"):
-        xsden_to_noncentral(DIE_XS, ps)
+        xsden_to_mwrangler(DIE_XS, ps)
     assert "defective" in caplog.text.lower()
 
 
 def test_proper_distribution_no_defective_log(caplog):
     """A proper distribution does not log a defective warning."""
     with caplog.at_level(logging.INFO, logger="aggregate.moments"):
-        xsden_to_noncentral(DIE_XS, DIE_PS)
+        xsden_to_mwrangler(DIE_XS, DIE_PS)
     assert "defective" not in caplog.text.lower()
 
 

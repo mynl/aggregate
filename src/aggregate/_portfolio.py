@@ -281,16 +281,19 @@ class Portfolio(object):
 
         self.validation_eps = get_settings().validation.eps
 
-    def help(self, regex, lod='short', output='short'):
+    def help(self, regex, lod='short', values='short', fmt='auto'):
         """
         Lookup help on methods and properties matching ``regex``.
 
-        ``lod`` (``'terse'|'short'|'all'``) controls how much docstring is
-        shown; ``output`` (``'none'|'short'|'all'``) how much of each value or
-        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
-        rows under ``'short'``). See :func:`aggregate.utilities.agg_help`.
+        Three orthogonal axes: ``lod`` (``'terse'|'short'|'all'``) controls how
+        much docstring is shown; ``values`` (``'none'|'short'|'all'``) how much
+        of each value or no-argument call result (a ``DataFrame`` / ``Series``
+        is headed to 5 rows under ``'short'``); ``fmt``
+        (``'auto'|'text'|'ansi'|'html'``) the render target (``auto`` = ANSI in
+        Jupyter, plain text in a terminal). See
+        :func:`aggregate.utilities.agg_help`.
         """
-        agg_help(self, regex, lod=lod, output=output)
+        agg_help(self, regex, lod=lod, values=values, fmt=fmt)
 
     def add_exa_sample(self, sample, S_calculation='forwards'):
         """Compute a sample-based ``density_df`` with ``E[X_i | X]`` from a sample.
@@ -2114,9 +2117,11 @@ class Portfolio(object):
 
         Re-parses :attr:`program` and renders through
         :func:`aggregate.decl_writer.format_program` (the inverse of the
-        parser): one ``port`` line then one tab-indented unit per line. Canonical
-        rather than verbatim. A portfolio built programmatically (empty
-        ``program``) returns ``''``.
+        parser). Rendered in the default ``spread`` layout: a ``port`` head line,
+        each unit two-space-indented, and each unit's clauses one level deeper.
+        Canonical rather than verbatim. Call ``format_program(self.program,
+        layout='terse')`` for the historical single-line-per-unit form. A
+        portfolio built programmatically (empty ``program``) returns ``''``.
         """
         return format_program(self.program, fmt='text')
 

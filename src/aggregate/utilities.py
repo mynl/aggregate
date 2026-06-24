@@ -1,6 +1,7 @@
 import inspect
 import itertools
 import logging
+import sys
 from numbers import Number
 
 import numpy as np
@@ -518,7 +519,39 @@ def kaplan_meier_np(loss, closed):
     return kaplan_meier(df)
 
 
-def agg_help(self, regex, lod='short', output='short'):
+def _in_jupyter():
+    """True iff running under a Jupyter (ZMQ) kernel, without importing IPython.
+
+    Probes ``sys.modules`` rather than importing IPython: the import costs ~1s
+    and ``utilities`` sits on the ``import aggregate`` path, so we never force it.
+    If IPython was never imported we are certainly not in a notebook. A live
+    ``ZMQInteractiveShell`` is notebook / lab / qtconsole (all render ANSI);
+    ``TerminalInteractiveShell`` or ``None`` is not Jupyter.
+    """
+    mod = sys.modules.get('IPython')
+    if mod is None:
+        return False
+    shell = mod.get_ipython()
+    return shell is not None and type(shell).__name__ == 'ZMQInteractiveShell'
+
+
+def _help_target(fmt):
+    """Resolve the :func:`agg_help` render target to ``'text'``, ``'ansi'`` or ``'html'``.
+
+    ``auto`` (the default) picks ``ansi`` under a Jupyter kernel and ``text``
+    otherwise. It deliberately never resolves to ``html`` -- ANSI colors with a
+    consistent monospace font are preferred even in JupyterLab; ``html`` is
+    reachable only by asking for it explicitly. An explicit ``fmt`` always wins.
+    """
+    if fmt not in ('auto', 'text', 'ansi', 'html'):
+        raise ValueError(
+            f"fmt must be 'auto', 'text', 'ansi', or 'html'; got {fmt!r}")
+    if fmt != 'auto':
+        return fmt
+    return 'ansi' if _in_jupyter() else 'text'
+
+
+def agg_help(self, regex, lod='short', values='short', fmt='auto'):
     """
     Investigate ``self`` for public names matching ``regex`` and display each
     one's documentation and (optionally) its value or no-argument call result.
@@ -540,35 +573,84 @@ def agg_help(self, regex, lod='short', output='short'):
         * ``'terse'`` -- name (and method signature) only, no docstring;
         * ``'short'`` -- the first few lines of the docstring;
         * ``'all'`` -- the full docstring.
-    output : {'short', 'none', 'all'}, default 'short'
+    values : {'short', 'none', 'all'}, default 'short'
         How much of each name's *value* to display -- the attribute value, or a
         method's no-argument call result (methods needing arguments are
         skipped):
 
-        * ``'none'`` -- show no values;
+        * ``'none'`` -- show no values (names + docstrings only);
         * ``'short'`` -- show values, but a :class:`pandas.DataFrame` or
           :class:`pandas.Series` is truncated to ``.head(5)``;
         * ``'all'`` -- show values in full.
+    fmt : {'auto', 'text', 'ansi', 'html'}, default 'auto'
+        Render *target*:
+
+        * ``'auto'`` -- ``ansi`` under a Jupyter kernel, ``text`` in a plain
+          terminal / REPL (never ``html`` -- ask for it explicitly);
+        * ``'text'`` -- plain ``print`` (no color, no IPython import);
+        * ``'ansi'`` -- ``text`` with the header line colorized via ANSI escapes
+          (renders as color in JupyterLab and in a color terminal);
+        * ``'html'`` -- the rich Markdown / IPython display path (Jupyter only).
 
     Notes
     -----
-    ``lod`` and ``output`` are orthogonal: ``lod`` governs the docstring,
-    ``output`` governs the value / call result. ``lod='terse', output='none'``
-    is a bare name listing. Documentation is shown for methods and properties
-    only (a plain field carries no useful docstring).
+    ``lod``, ``values`` and ``fmt`` are three orthogonal axes: ``lod`` governs
+    the docstring detail, ``values`` how much of the value / call result, and
+    ``fmt`` the render target. ``lod='terse', values='none'`` is a bare name
+    listing. Documentation is shown for methods and properties only (a plain
+    field carries no useful docstring).
     """
     if lod not in ('terse', 'short', 'all'):
         raise ValueError(f"lod must be 'terse', 'short', or 'all'; got {lod!r}")
-    if output not in ('none', 'short', 'all'):
+    if values not in ('none', 'short', 'all'):
         raise ValueError(
-            f"output must be 'none', 'short', or 'all'; got {output!r}")
-
-    # IPython imported lazily to keep it off the `import aggregate` path
-    # (it is ~1s to import); see module note below.
-    from IPython.display import Markdown, display
+            f"values must be 'none', 'short', or 'all'; got {values!r}")
+    target = _help_target(fmt)   # validates fmt; raises ValueError on a bad value
 
     short_doc_lines = 4   # 'short' lod: first few lines of the docstring
-    head_n = 5            # 'short' output: rows of a DataFrame/Series to show
+    head_n = 5            # 'short' values: rows of a DataFrame/Series to show
+
+    # Select the three emit primitives once, before the walk, so the branch on
+    # render target lives in one place rather than at every call site.
+    if target == 'html':
+        # IPython imported lazily to keep it off the `import aggregate` path
+        # (it is ~1s to import); see module note above. Only the html path needs
+        # it -- text / ansi stay dependency-free.
+        from IPython.display import Markdown, display
+
+        def emit_header(is_method, name, sig):
+            tag = 'Callable' if is_method else 'Attribute'
+            display(Markdown(f'### {tag}: {name}{sig}\n'))
+
+        def emit_doc(doc):
+            display(Markdown(doc))
+
+        def emit_value(value):
+            display(value)
+
+        def emit_error(name, msg):
+            display(Markdown(f'### Error: {name}\n'))
+            print(msg)
+    else:
+        # text / ansi both print plain; ansi colorizes only the header line, with
+        # a tiny set of escape constants (no Markdown->ANSI engine, no new dep).
+        bold, dim, accent, reset = (
+            ('\x1b[1m', '\x1b[2m', '\x1b[36m', '\x1b[0m')
+            if target == 'ansi' else ('', '', '', ''))
+
+        def emit_header(is_method, name, sig):
+            tag = 'Callable' if is_method else 'Attribute'
+            print(f'{dim}{tag}:{reset} {bold}{accent}{name}{reset}{sig}')
+
+        def emit_doc(doc):
+            print(doc)
+
+        def emit_value(value):
+            print(value)
+
+        def emit_error(name, msg):
+            print(f'Error: {name}')
+            print(msg)
 
     for name in dir(self):
         if not re.search(regex, name):
@@ -579,20 +661,19 @@ def agg_help(self, regex, lod='short', output='short'):
         try:
             ob = getattr(self, name)
         except Exception as e:  # noqa: BLE001 - report, don't propagate
-            display(Markdown(f'### Error: {name}\n'))
-            print(f'{type(e).__name__}: {e}')
+            emit_error(name, f'{type(e).__name__}: {e}')
             continue
 
         is_method = callable(ob) and not is_property
 
         # header, with the bound signature for methods
-        header = f'### {"Callable" if is_method else "Attribute"}: {name}'
+        sig = ''
         if is_method:
             try:
-                header += str(inspect.signature(ob))
+                sig = str(inspect.signature(ob))
             except (TypeError, ValueError):
                 pass
-        display(Markdown(header + '\n'))
+        emit_header(is_method, name, sig)
 
         # documentation (methods and properties only), governed by lod
         if lod != 'terse' and (is_method or is_property):
@@ -600,10 +681,10 @@ def agg_help(self, regex, lod='short', output='short'):
             if doc:
                 if lod == 'short':
                     doc = '\n'.join(doc.split('\n')[:short_doc_lines])
-                display(Markdown(doc))
+                emit_doc(doc)
 
-        # value / no-arg call result, governed by output
-        if output != 'none':
+        # value / no-arg call result, governed by values
+        if values != 'none':
             if is_method:
                 try:
                     value = ob()
@@ -611,10 +692,10 @@ def agg_help(self, regex, lod='short', output='short'):
                     continue
             else:
                 value = ob
-            if output == 'short' and isinstance(value, (pd.DataFrame, pd.Series)):
-                display(value.head(head_n))
+            if values == 'short' and isinstance(value, (pd.DataFrame, pd.Series)):
+                emit_value(value.head(head_n))
             else:
-                display(value)
+                emit_value(value)
 
 
 def introspect(ob):

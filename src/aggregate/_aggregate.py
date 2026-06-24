@@ -2038,18 +2038,20 @@ class Aggregate:
         # s.append(super().__repr__())
         return '\n'.join(s)
 
-    def help(self, regex, lod='short', output='short'):
+    def help(self, regex, lod='short', values='short', fmt='auto'):
         """
         Lookup help on methods and properties matching ``regex``.
 
         Thin wrapper over :func:`aggregate.utilities.agg_help` — the free
         function is prefixed to avoid shadowing Python's builtin ``help`` at
-        module / package scope. ``lod`` (``'terse'|'short'|'all'``) controls
-        how much docstring is shown; ``output`` (``'none'|'short'|'all'``) how
-        much of each value or no-argument call result (a ``DataFrame`` /
-        ``Series`` is headed to 5 rows under ``'short'``).
+        module / package scope. Three orthogonal axes: ``lod``
+        (``'terse'|'short'|'all'``) controls how much docstring is shown;
+        ``values`` (``'none'|'short'|'all'``) how much of each value or
+        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
+        rows under ``'short'``); ``fmt`` (``'auto'|'text'|'ansi'|'html'``) the
+        render target (``auto`` = ANSI in Jupyter, plain text in a terminal).
         """
-        agg_help(self, regex, lod=lod, output=output)
+        agg_help(self, regex, lod=lod, values=values, fmt=fmt)
 
     def _approx_description(self):
         """One-line description of the method-of-moments fit, or ``''`` if none.
@@ -3654,8 +3656,11 @@ class Aggregate:
         Derived by re-parsing :attr:`program` and rendering through
         :func:`aggregate.decl_writer.format_program` (the inverse of the
         parser). It is canonical, not verbatim --- equivalent programs share one
-        form. For the raw input as supplied to ``build`` use :attr:`program`.
-        An object built programmatically (empty ``program``) returns ``''``.
+        form. Rendered in the default ``spread`` layout (each clause on its own
+        two-space-indented line); call ``format_program(self.program,
+        layout='terse')`` for the single-line form. For the raw input as supplied
+        to ``build`` use :attr:`program`. An object built programmatically (empty
+        ``program``) returns ``''``.
         """
         return format_program(self.program, fmt='text')
 

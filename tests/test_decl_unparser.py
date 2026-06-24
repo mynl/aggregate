@@ -188,10 +188,18 @@ _SMOKE = 'agg X 10 claims sev lognorm 50 cv 0.8 occurrence net of 50% so 10 xs 0
 
 
 def test_format_text_is_plain():
+    # default layout is now 'spread': multiline, each clause on its own line
     out = format_program(_SMOKE, fmt='text')
     assert isinstance(out, str)
     assert '\x1b[' not in out and '<span' not in out
     assert out.startswith('agg X')
+    assert '\n  sev ' in out             # severity clause on its own indented line
+
+
+def test_format_text_terse_is_single_line():
+    out = format_program(_SMOKE, fmt='text', layout='terse')
+    assert '\n' not in out
+    assert out.startswith('agg X 10 claims sev ')
 
 
 def test_format_html_has_span():
@@ -220,14 +228,48 @@ def test_format_empty_returns_empty():
 
 def test_format_accepts_spec_tuple():
     parsed = build.parser.parse('agg Y dfreq [1:6] dsev [1]')
-    out = format_program(parsed, fmt='text')
-    assert out == 'agg Y dfreq [1 2 3 4 5 6] dsev [1]'
+    # terse reproduces the historical single-line form byte-for-byte
+    assert (format_program(parsed, fmt='text', layout='terse')
+            == 'agg Y dfreq [1 2 3 4 5 6] dsev [1]')
+    # spread heads with `agg Y` and indents the two clauses
+    spread = format_program(parsed, fmt='text')
+    lines = spread.split('\n')
+    assert lines[0] == 'agg Y'
+    assert lines[1] == '  dfreq [1 2 3 4 5 6]'
+    assert lines[2] == '  dsev [1]'
 
 
 def test_format_port_is_multiline():
-    out = format_program(
-        'port P agg A 1 claim sev lognorm 10 cv 1 fixed '
-        'agg B 1 claim sev lognorm 20 cv 1 fixed')
-    lines = out.split('\n')
-    assert lines[0] == 'port P'
-    assert all(ln.startswith('\tagg ') for ln in lines[1:])
+    prog = ('port P agg A 1 claim sev lognorm 10 cv 1 fixed '
+            'agg B 1 claim sev lognorm 20 cv 1 fixed')
+    # spread: two-space-indented unit heads, their clauses one level deeper
+    spread = format_program(prog).split('\n')
+    assert spread[0] == 'port P'
+    assert '  agg A' in spread
+    assert '  agg B' in spread
+    assert '    sev lognorm 10 cv 1' in spread
+    # terse: the historical tab-indented one-line-per-unit form
+    terse = format_program(prog, layout='terse').split('\n')
+    assert terse[0] == 'port P'
+    assert all(ln.startswith('\tagg ') for ln in terse[1:])
+
+
+def test_format_reins_cessions_indent():
+    prog = ('agg R 10 claims sev lognorm 50 cv 0.8 occurrence net of '
+            '75% so 100 xs 200 and 50% so 100 xs 300 poisson')
+    lines = format_program(prog).split('\n')
+    assert '  occurrence net of' in lines
+    i = lines.index('  occurrence net of')
+    # cessions indented one level past the clause keyword; first ends with ' and'
+    assert lines[i + 1] == '    75% so 100 xs 200 and'
+    assert lines[i + 2] == '    50% so 100 xs 300'
+
+
+def test_format_html_spread_preserves_newlines():
+    out = format_program(_SMOKE, fmt='html')           # default spread
+    assert '<span' in out and '\n' in out
+
+
+def test_format_bad_layout_raises():
+    with pytest.raises(ValueError):
+        format_program(_SMOKE, layout='zigzag')

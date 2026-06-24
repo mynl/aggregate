@@ -341,16 +341,16 @@ def test_mv_plot_two_panels():
 
 def test_mv_help_runs(capsys):
     mv = _mv()
-    mv.help('corr')   # should not raise (defaults lod='short', output='short')
-    # every lod x output combination runs
+    mv.help('corr')   # should not raise (defaults lod='short', values='short')
+    # every lod x values combination runs (fmt='text' to avoid IPython display)
     for lod in ('terse', 'short', 'all'):
-        for output in ('none', 'short', 'all'):
-            mv.help('corr', lod=lod, output=output)
+        for values in ('none', 'short', 'all'):
+            mv.help('corr', lod=lod, values=values, fmt='text')
     # bad options raise ValueError
     with pytest.raises(ValueError):
         mv.help('corr', lod='medium')
     with pytest.raises(ValueError):
-        mv.help('corr', output='lots')
+        mv.help('corr', values='lots')
 
 
 def test_mv_no_copula_defaults_independent():

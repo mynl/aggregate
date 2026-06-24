@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.0.0a101
+
+### `.help` render targets + `output` → `values` rename (**breaking**)
+
+`.help` (and the `agg_help` worker backing it on `Aggregate`, `Portfolio`,
+`Underwriter`, and the bivariate class) gains an `fmt` axis that picks the render
+target, so it reads well in a plain terminal / REPL — not only in Jupyter, where
+it previously rendered through `IPython.display` and printed ugly object reprs
+everywhere else.
+
+- `fmt='auto'` (default) resolves to **ANSI** under a Jupyter kernel and **plain
+  text** in a terminal. It never auto-selects `html` (ANSI color with a
+  consistent monospace font is preferred even in JupyterLab); reach `html`
+  explicitly. `fmt='text'` / `'ansi'` are dependency-free (no IPython import);
+  `fmt='html'` is the original rich Markdown path.
+- Jupyter detection probes `sys.modules` and never forces the ~1s IPython import.
+
+**Breaking:** the a98 `output` parameter is renamed to **`values`** (`none` /
+`short` / `all` — how much of each name's value / call result to show), removing
+the `output`/`fmt` overlap. `lod`, `values`, and `fmt` are now three orthogonal
+axes: docstring detail, value detail, render target. (The unrelated
+`Aggregate.approximate(output=...)` / `Portfolio.approximate` keep their own
+`output` — different method, different meaning.)
+
+Tests: `tests/test_help.py` (text/ansi/auto/html targets, the rename, bad-value
+guards); `tests/test_bivariate.py::test_mv_help_runs` updated to `values=`.
+
+## 1.0.0a100
+
+### `format_program` spread layout (default multiline)
+
+`format_program` gains a `layout` axis, orthogonal to the existing `fmt`
+(markup) axis. `layout='spread'` — now the **default** — renders DecL multiline:
+each clause on its own two-space-indented line, with reinsurance cessions and a
+portfolio's / bivariate's sub-aggregates nested one level deeper. `layout='terse'`
+is the historical single-line-per-statement form (a portfolio keeps its
+tab-indented units) and is byte-for-byte what `spec_to_decl` / `to_agg` produce.
+
+So `Aggregate.pprogram` / `.pprogram_html` and `Portfolio.pprogram` /
+`.pprogram_html` now render spread by default (and the doc examples that print
+them will re-render multiline on the next docs build). Pass
+`format_program(obj.program, layout='terse')` for the old one-line form.
+
+Internals: both layouts render from one intermediate `_Block` tree (head line +
+indented children), so the clause ordering lives in a single place. `spec_to_decl`
+stays terse-only — the round-trip / idempotence contract and the `.agg` snapshot
+are unchanged. Both layouts re-parse to the same spec (the preprocessor collapses
+intra-statement newlines + indentation to a single space). Top-level statements
+in a multi-statement program are now joined with a blank line so they re-parse as
+distinct statements.
+
+Docs: the printed DecL examples in the user guides now render spread; the author
+rebuilds the doc tree out-of-loop.
+
 ## 1.0.0a99
 
 ### Distortion calibration on signed and payoff supports

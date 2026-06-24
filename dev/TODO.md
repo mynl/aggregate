@@ -392,5 +392,10 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   IPython tracebacks; Sphinx `pygments_style` is global). If docs identity ever
   becomes a priority, do only the minimal palette + Pygments-style slice.
 - [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
-  both premium legs (`plan-pnl-premium.md` §9).
+  both premium legs. Now specced as the **GCN** view in `plan-pnl.md` §3.4
+  (`agg_re.make_pnl(gross=, ceded=)`, additive `Net = Gross + Ceded`).
+- [ ] **Named Cherny–Madan acceptability families** (#23) — add the **MINMAXVAR**
+  (and MAXVAR / MAXMINVAR) distortion kinds so `PnL.evaluate` can surface the
+  *named* indices (AIMINMAXVAR, …). `@Cherny2009a`. v1.0 reports the panel by
+  family + `gini_p`; `dual` already *is* MINVAR. See `plan-pnl.md` §1.1.
 - [ ] extend reinsurance clauses to allow net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros (rate on subject = quota share)

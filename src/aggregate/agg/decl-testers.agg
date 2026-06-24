@@ -219,6 +219,19 @@ agg PnL.Norm 100 claims ssev 50 * norm + 10 poisson                             
 agg PnL.PmL  5 claims ssev 100 - lognorm 80 cv .2 poisson                                                    note{premium minus loss: constant - dist reflects the severity (sev mean 20)}
 
 
+# Orient. The payoff/loss orientation suffix on an agg (1.0.0a102)
+# ============================================================
+# A trailing payoff/loss keyword sets the variable's sign-convention role
+# (value_type) WITHOUT any reflect/shift -- pure orientation, distinct from the
+# pnl affine wrapper. payoff marks an asset-return / direct-payoff primitive
+# ("more is better") that prices through the dual distortion; loss is the
+# explicit default. Placed last, before the note/hints trailer (after
+# freq/reins/approximate). See tests/test_negative_x.py and dev/plan-pnl.md S4.
+agg Orient.Payoff 100 claims sev lognorm 10 cv 1 poisson payoff                                              note{asset-return primitive; prices through the dual};
+agg Orient.Loss   100 claims sev lognorm 10 cv 1 poisson loss                                                note{explicit loss default};
+agg Orient.Dfreq  dfreq [1 2 3] dsev [1 2 3] payoff                                                          note{dfreq form carries the suffix too}
+
+
 # PortPnL. Portfolio combine on signed (P&L) support (1.0.0a22)
 # ============================================================
 # Independent signed units combine onto a shared signed grid: the FFT product

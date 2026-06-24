@@ -369,7 +369,8 @@ class UnderwritingTransformer(Transformer):
 
     # ----- aggregate -------------------------------------------------
     def agg_out_full(self, c):
-        _, name, exposures, layers, sev_clause, occ_reins, freq, agg_reins, approx, trailer = c
+        (_, name, exposures, layers, sev_clause, occ_reins, freq, agg_reins,
+         approx, orientation, trailer) = c
         spec = {
             "name": name,
             **exposures,
@@ -379,13 +380,15 @@ class UnderwritingTransformer(Transformer):
             **freq,
             **agg_reins,
             **self._check_approx(approx, occ_reins),
+            **orientation,
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
         return ("agg", name, spec)
 
     def agg_out_dfreq(self, c):
-        _, name, dfreq, layers, sev_clause, occ_reins, agg_reins, approx, trailer = c
+        (_, name, dfreq, layers, sev_clause, occ_reins, agg_reins, approx,
+         orientation, trailer) = c
         spec = {
             "name": name,
             **dfreq,
@@ -394,6 +397,7 @@ class UnderwritingTransformer(Transformer):
             **occ_reins,
             **agg_reins,
             **self._check_approx(approx, occ_reins),
+            **orientation,
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
@@ -849,6 +853,25 @@ class UnderwritingTransformer(Transformer):
 
     def approx_none(self, c):
         """Omitted ``approximate`` clause -> no spec key (constructor default)."""
+        return {}
+
+    # ----- orientation suffix (value_type) ---------------------------
+    def orientation_payoff(self, c):
+        """``payoff`` suffix -> ``{'value_type': 'payoff'}``.
+
+        Pure orientation: sets the sign-convention role only. No reflect /
+        shift (that affine is the ``pnl`` wrapper); pricing reads
+        ``_is_loss_value`` and applies the dual distortion. See
+        dev/plan-pnl.md S4.
+        """
+        return {"value_type": "payoff"}
+
+    def orientation_loss(self, c):
+        """``loss`` suffix -> ``{'value_type': 'loss'}`` (explicit default)."""
+        return {"value_type": "loss"}
+
+    def orientation_none(self, c):
+        """Omitted orientation -> no spec key (constructor default ``loss``)."""
         return {}
 
     def _check_approx(self, approx, occ_reins):

@@ -444,6 +444,22 @@ def _render_approx(spec: dict) -> str:
     return '' if kind == 'exact' else f'approximate {kind}'
 
 
+def _render_orientation(spec: dict) -> str:
+    """Render the trailing ``payoff`` / ``loss`` orientation suffix.
+
+    Emitted only when the spec carries an explicit ``value_type`` (the DecL
+    orientation suffix set it); the omitted clause is the ``loss`` default and
+    renders nothing, so a default ``agg`` round-trips unchanged. The ``pnl``
+    path synthesizes ``value_type`` via ``_attach_pnl`` and renders through
+    :func:`_render_pnl`, so this is the ``agg``-only path. See dev/plan-pnl.md.
+    """
+    vt = spec.get('value_type')
+    if vt is None:
+        return ''
+    from .utilities import value_type_role
+    return 'payoff' if value_type_role(vt) is False else 'loss'
+
+
 def _join(parts) -> str:
     """Join non-empty clause fragments with single spaces."""
     return ' '.join(p for p in parts if p)
@@ -554,6 +570,7 @@ def _render_agg(name: str, spec: dict) -> _Block:
         _render_freq(spec),
         _render_reins(spec, 'aggregate', 'agg_reins', 'agg_kind'),
         _render_approx(spec),
+        _render_orientation(spec),
         _render_trailer(spec),
     ])
 

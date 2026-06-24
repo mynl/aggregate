@@ -213,6 +213,60 @@ def test_value_type_member():
 
 
 # ---------------------------------------------------------------------------
+# Orientation suffix: ``agg ... payoff`` / ``loss`` sets value_type only.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('program, expected', [
+    ('agg O.Pay 100 claims sev lognorm 10 cv 1 poisson payoff', 'payoff'),
+    ('agg O.Loss 100 claims sev lognorm 10 cv 1 poisson loss', 'loss'),
+    ('agg O.Def 100 claims sev lognorm 10 cv 1 poisson', 'loss'),
+    ('agg O.Dfreq dfreq [1 2 3] dsev [1 2 3] payoff', 'payoff'),
+    ('agg O.Note 100 claims sev lognorm 10 cv 1 poisson payoff note{hi}', 'payoff'),
+])
+def test_orientation_suffix_sets_value_type(program, expected):
+    """The trailing ``payoff``/``loss`` keyword sets value_type, nothing else."""
+    a = build(program, update=False)
+    assert a.value_type == expected
+    # Pure orientation: NO affine (that is the pnl wrapper, not this suffix).
+    assert not a._agg_reflect
+    assert a._agg_shift == 0.0
+    assert not a._agg_affine_active()
+
+
+def test_orientation_does_not_collide_with_loss_exposure():
+    """``loss`` as an exposure head still works; the suffix is a separate slot."""
+    # bare exposure head ``85 loss`` (expected-loss form), default orientation
+    a = build('agg O.Exp 85 loss sev lognorm 8 cv 1 poisson', update=False)
+    assert a.value_type == 'loss'
+    # and an explicit orientation suffix on top of a loss-exposure head
+    b = build('agg O.Exp2 85 loss sev lognorm 8 cv 1 poisson payoff', update=False)
+    assert b.value_type == 'payoff'
+
+
+def test_orientation_name_with_payoff_prefix_is_id():
+    """A name beginning ``payoff`` still lexes as an identifier, not the keyword."""
+    a = build('agg payoff_book 100 claims sev lognorm 10 cv 1 poisson', update=False)
+    assert a.name == 'payoff_book' and a.value_type == 'loss'
+
+
+def test_orientation_payoff_prices_through_dual():
+    """A payoff orientation flips pricing to the dual via ``_is_loss_value``.
+
+    Same risk priced as a loss vs. a payoff with one distortion: the payoff
+    (more-is-better) is reversed onto the canonical loss frame, so the two
+    distortion premiums differ -- the suffix really drives the pricing path.
+    """
+    from aggregate import Distortion
+    d = Distortion('ph', 0.5)
+    loss = build('agg O.PrL 50 claims sev lognorm 10 cv 0.6 poisson')
+    pay = build('agg O.PrP 50 claims sev lognorm 10 cv 0.6 poisson payoff')
+    assert loss._is_loss_value and not pay._is_loss_value
+    pl = float(loss.price(0.99, d).iloc[0]['P'])
+    pp = float(pay.price(0.99, d).iloc[0]['P'])
+    assert abs(pl - pp) > 1e-6
+
+
+# ---------------------------------------------------------------------------
 # estimate_agg_window: symmetric (normal), right-skew, reflected left-skew.
 # ---------------------------------------------------------------------------
 

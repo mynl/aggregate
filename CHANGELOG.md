@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.0.0a102
+
+### DecL `payoff` / `loss` orientation suffix on `agg` (Stage A of `PnL`)
+
+First stage of the first-class `PnL` work (`dev/plan-pnl.md`). An `agg`
+declaration may now carry a trailing **`payoff`** or **`loss`** keyword that sets
+the variable's sign-convention role (`value_type`) — *pure orientation*, with
+**no reflect/shift** (that affine remains the `pnl` wrapper):
+
+```
+agg AssetReturn 100 claims sev lognorm 10 cv 1 poisson payoff
+```
+
+- `payoff` marks an asset-return / direct-payoff primitive ("more is better"); it
+  prices through the **dual** distortion via the existing `_is_loss_value` path
+  (`_canonical_loss_frame` reverses the support — no new pricing machinery).
+  `loss` is the explicit default; omitting the suffix is unchanged.
+- The suffix sits **last, immediately before the `note`/`hints` trailer** (after
+  freq / reinsurance / `approximate`), so it cannot collide with the `loss`
+  *exposure* head keyword. Available on both the `freq` and `dfreq` agg forms.
+- The DecL unparser (`decl_writer`) round-trips the suffix; a default `agg` is
+  unaffected.
+
+No behavior change for existing programs (the default is `loss`). The `pnl`
+veneer, signed summary, `evaluate` panel, plotting, and reinsurance-aware GCN
+views land in later stages.
+
 ## 1.0.0a101
 
 ### `.help` render targets + `output` → `values` rename (**breaking**)

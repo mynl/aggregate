@@ -1,10 +1,18 @@
 # Plan — user-facing `summary_df` + `tail_df`; rename the QA/behavior frames
 
-> **Status: DRAFT — not executed.** Applies to `Aggregate`, `Portfolio`,
-> `PnL`, and (where noted) `BivariateAggregate`. Goal: turn the daily-driver
-> display frames from *validation artifacts* into *risk views* a practitioner
-> reads at a glance, and free up the two best names (`summary_df`, `tail_df`)
-> for them.
+> **Status: EXECUTED for `Aggregate` + `Portfolio` (1.0.0a113).** Hard cut, no
+> deprecated aliases. `tail_df` shipped as a *method* (`tail_df(periods=…)`),
+> `summary_df` as a property. `qd` / `_repr_html_` lead with summary + tail and
+> flag validation only on failure. **`PnL` and `BivariateAggregate` deferred** —
+> their existing `summary_df` / `tail_df` already carry different, user-facing
+> meanings (PnL: additive Consideration/Obligation/Margin; Bivariate: validation
+> + per-axis support), so the template doesn't transplant cleanly; revisit in a
+> follow-up plan. HTML row-highlighting of the 1-in-200 / 1-in-250 rows is a
+> pending polish (frames carry the data; styling not yet applied).
+>
+> Goal: turn the daily-driver display frames from *validation artifacts* into
+> *risk views* a practitioner reads at a glance, and free up the two best names
+> (`summary_df`, `tail_df`) for them.
 
 ---
 

@@ -364,7 +364,7 @@ def bs_explain(agg, *, color: bool = False) -> str:
 
     # natural support bounds + concentration from the aggregate tail row
     try:
-        trow = agg.tail_df.loc['aggregate']
+        trow = agg.tail_behavior_df.loc['aggregate']
     except Exception:  # pragma: no cover - defensive
         trow = None
     if trow is not None:

@@ -36,7 +36,7 @@ from .utilities import (ft, ift,
                         round_bucket,
                         balanced_window,
                         agg_help, remove_fuzz, value_type_role)
-from ._grid_distribution import GridDistribution
+from ._grid_distribution import GridDistribution, return_period_map, period_to_p
 from .decl_writer import format_program, spec_to_decl
 import aggregate.random_agg as ar
 from .spectral import choquet_weights
@@ -65,6 +65,21 @@ __all__ = [
     'Aggregate',
 ]
 
+#: Default return-period ladder for the summary ``tail_df`` (overridable via
+#: ``tail_df(periods=...)``). The Solvency II ``1-in-200`` (99.5%) and US
+#: capital-adequacy / rating ``1-in-250`` (99.6%) anchors are both included and
+#: highlighted in the HTML rendering.
+DEFAULT_RETURN_PERIODS = (2, 5, 10, 25, 50, 100, 200, 250, 500, 1000)
+
+#: Key percentiles carried by the summary ``summary_df`` (low / median / high).
+SUMMARY_PERCENTILES = (0.01, 0.50, 0.99)
+
+#: Relative floor below which ``CV = SD / E[X]`` is left blank in ``summary_df``:
+#: the mean is treated as indistinguishable from zero when ``|E[X]| < tol * SD``
+#: (a signed / near-break-even position), where ``CV`` is meaningless. ``SD`` is
+#: always reported.
+CV_MEAN_REL_TOL = 1e-3
+
 
 def value_type_label(is_loss_value):
     """Render the is-loss boolean role as the configured label string.
@@ -81,6 +96,54 @@ def value_type_label(is_loss_value):
     """
     labels = get_settings().labels
     return labels.loss if is_loss_value else labels.payoff
+
+
+def return_period_frame(q, tvar, mean, is_loss_value, periods=None):
+    """Build a return-period / exceedance table from quantile and TVaR functions.
+
+    Shared by :meth:`Aggregate.tail_df` and :meth:`Portfolio.tail_df` so the
+    aggregate and portfolio-total tables read one implementation.
+
+    Parameters
+    ----------
+    q, tvar : callable
+        ``q(p)`` (VaR) and ``tvar(p)`` (TVaR) at a non-exceedance probability.
+    mean : float
+        ``E[X]`` -- the leverage denominator and ``xsVaR`` reference.
+    is_loss_value : bool
+        Orientation passed to :func:`period_to_p` (loss -> upper tail, payoff
+        -> downside).
+    periods : array_like of float, optional
+        Return-period ladder. Defaults to :data:`DEFAULT_RETURN_PERIODS`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Indexed by return period ``T``; columns ``p | VaR | TVaR | xsVaR |
+        VaR/Mean``; ``E[X]`` carried in ``.attrs['mean']``.
+    """
+    periods = DEFAULT_RETURN_PERIODS if periods is None else periods
+    T = np.atleast_1d(np.asarray(periods, dtype=float))
+    p = np.atleast_1d(period_to_p(T, is_loss_value))
+    mean = float(mean)
+    var = np.array([q(float(pi)) for pi in p], dtype=float)
+    tv = np.array([tvar(float(pi)) for pi in p], dtype=float)
+    leverage = (var / mean if abs(mean) > VALIDATION_NOISE
+                else np.full_like(var, np.nan))
+    # Integer return periods read cleanly as ``200`` not ``200.0``.
+    idx = pd.Index([int(t) if float(t).is_integer() else t for t in T], name='T')
+    df = pd.DataFrame(
+        {
+            'p': p,
+            'VaR': var,
+            'TVaR': tv,
+            'xsVaR': var - mean,
+            'VaR/Mean': leverage,
+        },
+        index=idx,
+    )
+    df.attrs['mean'] = mean
+    return df
 
 
 def max_log2(x):
@@ -358,16 +421,20 @@ class Aggregate:
     via :func:`build` parsing DecL.
 
     **Public surface that Portfolio and Bounds depend on.** Three stats
-    surfaces — ``info`` for text, ``summary_df`` for the daily moment audit,
+    surfaces — ``info`` for text, ``summary_df`` for the daily risk view,
     and ``stats_df`` for everything else — plus the compute and risk-measure
     surface:
 
     Stats / display
         - ``info``: one-screen textual summary (frequency, severity, layer,
           grid, validation flag). Not stats.
-        - ``summary_df``: 3-row Freq / Sev / Agg moment table with theoretical
-          and (post-``update``) empirical estimates plus relative errors.
-          The daily-driver display.
+        - ``summary_df``: 3-row Freq / Sev / Agg at-a-glance moments + key
+          percentiles. The daily-driver headline. ``tail_df`` is the companion
+          return-period table; ``validation_df`` the moment-error QA frame.
+        - ``stats_df``: ``MultiIndex (component, measure)`` × per-component
+          / ``mixed`` / ``independent`` / ``empirical`` / ``error``.
+          Single source of truth for Aggregate moments — see the property
+          for the row / column reference.
         - ``stats_df``: ``MultiIndex (component, measure)`` × per-component
           / ``mixed`` / ``independent`` / ``empirical`` / ``error``.
           Single source of truth for Aggregate moments — see the property
@@ -486,7 +553,7 @@ class Aggregate:
     def tail_description(self) -> str:
         """Three aligned lines summarising the frequency, severity, and aggregate tails.
 
-        Short narrative over the layered :attr:`tail_df` report -- per-layer
+        Short narrative over the layered :attr:`tail_behavior_df` report -- per-layer
         support and per-side tail class, plus the aggregate concentration. E.g.::
 
             frequency tail           poisson, count [0, inf), super-exponential right tail
@@ -505,7 +572,7 @@ class Aggregate:
         Walks the book bottom-up -- frequency, the severity components and their
         blend, the aggregate -- naming the single-big-jump mechanism (or the
         frequency driver) for a thick right tail, any power-law moment failure,
-        and the concentration. Derived from :attr:`tail_df`.
+        and the concentration. Derived from :attr:`tail_behavior_df`.
         """
         return _tail.explain_rows(self._tail_rows(), self._tail_info())
 
@@ -563,7 +630,7 @@ class Aggregate:
         return f'{len(self.sevs)} components'
 
     @property
-    def tail_df(self) -> pd.DataFrame:
+    def tail_behavior_df(self) -> pd.DataFrame:
         """The layered tail report -- support and tail class per layer -- as a DataFrame.
 
         One row per layer, bottom-up -- ``frequency``; one per severity mix
@@ -592,8 +659,8 @@ class Aggregate:
     def _tail_rows(self):
         """The layered tail report as a list of :class:`~aggregate.tail.TailRow`.
 
-        Single source for :attr:`tail_df`, :attr:`tail_description`, and
-        :attr:`tail_explanation`. Spec-only -- valid before :meth:`update`.
+        Single source for :attr:`tail_behavior_df`, :attr:`tail_description`,
+        and :attr:`tail_explanation`. Spec-only -- valid before :meth:`update`.
         """
         freq_min, freq_max, freq_zt = self._frequency_count_support()
         return _tail.build_tail_rows(
@@ -1107,7 +1174,7 @@ class Aggregate:
         acts on the aggregate directly). Frequency: the ``EX`` reference is the
         gross full moments for every view (the count is unchanged by occurrence
         reinsurance). On the ``Est`` (model-output) basis the gross view is left
-        ``NaN`` (mirroring ``summary_df``, which never re-estimates the input
+        ``NaN`` (mirroring ``validation_df``, which never re-estimates the input
         frequency); occ ceded / net carry the *unconditional* mean ``E[N]`` only
         (so ``freq * sev == agg`` per view), cv / skew ``NaN``. The aggregate
         stage has no sev rows and a degenerate freq row (all ``NaN``).
@@ -1200,11 +1267,11 @@ class Aggregate:
     def reins_summary_df(self):
         """Per-stage reinsurance summary -- the daily driver.
 
-        Mirrors the **economic view** of :attr:`summary_df`: compare the theoretic
+        Mirrors the **economic view** of :attr:`validation_df`: compare the theoretic
         reference (the leading view -- ``Gross`` for occurrence, ``Subject`` for
         aggregate) against the model output of each view. One block per
         applicable stage; each block is a ``view x component`` table sharing the
-        **same eight columns as** :attr:`summary_df`:
+        **same eight columns as** :attr:`validation_df`:
 
         * ``EX`` / ``Est EX`` / ``Change EX`` -- the **theoretic reference** mean
           (constant down each component), the per-view model-output mean, and
@@ -1218,7 +1285,7 @@ class Aggregate:
         view, so it is the **numerical validation / rebucketing error** (~0 under
         ``linear``); on the ceded / net rows it is the **% impact of the
         cession** on that moment. This is the per-view, per-component analogue of
-        the single ``Change`` column in :attr:`summary_df`.
+        the single ``Change`` column in :attr:`validation_df`.
 
         Layout (per the gross/subject convention; ``view`` and ``component``
         labels are lower-case to match the other frames):
@@ -1233,7 +1300,7 @@ class Aggregate:
         *unconditionally* (mean ``E[N]`` only, so ``freq * sev == agg`` within a
         view; cv / skew ``NaN``) -- consistent with :meth:`reins_stats_df`. The
         leading ``gross`` row's ``Est`` frequency is left ``NaN`` to mirror
-        :attr:`summary_df` exactly. (Only the per-layer ``layer.k`` columns of
+        :attr:`validation_df` exactly. (Only the per-layer ``layer.k`` columns of
         :meth:`reins_stats_df` are *conditional*; ``reins_summary_df`` is always
         unconditional.)
 
@@ -1245,7 +1312,7 @@ class Aggregate:
 
     def _reins_describe_block(self, stage, views, comps):
         """One :meth:`reins_summary_df` block: theoretic reference vs model output
-        by view x component, mirroring the eight-column :attr:`summary_df` layout.
+        by view x component, mirroring the eight-column :attr:`validation_df` layout.
 
         The ``EX`` / ``CV`` / ``Sk`` columns hold the **theoretic reference** --
         the leading view's exact (pre-bucket) moments: ``Gross`` for the
@@ -2148,9 +2215,13 @@ class Aggregate:
         return _validation.validation_explanation(self)
 
     def _html_info_blob(self):
-        """
-        Text top of _repr_html_
+        """Short HTML intro for ``_repr_html_`` -- identity, grid, *and a
+        validation flag only when the object fails*.
 
+        The headline tables (``summary_df`` / ``tail_df``) carry the risk view;
+        this blob is the one-glance context. Validation is **silent on pass**
+        (a clean or cleanly-reinsured subject says nothing) and surfaces a red
+        block only on a genuine failure -- the same convention as :meth:`qd`.
         """
         s = [f'<h3>Aggregate object: {self.name}</h3>']
         s.append(f'<p>{self.frequency.freq_name} frequency distribution.')
@@ -2163,25 +2234,56 @@ class Aggregate:
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.</p>')
-        if self.agg_density is not None:
-            r = self.valid
-            if r == Validation.NOT_UNREASONABLE:
-                s.append('<p>Validation: not unreasonable.</p>')
-            elif r == Validation.REINSURANCE:
-                # Reins present, subject validated cleanly.
-                s.append('<p>Validation: reinsurance; subject not unreasonable.</p>')
-            else:
-                s.append('<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div><pre>\n'
-                         f'{self.validation_explanation}</pre></p>')
-
+        if self.agg_density is not None and not self._validation_passes():
+            s.append('<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div><pre>\n'
+                     f'{self.validation_explanation}</pre></p>')
         return '\n'.join(s)
 
-    def _repr_html_(self):
-        """
-        For IPython.display
+    def _text_info_blob(self) -> str:
+        """Short plain-text intro (the text twin of :meth:`_html_info_blob`).
 
+        Object identity, the frequency / severity families, and the realised
+        grid -- the one-glance context :meth:`qd` prints above the headline
+        ``summary_df`` / ``tail_df``. **No validation line** (the caller flags
+        a failure separately, staying silent on a pass).
         """
-        return self._html_info_blob() + self.summary_df.to_html()
+        s = [f'Aggregate object: {self.name}',
+             f'{self.frequency.freq_name} frequency distribution.']
+        n = len(self.sevs)
+        if n == 1:
+            sv = self.sevs[0]
+            s.append(f'Severity {sv.long_name} distribution, {sv.support_description}.')
+        else:
+            s.append(f'Severity with {n} components.')
+        if self.bs > 0:
+            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
+            s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
+        return '\n'.join(s)
+
+    def _validation_passes(self) -> bool:
+        """Whether the object clears validation (clean *or* cleanly reinsured).
+
+        ``True`` for a ``NOT_UNREASONABLE`` result and for ``REINSURANCE`` (the
+        subject validated and reinsurance makes the moment audit n/a). Used by
+        the display surfaces (:meth:`_html_info_blob`, :meth:`qd`) to stay silent
+        on a pass and only flag a genuine failure.
+        """
+        r = self.valid
+        return bool(r == Validation.NOT_UNREASONABLE or (r & Validation.REINSURANCE))
+
+    def _repr_html_(self):
+        """HTML view: short intro, the ``summary_df`` headline, the ``tail_df``
+        return-period table, and a validation flag only on failure.
+        """
+        fmt = lambda x: f'{x:,.5g}'
+        out = [self._html_info_blob(),
+               '<h4>Summary</h4>',
+               self.summary_df.to_html(float_format=fmt, na_rep='')]
+        td = self.tail_df()
+        if td is not None:
+            out.append('<h4>Tail &mdash; return period (exact, not simulated)</h4>')
+            out.append(td.to_html(float_format=fmt, na_rep=''))
+        return '\n'.join(out)
 
     # ================================================================
     # Discretization, snap, update, FFT convolution
@@ -2226,7 +2328,7 @@ class Aggregate:
         ``True`` when the severity itself reaches below 0
         (:meth:`_signed_severity`) -- a ``ssev`` continuous severity or a
         ``dsev`` with a negative atom. This is the gate read by plotting,
-        two-sided quantiles, the signed-aware ``summary_df`` (SD instead of CV),
+        two-sided quantiles, the signed-aware ``validation_df`` (SD instead of CV),
         and the :class:`Portfolio` combine. (A premium-minus-loss position is
         now the separate :class:`PnL` veneer, not a signed aggregate.)
 
@@ -2569,7 +2671,7 @@ class Aggregate:
         See discretize for sev_calc, discretization_calc and normalize.
 
         Empirical-moment note: the aggregate raw moments -- and hence the
-        empirical CV/skew shown in ``stats_df`` and ``summary_df`` -- are taken
+        empirical CV/skew shown in ``stats_df`` and ``validation_df`` -- are taken
         from a de-fuzzed *copy* of the FFT density (values below machine
         epsilon zeroed). Without this, sub-eps floating-point fuzz in far-tail
         buckets is amplified by ``x**3`` in the third moment and corrupts the
@@ -2981,7 +3083,7 @@ class Aggregate:
         setting the ``validation_eps`` variable.
 
         All reads come from ``stats_df`` -- the single source of truth -- not
-        ``summary_df`` (display).
+        ``validation_df`` (display).
 
         The CV and skew tests are applied only when the theoretical value is
         finite and its magnitude exceeds ``VALIDATION_NOISE`` -- a
@@ -3648,10 +3750,13 @@ class Aggregate:
         return build(self._frequency_program(f'{self.name}.freq'))
 
     @property
-    def summary_df(self):
-        """Moment table for Freq / Sev / Agg, dense ``EX``/``CV``/``Sk`` headings.
+    def validation_df(self):
+        """Moment-vs-estimate table for Freq / Sev / Agg (the QA view).
 
-        The daily-driver display used by ``qd(agg)`` and ``_repr_html_``.
+        The validation frame: it proves the FFT reproduced the analytic
+        moments ("if the first three moments match, the aggregate is *not
+        unreasonable*"). Surfaced on demand and in :meth:`qd` when the object
+        *fails* validation; the daily-driver headline is :attr:`summary_df`.
         Three-row Freq / Sev / Agg frame.
 
         Two display modes, same 8-column shape and same column arithmetic:
@@ -3676,34 +3781,172 @@ class Aggregate:
         """
         return self._describe()
 
+    @staticmethod
+    def _cv_or_nan(mean, sd):
+        """``CV = SD / E[X]``, blanked (``NaN``) when the mean is ~0.
+
+        ``CV`` is meaningless near a zero mean (a signed / near-break-even
+        position), so it is left blank when ``|mean| < CV_MEAN_REL_TOL * sd``
+        -- the mean is then indistinguishable from zero at the scale of the
+        spread. ``SD`` is always reported by the caller; only ``CV`` blanks.
+        """
+        mean = float(mean)
+        sd = float(sd)
+        if not (np.isfinite(mean) and np.isfinite(sd)):
+            return np.nan
+        if abs(mean) < CV_MEAN_REL_TOL * sd:
+            return np.nan
+        if mean == 0.0:
+            return np.nan
+        return sd / mean
+
+    @property
+    def summary_df(self):
+        """At-a-glance risk view -- moments + key percentiles, Freq / Sev / Agg.
+
+        The daily-driver headline (the lead frame in :meth:`qd` and
+        :meth:`_repr_html_`). The compound-model identity made legible: each row
+        answers a different question -- count risk (``Freq``), single-claim
+        severity (``Sev``), total loss (``Agg``) -- and the percentiles trace
+        where the tail comes from (a heavy ``Agg`` skew you can see is inherited
+        from ``Sev``). The *validation* moment-error table is now
+        :attr:`validation_df`; the tail-behavior classifier is
+        :attr:`tail_behavior_df`.
+
+        **Index** ``Freq`` / ``Sev`` / ``Agg`` (the ``X`` index).
+
+        **Columns** ``E[X] | SD | CV | Skew | p0.01 | p0.50 | p0.99``.
+
+        - ``SD`` and ``CV`` are **both always present** (stable layout).
+          ``CV = SD / E[X]`` is blank when ``|E[X]|`` is ~0 relative to ``SD``
+          (a signed / near-break-even position -- see :meth:`_cv_or_nan`); ``SD``
+          never blanks. ``Skew`` is well defined even at mean 0, so it stays.
+        - Moments are the analytic (theoretical) moments from
+          :attr:`stats_df`, so the ``Freq`` × ``Sev`` = ``Agg`` mean identity is
+          exact.
+        - Percentiles come from the FFT grid (exact, not simulated): ``Agg`` via
+          :meth:`q`, ``Sev`` via :meth:`q_sev` (mixtures included, already on the
+          grid). They populate only **after** :meth:`update`.
+
+        **Frequency-row percentiles are blank** by design: frequency is carried
+        as a PGF (``freq_pgf``), applied in the Fourier domain -- the engine
+        never materializes a count distribution, so there is nothing to take a
+        quantile of. The Freq row still carries ``E[X] / SD / CV / Skew``
+        (PGF-exact), which is what that row is for (count volatility). To get the
+        count distribution as a first-class object, use
+        :meth:`create_frequency`, then ``.q(...)`` / ``.tvar(...)`` on it.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Three-row Freq / Sev / Agg frame, ``E[X]`` carried in ``.attrs``.
+        """
+        st = self.stats_df['mixed']
+        rows = ['Freq', 'Sev', 'Agg']
+        comps = ['freq', 'sev', 'agg']
+        means = [float(st[(c, 'mean')]) for c in comps]
+        cvs = [float(st[(c, 'cv')]) for c in comps]
+        sds = [m * cv if np.isfinite(cv) else np.nan for m, cv in zip(means, cvs)]
+        skews = [float(st[(c, 'skew')]) for c in comps]
+        df = pd.DataFrame(
+            {
+                'E[X]': means,
+                'SD': sds,
+                'CV': [self._cv_or_nan(m, sd) for m, sd in zip(means, sds)],
+                'Skew': skews,
+            },
+            index=rows,
+        )
+        df.index.name = 'X'
+        # Percentiles from the realised grid (exact, not simulated); Freq blank
+        # by design (PGF, no materialized count distribution); pre-update blank.
+        pcols = [f'p{p:.2f}' for p in SUMMARY_PERCENTILES]
+        for pc in pcols:
+            df[pc] = np.nan
+        if self.agg_density is not None:
+            for p, pc in zip(SUMMARY_PERCENTILES, pcols):
+                df.loc['Sev', pc] = self.q_sev(p)
+                df.loc['Agg', pc] = self.q(p)
+        for c in ('E[X]', 'SD', 'Skew', *pcols):
+            df[c] = _snap_noise(df[c])
+        df.attrs['mean'] = means[-1]
+        return df
+
+    def tail_df(self, periods=None):
+        """Return-period / exceedance table for the aggregate (the centerpiece).
+
+        The language of reinsurance submissions, cat-model output, and
+        Solvency II / rating-agency capital. **Aggregate-only** (tail risk is a
+        property of the total), so it complements :attr:`summary_df`
+        ("made of") with "how bad does it get". The tail numbers -- including the
+        1-in-1000 TVaR -- come from the FFT grid, **exact, not simulated** (no
+        Monte-Carlo wobble).
+
+        **Index** the return period ``T`` (default ladder
+        :data:`DEFAULT_RETURN_PERIODS`; pass ``periods=`` to override). The
+        1-in-200 (99.5%, Solvency II) and 1-in-250 (99.6%, US capital-adequacy /
+        rating) rows are highlighted in the HTML rendering.
+
+        **Columns** ``p | VaR | TVaR | xsVaR | VaR/Mean``.
+
+        - ``p`` non-exceedance probability for the row.
+        - ``VaR = q(p)`` -- the quoted number.
+        - ``TVaR = tvar(p)`` -- the priced number; adjacent to ``VaR`` so the
+          VaR-to-TVaR gap (tail fatness) reads at a glance.
+        - ``xsVaR = VaR - E[X]`` -- capital, the excess of VaR over expected.
+        - ``VaR/Mean`` -- leverage.
+
+        Parameters
+        ----------
+        periods : array_like of float, optional
+            Return-period ladder. Defaults to :data:`DEFAULT_RETURN_PERIODS`.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            Indexed by return period ``T``; ``E[X]`` carried in ``.attrs``.
+            ``None`` before :meth:`update` (the realised grid is not yet built).
+
+        Notes
+        -----
+        Loss objects (``is_loss_value``) map ``T = 1 / (1 - p)`` (the upper
+        tail); payoff / P&L objects map ``T = 1 / p`` so the table reads off the
+        downside -- the shared :func:`period_to_p`. Downside *TVaR* for a signed
+        payoff position is refined in the P&L veneer (see ``dev/plan-pnl-*``).
+        """
+        if self.agg_density is None:
+            return None
+        return return_period_frame(
+            self.q, self.tvar, self.est_m, self._is_loss_value, periods)
+
     def _describe(self, force_reins_label=None, force_sd=False):
-        """Build the ``summary_df`` frame, optionally forced into reins view.
+        """Build the ``validation_df`` frame, optionally forced into reins view.
 
         Parameters
         ----------
         force_reins_label : str or None
-            When ``None`` (the default, used by the ``summary_df`` property)
+            When ``None`` (the default, used by the ``validation_df`` property)
             the column format is chosen from this unit's own reinsurance:
             the economic Gross/Net/Ceded/Output view if a treaty is
             present, else the plain theory/empirical validation view.
 
             When a non-``None`` label is supplied, the economic view is
             forced and that label is used for the after-reins column,
-            regardless of this unit's own cession. ``Portfolio.summary_df``
+            regardless of this unit's own cession. ``Portfolio.validation_df``
             passes a portfolio-wide label here so that every unit block —
             including units with no reinsurance — shares one column
             layout and aligns with the ``total`` block.
         force_sd : bool, default False
             Force the **SD** spread trio (instead of CV) even when this unit
             is not itself signed. A signed unit always uses SD; this flag lets
-            ``Portfolio.summary_df`` push the whole table into SD when *any* unit
+            ``Portfolio.validation_df`` push the whole table into SD when *any* unit
             is signed, so the unit blocks and the ``total`` block share one
             column layout (CV and SD cannot be mixed in one frame).
 
         Returns
         -------
         pandas.DataFrame
-            Three-row Freq / Sev / Agg frame; see :attr:`summary_df`.
+            Three-row Freq / Sev / Agg frame; see :attr:`validation_df`.
         """
         if self._signed() or force_sd:
             return self._describe_signed(force_reins_label)
@@ -3761,7 +4004,7 @@ class Aggregate:
         return df
 
     def _describe_signed(self, force_reins_label=None):
-        """``summary_df`` for a signed aggregate -- **SD** trio instead of CV.
+        """``validation_df`` for a signed aggregate -- **SD** trio instead of CV.
 
         Same 8-column shape and column arithmetic as :meth:`_describe`, but the
         ``CV`` trio is replaced by an ``SD`` trio. The coefficient of variation
@@ -3769,7 +4012,7 @@ class Aggregate:
         (a signed aggregate straddling 0), so for any signed object -- a
         ``ssev`` / negative-``dsev`` aggregate -- the spread is reported as the
         standard deviation, which is finite and informative regardless of the
-        mean. (This also cleans up the 1.0.0a22 signed-portfolio summary_df.)
+        mean. (This also cleans up the 1.0.0a22 signed-portfolio validation_df.)
 
         The Freq / Sev / Agg rows are in their native (signed) frame; the
         theoretical (Gross) column is sourced from the loss ``stats_df``.
@@ -3840,7 +4083,7 @@ class Aggregate:
         return df
 
     def _reins_after_label(self):
-        """Heading for the model-output column in ``summary_df``.
+        """Heading for the model-output column in ``validation_df``.
 
         ``Net`` when every cession passes the net; ``Ceded`` when every
         cession passes the ceded; ``Output`` when occ and agg pass

@@ -43,10 +43,10 @@ LEGEND_FONT = 'x-small'
 PLOT_FACE_COLOR = 'lightsteelblue'
 FIGURE_BG_COLOR = 'aliceblue'
 
-# Column / view labels for reinsurance reporting (``summary_df``,
+# Column / view labels for reinsurance reporting (``validation_df``,
 # ``reins_summary_df``, ``reins_stats_df``). Centralised so the wording is
 # changed in one place. These are structural keys, not user settings.
-#   GROSS   -- top of step 1, before any cover (the first summary_df column).
+#   GROSS   -- top of step 1, before any cover (the first validation_df column).
 #   SUBJECT -- what is subject to the aggregate cover (= the occurrence output).
 #   NET     -- model output when every cover passes the net.
 #   CEDED   -- model output when every cover passes the ceded.

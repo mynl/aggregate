@@ -154,7 +154,7 @@ def _get_frame(obj, frame_name: str, kind: str) -> pd.DataFrame:
     if frame_name == "stats_df":
         return obj.stats_df
     if frame_name == "describe":
-        return obj.summary_df
+        return obj.validation_df
     if frame_name == "density_df":
         return obj.density_df
     raise KeyError(frame_name)

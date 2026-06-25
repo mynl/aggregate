@@ -435,7 +435,13 @@ The first-class `PnL` (Stages A–E) is in `dev/done/plan-pnl.md`. Next:
   derives the curve + saturating-top trim, and reads orientation via
   `gd.return_period`; `is_loss_value=` gone from the compositors. Severity GD
   inherits the aggregate role; reins wraps its gross/ceded/net PMFs as GDs.
-- [ ] **`summary_df` / `tail_df` risk views** — `dev/plan-summary-tail-tables.md`.
-  `tail_df` reuses the same orientation; unaffected by GD-knows-sign but
-  benefits from it. Comes after the return-period revisit.
+- [x] **`summary_df` / `tail_df` risk views** — done 1.0.0a113,
+  `dev/done/plan-summary-tail-tables.md`. New `summary_df` (moments +
+  percentiles) and `tail_df` (return-period table, now a method); old payloads
+  renamed `validation_df` / `tail_behavior_df` (hard cut, no aliases). `qd` /
+  `_repr_html_` lead with summary + tail, flag validation only on failure. Added
+  `period_to_p` (inverse of `return_period_map`). **Aggregate + Portfolio only**
+  — PnL and Bivariate deferred (their `summary_df`/`tail_df` already carry
+  different user-facing meanings); HTML row-highlighting of the SII/250 rows is a
+  pending polish.
   *Run order: GD-knows-sign → finish return-period plot → summary/tail → PnL.*

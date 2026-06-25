@@ -195,7 +195,7 @@ _LABEL_TO_CLASS = {label: tc for tc, label in _LABELS.items()}
 def tail_class_from_label(label: str) -> TailClass:
     """Inverse of :func:`tail_class_label`: map a label back to its :class:`TailClass`.
 
-    Used to recover the per-side rung from a rendered ``tail_df`` column (e.g. when
+    Used to recover the per-side rung from a rendered ``tail_behavior_df`` column (e.g. when
     a portfolio recomputes a per-side worst-of from its unit rows).
     """
     return _LABEL_TO_CLASS[label]
@@ -1363,7 +1363,7 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
 
 
 def tail_frame(rows) -> 'pd.DataFrame':
-    """Render a list of :class:`TailRow` as the public ``tail_df`` DataFrame.
+    """Render a list of :class:`TailRow` as the public ``tail_behavior_df`` DataFrame.
 
     Parameters
     ----------

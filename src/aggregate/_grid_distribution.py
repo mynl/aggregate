@@ -67,6 +67,39 @@ def return_period_map(p, is_loss_value=True):
         return 1.0 / (1.0 - p) if is_loss_value else 1.0 / p
 
 
+def period_to_p(period, is_loss_value=True):
+    """Non-exceedance probability ``p`` for return periods ``T`` under a role.
+
+    The exact inverse of :func:`return_period_map`: it turns the return-period
+    ladder of the summary ``tail_df`` (``1-in-200``, ``1-in-250``, ...) into the
+    quantile levels ``p`` to feed to ``q`` / ``tvar``.
+
+    Parameters
+    ----------
+    period : float or array_like
+        Return period ``T`` (``T >= 1``).
+    is_loss_value : bool, default True
+        Orientation. ``True`` (loss): the bad outcomes are rare *large* losses,
+        so the row sits in the upper tail, ``p = 1 - 1 / T``. ``False``
+        (payoff): the bad outcomes are rare *low* payoffs, so the row sits in
+        the lower tail, ``p = 1 / T`` -- the table reads off the downside.
+
+    Returns
+    -------
+    float or ndarray
+        Non-exceedance probability ``p = F(VaR)``.
+
+    Notes
+    -----
+    Pure function of ``(period, is_loss_value)`` and the exact inverse of
+    :func:`return_period_map`; the two share the single loss/payoff branch so
+    the Lee plot and the ``tail_df`` ladder round-trip cleanly.
+    """
+    period = np.asarray(period, dtype=float)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return 1.0 - 1.0 / period if is_loss_value else 1.0 / period
+
+
 QuantileFunctions = namedtuple("QuantileFunctions", 'q q_lower var q_upper tvar')
 
 #: The three mutually-determining views of one point on the distribution:

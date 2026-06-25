@@ -41,6 +41,7 @@ from .utilities import (ft, ift,
                         agg_help, explain_validation,
                         remove_fuzz as remove_fuzz_util)
 from ._grid_distribution import GridDistribution
+from ._aggregate import return_period_frame, SUMMARY_PERCENTILES
 from . import _pricing
 from . import _reinsurance
 from . import _bucket_window
@@ -567,18 +568,55 @@ class Portfolio(object):
         # cannot use ex, etc. because object may not have been updated
         return f'{self.name} at {super().__repr__()}'
 
-    def _repr_html_(self):
+    def _validation_passes(self) -> bool:
+        """Whether the portfolio clears validation (clean *or* cleanly reinsured).
+
+        Display twin of :meth:`Aggregate._validation_passes` -- lets
+        :meth:`_repr_html_` and :meth:`qd` stay silent on a pass and flag only a
+        genuine failure.
         """
-        Updated to mimic Aggregate
+        r = self.valid
+        return bool(r == Validation.NOT_UNREASONABLE or (r & Validation.REINSURANCE))
+
+    def _text_info_blob(self) -> str:
+        """Short plain-text intro for :meth:`qd` -- identity, unit count, grid.
+
+        The portfolio twin of :meth:`Aggregate._text_info_blob`; no validation
+        line (the caller flags a failure separately).
         """
-        s = [f'<h3>Portfolio object: {self.name}</h3>']
         _n = len(self.agg_list)
-        _s = "" if _n <= 1 else "s"
-        s.append(f'Portfolio contains {_n} aggregate component{_s}.')
+        _s = '' if _n == 1 else 's'
+        s = [f'Portfolio object: {self.name}',
+             f'Portfolio contains {_n} aggregate component{_s}.']
         if self.bs > 0:
-            s.append(f'Updated with bucket size {self.bs:.6g}, log2 = {self.log2}, validation: {self.validation_explanation}')
-        df = self.summary_df
-        return '\n'.join(s) + df.fillna('').to_html()
+            bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1 / self.bs)}'
+            s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
+        return '\n'.join(s)
+
+    def _repr_html_(self):
+        """HTML view: short intro, the ``summary_df`` headline, the ``tail_df``
+        return-period table, and a validation flag only on failure.
+        """
+        _n = len(self.agg_list)
+        _s = '' if _n == 1 else 's'
+        s = [f'<h3>Portfolio object: {self.name}</h3>',
+             f'<p>Portfolio contains {_n} aggregate component{_s}.']
+        if self.bs > 0:
+            s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.</p>')
+        else:
+            s.append('</p>')
+        if self.density_df is not None and not self._validation_passes():
+            s.append('<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div>'
+                     f'<pre>\n{self.validation_explanation}</pre></p>')
+        fmt = lambda x: f'{x:,.5g}'
+        out = ['\n'.join(s),
+               '<h4>Summary</h4>',
+               self.summary_df.to_html(float_format=fmt, na_rep='')]
+        td = self.tail_df()
+        if td is not None:
+            out.append('<h4>Tail &mdash; return period (exact, not simulated)</h4>')
+            out.append(td.to_html(float_format=fmt, na_rep=''))
+        return '\n'.join(out)
 
     def __str__(self):
         """ Default behavior """
@@ -797,7 +835,7 @@ class Portfolio(object):
             except (TypeError, ValueError):
                 return float('nan')
 
-        td = self.tail_df
+        td = self.tail_behavior_df
         tot = td.loc['total']
         parts = [f'The portfolio tail is {tot["left_tail"]} left / '
                  f'{tot["right_tail"]} right. Log2 is {log2}.']
@@ -847,11 +885,11 @@ class Portfolio(object):
         return ' '.join(parts)
 
     @property
-    def tail_df(self) -> 'pd.DataFrame':
+    def tail_behavior_df(self) -> 'pd.DataFrame':
         """Per-unit aggregate tail rows plus a worst-of ``total`` (``[bs-reporting]``).
 
         One row per unit -- that unit's aggregate-level
-        :attr:`Aggregate.tail_df` row (support ``min`` / ``max``, ``left_tail`` /
+        :attr:`Aggregate.tail_behavior_df` row (support ``min`` / ``max``, ``left_tail`` /
         ``right_tail`` classes, ``bounded``, ``concentrated`` / ``cv``) -- and a
         ``total`` row carrying the portfolio worst-of decay (computed *per side*)
         and the total-moment concentration. Spec-only for the per-unit rows
@@ -877,7 +915,7 @@ class Portfolio(object):
         pandas.DataFrame
             Indexed by unit name, with a final ``total`` row.
         """
-        rows = {a.name: a.tail_df.loc['aggregate'] for a in self.agg_list}
+        rows = {a.name: a.tail_behavior_df.loc['aggregate'] for a in self.agg_list}
         df = pd.DataFrame(rows).T
         worst = self.tail_class
         conc_flag, conc_cv = _tail.concentration(float(self.agg_m), float(self.agg_sd))
@@ -1014,7 +1052,7 @@ class Portfolio(object):
         return '\n'.join(s)
 
     def _reins_after_label(self):
-        """Portfolio-wide heading for the after-reins column in ``summary_df``.
+        """Portfolio-wide heading for the after-reins column in ``validation_df``.
 
         Aggregates the per-unit :meth:`Aggregate._reins_after_label`
         across the book. Returns ``None`` when **no** unit carries
@@ -1033,12 +1071,17 @@ class Portfolio(object):
         return REINS_LABEL_OUTPUT
 
     @property
-    def summary_df(self):
-        """Theoretic-and-empirical stats. Used in ``_repr_html_``.
+    def validation_df(self):
+        """Theoretic-and-empirical moment-error stats (the QA view).
+
+        The validation frame: theoretical moments vs the realised FFT estimate,
+        with noise-aware relative errors. Surfaced on demand and in :meth:`qd`
+        when a unit (or the total) *fails* validation; the daily-driver headline
+        is :attr:`summary_df`.
 
         Reads from the canonical ``stats_df``: theoretical moments from
         the ``total`` column, empirical from ``empirical``, errors from
-        ``error``. The output shape mirrors ``Aggregate.summary_df`` — one
+        ``error``. The output shape mirrors ``Aggregate.validation_df`` — one
         ``Freq``/``Sev``/``Agg`` row block per unit + ``total``.
 
         Two display modes, chosen at the **portfolio** level so the unit
@@ -1106,7 +1149,7 @@ class Portfolio(object):
         # Post-update? Empirical agg moments live in stats_df['empirical'].
         # After the punch-up: portfolio-level sev empirical is also
         # populated (via MomentAggregator off per-unit empirical sev);
-        # surface it in the summary_df table too. Under reinsurance the
+        # surface it in the validation_df table too. Under reinsurance the
         # ``total`` column is the (gross) Subject view and ``empirical``
         # the realised after-reins view, exactly mirroring Aggregate.
         emp_agg_m = emp.get(('agg', 'mean'), np.nan)
@@ -1149,6 +1192,94 @@ class Portfolio(object):
               for a in self] + [df]
         t2 = [a.name for a in self] + ['total']
         df = pd.concat(t1, keys=t2, names=['unit', 'X'])
+        return df
+
+    @property
+    def summary_df(self):
+        """At-a-glance risk view -- moments + key percentiles, per unit + total.
+
+        The portfolio analogue of :attr:`Aggregate.summary_df` and the
+        daily-driver headline. A ``MultiIndex (unit, X)`` block per unit (each
+        unit's own :attr:`Aggregate.summary_df` -- Freq / Sev / Agg moments and
+        percentiles) plus a ``total`` block carrying the **Agg row only** (a
+        portfolio has no single Freq / Sev). The ``total`` Agg row is the
+        portfolio's "what's my number" line: ``E[X] / SD / CV / Skew`` from the
+        canonical ``stats_df`` total, and ``p0.01 / p0.50 / p0.99`` from the
+        realised portfolio grid (:meth:`q`).
+
+        The moment-error QA frame is now :attr:`validation_df`; the return-period
+        table is :attr:`tail_df`; the tail-behavior classifier is
+        :attr:`tail_behavior_df`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``MultiIndex (unit, X)`` rows; columns ``E[X] | SD | CV | Skew |
+            p0.01 | p0.50 | p0.99``.
+        """
+        blocks = [a.summary_df for a in self]
+        keys = [a.name for a in self]
+        # ``total`` block: the Agg row only (no portfolio Freq / Sev).
+        m = float(self.agg_m)
+        sd = float(self.agg_sd)
+        total = pd.DataFrame(
+            {
+                'E[X]': [m],
+                'SD': [sd],
+                'CV': [Aggregate._cv_or_nan(m, sd)],
+                'Skew': [float(self.agg_skew)],
+            },
+            index=pd.Index(['Agg'], name='X'),
+        )
+        pcols = [f'p{p:.2f}' for p in SUMMARY_PERCENTILES]
+        for p, pc in zip(SUMMARY_PERCENTILES, pcols):
+            total[pc] = self.q(p) if self.density_df is not None else np.nan
+        for c in ('E[X]', 'SD', 'Skew', *pcols):
+            total[c] = _snap_noise(total[c])
+        total.attrs['mean'] = m
+        blocks.append(total)
+        keys.append('total')
+        df = pd.concat(blocks, keys=keys, names=['unit', 'X'])
+        df.attrs['mean'] = m
+        return df
+
+    def tail_df(self, periods=None):
+        """Return-period / exceedance table -- per unit plus the portfolio total.
+
+        The portfolio analogue of :meth:`Aggregate.tail_df`. A leading ``unit``
+        index level: each unit's aggregate return-period table
+        (:meth:`Aggregate.tail_df`) stacked under its name, plus a ``total``
+        block computed from the realised portfolio grid (:meth:`q` / :meth:`tvar`
+        / :meth:`est_m`). Columns ``p | VaR | TVaR | xsVaR | VaR/Mean``; the
+        numbers are exact (FFT grid, not simulated).
+
+        Per-unit *contribution* to the total tail (TVaR allocation) is
+        allocation / pricing territory -- see :meth:`price` -- not here.
+
+        Parameters
+        ----------
+        periods : array_like of float, optional
+            Return-period ladder. Defaults to :data:`DEFAULT_RETURN_PERIODS`.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            ``MultiIndex (unit, T)`` rows. ``None`` before :meth:`update`.
+        """
+        if self.density_df is None:
+            return None
+        blocks, keys = [], []
+        for a in self:
+            ut = a.tail_df(periods)
+            if ut is not None:
+                blocks.append(ut)
+                keys.append(a.name)
+        total = return_period_frame(
+            self.q, self.tvar, self.est_m, self._is_loss_value, periods)
+        blocks.append(total)
+        keys.append('total')
+        df = pd.concat(blocks, keys=keys, names=['unit', 'T'])
+        df.attrs['mean'] = float(self.est_m)
         return df
 
     # ================================================================
@@ -1276,9 +1407,9 @@ class Portfolio(object):
         """Portfolio end-to-end reinsurance loss summary.
 
         One block per unit plus a ``total`` block, concatenated with
-        ``unit`` / ... keys (the :attr:`summary_df` assembly pattern). Each
+        ``unit`` / ... keys (the :attr:`validation_df` assembly pattern). Each
         block is a ``view x component`` table of **mean loss** on the
-        eight :attr:`Aggregate.summary_df` columns (``EX | Est EX | Change EX |
+        eight :attr:`Aggregate.validation_df` columns (``EX | Est EX | Change EX |
         CV | Est CV | Change CV | Sk | Est Sk``) for the unit's own per-stage
         cession (from :meth:`Aggregate.reins_summary_df`); units without
         reinsurance are omitted from their own blocks. The ``total`` block is
@@ -1305,7 +1436,7 @@ class Portfolio(object):
                 keys.append(a.name)
         # total block: end-to-end gcn, eight columns matching the unit blocks.
         # Reference (EX/CV/Sk) is the gross end-to-end moment, held constant down
-        # each view (the economic view of summary_df): Est is the per-view output
+        # each view (the economic view of validation_df): Est is the per-view output
         # and Change = (output - gross) / gross. The gross row compares gross to
         # gross, so its Change is 0 (no exact pre-bucket reference exists for the
         # convolved portfolio marginals); the ceded / net rows read as the %
@@ -2119,7 +2250,7 @@ class Portfolio(object):
         False means it is definitely suspect. (Similar to the null hypothesis in a statistical test).
         Called and reported automatically by qd for Aggregate objects.
 
-        Checks the relative errors (from ``self.summary_df``) for:
+        Checks the relative errors (from ``stats_df['error']``) for:
 
         * severity mean < eps
         * severity cv < 10 * eps

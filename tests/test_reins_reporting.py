@@ -261,7 +261,7 @@ def test_describe_occ_leads_gross():
     assert occ.index.get_level_values('view')[0] == 'gross'
     # occurrence block carries freq / sev / agg components
     assert set(occ.index.get_level_values('component')) == {'freq', 'sev', 'agg'}
-    # same eight columns as Aggregate.summary_df
+    # same eight columns as Aggregate.validation_df
     assert list(d.columns) == DESCRIBE_COLS
 
 

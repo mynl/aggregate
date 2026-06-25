@@ -1089,7 +1089,7 @@ class Severity(ss.rv_continuous):
 
         E.g. ``lognorm, [0, inf), subexponential right tail``. Derived from the
         same :func:`~aggregate.tail.severity_tail_row` as the aggregate's
-        :attr:`~aggregate.distributions.Aggregate.tail_df` ``comp`` rows.
+        :attr:`~aggregate.distributions.Aggregate.tail_behavior_df` ``comp`` rows.
         """
         return _tail.describe_row(_tail.severity_tail_row(self, 'severity'))
 

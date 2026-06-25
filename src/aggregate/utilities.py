@@ -330,19 +330,17 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     # split output
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):
-            # Drop the noisy CV-error column (``Err CV`` for the legacy
-            # validation view; ``Change CV`` under reinsurance) for the
-            # compact ``qd`` rendering; keep everything else.
-            cols = x.summary_df.columns
-            drop = [c for c in ('Err CV', 'Change CV') if c in cols]
-            if drop:
-                qd(x.summary_df.drop(columns=drop).fillna(''), accuracy=accuracy, **kwargs)
-            else:
-                # object not updated
-                qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
-            bss = 'na' if x.bs == 0 else (f'{x.bs:.0f}' if x.bs >= 1 else f'1/{1/x.bs:.0f}')
-            vr = x.validation_explanation
-            print(f'log2 = {x.log2}, bandwidth = {bss}, validation: {vr}.')
+            # Headline risk view: a short text intro, the moments-and-
+            # percentiles ``summary_df``, then the return-period ``tail_df``.
+            # Validation is silent on a pass and flagged only on a genuine
+            # failure (mirrors ``_repr_html_``).
+            print(x._text_info_blob())
+            qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
+            td = x.tail_df()
+            if td is not None:
+                qd(td.fillna(''), accuracy=accuracy, **kwargs)
+            if x.density_df is not None and not x._validation_passes():
+                print(f'\nVALIDATION FAILS: {x.validation_explanation}')
         elif isinstance(x, pd.DataFrame):
             # 100 line width matches rtd html format
             args = {'line_width': 100,

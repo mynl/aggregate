@@ -173,7 +173,7 @@ def test_describe_finite(pnl):
     portfolio reports **SD** (not CV), so the mean-exactly-zero total no longer
     shows a blown-up ``Est CV`` = sd/~0; the spread columns are finite.
     """
-    d = pnl.summary_df
+    d = pnl.validation_df
     arr = d.select_dtypes('number').to_numpy(dtype=float)
     assert not np.isinf(arr).any()
     err_ex = d['Err EX'].to_numpy(dtype=float)
@@ -196,7 +196,7 @@ def test_describe_mixed_signed_forces_sd_everywhere():
         p = build('''port Mixed
             agg Signed dfreq [3] dsev [-2 -1 1 2]
             agg Plain  1 claim sev lognorm 10 cv .3 fixed''')
-    d = p.summary_df
+    d = p.validation_df
     # SD throughout, no CV anywhere
     assert any('SD' in str(c) for c in d.columns)
     assert not any('CV' in str(c) for c in d.columns)
@@ -216,7 +216,7 @@ def test_describe_unsigned_portfolio_uses_cv():
     p = build('''port Unsigned
         agg A 1 claim sev lognorm 10 cv .3 fixed
         agg B 1 claim sev lognorm 8 cv .2 fixed''')
-    d = p.summary_df
+    d = p.validation_df
     assert any('CV' in str(c) for c in d.columns)
     assert not any('SD' in str(c) for c in d.columns)
 

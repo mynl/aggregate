@@ -482,7 +482,7 @@ def test_zero_mean_signed_sd_is_finite():
     assert a.est_sev_sd == pytest.approx(1.0, abs=1e-9)
     assert a.est_sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
     # describe surfaces finite SD on both the theoretical and Est columns
-    d = a.summary_df
+    d = a.validation_df
     sd = d['SD']
     est_sd = d['Est SD']
     assert np.isfinite(sd['Sev']) and np.isfinite(sd['Agg'])

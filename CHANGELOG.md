@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.0.0a113
+
+### User-facing `summary_df` + `tail_df`; QA frames renamed (`dev/done/plan-summary-tail-tables.md`)
+
+Turns the daily-driver display frames from *validation artifacts* into *risk
+views* a practitioner reads at a glance, and frees the two best names for them.
+**Breaking** on `Aggregate` and `Portfolio` (hard cut, no deprecated aliases).
+
+Name map:
+
+| Name | Now | Was |
+|---|---|---|
+| `summary_df` | at-a-glance moments + key percentiles (Freq/Sev/Agg) | the moment-error table |
+| `tail_df` | return-period / exceedance table (VaR, TVaR, …) | the tail-behavior classifier |
+| `validation_df` | the moment-vs-estimate error table | old `summary_df` |
+| `tail_behavior_df` | support + per-side tail class + concentration | old `tail_df` |
+
+- **`summary_df`** (property): `E[X] | SD | CV | Skew | p0.01 | p0.50 | p0.99`,
+  indexed `Freq` / `Sev` / `Agg`. `SD` and `CV` are both always present (stable
+  layout); `CV = SD/E[X]` blanks when `|E[X]|` is ~0 relative to `SD` (signed /
+  near-break-even). Percentiles come from the FFT grid (exact, not simulated):
+  `Agg` via `q`, `Sev` via `q_sev`; **Freq percentiles are blank by design**
+  (frequency is a PGF, never materialized — use `create_frequency()` for the
+  count distribution). Moments are analytic, so `Freq × Sev = Agg` mean is exact.
+- **`tail_df`** (now a method, `tail_df(periods=…)`): the return-period table
+  `p | VaR | TVaR | xsVaR | VaR/Mean`, indexed by return period `T` (default
+  ladder `2…1000`, incl. the 1-in-200 / 1-in-250 capital anchors). Aggregate-only;
+  the Portfolio form adds a leading `unit` index level plus a `total` block.
+  Honors the loss/payoff convention via the new `period_to_p` (inverse of
+  `return_period_map`). `None` before `update()`.
+- **`validation_df`** / **`tail_behavior_df`**: the old `summary_df` /
+  `tail_df` payloads, unchanged, under names that say what they are. The
+  validation engine was already reading `stats_df['error']` directly, so the
+  rename is display-only (`self.valid` is untouched).
+- **`qd` / `_repr_html_`** now lead with `summary_df`, then `tail_df`, and flag
+  validation **only on failure** (silent on a pass); both open with the short
+  text / HTML intro.
+- Internal callers migrated (`_bucket_window`, `Portfolio.bs_explanation` and
+  `tail_behavior_df`); all stale `summary_df` / `tail_df` docrefs repointed.
+- **Deferred:** `PnL` and `BivariateAggregate` keep their existing
+  `summary_df` / `tail_df` (different, already user-facing meanings) — a separate
+  follow-up. Row-highlighting of the SII/250 rows in HTML is a pending polish.
+
 ## 1.0.0a112
 
 ### Lee/quantile worker consumes a `GridDistribution` (return-period revisit)

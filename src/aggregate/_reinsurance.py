@@ -19,7 +19,7 @@ from .utilities import ft
 
 logger = logging.getLogger(__name__)
 
-# Column layout shared with ``summary_df`` (see ``Aggregate._describe``): exact
+# Column layout shared with ``validation_df`` (see ``Aggregate._describe``): exact
 # (``EX``) value, rebucketed (``Est``) value, and ``Change`` for the mean and CV;
 # skew omits the change column (it is the hardest moment to estimate).
 # ``EX``/``Est`` here are the reins bases, not theory/empirical.
@@ -504,7 +504,7 @@ def reins_view_stats(agg):
     acts on the aggregate directly). Frequency: the ``EX`` reference is the
     gross full moments for every view (the count is unchanged by occurrence
     reinsurance). On the ``Est`` (model-output) basis the gross view is left
-    ``NaN`` (mirroring ``summary_df``, which never re-estimates the input
+    ``NaN`` (mirroring ``validation_df``, which never re-estimates the input
     frequency); occ ceded / net carry the *unconditional* mean ``E[N]`` only
     (so ``freq * sev == agg`` per view), cv / skew ``NaN``. The aggregate
     stage has no sev rows and a degenerate freq row (all ``NaN``).
@@ -551,7 +551,7 @@ def reins_view_stats(agg):
         # -- no division by ``P(attach)`` -- so ``freq * sev == agg`` within
         # each view; only the mean is meaningful (the per-view count is the
         # gross count), so cv / skew stay ``NaN``. The gross ``Est``
-        # frequency is left ``NaN`` to mirror ``summary_df`` exactly (the
+        # frequency is left ``NaN`` to mirror ``validation_df`` exactly (the
         # validation view never re-estimates the input frequency).
         f1, f2, f3 = agg.frequency.freq_moms(n)
         freq_gross = (f1, f2, f3,
@@ -571,7 +571,7 @@ def reins_view_stats(agg):
                 reins_agg6_from_sev_raw(agg, s1, s2, s3))
 
         # Est: moments of the rebucketed densities; unconditional freq
-        # (gross frequency left NaN to mirror summary_df).
+        # (gross frequency left NaN to mirror validation_df).
         for view, scol, acol, freq6 in [
                 ('gross', 'p_sev_gross', 'p_agg_gross', nan6),
                 ('ceded', 'p_sev_ceded', 'p_agg_ceded_occ', freq_est_uncond),
@@ -867,7 +867,7 @@ def reins_stats_df(agg):
 def reins_summary_df(agg):
     """Per-stage reinsurance summary -- the daily driver.
 
-    Mirrors the **economic view** of ``summary_df``. See :class:`Aggregate`
+    Mirrors the **economic view** of ``validation_df``. See :class:`Aggregate`
     for the full column / row documentation (carried on the delegating
     property). Derived from :func:`reins_view_stats`. Returns ``None`` when
     no reinsurance is configured.
@@ -889,7 +889,7 @@ def reins_summary_df(agg):
 
 def reins_describe_block(agg, stage, views, comps):
     """One :func:`reins_summary_df` block: theoretic reference vs model output
-    by view x component, mirroring the eight-column ``summary_df`` layout.
+    by view x component, mirroring the eight-column ``validation_df`` layout.
 
     The ``EX`` / ``CV`` / ``Sk`` columns hold the **theoretic reference** --
     the leading view's exact (pre-bucket) moments: ``Gross`` for the
@@ -1005,7 +1005,7 @@ def reins_kinds(agg):
 
 
 def reins_after_label(agg):
-    """Heading for the model-output column in ``summary_df``.
+    """Heading for the model-output column in ``validation_df``.
 
     ``Net`` when every cession passes the net; ``Ceded`` when every
     cession passes the ceded; ``Output`` when occ and agg pass

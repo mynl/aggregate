@@ -93,7 +93,7 @@ def valid_aggregate(agg):
     setting the ``validation_eps`` variable.
 
     All reads come from ``stats_df`` -- the single source of truth -- not
-    ``summary_df`` (display).
+    ``validation_df`` (display).
 
     The CV and skew tests are applied only when the theoretical value is
     finite and its magnitude exceeds ``VALIDATION_NOISE`` -- a
@@ -202,7 +202,7 @@ def valid_portfolio(port):
     False means it is definitely suspect. (Similar to the null hypothesis in a statistical test).
     Called and reported automatically by qd for Aggregate objects.
 
-    Checks the relative errors (from ``port.summary_df``) for:
+    Checks the relative errors (from ``port.stats_df['error']``) for:
 
     * severity mean < eps
     * severity cv < 10 * eps

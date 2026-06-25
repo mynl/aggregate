@@ -302,7 +302,7 @@ def test_tail_df_is_spec_only_and_schema():
     # The whole report is valid before update() (agg_density is None).
     a = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson')
     assert a.agg_density is None
-    df = a.tail_df
+    df = a.tail_behavior_df
     assert list(df.index) == ['frequency', 'comp0', 'aggregate']
     assert list(df.columns) == ['family', 'min', 'max', 'left_tail',
                                 'right_tail', 'bounded', 'concentrated',
@@ -314,7 +314,7 @@ def test_tail_df_per_side_tail_classes():
     # structural support, capped component reads bounded.
     a = _agg('agg TAILTEST [20 30 40] claims [inf inf 1000] xs [100 0 0] '
              'sev [gamma lognorm lognorm] [100 100 100] cv [1 3 1.3] mixed gamma .5')
-    df = a.tail_df
+    df = a.tail_behavior_df
     assert list(df.index) == ['frequency', 'comp0', 'comp1', 'comp2',
                               'severity', 'aggregate']
     assert df.loc['comp1', 'right_tail'] == 'subexponential'   # lognorm cv 3
@@ -328,7 +328,7 @@ def test_tail_df_per_side_tail_classes():
 
 def test_tail_df_structural_support_is_exact_when_bounded():
     # Fixed 3 claims x dice [1..6] -> support exactly [3, 18], bounded.
-    df = _agg('agg D dfreq [3] dsev [1:6]').tail_df
+    df = _agg('agg D dfreq [3] dsev [1:6]').tail_behavior_df
     assert df.loc['aggregate', 'min'] == 3.0
     assert df.loc['aggregate', 'max'] == 18.0
     assert df.loc['aggregate', 'bounded']
@@ -336,7 +336,7 @@ def test_tail_df_structural_support_is_exact_when_bounded():
 
 def test_tail_df_unbounded_support_is_inf():
     # A Poisson x lognorm book is unbounded above; bounded is False.
-    df = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson').tail_df
+    df = _agg('agg A 100 claims sev lognorm 100 cv 2 poisson').tail_behavior_df
     row = df.loc['aggregate']
     assert row['min'] == 0.0 and np.isinf(row['max'])
     assert not row['bounded']
@@ -344,23 +344,23 @@ def test_tail_df_unbounded_support_is_inf():
 
 def test_tail_df_capped_heavy_note():
     a = _agg('agg B 10 claims 1000 xs 0 sev lognorm 100 cv 2 poisson')
-    note = a.tail_df.loc['comp0', 'note']
+    note = a.tail_behavior_df.loc['comp0', 'note']
     assert 'subexponential base' in note and 'capped at 1,000' in note
 
 
 def test_tail_df_bounded_no_capped_note():
     # An intrinsically-bounded (atom / uniform) base must NOT read as capped-heavy.
     a = _agg('agg D dfreq [3] dsev [1:6]')
-    assert a.tail_df.loc['comp0', 'note'] == ''
+    assert a.tail_behavior_df.loc['comp0', 'note'] == ''
 
 
 def test_tail_df_concentration_is_cv():
     # cv = sd / mean. A large-E[N] low-cv book is concentrated (cv well below the
     # CONCENTRATION_CV cut ~ 0.1); an ordinary book is not (cv ~ O(1)).
-    conc = _agg('agg C 5000 claims sev gamma 100 cv 1 poisson').tail_df.loc['aggregate']
+    conc = _agg('agg C 5000 claims sev gamma 100 cv 1 poisson').tail_behavior_df.loc['aggregate']
     assert conc['concentrated']
     assert 0.0 < conc['cv'] < 0.1
-    ordinary = _agg('agg O 5 claims sev lognorm 100 cv 2 poisson').tail_df.loc['aggregate']
+    ordinary = _agg('agg O 5 claims sev lognorm 100 cv 2 poisson').tail_behavior_df.loc['aggregate']
     assert not ordinary['concentrated']
     assert ordinary['cv'] > 0.1
 
@@ -368,7 +368,7 @@ def test_tail_df_concentration_is_cv():
 def test_tail_df_power_law_note_and_structural_support():
     # Infinite variance (alpha 1.5): right_tail power-law, the note carries the
     # index and the failing moment; support is structural [0, inf] (not a reach).
-    row = _agg('agg P 10 claims sev 1 * pareto 1.5 poisson').tail_df.loc['aggregate']
+    row = _agg('agg P 10 claims sev 1 * pareto 1.5 poisson').tail_behavior_df.loc['aggregate']
     assert row['right_tail'] == 'power-law'
     assert 'alpha=1.5' in row['note'] and 'infinite variance' in row['note']
     assert row['min'] == 0.0 and np.isinf(row['max'])
@@ -376,7 +376,7 @@ def test_tail_df_power_law_note_and_structural_support():
 
 def test_tail_df_signed_support_is_two_sided():
     # A signed-severity aggregate has exact negative structural support.
-    df = _agg('agg S dfreq [2] dsev [-3 -1 2 5]').tail_df
+    df = _agg('agg S dfreq [2] dsev [-3 -1 2 5]').tail_behavior_df
     assert df.loc['aggregate', 'min'] == -6.0   # 2 x (-3)
     assert df.loc['aggregate', 'max'] == 10.0    # 2 x 5
 
@@ -440,7 +440,7 @@ def test_occ_reins_overlay_row_capped():
     """
     a = _agg('agg A 100 claims sev lognorm 50 cv 1.5 '
              'occurrence net of inf xs 1000 poisson')
-    df = a.tail_df
+    df = a.tail_behavior_df
     assert 'severity (net occ)' in df.index
     net = df.loc['severity (net occ)']
     assert net['right_tail'] == 'bounded'
@@ -459,7 +459,7 @@ def test_occ_reins_overlay_row_finite_layer_retains_tail():
     """
     a = _agg('agg B 100 claims sev lognorm 50 cv 1.5 '
              'occurrence net of 500 xs 1000 poisson')
-    net = a.tail_df.loc['severity (net occ)']
+    net = a.tail_behavior_df.loc['severity (net occ)']
     assert net['right_tail'] == 'subexponential'
     assert 'tail retained' in str(net['note'])
 

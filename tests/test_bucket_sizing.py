@@ -655,7 +655,7 @@ def test_1p_ordinary_nonsigned_stays_zero_based():
 
 
 def test_1p_reporting_surfaces():
-    """[bs-reporting] Portfolio gains ``bs_explanation`` and ``tail_df`` parity."""
+    """[bs-reporting] Portfolio gains ``bs_explanation`` and ``tail_behavior_df`` parity."""
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         p = build('port Rep '
@@ -665,7 +665,7 @@ def test_1p_reporting_surfaces():
     # new reporting template: per-side tail, candidate window widths, x_min/x_max
     assert 'portfolio method of moments' in expl and 'single big jump' in expl
     assert 'window width' in expl and 'x_max' in expl
-    td = p.tail_df
+    td = p.tail_behavior_df
     assert 'total' in td.index
     assert {'A', 'B'}.issubset(set(td.index))
     # the worst-of total tail is a label, not a raw enum

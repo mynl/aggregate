@@ -304,7 +304,7 @@ class Frequency(object):
         E.g. ``poisson frequency, super-exponential count``. The count *support*
         depends on the exposure (the aggregate's ``n``), so a standalone
         frequency reports only its family class; the full count support appears
-        in the aggregate's :attr:`~aggregate.distributions.Aggregate.tail_df`.
+        in the aggregate's :attr:`~aggregate.distributions.Aggregate.tail_behavior_df`.
         """
         rung, _ = _tail.classify_frequency(self)
         return f'{self.freq_name} frequency, {_tail.tail_class_label(rung)} count'

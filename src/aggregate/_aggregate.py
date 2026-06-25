@@ -946,13 +946,16 @@ class Aggregate:
         """
         return _reinsurance.reins_density_df(self)
 
-    def reins_occ_plot(self, axs=None):
+    def reins_occ_plot(self, axs=None, **kwargs):
         """
         Plots for occurrence reinsurance: occurrence log density and aggregate
         quantile plot. Reads the gross/ceded/net views from ``reins_density_df``.
+
+        :param kwargs: Lee-panel options forwarded to the quantile worker --
+               notably ``quantile_x='return'`` and ``max_return_period``.
         """
         from .plots import plot_reins_occ
-        return plot_reins_occ(self, axs=axs)
+        return plot_reins_occ(self, axs=axs, **kwargs)
 
     def occ_bivariate(self, views=('net', 'ceded'), bs=None,
                       log2_x=None, log2_y=None):
@@ -3411,7 +3414,10 @@ class Aggregate:
         :param xmax: Enter a "hint" for the xmax scale. E.g., if plotting gross and net you want all on
                the same scale. Only used on linear scales?
         :param axd:
-        :param kwargs: passed to ``plt.subplot_mosaic``
+        :param kwargs: Lee-panel options forwarded to the quantile worker --
+               notably ``quantile_x='return'`` (plot the Lee panel against log
+               return period instead of ``p``) and ``max_return_period``; plus
+               ``figsize`` for the canvas.
         :return:
         """
         from .plots import plot_aggregate

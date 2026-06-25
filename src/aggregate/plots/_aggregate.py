@@ -39,12 +39,15 @@ def plot_aggregate(agg, axd=None, xmax=0, **kwargs):
         Hint for the x-axis upper limit, e.g. to put gross and net on a common
         scale. Only used on linear scales.
     **kwargs
-        Passed to the canvas creator (e.g. ``figsize``).
+        Lee-panel (C) options forwarded to
+        :func:`aggregate.plots._quantile.plot_quantile` -- notably
+        ``quantile_x={'linear', 'return'}`` (``'return'`` plots panel C against
+        log return period) and ``max_return_period``. ``figsize`` is consumed
+        here for the canvas.
     """
+    figsize = kwargs.pop('figsize', (3 * FIG_W, FIG_H))
     if axd is None:
-        if 'figsize' not in kwargs:
-            kwargs['figsize'] = (3 * FIG_W, FIG_H)
-        agg.figure, axd = make_mosaic('ABC', **kwargs)
+        agg.figure, axd = make_mosaic('ABC', figsize=figsize)
     else:
         agg.figure = axd['A'].figure
 
@@ -99,18 +102,21 @@ def plot_aggregate(agg, axd=None, xmax=0, **kwargs):
         if span > 0:
             axd['B'].xaxis.set_major_locator(ticker.MultipleLocator(span))
 
-        # for Lee diagrams
+        # for Lee diagrams. Configure the linear panel first; the worker leaves
+        # it as-is for ``quantile_x='linear'`` and overrides it for ``'return'``.
         ax = axd['C']
+        ax.set(xlim=[-0.025, 1.025], ylim=[left, mx + 1], title='Quantile (Lee) plot')
         # trim so that the Lee plot doesn't spuriously tend up to infinity
         # little care: may not exaclty equal 1
         idx = (df.F == df.F.max()).idxmax()
         dft = df.loc[:idx]
-        plot_quantile(ax, dft.F, dft.loss, drawstyle='steps-pre', lw=3, label='Aggregate')
+        plot_quantile(ax, dft.F, dft.loss, is_loss_value=agg._is_loss_value,
+                      drawstyle='steps-pre', lw=3, label='Aggregate', **kwargs)
         # same trim for severity (on its own grid)
         sidx = (sdf.F_sev >= 1).idxmax()
         sdft = sdf.loc[:sidx]
-        plot_quantile(ax, sdft.F_sev, sdft.loss, drawstyle='steps-pre', lw=1, label='Severity')
-        ax.set(xlim=[-0.025, 1.025], ylim=[left, mx + 1], title='Quantile (Lee) plot')
+        plot_quantile(ax, sdft.F_sev, sdft.loss, is_loss_value=agg._is_loss_value,
+                      drawstyle='steps-pre', lw=1, label='Severity', **kwargs)
         ax.legend().set(visible=False)
     else:
         # continuous
@@ -137,11 +143,16 @@ def plot_aggregate(agg, axd=None, xmax=0, **kwargs):
         axd['B'].set(xlim=xlim2, ylim=ylim, title='Log density', yscale='log')
         axd['B'].legend().set(visible=False)
 
+        # Configure the linear panel first; the worker leaves it for
+        # ``quantile_x='linear'`` and overrides it for ``'return'``.
         ax = axd['C']
+        ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot',
+               xlabel='Non-exceeding probability p')
         # to do: same trimming for p-->1 needed?
-        plot_quantile(ax, df.F, df.loss, lw=2, label='Aggregate')
-        plot_quantile(ax, sdf.F_sev, sdf.loss, lw=1, label='Severity')
-        ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot', xlabel='Non-exceeding probability p')
+        plot_quantile(ax, df.F, df.loss, is_loss_value=agg._is_loss_value,
+                      lw=2, label='Aggregate', **kwargs)
+        plot_quantile(ax, sdf.F_sev, sdf.loss, is_loss_value=agg._is_loss_value,
+                      lw=1, label='Severity', **kwargs)
         ax.legend().set(visible=False)
 
 
@@ -207,7 +218,7 @@ def plot_pnl(pnl, axd=None, **kwargs):
     return pnl.figure
 
 
-def plot_reins_occ(agg, axs=None):
+def plot_reins_occ(agg, axs=None, **kwargs):
     """Occurrence-reinsurance plot: occurrence log density and aggregate Lee.
 
     Two panels -- occurrence log density (gross / ceded / net, left) and the
@@ -220,6 +231,10 @@ def plot_reins_occ(agg, axs=None):
     axs : array of Axes, optional
         Two target axes; a new ``1 x 2`` figure is created if omitted and
         stored on ``agg.figure``.
+    **kwargs
+        Lee-panel (right) options forwarded to
+        :func:`aggregate.plots._quantile.plot_quantile` -- notably
+        ``quantile_x={'linear', 'return'}`` and ``max_return_period``.
     """
     if agg.occ_reins is None:
         logger.warning('reins_occ_plot called with no occurrence reinsurance.')
@@ -241,6 +256,9 @@ def plot_reins_occ(agg, axs=None):
         xl = [-l / 50, l * 1.025]
     ax0.set(xlim=xl, xlabel='Loss', ylabel='Occurrence log density', title='Occurrence')
 
+    # Configure the linear panel first; the worker leaves it for
+    # ``quantile_x='linear'`` and overrides it for ``'return'``.
+    ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
     y = rd.loss.values
     for c, col in [('gross', 'p_agg_gross'), ('ceded', 'p_agg_ceded_occ'),
                    ('net', 'p_agg_net_occ')]:
@@ -252,6 +270,6 @@ def plot_reins_occ(agg, axs=None):
         s_values = s[::-1].cumsum()[::-1]
         s_values = np.where(np.abs(s_values) < 1e-15, 0, s_values)
         s_values = np.where(s_values == 0, np.nan, s_values)
-        ax1.plot(1 - s_values, y, label=c)
-    ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
+        plot_quantile(ax1, 1 - s_values, y, is_loss_value=agg._is_loss_value,
+                      label=c, **kwargs)
     ax1.legend()

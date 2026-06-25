@@ -1445,7 +1445,8 @@ class Severity(ss.rv_continuous):
         #    four analytic specials, plus any histogram with a layer).
         return _numerical_moms(self)
 
-    def plot(self, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='AB\nCD'):
+    def plot(self, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='AB\nCD',
+             **kwargs):
         """
         Quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
         replaced with log density plot.
@@ -1454,10 +1455,13 @@ class Severity(ss.rv_continuous):
         :param axd: axis dictionary, if None, create new figure. Must have keys 'A', 'B', 'C', 'D'.
         :param figsize: (width, height) in inches.
         :param layout: the subplot_mosaic layout of the figure. Default is 'AB\nCD'.
+        :param kwargs: Lee-panel options forwarded to the quantile worker --
+               notably ``quantile_x='return'`` and ``max_return_period``.
         :return:
         """
         from .plots import plot_severity
-        return plot_severity(self, n=n, axd=axd, figsize=figsize, layout=layout)
+        return plot_severity(self, n=n, axd=axd, figsize=figsize, layout=layout,
+                             **kwargs)
 
 
 # ---------------------------------------------------------------------------

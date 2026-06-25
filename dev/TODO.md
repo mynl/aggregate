@@ -420,6 +420,18 @@ The first-class `PnL` (Stages A–E) is in `dev/done/plan-pnl.md`. Next:
 - [x] **DecL unary minus on a severity** (`ssev -lognorm …`) — done 1.0.0a109,
   `dev/done/plan-decl-sev-unary-minus.md`. `sev1: MINUS sev1 -> sev1_negate`;
   reflected severity now requires `ssev` (plain `sev` rejects it).
-- [ ] **Return-period x-axis for quantile/Lee plots** (`plot(quantile_x='return')`)
-  — `dev/plan-plot-return-period.md`. `T=1/(1−p)` loss / `1/p` payoff, log-x.
-  Plotting-framework test; not PnL-specific.
+- [ ] **`GridDistribution` knows its sign (loss vs payoff)** —
+  `dev/plan-gd-knows-sign.md`. Make orientation an immutable GD property so
+  `Distortion.price(gd)` / the Lee plot consume a self-describing object instead
+  of a threaded `is_loss_value=` flag; the objective kernel (q/var/tvar/…) is
+  unchanged. **Do this FIRST** of the current run.
+- [~] **Return-period x-axis for quantile/Lee plots** (`plot(quantile_x='return')`)
+  — `dev/plan-plot-return-period.md`. First cut landed 1.0.0a110 (`T=1/(1−p)`
+  loss / `1/p` payoff, log-x; on `Aggregate.plot`, `Severity.plot`,
+  `reins_occ_plot`; `PnL`/`Portfolio` have no Lee panel). **Revisit pending:**
+  route the Lee workers to take a GD and read orientation off it once
+  GD-knows-sign lands (then plan moves to `dev/done/`).
+- [ ] **`summary_df` / `tail_df` risk views** — `dev/plan-summary-tail-tables.md`.
+  `tail_df` reuses the same orientation; unaffected by GD-knows-sign but
+  benefits from it. Comes after the return-period revisit.
+  *Run order: GD-knows-sign → finish return-period plot → summary/tail → PnL.*

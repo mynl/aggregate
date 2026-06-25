@@ -1,10 +1,37 @@
 # Plan — return-period x-axis for quantile (Lee) plots
 
-> **Status: DRAFT — not executed.** Not PnL-specific (applies to `Aggregate`,
-> `Portfolio`, and `PnL` plots). A deliberate exercise of the layered plotting
-> framework (`aggregate.plots`). Goal: a quantile/Lee panel option that plots the
-> outcome against **log return period** instead of the non-exceedance
-> probability `p`.
+> **Status: FIRST CUT LANDED in 1.0.0a110 — REVISIT pending.** The feature works
+> and ships, but it threads orientation as `is_loss_value=agg._is_loss_value`
+> into the Lee worker. Once `GridDistribution` carries its own sign
+> (`dev/plan-gd-knows-sign.md`), revisit this: route the Lee workers to take a
+> **GD** (the holders already build `agg._grid_distribution()` /
+> `_sev_grid_distribution()`) and read orientation + the return-period map off
+> the GD, removing the `is_loss_value=` argument from `plot_aggregate` /
+> `plot_severity` / `plot_reins_occ`. Pulled back out of `dev/done/` until that
+> revisit lands. A deliberate exercise of the layered plotting framework
+> (`aggregate.plots`): a quantile/Lee panel option that plots the outcome
+> against **log return period** instead of the non-exceedance probability `p`.
+>
+> **Scope at build time (author-confirmed):** the option lands on the three
+> plots that actually own a Lee panel — `Aggregate.plot` (panel C),
+> `Severity.plot` (panel D), and `Aggregate.reins_occ_plot` (the aggregate
+> panel, whose hand-drawn Lee was routed through `plot_quantile`). `PnL` and
+> `Portfolio` were dropped from the original list: their `.plot()` exhibits have
+> **no Lee panel** (PnL = density + distribution; Portfolio = density + log
+> density), so there is nothing for `quantile_x` to act on. Argument name
+> confirmed `quantile_x='linear'|'return'`; applies to the Lee panel only.
+>
+> **Two design corrections after first cut (author review):**
+> 1. **Threading.** `quantile_x` is **not** named in the Layer-2 compositors or
+>    the `.plot()` stubs — it rides through `**kwargs` straight to the Layer-1
+>    worker. The compositor pre-sets the linear panel limits/label/title and the
+>    worker leaves them for `'linear'` / overrides them for `'return'`, so the
+>    compositors never branch on `quantile_x`. Adding a future Lee-panel option
+>    no longer touches `_aggregate.py` / `_severity.py`.
+> 2. **Return-mode extents.** The worker caps drawing at `max_return_period`
+>    (default `1e9`, itself a pass-through kwarg) and **rescales the outcome (y)
+>    axis** to the deepest plotted point, so y tracks the cap instead of the
+>    diverging tail.
 
 ---
 

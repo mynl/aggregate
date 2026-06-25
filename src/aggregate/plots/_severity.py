@@ -17,7 +17,8 @@ from ._style import make_mosaic, FIG_W, FIG_H
 from ._quantile import plot_quantile
 
 
-def plot_severity(sev, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='AB\nCD'):
+def plot_severity(sev, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='AB\nCD',
+                  **kwargs):
     """Quick four-panel plot of a :class:`Severity`.
 
     Density (A), log density (B), distribution (C) and Lee/quantile (D), each
@@ -36,6 +37,11 @@ def plot_severity(sev, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='
         Figure size used when ``axd`` is None.
     layout : str, default ``'AB\\nCD'``
         Mosaic layout passed to the canvas creator.
+    **kwargs
+        Lee-panel (D) options forwarded to
+        :func:`aggregate.plots._quantile.plot_quantile` -- notably
+        ``quantile_x={'linear', 'return'}`` and ``max_return_period``. A
+        severity is a loss value, so the return-period branch is ``1/(1-p)``.
     """
     from ..distributions import SeverityDHistogram
 
@@ -66,6 +72,9 @@ def plot_severity(sev, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='
     ax.plot(xs, ys, drawstyle=ds)
     ax.set(title='Probability distribution', xlabel='Loss', ylim=[-0.025, 1.025])
 
+    # Configure the linear panel first; the worker leaves it for
+    # ``quantile_x='linear'`` and overrides it for ``'return'``.
     ax = axd['D']
-    plot_quantile(ax, ys, xs, drawstyle=ds)
-    ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability $p$', xlim=[-0.025, 1.025])
+    ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability $p$',
+           xlim=[-0.025, 1.025])
+    plot_quantile(ax, ys, xs, is_loss_value=True, drawstyle=ds, **kwargs)

@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.0a110
+
+### Feature: return-period x-axis for quantile (Lee) plots (`quantile_x='return'`)
+
+The Lee/quantile panel can now be drawn against **log return period** instead of
+the non-exceedance probability `p`. Pass `quantile_x='return'` (default
+`'linear'`, today's `x = p` behavior) to `Aggregate.plot`, `Severity.plot`, or
+`Aggregate.reins_occ_plot` — the three plots that own a Lee panel. The transform
+branches on the value-type role (`_is_loss_value`): a **loss** maps the
+large-`p` tail to large `T` via `T = 1/(1−p)`, a **payoff** maps the small-`p`
+tail via `T = 1/p`, so in both cases log-x spreads the rare *bad* tail where it
+can be read directly. The axis is log-scaled with decade ticks and labeled
+"Return period". Drawing is **capped at `max_return_period` (default 1e9)**: the
+saturating endpoint (`p→1` loss / `p→0` payoff, where `T` diverges) is dropped,
+and the outcome (y) axis is rescaled to the deepest *plotted* point so it tracks
+the cap rather than running off to the saturating tail. Only the Lee panel is
+affected — density and distribution panels are unchanged.
+
+The transform and **all** of its axis handling live in one Layer-1 worker
+(`plots._quantile.plot_quantile`). The option is **not** named in the Layer-2
+compositors or the class `.plot()` stubs — it rides through their `**kwargs`, so
+the layered plotting infrastructure stays thin and future Lee-panel options
+(e.g. `max_return_period`) flow through without touching `_aggregate.py` /
+`_severity.py`. `PnL` and `Portfolio` are unaffected: their `.plot()` exhibits
+have no Lee panel.
+
 ## 1.0.0a109
 
 ### Feature: bare unary minus on a severity (`ssev -lognorm …`)

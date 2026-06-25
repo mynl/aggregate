@@ -3897,8 +3897,10 @@ class Aggregate:
         float
             A (conservative) upper bound on the severity support: the analytic
             method-of-moments high quantile from the severity moments, capped by
-            any finite policy/support limit. ``inf`` if it cannot be estimated
-            (forces the windowed guard to fail safe -> no windowing).
+            any finite policy/support limit. A **degenerate (point-mass)**
+            severity returns its atom location directly (see Notes). ``inf`` if
+            it cannot be estimated (forces the windowed guard to fail safe -> no
+            windowing).
 
         Notes
         -----
@@ -3906,12 +3908,27 @@ class Aggregate:
         severity's reach, which biases the guard toward **not** windowing --
         the safe direction (a false reject merely keeps the legacy 0-based
         grid; a false accept would corrupt the severity discretisation).
+
+        A degenerate severity (standard deviation zero -- a ``dsev [k]`` point
+        mass, e.g. the count distribution materialized by
+        :meth:`create_frequency`) has no spread, so its skewness is ``0/0 =
+        NaN`` and the MoM fit returns NaN -- which would silently fail the
+        ``np.isfinite`` windowed guard and force a high-mean concentrated
+        aggregate onto the coarse 0-based grid (the *textbook* windowing case,
+        defeated). Such a severity's high extent is simply the atom location
+        (the mean), returned directly. The test is on the standard deviation
+        against :data:`VALIDATION_NOISE`, so a machine-noise ``cv`` still counts
+        as a point mass.
         """
         try:
             sev_m = float(self.stats_df['mixed'][('sev', 'mean')])
             sev_cv = float(self.stats_df['mixed'][('sev', 'cv')])
             sev_sk = float(self.stats_df['mixed'][('sev', 'skew')])
-            hi = float(_estimate_agg_percentile(sev_m, sev_cv, sev_sk, p))
+            if sev_m * sev_cv <= VALIDATION_NOISE:
+                # Degenerate point mass: zero spread, the MoM fit is undefined.
+                hi = sev_m
+            else:
+                hi = float(_estimate_agg_percentile(sev_m, sev_cv, sev_sk, p))
         except (ValueError, KeyError):
             hi = np.inf
         lim = (float(self.limit.max())

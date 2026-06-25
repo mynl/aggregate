@@ -111,6 +111,27 @@ def test_window_discrete_high_mean_bs_one():
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
 
 
+def test_window_point_mass_severity_windows():
+    """A point-mass (``dsev [1]``) severity must not block windowing.
+
+    ``1000000 claims dsev [1] poisson`` is the textbook count distribution
+    (mean 1e6, sd 1000, cv 1e-3 -- highly concentrated) and the exact idiom
+    ``create_frequency`` emits. A point mass has zero spread, so its skewness is
+    ``0/0 = NaN`` and the MoM ``_severity_high_estimate`` returned NaN, silently
+    failing the windowed severity-fit guard and forcing the coarse 0-based grid.
+    The degenerate-severity short-circuit returns the atom location instead, so
+    the band windows at ``bs=1`` on a non-zero origin.
+    """
+    a = build('agg PM 1000000 claims dsev [1] poisson')
+    df = a._bs_window_df
+    assert a._severity_high_estimate(1 - 1e-12) == pytest.approx(1.0)
+    assert bool(df.loc['windowed', 'selected'])
+    assert a.bs == 1.0, f'expected bs=1 on the integer lattice, got {a.bs}'
+    assert a.x_min > 900_000
+    assert a.est_m == pytest.approx(a.agg_m, rel=1e-6)
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
+
+
 def test_window_continuous_high_mean_matches_moments():
     """A high-mean continuous book windows and reproduces its moments.
 

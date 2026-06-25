@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.0a108
+
+### Fix: point-mass severity blocked the windowed grid (textbook concentration case)
+
+A high-mean, highly concentrated aggregate with a **point-mass severity**
+(`dsev [k]`) — e.g. `agg Test 1000000 claims dsev [1] poisson`, the count
+distribution `create_frequency` materializes — silently fell back to the coarse
+0-based grid instead of the tight two-sided window its `_bs_window_df` had
+already computed.
+
+Root cause: a point mass has zero spread, so its skewness is `0/0 = NaN` and
+`Aggregate._severity_high_estimate` (the windowed severity-fit guard's input)
+returned NaN from the method-of-moments fit. The guard's `np.isfinite(sev_hi)`
+test then failed, marking the `windowed` row inapplicable so selection fell
+through to `bounded_small` / `moment` (`bs≈20`, `x_min=0`, ~99% empty buckets).
+
+`_severity_high_estimate` now short-circuits a degenerate severity (standard
+deviation ≤ `VALIDATION_NOISE`) to its atom location (the mean), so the windowed
+method applies and is selected: `bs=1` on the integer lattice with a non-zero
+origin. Non-degenerate severities are unchanged. No API change. This directly
+fixes `create_frequency` count distributions at high frequency.
+
 ## 1.0.0a107
 
 ### `create_frequency()` — materialize the claim-count distribution

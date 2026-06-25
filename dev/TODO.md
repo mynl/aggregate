@@ -427,12 +427,14 @@ The first-class `PnL` (Stages A–E) is in `dev/done/plan-pnl.md`. Next:
   `Aggregate.value_type` setter resets the GD caches. Lee worker stays
   array-based but reads the shared map; compositors source orientation off the
   aggregate GD. Pricing `effective_g` kwarg left as a defaulted shim.
-- [~] **Return-period x-axis for quantile/Lee plots** (`plot(quantile_x='return')`)
-  — `dev/plan-plot-return-period.md`. First cut landed 1.0.0a110 (`T=1/(1−p)`
+- [x] **Return-period x-axis for quantile/Lee plots** (`plot(quantile_x='return')`)
+  — done, `dev/done/plan-plot-return-period.md`. First cut 1.0.0a110 (`T=1/(1−p)`
   loss / `1/p` payoff, log-x; on `Aggregate.plot`, `Severity.plot`,
-  `reins_occ_plot`; `PnL`/`Portfolio` have no Lee panel). **Revisit pending:**
-  route the Lee workers to take a GD and read orientation off it once
-  GD-knows-sign lands (then plan moves to `dev/done/`).
+  `reins_occ_plot`; `PnL`/`Portfolio` have no Lee panel). **Revisit landed
+  1.0.0a112:** `plot_quantile(ax, gd, …)` now consumes a `GridDistribution`,
+  derives the curve + saturating-top trim, and reads orientation via
+  `gd.return_period`; `is_loss_value=` gone from the compositors. Severity GD
+  inherits the aggregate role; reins wraps its gross/ceded/net PMFs as GDs.
 - [ ] **`summary_df` / `tail_df` risk views** — `dev/plan-summary-tail-tables.md`.
   `tail_df` reuses the same orientation; unaffected by GD-knows-sign but
   benefits from it. Comes after the return-period revisit.

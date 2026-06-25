@@ -4401,10 +4401,19 @@ class Aggregate:
         Severity has its own grid (``sev_density_df``); this is the discretised
         *output* severity PMF (the uniform ``bs``-grid fed to the FFT), distinct
         from the input ``self.fz``. Lazily built and cached.
+
+        Carries the **aggregate's** orientation (``self._is_loss_value``), not an
+        intrinsic loss role: the severity curve shares the aggregate's Lee panel
+        and must spread the same tail, so a payoff aggregate draws its severity
+        with the payoff convention too. The objective accessors that read this GD
+        (:meth:`sev_q`, :meth:`sev_tvar`) are sign-agnostic, so the role only
+        affects :meth:`GridDistribution.return_period`.
         """
         if self._sev_dist is None:
             ser = self.sev_density_df.query('p_sev > 0').p_sev
-            self._sev_dist = GridDistribution.from_series(ser, bs=self.bs, name=f'{self.name} sev')
+            self._sev_dist = GridDistribution.from_series(
+                ser, bs=self.bs, name=f'{self.name} sev',
+                is_loss_value=self._is_loss_value)
         return self._sev_dist
 
     def focus(self, p=1e-6):

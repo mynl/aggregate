@@ -13,6 +13,7 @@ import logging
 
 import numpy as np
 
+from .._grid_distribution import GridDistribution
 from ..utilities import nice_multiple
 from ._style import plt, ticker, make_mosaic, make_grid, FIG_W, FIG_H
 from ._quantile import plot_quantile
@@ -106,19 +107,18 @@ def plot_aggregate(agg, axd=None, xmax=0, **kwargs):
         # it as-is for ``quantile_x='linear'`` and overrides it for ``'return'``.
         ax = axd['C']
         ax.set(xlim=[-0.025, 1.025], ylim=[left, mx + 1], title='Quantile (Lee) plot')
-        # trim so that the Lee plot doesn't spuriously tend up to infinity
-        # little care: may not exaclty equal 1
-        idx = (df.F == df.F.max()).idxmax()
-        dft = df.loc[:idx]
-        # Panel orientation comes from the aggregate's self-describing GD; the
-        # severity curve follows the aggregate role (it shares this panel).
-        lee_is_loss = agg._grid_distribution().is_loss_value
-        plot_quantile(ax, dft.F, dft.loss, is_loss_value=lee_is_loss,
+        # Both curves are self-describing GDs: the worker derives (p, loss) and
+        # trims the saturating top, and reads orientation off the GD. The
+        # severity GD carries the aggregate's role (shared panel, one tail).
+        # The aggregate curve wraps the *anchored* ``df`` (the zero-mass baseline
+        # row at ``mn - 0.5`` shared with panels A/B) so the steps-pre Lee line
+        # rises from the baseline at its own signed index, not a stray ``loss=0``.
+        agg_gd = GridDistribution(
+            df.loss.to_numpy(), df.p_total.to_numpy(), bs=agg.bs, name=agg.name,
+            is_loss_value=agg._is_loss_value)
+        plot_quantile(ax, agg_gd,
                       drawstyle='steps-pre', lw=3, label='Aggregate', **kwargs)
-        # same trim for severity (on its own grid)
-        sidx = (sdf.F_sev >= 1).idxmax()
-        sdft = sdf.loc[:sidx]
-        plot_quantile(ax, sdft.F_sev, sdft.loss, is_loss_value=lee_is_loss,
+        plot_quantile(ax, agg._sev_grid_distribution(),
                       drawstyle='steps-pre', lw=1, label='Severity', **kwargs)
         ax.legend().set(visible=False)
     else:
@@ -151,12 +151,12 @@ def plot_aggregate(agg, axd=None, xmax=0, **kwargs):
         ax = axd['C']
         ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot',
                xlabel='Non-exceeding probability p')
-        # to do: same trimming for p-->1 needed?
-        # Panel orientation from the aggregate GD; severity follows (shared panel).
-        lee_is_loss = agg._grid_distribution().is_loss_value
-        plot_quantile(ax, df.F, df.loss, is_loss_value=lee_is_loss,
+        # Self-describing GDs: the worker derives (p, loss), trims the saturating
+        # top, and reads orientation off the GD. Severity follows the aggregate
+        # role (shared panel).
+        plot_quantile(ax, agg._grid_distribution(),
                       lw=2, label='Aggregate', **kwargs)
-        plot_quantile(ax, sdf.F_sev, sdf.loss, is_loss_value=lee_is_loss,
+        plot_quantile(ax, agg._sev_grid_distribution(),
                       lw=1, label='Severity', **kwargs)
         ax.legend().set(visible=False)
 
@@ -264,18 +264,14 @@ def plot_reins_occ(agg, axs=None, **kwargs):
     # Configure the linear panel first; the worker leaves it for
     # ``quantile_x='linear'`` and overrides it for ``'return'``.
     ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
-    y = rd.loss.values
-    lee_is_loss = agg._grid_distribution().is_loss_value
+    # Each gross / ceded / net aggregate PMF becomes a cheap GD carrying the
+    # aggregate's orientation; the worker derives the (p, loss) curve and the
+    # return-period map off it. (Replaces the old hand-rolled survival + 1e-15
+    # de-fuzz; the worker's saturating-top trim handles the flat tail instead.)
+    loss = rd.loss.to_numpy()
     for c, col in [('gross', 'p_agg_gross'), ('ceded', 'p_agg_ceded_occ'),
                    ('net', 'p_agg_net_occ')]:
-        # Plot-cosmetic de-fuzz: deliberate carve-out from the shared
-        # ``remove_fuzz`` -- a looser 1e-15 threshold plus the 0 -> nan step
-        # below so empty buckets drop out of the survival line.
-        s = rd[col].to_numpy().copy()
-        s[np.abs(s) < 1e-15] = 0
-        s_values = s[::-1].cumsum()[::-1]
-        s_values = np.where(np.abs(s_values) < 1e-15, 0, s_values)
-        s_values = np.where(s_values == 0, np.nan, s_values)
-        plot_quantile(ax1, 1 - s_values, y, is_loss_value=lee_is_loss,
-                      label=c, **kwargs)
+        gd = GridDistribution(loss, rd[col].to_numpy(), bs=agg.bs, name=c,
+                              is_loss_value=agg._is_loss_value)
+        plot_quantile(ax1, gd, label=c, **kwargs)
     ax1.legend()

@@ -13,6 +13,7 @@ worker.
 
 import numpy as np
 
+from .._grid_distribution import GridDistribution
 from ._style import make_mosaic, FIG_W, FIG_H
 from ._quantile import plot_quantile
 
@@ -77,4 +78,12 @@ def plot_severity(sev, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='
     ax = axd['D']
     ax.set(title='Quantile (Lee) plot', xlabel='Non-exceeding probability $p$',
            xlim=[-0.025, 1.025])
-    plot_quantile(ax, ys, xs, is_loss_value=True, drawstyle=ds, **kwargs)
+    # A severity has no discrete grid of its own, so wrap the plot-grid cdf as a
+    # throwaway GD whose ``cumsum(p)`` reconstructs ``F = cdf(xs)``. A standalone
+    # Severity carries no loss/payoff orientation (only ``self.signed``, the
+    # support-sign axis), so default to loss (True); a severity drawn inside an
+    # Aggregate instead inherits the aggregate's role via
+    # ``_sev_grid_distribution()``.
+    gd = GridDistribution(xs, np.diff(ys, prepend=0.0), name=sev.name,
+                          is_loss_value=True)
+    plot_quantile(ax, gd, drawstyle=ds, **kwargs)

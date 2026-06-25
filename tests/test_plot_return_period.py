@@ -14,7 +14,21 @@ import numpy as np
 import pytest
 
 from aggregate import build
+from aggregate._grid_distribution import GridDistribution
 from aggregate.plots._quantile import plot_quantile, MAX_RETURN_PERIOD
+
+
+def _gd(p, loss, is_loss_value=True):
+    """Wrap a (non-exceedance ``p``, outcome) curve as a GD.
+
+    The worker derives the curve from ``(cumsum(gd.p), gd.x)``, so the mass is
+    ``diff(p)`` with ``cumsum`` reconstructing the intended ``F = p``; the
+    outcomes are the GD index ``x``.
+    """
+    p = np.asarray(p, dtype=float)
+    loss = np.asarray(loss, dtype=float)
+    return GridDistribution(loss, np.diff(p, prepend=0.0),
+                            is_loss_value=is_loss_value)
 
 
 # ----------------------------------------------------------------------
@@ -25,7 +39,7 @@ def test_quantile_transform_loss_branch():
     fig, ax = matplotlib.pyplot.subplots()
     p = np.array([0.0, 0.5, 0.9, 1.0])
     loss = np.array([0.0, 10.0, 90.0, 100.0])
-    (line,) = plot_quantile(ax, p, loss, quantile_x='return', is_loss_value=True)
+    (line,) = plot_quantile(ax, _gd(p, loss, True), quantile_x='return')
     xs, ys = line.get_data()
     # the p == 1 atom is dropped (T would be infinite)
     assert len(xs) == 3
@@ -40,7 +54,7 @@ def test_quantile_transform_payoff_branch():
     fig, ax = matplotlib.pyplot.subplots()
     p = np.array([0.0, 0.1, 0.5, 1.0])
     loss = np.array([-100.0, -50.0, 0.0, 100.0])
-    (line,) = plot_quantile(ax, p, loss, quantile_x='return', is_loss_value=False)
+    (line,) = plot_quantile(ax, _gd(p, loss, False), quantile_x='return')
     xs, ys = line.get_data()
     assert len(xs) == 3                                   # p == 0 dropped
     np.testing.assert_allclose(xs, [10.0, 2.0, 1.0])      # 1/p
@@ -54,7 +68,7 @@ def test_quantile_caps_return_period():
     # p = 1 - 1e-12 -> T = 1e12, well past the 1e9 cap -> dropped.
     p = np.array([0.5, 1.0 - 1e-6, 1.0 - 1e-12])
     loss = np.array([10.0, 50.0, 9999.0])
-    (line,) = plot_quantile(ax, p, loss, quantile_x='return', is_loss_value=True)
+    (line,) = plot_quantile(ax, _gd(p, loss, True), quantile_x='return')
     xs, ys = line.get_data()
     assert xs.max() <= MAX_RETURN_PERIOD
     assert 9999.0 not in ys                               # the off-cap point is gone
@@ -66,7 +80,7 @@ def test_quantile_return_bounds_y_to_cap():
     ax.set_ylim(0, 1)                                     # a stale linear y-limit
     p = np.array([0.0, 0.9, 1.0 - 1e-12])
     loss = np.array([0.0, 90.0, 1e9])                     # huge off-cap outcome
-    plot_quantile(ax, p, loss, quantile_x='return', is_loss_value=True)
+    plot_quantile(ax, _gd(p, loss, True), quantile_x='return')
     # y rescaled to the kept data (top ~90), not the stale [0,1] nor the 1e9 atom
     lo, hi = ax.get_ylim()
     assert hi < 1e6
@@ -77,7 +91,7 @@ def test_quantile_linear_default_unchanged():
     fig, ax = matplotlib.pyplot.subplots()
     p = np.array([0.0, 0.5, 1.0])
     loss = np.array([0.0, 10.0, 20.0])
-    (line,) = plot_quantile(ax, p, loss)                  # default quantile_x='linear'
+    (line,) = plot_quantile(ax, _gd(p, loss))             # default quantile_x='linear'
     xs, _ = line.get_data()
     np.testing.assert_allclose(xs, p)
     assert ax.get_xscale() == 'linear'
@@ -86,7 +100,7 @@ def test_quantile_linear_default_unchanged():
 def test_quantile_bad_arg_raises():
     fig, ax = matplotlib.pyplot.subplots()
     with pytest.raises(ValueError, match="quantile_x"):
-        plot_quantile(ax, [0.5], [1.0], quantile_x='nope')
+        plot_quantile(ax, _gd([0.5], [1.0]), quantile_x='nope')
 
 
 # ----------------------------------------------------------------------

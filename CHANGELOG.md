@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.0.0a112
+
+### Lee/quantile worker consumes a `GridDistribution` (return-period revisit)
+
+Completes the return-period plot revisit deferred from a111: the Layer-1 Lee
+worker `plot_quantile(ax, gd, quantile_x=…, max_return_period=…)` now takes a
+`GridDistribution` instead of `(p, loss, is_loss_value=…)` arrays. The worker
+derives the curve from the GD's own `(cumsum(p), x)`, trims the saturating top of
+the quantile function itself, and reads orientation off `gd.return_period(p)` —
+so the `is_loss_value=` flag is gone from the compositors (`plot_aggregate`,
+`plot_severity`, `plot_reins_occ`); each passes a self-describing object instead.
+
+- `Aggregate._sev_grid_distribution()` now carries the **aggregate's** role
+  (`is_loss_value=self._is_loss_value`), not an intrinsic loss role: the severity
+  curve shares the aggregate's Lee panel and must spread the same tail, so a
+  payoff aggregate draws its severity with the payoff convention. Its objective
+  consumers (`sev_q`, `sev_tvar`) are sign-agnostic, so only `return_period` is
+  affected; the `value_type` setter already resets the `_sev_dist` cache.
+- `reins_occ_plot` wraps each gross/ceded/net aggregate PMF as a cheap GD (the
+  old hand-rolled survival + 1e-15 de-fuzz is gone; the worker's saturating-top
+  trim handles the flat tail). The reins Lee curves now draw as a continuous
+  staircase rather than a NaN-broken survival line.
+- The continuous-`Aggregate` Lee panel is now trimmed at the saturating top too
+  (previously a standing "to do" — only the discrete panel was trimmed).
+- A standalone `Severity` (no discrete grid of its own) wraps its plot-grid
+  `cdf` as a throwaway GD; the discrete `Aggregate` panel wraps the *anchored*
+  `df` so the steps-pre Lee line still rises from the baseline at its own signed
+  index (signed-aggregate regression preserved).
+
+No behavior change to the `'linear'` default beyond the continuous-panel trim
+and the reins staircase cosmetics. `plot_quantile`'s old array call shape is
+removed — direct callers pass a GD (see `tests/test_plot_return_period.py`).
+
 ## 1.0.0a111
 
 ### `GridDistribution` knows its sign (loss vs payoff)

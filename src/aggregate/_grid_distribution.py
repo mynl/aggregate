@@ -506,9 +506,16 @@ class GridDistribution:
         feasibility guard and the safeguarded root-find (:meth:`_invert_lev`,
         Newton with a bisection fallback) keep that failure mode explicit.
 
-        Conventions assume the **zero-based** grid (``x[0] == 0``, the
-        aggregate / portfolio convention) that :meth:`lev` and :meth:`q` are
-        built for; signed / payoff distributions are out of scope.
+        The capital anchor is a **loss-side** construction: ``a`` is an asset
+        level and ``L = E[min(X, a)]`` a limited *loss*, so the ``{p, L, a}``
+        identity is meaningful only for the loss orientation
+        (``is_loss_value=True``) on a **zero-based** grid (``x[0] == 0``, the
+        aggregate / portfolio convention that :meth:`lev` and :meth:`q` are
+        built for). Like the rest of the kernel this method does **not** consult
+        :attr:`is_loss_value` -- it cannot detect a misuse -- so the caller is
+        responsible for invoking it (and :meth:`lev` / :meth:`_invert_lev`) only
+        on a loss-oriented, zero-based GD; on a payoff GD the result is not a
+        capital anchor.
         """
         n = sum(v is not None for v in (p, L, a))
         if n != 1:

@@ -1,14 +1,17 @@
 # Plan — return-period x-axis for quantile (Lee) plots
 
-> **Status: FIRST CUT LANDED in 1.0.0a110 — REVISIT pending.** The feature works
-> and ships, but it threads orientation as `is_loss_value=agg._is_loss_value`
-> into the Lee worker. Once `GridDistribution` carries its own sign
-> (`dev/plan-gd-knows-sign.md`), revisit this: route the Lee workers to take a
-> **GD** (the holders already build `agg._grid_distribution()` /
-> `_sev_grid_distribution()`) and read orientation + the return-period map off
-> the GD, removing the `is_loss_value=` argument from `plot_aggregate` /
-> `plot_severity` / `plot_reins_occ`. Pulled back out of `dev/done/` until that
-> revisit lands. A deliberate exercise of the layered plotting framework
+> **Status: DONE.** First cut landed 1.0.0a110; the GD revisit landed
+> **1.0.0a112** (after `dev/done/plan-gd-knows-sign.md`). `plot_quantile(ax, gd,
+> …)` now consumes a `GridDistribution`: it derives the curve from
+> `(cumsum(gd.p), gd.x)`, trims the saturating top itself, and reads orientation
+> via `gd.return_period(p)`, so `is_loss_value=` is gone from `plot_aggregate` /
+> `plot_severity` / `plot_reins_occ`. The severity GD now inherits the
+> aggregate's role (so a payoff panel spreads one tail); `reins_occ_plot` wraps
+> its gross/ceded/net PMFs as GDs; the continuous-aggregate Lee panel is trimmed
+> at the saturating top too; a standalone `Severity` wraps its plot-grid `cdf`
+> as a throwaway GD, and the discrete `Aggregate` panel wraps the *anchored*
+> `df` to preserve the signed baseline anchor. A deliberate exercise of the
+> layered plotting framework
 > (`aggregate.plots`): a quantile/Lee panel option that plots the outcome
 > against **log return period** instead of the non-exceedance probability `p`.
 >

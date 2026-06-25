@@ -391,11 +391,35 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   headline wins are structurally weak (Jupyter `_repr_html_` doesn't fire from
   IPython tracebacks; Sphinx `pygments_style` is global). If docs identity ever
   becomes a priority, do only the minimal palette + Pygments-style slice.
-- [ ] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — extend `pnl` with
-  both premium legs. Now specced as the **GCN** view in `plan-pnl.md` §3.4
-  (`agg_re.make_pnl(gross=, ceded=)`, additive `Net = Gross + Ceded`).
+- [x] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — single-stage
+  (aggregate-only) **GCN** view landed in **1.0.0a106**
+  (`agg_re.make_pnl(gross=, ceded=)`, additive `Net = Gross + Ceded`). Multi-stage
+  occ+agg generalization → `dev/plan-pnl-gcn-reins.md`.
 - [ ] **Named Cherny–Madan acceptability families** (#23) — add the **MINMAXVAR**
   (and MAXVAR / MAXMINVAR) distortion kinds so `PnL.evaluate` can surface the
   *named* indices (AIMINMAXVAR, …). `@Cherny2009a`. v1.0 reports the panel by
-  family + `gini_p`; `dual` already *is* MINVAR. See `plan-pnl.md` §1.1.
+  family + `gini_p`; `dual` already *is* MINVAR. See `dev/done/plan-pnl.md` §1.1.
 - [ ] extend reinsurance clauses to allow net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros (rate on subject = quota share)
+
+## PnL follow-on plans (drafted post-1.0.0a106; v1.0 PnL A–E landed)
+
+The first-class `PnL` (Stages A–E) is in `dev/done/plan-pnl.md`. Next:
+
+- [ ] **First-class `PnL` distribution surface** — `dev/plan-pnl-first-class.md`.
+  `density_df` (net, full schema, indexed by net, groupby-sum), `stats_df`,
+  `info`, `_repr_html_`, `qd(pnl)`, `summary_df` quantile columns
+  (q01/q05/q95/q99). Confirmed: `pnl_df`→`density_df`; index by net; explicit
+  delegation (no `__getattr__`).
+- [ ] **Multi-stage GCN over occ and/or agg reins** — `dev/plan-pnl-gcn-reins.md`.
+  Source from `reins_density_df`; per-stage premiums; rows gross / ceded-occ /
+  net-occ / ceded-agg / net-agg, absent stages omitted; fixes true-gross under
+  occ+agg.
+- [ ] **`PortPnL` — portfolios of P&L positions** (#3.2) — `dev/plan-pnl-portfolio.md`.
+  Constant-consideration book is the cheap correct v1 (reuse Portfolio FFT +
+  stacked signed summary); loss-sensitive net-then-combine deferred.
+- [ ] **DecL unary minus on a severity** (`ssev -lognorm …`) —
+  `dev/plan-decl-sev-unary-minus.md`. Feasible/low-risk under Lark/Earley; watch
+  for grammar ambiguity. Not PnL-specific.
+- [ ] **Return-period x-axis for quantile/Lee plots** (`plot(quantile_x='return')`)
+  — `dev/plan-plot-return-period.md`. `T=1/(1−p)` loss / `1/p` payoff, log-x.
+  Plotting-framework test; not PnL-specific.

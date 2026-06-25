@@ -21,8 +21,8 @@ def test_rc_params_returns_copy():
 
 def test_use_sets_facecolor():
     aggregate.style.use(pandas=False)
-    assert plt.rcParams["axes.facecolor"] == "lightsteelblue"
-    assert plt.rcParams["figure.facecolor"] == "aliceblue"
+    assert plt.rcParams["axes.facecolor"] == "white"
+    assert plt.rcParams["figure.facecolor"] == "white"
 
 
 def test_use_pandas_toggle():
@@ -40,7 +40,7 @@ def test_context_scopes_rcparams():
     with aggregate.style.context():
         inside = plt.rcParams["axes.facecolor"]
     after = plt.rcParams["axes.facecolor"]
-    assert inside == "lightsteelblue"
+    assert inside == "white"
     assert before == after  # restored on exit
 
 
@@ -49,4 +49,4 @@ def test_context_overrides():
     with aggregate.style.context(**{"figure.figsize": (5.5, 3.5)}):
         assert tuple(plt.rcParams["figure.figsize"]) == (5.5, 3.5)
         # base style still applies for non-overridden keys
-        assert plt.rcParams["axes.facecolor"] == "lightsteelblue"
+        assert plt.rcParams["axes.facecolor"] == "white"

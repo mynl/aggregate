@@ -2458,7 +2458,7 @@ class Aggregate:
     def value_type(self, v):
         self._is_loss_value = value_type_role(v)
 
-    def make_pnl(self, consideration):
+    def make_pnl(self, consideration=None, *, gross=None, ceded=None, net=None):
         """Wrap this aggregate as the risky leg of a :class:`PnL` position.
 
         The net P&L is ``consideration - X`` when ``X`` is a loss and
@@ -2467,12 +2467,28 @@ class Aggregate:
         aggregate itself is left untouched (it is the obligation); the net is
         derived lazily on the :class:`PnL`.
 
+        Two construction modes:
+
+        * **single leg** -- ``make_pnl(consideration=C)``. On a reinsurance-
+          bearing aggregate this is a *net-only* P&L against the net loss (what
+          comes out of the aggregate).
+        * **Gross / Ceded / Net** -- ``make_pnl(gross=Pg, ceded=Pc[, net=Pn])``
+          on an **aggregate-reinsurance**-bearing aggregate: the additive
+          three-leg view (``Net = Gross + Ceded``). ``Pg`` is the gross premium
+          received, ``Pc`` the ceded premium paid; the net consideration is
+          ``Pg - Pc`` unless ``net=`` states the retained premium directly.
+
         Parameters
         ----------
-        consideration : float, array-like, or callable
-            The amount changing hands at inception, **signed** (``+`` received,
-            ``-`` paid). A callable ``f(x)`` is an increasing (loss-sensitive)
-            consideration applied bucket-wise on this aggregate's grid.
+        consideration : float, array-like, or callable, optional
+            The single-leg consideration, **signed** (``+`` received, ``-``
+            paid); a callable ``f(x)`` is a loss-sensitive consideration applied
+            bucket-wise. Mutually exclusive with ``gross``/``ceded``.
+        gross, ceded : float, optional
+            The gross premium received and ceded premium paid (positive
+            magnitudes) for the GCN view.
+        net : float, optional
+            Override the retained (net) premium; defaults to ``gross - ceded``.
 
         Returns
         -------
@@ -2481,10 +2497,11 @@ class Aggregate:
         Notes
         -----
         ``build('pnl NAME C prem - <body>')`` is sugar for
-        ``build('agg NAME <body>').make_pnl(consideration=C)``.
+        ``build('agg NAME <body>').make_pnl(consideration=C)``. The GCN view is a
+        Python-API construction (no DecL surface in this release).
         """
         from ._pnl import PnL
-        return PnL(self, consideration)
+        return PnL(self, consideration, gross=gross, ceded=ceded, net=net)
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, window_convention=None, **kwargs):

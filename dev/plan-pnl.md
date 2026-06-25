@@ -24,10 +24,17 @@
 >   full support (reuses `Distortion.calibrate_set`); returns the acceptability
 >   panel (ph/wang/dual/tvar, ccoc excluded) with breakeven `param` + `gini_p`
 >   (monotone in profit). Constant consideration only.
-> - Stage E (reins-aware GCN view, DecL swing/slide builder) and the deferred
->   `PortPnL` — pending.
+> - **Stage E — reins-aware Gross/Ceded/Net view — DONE (1.0.0a106).**
+>   `make_pnl(gross=, ceded=[, net=])` on an aggregate-reins leg → `gcn_df`, a
+>   doubly additive 3x3 exhibit (rows: Net=Gross+Ceded; cols: Margin=Consid+Oblig);
+>   net-only via `make_pnl(consideration=)`; Net drives moments/evaluate/plot
+>   (3-leg overlay). Python-API only.
+> - **v1.0 PnL scope complete.** Function-valued (callable) consideration shipped
+>   in Stage B/C. **Deferred (post-v1.0):** DecL swing/slide builder, book-level
+>   `PortPnL` (the net-then-combine attribution problem), named Cherny–Madan
+>   families (MINMAXVAR), independent/dependent `Aggregate` consideration leg.
 >
-> **Status: DRAFT — partially executed (Stages A, B, C, D landed).** Re-architects the `pnl` concept. **`pnl` is
+> **Status: DRAFT — v1.0 scope executed (Stages A–E landed; PortPnL & DecL swing deferred).** Re-architects the `pnl` concept. **`pnl` is
 > new and nothing external depends on it — this is a free *internal* change**, not
 > a compat-constrained migration; the return type of `build('pnl …')` changes
 > (`Aggregate` → `PnL`) and we update our own consumers freely. Version bump,

@@ -52,11 +52,34 @@ class PnL:
     -- see a later stage for ``evaluate``.
     """
 
-    def __init__(self, agg, consideration):
+    def __init__(self, agg, consideration=None, *, gross=None, ceded=None, net=None):
         self.agg = agg
-        self.consideration = consideration
         self.program = ''
         self._pnl_df = None
+        gcn = gross is not None or ceded is not None
+        if gcn:
+            if gross is None or ceded is None:
+                raise ValueError(
+                    'a Gross/Ceded/Net PnL needs both gross= and ceded= premiums.')
+            if consideration is not None:
+                raise ValueError(
+                    'pass either consideration= or gross=/ceded=, not both.')
+            if agg.agg_reins is None:
+                raise ValueError(
+                    'the Gross/Ceded/Net view requires aggregate reinsurance on '
+                    'the risky leg (gross/ceded/net loss distributions); the '
+                    "aggregate carries no 'aggregate net of/ceded to' treaty.")
+            # net consideration = gross received - ceded paid (or stated directly)
+            self._gcn = {'gross': float(gross), 'ceded': float(ceded)}
+            self.consideration = float(net) if net is not None \
+                else float(gross) - float(ceded)
+        else:
+            if consideration is None:
+                raise ValueError(
+                    'PnL needs a consideration= (or gross=/ceded= for the '
+                    'Gross/Ceded/Net view).')
+            self._gcn = None
+            self.consideration = consideration
 
     # ------------------------------------------------------------------
     # Identity / lifecycle
@@ -130,19 +153,21 @@ class PnL:
             (cdf), ``S`` (survival).
         """
         if self._pnl_df is None:
-            dd = self.agg.density_df
-            x = dd['loss'].to_numpy(dtype=float)
-            p = dd['p_total'].to_numpy(dtype=float)
-            y = self._net_values(x)
-            # group duplicate net outcomes (a callable consideration may not be
-            # injective) and sort ascending.
-            ser = pd.Series(p, index=y).groupby(level=0).sum().sort_index()
-            df = pd.DataFrame({'p_total': ser.to_numpy()},
-                              index=pd.Index(ser.index.to_numpy(), name='net'))
-            df['F'] = df['p_total'].cumsum()
-            df['S'] = 1.0 - df['F']
-            self._pnl_df = df
+            x, p = self._xp()
+            self._pnl_df = self._frame_from(self._net_values(x), p)
         return self._pnl_df
+
+    @staticmethod
+    def _frame_from(values, probs):
+        """A net frame (``p_total``/``F``/``S``, index ``net``) from ``(values,
+        probs)`` -- duplicate outcomes summed, sorted ascending.
+        """
+        ser = pd.Series(probs, index=values).groupby(level=0).sum().sort_index()
+        df = pd.DataFrame({'p_total': ser.to_numpy()},
+                          index=pd.Index(ser.index.to_numpy(), name='net'))
+        df['F'] = df['p_total'].cumsum()
+        df['S'] = 1.0 - df['F']
+        return df
 
     # ------------------------------------------------------------------
     # Moments (all on the shared loss grid (x, p), so the summary EX column
@@ -220,8 +245,12 @@ class PnL:
         -------
         pandas.DataFrame
             Rows ``Consideration`` / ``Obligation`` / ``Margin``; columns
-            ``EX`` / ``SD`` / ``Sk``.
+            ``EX`` / ``SD`` / ``Sk``. For a Gross/Ceded/Net position
+            (``make_pnl(gross=, ceded=)``) this is instead the additive GCN
+            exhibit -- see :meth:`gcn_df`.
         """
+        if self._gcn is not None:
+            return self.gcn_df
         x, p = self._xp()
         # consideration leg (constant -> certain, SD 0; callable -> f(X))
         if callable(self.consideration):
@@ -236,6 +265,52 @@ class PnL:
             {'EX': [cm, om, mm], 'SD': [csd, osd, msd], 'Sk': [csk, osk, msk]},
             index=['Consideration', 'Obligation', 'Margin'])
         df.index.name = 'P&L'
+        return df
+
+    @property
+    def gcn_df(self):
+        """The Gross / Ceded / Net exhibit -- **doubly additive**, signed.
+
+        For a ``make_pnl(gross=, ceded=)`` position on an aggregate-reinsurance
+        risky leg, a 3x3 table whose rows are the three legs and columns the
+        signed P&L parts, additive **both ways**:
+
+        - rows add: ``Net = Gross + Ceded`` (the legs are comonotone -- all
+          deterministic functions of the one gross loss -- so this stays 1-D, no
+          joint model); and
+        - columns add: ``Margin = Consideration + Obligation`` (the
+          :meth:`summary_df` convention).
+
+        The ceded leg is literally negative relative to gross: you **pay** the
+        ceded premium (Consideration ``-Pc``) and **receive** the recovery
+        (Obligation ``+E[R]``, a gain), so it nets the gross down to the
+        retained position. ``Net`` is the headline (it drives the net
+        :attr:`pnl_df`, moments, plot and :meth:`evaluate`).
+
+        Returns
+        -------
+        pandas.DataFrame
+            Rows ``Gross`` / ``Ceded`` / ``Net``; columns ``Consideration`` /
+            ``Obligation`` / ``Margin`` (expected values).
+        """
+        xs = self.agg.xs
+        if self.agg.agg_density_gross is None:
+            raise ValueError(
+                'no aggregate gross/ceded/net loss views on the risky leg; '
+                'update the aggregate (it must carry aggregate reinsurance).')
+        e_gross = float((xs * self.agg.agg_density_gross).sum())
+        e_recov = float((xs * self.agg.agg_density_ceded).sum())  # recovery R
+        e_net = float((xs * self.agg.agg_density_net).sum())
+        pg = self._gcn['gross']
+        pc = self._gcn['ceded']
+        pn = float(self.consideration)
+        # signed P&L contributions (loss subtracts, recovery adds).
+        df = pd.DataFrame(
+            {'Consideration': [pg, -pc, pn],
+             'Obligation': [-e_gross, e_recov, -e_net],
+             'Margin': [pg - e_gross, e_recov - pc, pn - e_net]},
+            index=['Gross', 'Ceded', 'Net'])
+        df.index.name = 'leg'
         return df
 
     # ------------------------------------------------------------------

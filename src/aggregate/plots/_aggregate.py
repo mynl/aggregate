@@ -152,7 +152,9 @@ def plot_pnl(pnl, axd=None, **kwargs):
     ``pnl.pnl_df``. There is **no severity panel**: a P&L is an affine of its
     aggregate, not a compound of a severity (that ``d/dx`` panel belongs to an
     :class:`Aggregate`; plot the bare risky leg via ``pnl.agg.plot()``). The
-    break-even line at 0 is marked.
+    break-even line at 0 is marked. For a Gross/Ceded/Net position
+    (``make_pnl(gross=, ceded=)``) the three legs' margins are overlaid, ``Net``
+    the heavy line.
 
     Parameters
     ----------
@@ -172,25 +174,36 @@ def plot_pnl(pnl, axd=None, **kwargs):
     else:
         pnl.figure = axd['A'].figure
 
-    df = pnl.pnl_df
     bs = pnl.agg.bs
+    discrete = bs == 1 and abs(pnl.mean) < 1025
     ax = axd['A']
-    if bs == 1 and abs(pnl.mean) < 1025:
-        # discrete: stems for the mass, a step cdf
-        ax.stem(df.index, df.p_total, basefmt='none', linefmt='C0-',
-                markerfmt='C0.', label='Margin')
-        ax.set(title='Probability mass function', xlabel='Net P&L')
-        df.F.plot(ax=axd['B'], drawstyle='steps-post', lw=2, label='Margin')
+
+    # The legs to draw: Net only (single leg), or Gross/Ceded/Net overlaid.
+    if pnl._gcn is not None:
+        xs = pnl.agg.xs
+        pg, pc = pnl._gcn['gross'], pnl._gcn['ceded']
+        legs = [
+            ('Gross', pnl._frame_from(pg - xs, pnl.agg.agg_density_gross), 1),
+            ('Ceded', pnl._frame_from(xs - pc, pnl.agg.agg_density_ceded), 1),
+            ('Net', pnl.pnl_df, 2.5),
+        ]
     else:
-        # continuous: density (mass / bs) and the cdf
-        (df.p_total / bs).plot(ax=ax, lw=2, label='Margin')
-        ax.set(title='Probability density', xlabel='Net P&L')
-        df.F.plot(ax=axd['B'], lw=2, label='Margin')
+        legs = [('Margin', pnl.pnl_df, 2)]
+
+    for label, f, lw in legs:
+        if discrete:
+            f.p_total.plot(ax=ax, drawstyle='steps-mid', lw=lw, label=label)
+            f.F.plot(ax=axd['B'], drawstyle='steps-post', lw=lw, label=label)
+        else:
+            (f.p_total / bs).plot(ax=ax, lw=lw, label=label)
+            f.F.plot(ax=axd['B'], lw=lw, label=label)
+    ax.set(title='Probability mass function' if discrete else 'Probability density',
+           xlabel='P&L')
     # break-even reference (a P&L can be a loss)
     for a in (ax, axd['B']):
         a.axvline(0.0, lw=0.75, color='C7', ls='--')
     ax.legend()
-    axd['B'].set(title='Distribution function', xlabel='Net P&L')
+    axd['B'].set(title='Distribution function', xlabel='P&L')
     return pnl.figure
 
 

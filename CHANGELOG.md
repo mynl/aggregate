@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.0a106
+
+### Reinsurance-aware Gross / Ceded / Net `PnL` view (Stage E of `PnL`)
+
+`PnL` is reinsurance-aware. On an **aggregate-reinsurance**-bearing risky leg:
+
+- `agg_re.make_pnl(consideration=P)` is a **net-only** P&L against the net loss
+  (what comes out of the aggregate) — unchanged single-leg behaviour;
+- `agg_re.make_pnl(gross=Pg, ceded=Pc[, net=Pn])` builds the **Gross / Ceded /
+  Net** view. `PnL.gcn_df` (also returned by `summary_df`) is a **doubly
+  additive** 3×3 exhibit: rows add (`Net = Gross + Ceded`, the legs are
+  comonotone — 1-D, no joint model) and columns add (`Margin = Consideration +
+  Obligation`). The ceded leg is literally negative: you pay the ceded premium
+  (`−Pc`) and receive the recovery (`+E[R]`). `net=` overrides the retained
+  premium (default `Pg − Pc`).
+- **Net is the headline** — it drives the net `pnl_df`, moments, `evaluate`, and
+  `plot()` (which overlays the three legs' margins, Net the heavy line).
+
+Constructed via the Python API (no DecL surface). Requires aggregate
+reinsurance; both `gross=` and `ceded=` are required, and are mutually exclusive
+with `consideration=`. (Function-valued consideration already shipped in a103;
+the DecL swing/slide builder and book-level `PortPnL` remain deferred.)
+
 ## 1.0.0a105
 
 ### `PnL.evaluate()` — the Cherny–Madan breakeven acceptability panel (Stage D of `PnL`)

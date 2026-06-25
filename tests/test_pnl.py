@@ -319,3 +319,82 @@ def test_evaluate_function_consideration_deferred():
         lambda x: 100.0 + 0.5 * x)
     with pytest.raises(NotImplementedError, match='constant consideration'):
         pnl.evaluate()
+
+
+# ----------------------------------------------------------------------
+# Reinsurance-aware Gross / Ceded / Net view
+# ----------------------------------------------------------------------
+_REINS = 'agg R 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000'
+
+
+def test_gcn_doubly_additive():
+    """gcn_df: rows add (Net = Gross + Ceded) AND columns add (Margin = C + O)."""
+    g = build(_REINS).make_pnl(gross=5500, ceded=1800).gcn_df
+    assert list(g.index) == ['Gross', 'Ceded', 'Net']
+    assert list(g.columns) == ['Consideration', 'Obligation', 'Margin']
+    # rows: the comonotone legs add
+    assert np.allclose(g.loc['Net'].to_numpy(),
+                       g.loc['Gross'].to_numpy() + g.loc['Ceded'].to_numpy())
+    # columns: Margin = Consideration + Obligation
+    assert np.allclose(g['Margin'].to_numpy(),
+                       g['Consideration'].to_numpy() + g['Obligation'].to_numpy())
+    # the ceded leg is literally negative: pay premium, receive recovery
+    assert g.loc['Ceded', 'Consideration'] == pytest.approx(-1800.0)
+    assert g.loc['Ceded', 'Obligation'] > 0          # recovery is a gain
+
+
+def test_gcn_summary_df_is_gcn():
+    """summary_df routes to the GCN exhibit for a Gross/Ceded/Net position."""
+    p = build(_REINS).make_pnl(gross=5500, ceded=1800)
+    assert list(p.summary_df.index) == ['Gross', 'Ceded', 'Net']
+    # net consideration defaults to gross - ceded
+    assert p.consideration == pytest.approx(3700.0)
+
+
+def test_gcn_net_override():
+    """net= overrides the derived gross - ceded retained premium."""
+    p = build(_REINS).make_pnl(gross=5500, ceded=1800, net=4000)
+    assert p.consideration == pytest.approx(4000.0)
+    assert p.gcn_df.loc['Net', 'Consideration'] == pytest.approx(4000.0)
+
+
+def test_gcn_net_leg_drives_moments_and_evaluate():
+    """Net is the headline: it drives pnl_df / moments / evaluate."""
+    agg = build(_REINS)
+    p = agg.make_pnl(gross=5500, ceded=1800)
+    e_net = float((agg.xs * agg.agg_density_net).sum())
+    assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
+    # evaluate runs on the net leg
+    assert list(p.evaluate().index) == ['ph', 'wang', 'dual', 'tvar']
+
+
+def test_net_only_on_reins_agg():
+    """make_pnl(consideration=) on a reins agg is a net-only P&L (no GCN)."""
+    agg = build(_REINS)
+    p = agg.make_pnl(consideration=3700)
+    assert p._gcn is None
+    e_net = float((agg.xs * agg.agg_density_net).sum())
+    assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
+    assert list(p.summary_df.index) == ['Consideration', 'Obligation', 'Margin']
+
+
+def test_gcn_requires_both_premiums_and_agg_reins():
+    agg = build(_REINS)
+    with pytest.raises(ValueError, match='both gross'):
+        agg.make_pnl(gross=5500)
+    with pytest.raises(ValueError, match='not both'):
+        agg.make_pnl(consideration=100, gross=5500, ceded=1800)
+    # no aggregate reinsurance -> no gross/ceded/net views
+    plain = build('agg P 100 claims sev lognorm 50 cv 1.5 poisson')
+    with pytest.raises(ValueError, match='aggregate reinsurance'):
+        plain.make_pnl(gross=5500, ceded=1800)
+
+
+def test_gcn_plot_overlays_three_legs():
+    import matplotlib
+    matplotlib.use('Agg')
+    p = build(_REINS).make_pnl(gross=5500, ceded=1800)
+    fig = p.plot()
+    assert len(fig.axes) == 2
+    # three lines (Gross/Ceded/Net) on the density panel
+    assert len(fig.axes[0].get_lines()) >= 3

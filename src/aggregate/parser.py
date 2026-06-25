@@ -954,6 +954,15 @@ class UnderwritingTransformer(Transformer):
     # ----- severity (continuous) ------------------------------------
     def sev_clause_sev(self, c):
         _sev, sev = c
+        if sev.get("sev_reflect", False):
+            # A reflected severity (``-X`` / ``shift - X``) is inherently signed
+            # -- it carries negative support. The plain ``sev`` clause builds a
+            # clamped, non-negative severity, so accepting a reflected body here
+            # would be ambiguous (does the negative half survive?). Require the
+            # explicit signed keyword instead. See dev/done/plan-decl-sev-unary-minus.md.
+            raise ValueError(
+                "DecL: a reflected (signed) severity needs 'ssev', not 'sev' "
+                "(reflection produces negative support; use 'ssev' to keep it)")
         return sev
 
     def sev_clause_ssev(self, c):
@@ -1054,6 +1063,29 @@ class UnderwritingTransformer(Transformer):
         if "sev_loc" in sev0:
             sev0["sev_loc"] = _check_vectorizable(sev0["sev_loc"]) * mag
         return sev0
+
+    def sev1_negate(self, c):
+        """``- X``: bare unary minus on a severity -> reflect it (``0 - X``).
+
+        Sugar for the working ``0 - X`` (``sev2_rsub`` with an implicit zero
+        shift). Unary minus binds *tighter* than the additive ``+/- c`` shift
+        (standard math precedence), so it negates at the ``sev1`` level and a
+        trailing shift wraps the reflected term: ``-lognorm 2 + 5`` parses as
+        ``(-X) + 5 == 5 - X``, *not* ``-(X + 5)``.
+
+        ``X`` (``sev1``) has value ``Lx + s*base`` with ``s = -1`` if already
+        reflected else ``+1``. A pure reflection ``-X = -Lx + (-s)*base`` negates
+        any location and toggles ``sev_reflect``. An *absent* ``sev_loc`` is left
+        absent (``-0 == 0``), matching the ``sev1_scaled`` convention so the form
+        is byte-identical to the canonical ``-1 * X`` under the unparser. Valid
+        only under ``ssev`` (a reflected severity is signed); ``sev_clause_sev``
+        rejects it under plain ``sev``.
+        """
+        _minus, sev1 = c
+        if "sev_loc" in sev1:
+            sev1["sev_loc"] = -_check_vectorizable(sev1["sev_loc"])
+        sev1["sev_reflect"] = not sev1.get("sev_reflect", False)
+        return sev1
 
     def sev1_passthrough(self, c):
         return c[0]

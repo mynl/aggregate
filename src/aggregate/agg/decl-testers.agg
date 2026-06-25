@@ -427,7 +427,7 @@ agg WinCts 100000 claims sev lognorm 100 cv 0.5 poisson
 # SBJ.Heavy is a positive heavy unlimited sev (window extends when log2 allows);
 # SBJ.Small is the constrained-log2 guard (keep the MoM window, honor log2).
 # See tests/test_bucket_sizing.py and dev/plan-bucket-window-2.md (1A-fix).
-agg SBJ.Signed 10 claims sev 100 - lognorm 10 cv 2.5 poisson                                                 note{signed heavy-left; grid must span the reach or the FFT aliases};
+agg SBJ.Signed 10 claims ssev 100 - lognorm 10 cv 2.5 poisson                                                note{signed heavy-left; grid must span the reach or the FFT aliases};
 agg SBJ.Heavy  5000 claims sev lognorm 100 cv 2 poisson                                                      note{positive heavy unlimited; far tail ~8e5, extends when log2 allows};
 agg SBJ.Small  5 claims sev lognorm 10 cv 2 poisson                                                          note{small heavy book, tail ~47k; constrained log2 keeps the MoM window}
 
@@ -550,3 +550,16 @@ agg SC.Base0  dfreq [1] dsev [0 10 20] [.5 .3 .2]                               
 agg SC.Signed dfreq [1] dsev [-10 0 10] [.5 .3 .2]                                                                note{Base0 slid -10: signed loss, shift-exact twin};
 pnl SC.Pnl    10 prem - dfreq [1] dsev [2 5 12] [.4 .4 .2]                                                        note{payoff: reversed then shifted; ask price = -P via g_dual};
 agg SC.Classic 50 claims sev lognorm 40 cv 1.5 poisson                                                            note{classic non-negative loss: transform branch never entered}
+
+# ============================================================
+# UM. DecL unary minus on a severity (1.0.0a109)
+# ============================================================
+# Bare unary minus `ssev -X` reflects the severity, sugar for the working
+# `ssev 0 - X`. Unary minus binds tighter than the additive shift, so
+# `-lognorm 2 + 5` is `(-X) + 5 == 5 - X`. A reflected severity is signed, so
+# the clamped `sev` clause rejects it (see tests/test_parser_errors.py). Round-
+# trips via the canonical `-1 * X` scaled form. See tests/test_decl_parser.py
+# and dev/done/plan-decl-sev-unary-minus.md.
+agg UM.Negate 10 claims ssev -lognorm 10 cv 0.5 poisson                                                          note{bare unary minus reflects; parity with `ssev 0 - lognorm`};
+agg UM.Shift  10 claims ssev -lognorm 2 cv 0.5 + 5 poisson                                                       note{tight bind: (-X) + 5 == 5 - X, mean 3};
+agg UM.Scaled 10 claims ssev -3 * lognorm 2 cv 0.5 poisson                                                       note{negative NUMBER -3 stays on the scaled path, mean -6}

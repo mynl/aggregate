@@ -233,6 +233,7 @@
         | sev1                   -> sev2_passthrough
     
     sev1: numbers TIMES sev0     -> sev1_scaled
+        | MINUS sev1             -> sev1_negate
         | sev0                   -> sev1_passthrough
     
     sev0: ids numbers CV numbers   -> sev0_mean_cv

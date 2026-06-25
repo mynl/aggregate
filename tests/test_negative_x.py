@@ -499,3 +499,46 @@ def test_positive_mean_sd_unchanged():
     assert a.agg_sd == pytest.approx(np.sqrt(ex2 - a.agg_m ** 2), rel=1e-12)
     assert a.agg_sd == pytest.approx(a.agg_m * a.agg_cv, rel=1e-12)
     assert a.agg_var == pytest.approx(a.agg_sd ** 2, rel=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# DecL unary minus on a severity (`ssev -X`) -- dev/done/plan-decl-sev-unary-minus.md
+# ---------------------------------------------------------------------------
+
+def test_unary_minus_parity_with_zero_sub():
+    """``ssev -X`` is sugar for ``ssev 0 - X`` (a pure reflection)."""
+    a = build('agg UMa 10 claims ssev -lognorm 10 cv 0.5 poisson')
+    b = build('agg UMb 10 claims ssev 0 - lognorm 10 cv 0.5 poisson')
+    assert a.sev_m == pytest.approx(b.sev_m, rel=1e-12)
+    assert a.sev_m == pytest.approx(-10.0, rel=1e-9)        # reflected mean
+    assert a.sev_sd == pytest.approx(b.sev_sd, rel=1e-12)
+
+
+def test_unary_minus_binds_tighter_than_shift():
+    """Standard precedence: ``-X + 5`` is ``(-X) + 5 == 5 - X``, not ``-(X+5)``."""
+    a = build('agg UMc 10 claims ssev -lognorm 2 cv 0.5 + 5 poisson')
+    b = build('agg UMd 10 claims ssev 5 - lognorm 2 cv 0.5 poisson')
+    assert a.sev_m == pytest.approx(b.sev_m, rel=1e-12)
+    assert a.sev_m == pytest.approx(3.0, rel=1e-9)          # 5 - E[X] = 5 - 2
+
+
+def test_unary_minus_negative_number_stays_scaled():
+    """``-3 * X`` lexes ``-3`` as one NUMBER (the scaled path), not unary minus."""
+    a = build('agg UMe 10 claims ssev -3 * lognorm 2 cv 0.5 poisson')
+    assert a.sev_m == pytest.approx(-6.0, rel=1e-9)         # -3 * E[X]
+
+
+def test_unary_minus_double_negation_cancels():
+    """``--X`` (two unary minuses) toggles ``sev_reflect`` twice -> back to X."""
+    a = build('agg UMf 10 claims ssev - -lognorm 10 cv 0.5 poisson')
+    assert a.sev_m == pytest.approx(10.0, rel=1e-9)
+
+
+@pytest.mark.parametrize('program', [
+    'agg Bad1 10 claims sev -lognorm 10 cv 0.5 poisson',   # unary minus
+    'agg Bad2 10 claims sev 0 - lognorm 10 cv 0.5 poisson',  # rsub reflection
+])
+def test_reflected_severity_rejected_under_plain_sev(program):
+    """A reflected (signed) severity needs ``ssev``; plain ``sev`` rejects it."""
+    with pytest.raises(Exception, match="needs 'ssev'"):
+        build(program)

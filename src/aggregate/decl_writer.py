@@ -299,7 +299,10 @@ def _render_sev_clause(spec: dict) -> str:
     """Render the severity clause of an aggregate: ``dsev``, ``sev`` or ``ssev``."""
     if _is_dsev(spec):
         return _render_dsev(spec)
-    kw = 'ssev' if spec.get('sev_signed') else 'sev'
+    # A reflected severity is signed (negative support) and the parser now
+    # rejects it under the clamped ``sev`` clause, so it must round-trip as
+    # ``ssev`` regardless of the explicit ``sev_signed`` flag.
+    kw = 'ssev' if (spec.get('sev_signed') or spec.get('sev_reflect')) else 'sev'
     return f'{kw} {_render_dist(spec)}'
 
 

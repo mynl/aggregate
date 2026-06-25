@@ -110,12 +110,15 @@ def plot_aggregate(agg, axd=None, xmax=0, **kwargs):
         # little care: may not exaclty equal 1
         idx = (df.F == df.F.max()).idxmax()
         dft = df.loc[:idx]
-        plot_quantile(ax, dft.F, dft.loss, is_loss_value=agg._is_loss_value,
+        # Panel orientation comes from the aggregate's self-describing GD; the
+        # severity curve follows the aggregate role (it shares this panel).
+        lee_is_loss = agg._grid_distribution().is_loss_value
+        plot_quantile(ax, dft.F, dft.loss, is_loss_value=lee_is_loss,
                       drawstyle='steps-pre', lw=3, label='Aggregate', **kwargs)
         # same trim for severity (on its own grid)
         sidx = (sdf.F_sev >= 1).idxmax()
         sdft = sdf.loc[:sidx]
-        plot_quantile(ax, sdft.F_sev, sdft.loss, is_loss_value=agg._is_loss_value,
+        plot_quantile(ax, sdft.F_sev, sdft.loss, is_loss_value=lee_is_loss,
                       drawstyle='steps-pre', lw=1, label='Severity', **kwargs)
         ax.legend().set(visible=False)
     else:
@@ -149,9 +152,11 @@ def plot_aggregate(agg, axd=None, xmax=0, **kwargs):
         ax.set(xlim=[-0.02, 1.02], ylim=xlim, title='Quantile (Lee) plot',
                xlabel='Non-exceeding probability p')
         # to do: same trimming for p-->1 needed?
-        plot_quantile(ax, df.F, df.loss, is_loss_value=agg._is_loss_value,
+        # Panel orientation from the aggregate GD; severity follows (shared panel).
+        lee_is_loss = agg._grid_distribution().is_loss_value
+        plot_quantile(ax, df.F, df.loss, is_loss_value=lee_is_loss,
                       lw=2, label='Aggregate', **kwargs)
-        plot_quantile(ax, sdf.F_sev, sdf.loss, is_loss_value=agg._is_loss_value,
+        plot_quantile(ax, sdf.F_sev, sdf.loss, is_loss_value=lee_is_loss,
                       lw=1, label='Severity', **kwargs)
         ax.legend().set(visible=False)
 
@@ -260,6 +265,7 @@ def plot_reins_occ(agg, axs=None, **kwargs):
     # ``quantile_x='linear'`` and overrides it for ``'return'``.
     ax1.set(xlabel='Probability of non-exceedance', ylabel='Loss', title='Aggregate')
     y = rd.loss.values
+    lee_is_loss = agg._grid_distribution().is_loss_value
     for c, col in [('gross', 'p_agg_gross'), ('ceded', 'p_agg_ceded_occ'),
                    ('net', 'p_agg_net_occ')]:
         # Plot-cosmetic de-fuzz: deliberate carve-out from the shared
@@ -270,6 +276,6 @@ def plot_reins_occ(agg, axs=None, **kwargs):
         s_values = s[::-1].cumsum()[::-1]
         s_values = np.where(np.abs(s_values) < 1e-15, 0, s_values)
         s_values = np.where(s_values == 0, np.nan, s_values)
-        plot_quantile(ax1, 1 - s_values, y, is_loss_value=agg._is_loss_value,
+        plot_quantile(ax1, 1 - s_values, y, is_loss_value=lee_is_loss,
                       label=c, **kwargs)
     ax1.legend()

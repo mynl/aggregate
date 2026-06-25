@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.0.0a111
+
+### `GridDistribution` knows its sign (loss vs payoff)
+
+Orientation — whether `X = 1` means "I pay 1" (**loss**) or "I receive 1"
+(**payoff**) — is now an intrinsic, immutable property of a `GridDistribution`
+(GD) rather than a side-channel flag threaded through every orientation-aware
+call. `GridDistribution(x, p, ..., is_loss_value=True)` and
+`GridDistribution.from_series(..., is_loss_value=True)` accept the role, expose
+it as the read-only `gd.is_loss_value`, surface it in `__repr__`
+(`GridDistribution 'name' (n=…, bs=…, loss|payoff)`), and propagate it through
+`gd.cap(a)`. The default is `True`, so sign-agnostic callers (including the
+pricing GDs in `bounds.py`) are unaffected.
+
+The **objective kernel is untouched**: `q`, `var`, `tvar`, `tvar_threshold`,
+`cdf`, `sf`, `pmf`, `mean`, `lev`, `tvar_of_limited` never read `is_loss_value`
+— they describe the random variable and are identical for a loss or a payoff
+(existing numeric tests pass byte-for-byte). Orientation is consulted only by
+the "which side is bad?" operations.
+
+The loss/payoff return-period map now lives on the GD: `gd.return_period(p)`
+returns `T = 1/(1−p)` for a loss and `T = 1/p` for a payoff, delegating to a new
+module-level `return_period_map(p, is_loss_value)` so the Lee/quantile plot
+worker and the upcoming summary `tail_df` share **one** implementation instead
+of each re-deriving the branch. The Lee worker (`plot_quantile`) keeps its
+array-based signature but now reads this shared map and caps directly on `T`
+(behavior-preserving); the `Aggregate` plot compositors source the panel
+orientation from the aggregate's own GD (`agg._grid_distribution().is_loss_value`),
+with the severity curve following the aggregate role (the panel convention).
+
+Holders thread their role into the GD they build (`Aggregate` /
+`Portfolio._grid_distribution()`), and the `Aggregate.value_type` setter now
+resets the GD caches (`_dist`, `_sev_dist`) so a post-build role change rebuilds
+with the new orientation. Pricing call sites that already thread
+`is_loss_value=` into `effective_g` are left as a defaulted shim for now.
+
 ## 1.0.0a110
 
 ### Feature: return-period x-axis for quantile (Lee) plots (`quantile_x='return'`)

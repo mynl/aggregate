@@ -420,11 +420,13 @@ The first-class `PnL` (Stages A–E) is in `dev/done/plan-pnl.md`. Next:
 - [x] **DecL unary minus on a severity** (`ssev -lognorm …`) — done 1.0.0a109,
   `dev/done/plan-decl-sev-unary-minus.md`. `sev1: MINUS sev1 -> sev1_negate`;
   reflected severity now requires `ssev` (plain `sev` rejects it).
-- [ ] **`GridDistribution` knows its sign (loss vs payoff)** —
-  `dev/plan-gd-knows-sign.md`. Make orientation an immutable GD property so
-  `Distortion.price(gd)` / the Lee plot consume a self-describing object instead
-  of a threaded `is_loss_value=` flag; the objective kernel (q/var/tvar/…) is
-  unchanged. **Do this FIRST** of the current run.
+- [x] **`GridDistribution` knows its sign (loss vs payoff)** — done 1.0.0a111,
+  `dev/done/plan-gd-knows-sign.md`. GD gained read-only `is_loss_value`
+  (`__repr__` + `cap` propagate it) and `return_period(p)` (shared module-level
+  `return_period_map`); kernel unchanged. Holders thread their role into the GD;
+  `Aggregate.value_type` setter resets the GD caches. Lee worker stays
+  array-based but reads the shared map; compositors source orientation off the
+  aggregate GD. Pricing `effective_g` kwarg left as a defaulted shim.
 - [~] **Return-period x-axis for quantile/Lee plots** (`plot(quantile_x='return')`)
   — `dev/plan-plot-return-period.md`. First cut landed 1.0.0a110 (`T=1/(1−p)`
   loss / `1/p` payoff, log-x; on `Aggregate.plot`, `Severity.plot`,

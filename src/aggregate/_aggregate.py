@@ -2460,6 +2460,11 @@ class Aggregate:
     @value_type.setter
     def value_type(self, v):
         self._is_loss_value = value_type_role(v)
+        # The cached GridDistributions carry the orientation, so a post-build
+        # role change must drop them; the next accessor rebuilds with the new
+        # is_loss_value. (Until now only update() reset these caches.)
+        self._dist = None
+        self._sev_dist = None
 
     def make_pnl(self, consideration=None, *, gross=None, ceded=None, net=None):
         """Wrap this aggregate as the risky leg of a :class:`PnL` position.
@@ -4386,7 +4391,8 @@ class Aggregate:
         """
         if self._dist is None:
             self._dist = GridDistribution.from_series(
-                self.density_df.p_total, bs=self.bs, name=self.name)
+                self.density_df.p_total, bs=self.bs, name=self.name,
+                is_loss_value=self._is_loss_value)
         return self._dist
 
     def _sev_grid_distribution(self):

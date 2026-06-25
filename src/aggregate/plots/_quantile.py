@@ -29,6 +29,7 @@ the keyword through ``**kwargs``.
 
 import numpy as np
 
+from .._grid_distribution import return_period_map
 from ._style import ticker
 
 __all__ = ['plot_quantile', 'MAX_RETURN_PERIOD']
@@ -95,15 +96,12 @@ def plot_quantile(ax, p, loss, quantile_x='linear', is_loss_value=True,
 
     p = np.asarray(p, dtype=float)
     loss = np.asarray(loss, dtype=float)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        if is_loss_value:
-            # bad tail at large p; cap T <= max -> p <= 1 - 1/max.
-            keep = p <= 1.0 - 1.0 / max_return_period
-            t = 1.0 / (1.0 - p)
-        else:
-            # bad tail at small p; cap T <= max -> p >= 1/max.
-            keep = p >= 1.0 / max_return_period
-            t = 1.0 / p
+    # The loss/payoff branch lives on the GridDistribution (return_period_map);
+    # the worker reads the same map rather than re-deriving 1/(1-p) vs 1/p.
+    t = return_period_map(p, is_loss_value)
+    # Cap directly on T: T <= max drops the diverging endpoint, and any NaN gap
+    # (nan <= max is False) too, so a pre-trimmed survival curve passes cleanly.
+    keep = t <= max_return_period
     lines = ax.plot(t[keep], loss[keep], **kwargs)
 
     # Own the x axis: log scale, decade ticks, label. Then re-enable

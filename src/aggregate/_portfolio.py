@@ -1518,7 +1518,8 @@ class Portfolio(object):
         """
         if self._dist is None:
             self._dist = GridDistribution.from_series(
-                self.density_df.p_total, bs=self.bs, name=self.name)
+                self.density_df.p_total, bs=self.bs, name=self.name,
+                is_loss_value=self._is_loss_value)
         return self._dist
 
     def cdf(self, x):

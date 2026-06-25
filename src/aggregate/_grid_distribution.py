@@ -30,7 +30,41 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import bisect
 
-__all__ = ['GridDistribution', 'make_var_tvar', 'ProbLossAssets']
+__all__ = ['GridDistribution', 'make_var_tvar', 'ProbLossAssets',
+           'return_period_map']
+
+
+def return_period_map(p, is_loss_value=True):
+    """Return period ``T`` for non-exceedance probabilities ``p`` under a role.
+
+    The loss/payoff branch in one place, so every consumer (the Lee/quantile
+    plot worker and the summary ``tail_df``) reads the same map instead of
+    re-deriving it.
+
+    Parameters
+    ----------
+    p : float or array_like
+        Non-exceedance probability ``F(x)``.
+    is_loss_value : bool, default True
+        Orientation. ``True`` (loss): the bad outcomes are rare *large* losses
+        at large ``p``, so ``T = 1 / (1 - p)``. ``False`` (payoff): the bad
+        outcomes are rare *low* payoffs at small ``p``, so ``T = 1 / p``.
+
+    Returns
+    -------
+    float or ndarray
+        Return period ``T``. Diverges (``inf``) at the saturating endpoint
+        (``p -> 1`` loss, ``p -> 0`` payoff); the caller caps / drops it.
+
+    Notes
+    -----
+    Pure function of ``(p, is_loss_value)``;
+    :meth:`GridDistribution.return_period` is the bound form that supplies the
+    distribution's own orientation.
+    """
+    p = np.asarray(p, dtype=float)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return 1.0 / (1.0 - p) if is_loss_value else 1.0 / p
 
 
 QuantileFunctions = namedtuple("QuantileFunctions", 'q q_lower var q_upper tvar')
@@ -157,6 +191,12 @@ class GridDistribution:
         raise a clear error.
     name : str, optional
         Display name.
+    is_loss_value : bool, default True
+        Orientation of the cash flow ``X``: ``True`` if ``X = 1`` means "I pay
+        1" (a **loss**, more is worse), ``False`` if it means "I receive 1" (a
+        **payoff**, more is better). Fixed at construction and read-only -- part
+        of the cash flow's identity, set by whoever builds the distribution.
+        Defaults ``True`` for the sign-agnostic callers that do not care.
 
     Notes
     -----
@@ -166,26 +206,35 @@ class GridDistribution:
     by ``bs`` -- only :meth:`pdf` / :meth:`snap` (and :meth:`lev` when ``bs`` is
     supplied) touch spacing. A ``bs``-divide creeping into ``tvar`` / ``q`` is a
     bug.
+
+    **Orientation is metadata, not a kernel input.** The objective accessors
+    above describe the random variable and are identical for a loss or a payoff,
+    so they never read :attr:`is_loss_value`. The flag is consulted only by the
+    "which side is bad?" operations -- pricing (which tail a distortion loads)
+    and :meth:`return_period` (which tail the return-period axis spreads).
     """
 
-    def __init__(self, x, p, bs=None, name=''):
+    def __init__(self, x, p, bs=None, name='', is_loss_value=True):
         self._x = np.asarray(x, dtype=float)
         self._p = np.asarray(p, dtype=float)
         self.bs = bs
         self.name = name
+        self._is_loss_value = bool(is_loss_value)
         self._vt = None              # lazy var/tvar kernel cache, owned HERE
         self._cum = None             # lazy cumulative (for cdf/sf/lev)
 
     @classmethod
-    def from_series(cls, ser, bs=None, name=''):
+    def from_series(cls, ser, bs=None, name='', is_loss_value=True):
         """Build from a ``pd.Series`` (index = outcomes, values = mass)."""
         return cls(np.asarray(ser.index, dtype=float), ser.to_numpy(dtype=float),
-                   bs, name or (ser.name if ser.name is not None else ''))
+                   bs, name or (ser.name if ser.name is not None else ''),
+                   is_loss_value)
 
     def __repr__(self):
         nm = f' {self.name!r}' if self.name else ''
         bs = '' if self.bs is None else f', bs={self.bs:g}'
-        return f'GridDistribution{nm} (n={len(self._x)}{bs})'
+        role = 'loss' if self._is_loss_value else 'payoff'
+        return f'GridDistribution{nm} (n={len(self._x)}{bs}, {role})'
 
     @property
     def x(self):
@@ -196,6 +245,26 @@ class GridDistribution:
     def p(self):
         """The probability mass vector (read-only view)."""
         return self._p
+
+    @property
+    def is_loss_value(self):
+        """Orientation (read-only): ``True`` loss, ``False`` payoff.
+
+        Metadata fixed at construction -- the objective kernel never consults
+        it; only :meth:`return_period` and pricing do.
+        """
+        return self._is_loss_value
+
+    def return_period(self, p):
+        """Return period ``T`` for non-exceedance probabilities ``p``.
+
+        Maps ``p`` to ``T`` through this distribution's own orientation:
+        ``T = 1 / (1 - p)`` for a loss (bad tail at large ``p``), ``T = 1 / p``
+        for a payoff (bad tail at small ``p``). Delegates to the shared
+        :func:`return_period_map` so the Lee plot and the summary ``tail_df``
+        read one implementation. Vectorizes over an array of ``p``.
+        """
+        return return_period_map(p, self._is_loss_value)
 
     # ------------------------------------------------------------------
     # lazy cores
@@ -508,9 +577,11 @@ class GridDistribution:
         """
         x, p = self._x, self._p
         if a >= x[-1]:
-            return GridDistribution(x.copy(), p.copy(), self.bs, self.name)
+            return GridDistribution(x.copy(), p.copy(), self.bs, self.name,
+                                    self._is_loss_value)
         mask = x < a
         tail = float(np.sum(p[~mask]))
         new_x = np.append(x[mask], a)
         new_p = np.append(p[mask], tail)
-        return GridDistribution(new_x, new_p, self.bs, self.name)
+        return GridDistribution(new_x, new_p, self.bs, self.name,
+                                self._is_loss_value)

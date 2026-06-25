@@ -1,6 +1,24 @@
 # Plan — `GridDistribution` knows its sign (loss vs payoff)
 
-> **Status: DRAFT — not executed.** Make orientation (loss vs payoff) an
+> **Status: APPROVED — executing (2026-06-25).** Four open questions resolved in
+> discussion:
+> 1. **Accessor name:** `return_period(p)` — a single GD method returning `T`
+>    (`1/(1−p)` loss, `1/p` payoff); "bad tail" is implicit in the map, no second
+>    method. The pure branch is factored to module-level `return_period_map(p,
+>    is_loss_value)` so the Lee worker and the future `tail_df` share one
+>    implementation.
+> 2. **Worker depth: minimal.** `plot_quantile` stays array-based and keeps its
+>    `is_loss_value=` kwarg; compositors source the orientation off the GD and the
+>    worker's `T` branch calls the shared `return_period_map`. (No GD-typed worker
+>    signature — that fuller change is deferred.)
+> 3. **Panel orientation:** the aggregate GD drives the whole Lee panel; the
+>    severity curve follows the aggregate's role (already the case — the panel
+>    passes `agg._is_loss_value` for the severity curve today).
+> 4. **Pricing scope:** GD field + plot only this pass. `effective_g`'s
+>    `is_loss_value=` kwarg stays a defaulted shim; `_portfolio_common` /
+>    `_pricing` threading is untouched.
+>
+> Make orientation (loss vs payoff) an
 > intrinsic, immutable property of a `GridDistribution` (GD), so the rare
 > "which side is bad?" operations — pricing and quantile/return-period plotting
 > — consume a self-describing object instead of a side-channel `is_loss_value=`

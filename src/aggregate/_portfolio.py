@@ -345,6 +345,59 @@ class Portfolio(object):
         logger.info('Returning new Portfolio object')
         return port
 
+    def create_frequency(self):
+        """Materialize the per-unit and total claim-count distributions.
+
+        Builds a new :class:`Portfolio` with one count-distribution unit per
+        constituent aggregate (each the output of
+        :meth:`Aggregate.create_frequency`). The portfolio total is then the
+        **total claim count across all units** -- a useful object in its own
+        right -- and every per-unit row is that unit's count distribution.
+
+        Returns
+        -------
+        Portfolio
+            A built portfolio named ``f'{self.name}.freq'`` whose units are the
+            per-unit count distributions and whose total is the total count.
+            Use e.g. ``.summary_df`` for per-unit and total count moments /
+            percentiles.
+
+        Examples
+        --------
+        >>> pf = port.create_frequency()
+        >>> pf.summary_df            # per-unit + total count moments
+
+        Notes
+        -----
+        The portfolio's own :attr:`program` is re-parsed to recover each unit's
+        raw transformer spec (portfolio units do not retain individual
+        programs), and each is paired with its built object's resolved ``n``.
+        The per-unit count lines are assembled into a ``port`` DecL program and
+        built through the normal ``build`` front door, so grid windowing, ``bs``
+        and ``log2`` for the total are sized automatically. The returned object
+        is a *snapshot*: rebuild it if the parent changes.
+
+        Raises
+        ------
+        ValueError
+            If the portfolio was built programmatically and carries no
+            :attr:`program` to re-parse.
+        """
+        if not self.program:
+            raise ValueError(
+                f'create_frequency requires a DecL program to re-parse; '
+                f'portfolio {self.name!r} was built programmatically (empty '
+                f'program).')
+        from .underwriter import build
+        name = f'{self.name}.freq'
+        _kind, _name, spec = build.parser.parse(self.program)
+        n_by_name = {a.name: a.n for a in self.agg_list}
+        units = [Aggregate._count_program(sub_spec, n_by_name[sub_name],
+                                          f'{sub_name}.freq')
+                 for _k, sub_name, sub_spec in spec['spec']]
+        program = f'port {name}\n' + '\n'.join('\t' + u for u in units)
+        return build(program)
+
     def sample_compare(self, ax=None):
         """Compare the sample-based portfolio total to the independent
         marginal sum.

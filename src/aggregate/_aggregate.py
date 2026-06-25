@@ -37,7 +37,7 @@ from .utilities import (ft, ift,
                         balanced_window,
                         agg_help, remove_fuzz, value_type_role)
 from ._grid_distribution import GridDistribution
-from .decl_writer import format_program
+from .decl_writer import format_program, spec_to_decl
 import aggregate.random_agg as ar
 from .spectral import choquet_weights
 from . import tail as _tail
@@ -3514,6 +3514,127 @@ class Aggregate:
     def pprogram_html(self):
         """Syntax-highlighted DecL program for IPython / Jupyter display."""
         return format_program(self.program, fmt='html')
+
+    @staticmethod
+    def _count_program(spec, n, name):
+        """Render the DecL for a claim-count distribution from a parsed spec.
+
+        Builds a minimal ``agg`` program that keeps the frequency clause verbatim
+        and replaces the severity with a point mass at 1 (``dsev [1]``). Because N
+        claims each of size 1 sum to N, the resulting aggregate density is exactly
+        the claim-count distribution ``P(N = k)``. Shared by
+        :meth:`create_frequency` and :meth:`Portfolio.create_frequency`.
+
+        Parameters
+        ----------
+        spec : dict
+            A **raw transformer spec** (``parser.parse(...)[2]``), *not* the
+            dense ``Aggregate._spec`` constructor dict.
+        n : float
+            The resolved total expected count (``Aggregate.n``).
+        name : str
+            Name for the rendered ``agg``.
+
+        Returns
+        -------
+        str
+            A canonical, single-line DecL ``agg`` program for the count
+            distribution.
+
+        Notes
+        -----
+        Only the *frequency* keys are carried over; severity, layers
+        (``exp_limit`` / ``exp_attachment``) and both reinsurance clauses are
+        dropped. Those reshape severity-per-claim or the aggregate total but
+        never the *number* of claims, and carrying them through against a
+        ``dsev [1]`` severity would corrupt the count (e.g.
+        ``occurrence net of 50 xs 0`` would net every unit point mass to 0).
+
+        The exposure is collapsed to the resolved expected count ``n`` as
+        ``<n> claims`` rather than re-rendering the original exposure clause:
+        when the count is *derived* from severity (``500 loss ...``, a
+        ``premium at lr`` or limit profile), swapping the severity would change
+        the count. ``n`` is the correct total expected count even for profiles
+        and mixed frequency. An empirical (``dfreq``) frequency already *is* the
+        count distribution, so its outcome/probability vectors are kept as the
+        ``dfreq`` head and no ``claims`` exposure is synthesized.
+
+        Frequency mixing / contagion (``mixed gamma c``, ``zm`` / ``zt``, etc.)
+        is part of the frequency and is preserved verbatim.
+        """
+        # Keep only the frequency clause; drop severity, layers and reinsurance.
+        new = {'name': name}
+        for key in ('freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0'):
+            if key in spec:
+                new[key] = spec[key]
+        # An empirical (dfreq) frequency is itself the count distribution and
+        # renders as the exposure head; everything else collapses to the
+        # resolved expected count.
+        if spec.get('freq_name') != 'empirical':
+            new['exp_en'] = n
+        # Point-mass severity: N unit claims sum to N.
+        new['sev_name'] = 'dhistogram'
+        new['sev_xs'] = [1.0]
+        new['sev_ps'] = [1.0]
+        return spec_to_decl(new, kind='agg', name=name)
+
+    def _frequency_program(self, name):
+        """Render the count-distribution DecL by re-parsing :attr:`program`.
+
+        The raw transformer spec is recovered by re-parsing :attr:`program`
+        (``spec_to_decl`` wants the transformer spec, not the dense
+        ``Aggregate._spec`` constructor dict), then handed to
+        :meth:`_count_program` with the resolved :attr:`n`.
+
+        Raises
+        ------
+        ValueError
+            If the object was built programmatically and carries no
+            :attr:`program` to re-parse.
+        """
+        if not self.program:
+            raise ValueError(
+                f'create_frequency requires a DecL program to re-parse; '
+                f'aggregate {self.name!r} was built programmatically (empty '
+                f'program).')
+        from .underwriter import build
+        _kind, _name, spec = build.parser.parse(self.program)
+        return self._count_program(spec, self.n, name)
+
+    def create_frequency(self):
+        """Materialize this object's claim-count distribution as an ``Aggregate``.
+
+        The engine carries frequency only as a PGF (applied in the Fourier
+        domain), so there is no ``q`` / ``tvar`` / ``cdf`` / percentiles for the
+        count itself. This builds the marginal count distribution as a
+        first-class :class:`Aggregate` (via the ``dsev [1]`` point-mass trick) so
+        every inherited method works on the count.
+
+        Returns
+        -------
+        Aggregate
+            A built aggregate named ``f'{self.name}.freq'`` whose aggregate
+            density *is* this object's claim-count distribution: ``agg_density[k]
+            = P(N = k)``. Use ``.q``, ``.tvar``, ``.cdf``, ``.plot``,
+            ``.density_df``, ``.summary_df`` etc. on it directly.
+
+        Examples
+        --------
+        >>> fa = a.create_frequency()
+        >>> fa.q([0.01, 0.5, 0.99])   # count percentiles
+        >>> fa.tvar(0.99)             # tail count
+        >>> fa.plot()                 # the count distribution, plotted
+
+        Notes
+        -----
+        Built through the normal ``build`` front door, so grid windowing, ``bs``
+        and ``log2`` selection all happen automatically -- a high-mean count
+        (large exposure) needs no special handling. The returned object is a
+        *snapshot*: rebuild it if the parent changes. See
+        :meth:`_frequency_program` for what is kept and dropped from the spec.
+        """
+        from .underwriter import build
+        return build(self._frequency_program(f'{self.name}.freq'))
 
     @property
     def summary_df(self):

@@ -1,6 +1,16 @@
 # Plan — `create_frequency()` on Aggregate and Portfolio
 
-> **Status: DRAFT — not executed.** Small, self-contained. No dependency on
+> **Status: EXECUTED (1.0.0a107).** `Aggregate.create_frequency()` /
+> `Portfolio.create_frequency()` shipped, sharing `Aggregate._count_program`
+> (static spec→DecL helper). Scope widened during execution: the spec edit
+> strips **layers and both occurrence + aggregate reinsurance** as well as
+> severity — the original "two nodes" (severity + exposure) would have corrupted
+> the count whenever a layer/reins clause was present (`occurrence net of
+> 50 xs 0` nets a `dsev [1]` unit to 0). Portfolio re-parses its *own* program
+> for the unit specs (units don't retain individual programs) and pairs each
+> with its object's resolved `n`. Verified across poisson / mixed gamma /
+> delaporte / sichel / zm / dfreq and exposure-derived counts; `zt` parent
+> builds still fail upstream (tracked B4, unrelated). No dependency on
 > `plan-summary-tail-tables.md` (that plan leaves Freq percentiles blank; this
 > one is how a user materializes the count distribution when they want it).
 

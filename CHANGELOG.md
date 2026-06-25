@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.0.0a107
+
+### `create_frequency()` — materialize the claim-count distribution
+
+The engine carries frequency only as a PGF (applied in the Fourier domain), so
+there was no `q` / `tvar` / `cdf` / percentiles for the claim *count*.
+`Aggregate.create_frequency()` now returns a first-class `Aggregate` whose
+aggregate density **is** the count distribution `P(N = k)` — built through the
+normal `build` front door via the `dsev [1]` point-mass trick (N unit claims sum
+to N). Every inherited method (`q`, `tvar`, `cdf`, `sf`, `pmf`, `plot`,
+`density_df`, `summary_df`, …) then works on the count.
+
+```python
+fa = a.create_frequency()    # an Aggregate that IS the count distribution
+fa.q([0.01, 0.5, 0.99])      # count percentiles
+fa.tvar(0.99)                # tail count
+```
+
+`Portfolio.create_frequency()` returns a `Portfolio` of one count-distribution
+unit per constituent aggregate; the portfolio total is the **total claim count
+across all units**.
+
+The rendered program keeps only the frequency clause (family + mixing /
+contagion + `zm`/`zt`) and collapses exposure to the resolved expected count
+`self.n claims`; severity, layers, and both occurrence and aggregate
+reinsurance are dropped — they reshape severity-per-claim or the aggregate
+total but never the *number* of claims (carrying `occurrence net of 50 xs 0`
+through a `dsev [1]` severity would have netted every unit to 0). An empirical
+(`dfreq`) frequency is kept as the count distribution directly. The result is a
+*snapshot* — rebuild if the parent changes. Built objects with no DecL program
+raise a clear error.
+
 ## 1.0.0a106
 
 ### Reinsurance-aware Gross / Ceded / Net `PnL` view (Stage E of `PnL`)

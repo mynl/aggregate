@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.0a109
+
+### Feature: bare unary minus on a severity (`ssev -lognorm …`)
+
+DecL now accepts a **bare unary minus** in front of a severity as sugar for the
+working `0 - X` reflection: `ssev -lognorm 10 cv 0.5` ≡ `ssev 0 - lognorm 10 cv
+0.5`. Unary minus binds *tighter* than the additive shift (standard math
+precedence), so `-lognorm 2 + 5` parses as `(-X) + 5 == 5 - X`, **not**
+`-(X + 5)`. A negative *number* multiplier (`-3 * lognorm`) still lexes as one
+`NUMBER` and stays on the existing scaled-reflection path. The new grammar
+alternative is `sev1: MINUS sev1 -> sev1_negate` (Earley + dynamic lexer, no
+ambiguity).
+
+### Breaking: a reflected severity now requires `ssev`, not `sev`
+
+A reflected severity carries negative support, so it is rejected under the
+clamped `sev` clause with a clear message (*"a reflected (signed) severity needs
+'ssev', not 'sev'"*). This applies to both the new `-X` form and the existing
+`0 - X` (`rsub`) form. Reflection already routed through the signed (no-clamp)
+build path regardless of the keyword, so this is a surface-consistency change,
+not a numerical one; `decl_writer` now emits `ssev` whenever `sev_reflect` is
+set so specs still round-trip. The one corpus line using `sev 100 - lognorm`
+(`SBJ.Signed`) is restated as `ssev` (behavior-identical).
+
 ## 1.0.0a108
 
 ### Fix: point-mass severity blocked the windowed grid (textbook concentration case)

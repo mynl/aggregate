@@ -417,9 +417,9 @@ The first-class `PnL` (Stages A–E) is in `dev/done/plan-pnl.md`. Next:
 - [ ] **`PortPnL` — portfolios of P&L positions** (#3.2) — `dev/plan-pnl-portfolio.md`.
   Constant-consideration book is the cheap correct v1 (reuse Portfolio FFT +
   stacked signed summary); loss-sensitive net-then-combine deferred.
-- [ ] **DecL unary minus on a severity** (`ssev -lognorm …`) —
-  `dev/plan-decl-sev-unary-minus.md`. Feasible/low-risk under Lark/Earley; watch
-  for grammar ambiguity. Not PnL-specific.
+- [x] **DecL unary minus on a severity** (`ssev -lognorm …`) — done 1.0.0a109,
+  `dev/done/plan-decl-sev-unary-minus.md`. `sev1: MINUS sev1 -> sev1_negate`;
+  reflected severity now requires `ssev` (plain `sev` rejects it).
 - [ ] **Return-period x-axis for quantile/Lee plots** (`plot(quantile_x='return')`)
   — `dev/plan-plot-return-period.md`. `T=1/(1−p)` loss / `1/p` payoff, log-x.
   Plotting-framework test; not PnL-specific.

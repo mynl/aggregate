@@ -343,7 +343,7 @@ def test_sbj_signed_severity_recovers_mass_no_alias():
     """
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        a = build('agg LNS 10 claims sev 100 - lognorm 10 cv 2.5 poisson')
+        a = build('agg LNS 10 claims ssev 100 - lognorm 10 cv 2.5 poisson')
     assert a.x_min < 0.0                                  # grid reaches below 0
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
     assert a.est_m == pytest.approx(a.agg_m, rel=1e-3)

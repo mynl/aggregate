@@ -1,6 +1,9 @@
 # Plan — DecL unary minus on a severity (`ssev -lognorm …`)
 
-> **Status: DRAFT — not executed.** Not PnL-specific. Goal: let DecL accept a
+> **Status: DONE — executed 1.0.0a109.** The `sev -X` guard was kept (author
+> decision); reflected severities now require `ssev` (plain `sev` rejects both
+> `-X` and `0 - X`), and `decl_writer` emits `ssev` whenever `sev_reflect` is
+> set. Not PnL-specific. Goal: let DecL accept a
 > **bare unary minus** in front of a severity, `ssev -lognorm 10 cv 0.5`, as
 > sugar for the working `ssev 0 - lognorm 10 cv 0.5` (reflect the severity).
 

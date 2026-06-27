@@ -2568,7 +2568,8 @@ class Aggregate:
         self._dist = None
         self._sev_dist = None
 
-    def make_pnl(self, consideration=None, *, gross=None, ceded=None, net=None):
+    def make_pnl(self, consideration=None, *, gross=None, ceded=None, net=None,
+                 expense_spec=None, gcn_economics=None):
         """Wrap this aggregate as the risky leg of a :class:`PnL` position.
 
         The net P&L is ``consideration - X`` when ``X`` is a loss and
@@ -2611,7 +2612,8 @@ class Aggregate:
         Python-API construction (no DecL surface in this release).
         """
         from ._pnl import PnL
-        return PnL(self, consideration, gross=gross, ceded=ceded, net=net)
+        return PnL(self, consideration, gross=gross, ceded=ceded, net=net,
+                   expense_spec=expense_spec, gcn_economics=gcn_economics)
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, window_convention=None, **kwargs):

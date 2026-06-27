@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.0.0a114
+
+### P&L expenses, ceded premium / ceding commission, and the GCN waterfall exhibit (`dev/done/plan-pnl-expenses-ceded-premium.md`)
+
+Phase 1 of three (Phase 2 reinstatements, Phase 3 variable rating). Adds gross
+**expenses**, per-layer **ceded premium**, and **ceding commission** to a `pnl`,
+all deterministic, and rebuilds the Gross/Ceded/Net exhibit as a multi-section
+reinsurance **waterfall**.
+
+- **`pnl` gross expenses** — `25% premium expenses` / `25% loss expenses` /
+  `2000 fixed expenses` (the base is explicit; `expense`/`expenses` both
+  accepted; optional, absent ⇒ 0). Books a gross obligation; reduces the margin
+  and drives a combined-ratio line. Expense clauses attach to `pnl` only.
+- **Ceded premium per reinsurance layer** — `deposit <amount>` | `rol <frac>` |
+  `rate <frac>` (mutually exclusive), plus an optional `cede <frac>` commission.
+  `deposit` is currency, `rol` = share × rol × limit, `rate` = rate × gross
+  premium; the commission books in the **expense** column as a credit, so net
+  expense = gross expense − commission. **Any** premium clause promotes a `pnl`
+  to the Gross/Ceded/Net view (the gross premium is the stated `pnl` premium).
+- **`PnL.gcn_df` rebuilt** as a waterfall-column, multi-section frame: columns
+  `gross | ceded occ | net occ | occ impact | ceded agg | net agg | agg impact |
+  impact` (inuring occurrence → aggregate; columns shown only for configured
+  sides; the `*impact` columns are percent change, percentage-point on ratios);
+  row sections **Mean** (Premium/Loss/Expense/UW — signed, additive down to UW
+  and across the GCN split), **Ratio** (LR/ER/CR), **Volatility** (SD & Skew of
+  LR/CR), and **UW percentiles** (payoff convention; regulatory anchors). Each
+  column reads its own exact aggregate marginal from `reins_density_df`; only the
+  Mean section adds across columns (means add, SDs don't). The single-leg
+  `summary_df` keeps `Consideration | Obligation | Margin`, now with an Expense
+  row and a combined-ratio line.
+- **Grammar / unparser** — new terminals `EXPENSES`, `FIXED`, `DEPOSIT`, `ROL`,
+  `CEDE` (reusing `RATE`); `reins_clause` refactored into `reins_layer` + optional
+  premium + optional `cede` (the loss-structure path is unchanged). Parse errors:
+  `cede` without a premium, `rol` without a finite limit, ceded-premium clauses on
+  a plain `agg`. `decl_writer` renders all new clauses (round-trip preserved).
+- New tests `tests/test_pnl_expenses.py`, `tests/test_pnl_ceded_premium.py`;
+  corpus section `EXP` in `decl-testers.agg`. Note: when a leg becomes
+  loss-sensitive (Phase 3 swing/slide on an XOL) the net-distribution derivation
+  swaps the comonotone relabel for the pushforward engine — recorded as a design
+  risk, not yet built.
+
 ## 1.0.0a113
 
 ### User-facing `summary_df` + `tail_df`; QA frames renamed (`dev/done/plan-summary-tail-tables.md`)

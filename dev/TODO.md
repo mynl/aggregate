@@ -43,7 +43,7 @@
 |   | H5 | `pedagogy` figure-generator migrations | B | — |
 |   | B4 | ZT/ZM frequency broken + add shift helpers | A | — |
 | ✓ | W10 | Retire `recommend_bucket`/`best_bucket` | A | done a95 (plan-finish-shared-concerns B0) |
-|   | P1 | P&L expenses + ceded premium/commission (`plan-pnl-expenses-ceded-premium`) | A | — |
+| ✓ | P1 | P&L expenses + ceded premium/commission (`plan-pnl-expenses-ceded-premium`) | A | done a114 (dev/done/) |
 |   | P2 | Reinstatement premiums + pushforward engine (`plan-reinstatements`) | A | P1 |
 |   | P3 | Variable rating: retro/swing/slide/PC/corridor (`plan-variable-rating`) | A | P2 |
 |   | T2 | Rationalize tests / library coupling | A | — |
@@ -274,9 +274,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 > dimensionality, per-layer economics matrix, naming). Every feature is one
 > deterministic φ pushed forward over the loss distribution, writing one P&L leg.
 
-- [ ] **P1 `[A]`** Expenses + ceded premium/commission, deterministic — the legs
-  model and final GCN shape (`Premium − Loss − Expense = UW`).
-  `dev/plan-pnl-expenses-ceded-premium.md`.
+- [x] **P1 `[A]`** Expenses + ceded premium/commission, deterministic — the legs
+  model and the GCN waterfall exhibit (`Premium − Loss − Expense = UW`). Done a114;
+  `dev/done/plan-pnl-expenses-ceded-premium.md`.
 - [ ] **P2 `[A]`** Reinstatement premiums + the 1-D/2-D pushforward engine (the
   engine-prover, always 2-D). `dev/plan-reinstatements.md`. Depends on P1.
 - [ ] **P3 `[A]`** Variable rating — retro, swing, slide, profit commission,

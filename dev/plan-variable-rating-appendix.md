@@ -164,7 +164,11 @@ plus the bounded number-words `one…five` (from Phase 2). Rationalization decis
 
 - **`[engine]`** (built in Phase 2): `pushforward_1d` + `pushforward_2d` →
   `GridDistribution`; `transformed_moments` (exact moments on the source grid). Generic over an
-  arbitrary vectorized φ; **not** reinstatement-named.
+  arbitrary vectorized φ; **not** reinstatement-named. **This replaces `PnL`'s comonotone
+  net-distribution relabel** (`pnl_df` / `_frame_from`, `_pnl.py:160`) once a leg is
+  loss-sensitive: a saturating XOL makes φ many-to-one (must *bin*, not *sort*), and the
+  occurrence split makes the net result non-single-valued in `L` (→ 2-D). Monotone on a quota
+  share, so the relabel survives there; XOL needs the engine. (Phase 1 plan, decision 7.)
 - **`ContractTerms` taxonomy**: each feature is a frozen dataclass owning its φ, loss basis, and
   target leg. `ReinstatementTerms` (Phase 2); `RetroTerms`, `SwingTerms`, `SlideTerms`,
   `ProfitCommissionTerms`, `CorridorTerms` (Phase 3). Subclass prefix form per CLAUDE.md if a

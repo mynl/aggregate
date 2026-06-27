@@ -236,14 +236,18 @@ def test_summary_df_signed_additive():
     """A sold cover: Consideration +, Obligation -, Margin = their sum; SD not CV."""
     a = build('pnl B 1000 prem - 70% lr sev gamma 100 cv 0.5 poisson')
     df = a.summary_df
-    assert list(df.index) == ['Consideration', 'Obligation', 'Margin']
+    assert list(df.index) == ['Consideration', 'Obligation', 'Expense',
+                              'Margin', 'Combined ratio']
     assert list(df.columns) == ['EX', 'SD', 'Sk']        # SD trio, no CV
     assert df.loc['Consideration', 'EX'] == pytest.approx(1000.0)
     assert df.loc['Consideration', 'SD'] == 0.0          # a constant is certain
     assert df.loc['Obligation', 'EX'] == pytest.approx(-700.0, rel=TOL)  # loss subtracts
-    # rows add (the defining property): Consideration + Obligation = Margin
+    assert df.loc['Expense', 'EX'] == 0.0                 # no expense declared
+    # rows add (the defining property): Consideration + Obligation + Expense = Margin
     assert (df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX']
+            + df.loc['Expense', 'EX']
             == pytest.approx(df.loc['Margin', 'EX'], abs=1e-6))
+    assert df.loc['Combined ratio', 'EX'] == pytest.approx(0.70, rel=TOL)
     # the margin SD is the obligation SD (constant consideration adds no spread)
     assert df.loc['Margin', 'SD'] == pytest.approx(df.loc['Obligation', 'SD'])
 
@@ -328,25 +332,36 @@ _REINS = 'agg R 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 x
 
 
 def test_gcn_doubly_additive():
-    """gcn_df: rows add (Net = Gross + Ceded) AND columns add (Margin = C + O)."""
+    """gcn_df Mean section: signed rows add to UW AND add across the GCN split.
+
+    The agg-only example has columns ``gross | ceded | net | impact``; the Mean
+    section's signed rows (Premium / Loss / Expense / UW) add down to UW within
+    each column and across the split (``gross + ceded = net``).
+    """
     g = build(_REINS).make_pnl(gross=5500, ceded=1800).gcn_df
-    assert list(g.index) == ['Gross', 'Ceded', 'Net']
-    assert list(g.columns) == ['Consideration', 'Obligation', 'Margin']
-    # rows: the comonotone legs add
-    assert np.allclose(g.loc['Net'].to_numpy(),
-                       g.loc['Gross'].to_numpy() + g.loc['Ceded'].to_numpy())
-    # columns: Margin = Consideration + Obligation
-    assert np.allclose(g['Margin'].to_numpy(),
-                       g['Consideration'].to_numpy() + g['Obligation'].to_numpy())
+    assert list(g.columns) == ['gross', 'ceded', 'net', 'impact']
+    assert list(g.index.get_level_values('section').unique()) == \
+        ['Mean', 'Ratio', 'Volatility', 'UW %ile']
+    m = g.xs('Mean')
+    # columns add across the split: net = gross + ceded (signed)
+    assert np.allclose(m['net'].to_numpy(), m['gross'].to_numpy() + m['ceded'].to_numpy())
+    # rows add down to UW within each column (Premium + Loss + Expense)
+    for col in ['gross', 'ceded', 'net']:
+        s = m[col]
+        assert s['UW'] == pytest.approx(s['Premium'] + s['Loss'] + s['Expense'])
     # the ceded leg is literally negative: pay premium, receive recovery
-    assert g.loc['Ceded', 'Consideration'] == pytest.approx(-1800.0)
-    assert g.loc['Ceded', 'Obligation'] > 0          # recovery is a gain
+    assert m.loc['Premium', 'ceded'] == pytest.approx(-1800.0)
+    assert m.loc['Loss', 'ceded'] > 0                # recovery is a gain
+    # impact = net vs gross percent change on the UW row
+    assert g.loc[('Mean', 'UW'), 'impact'] == pytest.approx(
+        m.loc['UW', 'net'] / m.loc['UW', 'gross'] - 1.0)
 
 
 def test_gcn_summary_df_is_gcn():
     """summary_df routes to the GCN exhibit for a Gross/Ceded/Net position."""
     p = build(_REINS).make_pnl(gross=5500, ceded=1800)
-    assert list(p.summary_df.index) == ['Gross', 'Ceded', 'Net']
+    assert p.summary_df.index.names == ['section', 'item']
+    assert list(p.summary_df.columns) == ['gross', 'ceded', 'net', 'impact']
     # net consideration defaults to gross - ceded
     assert p.consideration == pytest.approx(3700.0)
 
@@ -355,7 +370,7 @@ def test_gcn_net_override():
     """net= overrides the derived gross - ceded retained premium."""
     p = build(_REINS).make_pnl(gross=5500, ceded=1800, net=4000)
     assert p.consideration == pytest.approx(4000.0)
-    assert p.gcn_df.loc['Net', 'Consideration'] == pytest.approx(4000.0)
+    assert p.gcn_df.loc[('Mean', 'Premium'), 'net'] == pytest.approx(4000.0)
 
 
 def test_gcn_net_leg_drives_moments_and_evaluate():
@@ -375,7 +390,8 @@ def test_net_only_on_reins_agg():
     assert p._gcn is None
     e_net = float((agg.xs * agg.agg_density_net).sum())
     assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
-    assert list(p.summary_df.index) == ['Consideration', 'Obligation', 'Margin']
+    assert list(p.summary_df.index) == ['Consideration', 'Obligation', 'Expense',
+                                        'Margin', 'Combined ratio']
 
 
 def test_gcn_requires_both_premiums_and_agg_reins():
@@ -384,9 +400,9 @@ def test_gcn_requires_both_premiums_and_agg_reins():
         agg.make_pnl(gross=5500)
     with pytest.raises(ValueError, match='not both'):
         agg.make_pnl(consideration=100, gross=5500, ceded=1800)
-    # no aggregate reinsurance -> no gross/ceded/net views
+    # no reinsurance at all -> no gross/ceded/net views
     plain = build('agg P 100 claims sev lognorm 50 cv 1.5 poisson')
-    with pytest.raises(ValueError, match='aggregate reinsurance'):
+    with pytest.raises(ValueError, match='requires reinsurance'):
         plain.make_pnl(gross=5500, ceded=1800)
 
 

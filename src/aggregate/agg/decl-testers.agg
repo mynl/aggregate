@@ -563,3 +563,23 @@ agg SC.Classic 50 claims sev lognorm 40 cv 1.5 poisson                          
 agg UM.Negate 10 claims ssev -lognorm 10 cv 0.5 poisson                                                          note{bare unary minus reflects; parity with `ssev 0 - lognorm`};
 agg UM.Shift  10 claims ssev -lognorm 2 cv 0.5 + 5 poisson                                                       note{tight bind: (-X) + 5 == 5 - X, mean 3};
 agg UM.Scaled 10 claims ssev -3 * lognorm 2 cv 0.5 poisson                                                       note{negative NUMBER -3 stays on the scaled path, mean -6}
+
+# ============================================================
+# EXP. P&L gross expenses + ceded premium / commission (Phase 1)
+# ============================================================
+# Gross expenses on a pnl in three explicit forms (decision 1): a fraction of
+# premium, a fraction of expected loss, or a fixed amount; expense/expenses both
+# accepted. Ceded premium per reinsurance layer in one of deposit | rol | rate
+# (decision 3): deposit a currency amount, rol = share x rol x limit, rate =
+# rate x gross premium; an optional cede books the ceding commission as an
+# expense credit. Any premium clause promotes the pnl to the Gross/Ceded/Net
+# exhibit. See tests/test_pnl_expenses.py, tests/test_pnl_ceded_premium.py and
+# dev/done/plan-pnl-expenses-ceded-premium.md.
+pnl EXP.PremExp  1000 prem - 8 claims sev lognorm 50 cv 1 poisson 0.25 premium expenses                       note{variable expense: 25% of premium};
+pnl EXP.LossExp  1000 prem - 8 claims sev lognorm 50 cv 1 poisson 0.3 loss expenses                           note{variable expense: 30% of expected loss};
+pnl EXP.FixedExp 1000 prem - 8 claims sev lognorm 50 cv 1 poisson 200 fixed expenses                          note{fixed expense amount};
+pnl EXP.Deposit  5000 prem - 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 deposit 1500           note{ceded premium as a deposit amount};
+pnl EXP.RolCede  5000 prem - 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.25     note{rate-on-line premium + ceding commission};
+pnl EXP.Rate     5000 prem - 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rate 0.3              note{ceded premium as a rate on gross premium};
+pnl EXP.OccRol   5000 prem - 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.1 poisson               note{occurrence-layer ceded premium; occ-only GCN};
+pnl EXP.Both     5000 prem - 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.05 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.2 200 fixed expenses   note{both sides priced + fixed expense}

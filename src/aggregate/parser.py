@@ -486,7 +486,7 @@ class UnderwritingTransformer(Transformer):
 
     def pnl_out_full(self, c):
         (_pnl, name, premium, _prem, _minus, exposures, layers, sev_clause,
-         occ_reins, freq, agg_reins, approx, trailer) = c
+         occ_reins, freq, agg_reins, approx, expense, trailer) = c
         spec = {
             "name": name,
             **exposures,
@@ -496,6 +496,7 @@ class UnderwritingTransformer(Transformer):
             **freq,
             **agg_reins,
             **self._check_approx(approx, occ_reins),
+            **expense,
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
@@ -504,7 +505,7 @@ class UnderwritingTransformer(Transformer):
 
     def pnl_out_dfreq(self, c):
         (_pnl, name, premium, _prem, _minus, dfreq, layers, sev_clause,
-         occ_reins, agg_reins, approx, trailer) = c
+         occ_reins, agg_reins, approx, expense, trailer) = c
         spec = {
             "name": name,
             **dfreq,
@@ -513,11 +514,28 @@ class UnderwritingTransformer(Transformer):
             **occ_reins,
             **agg_reins,
             **self._check_approx(approx, occ_reins),
+            **expense,
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
         self._attach_pnl(spec, premium)
         return ("pnl", name, spec)
+
+    # ----- gross expenses on a pnl (decision 1) ---------------------
+    def expense_premium(self, c):
+        # ``<frac> premium expenses``: variable expense, base = gross premium.
+        return {"expense_spec": ("premium", float(c[0]))}
+
+    def expense_loss(self, c):
+        # ``<frac> loss expenses``: variable expense, base = expected gross loss.
+        return {"expense_spec": ("loss", float(c[0]))}
+
+    def expense_fixed(self, c):
+        # ``<amount> fixed expenses``: a fixed currency amount.
+        return {"expense_spec": ("fixed", float(c[0]))}
+
+    def expense_none(self, c):
+        return {}
 
     def pnl_exp_claims(self, c):
         numbers, _claims = c
@@ -818,20 +836,40 @@ class UnderwritingTransformer(Transformer):
         return {"freq_name": freq}
 
     # ----- reinsurance ----------------------------------------------
+    @staticmethod
+    def _split_reins(triples, which, kind):
+        """Split a reins_list of ``(layer, premium, cede)`` triples into spec keys.
+
+        ``<which>_reins`` is the list of ``(share, limit, attach)`` layer tuples
+        the reinsurance engine consumes (unchanged). The parallel per-layer
+        ``<which>_reins_premium`` (``(basis, value)`` or ``None``) and
+        ``<which>_reins_cede`` (fraction or ``None``) lists are added **only**
+        when some layer carries them, so plain reinsurance specs are untouched.
+        """
+        layers = [t[0] for t in triples]
+        prem = [t[1] for t in triples]
+        cede = [t[2] for t in triples]
+        out = {f"{which}_reins": layers, f"{which}_kind": kind}
+        if any(p is not None for p in prem):
+            out[f"{which}_reins_premium"] = prem
+        if any(x is not None for x in cede):
+            out[f"{which}_reins_cede"] = cede
+        return out
+
     def agg_reins_net(self, c):
-        return {"agg_reins": c[3], "agg_kind": "net of"}
+        return self._split_reins(c[3], "agg", "net of")
 
     def agg_reins_ceded(self, c):
-        return {"agg_reins": c[3], "agg_kind": "ceded to"}
+        return self._split_reins(c[3], "agg", "ceded to")
 
     def agg_reins_none(self, c):
         return {}
 
     def occ_reins_net(self, c):
-        return {"occ_reins": c[3], "occ_kind": "net of"}
+        return self._split_reins(c[3], "occ", "net of")
 
     def occ_reins_ceded(self, c):
-        return {"occ_reins": c[3], "occ_kind": "ceded to"}
+        return self._split_reins(c[3], "occ", "ceded to")
 
     def occ_reins_none(self, c):
         return {}
@@ -909,9 +947,11 @@ class UnderwritingTransformer(Transformer):
         return [c[0]]
 
     def reins_list_tower(self, c):
+        # A tower has no per-layer premium / cede: wrap each layer as a triple
+        # ``(layer, premium, cede)`` so reins_list elements are uniform.
         tower = c[0]
         limit, attach = tower[0], tower[1]
-        return [(1.0, l, a) for l, a in zip(limit, attach)]
+        return [((1.0, l, a), None, None) for l, a in zip(limit, attach)]
 
     def reins_clause_xs(self, c):
         limit, _xs, attach = c
@@ -950,6 +990,45 @@ class UnderwritingTransformer(Transformer):
                 "suspiciously small. Did you mean share of?"
             )
         return (n / limit, limit, attach)
+
+    # ----- ceded-premium / commission decorators (decision 3) -------
+    def reins_clause(self, c):
+        """Combine a loss layer with its optional premium / cede decorators.
+
+        Returns ``(layer, premium, cede)`` where ``layer`` is the
+        ``(share, limit, attach)`` tuple consumed by the reinsurance engine,
+        ``premium`` is ``(basis, value)`` (basis in ``deposit`` / ``rol`` /
+        ``rate``) or ``None``, and ``cede`` is the commission fraction or
+        ``None``. ``reins_list`` splits these into parallel spec keys.
+        """
+        layer, premium, cede = c
+        if cede is not None and premium is None:
+            raise ValueError(
+                "DecL: 'cede' (ceding commission) needs a ceded-premium clause "
+                "(deposit / rol / rate) on the same layer.")
+        if premium is not None and premium[0] == 'rol' and not np.isfinite(layer[1]):
+            raise ValueError(
+                "DecL: 'rol' (rate on line) needs a finite limit "
+                "(rate-on-line is a fraction of share x limit).")
+        return (layer, premium, cede)
+
+    def reins_premium_deposit(self, c):
+        return ('deposit', float(c[1]))
+
+    def reins_premium_rol(self, c):
+        return ('rol', float(c[1]))
+
+    def reins_premium_rate(self, c):
+        return ('rate', float(c[1]))
+
+    def reins_premium_none(self, c):
+        return None
+
+    def reins_cede_some(self, c):
+        return float(c[1])
+
+    def reins_cede_none(self, c):
+        return None
 
     # ----- severity (continuous) ------------------------------------
     def sev_clause_sev(self, c):

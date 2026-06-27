@@ -867,6 +867,62 @@ class Underwriter(object):
             f'browse             call .discover(regex) to list knowledge entries'
         )
 
+    @staticmethod
+    def _resolve_reins_economics(spec, gross_premium):
+        """Resolve per-layer ceded-premium / cede clauses to per-side economics.
+
+        Pops the ``occ_reins_premium`` / ``occ_reins_cede`` /
+        ``agg_reins_premium`` / ``agg_reins_cede`` keys from ``spec`` (so the
+        inner :class:`Aggregate` sees only the loss structure) and resolves each
+        layer's premium to currency: ``deposit`` is the amount, ``rol`` is
+        ``share x rol x limit``, ``rate`` is ``rate x gross_premium``. The ceding
+        commission is ``cede x ceded_premium`` per layer. Returns
+        ``{'gross', 'ceded', 'pc_occ', 'pc_agg', 'c_occ', 'c_agg'}`` for the GCN
+        view, or ``None`` when no ceded-premium clause is present.
+
+        Parameters
+        ----------
+        spec : dict
+            The pnl spec (mutated: the four reins-economics keys are popped).
+        gross_premium : float
+            The pnl's stated premium (the gross premium; the ``rate`` base).
+        """
+        keys = ('occ_reins_premium', 'occ_reins_cede',
+                'agg_reins_premium', 'agg_reins_cede')
+        if not any(k in spec for k in keys):
+            return None
+        pg = float(gross_premium)
+
+        def side(which):
+            layers = spec.get(f'{which}_reins') or []
+            prem = spec.pop(f'{which}_reins_premium', None)
+            cede = spec.pop(f'{which}_reins_cede', None)
+            pc = comm = 0.0
+            if prem is None:
+                return 0.0, 0.0
+            for i, p in enumerate(prem):
+                if p is None:
+                    continue
+                basis, val = p
+                share, limit, _attach = layers[i]
+                if basis == 'deposit':
+                    layer_pc = val
+                elif basis == 'rol':
+                    layer_pc = share * val * limit
+                elif basis == 'rate':
+                    layer_pc = val * pg
+                else:                                   # pragma: no cover
+                    raise ValueError(f'unknown ceded-premium basis {basis!r}')
+                pc += layer_pc
+                if cede is not None and cede[i] is not None:
+                    comm += cede[i] * layer_pc
+            return pc, comm
+
+        pc_occ, c_occ = side('occ')
+        pc_agg, c_agg = side('agg')
+        return {'gross': pg, 'ceded': pc_occ + pc_agg,
+                'pc_occ': pc_occ, 'pc_agg': pc_agg, 'c_occ': c_occ, 'c_agg': c_agg}
+
     def _factory(self, parsed):
         """
         Internal: construct the object described by a :class:`ParsedProgram`.
@@ -884,6 +940,12 @@ class Underwriter(object):
         kind, name, spec, program = parsed.kind, parsed.name, parsed.spec, parsed.program
 
         if kind == 'agg':
+            if any(k in spec for k in ('occ_reins_premium', 'occ_reins_cede',
+                                       'agg_reins_premium', 'agg_reins_cede')):
+                raise ValueError(
+                    f"{name}: ceded-premium clauses (deposit / rol / rate / cede) "
+                    "need a 'pnl' (a P&L context with a gross premium); a plain "
+                    "'agg' has no premium. Declare it as 'pnl ...'.")
             obj = Aggregate(**spec)
             obj.program = program
             # With ``program`` now populated, fold the method-of-moments
@@ -899,12 +961,21 @@ class Underwriter(object):
             # build the loss body, then wrap with the consideration. The net
             # (consideration - loss) is derived on the PnL.
             consideration = spec.pop('consideration')
+            expense_spec = spec.pop('expense_spec', None)
+            # Ceded-premium clauses promote the pnl to the Gross/Ceded/Net view
+            # (any-clause -> GCN): resolve them to per-side economics and pop the
+            # spec keys so the inner Aggregate sees only the loss structure.
+            econ = self._resolve_reins_economics(spec, consideration)
             inner = Aggregate(**spec)
             inner.program = program
             if getattr(inner, '_approx_fit', None):
                 _desc = inner._approx_description()
                 inner.note = f"{inner.note}; {_desc}" if inner.note else _desc
-            obj = inner.make_pnl(consideration)
+            if econ is not None:
+                obj = inner.make_pnl(gross=econ['gross'], ceded=econ['ceded'],
+                                     expense_spec=expense_spec, gcn_economics=econ)
+            else:
+                obj = inner.make_pnl(consideration, expense_spec=expense_spec)
             obj.program = program
         elif kind == 'bvagg':
             from .bivariate import BivariateAggregate

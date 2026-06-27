@@ -388,19 +388,33 @@ def _render_layers(spec: dict) -> str:
 # Reinsurance
 # ======================================================================
 
-def _render_reins_clause(clause) -> str:
-    """Render one ``(share, limit, attach)`` cession tuple.
+def _render_reins_clause(clause, premium=None, cede=None) -> str:
+    """Render one ``(share, limit, attach)`` cession tuple with its decorators.
 
     A full-line share (1.0) renders as ``limit xs attach``; a partial share
     renders as a percentage ``share of limit`` clause (``50% so limit xs
     attach``). The ``%`` marker tells the parser to read the leading number as a
     share directly, so the percentage form round-trips regardless of how the
     original was written (``so`` / ``po``, percent or absolute amount).
+
+    An optional ceded-premium ``premium`` (``(basis, value)`` with basis
+    ``deposit`` / ``rol`` / ``rate``) and ceding-commission ``cede`` (a fraction)
+    render after the layer. ``rol`` / ``rate`` / ``cede`` are fractions rendered
+    as bare numbers (re-parse identically, no ``%`` float dust).
     """
     share, limit, attach = clause
     if float(share) == 1.0:
-        return f'{_fmt_num(limit)} xs {_fmt_num(attach)}'
-    return f'{_fmt_num(float(share) * 100)}% so {_fmt_num(limit)} xs {_fmt_num(attach)}'
+        base = f'{_fmt_num(limit)} xs {_fmt_num(attach)}'
+    else:
+        base = (f'{_fmt_num(float(share) * 100)}% so '
+                f'{_fmt_num(limit)} xs {_fmt_num(attach)}')
+    parts = [base]
+    if premium is not None:
+        basis, value = premium
+        parts.append(f'{basis} {_fmt_num(value)}')
+    if cede is not None:
+        parts.append(f'cede {_fmt_num(cede)}')
+    return ' '.join(parts)
 
 
 def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
@@ -410,7 +424,8 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
     (``occurrence net of`` / ``aggregate ceded to``) and whose children are the
     cession strings, joined by ``and``. Terse it flattens to
     ``occurrence net of c1 and c2``; spread puts the keyword on its own line and
-    each cession one indent deeper.
+    each cession one indent deeper. Per-layer ceded-premium / ``cede`` decorators
+    (parallel ``<list_key>_premium`` / ``<list_key>_cede`` lists) ride along.
 
     Parameters
     ----------
@@ -423,7 +438,14 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
     """
     if list_key not in spec:
         return ''
-    cessions = [_render_reins_clause(c) for c in spec[list_key]]
+    layers = spec[list_key]
+    prem = spec.get(f'{list_key}_premium')
+    cede = spec.get(f'{list_key}_cede')
+    cessions = [
+        _render_reins_clause(c,
+                             prem[i] if prem is not None else None,
+                             cede[i] if cede is not None else None)
+        for i, c in enumerate(layers)]
     return _Block(f'{prefix} {spec[kind_key]}', cessions, sep='and')
 
 
@@ -445,6 +467,20 @@ def _render_approx(spec: dict) -> str:
     """Render the ``approximate <kind>`` clause, or ``''`` for the exact default."""
     kind = spec.get('approximate', 'exact')
     return '' if kind == 'exact' else f'approximate {kind}'
+
+
+def _render_expense(spec: dict) -> str:
+    """Render a ``pnl`` gross-expense clause, or ``''`` if absent (decision 1).
+
+    ``('fixed', amount)`` -> ``<amount> fixed expenses``; ``('premium'|'loss',
+    fraction)`` -> ``<fraction> premium|loss expenses`` (the fraction renders as
+    a bare number, re-parsing identically).
+    """
+    es = spec.get('expense_spec')
+    if es is None:
+        return ''
+    basis, value = es
+    return f'{_fmt_num(value)} {basis} expenses'
 
 
 def _render_orientation(spec: dict) -> str:
@@ -611,6 +647,7 @@ def _render_pnl(name: str, spec: dict) -> _Block:
         _render_freq(spec),
         _render_reins(spec, 'aggregate', 'agg_reins', 'agg_kind'),
         _render_approx(spec),
+        _render_expense(spec),
         _render_trailer(spec),
     ])
 

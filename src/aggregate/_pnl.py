@@ -30,6 +30,31 @@ import numpy as np
 import pandas as pd
 
 
+#: UW-result percentile levels for the GCN exhibit (payoff convention, so a
+#: *low* level is the bad tail). Deliberate regulatory anchors: 1/1000, 1/200
+#: (Solvency II), 1/250 (~US RBC / rating agency), 1/100, then the body and the
+#: good side. Used verbatim -- no rounding.
+GCN_PERCENTILES = (0.001, 0.005, 0.006, 0.01, 0.1, 0.5, 0.9, 0.99)
+
+#: Each waterfall perspective reads its own exact aggregate **marginal** from
+#: ``Aggregate.reins_density_df`` (means add across the split; SD / skew /
+#: percentiles are per-column marginals and do *not* add -- appendix S2).
+_GCN_LOSS_MARGINAL = {
+    'gross': 'p_agg_gross',
+    'ceded_occ': 'p_agg_ceded_occ',
+    'net_occ': 'p_agg_net_occ',
+    'ceded_agg': 'p_agg_ceded',
+    'net_agg': 'p_agg_net',
+}
+
+#: The cession perspectives (premium paid, recovery / commission received).
+_GCN_CEDED = frozenset({'ceded_occ', 'ceded_agg'})
+
+#: Exhibit row layout (section, item); the Ratio rows take a percentage-*point*
+#: impact, every other row a percent-change impact (decision 4).
+_GCN_RATIO_ROWS = (('Ratio', 'LR'), ('Ratio', 'ER'), ('Ratio', 'CR'))
+
+
 class PnL:
     """A profit-and-loss position: a consideration held against a risky leg.
 
@@ -52,10 +77,18 @@ class PnL:
     -- see a later stage for ``evaluate``.
     """
 
-    def __init__(self, agg, consideration=None, *, gross=None, ceded=None, net=None):
+    def __init__(self, agg, consideration=None, *, gross=None, ceded=None, net=None,
+                 expense_spec=None, gcn_economics=None):
         self.agg = agg
         self.program = ''
         self._pnl_df = None
+        #: gross-expense spec ``(basis, value)`` with basis in
+        #: ``{'premium', 'loss', 'fixed'}`` (decision 1); ``None`` => no expense.
+        self._expense_spec = expense_spec
+        #: per-side GCN economics from DecL ceded-premium clauses --
+        #: ``{'pc_occ', 'pc_agg', 'c_occ', 'c_agg'}`` (ceded premiums and
+        #: commissions by waterfall side); ``None`` => scalar / no commission.
+        self._gcn_econ = gcn_economics
         gcn = gross is not None or ceded is not None
         if gcn:
             if gross is None or ceded is None:
@@ -64,11 +97,11 @@ class PnL:
             if consideration is not None:
                 raise ValueError(
                     'pass either consideration= or gross=/ceded=, not both.')
-            if agg.agg_reins is None:
+            if agg.agg_reins is None and agg.occ_reins is None:
                 raise ValueError(
-                    'the Gross/Ceded/Net view requires aggregate reinsurance on '
-                    'the risky leg (gross/ceded/net loss distributions); the '
-                    "aggregate carries no 'aggregate net of/ceded to' treaty.")
+                    'the Gross/Ceded/Net view requires reinsurance on the risky '
+                    'leg (gross/ceded/net loss distributions); the aggregate '
+                    "carries no 'occurrence'/'aggregate net of/ceded to' treaty.")
             # net consideration = gross received - ceded paid (or stated directly)
             self._gcn = {'gross': float(gross), 'ceded': float(ceded)}
             self.consideration = float(net) if net is not None \
@@ -132,10 +165,55 @@ class PnL:
             return np.asarray(c(x), dtype=float)
         return float(np.sum(np.asarray(c, dtype=float)))
 
+    def _gross_expense(self):
+        """The gross expense ``E_G`` as a scalar (deterministic in Phase 1).
+
+        ``fixed`` is the currency amount; ``premium`` is a fraction of the gross
+        premium; ``loss`` is a fraction of the **expected gross loss** (so the
+        leg stays deterministic -- it becomes a distribution only with slide / PC
+        in Phase 3). ``None`` => ``0``.
+        """
+        spec = self._expense_spec
+        if spec is None:
+            return 0.0
+        basis, val = spec
+        if basis == 'fixed':
+            return float(val)
+        if basis == 'premium':
+            pg = float(self._gcn['gross']) if self._gcn is not None \
+                else float(self._consideration_at(0.0))
+            return float(val) * pg
+        if basis == 'loss':
+            has_reins = self.agg.occ_reins is not None or self.agg.agg_reins is not None
+            if has_reins:
+                rd = self.agg.reins_density_df
+                eg = float((rd['loss'].to_numpy() * rd['p_agg_gross'].to_numpy()).sum())
+            else:
+                x, p = self._xp()
+                eg = float((x * p).sum())
+            return float(val) * eg
+        raise ValueError(f'unknown expense basis {basis!r}')
+
+    def _total_commission(self):
+        """Total ceding commission ``C`` (a credit reducing net expense).
+
+        Deterministic in Phase 1 (the ``cede`` clause); ``0`` without one. Slide
+        / profit commission make this a distribution in Phase 3 (appendix S1).
+        """
+        econ = self._gcn_econ
+        if econ is None:
+            return 0.0
+        return float(econ.get('c_occ', 0.0) + econ.get('c_agg', 0.0))
+
+    def _net_expense(self):
+        """Net expense ``= gross expense - commission`` (decision 2)."""
+        return self._gross_expense() - self._total_commission()
+
     def _net_values(self, x):
-        """Map loss-grid outcomes ``x`` to net P&L outcomes (``C -/+ X``)."""
+        """Map loss-grid outcomes ``x`` to net P&L outcomes (``C -/+ X - E_net``)."""
         c = self._consideration_at(x)
-        return (c - x) if self.agg._is_loss_value else (c + x)
+        base = (c - x) if self.agg._is_loss_value else (c + x)
+        return base - self._net_expense()          # net of expense less commission
 
     @property
     def pnl_df(self):
@@ -260,57 +338,204 @@ class PnL:
         # obligation = the risky leg's SIGNED contribution to the net
         sign = -1.0 if self.agg._is_loss_value else 1.0
         om, osd, osk = self._moms(sign * x, p)
+        # expense leg: a signed cost (deterministic in Phase 1, so SD 0)
+        eg = self._gross_expense()
+        em, esd, esk = -eg, 0.0, 0.0
         mm, msd, msk = self._moms(self._net_values(x), p)
         df = pd.DataFrame(
-            {'EX': [cm, om, mm], 'SD': [csd, osd, msd], 'Sk': [csk, osk, msk]},
-            index=['Consideration', 'Obligation', 'Margin'])
+            {'EX': [cm, om, em, mm], 'SD': [csd, osd, esd, msd],
+             'Sk': [csk, osk, esk, msk]},
+            index=['Consideration', 'Obligation', 'Expense', 'Margin'])
         df.index.name = 'P&L'
+        # Combined-ratio line (loss + expense over premium); a loss-leg notion,
+        # NaN for a payoff or a non-positive premium.
+        lm = float((x * p).sum())
+        prem = cm
+        if self.agg._is_loss_value and prem > 0:
+            df.loc['Combined ratio'] = [(lm + eg) / prem, np.nan, np.nan]
         return df
+
+    # ------------------------------------------------------------------
+    # The Gross / Ceded / Net exhibit (the leg model; appendix S1)
+    # ------------------------------------------------------------------
+    def _gcn_marginal(self, perspective):
+        """The ``(x, p)`` loss/recovery marginal for a waterfall perspective.
+
+        Each perspective reads its **own** exact aggregate marginal from
+        ``Aggregate.reins_density_df`` (``p_agg_gross`` etc.), so a cession
+        perspective carries the recovery distribution and a retained perspective
+        the net-loss distribution -- no ``(L, R)`` joint is needed (appendix S2).
+        """
+        rd = self.agg.reins_density_df
+        x = rd['loss'].to_numpy(dtype=float)
+        p = rd[_GCN_LOSS_MARGINAL[perspective]].to_numpy(dtype=float)
+        return x, p
+
+    @staticmethod
+    def _quantile(x, p, level):
+        """Lower ``level``-quantile of a discrete ``(x, p)`` marginal."""
+        F = np.cumsum(p)
+        idx = int(np.searchsorted(F, level, side='left'))
+        return float(x[min(idx, len(x) - 1)])
+
+    def _gcn_perspective_rows(self, perspective, prem_mag, exp_mag):
+        """The full row vector (all sections) for one waterfall **column**.
+
+        Means are signed so they add down to ``UW`` *and* across the GCN split
+        (a cession pays premium ``-`` and receives recovery / commission ``+``).
+        Ratios use magnitudes (a ceded ``LR`` is recovery / ceded-premium).
+        Volatility and percentiles come from this column's own marginal; in
+        Phase 1 the expense is deterministic so ``SD(ER) = 0`` and
+        ``SD(CR) = SD(loss) / premium`` (decision 4).
+        """
+        x, p = self._gcn_marginal(perspective)
+        lm, lsd, lsk = self._moms(x, p)            # loss (or recovery) moments
+        ceded = perspective in _GCN_CEDED
+        P, E = prem_mag, exp_mag
+        # --- Mean section (signed) -------------------------------------
+        premium = (-P) if ceded else P
+        loss = (+lm) if ceded else (-lm)           # recovery is a gain (+)
+        expense = (+E) if ceded else (-E)          # commission credit later
+        uw = premium + loss + expense
+        # --- Ratio section (magnitudes) --------------------------------
+        nan = float('nan')
+        lr = lm / P if P else nan
+        er = E / P if P else nan
+        cr = (lm + E) / P if P else nan
+        # --- Volatility section ----------------------------------------
+        sd_lr = lsd / P if P else nan
+        sd_cr = lsd / P if P else nan              # expense deterministic here
+        # --- UW percentiles (this column's UW distribution) ------------
+        # retained: UW = P - loss - E (decreasing in loss); cession:
+        # UW = recovery + E - P (increasing in recovery).
+        pct = {}
+        for lvl in GCN_PERCENTILES:
+            if ceded:
+                pct[lvl] = self._quantile(x, p, lvl) + E - P
+            else:
+                pct[lvl] = P - self._quantile(x, p, 1.0 - lvl) - E
+        out = {
+            ('Mean', 'Premium'): premium, ('Mean', 'Loss'): loss,
+            ('Mean', 'Expense'): expense, ('Mean', 'UW'): uw,
+            ('Ratio', 'LR'): lr, ('Ratio', 'ER'): er, ('Ratio', 'CR'): cr,
+            ('Volatility', 'SD LR'): sd_lr, ('Volatility', 'SD CR'): sd_cr,
+            ('Volatility', 'Skew LR'): lsk, ('Volatility', 'Skew CR'): lsk,
+        }
+        for lvl in GCN_PERCENTILES:
+            out[('UW %ile', f'{lvl:g}')] = pct[lvl]
+        return out
+
+    @staticmethod
+    def _gcn_impact(target, base, ratio_rows):
+        """A percent-change (or percentage-*point*, for ratio rows) impact column."""
+        out = {}
+        for key in target:
+            t, b = target[key], base[key]
+            if key in ratio_rows:
+                out[key] = t - b                   # points
+            elif b:
+                out[key] = t / b - 1.0             # signed fraction
+            else:
+                out[key] = float('nan')
+        return out
 
     @property
     def gcn_df(self):
-        """The Gross / Ceded / Net exhibit -- **doubly additive**, signed.
+        """The Gross / Ceded / Net exhibit -- a multi-section waterfall (decision 4).
 
-        For a ``make_pnl(gross=, ceded=)`` position on an aggregate-reinsurance
-        risky leg, a 3x3 table whose rows are the three legs and columns the
-        signed P&L parts, additive **both ways**:
+        Columns are the reinsurance waterfall (inuring **occurrence -> aggregate**,
+        the aggregate cover applying to net-of-occurrence), shown only for the
+        sides that are configured::
 
-        - rows add: ``Net = Gross + Ceded`` (the legs are comonotone -- all
-          deterministic functions of the one gross loss -- so this stays 1-D, no
-          joint model); and
-        - columns add: ``Margin = Consideration + Obligation`` (the
-          :meth:`summary_df` convention).
+            gross | ceded occ | net occ | occ impact | ceded agg | net agg | agg impact | impact
 
-        The ceded leg is literally negative relative to gross: you **pay** the
-        ceded premium (Consideration ``-Pc``) and **receive** the recovery
-        (Obligation ``+E[R]``, a gain), so it nets the gross down to the
-        retained position. ``Net`` is the headline (it drives the net
-        :attr:`pnl_df`, moments, plot and :meth:`evaluate`).
+        With only one side present the single delta column is just ``impact`` and
+        the ``ceded`` / ``net`` columns drop the occ / agg qualifier. The
+        ``*impact`` columns are **percent change** of one perspective versus its
+        predecessor (``occ`` vs gross, ``agg`` vs net-occ, ``impact`` = net vs
+        gross) -- a percentage-*point* change on the Ratio rows.
+
+        Rows, in sections: **Mean** (Premium / Loss / Expense / UW, signed --
+        adds down to UW *and* across the GCN split); **Ratio** (LR / ER / CR from
+        the means); **Volatility** (SD and Skew of LR / CR); and **UW
+        percentiles** (payoff convention, low = bad tail; :data:`GCN_PERCENTILES`).
+        Only the Mean section adds across columns -- SD / skew / percentiles are
+        per-column marginals and do **not** add ("means add, SDs don't").
 
         Returns
         -------
         pandas.DataFrame
-            Rows ``Gross`` / ``Ceded`` / ``Net``; columns ``Consideration`` /
-            ``Obligation`` / ``Margin`` (expected values).
+            Row ``MultiIndex`` ``(section, item)``; one column per present
+            waterfall perspective plus the ``*impact`` columns.
         """
-        xs = self.agg.xs
-        if self.agg.agg_density_gross is None:
+        agg = self.agg
+        if agg.reins_density_df is None:
             raise ValueError(
-                'no aggregate gross/ceded/net loss views on the risky leg; '
-                'update the aggregate (it must carry aggregate reinsurance).')
-        e_gross = float((xs * self.agg.agg_density_gross).sum())
-        e_recov = float((xs * self.agg.agg_density_ceded).sum())  # recovery R
-        e_net = float((xs * self.agg.agg_density_net).sum())
-        pg = self._gcn['gross']
-        pc = self._gcn['ceded']
-        pn = float(self.consideration)
-        # signed P&L contributions (loss subtracts, recovery adds).
-        df = pd.DataFrame(
-            {'Consideration': [pg, -pc, pn],
-             'Obligation': [-e_gross, e_recov, -e_net],
-             'Margin': [pg - e_gross, e_recov - pc, pn - e_net]},
-            index=['Gross', 'Ceded', 'Net'])
-        df.index.name = 'leg'
+                'no gross/ceded/net loss views on the risky leg; update the '
+                'aggregate (it must carry occurrence or aggregate reinsurance).')
+        has_occ = agg.occ_reins is not None
+        has_agg = agg.agg_reins is not None
+        both = has_occ and has_agg
+        # Premium magnitudes per perspective. DecL ceded-premium clauses give a
+        # per-side split (`_gcn_econ`); the scalar Python-API GCN books its single
+        # ceded amount on the side actually present.
+        p_gross = float(self._gcn['gross'])
+        econ = self._gcn_econ
+        if econ is not None:
+            pc_occ = float(econ.get('pc_occ', 0.0))
+            pc_agg = float(econ.get('pc_agg', 0.0))
+        else:
+            ceded_total = float(self._gcn['ceded'])
+            pc_agg = ceded_total if has_agg else 0.0
+            pc_occ = ceded_total if (has_occ and not has_agg) else 0.0
+        prem_mag = {
+            'gross': p_gross,
+            'ceded_occ': pc_occ, 'net_occ': p_gross - pc_occ,
+            'ceded_agg': pc_agg, 'net_agg': p_gross - pc_occ - pc_agg,
+        }
+        # Gross expense books on the gross leg; each cession credits a commission
+        # (Phase 1: deterministic `cede`, absent here, so 0) so net expense
+        # = E_G - C_occ - C_agg. Means then add across the split.
+        e_gross = self._gross_expense()
+        c_occ = float(econ.get('c_occ', 0.0)) if econ is not None else 0.0
+        c_agg = float(econ.get('c_agg', 0.0)) if econ is not None else 0.0
+        exp_mag = {
+            'gross': e_gross,
+            'ceded_occ': c_occ, 'net_occ': e_gross - c_occ,
+            'ceded_agg': c_agg, 'net_agg': e_gross - c_occ - c_agg,
+        }
+        # Ordered display columns: (label, kind, spec).
+        final_net = 'net_agg' if has_agg else 'net_occ'
+        # The final net premium honors a `net=` override (== gross - ceded
+        # otherwise, so the no-override snapshot is unchanged).
+        prem_mag[final_net] = float(self.consideration)
+        ordered = [('gross', 'persp', 'gross')]
+        if has_occ:
+            q = ' occ' if both else ''
+            ordered += [(f'ceded{q}', 'persp', 'ceded_occ'),
+                        (f'net{q}', 'persp', 'net_occ')]
+            if both:
+                ordered.append(('occ impact', 'impact', ('net_occ', 'gross')))
+        if has_agg:
+            q = ' agg' if both else ''
+            ordered += [(f'ceded{q}', 'persp', 'ceded_agg'),
+                        (f'net{q}', 'persp', 'net_agg')]
+            if both:
+                ordered.append(('agg impact', 'impact', ('net_agg', 'net_occ')))
+        ordered.append(('impact', 'impact', (final_net, 'gross')))
+        # Compute each perspective's rows once, then assemble columns.
+        rows = {k: self._gcn_perspective_rows(k, prem_mag[k], exp_mag[k])
+                for _, kind, k in ordered if kind == 'persp'}
+        data = {}
+        for label, kind, spec in ordered:
+            if kind == 'persp':
+                data[label] = rows[spec]
+            else:
+                tgt, base = spec
+                data[label] = self._gcn_impact(rows[tgt], rows[base],
+                                               _GCN_RATIO_ROWS)
+        df = pd.DataFrame(data)
+        df.index = pd.MultiIndex.from_tuples(df.index, names=['section', 'item'])
         return df
 
     # ------------------------------------------------------------------
@@ -401,7 +626,8 @@ class PnL:
         S, ess_sup = _calibration_survival(dz, bs, a_full)
         el = _limited_ev(dz, bs, a_full + bs)      # E[loss-version] (uncapped)
         # breakeven g(loss-version) = P  <=>  g(Z) = P + c  (translation by c).
-        P = float(self._consideration_at(0.0))
+        # The premium available to absorb loss is net of expense less commission.
+        P = float(self._consideration_at(0.0)) - self._net_expense()
         target = P + c
         dists = Distortion.calibrate_set(
             S=S, bs=bs, premium_target=target, ess_sup=ess_sup,

@@ -1,0 +1,169 @@
+I want to
+
+1) build in expenses: build in gross expenses to pnl, get expenses wired through out the gcn and other pnl exhibits.
+2) Add ceded premium to reinsurance clauses
+3) add in variable-features and (adjust plan-reinstatements as needed) support retro rating, swings, slides and profit commissions.
+
+I want all these in v1. I believe that will then be all for v1. (Famous last words.)
+
+The pnl becomes Premium - Loss - Expenses = UW. The AI (acceptance index) still works on the uw result - no changes needed. So i think that sets us up to do everything.
+
+Pls feel free to split into two or possibly sub-plans as you see best for execution. (1-2) and (3) looks like a good split IMO. Keep plan-reinstatements.
+
+1) Add expenses
+
+```python
+pnl EXPENSES
+   10000 premium
+   # >> this is the new line; expenses are optional and set to 0 if missing
+   - 25% expenses  # % sign used to specify it is not 0.25 dollars of expense.
+   # or
+   - 2000 expense #expense and expenses both allowed
+   # one or other.
+   # << end
+   - 85% lr
+       5000 xs 0
+       sev lognorm 50 cv 3
+       mixed ig .25
+```
+
+
+2) Add premium and ceding commission (cede) info to reins
+
+```python
+occurrence (or aggregate) net of [ceded to] [program]
+    # doesn't matter what you request - prem is for the ceded leg
+    deposit [$$]  # avoid conflict with premium, deposit for initial premium is common
+    # or
+    min [$$]      # min is synonym for deposit often "min and deposit"
+    # or
+    rol [%]    # % is rate on line, only if there is a limit
+               # actual premium = share x rol * limit
+    # or
+    rate %     # applied to gross premium, run time error if no premium on computations
+    # optional but only valid with a premium
+    cede 24%   # cede as percent of ceded premium; premium entered gross
+and ...    # one price per layer; error to have > 1 variable price.
+    ...
+```
+
+
+3) Variable features
+
+Features Supported
+===================
+
+| Feature      | What varies       | Inputs                              |
+|:-------------|:------------------|:------------------------------------|
+| Reinst. Prem | ceded premium     | see other plan and below            |
+| Retro rating | ceded premium     | basic, lcm, min and max, loss basis |
+| Swing        | ceded prem        | similar to retro but for reins      |
+| Slide        | ceding commission | low, high, factor                   |
+| PC           | Expenses          | base, x after y allowance           |
+| Corridor     | Ceded loss        | from $$ to $$ share %%              |
+
+Swings and retro are very directly analogous: retro applies to a whole account, swings to reinsurance. PC are often combined with other terms. RPs we have already discussed.
+
+Examples
+=========
+
+First note, retro rating is different
+
+```python
+pnl RETRO
+    # retro rating prices the whole book, possibly net of inuring reinsurance
+    # this is for large account pricing
+    # in this case we put the  info in the rating clause, prefix with retro to flag
+    # what is coming
+   retro 3000 basic 1.1 lcm 3500 min 8000 max premium
+   # prem = max(3500, min(8000, 3000 + 1.1 L)), L = net loss out of aggregate
+   # min = basic if no min, basic and lcm required; max=inf if missing
+   - 200 expense(s)  # % expenses in this case apply to losses, thinking risk retention with low expenses - for p&l
+   # allow fixed and variable expenses.
+   # perspective is insurer quoting account; these are the insurer's expenses
+   - 5000 loss
+        5000 xs 0
+        sev lognorm 50 cv 3
+        occurrence net of 95% po 3500 xs 0
+        # reins occ program just shaping the net book - no premium
+        # retro just  looks at the price for the net part.
+        # occ reins cost is usually a pass through.
+    mixed gamma 0.5
+```
+
+The remainder of the terms apply to reinsurance.
+
+
+```python
+# per original dicussion but change in order of premium and rp clauses
+pnl REINSTATEMENT_PREMIUM
+   10000 premium
+   - 25% expense
+   - 77.5% lr
+       sev lognorm 50 cv 3
+       occurrence net of
+           95% po 100 xs 100
+                rol 18%  # note this moved relative to original
+                # no cede on cat
+                reinstatements 1 free and 1 at 50% and two at 100%
+       poisson
+
+# can apply to occ or agg
+# reins version of retro rating
+pnl SWING
+   10000 premium
+   - 3000 expense(s)
+   - 6000 loss
+        5000 xs 0
+        sev lognorm 50 cv 3
+        occurrence net of 95% po 3500 xs 0
+            swing  3000 basic 1.1 lcm 3500 min 8000 max premium # same as retro clause
+            # swing replaces rate, rol, deposit clause
+            # no cede
+    mixed gamma 0.5
+
+
+# can apply to occ or agg
+pnl SLIDE
+    10000 premium
+   - 28% expense(s)
+   - 7000 loss
+        5000 xs 0
+        sev lognorm 50 cv 3
+    mixed gamma 0.5
+    aggregate net of 95% po inf xs 0
+        rate 100%  # quota share
+        slide [min_comm min_LR] [rate lr] [rate lr] max_comm
+        # eg [.19 .8] [.25 .7] [.5 .6] .45 pays a min of 19% above 80% LR, then .25 for each point below .8
+        # down to .7, then .5 for each point below .6 lR with an overall max of 45%
+        # can apply to occ or acc
+        # slide replaces cede - error to have both
+        # could possibly use layer and attach language?
+
+# can apply to occ or agg
+pnl PC
+    10000 premium
+    - 2000 expense(s)
+    - 7000 loss
+        5000 xs 0
+        sev lognorm 50 cv 3
+        occurrence net of
+            95% po 4500 xs 500
+                deposit 1800
+                pc 25% after 20%  # for loss L pc pays max(0, 0.25(1 - L/premium - 0.2))
+    mixed gamma 0.5
+
+# can apply to occ or agg
+pnl CORRIDOR
+    10000 premium
+    - 2000 expense(s)
+    - 7000 loss
+        5000 xs 0
+        sev lognorm 50 cv 3
+        occurrence net of
+            95% po 4500 xs 500
+                deposit 2200
+                cede 30%
+                corridor 50% po a xs b and ... # a and b are ceded loss ratios entered as 0.2 or 20%
+    mixed gamma 0.5
+```

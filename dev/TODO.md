@@ -24,6 +24,7 @@
 | **D** | Docs & packaging |
 | **H** | Hygiene (module organization & dependencies) |
 | **N** | Numerics & pricing core (incl. signed / negative-x) |
+| **P** | P&L expenses & variable rating (reinstatements, retro/swing/slide/PC/corridor) |
 | **T** | Tests (suite consolidation) |
 | **W** | Windows & plotting |
 | **β** | Pre-beta scaffold retirement (delete at the alpha→beta cut) |
@@ -42,6 +43,9 @@
 |   | H5 | `pedagogy` figure-generator migrations | B | — |
 |   | B4 | ZT/ZM frequency broken + add shift helpers | A | — |
 | ✓ | W10 | Retire `recommend_bucket`/`best_bucket` | A | done a95 (plan-finish-shared-concerns B0) |
+|   | P1 | P&L expenses + ceded premium/commission (`plan-pnl-expenses-ceded-premium`) | A | — |
+|   | P2 | Reinstatement premiums + pushforward engine (`plan-reinstatements`) | A | P1 |
+|   | P3 | Variable rating: retro/swing/slide/PC/corridor (`plan-variable-rating`) | A | P2 |
 |   | T2 | Rationalize tests / library coupling | A | — |
 |   | T3 | Switcheroo `Port.Sample` regression case | B | — |
 |   | D1 | New README body for stable-v1.0 audience | A | — |
@@ -260,6 +264,23 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   and the `2_x_10mins` user guide updated to the `best_window` / `bs_window_df`
   surface. See `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`) for the
   original framing.
+
+---
+
+## Track P — P&L expenses & variable rating  `[A]` (last feature set for v1.0)
+
+> Three integrated plans executed in sequence, sharing
+> `dev/plan-variable-rating-appendix.md` (legs model, occ→2-D / agg→1-D
+> dimensionality, per-layer economics matrix, naming). Every feature is one
+> deterministic φ pushed forward over the loss distribution, writing one P&L leg.
+
+- [ ] **P1 `[A]`** Expenses + ceded premium/commission, deterministic — the legs
+  model and final GCN shape (`Premium − Loss − Expense = UW`).
+  `dev/plan-pnl-expenses-ceded-premium.md`.
+- [ ] **P2 `[A]`** Reinstatement premiums + the 1-D/2-D pushforward engine (the
+  engine-prover, always 2-D). `dev/plan-reinstatements.md`. Depends on P1.
+- [ ] **P3 `[A]`** Variable rating — retro, swing, slide, profit commission,
+  corridor — all reusing P2's engine. `dev/plan-variable-rating.md`. Depends on P2.
 
 ---
 

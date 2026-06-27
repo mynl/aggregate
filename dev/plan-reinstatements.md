@@ -11,6 +11,17 @@
 > **not** repeat them; it adds the four things the pre-plan omits — **DecL**, **PnL/cedednet
 > reuse**, **naming**, **first-class-citizen surface** — plus the execution order, the test
 > wrinkles, and the corrections to fold in.
+>
+> **Phase 2 of 3 (integration, 2026-06-27).** This is now the middle plan of a sequence —
+> **Phase 1 `plan-pnl-expenses-ceded-premium.md` → Phase 2 (this) → Phase 3
+> `plan-variable-rating.md`** — sharing **`plan-variable-rating-appendix.md`** (legs model,
+> dimensionality, per-layer economics, naming). Reinstatement premium is the **first and
+> hardest** variable-rating feature (always 2-D) and the **engine-prover** for the other five.
+> Three deltas from the standalone draft, marked **[Φ2]** below: (a) `[engine]` ships *both* a
+> 1-D and a 2-D pushforward (Phase 3's aggregate-basis features need 1-D); (b) the bespoke
+> reinstatement `deposit` is dropped in favor of Phase 1's general premium clause
+> (`deposit|rol|rate`); (c) `[reins-single-layer]` is lifted to the shared
+> `[one-variable-occurrence-layer]` rule (appendix §2).
 
 ---
 
@@ -29,7 +40,8 @@
        sev lognorm 50 cv 3
        occurrence net of
            95% po 100 xs 100
-               reinstatements 1 free and 1 at 50% and 2 at 100% deposit 10
+               rol 18%                                     # [Φ2] base premium = Phase 1 clause
+               reinstatements 1 free and 1 at 50% and 2 at 100%
        poisson
    ```
 
@@ -50,16 +62,45 @@
 
 **Open decisions resolved by the author's syntax:**
 
-- **`[decl-rol]`** — `deposit` accepts **currency** (`deposit 10`) **or** a rate-on-line
-  percent (`deposit 12% rol` → `D = 0.12·limit`). Base rate `r = D / limit` (linked); no
-  independent rol for v1.0.
+- **`[decl-rol]` [Φ2: superseded by Phase 1].** The base premium now comes from Phase 1's
+  layer-premium clause — `deposit <currency>` **or** `rol <pct>` **or** `rate <pct>` as distinct
+  keywords (not the old `deposit 12% rol` overload). Base rate `r = base_premium / limit`.
 - **`[decl-return]`** — `build()` returns a **`PnL`** (analysis-backed); gross premium = the
   `pnl` consideration.
-- **`[share]`** — non-100% occurrence share is **allowed** (`95% po 100 xs 100`); validate
-  exactly one reinstated layer.
+- **`[share]`** — non-100% occurrence share is **allowed** (`95% po 100 xs 100`).
 - **Missing `reinstatements` clause = free + unlimited reinstatements** (an ordinary
   occurrence layer; existing behavior). The `reinstatements [...]` clause is the opt-in to
   finite, paid reinstatement capacity.
+
+**Validation rules (locked, author 2026-06-27).** The reinstatement feature supports exactly
+**one reinstatement basis** (pre-plan §17.2: an independently reinstated tower needs a
+higher-dimensional state and is out of scope). Three guards enforce this, split between the
+grammar and the transformer/build by what each can express cleanly:
+
+- **`[reins-premium]` — a `reinstatements` clause requires a base premium clause → grammar
+  (true syntax error). [Φ2]** Reinstatements consume **Phase 1's** layer-premium clause
+  (`deposit|rol|rate`), not a bespoke reinstatement deposit. The base rate is `r = base_premium
+  / limit` (so `deposit 10` and `rol 18%` are both valid bases — the updated example uses
+  `rol`). A `reinstatements` clause with **no** premium clause on its layer is a parse/transform
+  error ("reinstatements require a base premium clause"), since `r` would be undefined. `swing`
+  is **not** a valid base (a reinstated layer cannot also swing — `[one-variable-occurrence-layer]`).
+- **`[reins-one-clause]` — at most one occurrence layer may carry a `reinstatements` clause →
+  transformer/build validation (not grammar).** A tower whose layers each carry the clause is
+  individually grammatical; "only one of you may carry this" is a cross-layer constraint that
+  is ugly in Lark and yields poor messages. Parse, then reject with a precise error
+  ("reinstatements may decorate at most one occurrence layer; found N"). Same routing as the
+  `agg_reins`-present rejection (decision 3).
+- **`[reins-single-layer]` — a `reinstatements` clause ⇒ `occ_reins` has length exactly 1
+  (option A) → transformer/build validation. [Φ2: now the shared rule.]** This is the first
+  instance of the foundation rule **`[one-variable-occurrence-layer]`** (appendix §2): a second
+  occurrence layer with independent variable pricing would need `(L, R₁, R₂)` = 3-D, above the
+  2-D engine ceiling. Reason it bites here: the engine's `R` is the ceded view of
+  `occ_bivariate`, which sums `occ_ceder` across the **whole tower**; `h(R)` and the cap
+  `(m+1)y` act on the *reinstated layer's own* recovery, and the two coincide only when that
+  layer is the sole occurrence layer. Reject a mixed tower ("reinstatements require a single
+  occurrence layer; found N") rather than silently computing `h`/the cap on the wrong variable.
+  (Ordinary towers **without** any variable feature are unaffected — multi-layer occurrence
+  programs still build normally.)
 
 Plus the pre-plan §24 decisions: payoff sign convention throughout (exhibits add); percentile
 rows show the "bad" (adverse) tail; deposit entered in currency (or `% rol`); custom premium
@@ -125,7 +166,8 @@ pnl Cat
     sev lognorm 50 cv 3
     occurrence net of
         95% po 100 xs 100             # one reinstated layer (share allowed)
-            reinstatements [0 0 .5 1 1] deposit 10
+            rol 18%                   # [Φ2] base premium = Phase 1 clause
+            reinstatements [0 0 .5 1 1]
     poisson
 ```
 
@@ -145,9 +187,9 @@ pnl Cat
   free + one full.
 - **Omitting the clause = free + unlimited** reinstatements (an ordinary occurrence layer —
   existing behavior); the `reinstatements …` clause is the opt-in to finite, paid capacity.
-- `deposit 10` — deposit premium `D` in **currency**, or `deposit 12% rol` → `D = 0.12·limit`.
-  Base rate `r = D / limit` (`[decl-rol]` resolved). The reinstatement premium is
-  `h(R) = r · Σ αⱼ[(R − bⱼ)₊ ∧ wⱼ]`.
+- **Base premium [Φ2]** — the layer's `deposit|rol|rate` clause (Phase 1) supplies `D`; e.g.
+  `rol 18%` → `D = share·0.18·limit`, or `deposit 10` → `D = 10`. Base rate `r = D / limit`. The
+  reinstatement premium is `h(R) = r · Σ αⱼ[(R − bⱼ)₊ ∧ wⱼ]`.
 - The occurrence layer stays in `occ_reins = [(share, limit, attach)]` with `occ_kind`
   (`'net of'`/`'ceded to'` both allowed — the analysis computes all views regardless). The cap
   `(m+1)·limit` is **derived in `ReinstatementTerms`**, never added to `occ_reins`/`agg_reins`.
@@ -159,15 +201,21 @@ New terminals `REINSTATEMENTS.2`, `DEPOSIT.2`, `ROL.2`, `FREE.2`, and a number-w
 Two sub-productions both feed the `reinstatement_rates` tuple: the `[α…]` list (a `doutcomes`/list),
 and a `<count> free | <count> at <pct>` group chain (counts are a number literal **or** a
 number-word; `at <pct>` and the `deposit … % rol` value reuse the existing `_PercentNumber`
-machinery). Watch lexer priority on the number-words so they don't shadow identifiers/distribution
+machinery). **A base premium clause is required** (`[reins-premium]`, [Φ2]): the layer must carry
+Phase 1's `deposit|rol|rate`, else `r = base_premium / limit` is undefined — enforce in the
+grammar where clean, otherwise at transform. Watch lexer priority on the number-words so they
+don't shadow identifiers/distribution
 names; keep `D3` (grammar-reference-from-`decl.lark`) in mind — the production must be
 self-documenting.
 
 **Transformer (`parser.py`).** New spec keys (Lark spec keys are a sanctioned carve-out from the
 `reins`-canonical rule, but spell these out): `reinstatement_rates` (tuple of α),
 `reinstatement_deposit` (`D` in currency, after resolving `% rol`). Validate at transform/build
-time: **exactly one occurrence layer** bears the clause, **no `agg_reins`** when reinstatements
-present (decision 3), rates nonnegative.
+time (the locked validation rules): **at most one occurrence layer bears the clause**
+(`[reins-one-clause]`); **`occ_reins` has length exactly 1** when a clause is present
+(`[reins-single-layer]`, option A — no mixed tower); **no `agg_reins`** when reinstatements
+present (decision 3); rates nonnegative. (The base-premium guard `[reins-premium]` is enforced
+upstream — Phase 1's `deposit|rol|rate` clause must be on the layer.)
 
 **`build()` return.** A `PnL` (decision `[decl-return]`). The underlying `Aggregate` carries the
 terms as attributes (`self.reinstatement_terms`); the `PnL` detects them and, when present, backs
@@ -189,7 +237,14 @@ the snapshot wrinkle.
   the result has `q`/`cdf`/`sf`/moments and plays with `Aggregate`/`PnL` reporting). `function`
   receives broadcast axis arrays `function(x_axis[:,None], y_axis[None,:])` and must be vectorized.
   NumPy broadcasting + two `np.bincount` calls for linear rebucketing (pre-plan §9.4); row chunking
-  (pre-plan §9.7); retain total mass and report deficit/clipped.
+  (pre-plan §9.7); retain total mass and report deficit/clipped. **This is the 2-D path
+  (`pushforward_2d`).**
+- **[Φ2] Also ship the 1-D path** — `pushforward_1d(density, function, ...)` over a single
+  aggregate marginal (e.g. `Aggregate.density`), returning the **same** `GridDistribution` result
+  type. Reinstatement premium only exercises the 2-D path (it is always occurrence-basis), but
+  Phase 3's aggregate-basis features (`swing`/`slide`/`pc`/`corridor` on an aggregate layer,
+  `retro` on a clean book) are 1-D pushforwards (appendix §2). Build both now so Phase 3 adds
+  features, not engine. One vectorized-φ contract, two entry points; the layer's basis selects.
 - `transformed_moments(self, function, max_order=2)` → **exact** moments on the source joint grid
   (`Σ pᵢⱼ f(lᵢ,rⱼ)^k`), the headline-driving numbers (pre-plan §15). These are the "EX" column;
   the rebucketed pushforward gives "Est" and the quantiles.
@@ -210,7 +265,8 @@ New module `src/aggregate/reinstatement.py` (no FFT code). Frozen dataclass:
 class ReinstatementTerms:
     limit: float            # y
     rates: tuple            # (α₁ … α_m) price multipliers; len == m
-    deposit: float          # D, currency (DecL resolves `12% rol` → 0.12·limit)
+    deposit: float          # D, currency — the layer's base premium, sourced from Phase 1's
+                            # `deposit|rol|rate` clause ([Φ2]); base rate r = D / limit
 ```
 
 - Derived: `rol` (`= deposit / limit`, `[decl-rol]` — not an independent field),
@@ -236,7 +292,9 @@ New class in `reinstatement.py`, owning the joint + pushforward + audit. Two ent
 - **Programmatic:** `Aggregate.reinstatement_analysis(gross_premium=None, terms=None,
   percentiles=(.90,.95,.99,.995,.996,.999))` (`_aggregate.py` concern):
 
-1. require `occ_reins` present, **reject `agg_reins`** (decision 3);
+1. require `occ_reins` present **with length exactly 1** (`[reins-single-layer]`), **reject
+   `agg_reins`** (decision 3); these guard the programmatic path the same way the transformer
+   guards the DecL path;
 2. `gross_premium` defaults from `self.exp_premium` if present, else required;
 3. `terms` defaults from the DecL `reinstatement_*` attributes if present, else required;
 4. build/reuse `occ_bivariate(views=('gross','ceded'))` (cache the joint independently of `terms`
@@ -295,17 +353,19 @@ carry the joint matrix (pre-plan §12). Keep the change surgical; `PnL`'s public
 
 ## Open decisions (author)
 
-All resolved (see "Decisions locked"): `[decl-rol]` (deposit currency or `% rol`, `r = D/limit`),
+All resolved (see "Decisions locked"): `[decl-rol]` ([Φ2] base premium from Phase 1's
+`deposit|rol|rate` clause, `r = base_premium/limit`),
 `[decl-return]` (`build()` → `PnL`), `[share]` (allow non-100% share, validate single layer),
 missing-clause default (free + unlimited), `[decl-shorthand]` (human `<n> free and <n> at <p>%`
 form **and** the `[…]` list escape hatch; counts as digits **or** number-words `one…five`; no hard
 cap), `[pnl-division]` (`gcn_df`/`summary_df`/`plot` live on the **`PnL`**, delegating to the
 engine — one face, one engine).
 
-**Forward hook (not v1.0):** sliding-scale / profit-commission premium ("swings and slides") is the
-same stochastic-consideration pattern — a deterministic premium function of the same `(L, R)` joint —
-so it drops onto `PnL` later through the identical pushforward path, no new abstraction. Keep the
-`[engine]` pushforward and the PnL-delegation seam general enough that it lands cleanly.
+**[Φ2] Forward hook is now Phase 3, in v1.0.** Retro / swing / slide / profit-commission /
+corridor are the same stochastic-leg pattern — a deterministic function pushed forward over the
+loss distribution, writing one leg — and land in `plan-variable-rating.md` reusing this plan's
+`[engine]` (both pushforward paths) and the leg-delegation seam. Keep both general (the 1-D/2-D
+split and the leg model in the appendix exist precisely so Phase 3 adds features, not engine).
 
 ---
 
@@ -337,7 +397,12 @@ Poisson/lognormal cat model.
   SLY snapshot**; the new reinstatement lines have **no** SLY reference, so the
   `test_spec_matches_snapshot` path cannot cover them. Add the reinstatement DecL lines to
   `test_decl.agg` with **hand-written spec assertions** (parse → assert `reinstatement_rates`/
-  `_deposit`/`_rol` and the single-layer/`no-agg_reins` guards), not via the frozen snapshot.
+  `_deposit`/`_rol`), not via the frozen snapshot. Also add **negative** cases asserting each
+  validation rule fires: `[reins-premium]` (a clause with no `deposit|rol|rate` base → error),
+  `[reins-one-clause]` (two layers each carrying a clause → reject), `[reins-single-layer]`
+  (one reinstated layer + a second plain occurrence layer → reject), and `agg_reins` present
+  → reject (decision 3). Your two-layer example from the design discussion is the canonical
+  `[reins-one-clause]` fixture.
 - **Regression bar:** every existing `test_suite.agg` line still parses and snapshot-matches
   (the grammar addition must be purely additive); `uv run pytest` green.
 

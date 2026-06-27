@@ -14,7 +14,7 @@ font.monospace:      Cascadia Mono, SFMono-Regular, Consolas, DejaVu Sans Mono
 mathtext.fontset:    dejavusans
 
 # --- color cycle (site-harmonized: blue primary, then complements) ---
-axes.prop_cycle: cycler('color', ['0d6efd', 'a81313', '198754', 'b54708', '6f42c1', '0aa2c0', 'd63384', '6c757d'])
+axes.prop_cycle: cycler('color', ['0d6efd', 'dc3545', '198754', 'eaab00', '6f42c1', '0aa2c0', 'd63384', '6c757d'])
 
 # --- text / label colors ---
 text.color:          212529

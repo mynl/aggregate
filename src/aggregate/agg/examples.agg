@@ -129,6 +129,12 @@ agg A.Discrete
     dsev [-10 -5 -2 -1 0 1 2 3] [1/16 1/16 1/8 1/8 1/8 1/4 1/8 1/8]
     note{Discrete example with signed severity; empirical distributions can be used directly!}
 
+agg Tweedie
+  25 claims
+  sev gamma 1 cv .05
+  poisson
+  note{Tweedie - Poisson sum of gammas. Extreme case, severity has low CV.}
+
 # ----------------------------------------------------------------------
 # B. Getting started
 # ----------------------------------------------------------------------

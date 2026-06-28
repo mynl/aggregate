@@ -1087,6 +1087,15 @@ class UnderwritingTransformer(Transformer):
     def reins_reinst_none(self, c):
         return None
 
+    def reins_reinst_zero(self, c):
+        """``no reinstatements`` -> zero reinstatements (a single annual limit).
+
+        The empty tuple is the distinct marker (vs ``None`` = omitted = free +
+        unlimited): ``m = 0``, recovery capped at the single occurrence limit
+        ``y``, no reinstatement premium.
+        """
+        return ()
+
     def reins_reinst_list(self, c):
         """``reinstatements [a1 a2 ...]`` -- the explicit price-multiplier list."""
         _kw, rates = c

@@ -147,5 +147,15 @@ def test_rejects_bad_inputs():
         ReinstatementTerms(limit=100.0, rates=(1.0,), deposit=-1.0)
     with pytest.raises(ValueError):
         ReinstatementTerms(limit=100.0, rates=(-0.5,), deposit=10.0)
-    with pytest.raises(ValueError):
-        ReinstatementTerms(limit=100.0, rates=(), deposit=10.0)
+
+
+def test_empty_rates_is_zero_reinstatements():
+    # An empty ``rates`` tuple is the valid zero-reinstatements case (m=0): a
+    # single annual limit y, no reinstatement premium (DecL ``no reinstatements``).
+    t = ReinstatementTerms(limit=100.0, rates=(), deposit=10.0)
+    assert t.n_reinstatements == 0
+    assert t.total_recovery_capacity == pytest.approx(100.0)
+    assert t.reinstatement_capacity == pytest.approx(0.0)
+    assert t.recovery(250.0) == pytest.approx(100.0)
+    assert t.reinstatement_premium(250.0) == pytest.approx(0.0)
+    assert t.maximum_reinstatement_premium == pytest.approx(0.0)

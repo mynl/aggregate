@@ -72,6 +72,36 @@ def test_deposit_base_premium_form():
     assert spec['occ_reins_premium'] == [('deposit', 1800.0)]
 
 
+def test_no_reinstatements_marker():
+    # ``no reinstatements`` -> the empty-tuple marker (m=0), distinct from the
+    # omitted clause (None = free + unlimited).
+    _, _, spec = _spec(
+        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'occurrence net of 100 xs 100 rol 18% no reinstatements poisson')
+    assert spec['occ_reins_reinst'] == [()]
+
+
+def test_no_reinstatements_is_a_single_annual_limit():
+    # zero reinstatements: recovery capped at the single occurrence limit y, no
+    # reinstatement premium, so the ceded premium is the deterministic deposit.
+    p = build(
+        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'occurrence net of 100 xs 100 rol 18% no reinstatements poisson')
+    t = p.agg.reinstatement_terms
+    assert t.n_reinstatements == 0
+    assert t.total_recovery_capacity == pytest.approx(100.0)   # single limit y
+    assert t.recovery(250.0) == pytest.approx(100.0)
+    assert t.reinstatement_premium(250.0) == pytest.approx(0.0)
+    # deterministic ceded premium (= the deposit; h(R) == 0) => the exact ceded
+    # premium has zero variance, vs a materially nonzero CV when reinstatements
+    # are paid. The exhibit CV carries only the heavy-tail grid-deficit floor.
+    an = p.reinstatement_analysis
+    assert an.stats_df.loc['reinstatement_premium', 'mean'] == pytest.approx(0.0)
+    assert an.stats_df.loc['ceded_premium', 'sd'] == pytest.approx(0.0, abs=1e-6)
+    assert p.gcn_df.loc[('Volatility', 'CV Premium'), 'ceded'] == pytest.approx(
+        0.0, abs=1e-6)
+
+
 def test_number_words_are_not_reserved_as_identifiers():
     # ``one`` is read as a count only in the reinstatement-count position; it
     # remains a valid identifier (severity name) everywhere else.

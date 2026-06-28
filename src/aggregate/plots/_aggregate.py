@@ -194,15 +194,29 @@ def plot_pnl(pnl, axd=None, **kwargs):
     discrete = bs == 1 and abs(pnl.mean) < 1025
     ax = axd['A']
 
-    # The legs to draw: Net only (single leg), or Gross/Ceded/Net overlaid.
-    if pnl._gcn is not None:
-        xs = pnl.agg.xs
-        pg, pc = pnl._gcn['gross'], pnl._gcn['ceded']
-        legs = [
-            ('Gross', pnl._frame_from(pg - xs, pnl.agg.agg_density_gross), 1),
-            ('Ceded', pnl._frame_from(xs - pc, pnl.agg.agg_density_ceded), 1),
-            ('Net', pnl.pnl_df, 2.5),
-        ]
+    # The legs to draw: Net only (single leg), or the retained waterfall
+    # ``Gross -> [Net occ] -> Net`` overlaid. The gross / net-of-occurrence
+    # aggregate loss distributions live in ``reins_density_df`` -- occurrence
+    # reinsurance does **not** populate the ``agg_density_*`` attributes (those
+    # are aggregate-reins only), which is why an occurrence-only GCN P&L
+    # previously dropped its gross / net-occ legs. Each leg is positioned by the
+    # same per-perspective premium / expense the GCN table uses (``_gcn_magnitudes``)
+    # so the curves and the exhibit means agree; the final ``Net`` leg is the
+    # canonical net P&L (``pnl_df``, matching ``summary_df`` / ``q`` / ``cdf``).
+    rd = pnl.agg.reins_density_df
+    if pnl._gcn is not None and rd is not None:
+        prem_mag, exp_mag, has_occ, has_agg = pnl._gcn_magnitudes()
+        xs = rd['loss'].to_numpy()
+        sign = -1.0 if pnl.agg._is_loss_value else 1.0
+
+        def _stage(persp, col):
+            margin = prem_mag[persp] + sign * xs - exp_mag[persp]
+            return pnl._frame_from(margin, rd[col].to_numpy())
+
+        legs = [('Gross', _stage('gross', 'p_agg_gross'), 1)]
+        if has_occ and has_agg:
+            legs.append(('Net occ', _stage('net_occ', 'p_agg_net_occ'), 1))
+        legs.append(('Net', pnl.pnl_df, 2.5))
     else:
         legs = [('Margin', pnl.pnl_df, 2)]
 

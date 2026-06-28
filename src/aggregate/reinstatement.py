@@ -52,7 +52,9 @@ class ReinstatementTerms:
     rates : tuple of float
         Price multipliers ``(alpha_1, ..., alpha_m)`` relative to ``r``; ``len``
         is the number of reinstatements ``m``. ``0`` is a free reinstatement,
-        ``1`` a full-rate one, ``0.5`` half rate.
+        ``1`` a full-rate one, ``0.5`` half rate. The **empty** tuple is the
+        zero-reinstatements case (``m = 0``): a single annual limit ``y`` with no
+        reinstatement premium (DecL ``no reinstatements``).
     deposit : float
         Base (deposit) ceded premium ``D`` in currency -- the layer's
         Phase-1 ``deposit | rol | rate`` premium. The base rate on line is
@@ -105,10 +107,10 @@ class ReinstatementTerms:
         rates = tuple(float(a) for a in self.rates)
         object.__setattr__(self, 'rates', rates)
         if self.premium_function is None:
-            if len(rates) < 1:
-                raise ValueError(
-                    'ReinstatementTerms: at least one reinstatement rate is '
-                    'required (an unlimited free layer carries no terms object).')
+            # An empty ``rates`` tuple is the *zero-reinstatements* case: ``m = 0``,
+            # a single annual limit ``y``, no reinstatement premium (DecL ``no
+            # reinstatements``). The omitted-clause / free + unlimited case carries
+            # no terms object at all, so it never reaches here.
             if any((not np.isfinite(a)) or a < 0 for a in rates):
                 raise ValueError(
                     f'ReinstatementTerms: rates must be finite and nonnegative, '

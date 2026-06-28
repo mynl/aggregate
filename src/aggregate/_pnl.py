@@ -150,6 +150,10 @@ class PnL:
         self.agg = agg
         self.program = ''
         self._pnl_df = None
+        #: cached GridDistribution over the net frame (the single home for
+        #: q / var / tvar / cdf / sf -- PnL delegates, never re-rolls). Lazy;
+        #: invalidated alongside ``_pnl_df``.
+        self._gd = None
         #: cached backing ReinstatementAnalysis (built lazily on first exhibit
         #: access when the aggregate carries DecL reinstatement terms).
         self._reins_analysis = None
@@ -220,6 +224,7 @@ class PnL:
         """
         self.agg.update(log2=log2, bs=bs, **kwargs)
         self._pnl_df = None
+        self._gd = None
         self._reins_analysis = None
         return self
 
@@ -531,6 +536,57 @@ class PnL:
                 out[key] = float('nan')
         return out
 
+    def _gcn_magnitudes(self):
+        """Per-perspective premium and expense magnitudes for the GCN waterfall.
+
+        Shared by :attr:`gcn_df` (the exhibit) and :func:`plot_pnl` (the overlay)
+        so the plotted leg positions match the table means exactly. Premium per
+        perspective: DecL ceded-premium clauses give a per-side split
+        (``_gcn_econ``); the scalar Python-API GCN books its single ceded amount
+        on the side actually present. Gross expense books on the gross leg; each
+        cession credits a commission (``cede``), so net expense
+        ``= E_G - C_occ - C_agg`` and means add across the split.
+
+        Returns
+        -------
+        prem_mag, exp_mag : dict
+            ``{perspective -> magnitude}`` for ``gross`` / ``ceded_occ`` /
+            ``net_occ`` / ``ceded_agg`` / ``net_agg``. The final net premium
+            honors a ``net=`` override.
+        has_occ, has_agg : bool
+            Which reinsurance tiers are present.
+        """
+        agg = self.agg
+        has_occ = agg.occ_reins is not None
+        has_agg = agg.agg_reins is not None
+        p_gross = float(self._gcn['gross'])
+        econ = self._gcn_econ
+        if econ is not None:
+            pc_occ = float(econ.get('pc_occ', 0.0))
+            pc_agg = float(econ.get('pc_agg', 0.0))
+        else:
+            ceded_total = float(self._gcn['ceded'])
+            pc_agg = ceded_total if has_agg else 0.0
+            pc_occ = ceded_total if (has_occ and not has_agg) else 0.0
+        prem_mag = {
+            'gross': p_gross,
+            'ceded_occ': pc_occ, 'net_occ': p_gross - pc_occ,
+            'ceded_agg': pc_agg, 'net_agg': p_gross - pc_occ - pc_agg,
+        }
+        e_gross = self._gross_expense()
+        c_occ = float(econ.get('c_occ', 0.0)) if econ is not None else 0.0
+        c_agg = float(econ.get('c_agg', 0.0)) if econ is not None else 0.0
+        exp_mag = {
+            'gross': e_gross,
+            'ceded_occ': c_occ, 'net_occ': e_gross - c_occ,
+            'ceded_agg': c_agg, 'net_agg': e_gross - c_occ - c_agg,
+        }
+        # The final net premium honors a `net=` override (== gross - ceded
+        # otherwise, so the no-override snapshot is unchanged).
+        final_net = 'net_agg' if has_agg else 'net_occ'
+        prem_mag[final_net] = float(self.consideration)
+        return prem_mag, exp_mag, has_occ, has_agg
+
     @property
     def gcn_df(self):
         """The Gross / Ceded / Net exhibit -- a multi-section waterfall (decision 4).
@@ -578,42 +634,10 @@ class PnL:
             raise ValueError(
                 'no gross/ceded/net loss views on the risky leg; update the '
                 'aggregate (it must carry occurrence or aggregate reinsurance).')
-        has_occ = agg.occ_reins is not None
-        has_agg = agg.agg_reins is not None
+        prem_mag, exp_mag, has_occ, has_agg = self._gcn_magnitudes()
         both = has_occ and has_agg
-        # Premium magnitudes per perspective. DecL ceded-premium clauses give a
-        # per-side split (`_gcn_econ`); the scalar Python-API GCN books its single
-        # ceded amount on the side actually present.
-        p_gross = float(self._gcn['gross'])
-        econ = self._gcn_econ
-        if econ is not None:
-            pc_occ = float(econ.get('pc_occ', 0.0))
-            pc_agg = float(econ.get('pc_agg', 0.0))
-        else:
-            ceded_total = float(self._gcn['ceded'])
-            pc_agg = ceded_total if has_agg else 0.0
-            pc_occ = ceded_total if (has_occ and not has_agg) else 0.0
-        prem_mag = {
-            'gross': p_gross,
-            'ceded_occ': pc_occ, 'net_occ': p_gross - pc_occ,
-            'ceded_agg': pc_agg, 'net_agg': p_gross - pc_occ - pc_agg,
-        }
-        # Gross expense books on the gross leg; each cession credits a commission
-        # (Phase 1: deterministic `cede`, absent here, so 0) so net expense
-        # = E_G - C_occ - C_agg. Means then add across the split.
-        e_gross = self._gross_expense()
-        c_occ = float(econ.get('c_occ', 0.0)) if econ is not None else 0.0
-        c_agg = float(econ.get('c_agg', 0.0)) if econ is not None else 0.0
-        exp_mag = {
-            'gross': e_gross,
-            'ceded_occ': c_occ, 'net_occ': e_gross - c_occ,
-            'ceded_agg': c_agg, 'net_agg': e_gross - c_occ - c_agg,
-        }
-        # Ordered display columns: (label, kind, spec).
         final_net = 'net_agg' if has_agg else 'net_occ'
-        # The final net premium honors a `net=` override (== gross - ceded
-        # otherwise, so the no-override snapshot is unchanged).
-        prem_mag[final_net] = float(self.consideration)
+        # Ordered display columns: (label, kind, spec).
         ordered = [('gross', 'persp', 'gross')]
         if has_occ:
             q = ' occ' if both else ''
@@ -644,28 +668,58 @@ class PnL:
         return df
 
     # ------------------------------------------------------------------
-    # Distribution functions (read the net frame)
+    # Distribution functions: ALL delegate to the net GridDistribution.
+    # GD is the single home for q / var / tvar / cdf / sf -- never re-roll a
+    # searchsorted here (that hand-rolled path was scalar-only and silently
+    # diverged from the canonical kernel; see the module note). Reuse, reuse.
     # ------------------------------------------------------------------
-    def q(self, p):
-        """Lower ``p``-quantile of the net: smallest outcome with ``F >= p``."""
-        df = self.pnl_df
-        y = df.index.to_numpy(dtype=float)
-        F = df['F'].to_numpy(dtype=float)
-        idx = int(np.searchsorted(F, p, side='left'))
-        idx = min(idx, len(y) - 1)
-        return float(y[idx])
+    @property
+    def gd(self):
+        """The net P&L as a :class:`GridDistribution` (payoff-oriented).
+
+        The single source for every quantile / tail accessor on a ``PnL``: the
+        net frame :attr:`pnl_df` wrapped as a :class:`GridDistribution`, exactly
+        as ``Aggregate`` / ``Portfolio`` / ``Severity`` / ``Bounds`` /
+        ``Bivariate`` each wrap one. Built lazily and cached; invalidated with
+        :attr:`pnl_df` on :meth:`update`. ``bs=None`` (the net grid is a
+        comonotone relabel and may be non-uniform -- only the width-dependent ops
+        need ``bs``, and quantiles do not); ``is_loss_value=False`` because a P&L
+        is a payoff (orientation is metadata the objective accessors ignore).
+        """
+        if self._gd is None:
+            from ._grid_distribution import GridDistribution
+            df = self.pnl_df
+            self._gd = GridDistribution(
+                df.index.to_numpy(dtype=float),
+                df['p_total'].to_numpy(dtype=float),
+                bs=None, name=self.name, is_loss_value=False)
+        return self._gd
+
+    def q(self, p, kind='lower'):
+        """Quantile (value at risk) of the net. Scalar or array ``p``.
+
+        Lower quantile ``inf{x : F(x) >= p}`` (``kind='lower'``) or upper
+        ``inf{x : F(x) > p}`` (``kind='upper'``); delegates to :attr:`gd`.
+        """
+        return self.gd.q(p, kind)
+
+    def var(self, p):
+        """Value at risk = lower quantile (alias for ``q(p, 'lower')``)."""
+        return self.gd.var(p)
+
+    # NB: no bare ``tvar`` on PnL. ``GridDistribution.tvar`` is the objective
+    # *upper-tail* shortfall (loss sense); a P&L is a payoff whose adverse tail
+    # is the *low* end, so a bare ``pnl.tvar(p)`` would silently return the
+    # average of the best outcomes. Reach it via ``pnl.gd.tvar`` with the
+    # orientation in mind, or add a properly-oriented downside tvar deliberately.
 
     def cdf(self, x):
-        """``P(net <= x)`` from the net frame (right-continuous step)."""
-        df = self.pnl_df
-        y = df.index.to_numpy(dtype=float)
-        F = df['F'].to_numpy(dtype=float)
-        idx = int(np.searchsorted(y, x, side='right')) - 1
-        return float(F[idx]) if idx >= 0 else 0.0
+        """``P(net <= x)`` -- right-continuous CDF. Scalar or array ``x``."""
+        return self.gd.cdf(x)
 
     def sf(self, x):
         """``P(net > x)`` -- the survival function of the net."""
-        return 1.0 - self.cdf(x)
+        return self.gd.sf(x)
 
     # ------------------------------------------------------------------
     # Evaluation: the Cherny--Madan breakeven acceptability panel

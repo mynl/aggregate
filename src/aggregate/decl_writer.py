@@ -403,7 +403,9 @@ def _render_reins_clause(clause, premium=None, cede=None, reinst=None) -> str:
     as bare numbers (re-parse identically, no ``%`` float dust). An optional
     reinstatement schedule ``reinst`` (a tuple of price multipliers) renders in
     the canonical explicit-list form ``reinstatements [a1 a2 ...]`` (the
-    treaty-language group chain is input sugar that canonicalises to the list).
+    treaty-language group chain is input sugar that canonicalises to the list);
+    the **empty** tuple renders as ``no reinstatements`` (zero reinstatements, a
+    single annual limit).
     """
     share, limit, attach = clause
     if float(share) == 1.0:
@@ -418,7 +420,11 @@ def _render_reins_clause(clause, premium=None, cede=None, reinst=None) -> str:
     if cede is not None:
         parts.append(f'cede {_fmt_num(cede)}')
     if reinst is not None:
-        parts.append(f'reinstatements [{" ".join(_fmt_num(a) for a in reinst)}]')
+        if len(reinst) == 0:
+            parts.append('no reinstatements')
+        else:
+            parts.append(
+                f'reinstatements [{" ".join(_fmt_num(a) for a in reinst)}]')
     return ' '.join(parts)
 
 

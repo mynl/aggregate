@@ -147,6 +147,34 @@ def test_cdf_q_sf_consistent():
     assert a.cdf(med) >= 0.5 - 1e-9
 
 
+def test_q_cdf_tvar_delegate_to_grid_distribution():
+    """PnL distribution accessors go through the net GridDistribution.
+
+    The hand-rolled scalar searchsorted (pre-fix) crashed on array input and
+    duplicated the canonical kernel; ``q`` / ``cdf`` / ``sf`` / ``var`` must all
+    delegate to ``pnl.gd`` (a GridDistribution) so they vectorize and agree with
+    the kernel every other class uses. Guards against re-rolling.
+    """
+    a = build('pnl X 1000 prem less 70% lr sev gamma 100 cv 0.5 poisson')
+    from aggregate._grid_distribution import GridDistribution
+    assert isinstance(a.gd, GridDistribution)
+    # vectorized quantiles -- the array path that used to raise TypeError
+    qs = a.q([0.01, 0.5, 0.99])
+    assert np.shape(qs) == (3,)
+    assert qs[0] <= qs[1] <= qs[2]
+    # scalar still works and matches the vector element
+    assert a.q(0.5) == pytest.approx(qs[1])
+    # vectorized cdf round-trips q
+    assert a.cdf(a.q(0.99)) >= 0.99 - 1e-9
+    cs = a.cdf([a.q(0.01), a.q(0.99)])
+    assert np.shape(cs) == (2,)
+    # var is the lower-quantile alias
+    assert a.var(0.9) == pytest.approx(a.q(0.9))
+    # the GridDistribution is the canonical object (tvar reached there, with the
+    # payoff orientation in mind -- deliberately not a bare pnl.tvar)
+    assert a.gd.tvar(0.9) >= a.gd.q(0.9)
+
+
 # ----------------------------------------------------------------------
 # Function-valued (loss-sensitive) consideration -- passed by hand
 # ----------------------------------------------------------------------

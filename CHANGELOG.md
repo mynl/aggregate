@@ -27,9 +27,13 @@ pnl Cat
   ordinary identifiers everywhere else) and the explicit list `[a1 ... am]`
   (escape hatch). `free` = `at 0%`; `at p%` is a multiplier of the base rate on
   line `r = base_premium / limit`, where the base premium is the layer's
-  `deposit | rol | rate` clause. Omitting the clause keeps the existing free +
-  unlimited behavior. New spec key `occ_reins_reinst`; `decl_writer` round-trips
-  both forms to the canonical list.
+  `deposit | rol | rate` clause. Three "how much annual cover" cases: **omit**
+  the clause = free + unlimited reinstatements (existing behavior); `reinstatements
+  …` = m paid/free reinstatements ((m+1)·y annual capacity); and **`no
+  reinstatements`** = zero reinstatements, a single annual limit y (m=0, recovery
+  capped at y, deterministic ceded premium). New spec key `occ_reins_reinst`
+  (rate tuple, or the empty tuple for `no reinstatements`); `decl_writer`
+  round-trips all forms.
 - **`build()` returns a `PnL`** whose `gcn_df` / `summary_df` are backed by a
   lazily built `ReinstatementAnalysis` (the stochastic ceded premium makes the
   ceded/net **CV Premium** rows nonzero, read off the `(L, R)` pushforward).
@@ -51,6 +55,24 @@ Pending follow-ups (tracked in `dev/TODO.md`): first-class trimmings
 (`plot` mosaic, `_repr_html_`, `info`, `qd`, `density_df`, `bs_*` narratives) and
 populating the `ceded_agg` / `net_agg` waterfall columns when a subsequent
 aggregate cover is present.
+
+### Fixes
+
+- **`PnL.plot()` dropped the gross / ceded legs for an occurrence-only GCN
+  P&L.** The plot read the gross / net-of-occurrence aggregate densities from the
+  `agg_density_*` attributes, which only **aggregate** reinsurance populates; for
+  an occurrence-only treaty they are `None`, so those legs drew as invisible
+  zero lines. The GCN overlay now reads the retained waterfall from
+  `reins_density_df` (`Gross → [Net occ] → Net`), positioned by the same
+  per-perspective premium / expense the GCN table uses (factored into the shared
+  `PnL._gcn_magnitudes`). occ-only → Gross/Net; occ+agg → Gross/Net occ/Net.
+- **`PnL.q` / `cdf` / `sf` were hand-rolled and scalar-only** (`pnl.q([.001,
+  .99])` raised `TypeError`). They now delegate to a cached net
+  `GridDistribution` (`pnl.gd`) — the single home for `q`/`var`/`cdf`/`sf` every
+  other class already uses — so they vectorize, gain `var`, and match the
+  canonical kernel. (`tvar` is deliberately reached via `pnl.gd.tvar`, not a bare
+  `pnl.tvar`: GD's `tvar` is the upper-tail/loss-sense shortfall, wrong-signed for
+  a payoff.)
 
 ## 1.0.0a115
 

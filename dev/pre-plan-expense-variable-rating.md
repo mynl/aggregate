@@ -15,16 +15,15 @@ Pls feel free to split into two or possibly sub-plans as you see best for execut
 ```python
 pnl EXPENSES
    10000 premium
-   # >> this is the new line; expenses are optional and set to 0 if missing
-   - 25% expenses  # % sign used to specify it is not 0.25 dollars of expense.
-   # or
-   - 2000 expense #expense and expenses both allowed
-   # one or other.
-   # << end
-   - 85% lr
+   less
+   85% lr
        5000 xs 0
        sev lognorm 50 cv 3
        mixed ig .25
+   # expenses are optional (0 if missing), base is EXPLICIT, clause placed LAST:
+   25% premium expenses    # fraction of premium ('%' => not dollars)
+   # or  25% loss expenses    (fraction of expected loss)
+   # or  2000 fixed expenses  ('expense'/'expenses' both accepted)
 ```
 
 
@@ -33,9 +32,8 @@ pnl EXPENSES
 ```python
 occurrence (or aggregate) net of [ceded to] [program]
     # doesn't matter what you request - prem is for the ceded leg
-    deposit [$$]  # avoid conflict with premium, deposit for initial premium is common
-    # or
-    min [$$]      # min is synonym for deposit often "min and deposit"
+    deposit [$$]  # deposit (initial) premium in currency
+                  # NO `min` synonym (freed for the swing/retro collar) -- deposit only
     # or
     rol [%]    # % is rate on line, only if there is a limit
                # actual premium = share x rol * limit
@@ -78,10 +76,9 @@ pnl RETRO
    retro 3000 basic 1.1 lcm 3500 min 8000 max premium
    # prem = max(3500, min(8000, 3000 + 1.1 L)), L = net loss out of aggregate
    # min = basic if no min, basic and lcm required; max=inf if missing
-   - 200 expense(s)  # % expenses in this case apply to losses, thinking risk retention with low expenses - for p&l
-   # allow fixed and variable expenses.
-   # perspective is insurer quoting account; these are the insurer's expenses
-   - 5000 loss
+   # the retro clause REPLACES `<numbers> premium` (it sets gross premium variably)
+   less
+   5000 loss
         5000 xs 0
         sev lognorm 50 cv 3
         occurrence net of 95% po 3500 xs 0
@@ -89,45 +86,49 @@ pnl RETRO
         # retro just  looks at the price for the net part.
         # occ reins cost is usually a pass through.
     mixed gamma 0.5
+   # perspective is insurer quoting account; these are the insurer's expenses
+   # (fixed and variable both allowed); clause placed LAST:
+   200 fixed expenses
 ```
 
 The remainder of the terms apply to reinsurance.
 
 
 ```python
-# per original dicussion but change in order of premium and rp clauses
 pnl REINSTATEMENT_PREMIUM
    10000 premium
-   - 25% expense
-   - 77.5% lr
+   less
+   77.5% lr
        sev lognorm 50 cv 3
        occurrence net of
            95% po 100 xs 100
-                rol 18%  # note this moved relative to original
+                rol 18%
                 # no cede on cat
                 reinstatements 1 free and 1 at 50% and two at 100%
        poisson
+   25% premium expenses
 
 # can apply to occ or agg
 # reins version of retro rating
 pnl SWING
    10000 premium
-   - 3000 expense(s)
-   - 6000 loss
+   less
+   6000 loss
         5000 xs 0
         sev lognorm 50 cv 3
         occurrence net of 95% po 3500 xs 0
-            swing  3000 basic 1.1 lcm 3500 min 8000 max premium # same as retro clause
+            swing 3000 basic 1.1 lcm 3500 min 8000 max premium # same as retro clause
             # swing replaces rate, rol, deposit clause
             # no cede
     mixed gamma 0.5
+   3000 fixed expenses
 
 
 # can apply to occ or agg
 pnl SLIDE
     10000 premium
-   - 28% expense(s)
-   - 7000 loss
+    less
+    7000 loss
         5000 xs 0
         sev lognorm 50 cv 3
     mixed gamma 0.5
@@ -139,12 +140,13 @@ pnl SLIDE
         # can apply to occ or acc
         # slide replaces cede - error to have both
         # could possibly use layer and attach language?
+    28% premium expenses
 
 # can apply to occ or agg
 pnl PC
     10000 premium
-    - 2000 expense(s)
-    - 7000 loss
+    less
+    7000 loss
         5000 xs 0
         sev lognorm 50 cv 3
         occurrence net of
@@ -152,12 +154,13 @@ pnl PC
                 deposit 1800
                 pc 25% after 20%  # for loss L pc pays max(0, 0.25(1 - L/premium - 0.2))
     mixed gamma 0.5
+    2000 fixed expenses
 
 # can apply to occ or agg
 pnl CORRIDOR
     10000 premium
-    - 2000 expense(s)
-    - 7000 loss
+    less
+    7000 loss
         5000 xs 0
         sev lognorm 50 cv 3
         occurrence net of
@@ -166,4 +169,26 @@ pnl CORRIDOR
                 cede 30%
                 corridor 50% po a xs b and ... # a and b are ceded loss ratios entered as 0.2 or 20%
     mixed gamma 0.5
+    2000 fixed expenses
+```
+
+Other Examples
+===============
+
+
+```python
+pnl REINSTATEMENT_PREMIUM
+   10000 premium
+   less
+   77.5% lr
+       sev lognorm 50 cv 3
+       occurrence net of
+           95% po 100 xs 100
+                rol 18%  # note this moved relative to original
+                # no cede on cat
+                reinstatements 1 free and 1 at 50% and two at 100%
+       poisson
+       aggregate net of
+            85% po 1500 xs 7000
+   20.5% premium expense
 ```

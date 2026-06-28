@@ -36,7 +36,7 @@
 
    ```
    pnl Cat
-       10000 premium - 85% lr                              # gross volume + expected loss
+       10000 premium less 85% lr                           # gross volume + expected loss
        sev lognorm 50 cv 3
        occurrence net of
            95% po 100 xs 100
@@ -45,16 +45,30 @@
        poisson
    ```
 
-2. **Exhibit: the returned `PnL`'s own `gcn_df` IS the exhibit.** Reuse the existing
-   doubly-additive Gross/Ceded/Net × Consideration/Obligation/Margin table and its SD-not-CV
-   convention; the only delta is that the Consideration column becomes a **distribution** on
-   the Ceded/Net rows (stochastic `D + h(R)`), so add spread (SD/CV) columns. Do **not** invent
-   a parallel exhibit format. `ReinstatementAnalysis` is the **engine** (joint `(L,R)`,
-   pushforward, the 11 legs, audit) that the `PnL` delegates to; it is not a second face.
+2. **Exhibit: the returned `PnL`'s own `gcn_df` IS the exhibit — reuse Phase 1's waterfall.**
+   Reuse Phase 1's multi-section waterfall `gcn_df` (perspective columns × Mean/Ratio/Volatility/
+   UW-%ile sections) and its SD-not-CV convention; do **not** invent a parallel exhibit format
+   (reuse-reuse-reuse). The delta is real but contained: stochastic ceded premium `D + h(R)`
+   makes the **Premium** row a distribution on the Ceded/Net columns (nonzero premium SD/CV), and
+   — because net UW then depends jointly on `(L,R)` — the **Volatility/Percentile** rows of those
+   columns must read off the `(L,R)` pushforward, not a 1-D loss marginal. This is what
+   `[pnl-share]` delivers: the waterfall builder is widened so a column's premium/UW value is
+   **scalar *or* a `GridDistribution`**; gross stays scalar+marginal, ceded/net come from the
+   pushforward. **No `Leg` class taxonomy** — just a scalar-or-distribution column.
+   `ReinstatementAnalysis` is the **engine** (joint `(L,R)`, pushforward, the legs, audit) that
+   the `PnL` delegates to; it is not a second face.
 
-3. **Recovery cap `(m+1)y` lives in `ReinstatementTerms`.** The source aggregate must carry
-   the occurrence layer (`occ_reins`) but **not** an aggregate cap; `agg_reins` on the source
-   is a hard error (would double-count the cap).
+3. **Recovery cap `(m+1)y` lives in `ReinstatementTerms` — never in `agg_reins`.** The source
+   aggregate carries the occurrence layer (`occ_reins`) and feeds the engine an **unlimited** `R`;
+   the reinstatement annual cap is applied by `ReinstatementTerms.recovery`, **not** by an
+   aggregate clause (expressing the cap via `agg_reins` would double-count it). A **genuine
+   subsequent aggregate cover** at its own attachment (e.g. `aggregate net of 85% po 1500 xs 7000`)
+   **is allowed**: its recovery is a deterministic function of net-of-occurrence loss `L − A(R)`,
+   hence of `(L, R)`, so it is just another pushforward over the **same** joint, written through
+   the waterfall's existing `ceded_agg`/`net_agg` columns (appendix §2 — "aggregate variable
+   features stay 1-D and may stack freely"; a whole tower of flat-rated agg covers is fine). Only
+   a **second occurrence** layer is forbidden (`[one-variable-occurrence-layer]`, would need
+   `(L, R₁, R₂)` = 3-D). So: at most one occurrence layer, but the aggregate tier composes freely.
 
 4. **Names:** `Aggregate.reinstatement_analysis() -> ReinstatementAnalysis` (the programmatic
    path); the DecL `pnl` block is the headline path. Full words (house default); `reins` stays
@@ -89,7 +103,8 @@ grammar and the transformer/build by what each can express cleanly:
   individually grammatical; "only one of you may carry this" is a cross-layer constraint that
   is ugly in Lark and yields poor messages. Parse, then reject with a precise error
   ("reinstatements may decorate at most one occurrence layer; found N"). Same routing as the
-  `agg_reins`-present rejection (decision 3).
+  `[reins-single-layer]` occurrence-count check — a cross-layer constraint enforced at
+  transform/build, not in the grammar.
 - **`[reins-single-layer]` — a `reinstatements` clause ⇒ `occ_reins` has length exactly 1
   (option A) → transformer/build validation. [Φ2: now the shared rule.]** This is the first
   instance of the foundation rule **`[one-variable-occurrence-layer]`** (appendix §2): a second
@@ -124,33 +139,43 @@ functions must be vectorized (`ValueError` if not); `BivariateDistribution.pushf
 - **`make_ceder_netter`** (`_reinsurance.py:83`) → piecewise-linear `ceder`/`netter`;
   `apply_occ_reins`/`apply_agg_reins` populate `sev_density_{gross,ceded,net}` /
   `agg_density_{gross,ceded,net}`. Occurrence and aggregate reins are independent stages.
-- **`PnL`** (`_pnl.py:33`) already has `gcn_df` (`:270`) — the doubly-additive
-  Gross/Ceded/Net × Consideration/Obligation/Margin table — and `summary_df` (`:225`) reporting
-  **SD not CV** near break-even (`:231`). This is the exhibit template (decision 2).
-- **DecL has no per-layer premium today.** `occ_reins`/`agg_reins` are pure loss structure
-  (`(share, limit, attach)` tuples + `occ_kind`/`agg_kind`); premium enters only via exposure
-  (`exp_premium`/`exp_lr`) or a `pnl` consideration. **Reinstatement premium is the first
-  pricing term embedded in the loss grammar** — handle with care.
+- **`PnL`** (`_pnl.py`) has `gcn_df` (`:457`) — **Phase 1's multi-section waterfall**: perspective
+  **columns** (`gross | ceded occ | net occ | … | impact`) × row sections (**Mean** Premium/Loss/
+  Expense/UW signed; **Ratio** LR/ER/CR; **Volatility** SD/Skew; **UW %ile**) — and `summary_df`
+  (`:312`) reporting **SD not CV** near break-even. This is the exhibit template (decision 2). **NB:
+  Phase 1 built this on per-perspective 1-D marginals from `reins_density_df` (`_gcn_perspective_rows`,
+  `:389`), *not* on a leg-iterating builder** — there is no `Leg` class. The Volatility/Percentile
+  rows treat premium as a constant, which is correct only while premium is deterministic; making
+  ceded premium stochastic forces those rows onto the `(L,R)` pushforward (see `[pnl-share]`).
+- **DecL now has a per-layer premium clause (Phase 1).** A `reins_clause` carries
+  `deposit|rol|rate` + optional `cede` (`decl.lark:250–262`), resolved to per-side economics on
+  the `PnL` (`_gcn_econ`). Reinstatements **reuse** that clause as the base premium `D`
+  ([Φ2]) — they are **not** the first pricing term in the loss grammar; they are the first
+  **stochastic** one (`h(R)` varies the already-chosen base). Handle with care.
 
 ---
 
-## The accounting maps onto `gcn_df` exactly (decision 2)
+## The accounting maps onto the waterfall `gcn_df` (decision 2)
 
-With payoff signs (premium received +, paid −; loss as a negative obligation; recovery +), for
-each grid point `(L, R)`, `A = terms.recovery(R)`, `RP = terms.reinstatement_premium(R)`,
-`D = terms.deposit`, `P_G` = gross premium:
+This is the per-`(L,R)` signed accounting — the **Mean section** of Phase 1's waterfall, here
+written with Gross/Ceded/Net as rows for legibility (the exhibit transposes it: those are
+**columns**). With payoff signs (premium received +, paid −; loss as a negative obligation;
+recovery +), for each grid point `(L, R)`, `A = terms.recovery(R)`,
+`RP = terms.reinstatement_premium(R)`, `D = terms.deposit`, `P_G` = gross premium:
 
-| | Consideration (premium) | Obligation (loss) | Margin |
+| | Premium (consideration) | Loss (obligation) | UW (margin) |
 |---|---|---|---|
 | **Gross** | `P_G` (fixed) | `−L` | `P_G − L` |
 | **Ceded** | `−(D + RP)` | `+A` | `A − D − RP` |
 | **Net** | `P_G − D − RP` | `−(L − A)` | `P_G − D − RP − L + A` |
 
-Rows add, columns add — **in expectation**. The only thing reinstatements add over `PnL.gcn_df`
-is that the Consideration column is now a **distribution** on the Ceded/Net rows. So the exhibit =
-`gcn_df` means + spread (SD/CV) columns + a note that means add but SDs/percentiles do not.
-`U_ceded = A − D − RP` is the **reinsurer's** underwriting result — the same object serves cedant
-and reinsurer.
+Means add down (to UW) and across (Gross = Ceded + Net) — **in expectation**. What reinstatements
+change over the deterministic Phase-1 case: the **Premium** entry is now a *distribution* on the
+Ceded/Net columns (nonzero SD/CV), and net UW depends jointly on `(L,R)`, so the Volatility/%ile
+rows of those columns come from the pushforward (not a 1-D marginal) — means add but SDs and
+percentiles do not. `U_ceded = A − D − RP` is the **reinsurer's** underwriting result — the same
+object serves cedant and reinsurer. A subsequent agg cover adds `+A_agg`/`−A_agg` legs in the agg
+columns by the same signed convention (decision 3).
 
 ---
 
@@ -162,16 +187,18 @@ and reinsurer.
 
 ```
 pnl Cat
-    10000 premium - 85% lr            # gross volume; expected loss = 8500
+    10000 premium less 85% lr         # gross volume; expected loss = 8500
     sev lognorm 50 cv 3
     occurrence net of
         95% po 100 xs 100             # one reinstated layer (share allowed)
             rol 18%                   # [Φ2] base premium = Phase 1 clause
             reinstatements [0 0 .5 1 1]
     poisson
+    aggregate net of                  # OPTIONAL subsequent agg cover (decision 3) — stays 2-D
+        85% po 1500 xs 7000           # deterministic pushforward on net-of-occ loss
 ```
 
-- The `pnl` block already parses `name <numbers> premium - <loss> … occ_reins freq …` and builds
+- The `pnl` block already parses `name <numbers> premium less <loss> … occ_reins freq …` and builds
   a `PnL(agg, consideration=...)`. **Gross premium `P_G` = the stated premium** (10000);
   expected loss from the `lr`/loss clause — both already handled by the `pnl` path. No new
   premium concept at the block level.
@@ -213,9 +240,10 @@ self-documenting.
 `reinstatement_deposit` (`D` in currency, after resolving `% rol`). Validate at transform/build
 time (the locked validation rules): **at most one occurrence layer bears the clause**
 (`[reins-one-clause]`); **`occ_reins` has length exactly 1** when a clause is present
-(`[reins-single-layer]`, option A — no mixed tower); **no `agg_reins`** when reinstatements
-present (decision 3); rates nonnegative. (The base-premium guard `[reins-premium]` is enforced
-upstream — Phase 1's `deposit|rol|rate` clause must be on the layer.)
+(`[reins-single-layer]`, option A — no mixed *occurrence* tower); a subsequent **aggregate**
+cover **is allowed** (decision 3 — it stays a deterministic pushforward over the same `(L,R)`
+joint, so it does not raise dimension); rates nonnegative. (The base-premium guard
+`[reins-premium]` is enforced upstream — Phase 1's `deposit|rol|rate` clause must be on the layer.)
 
 **`build()` return.** A `PnL` (decision `[decl-return]`). The underlying `Aggregate` carries the
 terms as attributes (`self.reinstatement_terms`); the `PnL` detects them and, when present, backs
@@ -225,8 +253,8 @@ exhibit access and cache. `pnl.reinstatement_analysis` exposes the engine object
 
 **Examples to add** to `src/aggregate/agg/test_decl.agg` (per the keep-in-sync rule) under a new
 reinstatement section: the block above, the free+50%+100% schedule, an `occurrence ceded to`
-variant, and a no-`reinstatements` layer (asserting free+unlimited default). See `[tests]` for
-the snapshot wrinkle.
+variant, a no-`reinstatements` layer (asserting free+unlimited default), and a reinstated layer
+**with a subsequent `aggregate net of` cover** (decision 3). See `[tests]` for the snapshot wrinkle.
 
 ### `[engine]` — generic pushforward on `BivariateDistribution` (public, decision 5)
 
@@ -292,14 +320,17 @@ New class in `reinstatement.py`, owning the joint + pushforward + audit. Two ent
 - **Programmatic:** `Aggregate.reinstatement_analysis(gross_premium=None, terms=None,
   percentiles=(.90,.95,.99,.995,.996,.999))` (`_aggregate.py` concern):
 
-1. require `occ_reins` present **with length exactly 1** (`[reins-single-layer]`), **reject
-   `agg_reins`** (decision 3); these guard the programmatic path the same way the transformer
-   guards the DecL path;
+1. require `occ_reins` present **with length exactly 1** (`[reins-single-layer]`); a subsequent
+   `agg_reins` cover **is allowed** (decision 3) — the source still feeds an *unlimited* `R` (the
+   reinstatement cap is never an `agg_reins`); these guard the programmatic path the same way the
+   transformer guards the DecL path;
 2. `gross_premium` defaults from `self.exp_premium` if present, else required;
 3. `terms` defaults from the DecL `reinstatement_*` attributes if present, else required;
 4. build/reuse `occ_bivariate(views=('gross','ceded'))` (cache the joint independently of `terms`
    so multiple schedules reuse one FFT2 — pre-plan §11.4);
-5. pushforward the 11 accounting legs; return the analysis.
+5. pushforward the accounting legs over the joint; **when an `agg_reins` cover is present**, build
+   its recovery `g(L − A(R))` (a deterministic function of the same `(L,R)` joint) and add the
+   `ceded_agg`/`net_agg` legs so the waterfall agg columns populate (decision 3); return the analysis.
 
 The `PnL` is the user-facing object; `ReinstatementAnalysis` is its engine (not a second face).
 The surface members below live on whichever object is canonical — `gcn_df`/`summary_df`/`plot`
@@ -329,11 +360,21 @@ on the `PnL` (delegating), the joint/audit/legs on the analysis — but exposed 
 and premium breakpoints overlaid; (b) `A(R)`, `h(R)`, `D+h(R)`, `D+h−A`; (c) gross vs net UW-loss
 survival/return-period; (d) the impact curve `qₚ(W_gross) − qₚ(W_net)`.
 
-### `[pnl-share]` — factor shared 1-D P&L presentation into `_pnl.py`
+### `[pnl-share]` — widen the waterfall builder to scalar-or-distribution columns, then share it
 
-Extract the reusable bits of `PnL.gcn_df`/`summary_df` (signed-additive table builder, SD-not-CV
-margin rule) into helpers that both `PnL` and `ReinstatementAnalysis` call. **Do not** make `PnL`
-carry the joint matrix (pre-plan §12). Keep the change surgical; `PnL`'s public surface unchanged.
+**Note the reality (corrected from the original draft):** Phase 1 did *not* ship a leg-iterating
+builder — `gcn_df` (`_pnl.py:457`) reads a fixed 1-D marginal per perspective with a constant
+premium (`_gcn_perspective_rows`). So this workstream both **widens** and **factors**:
+
+- **Widen.** Generalize the per-column row computation so a column's **premium/UW value may be a
+  `GridDistribution`** (from the pushforward), not only `scalar + loss-marginal`. Gross stays
+  scalar+marginal; ceded/net read mean/SD/skew/percentiles off the supplied distribution. This is
+  the lightweight "leg" — **no `Leg` class**, just a union-typed column input.
+- **Factor.** Extract the resulting signed-additive table builder + SD-not-CV margin rule into
+  helpers that both `PnL` and `ReinstatementAnalysis` call.
+
+**Do not** make `PnL` carry the joint matrix (pre-plan §12). Keep `PnL`'s public surface
+unchanged; the deterministic Phase-1 path must be byte-for-byte unchanged (snapshot guard).
 
 ---
 
@@ -400,9 +441,11 @@ Poisson/lognormal cat model.
   `_deposit`/`_rol`), not via the frozen snapshot. Also add **negative** cases asserting each
   validation rule fires: `[reins-premium]` (a clause with no `deposit|rol|rate` base → error),
   `[reins-one-clause]` (two layers each carrying a clause → reject), `[reins-single-layer]`
-  (one reinstated layer + a second plain occurrence layer → reject), and `agg_reins` present
-  → reject (decision 3). Your two-layer example from the design discussion is the canonical
-  `[reins-one-clause]` fixture.
+  (one reinstated layer + a second plain occurrence layer → reject). Your two-layer example from
+  the design discussion is the canonical `[reins-one-clause]` fixture. Plus a **positive**
+  agg-cover case (decision 3): a reinstated occurrence layer **with** a subsequent
+  `aggregate net of …` cover builds, `R` stays unlimited, and the `ceded_agg`/`net_agg` waterfall
+  columns populate with the agg recovery `g(L − A(R))` — assert the GCN identities still hold.
 - **Regression bar:** every existing `test_suite.agg` line still parses and snapshot-matches
   (the grammar addition must be purely additive); `uv run pytest` green.
 

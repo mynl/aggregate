@@ -84,7 +84,7 @@ Gross/Ceded/Net. The acceptance index (AI) reads the net UW result unchanged.
 - **`PnL`** (`_pnl.py:33`) with `gcn_df` (`:270`, the doubly-additive table) and `summary_df`
   (`:225`, SD-not-CV near break-even at `:231`). This is the table to extend with an Expense
   column and the leg model.
-- **The `pnl` output kind** already parses `name <numbers> premium - <loss> … occ_reins freq`
+- **The `pnl` output kind** already parses `name <numbers> premium less <loss> … occ_reins freq`
   and builds a `PnL(agg, consideration=...)`. Gross premium and the loss leg are wired.
 - **DecL reins clauses** carry pure loss structure today: `occ_reins`/`agg_reins` as
   `(share, limit, attach)` tuples + `occ_kind`/`agg_kind`. **No per-layer premium or expense

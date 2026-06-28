@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.0.0a116
+
+### Property-cat reinstatement premiums (stochastic ceded premium)
+
+Occurrence reinsurance with paid/free **reinstatements**, where the ceded
+premium `D + h(R)` is *stochastic* (the reinstatement premium `h(R)` is a
+function of the unlimited annual occurrence recovery `R`). One declarative `pnl`
+block does gross volume, the cat layer, the reinstatement schedule, and the
+gross/ceded/net underwriting exhibit:
+
+```
+pnl Cat
+    10000 premium less 85% lr
+    sev lognorm 50 cv 3
+    occurrence net of
+        95% po 100 xs 100
+            rol 18%
+            reinstatements 1 free and 1 at 50% and 2 at 100%
+    poisson
+```
+
+- **DecL** — a `reinstatements` clause decorates a single occurrence layer. Two
+  surface forms: the treaty-language group chain `<count> free and <count> at
+  <p>%` (counts as digits **or** the number-words `one`…`five`, which stay
+  ordinary identifiers everywhere else) and the explicit list `[a1 ... am]`
+  (escape hatch). `free` = `at 0%`; `at p%` is a multiplier of the base rate on
+  line `r = base_premium / limit`, where the base premium is the layer's
+  `deposit | rol | rate` clause. Omitting the clause keeps the existing free +
+  unlimited behavior. New spec key `occ_reins_reinst`; `decl_writer` round-trips
+  both forms to the canonical list.
+- **`build()` returns a `PnL`** whose `gcn_df` / `summary_df` are backed by a
+  lazily built `ReinstatementAnalysis` (the stochastic ceded premium makes the
+  ceded/net **CV Premium** rows nonzero, read off the `(L, R)` pushforward).
+  `pnl.reinstatement_analysis` exposes the engine; `Aggregate.reinstatement_analysis()`
+  is the arg-free programmatic entry point.
+- **Validation (locked)** — `[reins-premium]` (a reinstatements clause needs a
+  base premium clause); `[reins-one-clause]` (at most one occurrence layer may
+  carry the clause); `[reins-single-layer]` (a reinstated layer ⇒ a single
+  occurrence layer — the 2-D `(L, R)` engine ceiling). A subsequent
+  `aggregate net of` cover is allowed (it stays a deterministic pushforward over
+  the same joint).
+- **Engine** (landed earlier this feature): `BivariateDistribution.pushforward`
+  / `pushforward_1d` / `transformed_moments` (public); `ReinstatementTerms`
+  (recovery `A(R)`, reinstatement premium `h(R)`, annual cap `(m+1)y`);
+  `ReinstatementAnalysis` (eleven leg distributions, GCN/summary/validation/tail
+  exhibits); the shared `gcn_assemble_column` waterfall builder.
+
+Pending follow-ups (tracked in `dev/TODO.md`): first-class trimmings
+(`plot` mosaic, `_repr_html_`, `info`, `qd`, `density_df`, `bs_*` narratives) and
+populating the `ceded_agg` / `net_agg` waterfall columns when a subsequent
+aggregate cover is present.
+
 ## 1.0.0a115
 
 ### Multiple `pnl` expense terms (`and`-joined)

@@ -852,22 +852,47 @@ class UnderwritingTransformer(Transformer):
     # ----- reinsurance ----------------------------------------------
     @staticmethod
     def _split_reins(triples, which, kind):
-        """Split a reins_list of ``(layer, premium, cede)`` triples into spec keys.
+        """Split a reins_list of ``(layer, premium, cede, reinst)`` into spec keys.
 
         ``<which>_reins`` is the list of ``(share, limit, attach)`` layer tuples
         the reinsurance engine consumes (unchanged). The parallel per-layer
-        ``<which>_reins_premium`` (``(basis, value)`` or ``None``) and
-        ``<which>_reins_cede`` (fraction or ``None``) lists are added **only**
-        when some layer carries them, so plain reinsurance specs are untouched.
+        ``<which>_reins_premium`` (``(basis, value)`` or ``None``),
+        ``<which>_reins_cede`` (fraction or ``None``) and ``<which>_reins_reinst``
+        (reinstatement-rate tuple or ``None``) lists are added **only** when some
+        layer carries them, so plain reinsurance specs are untouched.
+
+        The cross-layer reinstatement constraints (locked, dev/plan-reinstatements.md)
+        are enforced here, where the whole layer list is in scope: reinstatements
+        decorate an **occurrence** layer only; **at most one** layer may carry the
+        clause ([reins-one-clause]); and the occurrence tier must then be a
+        **single** layer ([reins-single-layer], the 2-D ``(L, R)`` engine ceiling).
         """
         layers = [t[0] for t in triples]
         prem = [t[1] for t in triples]
         cede = [t[2] for t in triples]
+        reinst = [t[3] for t in triples]
         out = {f"{which}_reins": layers, f"{which}_kind": kind}
         if any(p is not None for p in prem):
             out[f"{which}_reins_premium"] = prem
         if any(x is not None for x in cede):
             out[f"{which}_reins_cede"] = cede
+        n_reinst = sum(1 for r in reinst if r is not None)
+        if n_reinst:
+            if which != "occ":
+                raise ValueError(
+                    "DecL: a 'reinstatements' clause decorates an occurrence "
+                    "layer, not aggregate reinsurance.")
+            if n_reinst > 1:
+                raise ValueError(
+                    f"DecL: 'reinstatements' may decorate at most one occurrence "
+                    f"layer; found {n_reinst} ([reins-one-clause]).")
+            if len(layers) != 1:
+                raise ValueError(
+                    f"DecL: 'reinstatements' require a single occurrence layer; "
+                    f"found {len(layers)} ([reins-single-layer]). A reinstated "
+                    "layer cannot share the occurrence tier with other layers "
+                    "(the engine ceiling is the 2-D (L, R) joint).")
+            out[f"{which}_reins_reinst"] = reinst
         return out
 
     def agg_reins_net(self, c):
@@ -961,11 +986,12 @@ class UnderwritingTransformer(Transformer):
         return [c[0]]
 
     def reins_list_tower(self, c):
-        # A tower has no per-layer premium / cede: wrap each layer as a triple
-        # ``(layer, premium, cede)`` so reins_list elements are uniform.
+        # A tower has no per-layer premium / cede / reinstatements: wrap each
+        # layer as a ``(layer, premium, cede, reinst)`` so reins_list elements
+        # are uniform.
         tower = c[0]
         limit, attach = tower[0], tower[1]
-        return [((1.0, l, a), None, None) for l, a in zip(limit, attach)]
+        return [((1.0, l, a), None, None, None) for l, a in zip(limit, attach)]
 
     def reins_clause_xs(self, c):
         limit, _xs, attach = c
@@ -1007,15 +1033,16 @@ class UnderwritingTransformer(Transformer):
 
     # ----- ceded-premium / commission decorators (decision 3) -------
     def reins_clause(self, c):
-        """Combine a loss layer with its optional premium / cede decorators.
+        """Combine a loss layer with its optional premium / cede / reinstatements.
 
-        Returns ``(layer, premium, cede)`` where ``layer`` is the
+        Returns ``(layer, premium, cede, reinst)`` where ``layer`` is the
         ``(share, limit, attach)`` tuple consumed by the reinsurance engine,
         ``premium`` is ``(basis, value)`` (basis in ``deposit`` / ``rol`` /
-        ``rate``) or ``None``, and ``cede`` is the commission fraction or
+        ``rate``) or ``None``, ``cede`` is the commission fraction or ``None``,
+        and ``reinst`` is the tuple of reinstatement price multipliers or
         ``None``. ``reins_list`` splits these into parallel spec keys.
         """
-        layer, premium, cede = c
+        layer, premium, cede, reinst = c
         if cede is not None and premium is None:
             raise ValueError(
                 "DecL: 'cede' (ceding commission) needs a ceded-premium clause "
@@ -1024,7 +1051,13 @@ class UnderwritingTransformer(Transformer):
             raise ValueError(
                 "DecL: 'rol' (rate on line) needs a finite limit "
                 "(rate-on-line is a fraction of share x limit).")
-        return (layer, premium, cede)
+        if reinst is not None and premium is None:
+            raise ValueError(
+                "DecL: a 'reinstatements' clause needs a base premium clause "
+                "(deposit / rol / rate) on the same layer; the base rate on "
+                "line r = base_premium / limit would otherwise be undefined "
+                "([reins-premium]).")
+        return (layer, premium, cede, reinst)
 
     def reins_premium_deposit(self, c):
         return ('deposit', float(c[1]))
@@ -1043,6 +1076,73 @@ class UnderwritingTransformer(Transformer):
 
     def reins_cede_none(self, c):
         return None
+
+    # ----- reinstatement schedule decorator (property-cat) ----------
+    # Both surface forms (explicit ``[alpha ...]`` list and the ``<count> free /
+    # <count> at <p>%`` group chain) reduce to a flat tuple of price multipliers
+    # alpha_j, carried on the spec key ``occ_reins_reinst`` and consumed by the
+    # underwriter to build a ReinstatementTerms. ``free`` = ``at 0%``.
+    _NUMBER_WORDS = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5}
+
+    def reins_reinst_none(self, c):
+        return None
+
+    def reins_reinst_list(self, c):
+        """``reinstatements [a1 a2 ...]`` -- the explicit price-multiplier list."""
+        _kw, rates = c
+        return self._reinst_rates(rates)
+
+    def reins_reinst_groups(self, c):
+        """``reinstatements <count> free and <count> at <p>% and ...``."""
+        _kw, groups = c
+        return self._reinst_rates(groups)
+
+    @staticmethod
+    def _reinst_rates(rates):
+        """Validate and freeze a reinstatement price-multiplier sequence."""
+        out = tuple(float(a) for a in rates)
+        if len(out) < 1:
+            raise ValueError(
+                "DecL: a 'reinstatements' clause needs at least one rate.")
+        if any((not np.isfinite(a)) or a < 0 for a in out):
+            raise ValueError(
+                "DecL: reinstatement rates must be finite and nonnegative, "
+                f"got {out!r}.")
+        return out
+
+    def reinst_groups_one(self, c):
+        return list(c[0])
+
+    def reinst_groups_cons(self, c):
+        lst, _and, grp = c
+        lst.extend(grp)
+        return lst
+
+    def reinst_group_free(self, c):
+        # ``<count> free`` -> ``count`` free (zero-rate) reinstatements.
+        count = c[0]
+        return [0.0] * count
+
+    def reinst_group_at(self, c):
+        # ``<count> at <p>%`` -> ``count`` reinstatements at multiplier ``p``.
+        count, _at, mult = c
+        return [float(mult)] * count
+
+    def count_number(self, c):
+        n = c[0]
+        if not (float(n) > 0 and float(n) == int(n)):
+            raise ValueError(
+                f"DecL: a reinstatement count must be a positive integer, "
+                f"got {n!r}.")
+        return int(n)
+
+    def count_word(self, c):
+        word = str(c[0]).lower()
+        if word not in self._NUMBER_WORDS:
+            raise ValueError(
+                f"DecL: '{c[0]}' is not a valid reinstatement count; use a "
+                f"digit or one of {', '.join(self._NUMBER_WORDS)}.")
+        return self._NUMBER_WORDS[word]
 
     # ----- severity (continuous) ------------------------------------
     def sev_clause_sev(self, c):

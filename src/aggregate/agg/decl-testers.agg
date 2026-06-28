@@ -585,3 +585,20 @@ pnl EXP.Rate     5000 prem less 100 claims sev lognorm 50 cv 1.5 poisson aggrega
 pnl EXP.OccRol   5000 prem less 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.1 poisson               note{occurrence-layer ceded premium; occ-only GCN};
 pnl EXP.Both     5000 prem less 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.05 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.2 200 fixed expenses   note{both sides priced + fixed expense};
 pnl EXP.MultiExp 1000 prem less 8 claims sev lognorm 50 cv 1 poisson 25% premium expense and 200 fixed expense                note{multiple expense terms joined by `and`, summed}
+
+# ============================================================
+# Property-cat reinstatement premiums (stochastic ceded premium). A
+# `reinstatements` clause decorates ONE occurrence layer carrying a base premium
+# (deposit | rol | rate); the price multipliers alpha_j (relative to the base
+# rate on line r = base_premium / limit) are given either as the treaty-language
+# group chain `<count> free and <count> at <p>%` (counts as digits or the
+# number-words one..five) or the explicit list `[a1 a2 ...]`. Both canonicalize
+# to the list form on unparse. The annual recovery cap (m+1)y lives in the
+# ReinstatementTerms, never in the occurrence layer. build() returns a PnL whose
+# GCN exhibit is backed by a ReinstatementAnalysis. See
+# tests/test_reinstatement_decl.py and dev/plan-reinstatements.md.
+pnl RI.Human 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 95% po 100 xs 100 rol 18% reinstatements 1 free and 1 at 50% and 2 at 100% poisson     note{treaty-language schedule: alpha = [0 .5 1 1]};
+pnl RI.Words 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 100 xs 100 rol 18% reinstatements one free and three at 100% poisson                    note{number-word counts: alpha = [0 1 1 1]};
+pnl RI.List  10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 100 xs 100 rol 18% reinstatements [0 .5 1 1] poisson                                     note{explicit price-multiplier list escape hatch};
+pnl RI.Ceded 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence ceded to 100 xs 100 deposit 1800 reinstatements [0 1 1] poisson                                 note{occurrence ceded to + deposit base premium};
+pnl RI.AggCover 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 100 xs 100 rol 18% reinstatements [0 1] poisson aggregate net of 85% po 1500 xs 7000  note{decision 3: reinstated occ layer + subsequent aggregate cover stays 2-D}

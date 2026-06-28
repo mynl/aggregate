@@ -59,8 +59,14 @@ from .config import get_settings
 from .moments import (MomentAggregator, xsden_to_mwrangler, xsden_to_meancvskew,
                       _noise_aware_rel_error, _snap_noise)
 from .utilities import round_bucket, balanced_window
+from ._grid_distribution import GridDistribution
 
 logger = logging.getLogger(__name__)
+
+# Default output grid length (log2) for a pushforward when neither ``bs`` nor
+# ``log2`` is pinned: the transformed variable lives on a single 1-D axis, so a
+# 16-bit grid (65,536 buckets) over its realized range is ample and cheap.
+_PUSHFORWARD_LOG2 = 16
 
 # Coverage of the per-axis sizing window: 1 - 10**-_WINDOW_NINES per tail.
 # First-class bivariate setting (see aggregate.config [bivariate]);
@@ -264,6 +270,180 @@ def scatter_bivariate(cv, nv, mass, bs_c, bs_n, n_c, n_n, scheme='linear'):
         np.add.at(out, (kc, kn1), mass * (1 - fc) * fn)
         np.add.at(out, (kc1, kn1), mass * fc * fn)
     return out
+
+
+# ----------------------------------------------------------------------
+# Generic pushforward of a joint (or marginal) density through a scalar map
+# ----------------------------------------------------------------------
+# After a 2-D FFT has produced the joint law of ``(L, R)``, quantities such as
+# net loss ``L - A(R)`` or net underwriting ``P_G - D - h(R) - L + A(R)`` are
+# deterministic, generally nonlinear functions of both coordinates. Their
+# marginals are *not* convolutions (the two axes are dependent), so the correct
+# object is the **pushforward** of the probability matrix through the map: scatter
+# every cell's mass onto a 1-D output grid at the transformed value. The same
+# machinery serves a 1-D source density (an aggregate marginal) for the
+# aggregate-basis variable-rating features. See ``dev/pre-plan-reinstatements.md``
+# sections 9-10 and ``dev/plan-variable-rating-appendix.md`` section 6.
+
+def _pushforward_grid(vmin, vmax, *, bs=None, log2=None, window=None):
+    """Resolve the output ``(z0, bs, n_out)`` for a 1-D pushforward grid.
+
+    The grid is regular (``z0 + bs * arange(n_out)``) and **may be signed** --
+    a net underwriting result runs negative -- so ``z0`` is aligned *down* to a
+    multiple of ``bs`` (``floor(lo / bs) * bs``) which keeps ``0`` on the grid
+    when the range straddles it.
+
+    Parameters
+    ----------
+    vmin, vmax : float
+        The realized min / max of the transformed values (used when ``window``
+        is not pinned).
+    bs : float, optional
+        Output bucket size. Default: sized from the range and ``log2``.
+    log2 : int, optional
+        Output grid length ``1 << log2``. Default: :data:`_PUSHFORWARD_LOG2`
+        when ``bs`` is also unset; ignored once ``bs`` and ``window`` fix the
+        count.
+    window : (float, float), optional
+        Explicit ``(lo, hi)`` output range, overriding the measured one.
+
+    Returns
+    -------
+    z0, bs, n_out : float, float, int
+    """
+    if window is not None:
+        lo, hi = float(window[0]), float(window[1])
+    else:
+        lo, hi = float(vmin), float(vmax)
+    if not hi > lo:                     # degenerate (constant map): tiny span
+        hi = lo + (abs(lo) + 1.0) * 1e-9
+    span = hi - lo
+    bs_pinned = bs is not None
+    if not bs_pinned:
+        target_log2 = int(log2) if log2 is not None else _PUSHFORWARD_LOG2
+        bs = float(round_bucket(span / (1 << target_log2)))
+    else:
+        bs = float(bs)
+    z0 = float(np.floor(lo / bs) * bs)
+    if log2 is not None and not bs_pinned:
+        # log2 pins the count; bs was sized to span/2**log2, so 1<<log2 buckets
+        # cover the range with a little headroom.
+        n_out = 1 << int(log2)
+    else:
+        n_out = int(np.ceil((hi - z0) / bs)) + 1
+    return z0, bs, int(n_out)
+
+
+def _scatter_1d(values, weights, z0, bs, n_out, scheme='linear'):
+    """Scatter ``weights`` onto a regular 1-D grid at transformed ``values``.
+
+    The 1-D analogue of :func:`scatter_bivariate`, built on :func:`numpy.bincount`
+    (faster than ``np.add.at`` for dense 1-D output; pre-plan section 9.4). Mass at
+    a value outside ``[z0, z0 + bs*(n_out-1)]`` piles onto the nearer edge bucket
+    (the same overflow mode as a univariate aggregate deficit) -- so **total mass
+    is retained**; the clipped amount is reported separately.
+
+    Parameters
+    ----------
+    values : ndarray
+        Transformed value at each source cell (any shape; flattened).
+    weights : ndarray
+        Source probability mass aligned with ``values`` (same shape).
+    z0, bs : float
+        Output grid origin and bucket size.
+    n_out : int
+        Output grid length.
+    scheme : {'linear', 'nearest'}, default 'linear'
+        ``'linear'`` splits each cell's mass over the two straddling buckets
+        (preserves the mean exactly); ``'nearest'`` rounds to one bucket.
+
+    Returns
+    -------
+    mass : ndarray
+        Length-``n_out`` output mass.
+    clipped : float
+        Mass whose true value fell outside the grid (piled on an edge).
+    """
+    u = (np.asarray(values, dtype=float).ravel() - z0) / bs
+    w = np.asarray(weights, dtype=float).ravel()
+    clipped = float(w[(u < 0.0) | (u > n_out - 1)].sum())
+    if scheme == 'nearest':
+        k = np.clip(np.round(u).astype(int), 0, n_out - 1)
+        mass = np.bincount(k, weights=w, minlength=n_out)
+    else:                               # linear split, mean-preserving
+        k0 = np.floor(u).astype(int)
+        f = u - k0
+        k0c = np.clip(k0, 0, n_out - 1)
+        k1c = np.clip(k0 + 1, 0, n_out - 1)
+        # clip fractional offset against the clipped index so out-of-range mass
+        # collapses cleanly onto the edge bucket (mirrors scatter_bivariate).
+        f = np.clip(f, 0.0, 1.0)
+        mass = np.bincount(k0c, weights=w * (1.0 - f), minlength=n_out)
+        mass += np.bincount(k1c, weights=w * f, minlength=n_out)
+    return mass[:n_out], clipped
+
+
+def _finalize_pushforward(values, weights, *, bs, log2, window, scheme,
+                          name, is_loss_value, source):
+    """Size the grid, scatter, and wrap the result as a :class:`GridDistribution`.
+
+    Shared tail of both pushforward entry points. Warns (does not raise) when a
+    material fraction of mass is clipped onto the grid edges, mirroring the
+    aggregate deficit convention. The clipped mass and source provenance are
+    stashed on the returned object (``.clipped_mass`` / ``.pushforward_source``)
+    for the audit.
+    """
+    vmin = float(np.min(values))
+    vmax = float(np.max(values))
+    z0, bs_out, n_out = _pushforward_grid(vmin, vmax, bs=bs, log2=log2,
+                                          window=window)
+    mass, clipped = _scatter_1d(values, weights, z0, bs_out, n_out, scheme)
+    grid = z0 + bs_out * np.arange(n_out)
+    total = float(weights.sum())
+    if total > 0 and clipped / total > 1e-8:
+        warnings.warn(
+            f'pushforward {name!r}: {clipped / total:.2e} of mass fell outside '
+            f'the output window [{grid[0]:g}, {grid[-1]:g}] and was clipped onto '
+            f'the edge buckets. Widen with window=/log2=/bs=.',
+            DefectiveDistributionWarning, stacklevel=3)
+    gd = GridDistribution(grid, mass, bs=bs_out, name=name or '',
+                          is_loss_value=is_loss_value)
+    gd.clipped_mass = clipped
+    gd.pushforward_source = source
+    return gd
+
+
+def pushforward_1d(grid, density, function, *, bs=None, log2=None, window=None,
+                   scheme='linear', name=None, is_loss_value=True):
+    """Pushforward of a 1-D source density through a scalar map ``z = function(x)``.
+
+    The aggregate-basis path of the shared variable-rating engine
+    (``plan-variable-rating-appendix.md`` section 2): when ceded loss is a
+    deterministic function of *gross* loss the joint is degenerate and a leg
+    ``psi(L)`` is a 1-D pushforward of the gross density. Returns the **same**
+    :class:`GridDistribution` result type as the 2-D :meth:`BivariateDistribution.pushforward`.
+
+    Parameters
+    ----------
+    grid : ndarray
+        The source loss index (e.g. ``Aggregate.density.index``).
+    density : ndarray
+        Source probability mass aligned with ``grid``.
+    function : callable
+        Vectorized ``function(x) -> z``; receives the ``grid`` array.
+    bs, log2, window, scheme, name, is_loss_value
+        As :meth:`BivariateDistribution.pushforward`.
+
+    Returns
+    -------
+    GridDistribution
+    """
+    x = np.asarray(grid, dtype=float)
+    p = np.asarray(density, dtype=float)
+    values = np.broadcast_to(np.asarray(function(x), dtype=float), x.shape)
+    return _finalize_pushforward(values, p, bs=bs, log2=log2, window=window,
+                                 scheme=scheme, name=name,
+                                 is_loss_value=is_loss_value, source='1d')
 
 
 def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
@@ -1796,6 +1976,160 @@ class BivariateDistribution(object):
         self.bs_ceded = float(bs_ceded)
         self.bs_net = float(bs_net)
         self.meta = dict(meta) if meta else {}
+
+    # ------------------------------------------------------------------
+    # axis access by role (not by the positional .ceded / .net names)
+    # ------------------------------------------------------------------
+    # The constructor stores the two grids positionally as ``.ceded`` (axis 0)
+    # and ``.net`` (axis 1) for the original netceded use, but for a
+    # ``('gross', 'ceded')`` joint axis 0 is *gross loss* L and axis 1 is the
+    # *unlimited ceded recovery* R -- the positional names lie. Pushforward and
+    # moment code must address axes by role through these accessors and
+    # :attr:`axis_names`, never by ``.ceded`` / ``.net``.
+    @property
+    def axis0(self):
+        """Axis-0 grid (the first ``views`` entry; positionally ``.ceded``)."""
+        return self.ceded
+
+    @property
+    def axis1(self):
+        """Axis-1 grid (the second ``views`` entry; positionally ``.net``)."""
+        return self.net
+
+    @property
+    def axis_names(self):
+        """``(name0, name1)`` axis roles from ``meta`` (default ceded/net)."""
+        return self.meta.get('axis_names', ('ceded (C)', 'net (N)'))
+
+    def pushforward(self, function, *, bs=None, log2=None, window=None,
+                    scheme='linear', name=None, is_loss_value=True,
+                    chunk_size=None):
+        """Pushforward of the joint density through a scalar map ``z = function(axis0, axis1)``.
+
+        Scatters every joint cell's probability onto a 1-D output grid at its
+        transformed value, yielding the exact distribution of ``Z =
+        function(L, R)`` (pre-plan section 9). This is the **correct** object for a
+        deterministic, generally nonlinear function of the two dependent axes --
+        a marginal convolution would be wrong. The result is a
+        :class:`~aggregate._grid_distribution.GridDistribution` carrying
+        ``q`` / ``cdf`` / ``sf`` / ``tvar`` / moments, ready for
+        :class:`~aggregate.PnL` reporting.
+
+        Parameters
+        ----------
+        function : callable
+            Vectorized ``function(x, y) -> z``, evaluated on broadcast axis
+            arrays ``function(axis0[:, None], axis1[None, :])``. Must broadcast to
+            the joint shape; addresses the axes **by role** (axis 0, axis 1), not
+            by the misleading positional ``.ceded`` / ``.net`` names.
+        bs : float, optional
+            Output bucket size. Default: sized from the realized value range.
+        log2 : int, optional
+            Output grid length ``1 << log2`` (default :data:`_PUSHFORWARD_LOG2`
+            when ``bs`` is unset).
+        window : (float, float), optional
+            Explicit ``(lo, hi)`` output range (may be signed).
+        scheme : {'linear', 'nearest'}, default 'linear'
+            Rebucketing scheme; ``'linear'`` preserves the mean.
+        name : str, optional
+            Name for the returned distribution.
+        is_loss_value : bool, default True
+            Orientation of ``Z`` (``True`` loss, ``False`` payoff) -- set
+            ``False`` for an underwriting-result leg.
+        chunk_size : int, optional
+            Process axis-0 in row chunks of this many rows to bound temporary
+            memory (pre-plan section 9.7); ``None`` evaluates the whole grid at
+            once.
+
+        Returns
+        -------
+        GridDistribution
+            The law of ``Z``; ``.clipped_mass`` reports edge-clipped mass.
+
+        Notes
+        -----
+        Complexity is ``O(n0 * n1)`` -- one pass over the joint cells -- using
+        NumPy broadcasting and two :func:`numpy.bincount` scatters (no Numba).
+        """
+        a0 = self.axis0
+        a1 = self.axis1
+        dens = self.density
+        n0 = len(a0)
+        if chunk_size is None or n0 <= chunk_size:
+            values = np.broadcast_to(
+                np.asarray(function(a0[:, None], a1[None, :]), dtype=float),
+                dens.shape)
+            return _finalize_pushforward(
+                values, dens, bs=bs, log2=log2, window=window, scheme=scheme,
+                name=name, is_loss_value=is_loss_value, source=self)
+        # chunked: a first pass measures the range, a second scatters
+        vmin, vmax = np.inf, -np.inf
+        for lo in range(0, n0, chunk_size):
+            v = function(a0[lo:lo + chunk_size, None], a1[None, :])
+            vmin = min(vmin, float(np.min(v)))
+            vmax = max(vmax, float(np.max(v)))
+        z0, bs_out, n_out = _pushforward_grid(vmin, vmax, bs=bs, log2=log2,
+                                              window=window)
+        mass = np.zeros(n_out)
+        clipped = 0.0
+        for lo in range(0, n0, chunk_size):
+            sl = slice(lo, lo + chunk_size)
+            v = np.broadcast_to(
+                np.asarray(function(a0[sl, None], a1[None, :]), dtype=float),
+                dens[sl].shape)
+            m, c = _scatter_1d(v, dens[sl], z0, bs_out, n_out, scheme)
+            mass += m
+            clipped += c
+        grid = z0 + bs_out * np.arange(n_out)
+        gd = GridDistribution(grid, mass, bs=bs_out, name=name or '',
+                              is_loss_value=is_loss_value)
+        gd.clipped_mass = clipped
+        gd.pushforward_source = self
+        return gd
+
+    def transformed_moments(self, function, max_order=3):
+        """Exact raw and central moments of ``Z = function(axis0, axis1)`` on the source grid.
+
+        The **exact** ``E[Z^k] = sum p_ij function(l_i, r_j)^k`` taken directly on
+        the joint grid -- no rebucketing -- so these are the headline "EX"
+        (exact) numbers the audit validates the pushforward "Est" against
+        (pre-plan section 15). Means add across legs by linearity; this is the
+        ground truth they add to.
+
+        Parameters
+        ----------
+        function : callable
+            Vectorized ``function(x, y) -> z`` on broadcast axis arrays (same
+            contract as :meth:`pushforward`).
+        max_order : int, default 3
+            Highest raw power taken.
+
+        Returns
+        -------
+        pandas.Series
+            ``mass``, ``mean``, and (to ``max_order``) ``var`` / ``sd`` / ``cv``
+            / ``skew``.
+        """
+        a0 = self.axis0
+        a1 = self.axis1
+        p = self.density
+        values = np.broadcast_to(
+            np.asarray(function(a0[:, None], a1[None, :]), dtype=float), p.shape)
+        tot = float(p.sum())
+        raw = [float(np.sum(p * values ** k)) for k in range(max_order + 1)]
+        out = {'mass': raw[0]}
+        mean = raw[1] / tot if tot else np.nan
+        out['mean'] = mean
+        if max_order >= 2:
+            var = raw[2] / tot - mean ** 2
+            sd = np.sqrt(var) if var > 0 else 0.0
+            out['var'] = var
+            out['sd'] = sd
+            out['cv'] = sd / mean if mean else np.nan
+        if max_order >= 3 and out.get('sd', 0) > 0:
+            m3 = raw[3] / tot - 3 * mean * (raw[2] / tot) + 2 * mean ** 3
+            out['skew'] = m3 / out['sd'] ** 3
+        return pd.Series(out, name=getattr(function, '__name__', 'Z'))
 
     def marginals(self):
         """Return the ceded and net marginal densities.

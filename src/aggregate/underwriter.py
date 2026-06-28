@@ -962,6 +962,10 @@ class Underwriter(object):
             # (consideration - loss) is derived on the PnL.
             consideration = spec.pop('consideration')
             expense_spec = spec.pop('expense_spec', None)
+            # Reinstatement schedule (stochastic ceded premium): pop before the
+            # inner Aggregate is built (it is not a loss-structure key) and use it
+            # below to attach a ReinstatementTerms.
+            reinst = spec.pop('occ_reins_reinst', None)
             # Ceded-premium clauses promote the pnl to the Gross/Ceded/Net view
             # (any-clause -> GCN): resolve them to per-side economics and pop the
             # spec keys so the inner Aggregate sees only the loss structure.
@@ -976,6 +980,24 @@ class Underwriter(object):
                                      expense_spec=expense_spec, gcn_economics=econ)
             else:
                 obj = inner.make_pnl(consideration, expense_spec=expense_spec)
+            # Attach the reinstatement basis to the inner Aggregate so the PnL
+            # exhibits delegate to a (lazily built) ReinstatementAnalysis and
+            # ``inner.reinstatement_analysis()`` works arg-free. The base premium
+            # D = the layer's resolved occurrence premium (econ['pc_occ']); the
+            # effective occurrence limit y = share x limit (the ceded recovery R
+            # is already share-scaled), so the base rate r = D / y = the rol.
+            if reinst is not None:
+                from .reinstatement import ReinstatementTerms
+                if econ is None:                        # pragma: no cover
+                    raise ValueError(
+                        f"{name}: 'reinstatements' require a base premium clause "
+                        "(deposit / rol / rate) on the occurrence layer.")
+                rates = next((r for r in reinst if r is not None), None)
+                share, limit, _attach = spec['occ_reins'][0]
+                inner.reinstatement_terms = ReinstatementTerms(
+                    limit=float(share) * float(limit), rates=rates,
+                    deposit=float(econ['pc_occ']))
+                inner.reinstatement_gross_premium = float(econ['gross'])
             obj.program = program
         elif kind == 'bvagg':
             from .bivariate import BivariateAggregate

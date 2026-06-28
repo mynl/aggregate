@@ -388,7 +388,7 @@ def _render_layers(spec: dict) -> str:
 # Reinsurance
 # ======================================================================
 
-def _render_reins_clause(clause, premium=None, cede=None) -> str:
+def _render_reins_clause(clause, premium=None, cede=None, reinst=None) -> str:
     """Render one ``(share, limit, attach)`` cession tuple with its decorators.
 
     A full-line share (1.0) renders as ``limit xs attach``; a partial share
@@ -400,7 +400,10 @@ def _render_reins_clause(clause, premium=None, cede=None) -> str:
     An optional ceded-premium ``premium`` (``(basis, value)`` with basis
     ``deposit`` / ``rol`` / ``rate``) and ceding-commission ``cede`` (a fraction)
     render after the layer. ``rol`` / ``rate`` / ``cede`` are fractions rendered
-    as bare numbers (re-parse identically, no ``%`` float dust).
+    as bare numbers (re-parse identically, no ``%`` float dust). An optional
+    reinstatement schedule ``reinst`` (a tuple of price multipliers) renders in
+    the canonical explicit-list form ``reinstatements [a1 a2 ...]`` (the
+    treaty-language group chain is input sugar that canonicalises to the list).
     """
     share, limit, attach = clause
     if float(share) == 1.0:
@@ -414,6 +417,8 @@ def _render_reins_clause(clause, premium=None, cede=None) -> str:
         parts.append(f'{basis} {_fmt_num(value)}')
     if cede is not None:
         parts.append(f'cede {_fmt_num(cede)}')
+    if reinst is not None:
+        parts.append(f'reinstatements [{" ".join(_fmt_num(a) for a in reinst)}]')
     return ' '.join(parts)
 
 
@@ -441,10 +446,12 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
     layers = spec[list_key]
     prem = spec.get(f'{list_key}_premium')
     cede = spec.get(f'{list_key}_cede')
+    reinst = spec.get(f'{list_key}_reinst')
     cessions = [
         _render_reins_clause(c,
                              prem[i] if prem is not None else None,
-                             cede[i] if cede is not None else None)
+                             cede[i] if cede is not None else None,
+                             reinst[i] if reinst is not None else None)
         for i, c in enumerate(layers)]
     return _Block(f'{prefix} {spec[kind_key]}', cessions, sep='and')
 

@@ -1104,6 +1104,77 @@ class Aggregate:
         mv.update()
         return mv
 
+    def reinstatement_analysis(self, gross_premium=None, terms=None, *,
+                               percentiles=None, bs=None,
+                               log2_x=None, log2_y=None):
+        """Stochastic-ceded reinstatement analysis for this occurrence layer.
+
+        Pairs a :class:`~aggregate.reinstatement.ReinstatementTerms` with the
+        ``(gross loss, unlimited ceded recovery)`` joint of this aggregate and
+        returns a :class:`~aggregate.reinstatement.ReinstatementAnalysis` (the
+        eleven leg distributions and the GCN / summary / audit / tail exhibits).
+        The reinstatement annual cap ``(m+1) y`` lives in ``terms.recovery`` --
+        the source feeds an **unlimited** ``R`` -- so the occurrence layer must
+        carry *no* annual aggregate cap of its own; a genuine subsequent
+        ``aggregate net of`` cover is allowed (it is a deterministic pushforward
+        over the same joint).
+
+        Parameters
+        ----------
+        gross_premium : float, optional
+            Fixed gross premium ``P_G``. Defaults to ``self.exp_premium`` (the
+            DecL ``premium`` clause) if set, else required.
+        terms : ReinstatementTerms, optional
+            The reinstatement basis. Defaults to ``self.reinstatement_terms`` (set
+            by a DecL ``reinstatements`` clause) if present, else required.
+        percentiles : tuple of float, optional
+            Adverse-tail levels for the summary table.
+        bs, log2_x, log2_y : optional
+            Forwarded to :meth:`occ_bivariate` for the joint grid.
+
+        Returns
+        -------
+        ReinstatementAnalysis
+
+        Raises
+        ------
+        ValueError
+            If the object carries no occurrence reinsurance, the occurrence layer
+            is not a single layer ([reins-single-layer]), or ``gross_premium`` /
+            ``terms`` are missing and have no default.
+        """
+        from .reinstatement import ReinstatementAnalysis, SUMMARY_PERCENTILES
+        if self.occ_reins is None:
+            raise ValueError(
+                'reinstatement_analysis requires occurrence reinsurance; none '
+                'configured on this aggregate.')
+        if len(self.occ_reins) != 1:
+            raise ValueError(
+                f'reinstatements require a single occurrence layer; found '
+                f'{len(self.occ_reins)} ([reins-single-layer]). A reinstated '
+                'layer cannot share the occurrence tier with other variable '
+                'layers (the engine ceiling is the 2-D (L, R) joint).')
+        if terms is None:
+            terms = getattr(self, 'reinstatement_terms', None)
+        if terms is None:
+            raise ValueError(
+                'reinstatement_analysis needs terms= (a ReinstatementTerms), or '
+                'a DecL reinstatements clause that sets self.reinstatement_terms.')
+        if gross_premium is None:
+            # the gross premium stashed by a DecL ``pnl ... reinstatements``
+            # build (the consideration), then the exposure ``premium`` clause.
+            gross_premium = getattr(self, 'reinstatement_gross_premium', None)
+        if gross_premium is None:
+            gross_premium = getattr(self, 'exp_premium', None)
+        if gross_premium is None or gross_premium == 0:
+            raise ValueError(
+                'reinstatement_analysis needs gross_premium= (no premium clause '
+                'on the aggregate to default from).')
+        joint = self.occ_bivariate(views=('gross', 'ceded'), bs=bs,
+                                   log2_x=log2_x, log2_y=log2_y).bivariate
+        kw = {} if percentiles is None else {'percentiles': percentiles}
+        return ReinstatementAnalysis(joint, terms, gross_premium, **kw)
+
     # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------
 
     @staticmethod

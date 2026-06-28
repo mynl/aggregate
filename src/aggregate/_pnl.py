@@ -55,6 +55,74 @@ _GCN_CEDED = frozenset({'ceded_occ', 'ceded_agg'})
 _GCN_RATIO_ROWS = (('Ratio', 'LR'), ('Ratio', 'ER'), ('Ratio', 'CR'))
 
 
+def gcn_assemble_column(*, ceded, prem_mean, prem_sd, loss_mean, loss_sd,
+                        loss_skew, exp_mean, exp_sd, uw_pctiles):
+    """Assemble one GCN waterfall column's full row vector from per-leg stats.
+
+    The shared signed-additive table builder ([pnl-share], appendix S1): both
+    :meth:`PnL._gcn_perspective_rows` (Phase-1 scalar premium + loss marginal)
+    and :class:`aggregate.reinstatement.ReinstatementAnalysis` (stochastic ceded
+    premium ``D + h(R)``, joint-sourced UW) feed it per-leg statistics and get
+    back one column of the exhibit. Keeping one builder guarantees the two
+    exhibits share rows, sign convention, and the CV-not-SD margin rule.
+
+    Parameters
+    ----------
+    ceded : bool
+        Cession column (premium paid ``-``, recovery received ``+``) vs a
+        retained column (premium ``+``, loss borne ``-``).
+    prem_mean, prem_sd : float
+        Premium leg mean (magnitude) and SD. ``prem_sd`` is ``0`` for a fixed
+        premium; a stochastic ceded premium makes it nonzero.
+    loss_mean, loss_sd, loss_skew : float
+        Loss / recovery leg moments (magnitudes).
+    exp_mean, exp_sd : float
+        Expense leg mean (magnitude) and SD (``0`` for a deterministic expense).
+    uw_pctiles : dict
+        ``{level: signed UW value}`` for this column, already computed by the
+        caller in the adverse-tail direction.
+
+    Returns
+    -------
+    dict
+        ``(section, item) -> value`` for one column, ready to assemble into the
+        ``gcn_df`` frame.
+    """
+    nan = float('nan')
+    P, E, lm = prem_mean, exp_mean, loss_mean
+    # --- Mean section (signed; adds down to UW and across the GCN split) ---
+    premium = (-P) if ceded else P
+    loss = (+lm) if ceded else (-lm)            # recovery is a gain (+)
+    expense = (+E) if ceded else (-E)
+    uw = premium + loss + expense
+    # --- Ratio section (magnitudes) ----------------------------------------
+    lr = lm / P if P else nan
+    er = E / P if P else nan
+    cr = (lm + E) / P if P else nan
+    # --- Volatility section ------------------------------------------------
+    # CV of each Mean-section leg (order premium, loss, expense). Premium /
+    # expense are deterministic (CV 0) in Phase 1; reinstatements make premium
+    # stochastic, Phase 3 slide / pc make expense stochastic.
+    cv_premium = prem_sd / P if P else nan
+    cv_loss = loss_sd / lm if lm else nan
+    cv_expense = exp_sd / E if E else 0.0
+    sd_lr = loss_sd / P if P else nan
+    sd_cr = loss_sd / P if P else nan           # expense deterministic in Phase 1
+    out = {
+        ('Mean', 'Premium'): premium, ('Mean', 'Loss'): loss,
+        ('Mean', 'Expense'): expense, ('Mean', 'UW'): uw,
+        ('Ratio', 'LR'): lr, ('Ratio', 'ER'): er, ('Ratio', 'CR'): cr,
+        ('Volatility', 'CV Premium'): cv_premium,
+        ('Volatility', 'CV Loss'): cv_loss,
+        ('Volatility', 'CV Expense'): cv_expense,
+        ('Volatility', 'SD LR'): sd_lr, ('Volatility', 'SD CR'): sd_cr,
+        ('Volatility', 'Skew LR'): loss_skew, ('Volatility', 'Skew CR'): loss_skew,
+    }
+    for lvl, val in uw_pctiles.items():
+        out[('UW %ile', f'{lvl:g}')] = val
+    return out
+
+
 class PnL:
     """A profit-and-loss position: a consideration held against a risky leg.
 
@@ -82,6 +150,9 @@ class PnL:
         self.agg = agg
         self.program = ''
         self._pnl_df = None
+        #: cached backing ReinstatementAnalysis (built lazily on first exhibit
+        #: access when the aggregate carries DecL reinstatement terms).
+        self._reins_analysis = None
         #: gross-expense spec: a list of ``(basis, value)`` terms (basis in
         #: ``{'premium', 'loss', 'fixed'}``) that sum (decision 1); a bare
         #: ``(basis, value)`` tuple is also accepted; ``None`` => no expense.
@@ -149,7 +220,31 @@ class PnL:
         """
         self.agg.update(log2=log2, bs=bs, **kwargs)
         self._pnl_df = None
+        self._reins_analysis = None
         return self
+
+    # ------------------------------------------------------------------
+    # Reinstatement analysis (stochastic ceded premium) -- lazy backing engine
+    # ------------------------------------------------------------------
+    @property
+    def reinstatement_analysis(self):
+        """The backing :class:`ReinstatementAnalysis`, or ``None``.
+
+        Present when the underlying aggregate carries DecL reinstatement terms
+        (``self.agg.reinstatement_terms``, set by a ``reinstatements`` clause);
+        built on first access and cached. The GCN exhibit (:attr:`gcn_df`, and
+        hence :attr:`summary_df`) delegates to it so the stochastic ceded
+        premium ``D + h(R)`` is reflected. Returns ``None`` for an ordinary
+        P&L. See ``dev/plan-reinstatements.md`` decisions 1-2.
+        """
+        terms = getattr(self.agg, 'reinstatement_terms', None)
+        if terms is None:
+            return None
+        if self._reins_analysis is None:
+            pg = getattr(self.agg, 'reinstatement_gross_premium', None)
+            self._reins_analysis = self.agg.reinstatement_analysis(
+                gross_premium=pg, terms=terms)
+        return self._reins_analysis
 
     # ------------------------------------------------------------------
     # The net distribution (derived, cached)
@@ -400,19 +495,6 @@ class PnL:
         lm, lsd, lsk = self._moms(x, p)            # loss (or recovery) moments
         ceded = perspective in _GCN_CEDED
         P, E = prem_mag, exp_mag
-        # --- Mean section (signed) -------------------------------------
-        premium = (-P) if ceded else P
-        loss = (+lm) if ceded else (-lm)           # recovery is a gain (+)
-        expense = (+E) if ceded else (-E)          # commission credit later
-        uw = premium + loss + expense
-        # --- Ratio section (magnitudes) --------------------------------
-        nan = float('nan')
-        lr = lm / P if P else nan
-        er = E / P if P else nan
-        cr = (lm + E) / P if P else nan
-        # --- Volatility section ----------------------------------------
-        sd_lr = lsd / P if P else nan
-        sd_cr = lsd / P if P else nan              # expense deterministic here
         # --- UW percentiles, loss-severity aligned ---------------------
         # The rows index the loss-severity direction, so every column reads as
         # one scenario: a *low* level is the bad-loss tail. Retained UW (gross /
@@ -428,16 +510,12 @@ class PnL:
                 pct[lvl] = self._quantile(x, p, 1.0 - lvl) + E - P
             else:
                 pct[lvl] = P - self._quantile(x, p, 1.0 - lvl) - E
-        out = {
-            ('Mean', 'Premium'): premium, ('Mean', 'Loss'): loss,
-            ('Mean', 'Expense'): expense, ('Mean', 'UW'): uw,
-            ('Ratio', 'LR'): lr, ('Ratio', 'ER'): er, ('Ratio', 'CR'): cr,
-            ('Volatility', 'SD LR'): sd_lr, ('Volatility', 'SD CR'): sd_cr,
-            ('Volatility', 'Skew LR'): lsk, ('Volatility', 'Skew CR'): lsk,
-        }
-        for lvl in GCN_PERCENTILES:
-            out[('UW %ile', f'{lvl:g}')] = pct[lvl]
-        return out
+        # Phase-1 premium and expense are deterministic (SD 0); the shared
+        # builder applies the signs, ratios, CV rows and percentile placement.
+        return gcn_assemble_column(
+            ceded=ceded, prem_mean=P, prem_sd=0.0,
+            loss_mean=lm, loss_sd=lsd, loss_skew=lsk,
+            exp_mean=E, exp_sd=0.0, uw_pctiles=pct)
 
     @staticmethod
     def _gcn_impact(target, base, ratio_rows):
@@ -483,7 +561,18 @@ class PnL:
         pandas.DataFrame
             Row ``MultiIndex`` ``(section, item)``; one column per present
             waterfall perspective plus the ``*impact`` columns.
+
+        Notes
+        -----
+        When the underlying aggregate carries a DecL ``reinstatements`` clause
+        the ceded premium ``D + h(R)`` is stochastic, so this delegates to the
+        backing :class:`~aggregate.reinstatement.ReinstatementAnalysis` (whose
+        columns read off the ``(L, R)`` joint pushforward, not a 1-D loss
+        marginal). See ``dev/plan-reinstatements.md`` decision 2.
         """
+        analysis = self.reinstatement_analysis
+        if analysis is not None:
+            return analysis.gcn_df
         agg = self.agg
         if agg.reins_density_df is None:
             raise ValueError(

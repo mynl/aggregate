@@ -485,7 +485,7 @@ class UnderwritingTransformer(Transformer):
         spec["consideration"] = premium
 
     def pnl_out_full(self, c):
-        (_pnl, name, premium, _prem, _minus, exposures, layers, sev_clause,
+        (_pnl, name, premium, _prem, _less, exposures, layers, sev_clause,
          occ_reins, freq, agg_reins, approx, expense, trailer) = c
         spec = {
             "name": name,
@@ -504,7 +504,7 @@ class UnderwritingTransformer(Transformer):
         return ("pnl", name, spec)
 
     def pnl_out_dfreq(self, c):
-        (_pnl, name, premium, _prem, _minus, dfreq, layers, sev_clause,
+        (_pnl, name, premium, _prem, _less, dfreq, layers, sev_clause,
          occ_reins, agg_reins, approx, expense, trailer) = c
         spec = {
             "name": name,

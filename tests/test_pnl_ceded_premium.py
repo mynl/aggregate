@@ -12,7 +12,7 @@ import pytest
 from aggregate import build
 
 TOL = 1e-3
-_BASE = 'pnl T 5000 prem - 100 claims sev lognorm 50 cv 1.5 '
+_BASE = 'pnl T 5000 prem less 100 claims sev lognorm 50 cv 1.5 '
 
 
 def test_deposit_rol_rate_resolution():

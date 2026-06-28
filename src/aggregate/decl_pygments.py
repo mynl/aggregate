@@ -134,7 +134,7 @@ class AggLexer(RegexLexer):
                     'netceded', 'grossceded', 'grossnet',
                     'approximate', 'approx', 'ssev',
                     'claims', 'ceded', 'claim', 'loss', 'payoff', 'dist',
-                    'expense', 'expenses', 'cede', 'deposit', 'rol',
+                    'expense', 'expenses', 'cede', 'deposit', 'rol', 'less',
                     'port', 'rate', 'net', 'sev', 'agg', 'xps', 'wts',
                     'inf', 'and', 'exp', 'at', 'cv', 'lr', 'xs',
                     'of', 'to', 'po', 'so', 'zm', 'zt', ),

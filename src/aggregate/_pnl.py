@@ -405,13 +405,19 @@ class PnL:
         # --- Volatility section ----------------------------------------
         sd_lr = lsd / P if P else nan
         sd_cr = lsd / P if P else nan              # expense deterministic here
-        # --- UW percentiles (this column's UW distribution) ------------
-        # retained: UW = P - loss - E (decreasing in loss); cession:
-        # UW = recovery + E - P (increasing in recovery).
+        # --- UW percentiles, loss-severity aligned ---------------------
+        # The rows index the loss-severity direction, so every column reads as
+        # one scenario: a *low* level is the bad-loss tail. Retained UW (gross /
+        # net) = P - loss - E falls with loss, so it reads the (1 - lvl) loss
+        # quantile. A cession UW = recovery + E - P *rises* with loss, so it
+        # reads the lvl recovery quantile -- i.e. the cession column is reversed
+        # (1 - lvl), giving the cedant's largest benefit at the worst-loss row.
+        # Percentiles never add across columns (different sort orders), so this
+        # alignment costs no additivity.
         pct = {}
         for lvl in GCN_PERCENTILES:
             if ceded:
-                pct[lvl] = self._quantile(x, p, lvl) + E - P
+                pct[lvl] = self._quantile(x, p, 1.0 - lvl) + E - P
             else:
                 pct[lvl] = P - self._quantile(x, p, 1.0 - lvl) - E
         out = {
@@ -458,9 +464,11 @@ class PnL:
         Rows, in sections: **Mean** (Premium / Loss / Expense / UW, signed --
         adds down to UW *and* across the GCN split); **Ratio** (LR / ER / CR from
         the means); **Volatility** (SD and Skew of LR / CR); and **UW
-        percentiles** (payoff convention, low = bad tail; :data:`GCN_PERCENTILES`).
-        Only the Mean section adds across columns -- SD / skew / percentiles are
-        per-column marginals and do **not** add ("means add, SDs don't").
+        percentiles** (:data:`GCN_PERCENTILES`), **loss-severity aligned** so each
+        row reads as one scenario direction: a low level is the bad-loss tail, so
+        the cession columns run reversed (largest cedant benefit at the worst-loss
+        row). Only the Mean section adds across columns -- SD / skew / percentiles
+        are per-column marginals and do **not** add ("means add, SDs don't").
 
         Returns
         -------

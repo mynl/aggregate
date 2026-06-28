@@ -271,7 +271,7 @@ port G.Bodoff
 # A profit is a negative loss. The `pnl` keyword builds premium-minus-
 # loss; a dsev with a negative atom carries genuine signed support and
 # auto-windows around a possibly-negative mean.
-pnl H.PnL 1000 prem - 70% lr sev lognorm 100 cv 2 poisson note{Premium minus loss: E[loss] = 700, expected margin 300.};
+pnl H.PnL 1000 prem less 70% lr sev lognorm 100 cv 2 poisson note{Premium minus loss: E[loss] = 700, expected margin 300.};
 agg H.Signed dfreq [3] dsev [-2 5] [.5 .5] note{Signed severity -- negative outcomes allowed (closed-form support).}
 
 

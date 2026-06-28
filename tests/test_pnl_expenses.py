@@ -10,7 +10,7 @@ import pytest
 from aggregate import build
 
 TOL = 1e-3
-_BASE = 'pnl A 1000 prem - 8 claims sev lognorm 50 cv 1 poisson'  # E[loss] = 8 * 50 = 400
+_BASE = 'pnl A 1000 prem less 8 claims sev lognorm 50 cv 1 poisson'  # E[loss] = 8 * 50 = 400
 
 
 def test_expense_absent_defaults_to_zero():

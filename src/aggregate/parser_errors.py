@@ -107,6 +107,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "CEDE": "'cede' (ceding commission)",
     "DEPOSIT": "'deposit' (ceded premium)",
     "ROL": "'rol' (rate on line)",
+    "LESS": "'less' (premium-minus-loss separator)",
     "DBVSEV": "'dbvsev'",
     "DFREQ": "'dfreq'",
     "DSEV": "'dsev'",

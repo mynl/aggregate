@@ -246,26 +246,26 @@ port PortPnL.Mixed agg Loss 30 claims sev lognorm 20 cv 0.8 poisson agg PnL 50 c
 # ============================================================
 # PnLprem. The pnl keyword: premium-minus-loss aggregates (1.0.0a23)
 # ============================================================
-# pnl NAME <premium> prem - <loss body> builds an ordinary loss aggregate and
-# applies an aggregate-level affine wrapper PnL = premium - A (reflect + a
+# pnl NAME <premium> prem less <loss body> builds an ordinary loss aggregate and
+# applies an aggregate-level affine wrapper PnL = premium less A (reflect + a
 # single shift by the total premium). The premium is subtracted ONCE for the
 # book (unlike a constant inside sev/ssev, which is per-claim). value_type is
 # set to payoff. Three exposure heads: N% lr (binds to the premium), N claims,
 # N loss. The premium vectorises like an agg exposure (total pnl only). A pnl
 # line goes anywhere an agg does, including as a port unit. See tests/test_pnl.py
 # and dev/done/plan-pnl-premium.md.
-pnl PnLprem.LR     1000 prem - 70% lr sev lognorm 100 cv 2 poisson                                           note{loss ratio form: E[loss]=700, margin 300};
-pnl PnLprem.Claims 100 prem - 10 claims sev lognorm 8 cv 1.5 poisson                                         note{claims form: premium independent of the loss model};
-pnl PnLprem.Loss   100 prem - 85 loss sev lognorm 8 cv 1.5 poisson                                           note{expected-loss form: E[loss]=85, margin 15};
-pnl PnLprem.Vec    [100 200 100] prem - .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson             note{vector consideration sums to 400; mean 80 = sum premium_i (1-lr)};
+pnl PnLprem.LR     1000 prem less 70% lr sev lognorm 100 cv 2 poisson                                           note{loss ratio form: E[loss]=700, margin 300};
+pnl PnLprem.Claims 100 prem less 10 claims sev lognorm 8 cv 1.5 poisson                                         note{claims form: premium independent of the loss model};
+pnl PnLprem.Loss   100 prem less 85 loss sev lognorm 8 cv 1.5 poisson                                           note{expected-loss form: E[loss]=85, margin 15};
+pnl PnLprem.Vec    [100 200 100] prem less .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson             note{vector consideration sums to 400; mean 80 = sum premium_i (1-lr)};
 # (Portfolios of pnl units -- book-level P&L -- are deferred; a pnl is the
 # standalone PnL veneer, not a portfolio unit. See dev/plan-pnl.md.)
 # Signed loss severity (dsev negative atom / ssev) under pnl (1.0.0a45): the
 # loss convolves on its genuine signed grid; the net is C - loss on that grid.
 # See tests/test_pnl.py and dev/done/plan-pnl-signed-severity.md.
-pnl PnLsigned.Dsev   5 premium - dfreq[3] dsev[-1 1]                                                          note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3};
-pnl PnLsigned.Asym   10 premium - dfreq[2] dsev[-2 1 3] [.5 .3 .2]                                            note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2};
-pnl PnLsigned.Ssev   100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson                              note{continuous signed severity: E[loss]=50, margin 50}
+pnl PnLsigned.Dsev   5 premium less dfreq[3] dsev[-1 1]                                                          note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3};
+pnl PnLsigned.Asym   10 premium less dfreq[2] dsev[-2 1 3] [.5 .3 .2]                                            note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2};
+pnl PnLsigned.Ssev   100 premium less 5 claims ssev 20 - lognorm 10 cv 0.5 poisson                              note{continuous signed severity: E[loss]=50, margin 50}
 
 # ============================================================
 # MV. The bivariate keyword: copula-coupled aggregates (1.0.0a24)
@@ -389,7 +389,7 @@ agg APX.RightSgamma 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma;
 agg APX.RightSlognorm 5000 claim sev lognorm 100 cv 2 poisson approximate slognorm;
 agg APX.LeftReflect 1 claim sev 100 * beta 5 1.3 fixed approximate sgamma;
 agg APX.AggReins 100 claim sev lognorm 100 cv 2 poisson aggregate net of 100 xs 0 approximate sgamma;
-pnl APX.PnL 600000 prem - 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma
+pnl APX.PnL 600000 prem less 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma
 
 # ============================================================
 # BKT. Portfolio combine grid -- best_window (1.0.0a49)
@@ -479,11 +479,11 @@ agg DW.Picks   100 claims sev lognorm 100 cv 2 picks [1000 5000 10000] [600 1500
 # the stats_df ('meta','prem')/('meta','lr') backfill from the pnl premium
 # (GROSS basis under reinsurance). See dev/done/plan-hygiene-4.md.
 agg H4.Loss 5 claims sev lognorm 50 cv 1 poisson                                                             note{loss unit for value_type derivation};
-pnl H4.Pay1 100 prem - 2 claims sev lognorm 30 cv 1 poisson                                                  note{payoff unit for value_type derivation};
-pnl H4.Prem 1000 prem - 10 claims sev lognorm 80 cv 1 poisson                                                note{pnl premium backfills meta prem/lr};
-pnl H4.PremLR 1000 prem - 65% lr sev lognorm 80 cv 1 poisson                                                 note{bare-lr pnl; exposure clause carries premium};
+pnl H4.Pay1 100 prem less 2 claims sev lognorm 30 cv 1 poisson                                                  note{payoff unit for value_type derivation};
+pnl H4.Prem 1000 prem less 10 claims sev lognorm 80 cv 1 poisson                                                note{pnl premium backfills meta prem/lr};
+pnl H4.PremLR 1000 prem less 65% lr sev lognorm 80 cv 1 poisson                                                 note{bare-lr pnl; exposure clause carries premium};
 agg H4.ExpPrem 100 prem at 0.65 lr sev lognorm 80 cv 1 poisson                                               note{exposure-clause premium; regression guard};
-pnl H4.Reins 1000 prem - 10 claims sev lognorm 80 cv 1 occurrence net of 100 xs 100 poisson                  note{prem/lr meta stay GROSS under reinsurance};
+pnl H4.Reins 1000 prem less 10 claims sev lognorm 80 cv 1 occurrence net of 100 xs 100 poisson                  note{prem/lr meta stay GROSS under reinsurance};
 port H4.Book agg A1 5 claims sev lognorm 50 cv 1 poisson agg A2 3 claims sev gamma 20 cv .5 poisson          note{homogeneous loss book; portfolio value_type}
 
 
@@ -509,7 +509,7 @@ port N2.Legacy   agg A dfreq [0 1 2] dsev [1 2 3] agg B dfreq [1] dsev [2 4] [.6
 port N2.PosOrigin agg A dfreq [1] dsev [10 11] agg B dfreq [1] dsev [20 22] [.6 .4]                               note{base for the hand-built positive-origin add_exa frame};
 port N2.SignedLN agg A 8 claims ssev 20 * lognorm 0.4 - 25 poisson agg L 4 claims sev lognorm 30 cv 0.4 poisson   note{signed continuous; exeqa vs Monte Carlo incl a<0};
 agg N2.Dice dfreq [1] dsev [1:6]                                                                                  note{hand checks: lev(3)=2.5 exlea(3)=2 exgta(3)=5};
-pnl N2.PnL 10 prem - dfreq [1] dsev [2 5] [.5 .5]                                                                 note{signed Aggregate direct sums carry the origin}
+pnl N2.PnL 10 prem less dfreq [1] dsev [2 5] [.5 .5]                                                                 note{signed Aggregate direct sums carry the origin}
 
 
 # N3. Distortion spine (numerics-3)
@@ -548,7 +548,7 @@ port BW.Mixed agg M1 dfreq [4] dsev [3] agg M2 dfreq [3] dsev [-1 1]            
 # dev/plan-signed-distortion-calibration.md.
 agg SC.Base0  dfreq [1] dsev [0 10 20] [.5 .3 .2]                                                                 note{non-negative base anchored at 0: classic c=0 path};
 agg SC.Signed dfreq [1] dsev [-10 0 10] [.5 .3 .2]                                                                note{Base0 slid -10: signed loss, shift-exact twin};
-pnl SC.Pnl    10 prem - dfreq [1] dsev [2 5 12] [.4 .4 .2]                                                        note{payoff: reversed then shifted; ask price = -P via g_dual};
+pnl SC.Pnl    10 prem less dfreq [1] dsev [2 5 12] [.4 .4 .2]                                                        note{payoff: reversed then shifted; ask price = -P via g_dual};
 agg SC.Classic 50 claims sev lognorm 40 cv 1.5 poisson                                                            note{classic non-negative loss: transform branch never entered}
 
 # ============================================================
@@ -575,11 +575,11 @@ agg UM.Scaled 10 claims ssev -3 * lognorm 2 cv 0.5 poisson                      
 # expense credit. Any premium clause promotes the pnl to the Gross/Ceded/Net
 # exhibit. See tests/test_pnl_expenses.py, tests/test_pnl_ceded_premium.py and
 # dev/done/plan-pnl-expenses-ceded-premium.md.
-pnl EXP.PremExp  1000 prem - 8 claims sev lognorm 50 cv 1 poisson 0.25 premium expenses                       note{variable expense: 25% of premium};
-pnl EXP.LossExp  1000 prem - 8 claims sev lognorm 50 cv 1 poisson 0.3 loss expenses                           note{variable expense: 30% of expected loss};
-pnl EXP.FixedExp 1000 prem - 8 claims sev lognorm 50 cv 1 poisson 200 fixed expenses                          note{fixed expense amount};
-pnl EXP.Deposit  5000 prem - 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 deposit 1500           note{ceded premium as a deposit amount};
-pnl EXP.RolCede  5000 prem - 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.25     note{rate-on-line premium + ceding commission};
-pnl EXP.Rate     5000 prem - 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rate 0.3              note{ceded premium as a rate on gross premium};
-pnl EXP.OccRol   5000 prem - 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.1 poisson               note{occurrence-layer ceded premium; occ-only GCN};
-pnl EXP.Both     5000 prem - 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.05 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.2 200 fixed expenses   note{both sides priced + fixed expense}
+pnl EXP.PremExp  1000 prem less 8 claims sev lognorm 50 cv 1 poisson 0.25 premium expenses                       note{variable expense: 25% of premium};
+pnl EXP.LossExp  1000 prem less 8 claims sev lognorm 50 cv 1 poisson 0.3 loss expenses                           note{variable expense: 30% of expected loss};
+pnl EXP.FixedExp 1000 prem less 8 claims sev lognorm 50 cv 1 poisson 200 fixed expenses                          note{fixed expense amount};
+pnl EXP.Deposit  5000 prem less 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 deposit 1500           note{ceded premium as a deposit amount};
+pnl EXP.RolCede  5000 prem less 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.25     note{rate-on-line premium + ceding commission};
+pnl EXP.Rate     5000 prem less 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rate 0.3              note{ceded premium as a rate on gross premium};
+pnl EXP.OccRol   5000 prem less 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.1 poisson               note{occurrence-layer ceded premium; occ-only GCN};
+pnl EXP.Both     5000 prem less 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.05 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.2 200 fixed expenses   note{both sides priced + fixed expense}

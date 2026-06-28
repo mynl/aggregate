@@ -188,25 +188,25 @@ port Gotcha agg A 50 claims sev 10 * norm + 5 splice [0 40] poisson agg B 50 cla
 # ============================================================
 # PnLprem. The pnl keyword: premium-minus-loss aggregates (1.0.0a23)
 # ============================================================
-# pnl NAME <premium> prem - <loss body> builds an ordinary loss aggregate and
-# applies an aggregate-level affine wrapper PnL = premium - A (reflect + a
+# pnl NAME <premium> prem less <loss body> builds an ordinary loss aggregate and
+# applies an aggregate-level affine wrapper PnL = premium less A (reflect + a
 # single shift by the total premium). The premium is subtracted ONCE for the
 # book (unlike a constant inside sev/ssev, which is per-claim). value_type is
 # set to payoff. Three exposure heads: N% lr (binds to the premium), N claims,
 # N loss. The premium vectorises like an agg exposure (total pnl only). A pnl
 # line goes anywhere an agg does, including as a port unit. See tests/test_pnl.py
 # and dev/done/plan-pnl-premium.md.
-pnl PnLprem.LR 1000 prem - 70% lr sev lognorm 100 cv 2 poisson note{loss ratio form: E[loss]=700, margin 300};
-pnl PnLprem.Claims 100 prem - 10 claims sev lognorm 8 cv 1.5 poisson note{claims form: premium independent of the loss model};
-pnl PnLprem.Loss 100 prem - 85 loss sev lognorm 8 cv 1.5 poisson note{expected-loss form: E[loss]=85, margin 15};
-pnl PnLprem.Vec [100 200 100] prem - .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson note{vector premium: shift 400, mean 80 = sum premium_i (1-lr)};
-port PnLprem.Book pnl Cat 2000 prem - 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem - 65% lr sev lognorm 100 cv 2 poisson;
+pnl PnLprem.LR 1000 prem less 70% lr sev lognorm 100 cv 2 poisson note{loss ratio form: E[loss]=700, margin 300};
+pnl PnLprem.Claims 100 prem less 10 claims sev lognorm 8 cv 1.5 poisson note{claims form: premium independent of the loss model};
+pnl PnLprem.Loss 100 prem less 85 loss sev lognorm 8 cv 1.5 poisson note{expected-loss form: E[loss]=85, margin 15};
+pnl PnLprem.Vec [100 200 100] prem less .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson note{vector premium: shift 400, mean 80 = sum premium_i (1-lr)};
+port PnLprem.Book pnl Cat 2000 prem less 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem less 65% lr sev lognorm 100 cv 2 poisson;
 # Signed loss severity (dsev negative atom / ssev) under pnl (1.0.0a45): the
 # loss convolves on its genuine signed grid before the affine relabel. See
 # tests/test_pnl.py and dev/done/plan-pnl-signed-severity.md.
-pnl PnLsigned.Dsev 5 premium - dfreq[3] dsev[-1 1] note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3};
-pnl PnLsigned.Asym 10 premium - dfreq[2] dsev[-2 1 3] [.5 .3 .2] note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2};
-pnl PnLsigned.Ssev 100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson note{continuous signed severity: E[loss]=50, margin 50}
+pnl PnLsigned.Dsev 5 premium less dfreq[3] dsev[-1 1] note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3};
+pnl PnLsigned.Asym 10 premium less dfreq[2] dsev[-2 1 3] [.5 .3 .2] note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2};
+pnl PnLsigned.Ssev 100 premium less 5 claims ssev 20 - lognorm 10 cv 0.5 poisson note{continuous signed severity: E[loss]=50, margin 50}
 
 # ============================================================
 # MV. The bivariate keyword: copula-coupled aggregates (1.0.0a24)
@@ -226,7 +226,7 @@ pnl PnLsigned.Ssev 100 premium - 5 claims ssev 20 - lognorm 10 cv 0.5 poisson no
 bivariate MV.Gumbel 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
 bivariate MV.ClaytonMixed 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula clayton 0.3 mixed gamma .2;
 bivariate MV.Normal 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula normal 0.5;
-bivariate MV.PnLAxis 25 claims agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 pnl B 900 prem - dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
+bivariate MV.PnLAxis 25 claims agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 pnl B 900 prem less dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson;
 bivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson;
 # netceded MODE: the joint (ceded, net) occurrence law of one reinsured aggregate
 # (same object as Aggregate.occ_bivariate()). Body is an ordinary agg carrying
@@ -249,7 +249,7 @@ agg APX.RightSgamma 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma;
 agg APX.RightSlognorm 5000 claim sev lognorm 100 cv 2 poisson approximate slognorm;
 agg APX.LeftReflect 1 claim sev 100 * beta 5 1.3 fixed approximate sgamma;
 agg APX.AggReins 100 claim sev lognorm 100 cv 2 poisson aggregate net of 100 xs 0 approximate sgamma;
-pnl APX.PnL 600000 prem - 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma
+pnl APX.PnL 600000 prem less 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma
 
 # ============================================================
 # WIN. Non-zero aggregate output window -- windowed sizing (1.0.0a51)
@@ -273,7 +273,7 @@ agg N3.Dice dfreq [1:6] dsev [1:6] note{six-surface consistency target; choquet 
 port N3.OneDice agg D dfreq [1:6] dsev [1:6] note{one-line port: line == total};
 port N3.Bodoff agg wind 1 claim sev dhistogram xps [0, 99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed note{bounded discrete; linear vs lifted; mass distortion exact};
 port N3.SignedD agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed totals price via dot(kappa, gp); shares NaN};
-port N3.PayPair pnl P1 10 prem - dfreq [1] dsev [2 5] [.5 .5] pnl P2 8 prem - dfreq [1] dsev [1 3] note{homogeneous payoff book prices through the dual};
+port N3.PayPair pnl P1 10 prem less dfreq [1] dsev [2 5] [.5 .5] pnl P2 8 prem less dfreq [1] dsev [1 3] note{homogeneous payoff book prices through the dual};
 port N3.Unb agg U 5 claims sev lognorm 10 cv 1 poisson note{mass-on-unbounded refused in the lifted builder (G6)}
 
 
@@ -291,7 +291,7 @@ agg A.Basic 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 poisson note{A plain Po
 # B. Portfolios
 # ----------------------------------------------------------------------
 port B.BasicPort agg A 50 claims 1000 xs 0 sev lognorm 100 cv 1.2 mixed gamma 0.4 agg B 65 claims 2000 xs 0 sev lognorm 150 cv 1.6 mixed gamma 0.2 note{Two-unit portfolio.};
-port B.PnLPort pnl Cat 2000 prem - 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem - 65% lr sev lognorm 100 cv 2 poisson note{Portfolio of two profit-and-loss units.}
+port B.PnLPort pnl Cat 2000 prem less 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem less 65% lr sev lognorm 100 cv 2 poisson note{Portfolio of two profit-and-loss units.}
 
 # ----------------------------------------------------------------------
 # C. Reinsurance
@@ -309,8 +309,8 @@ bivariate D.MVGumbel 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.
 # ----------------------------------------------------------------------
 # E. Profit and loss
 # ----------------------------------------------------------------------
-pnl E.PNL 1000 prem - 90% lr 1000 xs 0 sev lognorm 120 cv 1 mixed gamma .25 note{Single profit-and-loss line.};
-pnl E.PnLMix [100 200 100] prem - .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson note{Vector premium: shift 400, mean 80 = sum premium_i (1 - lr).}
+pnl E.PNL 1000 prem less 90% lr 1000 xs 0 sev lognorm 120 cv 1 mixed gamma .25 note{Single profit-and-loss line.};
+pnl E.PnLMix [100 200 100] prem less .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson note{Vector premium: shift 400, mean 80 = sum premium_i (1 - lr).}
 
 # ----------------------------------------------------------------------
 # F. Severity and frequency features

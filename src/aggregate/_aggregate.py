@@ -2607,7 +2607,7 @@ class Aggregate:
 
         Notes
         -----
-        ``build('pnl NAME C prem - <body>')`` is sugar for
+        ``build('pnl NAME C premium less <body>')`` is sugar for
         ``build('agg NAME <body>').make_pnl(consideration=C)``. The GCN view is a
         Python-API construction (no DecL surface in this release).
         """

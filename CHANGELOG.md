@@ -30,11 +30,20 @@ reinsurance **waterfall**.
   Mean section adds across columns (means add, SDs don't). The single-leg
   `summary_df` keeps `Consideration | Obligation | Margin`, now with an Expense
   row and a combined-ratio line.
+- **`pnl` separator is now `less`, not `-`** (hard switch). `pnl NAME <premium>
+  premium less <loss body>` — a dedicated keyword so the P&L split never collides
+  with severity arithmetic (`ssev 20 - lognorm`). The `-` separator is removed;
+  the corpus and tests are migrated. (Multi-line indented authoring already works
+  — newlines/indentation inside a statement are whitespace.)
+- **GCN UW percentiles are loss-severity aligned** — the cession columns are
+  reversed (report the `1 − p` quantile) so each percentile row reads as one
+  scenario direction (worst-loss row: gross deeply negative *and* recovery large).
 - **Grammar / unparser** — new terminals `EXPENSES`, `FIXED`, `DEPOSIT`, `ROL`,
-  `CEDE` (reusing `RATE`); `reins_clause` refactored into `reins_layer` + optional
-  premium + optional `cede` (the loss-structure path is unchanged). Parse errors:
-  `cede` without a premium, `rol` without a finite limit, ceded-premium clauses on
-  a plain `agg`. `decl_writer` renders all new clauses (round-trip preserved).
+  `CEDE`, `LESS` (reusing `RATE`); `reins_clause` refactored into `reins_layer` +
+  optional premium + optional `cede` (the loss-structure path is unchanged). Parse
+  errors: `cede` without a premium, `rol` without a finite limit, ceded-premium
+  clauses on a plain `agg`. `decl_writer` renders all new clauses (round-trip
+  preserved).
 - New tests `tests/test_pnl_expenses.py`, `tests/test_pnl_ceded_premium.py`;
   corpus section `EXP` in `decl-testers.agg`. Note: when a leg becomes
   loss-sensitive (Phase 3 swing/slide on an XOL) the net-distribution derivation

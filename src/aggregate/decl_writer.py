@@ -615,14 +615,14 @@ def _render_agg(name: str, spec: dict) -> _Block:
 
 
 def _render_pnl(name: str, spec: dict) -> _Block:
-    """Render a profit-and-loss aggregate (``pnl NAME <premium> premium - ...``).
+    """Render a profit-and-loss aggregate (``pnl NAME <premium> premium less ...``).
 
     Inverts ``pnl_out_*`` / ``_attach_pnl``. The premium is ``consideration``;
-    the exposure head after ``premium -`` is ``claims`` (``exp_en``), ``lr``
+    the exposure head after ``less`` is ``claims`` (``exp_en``), ``lr``
     (``exp_lr``, the bare loss-ratio form that binds to the premium) or ``loss``
     (``exp_el``).
 
-    Returns a :class:`_Block` whose head keeps ``pnl NAME <premium> premium -``
+    Returns a :class:`_Block` whose head keeps ``pnl NAME <premium> premium less``
     intact (so it re-parses to a :class:`aggregate.PnL`); the loss-head fragment
     is the first child clause.
     """
@@ -639,7 +639,7 @@ def _render_pnl(name: str, spec: dict) -> _Block:
     else:
         head = ''
 
-    return _Block(f'pnl {name} {premium} premium -', [
+    return _Block(f'pnl {name} {premium} premium less', [
         head,
         _render_layers(spec),
         _render_sev_clause(spec),

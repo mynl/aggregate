@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.0.0a118
+
+Starts **Phase 3 (variable rating)** with the `[terms]` workstream — the pure,
+engine-free contract-terms layer (`dev/plan-variable-rating.md`). No analysis or
+DecL wiring yet; that follows.
+
+- **New `ContractTerms` taxonomy** (`aggregate.contract_terms`, submodule access
+  only). A *contract term* is a deterministic vectorized map `phi` of a realized
+  loss quantity that fills one P&L leg (the legs model, appendix section 1). The
+  thin base owns the `target_leg` / `loss_basis` metadata, the abstract `phi`, and
+  the shared finite / nonnegative / monotone validation probe
+  `_check_vectorized` (generalized from the reinstatement callable validator).
+- **Five frozen-dataclass features**, each with a hand-checked sign-correct worked
+  example: `RetroTerms` (gross premium, collared affine in net account loss),
+  `SwingTerms` (ceded premium, collared affine in ceded loss — shares the collar
+  machinery via `_CollaredAffineTerms`), `SlideTerms` (sliding-scale ceding
+  commission, decreasing PWL of ceded LR from `(commission, loss_ratio)` anchors,
+  flat outside the ends), `ProfitCommissionTerms` (`share·(1 − LR − allowance)₊`),
+  and `CorridorTerms` (loss-ratio band the cedant retains). The ratio features
+  (slide / pc / corridor) read the **ceded loss ratio** so `phi` stays a pure
+  single-argument map; the analysis layer (next workstream) binds the premium.
+- **`ReinstatementTerms` refactored under `ContractTerms`** — sets the metadata,
+  exposes `reinstatement_premium` as `phi` (the premium decorator; `recovery`
+  remains the annual-cap loss transform, making reinstatement the one two-map
+  feature), and routes its callable validator through the shared probe.
+  Behavior-preserving: the full reinstatement suite stays green.
+- Spec-key naming for the layer-decorating features locked to the shipped
+  `{which}_reins_*` convention (`occ_reins_swing` / `agg_reins_swing`, etc.);
+  account-level `retro_terms` stays flat (the one exception). DecL / analysis
+  wiring is pending.
+
 ## 1.0.0a117
 
 Completes **Phase 2 (reinstatement premiums)** — see `1.0.0a116` for the core

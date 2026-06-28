@@ -12,11 +12,29 @@ loss, pushed forward over the loss distribution, making one leg stochastic.
 
 ---
 
-## Decisions locked (author, 2026-06-27)
+## Decisions locked (author, 2026-06-27; naming refined 2026-06-28)
 
 1. **Each feature is a `ContractTerms` subclass** owning its φ, loss basis (appendix §4), and
    target leg. The layer's **basis** (occurrence/aggregate) selects 1-D vs 2-D pushforward
-   (appendix §2); the feature never chooses dimension.
+   (appendix §2); the feature never chooses dimension. A thin `ContractTerms` base **is**
+   introduced (author, 2026-06-28); `ReinstatementTerms` is refactored under it. The base holds
+   class-level `target_leg` / `loss_basis` metadata, one abstract vectorized `phi`, and the shared
+   finite/monotone validation utilities (generalized from `_validate_callable`). Reinstatement is
+   the one **two-map** feature (`reinstatement_premium` = premium leg via `phi`; `recovery` = the
+   annual-cap loss transform, left as-is); the base stays thin so it is not over-fit to the
+   single-leg features.
+
+   **Spec-key naming (author, 2026-06-28; supersedes the `[decl]` flat `*_terms` keys).** The four
+   layer-decorating features follow the shipped per-layer convention `{which}_reins_{slot}` with
+   `which ∈ {occ, agg}` (parallel to `occ_reins_premium` / `occ_reins_cede` / `occ_reins_reinst`,
+   no `_terms` suffix): `occ_reins_swing` / `agg_reins_swing`, `occ_reins_slide` /
+   `agg_reins_slide`, `occ_reins_pc` / `agg_reins_pc`, `occ_reins_corridor` / `agg_reins_corridor`.
+   They are per-layer lists holding the raw DecL params, emitted by `_split_reins` (`parser.py`)
+   only when a layer carries the slot; the `*Terms` dataclass is assembled at analysis time (same
+   pattern as `occ_reins_reinst`). Rationale: the tier selects 1-D vs 2-D (appendix §2) and agg
+   features stack, so the spec must record *which* tier and index *by layer* — a flat scalar key
+   cannot. **`retro_terms` stays flat** — it is the account-level rating clause with no occ/agg
+   dimension, the one genuine exception.
 2. **`slide` is expressed as `(commission at loss-ratio)` anchor pairs**, piecewise-linear
    between, flat outside the end anchors — **no explicit min/max** (they are the end anchors,
    author-confirmed): `slide 45% at 60% and 25% at 70% and 19% at 80%`.
@@ -72,8 +90,9 @@ sign-correct worked example *before* it becomes a test fixture — especially re
 
 `decl.lark` / `parser.py`. New terminals `RETRO`, `SWING`, `BASIC`, `LCM`, `MIN`, `MAX`,
 `SLIDE`, `PC`, `AFTER`, `CORRIDOR` (appendix §5; reuse `at`/`and`/`po`/`xs`/`premium`/`loss`).
-`retro` decorates the **rating clause**; the rest decorate a reins layer. New spec keys
-(spelled out): `retro_terms`, `swing_terms`, `slide_terms`, `pc_terms`, `corridor_terms`.
+`retro` decorates the **rating clause**; the rest decorate a reins layer. New spec keys:
+account-level `retro_terms` (flat); per-layer `{which}_reins_swing` / `_slide` / `_pc` /
+`_corridor` for `which ∈ {occ, agg}` via `_split_reins` (decision 1, naming-refined).
 
 **Per-layer validation matrix (appendix §3)** — implement as one check over a layer's filled
 slots: one premium mechanism (`deposit|rol|rate|swing`), `cede` xor `slide`, `pc` optional,

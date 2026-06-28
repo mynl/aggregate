@@ -296,6 +296,19 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   *stochastic* commission (`slide` / profit commission) is Phase 3 (P3).
 - [ ] **P3 `[A]`** Variable rating — retro, swing, slide, profit commission,
   corridor — all reusing P2's engine. `dev/plan-variable-rating.md`. Depends on P2.
+  - [x] **`[terms]` landed (1.0.0a118):** `aggregate.contract_terms` — the
+    `ContractTerms` base + five frozen-dataclass features (`RetroTerms`,
+    `SwingTerms`, `SlideTerms`, `ProfitCommissionTerms`, `CorridorTerms`) with
+    hand-checked worked examples; `ReinstatementTerms` refactored under the base
+    (behavior-preserving). Spec-key naming locked to `{which}_reins_*` (flat
+    `retro_terms`). Tests: `tests/test_variable_rating_terms.py`.
+  - [ ] **`[analysis]`** wire φ through `pushforward_1d` (agg) / 2-D
+    `BivariateDistribution.pushforward` (occ) into GCN legs; bind ceded premium for
+    the LR features; guard slide/pc against a stochastic (swing) premium denominator.
+  - [ ] **`[decl]`** grammar + transformer + per-layer validation matrix
+    (`_split_reins` emits the new `{which}_reins_*` keys).
+  - [ ] **`[exhibit]`** `reins_description` / `reins_explanation` per feature;
+    `FEATURES.csv` rows + introspection cross-check.
 
 ---
 

@@ -29,6 +29,8 @@ from typing import Any, Callable, Optional
 import numpy as np
 import pandas as pd
 
+from .contract_terms import ContractTerms
+
 __all__ = ['ReinstatementTerms', 'ReinstatementAnalysis']
 
 #: Adverse-tail levels for the headline ``summary_df`` (pre-plan section 13).
@@ -36,7 +38,7 @@ SUMMARY_PERCENTILES = (0.90, 0.95, 0.99, 0.995, 0.996, 0.999)
 
 
 @dataclass(frozen=True)
-class ReinstatementTerms:
+class ReinstatementTerms(ContractTerms):
     r"""Immutable terms of one occurrence reinstatement basis.
 
     Describes a ``y`` xs ``a`` occurrence layer with ``m`` paid reinstatements,
@@ -83,7 +85,17 @@ class ReinstatementTerms:
     reinstatement capacity ``sum(w_j)`` is consumed. Recovery is
     ``A(R) = R \wedge Y``. Both are deterministic nondecreasing functions of the
     single random variable ``R``, hence comonotone (``dev/reinstatements.md``).
+
+    Reinstatement is the one **two-map** :class:`~aggregate.contract_terms.ContractTerms`
+    feature: :meth:`reinstatement_premium` is the premium decorator exposed as the
+    base :meth:`phi` (filling the ceded-premium leg), while :meth:`recovery` is the
+    annual-cap loss transform consumed separately by :class:`ReinstatementAnalysis`.
     """
+
+    #: ``ContractTerms`` metadata: ``h(R)`` fills the ceded-premium leg, reading
+    #: the unlimited annual occurrence recovery ``R`` (appendix sections 1, 4).
+    target_leg = 'ceded_premium'
+    loss_basis = 'occurrence_recovery'
 
     limit: float
     rates: tuple
@@ -136,32 +148,14 @@ class ReinstatementTerms:
 
     def _validate_callable(self):
         """Check the escape-hatch ``premium_function`` is vectorized, finite,
-        nonnegative and nondecreasing on a sample of the recovery range."""
-        probe = np.linspace(0.0, self.total_recovery_capacity, 257)
-        try:
-            vals = np.asarray(self.premium_function(probe), dtype=float)
-        except Exception as e:                       # noqa: BLE001
-            raise ValueError(
-                'ReinstatementTerms.from_callable: premium_function must accept '
-                'and return a NumPy array (it failed to evaluate on a vector). '
-                f'Underlying error: {e!r}') from e
-        if vals.shape != probe.shape:
-            raise ValueError(
-                'ReinstatementTerms.from_callable: premium_function must be '
-                f'vectorized (input shape {probe.shape}, output shape '
-                f'{vals.shape}).')
-        if not np.all(np.isfinite(vals)):
-            raise ValueError(
-                'ReinstatementTerms.from_callable: premium_function must be '
-                'finite over the recovery range.')
-        if np.any(vals < -1e-9):
-            raise ValueError(
-                'ReinstatementTerms.from_callable: premium_function must be '
-                'nonnegative.')
-        if np.any(np.diff(vals) < -1e-9):
-            raise ValueError(
-                'ReinstatementTerms.from_callable: premium_function must be '
-                'nondecreasing.')
+        nonnegative and nondecreasing on a sample of the recovery range.
+
+        Delegates to the shared :meth:`ContractTerms._check_vectorized` probe.
+        """
+        self._check_vectorized(
+            self.premium_function, 0.0, self.total_recovery_capacity,
+            where='ReinstatementTerms.from_callable: premium_function',
+            nonnegative=True, nondecreasing=True)
 
     # ------------------------------------------------------------------
     # alternative constructors
@@ -302,6 +296,15 @@ class ReinstatementTerms:
     def ceded_premium(self, R):
         """Total ceded premium ``D + h(R)`` (deposit plus reinstatement premium)."""
         return self.deposit + self.reinstatement_premium(R)
+
+    def phi(self, R):
+        """``ContractTerms`` leg map: the reinstatement premium ``h(R)``.
+
+        The premium decorator filling the ceded-premium leg (the annual-cap loss
+        transform :meth:`recovery` is the feature's second map, handled separately
+        by :class:`ReinstatementAnalysis`).
+        """
+        return self.reinstatement_premium(R)
 
     def __repr__(self):
         if self.premium_function is not None:

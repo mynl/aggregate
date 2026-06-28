@@ -569,7 +569,8 @@ agg UM.Scaled 10 claims ssev -3 * lognorm 2 cv 0.5 poisson                      
 # ============================================================
 # Gross expenses on a pnl in three explicit forms (decision 1): a fraction of
 # premium, a fraction of expected loss, or a fixed amount; expense/expenses both
-# accepted. Ceded premium per reinsurance layer in one of deposit | rol | rate
+# accepted. Multiple expense terms join with `and` and sum (EXP.MultiExp). Ceded
+# premium per reinsurance layer in one of deposit | rol | rate
 # (decision 3): deposit a currency amount, rol = share x rol x limit, rate =
 # rate x gross premium; an optional cede books the ceding commission as an
 # expense credit. Any premium clause promotes the pnl to the Gross/Ceded/Net
@@ -582,4 +583,5 @@ pnl EXP.Deposit  5000 prem less 100 claims sev lognorm 50 cv 1.5 poisson aggrega
 pnl EXP.RolCede  5000 prem less 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.25     note{rate-on-line premium + ceding commission};
 pnl EXP.Rate     5000 prem less 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rate 0.3              note{ceded premium as a rate on gross premium};
 pnl EXP.OccRol   5000 prem less 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.1 poisson               note{occurrence-layer ceded premium; occ-only GCN};
-pnl EXP.Both     5000 prem less 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.05 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.2 200 fixed expenses   note{both sides priced + fixed expense}
+pnl EXP.Both     5000 prem less 100 claims sev lognorm 50 cv 1.5 occurrence net of 100 xs 200 rol 0.05 poisson aggregate net of 2000 xs 3000 rol 0.08 cede 0.2 200 fixed expenses   note{both sides priced + fixed expense};
+pnl EXP.MultiExp 1000 prem less 8 claims sev lognorm 50 cv 1 poisson 25% premium expense and 200 fixed expense                note{multiple expense terms joined by `and`, summed}

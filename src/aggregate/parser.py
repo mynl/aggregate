@@ -522,17 +522,31 @@ class UnderwritingTransformer(Transformer):
         return ("pnl", name, spec)
 
     # ----- gross expenses on a pnl (decision 1) ---------------------
+    # Each term is a ``(basis, value)`` pair; ``expense_list`` collects the
+    # ``and``-joined terms and ``expense_some`` records them as the list spec
+    # key ``expense_spec`` (summed at compute time). The base is explicit.
     def expense_premium(self, c):
         # ``<frac> premium expenses``: variable expense, base = gross premium.
-        return {"expense_spec": ("premium", float(c[0]))}
+        return ("premium", float(c[0]))
 
     def expense_loss(self, c):
         # ``<frac> loss expenses``: variable expense, base = expected gross loss.
-        return {"expense_spec": ("loss", float(c[0]))}
+        return ("loss", float(c[0]))
 
     def expense_fixed(self, c):
         # ``<amount> fixed expenses``: a fixed currency amount.
-        return {"expense_spec": ("fixed", float(c[0]))}
+        return ("fixed", float(c[0]))
+
+    def expense_list_one(self, c):
+        return [c[0]]
+
+    def expense_list_cons(self, c):
+        lst, _and, term = c
+        lst.append(term)
+        return lst
+
+    def expense_some(self, c):
+        return {"expense_spec": c[0]}
 
     def expense_none(self, c):
         return {}

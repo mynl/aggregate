@@ -82,8 +82,9 @@ class PnL:
         self.agg = agg
         self.program = ''
         self._pnl_df = None
-        #: gross-expense spec ``(basis, value)`` with basis in
-        #: ``{'premium', 'loss', 'fixed'}`` (decision 1); ``None`` => no expense.
+        #: gross-expense spec: a list of ``(basis, value)`` terms (basis in
+        #: ``{'premium', 'loss', 'fixed'}``) that sum (decision 1); a bare
+        #: ``(basis, value)`` tuple is also accepted; ``None`` => no expense.
         self._expense_spec = expense_spec
         #: per-side GCN economics from DecL ceded-premium clauses --
         #: ``{'pc_occ', 'pc_agg', 'c_occ', 'c_agg'}`` (ceded premiums and
@@ -168,15 +169,22 @@ class PnL:
     def _gross_expense(self):
         """The gross expense ``E_G`` as a scalar (deterministic in Phase 1).
 
-        ``fixed`` is the currency amount; ``premium`` is a fraction of the gross
-        premium; ``loss`` is a fraction of the **expected gross loss** (so the
-        leg stays deterministic -- it becomes a distribution only with slide / PC
-        in Phase 3). ``None`` => ``0``.
+        ``_expense_spec`` is a **list** of ``(basis, value)`` terms (``and``-joined
+        in DecL) that **sum**; a bare ``(basis, value)`` tuple is accepted too (the
+        Python-API single-term form). For each term ``fixed`` is the currency
+        amount, ``premium`` a fraction of the gross premium, ``loss`` a fraction of
+        the **expected gross loss** (so the leg stays deterministic -- it becomes a
+        distribution only with slide / PC in Phase 3). ``None`` / empty => ``0``.
         """
         spec = self._expense_spec
-        if spec is None:
+        if not spec:
             return 0.0
-        basis, val = spec
+        # Normalize a bare ``(basis, value)`` tuple to a one-term list.
+        terms = [spec] if isinstance(spec[0], str) else spec
+        return float(sum(self._one_expense(basis, val) for basis, val in terms))
+
+    def _one_expense(self, basis, val):
+        """One expense term resolved to currency (see :meth:`_gross_expense`)."""
         if basis == 'fixed':
             return float(val)
         if basis == 'premium':

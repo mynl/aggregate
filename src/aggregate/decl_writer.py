@@ -472,15 +472,16 @@ def _render_approx(spec: dict) -> str:
 def _render_expense(spec: dict) -> str:
     """Render a ``pnl`` gross-expense clause, or ``''`` if absent (decision 1).
 
-    ``('fixed', amount)`` -> ``<amount> fixed expenses``; ``('premium'|'loss',
-    fraction)`` -> ``<fraction> premium|loss expenses`` (the fraction renders as
-    a bare number, re-parsing identically).
+    ``expense_spec`` is a list of ``(basis, value)`` terms joined with ``and``;
+    a bare ``(basis, value)`` tuple is also accepted. Each term renders as
+    ``<amount> fixed expenses`` / ``<fraction> premium|loss expenses`` (the
+    fraction is a bare number, re-parsing identically).
     """
     es = spec.get('expense_spec')
-    if es is None:
+    if not es:
         return ''
-    basis, value = es
-    return f'{_fmt_num(value)} {basis} expenses'
+    terms = [es] if isinstance(es[0], str) else es
+    return ' and '.join(f'{_fmt_num(value)} {basis} expenses' for basis, value in terms)
 
 
 def _render_orientation(spec: dict) -> str:

@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.0a115
+
+### Multiple `pnl` expense terms (`and`-joined)
+
+A `pnl` expense clause is now a **list of terms joined by `and`** (the
+reinsurance-list precedent), so a book can carry variable **and** fixed expenses
+at once:
+
+```
+pnl Book 1000 premium less 8 claims sev lognorm 50 cv 1 poisson
+    25% premium expense and 1000 fixed expense
+```
+
+- `expense_clause` → `expense_list` of `expense_term`s; the terms **sum** into the
+  gross expense. `expense_spec` is now a list of `(basis, value)` pairs (a bare
+  tuple is still accepted via the Python API). The inter-term `and` sits after all
+  reinsurance, so it never competes with a cession `and`.
+- `decl_writer` renders the term list (`… and …`); round-trip preserved. No
+  change to the GCN exhibit — it reads the summed `_gross_expense()`.
+- High-level shape: `pnl LABEL <premium> premium less <loss clause> <expense
+  term> [and <expense term> …]`.
+
 ## 1.0.0a114
 
 ### P&L expenses, ceded premium / ceding commission, and the GCN waterfall exhibit (`dev/done/plan-pnl-expenses-ceded-premium.md`)

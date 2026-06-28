@@ -113,17 +113,24 @@ pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
              | numbers LOSS     -> pnl_exp_loss
              | numbers LR       -> pnl_exp_lr
 
-// Gross expenses on a ``pnl`` (the base is explicit -- decision 1): a fraction
-// of premium (``25% premium expenses``), a fraction of expected loss
+// Gross expenses on a ``pnl`` (the base is explicit -- decision 1): each term is
+// a fraction of premium (``25% premium expenses``), a fraction of expected loss
 // (``25% loss expenses``), or a fixed currency amount (``2000 fixed expenses``).
-// ``expense`` and ``expenses`` are both accepted; the clause is optional. The
-// expense books a gross obligation; net expense = gross - commission (appendix
-// S1). Placed after ``approx_clause`` (before the trailer) so the leading
-// ``numbers`` cannot collide with the exposure / reins heads.
-expense_clause: numbers PREMIUM EXPENSES   -> expense_premium
-              | numbers LOSS EXPENSES      -> expense_loss
-              | numbers FIXED EXPENSES     -> expense_fixed
-              |                            -> expense_none
+// ``expense`` and ``expenses`` are both accepted. Multiple terms join with
+// ``and`` (the reinsurance precedent -- ``25% premium expense and 1000 fixed
+// expense``) and sum; the whole clause is optional. The expense books a gross
+// obligation; net expense = gross - commission (appendix S1). Placed after
+// ``approx_clause`` (before the trailer), and the terms sit after all reins, so
+// the inter-term ``and`` never competes with a reinsurance cession ``and``.
+expense_clause: expense_list   -> expense_some
+              |                 -> expense_none
+
+expense_list: expense_list AND expense_term   -> expense_list_cons
+            | expense_term                     -> expense_list_one
+
+expense_term: numbers PREMIUM EXPENSES   -> expense_premium
+            | numbers LOSS EXPENSES      -> expense_loss
+            | numbers FIXED EXPENSES     -> expense_fixed
 
 // ======================================================================
 // Bivariate aggregate (copula-coupled, strictly two-axis)

@@ -26,13 +26,32 @@ def test_expense_three_explicit_forms():
 
 
 def test_expense_basis_is_stored_explicitly():
-    assert build(_BASE + ' 25% premium expenses')._expense_spec == ('premium', 0.25)
-    assert build(_BASE + ' 200 fixed expenses')._expense_spec == ('fixed', 200.0)
+    # ``expense_spec`` is a list of (basis, value) terms
+    assert build(_BASE + ' 25% premium expenses')._expense_spec == [('premium', 0.25)]
+    assert build(_BASE + ' 200 fixed expenses')._expense_spec == [('fixed', 200.0)]
 
 
 def test_expense_singular_alias():
     # ``expense`` and ``expenses`` are both accepted
-    assert build(_BASE + ' 200 fixed expense')._expense_spec == ('fixed', 200.0)
+    assert build(_BASE + ' 200 fixed expense')._expense_spec == [('fixed', 200.0)]
+
+
+def test_multiple_expense_terms_sum():
+    # ``and``-joined terms sum: 25% of 1000 premium + 1000 fixed = 1250
+    p = build(_BASE + ' 25% premium expense and 1000 fixed expense')
+    assert p._expense_spec == [('premium', 0.25), ('fixed', 1000.0)]
+    assert p._gross_expense() == pytest.approx(0.25 * 1000 + 1000.0)
+    # three terms, mixing all bases (E[loss] = 400)
+    p3 = build(_BASE + ' 10% premium expense and 5% loss expense and 50 fixed expense')
+    assert p3._gross_expense() == pytest.approx(0.10 * 1000 + 0.05 * 400 + 50.0, rel=TOL)
+
+
+def test_single_tuple_expense_spec_still_accepted_via_api():
+    # the Python API single-term tuple form normalizes correctly
+    a = build('agg R 100 claims sev lognorm 50 cv 1.5 poisson '
+              'aggregate net of 2000 xs 3000')
+    p = a.make_pnl(gross=5500, ceded=1800, expense_spec=('fixed', 300.0))
+    assert p._gross_expense() == pytest.approx(300.0)
 
 
 def test_expense_reduces_margin_and_drives_combined_ratio():

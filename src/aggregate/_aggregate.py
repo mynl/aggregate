@@ -1105,7 +1105,9 @@ class Aggregate:
         return mv
 
     def reinstatement_analysis(self, gross_premium=None, terms=None, *,
-                               percentiles=None, bs=None,
+                               percentiles=None, agg_ceded_premium=0.0,
+                               gross_expense=0.0, occ_commission=0.0,
+                               agg_commission=0.0, bs=None,
                                log2_x=None, log2_y=None):
         """Stochastic-ceded reinstatement analysis for this occurrence layer.
 
@@ -1170,10 +1172,23 @@ class Aggregate:
             raise ValueError(
                 'reinstatement_analysis needs gross_premium= (no premium clause '
                 'on the aggregate to default from).')
-        joint = self.occ_bivariate(views=('gross', 'ceded'), bs=bs,
-                                   log2_x=log2_x, log2_y=log2_y).bivariate
+        biv = self.occ_bivariate(views=('gross', 'ceded'), bs=bs,
+                                 log2_x=log2_x, log2_y=log2_y)
+        # decision 3: a subsequent aggregate cover is a deterministic pushforward
+        # of the SAME joint via the net-of-occurrence loss L - A(R). Build its
+        # ceder g (the recovery map) so the analysis can populate the agg-tier
+        # waterfall columns; R stays unlimited (the cap lives only in terms).
+        agg_recovery = None
+        if self.agg_reins is not None:
+            ceder, _netter = _reinsurance.make_ceder_netter(self.agg_reins)
+            agg_recovery = ceder
         kw = {} if percentiles is None else {'percentiles': percentiles}
-        return ReinstatementAnalysis(joint, terms, gross_premium, **kw)
+        return ReinstatementAnalysis(biv.bivariate, terms, gross_premium,
+                                     joint_aggregate=biv, agg_recovery=agg_recovery,
+                                     agg_ceded_premium=agg_ceded_premium,
+                                     gross_expense=gross_expense,
+                                     occ_commission=occ_commission,
+                                     agg_commission=agg_commission, **kw)
 
     # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------
 

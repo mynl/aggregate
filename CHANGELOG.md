@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.0.0a117
+
+Completes **Phase 2 (reinstatement premiums)** — see `1.0.0a116` for the core
+feature. This release adds the first-class display surface, the decision-3
+subsequent aggregate cover, and deterministic expense / commission flow-through.
+
+- **First-class display surface** for `ReinstatementAnalysis`: `info`,
+  `_repr_html_`, `validation_explanation`, `density_df(leg=…)` (per-leg `p`/`F`/`S`
+  frame), the reused `bs_window_df` / `bs_description` / `bs_explanation`
+  joint-grid sizing audit (delegated to the `BivariateAggregate` holder), `qd`
+  support, and a four-panel `plot()` mosaic — joint `(L, R)` log density with the
+  recovery breakpoints / cap; the `A(R)` / `h(R)` / `D+h` / `D+h−A` maps; gross
+  vs net underwriting return-period; and the cession-impact curve. A
+  reinstatement-backed `PnL`'s `plot()` delegates to this mosaic.
+- **Subsequent aggregate cover (decision 3).** A reinstated occurrence layer may
+  carry a genuine subsequent `aggregate net of …` cover. Its recovery
+  `g(L − A(R))` is a deterministic pushforward of the *same* `(L, R)` joint (via
+  the net-of-occurrence loss), so `gcn_df` extends to the five-column inuring
+  waterfall `gross | ceded occ | net occ | ceded agg | net agg` with the means
+  adding tier by tier; `summary_df` collapses to Gross / total-cession / final-net;
+  `tail_df` and the plot read the net-of-everything result. The agg ceded premium
+  is threaded from the `pnl` layer clause. `R` stays unlimited — the reinstatement
+  cap lives only in `ReinstatementTerms`.
+- **Deterministic expenses & ceding commissions** now flow through the
+  reinstatement waterfall: a reinstatement `pnl` with `… expense` / `cede` books
+  the gross expense and the per-tier commission credits in the GCN **Expense**
+  section (means add down `Premium + Loss + Expense = UW` and across the split),
+  and `summary_df` / `tail_df` / `plot` report the underwriting result net of
+  expense — exactly as a plain `pnl` does. The reinstatement premium `h(R)` is
+  non-commissionable, so the commission stays deterministic; the *stochastic*
+  commission features (`slide` / profit commission) are Phase 3. The leg
+  distributions stay pure underwriting — expense is a deterministic presentation
+  shift, mirroring `PnL._gcn_perspective_rows`.
+
 ## 1.0.0a116
 
 ### Property-cat reinstatement premiums (stochastic ceded premium)
@@ -50,11 +84,6 @@ pnl Cat
   (recovery `A(R)`, reinstatement premium `h(R)`, annual cap `(m+1)y`);
   `ReinstatementAnalysis` (eleven leg distributions, GCN/summary/validation/tail
   exhibits); the shared `gcn_assemble_column` waterfall builder.
-
-Pending follow-ups (tracked in `dev/TODO.md`): first-class trimmings
-(`plot` mosaic, `_repr_html_`, `info`, `qd`, `density_df`, `bs_*` narratives) and
-populating the `ceded_agg` / `net_agg` waterfall columns when a subsequent
-aggregate cover is present.
 
 ### Fixes
 

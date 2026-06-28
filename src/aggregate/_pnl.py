@@ -247,8 +247,19 @@ class PnL:
             return None
         if self._reins_analysis is None:
             pg = getattr(self.agg, 'reinstatement_gross_premium', None)
+            # thread the deterministic Phase-1 economics so the reinstatement
+            # waterfall carries the same agg ceded premium, gross expense and
+            # ceding commissions a plain pnl would (the reinstatement premium
+            # h(R) is non-commissionable, so these stay deterministic).
+            pc_agg = c_occ = c_agg = 0.0
+            if self._gcn_econ is not None:
+                pc_agg = float(self._gcn_econ.get('pc_agg', 0.0))
+                c_occ = float(self._gcn_econ.get('c_occ', 0.0))
+                c_agg = float(self._gcn_econ.get('c_agg', 0.0))
             self._reins_analysis = self.agg.reinstatement_analysis(
-                gross_premium=pg, terms=terms)
+                gross_premium=pg, terms=terms, agg_ceded_premium=pc_agg,
+                gross_expense=self._gross_expense(),
+                occ_commission=c_occ, agg_commission=c_agg)
         return self._reins_analysis
 
     # ------------------------------------------------------------------
@@ -825,6 +836,10 @@ class PnL:
         -------
         matplotlib.figure.Figure
         """
+        analysis = self.reinstatement_analysis
+        if analysis is not None:
+            # reinstatement-backed: the stochastic-ceded mosaic is the exhibit
+            return analysis.plot(axd=axd, **kwargs)
         from .plots import plot_pnl
         return plot_pnl(self, axd=axd, **kwargs)
 

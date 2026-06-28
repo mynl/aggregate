@@ -97,6 +97,45 @@ def test_net_loss_equals_gross_minus_recovery_in_mean():
 
 
 # ----------------------------------------------------------------------
+# subsequent aggregate cover (decision 3): deterministic pushforward of the
+# same joint via the net-of-occurrence loss L - A(R)
+# ----------------------------------------------------------------------
+def test_agg_cover_adds_tier_legs_and_identities():
+    a = build('agg Cat 4 claims sev lognorm 60 cv 2.0 '
+              'occurrence net of 100 xs 100 '
+              'poisson aggregate net of 200 xs 300')
+    terms = ReinstatementTerms(100.0, (0.0, 1.0), 10.0)
+    an = a.reinstatement_analysis(gross_premium=1000.0, terms=terms,
+                                  agg_ceded_premium=40.0)
+    assert an.agg_recovery is not None
+    # the agg-tier legs are present
+    for leg in ('ceded_agg_loss', 'net_agg_loss', 'ceded_agg_uw', 'net_agg_uw',
+                'total_ceded_loss'):
+        assert leg in an.distributions
+    s = an.stats_df
+    # the agg cover actually recovers something on the net-of-occ loss
+    assert s.loc['ceded_agg_loss', 'mean'] > 0
+    # waterfall identities (means): net_occ + ceded_agg = net_agg
+    assert s.loc['net_agg_uw', 'mean'] == pytest.approx(
+        s.loc['net_uw', 'mean'] + s.loc['ceded_agg_uw', 'mean'], rel=1e-6)
+    # twice-net loss = net-of-occ loss minus the agg recovery
+    assert s.loc['net_agg_loss', 'mean'] == pytest.approx(
+        s.loc['net_loss', 'mean'] - s.loc['ceded_agg_loss', 'mean'], rel=1e-6)
+    # the audit covers the agg-tier identities and still passes
+    assert an.validation_df['abs_err'].max() < 1e-6
+
+
+def test_no_agg_cover_keeps_three_column_waterfall():
+    a = build('agg Cat 3 claims sev lognorm 60 cv 2.5 '
+              'occurrence net of 100 xs 100 poisson')
+    an = a.reinstatement_analysis(
+        gross_premium=1000.0, terms=ReinstatementTerms(100.0, (1.0,), 10.0))
+    assert an.agg_recovery is None
+    assert list(an.gcn_df.columns) == ['gross', 'ceded', 'net', 'impact']
+    assert 'ceded_agg_loss' not in an.distributions
+
+
+# ----------------------------------------------------------------------
 # grid invariance
 # ----------------------------------------------------------------------
 def test_mean_grid_invariant_across_bs():

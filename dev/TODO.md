@@ -277,18 +277,23 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
 - [x] **P1 `[A]`** Expenses + ceded premium/commission, deterministic — the legs
   model and the GCN waterfall exhibit (`Premium − Loss − Expense = UW`). Done a114;
   `dev/done/plan-pnl-expenses-ceded-premium.md`.
-- [~] **P2 `[A]`** Reinstatement premiums + the 1-D/2-D pushforward engine (the
-  engine-prover, always 2-D). `dev/plan-reinstatements.md`. Depends on P1.
+- [x] **P2 `[A]`** Reinstatement premiums + the 1-D/2-D pushforward engine (the
+  engine-prover, always 2-D). Done a116–a117; `dev/done/plan-reinstatements.md`. Depends on P1.
   Landed a116: `[engine]` (`BivariateDistribution.pushforward` / `pushforward_1d`
   / `transformed_moments`), `[terms]` (`ReinstatementTerms`), `[analysis]`
   (`ReinstatementAnalysis` + `Aggregate.reinstatement_analysis`), `[pnl-share]`
   (shared `gcn_assemble_column`), `[decl]` (the `pnl … reinstatements …` block,
-  three validation rules, `decl_writer` round-trip, `tests/test_reinstatement_decl.py`).
-  **Remaining:** first-class trimmings (`plot` mosaic, `_repr_html_`, `info`,
-  `qd`, `density_df`, `bs_*` narratives, `tests/test_reinstatement_exhibit.py`);
-  populate the `ceded_agg` / `net_agg` waterfall columns for a subsequent
-  aggregate cover (decision 3 — builds today, columns not yet filled); FEATURES.csv
-  row + introspection cross-check; then move the plan to `dev/done/`.
+  three validation rules, `no reinstatements`, `decl_writer` round-trip,
+  `tests/test_reinstatement_decl.py`), and the first-class trimmings (`plot`
+  mosaic, `_repr_html_`, `info`, `qd`, `density_df`, reused `bs_*` audit,
+  `tests/test_reinstatement_exhibit.py`), and the subsequent-aggregate-cover
+  waterfall (decision 3 — `ceded_agg` / `net_agg` columns populate with the agg
+  recovery `g(L − A(R))`, five-column inuring `gcn_df`, tier-by-tier additivity),
+  and the deterministic expense / ceding-commission closure (the GCN Expense
+  section now populates; UW reported net of expense across gcn_df / summary /
+  tail / plot). **Complete.** Only deferred: FEATURES.csv `ReinstatementAnalysis`
+  column + introspection cross-check (author's introspection workflow). The
+  *stochastic* commission (`slide` / profit commission) is Phase 3 (P3).
 - [ ] **P3 `[A]`** Variable rating — retro, swing, slide, profit commission,
   corridor — all reusing P2's engine. `dev/plan-variable-rating.md`. Depends on P2.
 

@@ -317,6 +317,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     """
     from .distributions import Aggregate
     from .portfolio import Portfolio
+    from .reinstatement import ReinstatementAnalysis
     if ff is None:
         ff = lambda x: f'{x:.5g}'
     elif ff == 'basic':
@@ -340,6 +341,14 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             if td is not None:
                 qd(td.fillna(''), accuracy=accuracy, **kwargs)
             if x.density_df is not None and not x._validation_passes():
+                print(f'\nVALIDATION FAILS: {x.validation_explanation}')
+        elif isinstance(x, ReinstatementAnalysis):
+            # Reinstatement analysis: treaty intro, the GCN summary_df, then the
+            # return-period tail_df; validation flagged only on a genuine failure.
+            print(x._text_info_blob())
+            qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
+            qd(x.tail_df().fillna(''), accuracy=accuracy, **kwargs)
+            if not x._validation_passes():
                 print(f'\nVALIDATION FAILS: {x.validation_explanation}')
         elif isinstance(x, pd.DataFrame):
             # 100 line width matches rtd html format

@@ -410,8 +410,10 @@ class ReinstatementAnalysis:
                          ('gross (G)', 'ceded (C)')) and 'gross' not in str(names[0]):
             # not fatal -- occ_bivariate(('gross','ceded')) labels axis0 'gross'
             pass
-        self._distributions = None
-        self._stats = None
+        #: cached InsuranceView over the leg set + the (L, R) joint source. One
+        #: kernel evaluation backs distributions / stats_df / every exhibit; the
+        #: fixed gross premium rides as an exact point mass (kept off the source).
+        self._view = None
 
     # ------------------------------------------------------------------
     # the named legs (deterministic pushforwards of the joint)
@@ -473,26 +475,38 @@ class ReinstatementAnalysis:
             })
         return legs
 
+    # ------------------------------------------------------------------
+    # the kernel evaluation: one InsuranceView over the leg set + (L, R) joint
+    # ------------------------------------------------------------------
+    @property
+    def view(self):
+        """The backing :class:`~aggregate._insurance_view.InsuranceView` (lazy).
+
+        Wraps the leg set and the full ``(L, R)``
+        :class:`~aggregate.bivariate.BivariateDistribution` source (the genuine
+        2-D occurrence path); the fixed ``gross_premium`` rides as an exact
+        one-point distribution. Every exhibit reads its cached
+        :attr:`distributions` / :attr:`stats_df`.
+        """
+        if self._view is None:
+            from .legs import Leg, LegSet
+            from ._insurance_view import InsuranceView
+            legs = LegSet(Leg(name, fn, is_loss)
+                          for name, (fn, is_loss) in self._leg_functions().items())
+            self._view = InsuranceView(
+                legs, self.source,
+                point_masses={'gross_premium': self.gross_premium})
+        return self._view
+
     @property
     def distributions(self):
-        """Dict of the eleven named 1-D leg :class:`GridDistribution` objects.
+        """Dict of the named leg :class:`GridDistribution` objects (via the kernel).
 
-        Built lazily by pushing each accounting leg forward over the joint; the
-        fixed ``gross_premium`` is a degenerate one-point distribution so the
-        reporting API stays uniform (pre-plan section 11.3).
+        Each accounting leg pushed forward over the joint; the fixed
+        ``gross_premium`` is a degenerate one-point distribution so the reporting
+        API stays uniform (pre-plan section 11.3).
         """
-        if self._distributions is None:
-            from ._grid_distribution import GridDistribution
-            d = {}
-            for name, (fn, is_loss) in self._leg_functions().items():
-                d[name] = self.source.pushforward(fn, name=name,
-                                                  is_loss_value=is_loss)
-            # fixed gross premium: degenerate point mass
-            d['gross_premium'] = GridDistribution(
-                np.array([self.gross_premium]), np.array([1.0]),
-                name='gross_premium', is_loss_value=True)
-            self._distributions = d
-        return self._distributions
+        return self.view.distributions
 
     # ------------------------------------------------------------------
     # exact moment store (the EX column; single source of truth)
@@ -506,23 +520,11 @@ class ReinstatementAnalysis:
         not the rebucketed pushforward. Means here are the ground truth the GCN
         Mean rows add to.
         """
-        if self._stats is None:
-            rows = {}
-            for name, (fn, _) in self._leg_functions().items():
-                rows[name] = self.source.transformed_moments(fn, max_order=3)
-            df = pd.DataFrame(rows).T
-            df.loc['gross_premium'] = {'mass': 1.0, 'mean': self.gross_premium,
-                                       'var': 0.0, 'sd': 0.0, 'cv': 0.0,
-                                       'skew': np.nan}
-            self._stats = df
-        return self._stats
+        return self.view.stats_df
 
     def _exact(self, name):
         """``(mean, sd, skew)`` of a leg from the exact :attr:`stats_df`."""
-        row = self.stats_df.loc[name]
-        sk = row.get('skew', np.nan)
-        return (float(row['mean']), float(row['sd']),
-                float(sk) if pd.notna(sk) else 0.0)
+        return self.view.exact(name)
 
     @property
     def _final_net_uw(self):

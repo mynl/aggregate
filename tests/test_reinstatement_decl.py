@@ -205,11 +205,14 @@ def test_ceded_premium_is_stochastic_in_exhibit():
     assert g.loc[('Volatility', 'CV Premium'), 'ceded'] > 0.0
 
 
-def test_summary_df_routes_through_gcn():
+def test_summary_df_is_fixed_table():
     p = build(_HUMAN)
-    # a GCN PnL's summary_df is the waterfall (consistent with the deterministic
-    # ceded-premium path); the richer headline table lives on the analysis.
-    assert list(p.summary_df.columns) == ['gross', 'ceded', 'net', 'impact']
+    # a PnL's summary_df is always the fixed small table (never morphs to the
+    # GCN waterfall); the GCN exhibit and the richer headline table are separate.
+    assert list(p.summary_df.index)[:4] == ['Consideration', 'Obligation',
+                                            'Expense', 'Margin']
+    assert list(p.summary_df.columns) == ['EX', 'SD', 'Sk']
+    assert list(p.gcn_df.columns) == ['gross', 'ceded', 'net', 'impact']
     assert list(p.reinstatement_analysis.summary_df.columns) == [
         'Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
 

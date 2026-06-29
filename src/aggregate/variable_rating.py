@@ -142,8 +142,10 @@ class VariableRatingAnalysis:
             self.ceder = lambda l: np.zeros_like(np.asarray(l, dtype=float))
         self.layer = layer
         self._validate_feature()
-        self._distributions = None
-        self._stats = None
+        #: cached InsuranceView over the leg set + degenerate GraphSource (the
+        #: aggregate-basis source: all mass on the curve a = ceder(l)). One
+        #: kernel evaluation backs distributions / stats_df / gcn_df.
+        self._view = None
 
     def _validate_feature(self):
         """Check the single feature has the economics its leg needs."""
@@ -159,89 +161,88 @@ class VariableRatingAnalysis:
                 f'ceded_premium={self.ceded_premium}.')
 
     # ------------------------------------------------------------------
-    # the named legs (deterministic 1-D pushforwards of the gross density)
+    # the named legs (maps f(l, a) over the degenerate (l, a=ceder(l)) source)
     # ------------------------------------------------------------------
     def _leg_functions(self):
-        """Return ``{name: (function, is_loss_value)}`` for every accounting leg.
+        """Return ``{name: (map, is_loss_value)}`` for every accounting leg.
 
-        Each ``function(l)`` is vectorized on the gross-loss grid. The single
-        feature makes exactly one leg loss-sensitive; the rest are deterministic
-        (scalar premiums / expense, the base layer ceder).
+        Each ``map(l, a)`` is vectorized on the gross-loss grid ``l`` and the
+        **base ceded loss** ``a = ceder(l)`` -- the second coordinate of the
+        degenerate :class:`~aggregate.legs.GraphSource` (the aggregate basis puts
+        all mass on the curve ``a = kappa(l)``). The single feature makes exactly
+        one leg loss-sensitive; the rest read scalars or the base cession ``a``.
+        Legs carry the **universal** ``f(X, Y)`` signature of the kernel, so the
+        occurrence (2-D) path is the same maps over a full joint.
         """
         terms = self.terms
         tl = terms.target_leg
         P_G = self.gross_premium
         P_C = self.ceded_premium
         E_G = self.gross_expense
-        ceder = self.ceder
+        C = self.commission
 
-        # --- ceded loss A(l): the base ceder, corridor-modified if applicable ---
+        # --- ceded loss A(l, a): the base cession a, corridor-modified if so ---
         if tl == 'ceded_loss':                              # corridor
-            def ceded_loss(l):
-                a0 = ceder(l)
-                return terms.phi(a0 / P_C) * P_C            # phi reads ceded LR
+            def ceded_loss(l, a):
+                return terms.phi(a / P_C) * P_C             # phi reads ceded LR
         else:
-            def ceded_loss(l):
-                return ceder(l)
+            def ceded_loss(l, a):
+                return a
 
-        # --- gross premium: retro varies it on net account loss l - A0(l) -------
+        # --- gross premium: retro varies it on net account loss l - a -----------
         if tl == 'gross_premium':                           # retro
-            def gross_premium(l):
-                net_account = np.asarray(l, dtype=float) - ceder(l)
-                return terms.phi(net_account)
+            def gross_premium(l, a):
+                return terms.phi(np.asarray(l, dtype=float) - a)
         else:
-            def gross_premium(l):
+            def gross_premium(l, a):
                 return np.full_like(np.asarray(l, dtype=float), P_G)
 
-        # --- ceded premium: swing varies it on ceded loss -----------------------
+        # --- ceded premium: swing varies it on ceded loss a ---------------------
         if tl == 'ceded_premium':                           # swing
-            def ceded_premium(l):
-                return terms.phi(ceder(l))
+            def ceded_premium(l, a):
+                return terms.phi(a)
         else:
-            def ceded_premium(l):
+            def ceded_premium(l, a):
                 return np.full_like(np.asarray(l, dtype=float), P_C)
 
         # --- ceding commission (expense credit): slide / pc vary it on ceded LR -
         if tl == 'expense':                                 # slide, profit comm.
-            def commission(l):
-                a0 = ceder(l)
-                return terms.phi(a0 / P_C) * P_C
+            def commission(l, a):
+                return terms.phi(a / P_C) * P_C
         else:
-            C = self.commission
-
-            def commission(l):
+            def commission(l, a):
                 return np.full_like(np.asarray(l, dtype=float), C)
 
-        def net_premium(l):
-            return gross_premium(l) - ceded_premium(l)
+        def net_premium(l, a):
+            return gross_premium(l, a) - ceded_premium(l, a)
 
-        def net_loss(l):
-            return np.asarray(l, dtype=float) - ceded_loss(l)
+        def net_loss(l, a):
+            return np.asarray(l, dtype=float) - ceded_loss(l, a)
 
-        def net_expense(l):                               # gross expense net of commission
-            return E_G - commission(l)
+        def net_expense(l, a):                            # gross expense net of commission
+            return E_G - commission(l, a)
 
         # underwriting legs INCLUDE the (possibly stochastic) expense / commission
         # so the percentile rows are correct; signs per the docstring table. The
         # ceded leg already carries cedant-perspective signs (recovery +, ceded
         # premium -), so net underwriting is gross_uw + ceded_uw (means add).
-        def gross_uw(l):
-            return gross_premium(l) - np.asarray(l, dtype=float) - E_G
+        def gross_uw(l, a):
+            return gross_premium(l, a) - np.asarray(l, dtype=float) - E_G
 
-        def ceded_uw(l):
-            return ceded_loss(l) - ceded_premium(l) + commission(l)
+        def ceded_uw(l, a):
+            return ceded_loss(l, a) - ceded_premium(l, a) + commission(l, a)
 
-        def net_uw(l):
-            return gross_uw(l) + ceded_uw(l)
+        def net_uw(l, a):
+            return gross_uw(l, a) + ceded_uw(l, a)
 
         return {
-            'gross_loss':     (lambda l: np.asarray(l, dtype=float), True),
+            'gross_loss':     (lambda l, a: np.asarray(l, dtype=float), True),
             'ceded_loss':     (ceded_loss, True),
             'net_loss':       (net_loss, True),
             'gross_premium':  (gross_premium, True),
             'ceded_premium':  (ceded_premium, True),
             'net_premium':    (net_premium, True),
-            'gross_expense':  (lambda l: np.full_like(np.asarray(l, float), E_G), True),
+            'gross_expense':  (lambda l, a: np.full_like(np.asarray(l, float), E_G), True),
             'commission':     (commission, True),
             'net_expense':    (net_expense, True),
             'gross_uw':       (gross_uw, False),
@@ -249,56 +250,45 @@ class VariableRatingAnalysis:
             'net_uw':         (net_uw, False),
         }
 
+    # ------------------------------------------------------------------
+    # the kernel evaluation: one InsuranceView over the leg set + source
+    # ------------------------------------------------------------------
+    @property
+    def view(self):
+        """The backing :class:`~aggregate._insurance_view.InsuranceView` (lazy).
+
+        Wraps the leg set and the degenerate
+        :class:`~aggregate.legs.GraphSource` (``kappa = ceder``); every exhibit
+        reads its cached :attr:`distributions` / :attr:`stats_df`.
+        """
+        if self._view is None:
+            from .legs import Leg, LegSet, GraphSource
+            from ._insurance_view import InsuranceView
+            legs = LegSet(Leg(name, fn, is_value)
+                          for name, (fn, is_value) in self._leg_functions().items())
+            source = GraphSource(self.grid, self.density, kappa=self.ceder)
+            self._view = InsuranceView(legs, source)
+        return self._view
+
     @property
     def distributions(self):
-        """Dict of the named leg :class:`GridDistribution` objects (lazy)."""
-        if self._distributions is None:
-            from .bivariate import pushforward_1d
-            d = {}
-            for name, (fn, is_loss) in self._leg_functions().items():
-                d[name] = pushforward_1d(self.grid, self.density, fn,
-                                         name=name, is_loss_value=is_loss)
-            self._distributions = d
-        return self._distributions
+        """Dict of the named leg :class:`GridDistribution` objects (via the kernel)."""
+        return self.view.distributions
 
-    # ------------------------------------------------------------------
-    # exact moment store (the EX column; single source of truth)
-    # ------------------------------------------------------------------
     @property
     def stats_df(self):
         """Exact per-leg moments on the gross grid (mean / sd / cv / skew).
 
-        The canonical moment store: each leg's exact ``sum p_i f(l_i)^k`` straight
-        off the gross density, not the rebucketed pushforward. Means here are the
-        ground truth the GCN Mean rows add to.
+        The canonical moment store: each leg's exact ``sum p_i f(l_i, a_i)^k``
+        straight off the gross density (the degenerate source's
+        ``transformed_moments``), not the rebucketed pushforward. Means here are
+        the ground truth the GCN Mean rows add to.
         """
-        if self._stats is None:
-            p = self.density
-            rows = {}
-            for name, (fn, _) in self._leg_functions().items():
-                v = np.broadcast_to(np.asarray(fn(self.grid), dtype=float),
-                                    self.grid.shape)
-                m1 = float(np.sum(p * v))
-                m2 = float(np.sum(p * v * v))
-                var = max(m2 - m1 * m1, 0.0)
-                sd = np.sqrt(var)
-                cv = sd / m1 if m1 else 0.0
-                if sd > 0:
-                    m3 = float(np.sum(p * (v - m1) ** 3))
-                    skew = m3 / sd ** 3
-                else:
-                    skew = np.nan
-                rows[name] = {'mass': float(np.sum(p)), 'mean': m1, 'var': var,
-                              'sd': sd, 'cv': cv, 'skew': skew}
-            self._stats = pd.DataFrame(rows).T
-        return self._stats
+        return self.view.stats_df
 
     def _exact(self, name):
         """``(mean, sd, skew)`` of a leg from the exact :attr:`stats_df`."""
-        row = self.stats_df.loc[name]
-        sk = row.get('skew', np.nan)
-        return (float(row['mean']), float(row['sd']),
-                float(sk) if pd.notna(sk) else 0.0)
+        return self.view.exact(name)
 
     # ------------------------------------------------------------------
     # the reused GCN waterfall (via the shared assembler)

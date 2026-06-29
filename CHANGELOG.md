@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.0.0a121
+
+P4 — the **bivariate leg kernel**: a domain-free engine for the P&L leg model,
+with insurance as a View on top. Collapses the ad-hoc leg machinery that
+`VariableRatingAnalysis` and `ReinstatementAnalysis` each carried onto one
+shared core, so "1-D vs 2-D" is now just a source swap and a feature only fills
+a leg. Executes `dev/plan-bivariate-legs.md` (moved to `dev/done/`); behavior is
+preserved except the intended `summary_df` no-morph change.
+
+- **`aggregate.legs` (new, domain-free kernel).** A `Leg` is one cash-flow
+  stream — a vectorized signed map `f(X, Y)` of the two coordinates of a
+  bivariate law, pushed forward onto its own `GridDistribution`. No insurance
+  vocabulary; signs live in the maps, so cash-flow algebra (`net = X − Y`, a
+  margin) is plain summation (`Leg.__add__` / `__sub__` / `__neg__` /
+  `Leg.combine`). `LegSet` evaluates an ordered, named set over a **source**:
+  `distributions(source)` (per-leg pushforwards) and `stats_df(source)` (exact
+  per-leg moments — the "EX" column, means add with no rebucketing).
+- **Source protocol + `GraphSource`.** A source is anything exposing
+  `pushforward(fn, …)` + `transformed_moments(fn, …)`; `BivariateDistribution`
+  already satisfies it (the full 2-D path). The new `GraphSource` is the
+  *degenerate* case — all mass on the curve `Y = κ(X)` over a 1-D grid — taking
+  the cheap `pushforward_1d` fast path. Dimensionality lives in the source, not
+  the leg; every leg keeps the universal `f(X, Y)` signature.
+- **`aggregate._insurance_view` (new).** The insurance vocabulary, as a
+  composition over a `LegSet` (never a mixin on `Leg`): the
+  `name → (perspective, category)` label map and the `category → kind` rollup
+  (`premium → consideration`; `loss`/`expense → obligation`;
+  `underwriting → margin`), plus an `InsuranceView` that owns the one cached
+  kernel evaluation (with fixed legs kept as exact point masses).
+- **`VariableRatingAnalysis` and `ReinstatementAnalysis` rebuilt on the kernel.**
+  Both now assemble a `LegSet` and read `distributions` / `stats_df` from an
+  `InsuranceView` (VR over a `GraphSource` with `κ =` the base ceder; the
+  reinstatement analysis over the `(L, R)` joint with `gross_premium` as a point
+  mass). The GCN / summary / tail / validation exhibits and all bespoke extras
+  are unchanged; the full variable-rating and reinstatement suites stay green.
+- **`PnL.summary_df` no longer morphs into the GCN waterfall.** It is *always*
+  the fixed small `Consideration / Obligation / Expense / Margin` table, even for
+  a Gross/Ceded/Net position (`dev/reporting-guidelines.md` guideline 1). The GCN
+  waterfall remains the separate `PnL.gcn_df` exhibit (and
+  `pnl.reinstatement_analysis.summary_df` for the richer headline). **Breaking
+  for callers that read `gcn`-shaped columns off `summary_df`** — read `gcn_df`.
+- **Tests.** New `tests/test_legs.py` (synthetic-source kernel: degenerate-vs-full
+  agreement, many-to-one binning, leg algebra, net as a fresh pushforward) and
+  `tests/test_insurance_view.py` (label vocabulary + the cached composition).
+- **Docs pending a rebuild:** the §3 "how a leg is computed" material graduates
+  to a bivariate-leg-model docs page (generic `X` / `Y` / `κ` notation); not
+  built in the iteration loop.
+
 ## 1.0.0a120
 
 Phase 3 variable rating — **retro** (the fifth feature) gets its DecL surface, so

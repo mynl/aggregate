@@ -385,11 +385,20 @@ def test_gcn_doubly_additive():
         m.loc['UW', 'net'] / m.loc['UW', 'gross'] - 1.0)
 
 
-def test_gcn_summary_df_is_gcn():
-    """summary_df routes to the GCN exhibit for a Gross/Ceded/Net position."""
+def test_gcn_summary_df_is_fixed_table():
+    """summary_df is always the fixed small table -- never morphs to the GCN.
+
+    Even for a Gross/Ceded/Net position the headline ``summary_df`` is the fixed
+    Consideration / Obligation / Expense / Margin layout; the additive GCN
+    waterfall is the separate :meth:`PnL.gcn_df` exhibit.
+    """
     p = build(_REINS).make_pnl(gross=5500, ceded=1800)
-    assert p.summary_df.index.names == ['section', 'item']
-    assert list(p.summary_df.columns) == ['gross', 'ceded', 'net', 'impact']
+    assert list(p.summary_df.index)[:4] == ['Consideration', 'Obligation',
+                                            'Expense', 'Margin']
+    assert list(p.summary_df.columns) == ['EX', 'SD', 'Sk']
+    # the GCN exhibit is still reachable on its own
+    assert p.gcn_df.index.names == ['section', 'item']
+    assert list(p.gcn_df.columns) == ['gross', 'ceded', 'net', 'impact']
     # net consideration defaults to gross - ceded
     assert p.consideration == pytest.approx(3700.0)
 

@@ -319,15 +319,22 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     keyword-first collar matching swing; trailing `premium` keeps `premium less`.
     Requires no inuring reinsurance (1-D case); retro+reins is a follow-up.
     Tests in `test_variable_rating_decl.py`; `VR.Retro` in `decl-testers.agg`.
-- [ ] **P4 `[A]` PnL legs unification** — collapse `ReinstatementAnalysis` +
-  `VariableRatingAnalysis` onto one `legs → cashflows → reporting` core so a feature
-  only fills a leg; fixes the `summary_df`→`gcn_df` morph; makes 1-D vs 2-D a source
-  swap. `dev/plan-bivariate-legs.md` (generic bivariate kernel; insurance as a View).
-  Supersedes the P3 `[analysis]`/`[exhibit]`
-  workstreams. **Pended within it** (perfect exhibits, addressed holistically per
+- [x] **P4 `[A]` PnL legs unification** — **DONE (1.0.0a121)**,
+  `dev/done/plan-bivariate-legs.md`. The domain-free bivariate **leg kernel**
+  (`aggregate.legs`: `Leg` / `LegSet` / `GraphSource` + the
+  `pushforward` / `transformed_moments` source protocol) with the insurance
+  vocabulary as a View (`aggregate._insurance_view`: the
+  `name → (perspective, category) → kind` label map + the cached `InsuranceView`
+  composition over a `LegSet`). `ReinstatementAnalysis` + `VariableRatingAnalysis`
+  rebuilt on the kernel (VR over a `GraphSource`, `κ =` base ceder; reinstatement
+  over the `(L, R)` joint, `gross_premium` a point mass) — behavior-frozen, both
+  suites green. The `summary_df`→`gcn_df` morph is removed (`summary_df` is always
+  the fixed small table). New `tests/test_legs.py` + `tests/test_insurance_view.py`.
+  **Pended within it** (perfect exhibits, addressed holistically per
   `dev/reporting-guidelines.md`): `validation_df` (= old summary), `reins_*` flavors,
   column-unit purity / presentation, `tail_df`/`plot`/`_repr_html_` unification,
-  occurrence-basis variable-rating *surface*, retro + reinsurance, `FEATURES.csv` rows.
+  occurrence-basis variable-rating *surface*, retro + reinsurance, `FEATURES.csv` rows,
+  and the full class collapse into one `ContractAnalysis`.
 - [ ] **Future (low priority):** reinstatement terms depending on event date
   (pro-rata as to time) — from `dev/done/pre-plan-reinstatements.md`.
 

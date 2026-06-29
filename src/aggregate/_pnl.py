@@ -458,16 +458,20 @@ class PnL:
         payoff). Freq / Sev / Agg detail lives on ``pnl.agg.summary_df`` (the
         honest obligation table) -- not here. See dev/plan-pnl.md S3.1.
 
+        This table is **always** the fixed small Consideration / Obligation /
+        Expense / Margin layout -- it never morphs into the GCN waterfall, even
+        for a Gross/Ceded/Net position. The richer additive GCN exhibit is a
+        separate object, :meth:`gcn_df` (and, for a stochastic-ceded position,
+        ``pnl.reinstatement_analysis.summary_df`` /
+        ``pnl.variable_rating_analysis``).
+
         Returns
         -------
         pandas.DataFrame
-            Rows ``Consideration`` / ``Obligation`` / ``Margin``; columns
-            ``EX`` / ``SD`` / ``Sk``. For a Gross/Ceded/Net position
-            (``make_pnl(gross=, ceded=)``) this is instead the additive GCN
-            exhibit -- see :meth:`gcn_df`.
+            Rows ``Consideration`` / ``Obligation`` / ``Expense`` / ``Margin``
+            (plus a ``Combined ratio`` line for a loss leg with positive
+            premium); columns ``EX`` / ``SD`` / ``Sk``.
         """
-        if self._gcn is not None:
-            return self.gcn_df
         x, p = self._xp()
         # consideration leg (constant -> certain, SD 0; callable -> f(X))
         if callable(self.consideration):

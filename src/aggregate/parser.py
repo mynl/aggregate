@@ -871,11 +871,33 @@ class UnderwritingTransformer(Transformer):
         prem = [t[1] for t in triples]
         cede = [t[2] for t in triples]
         reinst = [t[3] for t in triples]
+        variable = [t[4] for t in triples]
         out = {f"{which}_reins": layers, f"{which}_kind": kind}
         if any(p is not None for p in prem):
             out[f"{which}_reins_premium"] = prem
         if any(x is not None for x in cede):
             out[f"{which}_reins_cede"] = cede
+        # variable rating (Phase 3): one of swing / slide / pc / corridor on one
+        # aggregate layer (decision 0: at most one feature per program, no
+        # stacking; occurrence-basis variable rating is a follow-up). Emit the
+        # locked per-feature spec key ``<which>_reins_<feature>`` and record the
+        # decorated layer index so the underwriter resolves its economics.
+        present = [(i, v) for i, v in enumerate(variable) if v is not None]
+        if present:
+            if which != "agg":
+                raise ValueError(
+                    "DecL: variable-rating features (swing / slide / pc / "
+                    "corridor) are supported on aggregate reinsurance only in "
+                    "this release; occurrence-basis variable rating is a "
+                    "follow-up. (Reinstatements remain the occurrence "
+                    "stochastic-ceded feature.)")
+            if len(present) > 1:
+                raise ValueError(
+                    f"DecL: at most one variable-rating feature per program "
+                    f"(decision 0: no stacking); found {len(present)}.")
+            idx, (feat, params) = present[0]
+            out[f"{which}_reins_{feat}"] = params
+            out[f"{which}_reins_{feat}_layer"] = idx
         n_reinst = sum(1 for r in reinst if r is not None)
         if n_reinst:
             if which != "occ":
@@ -986,12 +1008,13 @@ class UnderwritingTransformer(Transformer):
         return [c[0]]
 
     def reins_list_tower(self, c):
-        # A tower has no per-layer premium / cede / reinstatements: wrap each
-        # layer as a ``(layer, premium, cede, reinst)`` so reins_list elements
-        # are uniform.
+        # A tower has no per-layer premium / cede / reinstatements / variable
+        # feature: wrap each layer as a ``(layer, premium, cede, reinst,
+        # variable)`` so reins_list elements are uniform.
         tower = c[0]
         limit, attach = tower[0], tower[1]
-        return [((1.0, l, a), None, None, None) for l, a in zip(limit, attach)]
+        return [((1.0, l, a), None, None, None, None)
+                for l, a in zip(limit, attach)]
 
     def reins_clause_xs(self, c):
         limit, _xs, attach = c
@@ -1033,16 +1056,18 @@ class UnderwritingTransformer(Transformer):
 
     # ----- ceded-premium / commission decorators (decision 3) -------
     def reins_clause(self, c):
-        """Combine a loss layer with its optional premium / cede / reinstatements.
+        """Combine a loss layer with its optional premium / cede / reinstatements
+        / variable-rating feature.
 
-        Returns ``(layer, premium, cede, reinst)`` where ``layer`` is the
+        Returns ``(layer, premium, cede, reinst, variable)`` where ``layer`` is the
         ``(share, limit, attach)`` tuple consumed by the reinsurance engine,
         ``premium`` is ``(basis, value)`` (basis in ``deposit`` / ``rol`` /
         ``rate``) or ``None``, ``cede`` is the commission fraction or ``None``,
-        and ``reinst`` is the tuple of reinstatement price multipliers or
-        ``None``. ``reins_list`` splits these into parallel spec keys.
+        ``reinst`` is the tuple of reinstatement price multipliers or ``None``,
+        and ``variable`` is ``(feature, params)`` for one of swing / slide / pc /
+        corridor or ``None``. ``reins_list`` splits these into parallel spec keys.
         """
-        layer, premium, cede, reinst = c
+        layer, premium, cede, reinst, variable = c
         if cede is not None and premium is None:
             raise ValueError(
                 "DecL: 'cede' (ceding commission) needs a ceded-premium clause "
@@ -1057,7 +1082,30 @@ class UnderwritingTransformer(Transformer):
                 "(deposit / rol / rate) on the same layer; the base rate on "
                 "line r = base_premium / limit would otherwise be undefined "
                 "([reins-premium]).")
-        return (layer, premium, cede, reinst)
+        if variable is not None:
+            feat = variable[0]
+            if reinst is not None:
+                raise ValueError(
+                    f"DecL: '{feat}' cannot combine with 'reinstatements' "
+                    "(decision 0: one variable-rating feature per program).")
+            if feat == 'swing':
+                if premium is not None:
+                    raise ValueError(
+                        "DecL: 'swing' supplies the ceded premium and replaces "
+                        "the deposit / rol / rate clause; give one or the other.")
+            else:
+                # slide / pc / corridor read the ceded loss ratio, so they need a
+                # fixed ceded-premium denominator.
+                if premium is None:
+                    raise ValueError(
+                        f"DecL: '{feat}' reads the ceded loss ratio and needs a "
+                        "ceded-premium clause (deposit / rol / rate) for the "
+                        "denominator.")
+                if feat == 'slide' and cede is not None:
+                    raise ValueError(
+                        "DecL: 'slide' replaces the fixed 'cede' commission; give "
+                        "one or the other.")
+        return (layer, premium, cede, reinst, variable)
 
     def reins_premium_deposit(self, c):
         return ('deposit', float(c[1]))
@@ -1076,6 +1124,61 @@ class UnderwritingTransformer(Transformer):
 
     def reins_cede_none(self, c):
         return None
+
+    # ----- variable-rating feature decorator (Phase 3) --------------
+    # One of swing / slide / pc / corridor optionally decorates a layer; each
+    # returns ``(feature, params)`` carried on the spec key
+    # ``<which>_reins_<feature>`` and consumed by the underwriter to build the
+    # matching ContractTerms. See dev/plan-variable-rating.md.
+    def reins_var_none(self, c):
+        return None
+
+    def reins_var_swing(self, c):
+        _kw, collar = c
+        return ('swing', collar)
+
+    def reins_var_slide(self, c):
+        _kw, anchors = c
+        return ('slide', {'anchors': tuple(anchors)})
+
+    def reins_var_pc(self, c):
+        _kw, share, _after, allowance = c
+        return ('pc', {'share': float(share), 'allowance': float(allowance)})
+
+    def reins_var_corridor(self, c):
+        _kw, share, _po, width, _xs, attach = c
+        return ('corridor', {'share': float(share), 'width': float(width),
+                             'attachment': float(attach)})
+
+    def collar(self, c):
+        """``basic <b> lcm <m> [min <lo>] [max <hi>]`` -> the collar dict."""
+        _basic, basic, _lcm, lcm, minimum, maximum = c
+        return {'basic': float(basic), 'lcm': float(lcm),
+                'minimum': minimum, 'maximum': maximum}
+
+    def collar_min_some(self, c):
+        return float(c[1])
+
+    def collar_min_none(self, c):
+        return None
+
+    def collar_max_some(self, c):
+        return float(c[1])
+
+    def collar_max_none(self, c):
+        return None
+
+    def slide_anchor(self, c):
+        comm, _at, lr = c
+        return (float(comm), float(lr))
+
+    def slide_anchors_one(self, c):
+        return [c[0]]
+
+    def slide_anchors_cons(self, c):
+        lst, _and, anchor = c
+        lst.append(anchor)
+        return lst
 
     # ----- reinstatement schedule decorator (property-cat) ----------
     # Both surface forms (explicit ``[alpha ...]`` list and the ``<count> free /

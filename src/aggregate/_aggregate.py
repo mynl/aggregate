@@ -1104,6 +1104,44 @@ class Aggregate:
         mv.update()
         return mv
 
+    def variable_rating_analysis(self, *, percentiles=None):
+        """Variable-rating analysis for this account's single feature.
+
+        Pairs the stored :class:`~aggregate.contract_terms.ContractTerms`
+        (a ``swing`` / ``slide`` / ``pc`` / ``corridor`` DecL feature, attached by
+        the underwriter) with this aggregate's **gross** loss density and returns a
+        :class:`~aggregate.variable_rating.VariableRatingAnalysis` (the leg
+        distributions and the Gross / Ceded / Net exhibit). The aggregate is built
+        gross of the decorated layer; the analysis applies the layer ceder, so the
+        feature's one stochastic leg is a 1-D pushforward of the gross density
+        (decision 0, aggregate basis).
+
+        Parameters
+        ----------
+        percentiles : tuple of float, optional
+            Adverse-tail levels for the summary; default the analysis default.
+
+        Returns
+        -------
+        VariableRatingAnalysis
+        """
+        from .variable_rating import VariableRatingAnalysis
+        terms = getattr(self, 'variable_terms', None)
+        if terms is None:
+            raise ValueError(
+                f"{self.name}: no variable-rating feature attached (set by a DecL "
+                "swing / slide / pc / corridor clause).")
+        grid = self.density_df.index.to_numpy()
+        density = self.density_df['p'].to_numpy()
+        kw = {} if percentiles is None else {'percentiles': percentiles}
+        return VariableRatingAnalysis(
+            grid, density, terms,
+            gross_premium=getattr(self, 'variable_gross_premium'),
+            ceded_premium=getattr(self, 'variable_ceded_premium', 0.0),
+            layer=getattr(self, 'variable_layer', None),
+            gross_expense=getattr(self, 'variable_gross_expense', 0.0),
+            commission=getattr(self, 'variable_commission', 0.0), **kw)
+
     def reinstatement_analysis(self, gross_premium=None, terms=None, *,
                                percentiles=None, agg_ceded_premium=0.0,
                                gross_expense=0.0, occ_commission=0.0,

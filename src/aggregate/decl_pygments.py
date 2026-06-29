@@ -137,7 +137,12 @@ class AggLexer(RegexLexer):
                     'expense', 'expenses', 'cede', 'deposit', 'rol', 'less',
                     'port', 'rate', 'net', 'sev', 'agg', 'xps', 'wts',
                     'inf', 'and', 'exp', 'at', 'cv', 'lr', 'xs',
-                    'of', 'to', 'po', 'so', 'zm', 'zt', ),
+                    'of', 'to', 'po', 'so', 'zm', 'zt',
+                    # reinstatements (Phase 2)
+                    'reinstatements', 'reinstatement', 'free', 'no',
+                    # variable rating (Phase 3)
+                    'swing', 'slide', 'retro', 'corridor', 'basic', 'lcm',
+                    'min', 'max', 'pc', 'after', ),
                 suffix=r'\b'
             ), Keyword),
         ],

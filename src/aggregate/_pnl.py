@@ -157,6 +157,9 @@ class PnL:
         #: cached backing ReinstatementAnalysis (built lazily on first exhibit
         #: access when the aggregate carries DecL reinstatement terms).
         self._reins_analysis = None
+        #: cached backing VariableRatingAnalysis (built lazily when the aggregate
+        #: carries a DecL swing / slide / pc / corridor feature).
+        self._var_analysis = None
         #: gross-expense spec: a list of ``(basis, value)`` terms (basis in
         #: ``{'premium', 'loss', 'fixed'}``) that sum (decision 1); a bare
         #: ``(basis, value)`` tuple is also accepted; ``None`` => no expense.
@@ -261,6 +264,23 @@ class PnL:
                 gross_expense=self._gross_expense(),
                 occ_commission=c_occ, agg_commission=c_agg)
         return self._reins_analysis
+
+    @property
+    def variable_rating_analysis(self):
+        """The backing :class:`VariableRatingAnalysis`, or ``None``.
+
+        Present when the underlying aggregate carries a DecL variable-rating
+        feature (``self.agg.variable_terms``, set by a ``swing`` / ``slide`` /
+        ``pc`` / ``corridor`` clause); built on first access and cached.
+        :attr:`gcn_df` delegates to it so the one stochastic leg (premium /
+        expense / ceded loss) is reflected. Returns ``None`` for an ordinary P&L.
+        See ``dev/plan-variable-rating.md`` decision 0.
+        """
+        if getattr(self.agg, 'variable_terms', None) is None:
+            return None
+        if self._var_analysis is None:
+            self._var_analysis = self.agg.variable_rating_analysis()
+        return self._var_analysis
 
     # ------------------------------------------------------------------
     # The net distribution (derived, cached)
@@ -640,6 +660,9 @@ class PnL:
         analysis = self.reinstatement_analysis
         if analysis is not None:
             return analysis.gcn_df
+        var = self.variable_rating_analysis
+        if var is not None:
+            return var.gcn_df
         agg = self.agg
         if agg.reins_density_df is None:
             raise ValueError(

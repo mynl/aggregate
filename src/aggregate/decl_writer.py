@@ -388,7 +388,42 @@ def _render_layers(spec: dict) -> str:
 # Reinsurance
 # ======================================================================
 
-def _render_reins_clause(clause, premium=None, cede=None, reinst=None) -> str:
+def _render_variable_feature(spec: dict, list_key: str, layer_idx: int) -> str:
+    """Render the variable-rating decorator on layer ``layer_idx``, or ``''``.
+
+    Mirrors the four Phase-3 spec keys ``<list_key>_swing`` / ``_slide`` / ``_pc``
+    / ``_corridor`` (each a params dict, with a parallel ``..._layer`` index) back
+    to their DecL surface so a variable-rating program round-trips. ``min`` / ``max``
+    on a swing collar render only when present (``None`` = omitted), preserving the
+    parsed spec exactly.
+    """
+    for feat in ('swing', 'slide', 'pc', 'corridor'):
+        params = spec.get(f'{list_key}_{feat}')
+        if params is None or spec.get(f'{list_key}_{feat}_layer') != layer_idx:
+            continue
+        if feat == 'swing':
+            s = (f"swing basic {_fmt_num(params['basic'])} "
+                 f"lcm {_fmt_num(params['lcm'])}")
+            if params.get('minimum') is not None:
+                s += f" min {_fmt_num(params['minimum'])}"
+            if params.get('maximum') is not None:
+                s += f" max {_fmt_num(params['maximum'])}"
+            return s
+        if feat == 'slide':
+            anchors = ' and '.join(f'{_fmt_num(c)} at {_fmt_num(lr)}'
+                                   for c, lr in params['anchors'])
+            return f'slide {anchors}'
+        if feat == 'pc':
+            return (f"pc {_fmt_num(params['share'])} "
+                    f"after {_fmt_num(params['allowance'])}")
+        if feat == 'corridor':
+            return (f"corridor {_fmt_num(params['share'])} po "
+                    f"{_fmt_num(params['width'])} xs {_fmt_num(params['attachment'])}")
+    return ''
+
+
+def _render_reins_clause(clause, premium=None, cede=None, reinst=None,
+                         variable='') -> str:
     """Render one ``(share, limit, attach)`` cession tuple with its decorators.
 
     A full-line share (1.0) renders as ``limit xs attach``; a partial share
@@ -425,6 +460,8 @@ def _render_reins_clause(clause, premium=None, cede=None, reinst=None) -> str:
         else:
             parts.append(
                 f'reinstatements [{" ".join(_fmt_num(a) for a in reinst)}]')
+    if variable:
+        parts.append(variable)
     return ' '.join(parts)
 
 
@@ -457,7 +494,8 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
         _render_reins_clause(c,
                              prem[i] if prem is not None else None,
                              cede[i] if cede is not None else None,
-                             reinst[i] if reinst is not None else None)
+                             reinst[i] if reinst is not None else None,
+                             _render_variable_feature(spec, list_key, i))
         for i, c in enumerate(layers)]
     return _Block(f'{prefix} {spec[kind_key]}', cessions, sep='and')
 

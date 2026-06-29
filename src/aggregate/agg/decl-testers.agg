@@ -602,4 +602,20 @@ pnl RI.Words 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 100
 pnl RI.List  10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 100 xs 100 rol 18% reinstatements [0 .5 1 1] poisson                                     note{explicit price-multiplier list escape hatch};
 pnl RI.Ceded 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence ceded to 100 xs 100 deposit 1800 reinstatements [0 1 1] poisson                                 note{occurrence ceded to + deposit base premium};
 pnl RI.AggCover 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 100 xs 100 rol 18% reinstatements [0 1] poisson aggregate net of 85% po 1500 xs 7000  note{decision 3: reinstated occ layer + subsequent aggregate cover stays 2-D};
-pnl RI.NoReinst 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 100 xs 100 rol 18% no reinstatements poisson                                          note{zero reinstatements: single annual limit y, deterministic ceded premium}
+pnl RI.NoReinst 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 100 xs 100 rol 18% no reinstatements poisson                                          note{zero reinstatements: single annual limit y, deterministic ceded premium};
+
+# ============================================================
+# Variable rating (Phase 3, decision 0: at most ONE variable feature per program,
+# no stacking). swing / slide / pc / corridor decorate ONE aggregate layer; each
+# makes one P&L leg stochastic via a ContractTerms pushed forward over the gross
+# density (1-D aggregate basis). build() returns a PnL whose GCN exhibit is backed
+# by a VariableRatingAnalysis. See tests/test_variable_rating_decl.py and
+# dev/plan-variable-rating.md.
+#   * swing    replaces deposit/rol/rate: ceded premium = clip(basic + lcm*A, min, max)
+#   * slide    replaces cede: commission slides down a ceded-LR scale from anchors
+#   * pc       profit commission share*(1 - LR - allowance)+ of ceded premium
+#   * corridor a ceded-LR band (po width xs attach) the cedant retains
+pnl VR.Swing    10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 swing basic 500 lcm 0.5 min 500 max 3000                            note{swing: stochastic ceded premium of ceded loss};
+pnl VR.Slide    10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80%        note{slide: stochastic ceding commission of ceded LR};
+pnl VR.PC       10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 pc 25% after 10%                                      note{profit commission of ceded LR};
+pnl VR.Corridor 10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 corridor 50% po 30% xs 20%                            note{corridor: cedant retains a ceded-LR band}

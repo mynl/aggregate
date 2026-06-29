@@ -302,11 +302,21 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     hand-checked worked examples; `ReinstatementTerms` refactored under the base
     (behavior-preserving). Spec-key naming locked to `{which}_reins_*` (flat
     `retro_terms`). Tests: `tests/test_variable_rating_terms.py`.
-  - [ ] **`[analysis]`** wire φ through `pushforward_1d` (agg) / 2-D
-    `BivariateDistribution.pushforward` (occ) into GCN legs; bind ceded premium for
-    the LR features; guard slide/pc against a stochastic (swing) premium denominator.
-  - [ ] **`[decl]`** grammar + transformer + per-layer validation matrix
-    (`_split_reins` emits the new `{which}_reins_*` keys).
+  - [x] **`[analysis]` (1-D) landed (1.0.0a119):** `aggregate.variable_rating`
+    `VariableRatingAnalysis` — feature-agnostic GCN engine, legs over `(l, a)`,
+    `pushforward_1d` aggregate basis, reuses `gcn_assemble_column`. Tests:
+    `tests/test_variable_rating_analysis.py`. **TODO:** `summary_df` / `tail_df` /
+    `plot` / `_repr_html_` (only `gcn_df` so far); the 2-D occurrence path.
+  - [x] **`[decl]` (4 features) landed (1.0.0a119):** swing / slide / pc / corridor
+    decorate one `aggregate net of` layer; grammar + transformer + `_split_reins`
+    emit `agg_reins_{swing,slide,pc,corridor}`; underwriter builds the terms +
+    `VariableRatingAnalysis`; `PnL.gcn_df` delegates. Grammar-sync mirrors updated
+    (also fixed the drifted Phase-2 `reinstatements`/`free`/`no` labels, **D10**).
+    Tests: `tests/test_variable_rating_decl.py`; lines in `decl-testers.agg`.
+  - [ ] **`retro` DecL surface** — account-level rating clause; needs a syntax
+    decision (works programmatically via `VariableRatingAnalysis` today).
+  - [ ] **Occurrence-basis (2-D) variable rating** — legs over the `(L,R)` joint
+    via `BivariateDistribution.pushforward`; currently agg-basis only.
   - [ ] **`[exhibit]`** `reins_description` / `reins_explanation` per feature;
     `FEATURES.csv` rows + introspection cross-check.
 

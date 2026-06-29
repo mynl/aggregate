@@ -14,6 +14,15 @@ loss, pushed forward over the loss distribution, making one leg stochastic.
 
 ## Decisions locked (author, 2026-06-27; naming refined 2026-06-28)
 
+0. **One variable feature per program — no stacking (author, 2026-06-28).** A
+   program carries **at most one** variable-rating feature (one of retro / swing /
+   slide / pc / corridor), full stop. This supersedes the per-layer composition
+   matrix (appendix §3) for Phase 3: there is no swing+slide, no stacked aggregate
+   features, so the LR denominator for slide/pc/corridor is always the deterministic
+   (fixed) ceded premium and φ stays a pure 1-arg map. Validation collapses to a
+   single "more than one variable feature → error" check. Reinstatement (Phase 2)
+   remains its own already-shipped path.
+
 1. **Each feature is a `ContractTerms` subclass** owning its φ, loss basis (appendix §4), and
    target leg. The layer's **basis** (occurrence/aggregate) selects 1-D vs 2-D pushforward
    (appendix §2); the feature never chooses dimension. A thin `ContractTerms` base **is**

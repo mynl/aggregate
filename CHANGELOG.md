@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.0.0a119
+
+Phase 3 variable rating — the `[analysis]` engine and the `[decl]` surface for the
+four aggregate-basis features (`dev/plan-variable-rating.md`). The four now run
+end-to-end through `build('...')`; retro stays programmatic pending a rating-clause
+syntax decision, and occurrence-basis (2-D) variable rating is a follow-up.
+
+- **`VariableRatingAnalysis`** (`aggregate.variable_rating`, submodule access only)
+  — a feature-agnostic Gross / Ceded / Net engine driven by any `ContractTerms`.
+  The feature's `target_leg` selects the one stochastic leg (gross premium / ceded
+  premium / expense / ceded loss); every leg is written over `(l, a)` and pushed
+  forward over the gross density via `pushforward_1d` (the 1-D aggregate basis,
+  decision 0: one variable feature per program, no stacking). `gcn_df` reuses the
+  shared `gcn_assemble_column`; means add `gross + ceded = net`. Takes raw arrays,
+  so it is unit-testable independent of `Aggregate`.
+- **DecL surface** for the four reins-layer features, each decorating one
+  `aggregate net of` layer: `swing basic <b> lcm <m> [min <lo>] [max <hi>]`
+  (replaces deposit/rol/rate), `slide <c> at <lr> and …` (replaces `cede`),
+  `pc <share> after <allowance>`, `corridor <share> po <width> xs <attach>`. New
+  grammar terminals + transformer rules emit the locked spec keys
+  `agg_reins_swing` / `_slide` / `_pc` / `_corridor`; per-layer validation enforces
+  the swing/premium and slide/cede exclusions, the LR-denominator requirement, and
+  decision 0 (at most one feature; aggregate basis only this release).
+- **`Aggregate.variable_rating_analysis()`** builds the analysis from the gross
+  density + the decorated layer; **`PnL.gcn_df` delegates** to it when the
+  aggregate carries a DecL variable feature (mirrors the reinstatement path).
+- **Grammar-sync mirrors** (`decl_pygments.AggLexer`, `parser_errors._TERMINAL_LABELS`)
+  updated for the new keywords — and for the Phase 2 `reinstatements` / `free` /
+  `no` keywords that had drifted (TODO D10), so `test_grammar_sync` is green.
+- Tests: `tests/test_variable_rating_analysis.py` (hand-checked GCN identities +
+  Monte-Carlo), `tests/test_variable_rating_decl.py` (build-through + negative
+  cases); DecL lines added to `src/aggregate/agg/decl-testers.agg`.
+
 ## 1.0.0a118
 
 Starts **Phase 3 (variable rating)** with the `[terms]` workstream — the pure,

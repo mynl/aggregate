@@ -618,4 +618,9 @@ pnl RI.NoReinst 10000 premium less 85% lr sev lognorm 50 cv 3 occurrence net of 
 pnl VR.Swing    10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 swing basic 500 lcm 0.5 min 500 max 3000                            note{swing: stochastic ceded premium of ceded loss};
 pnl VR.Slide    10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80%        note{slide: stochastic ceding commission of ceded LR};
 pnl VR.PC       10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 pc 25% after 10%                                      note{profit commission of ceded LR};
-pnl VR.Corridor 10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 corridor 50% po 30% xs 20%                            note{corridor: cedant retains a ceded-LR band}
+pnl VR.Corridor 10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 corridor 50% po 30% xs 20%                            note{corridor: cedant retains a ceded-LR band};
+# retro is the account-level rating clause: it replaces the fixed `<n> premium`
+# head with `retro <collar> premium`, varying the GROSS premium as a collared
+# affine map of net account loss (no inuring reinsurance in the 1-D case). Collar
+# is keyword-first, matching swing.
+pnl VR.Retro retro basic 3000 lcm 1.1 min 3500 max 8000 premium less 1000 loss sev lognorm 100 cv 2 poisson                                                            note{retro: stochastic gross premium of net account loss}

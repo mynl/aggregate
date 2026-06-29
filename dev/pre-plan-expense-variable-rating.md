@@ -73,7 +73,7 @@ pnl RETRO
     # this is for large account pricing
     # in this case we put the  info in the rating clause, prefix with retro to flag
     # what is coming
-   retro 3000 basic 1.1 lcm 3500 min 8000 max premium
+   retro basic 3000 lcm 1.1 min 3500 max 8000 premium
    # prem = max(3500, min(8000, 3000 + 1.1 L)), L = net loss out of aggregate
    # min = basic if no min, basic and lcm required; max=inf if missing
    # the retro clause REPLACES `<numbers> premium` (it sets gross premium variably)
@@ -105,6 +105,7 @@ pnl REINSTATEMENT_PREMIUM
                 rol 18%
                 # no cede on cat
                 reinstatements 1 free and 1 at 50% and two at 100%
+                # reinstatements [0 .5 1 1]
        poisson
    25% premium expenses
 
@@ -117,7 +118,7 @@ pnl SWING
         5000 xs 0
         sev lognorm 50 cv 3
         occurrence net of 95% po 3500 xs 0
-            swing 3000 basic 1.1 lcm 3500 min 8000 max premium # same as retro clause
+            swing 3000 basic 1.1 lcm 3500 min 8000 max # same as retro clause
             # swing replaces rate, rol, deposit clause
             # no cede
     mixed gamma 0.5

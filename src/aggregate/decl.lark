@@ -106,8 +106,17 @@ approx_clause: APPROXIMATE ID   -> approx_set
 // dev/done/plan-pnl-expenses-ceded-premium.md.
 // ======================================================================
 
-pnl_out: PNL name numbers PREMIUM LESS pnl_exposures layers sev_clause occ_reins freq agg_reins approx_clause expense_clause trailer  -> pnl_out_full
-       | PNL name numbers PREMIUM LESS dfreq layers sev_clause occ_reins              agg_reins approx_clause expense_clause trailer  -> pnl_out_dfreq
+pnl_out: PNL name pnl_premium LESS pnl_exposures layers sev_clause occ_reins freq agg_reins approx_clause expense_clause trailer  -> pnl_out_full
+       | PNL name pnl_premium LESS dfreq layers sev_clause occ_reins              agg_reins approx_clause expense_clause trailer  -> pnl_out_dfreq
+
+// The gross-premium head: a fixed amount ``<num> premium`` or the account-level
+// retrospective-rating clause ``retro <collar> premium`` (Phase 3). Retro
+// substitutes for the number in the existing ``... premium less`` head so the
+// gross premium becomes a collared affine map of net account loss; the trailing
+// ``premium`` keeps the ``premium less`` divider. The collar is keyword-first,
+// matching ``swing``. See dev/plan-variable-rating.md.
+pnl_premium: numbers PREMIUM        -> pnl_premium_fixed
+           | RETRO collar PREMIUM   -> pnl_premium_retro
 
 pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
              | numbers LOSS     -> pnl_exp_loss

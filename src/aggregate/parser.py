@@ -485,7 +485,7 @@ class UnderwritingTransformer(Transformer):
         spec["consideration"] = premium
 
     def pnl_out_full(self, c):
-        (_pnl, name, premium, _prem, _less, exposures, layers, sev_clause,
+        (_pnl, name, premium, _less, exposures, layers, sev_clause,
          occ_reins, freq, agg_reins, approx, expense, trailer) = c
         spec = {
             "name": name,
@@ -500,11 +500,11 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
-        self._attach_pnl(spec, premium)
+        self._attach_pnl_head(spec, premium)
         return ("pnl", name, spec)
 
     def pnl_out_dfreq(self, c):
-        (_pnl, name, premium, _prem, _less, dfreq, layers, sev_clause,
+        (_pnl, name, premium, _less, dfreq, layers, sev_clause,
          occ_reins, agg_reins, approx, expense, trailer) = c
         spec = {
             "name": name,
@@ -518,8 +518,35 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
-        self._attach_pnl(spec, premium)
+        self._attach_pnl_head(spec, premium)
         return ("pnl", name, spec)
+
+    # ----- gross-premium head: fixed amount or retro rating clause ---
+    def pnl_premium_fixed(self, c):
+        """``<num> premium`` -- the fixed gross premium (the original head)."""
+        return c[0]
+
+    def pnl_premium_retro(self, c):
+        """``retro <collar> premium`` -- the account-level retrospective rating
+        clause (Phase 3); returns the collar tagged for ``_attach_pnl_head``."""
+        _retro, collar, _prem = c
+        return {'_retro': collar}
+
+    def _attach_pnl_head(self, spec, head):
+        """Record the gross-premium head: a fixed consideration, or a retro clause.
+
+        A fixed head is a number recorded as ``consideration`` (delegating to
+        :meth:`_attach_pnl`). A retro head carries the keyword-first collar dict;
+        it is recorded as the account-level ``retro_terms`` spec key and uses the
+        collar ``basic`` as the representative consideration (the actual gross
+        premium is the variable map, resolved by the VariableRatingAnalysis).
+        """
+        if isinstance(head, dict) and '_retro' in head:
+            collar = head['_retro']
+            spec['retro_terms'] = collar
+            self._attach_pnl(spec, collar['basic'])
+        else:
+            self._attach_pnl(spec, head)
 
     # ----- gross expenses on a pnl (decision 1) ---------------------
     # Each term is a ``(basis, value)`` pair; ``expense_list`` collects the

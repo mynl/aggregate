@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.0a120
+
+Phase 3 variable rating — **retro** (the fifth feature) gets its DecL surface, so
+all five now run through `build('...')`.
+
+- **`retro` rating clause** in the `pnl` premium head: `retro <collar> premium`
+  substitutes for the fixed `<num> premium`, varying the **gross** premium as a
+  collared affine map of net account loss. The grammar factors the head into
+  `pnl_premium: numbers PREMIUM | RETRO collar PREMIUM`, so the trailing
+  `premium` keeps the `premium less` divider and reuses the existing head
+  structure. The collar is keyword-first (`basic <b> lcm <m> [min <lo>] [max
+  <hi>]`), matching `swing`:
+
+  ```
+  pnl R retro basic 3000 lcm 1.1 min 3500 max 8000 premium less 1000 loss sev lognorm 100 cv 2 poisson
+  ```
+- Underwriter builds `RetroTerms` and a `VariableRatingAnalysis` over the gross
+  density (`variable_layer=None`); `PnL.gcn_df` delegates as for the other
+  features. Retro currently requires **no inuring reinsurance** (the clean 1-D
+  net-account-loss = gross-loss case); retro + reinsurance is a follow-up and
+  raises a clear error. Unparser renders the retro head (shared `_render_collar`,
+  also now used by `swing`).
+- Tests: retro cases in `tests/test_variable_rating_decl.py`; `VR.Retro` line in
+  `decl-testers.agg`. Design note: `swing` deliberately takes **no** trailing
+  `premium` (it decorates a reins layer, with no `less` to pair with).
+
 ## 1.0.0a119
 
 Phase 3 variable rating — the `[analysis]` engine and the `[decl]` surface for the

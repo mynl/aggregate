@@ -16,6 +16,7 @@ from aggregate import build
 from aggregate.contract_terms import (
     CorridorTerms,
     ProfitCommissionTerms,
+    RetroTerms,
     SlideTerms,
     SwingTerms,
 )
@@ -90,6 +91,38 @@ def test_corridor_build():
     assert _means_add(p)
     # corridor reduces the cession -> ceded loss is the stochastic leg
     assert p.variable_rating_analysis.stats_df.loc['ceded_loss', 'cv'] > 0
+
+
+# ----------------------------------------------------------------------
+# retro -- account-level rating clause in the pnl premium head
+# ----------------------------------------------------------------------
+def test_retro_build():
+    p = build('pnl R retro basic 3000 lcm 1.1 min 3500 max 8000 premium '
+              'less 1000 loss sev lognorm 100 cv 2 poisson')
+    terms = p.agg.variable_terms
+    assert isinstance(terms, RetroTerms)
+    assert (terms.basic, terms.lcm, terms.minimum, terms.maximum) == \
+        (3000.0, 1.1, 3500.0, 8000.0)
+    # gross premium is the stochastic leg; collared between min and max
+    sdf = p.variable_rating_analysis.stats_df
+    assert sdf.loc['gross_premium', 'cv'] > 0
+    assert 3500.0 <= sdf.loc['gross_premium', 'mean'] <= 8000.0
+
+
+def test_retro_bare_collar():
+    p = build('pnl R retro basic 3000 lcm 1.1 premium '
+              'less 1000 loss sev lognorm 100 cv 2 poisson')
+    terms = p.agg.variable_terms
+    assert terms.minimum == pytest.approx(3000.0)        # defaults to basic
+    import numpy as np
+    assert np.isinf(terms.maximum)                       # uncapped
+
+
+def test_retro_with_reinsurance_rejected():
+    with pytest.raises(ValueError, match='retro'):
+        build('pnl R retro basic 3000 lcm 1.1 min 3500 max 8000 premium '
+              'less 1000 loss sev lognorm 100 cv 2 poisson '
+              'aggregate net of 5000 xs 4000 deposit 1500')
 
 
 # ----------------------------------------------------------------------

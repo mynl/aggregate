@@ -313,8 +313,11 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     `VariableRatingAnalysis`; `PnL.gcn_df` delegates. Grammar-sync mirrors updated
     (also fixed the drifted Phase-2 `reinstatements`/`free`/`no` labels, **D10**).
     Tests: `tests/test_variable_rating_decl.py`; lines in `decl-testers.agg`.
-  - [ ] **`retro` DecL surface** — account-level rating clause; needs a syntax
-    decision (works programmatically via `VariableRatingAnalysis` today).
+  - [x] **`retro` DecL surface landed (1.0.0a120):** `retro <collar> premium`
+    in the pnl head (`pnl_premium: numbers PREMIUM | RETRO collar PREMIUM`),
+    keyword-first collar matching swing; trailing `premium` keeps `premium less`.
+    Requires no inuring reinsurance (1-D case); retro+reins is a follow-up.
+    Tests in `test_variable_rating_decl.py`; `VR.Retro` in `decl-testers.agg`.
   - [ ] **Occurrence-basis (2-D) variable rating** — legs over the `(L,R)` joint
     via `BivariateDistribution.pushforward`; currently agg-basis only.
   - [ ] **`[exhibit]`** `reins_description` / `reins_explanation` per feature;

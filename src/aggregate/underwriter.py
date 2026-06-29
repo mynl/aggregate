@@ -976,11 +976,37 @@ class Underwriter(object):
                     var_params = spec.pop(f'agg_reins_{_f}')
                     var_layer_idx = spec.pop(f'agg_reins_{_f}_layer')
                     break
+            # Retro (Phase 3): the account-level rating clause varying the *gross*
+            # premium as a collared affine map of net account loss. Pop the collar.
+            retro_collar = spec.pop('retro_terms', None)
             # Ceded-premium clauses promote the pnl to the Gross/Ceded/Net view
             # (any-clause -> GCN): resolve them to per-side economics and pop the
             # spec keys so the inner Aggregate sees only the loss structure.
             econ = self._resolve_reins_economics(spec, consideration)
-            if var_feat is not None:
+            if retro_collar is not None:
+                # Retro varies the gross premium; its GCN delegates to a
+                # VariableRatingAnalysis over the gross density. The clean 1-D case
+                # is retro with no inuring reinsurance (net account loss = gross
+                # loss); retro + reinsurance (net-of-inuring basis) is a follow-up.
+                if var_feat is not None or spec.get('occ_reins') or \
+                        spec.get('agg_reins'):
+                    raise ValueError(
+                        f"{name}: 'retro' with reinsurance (or another variable "
+                        "feature) is not yet supported; retro currently requires a "
+                        "book with no inuring reinsurance (the 1-D net-account-loss "
+                        "= gross-loss case).")
+                inner = Aggregate(**spec)
+                inner.program = program
+                obj = inner.make_pnl(consideration, expense_spec=expense_spec)
+                from .contract_terms import RetroTerms
+                inner.variable_terms = RetroTerms(**retro_collar)
+                inner.variable_layer = None
+                inner.variable_gross_premium = float(consideration)
+                inner.variable_ceded_premium = 0.0
+                inner.variable_commission = 0.0
+                inner.variable_gross_expense = float(obj._gross_expense())
+                obj.program = program
+            elif var_feat is not None:
                 # The variable feature delegates its GCN to a
                 # VariableRatingAnalysis over the GROSS aggregate density, so do
                 # NOT apply the agg reinsurance in the inner Aggregate; keep the

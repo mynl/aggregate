@@ -388,6 +388,20 @@ def _render_layers(spec: dict) -> str:
 # Reinsurance
 # ======================================================================
 
+def _render_collar(collar: dict) -> str:
+    """Render a keyword-first collar ``basic <b> lcm <m> [min <lo>] [max <hi>]``.
+
+    Shared by ``swing`` (ceded premium) and ``retro`` (gross premium); ``min`` /
+    ``max`` render only when present (``None`` = omitted), preserving the spec.
+    """
+    s = f"basic {_fmt_num(collar['basic'])} lcm {_fmt_num(collar['lcm'])}"
+    if collar.get('minimum') is not None:
+        s += f" min {_fmt_num(collar['minimum'])}"
+    if collar.get('maximum') is not None:
+        s += f" max {_fmt_num(collar['maximum'])}"
+    return s
+
+
 def _render_variable_feature(spec: dict, list_key: str, layer_idx: int) -> str:
     """Render the variable-rating decorator on layer ``layer_idx``, or ``''``.
 
@@ -402,13 +416,7 @@ def _render_variable_feature(spec: dict, list_key: str, layer_idx: int) -> str:
         if params is None or spec.get(f'{list_key}_{feat}_layer') != layer_idx:
             continue
         if feat == 'swing':
-            s = (f"swing basic {_fmt_num(params['basic'])} "
-                 f"lcm {_fmt_num(params['lcm'])}")
-            if params.get('minimum') is not None:
-                s += f" min {_fmt_num(params['minimum'])}"
-            if params.get('maximum') is not None:
-                s += f" max {_fmt_num(params['maximum'])}"
-            return s
+            return f'swing {_render_collar(params)}'
         if feat == 'slide':
             anchors = ' and '.join(f'{_fmt_num(c)} at {_fmt_num(lr)}'
                                    for c, lr in params['anchors'])
@@ -678,7 +686,11 @@ def _render_pnl(name: str, spec: dict) -> _Block:
     intact (so it re-parses to a :class:`aggregate.PnL`); the loss-head fragment
     is the first child clause.
     """
-    premium = _fmt_seq(spec['consideration'])
+    retro = spec.get('retro_terms')
+    if retro is not None:
+        premium_head = f'retro {_render_collar(retro)} premium'
+    else:
+        premium_head = f'{_fmt_seq(spec["consideration"])} premium'
 
     if spec.get('freq_name') == 'empirical':
         head = _render_dfreq(spec)
@@ -691,7 +703,7 @@ def _render_pnl(name: str, spec: dict) -> _Block:
     else:
         head = ''
 
-    return _Block(f'pnl {name} {premium} premium less', [
+    return _Block(f'pnl {name} {premium_head} less', [
         head,
         _render_layers(spec),
         _render_sev_clause(spec),

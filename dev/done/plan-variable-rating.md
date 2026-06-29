@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-06-29** — moved to `dev/done`; superseded by `dev/plan-bivariate-legs.md` (see its consolidation note for why and what was subsumed). Executed a118–a120.
+
 # Plan — Phase 3: variable rating (retro, swing, slide, profit commission, corridor)
 
 > **Status: DRAFT — not executed.** Third of three integrated plans (Phase 1 → Phase 2

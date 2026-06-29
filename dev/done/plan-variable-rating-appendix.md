@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-06-29** — moved to `dev/done`; legs-model / dimensionality / engine-seam essentials absorbed into `dev/plan-bivariate-legs.md` §1–§3 (see its consolidation note).
+
 # Shared design appendix — legs model, dimensionality, per-layer economics, naming
 
 > **Status: DRAFT — shared foundation for three plans.** Referenced by

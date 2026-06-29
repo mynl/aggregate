@@ -294,8 +294,9 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
   tail / plot). **Complete.** Only deferred: FEATURES.csv `ReinstatementAnalysis`
   column + introspection cross-check (author's introspection workflow). The
   *stochastic* commission (`slide` / profit commission) is Phase 3 (P3).
-- [ ] **P3 `[A]`** Variable rating — retro, swing, slide, profit commission,
-  corridor — all reusing P2's engine. `dev/plan-variable-rating.md`. Depends on P2.
+- [x] **P3 `[A]`** Variable rating — retro, swing, slide, profit commission,
+  corridor — all five landed a118–a120 (aggregate basis). Plan moved to
+  `dev/done/plan-variable-rating.md`. Depends on P2.
   - [x] **`[terms]` landed (1.0.0a118):** `aggregate.contract_terms` — the
     `ContractTerms` base + five frozen-dataclass features (`RetroTerms`,
     `SwingTerms`, `SlideTerms`, `ProfitCommissionTerms`, `CorridorTerms`) with
@@ -318,10 +319,17 @@ negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
     keyword-first collar matching swing; trailing `premium` keeps `premium less`.
     Requires no inuring reinsurance (1-D case); retro+reins is a follow-up.
     Tests in `test_variable_rating_decl.py`; `VR.Retro` in `decl-testers.agg`.
-  - [ ] **Occurrence-basis (2-D) variable rating** — legs over the `(L,R)` joint
-    via `BivariateDistribution.pushforward`; currently agg-basis only.
-  - [ ] **`[exhibit]`** `reins_description` / `reins_explanation` per feature;
-    `FEATURES.csv` rows + introspection cross-check.
+- [ ] **P4 `[A]` PnL legs unification** — collapse `ReinstatementAnalysis` +
+  `VariableRatingAnalysis` onto one `legs → cashflows → reporting` core so a feature
+  only fills a leg; fixes the `summary_df`→`gcn_df` morph; makes 1-D vs 2-D a source
+  swap. `dev/plan-bivariate-legs.md` (generic bivariate kernel; insurance as a View).
+  Supersedes the P3 `[analysis]`/`[exhibit]`
+  workstreams. **Pended within it** (perfect exhibits, addressed holistically per
+  `dev/reporting-guidelines.md`): `validation_df` (= old summary), `reins_*` flavors,
+  column-unit purity / presentation, `tail_df`/`plot`/`_repr_html_` unification,
+  occurrence-basis variable-rating *surface*, retro + reinsurance, `FEATURES.csv` rows.
+- [ ] **Future (low priority):** reinstatement terms depending on event date
+  (pro-rata as to time) — from `dev/done/pre-plan-reinstatements.md`.
 
 ---
 

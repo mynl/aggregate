@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-06-29** — moved to `dev/done`; superseded by `dev/plan-bivariate-legs.md` (see its consolidation note). Executed (Phase 1).
+
 # Plan — multi-stage Gross/Ceded/Net `PnL` (occurrence and/or aggregate reins)
 
 > **Status: DRAFT — not executed.** Generalizes the single-stage (aggregate-only)

@@ -1,4 +1,6 @@
 
+> **SUPERSEDED 2026-06-29** — moved to `dev/done`; superseded by `dev/plan-bivariate-legs.md` (see its consolidation note). Realized as Phase 2 (a116–a117).
+
 # Specification: Property Catastrophe Reinstatement Analysis
 
 ## 1. Purpose

@@ -1,159 +1,166 @@
-group,name,kind,returns,description,Aggregate,Portfolio,BivariateAggregate,PnL,Severity,Frequency,Bounds,notes
-df-headline,summary_df,property,DataFrame,At-a-glance risk view: moments + key percentiles (Freq/Sev/Agg),Y,Y,Y*,Y*,,,,"WRINKLE: 3 meanings. Agg/Port = moments+percentiles (a113); Biv = theory-vs-realised validation; PnL = additive Consideration/Obligation/Margin. Biv+PnL not migrated to the a113 risk view."
-df-headline,tail_df,method,DataFrame,Return-period / exceedance table (p VaR TVaR xsVaR VaR/Mean),Y,Y,Y*,,,,,"WRINKLE: Agg/Port = return-period table, METHOD tail_df(periods=). Biv = per-axis support frame, PROPERTY. PnL has none (deferred)."
-df-headline,validation_df,property,DataFrame,"Moment-vs-estimate QA table (theory vs FFT estimate, rel error)",Y,Y,,,,,,"a113 rename of old summary_df. Biv keeps its validation inside summary_df (not migrated)."
-df-headline,tail_behavior_df,property,DataFrame,Layered tail report: support + per-side tail class + concentration,Y,Y,,,,,,a113 rename of old tail_df.
-df-headline,stats_df,attribute,DataFrame,Single source of truth for moments (component x measure x view),Y,Y,Y,,,,,Canonical moment store; summary_df/validation_df read from it.
-df-headline,density_df,property,DataFrame,Per-bucket density / distribution / risk-measure frame,Y,Y,Y,,,,,The realised PMF grid + derived columns.
-df-headline,density,property,DataFrame,The live (positive-mass) rows of density_df,Y,Y,Y,,,,,Convenience slice of density_df.
-df-headline,sev_density_df,property,DataFrame,Per-bucket severity density on the severity grid,Y,,,,,,,Severity-grid analogue of density_df.
-df-headline,bs_window_df,property,DataFrame,Curated bucket/window sizing decision [bs-reporting],Y,Y,Y,,,,,Grid-selection audit; None before update.
-df-headline,pnl_df,property,DataFrame,The net P&L distribution (deterministic transform of X),,,,Y,,,,PnL net distribution frame.
-df-headline,gcn_df,property,DataFrame,Gross/Ceded/Net exhibit (doubly additive signed),,,,Y,,,,"Only for make_pnl(gross=,ceded=) positions."
-df-headline,dependency_df,property,DataFrame,Joint dependence (cov / corr / tau) by level,,,Y,,,,,Bivariate-only.
-df-reins,reins_summary_df,property,DataFrame,Per-stage reinsurance summary (economic view of validation_df cols),Y,Y,,,,,,None when no reinsurance. Mirrors validation_df 8-col layout.
-df-reins,reins_stats_df,property,DataFrame,Per-layer reinsurance layering summary (empirical model-grid),Y,Y,,,,,,None when no reinsurance.
-df-reins,reins_density_df,property,DataFrame,Per-bucket gross/ceded/net densities under reinsurance,Y,Y,,,,,,None when no reinsurance.
-df-portfolio,augmented_df,method,DataFrame,Cached augmented density for a distortion (pricing columns),,Y,,,,,,Portfolio pricing scratch frame; see augmented_dfs cache.
-df-portfolio,unit_density_df,method,DataFrame,Long-form frame of all unit pmfs each on its native grid,,Y,,,,,,
-df-portfolio,aligned_unit_density_df,method,DataFrame,Unit pmfs scattered onto a common grid (display adapter),,Y,,,,,,
-df-portfolio,independent_density_df,attribute,DataFrame,Independent-combine total density (vs copula combine),,Y,,,,,,
-df-portfolio,independent_stats_df,attribute,DataFrame,Stats of the independent-combine total,,Y,,,,,,
-df-portfolio,sample_df,attribute,DataFrame,Stored multivariate sample (after sample()),,Y,,,,,,
-df-portfolio,distortion_df,attribute,DataFrame,Calibrated distortion parameter table,,Y,,,,,,
-df-portfolio,calibration_df,attribute,DataFrame,Distortion calibration diagnostics,,Y,,,,,,
-df-bounds,cloud_df,attribute,DataFrame,Cloud of weighted-TVaR distortions (n_s x K),,,,,,,Y,Bounds pricing-cloud machinery.
-df-bounds,tvar_df,attribute,DataFrame,TVaR by p_knots,,,,,,,Y,
-df-bounds,weight_df,attribute,DataFrame,Bracketing-pair weights,,,,,,,Y,
-str-narrative,info,property,str,Fixed-layout multi-line object summary (text),Y,Y,Y,,,,,"WRINKLE: not on PnL/Severity/Frequency."
-str-narrative,name,attribute,str,Object name,Y,Y,Y,Y,Y,,Y,Frequency has no name.
-str-narrative,value_type,property,str,Sign convention: 'loss' or 'payoff',Y,Y,,Y,,,,"Backed by _is_loss_value. Not on Severity (uses .signed) or Biv (per-axis)."
-str-narrative,pprogram,property,str,Canonical DecL program text (rendered from spec),Y,Y,,,,,,"WRINKLE: not on Biv/PnL though both are DecL-built."
-str-narrative,pprogram_html,property,str,Syntax-highlighted DecL program for Jupyter,Y,Y,,,,,,
-str-narrative,bs_description,property,str,One-line bucket-grid summary [bs-reporting],Y,Y,Y,,,,,
-str-narrative,bs_explanation,property,str,Verbose bucket-grid prose [bs-reporting],Y,Y,,,,,,"WRINKLE: Biv has bs_description but not bs_explanation."
-str-narrative,tail_description,property,str,Short narrative over the tail-behavior report,Y,Y,Y,,Y,Y,,Most widely shared narrative.
-str-narrative,tail_explanation,property,str,Verbose per-component tail prose,Y,Y,,,,,,"WRINKLE: description widely shared but explanation only Agg/Port."
-str-narrative,validation_explanation,property,str,Long-narrative validation result,Y,Y,,,,,,No paired validation_description (single narrative).
-str-narrative,reins_description,property,str,Short reinsurance description,Y,,,,,,,Agg-only; reins lives on the unit.
-str-narrative,reins_kinds,property,str,Kinds of reinsurance applied (text),Y,,,,,,,
-str-narrative,support_description,property,str,Short severity support description for info,,,,,Y,,,Severity-only.
-str-narrative,dsev_bucket,property,str,Scheme for placing discrete-severity atoms on the grid,Y,,,,,,,
-str-narrative,reins_bucket,property,str,Rebucketing scheme for net/ceded distributions,Y,,,,,,,
-str-narrative,allocation_method,property,str,Natural-allocation method: 'linear' or 'lifted',,Y,,,,,,Portfolio-only.
-stat,agg_m,attribute,scalar,Aggregate mean (theoretical),Y,Y,,,,,,"WRINKLE: Agg/Port name moments agg_m/agg_sd/agg_skew/agg_cv/agg_var; PnL/Severity use scipy-style mean/sd/skew/var properties."
-stat,agg_sd,attribute,scalar,Aggregate standard deviation,Y,Y,,,,,,
-stat,agg_cv,attribute,scalar,Aggregate coefficient of variation,Y,Y,,,,,,
-stat,agg_skew,attribute,scalar,Aggregate skewness,Y,Y,,,,,,
-stat,agg_var,attribute,scalar,Aggregate variance,Y,Y,,,,,,
-stat,est_m,attribute,scalar,Estimated (realised FFT) aggregate mean,Y,Y,,,,,,est_m/est_cv/est_sd/est_skew/est_var = empirical from the grid.
-stat,est_cv,attribute,scalar,Estimated aggregate CV,Y,Y,,,,,,
-stat,est_sd,attribute,scalar,Estimated aggregate SD,Y,Y,,,,,,
-stat,est_skew,attribute,scalar,Estimated aggregate skew,Y,Y,,,,,,
-stat,est_var,attribute,scalar,Estimated aggregate variance,Y,Y,,,,,,
-stat,sev_m,attribute,scalar,Severity mean (theoretical),Y,,,,,,,"WRINKLE: Agg exposes sev_m/sev_sd/sev_skew/sev_cv; Severity itself uses sev_mean + scipy mean() (sev_cv is shared)."
-stat,sev_sd,attribute,scalar,Severity standard deviation,Y,,,,,,,
-stat,sev_cv,attribute,scalar,Severity CV,Y,,,,Y,,,
-stat,sev_skew,attribute,scalar,Severity skewness,Y,,,,,,,
-stat,est_sev_m,attribute,scalar,Estimated (realised) severity mean,Y,,,,,,,est_sev_* = empirical severity moments.
-stat,mean,property,scalar,Mean (scipy-style),,,,Y,Y,,,"WRINKLE: PnL/Severity expose mean/sd/skew as properties; Agg/Port do not (use agg_m...)."
-stat,sd,property,scalar,Standard deviation (scipy-style),,,,Y,,,,"WRINKLE: PnL exposes sd; Severity uses scipy std()/sev_sd, not sd."
-stat,skew,property,scalar,Skewness (scipy-style),,,,Y,,,,
-stat,corr,property,scalar,Pearson correlation of the two component aggregates,,,Y,,,,,Bivariate-only.
-stat,prob_loss,property,scalar,P(net < 0): probability the position loses money,,,,Y,,,,
-stat,tail_class,property,scalar,(freq sev agg) TailClass triple,Y,Y,,,Y,,,
-stat,bounded,property,bool,Whether support is bounded,Y,Y,,,Y,,,
-dist-fn,q,method,scalar,Quantile / VaR: q(p),Y,Y,,Y,,,,"WRINKLE: Severity uses ppf (scipy) not q; PnL has q not ppf."
-dist-fn,ppf,method,scalar,Quantile (scipy alias of q),Y,,,,Y,,,Agg aliases ppf=q; Severity inherits scipy ppf.
-dist-fn,tvar,method,scalar,Tail value at risk: tvar(p),Y,Y,,,,,,"WRINKLE: PnL/Severity have no tvar (Severity has tvar_sev via Agg only)."
-dist-fn,var,method,scalar,Value at risk (alias of quantile),,Y,,Y,Y*,,,"WRINKLE: var = VaR on Port/PnL but = variance on Severity (scipy). Agg has NO var()."
-dist-fn,cdf,method,scalar,Cumulative distribution function,Y,Y,,Y,Y,,,
-dist-fn,sf,method,scalar,Survival function,Y,Y,,Y,Y,,,
-dist-fn,pdf,method,scalar,Probability density (continuous approximation),Y,Y,,,Y,,,
-dist-fn,pmf,method,scalar,Probability mass (discrete view),Y,Y,,,,,,
-dist-fn,q_sev,method,scalar,Severity quantile,Y,,,,,,,
-dist-fn,tvar_sev,method,scalar,Severity TVaR,Y,,,,,,,
-dist-fn,snap,method,scalar,Snap a value to the density_df grid (multiple of bs),Y,Y,,,,,,
-dist-fn,var_dict,method,dict,Dictionary of VaRs for the aggregate / units,Y,Y,,,,,,
-dist-fn,sample,method,DataFrame,Draw a sample from the distribution,Y,Y,,,,,,Severity uses rvs (scipy).
-dist-fn,freq_pmf,method,ndarray,Frequency pmf via the PGF,Y,,,,,,,
-pricing,price,method,object,Price using regulatory + pricing distortions,Y,Y,,,,,,Aggregate mirrors Portfolio.price.
-pricing,price_ccoc,method,object,Price at a constant cost of capital and VaR level,Y,Y,,,,,,
-pricing,price_pentagon,method,object,Complete the pricing octet given one target,Y,Y,,,,,,
-pricing,price_pentagon_ex,method,object,Complete the pricing octet over the full vocabulary,Y,Y,,,,,,
-pricing,pla,method,object,Given one of p/L/a return the consistent triple,Y,Y,,,,,,
-pricing,prob_loss_assets,method,object,Given one of p/L/a return the consistent triple,Y,Y,,,,,,
-pricing,apply_distortion,method,object,Apply a distortion to the density (gS columns),Y,Y,,,,,,
-pricing,calibrate_distortions,method,object,Calibrate the standard distortion set to a CoC target,Y,Y,,,,,,
-pricing,price_stand_alone,method,object,Price each unit stand-alone vs diversified,,Y,,,,,,Portfolio-only.
-pricing,analyze_distortion,method,object,Pricing readout for one distortion,,Y,,,,,,
-pricing,analyze_distortions,method,object,Pricing readout for a set of distortions,,Y,,,,,,
-pricing,pricing_at,method,DataFrame,Pentagon pricing readout per unit at p or a,,Y,,,,,,
-pricing,pricing_bounds,method,object,Price ranges of risks consistent with the total,,Y,,,,,,
-pricing,allocation_bounds,method,object,Natural-allocation premium ranges by unit,,Y,,,,,,
-pricing,bodoff,method,object,Bodoff layer asset allocation,,Y,,,,,,
-pricing,pentagon_at,method,object,Single-unit Pentagon object at a capital level,,Y,,,,,,
-pricing,tvar_threshold,method,scalar,Find pt with TVaR(pt) = VaR(p),,Y,,,,,,
-reins,apply_occ_reins,method,object,Apply the occurrence reinsurance structure,Y,,,,,,,Agg-only; Portfolio reins is per-unit.
-reins,apply_agg_reins,method,object,Apply the aggregate reinsurance structure,Y,,,,,,,
-reins,occ_ceder,method,callable,Occurrence ceded transform,Y,,,,,,,
-reins,occ_netter,method,callable,Occurrence net transform,Y,,,,,,,
-reins,occ_bivariate,method,object,Joint law of two occurrence gross/ceded/net aggregates,Y,,,,,,,
-reins,reins_occ_plot,method,None,Occurrence-reinsurance plots,Y,,,,,,,
-build-io,update,method,None,(Re)compute the discrete approximation,Y,Y,Y,Y,,,,Main compute entry; PnL delegates to its agg.
-build-io,update_work,method,None,FFT compute kernel,Y,,Y,,,,,
-build-io,make_pnl,method,PnL,Wrap this aggregate as a PnL position,Y,,,,,,,
-build-io,create_frequency,method,Aggregate,Materialize the count distribution as an Aggregate/Portfolio,Y,Y,,,,,,Good Agg/Port parity (a-series).
-build-io,approximate,method,object,Method-of-moments approximation to self,Y,Y,,,,,,verb method; stored kind on .approximation attr.
-build-io,as_severity,method,Severity,Convert a portfolio total into a Severity,,Y,,,,,,
-build-io,rescale,method,Aggregate,Rescaled copy (for derivatives),Y,,,,,,,
-build-io,unwrap,method,Aggregate,Unwrap an under-sized (small log2) result,Y,,,,,,,
-build-io,picks,method,object,Adjust severity to hit layer pick targets,Y,,,,,,,
-build-io,focus,method,DataFrame,Central window of density_df holding 1-p of mass,Y,,,,,,,
-build-io,create_from_sample,method,object,Build a portfolio from a multivariate sample,,Y,,,,,,
-build-io,json,method,str,Write spec to JSON,Y,Y,,,,,,
-build-io,save,method,None,Persist to the knowledge base,,Y,,,,,,"WRINKLE: save on Portfolio only; Aggregate has json but no save."
-build-io,spec,property,dict,Read-only DecL spec dictionary,Y,Y,,,,,,
-build-io,spec_ex,property,dict,Full spec incl derived info,Y,Y,,,,,,
-plot,plot,method,None,Standard severity + aggregate (Lee) plots,Y,Y,Y,Y,Y,,,Most widely shared method.
-plot,scatter,method,object,Scatter of unit marginals,,Y,,,,,,
-plot,plot_envelope,method,None,Bounds three-panel envelope figure,,,,,,,Y,
-plot,plot_weights,method,None,Bounds bracketing-weight contour,,,,,,,Y,
-plot,help,method,None,Lookup help on methods/properties by regex,Y,Y,Y,,,,,"WRINKLE: not on PnL/Severity/Frequency."
-analysis,aggregate_error_analysis,method,DataFrame,Aggregate error across a range of bucket sizes,Y,,,,,,,
-analysis,severity_error_analysis,method,DataFrame,Severity component error analysis,Y,,,,,,,
-analysis,entropy_fit,method,object,Max-entropy fit to the aggregate,Y,,,,,,,
-analysis,cramer_lundberg,method,callable,Pollaczeck-Khinchine surplus / ruin function,Y,,,,,,,Alias pollaczeck_khinchine.
-analysis,sample_compare,method,object,Compare sample-based total to independent,,Y,,,,,,
-analysis,evaluate,method,object,Cherny-Madan breakeven acceptability panel,,,,Y,,,,PnL-only.
-grid-attr,bs,attribute,scalar,Bucket size,Y,Y,Y,,,,,Grid params; 0 before update.
-grid-attr,log2,attribute,scalar,log2 of grid points,Y,Y,,,,,,"WRINKLE: bs on Biv but log2 not surfaced there."
-grid-attr,padding,attribute,scalar,FFT padding (zero-buckets multiplier),Y,Y,Y,,,,,
-grid-attr,normalize,attribute,bool,Whether the severity PMF is renormalised,Y,Y,,,,,,
-grid-attr,sev_calc,attribute,str,Severity discretization mode,Y,Y,,,,,,
-grid-attr,validation_eps,attribute,scalar,Relative-error tolerance for validation,Y,Y,,,,,,
-grid-attr,x_min,attribute,scalar,Grid lower bound,Y,,,,,,,
-grid-attr,x_max,attribute,scalar,Grid upper bound,Y,,,,,,,
-grid-attr,xs,attribute,ndarray,The bucket grid (outcome values),Y,,,,,,,
-grid-attr,n,attribute,scalar,Expected claim count,Y,,,,,,,
-grid-attr,en,attribute,ndarray,Per-component expected claim counts,Y,,Y,,,,,
-data-attr,agg_density,attribute,ndarray,Aggregate PMF on the grid,Y,,,,,,,agg_density_gross/ceded/net under reins.
-data-attr,ftagg_density,attribute,ndarray,FT of the aggregate density (for copula combine),Y,,,,,,,
-data-attr,sev_density,attribute,ndarray,Severity PMF on the grid,Y,,,,,,,
-data-attr,sevs,attribute,list,Component Severity objects,Y,,,,,,,
-data-attr,frequency,attribute,Frequency,The Frequency object,Y,,Y,,,,,
-data-attr,agg_list,attribute,list,Component Aggregate objects (units),,Y,,,,,,
-data-attr,unit_names,attribute,list,Unit names,,Y,Y,,,,,
-data-attr,marginals,property,tuple,The two marginal densities,,,Y,,,,,Bivariate-only.
-data-attr,copula,attribute,object,The copula coupling the components,,,Y,,,,,
-data-attr,bivariate,property,object,BivariateDistribution view of the joint density,,,Y,,,,,
-data-attr,agg,attribute,Aggregate,The risky-leg Aggregate,,,,Y,,,,PnL wraps an Aggregate.
-data-attr,consideration,attribute,scalar,The P&L consideration (premium leg),,,,Y,,,,
-state,valid,property,Validation,Validation flag (NOT_UNREASONABLE / REINSURANCE / fail bits),Y,Y,,,,,,Read by qd/_repr_html_; computed from stats_df.
-state,program,attribute,str,Original DecL program text,Y,Y,Y,Y,Y,,,
-state,figure,attribute,object,Last matplotlib figure produced,Y,Y,Y,,,,,
-severity-api,fz,attribute,object,Underlying frozen scipy.stats distribution,,,,,Y,,,Severity is an rv_continuous; inherits rvs/moment/stats/entropy/fit/interval/isf/median/std/expect/etc.
-severity-api,moms,method,tuple,First three moments of the layered severity X(a d),,,,,Y,,,
-frequency-api,freq_pgf,method,callable,Probability generating function,,,,,,Y,,Freq core; never materializes a count dist (see create_frequency).
-frequency-api,freq_moms,method,tuple,Frequency moments,,,,,,Y,,
-frequency-api,freq_name,attribute,str,Frequency family name,,,Y,,,Y,,
+group,name,kind,returns,description,Aggregate,Portfolio,BivariateAggregate,PnL,ReinstatementAnalysis,VariableRatingAnalysis,Severity,Frequency,Bounds,notes
+df-headline,summary_df,property,DataFrame,At-a-glance risk view: moments + key percentiles (Freq/Sev/Agg),Y,Y,Y*,Y*,Y,,,,,"WRINKLE: 4 meanings now. Agg/Port = moments+percentiles (a113); Biv = theory-vs-realised; PnL = fixed Consideration/Obligation/Expense/Margin (a121, no longer morphs to gcn_df); ReinstatementAnalysis = Gross/Ceded/Net/Impact headline. VariableRatingAnalysis has none yet (gap)."
+df-headline,tail_df,method,DataFrame,Return-period / exceedance table (p VaR TVaR xsVaR VaR/Mean),Y,Y,Y*,,Y,,,,,"WRINKLE: Agg/Port = return-period table, METHOD. Biv = per-axis support, PROPERTY. ReinstatementAnalysis = net-UW return-period, METHOD. PnL / VariableRatingAnalysis: none (gap)."
+df-headline,validation_df,property,DataFrame,"Moment-vs-estimate QA table (theory vs FFT estimate, rel error)",Y,Y,,,Y,,,,,a113 rename of old summary_df. Biv keeps its validation inside summary_df (not migrated).
+df-headline,tail_behavior_df,property,DataFrame,Layered tail report: support + per-side tail class + concentration,Y,Y,,,,,,,,a113 rename of old tail_df.
+df-headline,stats_df,attribute,DataFrame,Single source of truth for moments (component x measure x view),Y,Y,Y,,Y,Y,,,,Canonical moment store; summary_df/validation_df read from it.
+df-headline,density_df,property,DataFrame,Per-bucket density / distribution / risk-measure frame,Y,Y,Y,,Y,,,,,The realised PMF grid + derived columns.
+df-headline,density,property,DataFrame,The live (positive-mass) rows of density_df,Y,Y,Y,,,Y,,,,"WRINKLE: VariableRatingAnalysis.density is the INPUT gross-density array, not the density_df live slice -- name collision."
+df-headline,sev_density_df,property,DataFrame,Per-bucket severity density on the severity grid,Y,,,,,,,,,Severity-grid analogue of density_df.
+df-headline,bs_window_df,property,DataFrame,Curated bucket/window sizing decision [bs-reporting],Y,Y,Y,,Y,,,,,Grid-selection audit; None before update.
+df-headline,pnl_df,property,DataFrame,The net P&L distribution (deterministic transform of X),,,,Y,,,,,,PnL net distribution frame.
+df-headline,gcn_df,property,DataFrame,Gross/Ceded/Net exhibit (doubly additive signed),,,,Y,Y,Y,,,,"Only for make_pnl(gross=,ceded=) positions."
+df-headline,dependency_df,property,DataFrame,Joint dependence (cov / corr / tau) by level,,,Y,,,,,,,Bivariate-only.
+df-reins,reins_summary_df,property,DataFrame,Per-stage reinsurance summary (economic view of validation_df cols),Y,Y,,,,,,,,None when no reinsurance. Mirrors validation_df 8-col layout.
+df-reins,reins_stats_df,property,DataFrame,Per-layer reinsurance layering summary (empirical model-grid),Y,Y,,,,,,,,None when no reinsurance.
+df-reins,reins_density_df,property,DataFrame,Per-bucket gross/ceded/net densities under reinsurance,Y,Y,,,,,,,,None when no reinsurance.
+df-portfolio,augmented_df,method,DataFrame,Cached augmented density for a distortion (pricing columns),,Y,,,,,,,,Portfolio pricing scratch frame; see augmented_dfs cache.
+df-portfolio,unit_density_df,method,DataFrame,Long-form frame of all unit pmfs each on its native grid,,Y,,,,,,,,
+df-portfolio,aligned_unit_density_df,method,DataFrame,Unit pmfs scattered onto a common grid (display adapter),,Y,,,,,,,,
+df-portfolio,independent_density_df,attribute,DataFrame,Independent-combine total density (vs copula combine),,Y,,,,,,,,
+df-portfolio,independent_stats_df,attribute,DataFrame,Stats of the independent-combine total,,Y,,,,,,,,
+df-portfolio,sample_df,attribute,DataFrame,Stored multivariate sample (after sample()),,Y,,,,,,,,
+df-portfolio,distortion_df,attribute,DataFrame,Calibrated distortion parameter table,,Y,,,,,,,,
+df-portfolio,calibration_df,attribute,DataFrame,Distortion calibration diagnostics,,Y,,,,,,,,
+df-bounds,cloud_df,attribute,DataFrame,Cloud of weighted-TVaR distortions (n_s x K),,,,,,,,,Y,Bounds pricing-cloud machinery.
+df-bounds,tvar_df,attribute,DataFrame,TVaR by p_knots,,,,,,,,,Y,
+df-bounds,weight_df,attribute,DataFrame,Bracketing-pair weights,,,,,,,,,Y,
+str-narrative,info,property,str,Fixed-layout multi-line object summary (text),Y,Y,Y,,Y,,,,,WRINKLE: not on PnL/Severity/Frequency.
+str-narrative,name,attribute,str,Object name,Y,Y,Y,Y,,,Y,,Y,Frequency has no name.
+str-narrative,value_type,property,str,Sign convention: 'loss' or 'payoff',Y,Y,,Y,,,,,,Backed by _is_loss_value. Not on Severity (uses .signed) or Biv (per-axis).
+str-narrative,pprogram,property,str,Canonical DecL program text (rendered from spec),Y,Y,,,,,,,,WRINKLE: not on Biv/PnL though both are DecL-built.
+str-narrative,pprogram_html,property,str,Syntax-highlighted DecL program for Jupyter,Y,Y,,,,,,,,
+str-narrative,bs_description,property,str,One-line bucket-grid summary [bs-reporting],Y,Y,Y,,Y,,,,,
+str-narrative,bs_explanation,property,str,Verbose bucket-grid prose [bs-reporting],Y,Y,,,Y,,,,,WRINKLE: Biv has bs_description but not bs_explanation.
+str-narrative,tail_description,property,str,Short narrative over the tail-behavior report,Y,Y,Y,,,,Y,Y,,Most widely shared narrative.
+str-narrative,tail_explanation,property,str,Verbose per-component tail prose,Y,Y,,,,,,,,WRINKLE: description widely shared but explanation only Agg/Port.
+str-narrative,validation_explanation,property,str,Long-narrative validation result,Y,Y,,,Y,,,,,No paired validation_description (single narrative).
+str-narrative,reins_description,property,str,Short reinsurance description,Y,,,,Y,,,,,Agg-only; reins lives on the unit.
+str-narrative,reins_kinds,property,str,Kinds of reinsurance applied (text),Y,,,,,,,,,
+str-narrative,support_description,property,str,Short severity support description for info,,,,,,,Y,,,Severity-only.
+str-narrative,dsev_bucket,property,str,Scheme for placing discrete-severity atoms on the grid,Y,,,,,,,,,
+str-narrative,reins_bucket,property,str,Rebucketing scheme for net/ceded distributions,Y,,,,,,,,,
+str-narrative,allocation_method,property,str,Natural-allocation method: 'linear' or 'lifted',,Y,,,,,,,,Portfolio-only.
+stat,agg_m,attribute,scalar,Aggregate mean (theoretical),Y,Y,,,,,,,,WRINKLE: Agg/Port name moments agg_m/agg_sd/agg_skew/agg_cv/agg_var; PnL/Severity use scipy-style mean/sd/skew/var properties.
+stat,agg_sd,attribute,scalar,Aggregate standard deviation,Y,Y,,,,,,,,
+stat,agg_cv,attribute,scalar,Aggregate coefficient of variation,Y,Y,,,,,,,,
+stat,agg_skew,attribute,scalar,Aggregate skewness,Y,Y,,,,,,,,
+stat,agg_var,attribute,scalar,Aggregate variance,Y,Y,,,,,,,,
+stat,est_m,attribute,scalar,Estimated (realised FFT) aggregate mean,Y,Y,,,,,,,,est_m/est_cv/est_sd/est_skew/est_var = empirical from the grid.
+stat,est_cv,attribute,scalar,Estimated aggregate CV,Y,Y,,,,,,,,
+stat,est_sd,attribute,scalar,Estimated aggregate SD,Y,Y,,,,,,,,
+stat,est_skew,attribute,scalar,Estimated aggregate skew,Y,Y,,,,,,,,
+stat,est_var,attribute,scalar,Estimated aggregate variance,Y,Y,,,,,,,,
+stat,sev_m,attribute,scalar,Severity mean (theoretical),Y,,,,,,,,,WRINKLE: Agg exposes sev_m/sev_sd/sev_skew/sev_cv; Severity itself uses sev_mean + scipy mean() (sev_cv is shared).
+stat,sev_sd,attribute,scalar,Severity standard deviation,Y,,,,,,,,,
+stat,sev_cv,attribute,scalar,Severity CV,Y,,,,,,Y,,,
+stat,sev_skew,attribute,scalar,Severity skewness,Y,,,,,,,,,
+stat,est_sev_m,attribute,scalar,Estimated (realised) severity mean,Y,,,,,,,,,est_sev_* = empirical severity moments.
+stat,mean,property,scalar,Mean (scipy-style),,,,Y,,,Y,,,WRINKLE: PnL/Severity expose mean/sd/skew as properties; Agg/Port do not (use agg_m...).
+stat,sd,property,scalar,Standard deviation (scipy-style),,,,Y,,,,,,"WRINKLE: PnL exposes sd; Severity uses scipy std()/sev_sd, not sd."
+stat,skew,property,scalar,Skewness (scipy-style),,,,Y,,,,,,
+stat,corr,property,scalar,Pearson correlation of the two component aggregates,,,Y,,,,,,,Bivariate-only.
+stat,prob_loss,property,scalar,P(net < 0): probability the position loses money,,,,Y,,,,,,
+stat,tail_class,property,scalar,(freq sev agg) TailClass triple,Y,Y,,,,,Y,,,
+stat,bounded,property,bool,Whether support is bounded,Y,Y,,,,,Y,,,
+dist-fn,q,method,scalar,Quantile / VaR: q(p),Y,Y,,Y,,,,,,WRINKLE: Severity uses ppf (scipy) not q; PnL has q not ppf.
+dist-fn,ppf,method,scalar,Quantile (scipy alias of q),Y,,,,,,Y,,,Agg aliases ppf=q; Severity inherits scipy ppf.
+dist-fn,tvar,method,scalar,Tail value at risk: tvar(p),Y,Y,,,,,,,,WRINKLE: PnL/Severity have no tvar (Severity has tvar_sev via Agg only).
+dist-fn,var,method,scalar,Value at risk (alias of quantile),,Y,,Y,,,Y*,,,WRINKLE: var = VaR on Port/PnL but = variance on Severity (scipy). Agg has NO var().
+dist-fn,cdf,method,scalar,Cumulative distribution function,Y,Y,,Y,,,Y,,,
+dist-fn,sf,method,scalar,Survival function,Y,Y,,Y,,,Y,,,
+dist-fn,pdf,method,scalar,Probability density (continuous approximation),Y,Y,,,,,Y,,,
+dist-fn,pmf,method,scalar,Probability mass (discrete view),Y,Y,,,,,,,,
+dist-fn,q_sev,method,scalar,Severity quantile,Y,,,,,,,,,
+dist-fn,tvar_sev,method,scalar,Severity TVaR,Y,,,,,,,,,
+dist-fn,snap,method,scalar,Snap a value to the density_df grid (multiple of bs),Y,Y,,,,,,,,
+dist-fn,var_dict,method,dict,Dictionary of VaRs for the aggregate / units,Y,Y,,,,,,,,
+dist-fn,sample,method,DataFrame,Draw a sample from the distribution,Y,Y,,,,,,,,Severity uses rvs (scipy).
+dist-fn,freq_pmf,method,ndarray,Frequency pmf via the PGF,Y,,,,,,,,,
+pricing,price,method,object,Price using regulatory + pricing distortions,Y,Y,,,,,,,,Aggregate mirrors Portfolio.price.
+pricing,price_ccoc,method,object,Price at a constant cost of capital and VaR level,Y,Y,,,,,,,,
+pricing,price_pentagon,method,object,Complete the pricing octet given one target,Y,Y,,,,,,,,
+pricing,price_pentagon_ex,method,object,Complete the pricing octet over the full vocabulary,Y,Y,,,,,,,,
+pricing,pla,method,object,Given one of p/L/a return the consistent triple,Y,Y,,,,,,,,
+pricing,prob_loss_assets,method,object,Given one of p/L/a return the consistent triple,Y,Y,,,,,,,,
+pricing,apply_distortion,method,object,Apply a distortion to the density (gS columns),Y,Y,,,,,,,,
+pricing,calibrate_distortions,method,object,Calibrate the standard distortion set to a CoC target,Y,Y,,,,,,,,
+pricing,price_stand_alone,method,object,Price each unit stand-alone vs diversified,,Y,,,,,,,,Portfolio-only.
+pricing,analyze_distortion,method,object,Pricing readout for one distortion,,Y,,,,,,,,
+pricing,analyze_distortions,method,object,Pricing readout for a set of distortions,,Y,,,,,,,,
+pricing,pricing_at,method,DataFrame,Pentagon pricing readout per unit at p or a,,Y,,,,,,,,
+pricing,pricing_bounds,method,object,Price ranges of risks consistent with the total,,Y,,,,,,,,
+pricing,allocation_bounds,method,object,Natural-allocation premium ranges by unit,,Y,,,,,,,,
+pricing,bodoff,method,object,Bodoff layer asset allocation,,Y,,,,,,,,
+pricing,pentagon_at,method,object,Single-unit Pentagon object at a capital level,,Y,,,,,,,,
+pricing,tvar_threshold,method,scalar,Find pt with TVaR(pt) = VaR(p),,Y,,,,,,,,
+reins,apply_occ_reins,method,object,Apply the occurrence reinsurance structure,Y,,,,,,,,,Agg-only; Portfolio reins is per-unit.
+reins,apply_agg_reins,method,object,Apply the aggregate reinsurance structure,Y,,,,,,,,,
+reins,occ_ceder,method,callable,Occurrence ceded transform,Y,,,,,,,,,
+reins,occ_netter,method,callable,Occurrence net transform,Y,,,,,,,,,
+reins,occ_bivariate,method,object,Joint law of two occurrence gross/ceded/net aggregates,Y,,,,,,,,,
+reins,reins_occ_plot,method,None,Occurrence-reinsurance plots,Y,,,,,,,,,
+build-io,update,method,None,(Re)compute the discrete approximation,Y,Y,Y,Y,,,,,,Main compute entry; PnL delegates to its agg.
+build-io,update_work,method,None,FFT compute kernel,Y,,Y,,,,,,,
+build-io,make_pnl,method,PnL,Wrap this aggregate as a PnL position,Y,,,,,,,,,
+build-io,create_frequency,method,Aggregate,Materialize the count distribution as an Aggregate/Portfolio,Y,Y,,,,,,,,Good Agg/Port parity (a-series).
+build-io,approximate,method,object,Method-of-moments approximation to self,Y,Y,,,,,,,,verb method; stored kind on .approximation attr.
+build-io,as_severity,method,Severity,Convert a portfolio total into a Severity,,Y,,,,,,,,
+build-io,rescale,method,Aggregate,Rescaled copy (for derivatives),Y,,,,,,,,,
+build-io,unwrap,method,Aggregate,Unwrap an under-sized (small log2) result,Y,,,,,,,,,
+build-io,picks,method,object,Adjust severity to hit layer pick targets,Y,,,,,,,,,
+build-io,focus,method,DataFrame,Central window of density_df holding 1-p of mass,Y,,,,,,,,,
+build-io,create_from_sample,method,object,Build a portfolio from a multivariate sample,,Y,,,,,,,,
+build-io,json,method,str,Write spec to JSON,Y,Y,,,,,,,,
+build-io,save,method,None,Persist to the knowledge base,,Y,,,,,,,,WRINKLE: save on Portfolio only; Aggregate has json but no save.
+build-io,spec,property,dict,Read-only DecL spec dictionary,Y,Y,,,,,,,,
+build-io,spec_ex,property,dict,Full spec incl derived info,Y,Y,,,,,,,,
+plot,plot,method,None,Standard severity + aggregate (Lee) plots,Y,Y,Y,Y,Y,,Y,,,Most widely shared method.
+plot,scatter,method,object,Scatter of unit marginals,,Y,,,,,,,,
+plot,plot_envelope,method,None,Bounds three-panel envelope figure,,,,,,,,,Y,
+plot,plot_weights,method,None,Bounds bracketing-weight contour,,,,,,,,,Y,
+plot,help,method,None,Lookup help on methods/properties by regex,Y,Y,Y,,,,,,,WRINKLE: not on PnL/Severity/Frequency.
+analysis,aggregate_error_analysis,method,DataFrame,Aggregate error across a range of bucket sizes,Y,,,,,,,,,
+analysis,severity_error_analysis,method,DataFrame,Severity component error analysis,Y,,,,,,,,,
+analysis,entropy_fit,method,object,Max-entropy fit to the aggregate,Y,,,,,,,,,
+analysis,cramer_lundberg,method,callable,Pollaczeck-Khinchine surplus / ruin function,Y,,,,,,,,,Alias pollaczeck_khinchine.
+analysis,sample_compare,method,object,Compare sample-based total to independent,,Y,,,,,,,,
+analysis,evaluate,method,object,Cherny-Madan breakeven acceptability panel,,,,Y,,,,,,PnL-only.
+grid-attr,bs,attribute,scalar,Bucket size,Y,Y,Y,,,,,,,Grid params; 0 before update.
+grid-attr,log2,attribute,scalar,log2 of grid points,Y,Y,,,,,,,,WRINKLE: bs on Biv but log2 not surfaced there.
+grid-attr,padding,attribute,scalar,FFT padding (zero-buckets multiplier),Y,Y,Y,,,,,,,
+grid-attr,normalize,attribute,bool,Whether the severity PMF is renormalised,Y,Y,,,,,,,,
+grid-attr,sev_calc,attribute,str,Severity discretization mode,Y,Y,,,,,,,,
+grid-attr,validation_eps,attribute,scalar,Relative-error tolerance for validation,Y,Y,,,,,,,,
+grid-attr,x_min,attribute,scalar,Grid lower bound,Y,,,,,,,,,
+grid-attr,x_max,attribute,scalar,Grid upper bound,Y,,,,,,,,,
+grid-attr,xs,attribute,ndarray,The bucket grid (outcome values),Y,,,,,,,,,
+grid-attr,n,attribute,scalar,Expected claim count,Y,,,,,,,,,
+grid-attr,en,attribute,ndarray,Per-component expected claim counts,Y,,Y,,,,,,,
+data-attr,agg_density,attribute,ndarray,Aggregate PMF on the grid,Y,,,,,,,,,agg_density_gross/ceded/net under reins.
+data-attr,ftagg_density,attribute,ndarray,FT of the aggregate density (for copula combine),Y,,,,,,,,,
+data-attr,sev_density,attribute,ndarray,Severity PMF on the grid,Y,,,,,,,,,
+data-attr,sevs,attribute,list,Component Severity objects,Y,,,,,,,,,
+data-attr,frequency,attribute,Frequency,The Frequency object,Y,,Y,,,,,,,
+data-attr,agg_list,attribute,list,Component Aggregate objects (units),,Y,,,,,,,,
+data-attr,unit_names,attribute,list,Unit names,,Y,Y,,,,,,,
+data-attr,marginals,property,tuple,The two marginal densities,,,Y,,,,,,,Bivariate-only.
+data-attr,copula,attribute,object,The copula coupling the components,,,Y,,,,,,,
+data-attr,bivariate,property,object,BivariateDistribution view of the joint density,,,Y,,,,,,,
+data-attr,agg,attribute,Aggregate,The risky-leg Aggregate,,,,Y,,,,,,PnL wraps an Aggregate.
+data-attr,consideration,attribute,scalar,The P&L consideration (premium leg),,,,Y,,,,,,
+state,valid,property,Validation,Validation flag (NOT_UNREASONABLE / REINSURANCE / fail bits),Y,Y,,,,,,,,Read by qd/_repr_html_; computed from stats_df.
+state,program,attribute,str,Original DecL program text,Y,Y,Y,Y,,,Y,,,
+state,figure,attribute,object,Last matplotlib figure produced,Y,Y,Y,,Y,,,,,
+severity-api,fz,attribute,object,Underlying frozen scipy.stats distribution,,,,,,,Y,,,Severity is an rv_continuous; inherits rvs/moment/stats/entropy/fit/interval/isf/median/std/expect/etc.
+severity-api,moms,method,tuple,First three moments of the layered severity X(a d),,,,,,,Y,,,
+frequency-api,freq_pgf,method,callable,Probability generating function,,,,,,,,Y,,Freq core; never materializes a count dist (see create_frequency).
+frequency-api,freq_moms,method,tuple,Frequency moments,,,,,,,,Y,,
+frequency-api,freq_name,attribute,str,Frequency family name,,,Y,,,,,Y,,
+legs,distributions,property,dict,Per-leg GridDistribution objects (the pushed-forward leg set),,,,,Y,Y,,,,Kernel pushforward of the leg set (a121).
+legs,view,property,InsuranceView,InsuranceView over the leg set + source (one cached kernel evaluation),,,,,Y,Y,,,,a121 leg kernel; backs distributions/stats_df.
+str-narrative,reins_explanation,property,str,Multi-line reinsurance / treaty narrative,,,,,Y,,,,,Paired long form of reins_description.
+analysis-attr,terms,attribute,object,The ContractTerms feature (reinstatement / variable-rating basis),,,,,Y,Y,,,,Frozen-dataclass feature; contract_terms.py.
+analysis-attr,gross_premium,attribute,scalar,Fixed gross premium P_G,,,,,Y,Y,,,,
+build-io,reinstatement_analysis,method,object,Backing ReinstatementAnalysis for a reinstatement-bearing position (None otherwise),Y,,,Y,,,,,,"WRINKLE: METHOD on Aggregate (entry point: terms/gross_premium), PROPERTY on PnL (lazy backing). a116."
+build-io,variable_rating_analysis,method,object,Backing VariableRatingAnalysis for a swing/slide/pc/corridor position (None otherwise),Y,,,Y,,,,,,"WRINKLE: METHOD on Aggregate, PROPERTY on PnL (lazy backing). a119."

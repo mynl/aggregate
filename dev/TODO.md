@@ -1,524 +1,228 @@
 # TODO
 
-> The v1.0 backlog, organized into **tracks** with mnemonic codes. The priorities
-> table first, then the details per track, then post-v1.0 ideas. Snappy entries
-> only — details live in the plan files (`dev/`, `dev/done/`) and the git log.
-> **What's landed is in `CHANGELOG.md`** and is removed from here.
+> The v1.0 backlog. **Active sequence first** (the ordered P&L → reporting path),
+> then the remaining backlog grouped by theme, then post-v1.0 ideas. Snappy
+> entries only — details live in the plan files (`dev/`, `dev/done/`) and the git
+> log; **what's landed is in `CHANGELOG.md`** and removed from here.
 >
-> **Phase tags:** `[A]` alpha = must finish before cutting `1.0.0b1`.
-> `[B]` early beta = fine just after the alpha→beta cut, does not block it.
+> **Labels, not codes.** Every item has a descriptive `[Bracket-Label]`; the old
+> single-letter track codes (`N6`, `H4`, `T2`, …) are retired (CLAUDE.md, Naming
+> conventions — 2026-06-30). Phase: `alpha` = must finish before cutting
+> `1.0.0b1`; `beta` = fine just after the alpha→beta cut. GitHub issue numbers
+> kept in parentheses as the stable external cross-reference.
 >
-> **Last updated: 2026-06-21** — Cleanup pass: pruned all shipped/done items
-> (they live in `CHANGELOG.md`) — the completed Steve-manual entries, Track M
-> (bivariate, shipped a70–a80), Track F, and the done `W2` / `T1`; dropped `H9`
-> and `F7`. Next focus: `N6` / `N8` (numerics + guards) and Track D docs toward
-> `1.0.0b1`.
+> **Last updated: 2026-06-30** — Retired the cryptic track-code system for
+> descriptive labels and added the active P&L / reporting sequence on top. Pruned
+> the shipped god-module, P&L-expenses, variable-rating, reinstatement, and
+> bivariate-leg-kernel work (now in `CHANGELOG.md`, through `1.0.0a121`).
 
 ---
 
-## Track codes (alphabetical)
+## Active sequence — making P&L a first-class citizen (in order)
 
-| Code | Track |
-|------|-------|
-| **B** | Bugs & investigations |
-| **D** | Docs & packaging |
-| **H** | Hygiene (module organization & dependencies) |
-| **N** | Numerics & pricing core (incl. signed / negative-x) |
-| **P** | P&L expenses & variable rating (reinstatements, retro/swing/slide/PC/corridor) |
-| **T** | Tests (suite consolidation) |
-| **W** | Windows & plotting |
-| **β** | Pre-beta scaffold retirement (delete at the alpha→beta cut) |
+> The current focus, in dependency order. Item 1 *defines* the target; items 2–4
+> build to it. The three "sequenced around" items are slotted by the author:
+> `[Display-Mode]` waits on item 1, `[Signed-Bounded-Window]` is anytime,
+> `[Doc-Fix]` is last.
 
-## Priorities & dependencies
+1. **[PnL-API]** `alpha` — `create_pnl(source, consideration, obligation, names)`
+   + `create_pnl_tower`: a **domain-agnostic** P&L constructor over the
+   pushforward engine (labels-as-data, consideration/obligation/result → three
+   GDs + a single-column `summary_df`). Delivers the **missing generic entry
+   point** (build a P&L from a raw `(scenarios, probs)` model or a
+   `BivariateDistribution` — power generation, crop revenue, ALM) *and* the
+   first-class surface in one pass; folds in the old `[PnL-First-Class]`.
+   **Supersedes the a121 leg wrappers** (`legs.py` / `_insurance_view.py` come
+   out; the pushforward engine stays). DecL unchanged. Plan:
+   `dev/plan-pnl-api.md`. **Do this first — its report shapes are what the
+   guidelines standardize.**
+2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
+   for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
+   fixed** (it does not morph as the object gains properties), columns are
+   **pure** (one unit per column — currency and ratios never mixed), headings are
+   **presentation-ready**, and the `summary` (what *is* this?) vs `validation`
+   (= the old `summary`: is it calculating right?) vs `reins_<flavor>` (only when
+   reinsurance present) split is settled. Plan: `dev/reporting-guidelines.md`.
+   (The first fix it named, the `summary_df`→`gcn_df` morph, landed in
+   `1.0.0a121`.) Depends on `[PnL-API]`.
+3. **[Portfolio-of-PnL]** `alpha` — `PortPnL`: portfolios of P&L positions.
+   Constant-consideration v1 (`make_pnl(port_total, Σ Cᵢ)` + a stacked per-unit
+   signed summary; obligation combine is the existing Portfolio FFT); loss-
+   sensitive net-then-combine deferred. A book is a `create_pnl_tower` (or a
+   `create_pnl` over a portfolio total), so it is **nearly free once `[PnL-API]`
+   lands**. Plan: `dev/plan-pnl-portfolio.md`. Depends on `[PnL-API]`.
+4. **[Plotting-Punchups]** `alpha` — plotting polish; lead item: a `pnl` aggregate
+   plots the aggregate **only** (no loss-convention severity overlaid on a payoff
+   — wrong-sign distraction for the UW/finance audience). Plan:
+   `dev/plan-plotting-punchups.md`. Pairs with `[PnL-API]` plotting; do
+   alongside / after. (Related, separate: `[Plot-Severity-Outside-Window]` below.)
 
-**Critical path (the spine):** the `N` spine is mostly shipped — `N2`, `N3`,
-`N5`, `N5b` landed (a36–a57). What remains on the spine: **`N6`**
-(validation-calc review) and **`N8`** (input guards), plus Track D docs.
+**Sequenced around the above:**
 
-| Status | ID | Item | Phase | Depends on |
-|:--|----|------|:-----:|------------|
-|   | N6 | Validation-calc review | A | — |
-|   | N8 | Input guards & semantic consistency (3, ex-README) | A | — |
-|   | H4 | Docstring style sweep → NumPy | A | — |
-|   | H5 | `pedagogy` figure-generator migrations | B | — |
-|   | B4 | ZT/ZM frequency broken + add shift helpers | A | — |
-| ✓ | W10 | Retire `recommend_bucket`/`best_bucket` | A | done a95 (plan-finish-shared-concerns B0) |
-| ✓ | P1 | P&L expenses + ceded premium/commission (`plan-pnl-expenses-ceded-premium`) | A | done a114 (dev/done/) |
-|   | P2 | Reinstatement premiums + pushforward engine (`plan-reinstatements`) | A | P1 |
-|   | P3 | Variable rating: retro/swing/slide/PC/corridor (`plan-variable-rating`) | A | P2 |
-|   | T2 | Rationalize tests / library coupling | A | — |
-|   | T3 | Switcheroo `Port.Sample` regression case | B | — |
-|   | D1 | New README body for stable-v1.0 audience | A | — |
-|   | D2 | v1.0 Journey + statements of philosophy | A | — |
-|   | D3 | Grammar reference from `decl.lark` | A | — |
-|   | D4 | Tail-descriptor docs + tests | A | — |
-|   | D5 | Doc gaps (errors, ZT/ZM, splice, site refs…) | A | — |
-|   | D6 | API docstring coverage / rendering | A | H4 |
-|   | D7 | Reinsurance case-study docs rewrite | B | (N2–N3 shipped) |
-|   | D8 | PUNCHUP `pedagogy` + integrate docs | B | H5 |
-| ✅ | D11 | Sphinx docs → master `uber-library.bib` (a92) | B | — |
-|   | D12 | Cheat-sheet tweaks once UI settles | B | — (hold to beta) |
-| **— unclear / under-specified (revisit before scheduling) —** |
-|   | W3 | Plot severity outside the agg window | B | — (approach TBD) |
-|   | D9 | Reinsurance structure diagrams | B | — |
-| **— β pre-beta scaffold retirement (do at the b1 cut; see Track β below) —** |
-|   | β1 | Delete `_test_suite.agg` + `_test_suite2.agg` (SLY-parity scaffold) | A | b1 |
-|   | β2 | Retire their dependents (snapshot, fixtures, config, scripts, docs) | A | β1 |
-|   | β3 | Confirm `test_agg_libraries.py` is the surviving net for shipped libs | A | β1 |
-
-**Status:** blank = untouched, X Done, P in Progress.
-
-**DOD mapping:** Docs updated → **D**; Numerical calculations checked +
-negative-x methods → **N** (+ bug **B**); test suite trimmed → **T**.
+- **[Display-Mode]** `beta` — a presentation-only `user` / `dev` repr toggle (a
+  `ReprMixin`) that chooses *which* view an object renders without changing any
+  computed value. **Deferred until after `[Reporting-Guidelines]`** — what it
+  toggles between depends on the report shapes decided there. Plan:
+  `dev/plan-display-mode.md`.
+- **[Signed-Bounded-Window]** `alpha` — robustness fix: kill the `int(inf)`
+  overflow in the bucket/window sizer and guard the silently-ignored layer on a
+  signed severity. Independent — **do whenever** (regression bar: ordinary
+  aggregates byte-for-byte unchanged). Plan:
+  `dev/plan-signed-bounded-window-overflow.md`.
+- **[Doc-Fix]** `beta` — clear the executed-cell `*Error`s in the docs build.
+  **Last — after the code has settled** (it churns with every API change). Plan:
+  `dev/doc-fix.md`.
 
 ---
 
-## Track N — Numerics & pricing core  `[A]` (critical path)
+## Backlog — numerics & pricing core
 
-> Negative-x is folded in here: it focuses on the same code and the same
-> calculations. All "review numerics" work is **zero blast radius** (internal,
-> no API change, ideally identical numbers — faster compute + trim unused
-> `density_df` columns) **except** where the negative-x angle deliberately
-> extends behaviour to signed support. **Separate the base `density_df` calcs
-> from the apply-distortion calcs — both have a negative-x angle.** (The
-> apply-distortion side, `N2`/`N3`/`N5`, shipped a36–a57.)
-
-- [ ] **N6 `[A]` Validation-calc review** (#49) — audit the algorithm vs the
-  published *Aggregate* paper; make docs match the actual algo; the "all
-  switches → config" sub-goal is **done** (`eps`/`noise` a30; `aliasing_ratio` /
-  `exeqa_noise_floor` / `deficit_materiality` a83); fix the false-positive
+- **[Validation-Calc-Review]** `alpha` (#49) — audit the validation algorithm vs
+  the published *Aggregate* paper and make the docs match the actual algo. The
+  "all switches → config" sub-goal is done (`eps`/`noise`, `aliasing_ratio`,
+  `exeqa_noise_floor`, `deficit_materiality`); remaining: fix the false-positive
   *agg-mean-error ≫ sev-error / aliasing* failure (try larger `bs`; revisit the
-  too-tight tolerance — now an `aliasing_ratio` config edit). Independent of N8.
-- [ ] **N8 `[A]` Input guards & semantic consistency** *(ported from README,
-  2026-06-06)* — three small correctness/guard items:
-  - Treatment of zero `lb` is not consistent with attachment equals zero.
-  - Flag attempts to use **fixed** frequency with a non-integer expected value.
-  - Flag attempts to use **mixing** with an inconsistent frequency distribution.
+  too-tight tolerance, now an `aliasing_ratio` config edit).
+- **[Input-Guards]** `alpha` (ported from README) — three correctness/guard items:
+  zero `lb` not consistent with attachment equals zero; flag **fixed** frequency
+  with a non-integer expected value; flag **mixing** with an inconsistent
+  frequency distribution.
 
-  The latter two are input-validation guards; the first is a layer/attachment
-  semantics fix. Pairs with **N6** (validation) but distinct (guards, not the
-  validation-calc algorithm).
+## Backlog — bugs & investigations
 
----
+- **[ZT-ZM-Frequency-Fix]** `alpha` — zero-truncated / zero-modified frequency is
+  broken (`poisson zt` → NaN solver for every parameterization; `zm` builds but
+  the semantics are wrong — it inverts a post-modification mean). Redesign: the
+  user inputs the **un-truncated/un-modified base mean** and we apply the shift
+  **forward** (no solver); ship documented shift helpers (both directions). Two
+  examples are commented out in `examples.agg` until then. Pairs with `[Doc-Gaps]`.
+- **[bs_describe-Wart]** `beta` — investigate the `bs_describe` / `bs_explain`
+  module workers (the `color=` workers behind `bs_description` /
+  `bs_explanation`): purpose, the local-`line` accumulator, and whether they earn
+  their place / want reshaping. **Reconcile with `dev/done/plan-consistent-naming.md`
+  §3** (the deferred rename of the verb workers that shadow the noun properties by
+  one letter, e.g. → `_format_bs_grid`). Do the two together. *Standing reminder —
+  surface periodically until scoped.*
 
-## Track H — Hygiene (module organization & dependencies)  `[A]` (parallel)
+## Backlog — hygiene (module organization)
 
-- [ ] **H4 `[A]`** Docstring sweep `iman_conover.py` / `moments.py` (and pockets
-  elsewhere) Sphinx `:param:` → NumPy style; public surface first (#18). Feeds **D6**.
-- [ ] **H5 `[B]`** `pedagogy.py` migrations: figure generators out of `ft.py` /
-  `tweedie.py` so those stay API-focused (#19).
-- [ ] **H6 `[B]`** **God-module refactor track** — four sequenced plans, see
-  **`dev/plan-README.md`** for the map and the regret-guard. Order: **P1**
-  `plan-grid-distribution.md` (new `GridDistribution` value type; `make_var_tvar`
-  moves in from `utilities.py`; every consumer adopts) → **P2**
-  `plan-plots-subsystem.md` (one `plots/` package + global matplotlib defer)
-  — **Pass A landed** (structural port + matplotlib defer; `import aggregate` is
-  matplotlib-free, hygiene test added; no bump); **Pass B** (visual refresh,
-  author-driven) pending → **P3** `plan-split-distributions.md` (kind split behind a façade; **births the
-  shared concerns** `_validation`/`_bucket_window`/`_pricing` + Agg-only `_reinsurance`) →
-  **P4** `plan-split-portfolio.md` (**three-subsystem split** `_portfolio_density` /
-  `_portfolio_sample` / `_portfolio_common`; consumes the P3 shared concerns).
-  Deferred/conditional (post-beta, gated by the two-file rule): Agg 2B
-  `ReinsuranceProgram`, the **sample-subsystem review** (correlation/switcheroo —
-  extracted in P4, reviewed in its own later plan), relaxing pentagon completion to
-  not require `a`/`p`, Bounds & Bivariate structural splits. *(new, 2026-06-21;
-  updated 2026-06-23 for the pricing/portfolio pivot; drafted not executed — P1 is a
-  pure addition and valuable standalone.)*
-  - **P1 landed (1.0.0a90–a91), Bivariate deferred:** Phase 1 (a90) built
-    `aggregate._grid_distribution.GridDistribution`, relocated `make_var_tvar` out of
-    `utilities`, reshaped `_DiscreteRV` as a thin adapter, added
-    `tests/test_grid_distribution.py`. Phases 2–5 (a91) adopted it in **Aggregate**
-    (q/tvar/q_sev/tvar_sev — incl. a called-out `tvar_sev` bug fix), **Portfolio**
-    (q/var/tvar/tvar_threshold), and **Bounds** (`_resolve_obj` hands a GD;
-    `_tvar_x_a` → `GridDistribution.tvar_of_limited`). All behaviour-guarded by
-    `test_baseline.py` (numbers identical bar the `tvar_sev` fix). **Phase 6
-    (Bivariate) deferred** — purely additive (no existing q/tvar; joint-vs-marginal
-    quantile semantics are a design question) and Bivariate's structural split is
-    already deferred. `cdf/sf/pdf/pmf` on Agg/Port left on `interp1d` (used directly
-    as callables by plotting). Plan moved to `dev/done/`.
-  - **P2 landed (1.0.0a92, Pass A):** `aggregate.plots` subpackage (Layer-0
-    `_style`, the per-class compositors); all `.plot()` methods reduced to one-line
-    stubs; `import aggregate` is matplotlib-free; `tests/test_plots_boundary.py`
-    enforces the boundary. Pass B (visual refresh) deferred to the author.
-  - **P3 Phase 1 landed (pure move, no bump):** `distributions.py` (9.8k lines)
-    kind-split into `_fits` / `_frequency` / `_severity` / `_aggregate` behind
-    a thin re-export façade (`distributions.py` → ~50 lines). Subclass dispatch is
-    registry-based (`__init_subclass__`) so the move is dispatch-safe; three
-    function-local imports break the `_fits`/`_severity` → `_aggregate` cycles; the
-    façade re-exports the exact historical surface (vetted against every
-    `from …distributions import` in src + tests). Behaviour-identical (full suite
-    matches baseline).
-  - **P3 Phase 1b landed (pure move, no bump):** birthed the shared/Agg-only
-    concerns out of `_aggregate` (now ~6.2k): `_bucket_window.py` (bucket/window
-    sizing + the 7 window/bucket constants), `_reinsurance.py` (`make_ceder_netter`
-    / `_validate_reins_layers`), `_validation.py` (`explain_validation` **relocated
-    from `utilities.py`** with a back-compat re-import there, à la `make_var_tvar`;
-    + `VALIDATION_NOISE`/`ALIASING_RATIO`), `_pricing.py` (`price` / `price_pentagon`
-    as `agg`-param functions; the methods are thin delegators). All leaf/near-leaf
-    (never import `_aggregate`/`_portfolio`) so **P4 can drop the Portfolio side in
-    beside them**. Façade re-exports updated to the new homes. Full suite matches
-    baseline. **Deferred within 1b** (high-risk / low-reward now, revisit when P4
-    needs the side-by-side or in 2A): extracting the `Aggregate.valid` body (intricate,
-    `stats_df`-coupled, author-sensitive noise logic) and `_apply_reins_work` into
-    their concern modules — the modules exist and house the clean pieces; the method
-    bodies stay on `Aggregate` for now.
-  - **P3 Phase 1c landed (1.0.0a93, bumps):** distortion-set calibration factored
-    onto `Distortion.calibrate_set` (the permanent family-loop home; GD → Distortion);
-    added `Aggregate.calibrate_distortions` + `Aggregate.price_ccoc` (Agg/Port parity,
-    verified bit-for-bit vs the legacy 1-unit-Portfolio path); the single-GD pricing
-    glue (`calibrate_distortions`, `price_ccoc`) lives in `_pricing`. **Dropped** the
-    unused singular `Portfolio.calibrate_distortion` (plural unchanged in signature,
-    now resolves the survival datum once via `calibrate_set`). Tests added to
-    `test_distortion_calibrate.py`; `test_portfolio_peg_regression.py` (the calibration
-    pin) stays green. **Caveat surfaced:** `GridDistribution.lev` undercounts on the
-    Aggregate's filtered (`p_total>0`) grid (≈15% low at q99 in a smoke test), so the
-    Agg calibration sources `el` from the full `density_df['p_total']`; the GD.lev
-    filtered-grid behavior is worth review (P1 follow-up / 2A).
-  - **P3 Phase 2A landed (1.0.0a93):** the FFT convolution core lifted out of
-    `Aggregate._fft_aggregate` into `aggregate._aggregate_compute.freq_sev_convolution`
-    (a leaf pure function — `iFFT(freq_pgf(n, FFT(sev)))`); the method is now a thin
-    wrapper. Reachable/testable without a full `update()`; `tests/test_aggregate_compute.py`
-    pins it vs `np.convolve` (fixed count), the compound-Poisson moments, and byte-for-byte
-    parity with a built `Aggregate`. `discretize` left on the class (it orchestrates the
-    `Severity` objects, not plain arrays). **P3 is COMPLETE** (Phases 1/1b/1c/2A);
-    Phase 2B (`ReinsuranceProgram` composition) remains deferred/conditional. Next: **P4**
-    `plan-split-portfolio.md` (consumes the P3 shared concerns).
-  - **P4 Phase 4A landed (1.0.0a94), `dev/done/plan-split-portfolio.md`:**
-    `portfolio.py` (≈4.75k lines) split behind a re-export façade into
-    `_portfolio` (the `Portfolio` class + `make_awkward`) plus the three
-    subsystems — `_portfolio_density` (`add_exa`/`_ft_nots` independent-sum
-    kernel), `_portfolio_common` (the FFT-vs-sample-agnostic exeqa numerics:
-    `build_augmented`, `unit_capital_at`, `allocation_diagnostics`, `bodoff`,
-    convex-hull helpers), `_portfolio_sample` (`sample`/`add_exa_sample`/
-    `swap_density_df`/`make_comonotonic_allocations_work`, behaviour-frozen). The
-    matching `Portfolio` methods are thin delegators; `price_pentagon` now routes
-    through `_pricing`. `Portfolio.percentiles` **removed** (breaking, superseded
-    by vector-`q`). `tests/test_portfolio_subsystems.py` added; baseline unmoved.
-    **Deferred carryover → `dev/plan-finish-shared-concerns.md` (finish the
-    thin-shell concern modules):** **lead = reinsurance** — `_reinsurance.py` is a
-    152-line shell while ~400–600 lines of Agg-only reins code (`_apply_reins_work`,
-    `reins_density_df`/`reins_stats_df`/`reins_summary_df`, the `_reins_*6` moment
-    kernels, `reins_description`/`reins_kinds`, the `_describe` reins-label logic)
-    still sit on `_aggregate.py`; move them in → a real ~750-line module. Then
-    **bucket/window** (`_bs_window`/`best_window`/`bs_window_df`, with **W10
-    folded in** as Phase B0 — retire `recommend_bucket`/`best_bucket`, behaviour-
-    neutral) and **validation** (`valid`/`validation_explanation` bodies,
-    author-sensitive, byte-identical). **All three approved for execution**
-    (behaviour-frozen). Phase 4B composition + the sample-subsystem review stay
-    post-beta, conditional.
-  - **Finish-shared-concerns landed (1.0.0a95), `dev/done/plan-finish-shared-concerns.md`:**
-    the three thin-shell concern modules filled in — reinsurance bodies →
-    `_reinsurance.py` (Agg-only, now a real ~900-line module), bucket/window
-    bodies → `_bucket_window.py` (`Aggregate._bs_window` + the Portfolio sizers
-    `best_window`/`_bs_window`/`bs_window_df`/`_single_big_jump_window`/
-    `_build_bs_window_df` as free functions; `value_type_role` relocated to
-    `utilities.py` to keep the leaf cycle-free), validation bodies →
-    `_validation.py` (`valid_aggregate`/`valid_portfolio` side by side, shared
-    `validation_explanation`). **W10 done:** `recommend_bucket` / `best_bucket`
-    removed (breaking, off the live path); `aggregate_error_analysis` repointed
-    to `estimate_agg_window`; docs/user-guide updated to `best_window` /
-    `bs_window_df`. Behaviour-frozen (byte-identical relocations; baseline
-    unmoved). The H6 god-module track is now closed bar the post-beta /
-    conditional items (P2 Pass B, Phase 4B, Agg 2B, the sample-subsystem review).
+- **[Docstring-Sweep-NumPy]** `alpha` (#18) — Sphinx `:param:` → NumPy style in
+  `iman_conover.py` / `moments.py` (and pockets elsewhere); public surface first.
+  Feeds `[API-Docstring-Coverage]`.
+- **[Pedagogy-Migrations]** `beta` (#19) — move figure generators out of `ft.py` /
+  `tweedie.py` into `pedagogy.py` so those stay API-focused. Feeds
+  `[Pedagogy-Docs-Punchup]`.
 
----
+> The god-module refactor (the `GridDistribution` value type, the `plots/`
+> subsystem + matplotlib defer, the `distributions.py` / `portfolio.py` kind/
+> subsystem splits, and the shared-concern modules `_validation` /
+> `_bucket_window` / `_pricing` / `_reinsurance`) is **complete** — shipped
+> `1.0.0a90`–`a95`, see `CHANGELOG.md`. Post-beta / conditional leftovers: the
+> plots visual refresh, `ReinsuranceProgram` composition, the sample-subsystem
+> (correlation / switcheroo) review.
 
-## Track B — Bugs & investigations  `[A]` (small, parallel)
+## Backlog — tests
 
-- [ ] **B5 `[B]` Investigate `bs_describe` (the "bs_describe wart").** Flagged
-  during `plan-line-to-unit` (author: "not sure about that!" — and "keep
-  bothering me about it"). Scope TBD — review the `bs_describe`/`bs_explain`
-  module functions in `distributions.py` (the `color=` workers behind
-  `bs_description`/`bs_explanation`): purpose, the local-`line` accumulator, and
-  whether they still earn their place / want reshaping. **Reconcile with
-  `dev/done/plan-consistent-naming.md` §3** — the *deferred* bs-worker rename (the
-  `bs_describe`/`bs_explain` verb workers shadow the noun properties by one
-  letter; that plan parks renaming them to non-homonyms like `_format_bs_grid`).
-  Do these two together so the wart isn't fixed twice or lost. *(new,
-  2026-06-19; standing reminder — surface it periodically until scoped.)*
-- [ ] **B4 `[A]`** **Zero-truncated / zero-modified frequency is broken.**
-  `poisson zt` raises `function value at x=0.0 is NaN; solver cannot continue`
-  for every parameterization; `zm` builds but the *semantics* are wrong. The
-  current design takes the **post-modification** mean and inverts to find the
-  base mean — the "figuring" step is fragile and the wrong contract. Redesign:
-  the user inputs the **un-truncated/un-modified base mean** and we apply the
-  ZT/ZM shift forward (no solver). **Ship helper functions** that do the
-  mean/parameter shift for the user (both directions, documented). Until then
-  the two ZM/ZT examples are commented out in `examples.agg`. Pairs with D5
-  (ZT/ZM docs). *(new, 2026-06-17)*
+- **[Rationalize-Tests]** `alpha` (#51) — needed vs no-longer-needed; untangle and
+  re-wire how the suite *consumes* the single test library (the `conftest`
+  parametrization of every `test_suite.agg` line, the SLY snapshot regression)
+  without losing coverage.
+- **[Switcheroo-Sample-Regression]** `beta` (#12) — a `Port.Sample` regression
+  case guarding the kappa-replacement path.
 
----
+## Backlog — docs & packaging
 
-## Track W — Windows (range for output) & plotting
+> Most of these have **no code dependency** — ready whenever the docs cycle opens.
 
-- [ ] **W3 `[B]`** Plot severity outside the aggregate window (#8) — inset,
-  broken axis, or separate figure when grids don't overlap (`info` already warns).
-  *(approach undecided.)*
-- [x] **W10 `[A]`** Retire `recommend_bucket` — **DONE (1.0.0a95)**, executed as
-  `dev/done/plan-finish-shared-concerns.md` Phase B0. `recommend_bucket` and
-  `best_bucket` removed from both `Aggregate` and `Portfolio` (confirmed off the
-  live path — `update(bs=0)` routes through `_bs_window` / `best_window`), so the
-  removal was behaviour-neutral. The diagnostic `aggregate_error_analysis` was
-  repointed to `estimate_agg_window`; `test_best_bucket_retained_for_comparison`
-  removed; `tests/peg.py`, the underwriter comments, `config.py`, the default toml,
-  and the `2_x_10mins` user guide updated to the `best_window` / `bs_window_df`
-  surface. See `dev/done/plan-univariate-bucket.md` (`[recommend-bucket]`) for the
-  original framing.
+- **[README-Stable-Body]** `alpha` (#39, #13, #14) — rewrite the README body for
+  the stable-v1.0 audience (what / who / install / one-liner DecL); the
+  `README.md` + `CHANGELOG.md` split is done, only the body remains.
+- **[v1-Journey-Philosophy]** `alpha` (#15) — the v1.0 intro / "Journey" page +
+  statements of philosophy (user manages logging / warnings / matplotlib; the
+  distribution **is** `pᵢ` at `xᵢ`, no jump detection; `qd` is the doc-only
+  fixed-font exception); cover the v1.0 shifts (linear allocation default, bounded
+  detection, forwards-`S`, pentagon columns, `DefectiveDistributionWarning`).
+- **[Grammar-Reference-From-Lark]** `alpha` (#17) — regenerate
+  `docs/4_agg_language_reference/` from `decl.lark` / `grammar(add_to_doc=True)`
+  (it still describes the SLY-era grammar). No code dependency.
+- **[Tail-Descriptor-Docs-Tests]** `alpha` (#41, #42) — bounded / log-concave /
+  super-exp / exp / sub-exp descriptors for freq **and** sev, plus the
+  bounded/unbounded indicator; with tests.
+- **[Doc-Gaps]** `alpha` (#58–#62) — custom errors; syntax checker / better error
+  reporting; stale "site" database refs; ZT/ZM zero-truncation/modification;
+  splice examples. No code dependency.
+- **[API-Docstring-Coverage]** `alpha` — every public function/class carries a
+  NumPy-style docstring that renders in the API reference. The doc side of
+  `[Docstring-Sweep-NumPy]`.
+- **[Reinsurance-Case-Study-Docs]** `beta` (#16) — rebuild `bahnemann` /
+  `enterprise risk` / `other_misc` per-layer exhibits from `reins_stats_df`,
+  verify vs published (numerics now stable).
+- **[Pedagogy-Docs-Punchup]** `beta` (#40) — punch up `pedagogy` and integrate
+  with docs; possible minor renames. Needs `[Pedagogy-Migrations]`.
+- **[Reinsurance-Structure-Diagrams]** `beta` (#45) — under-specified; confirm
+  source / scope (PMIR code?).
+- **[Cheat-Sheet-Tweaks]** `beta` — at the alpha→beta cut, re-run `introspect` per
+  class, reconcile any renames/removals, and apply pending wording/layout tweaks
+  (incl. whether to densify DecL pages 2–3). Held until first beta.
+- **[Plot-Severity-Outside-Window]** `beta` (#8) — plot severity when its grid
+  doesn't overlap the aggregate window (inset, broken axis, or separate figure;
+  `info` already warns). Approach undecided.
 
----
+## Backlog — pre-beta scaffold retirement (do at the `1.0.0b1` cut)
 
-## Track P — P&L expenses & variable rating  `[A]` (last feature set for v1.0)
-
-> Three integrated plans executed in sequence, sharing
-> `dev/plan-variable-rating-appendix.md` (legs model, occ→2-D / agg→1-D
-> dimensionality, per-layer economics matrix, naming). Every feature is one
-> deterministic φ pushed forward over the loss distribution, writing one P&L leg.
-
-- [x] **P1 `[A]`** Expenses + ceded premium/commission, deterministic — the legs
-  model and the GCN waterfall exhibit (`Premium − Loss − Expense = UW`). Done a114;
-  `dev/done/plan-pnl-expenses-ceded-premium.md`.
-- [x] **P2 `[A]`** Reinstatement premiums + the 1-D/2-D pushforward engine (the
-  engine-prover, always 2-D). Done a116–a117; `dev/done/plan-reinstatements.md`. Depends on P1.
-  Landed a116: `[engine]` (`BivariateDistribution.pushforward` / `pushforward_1d`
-  / `transformed_moments`), `[terms]` (`ReinstatementTerms`), `[analysis]`
-  (`ReinstatementAnalysis` + `Aggregate.reinstatement_analysis`), `[pnl-share]`
-  (shared `gcn_assemble_column`), `[decl]` (the `pnl … reinstatements …` block,
-  three validation rules, `no reinstatements`, `decl_writer` round-trip,
-  `tests/test_reinstatement_decl.py`), and the first-class trimmings (`plot`
-  mosaic, `_repr_html_`, `info`, `qd`, `density_df`, reused `bs_*` audit,
-  `tests/test_reinstatement_exhibit.py`), and the subsequent-aggregate-cover
-  waterfall (decision 3 — `ceded_agg` / `net_agg` columns populate with the agg
-  recovery `g(L − A(R))`, five-column inuring `gcn_df`, tier-by-tier additivity),
-  and the deterministic expense / ceding-commission closure (the GCN Expense
-  section now populates; UW reported net of expense across gcn_df / summary /
-  tail / plot). **Complete.** Only deferred: FEATURES.csv `ReinstatementAnalysis`
-  column + introspection cross-check (author's introspection workflow). The
-  *stochastic* commission (`slide` / profit commission) is Phase 3 (P3).
-- [x] **P3 `[A]`** Variable rating — retro, swing, slide, profit commission,
-  corridor — all five landed a118–a120 (aggregate basis). Plan moved to
-  `dev/done/plan-variable-rating.md`. Depends on P2.
-  - [x] **`[terms]` landed (1.0.0a118):** `aggregate.contract_terms` — the
-    `ContractTerms` base + five frozen-dataclass features (`RetroTerms`,
-    `SwingTerms`, `SlideTerms`, `ProfitCommissionTerms`, `CorridorTerms`) with
-    hand-checked worked examples; `ReinstatementTerms` refactored under the base
-    (behavior-preserving). Spec-key naming locked to `{which}_reins_*` (flat
-    `retro_terms`). Tests: `tests/test_variable_rating_terms.py`.
-  - [x] **`[analysis]` (1-D) landed (1.0.0a119):** `aggregate.variable_rating`
-    `VariableRatingAnalysis` — feature-agnostic GCN engine, legs over `(l, a)`,
-    `pushforward_1d` aggregate basis, reuses `gcn_assemble_column`. Tests:
-    `tests/test_variable_rating_analysis.py`. **TODO:** `summary_df` / `tail_df` /
-    `plot` / `_repr_html_` (only `gcn_df` so far); the 2-D occurrence path.
-  - [x] **`[decl]` (4 features) landed (1.0.0a119):** swing / slide / pc / corridor
-    decorate one `aggregate net of` layer; grammar + transformer + `_split_reins`
-    emit `agg_reins_{swing,slide,pc,corridor}`; underwriter builds the terms +
-    `VariableRatingAnalysis`; `PnL.gcn_df` delegates. Grammar-sync mirrors updated
-    (also fixed the drifted Phase-2 `reinstatements`/`free`/`no` labels, **D10**).
-    Tests: `tests/test_variable_rating_decl.py`; lines in `decl-testers.agg`.
-  - [x] **`retro` DecL surface landed (1.0.0a120):** `retro <collar> premium`
-    in the pnl head (`pnl_premium: numbers PREMIUM | RETRO collar PREMIUM`),
-    keyword-first collar matching swing; trailing `premium` keeps `premium less`.
-    Requires no inuring reinsurance (1-D case); retro+reins is a follow-up.
-    Tests in `test_variable_rating_decl.py`; `VR.Retro` in `decl-testers.agg`.
-- [x] **P4 `[A]` PnL legs unification** — **DONE (1.0.0a121)**,
-  `dev/done/plan-bivariate-legs.md`. The domain-free bivariate **leg kernel**
-  (`aggregate.legs`: `Leg` / `LegSet` / `GraphSource` + the
-  `pushforward` / `transformed_moments` source protocol) with the insurance
-  vocabulary as a View (`aggregate._insurance_view`: the
-  `name → (perspective, category) → kind` label map + the cached `InsuranceView`
-  composition over a `LegSet`). `ReinstatementAnalysis` + `VariableRatingAnalysis`
-  rebuilt on the kernel (VR over a `GraphSource`, `κ =` base ceder; reinstatement
-  over the `(L, R)` joint, `gross_premium` a point mass) — behavior-frozen, both
-  suites green. The `summary_df`→`gcn_df` morph is removed (`summary_df` is always
-  the fixed small table). New `tests/test_legs.py` + `tests/test_insurance_view.py`.
-  **Pended within it** (perfect exhibits, addressed holistically per
-  `dev/reporting-guidelines.md`): `validation_df` (= old summary), `reins_*` flavors,
-  column-unit purity / presentation, `tail_df`/`plot`/`_repr_html_` unification,
-  occurrence-basis variable-rating *surface*, retro + reinsurance, `FEATURES.csv` rows,
-  and the full class collapse into one `ContractAnalysis`.
-- [ ] **Future (low priority):** reinstatement terms depending on event date
-  (pro-rata as to time) — from `dev/done/pre-plan-reinstatements.md`.
-
----
-
-## Track T — Tests (suite consolidation)  `[A]` (DOD: test suite trimmed)
-
-> The crux is **how the current tests use / interact with the test libraries**
-> (e.g. `conftest` parametrizing every line of `test_suite.agg`, the SLY
-> snapshot regression) — consolidating the data is only half the job; the test
-> code's coupling to it is the other half.
-
-- [ ] **T2 `[A]`** Rationalize tests — needed vs no-longer-needed; untangle and
-  re-wire how the suite *consumes* the single library without losing
-  effectiveness (#51).
-- [ ] **T3 `[B]`** Switcheroo harness `Port.Sample` regression case (#12) — guards
-  the kappa-replacement path.
-
----
-
-## Track D — Docs & packaging
-
-- [ ] **D1 `[A]`** New `README.md` for the stable-v1.0 audience (what / who /
-  install / one-liner DecL) (#39, #13, #14). The `README.rst`→`README.md` +
-  `CHANGELOG.md` split is done (2026-06-06); **remaining:** rewrite the README
-  body for the stable-v1.0 audience (currently the verbatim moved content).
-- [ ] **D2 `[A]`** v1.0 intro / "Journey" page **+ statements of philosophy**
-  (user manages logging / warnings / matplotlib; the distribution **is** `p_i`
-  at `x_i`, no jump detection; `qd` is the doc-only fixed-font exception); cover
-  the v1.0 shift (linear allocation default, bounded detection, forwards-`S`,
-  pentagon columns, `DefectiveDistributionWarning`) (#15 + DOD).
-- [ ] **D3 `[A]`** Grammar reference from `decl.lark` / `grammar(add_to_doc=True)`
-  — `docs/4_agg_language_reference/` still describes the SLY-era grammar (#17).
-  *No code dependency — ready now.*
-- [ ] **D4 `[A]`** Tail-descriptor docs **+ tests** (bounded / log-concave /
-  super-exp / exp / sub-exp for freq **and** sev) and the bounded/unbounded
-  indicator (#41, #42). Aligns with tail Phase 2.
-- [ ] **D5 `[A]`** Doc gaps: custom errors (#58); syntax checker / better error
-  reporting (#59); stale "site" database refs (#60); ZT/ZM zero-truncation/
-  modification (#61); splice examples (#62). *No code dependency — ready now.*
-- [ ] **D6 `[A]`** API docstring coverage / rendering — every public function/
-  class carries a NumPy-style docstring that renders in the API reference (the
-  "Docs updated" DOD bullet, doc side of **H4**).
-- [ ] **D7 `[B]`** Reinsurance case-study docs rewrite — `bahnemann`,
-  `enterprise risk`, `other_misc`: rebuild per-layer exhibits from
-  `reins_stats_df`, verify vs published (#16). N2–N3 numerics now stable.
-- [ ] **D8 `[B]`** PUNCHUP `pedagogy` and integrate with docs; possible minor
-  renamings (#40). **needs H5.**
-- [x] **D11 `[B]`** Transition the Sphinx docs' bibliography to the master
-  `C:/s/TELOS/Biblio/uber-library.bib` — **shipped a92** (`dev/done/plan-bibliography.md`).
-  `docs/update_extract_bib.py` extracts the cited entries from uber into the
-  committed `docs/extract.bib` (RTD has no access to `C:/S/...`, so the bibtex
-  config lists only repo-local files); `.rst` keys mapped to canonical uber
-  keys; non-uber/software refs moved to the hand-maintained `docs/manual.bib`;
-  `books.bib` retired.
-- [ ] **D12 `[B]` Cheat-sheet tweaks once the UI settles** — the six class / DecL
-  cheat sheets (`cheat-sheets/`) were rebuilt for the v1.0 API on the
-  tectonic + `make.ps1` / `combine.ps1` build with auto-`\aggversion` stamping
-  from `pyproject.toml` (see the dir's `README.rst` "instructions for Claude").
-  **Revisit at the alpha→beta cut (`1.0.0b1`)**, when the API has stabilized:
-  re-run `introspect` per class, reconcile any renames/removals, and apply
-  pending wording/layout tweaks (incl.\ whether to densify DecL pages 2–3).
-  *(flagged 2026-06-18; author wants this held until the first beta.)*
-- [ ] **D9 `[B]`** Reinsurance structure diagrams (PMIR code?) (#45).
-  *(under-specified — confirm source/scope.)*
-
----
-
-## Track β — Pre-beta scaffold retirement  `[A]` (do at the b1 cut)
-
-> The `.agg` libraries were split at a71 into a **shipped** set (`examples`,
-> `actuarial-severity-curves`, `decl-testers`, `cookbook`) and a **temporary**
+> The `.agg` libraries were split (a71) into a **shipped** set (`examples`,
+> `actuarial-severity-curves`, `decl-testers`, `cookbook`) and a temporary
 > SLY-parity scaffold (`_test_suite.agg`, `_test_suite2.agg`). The scaffold has
-> done its job (proving the Lark parser matches the retired SLY parser); delete
-> it and its dependents at the alpha→beta cut. The surviving net is
-> `tests/test_agg_libraries.py` (shipped libraries parse + cross-resolve), so
-> deleting the scaffold loses no live coverage.
+> done its job (proving the Lark parser matches the retired SLY parser); the
+> surviving net is `tests/test_agg_libraries.py`.
 
-- [ ] **β1 `[A]` Delete the scaffold `.agg` files** — `src/aggregate/agg/_test_suite.agg`
-  and `_test_suite2.agg`.
-- [ ] **β2 `[A]` Retire the scaffold's dependents**, all of which only exist to
-  exercise it:
-  - SLY snapshot: `tests/data/expected_specs.json` + `tests/capture_sly_snapshot.py`.
-  - `tests/test_decl_parser.py` (parametrizes every `_test_suite` line vs the snapshot).
-  - `tests/test_splice_suite.py` (reads `_test_suite2.agg`).
-  - `tests/conftest.py` — the `test_suite_lines` / `underwriter` fixtures (and any
-    test still using the `underwriter` fixture).
-  - `src/aggregate/config.py` `TEST_SUITE_FILENAME`; `Underwriter.test_suite_file`
-    property; `Underwriter.interpret_file`'s default-to-test-suite behaviour.
-  - `scripts/freeze_knowledge.py` / `scripts/bucket_baseline.py` —
-    `DEFAULT_DATABASES = ("_test_suite",)`.
-  - `src/aggregate/data/config.default.toml` — the `_test_suite` databases line.
-  - `docs/4_dec_Language_Reference.rst` — the "Test Suite Programs" section
-    (`literalinclude` of `_test_suite.agg`); repoint or drop.
-- [ ] **β3 `[A]` Confirm the surviving net** — `tests/test_agg_libraries.py` covers
-  the shipped libraries (optionally extend it from parse-only to a build smoke
-  test). Decide whether `decl-testers.agg` needs its own permanent parse harness
-  once the `_test_suite` snapshot is gone (it currently rides `test_decl_unparser`
-  + the mirrored pytest cases).
+- **[Scaffold-Retirement]** `alpha` (at b1) — delete `_test_suite.agg` /
+  `_test_suite2.agg` and retire their dependents: the SLY snapshot
+  (`tests/data/expected_specs.json` + `capture_sly_snapshot.py`),
+  `test_decl_parser.py`, `test_splice_suite.py`, the `conftest`
+  `test_suite_lines` / `underwriter` fixtures, `config.py` `TEST_SUITE_FILENAME` +
+  `Underwriter.test_suite_file` + `interpret_file`'s default, the
+  `freeze_knowledge.py` / `bucket_baseline.py` `DEFAULT_DATABASES`, the default
+  toml `_test_suite` line, and the docs "Test Suite Programs" `literalinclude`.
+  Confirm `test_agg_libraries.py` covers the shipped libraries (optionally extend
+  to a build smoke test); decide whether `decl-testers.agg` needs its own
+  permanent parse harness.
 
 ---
 
-## Related plans
+## Related plans (shipped → context)
 
-- **Numerics program** (`dev/done/plan-numerics-0-meta.md` + `-1`…`-4`) → the
-  N-track, **complete**: numerics-1/2/3 shipped (a55–a57 → N2/N3); numerics-4
-  (windowed combine/bivariate) delivered via `plan-mv` MV-2/MV-3 (a72/a76).
-- `dev/done/plan-config.md` (Phase 1 + Phase 2) → config, shipped a30 / a83.
-- `dev/done/plan-mv.md` → bivariate firm-up (MV-1…7, shipped a70–a80). Absorbs &
-  replaces the deleted `plan-multivariate-punchup.md`.
-- `dev/done/plan-pla.md` → `prob_loss_assets` / `pla` (free choice of capital
-  anchor over `{p, L, a}`) + `price_pentagon_ex`, shipped a97. Also fixed
-  `GridDistribution.lev` (cached grid view now built on the full `bs` grid, not
-  the `p_total > 0` subset) so `lev` matches the `exa` / `add_exa` datum.
-- `dev/done/` → shipped plans (tail-thickness, config Phase 1, pentagon, database
-  loading, bucket-window 1A/1P, allocation/pricing bounds, decl-unparser, …).
-
----
+- **Numerics program** (`dev/done/plan-numerics-0-meta.md` + `-1`…`-4`) —
+  complete; the apply-distortion calcs shipped a55–a57, windowed combine via
+  `dev/done/plan-mv.md` (a72/a76).
+- **Bivariate firm-up** (`dev/done/plan-mv.md`) — shipped a70–a80.
+- **`prob_loss_assets` / `pla`** (`dev/done/plan-pla.md`) — free capital anchor
+  over `{p, L, a}` + `price_pentagon_ex`, shipped a97.
+- **First-class P&L (Stages A–E)** (`dev/done/plan-pnl.md`) — the `PnL` veneer the
+  `[PnL-First-Class]` work builds on.
+- **P&L expenses / variable rating / reinstatements / bivariate leg kernel** —
+  shipped a114–a121 (`dev/done/plan-pnl-expenses-ceded-premium.md`,
+  `plan-reinstatements.md`, `plan-variable-rating.md`, `plan-bivariate-legs.md`).
+  The leg kernel (`aggregate.legs`) + insurance View (`aggregate._insurance_view`)
+  are the foundation `[Portfolio-of-PnL]` composes over.
+- `dev/done/` — the remaining shipped plans (config, pentagon, database loading,
+  bucket-window, allocation/pricing bounds, decl-unparser, bibliography, …).
 
 ## Post-v1.0 ideas
 
-- [ ] **Multi-resolution portfolio combine** (#20) — the real fix for the coarse
-  shared-`bs` deficit (a22 residual #4): compute each unit on its own `bs`,
-  decimate onto the shared grid before the Fourier product. Deficit accepted /
-  surfaced for now.
-- [ ] **General premium/loss algebra in DecL (v2.0)** (#21) — constant
-  aggregates, full aggregate arithmetic (`agg.A - agg.B`, `agg.A + c`); `pnl`
-  covers the common case for v1.0.
-- [x] **DecL colorization** (#22) — **rejected 2026-06-19**
-  (`dev/done/plans-considered-and-rejected.md`): payoff is aesthetic only and the
-  headline wins are structurally weak (Jupyter `_repr_html_` doesn't fire from
-  IPython tracebacks; Sphinx `pygments_style` is global). If docs identity ever
-  becomes a priority, do only the minimal palette + Pygments-style slice.
-- [x] **F6 `[B]` Gross/ceded-premium reinsurance P&L** (#5) — single-stage
-  (aggregate-only) **GCN** view landed in **1.0.0a106**
-  (`agg_re.make_pnl(gross=, ceded=)`, additive `Net = Gross + Ceded`). Multi-stage
-  occ+agg generalization → `dev/plan-pnl-gcn-reins.md`.
-- [ ] **Named Cherny–Madan acceptability families** (#23) — add the **MINMAXVAR**
-  (and MAXVAR / MAXMINVAR) distortion kinds so `PnL.evaluate` can surface the
-  *named* indices (AIMINMAXVAR, …). `@Cherny2009a`. v1.0 reports the panel by
-  family + `gini_p`; `dual` already *is* MINVAR. See `dev/done/plan-pnl.md` §1.1.
-- [ ] extend reinsurance clauses to allow net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros (rate on subject = quota share)
-
-## PnL follow-on plans (drafted post-1.0.0a106; v1.0 PnL A–E landed)
-
-The first-class `PnL` (Stages A–E) is in `dev/done/plan-pnl.md`. Next:
-
-- [ ] **First-class `PnL` distribution surface** — `dev/plan-pnl-first-class.md`.
-  `density_df` (net, full schema, indexed by net, groupby-sum), `stats_df`,
-  `info`, `_repr_html_`, `qd(pnl)`, `summary_df` quantile columns
-  (q01/q05/q95/q99). Confirmed: `pnl_df`→`density_df`; index by net; explicit
-  delegation (no `__getattr__`).
-- [ ] **Multi-stage GCN over occ and/or agg reins** — `dev/plan-pnl-gcn-reins.md`.
-  Source from `reins_density_df`; per-stage premiums; rows gross / ceded-occ /
-  net-occ / ceded-agg / net-agg, absent stages omitted; fixes true-gross under
-  occ+agg.
-- [ ] **`PortPnL` — portfolios of P&L positions** (#3.2) — `dev/plan-pnl-portfolio.md`.
-  Constant-consideration book is the cheap correct v1 (reuse Portfolio FFT +
-  stacked signed summary); loss-sensitive net-then-combine deferred.
-- [x] **DecL unary minus on a severity** (`ssev -lognorm …`) — done 1.0.0a109,
-  `dev/done/plan-decl-sev-unary-minus.md`. `sev1: MINUS sev1 -> sev1_negate`;
-  reflected severity now requires `ssev` (plain `sev` rejects it).
-- [x] **`GridDistribution` knows its sign (loss vs payoff)** — done 1.0.0a111,
-  `dev/done/plan-gd-knows-sign.md`. GD gained read-only `is_loss_value`
-  (`__repr__` + `cap` propagate it) and `return_period(p)` (shared module-level
-  `return_period_map`); kernel unchanged. Holders thread their role into the GD;
-  `Aggregate.value_type` setter resets the GD caches. Lee worker stays
-  array-based but reads the shared map; compositors source orientation off the
-  aggregate GD. Pricing `effective_g` kwarg left as a defaulted shim.
-- [x] **Return-period x-axis for quantile/Lee plots** (`plot(quantile_x='return')`)
-  — done, `dev/done/plan-plot-return-period.md`. First cut 1.0.0a110 (`T=1/(1−p)`
-  loss / `1/p` payoff, log-x; on `Aggregate.plot`, `Severity.plot`,
-  `reins_occ_plot`; `PnL`/`Portfolio` have no Lee panel). **Revisit landed
-  1.0.0a112:** `plot_quantile(ax, gd, …)` now consumes a `GridDistribution`,
-  derives the curve + saturating-top trim, and reads orientation via
-  `gd.return_period`; `is_loss_value=` gone from the compositors. Severity GD
-  inherits the aggregate role; reins wraps its gross/ceded/net PMFs as GDs.
-- [x] **`summary_df` / `tail_df` risk views** — done 1.0.0a113,
-  `dev/done/plan-summary-tail-tables.md`. New `summary_df` (moments +
-  percentiles) and `tail_df` (return-period table, now a method); old payloads
-  renamed `validation_df` / `tail_behavior_df` (hard cut, no aliases). `qd` /
-  `_repr_html_` lead with summary + tail, flag validation only on failure. Added
-  `period_to_p` (inverse of `return_period_map`). **Aggregate + Portfolio only**
-  — PnL and Bivariate deferred (their `summary_df`/`tail_df` already carry
-  different user-facing meanings); HTML row-highlighting of the SII/250 rows is a
-  pending polish.
-  *Run order: GD-knows-sign → finish return-period plot → summary/tail → PnL.*
+- **[Multi-Resolution-Portfolio-Combine]** (#20) — compute each unit on its own
+  `bs`, decimate onto the shared grid before the Fourier product (the real fix for
+  the coarse shared-`bs` deficit). Deficit accepted / surfaced for now.
+- **[Premium-Loss-Algebra-DecL]** (#21, v2.0) — constant aggregates and full
+  aggregate arithmetic (`agg.A - agg.B`, `agg.A + c`); `pnl` covers the common
+  case for v1.0.
+- **[Named-Cherny-Madan-Families]** (#23) — add the MINMAXVAR / MAXVAR / MAXMINVAR
+  distortion kinds so `PnL.evaluate` can surface the *named* indices (`dual`
+  already *is* MINVAR). `@Cherny2009a`.
+- **[Rate-Based-Reins-Clauses]** — extend reinsurance clauses to accept e.g.
+  `net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros` (rate on subject =
+  quota share).
+- **[Reinstatement-Event-Date-Terms]** — reinstatement terms depending on event
+  date (pro-rata as to time); from `dev/done/pre-plan-reinstatements.md`.
+- *(rejected: DecL colorization — aesthetic-only and structurally weak; see
+  `dev/done/plans-considered-and-rejected.md`.)*

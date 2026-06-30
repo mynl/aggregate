@@ -121,6 +121,18 @@ Aliasing/moment-matching validation is controlled by flags in `constants.py` and
 
 **Subclasses use the `Base<Kind>` prefix form**, not the `<Kind>Base` suffix form. So `FrequencyPoisson`, `FrequencyNegbin`, `SeverityLognorm`, `DistortionPH`, `DistortionTVaR` — not `PoissonFrequency` / `PHDistortion`. Rationale: subclasses sort with their base class alphabetically in the file, in autocomplete, in stack traces, and in docs. Apply this convention to any new class taxonomy introduced during the refactor (Frequency in Stage 1b, Severity in Stage 1d, future Distortion cleanup).
 
+**No cryptic codes — label everything with a descriptive bracketed name.** Every
+task, plan, workstream, TODO item, and phase carries a self-describing bracketed
+label like `[Reporting-Guidelines]`, `[PnL-First-Class]`, `[Signed-Bounded-Window]`
+— **never** a terse mnemonic (`N6`, `H4`, `T2`, `P3`, bare `[A]`/`[B]`). The
+author cannot hold short codes in their head across sessions; a spelled-out label
+reads on sight, and the brackets mark it as a label. The author may still *type* a
+short code at you in conversation (trusting your recall) — answer in full labels
+anyway, and write only full labels into any artifact. When relabeling a legacy
+item, keep any external cross-reference (a GitHub issue `#49`) in parentheses but
+lead with the descriptive label. This applies to `dev/TODO.md`, plan files, commit
+subjects, and run summaries alike.
+
 **Vet every new public method / attribute / kwarg name against the existing surface before adding it — at planning time, not after.** A new instance attribute set in `__init__` *silently shadows* a method of the same name (Python resolves the instance dict first), so `self.approximate = ...` turned the `Aggregate.approximate()` method into an uncallable string and went unnoticed through a whole plan (`dev/done/plan-approximate.md`). Before introducing a name: `rg` for it across `src/aggregate` (method defs, properties, `self.<name> =` assignments, DecL keywords / spec keys), confirm it does not collide with an existing callable or attribute on the *same* class (or its parents), and prefer a distinct noun for a stored value vs. a verb for an action (e.g. attribute `approximation` holding the kind, method `approximate()` doing the fit). Call out the chosen names explicitly in the plan so they can be reviewed.
 
 ## Documentation and docstrings

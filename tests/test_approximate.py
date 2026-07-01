@@ -145,7 +145,7 @@ def test_pnl_approximate_loss_part_fitted():
     """``pnl ... approximate`` fits the loss leg; the PnL nets the consideration."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        approx = build("pnl PA 600000 prem less 5000 claims sev lognorm 100 cv 2 "
+        approx = build("pnl PA 600000 prem less agg PA_e 5000 claims sev lognorm 100 cv 2 "
                        "poisson approximate sgamma")
     # the approximation is applied to the loss leg before the PnL snapshots it;
     # observably, E[margin] = consideration - E[loss] = 600000 - 500000 and the

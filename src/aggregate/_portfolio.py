@@ -227,6 +227,16 @@ class Portfolio(object):
                 f"A portfolio cannot mix {loss_label} and {payoff_label} units.")
         self._is_loss_value = roles.pop() if roles else True
 
+        # Accumulated premium: the plain sum of the units' ``exp_premium``
+        # (each a sizing/exposure input, ``premium at lr``). Exposed so a
+        # ``pnl`` sourced from this portfolio can ``inherit premium`` -- the
+        # portfolio total is the net-net consideration a wrapping P&L books.
+        # A pure sum, no distribution (units may size independently). Mirrors
+        # the ``Aggregate.exp_premium`` attribute name for a uniform surface.
+        self.exp_premium = float(sum(
+            float(np.sum(np.asarray(getattr(a, 'exp_premium', 0.0), dtype=float)))
+            for a in self.agg_list))
+
         # Canonical ``stats_df``: per-unit columns + ``mixed`` +
         # ``empirical`` + ``error``. Mirror of ``Aggregate.stats_df``
         # shape, minus the ``independent`` column (an

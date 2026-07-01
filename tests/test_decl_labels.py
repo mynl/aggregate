@@ -16,7 +16,7 @@ from aggregate.decl_writer import spec_to_decl
 
 TOL = 1e-6
 
-_PNL_BASE = ('pnl B 1000 premium less 850 loss sev lognorm 100 cv 1 poisson')
+_PNL_BASE = ('pnl B 1000 premium less agg B_e 850 loss sev lognorm 100 cv 1 poisson')
 
 
 @pytest.fixture(scope="module")
@@ -108,13 +108,13 @@ def test_premium_no_label_keeps_default_leg():
 # ----------------------------------------------------------------------
 def test_single_group_and_joined_is_one_leg():
     # backward compatible: and-joined terms sum into one leg named 'expense'
-    p = build(_PNL_BASE + ' 25% premium expense and 200 fixed expense')
+    p = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense')
     assert 'expense' in p.summary_df.index
     assert p.summary_df.loc['expense', 'EX'] == pytest.approx(0.25 * 1000 + 200)
 
 
 def test_juxtaposed_groups_are_separate_legs():
-    p = build(_PNL_BASE + ' 25% premium expense 200 fixed expense')
+    p = build(_PNL_BASE + ' less 25% premium expense 200 fixed expense')
     idx = p.summary_df.index
     # two separate legs, default basis-derived names
     assert 'premium expense' in idx
@@ -125,7 +125,7 @@ def test_juxtaposed_groups_are_separate_legs():
 
 
 def test_labeled_expense_groups():
-    p = build(_PNL_BASE + ' 25% premium expense as acq 30% loss expense as lae')
+    p = build(_PNL_BASE + ' less 25% premium expense as acq 30% loss expense as lae')
     idx = p.summary_df.index
     assert 'acq' in idx and 'lae' in idx
     assert p.summary_df.loc['acq', 'EX'] == pytest.approx(250.0)
@@ -133,15 +133,15 @@ def test_labeled_expense_groups():
 
 def test_combine_vs_separate_total_matches():
     # combined (and) vs separate (juxtaposition) must give the same total expense
-    combined = build(_PNL_BASE + ' 25% premium expense and 200 fixed expense')
-    separate = build(_PNL_BASE + ' 25% premium expense 200 fixed expense')
+    combined = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense')
+    separate = build(_PNL_BASE + ' less 25% premium expense 200 fixed expense')
     tot_c = combined.summary_df.loc['Total obligation', 'EX']
     tot_s = separate.summary_df.loc['Total obligation', 'EX']
     assert tot_c == pytest.approx(tot_s, rel=TOL)
 
 
 def test_labeled_group_combines_multiple_terms():
-    p = build(_PNL_BASE + ' 25% premium expense and 200 fixed expense as "acquisition"')
+    p = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense as "acquisition"')
     assert 'acquisition' in p.summary_df.index
     assert p.summary_df.loc['acquisition', 'EX'] == pytest.approx(0.25 * 1000 + 200)
 
@@ -150,7 +150,7 @@ def test_labeled_group_combines_multiple_terms():
 # Reins-clause label -> margin_df cession column
 # ----------------------------------------------------------------------
 def test_reins_label_names_margin_column():
-    p = build('pnl RP 1000 premium less 850 loss sev lognorm 100 cv 1 '
+    p = build('pnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
               'occurrence net of 100 xs 200 deposit 50 as "Cat XL" poisson')
     assert p.tower is not None
     assert 'Cat XL' in p.margin_df.columns
@@ -158,7 +158,7 @@ def test_reins_label_names_margin_column():
 
 
 def test_reins_no_label_keeps_structural_column():
-    p = build('pnl RP 1000 premium less 850 loss sev lognorm 100 cv 1 '
+    p = build('pnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
               'occurrence net of 100 xs 200 deposit 50 poisson')
     assert 'ceded' in p.margin_df.columns
 
@@ -169,9 +169,9 @@ def test_reins_no_label_keeps_structural_column():
 @pytest.mark.parametrize("program", [
     'agg GrossBook as "Gross Book" 100 claims sev lognorm 100 cv 2 poisson',
     'sev MySev as lae lognorm 100 cv 2',
-    'pnl Book as "My Book" 1000 premium as GWP less 850 loss '
-    'sev lognorm 100 cv 1 poisson 25% premium expense as acq 30% loss expense as lae',
-    'pnl RP 1000 premium less 850 loss sev lognorm 100 cv 1 '
+    'pnl Book as "My Book" 1000 premium as GWP less agg Book_e 850 loss '
+    'sev lognorm 100 cv 1 poisson less 25% premium expense as acq 30% loss expense as lae',
+    'pnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
     'occurrence net of 100 xs 200 deposit 50 as "Cat XL" poisson',
 ])
 def test_label_roundtrip(uw, program):

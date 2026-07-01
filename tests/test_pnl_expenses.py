@@ -15,7 +15,7 @@ from aggregate import build
 from aggregate._pnl import resolve_expense
 
 TOL = 1e-3
-_BASE = 'pnl A 1000 prem less 8 claims sev lognorm 50 cv 1 poisson'  # E[loss] = 8 * 50 = 400
+_BASE = 'pnl A 1000 prem less agg A_e 8 claims sev lognorm 50 cv 1 poisson'  # E[loss] = 8 * 50 = 400
 
 
 def test_expense_absent_defaults_to_zero():
@@ -25,14 +25,14 @@ def test_expense_absent_defaults_to_zero():
 
 def test_expense_three_explicit_forms():
     # premium basis: 25% of the 1000 gross premium
-    assert build(_BASE + ' 25% premium expenses').summary_df.loc[
+    assert build(_BASE + ' less 25% premium expenses').summary_df.loc[
         'expense', 'EX'] == pytest.approx(250.0)
     # loss basis: a fraction of the ACTUAL loss (now stochastic -- rate * loss per
     # atom); its EX is still rate * E[loss] = 0.30 * 400 = 120
-    assert build(_BASE + ' 30% loss expenses').summary_df.loc[
+    assert build(_BASE + ' less 30% loss expenses').summary_df.loc[
         'expense', 'EX'] == pytest.approx(120.0, rel=TOL)
     # fixed basis: a currency amount
-    assert build(_BASE + ' 200 fixed expenses').summary_df.loc[
+    assert build(_BASE + ' less 200 fixed expenses').summary_df.loc[
         'expense', 'EX'] == pytest.approx(200.0)
 
 
@@ -42,7 +42,7 @@ def test_loss_basis_expense_is_stochastic():
     The expense leg is ``rate * loss`` per atom, so it carries the loss's spread:
     its CV equals the loss CV (an old point mass at ``rate * E[loss]`` had CV 0).
     """
-    df = build(_BASE + ' 30% loss expenses').summary_df
+    df = build(_BASE + ' less 30% loss expenses').summary_df
     assert df.loc['expense', 'SD'] > 0
     assert df.loc['expense', 'CV'] == pytest.approx(df.loc['loss', 'CV'], rel=TOL)
 
@@ -62,16 +62,16 @@ def test_expense_basis_is_resolved_by_basis():
 
 def test_expense_singular_alias():
     # ``expense`` and ``expenses`` are both accepted
-    assert build(_BASE + ' 200 fixed expense').summary_df.loc[
+    assert build(_BASE + ' less 200 fixed expense').summary_df.loc[
         'expense', 'EX'] == pytest.approx(200.0)
 
 
 def test_multiple_expense_terms_sum():
     # ``and``-joined terms sum: 25% of 1000 premium + 1000 fixed = 1250
-    p = build(_BASE + ' 25% premium expense and 1000 fixed expense')
+    p = build(_BASE + ' less 25% premium expense and 1000 fixed expense')
     assert p.summary_df.loc['expense', 'EX'] == pytest.approx(0.25 * 1000 + 1000.0)
     # three terms, mixing all bases (E[loss] = 400)
-    p3 = build(_BASE + ' 10% premium expense and 5% loss expense and 50 fixed expense')
+    p3 = build(_BASE + ' less 10% premium expense and 5% loss expense and 50 fixed expense')
     assert p3.summary_df.loc['expense', 'EX'] == pytest.approx(
         0.10 * 1000 + 0.05 * 400 + 50.0, rel=TOL)
 
@@ -86,7 +86,7 @@ def test_single_tuple_expense_spec_still_accepted_via_api():
 
 
 def test_expense_reduces_margin_and_drives_combined_ratio():
-    p = build(_BASE + ' 200 fixed expenses')
+    p = build(_BASE + ' less 200 fixed expenses')
     df = p.summary_df
     assert df.loc['expense', 'EX'] == pytest.approx(200.0)   # a magnitude
     assert df.loc['expense', 'SD'] == pytest.approx(0.0, abs=1e-2)  # deterministic

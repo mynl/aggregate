@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.0.0a125
+
+**[PnL-Engine-Source]** — a P&L wraps a **complete stochastic engine** (no more
+"half-baked agg inside a pnl"). Executes `dev/plan-pnl-engine-source.md`.
+**Breaking `pnl` syntax.** Also subsumes the `[Portfolio-of-PnL]` TODO: point a
+`pnl` at a `port` rather than build a bespoke `PortPnL`.
+
+- **New `pnl` grammar.** `pnl NAME <premium> less <engine> [less <expenses>]`,
+  where `<engine>` is a complete aggregate: an inline `agg NAME <body>` (any agg
+  form — full / dfreq / tweedie / rename), a stored `agg.NAME`, or a stored
+  `port.NAME`. The old forked body (`pnl NAME <P> premium less <lr> lr sev …`) and
+  its bare-`lr` `pnl_exposures` / `_pnl_lr` machinery are **removed**. A second
+  `less` is the hard anchor introducing the (optional) expense clause, so the
+  embedded engine's tail can never cross into the expenses.
+- **Shared `agg_body`.** The aggregate body is factored out of `agg_out` and
+  reused verbatim by the embedded engine, so a `pnl` engine is byte-for-byte the
+  same aggregate a standalone `agg` builds (parse/shape snapshot unchanged).
+- **`inherit premium`.** A new premium head copying the engine's technical
+  premium — `Aggregate.exp_premium` (now retained on the instance) or the
+  accumulated `Portfolio.exp_premium`. A build error if the engine has none.
+- **Two independent premiums, on purpose.** The engine's `premium at lr` is a
+  sizing/exposure input; the P&L's premium is the booked consideration. Booking
+  `12000` over a book sized at `10000` is rate adequacy, not a bug.
+- **`xpnl` (exploded).** Same syntax; returns the Gross/net-occ/net-agg
+  `PnLTower` instead of the collapsed `PnL`. Requires a wrapped engine with
+  reinsurance economics; `xpnl` over a plain engine, or over a `port`, raises
+  `NotImplementedError` (the port total hides its units — nothing to explode).
+- **`port.NAME` sourcing + `Portfolio.exp_premium`.** A portfolio now accumulates
+  its units' premium (a plain sum, no distribution) and exposes the total-loss
+  density as a `pnl` source; a port-sourced P&L is the plain net-net-book case.
+- **Economics unchanged.** `deposit` / `cede` / `rol` / `rate` / reinstatements /
+  variable rating / `retro` stay in the engine's reins clauses and are resolved by
+  the wrapping `pnl`/`xpnl` exactly as before; the standalone-`agg` guard (a bare
+  `agg … cede …` still errors) is unchanged. `retro` over a *reinsured* engine
+  remains `NotImplementedError`.
+
+Migration: every `pnl X <P> premium less <exposure> <body>` becomes `pnl X <P>
+premium less agg X_e <exposure> <body>` (a bare `<lr> lr` exposure becomes `<P>
+premium at <lr> lr`); a trailing expense clause moves after a second `less`. All
+shipped `.agg` databases and the test suite were swept.
+
 ## 1.0.0a124
 
 **[DecL-Labels]** — human display labels, quoted names, and expense grouping.

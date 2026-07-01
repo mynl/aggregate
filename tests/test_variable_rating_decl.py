@@ -28,7 +28,7 @@ from aggregate.variable_rating import VariableRatingAnalysis
 
 warnings.filterwarnings('ignore', message='.*heavy right tail.*')
 
-_HEAD = ('pnl V 10000 premium less 85% lr sev lognorm 50 cv 3 poisson '
+_HEAD = ('pnl V 10000 premium less agg V_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson '
          'aggregate net of 5000 xs 4000 ')
 
 
@@ -117,7 +117,7 @@ def test_corridor_build():
 # ----------------------------------------------------------------------
 def test_retro_build():
     p = build('pnl R retro basic 3000 lcm 1.1 min 3500 max 8000 premium '
-              'less 1000 loss sev lognorm 100 cv 2 poisson')
+              'less agg R_e 1000 loss sev lognorm 100 cv 2 poisson')
     assert isinstance(p, PnL)
     assert isinstance(p.analysis, VariableRatingAnalysis)
     terms = p.analysis.terms
@@ -134,7 +134,7 @@ def test_retro_build():
 
 def test_retro_bare_collar():
     p = build('pnl R retro basic 3000 lcm 1.1 premium '
-              'less 1000 loss sev lognorm 100 cv 2 poisson')
+              'less agg R_e 1000 loss sev lognorm 100 cv 2 poisson')
     terms = p.analysis.terms
     assert terms.minimum == pytest.approx(3000.0)        # defaults to basic
     assert np.isinf(terms.maximum)                       # uncapped
@@ -143,7 +143,7 @@ def test_retro_bare_collar():
 def test_retro_with_reinsurance_rejected():
     with pytest.raises(ValueError, match='retro'):
         build('pnl R retro basic 3000 lcm 1.1 min 3500 max 8000 premium '
-              'less 1000 loss sev lognorm 100 cv 2 poisson '
+              'less agg R_e 1000 loss sev lognorm 100 cv 2 poisson '
               'aggregate net of 5000 xs 4000 deposit 1500')
 
 
@@ -168,5 +168,5 @@ def test_ratio_feature_without_premium_rejected():
 def test_occurrence_basis_rejected():
     # variable features are aggregate-basis only in this release
     with pytest.raises(ValueError, match='aggregate reinsurance only'):
-        build('pnl V 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        build('pnl V 10000 premium less agg V_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 deposit 1500 pc 25% after 10% poisson')

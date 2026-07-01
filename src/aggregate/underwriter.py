@@ -17,7 +17,7 @@ from .config import (get_settings, reload_settings as _reload_settings,
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .spectral import Distortion
-from .parser import UnderwritingLexer, UnderwritingParser
+from .parser import UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM
 from .utilities import (qd, agg_help)
 
 logger = logging.getLogger(__name__)
@@ -956,18 +956,39 @@ class Underwriter(object):
             if getattr(obj, '_approx_fit', None):
                 _desc = obj._approx_description()
                 obj.note = f"{obj.note}; {_desc}" if obj.note else _desc
-        elif kind == 'pnl':
-            # A ``pnl`` builds an inner pure-loss Aggregate plus a **recipe**; the
-            # eager P&L value object is *snapshotted* from the recipe only after
-            # the inner Aggregate is updated (build the engine first, then
-            # snapshot -- a PnL retains no engine). ``build_many`` calls
-            # :meth:`_snapshot_pnl` after the update loop; the factory just
-            # attaches ``inner._pnl_recipe`` and returns the inner Aggregate.
+        elif kind in ('pnl', 'xpnl'):
+            # A ``pnl`` / ``xpnl`` wraps a complete stochastic engine (an inline
+            # ``agg``, an ``agg.NAME`` ref, or a ``port.NAME`` ref) and reads its
+            # loss out. For an agg engine the loss structure is merged into
+            # ``spec``, so the inner pure-loss Aggregate is built here plus a
+            # **recipe**; the eager P&L value object is *snapshotted* from the
+            # recipe only after the inner Aggregate is updated (build the engine
+            # first, then snapshot -- a PnL retains no engine). ``build_many``
+            # calls :meth:`_snapshot_pnl` after the update loop. ``xpnl`` returns
+            # the exploded :class:`PnLTower` instead of the collapsed
+            # :class:`PnL`; a ``port`` engine takes the dedicated path below.
+            is_tower = (kind == 'xpnl')
+            port_engine = spec.pop('_engine_port', None)
+            # The engine's own note / label (inline agg): inner-Aggregate
+            # presentation metadata, not loss structure -- strip before build.
+            spec.pop('engine_note', None)
+            spec.pop('engine_display_label', None)
             consideration = spec.pop('consideration')
             expense_spec = spec.pop('expense_spec', None)
             # Optional consideration display label (the ``as`` clause on the
             # premium head) -> the consideration leg's dict key in the plain P&L.
             consideration_label = spec.pop('consideration_label', None)
+            if port_engine is not None:
+                obj = self._build_pnl_from_port(
+                    name, port_engine, consideration, expense_spec,
+                    consideration_label, is_tower, program)
+                parsed.object = obj
+                return parsed
+            # ``inherit premium``: resolve the sentinel to the engine's technical
+            # premium (the merged ``exp_premium``) before economics see it. A
+            # build error if the agg engine carries no premium (decision 3).
+            if consideration is INHERIT_PREMIUM:
+                consideration = self._inherit_agg_premium(name, spec)
             # Reinstatement schedule (stochastic ceded premium): pop before the
             # inner Aggregate is built (it is not a loss-structure key) and use it
             # below to attach a ReinstatementTerms.
@@ -1060,6 +1081,10 @@ class Underwriter(object):
                     'expense_spec': expense_spec, 'econ': econ,
                     'consideration': consideration,
                     'consideration_label': consideration_label}
+            # ``xpnl`` returns the exploded PnLTower rather than the collapsed
+            # PnL; carried on the recipe so :meth:`_snapshot_pnl` selects the
+            # tower face after the inner engine is updated.
+            inner._pnl_recipe['is_tower'] = is_tower
             inner.program = program
             obj = inner
         elif kind == 'bvagg':
@@ -1452,6 +1477,54 @@ class Underwriter(object):
         return rv
 
     @staticmethod
+    def _inherit_agg_premium(name, spec):
+        """Resolve ``inherit premium`` for an agg engine: its technical premium.
+
+        Reads the merged engine's ``exp_premium`` (from a ``premium at lr``
+        exposure or a stored agg with premium). A build error if the engine
+        carries no premium (a ``claims`` / ``loss`` exposure) -- ``inherit`` then
+        has nothing to copy (decision 3).
+        """
+        prem = spec.get('exp_premium', None)
+        total = (float(np.sum(np.asarray(prem, dtype=float)))
+                 if prem is not None else 0.0)
+        if not total:
+            raise ValueError(
+                f"{name}: 'inherit premium' but the wrapped engine has no "
+                "premium to inherit -- it needs a 'premium at lr' exposure (or a "
+                "stored agg / port carrying premium). Give an explicit "
+                "'<amount> premium' instead.")
+        return total
+
+    def _build_pnl_from_port(self, name, portname, consideration, expense_spec,
+                             consideration_label, is_tower, program):
+        """Build a portfolio-sourced P&L: wrap a ``port.NAME`` engine's total.
+
+        A ``port`` source reads the **net-net portfolio total** and sees nothing
+        inside, so a port-sourced P&L is inherently the *plain* case (decision 8).
+        The Portfolio is returned as a deferred object carrying a ``port_plain``
+        recipe; the :meth:`build_many` update loop updates it, then
+        :meth:`_snapshot_pnl` builds the eager :class:`PnL` from its total-loss
+        density. ``xpnl`` over a port is rejected (nothing to explode, decision 6).
+        """
+        if is_tower:
+            raise NotImplementedError(
+                f"{name}: 'xpnl' over a portfolio is not supported -- the "
+                "portfolio total hides its units, so there is nothing to explode. "
+                "Use 'pnl' for the net-net book P&L (or 'xpnl' over a single agg "
+                "engine).")
+        port_pp = self[('port', portname)]
+        port_spec = deepcopy(port_pp.spec)
+        port_units = [k for _i, _j, k in port_spec['spec']]
+        engine = Portfolio(name, port_units, uw=self,
+                           display_label=port_spec.get('display_label'))
+        engine.program = program
+        engine._pnl_recipe = {'kind': 'port_plain', 'expense_spec': expense_spec,
+                              'consideration': consideration,
+                              'consideration_label': consideration_label}
+        return engine
+
+    @staticmethod
     def _snapshot_pnl(inner, recipe):
         """Snapshot the eager P&L value object from an **updated** inner Aggregate.
 
@@ -1464,6 +1537,42 @@ class Underwriter(object):
         """
         from ._pnl import resolve_expense
         kind = recipe['kind']
+        if kind == 'port_plain':
+            # ``inner`` is an updated Portfolio; wrap its net-net total loss as a
+            # plain P&L against the stated (or inherited) consideration.
+            from ._pnl import create_pnl
+            consideration = recipe['consideration']
+            if consideration is INHERIT_PREMIUM:
+                prem = float(getattr(inner, 'exp_premium', 0.0) or 0.0)
+                if not prem:
+                    raise ValueError(
+                        f"{inner.name}: 'inherit premium' but the wrapped "
+                        "portfolio has no accumulated premium (its units carry "
+                        "no 'premium at lr' exposure). Give an explicit "
+                        "'<amount> premium'.")
+                consideration = prem
+            if recipe.get('expense_spec'):
+                raise NotImplementedError(
+                    f"{inner.name}: expenses on a portfolio-sourced P&L are not "
+                    "yet supported; wrap the expenses per unit, or use a single "
+                    "agg engine.")
+            dd = inner.density_df
+            source = (dd.index.values, dd['p_total'].values)
+            label = recipe.get('consideration_label') or 'consideration'
+            return create_pnl(
+                source, consideration={label: float(consideration)},
+                obligation={inner.name: lambda x: x}, role='sell',
+                result_name='margin', name=inner.name)
+        is_tower = recipe.get('is_tower', False)
+        if is_tower and kind != 'gcn':
+            # ``xpnl`` explodes the Gross/net-occ/net-agg waterfall, which only
+            # exists when the engine carries reinsurance economics. A plain / var
+            # / reinstatement engine has no such tower to explode.
+            raise NotImplementedError(
+                f"{inner.name}: 'xpnl' (the exploded tower) requires a wrapped "
+                "engine with reinsurance economics -- occurrence and/or aggregate "
+                "cessions with a ceded-premium clause (deposit / cede / rol / "
+                "rate). The engine here is plain; use 'pnl'.")
         if kind == 'var':
             inner.variable_gross_expense = resolve_expense(
                 inner, recipe['expense_spec'], inner.variable_gross_premium)
@@ -1480,9 +1589,12 @@ class Underwriter(object):
             return analysis.as_pnl()
         if kind == 'gcn':
             econ = recipe['econ']
-            return inner.make_pnl(gross=econ['gross'], ceded=econ['ceded'],
+            face = inner.make_pnl(gross=econ['gross'], ceded=econ['ceded'],
                                   expense_spec=recipe['expense_spec'],
                                   gcn_economics=econ)
+            # ``xpnl`` -> the full waterfall (PnLTower); ``pnl`` -> the collapsed
+            # net face (with the tower attached as ``.tower`` / ``._waterfall``).
+            return face._waterfall if is_tower else face
         return inner.make_pnl(recipe['consideration'],
                               expense_spec=recipe['expense_spec'],
                               consideration_label=recipe.get('consideration_label'))

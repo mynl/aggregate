@@ -128,6 +128,8 @@ _TERMINAL_LABELS: dict[str, str] = {
     "LOSS": "'loss'",
     "PAYOFF": "'payoff'",
     "PNL": "'pnl'",
+    "XPNL": "'xpnl' (exploded P&L tower)",
+    "INHERIT": "'inherit' (copy the engine's premium)",
     "PORT": "'port'",
     "RATE": "'rate'",
     "NET": "'net'",
@@ -153,6 +155,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "FREQ": "a frequency name (poisson, binomial, ...)",
     # Builtin-dotted forms.
     "BUILTIN_AGG": "a builtin aggregate (agg.X)",
+    "BUILTIN_PORT": "a builtin portfolio (port.X)",
     "BUILTIN_SEV": "a builtin severity (sev.X)",
     "BUILTIN_DIST": "a builtin distortion (dist.X)",
     "NOTE": "a note clause (note{...})",

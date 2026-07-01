@@ -56,11 +56,16 @@
    value — object-level `sev` label delivered). Landed **before**
    `[PnL-Engine-Source]` so that plan's program sweep is written once against final
    syntax. DecL grammar extended (additive).
-2. **[PnL-Engine-Source]** `alpha` — a P&L wraps a **complete** engine (`pnl NAME
-   <prem> less <agg|agg.NAME|port.NAME> [less <expenses>]`); deletes the
-   "half-baked agg inside a pnl" fork, adds `inherit premium` / `xpnl` / `port`
-   sourcing, subsumes `[Portfolio-of-PnL]`. Breaking `pnl` syntax + program sweep.
-   Plan: `dev/plan-pnl-engine-source.md`. Do **after** `[DecL-Labels]` (done).
+2. **[PnL-Engine-Source]** ✅ **DONE** `1.0.0a125` — a P&L wraps a **complete**
+   engine (`pnl NAME <prem> less <agg|agg.NAME|port.NAME> [less <expenses>]`);
+   deleted the "half-baked agg inside a pnl" fork, added `inherit premium` /
+   `xpnl` (→ `PnLTower`) / `port` sourcing + `Portfolio.exp_premium`, subsumes
+   `[Portfolio-of-PnL]` (below). Breaking `pnl` syntax; all `.agg` databases +
+   test suite swept. Plan moved to `dev/done/plan-pnl-engine-source.md`.
+   **Deferred (as NotImplementedError):** `retro` over a reinsured engine; loss-
+   basis expense as stochastic `rate·loss` inside the exploded tower (decision 9 —
+   a123 GCN-scalar carve-out kept; a reporting nicety, revisit if needed);
+   expenses on a port-sourced P&L.
 2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
    for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
    fixed** (it does not morph as the object gains properties), columns are
@@ -70,12 +75,13 @@
    reinsurance present) split is settled. Plan: `dev/reporting-guidelines.md`.
    (The first fix it named, the `summary_df`→`gcn_df` morph, landed in
    `1.0.0a121`.) Depends on `[PnL-API]`.
-3. **[Portfolio-of-PnL]** `alpha` — `PortPnL`: portfolios of P&L positions.
-   Constant-consideration v1 (`make_pnl(port_total, Σ Cᵢ)` + a stacked per-unit
-   signed summary; obligation combine is the existing Portfolio FFT); loss-
-   sensitive net-then-combine deferred. A book is a `create_pnl_tower` (or a
-   `create_pnl` over a portfolio total), so it is **nearly free once `[PnL-API]`
-   lands**. Plan: `dev/plan-pnl-portfolio.md`. Depends on `[PnL-API]`.
+3. **[Portfolio-of-PnL]** ✅ **SUBSUMED** by `[PnL-Engine-Source]` (`1.0.0a125`).
+   The constant-consideration case is delivered: `pnl NAME <prem> less port.NAME`
+   builds a `create_pnl` over the portfolio net-net total (`port.exp_premium`
+   accumulated for `inherit premium`). No bespoke `PortPnL`. Still deferred: the
+   loss-sensitive net-then-combine (per-unit netting before FFT combine, which
+   loses premium attribution) and pnl *units inside* a port (the pre-existing
+   `NotImplementedError` gate). Old plan: `dev/plan-pnl-portfolio.md`.
 4. **[Plotting-Punchups]** `alpha` — plotting polish; lead item: a `pnl` aggregate
    plots the aggregate **only** (no loss-convention severity overlaid on a payoff
    — wrong-sign distraction for the UW/finance audience). Plan:

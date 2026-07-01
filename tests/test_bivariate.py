@@ -200,7 +200,7 @@ def test_mv_pnl_component_rejected():
     """A pnl component in a bivariate (joint P&L) is deferred -> clear error."""
     prog = '''bivariate PL 25 claims
         agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
-        pnl B 900 prem less dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+        pnl B 900 prem less agg B_e dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
         copula gumbel 0.4
         poisson'''
     with pytest.raises(NotImplementedError, match='pnl components in a bivariate'):

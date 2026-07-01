@@ -129,7 +129,7 @@ class AggLexer(RegexLexer):
             # ID-exclusion list must be coloured by this lexer).
             (words(
                 ('occurrence', 'aggregate', 'distortion', 'exposure', 'tweedie',
-                    'premium', 'tower', 'picks', 'prem', 'pnl',
+                    'premium', 'tower', 'picks', 'prem', 'pnl', 'xpnl', 'inherit',
                     'bivariate', 'bv', 'clash', 'copula',
                     'netceded', 'grossceded', 'grossnet',
                     'approximate', 'approx', 'ssev',

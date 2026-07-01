@@ -111,7 +111,7 @@ def test_plot_has_four_panels():
 def test_pnl_reinstatement_analysis_plots_mosaic():
     # a DecL reinstatement pnl returns a PnL whose attached .analysis plots the
     # stochastic-ceded mosaic (p.plot() itself is the generic net-result plot).
-    p = build('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+    p = build('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% '
               'reinstatements [0 1] poisson')
     fig = p.analysis.plot()

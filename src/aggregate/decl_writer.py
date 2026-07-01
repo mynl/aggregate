@@ -695,7 +695,7 @@ def _render_agg(name: str, spec: dict) -> _Block:
     ])
 
 
-def _render_pnl(name: str, spec: dict) -> _Block:
+def _render_pnl(name: str, spec: dict, kind: str = 'pnl') -> _Block:
     """Render a profit-and-loss aggregate (``pnl NAME <premium> premium less ...``).
 
     Inverts ``pnl_out_*`` / ``_attach_pnl``. The premium is ``consideration``;
@@ -703,38 +703,57 @@ def _render_pnl(name: str, spec: dict) -> _Block:
     (``exp_lr``, the bare loss-ratio form that binds to the premium) or ``loss``
     (``exp_el``).
 
+    Under the current (engine-wrapped) grammar a P&L declares a complete backing
+    ``agg`` engine::
+
+        pnl NAME <premium> premium less agg NAME_e <exposure> <body> [less <exp>]
+
     Returns a :class:`_Block` whose head keeps ``pnl NAME <premium> premium less``
-    intact (so it re-parses to a :class:`aggregate.PnL`); the loss-head fragment
-    is the first child clause.
+    intact; the loss engine renders as a nested ``agg NAME_e`` sub-block (sharing
+    the ordinary :func:`_render_exposure` / severity / reinsurance / frequency /
+    ``approximate`` renderers), and any gross-expense clause follows after a second
+    ``less`` at the P&L level. The synthetic engine name (``NAME_e``) is cosmetic
+    --- it is discarded at build --- but must stay a valid identifier.
     """
+    from .parser import INHERIT_PREMIUM
     retro = spec.get('retro_terms')
+    consideration = spec.get('consideration')
     if retro is not None:
         premium_head = f'retro {_render_collar(retro)} premium'
+    elif consideration is INHERIT_PREMIUM:
+        # ``inherit premium`` -- copy the engine's technical premium; the sentinel
+        # never renders as a number.
+        premium_head = 'inherit premium'
     else:
-        premium_head = f'{_fmt_seq(spec["consideration"])} premium'
+        premium_head = f'{_fmt_seq(consideration)} premium'
     premium_head += _render_label(spec.get('consideration_label'))
     obj_label = _render_label(spec.get('display_label'))
 
-    if spec.get('freq_name') == 'empirical':
-        head = _render_dfreq(spec)
-    elif 'exp_en' in spec:
-        head = f'{_fmt_seq(spec["exp_en"])} claims'
-    elif 'exp_lr' in spec:
-        head = f'{_fmt_seq(spec["exp_lr"])} lr'
-    elif 'exp_el' in spec:
-        head = f'{_fmt_seq(spec["exp_el"])} loss'
+    port_engine = spec.get('_engine_port')
+    if port_engine is not None:
+        # A ``port.NAME``-sourced P&L: the engine is a stored portfolio reference
+        # (the net-net total), not an inline agg.
+        engine = f'port.{port_engine}'
     else:
-        head = ''
-
-    return _Block(f'pnl {name}{obj_label} {premium_head} less', [
-        head,
-        _render_layers(spec),
-        _render_sev_clause(spec),
-        _render_reins(spec, 'occurrence', 'occ_reins', 'occ_kind'),
-        _render_freq(spec),
-        _render_reins(spec, 'aggregate', 'agg_reins', 'agg_kind'),
-        _render_approx(spec),
-        _render_expense(spec),
+        # the loss leg is a complete ``agg NAME_e`` engine (new grammar); its
+        # exposure head (claims / loss / ``premium at lr`` / dfreq) and body reuse
+        # the ordinary agg renderers, so every exposure form round-trips through
+        # one code path. (An ``agg.NAME``-sourced P&L renders as the equivalent
+        # inline engine -- the merged loss structure round-trips identically.)
+        engine = _Block(f'agg {name}_e', [
+            _render_exposure(spec),
+            _render_layers(spec),
+            _render_sev_clause(spec),
+            _render_reins(spec, 'occurrence', 'occ_reins', 'occ_kind'),
+            _render_freq(spec),
+            _render_reins(spec, 'aggregate', 'agg_reins', 'agg_kind'),
+            _render_approx(spec),
+        ])
+    expense = _render_expense(spec)
+    keyword = 'xpnl' if kind == 'xpnl' else 'pnl'
+    return _Block(f'{keyword} {name}{obj_label} {premium_head} less', [
+        engine,
+        f'less {expense}' if expense else '',
         _render_trailer(spec),
     ])
 
@@ -745,8 +764,8 @@ def _render_agg_or_pnl(kind: str, name: str, spec: dict) -> _Block:
     A ``pnl`` declaration transforms to ``("pnl", name, spec)`` with a
     ``consideration`` key (set by ``_attach_pnl``); an ``agg`` has neither.
     """
-    if kind == 'pnl' or 'consideration' in spec:
-        return _render_pnl(name, spec)
+    if kind in ('pnl', 'xpnl') or 'consideration' in spec:
+        return _render_pnl(name, spec, kind=kind)
     return _render_agg(name, spec)
 
 
@@ -881,6 +900,7 @@ def _render_distortion(name: str, spec: dict) -> str:
 _KIND_RENDERERS = {
     'agg': lambda name, spec: _render_agg_or_pnl('agg', name, spec),
     'pnl': lambda name, spec: _render_agg_or_pnl('pnl', name, spec),
+    'xpnl': lambda name, spec: _render_agg_or_pnl('xpnl', name, spec),
     'sev': _render_sev_out,
     'port': _render_port,
     'bvagg': _render_bvagg,

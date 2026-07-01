@@ -1,8 +1,21 @@
 # Plan — [PnL-Engine-Source]: a P&L wraps a complete engine (no bastards)
 
-Status: **DRAFT** (2026-07-01). The load-bearing structural refactor. Follows the
-a123 `[PnL-Exhibits]` always-PnL work (`dev/done/plan-pnl-exhibits.md`) and pairs
-with `dev/plan-decl-labels.md` (land labels **first** — ordering note at the end).
+Status: **DONE** (`1.0.0a125`, 2026-07-01). The load-bearing structural refactor.
+Followed a123 `[PnL-Exhibits]` and a124 `[DecL-Labels]` (landed first, as planned).
+
+**Execution notes / deviations from the draft below:**
+- Two draft claims were wrong (verified in code): `Aggregate.exp_premium` was **not**
+  retained — added `self.exp_premium`/`self.exp_lr` in `__init__` (needed for
+  Portfolio accumulation + `inherit`); and the SLY snapshot has **zero** pnl
+  programs, so no re-baseline was needed.
+- Inline engine = **any** valid aggregate form (full/dfreq/tweedie/rename), not just
+  `full` — `agg_body` factored across all `agg_out` alternatives.
+- The unparser (`decl_writer._render_pnl`) also needed rewriting (a pre-existing gap
+  that broke `test_decl_unparser`) — now emits the engine-wrapped form, `inherit
+  premium`, and `less port.NAME`.
+- Deferred as `NotImplementedError`: `retro` over a reinsured engine; loss-basis
+  expense as stochastic `rate·loss` in the exploded tower (decision 9 fallback);
+  expenses on a port-sourced P&L.
 
 ## The problem — the `pnl` grammar is a fork of the `agg` grammar
 
@@ -28,10 +41,24 @@ you point a `pnl` at a `port`).
 
 ## Decisions (from the design dialogue — all settled)
 
+> **Resolved at execution (2026-07-01), superseding the stale grammar sketch below:**
+> * **Labels** — a124 already landed `display_label: AS label` (`as "Friendly
+>   Label"`, ID or quoted string) as a per-object slot after each internal `name`.
+>   Nothing to decide: the factored `agg_source_inline` keeps `AGG name
+>   display_label agg_body`, the wrapping `pnl`/`xpnl` keeps its own label, and
+>   both flow into exhibit column headers.
+> * **Inline engine = any valid aggregate.** A pnl is engine-agnostic — it only
+>   reads the outcome distribution (`agg.density_df.p_total`). So the embedded
+>   `agg NAME …` may be *any* inline agg form (full, dfreq, tweedie, rename), not
+>   just `full`; plus stored `agg.NAME` / `port.NAME`. `agg_body` is factored to
+>   span **all** `agg_out` alternatives minus the top-level trailer. Decision 1
+>   (named, complete engine — no anonymous body) is unchanged.
+
 1. **No bastards — breaking.** The `less` source is a *complete* engine only:
-   `agg name <body>` (inline, named), `agg.NAME`, or `port.NAME`. **No anonymous
-   inline body.** Every existing `pnl X 10000 premium less 85% lr sev … poisson`
-   is rewritten to wrap a real `agg`.
+   `agg name <body>` (inline, named — *any* agg form, see resolved note above),
+   `agg.NAME`, or `port.NAME`. **No anonymous inline body.** Every existing
+   `pnl X 10000 premium less 85% lr sev … poisson` is rewritten to wrap a real
+   `agg`.
 2. **Double-`less` for expenses** — `pnl NAME <premium> less <engine> less
    <expenses>`. The second `less` (a reserved keyword) is a **hard anchor** that
    dissolves the nested-trailer ambiguity: the embedded engine's tail cannot cross

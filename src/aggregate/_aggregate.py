@@ -1698,6 +1698,14 @@ class Aggregate:
             get_value(freq_zm), get_value(freq_p0))
         # Spec pass through from constructor arguments
         self.note = note
+        # Exposure premium / loss ratio, retained for the P&L path: a ``pnl``
+        # wrapping this engine reads ``exp_premium`` as the *technical* premium
+        # (``inherit premium``), and a Portfolio accumulates it across units. 0.0
+        # for a claims / loss exposure or an approximated aggregate (no premium).
+        # Held as passed (scalar or per-component vector); consumers reduce with
+        # ``np.sum``. See dev/plan-pnl-engine-source.md.
+        self.exp_premium = exp_premium
+        self.exp_lr = exp_lr
         # Raw `hints{...}` settings string; consumed by the underwriter build
         # path (caller-wins merge), retained here for round-tripping / repr.
         self.hints = hints

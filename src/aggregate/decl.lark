@@ -20,6 +20,7 @@
 answer: sev_out          -> answer_sev
       | agg_out          -> answer_agg
       | pnl_out          -> answer_pnl
+      | xpnl_out         -> answer_xpnl
       | port_out         -> answer_port
       | bv_out           -> answer_bv
       | distortion_out   -> answer_distortion
@@ -64,11 +65,19 @@ agg_list: agg_list port_item   -> agg_list_cons
 // Aggregate
 // ======================================================================
 
-agg_out: AGG name display_label exposures layers sev_clause occ_reins freq agg_reins approx_clause orientation trailer  -> agg_out_full
-       | AGG name display_label dfreq      layers sev_clause occ_reins         agg_reins approx_clause orientation trailer  -> agg_out_dfreq
-       | AGG name display_label TWEEDIE expr expr expr trailer                                    -> agg_out_tweedie
-       | AGG name display_label builtin_agg occ_reins agg_reins trailer                           -> agg_out_rename
-       | builtin_agg agg_reins trailer                                              -> agg_out_builtin
+agg_out: AGG name display_label agg_body trailer   -> agg_out_named
+       | builtin_agg agg_reins trailer              -> agg_out_builtin
+
+// The shared aggregate body -- everything after ``AGG name display_label`` and
+// before the trailer. Factored out of ``agg_out`` so the embedded engine of a
+// ``pnl`` / ``xpnl`` (see ``agg_source``) reuses the *identical* body: a P&L
+// wraps a complete aggregate, not a forked half-body ("no bastards"). The four
+// alternatives mirror the old ``agg_out`` variants (full / discrete-freq /
+// tweedie / rename-a-builtin). See dev/plan-pnl-engine-source.md.
+agg_body: exposures layers sev_clause occ_reins freq agg_reins approx_clause orientation  -> agg_body_full
+        | dfreq      layers sev_clause occ_reins       agg_reins approx_clause orientation  -> agg_body_dfreq
+        | TWEEDIE expr expr expr                                                             -> agg_body_tweedie
+        | builtin_agg occ_reins agg_reins                                                    -> agg_body_rename
 
 // Orientation suffix on an ``agg`` -- the variable's sign convention / role.
 // ``payoff`` marks an asset-return / direct-payoff primitive ("more is
@@ -95,32 +104,46 @@ approx_clause: APPROXIMATE ID   -> approx_set
 // ======================================================================
 // Profit-and-loss aggregate (premium minus loss)
 // ----------------------------------------------------------------------
-// ``pnl NAME <premium> premium less <loss-agg-body>`` is a sibling of ``agg``.
-// The premium is a single deterministic amount subtracted ONCE for the
-// book (an aggregate-level affine shift), as opposed to a constant inside
-// sev/dsev/ssev which is per-claim (multiplied by frequency). The body
-// after ``less`` is an ordinary aggregate; only the exposure head is
-// specialised so a bare ``lr`` can bind to the stated premium. ``less`` is a
-// dedicated keyword (not ``-``) so the P&L split never collides with severity
-// arithmetic (``ssev 20 - lognorm``). See dev/done/plan-pnl-premium.md and
-// dev/done/plan-pnl-expenses-ceded-premium.md.
+// ``pnl NAME <premium> less <engine> [less <expenses>]``. A P&L wraps a
+// **complete stochastic engine** and reads its loss out ("what comes out of
+// the sausage maker"). The engine (``agg_source``) is a complete aggregate --
+// an inline named ``agg NAME <body>``, a stored ``agg.NAME`` reference, or a
+// stored ``port.NAME`` reference -- never an anonymous half-body. The premium
+// is the *consideration* (what you book); the engine's own ``premium at lr``
+// is a separate *sizing* input. ``less`` is a dedicated keyword (not ``-``) so
+// the split never collides with severity arithmetic (``ssev 20 - lognorm``); a
+// **second** ``less`` is the hard anchor introducing the (optional) expense
+// clause -- the embedded engine's tail cannot cross a ``less``. ``xpnl`` is the
+// exploded sibling: same syntax, returns the Gross/net-occ/net-agg
+// :class:`PnLTower`. See dev/plan-pnl-engine-source.md,
+// dev/done/plan-pnl-premium.md, dev/done/plan-pnl-expenses-ceded-premium.md.
 // ======================================================================
 
-pnl_out: PNL name display_label pnl_premium LESS pnl_exposures layers sev_clause occ_reins freq agg_reins approx_clause expense_clause trailer  -> pnl_out_full
-       | PNL name display_label pnl_premium LESS dfreq layers sev_clause occ_reins              agg_reins approx_clause expense_clause trailer  -> pnl_out_dfreq
+pnl_out:  PNL  name display_label pnl_premium LESS agg_source expense_less trailer  -> pnl_out_engine
+xpnl_out: XPNL name display_label pnl_premium LESS agg_source expense_less trailer  -> xpnl_out_engine
 
-// The gross-premium head: a fixed amount ``<num> premium`` or the account-level
-// retrospective-rating clause ``retro <collar> premium`` (Phase 3). Retro
-// substitutes for the number in the existing ``... premium less`` head so the
-// gross premium becomes a collared affine map of net account loss; the trailing
-// ``premium`` keeps the ``premium less`` divider. The collar is keyword-first,
-// matching ``swing``. See dev/plan-variable-rating.md.
+// The wrapped engine: a complete aggregate. ``agg NAME <body>`` reuses the
+// shared ``agg_body`` (identical to a standalone ``agg``, minus the trailer,
+// which the wrapping pnl/xpnl owns); ``agg.NAME`` / ``port.NAME`` reference a
+// stored object. A ``port`` source reads the net-net portfolio total.
+agg_source: AGG name display_label agg_body   -> agg_source_inline
+          | builtin_agg                        -> agg_source_ref_agg
+          | BUILTIN_PORT                        -> agg_source_ref_port
+
+// The gross-premium head: a fixed amount ``<num> premium``, ``inherit premium``
+// (copy the engine's technical premium -- ``Aggregate.exp_premium`` / the
+// accumulated portfolio premium; a build error if the engine has none), or the
+// account-level retrospective-rating clause ``retro <collar> premium``. The
+// trailing ``premium`` keeps the ``premium less`` divider. See
+// dev/plan-variable-rating.md and dev/plan-pnl-engine-source.md.
 pnl_premium: numbers PREMIUM display_label        -> pnl_premium_fixed
+           | INHERIT PREMIUM display_label         -> pnl_premium_inherit
            | RETRO collar PREMIUM display_label   -> pnl_premium_retro
 
-pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
-             | numbers LOSS     -> pnl_exp_loss
-             | numbers LR       -> pnl_exp_lr
+// The optional second-``less`` expense clause (the hard anchor). Omit when no
+// expenses; ``less <expense-groups>`` otherwise.
+expense_less: LESS expense_groups   -> expense_less_some
+            |                         -> expense_less_none
 
 // Gross expenses on a ``pnl`` (the base is explicit -- decision 1): each term is
 // a fraction of premium (``25% premium expenses``), a fraction of expected loss
@@ -143,9 +166,6 @@ pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
 // anchored by the ``expense[s]`` keyword, so ``and`` (continue the group) vs a
 // bare ``numbers`` (start a new group) vs ``as`` (label the group) fully
 // disambiguates. See dev/plan-decl-labels.md.
-expense_clause: expense_groups   -> expense_some
-              |                    -> expense_none
-
 expense_groups: expense_groups expense_group   -> expense_groups_cons
               | expense_group                    -> expense_groups_one
 
@@ -584,6 +604,8 @@ SSEV.2:       /ssev(?![a-zA-Z0-9._:~\-])/
 LOSS.2:       /loss(?![a-zA-Z0-9._:~\-])/
 PAYOFF.2:     /payoff(?![a-zA-Z0-9._:~\-])/
 PNL.2:        /pnl(?![a-zA-Z0-9._:~\-])/
+XPNL.2:       /xpnl(?![a-zA-Z0-9._:~\-])/
+INHERIT.2:    /inherit(?![a-zA-Z0-9._:~\-])/
 PORT.2:       /port(?![a-zA-Z0-9._:~\-])/
 RATE.2:       /rate(?![a-zA-Z0-9._:~\-])/
 NET.2:        /net(?![a-zA-Z0-9._:~\-])/
@@ -611,6 +633,7 @@ FREQ.2: /(?:binomial|pascal|poisson|bernoulli|geometric|fixed|neymanA|neymana|ne
 // agg.X / sev.X / dist(ortion).X / note{...} — priority 3 outranks the
 // AGG / SEV / DISTORTION / ID alternatives that share their prefix.
 BUILTIN_AGG.3:  /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+BUILTIN_PORT.3: /port\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_SEV.3:  /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_DIST.3: /(?:distortion|dist)\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 NOTE.3:         /note\{[^}]*\}/
@@ -650,7 +673,7 @@ NUMBER.2: /-?(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|picks|pnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

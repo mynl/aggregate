@@ -27,7 +27,7 @@ def _spec(program):
     return _UW.parser.parse(program)
 
 
-_HUMAN = ('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+_HUMAN = ('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
           'occurrence net of 95% po 100 xs 100 rol 18% '
           'reinstatements 1 free and 1 at 50% and 2 at 100% poisson')
 
@@ -44,14 +44,14 @@ def test_group_chain_form_rates():
 
 def test_explicit_list_form_rates():
     _, _, spec = _spec(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% reinstatements [0 .5 1 1] poisson')
     assert spec['occ_reins_reinst'] == [(0.0, 0.5, 1.0, 1.0)]
 
 
 def test_number_word_counts():
     _, _, spec = _spec(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% '
         'reinstatements one free and three at 100% poisson')
     assert spec['occ_reins_reinst'] == [(0.0, 1.0, 1.0, 1.0)]
@@ -59,14 +59,14 @@ def test_number_word_counts():
 
 def test_single_group_no_free():
     _, _, spec = _spec(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% reinstatements 3 at 100% poisson')
     assert spec['occ_reins_reinst'] == [(1.0, 1.0, 1.0)]
 
 
 def test_deposit_base_premium_form():
     _, _, spec = _spec(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence ceded to 100 xs 100 deposit 1800 reinstatements [0 1 1] poisson')
     assert spec['occ_reins_reinst'] == [(0.0, 1.0, 1.0)]
     assert spec['occ_reins_premium'] == [('deposit', 1800.0)]
@@ -76,7 +76,7 @@ def test_no_reinstatements_marker():
     # ``no reinstatements`` -> the empty-tuple marker (m=0), distinct from the
     # omitted clause (None = free + unlimited).
     _, _, spec = _spec(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% no reinstatements poisson')
     assert spec['occ_reins_reinst'] == [()]
 
@@ -86,7 +86,7 @@ def test_no_reinstatements_is_a_single_annual_limit():
     # reinstatement premium, so the ceded premium is the deterministic deposit.
     # build returns a PnL; the analysis is attached as p.analysis.
     p = build(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% no reinstatements poisson')
     a = p.analysis
     t = a.terms
@@ -114,13 +114,13 @@ def test_number_words_are_not_reserved_as_identifiers():
 # ----------------------------------------------------------------------
 def test_no_clause_means_no_terms():
     _, _, spec = _spec(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% poisson')
     assert 'occ_reins_reinst' not in spec
     # no reinstatements clause + a base premium clause -> a plain PnLTower, NOT a
     # ReinstatementAnalysis: it carries no reinstatement terms / analysis surface.
     p = build(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% poisson')
     assert not isinstance(p, ReinstatementAnalysis)
     assert not hasattr(p, 'terms')
@@ -132,14 +132,14 @@ def test_no_clause_means_no_terms():
 def test_reins_premium_rule():
     # [reins-premium]: a reinstatements clause needs a base premium clause.
     with pytest.raises(ValueError, match=r'reins-premium'):
-        _spec('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        _spec('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 reinstatements [0 1] poisson')
 
 
 def test_reins_single_layer_rule():
     # [reins-single-layer]: a reinstated layer + a plain second occ layer.
     with pytest.raises(ValueError, match=r'reins-single-layer'):
-        _spec('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        _spec('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 10% reinstatements [0 1] '
               'and 200 xs 200 poisson')
 
@@ -147,20 +147,20 @@ def test_reins_single_layer_rule():
 def test_reins_one_clause_rule():
     # [reins-one-clause]: two layers each carrying a reinstatements clause.
     with pytest.raises(ValueError, match=r'reins-one-clause'):
-        _spec('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        _spec('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 10% reinstatements [0 1] '
               'and 200 xs 200 rol 5% reinstatements [0 1] poisson')
 
 
 def test_reinstatements_rejected_on_aggregate():
     with pytest.raises(ValueError, match=r'occurrence layer'):
-        _spec('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 poisson '
+        _spec('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson '
               'aggregate net of 2000 xs 3000 rol 8% reinstatements [0 1]')
 
 
 def test_negative_rate_rejected():
     with pytest.raises(ValueError, match=r'nonnegative'):
-        _spec('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        _spec('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% reinstatements [0 -1] poisson')
 
 
@@ -240,7 +240,7 @@ def test_arg_free_programmatic_entry_point():
 # ----------------------------------------------------------------------
 def test_subsequent_aggregate_cover_builds():
     p = build(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] '
         'poisson aggregate net of 85% po 1500 xs 7000 deposit 600')
     # the reinstated occurrence layer + a genuine subsequent agg cover both build;
@@ -274,9 +274,9 @@ def test_deterministic_expense_and_cede_in_waterfall():
     # a reinstatement pnl with gross expenses + a flat ceding commission shows
     # them in the GCN Expense section, net of the (deterministic) commission,
     # exactly as a plain pnl does. Phase-3 slide/pc make this leg stochastic.
-    p = build('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+    p = build('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% cede 20% reinstatements [0 1] '
-              'poisson 500 fixed expense and 10% premium expense')
+              'poisson less 500 fixed expense and 10% premium expense')
     a = p.analysis
     assert a.gross_expense == pytest.approx(1500.0)        # 500 + 10% * 10000
     assert a.occ_commission == pytest.approx(3.6)          # 20% * (18% * 100)
@@ -300,7 +300,7 @@ def test_deterministic_expense_and_cede_in_waterfall():
 def test_no_expense_leaves_waterfall_unshifted():
     # without expenses there is no expense / commission shift: the gross column
     # of the waterfall equals the pure gross underwriting mean (P_G - L).
-    p = build('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+    p = build('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] poisson')
     a = p.analysis
     assert a.gross_expense == pytest.approx(0.0)
@@ -312,7 +312,7 @@ def test_no_expense_leaves_waterfall_unshifted():
 def test_aggregate_cover_summary_total_cession():
     # the headline summary collapses to Gross / total-Ceded / final-Net
     p = build(
-        'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
+        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] '
         'poisson aggregate net of 85% po 1500 xs 7000 deposit 600')
     s = p.analysis.summary_df

@@ -55,9 +55,29 @@ from .parser_errors import format_error
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['UnderwritingLexer', 'UnderwritingParser', 'grammar']
+__all__ = ['UnderwritingLexer', 'UnderwritingParser', 'grammar',
+           'INHERIT_PREMIUM']
 
 GRAMMAR_FILE = Path(__file__).parent / "decl.lark"
+
+
+class _InheritPremium:
+    """Sentinel for ``inherit premium``: copy the engine's technical premium.
+
+    A ``pnl``/``xpnl`` premium head of ``inherit premium`` records this sentinel
+    as the consideration at parse time; the underwriter resolves it after the
+    engine is built (reading ``Aggregate.exp_premium`` or the accumulated
+    portfolio premium), erroring if the engine has no premium.
+    """
+
+    __slots__ = ()
+
+    def __repr__(self):
+        return "INHERIT_PREMIUM"
+
+
+#: Singleton :class:`_InheritPremium` sentinel (see :meth:`pnl_premium_inherit`).
+INHERIT_PREMIUM = _InheritPremium()
 
 
 # ======================================================================
@@ -369,44 +389,32 @@ class UnderwritingTransformer(Transformer):
         return [c[0]]
 
     # ----- aggregate -------------------------------------------------
-    def agg_out_full(self, c):
-        (_, name, display_label, exposures, layers, sev_clause, occ_reins, freq,
-         agg_reins, approx, orientation, trailer) = c
-        spec = {
-            "name": name,
-            **display_label,
-            **exposures,
-            **layers,
-            **sev_clause,
-            **occ_reins,
-            **freq,
-            **agg_reins,
-            **self._check_approx(approx, occ_reins),
-            **orientation,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
+    # ``agg_body`` is the shared aggregate body (everything after
+    # ``AGG name display_label``, before the trailer), factored out so the
+    # embedded engine of a ``pnl`` / ``xpnl`` reuses the identical body. Each
+    # ``agg_body_*`` returns a plain spec-fragment dict (no name / display_label
+    # / trailer); ``agg_out_named`` (top level) and ``agg_source_inline``
+    # (embedded) add the identity and, for the top level, the trailer. Tweedie
+    # synthesises its own descriptive note, carried on the fragment under the
+    # private ``_engine_note`` key so the wrapper can prefer it over the trailer
+    # note (matching the old ``agg_out_tweedie`` behaviour). See
+    # dev/plan-pnl-engine-source.md.
+    def agg_body_full(self, c):
+        (exposures, layers, sev_clause, occ_reins, freq, agg_reins, approx,
+         orientation) = c
+        return {
+            **exposures, **layers, **sev_clause, **occ_reins, **freq,
+            **agg_reins, **self._check_approx(approx, occ_reins), **orientation,
         }
-        return ("agg", name, spec)
 
-    def agg_out_dfreq(self, c):
-        (_, name, display_label, dfreq, layers, sev_clause, occ_reins, agg_reins,
-         approx, orientation, trailer) = c
-        spec = {
-            "name": name,
-            **display_label,
-            **dfreq,
-            **layers,
-            **sev_clause,
-            **occ_reins,
-            **agg_reins,
-            **self._check_approx(approx, occ_reins),
-            **orientation,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
+    def agg_body_dfreq(self, c):
+        (dfreq, layers, sev_clause, occ_reins, agg_reins, approx, orientation) = c
+        return {
+            **dfreq, **layers, **sev_clause, **occ_reins, **agg_reins,
+            **self._check_approx(approx, occ_reins), **orientation,
         }
-        return ("agg", name, spec)
 
-    def agg_out_tweedie(self, c):
+    def agg_body_tweedie(self, c):
         # Tweedie distribution in (mean, p, sigma^2) form. The variance
         # function is sigma^2 * mean^p; phi = sigma^2 in Jorgenson p. 127
         # notation. The Tweedie -> compound-Poisson(gamma) reparameterization
@@ -414,35 +422,38 @@ class UnderwritingTransformer(Transformer):
         # module is also runnable as ``python -m`` for grammar printing).
         from .tweedie import tweedie_convert
 
-        _, name, display_label, _tw, mu, pp, sig2, trailer = c
+        _tw, mu, pp, sig2 = c
         ans = tweedie_convert(p=pp, μ=mu, σ2=sig2)
         alpha = ans["α"]
         lam = ans["λ"]
         beta = ans["β"]
-        spec = {
-            "name": name,
-            **display_label,
+        return {
             "exp_en": lam,
             "freq_name": "poisson",
             "sev_name": "gamma",
             "sev_a": alpha,
             "sev_scale": beta,
             # tweedie synthesises its own descriptive note (the user note is
-            # not preserved, as before); hints still flow through.
-            "note": (
+            # not preserved, as before); hints still flow through the trailer.
+            "_engine_note": (
                 f"Tw(p={pp}, μ={mu}, σ^2={sig2}) --> "
                 f"CP(λ={lam:8g}, ga(α={alpha:.8g}, β={beta:.8g}), scale={beta:.8g}"
             ),
-            "hints": trailer["hints"],
         }
-        return ("agg", name, spec)
 
-    def agg_out_rename(self, c):
-        _, name, display_label, bagg, occ_reins, agg_reins, trailer = c
+    def agg_body_rename(self, c):
+        bagg, occ_reins, agg_reins = c
         if "name" in bagg:
             del bagg["name"]
-        spec = {"name": name, **display_label, **bagg, **occ_reins, **agg_reins,
-                "note": trailer["note"], "hints": trailer["hints"]}
+        return {**bagg, **occ_reins, **agg_reins}
+
+    def agg_out_named(self, c):
+        _, name, display_label, body, trailer = c
+        # Tweedie's synthetic note wins over any (absent) user note; hints ride
+        # the trailer. Non-tweedie bodies carry no ``_engine_note``.
+        note = body.pop("_engine_note", None) or trailer["note"]
+        spec = {"name": name, **display_label, **body,
+                "note": note, "hints": trailer["hints"]}
         return ("agg", name, spec)
 
     def agg_out_builtin(self, c):
@@ -455,77 +466,98 @@ class UnderwritingTransformer(Transformer):
     def answer_pnl(self, c):
         return c[0]
 
-    def _attach_pnl(self, spec, premium):
-        """Record the consideration on a loss ``spec`` (the ``pnl`` marker).
+    def answer_xpnl(self, c):
+        return c[0]
 
-        ``pnl`` builds the same loss-aggregate spec an ``agg`` would, plus a
-        single ``consideration`` entry (the stated premium). The underwriter
-        builds the pure-loss :class:`Aggregate` from the body and wraps it via
-        :meth:`Aggregate.make_pnl`; the net P&L (``consideration - loss``) is
-        derived on the resulting :class:`PnL`. The premium is a single
-        deterministic amount for the book, in contrast to a constant inside
-        ``sev``/``dsev``/``ssev`` which is per-claim.
+    def _attach_pnl(self, spec, premium):
+        """Record the consideration (the stated ``pnl`` premium) on a spec.
+
+        The premium is a single deterministic amount for the book (an
+        aggregate-level affine shift), in contrast to a constant inside
+        ``sev``/``dsev``/``ssev`` which is per-claim. ``inherit premium`` defers
+        resolution to the factory (the sentinel :data:`INHERIT_PREMIUM`), which
+        reads the built engine's technical premium.
 
         Parameters
         ----------
         spec : dict
-            The loss-aggregate spec (mutated in place).
-        premium : float or list
-            The stated premium (scalar or per-component vector), recorded as
-            ``consideration``.
-
-        Notes
-        -----
-        For the bare-``lr`` exposure form (``_pnl_lr`` marker on the spec) the
-        premium also drives the loss ratio: ``E[loss] = premium * lr``,
-        synthesised here exactly as :meth:`exposures_premium_lr` does, so the
-        per-component claim-count derivation is reused unchanged.
+            The pnl spec (mutated in place).
+        premium : float, list, or INHERIT_PREMIUM
+            The stated premium, recorded as ``consideration``.
         """
-        if "_pnl_lr" in spec:
-            lr = spec.pop("_pnl_lr")
-            spec["exp_premium"] = premium
-            spec["exp_lr"] = lr
-            spec["exp_el"] = np.array(premium) * np.array(lr)
         spec["consideration"] = premium
 
-    def pnl_out_full(self, c):
-        (_pnl, name, display_label, premium, _less, exposures, layers, sev_clause,
-         occ_reins, freq, agg_reins, approx, expense, trailer) = c
-        spec = {
-            "name": name,
-            **display_label,
-            **exposures,
-            **layers,
-            **sev_clause,
-            **occ_reins,
-            **freq,
-            **agg_reins,
-            **self._check_approx(approx, occ_reins),
-            **expense,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
-        }
-        self._attach_pnl_head(spec, premium)
-        return ("pnl", name, spec)
+    # ----- the wrapped engine (agg_source) ---------------------------
+    # A ``pnl`` / ``xpnl`` wraps a complete stochastic engine and reads its loss
+    # out. Each ``agg_source_*`` returns a ``(kind, name, spec)`` triple; kind is
+    # ``'agg'`` for an inline body or an ``agg.NAME`` reference (both merge into
+    # the pnl spec so the existing plain / GCN / retro / var / reinstatement
+    # factory path is reused unchanged), or ``'port'`` for a ``port.NAME``
+    # reference (the factory builds a Portfolio and reads its net-net total).
+    def agg_source_inline(self, c):
+        # ``agg NAME <body>`` -- a complete inline aggregate, no trailer (the
+        # wrapping pnl/xpnl owns it). Returns the engine spec fragment; the
+        # engine's own note (tweedie) and display label are carried through so
+        # the inner Aggregate is faithfully the declared engine.
+        _agg, name, display_label, body = c
+        engine_note = body.pop("_engine_note", None)
+        spec = {"name": name, **display_label, **body}
+        if engine_note:
+            spec["note"] = engine_note
+        return ("agg", name, spec)
 
-    def pnl_out_dfreq(self, c):
-        (_pnl, name, display_label, premium, _less, dfreq, layers, sev_clause,
-         occ_reins, agg_reins, approx, expense, trailer) = c
-        spec = {
-            "name": name,
-            **display_label,
-            **dfreq,
-            **layers,
-            **sev_clause,
-            **occ_reins,
-            **agg_reins,
-            **self._check_approx(approx, occ_reins),
-            **expense,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
-        }
+    def agg_source_ref_agg(self, c):
+        # ``agg.NAME`` (optionally scaled) -- ``builtin_agg`` already resolves it
+        # to a deep-copied spec dict via safe_lookup.
+        bagg = c[0]
+        return ("agg", bagg.get("name"), bagg)
+
+    def agg_source_ref_port(self, c):
+        # ``port.NAME`` -- resolve the stored portfolio spec; the pnl reads the
+        # net-net total density. The factory builds the Portfolio engine.
+        portid = str(c[0])
+        portname = portid.split(".", 1)[1]
+        portspec = self.safe_lookup(portid)
+        return ("port", portname, portspec)
+
+    def _pnl_spec(self, kind, name, display_label, premium, source, expense,
+                  trailer):
+        """Assemble the ``(kind, name, spec)`` tuple shared by ``pnl``/``xpnl``.
+
+        For an inline / ``agg.NAME`` engine the loss structure is merged into the
+        pnl spec (the pnl owns identity; the engine's name/note/hints/label are
+        set aside), so the underwriter's existing pnl factory path is reused. A
+        ``port.NAME`` engine cannot merge into a loss-agg spec, so it is recorded
+        under ``_engine_port`` for a dedicated factory path.
+        """
+        ekind, ename, espec = source
+        spec = {"name": name, **display_label, **expense,
+                "note": trailer["note"], "hints": trailer["hints"]}
+        if ekind == "port":
+            spec["_engine_port"] = ename
+        else:
+            for k, v in espec.items():
+                if k in ("name", "note", "hints", "display_label"):
+                    continue
+                spec[k] = v
+            # The engine's own note (tweedie) and label are inner-Aggregate
+            # presentation; keep them without shadowing the pnl's trailer/label.
+            if espec.get("note"):
+                spec["engine_note"] = espec["note"]
+            if "display_label" in espec:
+                spec["engine_display_label"] = espec["display_label"]
         self._attach_pnl_head(spec, premium)
-        return ("pnl", name, spec)
+        return (kind, name, spec)
+
+    def pnl_out_engine(self, c):
+        (_pnl, name, display_label, premium, _less, source, expense, trailer) = c
+        return self._pnl_spec("pnl", name, display_label, premium, source,
+                              expense, trailer)
+
+    def xpnl_out_engine(self, c):
+        (_xpnl, name, display_label, premium, _less, source, expense, trailer) = c
+        return self._pnl_spec("xpnl", name, display_label, premium, source,
+                              expense, trailer)
 
     # ----- gross-premium head: fixed amount or retro rating clause ---
     def pnl_premium_fixed(self, c):
@@ -537,6 +569,20 @@ class UnderwritingTransformer(Transformer):
         """
         numbers, _prem, display_label = c
         head = {'_premium': numbers}
+        if 'display_label' in display_label:
+            head['_premium_label'] = display_label['display_label']
+        return head
+
+    def pnl_premium_inherit(self, c):
+        """``inherit premium [as <label>]`` -- copy the engine's technical premium.
+
+        Resolution is deferred to the factory (the engine is not built at parse
+        time): the head carries the :data:`INHERIT_PREMIUM` sentinel, and the
+        underwriter reads the built engine's ``exp_premium`` (an :class:`Aggregate`)
+        or the accumulated portfolio premium, erroring if the engine has none.
+        """
+        _inherit, _prem, display_label = c
+        head = {'_premium': INHERIT_PREMIUM}
         if 'display_label' in display_label:
             head['_premium_label'] = display_label['display_label']
         return head
@@ -612,26 +658,13 @@ class UnderwritingTransformer(Transformer):
         lst.append(group)
         return lst
 
-    def expense_some(self, c):
-        return {"expense_spec": c[0]}
+    def expense_less_some(self, c):
+        # ``less <expense-groups>`` -- the second-``less`` clause.
+        _less, groups = c
+        return {"expense_spec": groups}
 
-    def expense_none(self, c):
+    def expense_less_none(self, c):
         return {}
-
-    def pnl_exp_claims(self, c):
-        numbers, _claims = c
-        return {"exp_en": numbers}
-
-    def pnl_exp_loss(self, c):
-        numbers, _loss = c
-        return {"exp_el": numbers}
-
-    def pnl_exp_lr(self, c):
-        # Bare loss ratio: binds to the pnl premium (resolved in _attach_pnl,
-        # which has the premium in scope). ``lr`` is just the multiplier --
-        # no expense / combined-ratio meaning.
-        lr, _lr = c
-        return {"_pnl_lr": _check_vectorizable(lr)}
 
     # ----- bivariate (copula-coupled) -------------------------------
     def answer_bv(self, c):

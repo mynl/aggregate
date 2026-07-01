@@ -44,6 +44,23 @@
    **property** with a construction-committed scale; new `margin_df` (the cession
    waterfall), `stochastic_engine`, `scale`, `tower`, `analysis`; `loss`-basis
    expense stochastic in the plain path. DecL unchanged.
+1c. **[DecL-Labels]** ✅ **DONE (`1.0.0a124`, `dev/done/plan-decl-labels.md`).**
+   Human display labels (`as "…"` / bareword), a `STRING` terminal, the reserved
+   word `as`, and **two-level expense grouping** (`and` combines into one leg;
+   juxtaposition makes separate legs, each with an optional label). Labels land on
+   `agg` / `pnl` / `sev` / `port` objects (`display_label` attr + `display_name`),
+   the premium head (consideration leg key), reins cessions (`margin_df` column),
+   and expense groups; full unparser round-trip. Additive, presentation-only —
+   no computed value changes. **Deferred:** per-component labels inside a
+   *mixture* severity (needs invasive severity mini-language changes for marginal
+   value — object-level `sev` label delivered). Landed **before**
+   `[PnL-Engine-Source]` so that plan's program sweep is written once against final
+   syntax. DecL grammar extended (additive).
+2. **[PnL-Engine-Source]** `alpha` — a P&L wraps a **complete** engine (`pnl NAME
+   <prem> less <agg|agg.NAME|port.NAME> [less <expenses>]`); deletes the
+   "half-baked agg inside a pnl" fork, adds `inherit premium` / `xpnl` / `port`
+   sourcing, subsumes `[Portfolio-of-PnL]`. Breaking `pnl` syntax + program sweep.
+   Plan: `dev/plan-pnl-engine-source.md`. Do **after** `[DecL-Labels]` (done).
 2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
    for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
    fixed** (it does not morph as the object gains properties), columns are

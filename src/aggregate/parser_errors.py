@@ -136,6 +136,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "XPS": "'xps'",
     "WEIGHTS": "'wts'",
     "AND": "'and'",
+    "AS": "'as'",
     "EXP": "'exp'",
     "AT": "'at'",
     "CV": "'cv'",

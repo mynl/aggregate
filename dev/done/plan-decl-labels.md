@@ -1,6 +1,22 @@
 # Plan — [DecL-Labels]: human labels, quoted names, and expense grouping
 
-Status: **DRAFT** (2026-07-01). Pure-presentation companion to
+Status: **DONE** (`1.0.0a124`, 2026-07-01). Landed before
+`dev/plan-pnl-engine-source.md` (still DRAFT) so its program sweep is written once
+against final syntax. Pure-presentation: no computed value changed.
+
+**Delivered:** `STRING` terminal + reserved `as`; `display_label` /
+`display_name` on `agg` / `pnl` / `sev` / `port` (repr + exhibit titles as
+`label (name)`); premium label → consideration leg key; two-level expense grammar
+(`and` combines, juxtaposition separates, per-group `as` label, basis-derived
+defaults, single-group back-compat `expense` leg); reins-cession label →
+`margin_df` column; full unparser round-trip; `tests/test_decl_labels.py` (21
+cases) + `decl-testers.agg` §Y. **Deferred:** per-component labels inside a
+*mixture* severity (invasive severity mini-language change for marginal value —
+object-level `sev` label delivered); tracked in `dev/TODO.md`.
+
+---
+
+Status (original): **DRAFT** (2026-07-01). Pure-presentation companion to
 `dev/plan-pnl-engine-source.md`. **Recommended to land first** (see that plan's
 ordering note): additive, low-risk, and independent of the structural refactor,
 so the engine-source program sweep is written once against final syntax.

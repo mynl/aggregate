@@ -624,3 +624,20 @@ pnl VR.Corridor 10000 premium less 85% lr sev lognorm 50 cv 3 poisson aggregate 
 # affine map of net account loss (no inuring reinsurance in the 1-D case). Collar
 # is keyword-first, matching swing.
 pnl VR.Retro retro basic 3000 lcm 1.1 min 3500 max 8000 premium less 1000 loss sev lognorm 100 cv 2 poisson                                                            note{retro: stochastic gross premium of net account loss}
+
+# ============================================================
+# Y. DecL labels & expense grouping                  (tests/test_decl_labels.py)
+# ============================================================
+# The `as` display-label clause: a bareword skips the quote tax, a "quoted"
+# label carries spaces. `name` stays the identity handle; the label is
+# presentation only (display_label / display_name / exhibit titles). Also the
+# two-level expense grammar: `and` combines terms into one leg, juxtaposition
+# makes separate legs, each with an optional `as` label. See dev/plan-decl-labels.md.
+agg LB.GrossBook as "Gross Book P&L" 100 claims sev lognorm 100 cv 2 poisson                                          note{quoted object display label};
+agg LB.Bareword as lae 100 claims sev lognorm 100 cv 2 poisson                                                        note{bareword label skips the quote tax};
+sev LB.Sev as "My Severity" lognorm 100 cv 2                                                                          note{sev object display label};
+pnl LB.Book as "My Book" 1000 premium as GWP less 850 loss sev lognorm 100 cv 1 poisson                               note{object label + premium (consideration) label};
+pnl LB.OneGroup 1000 premium less 850 loss sev lognorm 100 cv 1 poisson 25% premium expense and 200 fixed expense     note{and-joined -> one combined expense leg (back-compat)};
+pnl LB.TwoGroups 1000 premium less 850 loss sev lognorm 100 cv 1 poisson 25% premium expense 200 fixed expense        note{juxtaposition -> two separate expense legs};
+pnl LB.Labeled 1000 premium less 850 loss sev lognorm 100 cv 1 poisson 25% premium expense as acq 30% loss expense as lae   note{labeled expense groups};
+pnl LB.CatXL 1000 premium less 850 loss sev lognorm 100 cv 1 occurrence net of 100 xs 200 deposit 50 as "Cat XL" poisson    note{reins-cession label -> margin_df column};

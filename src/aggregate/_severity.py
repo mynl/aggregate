@@ -855,7 +855,8 @@ class Severity(ss.rv_continuous):
 
     def __init__(self, sev_name, exp_attachment=None, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=np.nan, sev_b=0,
                  sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, sev_lb=0, sev_ub=np.inf,
-                 sev_conditional=True, sev_signed=False, sev_reflect=False, name='', note='', hints=''):
+                 sev_conditional=True, sev_signed=False, sev_reflect=False, name='', note='', hints='',
+                 display_label=None):
         """Continuous random variable adding layer/attachment to ``ss.rv_continuous``.
 
         Construction is delegated to a registered subclass — ``__new__``
@@ -953,6 +954,10 @@ class Severity(ss.rv_continuous):
         self._reflect_shift = float(_scalar_bound(sev_loc)) if self.sev_reflect else 0.0
         self.sev_name = sev_name
         self.name = name
+        #: Optional human display label (the DecL ``as`` clause). Presentation
+        #: only -- preferred over ``name`` via :attr:`display_name`; ``name``
+        #: stays the identity handle. See dev/plan-decl-labels.md.
+        self.display_label = display_label
         self.long_name = sev_name
         self.note = note
         self.hints = hints
@@ -1296,6 +1301,15 @@ class Severity(ss.rv_continuous):
         logger.debug(
             f'Severity.__init__ | parameters {self.sev_a}, {self.sev_scale}: '
             f'target/actual {self.sev_mean} vs {mean};  {self.sev_cv} vs {acv}')
+
+    @property
+    def display_name(self):
+        """The human display label if set (the DecL ``as`` clause), else ``name``.
+
+        Presentation only; ``name`` stays the identity handle. See
+        dev/plan-decl-labels.md.
+        """
+        return getattr(self, 'display_label', None) or self.name
 
     def __repr__(self):
         """

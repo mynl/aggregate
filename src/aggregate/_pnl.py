@@ -263,7 +263,10 @@ class PnL:
     Parameters
     ----------
     name : str or None
-        The position's name.
+        The position's name (identity handle).
+    display_label : str or None
+        Optional human display label (the DecL ``as`` clause); presentation only,
+        preferred over ``name`` in repr / titles (see :attr:`display_name`).
     role : {'sell', 'buy'}
         ``'sell'`` -- you receive the consideration and owe the obligation
         (``result = consideration - obligation``); ``'buy'`` -- you pay the
@@ -290,10 +293,15 @@ class PnL:
     """
 
     def __init__(self, *, name, role, probs, consideration, obligation,
-                 result_name, bs=None, stochastic_engine=None, scale=None):
+                 result_name, bs=None, stochastic_engine=None, scale=None,
+                 display_label=None):
         if role not in ('sell', 'buy'):
             raise ValueError(f"role must be 'sell' or 'buy', got {role!r}.")
         self.name = name
+        #: Optional human display label (the DecL ``as`` clause). Presentation
+        #: only -- preferred over ``name`` in repr / exhibit titles via
+        #: :attr:`display_name`; ``name`` stays the identity handle.
+        self.display_label = display_label
         self.role = role
         self.result_name = result_name
         # Normalize the shared probability vector so it sums to exactly 1: a
@@ -678,10 +686,19 @@ class PnL:
         from .plots import plot_pnl
         return plot_pnl(self, axd=axd, **kwargs)
 
+    @property
+    def display_name(self):
+        """The human display label if set (the DecL ``as`` clause), else ``name``.
+
+        Presentation only -- repr / exhibit titles prefer it; ``name`` stays the
+        identity handle. See dev/plan-decl-labels.md.
+        """
+        return self.display_label or self.name
+
     def __repr__(self):
         nc = len(self._cons)
         no = len(self._obl)
-        return (f'PnL({self.name!r}: role={self.role}, '
+        return (f'PnL({self.display_name!r}: role={self.role}, '
                 f'{nc} consideration, {no} obligation -> {self.result_name!r})')
 
 
@@ -700,7 +717,8 @@ class _LossFrameShim:
 # The general constructor
 # ----------------------------------------------------------------------
 def create_pnl(source, *, consideration, obligation, role='sell',
-               result_name='result', name=None, probs=None, scale=None):
+               result_name='result', name=None, probs=None, scale=None,
+               display_label=None):
     """Build a :class:`PnL` from a source and its consideration / obligation maps.
 
     ``result(state) = consideration(state) - obligation(state)`` for ``role
@@ -724,7 +742,10 @@ def create_pnl(source, *, consideration, obligation, role='sell',
     result_name : str, default 'result'
         Label for the net result leg.
     name : str, optional
-        The position name.
+        The position name (identity handle).
+    display_label : str, optional
+        Optional human display label (the DecL ``as`` clause); presentation only,
+        preferred over ``name`` in repr / exhibit titles. See dev/plan-decl-labels.md.
     probs : array_like, optional
         Probability override; defaults from the source slot.
     scale : float or str, optional
@@ -747,7 +768,7 @@ def create_pnl(source, *, consideration, obligation, role='sell',
     return PnL(name=name, role=role, probs=p,
                consideration=cons_vals, obligation=obl_vals,
                result_name=result_name, bs=bs, stochastic_engine=source,
-               scale=scale)
+               scale=scale, display_label=display_label)
 
 
 # ----------------------------------------------------------------------
@@ -919,68 +940,122 @@ def create_pnl_tower(legs, *, delta_names=None, name=None):
 # ----------------------------------------------------------------------
 # The insurance preset: Gross / Ceded / Net as a PnLTower of legs
 # ----------------------------------------------------------------------
+def _normalize_expense_groups(expense_spec):
+    """Normalize a DecL ``expense`` spec to grouped form.
+
+    Returns ``[(label, [(basis, value), ...]), ...]`` -- a list of expense
+    **groups** (one obligation leg each). ``label`` is the group's ``as`` display
+    label or ``None``. Accepts three input shapes for backward compatibility:
+
+    * the **grouped** parser form ``[(label, [terms]), ...]`` (each element's
+      second item is a list of terms);
+    * a **legacy flat** list of ``(basis, value)`` terms -- one implicit unlabeled
+      group (each element's second item is a number);
+    * a **bare** single ``(basis, value)`` tuple -- one implicit unlabeled group.
+
+    ``None`` / empty -> ``[]``. A group is distinguished from a term structurally
+    (a group's payload is a list; a term's value is a number), so a label reading
+    ``"premium"`` cannot be mistaken for a basis.
+    """
+    if not expense_spec:
+        return []
+    first = expense_spec[0]
+    if isinstance(first, str):                       # bare ('basis', value)
+        return [(None, [tuple(expense_spec)])]
+    if len(first) == 2 and not isinstance(first[1], (list, tuple)):
+        # legacy flat list of (basis, value) terms -> one implicit group
+        return [(None, [tuple(t) for t in expense_spec])]
+    return [(lbl, [tuple(t) for t in terms]) for lbl, terms in expense_spec]
+
+
+def _default_group_name(terms):
+    """Default reported name for an unlabeled expense group.
+
+    A single-basis group is ``'<basis> expense'`` (e.g. ``'premium expense'``); a
+    mixed-basis group is the generic ``'expense'``. See dev/plan-decl-labels.md.
+    """
+    bases = {basis for basis, _ in terms}
+    return f'{next(iter(bases))} expense' if len(bases) == 1 else 'expense'
+
+
+def _expected_gross_loss(agg):
+    """The expected **gross** loss E[X] read off the aggregate's exact density."""
+    if agg.occ_reins is not None or agg.agg_reins is not None:
+        rd = agg.reins_density_df
+        return float((rd['loss'].to_numpy() * rd['p_agg_gross'].to_numpy()).sum())
+    dd = agg.density_df
+    return float((dd['loss'].to_numpy() * dd['p_total'].to_numpy()).sum())
+
+
 def resolve_expense(agg, expense_spec, gross_premium):
     """The gross expense ``E_G`` as a scalar from a DecL ``expense`` spec.
 
-    ``expense_spec`` is a list of ``(basis, value)`` terms (``and``-joined, they
-    sum); a bare ``(basis, value)`` tuple is accepted too. For each term
+    Sums **all** terms across **all** groups (grouping is a plain-path reporting
+    nicety; the Gross/Ceded/Net scalar is the total). ``expense_spec`` may be the
+    grouped form, a legacy flat list of ``(basis, value)`` terms, or a bare
+    ``(basis, value)`` tuple (see :func:`_normalize_expense_groups`). For each term
     ``'fixed'`` is a currency amount, ``'premium'`` a fraction of ``gross_premium``,
     ``'loss'`` a fraction of the **expected gross loss** (deterministic).
     ``None`` / empty -> ``0``.
     """
-    if not expense_spec:
-        return 0.0
-    terms = [expense_spec] if isinstance(expense_spec[0], str) else expense_spec
     total = 0.0
-    for basis, val in terms:
-        if basis == 'fixed':
-            total += float(val)
-        elif basis == 'premium':
-            total += float(val) * float(gross_premium)
-        elif basis == 'loss':
-            has_reins = agg.occ_reins is not None or agg.agg_reins is not None
-            if has_reins:
-                rd = agg.reins_density_df
-                eg = float((rd['loss'].to_numpy() * rd['p_agg_gross'].to_numpy()).sum())
+    for _label, terms in _normalize_expense_groups(expense_spec):
+        for basis, val in terms:
+            if basis == 'fixed':
+                total += float(val)
+            elif basis == 'premium':
+                total += float(val) * float(gross_premium)
+            elif basis == 'loss':
+                total += float(val) * _expected_gross_loss(agg)
             else:
-                dd = agg.density_df
-                eg = float((dd['loss'].to_numpy() * dd['p_total'].to_numpy()).sum())
-            total += float(val) * eg
-        else:
-            raise ValueError(f'unknown expense basis {basis!r}')
+                raise ValueError(f'unknown expense basis {basis!r}')
     return float(total)
 
 
 def _resolve_expense_split(agg, expense_spec, gross_premium):
-    """Split a DecL ``expense`` spec into ``(scalar, loss_rate)``.
+    """Split a DecL ``expense`` spec into per-group ``(name, scalar, loss_rate)``.
 
-    ``fixed`` and ``premium`` terms are **deterministic** -- a currency amount, or
-    a fraction of the fixed gross premium -- and fold into the scalar part. A
-    ``loss`` term is **loss adjustment expense**: a fraction of the *actual* loss,
-    so it is returned as a rate ``loss_rate`` to be applied per atom (``rate * x``)
-    rather than collapsed to ``rate * E[loss]``. The caller builds the expense
-    leg as ``loss_rate * x + scalar`` -- a scaled-loss distribution, not a point
-    mass. ``None`` / empty -> ``(0, 0)``.
+    Returns a **list** with one entry per expense group (``and``-joined terms make
+    one group; juxtaposed groups stay separate). Within a group ``fixed`` and
+    ``premium`` terms are **deterministic** -- a currency amount, or a fraction of
+    the fixed gross premium -- and fold into ``scalar``; a ``loss`` term is **loss
+    adjustment expense**, a fraction of the *actual* loss, returned as ``loss_rate``
+    to be applied per atom (``rate * x``) rather than collapsed to ``rate *
+    E[loss]``. The caller builds one obligation leg per group as ``loss_rate * x +
+    scalar`` -- a scaled-loss distribution, not a point mass.
+
+    ``name`` is the group's ``as`` label if given, else a basis-derived default
+    (``'premium expense'`` / ``'loss expense'`` / ``'fixed expense'``, or
+    ``'expense'`` for a mixed group); a lone unlabeled group keeps the historical
+    ``'expense'`` leg name. ``None`` / empty -> ``[]``.
 
     (Contrast :func:`resolve_expense`, which returns the single deterministic
-    scalar ``loss_rate * E[loss] + scalar`` the Gross/Ceded/Net commission split
-    needs.)
+    scalar the Gross/Ceded/Net commission split needs -- summed across groups.)
     """
-    if not expense_spec:
-        return 0.0, 0.0
-    terms = [expense_spec] if isinstance(expense_spec[0], str) else expense_spec
-    scalar = 0.0
-    loss_rate = 0.0
-    for basis, val in terms:
-        if basis == 'fixed':
-            scalar += float(val)
-        elif basis == 'premium':
-            scalar += float(val) * float(gross_premium)
-        elif basis == 'loss':
-            loss_rate += float(val)
+    groups = _normalize_expense_groups(expense_spec)
+    out = []
+    single_unlabeled = len(groups) == 1 and groups[0][0] is None
+    for label, terms in groups:
+        scalar = 0.0
+        loss_rate = 0.0
+        for basis, val in terms:
+            if basis == 'fixed':
+                scalar += float(val)
+            elif basis == 'premium':
+                scalar += float(val) * float(gross_premium)
+            elif basis == 'loss':
+                loss_rate += float(val)
+            else:
+                raise ValueError(f'unknown expense basis {basis!r}')
+        if label is not None:
+            name = label
+        elif single_unlabeled:
+            # preserve the historical single-leg name for back-compat
+            name = 'expense'
         else:
-            raise ValueError(f'unknown expense basis {basis!r}')
-    return scalar, loss_rate
+            name = _default_group_name(terms)
+        out.append((name, scalar, loss_rate))
+    return out
 
 
 def _gcn_magnitudes(agg, gross, ceded, net, expense_spec, econ):
@@ -1031,6 +1106,17 @@ _GCN_LOSS_MARGINAL = {
     'net_agg': 'p_agg_net',
 }
 _GCN_CEDED = frozenset({'ceded_occ', 'ceded_agg'})
+
+
+def _first_reins_label(labels):
+    """The first non-``None`` cession display label from a per-layer label list.
+
+    The tower consolidates a basis's cessions into a single ``ceded`` column, so
+    the first labeled layer names it. ``None`` / empty -> ``None``.
+    """
+    if not labels:
+        return None
+    return next((x for x in labels if x is not None), None)
 
 
 def _perspective_pnl(agg, persp, prem, exp, probs_col, loss_x):
@@ -1102,17 +1188,24 @@ def gcn_tower_from_aggregate(agg, *, gross, ceded, net=None, expense_spec=None,
         return _perspective_pnl(agg, persp, prem_mag[persp], exp_mag[persp],
                                 col, loss_x)
 
+    # A reins-clause ``as`` label (first labeled layer on each basis) renames that
+    # basis's **cession** column in the margin waterfall; the ``net`` columns keep
+    # their structural names. See dev/plan-decl-labels.md ([Labels-Reins]).
+    occ_ceded_label = _first_reins_label(getattr(agg, 'occ_reins_label', None))
+    agg_ceded_label = _first_reins_label(getattr(agg, 'agg_reins_label', None))
     # ordered display: (label, perspective-key) for present tiers
     perspectives = [('gross', 'gross')]
     impacts = []
     if has_occ:
         q = ' occ' if both else ''
-        perspectives += [(f'ceded{q}', 'ceded_occ'), (f'net{q}', 'net_occ')]
+        ceded_col = occ_ceded_label or f'ceded{q}'
+        perspectives += [(ceded_col, 'ceded_occ'), (f'net{q}', 'net_occ')]
         if both:
             impacts.append(('occ impact', f'net{q}', 'gross'))
     if has_agg:
         q = ' agg' if both else ''
-        perspectives += [(f'ceded{q}', 'ceded_agg'), (f'net{q}', 'net_agg')]
+        ceded_col = agg_ceded_label or f'ceded{q}'
+        perspectives += [(ceded_col, 'ceded_agg'), (f'net{q}', 'net_agg')]
         if both:
             impacts.append(('agg impact', f'net{q}', f'net occ'))
     final_label = perspectives[-1][0]

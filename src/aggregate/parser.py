@@ -354,8 +354,9 @@ class UnderwritingTransformer(Transformer):
 
     # ----- portfolio -------------------------------------------------
     def port_out(self, c):
-        _, name, trailer, agg_list = c
+        _, name, display_label, trailer, agg_list = c
         return ("port", name, {"spec": agg_list,
+                               **display_label,
                                "note": trailer["note"],
                                "hints": trailer["hints"]})
 
@@ -369,10 +370,11 @@ class UnderwritingTransformer(Transformer):
 
     # ----- aggregate -------------------------------------------------
     def agg_out_full(self, c):
-        (_, name, exposures, layers, sev_clause, occ_reins, freq, agg_reins,
-         approx, orientation, trailer) = c
+        (_, name, display_label, exposures, layers, sev_clause, occ_reins, freq,
+         agg_reins, approx, orientation, trailer) = c
         spec = {
             "name": name,
+            **display_label,
             **exposures,
             **layers,
             **sev_clause,
@@ -387,10 +389,11 @@ class UnderwritingTransformer(Transformer):
         return ("agg", name, spec)
 
     def agg_out_dfreq(self, c):
-        (_, name, dfreq, layers, sev_clause, occ_reins, agg_reins, approx,
-         orientation, trailer) = c
+        (_, name, display_label, dfreq, layers, sev_clause, occ_reins, agg_reins,
+         approx, orientation, trailer) = c
         spec = {
             "name": name,
+            **display_label,
             **dfreq,
             **layers,
             **sev_clause,
@@ -411,13 +414,14 @@ class UnderwritingTransformer(Transformer):
         # module is also runnable as ``python -m`` for grammar printing).
         from .tweedie import tweedie_convert
 
-        _, name, _tw, mu, pp, sig2, trailer = c
+        _, name, display_label, _tw, mu, pp, sig2, trailer = c
         ans = tweedie_convert(p=pp, μ=mu, σ2=sig2)
         alpha = ans["α"]
         lam = ans["λ"]
         beta = ans["β"]
         spec = {
             "name": name,
+            **display_label,
             "exp_en": lam,
             "freq_name": "poisson",
             "sev_name": "gamma",
@@ -434,10 +438,10 @@ class UnderwritingTransformer(Transformer):
         return ("agg", name, spec)
 
     def agg_out_rename(self, c):
-        _, name, bagg, occ_reins, agg_reins, trailer = c
+        _, name, display_label, bagg, occ_reins, agg_reins, trailer = c
         if "name" in bagg:
             del bagg["name"]
-        spec = {"name": name, **bagg, **occ_reins, **agg_reins,
+        spec = {"name": name, **display_label, **bagg, **occ_reins, **agg_reins,
                 "note": trailer["note"], "hints": trailer["hints"]}
         return ("agg", name, spec)
 
@@ -485,10 +489,11 @@ class UnderwritingTransformer(Transformer):
         spec["consideration"] = premium
 
     def pnl_out_full(self, c):
-        (_pnl, name, premium, _less, exposures, layers, sev_clause,
+        (_pnl, name, display_label, premium, _less, exposures, layers, sev_clause,
          occ_reins, freq, agg_reins, approx, expense, trailer) = c
         spec = {
             "name": name,
+            **display_label,
             **exposures,
             **layers,
             **sev_clause,
@@ -504,10 +509,11 @@ class UnderwritingTransformer(Transformer):
         return ("pnl", name, spec)
 
     def pnl_out_dfreq(self, c):
-        (_pnl, name, premium, _less, dfreq, layers, sev_clause,
+        (_pnl, name, display_label, premium, _less, dfreq, layers, sev_clause,
          occ_reins, agg_reins, approx, expense, trailer) = c
         spec = {
             "name": name,
+            **display_label,
             **dfreq,
             **layers,
             **sev_clause,
@@ -523,35 +529,56 @@ class UnderwritingTransformer(Transformer):
 
     # ----- gross-premium head: fixed amount or retro rating clause ---
     def pnl_premium_fixed(self, c):
-        """``<num> premium`` -- the fixed gross premium (the original head)."""
-        return c[0]
+        """``<num> premium [as <label>]`` -- the fixed gross premium.
+
+        Returns a dict carrying the amount (``_premium``) and an optional
+        consideration display label (``_premium_label``), consumed by
+        :meth:`_attach_pnl_head`.
+        """
+        numbers, _prem, display_label = c
+        head = {'_premium': numbers}
+        if 'display_label' in display_label:
+            head['_premium_label'] = display_label['display_label']
+        return head
 
     def pnl_premium_retro(self, c):
-        """``retro <collar> premium`` -- the account-level retrospective rating
-        clause (Phase 3); returns the collar tagged for ``_attach_pnl_head``."""
-        _retro, collar, _prem = c
-        return {'_retro': collar}
+        """``retro <collar> premium [as <label>]`` -- the account-level
+        retrospective rating clause (Phase 3); returns the collar tagged for
+        :meth:`_attach_pnl_head`, plus an optional consideration label."""
+        _retro, collar, _prem, display_label = c
+        head = {'_retro': collar}
+        if 'display_label' in display_label:
+            head['_premium_label'] = display_label['display_label']
+        return head
 
     def _attach_pnl_head(self, spec, head):
         """Record the gross-premium head: a fixed consideration, or a retro clause.
 
-        A fixed head is a number recorded as ``consideration`` (delegating to
-        :meth:`_attach_pnl`). A retro head carries the keyword-first collar dict;
-        it is recorded as the account-level ``retro_terms`` spec key and uses the
-        collar ``basic`` as the representative consideration (the actual gross
-        premium is the variable map, resolved by the VariableRatingAnalysis).
+        A fixed head carries ``_premium`` (a number), recorded as
+        ``consideration`` (delegating to :meth:`_attach_pnl`). A retro head carries
+        the keyword-first collar dict under ``_retro``; it is recorded as the
+        account-level ``retro_terms`` spec key and uses the collar ``basic`` as the
+        representative consideration (the actual gross premium is the variable map,
+        resolved by the VariableRatingAnalysis). Either may carry an optional
+        ``_premium_label`` -- the consideration leg's display label, recorded as
+        the ``consideration_label`` spec key.
         """
-        if isinstance(head, dict) and '_retro' in head:
+        if '_retro' in head:
             collar = head['_retro']
             spec['retro_terms'] = collar
             self._attach_pnl(spec, collar['basic'])
         else:
-            self._attach_pnl(spec, head)
+            self._attach_pnl(spec, head['_premium'])
+        if head.get('_premium_label') is not None:
+            spec['consideration_label'] = head['_premium_label']
 
-    # ----- gross expenses on a pnl (decision 1) ---------------------
-    # Each term is a ``(basis, value)`` pair; ``expense_list`` collects the
-    # ``and``-joined terms and ``expense_some`` records them as the list spec
-    # key ``expense_spec`` (summed at compute time). The base is explicit.
+    # ----- gross expenses on a pnl (two-level: groups of terms) ------
+    # Each term is a ``(basis, value)`` pair. ``and``-joined terms collect into
+    # one **group** (``expense_terms``); a group carries an optional ``as`` label
+    # (``expense_group``); juxtaposed groups (``expense_groups``) stay separate.
+    # ``expense_some`` records the whole thing as ``expense_spec`` -- a list of
+    # ``(label, [(basis, value), ...])`` groups, one obligation leg per group.
+    # See dev/plan-decl-labels.md.
     def expense_premium(self, c):
         # ``<frac> premium expenses``: variable expense, base = gross premium.
         return ("premium", float(c[0]))
@@ -564,12 +591,25 @@ class UnderwritingTransformer(Transformer):
         # ``<amount> fixed expenses``: a fixed currency amount.
         return ("fixed", float(c[0]))
 
-    def expense_list_one(self, c):
+    def expense_terms_one(self, c):
         return [c[0]]
 
-    def expense_list_cons(self, c):
+    def expense_terms_cons(self, c):
         lst, _and, term = c
         lst.append(term)
+        return lst
+
+    def expense_group(self, c):
+        # c = [terms_list, display_label] -> (label_or_None, terms_list)
+        terms, display_label = c
+        return (display_label.get("display_label"), terms)
+
+    def expense_groups_one(self, c):
+        return [c[0]]
+
+    def expense_groups_cons(self, c):
+        lst, group = c
+        lst.append(group)
         return lst
 
     def expense_some(self, c):
@@ -819,15 +859,17 @@ class UnderwritingTransformer(Transformer):
 
     # ----- severity output ------------------------------------------
     def sev_out_sev(self, c):
-        _, name, sev, trailer = c
+        _, name, display_label, sev, trailer = c
         sev["name"] = name
+        sev.update(display_label)
         sev["note"] = trailer["note"]
         sev["hints"] = trailer["hints"]
         return ("sev", name, sev)
 
     def sev_out_dsev(self, c):
-        _, name, dsev, trailer = c
+        _, name, display_label, dsev, trailer = c
         dsev["name"] = name
+        dsev.update(display_label)
         dsev["note"] = trailer["note"]
         dsev["hints"] = trailer["hints"]
         return ("sev", name, dsev)
@@ -899,11 +941,17 @@ class UnderwritingTransformer(Transformer):
         cede = [t[2] for t in triples]
         reinst = [t[3] for t in triples]
         variable = [t[4] for t in triples]
+        label = [t[5] for t in triples]
         out = {f"{which}_reins": layers, f"{which}_kind": kind}
         if any(p is not None for p in prem):
             out[f"{which}_reins_premium"] = prem
         if any(x is not None for x in cede):
             out[f"{which}_reins_cede"] = cede
+        # per-cession display labels (the ``as`` clause) -- emitted only when some
+        # layer carries one, so plain reinsurance specs are untouched. Consumed by
+        # the underwriter to name the tower / margin_df perspective columns.
+        if any(x is not None for x in label):
+            out[f"{which}_reins_label"] = label
         # variable rating (Phase 3): one of swing / slide / pc / corridor on one
         # aggregate layer (decision 0: at most one feature per program, no
         # stacking; occurrence-basis variable rating is a follow-up). Emit the
@@ -1036,11 +1084,11 @@ class UnderwritingTransformer(Transformer):
 
     def reins_list_tower(self, c):
         # A tower has no per-layer premium / cede / reinstatements / variable
-        # feature: wrap each layer as a ``(layer, premium, cede, reinst,
-        # variable)`` so reins_list elements are uniform.
+        # feature / label: wrap each layer as a ``(layer, premium, cede, reinst,
+        # variable, label)`` so reins_list elements are uniform.
         tower = c[0]
         limit, attach = tower[0], tower[1]
-        return [((1.0, l, a), None, None, None, None)
+        return [((1.0, l, a), None, None, None, None, None)
                 for l, a in zip(limit, attach)]
 
     def reins_clause_xs(self, c):
@@ -1086,15 +1134,18 @@ class UnderwritingTransformer(Transformer):
         """Combine a loss layer with its optional premium / cede / reinstatements
         / variable-rating feature.
 
-        Returns ``(layer, premium, cede, reinst, variable)`` where ``layer`` is the
-        ``(share, limit, attach)`` tuple consumed by the reinsurance engine,
+        Returns ``(layer, premium, cede, reinst, variable, label)`` where ``layer``
+        is the ``(share, limit, attach)`` tuple consumed by the reinsurance engine,
         ``premium`` is ``(basis, value)`` (basis in ``deposit`` / ``rol`` /
         ``rate``) or ``None``, ``cede`` is the commission fraction or ``None``,
         ``reinst`` is the tuple of reinstatement price multipliers or ``None``,
-        and ``variable`` is ``(feature, params)`` for one of swing / slide / pc /
-        corridor or ``None``. ``reins_list`` splits these into parallel spec keys.
+        ``variable`` is ``(feature, params)`` for one of swing / slide / pc /
+        corridor or ``None``, and ``label`` is the optional ``as`` display label
+        for the cession (or ``None``). ``reins_list`` splits these into parallel
+        spec keys.
         """
-        layer, premium, cede, reinst, variable = c
+        layer, premium, cede, reinst, variable, display_label = c
+        label = display_label.get("display_label")
         if cede is not None and premium is None:
             raise ValueError(
                 "DecL: 'cede' (ceding commission) needs a ceded-premium clause "
@@ -1132,7 +1183,7 @@ class UnderwritingTransformer(Transformer):
                     raise ValueError(
                         "DecL: 'slide' replaces the fixed 'cede' commission; give "
                         "one or the other.")
-        return (layer, premium, cede, reinst, variable)
+        return (layer, premium, cede, reinst, variable, label)
 
     def reins_premium_deposit(self, c):
         return ('deposit', float(c[1]))
@@ -1721,9 +1772,25 @@ class UnderwritingTransformer(Transformer):
     def builtin_agg_lookup(self, c):
         return self.safe_lookup(c[0])
 
-    # ----- name ------------------------------------------------------
+    # ----- name + optional display label -----------------------------
     def name(self, c):
         return c[0]
+
+    def display_label_some(self, c):
+        # c = [AS token, label value]; surfaced as a spec key that objects merge
+        # (``**display_label``) and the premium head / expense group read out.
+        return {"display_label": c[1]}
+
+    def display_label_none(self, c):
+        return {}
+
+    def label_id(self, c):
+        # a bareword label (``as lae``) -- skips the quote tax.
+        return str(c[0])
+
+    def label_string(self, c):
+        # a quoted label (``as "Loss Adjustment Expense"``) -- strip the delimiters.
+        return str(c[0])[1:-1]
 
     # ----- numbers (vectors and scalars) -----------------------------
     def numbers_list(self, c):

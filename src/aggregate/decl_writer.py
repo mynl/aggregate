@@ -431,7 +431,7 @@ def _render_variable_feature(spec: dict, list_key: str, layer_idx: int) -> str:
 
 
 def _render_reins_clause(clause, premium=None, cede=None, reinst=None,
-                         variable='') -> str:
+                         variable='', label=None) -> str:
     """Render one ``(share, limit, attach)`` cession tuple with its decorators.
 
     A full-line share (1.0) renders as ``limit xs attach``; a partial share
@@ -470,7 +470,7 @@ def _render_reins_clause(clause, premium=None, cede=None, reinst=None,
                 f'reinstatements [{" ".join(_fmt_num(a) for a in reinst)}]')
     if variable:
         parts.append(variable)
-    return ' '.join(parts)
+    return ' '.join(parts) + _render_label(label)
 
 
 def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
@@ -498,12 +498,14 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
     prem = spec.get(f'{list_key}_premium')
     cede = spec.get(f'{list_key}_cede')
     reinst = spec.get(f'{list_key}_reinst')
+    label = spec.get(f'{list_key}_label')
     cessions = [
         _render_reins_clause(c,
                              prem[i] if prem is not None else None,
                              cede[i] if cede is not None else None,
                              reinst[i] if reinst is not None else None,
-                             _render_variable_feature(spec, list_key, i))
+                             _render_variable_feature(spec, list_key, i),
+                             label[i] if label is not None else None)
         for i, c in enumerate(layers)]
     return _Block(f'{prefix} {spec[kind_key]}', cessions, sep='and')
 
@@ -528,19 +530,38 @@ def _render_approx(spec: dict) -> str:
     return '' if kind == 'exact' else f'approximate {kind}'
 
 
-def _render_expense(spec: dict) -> str:
-    """Render a ``pnl`` gross-expense clause, or ``''`` if absent (decision 1).
+def _render_label(label) -> str:
+    """Render an ``as <label>`` clause (``''`` when ``label`` is ``None``).
 
-    ``expense_spec`` is a list of ``(basis, value)`` terms joined with ``and``;
-    a bare ``(basis, value)`` tuple is also accepted. Each term renders as
-    ``<amount> fixed expenses`` / ``<fraction> premium|loss expenses`` (the
-    fraction is a bare number, re-parsing identically).
+    A bareword label (a valid identifier with no spaces) renders unquoted; any
+    other label is double-quoted. See dev/plan-decl-labels.md.
     """
-    es = spec.get('expense_spec')
-    if not es:
+    if not label:
         return ''
-    terms = [es] if isinstance(es[0], str) else es
-    return ' and '.join(f'{_fmt_num(value)} {basis} expenses' for basis, value in terms)
+    if re.fullmatch(r'[a-zA-Z][\w.\-]*', str(label)):
+        return f' as {label}'
+    return f' as "{label}"'
+
+
+def _render_expense(spec: dict) -> str:
+    """Render a ``pnl`` gross-expense clause, or ``''`` if absent.
+
+    ``expense_spec`` is a list of ``(label, [(basis, value), ...])`` **groups**
+    (legacy flat / bare shapes are accepted via :func:`_normalize_expense_groups`).
+    Within a group, terms join with ``and``; the group's optional ``as`` label
+    follows; juxtaposed groups are space-separated. Each term renders as
+    ``<amount> fixed expenses`` / ``<fraction> premium|loss expenses``.
+    """
+    from ._pnl import _normalize_expense_groups
+    groups = _normalize_expense_groups(spec.get('expense_spec'))
+    if not groups:
+        return ''
+    rendered = []
+    for label, terms in groups:
+        body = ' and '.join(
+            f'{_fmt_num(value)} {basis} expenses' for basis, value in terms)
+        rendered.append(body + _render_label(label))
+    return ' '.join(rendered)
 
 
 def _render_orientation(spec: dict) -> str:
@@ -661,7 +682,7 @@ def _render_agg(name: str, spec: dict) -> _Block:
     :class:`_Block` (head ``agg NAME``, the clauses its children) so it renders
     terse on one line or spread with each clause on its own indented line.
     """
-    return _Block(f'agg {name}', [
+    return _Block(f'agg {name}{_render_label(spec.get("display_label"))}', [
         _render_exposure(spec),
         _render_layers(spec),
         _render_sev_clause(spec),
@@ -691,6 +712,8 @@ def _render_pnl(name: str, spec: dict) -> _Block:
         premium_head = f'retro {_render_collar(retro)} premium'
     else:
         premium_head = f'{_fmt_seq(spec["consideration"])} premium'
+    premium_head += _render_label(spec.get('consideration_label'))
+    obj_label = _render_label(spec.get('display_label'))
 
     if spec.get('freq_name') == 'empirical':
         head = _render_dfreq(spec)
@@ -703,7 +726,7 @@ def _render_pnl(name: str, spec: dict) -> _Block:
     else:
         head = ''
 
-    return _Block(f'pnl {name} {premium_head} less', [
+    return _Block(f'pnl {name}{obj_label} {premium_head} less', [
         head,
         _render_layers(spec),
         _render_sev_clause(spec),
@@ -730,7 +753,8 @@ def _render_agg_or_pnl(kind: str, name: str, spec: dict) -> _Block:
 def _render_sev_out(name: str, spec: dict) -> str:
     """Render a standalone severity definition (``sev NAME ...``)."""
     body = _render_dsev(spec) if _is_dsev(spec) else _render_dist(spec)
-    return _join([f'sev {name}', body, _render_trailer(spec)])
+    return _join([f'sev {name}{_render_label(spec.get("display_label"))}',
+                  body, _render_trailer(spec)])
 
 
 def _render_port(name: str, spec: dict) -> _Block:
@@ -743,7 +767,8 @@ def _render_port(name: str, spec: dict) -> _Block:
     clauses spread one level deeper. Either way the preprocessor folds the
     indented continuation back into one logical statement on re-parse.
     """
-    head = _join([f'port {name}', _render_trailer(spec)])
+    head = _join([f'port {name}{_render_label(spec.get("display_label"))}',
+                  _render_trailer(spec)])
     units = [_render_agg_or_pnl(kind, sub_name, sub_spec)
              for kind, sub_name, sub_spec in spec['spec']]
     return _Block(head, units, tab=True)

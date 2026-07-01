@@ -965,6 +965,9 @@ class Underwriter(object):
             # attaches ``inner._pnl_recipe`` and returns the inner Aggregate.
             consideration = spec.pop('consideration')
             expense_spec = spec.pop('expense_spec', None)
+            # Optional consideration display label (the ``as`` clause on the
+            # premium head) -> the consideration leg's dict key in the plain P&L.
+            consideration_label = spec.pop('consideration_label', None)
             # Reinstatement schedule (stochastic ceded premium): pop before the
             # inner Aggregate is built (it is not a loss-structure key) and use it
             # below to attach a ReinstatementTerms.
@@ -1055,7 +1058,8 @@ class Underwriter(object):
                 inner._pnl_recipe = {
                     'kind': 'gcn' if econ is not None else 'plain',
                     'expense_spec': expense_spec, 'econ': econ,
-                    'consideration': consideration}
+                    'consideration': consideration,
+                    'consideration_label': consideration_label}
             inner.program = program
             obj = inner
         elif kind == 'bvagg':
@@ -1076,7 +1080,8 @@ class Underwriter(object):
                     f"{', '.join(pnl_units)}. Build a standalone PnL, or declare "
                     "the unit as a plain agg.")
             agg_list = [k for i, j, k in spec['spec']]
-            obj = Portfolio(name, agg_list, uw=self)
+            obj = Portfolio(name, agg_list, uw=self,
+                            display_label=spec.get('display_label'))
             obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:
@@ -1479,7 +1484,8 @@ class Underwriter(object):
                                   expense_spec=recipe['expense_spec'],
                                   gcn_economics=econ)
         return inner.make_pnl(recipe['consideration'],
-                              expense_spec=recipe['expense_spec'])
+                              expense_spec=recipe['expense_spec'],
+                              consideration_label=recipe.get('consideration_label'))
 
     def build(self, program, update=None, log2=0, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
         """

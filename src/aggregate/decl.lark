@@ -47,7 +47,7 @@ buildin_dist_list: buildin_dist_list BUILTIN_DIST   -> buildin_dist_list_cons
 // Portfolio
 // ======================================================================
 
-port_out: PORT name trailer agg_list
+port_out: PORT name display_label trailer agg_list
 
 agg_list: agg_list port_item   -> agg_list_cons
         | port_item            -> agg_list_one
@@ -64,10 +64,10 @@ agg_list: agg_list port_item   -> agg_list_cons
 // Aggregate
 // ======================================================================
 
-agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins approx_clause orientation trailer  -> agg_out_full
-       | AGG name dfreq      layers sev_clause occ_reins         agg_reins approx_clause orientation trailer  -> agg_out_dfreq
-       | AGG name TWEEDIE expr expr expr trailer                                    -> agg_out_tweedie
-       | AGG name builtin_agg occ_reins agg_reins trailer                           -> agg_out_rename
+agg_out: AGG name display_label exposures layers sev_clause occ_reins freq agg_reins approx_clause orientation trailer  -> agg_out_full
+       | AGG name display_label dfreq      layers sev_clause occ_reins         agg_reins approx_clause orientation trailer  -> agg_out_dfreq
+       | AGG name display_label TWEEDIE expr expr expr trailer                                    -> agg_out_tweedie
+       | AGG name display_label builtin_agg occ_reins agg_reins trailer                           -> agg_out_rename
        | builtin_agg agg_reins trailer                                              -> agg_out_builtin
 
 // Orientation suffix on an ``agg`` -- the variable's sign convention / role.
@@ -106,8 +106,8 @@ approx_clause: APPROXIMATE ID   -> approx_set
 // dev/done/plan-pnl-expenses-ceded-premium.md.
 // ======================================================================
 
-pnl_out: PNL name pnl_premium LESS pnl_exposures layers sev_clause occ_reins freq agg_reins approx_clause expense_clause trailer  -> pnl_out_full
-       | PNL name pnl_premium LESS dfreq layers sev_clause occ_reins              agg_reins approx_clause expense_clause trailer  -> pnl_out_dfreq
+pnl_out: PNL name display_label pnl_premium LESS pnl_exposures layers sev_clause occ_reins freq agg_reins approx_clause expense_clause trailer  -> pnl_out_full
+       | PNL name display_label pnl_premium LESS dfreq layers sev_clause occ_reins              agg_reins approx_clause expense_clause trailer  -> pnl_out_dfreq
 
 // The gross-premium head: a fixed amount ``<num> premium`` or the account-level
 // retrospective-rating clause ``retro <collar> premium`` (Phase 3). Retro
@@ -115,8 +115,8 @@ pnl_out: PNL name pnl_premium LESS pnl_exposures layers sev_clause occ_reins fre
 // gross premium becomes a collared affine map of net account loss; the trailing
 // ``premium`` keeps the ``premium less`` divider. The collar is keyword-first,
 // matching ``swing``. See dev/plan-variable-rating.md.
-pnl_premium: numbers PREMIUM        -> pnl_premium_fixed
-           | RETRO collar PREMIUM   -> pnl_premium_retro
+pnl_premium: numbers PREMIUM display_label        -> pnl_premium_fixed
+           | RETRO collar PREMIUM display_label   -> pnl_premium_retro
 
 pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
              | numbers LOSS     -> pnl_exp_loss
@@ -131,11 +131,28 @@ pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
 // obligation; net expense = gross - commission (appendix S1). Placed after
 // ``approx_clause`` (before the trailer), and the terms sit after all reins, so
 // the inter-term ``and`` never competes with a reinsurance cession ``and``.
-expense_clause: expense_list   -> expense_some
-              |                 -> expense_none
+// Expenses are a **two-level** list. Terms joined by ``and`` **combine** into one
+// reported item (one obligation leg); juxtaposed groups (no ``and``) stay
+// **separate** items -- the same combine-vs-separate distinction the rest of DecL
+// draws (layers inside one ``occurrence net of`` joined by ``and`` consolidate to
+// a single net; separate clauses are juxtaposed). Each group carries an optional
+// ``as`` label (attached to the group, not each term); the default name is the
+// basis (``premium expense`` / ``loss expense`` / ``fixed expense``) or a generic
+// ``expense`` for a single or mixed-basis group. Backward compatible: today's
+// ``and``-joined expenses are one unlabeled group summing to one leg. Each term is
+// anchored by the ``expense[s]`` keyword, so ``and`` (continue the group) vs a
+// bare ``numbers`` (start a new group) vs ``as`` (label the group) fully
+// disambiguates. See dev/plan-decl-labels.md.
+expense_clause: expense_groups   -> expense_some
+              |                    -> expense_none
 
-expense_list: expense_list AND expense_term   -> expense_list_cons
-            | expense_term                     -> expense_list_one
+expense_groups: expense_groups expense_group   -> expense_groups_cons
+              | expense_group                    -> expense_groups_one
+
+expense_group: expense_terms display_label   -> expense_group
+
+expense_terms: expense_terms AND expense_term   -> expense_terms_cons
+             | expense_term                       -> expense_terms_one
 
 expense_term: numbers PREMIUM EXPENSES   -> expense_premium
             | numbers LOSS EXPENSES      -> expense_loss
@@ -218,8 +235,8 @@ copula_clause: COPULA ID numbers   -> copula_one_param
 // Severity output (standalone `sev X ...` definitions)
 // ======================================================================
 
-sev_out: SEV name sev trailer    -> sev_out_sev
-       | SEV name dsev trailer   -> sev_out_dsev
+sev_out: SEV name display_label sev trailer    -> sev_out_sev
+       | SEV name display_label dsev trailer   -> sev_out_dsev
 
 // ======================================================================
 // Frequency
@@ -258,7 +275,7 @@ reins_list: reins_list AND reins_clause   -> reins_list_cons
 // valid only with a premium. Entered gross of commission. The loss layer feeds
 // the reinsurance engine exactly as before; the premium / cede / reinstatements
 // ride alongside for the P&L.
-reins_clause: reins_layer reins_premium reins_cede reins_reinst reins_variable   -> reins_clause
+reins_clause: reins_layer reins_premium reins_cede reins_reinst reins_variable display_label   -> reins_clause
 
 reins_layer: expr XS expr                   -> reins_clause_xs
            | expr SHARE_OF expr XS expr     -> reins_clause_share
@@ -454,10 +471,25 @@ builtin_agg: expr INHOMOG_MULTIPLY builtin_agg   -> builtin_agg_inhomog
            | BUILTIN_AGG                         -> builtin_agg_lookup
 
 // ======================================================================
-// Name (single identifier wrapper)
+// Name (single identifier wrapper) + optional human display label
+// ----------------------------------------------------------------------
+// ``name`` is the bareword *identity* (the knowledge-base key / reference
+// target); it stays ID-shaped. ``display_label`` is the optional *presentation*
+// string introduced by the reserved word ``as`` -- ``as lae`` (a bareword skips
+// the quote tax) or ``as "Loss Adjustment Expense"`` (quotes carry spaces). This
+// is the same identity-vs-presentation split as the ``_description`` /
+// ``_explanation`` convention, NOT a synonym for one concept. The clause is
+// reused wherever a label may attach (objects, the premium head, expense groups).
+// See dev/plan-decl-labels.md.
 // ======================================================================
 
 name: ID
+
+display_label: AS label   -> display_label_some
+             |             -> display_label_none
+
+label: ID       -> label_id
+     | STRING   -> label_string
 
 // ======================================================================
 // Numbers (vectors and scalars)
@@ -560,6 +592,7 @@ AGG.2:        /agg(?![a-zA-Z0-9._:~\-])/
 XPS.2:        /xps(?![a-zA-Z0-9._:~\-])/
 WEIGHTS.2:    /wts(?![a-zA-Z0-9._:~\-])/
 AND.2:        /and(?![a-zA-Z0-9._:~\-])/
+AS.2:         /as(?![a-zA-Z0-9._:~\-])/
 EXP.2:        /exp(?![a-zA-Z0-9._:~\-])/
 AT.2:         /at(?![a-zA-Z0-9._:~\-])/
 CV.2:         /cv(?![a-zA-Z0-9._:~\-])/
@@ -582,6 +615,13 @@ BUILTIN_SEV.3:  /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_DIST.3: /(?:distortion|dist)\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 NOTE.3:         /note\{[^}]*\}/
 HINTS.3:        /hints\{[^}]*\}/
+
+// A quoted display label. Delimited by double quotes, no embedded newline (an
+// unbalanced quote fails on its own line rather than swallowing the program) and
+// no escape handling (add `\"` only if a label ever needs a literal quote).
+// A fresh lexical class -- DecL is otherwise quote-free -- so it cannot collide
+// with keywords / ID / numbers. See dev/plan-decl-labels.md.
+STRING: /"[^"\n]*"/
 
 // NUMBER absorbs an optional leading minus so `-3` is one token rather than
 // MINUS NUMBER. Priority 2 keeps it ahead of the standalone MINUS terminal.
@@ -610,7 +650,7 @@ NUMBER.2: /-?(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|picks|pnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|picks|pnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

@@ -100,11 +100,14 @@ class Portfolio(object):
 
     """
 
-    def __init__(self, name, spec_list, uw=None):
+    def __init__(self, name, spec_list, uw=None, display_label=None):
         """
         Create a new :class:`Portfolio` object.
 
         :param name: The name of the portfolio. No spaces or underscores.
+        :param display_label: optional human display label (the DecL ``as``
+           clause); presentation only, preferred over ``name`` in repr / exhibit
+           titles via :attr:`display_name`. See dev/plan-decl-labels.md.
         :param spec_list: A list of
 
            1. dictionary: Aggregate object dictionary specifications or
@@ -117,6 +120,10 @@ class Portfolio(object):
         :returns:  new :class:`Portfolio` object.
         """
         self.name = name
+        #: Optional human display label (the DecL ``as`` clause). Presentation
+        #: only -- repr / exhibit titles prefer it via :attr:`display_name`;
+        #: ``name`` stays the identity handle. See dev/plan-decl-labels.md.
+        self.display_label = display_label
         self.agg_list = []
         self.unit_names = []
         self._valid = None
@@ -557,6 +564,22 @@ class Portfolio(object):
             float_cols = df.select_dtypes(include=['float64']).columns
             df[float_cols] = remove_fuzz_util(df, eps)[float_cols]
 
+    @property
+    def display_name(self):
+        """The human display label if set (the DecL ``as`` clause), else ``name``.
+
+        Presentation only -- repr / exhibit titles prefer it; ``name`` stays the
+        identity handle. See dev/plan-decl-labels.md.
+        """
+        return self.display_label or self.name
+
+    @property
+    def _title_name(self):
+        """Exhibit-title form: ``label (name)`` when a display label is set, else
+        ``name`` -- the human label leads, the identity handle stays visible."""
+        return f'{self.display_label} ({self.name})' if self.display_label \
+            else self.name
+
     def __repr__(self):
         """
         Goal unmbiguous
@@ -566,7 +589,7 @@ class Portfolio(object):
         # this messes up when port = self has been enhanced...
 
         # cannot use ex, etc. because object may not have been updated
-        return f'{self.name} at {super().__repr__()}'
+        return f'{self.display_name} at {super().__repr__()}'
 
     def _validation_passes(self) -> bool:
         """Whether the portfolio clears validation (clean *or* cleanly reinsured).
@@ -586,7 +609,7 @@ class Portfolio(object):
         """
         _n = len(self.agg_list)
         _s = '' if _n == 1 else 's'
-        s = [f'Portfolio object: {self.name}',
+        s = [f'Portfolio object: {self._title_name}',
              f'Portfolio contains {_n} aggregate component{_s}.']
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1 / self.bs)}'
@@ -599,7 +622,7 @@ class Portfolio(object):
         """
         _n = len(self.agg_list)
         _s = '' if _n == 1 else 's'
-        s = [f'<h3>Portfolio object: {self.name}</h3>',
+        s = [f'<h3>Portfolio object: {self._title_name}</h3>',
              f'<p>Portfolio contains {_n} aggregate component{_s}.']
         if self.bs > 0:
             s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.</p>')

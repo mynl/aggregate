@@ -1515,12 +1515,13 @@ class Aggregate:
                  sev_xs=None, sev_ps=None, sev_wt=1.0, sev_lb=0.0, sev_ub=np.inf, sev_conditional=True,
                  sev_signed=False, sev_reflect=False,
                  sev_pick_attachments=None, sev_pick_losses=None,
-                 occ_reins=None, occ_kind='',
+                 occ_reins=None, occ_kind='', occ_reins_label=None,
                  freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
-                 agg_reins=None, agg_kind='',
+                 agg_reins=None, agg_kind='', agg_reins_label=None,
                  reins_bucket=None, dsev_bucket=None,
                  value_type='loss',
                  approximate='exact',
+                 display_label=None,
                  note='', hints=''):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
@@ -1591,6 +1592,17 @@ class Aggregate:
                                 from the ``approximate()`` *method* (the MoM-surrogate
                                 factory) so the two do not collide. See
                                 dev/done/plan-approximate.md.
+        :param display_label:   optional human display label (the DecL ``as
+                                "..."`` clause); ``None`` falls back to ``name``.
+                                Presentation only -- repr / exhibit titles prefer
+                                it over ``name`` -- never an identity / reference
+                                target. See dev/plan-decl-labels.md.
+        :param occ_reins_label: optional per-occurrence-layer display labels (the
+                                reins-clause ``as`` clause); a list parallel to
+                                ``occ_reins`` (entries ``None`` where unlabeled), or
+                                ``None``. Names the Gross/Ceded/Net cession columns.
+        :param agg_reins_label: optional per-aggregate-layer display labels,
+                                parallel to ``agg_reins`` (see ``occ_reins_label``).
         :param note:            free-text note, from a ``note{...}`` clause
         :param hints:           raw ``hints{...}`` build-settings string
             (``key=value;`` form). Pure annotation here; the underwriter
@@ -1692,8 +1704,14 @@ class Aggregate:
         self.program = ''  # can be set externally
         self.occ_reins = occ_reins
         self.occ_kind = occ_kind
+        self.occ_reins_label = occ_reins_label
         self.agg_reins = agg_reins
         self.agg_kind = agg_kind
+        self.agg_reins_label = agg_reins_label
+        # Optional human display label (the DecL ``as`` clause). Presentation only
+        # -- repr / exhibit titles prefer it over ``name`` (see ``display_name``);
+        # ``name`` remains the identity / reference handle. See dev/plan-decl-labels.md.
+        self.display_label = display_label
         self.sev_pick_attachments = sev_pick_attachments
         self.sev_pick_losses = sev_pick_losses
 
@@ -2187,12 +2205,28 @@ class Aggregate:
     # Repr / info / help — string and HTML representations
     # ================================================================
 
+    @property
+    def display_name(self):
+        """The human display label if set (the DecL ``as`` clause), else ``name``.
+
+        Presentation only -- repr and exhibit titles prefer it; ``name`` stays the
+        identity / reference handle. See dev/plan-decl-labels.md.
+        """
+        return self.display_label or self.name
+
+    @property
+    def _title_name(self):
+        """Exhibit-title form: ``label (name)`` when a display label is set, so the
+        human label leads while the identity handle stays visible; else ``name``."""
+        return f'{self.display_label} ({self.name})' if self.display_label \
+            else self.name
+
     def __repr__(self):
         """
         String version of _repr_html_
         :return:
         """
-        return f'{self.name}, {super(Aggregate, self).__repr__()}'
+        return f'{self.display_name}, {super(Aggregate, self).__repr__()}'
 
     def __str__(self):
         """
@@ -2347,7 +2381,7 @@ class Aggregate:
         (a clean or cleanly-reinsured subject says nothing) and surfaces a red
         block only on a genuine failure -- the same convention as :meth:`qd`.
         """
-        s = [f'<h3>Aggregate object: {self.name}</h3>']
+        s = [f'<h3>Aggregate object: {self._title_name}</h3>']
         s.append(f'<p>{self.frequency.freq_name} frequency distribution.')
         n = len(self.sevs)
         if n == 1:
@@ -2371,7 +2405,7 @@ class Aggregate:
         ``summary_df`` / ``tail_df``. **No validation line** (the caller flags
         a failure separately, staying silent on a pass).
         """
-        s = [f'Aggregate object: {self.name}',
+        s = [f'Aggregate object: {self._title_name}',
              f'{self.frequency.freq_name} frequency distribution.']
         n = len(self.sevs)
         if n == 1:
@@ -2693,7 +2727,7 @@ class Aggregate:
         self._sev_dist = None
 
     def make_pnl(self, consideration=None, *, gross=None, ceded=None, net=None,
-                 expense_spec=None, gcn_economics=None):
+                 expense_spec=None, gcn_economics=None, consideration_label=None):
         """Wrap this aggregate as the risky leg of a :class:`PnL` position.
 
         The net P&L is ``consideration - X`` when ``X`` is a loss and
@@ -2724,6 +2758,9 @@ class Aggregate:
             magnitudes) for the GCN view.
         net : float, optional
             Override the retained (net) premium; defaults to ``gross - ceded``.
+        consideration_label : str, optional
+            Name for the single-leg consideration (the DecL premium ``as`` clause);
+            defaults to ``'consideration'``. See dev/plan-decl-labels.md.
 
         Returns
         -------
@@ -2779,15 +2816,25 @@ class Aggregate:
         # expense leg is `loss_rate * x + scalar` -- stochastic, not a point mass
         # at `rate * E[loss]`. `fixed` / `premium` terms are the deterministic
         # scalar. See ``_resolve_expense_split``.
-        scalar_exp, loss_rate = _resolve_expense_split(self, expense_spec, gp)
+        # One obligation leg per expense group (``and``-joined terms combine;
+        # juxtaposed groups stay separate). A group's ``as`` label (or a
+        # basis-derived default) names its leg; colliding default names are
+        # de-duplicated. See dev/plan-decl-labels.md.
         obl = {'loss': (lambda x: x)}
-        if loss_rate:
-            obl['expense'] = (lambda x, r=loss_rate, s=scalar_exp: r * x + s)
-        elif scalar_exp:
-            obl['expense'] = scalar_exp
-        return create_pnl(self, consideration={'consideration': cons},
+        for gname, scalar_exp, loss_rate in _resolve_expense_split(
+                self, expense_spec, gp):
+            key, n = gname, 2
+            while key in obl:
+                key = f'{gname} ({n})'
+                n += 1
+            if loss_rate:
+                obl[key] = (lambda x, r=loss_rate, s=scalar_exp: r * x + s)
+            elif scalar_exp:
+                obl[key] = scalar_exp
+        cons_key = consideration_label or 'consideration'
+        return create_pnl(self, consideration={cons_key: cons},
                           obligation=obl, role='sell', result_name='margin',
-                          name=self.name)
+                          name=self.name, display_label=self.display_label)
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, window_convention=None, **kwargs):

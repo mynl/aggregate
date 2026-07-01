@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.0a124
+
+**[DecL-Labels]** — human display labels, quoted names, and expense grouping.
+Additive and presentation-only: no computed value changes, labels land in dict
+keys, column headers, and repr / exhibit titles. Executes
+`dev/plan-decl-labels.md`. (Companion to the pending `[PnL-Engine-Source]`
+refactor; landed first so that plan's program sweep is written once against final
+syntax.)
+
+- **`as` display-label clause.** A new reserved word `as` introduces an optional
+  human label on `agg` / `pnl` / `sev` / `port` objects — a bareword skips the
+  quote tax (`as lae`) or a `STRING` carries spaces (`as "Gross Book P&L"`). The
+  bareword `name` stays the identity / reference handle; the label is presentation
+  only, surfaced as the new `display_label` attribute and preferred over `name` by
+  the new `display_name` property and by repr / exhibit titles (`label (name)`).
+- **`STRING` terminal.** A fresh quoted-string lexical class `/"[^"\n]*"/` (no
+  embedded newlines, no escapes in v1); DecL was quote-free, so it cannot collide
+  with keywords / `ID` / numbers.
+- **Premium label** — `<n> premium as "GWP"` names the consideration leg (the
+  P&L's consideration dict key / `summary_df` row).
+- **Expense grouping (two-level).** `and`-joined expense terms **combine** into one
+  reported obligation leg; **juxtaposed** groups (no `and`) stay **separate** legs
+  — the same combine-vs-separate distinction the rest of DecL draws. Each group
+  takes an optional `as` label; the default leg name is the basis (`premium
+  expense` / `loss expense` / `fixed expense`) or `expense` for a mixed / lone
+  group (backward compatible: today's `and`-joined expenses remain one `expense`
+  leg). `_resolve_expense_split` now returns one `(name, scalar, loss_rate)` per
+  group; `make_pnl` builds one leg per group.
+- **Reinsurance-cession label** — `... 100 xs 200 deposit 50 as "Cat XL"` renames
+  that basis's **cession** column in `PnL.margin_df` (the Gross/Ceded/Net
+  waterfall); the `net` columns keep their structural names.
+- **Round-trip.** The DecL unparser (`decl_writer`) renders every label form, so
+  labeled programs survive `spec → DecL → spec`.
+- **Deferred:** per-component labels inside a *mixture* severity (would need
+  invasive changes to the severity mini-language spec/engine for marginal value;
+  the object-level `sev` label is delivered). Tracked in `dev/TODO.md`.
+
 ## 1.0.0a123
 
 **[PnL-Exhibits]** — the `PnL` value object becomes **generic and

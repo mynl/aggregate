@@ -136,7 +136,7 @@ class AggLexer(RegexLexer):
                     'claims', 'ceded', 'claim', 'loss', 'payoff', 'dist',
                     'expense', 'expenses', 'cede', 'deposit', 'rol', 'less',
                     'port', 'rate', 'net', 'sev', 'agg', 'xps', 'wts',
-                    'inf', 'and', 'exp', 'at', 'cv', 'lr', 'xs',
+                    'inf', 'and', 'as', 'exp', 'at', 'cv', 'lr', 'xs',
                     'of', 'to', 'po', 'so', 'zm', 'zt',
                     # reinstatements (Phase 2)
                     'reinstatements', 'reinstatement', 'free', 'no',

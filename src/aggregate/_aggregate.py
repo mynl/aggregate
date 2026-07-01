@@ -2732,12 +2732,52 @@ class Aggregate:
         Notes
         -----
         ``build('pnl NAME C premium less <body>')`` is sugar for
-        ``build('agg NAME <body>').make_pnl(consideration=C)``. The GCN view is a
-        Python-API construction (no DecL surface in this release).
+        ``build('agg NAME <body>').make_pnl(consideration=C)``.
+
+        Returns
+        -------
+        PnL or PnLTower
+            A plain consideration returns a :class:`~aggregate.PnL` value object;
+            a Gross / Ceded / Net construction returns a
+            :class:`~aggregate.PnLTower` (its ``gcn_df`` is the waterfall; its
+            ``summary_df`` / ``q`` forward the net perspective).
         """
-        from ._pnl import PnL
-        return PnL(self, consideration, gross=gross, ceded=ceded, net=net,
-                   expense_spec=expense_spec, gcn_economics=gcn_economics)
+        import numpy as _np
+        from ._pnl import create_pnl, gcn_tower_from_aggregate, resolve_expense
+        if gross is not None or ceded is not None:
+            if gross is None or ceded is None:
+                raise ValueError(
+                    'a Gross/Ceded/Net PnL needs both gross= and ceded= premiums.')
+            if consideration is not None:
+                raise ValueError(
+                    'pass either consideration= or gross=/ceded=, not both.')
+            if self.agg_reins is None and self.occ_reins is None:
+                raise ValueError(
+                    'the Gross/Ceded/Net view requires reinsurance on the risky '
+                    'leg; the aggregate carries no occurrence / aggregate treaty.')
+            return gcn_tower_from_aggregate(
+                self, gross=gross, ceded=ceded, net=net,
+                expense_spec=expense_spec, gcn_economics=gcn_economics,
+                name=self.name)
+        if consideration is None:
+            raise ValueError(
+                'PnL needs a consideration= (or gross=/ceded= for the '
+                'Gross/Ceded/Net view).')
+        # a constant vector consideration sums to one book amount; a callable is a
+        # loss-sensitive consideration f(x); a scalar passes through.
+        if callable(consideration):
+            cons = consideration
+            gp = float(_np.sum(_np.asarray(consideration(0.0), dtype=float)))
+        else:
+            cons = float(_np.sum(_np.asarray(consideration, dtype=float)))
+            gp = cons
+        eg = resolve_expense(self, expense_spec, gp)
+        obl = {'loss': (lambda x: x)}
+        if eg:
+            obl['expense'] = eg
+        return create_pnl(self, consideration={'consideration': cons},
+                          obligation=obl, role='sell', result_name='margin',
+                          name=self.name)
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, window_convention=None, **kwargs):

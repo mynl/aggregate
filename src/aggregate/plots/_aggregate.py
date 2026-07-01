@@ -162,26 +162,27 @@ def plot_aggregate(agg, axd=None, xmax=0, **kwargs):
 
 
 def plot_pnl(pnl, axd=None, **kwargs):
-    """Net P&L (Margin) density and distribution for a :class:`PnL`.
+    """Net result density and distribution for a :class:`~aggregate.PnL`.
 
-    Two panels -- the Margin density (A) and distribution (B) -- read from
-    ``pnl.pnl_df``. There is **no severity panel**: a P&L is an affine of its
-    aggregate, not a compound of a severity (that ``d/dx`` panel belongs to an
-    :class:`Aggregate`; plot the bare risky leg via ``pnl.agg.plot()``). The
-    break-even line at 0 is marked. For a Gross/Ceded/Net position
-    (``make_pnl(gross=, ceded=)``) the three legs' margins are overlaid, ``Net``
-    the heavy line.
+    Two panels -- the result (net) density (A) and distribution / CDF (B) --
+    read from the P&L's exact result :class:`GridDistribution`
+    (:attr:`PnL.result`). There is **no severity panel** (a P&L is an accounting
+    object, not a compound of a severity), and no component overlay: the cession
+    waterfall lives on the :class:`~aggregate.PnLTower`. The break-even line at 0
+    is marked.
 
     Parameters
     ----------
     pnl : PnL
-        The (updated) position to plot.
+        The position to plot.
     axd : dict of str to Axes, optional
         Mosaic with keys ``'A'`` (density) and ``'B'`` (distribution). A new
         figure is created if omitted and stored on ``pnl.figure``.
     **kwargs
         Passed to the canvas creator (e.g. ``figsize``).
     """
+    import numpy as np
+    import pandas as pd
     if axd is None:
         if 'figsize' not in kwargs:
             kwargs['figsize'] = (2 * FIG_W, FIG_H)
@@ -190,49 +191,15 @@ def plot_pnl(pnl, axd=None, **kwargs):
     else:
         pnl.figure = axd['A'].figure
 
-    bs = pnl.agg.bs
-    discrete = bs == 1 and abs(pnl.mean) < 1025
-    ax = axd['A']
-
-    # The legs to draw: Net only (single leg), or the retained waterfall
-    # ``Gross -> [Net occ] -> Net`` overlaid. The gross / net-of-occurrence
-    # aggregate loss distributions live in ``reins_density_df`` -- occurrence
-    # reinsurance does **not** populate the ``agg_density_*`` attributes (those
-    # are aggregate-reins only), which is why an occurrence-only GCN P&L
-    # previously dropped its gross / net-occ legs. Each leg is positioned by the
-    # same per-perspective premium / expense the GCN table uses (``_gcn_magnitudes``)
-    # so the curves and the exhibit means agree; the final ``Net`` leg is the
-    # canonical net P&L (``pnl_df``, matching ``summary_df`` / ``q`` / ``cdf``).
-    rd = pnl.agg.reins_density_df
-    if pnl._gcn is not None and rd is not None:
-        prem_mag, exp_mag, has_occ, has_agg = pnl._gcn_magnitudes()
-        xs = rd['loss'].to_numpy()
-        sign = -1.0 if pnl.agg._is_loss_value else 1.0
-
-        def _stage(persp, col):
-            margin = prem_mag[persp] + sign * xs - exp_mag[persp]
-            return pnl._frame_from(margin, rd[col].to_numpy())
-
-        legs = [('Gross', _stage('gross', 'p_agg_gross'), 1)]
-        if has_occ and has_agg:
-            legs.append(('Net occ', _stage('net_occ', 'p_agg_net_occ'), 1))
-        legs.append(('Net', pnl.pnl_df, 2.5))
-    else:
-        legs = [('Margin', pnl.pnl_df, 2)]
-
-    for label, f, lw in legs:
-        if discrete:
-            f.p_total.plot(ax=ax, drawstyle='steps-mid', lw=lw, label=label)
-            f.F.plot(ax=axd['B'], drawstyle='steps-post', lw=lw, label=label)
-        else:
-            (f.p_total / bs).plot(ax=ax, lw=lw, label=label)
-            f.F.plot(ax=axd['B'], lw=lw, label=label)
-    ax.set(title='Probability mass function' if discrete else 'Probability density',
-           xlabel='P&L')
-    # break-even reference (a P&L can be a loss)
-    for a in (ax, axd['B']):
-        a.axvline(0.0, lw=0.75, color='C7', ls='--')
-    ax.legend()
+    gd = pnl.result                              # the exact net result GD
+    label = pnl.result_name
+    ser = gd.to_series(name=label)
+    cdf = pd.Series(np.cumsum(gd.p), index=gd.x, name=label)
+    ser.plot(ax=axd['A'], drawstyle='steps-mid', lw=2)
+    cdf.plot(ax=axd['B'], drawstyle='steps-post', lw=2)
+    axd['A'].set(title='Probability mass function', xlabel='P&L')
+    for a in (axd['A'], axd['B']):
+        a.axvline(0.0, lw=0.75, color='C7', ls='--')   # break-even reference
     axd['B'].set(title='Distribution function', xlabel='P&L')
     return pnl.figure
 

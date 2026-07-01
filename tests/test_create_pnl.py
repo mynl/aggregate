@@ -13,7 +13,7 @@ import warnings
 import numpy as np
 import pytest
 
-from aggregate._pnl_api import create_pnl, create_pnl_tower
+from aggregate import create_pnl, create_pnl_tower
 from aggregate._grid_distribution import GridDistribution
 from aggregate.bivariate import BivariateDistribution
 

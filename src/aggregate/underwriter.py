@@ -957,9 +957,12 @@ class Underwriter(object):
                 _desc = obj._approx_description()
                 obj.note = f"{obj.note}; {_desc}" if obj.note else _desc
         elif kind == 'pnl':
-            # A ``pnl`` is a first-class PnL veneer over a pure-loss Aggregate:
-            # build the loss body, then wrap with the consideration. The net
-            # (consideration - loss) is derived on the PnL.
+            # A ``pnl`` builds an inner pure-loss Aggregate plus a **recipe**; the
+            # eager P&L value object is *snapshotted* from the recipe only after
+            # the inner Aggregate is updated (build the engine first, then
+            # snapshot -- a PnL retains no engine). ``build_many`` calls
+            # :meth:`_snapshot_pnl` after the update loop; the factory just
+            # attaches ``inner._pnl_recipe`` and returns the inner Aggregate.
             consideration = spec.pop('consideration')
             expense_spec = spec.pop('expense_spec', None)
             # Reinstatement schedule (stochastic ceded premium): pop before the
@@ -984,10 +987,10 @@ class Underwriter(object):
             # spec keys so the inner Aggregate sees only the loss structure.
             econ = self._resolve_reins_economics(spec, consideration)
             if retro_collar is not None:
-                # Retro varies the gross premium; its GCN delegates to a
+                # Retro varies the gross premium; the snapshot is a
                 # VariableRatingAnalysis over the gross density. The clean 1-D case
                 # is retro with no inuring reinsurance (net account loss = gross
-                # loss); retro + reinsurance (net-of-inuring basis) is a follow-up.
+                # loss); retro + reinsurance is a follow-up.
                 if var_feat is not None or spec.get('occ_reins') or \
                         spec.get('agg_reins'):
                     raise ValueError(
@@ -996,27 +999,23 @@ class Underwriter(object):
                         "book with no inuring reinsurance (the 1-D net-account-loss "
                         "= gross-loss case).")
                 inner = Aggregate(**spec)
-                inner.program = program
-                obj = inner.make_pnl(consideration, expense_spec=expense_spec)
                 from .contract_terms import RetroTerms
                 inner.variable_terms = RetroTerms(**retro_collar)
                 inner.variable_layer = None
                 inner.variable_gross_premium = float(consideration)
                 inner.variable_ceded_premium = 0.0
                 inner.variable_commission = 0.0
-                inner.variable_gross_expense = float(obj._gross_expense())
-                obj.program = program
+                inner._pnl_recipe = {'kind': 'var', 'expense_spec': expense_spec,
+                                     'consideration': consideration}
             elif var_feat is not None:
-                # The variable feature delegates its GCN to a
-                # VariableRatingAnalysis over the GROSS aggregate density, so do
-                # NOT apply the agg reinsurance in the inner Aggregate; keep the
-                # decorated layer for the analysis ceder.
+                # The variable feature snapshots a VariableRatingAnalysis over the
+                # GROSS aggregate density, so do NOT apply the agg reinsurance in
+                # the inner Aggregate; keep the decorated layer for the analysis
+                # ceder.
                 var_layer = spec['agg_reins'][var_layer_idx]
                 spec.pop('agg_reins', None)
                 spec.pop('agg_kind', None)
                 inner = Aggregate(**spec)
-                inner.program = program
-                obj = inner.make_pnl(consideration, expense_spec=expense_spec)
                 from .contract_terms import (
                     CorridorTerms, ProfitCommissionTerms, SlideTerms, SwingTerms)
                 terms = {'swing': SwingTerms, 'slide': SlideTerms,
@@ -1027,39 +1026,38 @@ class Underwriter(object):
                 inner.variable_gross_premium = float(consideration)
                 inner.variable_ceded_premium = float(econ['pc_agg']) if econ else 0.0
                 inner.variable_commission = float(econ['c_agg']) if econ else 0.0
-                inner.variable_gross_expense = float(obj._gross_expense())
-                obj.program = program
+                inner._pnl_recipe = {'kind': 'var', 'expense_spec': expense_spec,
+                                     'consideration': consideration}
+            elif reinst is not None:
+                # Reinstatements (stochastic ceded premium D + h(R)) snapshot a
+                # ReinstatementAnalysis (the joint-sourced tower builder). The base
+                # premium D = the layer's resolved occurrence premium
+                # (econ['pc_occ']); effective occ limit y = share x limit.
+                from .reinstatement import ReinstatementTerms
+                if econ is None:                        # pragma: no cover
+                    raise ValueError(
+                        f"{name}: 'reinstatements' require a base premium clause "
+                        "(deposit / rol / rate) on the occurrence layer.")
+                inner = Aggregate(**spec)
+                rates = next((r for r in reinst if r is not None), None)
+                share, limit, _attach = spec['occ_reins'][0]
+                inner.reinstatement_terms = ReinstatementTerms(
+                    limit=float(share) * float(limit), rates=rates,
+                    deposit=float(econ['pc_occ']))
+                inner.reinstatement_gross_premium = float(econ['gross'])
+                inner._pnl_recipe = {'kind': 'reins', 'expense_spec': expense_spec,
+                                     'econ': econ}
             else:
                 inner = Aggregate(**spec)
-                inner.program = program
                 if getattr(inner, '_approx_fit', None):
                     _desc = inner._approx_description()
                     inner.note = f"{inner.note}; {_desc}" if inner.note else _desc
-                if econ is not None:
-                    obj = inner.make_pnl(gross=econ['gross'], ceded=econ['ceded'],
-                                         expense_spec=expense_spec, gcn_economics=econ)
-                else:
-                    obj = inner.make_pnl(consideration, expense_spec=expense_spec)
-                # Attach the reinstatement basis to the inner Aggregate so the PnL
-                # exhibits delegate to a (lazily built) ReinstatementAnalysis and
-                # ``inner.reinstatement_analysis()`` works arg-free. The base
-                # premium D = the layer's resolved occurrence premium
-                # (econ['pc_occ']); the effective occurrence limit y = share x
-                # limit (the ceded recovery R is already share-scaled), so the base
-                # rate r = D / y = the rol.
-                if reinst is not None:
-                    from .reinstatement import ReinstatementTerms
-                    if econ is None:                    # pragma: no cover
-                        raise ValueError(
-                            f"{name}: 'reinstatements' require a base premium "
-                            "clause (deposit / rol / rate) on the occurrence layer.")
-                    rates = next((r for r in reinst if r is not None), None)
-                    share, limit, _attach = spec['occ_reins'][0]
-                    inner.reinstatement_terms = ReinstatementTerms(
-                        limit=float(share) * float(limit), rates=rates,
-                        deposit=float(econ['pc_occ']))
-                    inner.reinstatement_gross_premium = float(econ['gross'])
-                obj.program = program
+                inner._pnl_recipe = {
+                    'kind': 'gcn' if econ is not None else 'plain',
+                    'expense_spec': expense_spec, 'econ': econ,
+                    'consideration': consideration}
+            inner.program = program
+            obj = inner
         elif kind == 'bvagg':
             from .bivariate import BivariateAggregate
             obj = BivariateAggregate(**spec)
@@ -1247,6 +1245,11 @@ class Underwriter(object):
             answer = self._factory(answer)
             if update:
                 answer.object.update(log2, bs, **kwargs)
+                recipe = getattr(answer.object, '_pnl_recipe', None)
+                if recipe is not None:
+                    prog = answer.object.program
+                    answer.object = self._snapshot_pnl(answer.object, recipe)
+                    answer.object.program = prog
             return [answer]
 
         # not a built-in reference — parse and factory each line
@@ -1404,21 +1407,6 @@ class Underwriter(object):
                         debug=self.debug, force_severity=True, **kwargs)
                 except (ZeroDivisionError, AttributeError) as e:
                     logger.error(e)
-            elif isinstance(answer.object, PnL) and update is True:
-                # A PnL delegates bucket/window selection to its loss leg's
-                # Aggregate.update (single source of truth); the net is derived.
-                d = answer.spec
-                log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
-                    d, log2, bs, bucket_sizing_p, kwargs)
-                log2_ = self.log2 if log2 == 0 else log2
-                logger.info('(%s, %s): pnl update(log2=%s, bs=%s)',
-                            answer.kind, answer.name, log2_, bs)
-                try:
-                    answer.object.update(
-                        log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
-                        debug=self.debug, force_severity=True, **kwargs)
-                except (ZeroDivisionError, AttributeError) as e:
-                    logger.error(e)
             elif isinstance(answer.object, Severity):
                 # severities have no update
                 pass
@@ -1447,7 +1435,49 @@ class Underwriter(object):
             else:
                 logger.warning('Unexpected: output kind is %s. (expr/number?)', type(answer.object))
 
+        # snapshot any deferred P&L: the inner Aggregate is now updated, so build
+        # the eager PnL / PnLTower / analysis value object from its recipe.
+        if update is True:
+            for answer in rv:
+                recipe = getattr(answer.object, '_pnl_recipe', None)
+                if recipe is not None:
+                    prog = answer.object.program
+                    answer.object = self._snapshot_pnl(answer.object, recipe)
+                    answer.object.program = prog
         return rv
+
+    @staticmethod
+    def _snapshot_pnl(inner, recipe):
+        """Snapshot the eager P&L value object from an **updated** inner Aggregate.
+
+        Called by :meth:`build_many` after the inner Aggregate is updated (build
+        the engine first, then snapshot). ``kind`` selects the object: a plain
+        consideration -> :class:`~aggregate.PnL`; a Gross/Ceded/Net economics ->
+        :class:`~aggregate.PnLTower`; reinstatements -> a
+        :class:`~aggregate.reinstatement.ReinstatementAnalysis`; a variable /
+        retro feature -> a :class:`~aggregate.variable_rating.VariableRatingAnalysis`.
+        """
+        from ._pnl import resolve_expense
+        kind = recipe['kind']
+        if kind == 'var':
+            inner.variable_gross_expense = resolve_expense(
+                inner, recipe['expense_spec'], inner.variable_gross_premium)
+            return inner.variable_rating_analysis()
+        if kind == 'reins':
+            econ = recipe['econ']
+            return inner.reinstatement_analysis(
+                agg_ceded_premium=float(econ.get('pc_agg', 0.0)),
+                gross_expense=resolve_expense(
+                    inner, recipe['expense_spec'], float(econ['gross'])),
+                occ_commission=float(econ.get('c_occ', 0.0)),
+                agg_commission=float(econ.get('c_agg', 0.0)))
+        if kind == 'gcn':
+            econ = recipe['econ']
+            return inner.make_pnl(gross=econ['gross'], ceded=econ['ceded'],
+                                  expense_spec=recipe['expense_spec'],
+                                  gcn_economics=econ)
+        return inner.make_pnl(recipe['consideration'],
+                              expense_spec=recipe['expense_spec'])
 
     def build(self, program, update=None, log2=0, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
         """

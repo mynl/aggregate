@@ -1,15 +1,15 @@
 group,name,kind,returns,description,Aggregate,Portfolio,BivariateAggregate,PnL,ReinstatementAnalysis,VariableRatingAnalysis,Severity,Frequency,Bounds,notes
-df-headline,summary_df,property,DataFrame,At-a-glance risk view: moments + key percentiles (Freq/Sev/Agg),Y,Y,Y*,Y*,Y,,,,,"WRINKLE: 4 meanings now. Agg/Port = moments+percentiles (a113); Biv = theory-vs-realised; PnL = fixed Consideration/Obligation/Expense/Margin (a121, no longer morphs to gcn_df); ReinstatementAnalysis = Gross/Ceded/Net/Impact headline. VariableRatingAnalysis has none yet (gap)."
-df-headline,tail_df,method,DataFrame,Return-period / exceedance table (p VaR TVaR xsVaR VaR/Mean),Y,Y,Y*,,Y,,,,,"WRINKLE: Agg/Port = return-period table, METHOD. Biv = per-axis support, PROPERTY. ReinstatementAnalysis = net-UW return-period, METHOD. PnL / VariableRatingAnalysis: none (gap)."
+df-headline,summary_df,property,DataFrame,At-a-glance risk view: moments + key percentiles (Freq/Sev/Agg),Y,Y,Y*,Y*,Y,Y,,,,"WRINKLE: PnL = FCC headline EX/%Consid/SD/CV/Skew/P01/Median/P99 (a122); Reinst/VarRt = Gross/Ceded/Net/Impact headline (VarRt gained a122); Agg/Port = moments+percentiles (a113); Biv = theory-vs-realised."
+df-headline,tail_df,method,DataFrame,Return-period / exceedance table (p VaR TVaR xsVaR VaR/Mean),Y,Y,Y*,,Y,Y,,,,"WRINKLE: Agg/Port = return-period table, METHOD. Biv = per-axis support, PROPERTY. Reinst/VarRt = net-UW return-period, METHOD (VarRt gained a122). PnL: none."
 df-headline,validation_df,property,DataFrame,"Moment-vs-estimate QA table (theory vs FFT estimate, rel error)",Y,Y,,,Y,,,,,a113 rename of old summary_df. Biv keeps its validation inside summary_df (not migrated).
 df-headline,tail_behavior_df,property,DataFrame,Layered tail report: support + per-side tail class + concentration,Y,Y,,,,,,,,a113 rename of old tail_df.
-df-headline,stats_df,attribute,DataFrame,Single source of truth for moments (component x measure x view),Y,Y,Y,,Y,Y,,,,Canonical moment store; summary_df/validation_df read from it.
-df-headline,density_df,property,DataFrame,Per-bucket density / distribution / risk-measure frame,Y,Y,Y,,Y,,,,,The realised PMF grid + derived columns.
+df-headline,stats_df,attribute,DataFrame,Single source of truth for moments (component x measure x view),Y,Y,Y,Y,Y,Y,,,,"Canonical moment store; summary_df/validation_df read from it. On PnL it is a METHOD stats_df(scale=) over the P&L legs (a122)."
+df-headline,density_df,property,DataFrame,Per-bucket density / distribution / risk-measure frame,Y,Y,Y,Y,Y,,,,,"The realised PMF grid + derived columns. On PnL it is an ordered {leg: GridDistribution} dict, not a single frame (a122)."
 df-headline,density,property,DataFrame,The live (positive-mass) rows of density_df,Y,Y,Y,,,Y,,,,"WRINKLE: VariableRatingAnalysis.density is the INPUT gross-density array, not the density_df live slice -- name collision."
 df-headline,sev_density_df,property,DataFrame,Per-bucket severity density on the severity grid,Y,,,,,,,,,Severity-grid analogue of density_df.
 df-headline,bs_window_df,property,DataFrame,Curated bucket/window sizing decision [bs-reporting],Y,Y,Y,,Y,,,,,Grid-selection audit; None before update.
-df-headline,pnl_df,property,DataFrame,The net P&L distribution (deterministic transform of X),,,,Y,,,,,,PnL net distribution frame.
-df-headline,gcn_df,property,DataFrame,Gross/Ceded/Net exhibit (doubly additive signed),,,,Y,Y,Y,,,,"Only for make_pnl(gross=,ceded=) positions."
+df-headline,result,property,GridDistribution,The net (result) leg distribution of a P&L,,,,Y,,,,,,"The exact net GridDistribution (replaces pnl_df, a122); q/cdf/sf/mean/sd/prob_loss delegate to it."
+df-headline,gcn_df,property,DataFrame,Gross/Ceded/Net waterfall (stats x perspective; means add),,,,,Y,Y,,,,"New-canonical stats x waterfall (a122). Also on PnLTower (no CSV column). Not on the plain PnL value object."
 df-headline,dependency_df,property,DataFrame,Joint dependence (cov / corr / tau) by level,,,Y,,,,,,,Bivariate-only.
 df-reins,reins_summary_df,property,DataFrame,Per-stage reinsurance summary (economic view of validation_df cols),Y,Y,,,,,,,,None when no reinsurance. Mirrors validation_df 8-col layout.
 df-reins,reins_stats_df,property,DataFrame,Per-layer reinsurance layering summary (empirical model-grid),Y,Y,,,,,,,,None when no reinsurance.
@@ -27,7 +27,7 @@ df-bounds,tvar_df,attribute,DataFrame,TVaR by p_knots,,,,,,,,,Y,
 df-bounds,weight_df,attribute,DataFrame,Bracketing-pair weights,,,,,,,,,Y,
 str-narrative,info,property,str,Fixed-layout multi-line object summary (text),Y,Y,Y,,Y,,,,,WRINKLE: not on PnL/Severity/Frequency.
 str-narrative,name,attribute,str,Object name,Y,Y,Y,Y,,,Y,,Y,Frequency has no name.
-str-narrative,value_type,property,str,Sign convention: 'loss' or 'payoff',Y,Y,,Y,,,,,,Backed by _is_loss_value. Not on Severity (uses .signed) or Biv (per-axis).
+str-narrative,value_type,property,str,Sign convention: 'loss' or 'payoff',Y,Y,,,,,,,,"Backed by _is_loss_value. Not on Severity (uses .signed), Biv (per-axis), or PnL (a122: the value object is always a payoff net)."
 str-narrative,pprogram,property,str,Canonical DecL program text (rendered from spec),Y,Y,,,,,,,,WRINKLE: not on Biv/PnL though both are DecL-built.
 str-narrative,pprogram_html,property,str,Syntax-highlighted DecL program for Jupyter,Y,Y,,,,,,,,
 str-narrative,bs_description,property,str,One-line bucket-grid summary [bs-reporting],Y,Y,Y,,Y,,,,,
@@ -100,7 +100,7 @@ reins,occ_ceder,method,callable,Occurrence ceded transform,Y,,,,,,,,,
 reins,occ_netter,method,callable,Occurrence net transform,Y,,,,,,,,,
 reins,occ_bivariate,method,object,Joint law of two occurrence gross/ceded/net aggregates,Y,,,,,,,,,
 reins,reins_occ_plot,method,None,Occurrence-reinsurance plots,Y,,,,,,,,,
-build-io,update,method,None,(Re)compute the discrete approximation,Y,Y,Y,Y,,,,,,Main compute entry; PnL delegates to its agg.
+build-io,update,method,None,(Re)compute the discrete approximation,Y,Y,Y,,,,,,,"Main compute entry. A PnL has no update (a122): update the engine, then snapshot the value object."
 build-io,update_work,method,None,FFT compute kernel,Y,,Y,,,,,,,
 build-io,make_pnl,method,PnL,Wrap this aggregate as a PnL position,Y,,,,,,,,,
 build-io,create_frequency,method,Aggregate,Materialize the count distribution as an Aggregate/Portfolio,Y,Y,,,,,,,,Good Agg/Port parity (a-series).
@@ -147,10 +147,8 @@ data-attr,unit_names,attribute,list,Unit names,,Y,Y,,,,,,,
 data-attr,marginals,property,tuple,The two marginal densities,,,Y,,,,,,,Bivariate-only.
 data-attr,copula,attribute,object,The copula coupling the components,,,Y,,,,,,,
 data-attr,bivariate,property,object,BivariateDistribution view of the joint density,,,Y,,,,,,,
-data-attr,agg,attribute,Aggregate,The risky-leg Aggregate,,,,Y,,,,,,PnL wraps an Aggregate.
-data-attr,consideration,attribute,scalar,The P&L consideration (premium leg),,,,Y,,,,,,
 state,valid,property,Validation,Validation flag (NOT_UNREASONABLE / REINSURANCE / fail bits),Y,Y,,,,,,,,Read by qd/_repr_html_; computed from stats_df.
-state,program,attribute,str,Original DecL program text,Y,Y,Y,Y,,,Y,,,
+state,program,attribute,str,Original DecL program text,Y,Y,Y,Y,Y,Y,Y,,,
 state,figure,attribute,object,Last matplotlib figure produced,Y,Y,Y,,Y,,,,,
 severity-api,fz,attribute,object,Underlying frozen scipy.stats distribution,,,,,,,Y,,,Severity is an rv_continuous; inherits rvs/moment/stats/entropy/fit/interval/isf/median/std/expect/etc.
 severity-api,moms,method,tuple,First three moments of the layered severity X(a d),,,,,,,Y,,,
@@ -158,9 +156,8 @@ frequency-api,freq_pgf,method,callable,Probability generating function,,,,,,,,Y,
 frequency-api,freq_moms,method,tuple,Frequency moments,,,,,,,,Y,,
 frequency-api,freq_name,attribute,str,Frequency family name,,,Y,,,,,Y,,
 legs,distributions,property,dict,Per-leg GridDistribution objects (the pushed-forward leg set),,,,,Y,Y,,,,Kernel pushforward of the leg set (a121).
-legs,view,property,InsuranceView,InsuranceView over the leg set + source (one cached kernel evaluation),,,,,Y,Y,,,,a121 leg kernel; backs distributions/stats_df.
 str-narrative,reins_explanation,property,str,Multi-line reinsurance / treaty narrative,,,,,Y,,,,,Paired long form of reins_description.
 analysis-attr,terms,attribute,object,The ContractTerms feature (reinstatement / variable-rating basis),,,,,Y,Y,,,,Frozen-dataclass feature; contract_terms.py.
 analysis-attr,gross_premium,attribute,scalar,Fixed gross premium P_G,,,,,Y,Y,,,,
-build-io,reinstatement_analysis,method,object,Backing ReinstatementAnalysis for a reinstatement-bearing position (None otherwise),Y,,,Y,,,,,,"WRINKLE: METHOD on Aggregate (entry point: terms/gross_premium), PROPERTY on PnL (lazy backing). a116."
-build-io,variable_rating_analysis,method,object,Backing VariableRatingAnalysis for a swing/slide/pc/corridor position (None otherwise),Y,,,Y,,,,,,"WRINKLE: METHOD on Aggregate, PROPERTY on PnL (lazy backing). a119."
+build-io,reinstatement_analysis,method,object,Aggregate entry point building a ReinstatementAnalysis,Y,,,,,,,,,"METHOD on Aggregate (terms/gross_premium/economics). build('pnl ... reinstatements') returns the analysis directly (a122)."
+build-io,variable_rating_analysis,method,object,Aggregate entry point building a VariableRatingAnalysis,Y,,,,,,,,,"METHOD on Aggregate. build('pnl ... swing/slide/pc/corridor/retro') returns the analysis directly (a122)."

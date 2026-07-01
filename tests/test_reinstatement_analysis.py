@@ -61,10 +61,12 @@ def test_requires_gross_premium():
 # ----------------------------------------------------------------------
 def test_means_add_across_gcn_split():
     an = _analysis()
-    m = an.gcn_df.xs('Mean')
-    for row in ('Premium', 'Loss', 'UW'):
-        assert m.loc[row, 'net'] == pytest.approx(
-            m.loc[row, 'gross'] + m.loc[row, 'ceded'], rel=1e-9, abs=1e-9)
+    g = an.gcn_df
+    # the new stats x waterfall shape: gross / ceded / net underwriting columns,
+    # means add on the EX row (gross + ceded = net)
+    assert list(g.columns)[:3] == ['gross', 'ceded', 'net']
+    assert g.loc['EX', 'net'] == pytest.approx(
+        g.loc['EX', 'gross'] + g.loc['EX', 'ceded'], rel=1e-9, abs=1e-9)
 
 
 def test_validation_identities_pass():
@@ -131,7 +133,10 @@ def test_no_agg_cover_keeps_three_column_waterfall():
     an = a.reinstatement_analysis(
         gross_premium=1000.0, terms=ReinstatementTerms(100.0, (1.0,), 10.0))
     assert an.agg_recovery is None
-    assert list(an.gcn_df.columns) == ['gross', 'ceded', 'net', 'impact']
+    # occ-only: the three-perspective waterfall (gross / ceded / net) plus a
+    # trailing benefit column; no agg tier.
+    assert list(an.gcn_df.columns)[:3] == ['gross', 'ceded', 'net']
+    assert len(an.gcn_df.columns) == 4
     assert 'ceded_agg_loss' not in an.distributions
 
 

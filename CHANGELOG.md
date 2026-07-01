@@ -1,5 +1,55 @@
 # Changelog
 
+## 1.0.0a122
+
+**[PnL-API]** — a domain-agnostic **`create_pnl`** and a reshaped, engine-free
+`PnL` value object. A P&L is *money in minus money out* over a random state:
+group each component map's values over the source atoms by output value and sum
+probability, and you get three **exact** `GridDistribution` legs (consideration,
+obligation, result). Executes `dev/plan-pnl-api.md`; **supersedes** the a121 leg
+kernel (`legs.py` / `_insurance_view.py`), which are removed. Insurance becomes
+one *caller* of the general API, not a special case.
+
+- **`create_pnl(source, *, consideration, obligation, role='sell', …)` (new,
+  public).** The general entry. `source` is an opaque slot — a
+  `GridDistribution`, an `Aggregate`, a `BivariateDistribution`, or a bare
+  `(values, probs)` pair; the component maps decide what it means. Magnitudes are
+  non-negative and the **`role`** (`'sell'`/`'buy'`) supplies the sign, so the
+  cession sign-flip falls out of the role, never a hand edit. Labels are **data**
+  (the dict keys name the legs) — no built-in perspective/category taxonomy.
+- **`PnL` reshaped into a lightweight value object.** It **consumes and discards**
+  its stochastic engine: no `.agg`, no `update()`, no `validation_df` (the legs
+  are exact group-bys — nothing of its own to validate). The four FCC reports:
+  `summary_df` (headline, columns `EX / % Consid / SD / CV / Skew / P01 / Median /
+  P99`), `stats_df(scale=)` (detailed stats×legs, each paired with a
+  `%-of-scale`; a stochastic scale warns), `density_df` (an ordered
+  `{leg: GridDistribution}`, no lossy shared staple), and `plot` (net density +
+  CDF). `q` / `cdf` / `sf` / `evaluate` / `prob_loss` kept. **Breaking:** the old
+  `pnl_df`, `.agg`, `update()`, `value_type`, and the fixed
+  Consideration/Obligation/Expense/Margin `summary_df` are gone.
+- **`create_pnl_tower` / `PnLTower` (new).** Stacks legs into the inuring
+  waterfall — each leg, the running **net** after it, each one-step **benefit**
+  delta, and a total benefit — as `gcn_df` (stats rows × waterfall columns; means
+  add, SDs don't). The plain Gross/Ceded/Net view is a tower of per-perspective
+  legs (`gcn_tower_from_aggregate`), with the resolved `deposit`/`rol`/`rate`/
+  `cede` economics on `.economics`.
+- **Insurance rewired onto the tower.** `ReinstatementAnalysis` and
+  `VariableRatingAnalysis` are now `create_pnl` tower builders over their joint /
+  degenerate sources; `build('pnl …')` returns the analysis (reinstatement /
+  swing / slide / pc / corridor / retro) or a `PnLTower` (Gross/Ceded/Net)
+  directly. Their `summary_df` / `tail_df` / `validation_df` keep their shapes;
+  `VariableRatingAnalysis` **gains** `summary_df` / `tail_df`. `gcn_df` adopts the
+  new-canonical stats×waterfall schema (the legacy `Mean`/`Ratio`/`Volatility`/
+  `UW %ile` multi-section exhibit is retired).
+- **Removed:** `aggregate.legs` (`Leg` / `LegSet` / `GraphSource`),
+  `aggregate._insurance_view` (`InsuranceView` and the perspective/category
+  vocabulary), and `gcn_assemble_column` / the hand-rolled `_gcn_*`. The exact
+  reinstatement / variable audit is preserved via the *kept* pushforward
+  primitives (`BivariateDistribution.pushforward` / `pushforward_1d`), not the
+  removed View. `GridDistribution` gains `to_series()`.
+- **DecL: 0 changes.** The grammar stays insurance-only; the cross-domain vehicle
+  is the Python `create_pnl` API.
+
 ## 1.0.0a121
 
 P4 — the **bivariate leg kernel**: a domain-free engine for the P&L leg model,

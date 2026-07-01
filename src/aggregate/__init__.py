@@ -27,6 +27,7 @@ from .utilities     import *  # noqa: F401,F403
 from .decl_writer   import *  # noqa: F401,F403
 from .spectral      import *  # noqa: F401,F403
 from .distributions import *  # noqa: F401,F403
+from ._pnl          import *  # noqa: F401,F403
 from .portfolio     import *  # noqa: F401,F403
 from .underwriter   import *  # noqa: F401,F403
 from .bounds        import *  # noqa: F401,F403

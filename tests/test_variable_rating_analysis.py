@@ -7,6 +7,14 @@ Gross loss ``L`` atoms ``[0, 100, 200, 300]`` with probabilities
 layer: ``A(L) = clip(L - 100, 0, 100)`` so ``A = [0, 0, 100, 100]``, ``E[A] = 30``,
 ``E[net] = 70``. Each feature is checked against numbers computed by hand in the
 module docstring of the matching worked example.
+
+The GCN identities now read off two observable surfaces of the analysis:
+
+* ``gcn_df`` -- the new stats x ``['gross','ceded','net','impact']`` table; means
+  add on the ``EX`` row (``EX[gross] + EX[ceded] == EX[net]`` on the underwriting
+  result).
+* ``stats_df`` -- exact per-leg moments; the granular per-leg means (premium,
+  loss, underwriting) and the single stochastic leg's CV.
 """
 
 import numpy as np
@@ -21,21 +29,24 @@ from aggregate.contract_terms import (
 )
 from aggregate.variable_rating import VariableRatingAnalysis
 
+
+def _assert_means_add(an):
+    """Gross + Ceded == Net on the ``EX`` row of the underwriting GCN waterfall."""
+    g = an.gcn_df
+    assert g.loc['EX', 'gross'] + g.loc['EX', 'ceded'] == \
+        pytest.approx(g.loc['EX', 'net'], abs=1e-6)
+
+
+def _assert_gained(an):
+    """Smoke the surfaces gained in the refactor: ``summary_df`` and ``tail_df``."""
+    assert list(an.summary_df.columns) == \
+        ['Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
+    assert list(an.tail_df().columns) == ['gross_uw', 'net_uw', 'benefit']
+
+
 GRID = np.array([0.0, 100.0, 200.0, 300.0])
 PROB = np.array([0.4, 0.3, 0.2, 0.1])
 LAYER = (1.0, 100.0, 100.0)            # 100 xs 100, full share
-
-
-def _means(an):
-    """``{row: (gross, ceded, net)}`` for the Mean section of the GCN."""
-    M = an.gcn_df.xs('Mean')
-    return {row: (M.loc[row, 'gross'], M.loc[row, 'ceded'], M.loc[row, 'net'])
-            for row in ('Premium', 'Loss', 'UW', 'Expense')}
-
-
-def _assert_means_add(an):
-    for row, (g, c, n) in _means(an).items():
-        assert g + c == pytest.approx(n, abs=1e-6), f'{row}: {g}+{c} != {n}'
 
 
 # ----------------------------------------------------------------------
@@ -47,13 +58,23 @@ def test_swing_gcn():
         GRID, PROB, SwingTerms(basic=20.0, lcm=1.0, minimum=20.0, maximum=120.0),
         gross_premium=200.0, ceded_premium=50.0, layer=LAYER)
     _assert_means_add(an)
-    m = _means(an)
-    assert m['Premium'] == pytest.approx((200.0, -50.0, 150.0))
-    assert m['Loss'] == pytest.approx((-100.0, 30.0, -70.0))
-    assert m['UW'] == pytest.approx((100.0, -20.0, 80.0))
-    # the ceded-premium leg is the stochastic one
-    assert an.stats_df.loc['ceded_premium', 'cv'] > 0
-    assert an.stats_df.loc['gross_premium', 'cv'] == pytest.approx(0.0)
+    s = an.stats_df
+    # premium row: gross 200, ceded (magnitude) 50, net = gross - ceded = 150
+    assert s.loc['gross_premium', 'mean'] == pytest.approx(200.0)
+    assert s.loc['ceded_premium', 'mean'] == pytest.approx(50.0)
+    assert s.loc['net_premium', 'mean'] == pytest.approx(150.0)
+    # loss row: gross 100, ceded 30, net 70
+    assert s.loc['gross_loss', 'mean'] == pytest.approx(100.0)
+    assert s.loc['ceded_loss', 'mean'] == pytest.approx(30.0)
+    assert s.loc['net_loss', 'mean'] == pytest.approx(70.0)
+    # underwriting row: gross 100, ceded -20 (30 - 50), net 80
+    assert s.loc['gross_uw', 'mean'] == pytest.approx(100.0)
+    assert s.loc['ceded_uw', 'mean'] == pytest.approx(-20.0)
+    assert s.loc['net_uw', 'mean'] == pytest.approx(80.0)
+    # the ceded-premium leg is the stochastic one; gross premium is fixed
+    assert s.loc['ceded_premium', 'cv'] > 0
+    assert s.loc['gross_premium', 'cv'] == pytest.approx(0.0)
+    _assert_gained(an)
 
 
 # ----------------------------------------------------------------------
@@ -66,12 +87,14 @@ def test_slide_gcn():
         GRID, PROB, SlideTerms.from_anchors((0.45, 0.60), (0.25, 0.70), (0.19, 0.80)),
         gross_premium=200.0, ceded_premium=50.0, layer=LAYER, gross_expense=40.0)
     _assert_means_add(an)
-    assert an.stats_df.loc['commission', 'mean'] == pytest.approx(18.6)
-    assert an.stats_df.loc['commission', 'cv'] > 0
-    m = _means(an)
-    assert m['UW'][0] == pytest.approx(60.0)        # gross: 200 - 100 - 40
-    assert m['UW'][1] == pytest.approx(-1.4)        # ceded: 30 - 50 + 18.6
-    assert m['UW'][2] == pytest.approx(58.6)
+    s = an.stats_df
+    assert s.loc['commission', 'mean'] == pytest.approx(18.6)
+    assert s.loc['commission', 'cv'] > 0
+    # underwriting: gross 200-100-40=60; ceded 30-50+18.6=-1.4; net 58.6
+    assert s.loc['gross_uw', 'mean'] == pytest.approx(60.0)
+    assert s.loc['ceded_uw', 'mean'] == pytest.approx(-1.4)
+    assert s.loc['net_uw', 'mean'] == pytest.approx(58.6)
+    _assert_gained(an)
 
 
 # ----------------------------------------------------------------------
@@ -84,8 +107,10 @@ def test_pc_gcn():
         GRID, PROB, ProfitCommissionTerms(share=0.25, allowance=0.10),
         gross_premium=200.0, ceded_premium=50.0, layer=LAYER, gross_expense=40.0)
     _assert_means_add(an)
-    assert an.stats_df.loc['commission', 'mean'] == pytest.approx(7.875)
-    assert _means(an)['UW'][1] == pytest.approx(-12.125)  # 30 - 50 + 7.875
+    s = an.stats_df
+    assert s.loc['commission', 'mean'] == pytest.approx(7.875)
+    assert s.loc['ceded_uw', 'mean'] == pytest.approx(-12.125)  # 30 - 50 + 7.875
+    _assert_gained(an)
 
 
 # ----------------------------------------------------------------------
@@ -97,9 +122,13 @@ def test_corridor_gcn():
         GRID, PROB, CorridorTerms(share=0.5, width=0.30, attachment=0.20),
         gross_premium=200.0, ceded_premium=50.0, layer=LAYER)
     _assert_means_add(an)
-    m = _means(an)
-    assert m['Loss'] == pytest.approx((-100.0, 27.75, -72.25))  # reduced cession
-    assert an.stats_df.loc['ceded_loss', 'cv'] > 0
+    s = an.stats_df
+    # loss row: gross 100, ceded reduced to 27.75, net 72.25
+    assert s.loc['gross_loss', 'mean'] == pytest.approx(100.0)
+    assert s.loc['ceded_loss', 'mean'] == pytest.approx(27.75)
+    assert s.loc['net_loss', 'mean'] == pytest.approx(72.25)
+    assert s.loc['ceded_loss', 'cv'] > 0
+    _assert_gained(an)
 
 
 # ----------------------------------------------------------------------
@@ -111,8 +140,10 @@ def test_retro_gcn():
         GRID, PROB, RetroTerms(basic=150.0, lcm=1.1, minimum=150.0, maximum=400.0),
         gross_premium=200.0, ceded_premium=0.0, layer=None)
     _assert_means_add(an)
-    assert an.stats_df.loc['gross_premium', 'mean'] == pytest.approx(252.0)
-    assert an.stats_df.loc['gross_premium', 'cv'] > 0
+    s = an.stats_df
+    assert s.loc['gross_premium', 'mean'] == pytest.approx(252.0)
+    assert s.loc['gross_premium', 'cv'] > 0
+    _assert_gained(an)
 
 
 # ----------------------------------------------------------------------

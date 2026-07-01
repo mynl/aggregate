@@ -84,22 +84,21 @@ def test_no_reinstatements_marker():
 def test_no_reinstatements_is_a_single_annual_limit():
     # zero reinstatements: recovery capped at the single occurrence limit y, no
     # reinstatement premium, so the ceded premium is the deterministic deposit.
+    # build returns the ReinstatementAnalysis directly (p IS the analysis).
     p = build(
         'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% no reinstatements poisson')
-    t = p.agg.reinstatement_terms
+    t = p.terms
     assert t.n_reinstatements == 0
     assert t.total_recovery_capacity == pytest.approx(100.0)   # single limit y
     assert t.recovery(250.0) == pytest.approx(100.0)
     assert t.reinstatement_premium(250.0) == pytest.approx(0.0)
     # deterministic ceded premium (= the deposit; h(R) == 0) => the exact ceded
     # premium has zero variance, vs a materially nonzero CV when reinstatements
-    # are paid. The exhibit CV carries only the heavy-tail grid-deficit floor.
-    an = p.reinstatement_analysis
-    assert an.stats_df.loc['reinstatement_premium', 'mean'] == pytest.approx(0.0)
-    assert an.stats_df.loc['ceded_premium', 'sd'] == pytest.approx(0.0, abs=1e-6)
-    assert p.gcn_df.loc[('Volatility', 'CV Premium'), 'ceded'] == pytest.approx(
-        0.0, abs=1e-6)
+    # are paid.
+    assert p.stats_df.loc['reinstatement_premium', 'mean'] == pytest.approx(0.0)
+    assert p.stats_df.loc['ceded_premium', 'sd'] == pytest.approx(0.0, abs=1e-6)
+    assert p.stats_df.loc['ceded_premium', 'cv'] == pytest.approx(0.0, abs=1e-6)
 
 
 def test_number_words_are_not_reserved_as_identifiers():
@@ -117,11 +116,13 @@ def test_no_clause_means_no_terms():
         'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% poisson')
     assert 'occ_reins_reinst' not in spec
+    # no reinstatements clause + a base premium clause -> a plain PnLTower, NOT a
+    # ReinstatementAnalysis: it carries no reinstatement terms / analysis surface.
     p = build(
         'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% poisson')
-    assert p.reinstatement_analysis is None
-    assert getattr(p.agg, 'reinstatement_terms', None) is None
+    assert not isinstance(p, ReinstatementAnalysis)
+    assert not hasattr(p, 'terms')
 
 
 # ----------------------------------------------------------------------
@@ -163,22 +164,20 @@ def test_negative_rate_rejected():
 
 
 # ----------------------------------------------------------------------
-# build() return: a PnL backed by a ReinstatementAnalysis
+# build() return: a ReinstatementAnalysis directly (p IS the analysis)
 # ----------------------------------------------------------------------
 def test_build_returns_analysis_backed_pnl():
     p = build(_HUMAN)
-    an = p.reinstatement_analysis
-    assert isinstance(an, ReinstatementAnalysis)
-    # the cached engine is reused
-    assert p.reinstatement_analysis is an
-    assert an.gross_premium == 10000.0
+    # build now returns the ReinstatementAnalysis itself (no PnL delegate)
+    assert isinstance(p, ReinstatementAnalysis)
+    assert p.gross_premium == 10000.0
 
 
 def test_terms_carry_share_scaled_limit_and_base_premium():
     # 95% po 100 xs 100 rol 18%: effective limit y = share*limit = 95; base
     # premium D = share*rol*limit = 17.1; base rate r = D/y = 0.18 = the rol.
     p = build(_HUMAN)
-    t = p.agg.reinstatement_terms
+    t = p.terms
     assert isinstance(t, ReinstatementTerms)
     assert t.limit == pytest.approx(95.0)
     assert t.deposit == pytest.approx(17.1)
@@ -189,40 +188,47 @@ def test_terms_carry_share_scaled_limit_and_base_premium():
 def test_gcn_df_delegates_and_means_add():
     p = build(_HUMAN)
     g = p.gcn_df
-    assert list(g.columns) == ['gross', 'ceded', 'net', 'impact']
-    for row in ('Premium', 'Loss', 'UW'):
-        assert g.loc[('Mean', row), 'net'] == pytest.approx(
-            g.loc[('Mean', row), 'gross'] + g.loc[('Mean', row), 'ceded'],
-            rel=1e-6, abs=1e-6)
+    # the new stats x waterfall shape: EX/SD/CV/Skew/percentile rows, gross /
+    # ceded / net underwriting columns plus a benefit (impact) column.
+    cols = list(g.columns)
+    assert cols[:3] == ['gross', 'ceded', 'net']
+    assert 'EX' in g.index
+    # means add on the EX row: gross + ceded = net
+    assert g.loc['EX', 'net'] == pytest.approx(
+        g.loc['EX', 'gross'] + g.loc['EX', 'ceded'], rel=1e-6, abs=1e-6)
+    # the trailing benefit column is the cession impact = net - gross
+    assert g.loc['EX', cols[-1]] == pytest.approx(
+        g.loc['EX', 'net'] - g.loc['EX', 'gross'], rel=1e-6, abs=1e-6)
 
 
 def test_ceded_premium_is_stochastic_in_exhibit():
     p = build(_HUMAN)
     g = p.gcn_df
-    # the headline effect: stochastic ceded premium => nonzero CV(premium) on
-    # the cession / net columns, zero on gross.
-    assert g.loc[('Volatility', 'CV Premium'), 'gross'] == 0.0
-    assert g.loc[('Volatility', 'CV Premium'), 'ceded'] > 0.0
+    # the headline effect: the stochastic ceded premium D + h(R) => a nonzero CV
+    # on the cession column of the waterfall...
+    assert g.loc['CV', 'ceded'] > 0.0
+    # ...and per leg, the ceded premium is stochastic while the gross premium is
+    # the fixed P_G (zero CV).
+    assert p.stats_df.loc['ceded_premium', 'cv'] > 0.0
+    assert p.stats_df.loc['gross_premium', 'cv'] == 0.0
 
 
-def test_summary_df_is_fixed_table():
+def test_summary_df_is_the_gcn_table():
     p = build(_HUMAN)
-    # a PnL's summary_df is always the fixed small table (never morphs to the
-    # GCN waterfall); the GCN exhibit and the richer headline table are separate.
-    assert list(p.summary_df.index)[:4] == ['Consideration', 'Obligation',
-                                            'Expense', 'Margin']
-    assert list(p.summary_df.columns) == ['EX', 'SD', 'Sk']
-    assert list(p.gcn_df.columns) == ['gross', 'ceded', 'net', 'impact']
-    assert list(p.reinstatement_analysis.summary_df.columns) == [
+    # for a reinstatement build, p IS the analysis, so p.summary_df is the
+    # canonical Gross / Ceded / Net headline table (not the old fixed PnL table).
+    assert list(p.summary_df.columns) == [
         'Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
+    assert list(p.gcn_df.columns)[:3] == ['gross', 'ceded', 'net']
 
 
 def test_arg_free_programmatic_entry_point():
-    # build attaches terms + gross premium, so the programmatic API works arg-free.
+    # build attaches terms + gross premium and calls the programmatic entry point
+    # arg-free internally, so the returned analysis already carries both.
     p = build(_HUMAN)
-    an = p.agg.reinstatement_analysis()
-    assert an.gross_premium == 10000.0
-    assert an.terms.rates == (0.0, 0.5, 1.0, 1.0)
+    assert isinstance(p, ReinstatementAnalysis)
+    assert p.gross_premium == 10000.0
+    assert p.terms.rates == (0.0, 0.5, 1.0, 1.0)
 
 
 # ----------------------------------------------------------------------
@@ -233,29 +239,30 @@ def test_subsequent_aggregate_cover_builds():
         'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] '
         'poisson aggregate net of 85% po 1500 xs 7000 deposit 600')
-    # the reinstated occurrence layer + a genuine subsequent agg cover both build
-    assert p.agg.reinstatement_terms is not None
-    assert p.agg.agg_reins is not None
-    an = p.reinstatement_analysis
-    assert an.agg_recovery is not None
-    assert an.agg_ceded_premium == pytest.approx(600.0)   # threaded from the pnl
-    # decision 3: the waterfall extends to the five-column inuring form, and the
-    # ceded_agg column populates with the agg recovery g(L - A(R)).
+    # the reinstated occurrence layer + a genuine subsequent agg cover both build;
+    # p IS the analysis, with the agg tier threaded from the pnl economics.
+    assert p.terms is not None
+    assert p.agg_recovery is not None
+    assert p.agg_ceded_premium == pytest.approx(600.0)   # threaded from the pnl
+    # the agg cover actually recovers on the net-of-occurrence loss L - A(R)
+    assert p.stats_df.loc['ceded_agg_loss', 'mean'] > 0
+    # decision 3: the waterfall extends to the inuring both-tiers form. Read the
+    # actual columns (a running-net tower): gross, occ cession, net-of-occ,
+    # agg cession, final net, and the benefit columns.
     g = p.gcn_df
-    assert list(g.columns) == ['gross', 'ceded occ', 'net occ', 'ceded agg',
-                               'net agg', 'occ impact', 'agg impact', 'impact']
-    assert g.loc[('Mean', 'Loss'), 'ceded agg'] > 0       # real agg recovery
-    m = g.xs('Mean')
-    # means add tier by tier
-    for row in ('Premium', 'Loss', 'UW'):
-        assert m.loc[row, 'net occ'] == pytest.approx(
-            m.loc[row, 'gross'] + m.loc[row, 'ceded occ'], rel=1e-6, abs=1e-6)
-        assert m.loc[row, 'net agg'] == pytest.approx(
-            m.loc[row, 'net occ'] + m.loc[row, 'ceded agg'], rel=1e-6, abs=1e-6)
+    cols = list(g.columns)
+    assert cols == ['gross', 'ceded', 'net/ceded', 'occ benefit', 'ceded agg',
+                    'net', 'agg benefit', 'total benefit']
+    # means add tier by tier on the EX row: gross + occ cession = net-of-occ;
+    # net-of-occ + agg cession = final net.
+    assert g.loc['EX', 'net/ceded'] == pytest.approx(
+        g.loc['EX', 'gross'] + g.loc['EX', 'ceded'], rel=1e-6, abs=1e-6)
+    assert g.loc['EX', 'net'] == pytest.approx(
+        g.loc['EX', 'net/ceded'] + g.loc['EX', 'ceded agg'], rel=1e-6, abs=1e-6)
     # the additive audit (incl. the agg-tier identities) still passes
-    assert an.validation_df['abs_err'].max() < 1e-6
+    assert p.validation_df['abs_err'].max() < 1e-6
     # the final net (tail / summary) is net of everything
-    assert an._final_net_uw == 'net_agg_uw'
+    assert p._final_net_uw == 'net_agg_uw'
 
 
 def test_deterministic_expense_and_cede_in_waterfall():
@@ -265,33 +272,34 @@ def test_deterministic_expense_and_cede_in_waterfall():
     p = build('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% cede 20% reinstatements [0 1] '
               'poisson 500 fixed expense and 10% premium expense')
-    an = p.reinstatement_analysis
-    assert an.gross_expense == pytest.approx(1500.0)        # 500 + 10% * 10000
-    assert an.occ_commission == pytest.approx(3.6)          # 20% * (18% * 100)
+    assert p.gross_expense == pytest.approx(1500.0)        # 500 + 10% * 10000
+    assert p.occ_commission == pytest.approx(3.6)          # 20% * (18% * 100)
     g = p.gcn_df
-    e = g.xs('Mean').loc['Expense']
-    # gross books the whole expense (cost, -); the cession credits its commission
-    assert e['gross'] == pytest.approx(-1500.0)
-    assert e['ceded'] == pytest.approx(3.6)
-    assert e['net'] == pytest.approx(-1496.4)               # adds across
-    m = g.xs('Mean')
-    # Premium + Loss + Expense = UW down each column
-    for c in ('gross', 'ceded', 'net'):
-        assert m.loc['Premium', c] + m.loc['Loss', c] + m.loc['Expense', c] == \
-            pytest.approx(m.loc['UW', c], rel=1e-6, abs=1e-6)
-    # the summary UW is net of expense and ties to the gcn_df Mean UW
-    s = an.summary_df
+    # the deterministic expense / commission is baked into the waterfall UW: the
+    # gross column books the whole expense (a -1500 cost vs the pure gross UW),
+    # while the cession credits its commission (+3.6 vs the pure ceded UW).
+    assert g.loc['EX', 'gross'] == pytest.approx(
+        p.stats_df.loc['gross_uw', 'mean'] - 1500.0, rel=1e-6, abs=1e-6)
+    assert g.loc['EX', 'ceded'] == pytest.approx(
+        p.stats_df.loc['ceded_uw', 'mean'] + 3.6, rel=1e-6, abs=1e-6)
+    # means still add across the split on the EX row
+    assert g.loc['EX', 'net'] == pytest.approx(
+        g.loc['EX', 'gross'] + g.loc['EX', 'ceded'], rel=1e-6, abs=1e-6)
+    # the summary UW is net of expense and ties to the gcn_df EX net UW
+    s = p.summary_df
     assert s.loc[('', 'Underwriting'), 'Net'] == pytest.approx(
-        m.loc['UW', 'net'], rel=1e-6, abs=1e-3)
+        g.loc['EX', 'net'], rel=1e-6, abs=1e-3)
 
 
 def test_no_expense_leaves_waterfall_unshifted():
-    # without expenses the Expense row is zero (shift is a no-op)
+    # without expenses there is no expense / commission shift: the gross column
+    # of the waterfall equals the pure gross underwriting mean (P_G - L).
     p = build('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] poisson')
-    e = p.gcn_df.xs('Mean').loc['Expense']
-    assert e['gross'] == pytest.approx(0.0)
-    assert e['net'] == pytest.approx(0.0)
+    assert p.gross_expense == pytest.approx(0.0)
+    assert p.occ_commission == pytest.approx(0.0)
+    assert p.gcn_df.loc['EX', 'gross'] == pytest.approx(
+        p.stats_df.loc['gross_uw', 'mean'], rel=1e-6, abs=1e-6)
 
 
 def test_aggregate_cover_summary_total_cession():
@@ -300,7 +308,7 @@ def test_aggregate_cover_summary_total_cession():
         'pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] '
         'poisson aggregate net of 85% po 1500 xs 7000 deposit 600')
-    s = p.reinstatement_analysis.summary_df
+    s = p.summary_df
     assert list(s.columns) == ['Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
     # premium / loss are magnitudes: the cession flows out, so Gross - Ceded = Net
     for item in ('Premium', 'Loss'):

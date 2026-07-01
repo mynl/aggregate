@@ -147,11 +147,11 @@ def test_pnl_approximate_loss_part_fitted():
         warnings.simplefilter("ignore")
         approx = build("pnl PA 600000 prem less 5000 claims sev lognorm 100 cv 2 "
                        "poisson approximate sgamma")
-    # the approximation lives on the (loss) risky leg
-    assert approx.agg.approximation == "sgamma"
-    # E[margin] = consideration - E[loss] = 600000 - 500000
+    # the approximation is applied to the loss leg before the PnL snapshots it;
+    # observably, E[margin] = consideration - E[loss] = 600000 - 500000 and the
+    # net result mass is conserved (the eager group-by loses no mass).
     assert approx.mean == pytest.approx(100000.0, rel=1e-3)
-    assert approx.pnl_df.p_total.sum() == pytest.approx(1.0, abs=1e-6)
+    assert approx.result.to_series().sum() == pytest.approx(1.0, abs=1e-6)
 
 
 def test_portfolio_combine_conserves_mass():

@@ -25,17 +25,16 @@
 > `[Display-Mode]` waits on item 1, `[Signed-Bounded-Window]` is anytime,
 > `[Doc-Fix]` is last.
 
-1. **[PnL-API]** `alpha` — `create_pnl(source, consideration, obligation, names)`
-   + `create_pnl_tower`: a **domain-agnostic** P&L constructor over the
-   pushforward engine (labels-as-data, consideration/obligation/result → three
-   GDs + a single-column `summary_df`). Delivers the **missing generic entry
-   point** (build a P&L from a raw `(scenarios, probs)` model or a
-   `BivariateDistribution` — power generation, crop revenue, ALM) *and* the
-   first-class surface in one pass; folds in the old `[PnL-First-Class]`.
-   **Supersedes the a121 leg wrappers** (`legs.py` / `_insurance_view.py` come
-   out; the pushforward engine stays). DecL unchanged. Plan:
-   `dev/plan-pnl-api.md`. **Do this first — its report shapes are what the
-   guidelines standardize.**
+1. **[PnL-API]** ✅ **DONE (`1.0.0a122`, `dev/done/plan-pnl-api.md`).**
+   `create_pnl(source, *, consideration, obligation, role, …)` + `create_pnl_tower`
+   / `PnLTower`: the **domain-agnostic** P&L constructor over the pushforward
+   engine (labels-as-data; consideration/obligation/result → exact GDs + the four
+   FCC reports). `PnL` reshaped into an engine-free value object; `build('pnl …')`
+   returns a `PnL` / `PnLTower` / `ReinstatementAnalysis` / `VariableRatingAnalysis`.
+   The a121 leg wrappers (`legs.py` / `_insurance_view.py`) and
+   `gcn_assemble_column` / `_gcn_*` are removed; the pushforward primitives stay.
+   `gcn_df` adopted the new-canonical stats×waterfall schema (byte-identical bar
+   relaxed by the author). DecL unchanged.
 2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
    for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
    fixed** (it does not morph as the object gains properties), columns are

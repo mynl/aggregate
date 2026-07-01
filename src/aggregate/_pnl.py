@@ -11,13 +11,14 @@ by output value and sum probability, and you get a :class:`GridDistribution` per
 leg -- **exact**, with all its moments and percentiles. That triple
 (consideration, obligation, result) **is** the whole object.
 
-A :class:`PnL` **consumes and throws away** its stochastic engine: it is neither
-an :class:`Aggregate` (no subclass) nor *has* one (no retained reference).
-:func:`create_pnl` reads the probabilities and the component values off whatever
-``source`` you hand it, builds the leg distributions **eagerly**, and discards
-the source. A P&L is then just signed distributions + their exact moments + the
-caller's labels -- a lightweight *accounting* value object that any domain can
-build, with insurance as one caller among many.
+A :class:`PnL` **does not depend on** its stochastic engine: it is not an
+:class:`Aggregate` (no subclass), and although it keeps an opaque reference to
+the ``source`` it was built over (:attr:`PnL.stochastic_engine`, for drill-down),
+it never reads back through it. :func:`create_pnl` reads the probabilities and
+the component values off whatever ``source`` you hand it and builds the leg
+distributions **eagerly**; from then on a P&L is just signed distributions +
+their exact moments + the caller's labels -- a lightweight *accounting* value
+object that any domain can build, with insurance as one caller among many.
 
 Two things make this cross-domain:
 
@@ -41,11 +42,12 @@ leg names -- the kernel never needs the word "ceded." See ``dev/plan-pnl-api.md`
 """
 from __future__ import annotations
 
-import warnings
 from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
+
+from .moments import VALIDATION_NOISE, _snap_noise
 
 __all__ = ['create_pnl', 'create_pnl_tower', 'PnL', 'PnLTower']
 
@@ -152,14 +154,28 @@ def _moments_of(values, probs):
     """Exact ``(mean, sd, cv, skew)`` of per-atom ``values`` under ``probs``.
 
     Taken straight off the atoms (no rebucketing), so these are the ground-truth
-    moments the reports add to. A point mass has ``sd = cv = 0`` and ``skew =
-    nan``; a zero mean has ``cv = nan``.
+    moments the reports add to. Two guards keep degenerate legs clean:
+
+    * a **constant** leg (all ``values`` equal -- e.g. a fixed premium) returns
+      ``sd = 0`` **exactly** regardless of any probability defect, so a fixed
+      consideration reports ``SD = 0`` rather than the spurious
+      ``sqrt(c^2 * Sum(p) * (1 - Sum(p)))`` picked up when the source density does
+      not sum to exactly 1;
+    * a **break-even** mean (``|mean| <= VALIDATION_NOISE``) returns ``cv = nan``
+      -- CV is not meaningful when the mean is indistinguishable from zero.
+
+    ``probs`` is assumed normalized (:class:`PnL` normalizes at construction).
     """
+    values = np.asarray(values, dtype=float)
+    if values.size and float(values.max()) == float(values.min()):
+        m = float(values.flat[0])
+        cv = 0.0 if abs(m) > VALIDATION_NOISE else float('nan')
+        return m, 0.0, cv, float('nan')
     m = float((values * probs).sum())
     var = float((values * values * probs).sum()) - m * m
     var = var if var > 0 else 0.0
     sd = var ** 0.5
-    cv = (sd / m) if m else float('nan')
+    cv = (sd / m) if abs(m) > VALIDATION_NOISE else float('nan')
     if sd > 0:
         skew = float((((values - m) ** 3) * probs).sum()) / sd ** 3
     else:
@@ -217,10 +233,20 @@ class _Leg:
         return [m, sd, cv, skew] + [float(gd.q(q)) for q in PERCENTILE_LADDER]
 
 
+def _pct_label(q):
+    """Percentile row/column label: ``f'P{q*100:.3g}'`` (``P1`` / ``P50`` / ``P99.5``)."""
+    return f'P{q * 100:.3g}'
+
+
 def _stat_names():
     """Row labels for a stats column: ``EX`` / ``SD`` / ``CV`` / ``Skew`` + ladder."""
-    return ['EX', 'SD', 'CV', 'Skew'] + \
-        [f'P{int(round(q * 100)):02d}' for q in PERCENTILE_LADDER]
+    return ['EX', 'SD', 'CV', 'Skew'] + [_pct_label(q) for q in PERCENTILE_LADDER]
+
+
+#: Rows on which a ``Scaled`` (per-unit-of-consideration) value is **not**
+#: meaningful -- a ratio (``CV``) or a shape (``Skew``) does not scale, so its
+#: scaled cell is ``nan``.
+_UNSCALABLE_STATS = frozenset({'CV', 'Skew'})
 
 
 # ----------------------------------------------------------------------
@@ -264,14 +290,32 @@ class PnL:
     """
 
     def __init__(self, *, name, role, probs, consideration, obligation,
-                 result_name, bs=None):
+                 result_name, bs=None, stochastic_engine=None, scale=None):
         if role not in ('sell', 'buy'):
             raise ValueError(f"role must be 'sell' or 'buy', got {role!r}.")
         self.name = name
         self.role = role
         self.result_name = result_name
-        self._probs = np.asarray(probs, dtype=float)
+        # Normalize the shared probability vector so it sums to exactly 1: a
+        # source density that clips a little tail mass (Sum(p) = 1 - eps) would
+        # otherwise give a *constant* consideration leg a spurious mean (c*Sum(p))
+        # and variance (c^2*Sum(p)*(1-Sum(p))). A P&L *is* a probability
+        # distribution; the clipped tail is a discretization artifact, so renormalize.
+        p = np.asarray(probs, dtype=float)
+        total = float(p.sum())
+        self._probs = p / total if total > 0 else p
         self._bs = bs
+        #: The opaque stochastic generator the P&L was built over (an
+        #: :class:`Aggregate`, a :class:`GridDistribution`, ...). A P&L *has a*
+        #: generator but never *depends* on it for its exhibits (those are read
+        #: off the leg value arrays); retained for reference / drill-down only.
+        self._stochastic_engine = stochastic_engine
+        #: Optional attached domain waterfall producing :attr:`margin_df` -- a
+        #: :class:`PnLTower` (Gross/Ceded/Net cession) or an analysis object
+        #: (:class:`~aggregate.reinstatement.ReinstatementAnalysis` /
+        #: :class:`~aggregate.variable_rating.VariableRatingAnalysis`). Both expose
+        #: a ``gcn_df``. ``None`` on a plain P&L.
+        self._waterfall = None
         self._cons = OrderedDict(
             (k, _Leg(k, v, self._probs, is_loss_value=False))
             for k, v in consideration.items())
@@ -288,6 +332,82 @@ class PnL:
                                 self._probs, is_loss_value=False)
         self._obl_total = _Leg('Total obligation', self._obl_total_vals,
                                self._probs, is_loss_value=True)
+        self._scale_value, self._scale_label = self._resolve_scale(scale)
+
+    def _resolve_scale(self, scale):
+        """Commit the ``stats_df`` / ``summary_df`` scale at construction.
+
+        Returns ``(value, label)``. ``scale`` is ``None`` (the default -- the
+        **expected total consideration**, the natural unitizer), a bare number
+        (an explicit scale, e.g. the RP case's ``gross - deposit``), or a
+        consideration leg name.
+        """
+        if scale is None:
+            return self._cons_total.mean, 'consideration'
+        if isinstance(scale, str):
+            return self._cons[scale].mean, scale
+        return float(scale), 'scale'
+
+    @property
+    def stochastic_engine(self):
+        """The opaque stochastic generator the P&L was built over (or ``None``).
+
+        A P&L *has a* generator (an :class:`Aggregate`, a
+        :class:`GridDistribution`, a bivariate, ...) but is agnostic about which,
+        and never *depends* on it: the exhibits are read off the leg value arrays
+        captured at construction. Retained for reference / drill-down only.
+        """
+        return self._stochastic_engine
+
+    @property
+    def tower(self):
+        """The attached :class:`PnLTower` (Gross/Ceded/Net cession), or ``None``.
+
+        Present on a cession-bearing P&L built through the Gross/Ceded/Net path;
+        ``None`` on a plain P&L or one backed by an analysis object (see
+        :attr:`analysis`).
+        """
+        return self._waterfall if isinstance(self._waterfall, PnLTower) else None
+
+    @property
+    def analysis(self):
+        """The attached domain analysis object, or ``None``.
+
+        A :class:`~aggregate.reinstatement.ReinstatementAnalysis` or
+        :class:`~aggregate.variable_rating.VariableRatingAnalysis` when the P&L was
+        built from a reinstatement / variable-rating program (the drill-down home
+        for the treaty maps, ``validation_df``, ``tail_df``, ``plot``); ``None``
+        otherwise.
+        """
+        return None if isinstance(self._waterfall, (PnLTower, type(None))) \
+            else self._waterfall
+
+    @property
+    def margin_df(self):
+        """The Gross / Ceded / Net **margin waterfall** (stats x perspective).
+
+        Rows are ``EX / SD / CV / Skew`` and the :data:`PERCENTILE_LADDER`;
+        columns are the ``Gross`` / ``Ceded`` / ``Net`` perspectives plus the
+        one-step benefit / impact deltas. Only ``EX`` adds across the split; SD /
+        CV / Skew / percentiles are per-column ("means add, SDs don't"). Forwarded
+        from the attached cession waterfall (:attr:`tower` / :attr:`analysis`); a
+        **plain** P&L has no cession, so it raises.
+
+        Returns
+        -------
+        pandas.DataFrame
+
+        Raises
+        ------
+        AttributeError
+            If the P&L carries no cession waterfall.
+        """
+        if self._waterfall is None:
+            raise AttributeError(
+                f'{self.name!r} is a plain P&L with no cession; margin_df is only '
+                'defined for a Gross/Ceded/Net position (a reinsurance / '
+                'reinstatement / variable-rating program).')
+        return self._waterfall.gcn_df
 
     # ------------------------------------------------------------------
     # Leg access
@@ -319,8 +439,18 @@ class PnL:
 
     @property
     def E_consideration(self):
-        """``E[Total consideration]`` -- the denominator of the ``% Consid`` column."""
+        """``E[Total consideration]`` -- the default scale (``role='sell'``)."""
         return float((self._cons_total_vals * self._probs).sum())
+
+    @property
+    def scale(self):
+        """The committed ``(value, label)`` scale for the ``Scaled`` columns.
+
+        Fixed at construction (default: the expected total consideration). Every
+        ``Scaled`` cell in :attr:`summary_df` / :attr:`stats_df` divides by this
+        one number, so the reports never re-derive it per call.
+        """
+        return self._scale_value, self._scale_label
 
     # ------------------------------------------------------------------
     # FCC report 1: the short headline
@@ -329,73 +459,73 @@ class PnL:
     def summary_df(self):
         """The headline P&L table: one row per leg, ratio-and-percentile columns.
 
-        Rows, in order: each **consideration** component (named / ordered by the
-        ``consideration`` dict keys), **Total consideration** (only if >1
-        component); each **obligation** component, **Total obligation** (only if
-        >1); the **result** (named by ``result_name``). Columns: ``EX`` (mean --
-        a magnitude for a consideration / obligation row, the signed net for the
-        result), ``% Consid`` (``EX`` over :attr:`E_consideration`), ``SD``,
-        ``CV``, ``Skew``, ``P01`` / ``Median`` / ``P99``.
+        **Fixed shape.** Rows, in order: each **consideration** component (named /
+        ordered by the ``consideration`` dict keys), **Total consideration** (only
+        if >1 component); each **obligation** component, **Total obligation** (only
+        if >1); the **result** (named by ``result_name``) -- so the row set varies
+        only with the number of legs, never with the P&L's flavor. Columns are
+        always ``EX`` (mean -- a magnitude for a consideration / obligation row,
+        the signed net for the result), ``Scaled`` (``EX`` over the committed
+        :attr:`scale`), ``SD``, ``CV``, ``Skew``, ``P1`` / ``Median`` / ``P99``.
 
         Returns
         -------
         pandas.DataFrame
             Indexed by leg label (index name ``'P&L'``).
         """
-        denom = self.E_consideration
+        denom = self._scale_value
+        scalable = denom and abs(denom) > VALIDATION_NOISE
         rows = OrderedDict()
         for label, leg, _is_total in self._summary_legs():
             m, sd, cv, skew = leg.moments
             gd = leg.gd
             rows[label] = [
-                m, (m / denom if denom else float('nan')), sd, cv, skew,
+                m, (m / denom if scalable else float('nan')),
+                _snap_noise(sd), cv, _snap_noise(skew),
                 float(gd.q(0.01)), float(gd.q(0.50)), float(gd.q(0.99))]
         df = pd.DataFrame.from_dict(
             rows, orient='index',
-            columns=['EX', '% Consid', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99'])
+            columns=['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99'])
         df.index.name = 'P&L'
         return df
 
     # ------------------------------------------------------------------
     # FCC report 2: the detailed stats x legs table
     # ------------------------------------------------------------------
-    def stats_df(self, scale='Total'):
-        """The detailed ``stats x legs`` table, each leg paired with a ``%-of-scale``.
+    @property
+    def stats_df(self):
+        """The detailed ``stats x legs`` table, each leg paired with a ``Scaled`` value.
 
-        Every statistic (``EX`` / ``SD`` / ``CV`` / ``Skew`` and the full
-        :data:`PERCENTILE_LADDER`) for every leg, paired with the same value as a
-        fraction of a **fixed consideration scale** -- two columns per leg
-        (``value``, ``% of <scale>``).
+        **Fixed shape.** Every statistic (``EX`` / ``SD`` / ``CV`` / ``Skew`` and
+        the full :data:`PERCENTILE_LADDER`, labelled ``P1`` / ``P5`` / ... ) for
+        every leg, paired with the same value divided by the committed
+        :attr:`scale` -- two columns per leg (``value``, ``Scaled``). The scale is
+        a single number fixed at construction (default: the expected total
+        consideration), so this is a property, not a method.
 
-        Parameters
-        ----------
-        scale : str, default ``'Total'``
-            The consideration element to divide by: ``'Total'`` (Total
-            consideration) or a single ``consideration`` key. The scale **must be
-            deterministic** (``SD == 0``): a non-fixed scale **warns** and divides
-            by its ``EX``.
+        ``CV`` and ``Skew`` are unitless already, so their ``Scaled`` cells are
+        ``nan`` (scaling a ratio / shape is meaningless); a break-even scale
+        (``|value| <= VALIDATION_NOISE``) makes every ``Scaled`` cell ``nan``.
 
         Returns
         -------
         pandas.DataFrame
-            Index = statistics; columns = a ``(leg, {'value', '% of <scale>'})``
-            MultiIndex.
+            Index = statistics (single level); columns = a ``(leg, {'value',
+            'Scaled'})`` MultiIndex.
         """
-        scale_leg = self._cons_total if scale == 'Total' else self._cons[scale]
-        scale_mean, scale_sd, _, _ = scale_leg.moments
-        if scale_sd > 0:
-            warnings.warn(
-                f'stats_df scale {scale!r} is stochastic (SD={scale_sd:.4g} != 0); '
-                'a distribution cannot be scaled by a random consideration without '
-                'the joint, so dividing by its mean EX instead.')
-        denom = scale_mean if scale_mean else float('nan')
-        scale_label = 'Total' if scale == 'Total' else scale
+        denom = self._scale_value
+        scalable = denom and abs(denom) > VALIDATION_NOISE
+        stat_names = _stat_names()
         data = OrderedDict()
         for label, leg, _is_total in self._summary_legs():
-            vals = leg.stat_vector()
+            vals = [_snap_noise(v) for v in leg.stat_vector()]
+            scaled = [
+                (float('nan') if (name in _UNSCALABLE_STATS or not scalable)
+                 else v / denom)
+                for name, v in zip(stat_names, vals)]
             data[(label, 'value')] = vals
-            data[(label, f'% of {scale_label}')] = [v / denom for v in vals]
-        df = pd.DataFrame(data, index=_stat_names())
+            data[(label, 'Scaled')] = scaled
+        df = pd.DataFrame(data, index=stat_names)
         df.columns = pd.MultiIndex.from_tuples(df.columns, names=['leg', ''])
         df.index.name = 'stat'
         return df
@@ -570,7 +700,7 @@ class _LossFrameShim:
 # The general constructor
 # ----------------------------------------------------------------------
 def create_pnl(source, *, consideration, obligation, role='sell',
-               result_name='result', name=None, probs=None):
+               result_name='result', name=None, probs=None, scale=None):
     """Build a :class:`PnL` from a source and its consideration / obligation maps.
 
     ``result(state) = consideration(state) - obligation(state)`` for ``role
@@ -597,6 +727,11 @@ def create_pnl(source, *, consideration, obligation, role='sell',
         The position name.
     probs : array_like, optional
         Probability override; defaults from the source slot.
+    scale : float or str, optional
+        The unitizer for the ``Scaled`` columns, fixed at construction. ``None``
+        (default) uses the expected total consideration; a number is an explicit
+        scale (e.g. the reinstatement-programme ``gross - deposit``); a string
+        names a consideration leg.
 
     Returns
     -------
@@ -611,7 +746,8 @@ def create_pnl(source, *, consideration, obligation, role='sell',
         (k, _eval_component(v, coords, shape)) for k, v in obl.items())
     return PnL(name=name, role=role, probs=p,
                consideration=cons_vals, obligation=obl_vals,
-               result_name=result_name, bs=bs)
+               result_name=result_name, bs=bs, stochastic_engine=source,
+               scale=scale)
 
 
 # ----------------------------------------------------------------------
@@ -813,6 +949,38 @@ def resolve_expense(agg, expense_spec, gross_premium):
         else:
             raise ValueError(f'unknown expense basis {basis!r}')
     return float(total)
+
+
+def _resolve_expense_split(agg, expense_spec, gross_premium):
+    """Split a DecL ``expense`` spec into ``(scalar, loss_rate)``.
+
+    ``fixed`` and ``premium`` terms are **deterministic** -- a currency amount, or
+    a fraction of the fixed gross premium -- and fold into the scalar part. A
+    ``loss`` term is **loss adjustment expense**: a fraction of the *actual* loss,
+    so it is returned as a rate ``loss_rate`` to be applied per atom (``rate * x``)
+    rather than collapsed to ``rate * E[loss]``. The caller builds the expense
+    leg as ``loss_rate * x + scalar`` -- a scaled-loss distribution, not a point
+    mass. ``None`` / empty -> ``(0, 0)``.
+
+    (Contrast :func:`resolve_expense`, which returns the single deterministic
+    scalar ``loss_rate * E[loss] + scalar`` the Gross/Ceded/Net commission split
+    needs.)
+    """
+    if not expense_spec:
+        return 0.0, 0.0
+    terms = [expense_spec] if isinstance(expense_spec[0], str) else expense_spec
+    scalar = 0.0
+    loss_rate = 0.0
+    for basis, val in terms:
+        if basis == 'fixed':
+            scalar += float(val)
+        elif basis == 'premium':
+            scalar += float(val) * float(gross_premium)
+        elif basis == 'loss':
+            loss_rate += float(val)
+        else:
+            raise ValueError(f'unknown expense basis {basis!r}')
+    return scalar, loss_rate
 
 
 def _gcn_magnitudes(agg, gross, ceded, net, expense_spec, econ):

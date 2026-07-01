@@ -631,6 +631,60 @@ class ReinstatementAnalysis:
         return create_pnl_tower(legs, delta_names=deltas).gcn_df
 
     # ------------------------------------------------------------------
+    # the net P&L value object (the always-PnL face; analysis is attached)
+    # ------------------------------------------------------------------
+    def as_pnl(self):
+        """The **net** position as a :class:`~aggregate.PnL`, with ``self`` attached.
+
+        The face a ``build('pnl ... reinstatements ...')`` program returns: a P&L
+        over the ``(L, R)`` joint whose net legs are the (stochastic) net premium
+        ``P_G - D - h(R)``, the net loss ``L - A(R)`` and the deterministic net
+        expense, so its fixed exhibits describe the retained position and its
+        ``margin_df`` forwards this analysis's Gross/Ceded/Net waterfall. The
+        analysis itself is reachable as :attr:`~aggregate.PnL.analysis` (the treaty
+        maps, ``validation_df``, ``tail_df``, ``plot``).
+
+        The committed ``Scaled`` denominator is the deterministic ``gross -
+        deposit`` (minus any aggregate-cover deposit) -- the natural net-premium
+        base once the stochastic reinstatement premium is stripped out.
+        """
+        from ._pnl import create_pnl
+        src = self.source
+        P_G, D = self.gross_premium, self.terms.deposit
+        A, h = self.terms.recovery, self.terms.reinstatement_premium
+        has_agg = self.agg_recovery is not None
+        pc = self.agg_ceded_premium if has_agg else 0.0
+        net_expense = self._exp_mag['net_agg' if has_agg else 'net_occ']
+        if has_agg:
+            g0 = self.agg_recovery
+
+            def g_rec(l, r):
+                return g0(np.maximum(l - A(r), 0.0))
+
+            def net_premium(l, r):
+                return P_G - D - h(r) - pc
+
+            def net_loss(l, r):
+                return (l - A(r)) - g_rec(l, r)
+        else:
+            def net_premium(l, r):
+                return P_G - D - h(r)
+
+            def net_loss(l, r):
+                return l - A(r)
+
+        obligation = {'net loss': net_loss}
+        if net_expense:
+            obligation['net expense'] = net_expense
+        face = create_pnl(
+            src, role='sell', name='net',
+            consideration={'net premium': net_premium},
+            obligation=obligation, result_name='margin',
+            scale=float(P_G - D - pc))
+        face._waterfall = self
+        return face
+
+    # ------------------------------------------------------------------
     # the headline summary (pre-plan section 13)
     # ------------------------------------------------------------------
     @property

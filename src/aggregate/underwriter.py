@@ -1462,15 +1462,17 @@ class Underwriter(object):
         if kind == 'var':
             inner.variable_gross_expense = resolve_expense(
                 inner, recipe['expense_spec'], inner.variable_gross_premium)
-            return inner.variable_rating_analysis()
+            # always-PnL: return the net P&L face, analysis attached as .analysis.
+            return inner.variable_rating_analysis().as_pnl()
         if kind == 'reins':
             econ = recipe['econ']
-            return inner.reinstatement_analysis(
+            analysis = inner.reinstatement_analysis(
                 agg_ceded_premium=float(econ.get('pc_agg', 0.0)),
                 gross_expense=resolve_expense(
                     inner, recipe['expense_spec'], float(econ['gross'])),
                 occ_commission=float(econ.get('c_occ', 0.0)),
                 agg_commission=float(econ.get('c_agg', 0.0)))
+            return analysis.as_pnl()
         if kind == 'gcn':
             econ = recipe['econ']
             return inner.make_pnl(gross=econ['gross'], ceded=econ['ceded'],

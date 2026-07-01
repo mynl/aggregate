@@ -8,8 +8,6 @@ These tests exercise the cross-domain core -- a raw ``(values, probs)`` slot, a
 new capability that is *not* insurance-shaped. The insurance presets
 (``gcn_df`` / reinstatement / variable rating) are covered by their own suites.
 """
-import warnings
-
 import numpy as np
 import pytest
 
@@ -83,19 +81,21 @@ def test_means_add_sds_dont_in_tower():
         g.loc['EX', 'net'] - g.loc['EX', 'base'], abs=1e-9)
 
 
-def test_stats_df_scale_default_and_stochastic_warns():
-    """Default scale is Total consideration; a stochastic scale warns and uses EX."""
+def test_stats_df_committed_scale_and_unscalable_nan():
+    """stats_df is a property; Scaled divides by the committed scale; CV/Skew nan."""
     p = create_pnl((_VALS, _PROBS), consideration={'premium': 20.0},
                    obligation={'loss': lambda x: x})
-    sdf = p.stats_df()
-    # premium is the (deterministic) scale: its '% of Total' EX is exactly 1
-    assert sdf.loc['EX', ('premium', '% of Total')] == pytest.approx(1.0)
-    # a stochastic consideration scale warns
-    q = create_pnl((_VALS, _PROBS),
-                   consideration={'variable': lambda x: 20.0 + x},
-                   obligation={'loss': lambda x: x})
-    with pytest.warns(UserWarning, match='stochastic'):
-        q.stats_df(scale='variable')
+    sdf = p.stats_df                                   # a property, not a method
+    # the default scale is E[Total consideration] = 20: premium's Scaled EX is 1
+    assert sdf.loc['EX', ('premium', 'Scaled')] == pytest.approx(1.0)
+    # a ratio / shape does not scale -> nan in the Scaled column
+    assert np.isnan(sdf.loc['CV', ('loss', 'Scaled')])
+    assert np.isnan(sdf.loc['Skew', ('loss', 'Scaled')])
+    # an explicit scale, committed at construction (the RP gross - deposit case)
+    q = create_pnl((_VALS, _PROBS), consideration={'premium': 20.0},
+                   obligation={'loss': lambda x: x}, scale=10.0)
+    assert q.scale == (10.0, 'scale')
+    assert q.stats_df.loc['EX', ('premium', 'Scaled')] == pytest.approx(2.0)
 
 
 def test_density_df_is_ordered_dict_of_gds():

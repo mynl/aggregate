@@ -2728,22 +2728,19 @@ class Aggregate:
         Returns
         -------
         PnL
+            **Always** a :class:`~aggregate.PnL` value object. A Gross / Ceded /
+            Net construction returns the **net** position, with the full waterfall
+            attached as :attr:`~aggregate.PnL.tower` and surfaced through
+            :attr:`~aggregate.PnL.margin_df`.
 
         Notes
         -----
         ``build('pnl NAME C premium less <body>')`` is sugar for
         ``build('agg NAME <body>').make_pnl(consideration=C)``.
-
-        Returns
-        -------
-        PnL or PnLTower
-            A plain consideration returns a :class:`~aggregate.PnL` value object;
-            a Gross / Ceded / Net construction returns a
-            :class:`~aggregate.PnLTower` (its ``gcn_df`` is the waterfall; its
-            ``summary_df`` / ``q`` forward the net perspective).
         """
         import numpy as _np
-        from ._pnl import create_pnl, gcn_tower_from_aggregate, resolve_expense
+        from ._pnl import (create_pnl, gcn_tower_from_aggregate,
+                           _resolve_expense_split)
         if gross is not None or ceded is not None:
             if gross is None or ceded is None:
                 raise ValueError(
@@ -2755,10 +2752,17 @@ class Aggregate:
                 raise ValueError(
                     'the Gross/Ceded/Net view requires reinsurance on the risky '
                     'leg; the aggregate carries no occurrence / aggregate treaty.')
-            return gcn_tower_from_aggregate(
+            # A Gross/Ceded/Net program returns the **net** PnL value object (the
+            # fixed exhibits describe the retained position); the full waterfall
+            # is attached as ``pnl.tower`` and surfaces as ``pnl.margin_df``.
+            tower = gcn_tower_from_aggregate(
                 self, gross=gross, ceded=ceded, net=net,
                 expense_spec=expense_spec, gcn_economics=gcn_economics,
                 name=self.name)
+            face = tower.net
+            face.result_name = 'margin'      # uniform result label across P&Ls
+            face._waterfall = tower
+            return face
         if consideration is None:
             raise ValueError(
                 'PnL needs a consideration= (or gross=/ceded= for the '
@@ -2771,10 +2775,16 @@ class Aggregate:
         else:
             cons = float(_np.sum(_np.asarray(consideration, dtype=float)))
             gp = cons
-        eg = resolve_expense(self, expense_spec, gp)
+        # LAE (a `loss`-basis expense) scales with the *actual* loss, so the
+        # expense leg is `loss_rate * x + scalar` -- stochastic, not a point mass
+        # at `rate * E[loss]`. `fixed` / `premium` terms are the deterministic
+        # scalar. See ``_resolve_expense_split``.
+        scalar_exp, loss_rate = _resolve_expense_split(self, expense_spec, gp)
         obl = {'loss': (lambda x: x)}
-        if eg:
-            obl['expense'] = eg
+        if loss_rate:
+            obl['expense'] = (lambda x, r=loss_rate, s=scalar_exp: r * x + s)
+        elif scalar_exp:
+            obl['expense'] = scalar_exp
         return create_pnl(self, consideration={'consideration': cons},
                           obligation=obl, role='sell', result_name='margin',
                           name=self.name)

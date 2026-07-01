@@ -1,15 +1,16 @@
 group,name,kind,returns,description,Aggregate,Portfolio,BivariateAggregate,PnL,ReinstatementAnalysis,VariableRatingAnalysis,Severity,Frequency,Bounds,notes
-df-headline,summary_df,property,DataFrame,At-a-glance risk view: moments + key percentiles (Freq/Sev/Agg),Y,Y,Y*,Y*,Y,Y,,,,"WRINKLE: PnL = FCC headline EX/%Consid/SD/CV/Skew/P01/Median/P99 (a122); Reinst/VarRt = Gross/Ceded/Net/Impact headline (VarRt gained a122); Agg/Port = moments+percentiles (a113); Biv = theory-vs-realised."
+df-headline,summary_df,property,DataFrame,At-a-glance risk view: moments + key percentiles (Freq/Sev/Agg),Y,Y,Y*,Y*,Y,Y,,,,"WRINKLE: PnL = FCC headline, FIXED shape EX/Scaled/SD/CV/Skew/P1/Median/P99 (a123; build('pnl') always returns PnL); Reinst/VarRt = Gross/Ceded/Net/Impact headline on the attached .analysis (VarRt gained a122); Agg/Port = moments+percentiles (a113); Biv = theory-vs-realised."
 df-headline,tail_df,method,DataFrame,Return-period / exceedance table (p VaR TVaR xsVaR VaR/Mean),Y,Y,Y*,,Y,Y,,,,"WRINKLE: Agg/Port = return-period table, METHOD. Biv = per-axis support, PROPERTY. Reinst/VarRt = net-UW return-period, METHOD (VarRt gained a122). PnL: none."
 df-headline,validation_df,property,DataFrame,"Moment-vs-estimate QA table (theory vs FFT estimate, rel error)",Y,Y,,,Y,,,,,a113 rename of old summary_df. Biv keeps its validation inside summary_df (not migrated).
 df-headline,tail_behavior_df,property,DataFrame,Layered tail report: support + per-side tail class + concentration,Y,Y,,,,,,,,a113 rename of old tail_df.
-df-headline,stats_df,attribute,DataFrame,Single source of truth for moments (component x measure x view),Y,Y,Y,Y,Y,Y,,,,"Canonical moment store; summary_df/validation_df read from it. On PnL it is a METHOD stats_df(scale=) over the P&L legs (a122)."
+df-headline,stats_df,attribute,DataFrame,Single source of truth for moments (component x measure x view),Y,Y,Y,Y,Y,Y,,,,"Canonical moment store; summary_df/validation_df read from it. On PnL it is a PROPERTY over the P&L legs -- fixed layout, stats x (leg, value/Scaled), scale committed at construction (a123, was a method a122)."
 df-headline,density_df,property,DataFrame,Per-bucket density / distribution / risk-measure frame,Y,Y,Y,Y,Y,,,,,"The realised PMF grid + derived columns. On PnL it is an ordered {leg: GridDistribution} dict, not a single frame (a122)."
 df-headline,density,property,DataFrame,The live (positive-mass) rows of density_df,Y,Y,Y,,,Y,,,,"WRINKLE: VariableRatingAnalysis.density is the INPUT gross-density array, not the density_df live slice -- name collision."
 df-headline,sev_density_df,property,DataFrame,Per-bucket severity density on the severity grid,Y,,,,,,,,,Severity-grid analogue of density_df.
 df-headline,bs_window_df,property,DataFrame,Curated bucket/window sizing decision [bs-reporting],Y,Y,Y,,Y,,,,,Grid-selection audit; None before update.
 df-headline,result,property,GridDistribution,The net (result) leg distribution of a P&L,,,,Y,,,,,,"The exact net GridDistribution (replaces pnl_df, a122); q/cdf/sf/mean/sd/prob_loss delegate to it."
-df-headline,gcn_df,property,DataFrame,Gross/Ceded/Net waterfall (stats x perspective; means add),,,,,Y,Y,,,,"New-canonical stats x waterfall (a122). Also on PnLTower (no CSV column). Not on the plain PnL value object."
+df-headline,gcn_df,property,DataFrame,Gross/Ceded/Net waterfall (stats x perspective; means add),,,,,Y,Y,,,,"New-canonical stats x waterfall (a122). Also on PnLTower (no CSV column). Not on the plain PnL value object; a PnL surfaces it as margin_df (a123)."
+df-headline,margin_df,property,DataFrame,Gross/Ceded/Net margin waterfall (stats x perspective; means add),,,,Y,,,,,,"a123; forwards the attached tower/analysis gcn_df. A plain PnL has no cession -> raises."
 df-headline,dependency_df,property,DataFrame,Joint dependence (cov / corr / tau) by level,,,Y,,,,,,,Bivariate-only.
 df-reins,reins_summary_df,property,DataFrame,Per-stage reinsurance summary (economic view of validation_df cols),Y,Y,,,,,,,,None when no reinsurance. Mirrors validation_df 8-col layout.
 df-reins,reins_stats_df,property,DataFrame,Per-layer reinsurance layering summary (empirical model-grid),Y,Y,,,,,,,,None when no reinsurance.
@@ -148,7 +149,12 @@ data-attr,marginals,property,tuple,The two marginal densities,,,Y,,,,,,,Bivariat
 data-attr,copula,attribute,object,The copula coupling the components,,,Y,,,,,,,
 data-attr,bivariate,property,object,BivariateDistribution view of the joint density,,,Y,,,,,,,
 state,valid,property,Validation,Validation flag (NOT_UNREASONABLE / REINSURANCE / fail bits),Y,Y,,,,,,,,Read by qd/_repr_html_; computed from stats_df.
-state,program,attribute,str,Original DecL program text,Y,Y,Y,Y,Y,Y,Y,,,
+state,program,attribute,str,Original DecL program text,Y,Y,Y,Y,,,Y,,,"Reinst/VarRt are attached via pnl.analysis (a123), which carries no program; the returned PnL does."
+state,stochastic_engine,property,object,The source the P&L was built over (Aggregate/GridDistribution/...),,,,Y,,,,,,"a123; retained for drill-down; the exhibits never depend on it."
+state,scale,property,tuple,"The committed (value,label) unitizer for the Scaled columns",,,,Y,,,,,,"a123; fixed at construction; default E[Total consideration]; the reinstatement net uses gross-deposit."
+state,tower,property,PnLTower,Attached Gross/Ceded/Net waterfall (plain cession) or None,,,,Y,,,,,,"a123; None unless a deposit/rol/rate/cede cession. See analysis for reinstatement/variable rating."
+state,analysis,property,object,Attached domain analysis (Reinst/VarRt) or None,,,,Y,,,,,,"a123; the drill-down home for treaty maps, validation_df, tail_df, plot."
+state,as_pnl,method,PnL,Net position as a PnL with the analysis attached,,,,,Y,Y,,,,"a123; the always-PnL face build('pnl') returns for reinstatement / variable-rating programs."
 state,figure,attribute,object,Last matplotlib figure produced,Y,Y,Y,,Y,,,,,
 severity-api,fz,attribute,object,Underlying frozen scipy.stats distribution,,,,,,,Y,,,Severity is an rv_continuous; inherits rvs/moment/stats/entropy/fit/interval/isf/median/std/expect/etc.
 severity-api,moms,method,tuple,First three moments of the layered severity X(a d),,,,,,,Y,,,

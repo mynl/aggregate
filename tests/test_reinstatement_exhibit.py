@@ -108,12 +108,13 @@ def test_plot_has_four_panels():
             'Underwriting result: gross vs net', 'Cession impact'} <= titles
 
 
-def test_pnl_plot_delegates_to_analysis():
-    # a DecL reinstatement pnl plots the stochastic-ceded mosaic
+def test_pnl_reinstatement_analysis_plots_mosaic():
+    # a DecL reinstatement pnl returns a PnL whose attached .analysis plots the
+    # stochastic-ceded mosaic (p.plot() itself is the generic net-result plot).
     p = build('pnl Cat 10000 premium less 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% '
               'reinstatements [0 1] poisson')
-    fig = p.plot()
+    fig = p.analysis.plot()
     titles = {ax.get_title() for ax in fig.axes if ax.get_title()}
     assert 'Cession impact' in titles
 

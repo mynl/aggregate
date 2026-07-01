@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.0.0a123
+
+**[PnL-Exhibits]** — the `PnL` value object becomes **generic and
+self-describing**: fixed-shape exhibits driven only by the constructor args, and
+**`build('pnl …')` always returns a `PnL`** (never a `PnLTower` /
+`ReinstatementAnalysis` / `VariableRatingAnalysis` — domain-specific return types
+were removed). Executes `dev/plan-pnl-exhibits.md`.
+
+- **Always-`PnL` routing.** Every `pnl` program returns the **net** `PnL`. The
+  Gross/Ceded/Net waterfall / reinstatement / variable-rating machinery is now
+  **attached**, not returned: `pnl.tower` (a `PnLTower`, for a plain cession) or
+  `pnl.analysis` (a `ReinstatementAnalysis` / `VariableRatingAnalysis`, the
+  drill-down home for the treaty maps, `validation_df`, `tail_df`, `plot`).
+  **Breaking:** `build('pnl … reinstatements …')` / `… swing …` / `… deposit …`
+  now yield a `PnL`; reach the old object via `.analysis` / `.tower`.
+- **New `PnL.margin_df`** — the Gross/Ceded/Net **margin waterfall** (stat rows ×
+  `gross`/`ceded`/`net`/benefit columns), forwarded from the attached
+  tower/analysis. A plain P&L has no cession, so it raises. Replaces the old
+  top-level `gcn_df` on a P&L (which no longer exists — `gcn_df` is domain-specific).
+- **`summary_df` fixed shape.** Columns are always `EX / Scaled / SD / CV / Skew /
+  P1 / Median / P99` (renamed `% Consid` → **`Scaled`**, `P01/P99` → `P1/P99`);
+  rows vary only with the number of legs. A **constant** leg (a fixed premium) now
+  reports `SD = 0`, `CV = 0`, `Skew = NaN` exactly — probabilities are renormalized
+  to sum to 1, so a clipped source tail no longer leaks spurious variance; residual
+  float dust is snapped (`moments._snap_noise`).
+- **`stats_df` is now a property** (was a method `stats_df(scale=…)`). One fixed
+  layout: stat rows (`EX/SD/CV/Skew` + `P1…P99`) × `(leg, {value, Scaled})`
+  columns. The **scale is committed at construction** (`create_pnl(scale=…)`;
+  default = expected total consideration; the reinstatement net uses
+  `gross − deposit`). `CV` / `Skew` do not scale → their `Scaled` cells are `NaN`;
+  CV is guarded to `NaN` at a break-even (near-zero) mean.
+- **`PnL.stochastic_engine`** — a P&L now retains an opaque reference to the source
+  it was built over (an `Aggregate`, `GridDistribution`, …) for drill-down, though
+  it never *depends* on it (the exhibits are read off the leg value arrays).
+- **`loss`-basis expense is stochastic** in the plain path: `20% loss expenses` is
+  now `0.20 × actual loss` per atom (LAE scales with loss), not a point mass at
+  `0.20 × E[loss]`. `fixed` / `premium` terms stay deterministic. (The GCN
+  commission split still uses the scalar `E[loss]` form.)
+
 ## 1.0.0a122
 
 **[PnL-API]** — a domain-agnostic **`create_pnl`** and a reshaped, engine-free

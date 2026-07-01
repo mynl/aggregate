@@ -365,6 +365,51 @@ class VariableRatingAnalysis:
         return create_pnl_tower([gross, ceded], delta_names=['impact']).gcn_df
 
     # ------------------------------------------------------------------
+    # the net P&L value object (the always-PnL face; analysis is attached)
+    # ------------------------------------------------------------------
+    def as_pnl(self):
+        """The **net** position as a :class:`~aggregate.PnL`, with ``self`` attached.
+
+        The face a ``build('pnl ... <feature> ...')`` program returns: a P&L over
+        the gross density whose net legs are the feature's net premium / net loss /
+        net expense, so its fixed exhibits (``summary_df`` / ``stats_df`` /
+        ``density_df``) describe the retained position and its ``margin_df``
+        forwards this analysis's Gross/Ceded/Net waterfall. The analysis itself is
+        reachable as :attr:`~aggregate.PnL.analysis` for the treaty maps,
+        ``tail_df`` and ``plot``.
+        """
+        from ._pnl import create_pnl
+        c = self._components()
+        ceder = self.ceder
+        E_G = self.gross_expense
+        gp, cp, cl, cm = (c['gross_premium'], c['ceded_premium'],
+                          c['ceded_loss'], c['commission'])
+
+        def net_premium(l):
+            a = ceder(l)
+            return gp(l, a) - cp(l, a)
+
+        def net_loss(l):
+            a = ceder(l)
+            return np.asarray(l, dtype=float) - cl(l, a)
+
+        def net_expense(l):
+            return E_G - cm(l, ceder(l))
+
+        obligation = {'net loss': net_loss}
+        # include the expense leg only when it is not identically zero: a nonzero
+        # gross expense / fixed commission, or a feature that *fills* the expense
+        # leg (slide / profit commission -> a stochastic commission).
+        if E_G or self.commission or self.terms.target_leg == 'expense':
+            obligation['net expense'] = net_expense
+        face = create_pnl(
+            (self.grid, self.density), role='sell', name='net',
+            consideration={'net premium': net_premium},
+            obligation=obligation, result_name='margin')
+        face._waterfall = self
+        return face
+
+    # ------------------------------------------------------------------
     # the headline summary + the return-period capital exhibit (gained free)
     # ------------------------------------------------------------------
     @property

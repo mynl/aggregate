@@ -29,12 +29,21 @@
    `create_pnl(source, *, consideration, obligation, role, …)` + `create_pnl_tower`
    / `PnLTower`: the **domain-agnostic** P&L constructor over the pushforward
    engine (labels-as-data; consideration/obligation/result → exact GDs + the four
-   FCC reports). `PnL` reshaped into an engine-free value object; `build('pnl …')`
-   returns a `PnL` / `PnLTower` / `ReinstatementAnalysis` / `VariableRatingAnalysis`.
+   FCC reports). `PnL` reshaped into an engine-free value object.
    The a121 leg wrappers (`legs.py` / `_insurance_view.py`) and
    `gcn_assemble_column` / `_gcn_*` are removed; the pushforward primitives stay.
    `gcn_df` adopted the new-canonical stats×waterfall schema (byte-identical bar
    relaxed by the author). DecL unchanged.
+1b. **[PnL-Exhibits]** ✅ **DONE (`1.0.0a123`, `dev/done/plan-pnl-exhibits.md`).**
+   Makes the `PnL` value object **generic and self-describing** and advances
+   `[Reporting-Guidelines]` for the P&L surface: `build('pnl …')` **always
+   returns a `PnL`** (the domain-specific `PnLTower` / `ReinstatementAnalysis` /
+   `VariableRatingAnalysis` return types are gone — attached as `pnl.tower` /
+   `pnl.analysis`). Fixed-shape `summary_df` (`% Consid`→`Scaled`, `P01`→`P1`,
+   constant legs exact via prob-renormalization + dust-snap); `stats_df` a
+   **property** with a construction-committed scale; new `margin_df` (the cession
+   waterfall), `stochastic_engine`, `scale`, `tower`, `analysis`; `loss`-basis
+   expense stochastic in the plain path. DecL unchanged.
 2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
    for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
    fixed** (it does not morph as the object gains properties), columns are

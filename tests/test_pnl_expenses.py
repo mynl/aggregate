@@ -27,12 +27,24 @@ def test_expense_three_explicit_forms():
     # premium basis: 25% of the 1000 gross premium
     assert build(_BASE + ' 25% premium expenses').summary_df.loc[
         'expense', 'EX'] == pytest.approx(250.0)
-    # loss basis: a fraction of EXPECTED gross loss (deterministic in Phase 1)
+    # loss basis: a fraction of the ACTUAL loss (now stochastic -- rate * loss per
+    # atom); its EX is still rate * E[loss] = 0.30 * 400 = 120
     assert build(_BASE + ' 30% loss expenses').summary_df.loc[
         'expense', 'EX'] == pytest.approx(120.0, rel=TOL)
     # fixed basis: a currency amount
     assert build(_BASE + ' 200 fixed expenses').summary_df.loc[
         'expense', 'EX'] == pytest.approx(200.0)
+
+
+def test_loss_basis_expense_is_stochastic():
+    """A plain loss-basis (LAE) expense scales with the actual loss, not a point mass.
+
+    The expense leg is ``rate * loss`` per atom, so it carries the loss's spread:
+    its CV equals the loss CV (an old point mass at ``rate * E[loss]`` had CV 0).
+    """
+    df = build(_BASE + ' 30% loss expenses').summary_df
+    assert df.loc['expense', 'SD'] > 0
+    assert df.loc['expense', 'CV'] == pytest.approx(df.loc['loss', 'CV'], rel=TOL)
 
 
 def test_expense_basis_is_resolved_by_basis():
@@ -97,8 +109,8 @@ def test_expense_in_gcn_exhibit():
     p = a.make_pnl(gross=5500, ceded=1800, expense_spec=('premium', 0.2))
     # net perspective expense == gross expense (no commission yet) == 0.2 * 5500
     assert p.summary_df.loc['expense', 'EX'] == pytest.approx(1100.0)
-    # the expense ratio reads off the gross premium
-    assert 1100.0 / p.economics['gross'] == pytest.approx(0.2, rel=TOL)
+    # the expense ratio reads off the gross premium (economics via the tower)
+    assert 1100.0 / p.tower.economics['gross'] == pytest.approx(0.2, rel=TOL)
 
 
 def test_expense_only_on_pnl_not_agg():

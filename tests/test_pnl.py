@@ -10,8 +10,9 @@ coincide. See ``dev/plan-pnl-api.md``.
 A :class:`PnL` **consumes and discards** its stochastic engine: there is no
 ``pnl.agg`` and no ``value_type``. The obligation leg is the honest loss
 (``summary_df.loc['loss']`` in loss terms); the net is the derived ``result``
-:class:`GridDistribution`. A ceded-premium clause promotes the ``pnl`` to a
-:class:`PnLTower` (Gross / Ceded / Net waterfall). Portfolios / bivariates of
+:class:`GridDistribution`. ``build('pnl ...')`` always returns a :class:`PnL`; a
+ceded-premium clause attaches the Gross / Ceded / Net waterfall as ``pnl.tower``
+(reached as the ``pnl.margin_df`` exhibit). Portfolios / bivariates of
 ``pnl`` units are deferred (book-level P&L), and rejected with a clear error.
 
 Covers: the PnL / PnLTower return types, the three exposure forms (lr / claims /
@@ -261,7 +262,7 @@ def test_bivariate_with_pnl_component_rejected():
 # ----------------------------------------------------------------------
 # summary_df: one row per leg, EX magnitudes + the signed result
 # ----------------------------------------------------------------------
-_SUMMARY_COLS = ['EX', '% Consid', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
+_SUMMARY_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99']
 
 
 def test_summary_df_leg_rows_and_additive_result():
@@ -271,13 +272,14 @@ def test_summary_df_leg_rows_and_additive_result():
     assert list(df.index) == ['consideration', 'loss', 'margin']
     assert list(df.columns) == _SUMMARY_COLS
     assert df.loc['consideration', 'EX'] == pytest.approx(1000.0)
-    assert df.loc['consideration', 'SD'] == pytest.approx(0.0, abs=1e-2)  # constant
+    # a constant consideration renormalizes to SD exactly 0 (no spurious spread)
+    assert df.loc['consideration', 'SD'] == 0.0
     assert df.loc['loss', 'EX'] == pytest.approx(700.0, rel=TOL)   # a magnitude
     # the defining identity: result EX = consideration EX - obligation EX
     assert df.loc['margin', 'EX'] == pytest.approx(
         df.loc['consideration', 'EX'] - df.loc['loss', 'EX'], abs=1e-6)
-    # % Consid divides by E[Total consideration]
-    assert df.loc['loss', '% Consid'] == pytest.approx(0.70, rel=TOL)
+    # Scaled divides by E[Total consideration]
+    assert df.loc['loss', 'Scaled'] == pytest.approx(0.70, rel=TOL)
     # the margin SD is the loss SD (constant consideration adds no spread)
     assert df.loc['margin', 'SD'] == pytest.approx(df.loc['loss', 'SD'])
 
@@ -367,19 +369,21 @@ _REINS = 'agg R 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 x
 
 
 def test_gcn_means_add_and_impact():
-    """gcn_df: EX adds across the split (net = gross + ceded); impact = net - gross.
+    """margin_df: EX adds across the split (net = gross + ceded); impact = net - gross.
 
     The agg-only example has columns ``gross | ceded | net | impact``. On the
     ``EX`` row the signed leg results add across the Gross/Ceded/Net split
     (``EX[gross] + EX[ceded] == EX[net]``, the covariance carried per atom); the
-    ``impact`` column is ``net - gross`` per statistic.
+    ``impact`` column is ``net - gross`` per statistic. The waterfall lives on the
+    PnL's ``margin_df`` and the tower is reachable via ``.tower``.
     """
-    tower = build(_REINS).make_pnl(gross=5500, ceded=1800)
-    assert isinstance(tower, PnLTower)
-    g = tower.gcn_df
+    pnl = build(_REINS).make_pnl(gross=5500, ceded=1800)
+    assert isinstance(pnl, PnL)
+    assert isinstance(pnl.tower, PnLTower)
+    g = pnl.margin_df
     assert list(g.columns) == ['gross', 'ceded', 'net', 'impact']
     assert list(g.index) == ['EX', 'SD', 'CV', 'Skew',
-                             'P01', 'P05', 'P10', 'P25', 'P50', 'P75', 'P90',
+                             'P1', 'P5', 'P10', 'P25', 'P50', 'P75', 'P90',
                              'P95', 'P99']
     # means add across the split (EX row only)
     assert g.loc['EX', 'net'] == pytest.approx(
@@ -388,26 +392,27 @@ def test_gcn_means_add_and_impact():
     assert g.loc['EX', 'impact'] == pytest.approx(
         g.loc['EX', 'net'] - g.loc['EX', 'gross'], abs=1e-6)
     # the resolved economics carry the scalar-API premiums
-    assert tower.economics['gross'] == pytest.approx(5500.0)
-    assert tower.economics['ceded'] == pytest.approx(1800.0)
+    assert pnl.tower.economics['gross'] == pytest.approx(5500.0)
+    assert pnl.tower.economics['ceded'] == pytest.approx(1800.0)
 
 
 def test_gcn_summary_df_is_net_perspective():
-    """The tower's summary_df is the NET perspective's PnL headline table.
+    """The PnL's summary_df is the NET perspective's headline table.
 
-    The additive GCN waterfall is the separate :attr:`PnLTower.gcn_df` exhibit;
-    the headline ``summary_df`` forwards the net perspective's leg table (same
-    8 columns), whose net premium defaults to ``gross - ceded``.
+    The additive GCN waterfall is the separate :attr:`PnL.margin_df` exhibit;
+    the headline ``summary_df`` is the net perspective's leg table (same
+    8 columns), whose net premium defaults to ``gross - ceded`` and whose result
+    row is the uniform ``margin`` label.
     """
     p = build(_REINS).make_pnl(gross=5500, ceded=1800)
     sdf = p.summary_df
     assert list(sdf.columns) == _SUMMARY_COLS
     assert list(sdf.index) == ['premium', 'loss', 'expense',
-                               'Total obligation', 'net_agg']
+                               'Total obligation', 'margin']
     # net premium defaults to gross - ceded = 3700
     assert sdf.loc['premium', 'EX'] == pytest.approx(3700.0)
-    # the GCN waterfall exhibit is still reachable on its own
-    assert list(p.gcn_df.columns) == ['gross', 'ceded', 'net', 'impact']
+    # the GCN waterfall exhibit is still reachable via margin_df
+    assert list(p.margin_df.columns) == ['gross', 'ceded', 'net', 'impact']
 
 
 def test_gcn_net_override():
@@ -417,14 +422,15 @@ def test_gcn_net_override():
 
 
 def test_gcn_net_leg_drives_moments():
-    """Net is the headline: it drives summary_df / moments / q."""
+    """Net is the headline: the returned PnL *is* the net, driving summary_df / moments / q."""
     agg = build(_REINS)
     p = agg.make_pnl(gross=5500, ceded=1800)
     e_net = float((agg.xs * agg.agg_density_net).sum())
-    assert p.net.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
-    # the net leg is the tower's headline
-    assert p.summary_df.loc['net_agg', 'EX'] == pytest.approx(p.net.mean)
-    assert p.q(0.5) == pytest.approx(p.net.q(0.5))
+    assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
+    # the net (margin) result is the headline
+    assert p.summary_df.loc['margin', 'EX'] == pytest.approx(p.mean)
+    # q delegates to the net result GridDistribution
+    assert p.q(0.5) == pytest.approx(p.gd.q(0.5))
 
 
 def test_net_only_on_reins_agg():

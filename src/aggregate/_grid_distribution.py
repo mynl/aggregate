@@ -263,6 +263,27 @@ class GridDistribution:
                    bs, name or (ser.name if ser.name is not None else ''),
                    is_loss_value)
 
+    def to_series(self, name=None):
+        """The mass as a ``pd.Series`` ``outcome -> prob`` (index = ``x``).
+
+        The thin Series view a :class:`~aggregate.PnL` ``density_df`` iterates
+        over: a GD on its own (possibly irregular, exact) grid, ready to plot or
+        tabulate without stapling onto a shared grid. The index is named
+        ``'outcome'``; the series is named ``name`` (defaults to the GD's name).
+
+        Parameters
+        ----------
+        name : str, optional
+            Series name; defaults to :attr:`name`.
+
+        Returns
+        -------
+        pandas.Series
+            Index = outcomes ``x`` (named ``'outcome'``), values = mass ``p``.
+        """
+        return pd.Series(self._p, index=pd.Index(self._x, name='outcome'),
+                         name=name if name is not None else (self.name or None))
+
     def __repr__(self):
         nm = f' {self.name!r}' if self.name else ''
         bs = '' if self.bs is None else f', bs={self.bs:g}'

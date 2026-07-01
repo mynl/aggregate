@@ -1,6 +1,37 @@
 # Plan — `create_pnl`: a domain-agnostic P&L API over the pushforward engine
 
-> **Status: DRAFT — not executed.** Author insight (2026-06-30): DecL is
+> **Status: EXECUTING (2026-06-30).** Author decision: **relax the
+> `gcn_df` byte-identical bar to "new-canonical."** The single blocking gap in the
+> draft was that a *generic* `create_pnl_tower` cannot re-emit the legacy
+> `gcn_df` multi-section exhibit (`Mean/Ratio/Volatility/UW%ile` + `*impact`
+> columns, built by `gcn_assemble_column`) byte-identical. Resolution: **`gcn_df`
+> adopts the new FCC tower schema** (legs + running net + one-step/total deltas,
+> stats as rows), its test files are **rewritten to the new shape**, and the
+> byte-identical guarantee is **dropped** (published exhibit output changes by
+> design). Wherever this plan says "byte-identical `gcn_df`" / "the final frame
+> equals today's `gcn_df`," read it as **"the tower reproduces the cascade
+> *semantically* in the new schema."** `gcn_assemble_column` and the hand-rolled
+> `_gcn_*` are deleted as planned; nothing has to reproduce them.
+>
+> **Insurance-rewire decisions (2026-06-30, settled before execution):**
+> 1. **`validation_df` keeps a real audit.** A `create_pnl` leg is an *exact*
+>    group-by (no rebucketing), so EX==Est and an exact-vs-rebucketed audit would
+>    be vacuous. So `ReinstatementAnalysis` **retains its rebucketed
+>    `source.pushforward` distributions** (via the *kept* primitives
+>    `BivariateDistribution.pushforward` / `pushforward_1d` — not `InsuranceView`)
+>    **alongside** the exact tower legs, so `validation_df` stays meaningful. This
+>    is also why deleting `legs.py` / `_insurance_view.py` is unaffected: the
+>    rebucketed path is a primitive, not the View.
+> 2. **`build('pnl …')` returns a tower for GCN / reins / variable.** A plain
+>    single-leg `pnl` returns a `PnL`; any cession (gcn / reins / variable / retro)
+>    returns the `PnLTower` / analysis object that carries `.gcn_df` and forwards
+>    the net leg's value-object surface (`summary_df` / `density_df` / `q` /
+>    `plot`).
+> 3. **Analysis `summary_df` / `tail_df` keep their current shapes** (Gross /
+>    Ceded / Net / Impact / Pct-Impact), re-sourced from the tower legs — they do
+>    **not** adopt §1's new FCC `summary_df` columns.
+>
+> **Status (original): DRAFT — not executed.** Author insight (2026-06-30): DecL is
 > *expressly* an insurance language and will **not** soon express power
 > generation, crop revenue, or ALM. The cross-domain vehicle is the **Python
 > `PnL` API**, not the grammar. So: keep DecL insurance-only (**no DecL changes

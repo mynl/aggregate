@@ -81,19 +81,19 @@ def plot_distortion(dist, xs=None, n=101, both=True, ax=None, plot_points=True,
     if c_dual is None:
         c_dual = 'C1'
     if scale == 'linear':
-        ax.plot(xs, y1, c=c, label=dist.name, **kwargs)
+        ax.plot(xs, y1, c=c, label=dist.display_name, **kwargs)
         if both:
             ax.plot(xs, y2, c=c_dual, label='$g\\check$', **kwargs)
         ax.plot(xs, xs, color='k', lw=0.5, alpha=0.5)
     elif scale == 'return':
-        ax.plot(xs, y1, c=c, label=dist.name, **kwargs)
+        ax.plot(xs, y1, c=c, label=dist.display_name, **kwargs)
         if both:
-            ax.plot(xs, y2, c=c_dual, label=f'Dual {dist.name}', **kwargs)
+            ax.plot(xs, y2, c=c_dual, label=f'Dual {dist.display_name}', **kwargs)
         ax.set(xscale='log', yscale='log',
                xlim=[1 / 5_000, 1], ylim=[1 / 5_000, 1])
         ax.plot(xs, xs, color='k', lw=0.5, alpha=0.5)
 
-    ax.set(title=dist.name, aspect='equal')
+    ax.set(title=dist.display_name, aspect='equal')
     if scale == 'linear':
         ax.set(xticks=np.linspace(0, 1, 6),
                yticks=np.linspace(0, 1, 6))

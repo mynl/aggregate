@@ -48,6 +48,7 @@ import numpy as np
 import pandas as pd
 
 from .moments import VALIDATION_NOISE, _snap_noise
+from ._labeled import LabeledMixin
 
 __all__ = ['create_pnl', 'create_pnl_tower', 'PnL', 'PnLTower']
 
@@ -252,7 +253,7 @@ _UNSCALABLE_STATS = frozenset({'CV', 'Skew'})
 # ----------------------------------------------------------------------
 # The P&L value object
 # ----------------------------------------------------------------------
-class PnL:
+class PnL(LabeledMixin):
     """A profit-and-loss position: consideration legs, obligation legs, a result.
 
     A lightweight value object -- signed leg distributions + their exact moments
@@ -294,14 +295,14 @@ class PnL:
 
     def __init__(self, *, name, role, probs, consideration, obligation,
                  result_name, bs=None, stochastic_engine=None, scale=None,
-                 display_label=None):
+                 display_label=None, label_map=None):
         if role not in ('sell', 'buy'):
             raise ValueError(f"role must be 'sell' or 'buy', got {role!r}.")
         self.name = name
-        #: Optional human display label (the DecL ``as`` clause). Presentation
-        #: only -- preferred over ``name`` in repr / exhibit titles via
-        #: :attr:`display_name`; ``name`` stays the identity handle.
-        self.display_label = display_label
+        # Object-level display label + interior label_map (leg-level labels ride
+        # on the consideration / obligation dict keys). Presentation only;
+        # ``name`` stays the identity handle. See dev/plan-labels.md.
+        self._init_labels(display_label=display_label, label_map=label_map)
         self.role = role
         self.result_name = result_name
         # Normalize the shared probability vector so it sums to exactly 1: a
@@ -686,14 +687,8 @@ class PnL:
         from .plots import plot_pnl
         return plot_pnl(self, axd=axd, **kwargs)
 
-    @property
-    def display_name(self):
-        """The human display label if set (the DecL ``as`` clause), else ``name``.
-
-        Presentation only -- repr / exhibit titles prefer it; ``name`` stays the
-        identity handle. See dev/plan-decl-labels.md.
-        """
-        return self.display_label or self.name
+    # ``display_name`` comes from ``LabeledMixin`` (the shared label surface);
+    # ``name`` stays the identity handle. See dev/plan-labels.md.
 
     def __repr__(self):
         nc = len(self._cons)

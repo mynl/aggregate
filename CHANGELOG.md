@@ -1,5 +1,61 @@
 # Changelog
 
+## 1.0.0a128
+
+**[DecL-Labels-Everywhere]** — broaden DecL `as` labels to interior sub-object
+sites, route Portfolio exhibits through them, and give every labelable class one
+shared label surface. Follow-on to the a124 `[DecL-Labels]` object-level pass.
+Pure presentation — **no computed value changes**; labels land in attributes,
+dict keys, and rendered text, never in the FFT. (Phases 0–4 of
+`dev/plan-labels.md`; the S4/S5 mixture-component and frequency labels stay
+deferred.)
+
+- **One `LabeledMixin`** (`_labeled.py`, the repo's first mixin) now carries the
+  whole label surface — `display_label`, the resolved `display_name` property, the
+  interior `label_map` + read-only `labels` namespace view, the `renamer` property,
+  and the per-object `use_labels` switch (default `True`; the setter invalidates the
+  cached renamer). Mixed into `Aggregate`, `Portfolio`, `PnL`, `Severity`, and
+  `Distortion` via an explicit `self._init_labels(...)` (no cooperative `super()` —
+  `Severity` sits on a heavy scipy base). The four a124 classes lost their
+  duplicated `display_label`/`display_name`/`_title_name` copies.
+- **Interior labels** — the `as "..."` clause now names three sub-object sites
+  inside an `agg` body, gathered into `Aggregate.label_map` and read back via the
+  `labels` namespace (`a.labels.exposure`, `a.labels.layer`, `a.labels.severity`):
+  - **exposure** (S1) — `10000 premium as "GWP 2026" at 0.65 lr` (mid-clause, right
+    after the amount; end-clause for bare `claims` / `loss`).
+  - **inline severity clause** (S3) — `sev lognorm 100 cv 2 as "ISO ME B"`.
+  - **occurrence layer** (S2) — `1000 xs 500 as "Working Layer"` (guarded by an
+    explicit ambiguity test vs. the following severity clause).
+  Round-trips through `decl_writer`. Bivariate / clash reuse the shared productions
+  but are out of scope, so their temp label keys are stripped.
+- **Portfolio exhibits route through labels (Phase 4).** Each object now exposes a
+  `renamer` (`{handle: display}`) and a `use_labels` switch (default on); the mixin
+  applies the renamer as a final `df.rename()` on a **copy** at the display
+  boundary, so canonical (handle-keyed) frames and any compute/join that keys off
+  the handle are untouched (D2). For a **Portfolio** the axis is its member units
+  (+ `total`), each mapped to its member Aggregate's `display_name`; a labeled unit
+  shows its label in `summary_df`, `unit_density_df` /
+  `aligned_unit_density_df`, the `analyze_distortion(s)` pricing frames, and the
+  `plot` legend, while an **unlabeled portfolio is unchanged** (identity renamer).
+  Ordering always keys off the handle — the label rides in via the order-preserving
+  `rename`, so relabeling can never reorder an exhibit (D4). `Portfolio.unit_renamer`
+  is now a thin alias for `renamer`; its old name-guessing heuristic (`.`/`:`
+  title-casing, `X1` → TeX subscripting) is **removed** (it had no internal callers).
+- **Distortion naming realigned (D6, breaking for direct attribute users).** The
+  old inverted scheme (`name` property returning the label, a mandatory
+  `display_name` **attribute** holding it) is gone. Now `name` = the kind handle
+  (`'ph'`), `display_label` = the optional explicit label, and `display_name` =
+  the resolved property (`display_label` → auto-pretty `'PH(0.9)'` derived default
+  → handle). `str`/`repr` show the pretty form. The ~20 factory shortcuts no longer
+  pass `display_name=`; the pretty strings moved into per-subclass
+  `_display_default()`. Construction keyword `display_name=` → `display_label=`
+  across `Distortion` and the `approx_ccoc` / `convex_distortion` / `bagged_distortion`
+  helpers. Exhibit/plot/cache-key readers of a distortion's old `.name` were
+  repointed at `.display_name` (notably the augmented-frame cache key, so
+  `TVaR(0.9)` and `TVaR(0.99)` stay distinct). Directly-constructed distortions now
+  get the auto-pretty label too, so a bare `PHDistortion(a=0.7)` and
+  `Distortion.ph(0.7)` share an `id()` (previously differed).
+
 ## 1.0.0a127
 
 **[Test-Speed-SOP]** — parallel-by-default test suite and a fast local loop.

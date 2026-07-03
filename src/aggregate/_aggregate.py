@@ -37,6 +37,7 @@ from .utilities import (ft, ift,
                         balanced_window,
                         agg_help, remove_fuzz, value_type_role)
 from ._grid_distribution import GridDistribution, return_period_map, period_to_p
+from ._labeled import LabeledMixin
 from .decl_writer import format_program, spec_to_decl
 import aggregate.random_agg as ar
 from .spectral import choquet_weights
@@ -406,7 +407,7 @@ _STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
 )
 
 
-class Aggregate:
+class Aggregate(LabeledMixin):
     """Compound (aggregate) probability distribution.
 
     Implements the FFT-based algorithm of Mildenhall (2024): discretize
@@ -1521,7 +1522,7 @@ class Aggregate:
                  reins_bucket=None, dsev_bucket=None,
                  value_type='loss',
                  approximate='exact',
-                 display_label=None,
+                 display_label=None, label_map=None,
                  note='', hints=''):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
@@ -1716,10 +1717,11 @@ class Aggregate:
         self.agg_reins = agg_reins
         self.agg_kind = agg_kind
         self.agg_reins_label = agg_reins_label
-        # Optional human display label (the DecL ``as`` clause). Presentation only
-        # -- repr / exhibit titles prefer it over ``name`` (see ``display_name``);
-        # ``name`` remains the identity / reference handle. See dev/plan-decl-labels.md.
-        self.display_label = display_label
+        # Object-level display label + interior label_map (exposure / layer /
+        # severity clause / cessions). Presentation only -- repr / exhibit titles
+        # and the exhibit ``renamer`` read these; ``name`` stays the identity /
+        # reference handle. See dev/plan-labels.md ([DecL-Labels-Everywhere]).
+        self._init_labels(display_label=display_label, label_map=label_map)
         self.sev_pick_attachments = sev_pick_attachments
         self.sev_pick_losses = sev_pick_losses
 
@@ -2213,21 +2215,8 @@ class Aggregate:
     # Repr / info / help — string and HTML representations
     # ================================================================
 
-    @property
-    def display_name(self):
-        """The human display label if set (the DecL ``as`` clause), else ``name``.
-
-        Presentation only -- repr and exhibit titles prefer it; ``name`` stays the
-        identity / reference handle. See dev/plan-decl-labels.md.
-        """
-        return self.display_label or self.name
-
-    @property
-    def _title_name(self):
-        """Exhibit-title form: ``label (name)`` when a display label is set, so the
-        human label leads while the identity handle stays visible; else ``name``."""
-        return f'{self.display_label} ({self.name})' if self.display_label \
-            else self.name
+    # ``display_name`` / ``_title_name`` come from ``LabeledMixin`` (the shared
+    # label surface); ``name`` stays the identity handle. See dev/plan-labels.md.
 
     def __repr__(self):
         """
@@ -3658,7 +3647,7 @@ class Aggregate:
             return
         if getattr(dist, 'has_mass', False) and not self.bounded:
             raise ValueError(
-                f'mass distortion ({dist.name}) on an unbounded aggregate: '
+                f'mass distortion ({dist.display_name}) on an unbounded aggregate: '
                 f'the mass lands on the last represented bucket, a '
                 f'different bounded problem. Certify `bounded = True` if '
                 f'the support is in fact bounded.')

@@ -648,3 +648,12 @@ pnl LB.OneGroup 1000 premium less agg LB.OneGroup_e 850 loss sev lognorm 100 cv 
 pnl LB.TwoGroups 1000 premium less agg LB.TwoGroups_e 850 loss sev lognorm 100 cv 1 poisson less 25% premium expense 200 fixed expense      note{juxtaposition -> two separate expense legs};
 pnl LB.Labeled 1000 premium less agg LB.Labeled_e 850 loss sev lognorm 100 cv 1 poisson less 25% premium expense as acq 30% loss expense as lae note{labeled expense groups};
 pnl LB.CatXL 1000 premium less agg LB.CatXL_e 850 loss sev lognorm 100 cv 1 occurrence net of 100 xs 200 deposit 50 as "Cat XL" poisson  note{reins-cession label -> margin_df column};
+# [DecL-Labels-Everywhere]: interior sub-object labels -> Aggregate.label_map,
+# read back through the `labels` namespace (a.labels.exposure / .layer / .severity).
+# exposure label sits mid-clause (after the amount, before `at ... lr/rate`);
+# layer and inline-severity labels append after their clause. See dev/plan-labels.md.
+agg LB.Exposure 10000 premium as "GWP 2026" at 0.65 lr 1000 xs 0 sev lognorm 100 cv 2 poisson                          note{exposure label, mid-clause -> label_map[exposure]};
+agg LB.Claims 100 claims as "Claim count" sev lognorm 100 cv 2 poisson                                                 note{claims exposure label, end-clause};
+agg LB.Layer 100 claims 1000 xs 500 as "Working Layer" sev lognorm 100 cv 2 poisson                                    note{layer label -> label_map[layer]; S2 ambiguity guard vs following sev};
+agg LB.SevClause 100 claims sev lognorm 100 cv 2 as "ISO ME B" poisson                                                 note{inline severity-clause label -> label_map[severity]};
+agg LB.AllInterior 10000 premium as GWP at 0.65 lr 1000 xs 500 as "Layer 1" sev lognorm 100 cv 2 as "ISO" poisson      note{all three interior labels combine};

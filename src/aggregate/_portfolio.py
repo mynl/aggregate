@@ -41,6 +41,7 @@ from .utilities import (ft, ift,
                         agg_help, explain_validation,
                         remove_fuzz as remove_fuzz_util)
 from ._grid_distribution import GridDistribution
+from ._labeled import LabeledMixin
 from ._aggregate import return_period_frame, SUMMARY_PERCENTILES
 from . import _pricing
 from . import _reinsurance
@@ -89,7 +90,7 @@ _PORT_STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
 )
 
 
-class Portfolio(object):
+class Portfolio(LabeledMixin):
     """
     Portfolio creates and manages a portfolio of Aggregate objects each modeling one
     unit of business. Applications include
@@ -100,7 +101,7 @@ class Portfolio(object):
 
     """
 
-    def __init__(self, name, spec_list, uw=None, display_label=None):
+    def __init__(self, name, spec_list, uw=None, display_label=None, label_map=None):
         """
         Create a new :class:`Portfolio` object.
 
@@ -120,10 +121,10 @@ class Portfolio(object):
         :returns:  new :class:`Portfolio` object.
         """
         self.name = name
-        #: Optional human display label (the DecL ``as`` clause). Presentation
-        #: only -- repr / exhibit titles prefer it via :attr:`display_name`;
-        #: ``name`` stays the identity handle. See dev/plan-decl-labels.md.
-        self.display_label = display_label
+        # Object-level display label + interior label_map (unit-level labels
+        # ride on the member Aggregates). Presentation only; ``name`` stays the
+        # identity handle. See dev/plan-labels.md ([DecL-Labels-Everywhere]).
+        self._init_labels(display_label=display_label, label_map=label_map)
         self.agg_list = []
         self.unit_names = []
         self._valid = None
@@ -274,7 +275,8 @@ class Portfolio(object):
         self._remove_fuzz = 0
         self.discretization_calc = ''
         self.normalize = None
-        self._unit_renamer = None
+        # ``renamer`` (the label-sourced unit -> display map) is provided by
+        # LabeledMixin and cached in ``self._renamer`` (set by _init_labels).
         # if created by uw it stores the program here
         self.program = ''
         self.distortions = None
@@ -574,21 +576,8 @@ class Portfolio(object):
             float_cols = df.select_dtypes(include=['float64']).columns
             df[float_cols] = remove_fuzz_util(df, eps)[float_cols]
 
-    @property
-    def display_name(self):
-        """The human display label if set (the DecL ``as`` clause), else ``name``.
-
-        Presentation only -- repr / exhibit titles prefer it; ``name`` stays the
-        identity handle. See dev/plan-decl-labels.md.
-        """
-        return self.display_label or self.name
-
-    @property
-    def _title_name(self):
-        """Exhibit-title form: ``label (name)`` when a display label is set, else
-        ``name`` -- the human label leads, the identity handle stays visible."""
-        return f'{self.display_label} ({self.name})' if self.display_label \
-            else self.name
+    # ``display_name`` / ``_title_name`` come from ``LabeledMixin`` (the shared
+    # label surface); ``name`` stays the identity handle. See dev/plan-labels.md.
 
     def __repr__(self):
         """
@@ -1273,6 +1262,10 @@ class Portfolio(object):
         blocks.append(total)
         keys.append('total')
         df = pd.concat(blocks, keys=keys, names=['unit', 'X'])
+        # Route the unit axis through the label renamer for display (D2/D4); a
+        # no-op for an unlabeled portfolio (identity map). Reattach ``attrs``
+        # since ``rename`` returns a fresh frame.
+        df = self._relabel(df)
         df.attrs['mean'] = m
         return df
 
@@ -2516,7 +2509,9 @@ class Portfolio(object):
                               'x_min', 'x_max', 'mass']])
         out = pd.concat(blocks)
         out = out.set_index(['unit', 'loss'], drop=False)
-        return out
+        # Relabel the display ``unit`` index level; the ``unit`` data column keeps
+        # the handle as the join key (D2). No-op for an unlabeled portfolio.
+        return self._relabel(out)
 
     def aligned_unit_density_df(self, grid='total', *,
                                 allow_window_mismatch=False):
@@ -2602,7 +2597,8 @@ class Portfolio(object):
                 f'grid -- {"; ".join(mismatched)}. This view is a clipped '
                 f'display artifact; pass allow_window_mismatch=True to '
                 f'acknowledge.', stacklevel=2)
-        return out
+        # A display adapter -- relabel the unit axis (no-op when unlabeled).
+        return self._relabel(out)
 
     def plot(self, axd=None, figsize=(2 * FIG_W, FIG_H)):
         """
@@ -2738,7 +2734,10 @@ class Portfolio(object):
         """
         if isinstance(distortion, str):
             distortion = self.distortions[distortion]
-        name = distortion.name
+        # display_name is the label-or-pretty-or-kind resolver; it keys the cache
+        # so distortions of the same kind but different shape (TVaR(0.9) vs
+        # TVaR(0.99)) stay distinct -- the bare kind handle would collide.
+        name = distortion.display_name
         key = (name, view, self._is_loss_value, S_calculation, allocation)
         if key not in self._augmented_dfs:
             self._augmented_dfs[key] = self._build_augmented(
@@ -3303,7 +3302,7 @@ class Portfolio(object):
         # one-row audit, same orientation as every other readout: descriptors
         # (dname/dshape) lead, the pentagon octet is the trailing [-8:].
         audit_df = pd.DataFrame(
-            {'dname': distortion.name, 'dshape': distortion.shape,
+            {'dname': distortion.display_name, 'dshape': distortion.shape,
              'L': pricing_df.loc['total', 'L'],
              'M': pricing_df.loc['total', 'M'],
              'P': pricing_df.loc['total', 'P'],
@@ -3311,10 +3310,13 @@ class Portfolio(object):
             index=pd.Index(['total'], name='unit'),
         )
         audit_df = complete_pentagon(audit_df)
+        # Route the unit axis of the display frames through the label renamer
+        # (D2/D4); computed above off the handle-keyed frame, so no-op for an
+        # unlabeled portfolio.
         return AnalyzeDistortionResult(
             distortion=distortion,
-            pricing_df=pricing_df,
-            audit_df=audit_df,
+            pricing_df=self._relabel(pricing_df),
+            audit_df=self._relabel(audit_df),
         )
 
     def analyze_distortions(self, *, p=None, a=None, distortions=None):
@@ -3417,44 +3419,43 @@ class Portfolio(object):
         }
         return AnalyzeDistortionsResult(
             distortions=dict(distortions),
-            pricing_df=pricing_df,
+            # Route the unit columns of the display exhibit through the label
+            # renamer (D2/D4); no-op for an unlabeled portfolio. The cached
+            # ``augmented_dfs`` stay handle-keyed (compute view).
+            pricing_df=self._relabel(pricing_df),
             augmented_dfs=augmented_dfs,
         )
 
 
+    # ------------------------------------------------------------------
+    # Label surface (LabeledMixin hooks) -- the exhibit axis is the member
+    # units plus ``total``; each unit's label is its member Aggregate's
+    # resolved ``display_name``. See dev/plan-labels.md ([DecL-Labels-Everywhere]).
+    # ------------------------------------------------------------------
+    def _label_handles(self):
+        """The exhibit axis: member-unit handles plus ``total``."""
+        return list(self.unit_names_ex)
+
+    def _resolve_handle_label(self, handle):
+        """A unit handle -> its member Aggregate's resolved display label
+        (label -> name). ``total`` and any non-unit handle fall back to
+        themselves, so an unlabeled portfolio's exhibits are unchanged."""
+        for a in self.agg_list:
+            if a.name == handle:
+                return a.display_name
+        return handle
+
     @property
     def unit_renamer(self):
+        """Deprecated alias for :attr:`renamer` (the label-sourced ``{handle:
+        display}`` map units render through).
+
+        The old handle-guessing heuristic (``.`` / ``:`` title-casing, ``X1`` ->
+        TeX subscripting) was removed in ``1.0.0a128`` -- an explicit
+        ``as "..."`` label on the member unit now supplies the display name, and
+        an unlabeled unit falls back to its handle. See dev/plan-labels.md D4.
         """
-        plausible defaults for nicer looking names
-
-        replaces . or : with space and capitalizes (generally don't use . because it messes with
-        analyze distortion....
-
-        leaves : alone
-
-        converts X1 to tex
-
-        converts XM1 to tex with minus (for reserves)
-
-        :return:
-        """
-        def rename(ln):
-            # guesser ...
-            if ln == 'total':
-                return 'Total'
-            if ln.find('.') > 0:
-                return ln.replace('.', ' ').title()
-            if ln.find(':') > 0:
-                return ln.replace(':', ' ').title()
-            # numbered units
-            ln = re.sub('([A-Z])m([0-9]+)', r'$\1_{-\2}$', ln)
-            ln = re.sub('([A-Z])([0-9]+)', r'$\1_{\2}$', ln)
-            return ln
-
-        if self._unit_renamer is None:
-            self._unit_renamer = { ln: rename(ln) for ln in self.unit_names_ex}
-
-        return self._unit_renamer
+        return self.renamer
 
     def nice_program(self, wrap_col=90):
         """

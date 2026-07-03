@@ -56,6 +56,22 @@
    value — object-level `sev` label delivered). Landed **before**
    `[PnL-Engine-Source]` so that plan's program sweep is written once against final
    syntax. DecL grammar extended (additive).
+1d. **[DecL-Labels-Everywhere]** ✅ **DONE (`1.0.0a128`, `dev/plan-labels.md`,
+   Phases 0–4).** Broadened the `as "…"` label to three interior sub-object sites
+   (exposure — mid-clause; occurrence layer; inline severity clause) → gathered
+   into `Aggregate.label_map`, read via the `labels` namespace (`a.labels.exposure`
+   / `.layer` / `.severity`); full unparser round-trip; S2 layer ambiguity guarded
+   by a test. All five labelable classes (`Aggregate` / `Portfolio` / `PnL` /
+   `Severity` / `Distortion`) now share one `LabeledMixin` (the repo's first mixin;
+   `_labeled.py`). Distortion naming realigned (D6): `name` = kind handle,
+   `display_name` = resolved property (label → auto-pretty → handle). Portfolio
+   exhibits (`summary_df`, unit-density frames, `analyze_distortion(s)` pricing
+   frames, `plot` legend) route the unit axis through a label-sourced `renamer`
+   (per-object `use_labels` switch, default on); `unit_renamer`'s heuristic
+   removed. Presentation-only, no computed value changes. **Deferred to a future
+   pass (D3):** **S4** per-component labels inside a *mixture* severity (invasive
+   severity mini-language — still the a124 deferral above) and **S5** frequency
+   labels (low value). Plan retains Phases 5–6 for that pass.
 2. **[PnL-Engine-Source]** ✅ **DONE** `1.0.0a125` — a P&L wraps a **complete**
    engine (`pnl NAME <prem> less <agg|agg.NAME|port.NAME> [less <expenses>]`);
    deleted the "half-baked agg inside a pnl" fork, added `inherit premium` /

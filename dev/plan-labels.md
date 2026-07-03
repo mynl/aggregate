@@ -1,7 +1,19 @@
 # Plan — [DecL-Labels-Everywhere]: labels as namespaces, and their exhibit integration
 
-Status: **READY** (2026-07-03; D1–D6 settled; delivery via a shared `LabeledMixin`
-— D7). Follow-on to `dev/done/plan-decl-labels.md`
+Status: **DONE (Phases 0–4)** — landed `1.0.0a128`, all green (2143 tests + the
+`dev/FEATURES.csv` audit). Phase 0 (`LabeledMixin` + object model), Phases 1–3
+(exposure / severity-clause / layer interior labels + grammar + unparser +
+round-trip), Phase 3b (Distortion D6 realignment), **Phase 4** (Portfolio exhibit
+`renamer` sweep: `summary_df`, unit-density frames, `analyze_distortion(s)` pricing
+frames, `plot` legend; `use_labels` switch; `unit_renamer` heuristic retired).
+Narrowed during execution: `unit_renamer` had **no internal callers** and PnL legs
+already carry their labels from a124, so Phase 4 was Portfolio-only. The interior
+labels (exposure/layer/severity) are stored + introspectable via `a.labels`; no
+dedicated per-unit interior-label breakdown exhibit yet (a natural follow-on).
+**Phases 5–6 (S4 mixture-component / S5 frequency labels) remain deferred (D3).**
+
+Original status: **READY** (2026-07-03; D1–D6 settled; delivery via a shared
+`LabeledMixin` — D7). Follow-on to `dev/done/plan-decl-labels.md`
 (`[DecL-Labels]`, landed `1.0.0a124`). That pass delivered *object-level* labels
 and three special sites; this pass is the two things it left on the table, both
 of which the author explicitly asked for:

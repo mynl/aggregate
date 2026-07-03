@@ -29,7 +29,11 @@ df-bounds,weight_df,attribute,DataFrame,Bracketing-pair weights,,,,,,,,,Y,
 str-narrative,info,property,str,Fixed-layout multi-line object summary (text),Y,Y,Y,,Y,,,,,WRINKLE: not on PnL/Severity/Frequency.
 str-narrative,name,attribute,str,Object name,Y,Y,Y,Y,,,Y,,Y,Frequency has no name.
 str-narrative,display_label,attribute,str,Optional human display label from the DecL 'as' clause (None if unset) [DecL-Labels],Y,Y,,Y,,,Y,,,"a124. Presentation only; None falls back to name. Not on Biv/Frequency/analyses."
-str-narrative,display_name,property,str,Display label if set else name (repr/exhibit titles prefer it) [DecL-Labels],Y,Y,,Y,,,Y,,,"a124. Pairs with display_label."
+str-narrative,display_name,property,str,Display label if set else name (repr/exhibit titles prefer it) [DecL-Labels],Y,Y,,Y,,,Y,,,"a124/a128. Now resolves label -> derived default -> handle via LabeledMixin (Distortion too, not a column here)."
+str-narrative,label_map,attribute,dict,Interior sub-object labels keyed by site (exposure/layer/severity) [DecL-Labels-Everywhere],Y,Y,,Y,,,Y,,,"a128. Via LabeledMixin. {} when no interior labels. Populated by the DecL 'as' clause on sub-object sites."
+str-narrative,labels,property,namespace,Read-only view over label_map: a.labels.exposure / .layer / .severity [DecL-Labels-Everywhere],Y,Y,,Y,,,Y,,,"a128. Via LabeledMixin. Missing sites resolve to None, never raise."
+str-narrative,renamer,property,dict,"{handle: display} map exhibits rename through at serve time [DecL-Labels-Everywhere]",Y,Y,,Y,,,Y,,,"a128. Via LabeledMixin. Portfolio -> units(+total); identity for an unlabeled object. Portfolio.unit_renamer is a thin alias."
+state,use_labels,property,bool,Per-object switch: serve relabeled exhibits (default True; False = raw handles) [DecL-Labels-Everywhere],Y,Y,,Y,,,Y,,,"a128. Via LabeledMixin. Setter invalidates the cached renamer."
 str-narrative,value_type,property,str,Sign convention: 'loss' or 'payoff',Y,Y,,,,,,,,"Backed by _is_loss_value. Not on Severity (uses .signed), Biv (per-axis), or PnL (a122: the value object is always a payoff net)."
 str-narrative,pprogram,property,str,Canonical DecL program text (rendered from spec),Y,Y,,,,,,,,WRINKLE: not on Biv/PnL though both are DecL-built.
 str-narrative,pprogram_html,property,str,Syntax-highlighted DecL program for Jupyter,Y,Y,,,,,,,,

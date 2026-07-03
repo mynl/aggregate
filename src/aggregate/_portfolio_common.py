@@ -138,7 +138,7 @@ def build_augmented(port, dist, *, view='ask', S_calculation='forwards',
     if allocation == 'lifted' and mass_unbounded:
         raise ValueError(
             f"lifted allocation on an unbounded portfolio with a mass "
-            f"distortion ({dist.name}) is unstable on the right edge "
+            f"distortion ({dist.display_name}) is unstable on the right edge "
             f"(essentially all the distortion weight lands on the last "
             f"bucket). Use allocation='linear' or certify "
             f"`portfolio.bounded = True` if the support is in fact bounded.")

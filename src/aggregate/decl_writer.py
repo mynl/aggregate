@@ -297,13 +297,16 @@ def _render_dsev(spec: dict) -> str:
 
 def _render_sev_clause(spec: dict) -> str:
     """Render the severity clause of an aggregate: ``dsev``, ``sev`` or ``ssev``."""
+    # Interior ``severity`` label rides in ``label_map`` (dev/plan-labels.md S3),
+    # appended after the whole clause.
+    label = _render_label(spec.get('label_map', {}).get('severity'))
     if _is_dsev(spec):
-        return _render_dsev(spec)
+        return _render_dsev(spec) + label
     # A reflected severity is signed (negative support) and the parser now
     # rejects it under the clamped ``sev`` clause, so it must round-trip as
     # ``ssev`` regardless of the explicit ``sev_signed`` flag.
     kw = 'ssev' if (spec.get('sev_signed') or spec.get('sev_reflect')) else 'sev'
-    return f'{kw} {_render_dist(spec)}'
+    return f'{kw} {_render_dist(spec)}{label}'
 
 
 # ======================================================================
@@ -363,13 +366,16 @@ def _render_exposure(spec: dict) -> str:
     """
     if spec.get('freq_name') == 'empirical':
         return _render_dfreq(spec)
+    # Interior ``exposure`` label rides in ``label_map`` (dev/plan-labels.md S1);
+    # it prints right after the amount/keyword unit, before any ``at ... lr/rate``.
+    label = _render_label(spec.get('label_map', {}).get('exposure'))
     if 'exp_premium' in spec:
-        return (f'{_fmt_seq(spec["exp_premium"])} premium '
+        return (f'{_fmt_seq(spec["exp_premium"])} premium{label} '
                 f'at {_fmt_seq(spec["exp_lr"])} lr')
     if 'exp_el' in spec:
-        return f'{_fmt_seq(spec["exp_el"])} loss'
+        return f'{_fmt_seq(spec["exp_el"])} loss{label}'
     if 'exp_en' in spec:
-        return f'{_fmt_seq(spec["exp_en"])} claims'
+        return f'{_fmt_seq(spec["exp_en"])} claims{label}'
     return ''
 
 
@@ -380,7 +386,11 @@ def _render_layers(spec: dict) -> str:
     renders in the explicit ``xs`` form, which re-parses to the same vectors.
     """
     if 'exp_limit' in spec:
-        return f'{_fmt_seq(spec["exp_limit"])} xs {_fmt_seq(spec["exp_attachment"])}'
+        # Interior ``layer`` label rides in ``label_map`` (dev/plan-labels.md S2),
+        # appended after the ``xs`` clause.
+        label = _render_label(spec.get('label_map', {}).get('layer'))
+        return (f'{_fmt_seq(spec["exp_limit"])} xs '
+                f'{_fmt_seq(spec["exp_attachment"])}{label}')
     return ''
 
 

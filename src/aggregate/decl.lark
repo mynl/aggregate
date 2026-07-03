@@ -380,10 +380,13 @@ slide_anchor: expr AT expr   -> slide_anchor
 // Severity (continuous: scipy.stats wrappers)
 // ======================================================================
 
-sev_clause: SEV sev          -> sev_clause_sev
-          | SSEV sev         -> sev_clause_ssev
-          | dsev             -> sev_clause_dsev
-          | BUILTIN_SEV      -> sev_clause_builtin
+// ``display_label`` (optional ``as "..."``) names the inline severity clause;
+// appended as the last child (dev/plan-labels.md S3). AS is disjoint from what
+// follows a sev_clause (occ_reins / freq / agg_reins), so it is Earley-safe.
+sev_clause: SEV sev display_label          -> sev_clause_sev
+          | SSEV sev display_label         -> sev_clause_ssev
+          | dsev display_label             -> sev_clause_dsev
+          | BUILTIN_SEV display_label      -> sev_clause_builtin
 
 sev: sev "!"                 -> sev_unconditional
    | sev picks               -> sev_picks
@@ -433,9 +436,14 @@ splice: SPLICE "[" numberl "]" "[" numberl "]"   -> splice_two
 // Layers
 // ======================================================================
 
-layers: numbers XS numbers   -> layers_xs
-      | tower                -> layers_tower
-      |                      -> layers_none
+// ``display_label`` (optional ``as "..."``) names the occurrence layer, appended
+// as the last child (dev/plan-labels.md S2). The one real hazard is the following
+// ``sev_clause``: AS is disjoint from SEV/SSEV/dsev/BUILTIN_SEV (and from the
+// numbers a bare layer is otherwise followed by), so the split is Earley-safe --
+// guarded by an explicit ambiguity test.
+layers: numbers XS numbers display_label   -> layers_xs
+      | tower                              -> layers_tower
+      |                                    -> layers_none
 
 tower: TOWER doutcomes
 
@@ -465,10 +473,14 @@ trailer: NOTE HINTS   -> trailer_nh
 // Exposures
 // ======================================================================
 
-exposures: numbers CLAIMS                       -> exposures_claims
-         | numbers LOSS                         -> exposures_loss
-         | numbers PREMIUM AT numbers LR        -> exposures_premium_lr
-         | numbers EXPOSURE AT numbers RATE     -> exposures_exposure_rate
+// ``display_label`` (the optional ``as "..."``) names the sizing basis; it
+// sits right after the amount/keyword unit (before ``at ... lr/rate``), the
+// natural reading spot -- see dev/plan-labels.md S1. AS is disjoint from AT and
+// from what follows a bare exposures clause, so the placement is Earley-safe.
+exposures: numbers CLAIMS display_label                    -> exposures_claims
+         | numbers LOSS display_label                      -> exposures_loss
+         | numbers PREMIUM display_label AT numbers LR      -> exposures_premium_lr
+         | numbers EXPOSURE display_label AT numbers RATE   -> exposures_exposure_rate
 
 // ======================================================================
 // IDs (severity-name lists or singletons)

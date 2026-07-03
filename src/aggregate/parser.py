@@ -399,20 +399,53 @@ class UnderwritingTransformer(Transformer):
     # private ``_engine_note`` key so the wrapper can prefer it over the trailer
     # note (matching the old ``agg_out_tweedie`` behaviour). See
     # dev/plan-pnl-engine-source.md.
+    # Interior-label temp keys emitted by the sub-object fragments (exposure /
+    # layer / inline severity clause). They are gathered into one ``label_map``
+    # sub-dict here in the body assembly and stripped from the flat spec; the
+    # ``Aggregate`` (via ``LabeledMixin``) reads ``label_map``. See
+    # dev/plan-labels.md ([DecL-Labels-Everywhere], S1/S2/S3).
+    _INTERIOR_LABEL_KEYS = {
+        "_exposure_label": "exposure",
+        "_layer_label": "layer",
+        "_severity_label": "severity",
+    }
+
+    def _pop_interior_labels(self, spec):
+        """Pop the interior-label temp keys out of a merged fragment dict and
+        return ``{site: label}`` for the ones that carry a (non-None) label.
+        Mutates ``spec`` in place. Consumers that want labels fold the result
+        into ``label_map``; consumers that don't (bivariate, clash) call it
+        purely to strip the temp keys."""
+        label_map = {}
+        for tmp, site in self._INTERIOR_LABEL_KEYS.items():
+            if tmp in spec:
+                val = spec.pop(tmp)
+                if val is not None:
+                    label_map[site] = val
+        return label_map
+
     def agg_body_full(self, c):
         (exposures, layers, sev_clause, occ_reins, freq, agg_reins, approx,
          orientation) = c
-        return {
+        spec = {
             **exposures, **layers, **sev_clause, **occ_reins, **freq,
             **agg_reins, **self._check_approx(approx, occ_reins), **orientation,
         }
+        label_map = self._pop_interior_labels(spec)
+        if label_map:
+            spec["label_map"] = label_map
+        return spec
 
     def agg_body_dfreq(self, c):
         (dfreq, layers, sev_clause, occ_reins, agg_reins, approx, orientation) = c
-        return {
+        spec = {
             **dfreq, **layers, **sev_clause, **occ_reins, **agg_reins,
             **self._check_approx(approx, occ_reins), **orientation,
         }
+        label_map = self._pop_interior_labels(spec)
+        if label_map:
+            spec["label_map"] = label_map
+        return spec
 
     def agg_body_tweedie(self, c):
         # Tweedie distribution in (mean, p, sigma^2) form. The variance
@@ -714,6 +747,10 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
+        # Bivariate reuses the shared ``exposures`` production but is out of
+        # scope for labels (dev/plan-labels.md); strip any interior-label temp
+        # keys so they don't leak into the bivariate spec.
+        self._pop_interior_labels(spec)
         return ("bvagg", name, spec)
 
     def bv_out_copula_nofreq(self, c):
@@ -727,6 +764,10 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
+        # Bivariate reuses the shared ``exposures`` production but is out of
+        # scope for labels (dev/plan-labels.md); strip any interior-label temp
+        # keys so they don't leak into the bivariate spec.
+        self._pop_interior_labels(spec)
         return ("bvagg", name, spec)
 
     def bv_out_copula_dfreq(self, c):
@@ -746,6 +787,10 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
+        # Bivariate reuses the shared ``exposures`` production but is out of
+        # scope for labels (dev/plan-labels.md); strip any interior-label temp
+        # keys so they don't leak into the bivariate spec.
+        self._pop_interior_labels(spec)
         return ("bvagg", name, spec)
 
     def bv_out_discrete(self, c):
@@ -765,6 +810,10 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
+        # Bivariate reuses the shared ``exposures`` production but is out of
+        # scope for labels (dev/plan-labels.md); strip any interior-label temp
+        # keys so they don't leak into the bivariate spec.
+        self._pop_interior_labels(spec)
         return ("bvagg", name, spec)
 
     def bv_out_discrete_nofreq(self, c):
@@ -779,6 +828,10 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
+        # Bivariate reuses the shared ``exposures`` production but is out of
+        # scope for labels (dev/plan-labels.md); strip any interior-label temp
+        # keys so they don't leak into the bivariate spec.
+        self._pop_interior_labels(spec)
         return ("bvagg", name, spec)
 
     def bv_out_discrete_dfreq(self, c):
@@ -796,6 +849,10 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
+        # Bivariate reuses the shared ``exposures`` production but is out of
+        # scope for labels (dev/plan-labels.md); strip any interior-label temp
+        # keys so they don't leak into the bivariate spec.
+        self._pop_interior_labels(spec)
         return ("bvagg", name, spec)
 
     @staticmethod
@@ -834,7 +891,11 @@ class UnderwritingTransformer(Transformer):
     def clash_comp(self, c):
         """A clash component body: ``layers sev_clause`` -> a partial spec dict."""
         layers, sev_clause = c
-        return {**layers, **sev_clause}
+        spec = {**layers, **sev_clause}
+        # Clash components are out of scope for labels; strip any interior-label
+        # temp keys so they don't leak into the clash spec (dev/plan-labels.md).
+        self._pop_interior_labels(spec)
+        return spec
 
     def _clash_spec(self, name, na, nb, nc, comp_a, comp_b, freq, trailer):
         """Build the clash bivariate spec from the (na, nb, nc) counts.
@@ -877,6 +938,10 @@ class UnderwritingTransformer(Transformer):
             "note": trailer["note"],
             "hints": trailer["hints"],
         }
+        # Bivariate reuses the shared ``exposures`` production but is out of
+        # scope for labels (dev/plan-labels.md); strip any interior-label temp
+        # keys so they don't leak into the bivariate spec.
+        self._pop_interior_labels(spec)
         return ("bvagg", name, spec)
 
     def clash_out(self, c):
@@ -1369,7 +1434,7 @@ class UnderwritingTransformer(Transformer):
 
     # ----- severity (continuous) ------------------------------------
     def sev_clause_sev(self, c):
-        _sev, sev = c
+        _sev, sev, display_label = c
         if sev.get("sev_reflect", False):
             # A reflected severity (``-X`` / ``shift - X``) is inherently signed
             # -- it carries negative support. The plain ``sev`` clause builds a
@@ -1379,6 +1444,7 @@ class UnderwritingTransformer(Transformer):
             raise ValueError(
                 "DecL: a reflected (signed) severity needs 'ssev', not 'sev' "
                 "(reflection produces negative support; use 'ssev' to keep it)")
+        sev["_severity_label"] = display_label.get("display_label")
         return sev
 
     def sev_clause_ssev(self, c):
@@ -1386,17 +1452,22 @@ class UnderwritingTransformer(Transformer):
         # negative loss. Same spec as sev, flagged so the Severity keeps its
         # negative support instead of clamping x<0 -> 0. Orthogonal to
         # value_type (does NOT imply payoff). See dev/plan-negative-x-agg.md.
-        _ssev, sev = c
+        _ssev, sev, display_label = c
         sev['sev_signed'] = True
+        sev["_severity_label"] = display_label.get("display_label")
         return sev
 
     def sev_clause_dsev(self, c):
-        return c[0]
+        dsev, display_label = c
+        dsev["_severity_label"] = display_label.get("display_label")
+        return dsev
 
     def sev_clause_builtin(self, c):
-        b = self.safe_lookup(c[0])
+        builtin, display_label = c
+        b = self.safe_lookup(builtin)
         if "name" in b:
             del b["name"]
+        b["_severity_label"] = display_label.get("display_label")
         return b
 
     def sev_unconditional(self, c):
@@ -1679,8 +1750,9 @@ class UnderwritingTransformer(Transformer):
 
     # ----- layers ----------------------------------------------------
     def layers_xs(self, c):
-        limit, _xs, attach = c
-        return {"exp_attachment": attach, "exp_limit": limit}
+        limit, _xs, attach, display_label = c
+        return {"exp_attachment": attach, "exp_limit": limit,
+                "_layer_label": display_label.get("display_label")}
 
     def layers_tower(self, c):
         tower = c[0]
@@ -1718,27 +1790,31 @@ class UnderwritingTransformer(Transformer):
 
     # ----- exposures -------------------------------------------------
     def exposures_claims(self, c):
-        numbers, _claims = c
-        return {"exp_en": numbers}
+        numbers, _claims, display_label = c
+        return {"exp_en": numbers,
+                "_exposure_label": display_label.get("display_label")}
 
     def exposures_loss(self, c):
-        numbers, _loss = c
-        return {"exp_el": numbers}
+        numbers, _loss, display_label = c
+        return {"exp_el": numbers,
+                "_exposure_label": display_label.get("display_label")}
 
     def exposures_premium_lr(self, c):
-        prem, _premium, _at, lr, _lr = c
+        prem, _premium, display_label, _at, lr, _lr = c
         return {
             "exp_premium": prem,
             "exp_lr": lr,
             "exp_el": np.array(prem) * np.array(lr),
+            "_exposure_label": display_label.get("display_label"),
         }
 
     def exposures_exposure_rate(self, c):
-        exp_, _exposure, _at, rate, _rate = c
+        exp_, _exposure, display_label, _at, rate, _rate = c
         return {
             "exp_premium": exp_,
             "exp_lr": rate,
             "exp_el": np.array(exp_) * np.array(rate),
+            "_exposure_label": display_label.get("display_label"),
         }
 
     # ----- ids -------------------------------------------------------

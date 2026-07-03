@@ -125,6 +125,16 @@ Aliasing/moment-matching validation is controlled by flags in `constants.py` and
 
 **Subclasses use the `Base<Kind>` prefix form**, not the `<Kind>Base` suffix form. So `FrequencyPoisson`, `FrequencyNegbin`, `SeverityLognorm`, `DistortionPH`, `DistortionTVaR` — not `PoissonFrequency` / `PHDistortion`. Rationale: subclasses sort with their base class alphabetically in the file, in autocomplete, in stack traces, and in docs. Apply this convention to any new class taxonomy introduced during the refactor (Frequency in Stage 1b, Severity in Stage 1d, future Distortion cleanup).
 
+**Mixins use the `<Role>Mixin` suffix form.** The `Base<Kind>` rule above is for
+sibling *taxonomies*; a mixin is a different idiom, so the `…Mixin` suffix is the
+clear signal. The first (and so far only) mixin is `LabeledMixin`
+(`_labeled.py`) — the shared label surface (`display_label` / `display_name` /
+`label_map` / `labels` / `renamer` / `use_labels`) mixed into `Aggregate`,
+`Portfolio`, `PnL`, `Severity`, and `Distortion`, which share no common base.
+Mixins define **no `__init__`** (they stay transparent to the host's `super()`
+chain); each host calls an explicit `self._init_labels(...)` when ready. See
+`dev/plan-labels.md` (`[DecL-Labels-Everywhere]`).
+
 **No cryptic codes — label everything with a descriptive bracketed name.** Every
 task, plan, workstream, TODO item, and phase carries a self-describing bracketed
 label like `[Reporting-Guidelines]`, `[PnL-First-Class]`, `[Signed-Bounded-Window]`

@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.0.0a126
+
+**[Massive-Bivariate]** — massive (disk-backed) bivariate distributions:
+out-of-core update, dict pushforwards, exploration-grade visualization.
+Executes `dev/done/plan-bv.md` (techniques proven in the bigbiv exploration
+repo). A `bv` now updates at `log2 = (14, 14)` and beyond with the joint
+density living **on disk only** (zarr) and RAM bounded by a band.
+
+- **`update(store_dir=...)`** on `BivariateAggregate` routes all three modes
+  (copula, discrete `dbvsev`, netceded) through the new out-of-core kernel
+  `_aggregate_compute_massive.massive_bivariate_convolution` — a 3-pass
+  zarr corner-turn (row-FFT → column-band FFT+pgf → inverse row-FFT with the
+  `i0`/`j0` window relabel folded in at write time). `store_dir=None` is the
+  in-core path, untouched. Massive default `padding=0` (the measured window
+  is the guard; `deficit` reports any wrap). Sparse severities where dense
+  would not fit: the netceded comonotone scatter goes to scipy.sparse
+  (`scatter_bivariate_sparse`), the copula rectangle mass is trimmed to the
+  per-event support, the `dbvsev` lattice scatters sparse. The `_size_axes`
+  *measurement* grid is capped at 2^20 on the massive path only.
+- **`MassiveBivariateDistribution`** — the disk-backed sibling of
+  `BivariateDistribution`: lazy `.density` zarr view, exact accumulator
+  marginals/moments/corr (no disk read), `marginal(i)`, `slice(x=/y=)`
+  conditionals, streamed `transformed_moments`, and **`reopen(store_dir)`**
+  (the store is self-describing — no FFT re-run in a later session).
+  `marginals` / `moments` / `corr` / `deficit` / `info` / `summary_df` on the
+  parent bv all work from the pass-3 accumulators.
+- **Dict pushforward** — `pushforward({key: f(x, y) or constant}, bs,
+  bs_total=, windows=)` streams every function *and their pre-bucket
+  **total*** in ONE pass over the density; a single function skips the
+  total; constants short-circuit to point masses before the sweep; a per-key
+  Est-vs-EX audit (`.pushforward_audit_df`) folds in the same sweep with
+  `mean(total) == Σ mean(f_i)` exact. Also available on the in-core
+  `BivariateDistribution.pushforward` (dict form) for API uniformity.
+- **Visualization** — a sum/max/min decimation pyramid built during pass 3
+  (`pyramid.zarr`); Tier-1 matplotlib exhibit
+  (`plots/_bivariate_massive.py`): constant-cost pan/zoom (only the pyramid
+  level matching the pixel budget is read), log10 color by default,
+  max-channel luminance boost so sub-pixel ridges/atoms glow, axis atom
+  strips + origin badge, exact marginal panels, decade and joint-exceedance
+  contours, `plot_slice`. Tier-2 **`explore()`**: a holoviews + datashader +
+  bokeh app (pan/zoom re-aggregation, channel toggle, hover readout, linked
+  marginals, click-to-slice) behind the new `aggregate[viz]` extra.
+- **Packaging** — new optional extras: `aggregate[massive]` (`zarr>=3`) and
+  `aggregate[viz]` (datashader, holoviews, bokeh). Lazy imports with
+  actionable errors; no dask (single-process banded loops + threaded scipy
+  FFTs, per the measured bigbiv comparison).
+- Measured at `(14, 14)` (16384², dev machine): update ~142 s wall,
+  deficit 2e-8, density ~0.8 GB compressed on disk, 2-function pushforward
+  sweep ~43 s, `reopen` 0.02 s, full-view and deep-zoom plots 0.7 s / 0.35 s,
+  peak RSS 2.4 GB.
+
 ## 1.0.0a125
 
 **[PnL-Engine-Source]** — a P&L wraps a **complete stochastic engine** (no more

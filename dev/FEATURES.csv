@@ -103,7 +103,7 @@ reins,occ_ceder,method,callable,Occurrence ceded transform,Y,,,,,,,,,
 reins,occ_netter,method,callable,Occurrence net transform,Y,,,,,,,,,
 reins,occ_bivariate,method,object,Joint law of two occurrence gross/ceded/net aggregates,Y,,,,,,,,,
 reins,reins_occ_plot,method,None,Occurrence-reinsurance plots,Y,,,,,,,,,
-build-io,update,method,None,(Re)compute the discrete approximation,Y,Y,Y,,,,,,,"Main compute entry. A PnL has no update (a122): update the engine, then snapshot the value object."
+build-io,update,method,None,(Re)compute the discrete approximation,Y,Y,Y,,,,,,,"Main compute entry. A PnL has no update (a122): update the engine, then snapshot the value object. Biv gained update(store_dir=) (a126): disk-backed massive path, joint streamed to zarr, padding defaults 0 there."
 build-io,update_work,method,None,FFT compute kernel,Y,,Y,,,,,,,
 build-io,make_pnl,method,PnL,Wrap this aggregate as a PnL position,Y,,,,,,,,,
 build-io,create_frequency,method,Aggregate,Materialize the count distribution as an Aggregate/Portfolio,Y,Y,,,,,,,,Good Agg/Port parity (a-series).
@@ -149,7 +149,7 @@ data-attr,agg_list,attribute,list,Component Aggregate objects (units),,Y,,,,,,,,
 data-attr,unit_names,attribute,list,Unit names,,Y,Y,,,,,,,
 data-attr,marginals,property,tuple,The two marginal densities,,,Y,,,,,,,Bivariate-only.
 data-attr,copula,attribute,object,The copula coupling the components,,,Y,,,,,,,
-data-attr,bivariate,property,object,BivariateDistribution view of the joint density,,,Y,,,,,,,
+data-attr,bivariate,property,object,BivariateDistribution view of the joint density,,,Y,,,,,,,"After update(store_dir=) it is the disk-backed MassiveBivariateDistribution (a126): lazy .density zarr view, marginal(i)/slice()/pushforward(dict)/plot/explore/reopen."
 state,valid,property,Validation,Validation flag (NOT_UNREASONABLE / REINSURANCE / fail bits),Y,Y,,,,,,,,Read by qd/_repr_html_; computed from stats_df.
 state,program,attribute,str,Original DecL program text,Y,Y,Y,Y,,,Y,,,"Reinst/VarRt are attached via pnl.analysis (a123), which carries no program; the returned PnL does."
 state,stochastic_engine,property,object,The source the P&L was built over (Aggregate/GridDistribution/...),,,,Y,,,,,,"a123; retained for drill-down; the exhibits never depend on it."

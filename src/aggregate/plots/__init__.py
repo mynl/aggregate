@@ -36,6 +36,8 @@ from ._distortion import plot_distortion, plot_distortion_affine
 from ._portfolio import plot_portfolio, plot_scatter, plot_sample_compare
 from ._bounds import plot_bounds_envelope, plot_bounds_weights, plot_hull_bounds
 from ._bivariate import plot_bivariate, plot_bivariate_distribution
+from ._bivariate_massive import (plot_bivariate_massive,
+                                 plot_bivariate_massive_slice)
 from ._fourier import (plot_fourier, plot_fourier_wraps, plot_fourier_simpson,
                        plot_fourier1d)
 
@@ -51,6 +53,7 @@ __all__ = [
     'plot_portfolio', 'plot_scatter', 'plot_sample_compare',
     'plot_bounds_envelope', 'plot_bounds_weights', 'plot_hull_bounds',
     'plot_bivariate', 'plot_bivariate_distribution',
+    'plot_bivariate_massive', 'plot_bivariate_massive_slice',
     'plot_fourier', 'plot_fourier_wraps', 'plot_fourier_simpson',
     'plot_fourier1d',
 ]

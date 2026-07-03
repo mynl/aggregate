@@ -34,6 +34,7 @@ Technical Guides cover theory and implementation. How calculations work in theor
     5_technical_guides/5_x_bodoff
     5_technical_guides/5_x_pk
     5_technical_guides/5_x_calculations
+    5_technical_guides/5_x_massive_bivariate
     5_technical_guides/5_x_working_with_samples
 
 

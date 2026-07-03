@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a125"
+version = "1.0.0a126"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -72,6 +72,17 @@ notebook = [
     "attrs",
     "ipython-autotime",
     # "greater_tables",
+]
+# disk-backed (out-of-core) bivariate update -- dev/plan-bv.md. zarr 3 needs
+# py >= 3.11, matching requires-python.
+massive = [
+    "zarr>=3",
+]
+# Tier-2 interactive explorer for the massive bivariate (plan-bv §7.3).
+viz = [
+    "datashader",
+    "holoviews",
+    "bokeh",
 ]
 
 [tool.setuptools]

@@ -45,16 +45,18 @@ per unit *before* the joint combine, which the 2D FFT does not preserve. Use
 plain ``agg`` components, or build a standalone :class:`aggregate.PnL`.
 """
 
+import json
 import logging
+import os
 import warnings
 from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
 import scipy.fft as sfft
+import scipy.sparse as ssp
 
-from .constants import (FIG_H, FIG_W, DefectiveDistributionWarning,
-                        info_row, INFO_NA)
+from .constants import DefectiveDistributionWarning, info_row, INFO_NA
 from .config import get_settings
 from .moments import (MomentAggregator, xsden_to_mwrangler, xsden_to_meancvskew,
                       _noise_aware_rel_error, _snap_noise)
@@ -80,6 +82,11 @@ _TOTAL_LOG2 = get_settings().bivariate.total_log2
 # Smallest per-axis log2 the sizer will hand back (keeps a usable grid).
 # First-class bivariate setting (see aggregate.config [bivariate]).
 _MIN_AXIS_LOG2 = get_settings().bivariate.min_axis_log2
+# Cap on the 1-D measurement grid used by _size_axes on the MASSIVE path only:
+# a massive budget like (16, 16) would otherwise ask the standalone marginal
+# for a 2**32-bucket update just to read its window. 2**20 buckets resolve the
+# window edges to 10**-window_nines amply; the in-core path is untouched.
+_MASSIVE_MEASURE_LOG2 = 20
 
 # View-pair plumbing for the occurrence netceded family (the ``netceded`` /
 # ``grossceded`` / ``grossnet`` DecL prefixes and ``occ_bivariate(views=...)``).
@@ -272,6 +279,48 @@ def scatter_bivariate(cv, nv, mass, bs_c, bs_n, n_c, n_n, scheme='linear'):
     return out
 
 
+def scatter_bivariate_sparse(cv, nv, mass, bs_c, bs_n, n_c, n_n, scheme='linear'):
+    """Sparse (scipy CSR) form of :func:`scatter_bivariate` for the massive path.
+
+    Identical placement math -- nearest / bilinear split, edge-clipped
+    overflow -- but the result is a ``scipy.sparse.csr_matrix`` holding only
+    the populated cells (~``len(mass)`` points, or 4x for ``'linear'``). The
+    dense ``(n_c, n_n)`` form does not fit in RAM at massive grid sizes; the
+    out-of-core kernel streams a sparse severity row-band by row-band
+    (``dev/plan-bv.md`` §4.2 pass 1).
+
+    Parameters
+    ----------
+    cv, nv, mass, bs_c, bs_n, n_c, n_n, scheme
+        As :func:`scatter_bivariate`.
+
+    Returns
+    -------
+    scipy.sparse.csr_matrix
+        Bivariate severity mass, shape ``(n_c, n_n)``; duplicate placements
+        are summed by the CSR conversion. Total mass equals ``mass.sum()``.
+    """
+    sc = np.asarray(cv, dtype=float) / bs_c
+    sn = np.asarray(nv, dtype=float) / bs_n
+    mass = np.asarray(mass, dtype=float)
+    if scheme == 'nearest':
+        rows = np.clip(np.round(sc).astype(int), 0, n_c - 1)
+        cols = np.clip(np.round(sn).astype(int), 0, n_n - 1)
+        w = mass
+    else:  # 'linear' -- bilinear split, preserves both marginal first moments
+        kc = np.clip(np.floor(sc).astype(int), 0, n_c - 1)
+        kn = np.clip(np.floor(sn).astype(int), 0, n_n - 1)
+        fc = np.clip(sc - kc, 0.0, 1.0)
+        fn = np.clip(sn - kn, 0.0, 1.0)
+        kc1 = np.clip(kc + 1, 0, n_c - 1)
+        kn1 = np.clip(kn + 1, 0, n_n - 1)
+        rows = np.concatenate([kc, kc1, kc, kc1])
+        cols = np.concatenate([kn, kn, kn1, kn1])
+        w = np.concatenate([mass * (1 - fc) * (1 - fn), mass * fc * (1 - fn),
+                            mass * (1 - fc) * fn, mass * fc * fn])
+    return ssp.coo_matrix((w, (rows, cols)), shape=(n_c, n_n)).tocsr()
+
+
 # ----------------------------------------------------------------------
 # Generic pushforward of a joint (or marginal) density through a scalar map
 # ----------------------------------------------------------------------
@@ -446,6 +495,292 @@ def pushforward_1d(grid, density, function, *, bs=None, log2=None, window=None,
                                  is_loss_value=is_loss_value, source='1d')
 
 
+# ----------------------------------------------------------------------
+# Dict pushforward: several f_i(X, Y) (+ their total) in ONE pass (plan-bv §6)
+# ----------------------------------------------------------------------
+
+def _probe_constant(f, xs0, xs1, n_probe=7):
+    """Detect a constant ``f(x, y)`` on a coarse probe lattice.
+
+    A constant function (common -- a premium) never enters the band sweep:
+    its pushforward is a point mass at the constant. The probe evaluates
+    ``f`` on an ``n_probe x n_probe`` lattice spanning the label ranges; a
+    genuinely non-constant function that is constant on the probe is
+    pathological and out of scope (documented in :meth:`pushforward`).
+
+    Returns
+    -------
+    float or None
+        The constant value, or ``None`` if ``f`` varies on the probe.
+    """
+    px = xs0[np.linspace(0, len(xs0) - 1, min(n_probe, len(xs0))).astype(int)]
+    py = xs1[np.linspace(0, len(xs1) - 1, min(n_probe, len(xs1))).astype(int)]
+    v = np.asarray(f(px[:, None], py[None, :]), dtype=float)
+    v = np.broadcast_to(v, (len(px), len(py)))
+    if np.all(v == v.flat[0]):
+        return float(v.flat[0])
+    return None
+
+
+def _pushforward_functions(bands, xs0, xs1, total_mass, functions, bs, *,
+                           bs_total=None, total_key='total', windows=None,
+                           scheme='linear', is_loss_value=True, source=None,
+                           row_chunk=1024):
+    """Streamed pushforward of a dict of functions ``{key: f(x, y)}`` -- and,
+    for two or more, their **total** ``t = sum f_i`` -- in one pass over the
+    joint density (``dev/plan-bv.md`` §6).
+
+    The single driver behind both containers:
+    :meth:`MassiveBivariateDistribution.pushforward` feeds it disk bands;
+    :meth:`BivariateDistribution.pushforward` (dict form) feeds the in-core
+    density as one band. The total is accumulated **pre-bucketing** --
+    evaluated exactly per cell, summed, then bucketed once with its own
+    ``bs_total`` -- never as a sum of bucketed results, so
+    ``mean(total) == sum(mean(f_i))`` is a hard invariant. Constants (given
+    as numbers, or callables flagged by :func:`_probe_constant`) are
+    short-circuited before the sweep: a point mass at the constant, a scalar
+    shift inside the total.
+
+    Parameters
+    ----------
+    bands : callable
+        Zero-argument generator factory yielding ``(r0, r1, band)`` density
+        row bands in physical order; called once for the sweep. (A factory,
+        not an iterator, so the label-only window pre-sweep never touches
+        the density.)
+    xs0, xs1 : ndarray
+        Axis label grids.
+    total_mass : float
+        Total joint mass (for the constant point masses and the audit).
+    functions : dict[str, callable or float]
+        Named maps ``f(x, y)`` (vectorized, broadcast contract as
+        :meth:`BivariateDistribution.pushforward`) or constants.
+    bs : float or array-like
+        Output bucket size -- scalar (every key) or length ``len(functions)``
+        in iteration order.
+    bs_total : float, optional
+        Output bucket size for the total. **Required** when two or more
+        functions are given; must be omitted for a single function.
+    total_key : str, default 'total'
+        Key for the total entry; collision with a user key raises.
+    windows : dict[str, (float, float)], optional
+        Explicit output ranges per key (``total_key`` allowed); keys not
+        pinned are measured by a label-only pre-sweep (CPU, no disk).
+    scheme : {'linear', 'nearest'}, default 'linear'
+        Scatter scheme (``'linear'`` preserves the mean).
+    is_loss_value : bool, default True
+        Orientation of the outputs.
+    source : object, optional
+        Stashed on each result as ``.pushforward_source``.
+    row_chunk : int, default 1024
+        Row band size for the label-only pre-sweep.
+
+    Returns
+    -------
+    dict[str, GridDistribution]
+        One entry per key, plus ``total_key`` when ``len(functions) >= 2``.
+        Each carries ``.clipped_mass``, ``.pushforward_source`` and the
+        shared Est-vs-EX audit frame ``.pushforward_audit_df`` (rows per key,
+        exact streamed moments vs the realized output moments).
+    """
+    if not isinstance(functions, dict) or not functions:
+        raise ValueError('functions must be a non-empty dict {key: f(x, y)}.')
+    keys = list(functions)
+    n = len(keys)
+    if total_key in keys:
+        raise ValueError(
+            f'functions key {total_key!r} collides with the reserved total '
+            f'key; rename it or pass total_key=.')
+    if n >= 2 and bs_total is None:
+        raise ValueError(
+            f'bs_total is required with {n} functions: the total '
+            f't = sum(f_i) is returned under {total_key!r} and needs its own '
+            'output bucket size (explicit is better than implicit).')
+    if n == 1 and bs_total is not None:
+        raise ValueError('bs_total given with a single function: no total is '
+                         'computed (nothing for it to size).')
+    if np.isscalar(bs):
+        bs_map = {k: float(bs) for k in keys}
+    else:
+        bs_arr = np.asarray(bs, dtype=float)
+        if len(bs_arr) != n:
+            raise ValueError(
+                f'bs must be a scalar or length {n} (one per function in '
+                f'iteration order); got length {len(bs_arr)}.')
+        bs_map = dict(zip(keys, bs_arr))
+    windows = dict(windows or {})
+
+    # ------------------------------------------------------------------
+    # classify: constants never enter the sweep (numbers, or probe-constant
+    # callables); their total contribution is a scalar shift.
+    # ------------------------------------------------------------------
+    consts, funcs = {}, {}
+    for k, f in functions.items():
+        if callable(f):
+            c = _probe_constant(f, xs0, xs1)
+            if c is None:
+                funcs[k] = f
+            else:
+                consts[k] = c
+        else:
+            consts[k] = float(f)
+    const_shift = float(sum(consts.values()))
+    with_total = n >= 2
+
+    # ------------------------------------------------------------------
+    # windows: label-only pre-sweep for any unpinned key (CPU, no disk I/O).
+    # The total's range is measured cell-wise on the summed values -- NOT as
+    # the sum of per-key extremes.
+    # ------------------------------------------------------------------
+    need = [k for k in funcs if k not in windows]
+    need_total = with_total and total_key not in windows
+    if need or need_total:
+        lo = {k: np.inf for k in funcs}
+        hi = {k: -np.inf for k in funcs}
+        lo_t, hi_t = np.inf, -np.inf
+        yb = xs1[None, :]
+        for r0 in range(0, len(xs0), row_chunk):
+            r1 = min(r0 + row_chunk, len(xs0))
+            xb = xs0[r0:r1, None]
+            t = None
+            for k, f in funcs.items():
+                v = np.asarray(f(xb, yb), dtype=float)
+                lo[k] = min(lo[k], float(v.min()))
+                hi[k] = max(hi[k], float(v.max()))
+                if need_total:
+                    vb = np.broadcast_to(v, (r1 - r0, len(xs1)))
+                    t = vb.copy() if t is None else t + vb
+            if need_total and t is not None:
+                lo_t = min(lo_t, float(t.min()))
+                hi_t = max(hi_t, float(t.max()))
+        for k in need:
+            windows[k] = (lo[k], hi[k])
+        if need_total:
+            if not funcs:                      # all constants
+                lo_t = hi_t = 0.0
+            windows[total_key] = (lo_t + const_shift, hi_t + const_shift)
+
+    # ------------------------------------------------------------------
+    # output grids + accumulators (mass, clip, raw moments E[Z^k], k <= 3)
+    # ------------------------------------------------------------------
+    specs = {}
+    for k in funcs:
+        z0, bs_k, n_out = _pushforward_grid(*windows[k], bs=bs_map[k])
+        specs[k] = dict(z0=z0, bs=bs_k, n_out=n_out, mass=np.zeros(n_out),
+                        clipped=0.0, raw=np.zeros(4))
+    if with_total:
+        z0, bs_t, n_out = _pushforward_grid(*windows[total_key],
+                                            bs=float(bs_total))
+        specs[total_key] = dict(z0=z0, bs=bs_t, n_out=n_out,
+                                mass=np.zeros(n_out), clipped=0.0,
+                                raw=np.zeros(4))
+
+    # ------------------------------------------------------------------
+    # THE sweep: one disk read per band, n+1 bincount scatters, the exact
+    # ("EX") raw moments folded alongside for free.
+    # ------------------------------------------------------------------
+    def _fold(sp, values, dens):
+        m, c = _scatter_1d(values, dens, sp['z0'], sp['bs'], sp['n_out'],
+                           scheme)
+        sp['mass'] += m
+        sp['clipped'] += c
+        vk = np.ones_like(values)
+        for j in range(4):
+            sp['raw'][j] += float(np.sum(dens * vk))
+            if j < 3:
+                vk = vk * values
+
+    if funcs or with_total:
+        yb = xs1[None, :]
+        for r0, r1, dens in bands():
+            xb = xs0[r0:r1, None]
+            t = None
+            for k, f in funcs.items():
+                v = np.broadcast_to(np.asarray(f(xb, yb), dtype=float),
+                                    dens.shape)
+                _fold(specs[k], v, dens)
+                if with_total:
+                    t = v.copy() if t is None else t + v
+            if with_total:
+                if t is None:                  # all constants
+                    t = np.zeros(dens.shape)
+                if const_shift:
+                    t = t + const_shift
+                _fold(specs[total_key], t, dens)
+
+    # ------------------------------------------------------------------
+    # results + the shared Est-vs-EX audit frame
+    # ------------------------------------------------------------------
+    out = {}
+    audit_rows = {}
+
+    def _ex_stats(raw):
+        m0 = raw[0]
+        mean = raw[1] / m0 if m0 else np.nan
+        var = raw[2] / m0 - mean ** 2 if m0 else np.nan
+        return mean, (np.sqrt(var) if var > 0 else 0.0)
+
+    def _est_stats(grid, mass):
+        m0 = mass.sum()
+        mean = (grid @ mass) / m0 if m0 else np.nan
+        var = (grid ** 2) @ mass / m0 - mean ** 2 if m0 else np.nan
+        return mean, (np.sqrt(var) if var > 0 else 0.0)
+
+    for k in keys:
+        if k in consts:
+            c = consts[k]
+            gd = GridDistribution(np.array([c]), np.array([total_mass]),
+                                  bs=bs_map[k], name=str(k),
+                                  is_loss_value=is_loss_value)
+            gd.clipped_mass = 0.0
+            audit_rows[k] = (c, 0.0, c, 0.0)
+        else:
+            sp = specs[k]
+            grid = sp['z0'] + sp['bs'] * np.arange(sp['n_out'])
+            _warn_pushforward_clip(k, sp['clipped'], total_mass, grid)
+            gd = GridDistribution(grid, sp['mass'], bs=sp['bs'], name=str(k),
+                                  is_loss_value=is_loss_value)
+            gd.clipped_mass = sp['clipped']
+            audit_rows[k] = (*_ex_stats(sp['raw']),
+                             *_est_stats(grid, sp['mass']))
+        gd.pushforward_source = source
+        out[k] = gd
+    if with_total:
+        sp = specs[total_key]
+        grid = sp['z0'] + sp['bs'] * np.arange(sp['n_out'])
+        _warn_pushforward_clip(total_key, sp['clipped'], total_mass, grid)
+        gd = GridDistribution(grid, sp['mass'], bs=sp['bs'],
+                              name=str(total_key), is_loss_value=is_loss_value)
+        gd.clipped_mass = sp['clipped']
+        gd.pushforward_source = source
+        out[total_key] = gd
+        audit_rows[total_key] = (*_ex_stats(sp['raw']),
+                                 *_est_stats(grid, sp['mass']))
+
+    audit = pd.DataFrame(
+        {k: {'EX': ex_m, 'Est EX': est_m,
+             'Err EX': _noise_aware_rel_error(est_m, ex_m),
+             'SD': ex_s, 'Est SD': est_s,
+             'Err SD': _noise_aware_rel_error(est_s, ex_s)}
+         for k, (ex_m, ex_s, est_m, est_s) in audit_rows.items()}).T
+    audit = audit[['EX', 'Est EX', 'Err EX', 'SD', 'Est SD', 'Err SD']]
+    audit.index.name = 'key'
+    for gd in out.values():
+        gd.pushforward_audit_df = audit
+    return out
+
+
+def _warn_pushforward_clip(name, clipped, total, grid):
+    """Warn when a material fraction of mass clipped onto the window edges
+    (the shared convention of :func:`_finalize_pushforward`)."""
+    if total > 0 and clipped / total > 1e-8:
+        warnings.warn(
+            f'pushforward {name!r}: {clipped / total:.2e} of mass fell outside '
+            f'the output window [{grid[0]:g}, {grid[-1]:g}] and was clipped onto '
+            f'the edge buckets. Widen with windows= or coarsen bs.',
+            DefectiveDistributionWarning, stacklevel=3)
+
+
 def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
                          log2_x=None, log2_y=None, total_log2=None):
     """Joint per-occurrence density of two of {gross, ceded, net} for one aggregate.
@@ -514,6 +849,58 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
     """
     import scipy.fft as _sfft
 
+    x0, x1, mass, bs, n0, n1, clipped = _netceded_sizing(
+        agg, views, bs=bs, log2_x=log2_x, log2_y=log2_y,
+        total_log2=total_log2)
+    bs_x = bs_y = bs
+    grid_x = bs_x * np.arange(n0)
+    grid_y = bs_y * np.arange(n1)
+
+    sev2 = scatter_bivariate(x0, x1, mass, bs_x, bs_y, n0, n1,
+                             scheme=agg.reins_bucket)
+
+    if agg.n == 0:
+        density = np.zeros((n0, n1))
+        density[0, 0] = 1.0
+    elif np.sum(agg.en) == 1 and agg.frequency.freq_name == 'fixed':
+        density = sev2.copy()
+    else:
+        pad = agg.padding
+        s_shape = (n0 << pad, n1 << pad)
+        z = _sfft.rfft2(sev2, s=s_shape)
+        ftagg = agg.frequency.freq_pgf(agg.n, z.ravel()).reshape(z.shape)
+        density = np.real(_sfft.irfft2(ftagg, s=s_shape))[:n0, :n1]
+
+    density[np.abs(density) < 1e-15] = 0.0
+    deficit = float(1.0 - density.sum())
+    return density, grid_x, grid_y, bs_x, bs_y, sev2, deficit, clipped
+
+
+def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
+                     total_log2=None):
+    """Window measurement, common-``bs`` grid sizing and view-image sampling
+    for the netceded joint -- the mode-specific severity *inputs*, shared by
+    the in-core :func:`build_netceded_joint` (dense scatter + in-core FFT) and
+    the massive update path (sparse scatter + out-of-core kernel).
+
+    Parameters
+    ----------
+    agg, views, bs, log2_x, log2_y, total_log2
+        As :func:`build_netceded_joint`.
+
+    Returns
+    -------
+    x0, x1 : ndarray
+        The two views' image points sampled on the gross grid.
+    mass : ndarray
+        Gross severity mass aligned with ``x0`` / ``x1``.
+    bs : float
+        The common per-axis bucket size.
+    n0, n1 : int
+        Axis grid lengths.
+    clipped : bool
+        ``True`` if a pinned ``bs`` forced a window clip (warned).
+    """
     if agg.occ_reins is None:
         raise ValueError(
             'netceded requires occurrence reinsurance; none configured.')
@@ -569,34 +956,14 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
             f'than the budget 2**{total_log2} at the pinned bs={bs:g}; the wider '
             f'axis is clipped (a tail deficit). Raise update(log2=...) or relax '
             f'the bs pin.',
-            DefectiveDistributionWarning, stacklevel=2)
-    bs_x = bs_y = bs
+            DefectiveDistributionWarning, stacklevel=3)
     n0 = 1 << log2_0
     n1 = 1 << log2_1
-    grid_x = bs_x * np.arange(n0)
-    grid_y = bs_y * np.arange(n1)
 
     x0 = np.asarray(_view_image_fn(agg, views[0])(agg.xs), dtype=float)
     x1 = np.asarray(_view_image_fn(agg, views[1])(agg.xs), dtype=float)
     mass = np.asarray(agg.sev_density_gross, dtype=float)
-    sev2 = scatter_bivariate(x0, x1, mass, bs_x, bs_y, n0, n1,
-                             scheme=agg.reins_bucket)
-
-    if agg.n == 0:
-        density = np.zeros((n0, n1))
-        density[0, 0] = 1.0
-    elif np.sum(agg.en) == 1 and agg.frequency.freq_name == 'fixed':
-        density = sev2.copy()
-    else:
-        pad = agg.padding
-        s_shape = (n0 << pad, n1 << pad)
-        z = _sfft.rfft2(sev2, s=s_shape)
-        ftagg = agg.frequency.freq_pgf(agg.n, z.ravel()).reshape(z.shape)
-        density = np.real(_sfft.irfft2(ftagg, s=s_shape))[:n0, :n1]
-
-    density[np.abs(density) < 1e-15] = 0.0
-    deficit = float(1.0 - density.sum())
-    return density, grid_x, grid_y, bs_x, bs_y, sev2, deficit, clipped
+    return x0, x1, mass, bs, n0, n1, clipped
 
 
 def _lattice_bs(xs):
@@ -634,6 +1001,16 @@ def _lattice_bs(xs):
     for v in vals[1:]:
         g = _fgcd(g, v)
     return float(g)
+
+
+def _dense_1d(v):
+    """Flatten a vector-like to a dense 1-D ndarray.
+
+    The per-claim severity ``_S`` may be scipy.sparse after a massive update
+    (its ``sum(axis=...)`` returns an ``np.matrix``); this normalises either
+    form so the severity moment/dependence code is representation-agnostic.
+    """
+    return np.asarray(v, dtype=float).ravel()
 
 
 class BivariateAggregate:
@@ -721,6 +1098,9 @@ class BivariateAggregate:
         self.axis_xs = [None, None]
         self.bs = [None, None]
         self.deficit = np.nan
+        # massive (disk-backed) result surface; set by update(store_dir=...)
+        self._massive = None
+        self._massive_dist = None
         self._S = None
         # given joint per-claim severity matrix (discrete mode); None otherwise,
         # so update_work falls back to the copula rectangle_pmf.
@@ -1017,7 +1397,7 @@ class BivariateAggregate:
         lo, hi = balanced_window(ser, prob)
         return lo, hi, float(a.bs)
 
-    def _size_axes(self, total_log2, bs_axes, log2_axes):
+    def _size_axes(self, total_log2, bs_axes, log2_axes, measure_log2=None):
         """Measure each axis's grid from its realized standalone marginal (§5).
 
         The bv's privilege is to *measure*, not guess. Each standalone loss
@@ -1044,6 +1424,12 @@ class BivariateAggregate:
         log2_axes : list of (int or None)
             Per-axis explicit ``log2``; ``None`` to allocate that axis from the
             budget. With one axis pinned the other takes the rest of the budget.
+        measure_log2 : int, optional
+            Grid length (log2) for the standalone-marginal *measurement*
+            updates. Default ``total_log2`` (the historical in-core behavior);
+            the massive path caps it at :data:`_MASSIVE_MEASURE_LOG2` so a
+            ``(16, 16)`` budget does not ask a 1-D marginal for ``2**32``
+            buckets just to read its window.
 
         Returns
         -------
@@ -1058,10 +1444,12 @@ class BivariateAggregate:
             ``True`` if explicit per-axis ``log2`` overrides exceed the budget.
         """
         prob = 10.0 ** -_WINDOW_NINES
+        if measure_log2 is None:
+            measure_log2 = total_log2
         # 1. Measure each marginal's support window off the realized pmf.
         los, his, widths = [], [], []
         for i in range(2):
-            lo, hi, bs0 = self._measure_marginal_window(i, prob, total_log2)
+            lo, hi, bs0 = self._measure_marginal_window(i, prob, measure_log2)
             # Use the MEASURED lower edge -- do not pin to 0. The only 0-pin is a
             # pnl axis, whose loss has a known lower bound of 0 *and* whose
             # _affine_axis relabel assumes a 0-based loss grid; there the affine
@@ -1138,7 +1526,8 @@ class BivariateAggregate:
     # update
     # ------------------------------------------------------------------
 
-    def update(self, log2=0, bs=0, padding=1, **kwargs):
+    def update(self, log2=0, bs=0, padding=None, store_dir=None,
+               row_chunk=512, col_chunk=512, keep_transform=False, **kwargs):
         """Build the joint density: size axes, discretise ``g_i``, 2D FFT.
 
         Parameters
@@ -1151,16 +1540,39 @@ class BivariateAggregate:
             per-axis log2 directly (the budget is then their sum) -- use it to
             explore a split (e.g. ``(11, 9)`` vs ``(10, 10)``). The auto split
             *falls out* of each realized marginal's measured support -- the bv
-            measures, it does not guess (``dev/plan-mv.md`` §5). Memory is
-            quadratic in the per-axis length, so raise only a little.
+            measures, it does not guess (``dev/plan-mv.md`` §5). In-core,
+            memory is quadratic in the per-axis length, so raise only a
+            little; with ``store_dir`` the joint lives on disk and budgets
+            like ``(14, 14)``--``(16, 16)`` are the point (``dev/plan-bv.md``).
         bs : float or (float, float), optional
             A **scalar** is applied to both axes; a **2-tuple ``(bs_x, bs_y)``**
             pins the per-axis bucket size. ``0`` (default) measures each axis's
             ``bs`` from its standalone marginal. (Both ``log2`` and ``bs`` tuple
             forms pass straight through ``build(..., log2=(a, b), bs=(x, y))``.)
-        padding : int, default 1
+        padding : int, optional
             FFT zero-padding factor per axis (mirrors the 1D aggregate; ``1``
-            doubles each axis length for the transform).
+            doubles each axis length for the transform). Default ``1``
+            in-core; **``0`` on the massive path** (``store_dir`` set) -- the
+            measured window already covers the support to
+            ``10**-window_nines``, so padding would quadruple disk and time
+            for no useful protection; ``deficit`` is the guard
+            (plan-bv §4.4, settled 2026-07-02).
+        store_dir : str, optional
+            Backing directory for a **massive (disk-backed) update**: the
+            realized joint density is streamed to ``density.zarr`` in this
+            directory and never materialises in RAM (peak memory is bounded
+            by a band regardless of grid size). ``None`` (default) is today's
+            in-core path, untouched. Requires the optional ``zarr`` extra
+            (``pip install aggregate[massive]``). Results surface through
+            :attr:`bivariate` as a :class:`MassiveBivariateDistribution`;
+            ``self.density`` stays ``None``. Prefer a fast local drive with
+            room for the transient staging store (~2x the density).
+        row_chunk, col_chunk : int, optional
+            Massive-path band / tile sizes (ignored in-core). Peak RAM ~
+            ``max(row_chunk * M1, M0 * col_chunk) * 16`` bytes.
+        keep_transform : bool, optional
+            Massive path: keep the ``z1`` / ``z2`` staging stores after the
+            update (default deletes them; ``z2`` is as large as the density).
         **kwargs
             Ignored (accepted for a uniform ``build`` call signature).
 
@@ -1177,9 +1589,18 @@ class BivariateAggregate:
         from the single reinsured aggregate's comonotone scatter
         (:func:`build_netceded_joint`) instead.
         """
-        self.padding = int(padding)
+        # massive default padding 0 (measured window + deficit guard);
+        # in-core default 1, both overridable.
+        self.padding = (int(padding) if padding is not None
+                        else (0 if store_dir is not None else 1))
+        # a re-update replaces any previous result surface, either kind
+        self._massive = None
+        self._massive_dist = None
         if self.mode == 'netceded':
-            return self._update_netceded(log2=log2, bs=bs)
+            return self._update_netceded(log2=log2, bs=bs, store_dir=store_dir,
+                                         row_chunk=row_chunk,
+                                         col_chunk=col_chunk,
+                                         keep_transform=keep_transform)
         # Parse scalar-or-(x, y) sizing args into per-axis overrides + budget.
         # Tuple entries may be None/0 to leave that axis auto.
         if isinstance(log2, (tuple, list)):
@@ -1201,8 +1622,10 @@ class BivariateAggregate:
         if self.mode == 'discrete':
             bs_axes = [bs_axes[i] if bs_axes[i] is not None else self._lattice_bs[i]
                        for i in range(2)]
+        measure_log2 = (min(total_log2, _MASSIVE_MEASURE_LOG2)
+                        if store_dir is not None else None)
         bss, log2s, x_mins, his, clipped = self._size_axes(
-            total_log2, bs_axes, log2_axes)
+            total_log2, bs_axes, log2_axes, measure_log2=measure_log2)
         self._clipped = clipped
         self._gs = []
         self._i0 = []                    # per-event severity negative reach (lay-in wrap)
@@ -1233,17 +1656,24 @@ class BivariateAggregate:
         # severity grids are the per-event grids (signed where the component is),
         # captured for the severity panel of plot().
         self._sev_xs = [np.asarray(a.xs, dtype=float).copy() for a in self.units]
+        if store_dir is not None:
+            return self._update_massive(store_dir, row_chunk, col_chunk,
+                                        keep_transform)
         self.update_work()
         return self
 
-    def _update_netceded(self, log2=0, bs=0):
+    def _update_netceded(self, log2=0, bs=0, store_dir=None,
+                         row_chunk=512, col_chunk=512, keep_transform=False):
         """Build the joint (ceded, net) density of the single reinsured agg.
 
         Updates the inner aggregate (only if this object built it -- a
         pre-built agg passed by :meth:`Aggregate.occ_bivariate` must already be
         updated, so the precondition raises propagate), then assembles the joint
         via :func:`build_netceded_joint` and caches the per-axis ceded / net
-        theoretical moments from the inner ``reins_stats_df``.
+        theoretical moments from the inner ``reins_stats_df``. With
+        ``store_dir`` the comonotone scatter goes to a scipy.sparse matrix and
+        the compound streams through the out-of-core kernel instead
+        (``dev/plan-bv.md`` §4.4) -- the joint never materialises in RAM.
         """
         a = self._nc_agg
         if self._nc_built_here and a.sev_density_gross is None:
@@ -1253,6 +1683,37 @@ class BivariateAggregate:
             if bs:
                 kw['bs'] = bs
             a.update(**kw)
+        if store_dir is not None:
+            from ._aggregate_compute_massive import (
+                massive_bivariate_convolution, PyramidBuilder)
+            x0, x1, mass, bs_c, n0, n1, clipped = _netceded_sizing(
+                a, self._views, **self._nc_kwargs)
+            sev2 = scatter_bivariate_sparse(x0, x1, mass, bs_c, bs_c, n0, n1,
+                                            scheme=a.reins_bucket)
+            gx = bs_c * np.arange(n0)
+            gy = bs_c * np.arange(n1)
+            mlog2 = (int(np.log2(n0)) + self.padding,
+                     int(np.log2(n1)) + self.padding)
+            pyramid = PyramidBuilder(store_dir, n0, n1,
+                                     row_chunk=row_chunk, col_chunk=col_chunk)
+            res = massive_bivariate_convolution(
+                sev2, a.frequency.freq_pgf, float(a.n),
+                N0=n0, N1=n1, bs0=bs_c, bs1=bs_c,
+                i0=(0, 0), j0=(0, 0), mlog2=mlog2,
+                store_dir=store_dir, xs0=gx, xs1=gy,
+                row_chunk=row_chunk, col_chunk=col_chunk,
+                keep_transform=keep_transform, on_band=pyramid.on_band)
+            pyramid.finish()
+            self.density = None
+            self.axis_xs = [gx, gy]
+            self.bs = [bs_c, bs_c]
+            self._S = sev2
+            self._sev_xs = [gx, gy]   # severity panel = comonotone view scatter
+            self.deficit = float(res.deficit)
+            self._clipped = clipped
+            self._marg_theory = self._netceded_theory(a, self._views)
+            self._finish_massive(res)
+            return self
         density, gx, gy, bs_x, bs_y, sev2, deficit, clipped = build_netceded_joint(
             a, views=self._views, **self._nc_kwargs)
         self.density = density
@@ -1302,6 +1763,123 @@ class BivariateAggregate:
             out[M0 - i0_0:, M1 - i0_1:] = S[:i0_0, :i0_1]
         return out
 
+    def _form_severity_matrix(self, N0, N1, massive=False):
+        """Form the joint per-claim severity ``S`` (copula / discrete modes).
+
+        The mode-specific severity *formation*, shared by the in-core
+        :meth:`update_work` and the massive :meth:`_update_massive` paths.
+        Discrete mode scatters the given lattice matrix onto the output grid
+        at exact bucket indices (the lattice ``bs`` is the gcd); copula mode
+        builds the discrete-Sklar rectangle mass from the per-event marginal
+        CDFs (the Bernoulli zero-inflation is automatic as a jump in ``G``).
+
+        With ``massive=True`` the result is RAM-bounded instead of full-grid
+        dense: the discrete scatter goes to scipy.sparse, and the copula
+        rectangle mass is **trimmed to the per-event support** -- ``G_i`` is
+        cut where its remaining tail is below ``1e-15`` (the kernel's clamp
+        threshold), so the dropped rectangle mass is ``< 2e-15`` and shows up
+        (harmlessly) in ``deficit`` -- because the untrimmed ``(N0, N1)``
+        rectangle matrix is exactly the allocation the disk-backed path
+        exists to avoid. ``self._sev_xs`` is trimmed to match.
+
+        Parameters
+        ----------
+        N0, N1 : int
+            Output grid lengths.
+        massive : bool, default False
+            Return the RAM-bounded (sparse / trimmed) form.
+
+        Returns
+        -------
+        ndarray or scipy.sparse.csr_matrix
+            The per-claim severity, stored on ``self._S`` (retained for the
+            severity panel of ``plot()`` and the ``Sev`` dependence row).
+        """
+        if self._S_given is not None:
+            # discrete mode: scatter the given joint per-claim matrix onto the
+            # (N0, N1) output grid at each lattice point's bucket index. The
+            # lattice bs divides every atom (gcd), so the indices are exact and
+            # the per-event-severity row/column sums reproduce g0 / g1 on the grid.
+            ix = np.round(self._dbv_xs / self.bs[0]).astype(int)
+            iy = np.round(self._dbv_ys / self.bs[1]).astype(int)
+            if massive:
+                rows = np.repeat(ix, len(iy))
+                cols = np.tile(iy, len(ix))
+                S = ssp.coo_matrix((np.asarray(self._S_given, dtype=float).ravel(),
+                                    (rows, cols)), shape=(N0, N1)).tocsr()
+            else:
+                S = np.zeros((N0, N1))
+                S[np.ix_(ix, iy)] = self._S_given
+        else:
+            g0, g1 = self._gs
+            G0 = np.cumsum(g0)
+            G1 = np.cumsum(g1)
+            if massive:
+                # trim each CDF where the remaining per-event tail is fp dust
+                # (see the docstring); keep at least the signed lay-in rows.
+                k0 = min(int(np.searchsorted(G0, 1.0 - 1e-15)) + 1, len(G0))
+                k1 = min(int(np.searchsorted(G1, 1.0 - 1e-15)) + 1, len(G1))
+                k0 = max(k0, self._i0[0] + 1)
+                k1 = max(k1, self._i0[1] + 1)
+                G0, G1 = G0[:k0], G1[:k1]
+                self._sev_xs = [self._sev_xs[0][:k0], self._sev_xs[1][:k1]]
+            # joint per-claim severity via the copula (marginals exact by
+            # construction); retained for the severity panel of plot().
+            S = self.copula.rectangle_pmf(G0, G1)
+        self._S = S
+        return S
+
+    def _update_massive(self, store_dir, row_chunk, col_chunk, keep_transform):
+        """Run the disk-backed (out-of-core) update for the copula / discrete
+        modes and install the massive result surface.
+
+        Same sizing, severity formation and ``i0``/``j0``/``mlog2`` windowing
+        as :meth:`update_work`; only the FFT-PGF-iFFT core is delegated to
+        :func:`~aggregate._aggregate_compute_massive.massive_bivariate_convolution`,
+        which streams the joint to ``store_dir`` and folds the marginals /
+        mixed moments band by band (``dev/plan-bv.md`` §4).
+        """
+        from ._aggregate_compute_massive import (massive_bivariate_convolution,
+                                                 PyramidBuilder)
+
+        N0, N1 = self._nout
+        S = self._form_severity_matrix(N0, N1, massive=True)
+        pyramid = PyramidBuilder(store_dir, N0, N1,
+                                 row_chunk=row_chunk, col_chunk=col_chunk)
+        res = massive_bivariate_convolution(
+            S, self.frequency.freq_pgf, self.en,
+            N0=N0, N1=N1, bs0=self.bs[0], bs1=self.bs[1],
+            i0=tuple(self._i0), j0=tuple(self._j0), mlog2=tuple(self._mlog2),
+            store_dir=store_dir, xs0=self.axis_xs[0], xs1=self.axis_xs[1],
+            row_chunk=row_chunk, col_chunk=col_chunk,
+            keep_transform=keep_transform, on_band=pyramid.on_band)
+        pyramid.finish()
+        self.density = None
+        self.deficit = float(res.deficit)
+        self._marg_theory = [self._marginal_moments(0), self._marginal_moments(1)]
+        self._finish_massive(res)
+        return self
+
+    def _finish_massive(self, res):
+        """Install the massive result surface: keep the kernel result, build
+        the :class:`MassiveBivariateDistribution` container and persist the
+        store metadata so :meth:`MassiveBivariateDistribution.reopen` can
+        reconstruct it in a later session without re-running the FFT."""
+        if self.mode == 'netceded':
+            en, fname = float(self._nc_agg.n), self._nc_agg.frequency.freq_name
+            cop = 'netceded'
+        else:
+            en, fname = float(self.en), self.freq_name
+            cop = self.mode if self.copula is None else str(self.copula)
+        meta = {'name': self.name, 'en': en, 'freq_name': fname,
+                'copula': cop, 'deficit': float(res.deficit),
+                'axis_names': tuple(self.unit_names), 'mode': self.mode,
+                'padding': self.padding,
+                'log2': [int(np.log2(len(res.xs0))), int(np.log2(len(res.xs1)))]}
+        self._massive = res
+        self._massive_dist = MassiveBivariateDistribution.from_result(res, meta)
+        self._massive_dist.save()
+
     def update_work(self):
         """Assemble the joint density from the per-event severities ``g_i``.
 
@@ -1328,24 +1906,7 @@ class BivariateAggregate:
         N0, N1 = getattr(self, '_nout', [len(g0), len(g1)])
         mlog2 = getattr(self, '_mlog2', [int(np.log2(N0)) + self.padding,
                                          int(np.log2(N1)) + self.padding])
-        # marginal CDFs in physical order (the copula couples ranks); the
-        # Bernoulli zero-inflation is automatic as a jump in G.
-        if self._S_given is not None:
-            # discrete mode: scatter the given joint per-claim matrix onto the
-            # (N0, N1) output grid at each lattice point's bucket index. The
-            # lattice bs divides every atom (gcd), so the indices are exact and
-            # the per-event-severity row/column sums reproduce g0 / g1 on the grid.
-            S = np.zeros((N0, N1))
-            ix = np.round(self._dbv_xs / self.bs[0]).astype(int)
-            iy = np.round(self._dbv_ys / self.bs[1]).astype(int)
-            S[np.ix_(ix, iy)] = self._S_given
-        else:
-            G0 = np.cumsum(g0)
-            G1 = np.cumsum(g1)
-            # joint per-claim severity via the copula (marginals exact by
-            # construction); retained for the severity panel of plot().
-            S = self.copula.rectangle_pmf(G0, G1)
-        self._S = S
+        S = self._form_severity_matrix(N0, N1)
 
         if self.en == 0:
             density = np.zeros((N0, N1))
@@ -1374,7 +1935,7 @@ class BivariateAggregate:
     # ------------------------------------------------------------------
 
     def _require_density(self):
-        if self.density is None:
+        if self.density is None and self._massive is None:
             raise ValueError('BivariateAggregate not updated; call update().')
 
     @property
@@ -1382,9 +1943,13 @@ class BivariateAggregate:
         """A :class:`BivariateDistribution` view of the joint density.
 
         Reuses the shared container for moments, correlation, contour and the
-        HTML repr.
+        HTML repr. After a massive update (``update(store_dir=...)``) this is
+        the :class:`MassiveBivariateDistribution` built at update time -- same
+        role accessors, disk-backed density.
         """
         self._require_density()
+        if self._massive_dist is not None:
+            return self._massive_dist
         if self.mode == 'netceded':
             en, fname = float(self._nc_agg.n), self._nc_agg.frequency.freq_name
             cop = 'netceded'
@@ -1402,9 +1967,12 @@ class BivariateAggregate:
         """Return the two marginal densities ``(density.sum(1), density.sum(0))``.
 
         Each reproduces the standalone aggregate for that component (a ``pnl``
-        axis reproduces the standalone ``pnl``).
+        axis reproduces the standalone ``pnl``). After a massive update these
+        are the exact pass-3 accumulators -- no disk read.
         """
         self._require_density()
+        if self._massive is not None:
+            return self._massive.marg0, self._massive.marg1
         return self.density.sum(axis=1), self.density.sum(axis=0)
 
     def moments(self, max_order=3):
@@ -1435,6 +2003,11 @@ class BivariateAggregate:
             grid as the columns, labelled by the two component names.
         """
         self._require_density()
+        if self.density is None:
+            raise ValueError(
+                'the joint density is disk-backed (massive update); a full '
+                'DataFrame would read the whole store. Slice the zarr view '
+                'instead: self.bivariate.density[rows, cols].')
         return pd.DataFrame(
             self.density,
             index=pd.Index(self.axis_xs[0], name=self.unit_names[0]),
@@ -1618,10 +2191,10 @@ class BivariateAggregate:
             S = self._S
             x0 = np.asarray(self._sev_xs[0], dtype=float)
             x1 = np.asarray(self._sev_xs[1], dtype=float)
-            s0, s1 = S.sum(axis=1), S.sum(axis=0)
+            s0, s1 = _dense_1d(S.sum(axis=1)), _dense_1d(S.sum(axis=0))
             eA, eB = x0 @ s0, x1 @ s1
             vA, vB = (x0 ** 2) @ s0 - eA ** 2, (x1 ** 2) @ s1 - eB ** 2
-            covS = x0 @ (S @ x1) - eA * eB
+            covS = x0 @ _dense_1d(S @ x1) - eA * eB
             corrS = covS / np.sqrt(vA * vB) if vA > 0 and vB > 0 else np.nan
             tau = self.copula.tau() if self.copula is not None else np.nan
             rows['Sev'] = {'cov': covS, 'corr': corrS, 'tau': tau}
@@ -1656,7 +2229,7 @@ class BivariateAggregate:
             return MomentAggregator.static_moments_to_mcvsk(*sm)
         if self._S is not None and self._sev_xs[i] is not None:
             x = np.asarray(self._sev_xs[i], dtype=float)
-            g = self._S.sum(axis=1 - i)
+            g = _dense_1d(self._S.sum(axis=1 - i))
             return MomentAggregator.static_moments_to_mcvsk(
                 x @ g, (x ** 2) @ g, (x ** 3) @ g)
         return np.nan, np.nan, np.nan
@@ -1674,10 +2247,10 @@ class BivariateAggregate:
             return np.nan, np.nan, np.nan
         x0 = np.asarray(self._sev_xs[0], dtype=float)
         x1 = np.asarray(self._sev_xs[1], dtype=float)
-        s0, s1 = S.sum(axis=1), S.sum(axis=0)
+        s0, s1 = _dense_1d(S.sum(axis=1)), _dense_1d(S.sum(axis=0))
         eA, eA2, eA3 = x0 @ s0, (x0 ** 2) @ s0, (x0 ** 3) @ s0
         eB, eB2, eB3 = x1 @ s1, (x1 ** 2) @ s1, (x1 ** 3) @ s1
-        sx1, sx1_2 = S @ x1, S @ (x1 ** 2)
+        sx1, sx1_2 = _dense_1d(S @ x1), _dense_1d(S @ (x1 ** 2))
         eAB, eA2B, eAB2 = x0 @ sx1, (x0 ** 2) @ sx1, x0 @ sx1_2
         m1 = eA + eB
         m2 = eA2 + 2 * eAB + eB2
@@ -1740,7 +2313,7 @@ class BivariateAggregate:
         ``Aggregate`` / ``Portfolio``; the bivariate row catalogue is documented
         in ``dev/info-strings.rst``.
         """
-        updated = self.density is not None
+        updated = self.density is not None or self._massive is not None
         if self.mode == 'netceded':
             copula = 'comonotone (netceded)'
             freq_name = self._nc_agg.frequency.freq_name
@@ -1910,7 +2483,15 @@ class BivariateAggregate:
         mode -- on the severity grids); the right panel is the joint
         **aggregate** density (on the output grids, P&L-relabelled for any
         ``pnl`` axis).
+
+        After a massive update (``update(store_dir=...)``) this delegates to
+        the disk-backed exhibit
+        :meth:`MassiveBivariateDistribution.plot` (its own option set --
+        ``window`` / ``contours`` / ``exceedance``, log color by default);
+        call ``self.bivariate.plot(...)`` directly for full control.
         """
+        if self._massive is not None:
+            return self.bivariate.plot(**kwargs)
         from .plots import plot_bivariate
         return plot_bivariate(self, axs=axs, levels=levels, log=log, **kwargs)
 
@@ -1929,15 +2510,17 @@ class BivariateAggregate:
 
     def __repr__(self):
         tag = self.mode if self.copula is None else repr(self.copula)
-        if self.density is None:
+        if self.density is None and self._massive is None:
             return (f'BivariateAggregate(name={self.name!r}, '
                     f'units={self.unit_names!r}, {tag}, not updated)')
+        shape = (len(self.axis_xs[0]), len(self.axis_xs[1]))
+        massive = ', disk-backed' if self._massive is not None else ''
         return (f'BivariateAggregate(name={self.name!r}, '
                 f'units={self.unit_names!r}, {tag}, '
-                f'shape={self.density.shape}, corr={self.corr:.4f})')
+                f'shape={shape}{massive}, corr={self.corr:.4f})')
 
     def _repr_html_(self):
-        if self.density is None:
+        if self.density is None and self._massive is None:
             return f'<pre>{self!r}</pre>'
         return self.bivariate._repr_html_()
 
@@ -2003,8 +2586,19 @@ class BivariateDistribution(object):
 
     def pushforward(self, function, *, bs=None, log2=None, window=None,
                     scheme='linear', name=None, is_loss_value=True,
-                    chunk_size=None):
+                    chunk_size=None, bs_total=None, total_key='total',
+                    windows=None):
         """Pushforward of the joint density through a scalar map ``z = function(axis0, axis1)``.
+
+        ``function`` may also be a **dict** ``{key: f(x, y)}`` -- the
+        multi-function form (plan-bv §6, shared with
+        :meth:`MassiveBivariateDistribution.pushforward`): every ``f_i`` (and,
+        for two or more, their pre-bucket **total** under ``total_key``) is
+        scattered in one pass and a ``dict[str, GridDistribution]`` returned.
+        In the dict form ``bs`` is required (scalar or one per key),
+        ``bs_total`` is required for two or more functions, ``windows=``
+        optionally pins per-key output ranges, and ``log2`` / ``window`` /
+        ``name`` / ``chunk_size`` do not apply.
 
         Scatters every joint cell's probability onto a 1-D output grid at its
         transformed value, yielding the exact distribution of ``Z =
@@ -2055,6 +2649,28 @@ class BivariateDistribution(object):
         a1 = self.axis1
         dens = self.density
         n0 = len(a0)
+        if isinstance(function, dict):
+            if bs is None:
+                raise ValueError('the dict pushforward requires bs= (the '
+                                 'caller knows their output scale).')
+            if log2 is not None or window is not None or name is not None:
+                raise ValueError('log2 / window / name do not apply to the '
+                                 'dict pushforward; use bs= and windows=.')
+            step = chunk_size or n0
+
+            def bands():
+                for lo in range(0, n0, step):
+                    hi = min(lo + step, n0)
+                    yield lo, hi, dens[lo:hi]
+
+            return _pushforward_functions(
+                bands, np.asarray(a0, dtype=float), np.asarray(a1, dtype=float),
+                float(dens.sum()), function, bs, bs_total=bs_total,
+                total_key=total_key, windows=windows, scheme=scheme,
+                is_loss_value=is_loss_value, source=self)
+        if bs_total is not None or windows is not None:
+            raise ValueError('bs_total / windows apply only to the dict '
+                             'pushforward form.')
         if chunk_size is None or n0 <= chunk_size:
             values = np.broadcast_to(
                 np.asarray(function(a0[:, None], a1[None, :]), dtype=float),
@@ -2253,3 +2869,528 @@ class BivariateDistribution(object):
             for k, v in rows)
         return (f'<table class="aggregate bivariate">'
                 f'<caption>BivariateDistribution</caption>{body}</table>')
+
+
+class MassiveBivariateDistribution(object):
+    """Disk-backed joint distribution of two aggregate quantities.
+
+    The massive sibling of :class:`BivariateDistribution`
+    (``dev/plan-bv.md`` §5): the realized joint density lives in a zarr store
+    (``density.zarr`` in ``store_dir``, physical order) and is only ever read
+    band by band; the container carries the exact pass-3 accumulators --
+    marginals, total mass / deficit, and the mixed raw moments
+    ``E[X^a Y^b], a, b <= 3`` -- so the headline surface (marginals, moments,
+    correlation, repr) costs no disk read at all. Same role accessors
+    (:attr:`axis0`, :attr:`axis1`, :attr:`axis_names`) as the in-core
+    container, so pushforward / moment code addresses axes by role.
+
+    The store directory is self-describing (``meta.json`` +
+    ``accumulators.npz`` written by :meth:`save`), so :meth:`reopen`
+    reconstructs the container in a later session without re-running the FFT.
+
+    Parameters
+    ----------
+    store_dir : str
+        The backing directory.
+    xs0, xs1 : ndarray
+        Per-axis output label grids.
+    bs0, bs1 : float
+        Per-axis bucket sizes.
+    marg0, marg1 : ndarray
+        Exact axis marginals.
+    total_mass, deficit : float
+        Realized joint mass and its complement.
+    raw_moments : ndarray
+        ``(4, 4)`` unnormalised mixed raw moment sums.
+    meta : dict, optional
+        Provenance (``name``, ``en``, ``freq_name``, ``copula``,
+        ``axis_names``, ``mode``, ...).
+    density : zarr.Array, optional
+        An already-open handle (fresh from the kernel); opened lazily from
+        ``store_dir`` when omitted (the :meth:`reopen` path).
+    """
+
+    _META_FILE = 'meta.json'
+    _ACC_FILE = 'accumulators.npz'
+
+    def __init__(self, store_dir, xs0, xs1, bs0, bs1, marg0, marg1,
+                 total_mass, deficit, raw_moments, meta=None, density=None):
+        self.store_dir = str(store_dir)
+        self.xs0 = np.asarray(xs0, dtype=float)
+        self.xs1 = np.asarray(xs1, dtype=float)
+        self.bs0 = float(bs0)
+        self.bs1 = float(bs1)
+        self.marg0 = np.asarray(marg0, dtype=float)
+        self.marg1 = np.asarray(marg1, dtype=float)
+        self.total_mass = float(total_mass)
+        self.deficit = float(deficit)
+        self.raw_moments = np.asarray(raw_moments, dtype=float)
+        self.meta = dict(meta) if meta else {}
+        self._density = density
+
+    @classmethod
+    def from_result(cls, res, meta=None):
+        """Build from a kernel :class:`~aggregate._aggregate_compute_massive.MassiveResult`."""
+        return cls(res.store_dir, res.xs0, res.xs1, res.bs0, res.bs1,
+                   res.marg0, res.marg1, res.total_mass, res.deficit,
+                   res.raw_moments, meta=meta, density=res.density)
+
+    # ------------------------------------------------------------------
+    # axis access by role (mirrors BivariateDistribution)
+    # ------------------------------------------------------------------
+    @property
+    def axis0(self):
+        """Axis-0 grid."""
+        return self.xs0
+
+    @property
+    def axis1(self):
+        """Axis-1 grid."""
+        return self.xs1
+
+    @property
+    def axis_names(self):
+        """``(name0, name1)`` axis roles from ``meta``."""
+        return tuple(self.meta.get('axis_names', ('X', 'Y')))
+
+    @property
+    def density(self):
+        """The joint density as a **lazy zarr array view** (never in RAM).
+
+        Duck-types for slicing -- ``bv.density[1000:1010, :]`` reads just
+        those tiles. A full ``[:]`` read is the user explicitly asking for
+        the whole (potentially tens-of-GB) array and getting what they asked
+        for.
+        """
+        if self._density is None:
+            from ._aggregate_compute_massive import _require_zarr
+            zarr = _require_zarr()
+            self._density = zarr.open(
+                os.path.join(self.store_dir, 'density.zarr'), mode='r+')
+        return self._density
+
+    # ------------------------------------------------------------------
+    # accumulator-backed surface (no disk reads)
+    # ------------------------------------------------------------------
+    def marginal(self, i):
+        """Axis-``i`` marginal as a :class:`~aggregate._grid_distribution.GridDistribution`.
+
+        Exact (the pass-3 fold), precomputed -- no disk read.
+        """
+        xs = (self.xs0, self.xs1)[i]
+        dens = (self.marg0, self.marg1)[i]
+        bs = (self.bs0, self.bs1)[i]
+        return GridDistribution(xs, dens, bs=bs, name=str(self.axis_names[i]))
+
+    def marginals(self):
+        """Return the two marginal densities (exact, precomputed)."""
+        return self.marg0, self.marg1
+
+    def moments(self, max_order=3):
+        """Mixed raw moments ``E[X^i Y^j]``, same frame as the in-core container.
+
+        Orders up to 3 per axis come from the pass-3 accumulators (free);
+        a larger ``max_order`` streams one band sweep over the on-disk
+        density.
+
+        Parameters
+        ----------
+        max_order : int, default 3
+            Highest power taken on each axis.
+
+        Returns
+        -------
+        DataFrame
+            As :meth:`BivariateDistribution.moments` (``C^i`` rows /
+            ``N^j`` columns -- the historical labels).
+        """
+        if max_order < self.raw_moments.shape[0]:
+            m = self.raw_moments[:max_order + 1, :max_order + 1]
+        else:
+            m = self._streamed_mixed_moments(max_order)
+        return pd.DataFrame(
+            m,
+            index=pd.Index([f'C^{i}' for i in range(max_order + 1)], name='C'),
+            columns=pd.Index([f'N^{j}' for j in range(max_order + 1)], name='N'))
+
+    def _streamed_mixed_moments(self, max_order):
+        """One band sweep over ``density.zarr`` for moments above order 3."""
+        dens = self.density
+        rc = int(dens.chunks[0])
+        n0 = len(self.xs0)
+        ypow = np.vstack([self.xs1 ** b for b in range(max_order + 1)])
+        parts = []
+        for r0 in range(0, n0, rc):
+            r1 = min(r0 + rc, n0)
+            band = np.asarray(dens[r0:r1, :])
+            band_y = band @ ypow.T
+            mom = np.empty((max_order + 1, max_order + 1))
+            xa = np.ones(r1 - r0)
+            for a in range(max_order + 1):
+                mom[a, :] = xa @ band_y
+                xa = xa * self.xs0[r0:r1]
+            parts.append(mom)
+        return np.sum(np.stack(parts), axis=0)
+
+    def corr(self):
+        """Pearson correlation of the two axes (from the accumulators)."""
+        m = self.raw_moments
+        tot = m[0, 0]
+        e0, e1 = m[1, 0] / tot, m[0, 1] / tot
+        v0 = m[2, 0] / tot - e0 ** 2
+        v1 = m[0, 2] / tot - e1 ** 2
+        cov = m[1, 1] / tot - e0 * e1
+        denom = v0 * v1
+        if denom <= 0:
+            return np.nan
+        return float(cov / np.sqrt(denom))
+
+    # ------------------------------------------------------------------
+    # streamed probes
+    # ------------------------------------------------------------------
+    def slice(self, x=None, y=None):
+        """Conditional distribution along one axis: ``P(Y | X ~ x)`` or ``P(X | Y ~ y)``.
+
+        The analyst's probe: one row (or column) of tiles read from the
+        store -- instant at any grid size.
+
+        Parameters
+        ----------
+        x, y : float, optional
+            Exactly one must be given: the conditioning value, snapped to the
+            nearest bucket.
+
+        Returns
+        -------
+        GridDistribution
+            The normalised conditional law on the other axis.
+        """
+        if (x is None) == (y is None):
+            raise ValueError('give exactly one of x= or y=.')
+        if x is not None:
+            idx = int(np.clip(round((x - self.xs0[0]) / self.bs0),
+                              0, len(self.xs0) - 1))
+            row = np.asarray(self.density[idx, :]).ravel()
+            grid, bs = self.xs1, self.bs1
+            name = (f'{self.axis_names[1]} | '
+                    f'{self.axis_names[0]}={self.xs0[idx]:g}')
+        else:
+            idx = int(np.clip(round((y - self.xs1[0]) / self.bs1),
+                              0, len(self.xs1) - 1))
+            row = np.asarray(self.density[:, idx]).ravel()
+            grid, bs = self.xs0, self.bs0
+            name = (f'{self.axis_names[0]} | '
+                    f'{self.axis_names[1]}={self.xs1[idx]:g}')
+        tot = row.sum()
+        if tot <= 0:
+            raise ValueError(
+                f'no mass on the conditioning slice ({name}); pick a value '
+                'inside the support (see .marginal()).')
+        return GridDistribution(grid, row / tot, bs=bs, name=name)
+
+    def pushforward(self, functions, bs, *, bs_total=None, total_key='total',
+                    windows=None, scheme='linear', is_loss_value=True):
+        """Streamed pushforwards of ``{key: f(X, Y)}`` -- one pass over the disk.
+
+        The money method (``dev/plan-bv.md`` §6): every ``f_i`` -- and, for
+        two or more, their **total** ``t = sum f_i`` -- is scattered onto its
+        own 1-D output grid in a single band sweep of ``density.zarr``. The
+        expensive FFT never reruns (update is decoupled), so this is
+        repeatable at will: one full read of the store per call, regardless
+        of how many functions ride along.
+
+        Parameters
+        ----------
+        functions : dict[str, callable or float]
+            Named vectorized maps ``f(x, y)`` on broadcast label arrays
+            (role-addressed axes, the :meth:`BivariateDistribution.pushforward`
+            contract), or plain numbers. Constants -- numbers, or callables
+            constant on a coarse probe lattice (a genuinely non-constant
+            function that fools the probe is pathological and out of scope)
+            -- are short-circuited before the sweep: a point mass at the
+            constant carrying ``total_mass``, a scalar shift inside the
+            total, zero band-loop evaluations.
+        bs : float or array-like
+            Output bucket size(s) -- required, the caller knows their output
+            scale. Scalar applies to every key; an array is matched to
+            ``functions`` in iteration order.
+        bs_total : float, optional
+            Bucket size for the total -- **required** with two or more
+            functions, forbidden with one (no total is computed then: the
+            usual, fast case).
+        total_key : str, default 'total'
+            Key under which the total is returned; a collision with a user
+            key raises. The total is accumulated **pre-bucketing** (evaluated
+            exactly per cell, summed, bucketed once) -- never as a sum of
+            bucketed results -- so ``mean(total) == sum(mean(f_i))`` exactly.
+        windows : dict[str, (float, float)], optional
+            Explicit ``(lo, hi)`` output ranges per key (including
+            ``total_key``), skipping the label-only pre-sweep for those keys.
+            Values outside a pinned window clip onto the edge buckets and are
+            reported via ``.clipped_mass`` (the house convention).
+        scheme : {'linear', 'nearest'}, default 'linear'
+            Rebucketing scheme; ``'linear'`` preserves the mean.
+        is_loss_value : bool, default True
+            Orientation of the outputs.
+
+        Returns
+        -------
+        dict[str, GridDistribution]
+            One per key, plus ``total_key`` when two or more functions are
+            given. Each carries ``.clipped_mass``, ``.pushforward_source``
+            and the shared Est-vs-EX audit frame ``.pushforward_audit_df``
+            (the streamed exact moments cost nothing extra -- they fold in
+            the same sweep).
+        """
+        dens = self.density
+        rc = int(dens.chunks[0])
+        n0 = len(self.xs0)
+
+        def bands():
+            for r0 in range(0, n0, rc):
+                r1 = min(r0 + rc, n0)
+                yield r0, r1, np.asarray(dens[r0:r1, :])
+
+        return _pushforward_functions(
+            bands, self.xs0, self.xs1, self.total_mass, functions, bs,
+            bs_total=bs_total, total_key=total_key, windows=windows,
+            scheme=scheme, is_loss_value=is_loss_value, source=self)
+
+    def transformed_moments(self, function, max_order=3):
+        """Exact raw / central moments of ``Z = function(axis0, axis1)``, streamed.
+
+        The massive version of
+        :meth:`BivariateDistribution.transformed_moments` -- the same "EX"
+        audit numbers, folded over one band sweep of the on-disk density.
+
+        Parameters
+        ----------
+        function : callable
+            Vectorized ``function(x, y) -> z`` on broadcast label arrays
+            (role-addressed axes).
+        max_order : int, default 3
+            Highest raw power taken.
+
+        Returns
+        -------
+        pandas.Series
+            ``mass``, ``mean``, and (to ``max_order``) ``var`` / ``sd`` /
+            ``cv`` / ``skew``.
+        """
+        dens = self.density
+        rc = int(dens.chunks[0])
+        n0 = len(self.xs0)
+        yb = self.xs1[None, :]
+        raw = np.zeros(max_order + 1)
+        for r0 in range(0, n0, rc):
+            r1 = min(r0 + rc, n0)
+            band = np.asarray(dens[r0:r1, :])
+            values = np.broadcast_to(
+                np.asarray(function(self.xs0[r0:r1, None], yb), dtype=float),
+                band.shape)
+            vk = np.ones_like(band)
+            for k in range(max_order + 1):
+                raw[k] += float(np.sum(band * vk))
+                if k < max_order:
+                    vk = vk * values
+        tot = float(self.total_mass)
+        out = {'mass': raw[0]}
+        mean = raw[1] / tot if tot else np.nan
+        out['mean'] = mean
+        if max_order >= 2:
+            var = raw[2] / tot - mean ** 2
+            sd = np.sqrt(var) if var > 0 else 0.0
+            out['var'] = var
+            out['sd'] = sd
+            out['cv'] = sd / mean if mean else np.nan
+        if max_order >= 3 and out.get('sd', 0) > 0:
+            m3 = raw[3] / tot - 3 * mean * (raw[2] / tot) + 2 * mean ** 3
+            out['skew'] = m3 / out['sd'] ** 3
+        return pd.Series(out, name=getattr(function, '__name__', 'Z'))
+
+    # ------------------------------------------------------------------
+    # visualization (plan-bv §7)
+    # ------------------------------------------------------------------
+    @property
+    def pyramid(self):
+        """The sum/max/min decimation pyramid (a lazy zarr group), or ``None``.
+
+        Built during pass 3 of the update (``pyramid.zarr`` beside the
+        density); ``None`` if the store predates it or was cleaned. Levels
+        and channel order are in ``pyramid.attrs``.
+        """
+        if getattr(self, '_pyramid', None) is None:
+            path = os.path.join(self.store_dir, 'pyramid.zarr')
+            if not os.path.exists(path):
+                return None
+            from ._aggregate_compute_massive import _require_zarr
+            zarr = _require_zarr()
+            self._pyramid = zarr.open_group(path, mode='r')
+        return self._pyramid
+
+    def plot(self, window=None, log=True, contours=False, exceedance=False,
+             pixels=800, **kwargs):
+        """Exploration-grade exhibit of the massive joint (plan-bv §7.2).
+
+        Constant-cost at any zoom: only the pyramid level matching the pixel
+        budget (or raw tiles at extreme zoom) is read -- never the full grid.
+        Log-scale color by default (mass spans many decades; ``log=False``
+        opts out), sum-channel body with a max-channel luminance boost so
+        sub-pixel ridges and atoms glow, axis atom strips + origin badge,
+        exact marginal panels. Delegates to
+        :func:`aggregate.plots.plot_bivariate_massive`.
+
+        Parameters
+        ----------
+        window : ((x0, x1), (y0, y1)), optional
+            Value-coordinate zoom window; default the full grid.
+        log : bool, default True
+            ``log10`` color scale.
+        contours : bool, default False
+            Overlay decade contours of the log-density.
+        exceedance : bool, default False
+            Overlay joint-exceedance contours ``P(X > x, Y > y)``.
+        pixels : int, default 800
+            Pixel budget per axis -- picks the pyramid level.
+        **kwargs
+            Forwarded to the compositor.
+        """
+        from .plots import plot_bivariate_massive
+        return plot_bivariate_massive(self, window=window, log=log,
+                                      contours=contours,
+                                      exceedance=exceedance, pixels=pixels,
+                                      **kwargs)
+
+    def plot_slice(self, x=None, y=None, ax=None, log=False):
+        """Plot a conditional slice ``P(Y | X ~ x)`` / ``P(X | Y ~ y)`` (§7.2).
+
+        Delegates to :func:`aggregate.plots.plot_bivariate_massive_slice`;
+        the data is one row/column of tiles (:meth:`slice`).
+        """
+        from .plots import plot_bivariate_massive_slice
+        return plot_bivariate_massive_slice(self, x=x, y=y, ax=ax, log=log)
+
+    def explore(self, **kwargs):
+        """Interactive pan / zoom explorer in JupyterLab (plan-bv §7.3).
+
+        A holoviews + datashader + bokeh app over the decimation pyramid:
+        dynamic re-aggregation on every viewport change, channel toggle
+        (sum / max / min), hover readout, linked marginals re-windowed to
+        the view, click-to-slice conditionals. Requires the optional
+        ``aggregate[viz]`` extra; the matplotlib Tier-1 :meth:`plot` is
+        always available. **Needs a live kernel**: display the result in a
+        JupyterLab cell -- a saved-to-HTML export is a static snapshot and
+        none of the interactivity (including tap-to-slice) runs there.
+
+        Parameters
+        ----------
+        **kwargs
+            Forwarded to :func:`aggregate.plots._bivariate_explore.explore`
+            (``pixels``, ``cmap``, ``width``, ``height``).
+
+        Returns
+        -------
+        holoviews.Layout
+            Display it in a notebook cell to launch the app.
+        """
+        from .plots._bivariate_explore import explore
+        return explore(self, **kwargs)
+
+    # ------------------------------------------------------------------
+    # persistence
+    # ------------------------------------------------------------------
+    def save(self):
+        """Persist the accumulators + metadata beside ``density.zarr``.
+
+        Called automatically at update time; makes the store directory
+        self-describing so :meth:`reopen` works in a later session.
+        """
+        from datetime import datetime
+        np.savez(os.path.join(self.store_dir, self._ACC_FILE),
+                 xs0=self.xs0, xs1=self.xs1,
+                 marg0=self.marg0, marg1=self.marg1,
+                 raw_moments=self.raw_moments)
+        meta = dict(self.meta)
+        meta.setdefault('created', datetime.now().isoformat(timespec='seconds'))
+        meta['axis_names'] = list(self.axis_names)
+        payload = {'bs0': self.bs0, 'bs1': self.bs1,
+                   'total_mass': self.total_mass, 'deficit': self.deficit,
+                   'meta': meta}
+        with open(os.path.join(self.store_dir, self._META_FILE), 'w',
+                  encoding='utf-8') as f:
+            json.dump(payload, f, indent=1, default=str)
+
+    @classmethod
+    def reopen(cls, store_dir):
+        """Reconstruct the container from a saved store directory.
+
+        No FFT re-run: the accumulators and metadata are read back and the
+        density opens lazily. Worth a lot after a 30-minute ``(16, 16)``
+        update.
+
+        Parameters
+        ----------
+        store_dir : str
+            A directory previously written by ``update(store_dir=...)``.
+
+        Returns
+        -------
+        MassiveBivariateDistribution
+        """
+        store_dir = str(store_dir)
+        meta_path = os.path.join(store_dir, cls._META_FILE)
+        acc_path = os.path.join(store_dir, cls._ACC_FILE)
+        if not (os.path.exists(meta_path) and os.path.exists(acc_path)):
+            raise FileNotFoundError(
+                f'{store_dir} is not a massive bivariate store (missing '
+                f'{cls._META_FILE} / {cls._ACC_FILE}).')
+        with open(meta_path, encoding='utf-8') as f:
+            payload = json.load(f)
+        acc = np.load(acc_path)
+        meta = payload.get('meta', {})
+        if 'axis_names' in meta:
+            meta['axis_names'] = tuple(meta['axis_names'])
+        return cls(store_dir, acc['xs0'], acc['xs1'],
+                   payload['bs0'], payload['bs1'],
+                   acc['marg0'], acc['marg1'],
+                   payload['total_mass'], payload['deficit'],
+                   acc['raw_moments'], meta=meta)
+
+    # ------------------------------------------------------------------
+    # reprs
+    # ------------------------------------------------------------------
+    def _summary(self):
+        """Return ``(E0, E1, corr, deficit)`` for the repr builders."""
+        m = self.raw_moments
+        tot = m[0, 0]
+        return m[1, 0] / tot, m[0, 1] / tot, self.corr(), self.deficit
+
+    def __repr__(self):
+        e0, e1, rho, deficit = self._summary()
+        shape = (len(self.xs0), len(self.xs1))
+        return (f'MassiveBivariateDistribution('
+                f'name={self.meta.get("name", "")!r}, shape={shape}, '
+                f'bs=({self.bs0:g}, {self.bs1:g}), '
+                f'E[{self.axis_names[0]}]={e0:,.4g}, '
+                f'E[{self.axis_names[1]}]={e1:,.4g}, corr={rho:.4f}, '
+                f'store={self.store_dir!r})')
+
+    def _repr_html_(self):
+        e0, e1, rho, deficit = self._summary()
+        names = self.axis_names
+        rows = [
+            ('name', self.meta.get('name', '')),
+            ('grid shape', f'{len(self.xs0)} &times; {len(self.xs1)}'),
+            ('bucket', f'{self.bs0:g}, {self.bs1:g}'),
+            (f'E[{names[0]}]', f'{e0:,.6g}'),
+            (f'E[{names[1]}]', f'{e1:,.6g}'),
+            ('correlation', f'{rho:.6f}'),
+            ('tail deficit', f'{deficit:.2e}'),
+            ('store', self.store_dir),
+        ]
+        body = ''.join(
+            f'<tr><th style="text-align:left">{k}</th><td>{v}</td></tr>'
+            for k, v in rows)
+        return (f'<table class="aggregate bivariate">'
+                f'<caption>MassiveBivariateDistribution (disk-backed)</caption>'
+                f'{body}</table>')

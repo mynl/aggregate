@@ -14,21 +14,25 @@ Use `uv` for all environment and dependency management.
 
 **Set `UV_LINK_MODE=copy` whenever invoking `uv`.** The repo lives on a path where uv's default hardlink mode falls back with a warning; copy mode is the supported choice here. The repo's `.claude/settings.local.json` sets this automatically for the Claude harness; in a regular shell run `export UV_LINK_MODE=copy` (POSIX) or `$env:UV_LINK_MODE = "copy"` (PowerShell).
 
-**Sync environment:**
+**Sync environment — use `--all-extras` for a dev checkout:**
 ```
-uv sync
+uv sync --all-extras
 ```
+The project's optional dependencies live in five extras — `dev` (docs build,
+pytest, ruff), `notebook` (JupyterLab, widgets, jupytext), `numba` (compiled
+TVaR/biTVaR paths), `massive` (`zarr`, disk-backed bivariate), and `viz`
+(`holoviews`/`datashader`/`bokeh`, bivariate exploration). `--all-extras`
+installs the lot in one shot.
 
-**Install with dev extras** (docs build, pytest):
-```
-uv sync --extra dev
-```
+**Do NOT `uv sync --extra dev` (or any single extra) in this checkout.** `uv sync`
+is an *exact* sync: selecting a subset of extras makes uv **prune** the packages
+belonging to the *unselected* extras. `uv sync --extra dev` deletes the
+`massive`/`viz`/`numba` packages (`zarr`, `holoviews`, `datashader`, `numba`) and
+their transitive deps — which breaks the bivariate suites (and once broke `zarr`'s
+pytest plugin mid-prune). Always sync `--all-extras`; add one tool ad hoc with
+`uv pip install <pkg>`.
 
-**Install with notebook extras** (JupyterLab, widgets, jupytext — for interactive testing/hacking):
-```
-uv sync --extra notebook
-uv run jupyter lab
-```
+After syncing, JupyterLab is available: `uv run jupyter lab`.
 
 **Run anything in the managed environment:**
 ```
@@ -115,7 +119,7 @@ Aliasing/moment-matching validation is controlled by flags in `constants.py` and
 
 ### numba
 
-`utilities.py` has optional numba-compiled paths for TVaR and biTVaR inner loops. Numba is not required (pure-numpy fallbacks exist); it was removed as a hard dependency in 0.27.
+`utilities.py` has optional numba-compiled paths for TVaR and biTVaR inner loops. Numba is not required (pure-numpy fallbacks exist); it was removed as a hard dependency in 0.27. It is a declared opt-in extra — `pip install aggregate[numba]` — and is included when you sync a dev checkout with `uv sync --all-extras`.
 
 ## Naming conventions
 
@@ -163,6 +167,50 @@ The pytest suite at `tests/` is the primary test mechanism — run with `uv run 
 The snapshot can be regenerated with `uv run python tests/capture_sly_snapshot.py` IF the SLY parser is restored from git history; otherwise treat it as a frozen reference.
 
 Validation failures surface as warnings via `explain_validation()`; numerical issues (aliasing, CV mismatch, skewness) set flags in `constants.py`.
+
+### Running the suite efficiently (standard operating procedure)
+
+The suite is large (~2,300 cases) and a serial run takes minutes. Follow this
+layered strategy — fast selective runs while iterating, the full suite only at
+commit boundaries:
+
+- **Full runs are parallel by default.** `addopts` includes `-n auto`
+  (`pytest-xdist`), fanning the FFT/numpy-bound suite across all cores. Plain
+  `uv run pytest` is already parallel — no flag needed. Disable with `-n0` when
+  you need a `pdb` breakpoint or deterministic single-process ordering.
+- **During the edit loop, run a subset — don't re-run everything.** Pick the
+  tightest scope that covers the change:
+  - `uv run pytest tests/test_pnl.py` — one file (or `::test_name` for one test).
+  - `uv run pytest -k "pnl and not engine"` — keyword match on test names.
+  - `uv run pytest --lf` — **last-failed**: rerun only what failed last time
+    (pytest caches this in `.pytest_cache`; free, no setup). `--ff` runs failures
+    first then the rest; `-x` stops at the first failure.
+  - Typical loop: break something → `--lf` until green → then one full `uv run
+    pytest` as the gate.
+- **Do NOT rely on eyeballing blast radius as the *only* check.** Use it to pick
+  the fast local loop; always finish with a full (parallel) run before declaring
+  a change done. When in doubt about coverage, run the whole suite — `-n auto`
+  makes that cheap.
+- **`slow` marker — fast-by-default.** `addopts` carries `-m 'not slow'`, so the
+  everyday `uv run pytest` skips the quarantined heavy cases. The three
+  bleeding-edge bivariate suites (`test_bivariate.py`, `test_massive_bivariate.py`,
+  `test_reins_bivariate.py`) are tagged `slow` at module level via
+  `pytestmark = pytest.mark.slow` — they hold the two multi-minute monsters that
+  set the whole suite's wall-clock floor. **Run everything (the gate / CI) with
+  `uv run pytest -m 'slow or not slow'`;** run just the heavy suites with
+  `-m slow`. To quarantine a new expensive case, tag it `@pytest.mark.slow` (or
+  add `pytestmark` for a whole module); find candidates with
+  `uv run pytest -m 'slow or not slow' --durations=20`. `--strict-markers` is on,
+  so every marker must be registered in `[tool.pytest.ini_options].markers`.
+- **Sync with `uv sync --all-extras`, never a single `--extra`.** `uv sync` is an
+  *exact* sync: it prunes anything outside the selected extras. The optional deps
+  are split across five extras (`dev`/`notebook`/`numba`/`massive`/`viz`), so
+  `uv sync --extra dev` *deletes* the `massive`/`viz`/`numba` packages (`zarr`,
+  `holoviews`, `datashader`, `numba`) and breaks the bivariate suites — this once
+  broke `zarr`'s pytest plugin by deleting `donfig`/`google-crc32c` mid-prune.
+  `--all-extras` selects them all, so nothing gets pruned. Add a one-off tool with
+  `uv pip install <pkg>`; `uv sync --inexact` is a fallback that keeps extraneous
+  packages if you ever need it.
 
 ## Release & housekeeping workflow
 

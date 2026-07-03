@@ -18,6 +18,11 @@ zarr = pytest.importorskip('zarr')
 from aggregate import build
 from aggregate._aggregate_compute_massive import massive_bivariate_convolution
 
+# Bleeding-edge disk-backed bivariate kernel and the heaviest cases in the
+# suite; quarantined from the fast local loop (`-m 'not slow'`), still run in
+# full/CI.
+pytestmark = pytest.mark.slow
+
 
 # ----------------------------------------------------------------------
 # reference programs (mirroring tests/test_bivariate.py)

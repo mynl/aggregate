@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.0.0a127
+
+**[Test-Speed-SOP]** — parallel-by-default test suite and a fast local loop.
+No library behavior change; test infrastructure and developer docs only.
+
+- **`pytest-xdist`** added to the `dev` extra; `addopts` now carries `-n auto`,
+  so `uv run pytest` fans the (FFT/numpy-bound) suite across all cores. Disable
+  with `-n0` for `pdb`/deterministic ordering.
+- **`slow` marker** registered and applied at module level to the three
+  bleeding-edge bivariate suites (`test_bivariate.py`, `test_massive_bivariate.py`,
+  `test_reins_bivariate.py`) — the 159 heaviest cases, whose two multi-minute
+  monsters set the whole suite's wall-clock floor. `addopts` defaults to
+  `-m 'not slow'`, so the everyday loop skips them and stays fast; run the full
+  gate/CI suite with `uv run pytest -m 'slow or not slow'`.
+- **CLAUDE.md** gains a "running the suite efficiently" SOP (parallel default,
+  `--lf`/`-k`/`-x` edit loop, full run at the gate, the `slow`-marker recipe) and
+  a corrected sync rule: sync a dev checkout with **`uv sync --all-extras`**, never
+  a single `--extra` — `uv sync` is exact, so a subset prunes the other extras'
+  packages (`uv sync --extra dev` deletes the `massive`/`viz`/`numba` stack and
+  breaks the bivariate suites).
+- **`numba` is now a declared opt-in extra** (`pip install aggregate[numba]`),
+  joining the existing `massive` (`zarr`) and `viz` (`holoviews`/`datashader`/
+  `bokeh`) extras — the numba-compiled TVaR / biTVaR paths in `utilities.py` are
+  optional (pure-numpy fallbacks exist). Installed via `uv sync --all-extras`.
+
 ## 1.0.0a126
 
 **[Massive-Bivariate]** — massive (disk-backed) bivariate distributions:

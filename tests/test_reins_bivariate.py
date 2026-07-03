@@ -28,6 +28,10 @@ from aggregate.constants import DefectiveDistributionWarning  # noqa: E402
 from aggregate.bivariate import (  # noqa: E402
     BivariateDistribution, scatter_bivariate)
 
+# Bleeding-edge bivariate machinery and among the heaviest cases in the suite;
+# quarantined from the fast local loop (`-m 'not slow'`), still run in full/CI.
+pytestmark = pytest.mark.slow
+
 
 # Lognormal occurrence cover: the general (deficit-carrying) path.
 OCC = (

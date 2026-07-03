@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a126"
+version = "1.0.0a127"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -62,6 +62,7 @@ dev = [
     "sphinxcontrib-bibtex",
     "sphinx-multitoc-numbering",
     "pytest>=7",
+    "pytest-xdist>=3",
     "pyarrow>=15",
     "ruff>=0.6",
 ]
@@ -72,6 +73,14 @@ notebook = [
     "attrs",
     "ipython-autotime",
     # "greater_tables",
+]
+# Opt-in accelerator: numba-compiled TVaR / biTVaR inner loops in utilities.py.
+# Pure-numpy fallbacks exist, so this is not required (numba was dropped as a
+# hard dependency in 0.27). Declared here so it is an installable extra
+# (`pip install aggregate[numba]` / `uv sync --extra numba`) rather than an
+# undeclared package that a bare `uv sync` treats as removable.
+numba = [
+    "numba",
 ]
 # disk-backed (out-of-core) bivariate update -- dev/plan-bv.md. zarr 3 needs
 # py >= 3.11, matching requires-python.
@@ -114,7 +123,16 @@ select = ["F"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+# -n auto fans the suite across all cores (pytest-xdist); the workload is
+# FFT/numpy-bound and parallelizes cleanly. Disable with `-n0` when you need a
+# breakpoint/pdb or deterministic single-process ordering.
+# -m 'not slow' is the fast-by-default local loop: the bleeding-edge bivariate
+# suites (the multi-minute cases) are quarantined. Run EVERYTHING (gate/CI) with
+#   uv run pytest -m 'slow or not slow'
+addopts = "-ra --strict-markers -n auto -m 'not slow'"
+markers = [
+    "slow: bleeding-edge / multi-minute cases (bivariate, massive bivariate, reins bivariate). Deselected by default via addopts; run the full suite with `-m 'slow or not slow'`.",
+]
 
 #[tool.setuptools.packages.find]
 #where = ["."]
@@ -122,4 +140,3 @@ addopts = "-ra --strict-markers"
 
 [project.entry-points."pygments.lexers"]
 lexer = "aggregate.decl_pygments:AggLexer"
-

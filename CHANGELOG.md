@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.0a132
+
+**[Labels-Reins-Into-Namespace]** — the per-layer cession labels join the
+`labels` namespace, making it the complete interior-label surface. The
+reins-clause `as` labels now pool into `label_map` as sparse
+`{layer_index: label}` dicts — read `a.labels.occ_reins[0]` /
+`a.labels.agg_reins` (the shape `_LabelView` always documented) — and the
+parallel `occ_reins_label` / `agg_reins_label` **attributes are gone** (one
+home, no synonyms). The DecL spec keys and the unparser round-trip are
+unchanged; the P&L builders read the namespace. Object-level labels stay on
+`display_label` / `display_name` (each node's label lives on the node; only
+classless clause sites pool into the owning object's map — the deliberate
+tree rule, reaffirmed).
+
 ## 1.0.0a131
 
 **[PnL-Generic-Final] phase [Xpnl-Onion-2D]** — the massive-source route and

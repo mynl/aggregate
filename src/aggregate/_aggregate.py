@@ -1601,9 +1601,13 @@ class Aggregate(LabeledMixin):
         :param occ_reins_label: optional per-occurrence-layer display labels (the
                                 reins-clause ``as`` clause); a list parallel to
                                 ``occ_reins`` (entries ``None`` where unlabeled), or
-                                ``None``. Names the Gross/Ceded/Net cession columns.
+                                ``None``. Pooled into ``label_map['occ_reins']`` as
+                                a sparse ``{layer_index: label}`` dict (read via
+                                ``a.labels.occ_reins``); names the cession group /
+                                leg rows in a P&L ledger.
         :param agg_reins_label: optional per-aggregate-layer display labels,
-                                parallel to ``agg_reins`` (see ``occ_reins_label``).
+                                parallel to ``agg_reins`` (see ``occ_reins_label``;
+                                pooled into ``label_map['agg_reins']``).
         :param note:            free-text note, from a ``note{...}`` clause
         :param hints:           raw ``hints{...}`` build-settings string
             (``key=value;`` form). Pure annotation here; the underwriter
@@ -1713,15 +1717,25 @@ class Aggregate(LabeledMixin):
         self.program = ''  # can be set externally
         self.occ_reins = occ_reins
         self.occ_kind = occ_kind
-        self.occ_reins_label = occ_reins_label
         self.agg_reins = agg_reins
         self.agg_kind = agg_kind
-        self.agg_reins_label = agg_reins_label
         # Object-level display label + interior label_map (exposure / layer /
         # severity clause / cessions). Presentation only -- repr / exhibit titles
         # and the exhibit ``renamer`` read these; ``name`` stays the identity /
-        # reference handle. See dev/plan-labels.md ([DecL-Labels-Everywhere]).
+        # reference handle. See dev/done/plan-labels.md ([DecL-Labels-Everywhere]).
         self._init_labels(display_label=display_label, label_map=label_map)
+        # The per-layer cession labels arrive as spec lists parallel to
+        # ``occ_reins`` / ``agg_reins`` (the unparser round-trips those keys)
+        # but POOL into ``label_map`` as sparse ``{layer_index: label}`` dicts
+        # -- read ``a.labels.occ_reins[0]`` -- so ``labels`` is the complete
+        # interior-label surface: one home, no parallel label attributes.
+        for site, layer_labels in (('occ_reins', occ_reins_label),
+                                   ('agg_reins', agg_reins_label)):
+            if layer_labels:
+                d = {i: lbl for i, lbl in enumerate(layer_labels)
+                     if lbl is not None}
+                if d:
+                    self.label_map[site] = d
         self.sev_pick_attachments = sev_pick_attachments
         self.sev_pick_losses = sev_pick_losses
 

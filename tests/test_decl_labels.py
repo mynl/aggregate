@@ -203,6 +203,27 @@ def test_label_roundtrip(uw, program):
 # Interior sub-object labels ([DecL-Labels-Everywhere]): exposure / layer /
 # inline severity clause -> Aggregate.label_map + the labels namespace view
 # ----------------------------------------------------------------------
+def test_reins_labels_pool_into_label_map():
+    """Per-layer cession labels live in label_map as sparse {index: label}
+    dicts -- a.labels.occ_reins[i] -- with no parallel label attributes:
+    the labels namespace is the complete interior-label surface."""
+    a = build('agg RL 100 claims sev lognorm 100 cv 2 '
+              'occurrence net of 50 xs 50 and 100 xs 100 as "Occ Layer B" '
+              'poisson aggregate net of 2000 xs 8000 as "Agg 2 x 8"',
+              update=False)
+    assert a.labels.occ_reins == {1: 'Occ Layer B'}   # sparse: layer 0 unlabeled
+    assert a.labels.occ_reins[1] == 'Occ Layer B'
+    assert a.labels.agg_reins == {0: 'Agg 2 x 8'}
+    assert a.label_map['occ_reins'] == {1: 'Occ Layer B'}
+    assert not hasattr(a, 'occ_reins_label')          # one home, no parallels
+    assert not hasattr(a, 'agg_reins_label')
+    # unlabeled cessions leave the sites absent (None via the view)
+    b = build('agg RU 100 claims sev lognorm 100 cv 2 '
+              'occurrence net of 50 xs 50 poisson', update=False)
+    assert b.labels.occ_reins is None
+    assert 'occ_reins' not in b.label_map
+
+
 def test_exposure_label_premium_mid_clause():
     a = build('agg E 10000 premium as "GWP 2026" at 0.65 lr 1000 xs 0 '
               'sev lognorm 100 cv 2 poisson')

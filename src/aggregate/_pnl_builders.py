@@ -247,15 +247,17 @@ _GCN_LOSS_MARGINAL = {
 _GCN_CEDED = frozenset({'ceded_occ', 'ceded_agg'})
 
 
-def _first_reins_label(labels):
-    """The first non-``None`` cession display label from a per-layer label list.
+def _first_reins_label(agg, site):
+    """The lowest-indexed labeled layer's label on a cession basis, or ``None``.
 
     A basis's cessions consolidate into a single group / perspective, so the
-    first labeled layer names it. ``None`` / empty -> ``None``.
+    first labeled layer names it. Reads the sparse ``{layer_index: label}``
+    dict pooled into the engine's ``label_map`` (``agg.labels.occ_reins`` /
+    ``.agg_reins``); ``site`` is ``'occ_reins'`` or ``'agg_reins'``.
     """
-    if not labels:
-        return None
-    return next((x for x in labels if x is not None), None)
+    d = getattr(agg, 'label_map', None) or {}
+    d = d.get(site) or {}
+    return d[min(d)] if d else None
 
 
 def _ledger_economics(agg, gross, ceded, econ):
@@ -370,9 +372,9 @@ def build_gcn_pnl(agg, *, gross, ceded, gcn_economics=None, expense_spec=None,
     has_agg = agg.agg_reins is not None
     p_gross, pc_occ, pc_agg, c_occ, c_agg = _ledger_economics(
         agg, gross, ceded, gcn_economics)
-    occ_base = _first_reins_label(getattr(agg, 'occ_reins_label', None)) \
+    occ_base = _first_reins_label(agg, 'occ_reins') \
         or 'ceded occ'
-    agg_base = _first_reins_label(getattr(agg, 'agg_reins_label', None)) \
+    agg_base = _first_reins_label(agg, 'agg_reins') \
         or 'ceded agg'
     prem_key = consideration_label or 'premium'
     loss_key = loss_label or 'loss'
@@ -462,8 +464,8 @@ def build_xpnl_stack(agg, *, gross, ceded, gcn_economics=None,
 
     # A reins-clause ``as`` label (first labeled layer on each basis) names
     # that basis's cession row; the ``net`` rows keep their structural names.
-    occ_label = _first_reins_label(getattr(agg, 'occ_reins_label', None))
-    agg_label = _first_reins_label(getattr(agg, 'agg_reins_label', None))
+    occ_label = _first_reins_label(agg, 'occ_reins')
+    agg_label = _first_reins_label(agg, 'agg_reins')
     perspectives = [('gross', persp_pnl('gross'))]
     impacts = []
     if has_occ:
@@ -532,7 +534,7 @@ def build_variable_pnl(agg, *, expense_spec=None, consideration_label=None,
     groups = [Group('gross', 'sell', cons, obl)]
     if layer is not None:
         g_ceder, _netter = _reinsurance.make_ceder_netter([layer])
-        base = _first_reins_label(getattr(agg, 'agg_reins_label', None)) \
+        base = _first_reins_label(agg, 'agg_reins') \
             or 'ceded agg'
         if tl == 'ceded_premium':            # swing: stochastic ceded premium
             c_cons = [Leg(f'{base} premium',
@@ -586,9 +588,9 @@ def build_reinstatement_pnl(agg, analysis, *, expense_spec=None,
     t = analysis.terms
     P_G, D = analysis.gross_premium, t.deposit
     A, h = t.recovery, t.reinstatement_premium
-    occ_base = _first_reins_label(getattr(agg, 'occ_reins_label', None)) \
+    occ_base = _first_reins_label(agg, 'occ_reins') \
         or 'ceded occ'
-    agg_base = _first_reins_label(getattr(agg, 'agg_reins_label', None)) \
+    agg_base = _first_reins_label(agg, 'agg_reins') \
         or 'ceded agg'
     prem_key = consideration_label or 'premium'
     loss_key = loss_label or 'loss'

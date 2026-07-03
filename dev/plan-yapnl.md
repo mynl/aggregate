@@ -1,14 +1,19 @@
 # Plan — [PnL-Generic-Final] (a.k.a. yapnl — yet another PnL plan, the last one)
 
-Status: **READY** (2026-07-03). All design decisions settled with the author
-through three iteration rounds; the decision log at the end records each one.
-This is the last structural step before beta: make `PnL` *actually* generic,
-consolidate the four divergent construction paths, and pin down the 2-D case.
+Status: **READY** (2026-07-03, revised round 4 after review). All design
+decisions settled with the author; the decision log at the end records each
+one (including the one vetoed item). This is the last structural step before
+beta: make `PnL` *actually* generic, consolidate the four divergent
+construction paths, and pin down the 2-D case.
 
-One semantic refinement introduced by this plan (flagged for the author, see
-[Pnl-Returns-The-Ledger]): `pnl` returns the richest **per-atom group ledger**
-the program supports — cession groups included — rather than a collapsed
-net-only face; `xpnl` keeps the cross-marginal onion peel.
+Prerequisite landed: **[DecL-Labels-Everywhere]** shipped at `1.0.0a128`
+(`dev/done/plan-labels.md`). `PnL` is a `LabeledMixin`
+(`_labeled.py`) — the new kernel keeps that: `PnL(LabeledMixin)`, labels
+initialized via `self._init_labels(display_label=…, label_map=…)`, giving
+`display_name` / `labels` / `use_labels` / `renamer` for free. **Leg labels
+are the ledger row keys directly** (the a124 convention — for legs, label =
+handle; there is no separate handle/`renamer` indirection at the leg level,
+and ledger ordering is declaration order, never label text).
 
 ## The model
 
@@ -51,8 +56,9 @@ pnl_a + pnl_b       # same source required; concatenates the group ledgers
 ```
 
 * `source`: `GridDistribution` | `Aggregate` | `(values, probs)` [1-D];
-  `BivariateDistribution` | `MassiveBivariate` [2-D]. No `probs=` override
-  (transition artifact, removed).
+  `BivariateDistribution` | `MassiveBivariateDistribution` [2-D] (the exact
+  class names in `bivariate.py`). No `probs=` override (transition artifact,
+  removed).
 * Component shorthand: `{label: func}` ≡ `[Leg(label, func), ...]` in
   declaration order — the simple case reads as simply as before.
 * `create_pnl` / `create_pnl_tower` / `PnLTower` **retire** (breaking;
@@ -74,9 +80,11 @@ pnl_a + pnl_b       # same source required; concatenates the group ledgers
   equal spacing — they never touch the FFT machinery). `bs>0` legs rebucket
   via the shared pushforward machinery and feed `validation_df`.
 * **Massive source**: `bs` required per leg; the whole leg set + subtotal
-  functions evaluate in **one** `MassiveBivariate.pushforward` band sweep,
-  each derived row pushed as its own signed-sum function (never a sum of
-  bucketed legs) — the a126 dict-pushforward contract, reused.
+  functions evaluate in **one** `MassiveBivariateDistribution.pushforward`
+  band sweep (its `bs` parameter takes an array matched to the function dict
+  in iteration order — per-leg `bs` needs no API change), each derived row
+  pushed as its own signed-sum function (never a sum of bucketed legs) — the
+  a126 dict-pushforward contract, reused.
 
 ### Exhibits — one row ledger, three views
 
@@ -111,6 +119,9 @@ with signed groups there is nothing left to declare, so there is no
 * **`validation_df`** — Est-vs-EX audit for every `bs>0` leg (linear scheme
   matches means, so it reads *very* close — but it is visible). No reaching
   through to the source's own validation, which may not exist.
+* **`margin_df` retires** — its metrics-as-rows orientation is superseded by
+  `stats_df` (rows = ledger, columns = metrics). One canonical frame per
+  view; no alias kept.
 * Signed orientation throughout ([Signed-Exhibits-Role-Orientation]): each
   row's GD is built on the signed values, so `Pq(−X) = −P(1−q)(X)` puts the
   adverse tail where the reader expects for both roles, automatically.
@@ -149,16 +160,24 @@ Label plumbing (fixes the observed bugs):
   survive privately for scalar needs but never feeds a leg;
 * reins-layer `as` labels → cession group / leg labels.
 
-### [Pnl-Returns-The-Ledger] — `pnl` vs `xpnl` semantics (refinement)
+### `pnl` vs `xpnl` routing
 
-* **`pnl`** returns the **richest per-atom group ledger** the program
-  supports, over the deepest source the cash flows are jointly measurable
-  on. Nothing is lost vs the old collapsed face — the grand result *is* the
-  net — and the cession groups now show as labeled rows.
-* **`xpnl`** returns the **marginal perspective stack** (the onion peel
-  across `reins_density_df` marginals: gross / net-occ / net-agg columns,
-  each perspective its own `PnL`). Requires reinsurance economics; `xpnl`
-  over a plain engine or a `port` stays an error.
+Not a design decision — the direct consequence of [Group-Ledger] +
+[Cash-Flow-Legs-Default]: the builders always book the parts into `Group`s,
+so the `PnL` a program produces *is* its group ledger. (A separately flagged
+"[Pnl-Returns-The-Ledger]" refinement was vetoed as redundant — see the
+decision log.)
+
+* **`pnl`** returns the `PnL` built per the source-selection table below —
+  for a program with cessions that is a multi-group ledger over the deepest
+  source the cash flows are jointly measurable on. The grand result *is*
+  the net, so nothing is lost vs today's collapsed face; the cession groups
+  show as labeled rows.
+* **`xpnl`** returns the **marginal perspective stack** (across
+  `reins_density_df` marginals: gross / net-occ / net-agg, each perspective
+  its own one-group `PnL`, assembled by `stack_marginal_pnls`). Requires
+  reinsurance economics; `xpnl` over a plain engine or a `port` stays an
+  error.
 * The analyses (`ReinstatementAnalysis` / `VariableRatingAnalysis`) demote
   to **builders + domain extras** (terms objects, ceder / recovery maps,
   `validation_df`, `tail_df`, `plot`); their bespoke `summary_df` /
@@ -332,14 +351,14 @@ real `f(x)` group, the occ cession visible only through `xpnl`.
    `+` composition; `{label: func}` shorthand; [One-2D-Source] validation;
    per-leg `bs` (exact / rebucket); signed exhibits + percentile
    orientation; the three-view exhibit trio (`summary_df` / `stats_df` /
-   `scaled_stats_df`) + `validation_df`; retire `create_pnl` /
+   `scaled_stats_df`) + `validation_df`; `margin_df` retired; keep
+   `PnL(LabeledMixin)` + `_init_labels`; retire `create_pnl` /
    `create_pnl_tower` / `PnLTower` (keep `stack_marginal_pnls`); move the
-   insurance helpers out to `_pnl_builders.py` (relocation only). All
-   existing tests pass modulo renames / signs / row labels.
+   insurance helpers out to `_pnl_builders.py` (relocation only).
 2. **[Builders-Plain-GCN-Port]** — `build_plain_pnl`, the gcn ledger /
    marginal-stack builders, `build_port_pnl`: cash-flow legs, engine-label →
-   loss-leg label, expense groups uniform (port expenses un-NYI),
-   [Pnl-Returns-The-Ledger] routing; `_snapshot_pnl` thinned; `make_pnl`
+   loss-leg label, expense groups uniform (port expenses un-NYI), the
+   `pnl` / `xpnl` routing above; `_snapshot_pnl` thinned; `make_pnl`
    delegates.
 3. **[Builders-Variable-Features]** — the six features as one-changed-leg
    builders (examples 2, 4, 5); acceptance pair passes; analyses demoted
@@ -348,13 +367,16 @@ real `f(x)` group, the occ cession visible only through `xpnl`.
 4. **[Xpnl-Onion-2D]** — `xpnl` = marginal stack; reinstatement /
    subsequent-agg joint ledgers; second-occ-feature hard error;
    massive-source one-sweep smoke.
-5. **[Sweep-Tests-Docs]** — test updates (`create_pnl` call sites,
-   `test_pnl_*`, `test_create_pnl.py`), `test_decl.agg` sync (append the
-   example programs above), `dev/FEATURES.csv` + introspection cross-check,
+5. **[Sweep-Tests-Docs]** — `test_decl.agg` sync (append the example
+   programs above), `dev/FEATURES.csv` + introspection cross-check,
    CHANGELOG + version bump, `.rst`/`.qmd` lockstep (author rebuilds),
    `dev/TODO.md`.
 
-Each phase independently green; version bump per house rule.
+**Each phase independently green** — a phase that breaks a test updates that
+test *within the phase* (Phase 1 rewrites `tests/test_create_pnl.py` and the
+`create_pnl` call sites in `test_pnl_*.py` when it retires `create_pnl`;
+Phase 3 rebases the analyses' tests when it demotes them). Phase 5 is the
+housekeeping sweep, not deferred test repair. Version bump per house rule.
 
 ## Testing
 
@@ -379,10 +401,10 @@ Each phase independently green; version bump per house rule.
 ## Risks / notes
 
 * **Breaking surface** (pre-beta, deliberate): `create_pnl` /
-  `create_pnl_tower` / `PnLTower` gone; analyses' exhibits gone;
-  `pnl.analysis` narrowed; `pnl` now returns the ledger (row set grows —
-  downstream row-label consumers rebase once). One migration note in
-  CHANGELOG.
+  `create_pnl_tower` / `PnLTower` / `margin_df` gone; analyses' exhibits
+  gone; `pnl.analysis` narrowed; a reins program's `pnl` exhibit row set
+  grows (cession groups as rows — downstream row-label consumers rebase
+  once). One migration note in CHANGELOG.
 * The degenerate-1-D (agg feature) and joint (occ feature) paths must
   produce the **same leg labels** for the same DecL clauses — write the
   label resolution once, in the builders.
@@ -426,9 +448,11 @@ Each phase independently green; version bump per house rule.
   `X / scale`) + `summary_df` as one row-ledger, three views; `+`
   composition; `PnLTower` retires, `stack_marginal_pnls` survives for the
   no-joint case.
-* **[Pnl-Returns-The-Ledger]** — introduced by this plan (author to veto if
-  unwanted): `pnl` returns the maximal per-atom ledger (cession groups as
-  rows; grand result = net), `xpnl` the marginal perspective stack.
+* **[Pnl-Returns-The-Ledger]** — **VETOED** (author, 2026-07-03): an
+  LLM-introduced "refinement" flag, dropped as redundant — what `pnl` /
+  `xpnl` return follows from [Group-Ledger] + [Cash-Flow-Legs-Default] and
+  is spelled out in the routing section; no separate decision exists. Do
+  not reintroduce.
 
 **Future (out of scope, keep buildable):** [Layer-Peeling-Shorthand] — a
 DecL shorthand adding reins layers one at a time (top-down / bottom-up), one

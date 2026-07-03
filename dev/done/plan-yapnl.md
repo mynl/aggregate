@@ -1,9 +1,24 @@
 # Plan — [PnL-Generic-Final] (a.k.a. yapnl — yet another PnL plan, the last one)
 
-Status: **READY** (2026-07-03, revised round 4 after review). All design
-decisions settled with the author; the decision log at the end records each
-one (including the one vetoed item). This is the last structural step before
-beta: make `PnL` *actually* generic, consolidate the four divergent
+Status: **DONE** — landed `1.0.0a129`–`1.0.0a131` (2026-07-03), all green
+(fast suite + slow gate + the `dev/FEATURES.csv` audit). Execution notes:
+phases [Kernel-Group-Ledger] + [Builders-Plain-GCN-Port] (and the `xpnl`
+slice of [Xpnl-Onion-2D]) landed together as `a129` — the single shared
+`PnL` class couples them, so separate green checkpoints were not achievable;
+[Builders-Variable-Features] = `a130`; the massive one-sweep route +
+closeout = `a131`. The ledger row template is one shared plan
+(`_ledger_plan`) consumed by both evaluation routes. Judgment calls flagged
+for author review in the run summary: the occ guaranteed-cost booking (occ
+ceded premium as an obligation constant in the retained sell group), the
+default group / leg label vocabulary (`ceded occ` / `ceded agg`,
+`<group> premium / recovery / commission`), `xpnl` returning the bare
+DataFrame, `make_pnl(net=)` retired, and loss-basis expense degrading to a
+constant over a net marginal.
+
+Original status: **READY** (2026-07-03, revised round 4 after review). All
+design decisions settled with the author; the decision log at the end records
+each one (including the one vetoed item). This is the last structural step
+before beta: make `PnL` *actually* generic, consolidate the four divergent
 construction paths, and pin down the 2-D case.
 
 Prerequisite landed: **[DecL-Labels-Everywhere]** shipped at `1.0.0a128`

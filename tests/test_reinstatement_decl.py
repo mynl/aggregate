@@ -97,9 +97,9 @@ def test_no_reinstatements_is_a_single_annual_limit():
     # deterministic ceded premium (= the deposit; h(R) == 0) => the exact ceded
     # premium has zero variance, vs a materially nonzero CV when reinstatements
     # are paid.
-    assert a.stats_df.loc['reinstatement_premium', 'mean'] == pytest.approx(0.0)
-    assert a.stats_df.loc['ceded_premium', 'sd'] == pytest.approx(0.0, abs=1e-6)
-    assert a.stats_df.loc['ceded_premium', 'cv'] == pytest.approx(0.0, abs=1e-6)
+    assert a._stats_df.loc['reinstatement_premium', 'mean'] == pytest.approx(0.0)
+    assert a._stats_df.loc['ceded_premium', 'sd'] == pytest.approx(0.0, abs=1e-6)
+    assert a._stats_df.loc['ceded_premium', 'cv'] == pytest.approx(0.0, abs=1e-6)
 
 
 def test_number_words_are_not_reserved_as_identifiers():
@@ -188,41 +188,42 @@ def test_terms_carry_share_scaled_limit_and_base_premium():
     assert t.rates == (0.0, 0.5, 1.0, 1.0)
 
 
-def test_gcn_df_delegates_and_means_add():
+def test_ledger_rows_and_means_add():
+    """The reinstatement pnl is a two-group ledger over the (L, R) joint:
+    gross sell group + occ cession buy group; the EX column adds down the
+    sheet and the total impact is the cession's step delta."""
     p = build(_HUMAN)
-    g = p.margin_df
-    # the new stats x waterfall shape: EX/SD/CV/Skew/percentile rows, gross /
-    # ceded / net underwriting columns plus a benefit (impact) column.
-    cols = list(g.columns)
-    assert cols[:3] == ['gross', 'ceded', 'net']
-    assert 'EX' in g.index
-    # means add on the EX row: gross + ceded = net
-    assert g.loc['EX', 'net'] == pytest.approx(
-        g.loc['EX', 'gross'] + g.loc['EX', 'ceded'], rel=1e-6, abs=1e-6)
-    # the trailing benefit column is the cession impact = net - gross
-    assert g.loc['EX', cols[-1]] == pytest.approx(
-        g.loc['EX', 'net'] - g.loc['EX', 'gross'], rel=1e-6, abs=1e-6)
+    s = p.summary_df
+    for row in ('premium', 'loss', 'gross result', 'ceded occ premium',
+                'ceded occ recovery', 'ceded occ result',
+                'net through ceded occ', 'margin', 'total impact'):
+        assert row in s.index, row
+    assert s.loc['margin', 'EX'] == pytest.approx(
+        s.loc['gross result', 'EX'] + s.loc['ceded occ result', 'EX'],
+        rel=1e-6, abs=1e-6)
+    assert s.loc['total impact', 'EX'] == pytest.approx(
+        s.loc['ceded occ result', 'EX'], abs=1e-9)
 
 
 def test_ceded_premium_is_stochastic_in_exhibit():
     p = build(_HUMAN)
-    g = p.margin_df
-    # the headline effect: the stochastic ceded premium D + h(R) => a nonzero CV
-    # on the cession column of the waterfall...
-    assert g.loc['CV', 'ceded'] > 0.0
-    # ...and per leg, the ceded premium is stochastic while the gross premium is
-    # the fixed P_G (zero CV).
-    assert p.analysis.stats_df.loc['ceded_premium', 'cv'] > 0.0
-    assert p.analysis.stats_df.loc['gross_premium', 'cv'] == 0.0
+    s = p.summary_df
+    # the headline effect: the stochastic ceded premium D + h(R) shows a
+    # nonzero SD on its ledger row, while the gross premium is fixed...
+    assert s.loc['ceded occ premium', 'SD'] > 0.0
+    assert s.loc['premium', 'SD'] == 0.0
+    # ...and the analysis's exact engine agrees.
+    assert p.analysis._stats_df.loc['ceded_premium', 'cv'] > 0.0
+    assert p.analysis._stats_df.loc['gross_premium', 'cv'] == 0.0
 
 
-def test_summary_df_is_the_gcn_table():
+def test_ledger_mean_check_ceded_premium():
+    """E[ceded occ premium row] = -(D + E[h(R)]) -- the plan's mean check."""
     p = build(_HUMAN)
-    # the attached analysis carries the canonical Gross / Ceded / Net headline
-    # table; the PnL's own summary_df is the fixed template (tested elsewhere).
-    assert list(p.analysis.summary_df.columns) == [
-        'Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
-    assert list(p.margin_df.columns)[:3] == ['gross', 'ceded', 'net']
+    a = p.analysis
+    e_h = a._stats_df.loc['reinstatement_premium', 'mean']
+    assert p.summary_df.loc['ceded occ premium', 'EX'] == pytest.approx(
+        -(a.terms.deposit + e_h), rel=1e-9)
 
 
 def test_arg_free_programmatic_entry_point():
@@ -250,78 +251,55 @@ def test_subsequent_aggregate_cover_builds():
     assert a.agg_recovery is not None
     assert a.agg_ceded_premium == pytest.approx(600.0)   # threaded from the pnl
     # the agg cover actually recovers on the net-of-occurrence loss L - A(R)
-    assert a.stats_df.loc['ceded_agg_loss', 'mean'] > 0
-    # decision 3: the waterfall extends to the inuring both-tiers form. Read the
-    # actual columns (a running-net tower): gross, occ cession, net-of-occ,
-    # agg cession, final net, and the benefit columns.
-    g = p.margin_df
-    cols = list(g.columns)
-    assert cols == ['gross', 'ceded', 'net/ceded', 'occ benefit', 'ceded agg',
-                    'net', 'agg benefit', 'total benefit']
-    # means add tier by tier on the EX row: gross + occ cession = net-of-occ;
-    # net-of-occ + agg cession = final net.
-    assert g.loc['EX', 'net/ceded'] == pytest.approx(
-        g.loc['EX', 'gross'] + g.loc['EX', 'ceded'], rel=1e-6, abs=1e-6)
-    assert g.loc['EX', 'net'] == pytest.approx(
-        g.loc['EX', 'net/ceded'] + g.loc['EX', 'ceded agg'], rel=1e-6, abs=1e-6)
+    assert a._stats_df.loc['ceded_agg_loss', 'mean'] > 0
+    # decision 3: the ledger extends to the inuring both-tiers form -- a third
+    # buy group over the SAME joint (no new dimension).
+    s = p.summary_df
+    for row in ('gross result', 'ceded occ result', 'net through ceded occ',
+                'ceded agg premium', 'ceded agg recovery', 'ceded agg result',
+                'net through ceded agg', 'margin'):
+        assert row in s.index, row
+    # means add tier by tier down the sheet
+    assert s.loc['net through ceded occ', 'EX'] == pytest.approx(
+        s.loc['gross result', 'EX'] + s.loc['ceded occ result', 'EX'],
+        rel=1e-6, abs=1e-6)
+    assert s.loc['margin', 'EX'] == pytest.approx(
+        s.loc['net through ceded occ', 'EX'] + s.loc['ceded agg result', 'EX'],
+        rel=1e-6, abs=1e-6)
     # the additive audit (incl. the agg-tier identities) still passes
     assert a.validation_df['abs_err'].max() < 1e-6
-    # the final net (tail / summary) is net of everything
+    # the final net (tail) is net of everything
     assert a._final_net_uw == 'net_agg_uw'
 
 
-def test_deterministic_expense_and_cede_in_waterfall():
-    # a reinstatement pnl with gross expenses + a flat ceding commission shows
-    # them in the GCN Expense section, net of the (deterministic) commission,
-    # exactly as a plain pnl does. Phase-3 slide/pc make this leg stochastic.
+def test_expense_and_cede_book_as_ledger_legs():
+    # a reinstatement pnl with gross expenses + a flat ceding commission books
+    # them as cash-flow legs: the and-joined expense group on the gross group,
+    # the commission as a received leg on the cession.
     p = build('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% cede 20% reinstatements [0 1] '
               'poisson less 500 fixed expense and 10% premium expense')
     a = p.analysis
     assert a.gross_expense == pytest.approx(1500.0)        # 500 + 10% * 10000
     assert a.occ_commission == pytest.approx(3.6)          # 20% * (18% * 100)
-    g = p.margin_df
-    # the deterministic expense / commission is baked into the waterfall UW: the
-    # gross column books the whole expense (a -1500 cost vs the pure gross UW),
-    # while the cession credits its commission (+3.6 vs the pure ceded UW).
-    assert g.loc['EX', 'gross'] == pytest.approx(
-        a.stats_df.loc['gross_uw', 'mean'] - 1500.0, rel=1e-6, abs=1e-6)
-    assert g.loc['EX', 'ceded'] == pytest.approx(
-        a.stats_df.loc['ceded_uw', 'mean'] + 3.6, rel=1e-6, abs=1e-6)
-    # means still add across the split on the EX row
-    assert g.loc['EX', 'net'] == pytest.approx(
-        g.loc['EX', 'gross'] + g.loc['EX', 'ceded'], rel=1e-6, abs=1e-6)
-    # the summary UW is net of expense and ties to the gcn_df EX net UW
-    s = a.summary_df
-    assert s.loc[('', 'Underwriting'), 'Net'] == pytest.approx(
-        g.loc['EX', 'net'], rel=1e-6, abs=1e-3)
+    s = p.summary_df
+    assert s.loc['expense', 'EX'] == pytest.approx(-1500.0)
+    assert s.loc['ceded occ commission', 'EX'] == pytest.approx(3.6)
+    # the gross group result books the whole expense vs the pure gross UW
+    assert s.loc['gross result', 'EX'] == pytest.approx(
+        a._stats_df.loc['gross_uw', 'mean'] - 1500.0, rel=1e-6, abs=1e-6)
+    # and the cession result credits its commission vs the pure ceded UW
+    assert s.loc['ceded occ result', 'EX'] == pytest.approx(
+        a._stats_df.loc['ceded_uw', 'mean'] + 3.6, rel=1e-6, abs=1e-6)
 
 
-def test_no_expense_leaves_waterfall_unshifted():
-    # without expenses there is no expense / commission shift: the gross column
-    # of the waterfall equals the pure gross underwriting mean (P_G - L).
+def test_no_expense_leaves_ledger_pure():
+    # without expenses the gross group result is the pure gross underwriting
+    # mean (P_G - L).
     p = build('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] poisson')
     a = p.analysis
     assert a.gross_expense == pytest.approx(0.0)
     assert a.occ_commission == pytest.approx(0.0)
-    assert p.margin_df.loc['EX', 'gross'] == pytest.approx(
-        a.stats_df.loc['gross_uw', 'mean'], rel=1e-6, abs=1e-6)
-
-
-def test_aggregate_cover_summary_total_cession():
-    # the headline summary collapses to Gross / total-Ceded / final-Net
-    p = build(
-        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
-        'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] '
-        'poisson aggregate net of 85% po 1500 xs 7000 deposit 600')
-    s = p.analysis.summary_df
-    assert list(s.columns) == ['Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
-    # premium / loss are magnitudes: the cession flows out, so Gross - Ceded = Net
-    for item in ('Premium', 'Loss'):
-        assert s.loc[('', item), 'Gross'] - s.loc[('', item), 'Ceded'] == \
-            pytest.approx(s.loc[('', item), 'Net'], rel=1e-6, abs=1e-6)
-    # the underwriting result is signed: the cession gain adds, Gross + Ceded = Net
-    assert s.loc[('', 'Underwriting'), 'Gross'] + \
-        s.loc[('', 'Underwriting'), 'Ceded'] == pytest.approx(
-            s.loc[('', 'Underwriting'), 'Net'], rel=1e-6, abs=1e-6)
+    assert p.summary_df.loc['gross result', 'EX'] == pytest.approx(
+        a._stats_df.loc['gross_uw', 'mean'], rel=1e-6, abs=1e-6)

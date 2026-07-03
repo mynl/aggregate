@@ -1047,7 +1047,7 @@ class UnderwritingTransformer(Transformer):
             out[f"{which}_reins_cede"] = cede
         # per-cession display labels (the ``as`` clause) -- emitted only when some
         # layer carries one, so plain reinsurance specs are untouched. Consumed by
-        # the underwriter to name the tower / margin_df perspective columns.
+        # the underwriter to name the cession group / ledger rows.
         if any(x is not None for x in label):
             out[f"{which}_reins_label"] = label
         # variable rating (Phase 3): one of swing / slide / pc / corridor on one

@@ -478,16 +478,19 @@ class ReinstatementAnalysis:
         return legs
 
     # ------------------------------------------------------------------
-    # the leg evaluation: pushforwards + exact moments over the (L, R) joint
+    # the leg evaluation: pushforwards + exact moments over the (L, R) joint.
+    # INTERNAL -- the engine behind the kept domain extras (validation_df /
+    # tail_df / plot / info); the human-facing exhibits are the returned
+    # PnL's group ledger ([Builders-Variable-Features] demotion).
     # ------------------------------------------------------------------
     @property
-    def distributions(self):
-        """Dict of the named leg :class:`GridDistribution` objects.
+    def _distributions(self):
+        """Dict of the named leg :class:`GridDistribution` objects (internal).
 
         Each accounting leg is **pushed forward** (scattered, rebucketed onto a
         regular grid -- the form :attr:`validation_df` audits against the exact
         moments) over the ``(L, R)`` joint; the fixed ``gross_premium`` is a
-        degenerate one-point distribution so the reporting API stays uniform.
+        degenerate one-point distribution so the internal API stays uniform.
         """
         if self._dists is None:
             from ._grid_distribution import GridDistribution
@@ -500,17 +503,16 @@ class ReinstatementAnalysis:
         return self._dists
 
     # ------------------------------------------------------------------
-    # exact moment store (the EX column; single source of truth)
+    # exact moment store (the audit's EX basis; internal)
     # ------------------------------------------------------------------
     @property
-    def stats_df(self):
-        """Exact per-leg moments on the source joint grid (mean / sd / cv / skew).
+    def _stats_df(self):
+        """Exact per-leg moments on the source joint grid (internal).
 
-        The canonical moment store (the audit's "EX" column): each leg's exact
-        ``sum p_ij f(l_i, r_j)^k`` straight off the joint
+        Each leg's exact ``sum p_ij f(l_i, r_j)^k`` straight off the joint
         (:meth:`~aggregate.bivariate.BivariateDistribution.transformed_moments`),
-        not the rebucketed pushforward. Means here are the ground truth the GCN
-        Mean rows add to.
+        not the rebucketed pushforward -- the ground truth
+        :attr:`validation_df` audits against.
         """
         if self._stats is None:
             rows = {name: self.source.transformed_moments(fn)
@@ -523,8 +525,8 @@ class ReinstatementAnalysis:
         return self._stats
 
     def _exact(self, name):
-        """``(mean, sd, skew)`` of a leg from the exact :attr:`stats_df`."""
-        row = self.stats_df.loc[name]
+        """``(mean, sd, skew)`` of a leg from the exact :attr:`_stats_df`."""
+        row = self._stats_df.loc[name]
         sk = row.get('skew', np.nan)
         return (float(row['mean']), float(row['sd']),
                 float(sk) if pd.notna(sk) else 0.0)
@@ -569,188 +571,12 @@ class ReinstatementAnalysis:
         expense cost on a retained column.
         """
         from ._grid_distribution import GridDistribution
-        gd = self.distributions[uw_leg]
+        gd = self._distributions[uw_leg]
         shift = self._exp_mag[perspective] * (1.0 if ceded else -1.0)
         if shift == 0.0:
             return gd
         return GridDistribution(gd.x + shift, gd.p, bs=gd.bs, name=gd.name,
                                 is_loss_value=gd.is_loss_value)
-
-    # ------------------------------------------------------------------
-    # the reused GCN waterfall (via the shared assembler)
-    # ------------------------------------------------------------------
-    @property
-    def gcn_df(self):
-        """Gross / Ceded / Net underwriting waterfall as a :class:`PnLTower`.
-
-        Every accounting leg is a :func:`~aggregate.create_pnl` over the **same**
-        ``(L, R)`` joint, so their per-occurrence results add **per atom**: the
-        gross ``sell`` leg (``+premium -loss -expense``) and the occurrence
-        ``buy`` cession (``+recovery +commission -ceded_premium``, the ceded
-        premium ``D + h(R)`` genuinely stochastic) stack into the running net
-        ``= net_uw``. The exhibit is the new-canonical stats x waterfall table
-        (:attr:`PnLTower.gcn_df`) -- ``EX`` adds across the split, SD / CV / Skew
-        / percentiles are per-column.
-
-        With a subsequent aggregate cover (decision 3) a second ``buy`` leg (the
-        agg recovery ``g(L - A(R))``, a deterministic pushforward of the same
-        joint) inures on the net-of-occurrence, so the tower gains the ``ceded
-        agg`` / running-net / ``agg benefit`` columns and a ``total benefit``.
-        """
-        from ._pnl import create_pnl, create_pnl_tower
-        src = self.source
-        P_G, D = self.gross_premium, self.terms.deposit
-        A, h = self.terms.recovery, self.terms.reinstatement_premium
-        E_G = self.gross_expense
-        gross_obl = {'loss': (lambda l, r: l)}
-        if E_G:
-            gross_obl['expense'] = E_G
-        gross = create_pnl(src, role='sell', name='gross',
-                           consideration={'premium': P_G},
-                           obligation=gross_obl, result_name='gross')
-        occ_obl = {'recovery': (lambda l, r: A(r))}
-        if self.occ_commission:
-            occ_obl['commission'] = self.occ_commission
-        occ = create_pnl(src, role='buy', name='ceded',
-                         consideration={'ceded premium': (lambda l, r: D + h(r))},
-                         obligation=occ_obl, result_name='ceded')
-        legs, deltas = [gross, occ], ['occ benefit']
-        if self.agg_recovery is not None:
-            g0, pc = self.agg_recovery, self.agg_ceded_premium
-
-            def g_rec(l, r):
-                return g0(np.maximum(l - A(r), 0.0))
-
-            agg_obl = {'recovery': g_rec}
-            if self.agg_commission:
-                agg_obl['commission'] = self.agg_commission
-            agg = create_pnl(src, role='buy', name='ceded agg',
-                             consideration={'ceded premium': pc},
-                             obligation=agg_obl, result_name='ceded agg')
-            legs, deltas = [gross, occ, agg], ['occ benefit', 'agg benefit']
-        return create_pnl_tower(legs, delta_names=deltas).gcn_df
-
-    # ------------------------------------------------------------------
-    # the net P&L value object (the always-PnL face; analysis is attached)
-    # ------------------------------------------------------------------
-    def as_pnl(self):
-        """The **net** position as a :class:`~aggregate.PnL`, with ``self`` attached.
-
-        The face a ``build('pnl ... reinstatements ...')`` program returns: a P&L
-        over the ``(L, R)`` joint whose net legs are the (stochastic) net premium
-        ``P_G - D - h(R)``, the net loss ``L - A(R)`` and the deterministic net
-        expense, so its fixed exhibits describe the retained position and its
-        ``margin_df`` forwards this analysis's Gross/Ceded/Net waterfall. The
-        analysis itself is reachable as :attr:`~aggregate.PnL.analysis` (the treaty
-        maps, ``validation_df``, ``tail_df``, ``plot``).
-
-        The committed ``Scaled`` denominator is the deterministic ``gross -
-        deposit`` (minus any aggregate-cover deposit) -- the natural net-premium
-        base once the stochastic reinstatement premium is stripped out.
-        """
-        from ._pnl import create_pnl
-        src = self.source
-        P_G, D = self.gross_premium, self.terms.deposit
-        A, h = self.terms.recovery, self.terms.reinstatement_premium
-        has_agg = self.agg_recovery is not None
-        pc = self.agg_ceded_premium if has_agg else 0.0
-        net_expense = self._exp_mag['net_agg' if has_agg else 'net_occ']
-        if has_agg:
-            g0 = self.agg_recovery
-
-            def g_rec(l, r):
-                return g0(np.maximum(l - A(r), 0.0))
-
-            def net_premium(l, r):
-                return P_G - D - h(r) - pc
-
-            def net_loss(l, r):
-                return (l - A(r)) - g_rec(l, r)
-        else:
-            def net_premium(l, r):
-                return P_G - D - h(r)
-
-            def net_loss(l, r):
-                return l - A(r)
-
-        obligation = {'net loss': net_loss}
-        if net_expense:
-            obligation['net expense'] = net_expense
-        face = create_pnl(
-            src, role='sell', name='net',
-            consideration={'net premium': net_premium},
-            obligation=obligation, result_name='margin',
-            scale=float(P_G - D - pc))
-        face._waterfall = self
-        return face
-
-    # ------------------------------------------------------------------
-    # the headline summary (pre-plan section 13)
-    # ------------------------------------------------------------------
-    @property
-    def summary_df(self):
-        """Headline Gross / Ceded / Net / Impact / Pct Impact table (pre-plan section 13).
-
-        Rows: Premium, CV(Premium), Loss, CV(Loss), Underwriting Result,
-        SD(Underwriting Result), then the adverse-tail percentile rows
-        (:attr:`percentiles`). The Impact column is Net - Gross (``= -Ceded`` for
-        premium / loss); Pct Impact is the percent change vs gross. Reports
-        SD(UW) (a near-zero margin) but CV(premium) / CV(loss) (materially
-        nonzero), following the PnL convention. With a subsequent aggregate cover
-        the ``Ceded`` column is the **total** cession (occurrence + aggregate)
-        and ``Net`` is net of everything, so Gross + Ceded = Net still holds. The
-        Underwriting rows are **net of the deterministic expense / commission**
-        (a constant shift; SD unchanged) so they tie to :attr:`gcn_df`.
-        """
-        if self.agg_recovery is None:
-            ceded_legs = ('ceded_premium', 'ceded_loss', 'ceded_uw')
-            net_legs = ('net_premium', 'net_loss', 'net_uw')
-            uw_persp = {'gross': 'gross', 'ceded': 'ceded_occ', 'net': 'net_occ'}
-        else:
-            ceded_legs = ('total_ceded_premium', 'total_ceded_loss',
-                          'total_ceded_uw')
-            net_legs = ('net_agg_premium', 'net_agg_loss', 'net_agg_uw')
-            uw_persp = {'gross': 'gross', 'ceded': 'total_ceded', 'net': 'net_agg'}
-        prem = {'gross': self._exact('gross_premium'),
-                'ceded': self._exact(ceded_legs[0]),
-                'net': self._exact(net_legs[0])}
-        loss = {'gross': self._exact('gross_loss'),
-                'ceded': self._exact(ceded_legs[1]),
-                'net': self._exact(net_legs[1])}
-        uw = {'gross': self._exact('gross_uw'),
-              'ceded': self._exact(ceded_legs[2]),
-              'net': self._exact(net_legs[2])}
-        # deterministic expense / commission shift per column (+ credit on the
-        # cession, - cost on a retained column); 0 when no expenses are threaded.
-        ceded_col = {'gross': False, 'ceded': True, 'net': False}
-        shift = {c: self._exp_mag[uw_persp[c]] * (1.0 if ceded_col[c] else -1.0)
-                 for c in ('gross', 'ceded', 'net')}
-        d = self.distributions
-        uw_dist = {'gross': d['gross_uw'], 'ceded': d[ceded_legs[2]],
-                   'net': d[net_legs[2]]}
-        cols = ['gross', 'ceded', 'net']
-        rows = {}
-        rows[('', 'Premium')] = {c: prem[c][0] for c in cols}
-        rows[('', 'CV(Premium)')] = {
-            c: (prem[c][1] / prem[c][0] if prem[c][0] else np.nan) for c in cols}
-        rows[('', 'Loss')] = {c: loss[c][0] for c in cols}
-        rows[('', 'CV(Loss)')] = {
-            c: (loss[c][1] / loss[c][0] if loss[c][0] else np.nan) for c in cols}
-        rows[('', 'Underwriting')] = {c: uw[c][0] + shift[c] for c in cols}
-        rows[('', 'SD(Underwriting)')] = {c: uw[c][1] for c in cols}
-        for lvl in self.percentiles:
-            # adverse tail of an underwriting *result* (payoff): the bad outcome
-            # is the low quantile, so the lvl-adverse row is q(1 - lvl).
-            rows[('Percentile', f'{lvl:g}')] = {
-                c: float(uw_dist[c].q(1.0 - lvl)) + shift[c] for c in cols}
-        df = pd.DataFrame(rows).T
-        df['Impact'] = df['net'] - df['gross']
-        with np.errstate(divide='ignore', invalid='ignore'):
-            df['Pct Impact'] = np.where(df['gross'] != 0,
-                                        df['net'] / df['gross'] - 1.0, np.nan)
-        df.index = pd.MultiIndex.from_tuples(df.index, names=['section', 'item'])
-        df.columns = ['Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
-        return df
 
     # ------------------------------------------------------------------
     # the audit (pre-plan section 16)
@@ -765,8 +591,8 @@ class ReinstatementAnalysis:
         for the headline legs. Computed on the joint grid **before** rebucketing
         is the ground truth; the pushforward (Est) should match to grid accuracy.
         """
-        d = self.distributions
-        s = self.stats_df
+        d = self._distributions
+        s = self._stats_df
         recs = []
 
         def add(item, ex, est):
@@ -836,7 +662,7 @@ class ReinstatementAnalysis:
         """
         if periods is None:
             periods = (10, 20, 50, 100, 200, 250, 1000)
-        d = self.distributions
+        d = self._distributions
         net_leg = d[self._final_net_uw]
         # net of deterministic expense / commission (constant shift), so the
         # capital number is the true bad net year (premium - loss - expense).
@@ -909,37 +735,6 @@ class ReinstatementAnalysis:
         return float(self.validation_df['abs_err'].max()) < 1e-6
 
     # ------------------------------------------------------------------
-    # per-leg density frame
-    # ------------------------------------------------------------------
-    def density_df(self, leg='net_uw'):
-        """Per-bucket frame ``(p, F, S)`` for one named leg distribution.
-
-        Each leg is a :class:`~aggregate._grid_distribution.GridDistribution` on
-        its own pushforward grid (the legs do not share a grid), so this returns
-        one leg at a time; ``leg`` defaults to the headline ``net_uw``.
-
-        Parameters
-        ----------
-        leg : str, default ``'net_uw'``
-            One of :attr:`distributions` (e.g. ``gross_uw``, ``ceded_premium``,
-            ``net_loss``, ``reinstatement_premium``).
-
-        Returns
-        -------
-        pandas.DataFrame
-            Index the leg value; columns ``p`` (mass), ``F`` (cdf), ``S``
-            (survival).
-        """
-        d = self.distributions
-        if leg not in d:
-            raise ValueError(
-                f'unknown leg {leg!r}; choose from {sorted(d)}.')
-        gd = d[leg]
-        F = np.cumsum(gd.p)
-        return pd.DataFrame({'p': gd.p, 'F': F, 'S': 1.0 - F},
-                            index=pd.Index(gd.x, name=leg))
-
-    # ------------------------------------------------------------------
     # joint-grid sizing audit (reused from the BivariateAggregate holder)
     # ------------------------------------------------------------------
     @property
@@ -977,7 +772,7 @@ class ReinstatementAnalysis:
     def info(self):
         """Fixed-layout text summary (terms, premium, headline means, audit)."""
         from .constants import info_row
-        t, s = self.terms, self.stats_df
+        t, s = self.terms, self._stats_df
         rows = [
             ('reinstatement analysis', f'{t.limit:g} xs layer'),
             ('gross premium', f'{self.gross_premium:,.6g}'),
@@ -1004,11 +799,15 @@ class ReinstatementAnalysis:
                 f'gross premium {self.gross_premium:g}, deposit {t.deposit:g}.')
 
     def _repr_html_(self):
-        """Jupyter display: treaty intro, the GCN summary, and the tail table."""
+        """Jupyter display: treaty intro and the return-period tail table.
+
+        The Gross/Ceded/Net exhibit is the owning PnL's ledger
+        ([Builders-Variable-Features] demotion); the analysis displays only
+        its domain extras.
+        """
         intro = self._text_info_blob()
         parts = [f'<h4>Reinstatement analysis &mdash; {self.terms.limit:g} xs '
-                 f'layer</h4>', f'<p>{intro}</p>',
-                 self.summary_df.to_html(), self.tail_df().to_html()]
+                 f'layer</h4>', f'<p>{intro}</p>', self.tail_df().to_html()]
         if not self._validation_passes():
             parts.append('<p><b>VALIDATION FAILS:</b> '
                          f'{self.validation_explanation}</p>')

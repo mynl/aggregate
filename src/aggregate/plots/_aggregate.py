@@ -168,8 +168,7 @@ def plot_pnl(pnl, axd=None, **kwargs):
     read from the P&L's exact result :class:`GridDistribution`
     (:attr:`PnL.result`). There is **no severity panel** (a P&L is an accounting
     object, not a compound of a severity), and no component overlay: the cession
-    waterfall lives on the :class:`~aggregate.PnLTower`. The break-even line at 0
-    is marked.
+    waterfall is the ledger's own rows. The break-even line at 0 is marked.
 
     Parameters
     ----------

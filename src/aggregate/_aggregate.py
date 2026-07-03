@@ -2723,58 +2723,55 @@ class Aggregate(LabeledMixin):
         self._dist = None
         self._sev_dist = None
 
-    def make_pnl(self, consideration=None, *, gross=None, ceded=None, net=None,
-                 expense_spec=None, gcn_economics=None, consideration_label=None):
+    def make_pnl(self, consideration=None, *, gross=None, ceded=None,
+                 expense_spec=None, gcn_economics=None, consideration_label=None,
+                 loss_label=None):
         """Wrap this aggregate as the risky leg of a :class:`PnL` position.
 
-        The net P&L is ``consideration - X`` when ``X`` is a loss and
-        ``consideration + X`` when ``X`` is a payoff -- the combine sign is read
-        from :attr:`value_type`, so there is **no** ``sign`` argument. The
-        aggregate itself is left untouched (it is the obligation); the net is
-        derived lazily on the :class:`PnL`.
+        Object sugar delegating to the builders in
+        :mod:`aggregate._pnl_builders`. Two construction modes:
 
-        Two construction modes:
-
-        * **single leg** -- ``make_pnl(consideration=C)``. On a reinsurance-
-          bearing aggregate this is a *net-only* P&L against the net loss (what
-          comes out of the aggregate).
-        * **Gross / Ceded / Net** -- ``make_pnl(gross=Pg, ceded=Pc[, net=Pn])``
-          on an **aggregate-reinsurance**-bearing aggregate: the additive
-          three-leg view (``Net = Gross + Ceded``). ``Pg`` is the gross premium
-          received, ``Pc`` the ceded premium paid; the net consideration is
-          ``Pg - Pc`` unless ``net=`` states the retained premium directly.
+        * **plain** -- ``make_pnl(consideration=C)``: a one-group ``sell``
+          ledger over this aggregate's own density (for a reinsurance-bearing
+          aggregate that is the *net* density -- what comes out of the
+          aggregate).
+        * **group ledger** -- ``make_pnl(gross=Pg, ceded=Pc)`` on a
+          reinsurance-bearing aggregate: the per-atom Gross / Ceded / Net
+          **group ledger** (:func:`~aggregate._pnl_builders.build_gcn_pnl`) --
+          an aggregate-only cession books as a real ``buy`` group over the
+          gross marginal; an occurrence program books over the net-of-occ
+          marginal with the occ economics as constants (its risk transfer is
+          the ``xpnl`` exhibit).
 
         Parameters
         ----------
         consideration : float, array-like, or callable, optional
-            The single-leg consideration, **signed** (``+`` received, ``-``
-            paid); a callable ``f(x)`` is a loss-sensitive consideration applied
-            bucket-wise. Mutually exclusive with ``gross``/``ceded``.
+            The plain-mode consideration, **signed** (``+`` received, ``-``
+            paid); a vector sums to one book amount; a callable ``f(x)`` is a
+            loss-sensitive consideration applied bucket-wise. Mutually
+            exclusive with ``gross``/``ceded``.
         gross, ceded : float, optional
             The gross premium received and ceded premium paid (positive
-            magnitudes) for the GCN view.
-        net : float, optional
-            Override the retained (net) premium; defaults to ``gross - ceded``.
+            magnitudes) for the group-ledger view.
         consideration_label : str, optional
-            Name for the single-leg consideration (the DecL premium ``as`` clause);
-            defaults to ``'consideration'``. See dev/plan-decl-labels.md.
+            Name for the premium leg (the DecL premium ``as`` clause);
+            defaults to ``'consideration'`` (plain) / ``'premium'`` (ledger).
+        loss_label : str, optional
+            Name for the loss leg (the DecL engine ``as`` clause); defaults to
+            ``'loss'``.
 
         Returns
         -------
         PnL
-            **Always** a :class:`~aggregate.PnL` value object. A Gross / Ceded /
-            Net construction returns the **net** position, with the full waterfall
-            attached as :attr:`~aggregate.PnL.tower` and surfaced through
-            :attr:`~aggregate.PnL.margin_df`.
+            **Always** a :class:`~aggregate.PnL` value object; the ledger form
+            carries its resolved cession economics as ``pnl.economics``.
 
         Notes
         -----
         ``build('pnl NAME C premium less <body>')`` is sugar for
         ``build('agg NAME <body>').make_pnl(consideration=C)``.
         """
-        import numpy as _np
-        from ._pnl import (create_pnl, gcn_tower_from_aggregate,
-                           _resolve_expense_split)
+        from ._pnl_builders import build_plain_pnl, build_gcn_pnl
         if gross is not None or ceded is not None:
             if gross is None or ceded is None:
                 raise ValueError(
@@ -2786,52 +2783,21 @@ class Aggregate(LabeledMixin):
                 raise ValueError(
                     'the Gross/Ceded/Net view requires reinsurance on the risky '
                     'leg; the aggregate carries no occurrence / aggregate treaty.')
-            # A Gross/Ceded/Net program returns the **net** PnL value object (the
-            # fixed exhibits describe the retained position); the full waterfall
-            # is attached as ``pnl.tower`` and surfaces as ``pnl.margin_df``.
-            tower = gcn_tower_from_aggregate(
-                self, gross=gross, ceded=ceded, net=net,
-                expense_spec=expense_spec, gcn_economics=gcn_economics,
-                name=self.name)
-            face = tower.net
-            face.result_name = 'margin'      # uniform result label across P&Ls
-            face._waterfall = tower
-            return face
+            return build_gcn_pnl(
+                self, gross=gross, ceded=ceded, gcn_economics=gcn_economics,
+                expense_spec=expense_spec,
+                consideration_label=consideration_label,
+                loss_label=loss_label, name=self.name,
+                display_label=self.display_label)
         if consideration is None:
             raise ValueError(
                 'PnL needs a consideration= (or gross=/ceded= for the '
                 'Gross/Ceded/Net view).')
-        # a constant vector consideration sums to one book amount; a callable is a
-        # loss-sensitive consideration f(x); a scalar passes through.
-        if callable(consideration):
-            cons = consideration
-            gp = float(_np.sum(_np.asarray(consideration(0.0), dtype=float)))
-        else:
-            cons = float(_np.sum(_np.asarray(consideration, dtype=float)))
-            gp = cons
-        # LAE (a `loss`-basis expense) scales with the *actual* loss, so the
-        # expense leg is `loss_rate * x + scalar` -- stochastic, not a point mass
-        # at `rate * E[loss]`. `fixed` / `premium` terms are the deterministic
-        # scalar. See ``_resolve_expense_split``.
-        # One obligation leg per expense group (``and``-joined terms combine;
-        # juxtaposed groups stay separate). A group's ``as`` label (or a
-        # basis-derived default) names its leg; colliding default names are
-        # de-duplicated. See dev/plan-decl-labels.md.
-        obl = {'loss': (lambda x: x)}
-        for gname, scalar_exp, loss_rate in _resolve_expense_split(
-                self, expense_spec, gp):
-            key, n = gname, 2
-            while key in obl:
-                key = f'{gname} ({n})'
-                n += 1
-            if loss_rate:
-                obl[key] = (lambda x, r=loss_rate, s=scalar_exp: r * x + s)
-            elif scalar_exp:
-                obl[key] = scalar_exp
-        cons_key = consideration_label or 'consideration'
-        return create_pnl(self, consideration={cons_key: cons},
-                          obligation=obl, role='sell', result_name='margin',
-                          name=self.name, display_label=self.display_label)
+        return build_plain_pnl(
+            self, consideration=consideration,
+            consideration_label=consideration_label, loss_label=loss_label,
+            expense_spec=expense_spec, name=self.name,
+            display_label=self.display_label)
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, window_convention=None, **kwargs):

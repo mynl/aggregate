@@ -343,10 +343,10 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             if x.density_df is not None and not x._validation_passes():
                 print(f'\nVALIDATION FAILS: {x.validation_explanation}')
         elif isinstance(x, ReinstatementAnalysis):
-            # Reinstatement analysis: treaty intro, the GCN summary_df, then the
-            # return-period tail_df; validation flagged only on a genuine failure.
+            # Reinstatement analysis: treaty intro then the return-period
+            # tail_df (the Gross/Ceded/Net exhibit is the owning PnL's ledger);
+            # validation flagged only on a genuine failure.
             print(x._text_info_blob())
-            qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
             qd(x.tail_df().fillna(''), accuracy=accuracy, **kwargs)
             if not x._validation_passes():
                 print(f'\nVALIDATION FAILS: {x.validation_explanation}')

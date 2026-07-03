@@ -51,29 +51,6 @@ def test_repr_html_has_tables():
 
 
 # ----------------------------------------------------------------------
-# density_df (per leg)
-# ----------------------------------------------------------------------
-def test_density_df_default_and_named_leg():
-    an = _analysis()
-    df = an.density_df()                      # default net_uw
-    assert list(df.columns) == ['p', 'F', 'S']
-    assert df['p'].sum() == pytest.approx(1.0, abs=1e-6)
-    assert df.index.name == 'net_uw'
-    # a different leg
-    cp = an.density_df('ceded_premium')
-    assert cp.index.name == 'ceded_premium'
-    # F is a nondecreasing cdf ending at ~1
-    assert np.all(np.diff(cp['F'].to_numpy()) >= -1e-12)
-    assert cp['F'].iloc[-1] == pytest.approx(1.0, abs=1e-6)
-
-
-def test_density_df_unknown_leg_raises():
-    an = _analysis()
-    with pytest.raises(ValueError, match='unknown leg'):
-        an.density_df('not_a_leg')
-
-
-# ----------------------------------------------------------------------
 # bs_* sizing audit (reused from the BivariateAggregate holder)
 # ----------------------------------------------------------------------
 def test_bs_audit_reused_from_holder():
@@ -127,5 +104,4 @@ def test_qd_runs(capsys):
     qd(an)
     out = capsys.readouterr().out
     assert 'Reinstatement analysis' in out
-    assert 'Underwriting' in out          # summary_df row
-    assert 'return_period' in out         # tail_df index
+    assert 'return_period' in out         # tail_df index (the kept exhibit)

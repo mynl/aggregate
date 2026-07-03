@@ -5,10 +5,10 @@
 returns an :class:`~aggregate.PnL` value object (the always-PnL face) with the
 :class:`~aggregate.variable_rating.VariableRatingAnalysis` attached as
 ``.analysis``. The returned P&L carries its own fixed exhibits (the net-position
-``summary_df`` / ``stats_df`` templates); the Gross/Ceded/Net waterfall and the
-treaty maps live on ``.analysis`` (and the waterfall is forwarded as
-``.margin_df``). Retro (account-level rating clause) varies the gross premium and
-is the 1-D case with no reinsurance.
+``summary_df`` / ``stats_df`` templates); the Gross/Ceded/Net waterfall
+(``gcn_df``) and the treaty maps live on ``.analysis``. Retro (account-level
+rating clause) varies the gross premium and is the 1-D case with no
+reinsurance.
 """
 
 import warnings
@@ -33,18 +33,16 @@ _HEAD = ('pnl V 10000 premium less agg V_e 10000 prem at 85% lr sev lognorm 50 c
 
 
 def _means_add(pnl):
-    """Gross + Ceded == Net on the ``EX`` row of the GCN waterfall (``margin_df``)."""
-    g = pnl.margin_df
-    return abs(g.loc['EX', 'gross'] + g.loc['EX', 'ceded']
-              - g.loc['EX', 'net']) < 1e-3
+    """The signed ledger foots: the leg means sum to the grand result."""
+    dd = pnl.density_df
+    legs = [k for k in dd if not k.endswith('result') and k != 'margin']
+    return abs(sum(dd[k].mean() for k in legs) - pnl.mean) < 1e-3
 
 
 def _assert_gained(pnl):
-    """Smoke the analysis surfaces: its GCN ``summary_df`` and ``tail_df``."""
-    a = pnl.analysis
-    assert list(a.summary_df.columns) == \
-        ['Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
-    assert list(a.tail_df().columns) == ['gross_uw', 'net_uw', 'benefit']
+    """Smoke the analysis drill-down surface (the kept domain extra)."""
+    assert list(pnl.analysis.tail_df().columns) == \
+        ['gross_uw', 'net_uw', 'benefit']
 
 
 # ----------------------------------------------------------------------
@@ -59,8 +57,9 @@ def test_swing_build():
     assert (terms.basic, terms.lcm, terms.minimum, terms.maximum) == \
         (500.0, 0.5, 500.0, 3000.0)
     assert _means_add(p)
-    # ceded premium is the stochastic leg
-    assert p.analysis.stats_df.loc['ceded_premium', 'cv'] > 0
+    # ceded premium is the stochastic leg -- in the ledger and the engine
+    assert p.summary_df.loc['ceded agg premium', 'SD'] > 0
+    assert p.analysis._stats_df.loc['ceded_premium', 'cv'] > 0
     _assert_gained(p)
 
 
@@ -81,7 +80,9 @@ def test_slide_build():
     assert terms.anchors == ((0.45, 0.60), (0.25, 0.70), (0.19, 0.80))
     assert _means_add(p)
     assert p.analysis.ceded_premium == pytest.approx(1500.0)  # deposit denom
-    assert p.analysis.stats_df.loc['commission', 'cv'] > 0
+    # the sliding commission is the one changed leg (stochastic, received)
+    assert p.summary_df.loc['sliding commission', 'SD'] > 0
+    assert p.analysis._stats_df.loc['commission', 'cv'] > 0
     _assert_gained(p)
 
 
@@ -94,7 +95,8 @@ def test_pc_build():
     assert isinstance(terms, ProfitCommissionTerms)
     assert (terms.share, terms.allowance) == (0.25, 0.10)
     assert _means_add(p)
-    assert p.analysis.stats_df.loc['commission', 'cv'] > 0
+    assert p.summary_df.loc['profit commission', 'SD'] > 0
+    assert p.analysis._stats_df.loc['commission', 'cv'] > 0
     _assert_gained(p)
 
 
@@ -107,8 +109,9 @@ def test_corridor_build():
     assert isinstance(terms, CorridorTerms)
     assert (terms.share, terms.width, terms.attachment) == (0.50, 0.30, 0.20)
     assert _means_add(p)
-    # corridor reduces the cession -> ceded loss is the stochastic leg
-    assert p.analysis.stats_df.loc['ceded_loss', 'cv'] > 0
+    # corridor reduces the cession -> the recovery is the changed leg
+    assert p.summary_df.loc['ceded agg recovery', 'SD'] > 0
+    assert p.analysis._stats_df.loc['ceded_loss', 'cv'] > 0
     _assert_gained(p)
 
 
@@ -125,11 +128,50 @@ def test_retro_build():
     assert (terms.basic, terms.lcm, terms.minimum, terms.maximum) == \
         (3000.0, 1.1, 3500.0, 8000.0)
     # gross premium is the stochastic leg; collared between min and max
-    sdf = p.analysis.stats_df
-    assert sdf.loc['gross_premium', 'cv'] > 0
-    assert 3500.0 <= sdf.loc['gross_premium', 'mean'] <= 8000.0
+    s = p.summary_df
+    assert s.loc['premium', 'SD'] > 0
+    assert 3500.0 <= s.loc['premium', 'EX'] <= 8000.0
     assert _means_add(p)
     _assert_gained(p)
+
+
+# ----------------------------------------------------------------------
+# the acceptance pair (dev/plan-yapnl.md examples 1-2): a retro program has
+# the SAME exhibit shape as the plain gross book -- a feature never changes
+# the machinery, it changes one leg's function
+# ----------------------------------------------------------------------
+def test_acceptance_pair_gross_vs_retro_same_shape():
+    gross = build(
+        'pnl GrossPNL as "Gross Book PNL" inherit premium as "Gross Premium" '
+        'less agg A as "Gross Loss" 10000 premium at 85% lr '
+        'sev lognorm 50 cv 3 poisson '
+        'less 5% loss expense as LAE '
+        '100 fixed expense and 10% premium expense as "Fixed & Acq Exp"')
+    retro = build(
+        'pnl RetroPNL as "Retro Rated Gross PNL" '
+        'retro basic 2000 lcm 1.1 min 8000 max 14000 premium as "Retro Premium" '
+        'less agg B as "Gross Loss" 10000 premium at 85% lr '
+        'sev lognorm 50 cv 3 poisson '
+        'less 5% loss expense as LAE '
+        '100 fixed expense as "Fixed Exp" 10% premium expense as "Acq Exp"')
+    g, r = gross.summary_df, retro.summary_df
+    # identical template: declared labels on every row, same columns
+    assert list(g.columns) == list(r.columns)
+    assert list(g.index) == ['Gross Premium', 'Gross Loss', 'LAE',
+                             'Fixed & Acq Exp', 'total obligation', 'margin']
+    assert list(r.index) == ['Retro Premium', 'Gross Loss', 'LAE',
+                             'Fixed Exp', 'Acq Exp', 'total obligation',
+                             'margin']
+    # LAE is stochastic (rate * actual loss) in BOTH programs
+    assert g.loc['LAE', 'SD'] > 0 and r.loc['LAE', 'SD'] > 0
+    # the one changed leg: the retro premium is stochastic, the gross fixed
+    assert g.loc['Gross Premium', 'SD'] == 0
+    assert r.loc['Retro Premium', 'SD'] > 0
+    # the EX column foots to the result in both
+    for df in (g, r):
+        legs = [i for i in df.index if i not in ('total obligation', 'margin')]
+        assert df.loc['margin', 'EX'] == pytest.approx(
+            df.loc[legs, 'EX'].sum(), abs=1e-6)
 
 
 def test_retro_bare_collar():

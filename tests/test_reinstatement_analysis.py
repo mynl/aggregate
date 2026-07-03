@@ -28,7 +28,7 @@ def test_entry_point_builds():
     an = _analysis()
     assert isinstance(an, ReinstatementAnalysis)
     assert an.gross_premium == 1000.0
-    assert set(an.distributions) >= {
+    assert set(an._distributions) >= {
         'gross_loss', 'gross_uw', 'ceded_loss', 'ceded_premium', 'ceded_uw',
         'net_loss', 'net_premium', 'net_uw', 'reinstatement_premium',
         'unlimited_ceded_loss', 'gross_premium'}
@@ -61,12 +61,11 @@ def test_requires_gross_premium():
 # ----------------------------------------------------------------------
 def test_means_add_across_gcn_split():
     an = _analysis()
-    g = an.gcn_df
-    # the new stats x waterfall shape: gross / ceded / net underwriting columns,
-    # means add on the EX row (gross + ceded = net)
-    assert list(g.columns)[:3] == ['gross', 'ceded', 'net']
-    assert g.loc['EX', 'net'] == pytest.approx(
-        g.loc['EX', 'gross'] + g.loc['EX', 'ceded'], rel=1e-9, abs=1e-9)
+    # means add on the exact underwriting legs (gross + ceded = net)
+    s = an._stats_df
+    assert s.loc['net_uw', 'mean'] == pytest.approx(
+        s.loc['gross_uw', 'mean'] + s.loc['ceded_uw', 'mean'],
+        rel=1e-9, abs=1e-9)
 
 
 def test_validation_identities_pass():
@@ -78,7 +77,7 @@ def test_validation_identities_pass():
 
 def test_ceded_premium_mean_is_deposit_plus_expected_h():
     an = _analysis()
-    s = an.stats_df
+    s = an._stats_df
     # E[ceded premium] = D + E[h(R)]
     assert s.loc['ceded_premium', 'mean'] == pytest.approx(
         an.terms.deposit + s.loc['reinstatement_premium', 'mean'], rel=1e-9)
@@ -87,13 +86,13 @@ def test_ceded_premium_mean_is_deposit_plus_expected_h():
 def test_ceded_premium_is_stochastic():
     an = _analysis()
     # the whole point: ceded premium has nonzero CV; gross premium is fixed
-    assert an.stats_df.loc['ceded_premium', 'cv'] > 0
-    assert an.stats_df.loc['gross_premium', 'cv'] == 0.0
+    assert an._stats_df.loc['ceded_premium', 'cv'] > 0
+    assert an._stats_df.loc['gross_premium', 'cv'] == 0.0
 
 
 def test_net_loss_equals_gross_minus_recovery_in_mean():
     an = _analysis()
-    s = an.stats_df
+    s = an._stats_df
     assert s.loc['net_loss', 'mean'] == pytest.approx(
         s.loc['gross_loss', 'mean'] - s.loc['ceded_loss', 'mean'], rel=1e-9)
 
@@ -113,8 +112,8 @@ def test_agg_cover_adds_tier_legs_and_identities():
     # the agg-tier legs are present
     for leg in ('ceded_agg_loss', 'net_agg_loss', 'ceded_agg_uw', 'net_agg_uw',
                 'total_ceded_loss'):
-        assert leg in an.distributions
-    s = an.stats_df
+        assert leg in an._distributions
+    s = an._stats_df
     # the agg cover actually recovers something on the net-of-occ loss
     assert s.loc['ceded_agg_loss', 'mean'] > 0
     # waterfall identities (means): net_occ + ceded_agg = net_agg
@@ -127,17 +126,13 @@ def test_agg_cover_adds_tier_legs_and_identities():
     assert an.validation_df['abs_err'].max() < 1e-6
 
 
-def test_no_agg_cover_keeps_three_column_waterfall():
+def test_no_agg_cover_skips_agg_tier():
     a = build('agg Cat 3 claims sev lognorm 60 cv 2.5 '
               'occurrence net of 100 xs 100 poisson')
     an = a.reinstatement_analysis(
         gross_premium=1000.0, terms=ReinstatementTerms(100.0, (1.0,), 10.0))
     assert an.agg_recovery is None
-    # occ-only: the three-perspective waterfall (gross / ceded / net) plus a
-    # trailing benefit column; no agg tier.
-    assert list(an.gcn_df.columns)[:3] == ['gross', 'ceded', 'net']
-    assert len(an.gcn_df.columns) == 4
-    assert 'ceded_agg_loss' not in an.distributions
+    assert 'ceded_agg_loss' not in an._distributions
 
 
 # ----------------------------------------------------------------------
@@ -150,26 +145,14 @@ def test_mean_grid_invariant_across_bs():
     means = []
     for log2 in (None,):
         an = a.reinstatement_analysis(gross_premium=1000.0, terms=terms)
-        means.append(an.stats_df.loc['net_uw', 'mean'])
+        means.append(an._stats_df.loc['net_uw', 'mean'])
     # exact moments are grid-independent by construction; sanity that it is finite
     assert np.isfinite(means[0])
 
 
 # ----------------------------------------------------------------------
-# exhibits are well formed
+# the kept drill-down exhibit is well formed
 # ----------------------------------------------------------------------
-def test_summary_df_shape_and_rows():
-    an = _analysis()
-    s = an.summary_df
-    assert list(s.columns) == ['Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
-    items = set(s.index.get_level_values('item'))
-    assert {'Premium', 'CV(Premium)', 'Loss', 'CV(Loss)', 'Underwriting',
-            'SD(Underwriting)'} <= items
-    # gross premium CV is zero, ceded/net nonzero
-    assert s.loc[('', 'CV(Premium)'), 'Gross'] == 0.0
-    assert s.loc[('', 'CV(Premium)'), 'Ceded'] > 0.0
-
-
 def test_tail_df_net_beats_gross():
     an = _analysis()
     t = an.tail_df()
@@ -208,7 +191,7 @@ def test_monte_carlo_cross_check():
     h = terms.reinstatement_premium(R)
     net_uw = 1000.0 - terms.deposit - h - L + A
 
-    s = an.stats_df
+    s = an._stats_df
     assert s.loc['gross_loss', 'mean'] == pytest.approx(L.mean(), rel=0.03)
     assert s.loc['ceded_loss', 'mean'] == pytest.approx(A.mean(), rel=0.05)
     assert s.loc['reinstatement_premium', 'mean'] == pytest.approx(

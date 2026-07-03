@@ -57,6 +57,18 @@ Pricing
 .. automodule:: aggregate._pricing
    :private-members:
 
+The P&L kernel and its insurance builders
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The domain-agnostic group-ledger kernel (``Leg`` / ``Group`` / ``PnL`` /
+``stack_marginal_pnls``, re-exported at the top level) and the DecL builders
+that translate insurance programs into sources plus signed groups. See
+``dev/done/plan-yapnl.md``.
+
+.. automodule:: aggregate._pnl
+
+.. automodule:: aggregate._pnl_builders
+
 Compute leaves
 --------------
 

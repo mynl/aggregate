@@ -110,7 +110,9 @@ def test_single_group_and_joined_is_one_leg():
     # backward compatible: and-joined terms sum into one leg named 'expense'
     p = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense')
     assert 'expense' in p.summary_df.index
-    assert p.summary_df.loc['expense', 'EX'] == pytest.approx(0.25 * 1000 + 200)
+    # ledger rows are signed: a sold expense books negative
+    assert p.summary_df.loc['expense', 'EX'] == pytest.approx(
+        -(0.25 * 1000 + 200))
 
 
 def test_juxtaposed_groups_are_separate_legs():
@@ -120,47 +122,56 @@ def test_juxtaposed_groups_are_separate_legs():
     assert 'premium expense' in idx
     assert 'fixed expense' in idx
     assert 'expense' not in idx
-    assert p.summary_df.loc['premium expense', 'EX'] == pytest.approx(250.0)
-    assert p.summary_df.loc['fixed expense', 'EX'] == pytest.approx(200.0)
+    assert p.summary_df.loc['premium expense', 'EX'] == pytest.approx(-250.0)
+    assert p.summary_df.loc['fixed expense', 'EX'] == pytest.approx(-200.0)
 
 
 def test_labeled_expense_groups():
     p = build(_PNL_BASE + ' less 25% premium expense as acq 30% loss expense as lae')
     idx = p.summary_df.index
     assert 'acq' in idx and 'lae' in idx
-    assert p.summary_df.loc['acq', 'EX'] == pytest.approx(250.0)
+    assert p.summary_df.loc['acq', 'EX'] == pytest.approx(-250.0)
 
 
 def test_combine_vs_separate_total_matches():
     # combined (and) vs separate (juxtaposition) must give the same total expense
     combined = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense')
     separate = build(_PNL_BASE + ' less 25% premium expense 200 fixed expense')
-    tot_c = combined.summary_df.loc['Total obligation', 'EX']
-    tot_s = separate.summary_df.loc['Total obligation', 'EX']
+    tot_c = combined.summary_df.loc['total obligation', 'EX']
+    tot_s = separate.summary_df.loc['total obligation', 'EX']
     assert tot_c == pytest.approx(tot_s, rel=TOL)
 
 
 def test_labeled_group_combines_multiple_terms():
     p = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense as "acquisition"')
     assert 'acquisition' in p.summary_df.index
-    assert p.summary_df.loc['acquisition', 'EX'] == pytest.approx(0.25 * 1000 + 200)
+    assert p.summary_df.loc['acquisition', 'EX'] == pytest.approx(
+        -(0.25 * 1000 + 200))
 
 
 # ----------------------------------------------------------------------
-# Reins-clause label -> margin_df cession column
+# Reins-clause label -> cession leg / group labels in the ledger
 # ----------------------------------------------------------------------
-def test_reins_label_names_margin_column():
+def test_reins_label_names_cession_rows():
+    # an occ guaranteed-cost program books its ceded premium as a constant
+    # leg named by the reins ``as`` label
     p = build('pnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
               'occurrence net of 100 xs 200 deposit 50 as "Cat XL" poisson')
-    assert p.tower is not None
-    assert 'Cat XL' in p.margin_df.columns
-    assert 'ceded' not in p.margin_df.columns
+    idx = p.summary_df.index
+    assert 'Cat XL premium' in idx
+    assert 'ceded occ premium' not in idx
+    # an agg cession is a real buy group named by its label
+    q = build('pnl RQ 1000 premium less agg RQ_e 850 loss sev lognorm 100 cv 1 '
+              'poisson aggregate net of 500 xs 1000 deposit 50 as "Stop Loss"')
+    for row in ('Stop Loss premium', 'Stop Loss recovery', 'Stop Loss result',
+                'net through Stop Loss'):
+        assert row in q.summary_df.index, row
 
 
-def test_reins_no_label_keeps_structural_column():
+def test_reins_no_label_keeps_structural_rows():
     p = build('pnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
               'occurrence net of 100 xs 200 deposit 50 poisson')
-    assert 'ceded' in p.margin_df.columns
+    assert 'ceded occ premium' in p.summary_df.index
 
 
 # ----------------------------------------------------------------------

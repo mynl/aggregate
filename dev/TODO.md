@@ -78,10 +78,26 @@
    `xpnl` (→ `PnLTower`) / `port` sourcing + `Portfolio.exp_premium`, subsumes
    `[Portfolio-of-PnL]` (below). Breaking `pnl` syntax; all `.agg` databases +
    test suite swept. Plan moved to `dev/done/plan-pnl-engine-source.md`.
-   **Deferred (as NotImplementedError):** `retro` over a reinsured engine; loss-
-   basis expense as stochastic `rate·loss` inside the exploded tower (decision 9 —
-   a123 GCN-scalar carve-out kept; a reporting nicety, revisit if needed);
-   expenses on a port-sourced P&L.
+   Its deferrals (stochastic loss-basis expense everywhere; expenses on a
+   port-sourced P&L) closed at `[PnL-Generic-Final]`; `retro` over a reinsured
+   engine remains a NotImplementedError.
+2a. **[PnL-Generic-Final]** ✅ **DONE (`1.0.0a129`–`a131`,
+   `dev/done/plan-yapnl.md`).** The last structural step before beta: the P&L
+   kernel rewritten as a **source plus signed group ledger** (`Leg` / `Group` /
+   public `PnL(*, name, source, groups=…)` + single-group sugar + `+`
+   composition + `stack_marginal_pnls`; insurance semantics in the new
+   `_pnl_builders.py`). Signed exhibits throughout (rows = ledger, columns =
+   metrics: `summary_df` / `stats_df` / `scaled_stats_df` / `density_df` /
+   `validation_df`); exact irregular legs by default, `bs>0` rebuckets +
+   audit; a reinsurance `pnl` returns the per-atom group ledger (agg cession
+   a real `buy` group; occ guaranteed-cost over the net-of-occ marginal);
+   `xpnl` = the marginal perspective stack (a DataFrame); the six variable
+   features are one-changed-leg builders (retro acceptance pair = same shape
+   as plain, a test); analyses demoted to drill-down (`pnl.analysis`); a
+   massive source evaluates the whole ledger in one pushforward band sweep.
+   **Retired:** `create_pnl` / `create_pnl_tower` / `PnLTower` /
+   `PnL.margin_df` / `.tower` / `.stochastic_engine` / `make_pnl(net=)` /
+   the analyses' bespoke exhibits.
 2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
    for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
    fixed** (it does not morph as the object gains properties), columns are

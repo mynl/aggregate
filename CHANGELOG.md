@@ -1,5 +1,92 @@
 # Changelog
 
+## 1.0.0a131
+
+**[PnL-Generic-Final] phase [Xpnl-Onion-2D]** — the massive-source route and
+the 2-D closeout.
+
+- A `MassiveBivariateDistribution` source now evaluates the **whole ledger in
+  one pushforward band sweep**: every leg needs an explicit `bs > 0`, each
+  derived row (totals, group results, running nets, grand rows) is pushed as
+  its own signed-sum function — never a sum of bucketed legs — so
+  `mean(result) == sum(signed leg means)` exactly; exact means / sds come
+  back from the sweep's streamed audit and feed `validation_df` (every leg
+  audited). The ledger row template is now a single shared plan
+  (`_ledger_plan`) consumed by both evaluation routes, so they cannot drift.
+- The `xpnl` marginal stack, the reinstatement / subsequent-agg joint
+  ledgers, and the 2-D guards (an `is2d` leg over a 1-D source errors; a
+  second occurrence-level feature is unreachable — `[reins-one-clause]` and
+  the aggregate-basis-only variable-rating rule reject it at parse /
+  validation time) landed in a129–a130 and are covered by tests.
+
+## 1.0.0a130
+
+**[PnL-Generic-Final] phase [Builders-Variable-Features]** — the six variable
+features become one-changed-leg ledger builders; the analyses demote to
+drill-down objects.
+
+- `build_variable_pnl` (retro / swing / slide / pc / corridor) and
+  `build_reinstatement_pnl` in `_pnl_builders.py`: every feature program now
+  returns the **cash-flow-parts group ledger** (a feature never changes the
+  machinery — it changes one leg's function): retro = a stochastic premium
+  leg over the gross density (same ledger shape as a plain book — the
+  acceptance pair, now a test); swing = a stochastic cession premium; slide /
+  pc = a stochastic commission leg on the cession; corridor = the adjusted
+  recovery; reinstatements = the two-group (three with a subsequent agg
+  cover) ledger over the one shared `(L, R)` joint, ceded premium
+  `D + h(R)` genuinely stochastic, LAE stochastic `rate·l` off axis 0,
+  committed `Scaled` denominator `gross − deposit − pc_agg`.
+- **Analyses demoted** (`ReinstatementAnalysis` / `VariableRatingAnalysis`):
+  their bespoke `summary_df` / `stats_df` / `distributions` / `gcn_df` /
+  `as_pnl` / per-leg `density_df` are gone — the exhibit IS the returned
+  PnL's ledger. Kept as domain extras: `terms`, the recovery / ceder maps,
+  `validation_df` (reinstatement Est-vs-EX audit), `tail_df`, `plot`, and
+  narratives; the exact-moment engine survives privately behind them.
+  `qd(analysis)` / `_repr_html_` show the treaty intro + `tail_df`.
+
+## 1.0.0a129
+
+**[PnL-Generic-Final] phases [Kernel-Group-Ledger] + [Builders-Plain-GCN-Port]**
+— the P&L kernel rewritten as a **source plus signed group ledger**
+(`dev/plan-yapnl.md`); insurance semantics moved out to a new
+`_pnl_builders.py`. **Breaking (pre-beta, deliberate):**
+
+- New kernel surface: `Leg(label, func, bs=0, is2d=False)`,
+  `Group(label, role, consideration, obligation)`, the public
+  `PnL(*, name, source, groups=…)` constructor (single-group
+  `role=/consideration=/obligation=` sugar; `{label: func}` shorthand;
+  `pnl_a + pnl_b` concatenates same-source ledgers), and
+  `stack_marginal_pnls` (the no-joint assembler).
+- **Signed exhibits throughout**: the group `role` books each leg
+  (`sell` → `+consideration, −obligation`; `buy` → the contra), so the `EX`
+  column adds down the sheet and every row's distribution sits on the signed
+  values (percentile orientation automatic). Rows = the ledger, columns =
+  metrics: `summary_df` (headline), `stats_df` (full ladder, currency),
+  `scaled_stats_df` (the stats of `X / scale`; the `_UNSCALABLE_STATS` NaN
+  machinery is gone), `density_df` (`{row: GridDistribution}`), and
+  `validation_df` (Est-vs-EX audit for `bs>0` legs — exact irregular
+  distributions are the default, `bs>0` rebuckets via the shared pushforward
+  machinery).
+- **Retired**: `create_pnl`, `create_pnl_tower`, `PnLTower`, `PnL.margin_df`,
+  `PnL.tower`, `PnL.stochastic_engine` (now `PnL.source`), the
+  `make_pnl(net=…)` override (net is a result, never a construction
+  primitive), and the old stats-as-rows `stats_df` orientation.
+- **A reinsurance `pnl` now returns the group ledger**: an aggregate-only
+  cession is a real `buy` group over the gross marginal (rows
+  `ceded agg premium / recovery / result`, running net, grand rows); an
+  occurrence guaranteed-cost program books over the net-of-occ marginal with
+  the occ economics as constant legs. Resolved economics ride as
+  `pnl.economics`. **`xpnl` returns the marginal perspective stack** as a
+  perspectives × stats DataFrame (was a `PnLTower`).
+- Label plumbing fixed: the engine `as` label now names the **loss leg**
+  (was silently discarded), expense-group `as` labels name one obligation leg
+  per group in every path, reins-layer `as` labels name cession groups /
+  legs. Port-sourced P&Ls support expense clauses (un-NYI).
+- The reinstatement / variable-rating analyses build their faces and
+  waterfalls on the new kernel (`.analysis` is now a plain attribute); their
+  bespoke exhibits are unchanged this version and demote next
+  ([Builders-Variable-Features]).
+
 ## 1.0.0a128
 
 **[DecL-Labels-Everywhere]** — broaden DecL `as` labels to interior sub-object

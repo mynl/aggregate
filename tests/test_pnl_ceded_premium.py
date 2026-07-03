@@ -1,19 +1,21 @@
 """Ceded premium (``deposit`` / ``rol`` / ``rate``) and ceding commission
-(``cede``) on a ``pnl`` (Phase 1, decision 3).
+(``cede``) on a ``pnl`` (signed group-ledger form).
 
-A premium clause on any reinsurance layer attaches a :class:`PnLTower` (the
-Gross/Ceded/Net exhibit) to the returned :class:`PnL` as ``pnl.tower`` (the
-waterfall surfaces as ``pnl.margin_df``). The premium resolves to currency
-(``deposit`` an amount, ``rol`` = share x rol x limit, ``rate`` = rate x gross
-premium); the commission ``cede x ceded_premium`` books as an expense credit.
-The resolved economics are exposed on :attr:`PnLTower.economics` (keys
-``pc_occ`` / ``pc_agg`` = occ / agg ceded premium, ``c_occ`` / ``c_agg`` =
-commissions, ``gross`` / ``ceded`` = totals). See
-``dev/done/plan-pnl-expenses-ceded-premium.md``.
+A premium clause on any reinsurance layer promotes the ``pnl`` to the
+Gross/Ceded/Net **group ledger** (``dev/plan-yapnl.md``): an aggregate cession
+is a real ``buy`` group over the gross marginal (its rows book contra:
+``-premium / +recovery / +commission``); an occurrence guaranteed-cost program
+books over the net-of-occ marginal with the occ ceded premium as a constant
+leg (the occ risk transfer is the ``xpnl`` exhibit). The premium resolves to
+currency (``deposit`` an amount, ``rol`` = share x rol x limit, ``rate`` =
+rate x gross premium); the commission ``cede x ceded_premium`` books as a
+received leg on the cession. The resolved economics ride on
+:attr:`PnL.economics` (keys ``pc_occ`` / ``pc_agg`` = occ / agg ceded premium,
+``c_occ`` / ``c_agg`` = commissions, ``gross`` / ``ceded`` = totals).
 """
 import pytest
 
-from aggregate import build, PnL, PnLTower
+from aggregate import build, PnL
 
 TOL = 1e-3
 _BASE = 'pnl T 5000 prem less agg T_e 100 claims sev lognorm 50 cv 1.5 '
@@ -21,74 +23,92 @@ _BASE = 'pnl T 5000 prem less agg T_e 100 claims sev lognorm 50 cv 1.5 '
 
 def test_deposit_rol_rate_resolution():
     assert build(_BASE + 'poisson aggregate net of 2000 xs 3000 deposit 1500'
-                 ).tower.economics['pc_agg'] == pytest.approx(1500.0)
+                 ).economics['pc_agg'] == pytest.approx(1500.0)
     # rol: share (1.0) x 8% x limit (2000)
     assert build(_BASE + 'poisson aggregate net of 2000 xs 3000 rol 8%'
-                 ).tower.economics['pc_agg'] == pytest.approx(0.08 * 2000)
+                 ).economics['pc_agg'] == pytest.approx(0.08 * 2000)
     # rate: 30% of the gross premium (5000)
     assert build(_BASE + 'poisson aggregate net of 2000 xs 3000 rate 30%'
-                 ).tower.economics['pc_agg'] == pytest.approx(0.30 * 5000)
+                 ).economics['pc_agg'] == pytest.approx(0.30 * 5000)
 
 
 def test_deposit_and_rol_coincide_when_equal():
     rol = build(_BASE + 'poisson aggregate net of 2000 xs 3000 rol 8%')
     dep = build(_BASE + 'poisson aggregate net of 2000 xs 3000 deposit 160')
-    assert rol.tower.economics['ceded'] == pytest.approx(dep.tower.economics['ceded'])
+    assert rol.economics['ceded'] == pytest.approx(dep.economics['ceded'])
 
 
-def test_cede_books_commission_credit_and_nets_expense():
+def test_cede_books_commission_leg_on_the_cession():
     p = build(_BASE + 'poisson aggregate net of 2000 xs 3000 rol 8% cede 25%')
-    assert p.tower.economics['c_agg'] == pytest.approx(0.25 * 160)  # commission credit
-    # net expense = gross expense - commission = 0 - 40 (a net credit) shows on the
-    # net perspective's expense leg
-    assert p.summary_df.loc['expense', 'EX'] == pytest.approx(-40.0)
+    assert p.economics['c_agg'] == pytest.approx(0.25 * 160)
+    # the commission is a received leg on the buy group: +40 in the ledger
+    assert p.summary_df.loc['ceded agg commission', 'EX'] == pytest.approx(40.0)
 
 
-def test_any_premium_clause_attaches_gcn_tower():
-    # no premium clause -> ordinary single-leg (net-only) plain pnl, no tower
+def test_any_premium_clause_promotes_to_ledger():
+    # no premium clause -> ordinary single-group (net-only) plain pnl
     plain = build(_BASE + 'poisson aggregate net of 2000 xs 3000')
     assert isinstance(plain, PnL)
-    assert plain.tower is None
-    # a premium clause -> a PnL carrying the Gross/Ceded/Net tower
+    assert not hasattr(plain, 'economics')
+    assert 'ceded agg result' not in plain.summary_df.index
+    # a premium clause -> the two-group ledger with a real cession group
     p = build(_BASE + 'poisson aggregate net of 2000 xs 3000 deposit 1500')
     assert isinstance(p, PnL)
-    assert isinstance(p.tower, PnLTower)
+    s = p.summary_df
+    for row in ('ceded agg premium', 'ceded agg recovery', 'ceded agg result',
+                'net through ceded agg', 'margin', 'total impact'):
+        assert row in s.index
+    # the cession books contra and its result is the step delta
+    assert s.loc['ceded agg premium', 'EX'] == pytest.approx(-1500.0)
+    assert s.loc['ceded agg result', 'EX'] == pytest.approx(
+        s.loc['total impact', 'EX'], abs=1e-9)
 
 
-def test_occurrence_only_gcn_columns():
+def test_occurrence_only_books_constants_over_net_occ():
+    """An occ guaranteed-cost program books over the net-of-occ marginal:
+    the occ ceded premium is a constant leg (the occ risk transfer is the
+    ``xpnl`` exhibit)."""
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 10% poisson')
-    assert list(p.margin_df.columns) == ['gross', 'ceded', 'net', 'impact']
-    assert p.tower.economics['pc_occ'] == pytest.approx(0.10 * 100)
-    assert p.tower.economics['pc_agg'] == 0.0
+    s = p.summary_df
+    assert s.loc['ceded occ premium', 'EX'] == pytest.approx(-(0.10 * 100))
+    assert 'loss (net occ)' in s.index
+    assert p.economics['pc_occ'] == pytest.approx(0.10 * 100)
+    assert p.economics['pc_agg'] == 0.0
+    # single-group ledger (the occ cession is not measurable per atom here)
+    assert 'total impact' not in s.index
 
 
-def test_both_sides_split_and_full_waterfall():
+def test_both_sides_split_and_full_ledger():
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
-    e = p.tower.economics
+    e = p.economics
     assert e['pc_occ'] == pytest.approx(0.05 * 100)
     assert e['pc_agg'] == pytest.approx(0.08 * 2000)
     assert e['c_agg'] == pytest.approx(0.20 * 160)
-    assert list(p.margin_df.columns) == [
-        'gross', 'ceded occ', 'net occ', 'ceded agg', 'net agg',
-        'occ impact', 'agg impact', 'impact']
+    s = p.summary_df
+    # net-of-occ sell group + real agg cession buy group
+    for row in ('premium', 'loss (net occ)', 'ceded occ premium',
+                'net occ result', 'ceded agg premium', 'ceded agg recovery',
+                'ceded agg commission', 'ceded agg result',
+                'net through ceded agg', 'margin'):
+        assert row in s.index, row
 
 
-def test_gcn_means_add_across_waterfall():
+def test_ledger_means_add_down_the_sheet():
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
-    g = p.margin_df
-    # means add across the split on the EX row: gross + ceded occ = net occ, then
-    # net occ + ceded agg = net agg (the covariance carried per atom)
-    assert g.loc['EX', 'gross'] + g.loc['EX', 'ceded occ'] == pytest.approx(
-        g.loc['EX', 'net occ'], abs=1e-2)
-    assert g.loc['EX', 'net occ'] + g.loc['EX', 'ceded agg'] == pytest.approx(
-        g.loc['EX', 'net agg'], abs=1e-2)
-    # the impact columns are the running deltas off the retained legs
-    assert g.loc['EX', 'occ impact'] == pytest.approx(
-        g.loc['EX', 'net occ'] - g.loc['EX', 'gross'], abs=1e-2)
-    assert g.loc['EX', 'agg impact'] == pytest.approx(
-        g.loc['EX', 'net agg'] - g.loc['EX', 'net occ'], abs=1e-2)
+    s = p.summary_df
+    # group results are per-atom sums of their signed legs
+    assert s.loc['net occ result', 'EX'] == pytest.approx(
+        s.loc['premium', 'EX'] + s.loc['loss (net occ)', 'EX']
+        + s.loc['ceded occ premium', 'EX'], abs=1e-2)
+    assert s.loc['ceded agg result', 'EX'] == pytest.approx(
+        s.loc['ceded agg premium', 'EX'] + s.loc['ceded agg recovery', 'EX']
+        + s.loc['ceded agg commission', 'EX'], abs=1e-2)
+    # the grand result sums the group results
+    assert s.loc['margin', 'EX'] == pytest.approx(
+        s.loc['net occ result', 'EX'] + s.loc['ceded agg result', 'EX'],
+        abs=1e-2)
 
 
 def test_cede_without_premium_errors():

@@ -580,3 +580,77 @@ def test_kernel_staging_lifecycle(tmp_path):
         **_copula_kernel_kwargs(mv, d2, keep_transform=True))
     assert (d2 / 'z1.zarr').exists()
     assert (d2 / 'z2.zarr').exists()
+
+
+# ----------------------------------------------------------------------
+# [PnL-Generic-Final] massive-source group ledger: one band sweep
+# ----------------------------------------------------------------------
+def _tiny_massive(tmp_path):
+    """A hand-built 4 x 3 disk-backed joint (atoms small enough to check by
+    hand) plus its in-core twin for the cross-check."""
+    from aggregate.bivariate import (BivariateDistribution,
+                                     MassiveBivariateDistribution)
+    xs0 = np.array([0.0, 10.0, 20.0, 30.0])          # loss L
+    xs1 = np.array([0.0, 5.0, 10.0])                  # recovery R
+    dens = np.array([[0.20, 0.05, 0.00],
+                     [0.15, 0.10, 0.05],
+                     [0.05, 0.10, 0.10],
+                     [0.00, 0.05, 0.15]])
+    store = tmp_path / 'pnl_bv'
+    store.mkdir()
+    z = zarr.open_array(str(store / 'density.zarr'), mode='w',
+                        shape=dens.shape, chunks=(2, 3), dtype=float)
+    z[:] = dens
+    massive = MassiveBivariateDistribution(
+        str(store), xs0, xs1, 10.0, 5.0, dens.sum(axis=1), dens.sum(axis=0),
+        float(dens.sum()), 0.0, np.zeros((4, 4)), density=z)
+    incore = BivariateDistribution(dens, xs0, xs1, bs_ceded=10.0, bs_net=5.0)
+    return massive, incore
+
+
+def _ledger_groups(bs=0.0):
+    from aggregate import Leg, Group
+    return [
+        Group('gross', 'sell',
+              [Leg('premium', 18.0, bs=bs)],
+              [Leg('loss', lambda l: l, bs=bs)]),
+        Group('occ xl', 'buy',
+              [Leg('ceded premium', 4.0, bs=bs)],
+              [Leg('recovery', lambda l, r: r, is2d=True, bs=bs)]),
+    ]
+
+
+def test_massive_pnl_one_sweep_ledger(tmp_path):
+    """A zarr-backed joint evaluates the whole ledger in one band sweep:
+    same row template as the in-memory route, mean(result) == sum of the
+    signed leg means to VALIDATION_NOISE, and every leg audited."""
+    from aggregate import PnL
+    from aggregate.moments import VALIDATION_NOISE
+    massive, incore = _tiny_massive(tmp_path)
+    pm = PnL(name='massive', source=massive, groups=_ledger_groups(bs=1.0))
+    pi = PnL(name='incore', source=incore, groups=_ledger_groups())
+    # identical row template (the shared _ledger_plan)
+    assert list(pm.summary_df.index) == list(pi.summary_df.index)
+    # the sweep's exact means match the in-core exact means, row by row
+    for row in pm.summary_df.index:
+        assert pm.summary_df.loc[row, 'EX'] == pytest.approx(
+            pi.summary_df.loc[row, 'EX'], abs=1e-12), row
+    # mean(result) == sum of signed leg means -- the derived row is pushed as
+    # its own signed-sum function, never a sum of bucketed legs
+    leg_means = sum(pm.summary_df.loc[r, 'EX']
+                    for r in ('premium', 'loss', 'ceded premium', 'recovery'))
+    assert abs(pm.mean - leg_means) < 10 * VALIDATION_NOISE
+    # every declared leg is bs > 0 and audited (linear scheme: means match)
+    v = pm.validation_df
+    assert set(v.index) == {'premium', 'loss', 'ceded premium', 'recovery'}
+    assert v['abs_err'].max() < 10 * VALIDATION_NOISE
+    # accessors ride the grand result
+    assert pm.prob_loss == pytest.approx(pi.prob_loss, abs=1e-12)
+    assert pm.q(0.5) == pytest.approx(pi.q(0.5), abs=1.0)  # bucketed grid
+
+
+def test_massive_pnl_requires_bs_per_leg(tmp_path):
+    from aggregate import PnL
+    massive, _incore = _tiny_massive(tmp_path)
+    with pytest.raises(ValueError, match='bs > 0'):
+        PnL(name='bad', source=massive, groups=_ledger_groups(bs=0.0))

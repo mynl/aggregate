@@ -260,11 +260,26 @@ pnl PnLprem.Loss   100 prem less agg PnLprem.Loss_e 85 loss sev lognorm 8 cv 1.5
 pnl PnLprem.Vec    [100 200 100] prem less agg PnLprem.Vec_e [100 200 100] prem at .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson           note{vector consideration sums to 400; mean 80 = sum premium_i (1-lr)};
 # Engine-source forms (1.0.0a125): a pnl / xpnl wraps a COMPLETE engine.
 # ``inherit premium`` copies the engine's technical premium; ``xpnl`` returns the
-# exploded PnLTower. The stored-``agg.NAME`` / ``port.NAME`` source forms need a
-# loaded referent, so they live in tests/test_pnl_engine_source.py (this corpus
-# round-trips each line in isolation). See dev/done/plan-pnl-engine-source.md.
+# exploded marginal perspective stack. The stored-``agg.NAME`` / ``port.NAME``
+# source forms need a loaded referent, so they live in
+# tests/test_pnl_engine_source.py (this corpus round-trips each line in
+# isolation). See dev/done/plan-pnl-engine-source.md.
 pnl  ES.Inherit inherit premium less agg ES.Inherit_e 8000 prem at 65% lr sev lognorm 100 cv 2 poisson            note{inherit copies the engine's 8000 technical premium; margin 8000 - 5200};
-xpnl ES.Tower   1000 prem less agg ES.Tower_e 1000 prem at 70% lr sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 poisson  note{exploded Gross/net-occ/net-agg PnLTower};
+xpnl ES.Tower   1000 prem less agg ES.Tower_e 1000 prem at 70% lr sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 poisson  note{exploded gross/net-occ marginal perspective stack};
+# [PnL-Generic-Final] (dev/plan-yapnl.md example programs, 1.0.0a129-a131): a
+# pnl is a source plus a signed GROUP LEDGER -- cash-flow-parts rows, EX adds
+# down the sheet. The acceptance pair (YAPNL.Gross vs YAPNL.Retro) shares one
+# exhibit template: a feature never changes the machinery, it changes one
+# leg's function. See tests/test_variable_rating_decl.py and tests/test_pnl*.py.
+pnl YAPNL.Gross as "Gross Book PNL" inherit premium as "Gross Premium" less agg YAPNL.Gross_e as "Gross Loss" 10000 premium at 85% lr sev lognorm 50 cv 3 poisson less 5% loss expense as LAE 100 fixed expense and 10% premium expense as "Fixed & Acq Exp"  note{acceptance pair 1: plain gross book ledger, LAE stochastic};
+pnl YAPNL.Retro as "Retro Rated Gross PNL" retro basic 2000 lcm 1.1 min 8000 max 14000 premium as "Retro Premium" less agg YAPNL.Retro_e as "Gross Loss" 10000 premium at 85% lr sev lognorm 50 cv 3 poisson less 5% loss expense as LAE 100 fixed expense as "Fixed Exp" 10% premium expense as "Acq Exp"  note{acceptance pair 2: same shape, stochastic retro premium};
+pnl YAPNL.AggCeded 10000 premium less agg YAPNL.AggCeded_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 500 cede 10% less 20% premium expense  note{two-group ledger: gross sell + agg cession buy group, per-atom exact waterfall};
+pnl YAPNL.OccReinst 10000 premium less agg YAPNL.OccReinst_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 occurrence net of 24500 xs 500 deposit 1000 reinstatements [1] mixed gamma 0.25 less 20% premium expense  note{2-D ledger over the (L, R) joint; ceded premium D + h(R) stochastic};
+pnl YAPNL.Swing 10000 premium less agg YAPNL.Swing_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 swing basic 0 lcm 1.1 min 300 max 1000 less 20% premium expense  note{one changed leg: stochastic swing ceded premium};
+pnl YAPNL.Slide 10000 premium less agg YAPNL.Slide_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80% less 20% premium expense  note{one changed leg: sliding commission on the cession};
+pnl YAPNL.PC 10000 premium less agg YAPNL.PC_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 1500 pc 50% after 10% less 20% premium expense  note{one changed leg: profit commission on the cession};
+pnl YAPNL.Corridor 10000 premium less agg YAPNL.Corridor_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 500 corridor 50% po 30% xs 20% less 20% premium expense  note{one changed leg: corridor-adjusted recovery};
+xpnl YAPNL.Onion 10000 premium less agg YAPNL.Onion_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 occurrence net of 24500 xs 500 deposit 1000 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 200 less 20% premium expense  note{guaranteed-cost onion: the marginal perspective stack across reins_density_df marginals};
 # (Portfolios of pnl units -- book-level P&L -- are deferred; a pnl is the
 # standalone PnL veneer, not a portfolio unit. See dev/plan-pnl.md.)
 # Signed loss severity (dsev negative atom / ssev) under pnl (1.0.0a45): the
@@ -647,7 +662,7 @@ pnl LB.Book as "My Book" 1000 premium as GWP less agg LB.Book_e 850 loss sev log
 pnl LB.OneGroup 1000 premium less agg LB.OneGroup_e 850 loss sev lognorm 100 cv 1 poisson less 25% premium expense and 200 fixed expense   note{and-joined -> one combined expense leg (back-compat)};
 pnl LB.TwoGroups 1000 premium less agg LB.TwoGroups_e 850 loss sev lognorm 100 cv 1 poisson less 25% premium expense 200 fixed expense      note{juxtaposition -> two separate expense legs};
 pnl LB.Labeled 1000 premium less agg LB.Labeled_e 850 loss sev lognorm 100 cv 1 poisson less 25% premium expense as acq 30% loss expense as lae note{labeled expense groups};
-pnl LB.CatXL 1000 premium less agg LB.CatXL_e 850 loss sev lognorm 100 cv 1 occurrence net of 100 xs 200 deposit 50 as "Cat XL" poisson  note{reins-cession label -> margin_df column};
+pnl LB.CatXL 1000 premium less agg LB.CatXL_e 850 loss sev lognorm 100 cv 1 occurrence net of 100 xs 200 deposit 50 as "Cat XL" poisson  note{reins-cession label -> cession leg / group rows in the ledger};
 # [DecL-Labels-Everywhere]: interior sub-object labels -> Aggregate.label_map,
 # read back through the `labels` namespace (a.labels.exposure / .layer / .severity).
 # exposure label sits mid-clause (after the amount, before `at ... lr/rate`);

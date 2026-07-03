@@ -1,26 +1,27 @@
 """Tests for the ``pnl`` keyword and the first-class :class:`PnL` value object.
 
-``pnl NAME <consideration> prem less agg NAME_e <loss body>`` builds a pure-loss aggregate
-X (the obligation) and snapshots it into a :class:`PnL` whose result (net) is
-``consideration - X``. The consideration is a single amount for the book, in
-contrast to a constant inside ``sev``/``dsev``/``ssev`` which is per-claim.
-``build('pnl ...')`` and ``build('agg ...').make_pnl(consideration=...)``
-coincide. See ``dev/plan-pnl-api.md``.
+``pnl NAME <consideration> prem less agg NAME_e <loss body>`` builds a pure-loss
+aggregate X (the obligation) and snapshots it into a :class:`PnL` whose result
+(net) is ``consideration - X``. The consideration is a single amount for the
+book, in contrast to a constant inside ``sev``/``dsev``/``ssev`` which is
+per-claim. ``build('pnl ...')`` and
+``build('agg ...').make_pnl(consideration=...)`` coincide.
 
 A :class:`PnL` **consumes and discards** its stochastic engine: there is no
-``pnl.agg`` and no ``value_type``. The obligation leg is the honest loss
-(``summary_df.loc['loss']`` in loss terms); the net is the derived ``result``
-:class:`GridDistribution`. ``build('pnl ...')`` always returns a :class:`PnL`; a
-ceded-premium clause attaches the Gross / Ceded / Net waterfall as ``pnl.tower``
-(reached as the ``pnl.margin_df`` exhibit). Portfolios / bivariates of
-``pnl`` units are deferred (book-level P&L), and rejected with a clear error.
+``pnl.agg`` and no ``value_type``. The ledger rows are **signed cash flows**
+(``dev/plan-yapnl.md``): the sold obligation books at ``-E[X]`` and the ``EX``
+column adds down the sheet to the ``margin`` result. ``build('pnl ...')``
+always returns a :class:`PnL`; a ceded-premium clause books the cession as a
+real ``buy`` group in the ledger (with the resolved economics on
+``pnl.economics``). Portfolios / bivariates of ``pnl`` units are deferred
+(book-level P&L), and rejected with a clear error.
 
-Covers: the PnL / PnLTower return types, the three exposure forms (lr / claims /
-loss), the moment closed forms (mean shift, sd invariant, skew sign flip),
-vector consideration, P(loss), the per-claim-vs-once distinction, mass
-conservation of the net, the honest obligation leg, make_pnl equivalence, signed
-loss severity under pnl, function-valued consideration, the summary_df shape, the
-Gross/Ceded/Net waterfall, and the collection rejections.
+Covers: the PnL return type, the three exposure forms (lr / claims / loss),
+the moment closed forms (mean shift, sd invariant, skew sign flip), vector
+consideration, P(loss), the per-claim-vs-once distinction, mass conservation
+of the net, the signed obligation leg, make_pnl equivalence, signed loss
+severity under pnl, function-valued consideration, the summary_df shape, the
+Gross/Ceded/Net group ledger, and the collection rejections.
 """
 from __future__ import annotations
 
@@ -29,7 +30,7 @@ import warnings
 import numpy as np
 import pytest
 
-from aggregate import build, PnL, PnLTower
+from aggregate import build, PnL
 from aggregate.constants import DefectiveDistributionWarning
 
 # severities chosen light enough that the 12-nines window is well-resolved, so
@@ -46,14 +47,14 @@ def test_build_pnl_returns_pnl():
     assert isinstance(a, PnL)
     assert a.role == 'sell'                     # receive consideration, owe loss
     assert a.result_name == 'margin'
-    # the obligation leg is an honest loss: non-negative severity
-    assert a.density_df['loss'].x.min() >= 0.0
+    # the obligation row is the signed sold loss: booked non-positive
+    assert a.density_df['loss'].x.max() <= 0.0
 
 
-def test_obligation_is_untouched():
-    """The obligation leg is the honest loss (E[X]=700), not the net."""
+def test_obligation_books_signed():
+    """The obligation row books the signed loss (-E[X] = -700), and EX foots."""
     a = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
-    assert a.summary_df.loc['loss', 'EX'] == pytest.approx(700.0, rel=TOL)
+    assert a.summary_df.loc['loss', 'EX'] == pytest.approx(-700.0, rel=TOL)
     # net = 1000 - 700 = 300
     assert a.mean == pytest.approx(300.0, rel=TOL, abs=2.0)
 
@@ -266,7 +267,7 @@ _SUMMARY_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99']
 
 
 def test_summary_df_leg_rows_and_additive_result():
-    """A sold cover: consideration/loss magnitudes, result = consideration - loss."""
+    """A sold cover: signed rows, result = consideration + obligation (EX foots)."""
     a = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     df = a.summary_df
     assert list(df.index) == ['consideration', 'loss', 'margin']
@@ -274,24 +275,24 @@ def test_summary_df_leg_rows_and_additive_result():
     assert df.loc['consideration', 'EX'] == pytest.approx(1000.0)
     # a constant consideration renormalizes to SD exactly 0 (no spurious spread)
     assert df.loc['consideration', 'SD'] == 0.0
-    assert df.loc['loss', 'EX'] == pytest.approx(700.0, rel=TOL)   # a magnitude
-    # the defining identity: result EX = consideration EX - obligation EX
+    assert df.loc['loss', 'EX'] == pytest.approx(-700.0, rel=TOL)  # signed
+    # the defining identity: the EX column adds down the sheet
     assert df.loc['margin', 'EX'] == pytest.approx(
-        df.loc['consideration', 'EX'] - df.loc['loss', 'EX'], abs=1e-6)
-    # Scaled divides by E[Total consideration]
-    assert df.loc['loss', 'Scaled'] == pytest.approx(0.70, rel=TOL)
+        df.loc['consideration', 'EX'] + df.loc['loss', 'EX'], abs=1e-6)
+    # Scaled divides by the committed E[total consideration]
+    assert df.loc['loss', 'Scaled'] == pytest.approx(-0.70, rel=TOL)
     # the margin SD is the loss SD (constant consideration adds no spread)
     assert df.loc['margin', 'SD'] == pytest.approx(df.loc['loss', 'SD'])
 
 
 def test_summary_df_negative_consideration():
-    """A negative consideration passes through as the leg magnitude; result adds."""
+    """A negative consideration passes through signed; the EX column foots."""
     b = build('agg P 5 claims sev gamma 8 cv .5 poisson').make_pnl(-100)
     df = b.summary_df
     assert df.loc['consideration', 'EX'] == pytest.approx(-100.0)
-    assert df.loc['loss', 'EX'] > 0                       # honest loss magnitude
+    assert df.loc['loss', 'EX'] < 0                       # signed sold loss
     assert df.loc['margin', 'EX'] == pytest.approx(
-        df.loc['consideration', 'EX'] - df.loc['loss', 'EX'], abs=1e-6)
+        df.loc['consideration', 'EX'] + df.loc['loss', 'EX'], abs=1e-6)
 
 
 def test_summary_df_function_consideration_has_spread():
@@ -301,7 +302,7 @@ def test_summary_df_function_consideration_has_spread():
     df = swing.summary_df
     assert df.loc['consideration', 'SD'] > 0              # f(X) varies
     assert df.loc['margin', 'EX'] == pytest.approx(
-        df.loc['consideration', 'EX'] - df.loc['loss', 'EX'], abs=1e-6)
+        df.loc['consideration', 'EX'] + df.loc['loss', 'EX'], abs=1e-6)
 
 
 # ----------------------------------------------------------------------
@@ -363,74 +364,57 @@ def test_evaluate_function_consideration_runs():
 
 
 # ----------------------------------------------------------------------
-# Reinsurance-aware Gross / Ceded / Net view (a PnLTower)
+# Reinsurance-aware Gross / Ceded / Net group ledger
 # ----------------------------------------------------------------------
 _REINS = 'agg R 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000'
 
+#: the agg-only two-group ledger row template (gross sell + agg cession buy)
+_GCN_ROWS = ['premium', 'loss', 'gross result',
+             'ceded agg premium', 'ceded agg recovery', 'ceded agg result',
+             'net through ceded agg',
+             'total consideration', 'total obligation', 'margin',
+             'total impact']
 
-def test_gcn_means_add_and_impact():
-    """margin_df: EX adds across the split (net = gross + ceded); impact = net - gross.
 
-    The agg-only example has columns ``gross | ceded | net | impact``. On the
-    ``EX`` row the signed leg results add across the Gross/Ceded/Net split
-    (``EX[gross] + EX[ceded] == EX[net]``, the covariance carried per atom); the
-    ``impact`` column is ``net - gross`` per statistic. The waterfall lives on the
-    PnL's ``margin_df`` and the tower is reachable via ``.tower``.
+def test_gcn_ledger_rows_and_means_add():
+    """The agg-only program is a two-group per-atom ledger over the gross
+    marginal: gross ``sell`` group + agg cession ``buy`` group. The EX column
+    adds down the sheet (covariance carried per atom); the resolved economics
+    ride on ``pnl.economics``.
     """
     pnl = build(_REINS).make_pnl(gross=5500, ceded=1800)
     assert isinstance(pnl, PnL)
-    assert isinstance(pnl.tower, PnLTower)
-    g = pnl.margin_df
-    assert list(g.columns) == ['gross', 'ceded', 'net', 'impact']
-    assert list(g.index) == ['EX', 'SD', 'CV', 'Skew',
-                             'P1', 'P5', 'P10', 'P25', 'P50', 'P75', 'P90',
-                             'P95', 'P99']
-    # means add across the split (EX row only)
-    assert g.loc['EX', 'net'] == pytest.approx(
-        g.loc['EX', 'gross'] + g.loc['EX', 'ceded'], abs=1e-6)
-    # impact column = net - gross per statistic
-    assert g.loc['EX', 'impact'] == pytest.approx(
-        g.loc['EX', 'net'] - g.loc['EX', 'gross'], abs=1e-6)
+    s = pnl.summary_df
+    assert list(s.index) == _GCN_ROWS
+    # group results are step deltas; the grand result sums them
+    assert s.loc['margin', 'EX'] == pytest.approx(
+        s.loc['gross result', 'EX'] + s.loc['ceded agg result', 'EX'],
+        abs=1e-6)
+    # total impact = the cession's step delta (result vs the gross result)
+    assert s.loc['total impact', 'EX'] == pytest.approx(
+        s.loc['ceded agg result', 'EX'], abs=1e-6)
+    # the cession books contra: -premium, +recovery
+    assert s.loc['ceded agg premium', 'EX'] == pytest.approx(-1800.0)
+    assert s.loc['ceded agg recovery', 'EX'] > 0
     # the resolved economics carry the scalar-API premiums
-    assert pnl.tower.economics['gross'] == pytest.approx(5500.0)
-    assert pnl.tower.economics['ceded'] == pytest.approx(1800.0)
+    assert pnl.economics['gross'] == pytest.approx(5500.0)
+    assert pnl.economics['ceded'] == pytest.approx(1800.0)
 
 
-def test_gcn_summary_df_is_net_perspective():
-    """The PnL's summary_df is the NET perspective's headline table.
-
-    The additive GCN waterfall is the separate :attr:`PnL.margin_df` exhibit;
-    the headline ``summary_df`` is the net perspective's leg table (same
-    8 columns), whose net premium defaults to ``gross - ceded`` and whose result
-    row is the uniform ``margin`` label.
-    """
-    p = build(_REINS).make_pnl(gross=5500, ceded=1800)
-    sdf = p.summary_df
-    assert list(sdf.columns) == _SUMMARY_COLS
-    assert list(sdf.index) == ['premium', 'loss', 'expense',
-                               'Total obligation', 'margin']
-    # net premium defaults to gross - ceded = 3700
-    assert sdf.loc['premium', 'EX'] == pytest.approx(3700.0)
-    # the GCN waterfall exhibit is still reachable via margin_df
-    assert list(p.margin_df.columns) == ['gross', 'ceded', 'net', 'impact']
-
-
-def test_gcn_net_override():
-    """net= overrides the derived gross - ceded retained premium."""
-    p = build(_REINS).make_pnl(gross=5500, ceded=1800, net=4000)
-    assert p.summary_df.loc['premium', 'EX'] == pytest.approx(4000.0)
-
-
-def test_gcn_net_leg_drives_moments():
-    """Net is the headline: the returned PnL *is* the net, driving summary_df / moments / q."""
+def test_gcn_net_position_drives_moments():
+    """The grand result is the net position, driving moments / q; the grand
+    total consideration books gross - ceded."""
     agg = build(_REINS)
     p = agg.make_pnl(gross=5500, ceded=1800)
     e_net = float((agg.xs * agg.agg_density_net).sum())
     assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
-    # the net (margin) result is the headline
-    assert p.summary_df.loc['margin', 'EX'] == pytest.approx(p.mean)
-    # q delegates to the net result GridDistribution
+    s = p.summary_df
+    assert s.loc['total consideration', 'EX'] == pytest.approx(3700.0)
+    assert s.loc['margin', 'EX'] == pytest.approx(p.mean)
+    # q delegates to the grand result GridDistribution
     assert p.q(0.5) == pytest.approx(p.gd.q(0.5))
+    # SDs do not add: the cession trims the tail
+    assert s.loc['margin', 'SD'] < s.loc['gross result', 'SD']
 
 
 def test_net_only_on_reins_agg():

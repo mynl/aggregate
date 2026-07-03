@@ -562,7 +562,7 @@ def _render_expense(spec: dict) -> str:
     follows; juxtaposed groups are space-separated. Each term renders as
     ``<amount> fixed expenses`` / ``<fraction> premium|loss expenses``.
     """
-    from ._pnl import _normalize_expense_groups
+    from ._pnl_builders import _normalize_expense_groups
     groups = _normalize_expense_groups(spec.get('expense_spec'))
     if not groups:
         return ''
@@ -750,7 +750,10 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl') -> _Block:
         # the ordinary agg renderers, so every exposure form round-trips through
         # one code path. (An ``agg.NAME``-sourced P&L renders as the equivalent
         # inline engine -- the merged loss structure round-trips identically.)
-        engine = _Block(f'agg {name}_e', [
+        # The engine's own ``as`` label names the P&L's loss leg
+        # (dev/plan-yapnl.md label plumbing), so it must round-trip.
+        engine_label = _render_label(spec.get('engine_display_label'))
+        engine = _Block(f'agg {name}_e{engine_label}', [
             _render_exposure(spec),
             _render_layers(spec),
             _render_sev_clause(spec),

@@ -7,8 +7,8 @@ reinstatement premiums, this is generic over **any**
 :class:`~aggregate.contract_terms.ContractTerms`: the feature's vectorized
 ``phi`` is pushed forward over the loss distribution to make exactly **one** P&L
 leg stochastic (decision 0: one variable feature per program, no stacking), and
-the Gross / Ceded / Net waterfall is a :class:`~aggregate.PnLTower` of legs
-(:func:`~aggregate.create_pnl` over the degenerate 1-D source).
+the Gross / Ceded / Net waterfall is a group ledger of :class:`~aggregate.PnL`
+legs over the degenerate 1-D source.
 
 Every accounting leg is written as a function of ``(l, a)`` -- gross loss ``l``
 and ceded loss ``a`` -- so the **same** code serves both bases (appendix
@@ -173,7 +173,7 @@ class VariableRatingAnalysis:
         ``l - a``); ``ceded_premium`` (swing, on ceded loss ``a``); ``expense``
         (slide / profit commission, on ceded LR ``a / P_C``); ``ceded_loss``
         (corridor, on ceded LR). These decompose every accounting leg the
-        :func:`~aggregate.create_pnl` tower and the exhibits read.
+        group ledger and the exhibits read.
         """
         terms = self.terms
         tl = terms.target_leg
@@ -279,12 +279,13 @@ class VariableRatingAnalysis:
         return lambda l: fn(l, ceder(l))
 
     @property
-    def distributions(self):
-        """Dict of the named leg :class:`GridDistribution` objects.
+    def _distributions(self):
+        """Dict of the named leg :class:`GridDistribution` objects (internal).
 
         Each leg ``psi(l) = f(l, ceder(l))`` is a **1-D pushforward** of the gross
-        density (:func:`~aggregate.bivariate.pushforward_1d`; the rebucketed form
-        the exhibits read), the degenerate aggregate-basis path.
+        density (:func:`~aggregate.bivariate.pushforward_1d`), the degenerate
+        aggregate-basis path. The internal engine behind :meth:`tail_df`; the
+        human-facing exhibits are the owning PnL's group ledger.
         """
         if self._dists is None:
             from .bivariate import pushforward_1d
@@ -295,12 +296,11 @@ class VariableRatingAnalysis:
         return self._dists
 
     @property
-    def stats_df(self):
-        """Exact per-leg moments on the gross grid (mean / sd / cv / skew).
+    def _stats_df(self):
+        """Exact per-leg moments on the gross grid (internal).
 
-        The canonical moment store: each leg's exact ``sum p_i psi(l_i)^k``
-        straight off the gross density (no rebucketing). Means here are the ground
-        truth the GCN Mean rows add to.
+        Each leg's exact ``sum p_i psi(l_i)^k`` straight off the gross density
+        (no rebucketing) -- the ground-truth moment store.
         """
         if self._stats is None:
             rows = {name: self._moments(fn)
@@ -324,136 +324,11 @@ class VariableRatingAnalysis:
                           'cv': cv, 'skew': skew})
 
     def _exact(self, name):
-        """``(mean, sd, skew)`` of a leg from the exact :attr:`stats_df`."""
-        row = self.stats_df.loc[name]
+        """``(mean, sd, skew)`` of a leg from the exact :attr:`_stats_df`."""
+        row = self._stats_df.loc[name]
         sk = row.get('skew', np.nan)
         return (float(row['mean']), float(row['sd']),
                 float(sk) if pd.notna(sk) else 0.0)
-
-    # ------------------------------------------------------------------
-    # the Gross / Ceded / Net waterfall, as a PnLTower of legs
-    # ------------------------------------------------------------------
-    @property
-    def gcn_df(self):
-        """Gross / Ceded / Net underwriting waterfall as a :class:`PnLTower`.
-
-        Every accounting leg is a :func:`~aggregate.create_pnl` over the **same**
-        degenerate 1-D source (all mass on ``a = ceder(l)``), so the gross ``sell``
-        leg and the ``buy`` cession stack into the running net **per atom**. The
-        feature makes exactly one component stochastic (nonzero ``CV`` in its
-        column). New-canonical stats x ``gross | ceded | net | impact`` table.
-        """
-        from ._pnl import create_pnl, create_pnl_tower
-        c = self._components()
-        ceder = self.ceder
-        E_G = self.gross_expense
-        gp, cp, cl, cm = (c['gross_premium'], c['ceded_premium'],
-                          c['ceded_loss'], c['commission'])
-        gross_obl = {'loss': (lambda l: l)}
-        if E_G:
-            gross_obl['expense'] = E_G
-        gross = create_pnl(
-            (self.grid, self.density), role='sell', name='gross',
-            consideration={'premium': (lambda l: gp(l, ceder(l)))},
-            obligation=gross_obl, result_name='gross')
-        ceded = create_pnl(
-            (self.grid, self.density), role='buy', name='ceded',
-            consideration={'ceded premium': (lambda l: cp(l, ceder(l)))},
-            obligation={'recovery': (lambda l: cl(l, ceder(l))),
-                        'commission': (lambda l: cm(l, ceder(l)))},
-            result_name='ceded')
-        return create_pnl_tower([gross, ceded], delta_names=['impact']).gcn_df
-
-    # ------------------------------------------------------------------
-    # the net P&L value object (the always-PnL face; analysis is attached)
-    # ------------------------------------------------------------------
-    def as_pnl(self):
-        """The **net** position as a :class:`~aggregate.PnL`, with ``self`` attached.
-
-        The face a ``build('pnl ... <feature> ...')`` program returns: a P&L over
-        the gross density whose net legs are the feature's net premium / net loss /
-        net expense, so its fixed exhibits (``summary_df`` / ``stats_df`` /
-        ``density_df``) describe the retained position and its ``margin_df``
-        forwards this analysis's Gross/Ceded/Net waterfall. The analysis itself is
-        reachable as :attr:`~aggregate.PnL.analysis` for the treaty maps,
-        ``tail_df`` and ``plot``.
-        """
-        from ._pnl import create_pnl
-        c = self._components()
-        ceder = self.ceder
-        E_G = self.gross_expense
-        gp, cp, cl, cm = (c['gross_premium'], c['ceded_premium'],
-                          c['ceded_loss'], c['commission'])
-
-        def net_premium(l):
-            a = ceder(l)
-            return gp(l, a) - cp(l, a)
-
-        def net_loss(l):
-            a = ceder(l)
-            return np.asarray(l, dtype=float) - cl(l, a)
-
-        def net_expense(l):
-            return E_G - cm(l, ceder(l))
-
-        obligation = {'net loss': net_loss}
-        # include the expense leg only when it is not identically zero: a nonzero
-        # gross expense / fixed commission, or a feature that *fills* the expense
-        # leg (slide / profit commission -> a stochastic commission).
-        if E_G or self.commission or self.terms.target_leg == 'expense':
-            obligation['net expense'] = net_expense
-        face = create_pnl(
-            (self.grid, self.density), role='sell', name='net',
-            consideration={'net premium': net_premium},
-            obligation=obligation, result_name='margin')
-        face._waterfall = self
-        return face
-
-    # ------------------------------------------------------------------
-    # the headline summary + the return-period capital exhibit (gained free)
-    # ------------------------------------------------------------------
-    @property
-    def summary_df(self):
-        """Gross / Ceded / Net / Impact / Pct-Impact headline (mirrors reinstatement).
-
-        Rows: Premium, CV(Premium), Loss, CV(Loss), Underwriting, SD(Underwriting),
-        then the adverse-tail percentile rows (:attr:`percentiles`). The
-        underwriting legs already fold in the (possibly stochastic) expense /
-        commission, so no shift is applied. Impact is Net - Gross; Pct Impact the
-        percent change vs gross.
-        """
-        prem = {'gross': self._exact('gross_premium'),
-                'ceded': self._exact('ceded_premium'),
-                'net': self._exact('net_premium')}
-        loss = {'gross': self._exact('gross_loss'),
-                'ceded': self._exact('ceded_loss'),
-                'net': self._exact('net_loss')}
-        uw = {'gross': self._exact('gross_uw'), 'ceded': self._exact('ceded_uw'),
-              'net': self._exact('net_uw')}
-        d = self.distributions
-        uw_dist = {'gross': d['gross_uw'], 'ceded': d['ceded_uw'],
-                   'net': d['net_uw']}
-        cols = ['gross', 'ceded', 'net']
-        rows = {}
-        rows[('', 'Premium')] = {c: prem[c][0] for c in cols}
-        rows[('', 'CV(Premium)')] = {
-            c: (prem[c][1] / prem[c][0] if prem[c][0] else np.nan) for c in cols}
-        rows[('', 'Loss')] = {c: loss[c][0] for c in cols}
-        rows[('', 'CV(Loss)')] = {
-            c: (loss[c][1] / loss[c][0] if loss[c][0] else np.nan) for c in cols}
-        rows[('', 'Underwriting')] = {c: uw[c][0] for c in cols}
-        rows[('', 'SD(Underwriting)')] = {c: uw[c][1] for c in cols}
-        for lvl in self.percentiles:
-            rows[('Percentile', f'{lvl:g}')] = {
-                c: float(uw_dist[c].q(1.0 - lvl)) for c in cols}
-        df = pd.DataFrame(rows).T
-        df['Impact'] = df['net'] - df['gross']
-        with np.errstate(divide='ignore', invalid='ignore'):
-            df['Pct Impact'] = np.where(df['gross'] != 0,
-                                        df['net'] / df['gross'] - 1.0, np.nan)
-        df.index = pd.MultiIndex.from_tuples(df.index, names=['section', 'item'])
-        df.columns = ['Gross', 'Ceded', 'Net', 'Impact', 'Pct Impact']
-        return df
 
     def tail_df(self, periods=None):
         """Return-period table of **net underwriting result** (the capital exhibit).
@@ -476,7 +351,7 @@ class VariableRatingAnalysis:
         """
         if periods is None:
             periods = (10, 20, 50, 100, 200, 250, 1000)
-        d = self.distributions
+        d = self._distributions
         recs = []
         for T in periods:
             lvl = 1.0 / T

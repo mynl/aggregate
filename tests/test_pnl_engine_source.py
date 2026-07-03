@@ -3,15 +3,16 @@
 The breaking ``pnl NAME <premium> less <engine> [less <expenses>]`` syntax, where
 the engine is an inline ``agg``, a stored ``agg.NAME``, or a stored ``port.NAME``.
 Covers the ``inherit premium`` head, the two-independent-premiums feature, the
-``xpnl`` exploded tower, and the deferred/error edges. See
-dev/plan-pnl-engine-source.md.
+``xpnl`` marginal perspective stack, and the deferred/error edges. See
+dev/plan-pnl-engine-source.md and dev/plan-yapnl.md.
 """
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from aggregate import Underwriter
-from aggregate._pnl import PnL, PnLTower
+from aggregate._pnl import PnL
 
 
 @pytest.fixture
@@ -113,15 +114,34 @@ def test_ref_port_engine_fixed_and_inherit(uw):
     assert isinstance(uw('pnl PC inherit premium less port.Bk'), PnL)
 
 
+def test_port_engine_expenses_supported(uw):
+    """Expenses on a portfolio-sourced P&L book like any other (un-NYI)."""
+    uw('agg U1 500 premium at 0.6 lr sev lognorm 50 cv 2 poisson')
+    uw('port Bk1 agg.U1')
+    p = uw('pnl PE 1000 premium less port.Bk1 less 10% premium expense '
+           'and 50 fixed expense')
+    assert isinstance(p, PnL)
+    # one obligation leg for the and-joined group, booked signed
+    assert p.summary_df.loc['expense', 'EX'] == pytest.approx(
+        -(0.10 * 1000 + 50.0))
+
+
 # ----------------------------------------------------------------------
-# xpnl -> exploded PnLTower
+# xpnl -> the marginal perspective stack
 # ----------------------------------------------------------------------
-def test_xpnl_returns_tower_over_gcn_engine(uw):
-    """``xpnl`` over an engine with reinsurance economics returns a PnLTower."""
+def test_xpnl_returns_marginal_stack_over_gcn_engine(uw):
+    """``xpnl`` over an engine with reinsurance economics returns the
+    perspective x stats frame (gross / ceded / net rows + the impact delta)."""
     t = uw('xpnl X 1000 premium less agg e 1000 premium at 0.7 lr '
            'sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 '
            'poisson')
-    assert isinstance(t, PnLTower)
+    assert isinstance(t, pd.DataFrame)
+    assert list(t.index) == ['gross', 'ceded', 'net', 'impact']
+    # means add across the perspective rows (the onion peel)
+    assert t.loc['net', 'EX'] == pytest.approx(
+        t.loc['gross', 'EX'] + t.loc['ceded', 'EX'], abs=1e-6)
+    assert t.loc['impact', 'EX'] == pytest.approx(
+        t.loc['net', 'EX'] - t.loc['gross', 'EX'], abs=1e-6)
 
 
 def test_xpnl_over_plain_engine_not_implemented(uw):

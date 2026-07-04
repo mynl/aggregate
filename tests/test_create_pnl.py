@@ -168,6 +168,51 @@ def test_plus_requires_same_source():
 
 
 # ----------------------------------------------------------------------
+# stats_df (View, Line) MultiIndex
+# ----------------------------------------------------------------------
+def test_stats_df_view_line_multiindex():
+    """stats_df rows carry a (View, Line) MultiIndex: legs under their side,
+    total rows -> (View, 'Total'), the result -> ('Margin', 'Total'). The
+    flat ledger labels stay the canonical keys on the other exhibits."""
+    p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
+            consideration={'premium': 15.0},
+            obligation={'loss': lambda x: x, 'expense': 3.0})
+    s = p.stats_df
+    assert list(s.index.names) == ['View', 'Line']
+    assert list(s.index) == [
+        ('Consideration', 'premium'),
+        ('Obligation', 'loss'), ('Obligation', 'expense'),
+        ('Obligation', 'Total'),
+        ('Margin', 'Total')]
+    assert p.scaled_stats_df.index.equals(s.index)
+    # canonical flat keys untouched
+    assert list(p.summary_df.index) == [
+        'premium', 'loss', 'expense', 'total obligation', 'result']
+
+
+def test_stats_df_multiindex_multigroup():
+    """Multi-group sheet: per-group totals qualify by group label, group
+    results sit under Margin keyed by the group label, running nets and the
+    grand rows close under ('Margin', 'Total') / ('Margin', 'Total impact')."""
+    t = PnL(name='m', source=(_VALS, _PROBS), groups=[
+        Group('base', 'sell', {'premium': 15.0, 'fee': 1.0},
+              {'loss': lambda x: x}),
+        Group('cover', 'buy', {'ceded premium': 2.0},
+              {'recovery': lambda x: np.maximum(x - 20, 0)}),
+    ])
+    assert list(t.stats_df.index) == [
+        ('Consideration', 'premium'), ('Consideration', 'fee'),
+        ('Consideration', 'base total'),
+        ('Obligation', 'loss'),
+        ('Margin', 'base'),
+        ('Consideration', 'ceded premium'),
+        ('Obligation', 'recovery'),
+        ('Margin', 'cover'), ('Margin', 'Net through cover'),
+        ('Consideration', 'Total'), ('Obligation', 'Total'),
+        ('Margin', 'Total'), ('Margin', 'Total impact')]
+
+
+# ----------------------------------------------------------------------
 # scale / scaled_stats_df
 # ----------------------------------------------------------------------
 def test_scaled_stats_df_is_stats_of_x_over_scale():
@@ -238,7 +283,8 @@ def test_bs_leg_rebuckets_and_feeds_validation_df():
     # the linear scheme preserves the mean
     assert v.loc['loss', 'abs_err'] == pytest.approx(0.0, abs=1e-12)
     # the leg GD sits on the regular bs grid; the exact EX is off the atoms
-    assert bucketed.stats_df.loc['loss', 'EX'] == pytest.approx(-10.0)
+    assert bucketed.stats_df.loc[('Obligation', 'loss'), 'EX'] == \
+        pytest.approx(-10.0)
 
 
 def test_derived_rows_stay_exact_alongside_bs_legs():

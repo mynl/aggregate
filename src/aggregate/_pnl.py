@@ -503,6 +503,14 @@ def _stat_names():
     return ['EX', 'SD', 'CV', 'Skew'] + [_pct_label(q) for q in PERCENTILE_LADDER]
 
 
+#: Default ``View`` level names for the :attr:`PnL.stats_df` row MultiIndex,
+#: keyed by the internal side codes (``margin`` covers every result-flavored
+#: row: group results, running nets, the grand result, total impact).
+#: Capitalized, presentation-ready.
+_VIEW_DEFAULTS = {'cons': 'Consideration', 'obl': 'Obligation',
+                  'margin': 'Margin'}
+
+
 #: ``stats_df`` / ``scaled_stats_df`` columns that are scale-invariant: a ratio
 #: (``CV``) and a shape (``Skew``) pass through ``X / scale`` unchanged; every
 #: other column divides by the committed scale.
@@ -995,25 +1003,70 @@ class PnL(LabeledMixin):
         df.index.name = 'P&L'
         return df
 
+    def _view_index(self):
+        """The ``(View, Line)`` row MultiIndex for :attr:`stats_df` /
+        :attr:`scaled_stats_df`, aligned with the ledger plan order.
+
+        ``View`` buckets every ledger row: legs and totals under their side
+        (:data:`_VIEW_DEFAULTS` -- ``Consideration`` / ``Obligation``), all
+        result-flavored rows (group results, running nets, the grand result,
+        total impact) under ``Margin``. ``Line`` is the presentation label:
+        leg labels as declared; total rows read ``Total`` (qualified as
+        ``'<group> total'`` per group on a multi-group sheet); group results
+        read the group label; the grand result reads ``Total``. Presentation
+        only -- the flat plan labels stay the canonical row keys everywhere
+        else (:attr:`summary_df`, :attr:`density_df`, :attr:`validation_df`,
+        the sweep result keys).
+        """
+        groups = self._group_specs
+        multi = len(groups) > 1
+        v = _VIEW_DEFAULTS
+        tuples = []
+        for label, kind, payload in self._plan:
+            if kind == 'leg':
+                _gi, side, _li = payload
+                t = (v[side], label)
+            elif kind == 'group_total':
+                gi, side = payload
+                t = (v[side],
+                     f'{groups[gi].label} total' if multi else 'Total')
+            elif kind == 'group_result':
+                t = (v['margin'],
+                     groups[payload].label if multi else 'Total')
+            elif kind == 'running_net':
+                t = (v['margin'], f'Net through {groups[payload].label}')
+            elif kind == 'grand_total':
+                t = (v[payload], 'Total')
+            elif kind == 'grand_result':
+                t = (v['margin'], 'Total')
+            else:                                     # 'total_impact'
+                t = (v['margin'], 'Total impact')
+            tuples.append(t)
+        return pd.MultiIndex.from_tuples(tuples, names=['View', 'Line'])
+
     @property
     def stats_df(self):
         """The full ledger x metrics table, in currency units.
 
-        Same rows as :attr:`summary_df`; columns are ``EX`` / ``SD`` / ``CV``
-        / ``Skew`` and the full :data:`PERCENTILE_LADDER` (``P1`` ... ``P99``).
+        Same rows as :attr:`summary_df` (ledger order preserved), indexed by
+        the two-level ``(View, Line)`` MultiIndex of :meth:`_view_index`:
+        ``View`` groups the sheet into ``Consideration`` / ``Obligation`` /
+        ``Margin``, ``Line`` is the presentation row label (leg labels as
+        declared; total rows read ``Total``, so ``'total obligation'``
+        displays as ``('Obligation', 'Total')`` and the result as
+        ``('Margin', 'Total')``). Columns are ``EX`` / ``SD`` / ``CV`` /
+        ``Skew`` and the full :data:`PERCENTILE_LADDER` (``P1`` ... ``P99``).
 
         Returns
         -------
         pandas.DataFrame
-            Indexed by row label (index name ``'P&L'``); columns the metric
-            names.
+            ``(View, Line)`` MultiIndexed rows in ledger order; columns the
+            metric names.
         """
-        data = {label: [_snap_noise(v) for v in row.stat_vector()]
-                for label, row in self._rows.items()}
-        df = pd.DataFrame.from_dict(data, orient='index',
-                                    columns=_stat_names())
-        df.index.name = 'P&L'
-        return df
+        data = [[_snap_noise(v) for v in row.stat_vector()]
+                for row in self._rows.values()]
+        return pd.DataFrame(data, index=self._view_index(),
+                            columns=_stat_names())
 
     @property
     def scaled_stats_df(self):
@@ -1023,6 +1076,7 @@ class PnL(LabeledMixin):
         :attr:`scale`; ``CV`` and ``Skew`` are scale-invariant and pass
         through unchanged. Every cell defined (a break-even scale yields
         ``nan`` in the divided columns -- there is no unit to measure in).
+        Carries the same ``(View, Line)`` row MultiIndex as :attr:`stats_df`.
         """
         df = self.stats_df
         denom = self._scale_value

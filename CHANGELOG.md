@@ -14,6 +14,16 @@ unchanged; the P&L builders read the namespace. Object-level labels stay on
 classless clause sites pool into the owning object's map — the deliberate
 tree rule, reaffirmed).
 
+**[PnL-Stats-View-MultiIndex]** — `PnL.stats_df` / `scaled_stats_df` rows now
+carry a two-level `(View, Line)` MultiIndex: `View` groups the sheet into
+`Consideration` / `Obligation` / `Margin` (result rows, running nets, total
+impact); `Line` is the presentation label — leg labels as declared, total rows
+read `Total` (qualified `'<group> total'` per group on a multi-group sheet),
+group results the group label, the grand result `('Margin', 'Total')`.
+Presentation only: the flat ledger labels stay the canonical row keys on
+`summary_df` / `density_df` / `validation_df` and the sweep results. No
+version bump (author call).
+
 ## 1.0.0a131
 
 **[PnL-Generic-Final] phase [Xpnl-Onion-2D]** — the massive-source route and

@@ -48,7 +48,7 @@ buildin_dist_list: buildin_dist_list BUILTIN_DIST   -> buildin_dist_list_cons
 // Portfolio
 // ======================================================================
 
-port_out: PORT name display_label trailer agg_list
+port_out: PORT name as_label trailer agg_list
 
 agg_list: agg_list port_item   -> agg_list_cons
         | port_item            -> agg_list_one
@@ -65,10 +65,10 @@ agg_list: agg_list port_item   -> agg_list_cons
 // Aggregate
 // ======================================================================
 
-agg_out: AGG name display_label agg_body trailer   -> agg_out_named
+agg_out: AGG name as_label agg_body trailer   -> agg_out_named
        | builtin_agg agg_reins trailer              -> agg_out_builtin
 
-// The shared aggregate body -- everything after ``AGG name display_label`` and
+// The shared aggregate body -- everything after ``AGG name as_label`` and
 // before the trailer. Factored out of ``agg_out`` so the embedded engine of a
 // ``pnl`` / ``xpnl`` (see ``agg_source``) reuses the *identical* body: a P&L
 // wraps a complete aggregate, not a forked half-body ("no bastards"). The four
@@ -119,14 +119,14 @@ approx_clause: APPROXIMATE ID   -> approx_set
 // dev/done/plan-pnl-premium.md, dev/done/plan-pnl-expenses-ceded-premium.md.
 // ======================================================================
 
-pnl_out:  PNL  name display_label pnl_premium LESS agg_source expense_less trailer  -> pnl_out_engine
-xpnl_out: XPNL name display_label pnl_premium LESS agg_source expense_less trailer  -> xpnl_out_engine
+pnl_out:  PNL  name as_label pnl_premium LESS agg_source expense_less trailer  -> pnl_out_engine
+xpnl_out: XPNL name as_label pnl_premium LESS agg_source expense_less trailer  -> xpnl_out_engine
 
 // The wrapped engine: a complete aggregate. ``agg NAME <body>`` reuses the
 // shared ``agg_body`` (identical to a standalone ``agg``, minus the trailer,
 // which the wrapping pnl/xpnl owns); ``agg.NAME`` / ``port.NAME`` reference a
 // stored object. A ``port`` source reads the net-net portfolio total.
-agg_source: AGG name display_label agg_body   -> agg_source_inline
+agg_source: AGG name as_label agg_body   -> agg_source_inline
           | builtin_agg                        -> agg_source_ref_agg
           | BUILTIN_PORT                        -> agg_source_ref_port
 
@@ -136,9 +136,9 @@ agg_source: AGG name display_label agg_body   -> agg_source_inline
 // account-level retrospective-rating clause ``retro <collar> premium``. The
 // trailing ``premium`` keeps the ``premium less`` divider. See
 // dev/plan-variable-rating.md and dev/plan-pnl-engine-source.md.
-pnl_premium: numbers PREMIUM display_label        -> pnl_premium_fixed
-           | INHERIT PREMIUM display_label         -> pnl_premium_inherit
-           | RETRO collar PREMIUM display_label   -> pnl_premium_retro
+pnl_premium: numbers PREMIUM as_label        -> pnl_premium_fixed
+           | INHERIT PREMIUM as_label         -> pnl_premium_inherit
+           | RETRO collar PREMIUM as_label   -> pnl_premium_retro
 
 // The optional second-``less`` expense clause (the hard anchor). Omit when no
 // expenses; ``less <expense-groups>`` otherwise.
@@ -169,7 +169,7 @@ expense_less: LESS expense_groups   -> expense_less_some
 expense_groups: expense_groups expense_group   -> expense_groups_cons
               | expense_group                    -> expense_groups_one
 
-expense_group: expense_terms display_label   -> expense_group
+expense_group: expense_terms as_label   -> expense_group
 
 expense_terms: expense_terms AND expense_term   -> expense_terms_cons
              | expense_term                       -> expense_terms_one
@@ -255,8 +255,8 @@ copula_clause: COPULA ID numbers   -> copula_one_param
 // Severity output (standalone `sev X ...` definitions)
 // ======================================================================
 
-sev_out: SEV name display_label sev trailer    -> sev_out_sev
-       | SEV name display_label dsev trailer   -> sev_out_dsev
+sev_out: SEV name as_label sev trailer    -> sev_out_sev
+       | SEV name as_label dsev trailer   -> sev_out_dsev
 
 // ======================================================================
 // Frequency
@@ -295,7 +295,7 @@ reins_list: reins_list AND reins_clause   -> reins_list_cons
 // valid only with a premium. Entered gross of commission. The loss layer feeds
 // the reinsurance engine exactly as before; the premium / cede / reinstatements
 // ride alongside for the P&L.
-reins_clause: reins_layer reins_premium reins_cede reins_reinst reins_variable display_label   -> reins_clause
+reins_clause: reins_layer reins_premium reins_cede reins_reinst reins_variable as_label   -> reins_clause
 
 reins_layer: expr XS expr                   -> reins_clause_xs
            | expr SHARE_OF expr XS expr     -> reins_clause_share
@@ -380,13 +380,13 @@ slide_anchor: expr AT expr   -> slide_anchor
 // Severity (continuous: scipy.stats wrappers)
 // ======================================================================
 
-// ``display_label`` (optional ``as "..."``) names the inline severity clause;
+// ``as_label`` (optional ``as "..."``) names the inline severity clause;
 // appended as the last child (dev/plan-labels.md S3). AS is disjoint from what
 // follows a sev_clause (occ_reins / freq / agg_reins), so it is Earley-safe.
-sev_clause: SEV sev display_label          -> sev_clause_sev
-          | SSEV sev display_label         -> sev_clause_ssev
-          | dsev display_label             -> sev_clause_dsev
-          | BUILTIN_SEV display_label      -> sev_clause_builtin
+sev_clause: SEV sev as_label          -> sev_clause_sev
+          | SSEV sev as_label         -> sev_clause_ssev
+          | dsev as_label             -> sev_clause_dsev
+          | BUILTIN_SEV as_label      -> sev_clause_builtin
 
 sev: sev "!"                 -> sev_unconditional
    | sev picks               -> sev_picks
@@ -436,12 +436,12 @@ splice: SPLICE "[" numberl "]" "[" numberl "]"   -> splice_two
 // Layers
 // ======================================================================
 
-// ``display_label`` (optional ``as "..."``) names the occurrence layer, appended
+// ``as_label`` (optional ``as "..."``) names the occurrence layer, appended
 // as the last child (dev/plan-labels.md S2). The one real hazard is the following
 // ``sev_clause``: AS is disjoint from SEV/SSEV/dsev/BUILTIN_SEV (and from the
 // numbers a bare layer is otherwise followed by), so the split is Earley-safe --
 // guarded by an explicit ambiguity test.
-layers: numbers XS numbers display_label   -> layers_xs
+layers: numbers XS numbers as_label   -> layers_xs
       | tower                              -> layers_tower
       |                                    -> layers_none
 
@@ -473,14 +473,14 @@ trailer: NOTE HINTS   -> trailer_nh
 // Exposures
 // ======================================================================
 
-// ``display_label`` (the optional ``as "..."``) names the sizing basis; it
+// ``as_label`` (the optional ``as "..."``) names the sizing basis; it
 // sits right after the amount/keyword unit (before ``at ... lr/rate``), the
 // natural reading spot -- see dev/plan-labels.md S1. AS is disjoint from AT and
 // from what follows a bare exposures clause, so the placement is Earley-safe.
-exposures: numbers CLAIMS display_label                    -> exposures_claims
-         | numbers LOSS display_label                      -> exposures_loss
-         | numbers PREMIUM display_label AT numbers LR      -> exposures_premium_lr
-         | numbers EXPOSURE display_label AT numbers RATE   -> exposures_exposure_rate
+exposures: numbers CLAIMS as_label                    -> exposures_claims
+         | numbers LOSS as_label                      -> exposures_loss
+         | numbers PREMIUM as_label AT numbers LR      -> exposures_premium_lr
+         | numbers EXPOSURE as_label AT numbers RATE   -> exposures_exposure_rate
 
 // ======================================================================
 // IDs (severity-name lists or singletons)
@@ -506,7 +506,7 @@ builtin_agg: expr INHOMOG_MULTIPLY builtin_agg   -> builtin_agg_inhomog
 // Name (single identifier wrapper) + optional human display label
 // ----------------------------------------------------------------------
 // ``name`` is the bareword *identity* (the knowledge-base key / reference
-// target); it stays ID-shaped. ``display_label`` is the optional *presentation*
+// target); it stays ID-shaped. ``as_label`` is the optional *presentation*
 // string introduced by the reserved word ``as`` -- ``as lae`` (a bareword skips
 // the quote tax) or ``as "Loss Adjustment Expense"`` (quotes carry spaces). This
 // is the same identity-vs-presentation split as the ``_description`` /
@@ -517,8 +517,8 @@ builtin_agg: expr INHOMOG_MULTIPLY builtin_agg   -> builtin_agg_inhomog
 
 name: ID
 
-display_label: AS label   -> display_label_some
-             |             -> display_label_none
+as_label: AS label   -> as_label_some
+             |             -> as_label_none
 
 label: ID       -> label_id
      | STRING   -> label_string

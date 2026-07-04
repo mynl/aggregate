@@ -1522,7 +1522,7 @@ class Aggregate(LabeledMixin):
                  reins_bucket=None, dsev_bucket=None,
                  value_type='loss',
                  approximate='exact',
-                 display_label=None, label_map=None,
+                 label=None, label_map=None,
                  note='', hints=''):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
@@ -1593,7 +1593,7 @@ class Aggregate(LabeledMixin):
                                 from the ``approximate()`` *method* (the MoM-surrogate
                                 factory) so the two do not collide. See
                                 dev/done/plan-approximate.md.
-        :param display_label:   optional human display label (the DecL ``as
+        :param label:   optional human display label (the DecL ``as
                                 "..."`` clause); ``None`` falls back to ``name``.
                                 Presentation only -- repr / exhibit titles prefer
                                 it over ``name`` -- never an identity / reference
@@ -1723,7 +1723,7 @@ class Aggregate(LabeledMixin):
         # severity clause / cessions). Presentation only -- repr / exhibit titles
         # and the exhibit ``renamer`` read these; ``name`` stays the identity /
         # reference handle. See dev/done/plan-labels.md ([DecL-Labels-Everywhere]).
-        self._init_labels(display_label=display_label, label_map=label_map)
+        self._init_labels(label=label, label_map=label_map)
         # The per-layer cession labels arrive as spec lists parallel to
         # ``occ_reins`` / ``agg_reins`` (the unparser round-trips those keys)
         # but POOL into ``label_map`` as sparse ``{layer_index: label}`` dicts
@@ -2229,7 +2229,7 @@ class Aggregate(LabeledMixin):
     # Repr / info / help — string and HTML representations
     # ================================================================
 
-    # ``display_name`` / ``_title_name`` come from ``LabeledMixin`` (the shared
+    # ``label`` / ``_title_name`` come from ``LabeledMixin`` (the shared
     # label surface); ``name`` stays the identity handle. See dev/plan-labels.md.
 
     def __repr__(self):
@@ -2237,7 +2237,7 @@ class Aggregate(LabeledMixin):
         String version of _repr_html_
         :return:
         """
-        return f'{self.display_name}, {super(Aggregate, self).__repr__()}'
+        return f'{self.label}, {super(Aggregate, self).__repr__()}'
 
     def __str__(self):
         """
@@ -2802,7 +2802,7 @@ class Aggregate(LabeledMixin):
                 expense_spec=expense_spec,
                 consideration_label=consideration_label,
                 loss_label=loss_label, name=self.name,
-                display_label=self.display_label)
+                label=self.label)
         if consideration is None:
             raise ValueError(
                 'PnL needs a consideration= (or gross=/ceded= for the '
@@ -2811,7 +2811,7 @@ class Aggregate(LabeledMixin):
             self, consideration=consideration,
             consideration_label=consideration_label, loss_label=loss_label,
             expense_spec=expense_spec, name=self.name,
-            display_label=self.display_label)
+            label=self.label)
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, window_convention=None, **kwargs):
@@ -3627,7 +3627,7 @@ class Aggregate(LabeledMixin):
             return
         if getattr(dist, 'has_mass', False) and not self.bounded:
             raise ValueError(
-                f'mass distortion ({dist.display_name}) on an unbounded aggregate: '
+                f'mass distortion ({dist.label}) on an unbounded aggregate: '
                 f'the mass lands on the last represented bucket, a '
                 f'different bounded problem. Certify `bounded = True` if '
                 f'the support is in fact bounded.')

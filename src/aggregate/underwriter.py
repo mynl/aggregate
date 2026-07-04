@@ -974,7 +974,7 @@ class Underwriter(object):
             # label names the **loss leg** in the P&L ledger, so pop it into
             # the recipe (dev/plan-yapnl.md label plumbing).
             spec.pop('engine_note', None)
-            loss_label = spec.pop('engine_display_label', None)
+            loss_label = spec.pop('engine_label', None)
             consideration = spec.pop('consideration')
             expense_spec = spec.pop('expense_spec', None)
             # Optional consideration display label (the ``as`` clause on the
@@ -1116,7 +1116,7 @@ class Underwriter(object):
                     "the unit as a plain agg.")
             agg_list = [k for i, j, k in spec['spec']]
             obj = Portfolio(name, agg_list, uw=self,
-                            display_label=spec.get('display_label'))
+                            label=spec.get('label'))
             obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:
@@ -1527,7 +1527,7 @@ class Underwriter(object):
         port_spec = deepcopy(port_pp.spec)
         port_units = [k for _i, _j, k in port_spec['spec']]
         engine = Portfolio(name, port_units, uw=self,
-                           display_label=port_spec.get('display_label'))
+                           label=port_spec.get('label'))
         engine.program = program
         engine._pnl_recipe = {'kind': 'port_plain', 'expense_spec': expense_spec,
                               'consideration': consideration,
@@ -1596,7 +1596,7 @@ class Underwriter(object):
                 inner, expense_spec=recipe['expense_spec'],
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
-                display_label=inner.display_label)
+                label=inner.label)
             face.analysis = analysis
             return face
         if kind == 'reins':
@@ -1611,7 +1611,7 @@ class Underwriter(object):
                 inner, analysis, expense_spec=recipe['expense_spec'],
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
-                display_label=inner.display_label)
+                label=inner.label)
         if kind == 'gcn':
             econ = recipe['econ']
             if is_tower:
@@ -1627,13 +1627,13 @@ class Underwriter(object):
                 gcn_economics=econ, expense_spec=recipe['expense_spec'],
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
-                display_label=inner.display_label)
+                label=inner.label)
         return build_plain_pnl(
             inner, consideration=recipe['consideration'],
             consideration_label=recipe.get('consideration_label'),
             loss_label=recipe.get('loss_label'),
             expense_spec=recipe['expense_spec'], name=inner.name,
-            display_label=inner.display_label)
+            label=inner.label)
 
     def build(self, program, update=None, log2=0, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
         """

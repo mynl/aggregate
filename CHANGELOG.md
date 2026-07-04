@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.0a133
+
+**[Label-Canonical]** — one human-facing `label`, no `display_` twins. The
+`LabeledMixin` surface collapsed its two near-synonym public names onto a single
+resolved `label` property (`_label` → derived default → `name`, never blank);
+the stored slot is now the private `_label`. The old public
+`display_name` (resolved property) and `display_label` (stored attribute /
+constructor kwarg / spec key) are **gone** — every host constructor
+(`Aggregate`, `Portfolio`, `Severity`, `PnL`, every `Distortion*`) now takes
+`label=` instead of `display_label=`, and reads back through `.label`.
+
+- **Grammar:** the wrapper rule `display_label` → `as_label` (aliases
+  `as_label_some` / `as_label_none`); the inner `label: ID` text-capture rule is
+  unchanged. The DecL `as "…"` clause is untouched at the source level.
+- **Spec keys:** `display_label` → `label`, `engine_display_label` →
+  `engine_label`; the transient parser-internal `_premium_label` → `_label`
+  (the emitted `consideration_label` key is unchanged).
+- **Copula folded onto the mixin:** `copula.Copula` / `CopulaShuffle` now
+  subclass `LabeledMixin` (dropping their hand-rolled `display_name`
+  empty-string sentinel); their kind handle is exposed as `name` and a
+  kind-based `_label_default()` keeps `label` non-blank.
+- **Carve-out:** `_pnl.Leg` / `Group` keep their single `self.label` string
+  (handle *and* label in one — no name/label split to model); left untouched.
+- Breaking rename, pre-1.0 (acceptable). Docs `ref_include.rst` pending a
+  grammar regen.
+
 ## 1.0.0a132
 
 **[Labels-Reins-Into-Namespace]** — the per-layer cession labels join the

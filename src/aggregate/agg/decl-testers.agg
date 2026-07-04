@@ -652,7 +652,7 @@ pnl VR.Retro retro basic 3000 lcm 1.1 min 3500 max 8000 premium less agg VR.Retr
 # ============================================================
 # The `as` display-label clause: a bareword skips the quote tax, a "quoted"
 # label carries spaces. `name` stays the identity handle; the label is
-# presentation only (display_label / display_name / exhibit titles). Also the
+# presentation only (the resolved `label` / exhibit titles). Also the
 # two-level expense grammar: `and` combines terms into one leg, juxtaposition
 # makes separate legs, each with an optional `as` label. See dev/plan-decl-labels.md.
 agg LB.GrossBook as "Gross Book P&L" 100 claims sev lognorm 100 cv 2 poisson                                          note{quoted object display label};

@@ -44,8 +44,8 @@ def plot_portfolio(port, axd=None, figsize=(2 * FIG_W, FIG_H)):
     # unlabeled portfolio's legend is unchanged; the ``p_`` prefix is kept as the
     # data handle otherwise.
     if port.use_labels:
-        legend_ren = {f'p_{a.name}': a.display_name
-                      for a in port.agg_list if a.display_label is not None}
+        legend_ren = {f'p_{a.name}': a.label
+                      for a in port.agg_list if a.label is not None}
         if legend_ren:
             bit = bit.rename(columns=legend_ren)
     bit.plot(ax=ax, xlim=xl, ylim=yl)

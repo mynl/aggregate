@@ -538,7 +538,7 @@ class Distortion(LabeledMixin):
         * ``pricing_ok: bool = True`` — included in pricing-only lists.
         * ``has_mass_default: bool = False`` — listed in ``_has_mass_``.
         * ``def _build(self): ...`` — set ``self.has_mass``, ``self.mass``,
-          ``self.gini_p`` (if applicable), ``self.display_name``
+          ``self.gini_p`` (if applicable), ``self.label``
           (if blank), and override ``g``/``g_inv``/``g_prime`` if the
           default class methods aren't applicable.
 
@@ -621,7 +621,7 @@ class Distortion(LabeledMixin):
                 f"available: {sorted(cls._registry)}")
         return object.__new__(subclass)
 
-    def __init__(self, name=None, shape=None, *, display_label=None, **natural):
+    def __init__(self, name=None, shape=None, *, label=None, **natural):
         """
         Scalar-shape constructor used by ``ph``, ``wang``, ``dual``, ``tvar``.
 
@@ -640,9 +640,9 @@ class Distortion(LabeledMixin):
         shape : float, optional
             Positional shape parameter. May also be passed by its natural
             name (e.g. ``a=0.7`` for ph); passing both raises ``TypeError``.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause). When ``None``
-            (the usual case) :attr:`display_name` falls back to the kind's
+            (the usual case) :attr:`label` falls back to the kind's
             auto-pretty derived default (``'PH(0.9)'``), then to ``name``.
         **natural : float
             Accept the kind's natural parameter name (``a``, ``lam``, ``b``,
@@ -664,7 +664,7 @@ class Distortion(LabeledMixin):
                 f'{list(natural)}')
         self._name = name
         self.shape = shape
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -936,12 +936,12 @@ class Distortion(LabeledMixin):
     def _id_fields(self):
         """Tuple of identifying attribute values used by ``id()``.
 
-        The default returns ``(_name, shape, display_name)`` — appropriate
+        The default returns ``(_name, shape, label)`` — appropriate
         for scalar-shape kinds. Subclasses with extra structural state
         (``r0``, multi-parameter kinds, list-of-distortions kinds) override
         this method.
         """
-        return (self._name, self.shape, self.display_name)
+        return (self._name, self.shape, self.label)
 
     def id(self):
         """Unique ID as a short string, based on the structural fields
@@ -949,18 +949,18 @@ class Distortion(LabeledMixin):
         return _short_hash(str(self._id_fields()))
 
     def __str__(self):
-        return self.display_name
+        return self.label
 
     def __repr__(self):
-        return self.display_name
+        return self.label
 
     @property
     def name(self):
         """The identity handle -- the distortion kind (or a given name).
 
-        ``display_name`` (from :class:`~aggregate._labeled.LabeledMixin`) resolves
-        the human label: explicit ``display_label`` -> the kind's auto-pretty
-        derived default (:meth:`_display_default`) -> this handle.
+        ``label`` (from :class:`~aggregate._labeled.LabeledMixin`) resolves
+        the human label: explicit ``label`` -> the kind's auto-pretty
+        derived default (:meth:`_label_default`) -> this handle.
         """
         return self._name
 
@@ -1416,7 +1416,7 @@ class Distortion(LabeledMixin):
                              f'sum={self._wts.sum():.4g}]')
         # Combinator kinds (minimum, mixture): member names (+ weights).
         if hasattr(self, '_distortions'):
-            members = ', '.join(d.display_name for d in self._distortions)
+            members = ', '.join(d.label for d in self._distortions)
             parts.append(f'members=[{members}]')
             if getattr(self, '_wts', None) is not None:
                 parts.append(
@@ -1516,18 +1516,18 @@ class Distortion(LabeledMixin):
     @staticmethod
     def tvar(p):
         """Construct a TVaR distortion at level ``p``."""
-        # display_name -> the ``'TVaR(p)'`` auto-pretty derived default.
+        # label -> the ``'TVaR(p)'`` auto-pretty derived default.
         return Distortion('tvar', p=p)
 
     @staticmethod
     def max():
         """TVaR at ``p=1`` (the max)."""
-        return Distortion('tvar', p=1.0, display_label='max')
+        return Distortion('tvar', p=1.0, label='max')
 
     @staticmethod
     def mean():
         """TVaR at ``p=0`` (the mean)."""
-        return Distortion('tvar', p=0.0, display_label='mean')
+        return Distortion('tvar', p=0.0, label='mean')
 
     @staticmethod
     def wang(lam):
@@ -1693,7 +1693,7 @@ class Distortion(LabeledMixin):
             wts = np.insert(wts, 0, mean)
             mn = f', mn={mean:.3f}'
         return Distortion('wtdtvar', ps=ps, wts=wts,
-                          display_label=name or f'Rnd {n_knots} knots{mn}{ma}')
+                          label=name or f'Rnd {n_knots} knots{mn}{ma}')
 
     # ------------------------------------------------------------------
     # Pricing
@@ -2001,7 +2001,7 @@ class CCoCDistortion(Distortion):
     strict_pricing = True
     _calibration_init_shape = 0.25
 
-    def __init__(self, name='ccoc', *, d=None, r=None, display_label=None):
+    def __init__(self, name='ccoc', *, d=None, r=None, label=None):
         """
         Construct a CCoC distortion. Pass exactly one of ``d`` or ``r``.
 
@@ -2014,9 +2014,9 @@ class CCoCDistortion(Distortion):
             Discount intercept ``d = r/(1+r)``.
         r : float, optional
             Target return ``r``. Newton calibration iterates on this.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause); when ``None``,
-            :attr:`display_name` uses the kind's auto-pretty derived default.
+            :attr:`label` uses the kind's auto-pretty derived default.
 
         Raises
         ------
@@ -2039,7 +2039,7 @@ class CCoCDistortion(Distortion):
         self.d = d
         self.v = 1.0 - d
         self.shape = r
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -2054,9 +2054,9 @@ class CCoCDistortion(Distortion):
         self.gini_p = self.d
 
     def _id_fields(self):
-        return (self._name, self.r, self.d, self.display_name)
+        return (self._name, self.r, self.d, self.label)
 
-    def _display_default(self):
+    def _label_default(self):
         return f'ccoc({self.r:.3g})'
 
     def g(self, x):
@@ -2134,7 +2134,7 @@ class PHDistortion(Distortion):
     param_name = 'a'
     _calibration_init_shape = 0.95
 
-    def _display_default(self):
+    def _label_default(self):
         return f'PH({self.shape:.3g})'
 
     @property
@@ -2225,7 +2225,7 @@ class WangDistortion(Distortion):
     param_name = 'lam'
     _calibration_init_shape = 0.95
 
-    def _display_default(self):
+    def _label_default(self):
         return f'Wang({self.shape:.3g})'
 
     @property
@@ -2305,7 +2305,7 @@ class DualDistortion(Distortion):
     param_name = 'b'
     _calibration_init_shape = 2.0
 
-    def _display_default(self):
+    def _label_default(self):
         return f'dual({self.shape:.3g})'
 
     @property
@@ -2403,7 +2403,7 @@ class TVaRDistortion(Distortion):
     param_name = 'p'
     _calibration_init_shape = 0.9
 
-    def _display_default(self):
+    def _label_default(self):
         return f'TVaR({self.shape:.3g})'
 
     @property
@@ -2533,7 +2533,7 @@ class BiTVaRDistortion(Distortion):
     documented = True
     pricing_ok = True
 
-    def __init__(self, name='bitvar', *, p0, p1, w1, display_label=None):
+    def __init__(self, name='bitvar', *, p0, p1, w1, label=None):
         """
         Construct a BiTVaR distortion.
 
@@ -2547,9 +2547,9 @@ class BiTVaRDistortion(Distortion):
             Weight on the upper TVaR at ``p1``; ``1 - w1`` is the weight on
             ``p0``. ``self.shape`` is set to ``w1`` so calibration code
             (which iterates on shape) targets the upper weight.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause); when ``None``,
-            :attr:`display_name` uses the kind's auto-pretty derived default.
+            :attr:`label` uses the kind's auto-pretty derived default.
         """
         if not (p0 < p1):
             raise ValueError(f'bitvar requires p0 < p1, got {p0=}, {p1=}')
@@ -2558,7 +2558,7 @@ class BiTVaRDistortion(Distortion):
         self._p1 = p1
         self._w1 = w1
         self.shape = w1
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -2602,9 +2602,9 @@ class BiTVaRDistortion(Distortion):
                                   bounds_error=False, fill_value=(0, 1))
 
     def _id_fields(self):
-        return (self._name, self._p0, self._p1, self._w1, self.display_name)
+        return (self._name, self._p0, self._p1, self._w1, self.label)
 
-    def _display_default(self):
+    def _label_default(self):
         return f'bitvar({self._p0:.3g}, {self._p1:.3g}; {self._w1:.3g})'
 
     def g(self, x):
@@ -2691,7 +2691,7 @@ class WtdTVaRDistortion(Distortion):
     documented = True
     pricing_ok = True
 
-    def __init__(self, name='wtdtvar', *, ps, wts, display_label=None):
+    def __init__(self, name='wtdtvar', *, ps, wts, label=None):
         """
         Construct a weighted-TVaR distortion.
 
@@ -2706,9 +2706,9 @@ class WtdTVaRDistortion(Distortion):
             same length as ``ps``. If ``np.isclose(sum(wts), 1)`` the
             weights are normalised silently to clean up FP noise;
             otherwise a ``ValueError`` is raised.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause); when ``None``,
-            :attr:`display_name` uses the kind's auto-pretty derived default.
+            :attr:`label` uses the kind's auto-pretty derived default.
         """
         ps_arr = np.asarray(ps, dtype=float)
         wts_arr = np.asarray(wts, dtype=float)
@@ -2727,7 +2727,7 @@ class WtdTVaRDistortion(Distortion):
         # shape is set to ps for compatibility with code that reads
         # ``self.shape`` to recover the threshold vector.
         self.shape = ps_arr
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -2780,7 +2780,7 @@ class WtdTVaRDistortion(Distortion):
         self.g_inv = interp1d(gs, s, kind='linear',
                               bounds_error=False, fill_value=(0, 1))
 
-    def _display_default(self):
+    def _label_default(self):
         return f'wtdTVaR on {len(self._ps):d} points'
 
     def g_prime(self, s):
@@ -2796,7 +2796,7 @@ class WtdTVaRDistortion(Distortion):
 
     def _id_fields(self):
         return (self._name, tuple(self._ps), tuple(self._wts),
-                self.display_name)
+                self.label)
 
     @cached_property
     def tvar_info_df(self):
@@ -2895,14 +2895,14 @@ class MinimumDistortion(Distortion):
     documented = False
     pricing_ok = False
 
-    def __init__(self, name='minimum', distortions=None, *, display_label=None):
+    def __init__(self, name='minimum', distortions=None, *, label=None):
         if distortions is None:
             raise TypeError(
                 'MinimumDistortion requires a non-empty `distortions` list')
         self._name = 'minimum' if name == 'roe' else name
         self._distortions = list(distortions)
         self.shape = self._distortions  # back-compat: legacy code reads .shape
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -2915,13 +2915,13 @@ class MinimumDistortion(Distortion):
         self.has_mass = bool(np.all([d.has_mass for d in dists]))
         self.mass = float(np.min([d.mass for d in dists])) if self.has_mass else 0
 
-    def _display_default(self):
+    def _label_default(self):
         return f'minimum({len(self._distortions):d})'
 
     def _id_fields(self):
         return (self._name,
                 tuple(d.id() for d in self._distortions),
-                self.display_name)
+                self.label)
 
     def min_index(self, x):
         g_values = np.array([gi.g(x) for gi in self._distortions])
@@ -3094,7 +3094,7 @@ class MixtureDistortion(Distortion):
     pricing_ok = False
 
     def __init__(self, name='mixture', distortions=None, *, wts=None,
-                 display_label=None):
+                 label=None):
         if distortions is None:
             raise TypeError(
                 'MixtureDistortion requires a non-empty `distortions` list')
@@ -3104,7 +3104,7 @@ class MixtureDistortion(Distortion):
             wts = np.array([1 / len(self._distortions)] * len(self._distortions))
         self._wts = np.asarray(wts, dtype=float)
         self.shape = self._distortions  # back-compat: legacy code reads .shape
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -3126,14 +3126,14 @@ class MixtureDistortion(Distortion):
             self.mass = 0
         self._weights = np.asarray(self._wts, dtype=float)
 
-    def _display_default(self):
+    def _label_default(self):
         return f'mixture({len(self._distortions):d})'
 
     def _id_fields(self):
         return (self._name,
                 tuple(d.id() for d in self._distortions),
                 tuple(self._wts),
-                self.display_name)
+                self.label)
 
     def _combine(self, values):
         w = self._weights
@@ -3227,7 +3227,7 @@ class BetaDistortion(Distortion):
     documented = True
     pricing_ok = False
 
-    def __init__(self, name='beta', *, a, b, display_label=None):
+    def __init__(self, name='beta', *, a, b, label=None):
         """
         Construct a beta distortion.
 
@@ -3239,9 +3239,9 @@ class BetaDistortion(Distortion):
             First shape parameter; must satisfy ``0 < a <= 1``.
         b : float
             Second shape parameter; must satisfy ``b >= 1``.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause); when ``None``,
-            :attr:`display_name` uses the kind's auto-pretty derived default.
+            :attr:`label` uses the kind's auto-pretty derived default.
         """
         assert 0 < a <= 1, f'a parameter must be in (0, 1], not {a}'
         assert b >= 1, f'b parameter must be >= 1, not {b}'
@@ -3249,7 +3249,7 @@ class BetaDistortion(Distortion):
         self._a = a
         self._b = b
         self.shape = [a, b]
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -3265,9 +3265,9 @@ class BetaDistortion(Distortion):
         self._fz = ss.beta(self._a, self._b)
 
     def _id_fields(self):
-        return (self._name, self._a, self._b, self.display_name)
+        return (self._name, self._a, self._b, self.label)
 
-    def _display_default(self):
+    def _label_default(self):
         return f'beta({self._a:.3f}, {self._b:.3f})'
 
     def g(self, x):
@@ -3315,7 +3315,7 @@ class PowerDistortion(Distortion):
     documented = False
     pricing_ok = False
 
-    def __init__(self, name='power', *, x0, x1, alpha, display_label=None):
+    def __init__(self, name='power', *, x0, x1, alpha, label=None):
         """
         Construct a power distortion.
 
@@ -3328,16 +3328,16 @@ class PowerDistortion(Distortion):
         alpha : float
             Exponent. ``self.shape`` is set to ``alpha`` for legacy
             code that reads ``shape``; calibration is NOT supported.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause); when ``None``,
-            :attr:`display_name` uses the kind's auto-pretty derived default.
+            :attr:`label` uses the kind's auto-pretty derived default.
         """
         assert x0 < x1, 'x0 must be less than x1'
         self._name = 'power' if name == 'roe' else name
         self._x0 = x0
         self._x1 = x1
         self.shape = float(alpha)
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -3365,9 +3365,9 @@ class PowerDistortion(Distortion):
             self._br = np.log(x0)
 
     def _id_fields(self):
-        return (self._name, self._x0, self._x1, self.shape, self.display_name)
+        return (self._name, self._x0, self._x1, self.shape, self.label)
 
-    def _display_default(self):
+    def _label_default(self):
         return f'power({self.shape:.3f}, {self._x0:.3f}, {self._x1:.3f})'
 
     def g(self, s):
@@ -3419,7 +3419,7 @@ class CLLDistortion(Distortion):
     strict_pricing = True
     _calibration_init_shape = 0.95
 
-    def __init__(self, name='cll', *, r0=0.0, b, display_label=None):
+    def __init__(self, name='cll', *, r0=0.0, b, label=None):
         """
         Construct a capped log-linear distortion.
 
@@ -3431,14 +3431,14 @@ class CLLDistortion(Distortion):
             Mass-at-zero intercept (default 0).
         b : float
             Power-law exponent; Newton calibration iterates on this.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause); when ``None``,
-            :attr:`display_name` uses the kind's auto-pretty derived default.
+            :attr:`label` uses the kind's auto-pretty derived default.
         """
         self._name = 'cll' if name == 'roe' else name
         self.r0 = r0
         self.shape = b
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -3453,7 +3453,7 @@ class CLLDistortion(Distortion):
         self._build()
 
     def _id_fields(self):
-        return (self._name, self.shape, self.r0, self.display_name)
+        return (self._name, self.shape, self.r0, self.label)
 
     def _build(self):
         self._ea = np.exp(self.r0)
@@ -3537,7 +3537,7 @@ class CLinDistortion(Distortion):
     has_mass_default = True
     _calibration_init_shape = 1.0
 
-    def __init__(self, name='clin', *, r0=0.0, slope, display_label=None):
+    def __init__(self, name='clin', *, r0=0.0, slope, label=None):
         """
         Construct a capped linear distortion.
 
@@ -3549,14 +3549,14 @@ class CLinDistortion(Distortion):
             Mass-at-zero intercept (default 0).
         slope : float
             Linear slope; Newton calibration iterates on this.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause); when ``None``,
-            :attr:`display_name` uses the kind's auto-pretty derived default.
+            :attr:`label` uses the kind's auto-pretty derived default.
         """
         self._name = 'clin' if name == 'roe' else name
         self.r0 = r0
         self.shape = slope
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -3571,7 +3571,7 @@ class CLinDistortion(Distortion):
         self._build()
 
     def _id_fields(self):
-        return (self._name, self.shape, self.r0, self.display_name)
+        return (self._name, self.shape, self.r0, self.label)
 
     def _build(self):
         self.has_mass = (self.r0 > 0)
@@ -3650,7 +3650,7 @@ class LEPDistortion(Distortion):
     has_mass_default = True
     _calibration_init_shape = 0.25
 
-    def __init__(self, name='lep', *, r0=0.0, r, display_label=None):
+    def __init__(self, name='lep', *, r0=0.0, r, label=None):
         """
         Construct a leverage-equivalent pricing distortion.
 
@@ -3662,14 +3662,14 @@ class LEPDistortion(Distortion):
             Rental rate (mass-at-zero intercept; default 0).
         r : float
             Target return; Newton calibration iterates on this.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause); when ``None``,
-            :attr:`display_name` uses the kind's auto-pretty derived default.
+            :attr:`label` uses the kind's auto-pretty derived default.
         """
         self._name = 'lep' if name == 'roe' else name
         self.r0 = r0
         self.shape = r
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -3684,7 +3684,7 @@ class LEPDistortion(Distortion):
         self._build()
 
     def _id_fields(self):
-        return (self._name, self.shape, self.r0, self.display_name)
+        return (self._name, self.shape, self.r0, self.label)
 
     def _build(self):
         r = self.shape
@@ -3787,7 +3787,7 @@ class LYDistortion(Distortion):
     has_mass_default = True
     _calibration_init_shape = 1.25
 
-    def __init__(self, name='ly', *, r0=0.0, r, display_label=None):
+    def __init__(self, name='ly', *, r0=0.0, r, label=None):
         """
         Construct a linear-yield distortion.
 
@@ -3799,14 +3799,14 @@ class LYDistortion(Distortion):
             Occupancy rate (mass-at-zero intercept; default 0).
         r : float
             Consumption rate; Newton calibration iterates on this.
-        display_label : str, optional
+        label : str, optional
             Explicit override label (the DecL ``as`` clause); when ``None``,
-            :attr:`display_name` uses the kind's auto-pretty derived default.
+            :attr:`label` uses the kind's auto-pretty derived default.
         """
         self._name = 'ly' if name == 'roe' else name
         self.r0 = r0
         self.shape = r
-        self._init_labels(display_label=display_label)
+        self._init_labels(label=label)
         self._common_init()
         self._build()
 
@@ -3821,7 +3821,7 @@ class LYDistortion(Distortion):
         self._build()
 
     def _id_fields(self):
-        return (self._name, self.shape, self.r0, self.display_name)
+        return (self._name, self.shape, self.r0, self.label)
 
     def _build(self):
         self.has_mass = (self.r0 > 0)
@@ -3866,7 +3866,7 @@ class LYDistortion(Distortion):
 # ===========================================================================
 
 
-def approx_ccoc(roe, eps=1e-14, display_label=None):
+def approx_ccoc(roe, eps=1e-14, label=None):
     """
     Continuous approximation to the CCoC distortion at given ROE.
 
@@ -3875,9 +3875,9 @@ def approx_ccoc(roe, eps=1e-14, display_label=None):
     ``w1 = roe / (1 + roe)``.
     """
     return Distortion('bitvar', p0=0, p1=1 - eps, w1=roe / (1 + roe),
-                      display_label=(f'aCCoC {roe:.2%}'
-                                     if display_label is None
-                                     else display_label))
+                      label=(f'aCCoC {roe:.2%}'
+                                     if label is None
+                                     else label))
 
 
 def tvar_weights(d):
@@ -3955,7 +3955,7 @@ def consistent_distortions(p):
 # hull of the supplied (s, g(s)) data.
 
 
-def convex_distortion(s, gs, *, display_label=None):
+def convex_distortion(s, gs, *, label=None):
     """
     Build a distortion as the upper convex envelope of ``(s, g(s))`` points.
 
@@ -3971,7 +3971,7 @@ def convex_distortion(s, gs, *, display_label=None):
     gs : array_like
         Matching ``g(s)`` values, same length as ``s``. The points
         ``(0, 0)`` and ``(1, 1)`` are added if missing.
-    display_label : str, optional
+    label : str, optional
         Explicit override label (the DecL ``as`` clause).
 
     Returns
@@ -4031,11 +4031,11 @@ def convex_distortion(s, gs, *, display_label=None):
         wts = np.ones_like(ps) / len(ps)
     wts = wts / wts.sum()
     return WtdTVaRDistortion('wtdtvar', ps=ps, wts=wts,
-                             display_label=display_label)
+                             label=label)
 
 
 def bagged_distortion(data, proportion, samples, *,
-                      el_col='EL', spread_col='Spread', display_label=None):
+                      el_col='EL', spread_col='Spread', label=None):
     """
     Bootstrap-aggregated convex distortion from tabular ``(EL, Spread)`` data.
 
@@ -4054,7 +4054,7 @@ def bagged_distortion(data, proportion, samples, *,
         Number of bootstrap iterations.
     el_col, spread_col : str, optional
         Column names. Default ``'EL'`` and ``'Spread'``.
-    display_label : str, optional
+    label : str, optional
         Explicit override label (the DecL ``as`` clause).
 
     Returns
@@ -4071,7 +4071,7 @@ def bagged_distortion(data, proportion, samples, *,
         d = convex_distortion(s_pts, gs_pts)
         accum += np.asarray(d.g(s_grid), dtype=float)
     accum /= samples
-    return convex_distortion(s_grid, accum, display_label=display_label)
+    return convex_distortion(s_grid, accum, label=label)
 
 
 def convex_example(source='bond'):
@@ -4101,7 +4101,7 @@ def convex_example(source='bond'):
         df = pd.read_fwf(StringIO(yield_curve))
         df.columns = ['Rating', 'EL', 'Yield']
         return convex_distortion(df['EL'].values, df['Yield'].values,
-                                 display_label='Yield Curve')
+                                 label='Yield Curve')
 
     elif source.lower() == 'cat':
         cat_bond = '''EL,ROL
@@ -4119,7 +4119,7 @@ def convex_example(source='bond'):
         1,1'''
         df = pd.read_csv(StringIO(cat_bond))
         return convex_distortion(df['EL'].values, df['ROL'].values,
-                                 display_label='Cat Bond')
+                                 label='Cat Bond')
 
     else:
         raise ValueError(

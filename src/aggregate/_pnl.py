@@ -555,7 +555,7 @@ class PnL(LabeledMixin):
         a number is an explicit scale; a string names a consideration leg.
     result_name : str, default 'result'
         Label for the grand result row.
-    display_label : str, optional
+    label : str, optional
         Optional human display label (the DecL ``as`` clause); presentation
         only, preferred over ``name`` in repr / titles.
 
@@ -572,7 +572,7 @@ class PnL(LabeledMixin):
 
     def __init__(self, *, name, source, groups=None, role=None,
                  consideration=None, obligation=None, scale=None,
-                 result_name='result', display_label=None, label_map=None):
+                 result_name='result', label=None, label_map=None):
         if groups is None:
             if role is None:
                 raise ValueError(
@@ -596,7 +596,7 @@ class PnL(LabeledMixin):
         # Object-level display label + interior label_map (leg-level labels
         # are the ledger row keys directly). Presentation only; ``name`` stays
         # the identity handle. See dev/done/plan-labels.md.
-        self._init_labels(display_label=display_label, label_map=label_map)
+        self._init_labels(label=label, label_map=label_map)
         self.result_name = result_name
         #: The attached domain analysis object (a
         #: :class:`~aggregate.reinstatement.ReinstatementAnalysis` /
@@ -1230,7 +1230,7 @@ class PnL(LabeledMixin):
         from .plots import plot_pnl
         return plot_pnl(self, axd=axd, **kwargs)
 
-    # ``display_name`` comes from ``LabeledMixin`` (the shared label surface);
+    # ``label`` comes from ``LabeledMixin`` (the shared label surface);
     # ``name`` stays the identity handle. See dev/done/plan-labels.md.
 
     def __repr__(self):
@@ -1238,10 +1238,10 @@ class PnL(LabeledMixin):
         nl = sum(len(g.cons) + len(g.obl) for g in self._egroups)
         if ng == 1:
             g = self._egroups[0]
-            return (f'PnL({self.display_name!r}: role={g.role}, '
+            return (f'PnL({self.label!r}: role={g.role}, '
                     f'{len(g.cons)} consideration, {len(g.obl)} obligation '
                     f'-> {self.result_name!r})')
-        return (f'PnL({self.display_name!r}: {ng} groups, {nl} legs '
+        return (f'PnL({self.label!r}: {ng} groups, {nl} legs '
                 f'-> {self.result_name!r})')
 
 

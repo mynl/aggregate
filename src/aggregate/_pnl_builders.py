@@ -296,7 +296,7 @@ def _marginal_gd(agg, perspective):
 # ----------------------------------------------------------------------
 def build_plain_pnl(engine, *, consideration, consideration_label=None,
                     loss_label=None, expense_spec=None, name=None,
-                    display_label=None):
+                    label=None):
     """A plain book as a one-group :class:`PnL` over the engine's own density.
 
     Parameters
@@ -315,7 +315,7 @@ def build_plain_pnl(engine, *, consideration, consideration_label=None,
     expense_spec : list or tuple, optional
         A DecL ``expense`` spec; one obligation leg per group, loss-basis
         terms stochastic (``rate * x``).
-    name, display_label : str, optional
+    name, label : str, optional
         The P&L handle and its optional human label.
 
     Returns
@@ -336,12 +336,12 @@ def build_plain_pnl(engine, *, consideration, consideration_label=None,
                consideration=[Leg(consideration_label or 'consideration',
                                   cons)],
                obligation=obligation, result_name='margin',
-               display_label=display_label)
+               label=label)
 
 
 def build_gcn_pnl(agg, *, gross, ceded, gcn_economics=None, expense_spec=None,
                   consideration_label=None, loss_label=None, name=None,
-                  display_label=None):
+                  label=None):
     """A reinsurance program as a per-atom **group ledger** :class:`PnL`.
 
     Source selection (``dev/plan-yapnl.md``): an aggregate-only program books
@@ -411,7 +411,7 @@ def build_gcn_pnl(agg, *, gross, ceded, gcn_economics=None, expense_spec=None,
         groups.append(Group(agg_base, 'buy',
                             [Leg(f'{agg_base} premium', pc_agg)], obl))
     pnl = PnL(name=name or agg.name, source=source, groups=groups,
-              result_name='margin', display_label=display_label)
+              result_name='margin', label=label)
     #: the resolved cession economics (a DecL clause's per-side split, or the
     #: scalar API's single amounts) -- the observable of the DecL premium /
     #: commission resolution (``deposit`` / ``rol`` / ``rate`` / ``cede``).
@@ -490,7 +490,7 @@ def build_xpnl_stack(agg, *, gross, ceded, gcn_economics=None,
 #  it changes one leg's function)
 # ----------------------------------------------------------------------
 def build_variable_pnl(agg, *, expense_spec=None, consideration_label=None,
-                       loss_label=None, name=None, display_label=None):
+                       loss_label=None, name=None, label=None):
     """A retro / swing / slide / pc / corridor program as a group ledger.
 
     Reads the feature attached to ``agg`` by the underwriter
@@ -556,12 +556,12 @@ def build_variable_pnl(agg, *, expense_spec=None, consideration_label=None,
             c_obl.append(Leg(f'{base} commission', C))
         groups.append(Group(base, 'buy', c_cons, c_obl))
     return PnL(name=name or agg.name, source=agg, groups=groups,
-               result_name='margin', display_label=display_label)
+               result_name='margin', label=label)
 
 
 def build_reinstatement_pnl(agg, analysis, *, expense_spec=None,
                             consideration_label=None, loss_label=None,
-                            name=None, display_label=None):
+                            name=None, label=None):
     """An occurrence-reinstatements program as a 2-D group ledger.
 
     Books over the one shared ``(L, R)`` joint ([One-2D-Source]): the gross
@@ -624,6 +624,6 @@ def build_reinstatement_pnl(agg, analysis, *, expense_spec=None,
                             [Leg(f'{agg_base} premium', pc)], a_obl))
     pnl = PnL(name=name or agg.name, source=analysis.source, groups=groups,
               result_name='margin', scale=float(P_G - D - pc),
-              display_label=display_label)
+              label=label)
     pnl.analysis = analysis
     return pnl

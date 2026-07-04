@@ -31,37 +31,37 @@ def _parse(uw, program):
 # ----------------------------------------------------------------------
 # Object display labels
 # ----------------------------------------------------------------------
-def test_no_label_display_name_falls_back_to_name():
+def test_no_label_label_falls_back_to_name():
     a = build('agg Plain 100 claims sev lognorm 100 cv 2 poisson')
-    assert a.display_label is None
-    assert a.display_name == a.name == 'Plain'
+    assert a._label is None                 # no explicit label stored
+    assert a.label == a.name == 'Plain'     # resolved property falls back to name
 
 
 def test_quoted_object_label():
     a = build('agg GrossBook as "Gross Book P&L" 100 claims sev lognorm 100 cv 2 poisson')
     assert a.name == 'GrossBook'                    # identity handle unchanged
-    assert a.display_label == 'Gross Book P&L'      # spaces carried by quotes
-    assert a.display_name == 'Gross Book P&L'
+    assert a.label == 'Gross Book P&L'      # spaces carried by quotes
+    assert a.label == 'Gross Book P&L'
     assert 'Gross Book P&L' in repr(a)
 
 
 def test_bareword_object_label_skips_quotes():
     a = build('agg Lae as lae 100 claims sev lognorm 100 cv 2 poisson')
-    assert a.display_label == 'lae'
+    assert a.label == 'lae'
     assert a.name == 'Lae'
 
 
 def test_sev_object_label():
     s = build('sev MySev as "My Severity" lognorm 100 cv 2')
     assert s.name == 'MySev'
-    assert s.display_label == 'My Severity'
-    assert s.display_name == 'My Severity'
+    assert s.label == 'My Severity'
+    assert s.label == 'My Severity'
 
 
 def test_pnl_object_label():
     p = build(_PNL_BASE.replace('pnl B', 'pnl B as "My Book"'))
     assert p.name == 'B'
-    assert p.display_label == 'My Book'
+    assert p.label == 'My Book'
     assert 'My Book' in repr(p)
 
 
@@ -70,8 +70,8 @@ def test_port_object_label():
               'agg A 50 claims sev lognorm 100 cv 2 poisson '
               'agg B 50 claims sev lognorm 100 cv 2 poisson')
     assert p.name == 'MyPort'
-    assert p.display_label == 'My Portfolio'
-    assert p.display_name == 'My Portfolio'
+    assert p.label == 'My Portfolio'
+    assert p.label == 'My Portfolio'
 
 
 def test_title_name_shows_label_and_identity():
@@ -286,29 +286,29 @@ def test_bivariate_strips_shared_exposure_label():
 
 
 # ----------------------------------------------------------------------
-# Distortion label realignment (D6): name = kind handle, display_name resolves
+# Distortion label realignment (D6): name = kind handle, label resolves
 # label -> auto-pretty derived default -> handle
 # ----------------------------------------------------------------------
 def test_distortion_name_is_kind_handle():
     from aggregate.spectral import Distortion
     d = Distortion.ph(0.5)
     assert d.name == 'ph'                 # handle is the kind
-    assert d.display_name == 'PH(0.5)'    # auto-pretty derived default
+    assert d.label == 'PH(0.5)'    # auto-pretty derived default
     assert str(d) == 'PH(0.5)'
 
 
 def test_distortion_explicit_label_wins():
     from aggregate.spectral import Distortion
-    d = Distortion('ph', a=0.5, display_label='My PH')
+    d = Distortion('ph', a=0.5, label='My PH')
     assert d.name == 'ph'
-    assert d.display_name == 'My PH'
+    assert d.label == 'My PH'
 
 
 def test_distortion_direct_construction_gets_auto_pretty():
     from aggregate.spectral import PHDistortion
     d = PHDistortion(a=0.7)
     assert d.name == 'ph'
-    assert d.display_name == 'PH(0.7)'
+    assert d.label == 'PH(0.7)'
 
 
 def test_use_labels_switch_invalidates_renamer():

@@ -50,6 +50,8 @@ import logging
 import numpy as np
 from scipy.stats import norm, multivariate_normal
 
+from ._labeled import LabeledMixin
+
 logger = logging.getLogger(__name__)
 
 # Clip applied to CDF arguments before an inverse-normal transform so the
@@ -59,7 +61,7 @@ logger = logging.getLogger(__name__)
 _PPF_CLIP = 1e-15
 
 
-class Copula:
+class Copula(LabeledMixin):
     """Base class for bivariate copulas; registry + factory dispatch.
 
     Each concrete kind is a subclass declared below (:class:`CopulaNormal`,
@@ -91,8 +93,9 @@ class Copula:
     param : float, optional
         Positional natural parameter. May also be passed by its natural name
         (e.g. ``tau=0.4``); passing both raises ``TypeError``.
-    display_name : str, optional
-        Override label; ``str(c)`` returns this if set.
+    label : str, optional
+        Explicit human label; :attr:`label` (and ``str(c)``) return it when set,
+        else fall back to the kind-based pretty default (:meth:`_label_default`).
     **natural : float
         Accept the kind's natural parameter name as a keyword.
     """
@@ -125,7 +128,7 @@ class Copula:
                 f"available: {sorted(cls._registry)}")
         return object.__new__(subclass)
 
-    def __init__(self, name=None, param=None, *, display_name='', **natural):
+    def __init__(self, name=None, param=None, *, label=None, **natural):
         if name is None:
             name = type(self).kind
         pn = type(self).param_name
@@ -139,12 +142,27 @@ class Copula:
                 f'{list(natural)}')
         self._name = name
         self.param = None if param is None else float(param)
-        self.display_name = display_name
+        self._init_labels(label=label)
         self._build()
+
+    @property
+    def name(self):
+        """The copula kind handle (the registry key / identity)."""
+        return self._name
 
     # ------------------------------------------------------------------
     # Subclass hooks
     # ------------------------------------------------------------------
+
+    def _label_default(self):
+        """Kind-based pretty label, e.g. ``'gumbel(tau=0.4)'`` or ``'normal'``.
+
+        Ensures :attr:`label` is never blank even when no explicit ``label`` was
+        passed and ``name`` bottoms out (as during pickle reconstruction).
+        """
+        if self.param is None:
+            return self._name
+        return f'{self._name}({type(self).param_name}={self.param:g})'
 
     def _build(self):
         """Subclass hook: validate :attr:`param`, set the analytic parameter."""
@@ -250,11 +268,7 @@ class Copula:
                 f' -> tau={self.tau():.4f})')
 
     def __str__(self):
-        if self.display_name:
-            return self.display_name
-        if self.param is None:
-            return self._name
-        return f'{self._name}({type(self).param_name}={self.param:g})'
+        return self.label
 
 
 # ---------------------------------------------------------------------------
@@ -540,8 +554,8 @@ class CopulaShuffle(Copula):
         Per-strip reflection flags (see :class:`ShuffleOfMin`).
     som : ShuffleOfMin, optional
         A pre-built shuffle, used in place of ``perm`` / ``flip``.
-    display_name : str, optional
-        Override label for ``str(self)``.
+    label : str, optional
+        Explicit human label for :attr:`label` / ``str(self)``.
 
     Notes
     -----
@@ -553,7 +567,7 @@ class CopulaShuffle(Copula):
     param_name = None
     long_name = 'Shuffle-of-Min'
 
-    def __init__(self, perm=None, flip=None, *, som=None, display_name=''):
+    def __init__(self, perm=None, flip=None, *, som=None, label=None):
         # Programmatic-only: bypass the base float-parameter __init__. Tolerate a
         # leaked kind name from an accidental Copula('shuffle', ...) factory call.
         if isinstance(perm, str):
@@ -568,7 +582,7 @@ class CopulaShuffle(Copula):
         self.som = som
         self._name = 'shuffle'
         self.param = None
-        self.display_name = display_name
+        self._init_labels(label=label)
         self.n = som.n
 
     def _C_interior(self, u, v):
@@ -608,10 +622,13 @@ class CopulaShuffle(Copula):
         off = float((si * sp).sum())           # i == j terms vanish (sign 0)
         return (diag + off) / (n * n)
 
-    def __str__(self):
-        if self.display_name:
-            return self.display_name
+    def _label_default(self):
+        """Kind-based pretty label ``'shuffle(n=<n>)'`` (param is a permutation,
+        not a scalar, so the base pretty form does not apply)."""
         return f'shuffle(n={self.som.n})'
+
+    def __str__(self):
+        return self.label
 
     def __repr__(self):
         return (f'CopulaShuffle(perm={self.som.perm.tolist()}, '

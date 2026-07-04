@@ -857,7 +857,7 @@ class Severity(LabeledMixin, ss.rv_continuous):
     def __init__(self, sev_name, exp_attachment=None, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=np.nan, sev_b=0,
                  sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, sev_lb=0, sev_ub=np.inf,
                  sev_conditional=True, sev_signed=False, sev_reflect=False, name='', note='', hints='',
-                 display_label=None, label_map=None):
+                 label=None, label_map=None):
         """Continuous random variable adding layer/attachment to ``ss.rv_continuous``.
 
         Construction is delegated to a registered subclass — ``__new__``
@@ -957,7 +957,7 @@ class Severity(LabeledMixin, ss.rv_continuous):
         self.name = name
         # Object-level display label + interior label_map. Presentation only;
         # ``name`` stays the identity handle. See dev/plan-labels.md.
-        self._init_labels(display_label=display_label, label_map=label_map)
+        self._init_labels(label=label, label_map=label_map)
         self.long_name = sev_name
         self.note = note
         self.hints = hints
@@ -1302,7 +1302,7 @@ class Severity(LabeledMixin, ss.rv_continuous):
             f'Severity.__init__ | parameters {self.sev_a}, {self.sev_scale}: '
             f'target/actual {self.sev_mean} vs {mean};  {self.sev_cv} vs {acv}')
 
-    # ``display_name`` comes from ``LabeledMixin`` (the shared label surface);
+    # ``label`` comes from ``LabeledMixin`` (the shared label surface);
     # ``name`` stays the identity handle. See dev/plan-labels.md.
 
     def __repr__(self):

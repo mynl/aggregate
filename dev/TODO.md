@@ -72,6 +72,16 @@
    pass (D3):** **S4** per-component labels inside a *mixture* severity (invasive
    severity mini-language — still the a124 deferral above) and **S5** frequency
    labels (low value). Plan retains Phases 5–6 for that pass.
+1e. **[Label-Canonical]** ✅ **DONE (`1.0.0a133`, `dev/done/plan-label-canonical.md`).**
+   Collapsed the `LabeledMixin` twin names onto one resolved `label` property
+   (private stored slot `_label`); `display_name` / `display_label` and the
+   `display_label=` kwarg / spec key are gone (constructors + spec key now
+   `label`, `engine_display_label` → `engine_label`). Grammar wrapper rule
+   `display_label` → `as_label` (inner `label: ID` capture unchanged). Copula
+   folded onto `LabeledMixin` (drops its hand-rolled `display_name` sentinel;
+   `name` handle + kind-based `_label_default`). Carve-out: `_pnl.Leg`/`Group`
+   keep their single `self.label`. `ref_include.rst` unaffected (rule names not
+   emitted there). Breaking rename, pre-1.0.
 2. **[PnL-Engine-Source]** ✅ **DONE** `1.0.0a125` — a P&L wraps a **complete**
    engine (`pnl NAME <prem> less <agg|agg.NAME|port.NAME> [less <expenses>]`);
    deleted the "half-baked agg inside a pnl" fork, added `inherit premium` /

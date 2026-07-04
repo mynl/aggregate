@@ -351,7 +351,7 @@ class Bounds:
         s = self.s_grid
         g = self.cloud_df.min(axis=1).values
         return convex_distortion(
-            s, g, display_label=f'min env({self.name}, prem={self.premium:.4g})')
+            s, g, label=f'min env({self.name}, prem={self.premium:.4g})')
 
     @cached_property
     def max_envelope(self):
@@ -943,11 +943,11 @@ class _HullEngine:
         p0, p1, w1 = float(p0[0]), float(p1[0]), float(w1[0])
         # Degenerate: slice landed on a vertex -> pure TVaR at that level.
         if w1 == 0.0 or p0 == p1:
-            return Distortion('tvar', p=p0, display_label=f'TVaR({p0:.5g})')
+            return Distortion('tvar', p=p0, label=f'TVaR({p0:.5g})')
         if w1 == 1.0:
-            return Distortion('tvar', p=p1, display_label=f'TVaR({p1:.5g})')
+            return Distortion('tvar', p=p1, label=f'TVaR({p1:.5g})')
         return Distortion('bitvar', p0=p0, p1=p1, w1=w1,
-                          display_label=f'bitvar({p0:.5g}, {p1:.5g}; {w1:.4g})')
+                          label=f'bitvar({p0:.5g}, {p1:.5g}; {w1:.4g})')
 
     # ----------------------------------------------------------------------
     # Plotting

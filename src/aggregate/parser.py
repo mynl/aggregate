@@ -374,9 +374,9 @@ class UnderwritingTransformer(Transformer):
 
     # ----- portfolio -------------------------------------------------
     def port_out(self, c):
-        _, name, display_label, trailer, agg_list = c
+        _, name, as_label, trailer, agg_list = c
         return ("port", name, {"spec": agg_list,
-                               **display_label,
+                               **as_label,
                                "note": trailer["note"],
                                "hints": trailer["hints"]})
 
@@ -390,9 +390,9 @@ class UnderwritingTransformer(Transformer):
 
     # ----- aggregate -------------------------------------------------
     # ``agg_body`` is the shared aggregate body (everything after
-    # ``AGG name display_label``, before the trailer), factored out so the
+    # ``AGG name as_label``, before the trailer), factored out so the
     # embedded engine of a ``pnl`` / ``xpnl`` reuses the identical body. Each
-    # ``agg_body_*`` returns a plain spec-fragment dict (no name / display_label
+    # ``agg_body_*`` returns a plain spec-fragment dict (no name / as_label
     # / trailer); ``agg_out_named`` (top level) and ``agg_source_inline``
     # (embedded) add the identity and, for the top level, the trailer. Tweedie
     # synthesises its own descriptive note, carried on the fragment under the
@@ -481,11 +481,11 @@ class UnderwritingTransformer(Transformer):
         return {**bagg, **occ_reins, **agg_reins}
 
     def agg_out_named(self, c):
-        _, name, display_label, body, trailer = c
+        _, name, as_label, body, trailer = c
         # Tweedie's synthetic note wins over any (absent) user note; hints ride
         # the trailer. Non-tweedie bodies carry no ``_engine_note``.
         note = body.pop("_engine_note", None) or trailer["note"]
-        spec = {"name": name, **display_label, **body,
+        spec = {"name": name, **as_label, **body,
                 "note": note, "hints": trailer["hints"]}
         return ("agg", name, spec)
 
@@ -532,9 +532,9 @@ class UnderwritingTransformer(Transformer):
         # wrapping pnl/xpnl owns it). Returns the engine spec fragment; the
         # engine's own note (tweedie) and display label are carried through so
         # the inner Aggregate is faithfully the declared engine.
-        _agg, name, display_label, body = c
+        _agg, name, as_label, body = c
         engine_note = body.pop("_engine_note", None)
-        spec = {"name": name, **display_label, **body}
+        spec = {"name": name, **as_label, **body}
         if engine_note:
             spec["note"] = engine_note
         return ("agg", name, spec)
@@ -553,7 +553,7 @@ class UnderwritingTransformer(Transformer):
         portspec = self.safe_lookup(portid)
         return ("port", portname, portspec)
 
-    def _pnl_spec(self, kind, name, display_label, premium, source, expense,
+    def _pnl_spec(self, kind, name, as_label, premium, source, expense,
                   trailer):
         """Assemble the ``(kind, name, spec)`` tuple shared by ``pnl``/``xpnl``.
 
@@ -564,32 +564,32 @@ class UnderwritingTransformer(Transformer):
         under ``_engine_port`` for a dedicated factory path.
         """
         ekind, ename, espec = source
-        spec = {"name": name, **display_label, **expense,
+        spec = {"name": name, **as_label, **expense,
                 "note": trailer["note"], "hints": trailer["hints"]}
         if ekind == "port":
             spec["_engine_port"] = ename
         else:
             for k, v in espec.items():
-                if k in ("name", "note", "hints", "display_label"):
+                if k in ("name", "note", "hints", "label"):
                     continue
                 spec[k] = v
             # The engine's own note (tweedie) and label are inner-Aggregate
             # presentation; keep them without shadowing the pnl's trailer/label.
             if espec.get("note"):
                 spec["engine_note"] = espec["note"]
-            if "display_label" in espec:
-                spec["engine_display_label"] = espec["display_label"]
+            if "label" in espec:
+                spec["engine_label"] = espec["label"]
         self._attach_pnl_head(spec, premium)
         return (kind, name, spec)
 
     def pnl_out_engine(self, c):
-        (_pnl, name, display_label, premium, _less, source, expense, trailer) = c
-        return self._pnl_spec("pnl", name, display_label, premium, source,
+        (_pnl, name, as_label, premium, _less, source, expense, trailer) = c
+        return self._pnl_spec("pnl", name, as_label, premium, source,
                               expense, trailer)
 
     def xpnl_out_engine(self, c):
-        (_xpnl, name, display_label, premium, _less, source, expense, trailer) = c
-        return self._pnl_spec("xpnl", name, display_label, premium, source,
+        (_xpnl, name, as_label, premium, _less, source, expense, trailer) = c
+        return self._pnl_spec("xpnl", name, as_label, premium, source,
                               expense, trailer)
 
     # ----- gross-premium head: fixed amount or retro rating clause ---
@@ -597,13 +597,13 @@ class UnderwritingTransformer(Transformer):
         """``<num> premium [as <label>]`` -- the fixed gross premium.
 
         Returns a dict carrying the amount (``_premium``) and an optional
-        consideration display label (``_premium_label``), consumed by
+        consideration display label (``_label``), consumed by
         :meth:`_attach_pnl_head`.
         """
-        numbers, _prem, display_label = c
+        numbers, _prem, as_label = c
         head = {'_premium': numbers}
-        if 'display_label' in display_label:
-            head['_premium_label'] = display_label['display_label']
+        if 'label' in as_label:
+            head['_label'] = as_label['label']
         return head
 
     def pnl_premium_inherit(self, c):
@@ -614,20 +614,20 @@ class UnderwritingTransformer(Transformer):
         underwriter reads the built engine's ``exp_premium`` (an :class:`Aggregate`)
         or the accumulated portfolio premium, erroring if the engine has none.
         """
-        _inherit, _prem, display_label = c
+        _inherit, _prem, as_label = c
         head = {'_premium': INHERIT_PREMIUM}
-        if 'display_label' in display_label:
-            head['_premium_label'] = display_label['display_label']
+        if 'label' in as_label:
+            head['_label'] = as_label['label']
         return head
 
     def pnl_premium_retro(self, c):
         """``retro <collar> premium [as <label>]`` -- the account-level
         retrospective rating clause (Phase 3); returns the collar tagged for
         :meth:`_attach_pnl_head`, plus an optional consideration label."""
-        _retro, collar, _prem, display_label = c
+        _retro, collar, _prem, as_label = c
         head = {'_retro': collar}
-        if 'display_label' in display_label:
-            head['_premium_label'] = display_label['display_label']
+        if 'label' in as_label:
+            head['_label'] = as_label['label']
         return head
 
     def _attach_pnl_head(self, spec, head):
@@ -639,7 +639,7 @@ class UnderwritingTransformer(Transformer):
         account-level ``retro_terms`` spec key and uses the collar ``basic`` as the
         representative consideration (the actual gross premium is the variable map,
         resolved by the VariableRatingAnalysis). Either may carry an optional
-        ``_premium_label`` -- the consideration leg's display label, recorded as
+        ``_label`` -- the consideration leg's display label, recorded as
         the ``consideration_label`` spec key.
         """
         if '_retro' in head:
@@ -648,8 +648,8 @@ class UnderwritingTransformer(Transformer):
             self._attach_pnl(spec, collar['basic'])
         else:
             self._attach_pnl(spec, head['_premium'])
-        if head.get('_premium_label') is not None:
-            spec['consideration_label'] = head['_premium_label']
+        if head.get('_label') is not None:
+            spec['consideration_label'] = head['_label']
 
     # ----- gross expenses on a pnl (two-level: groups of terms) ------
     # Each term is a ``(basis, value)`` pair. ``and``-joined terms collect into
@@ -679,9 +679,9 @@ class UnderwritingTransformer(Transformer):
         return lst
 
     def expense_group(self, c):
-        # c = [terms_list, display_label] -> (label_or_None, terms_list)
-        terms, display_label = c
-        return (display_label.get("display_label"), terms)
+        # c = [terms_list, as_label] -> (label_or_None, terms_list)
+        terms, as_label = c
+        return (as_label.get("label"), terms)
 
     def expense_groups_one(self, c):
         return [c[0]]
@@ -957,17 +957,17 @@ class UnderwritingTransformer(Transformer):
 
     # ----- severity output ------------------------------------------
     def sev_out_sev(self, c):
-        _, name, display_label, sev, trailer = c
+        _, name, as_label, sev, trailer = c
         sev["name"] = name
-        sev.update(display_label)
+        sev.update(as_label)
         sev["note"] = trailer["note"]
         sev["hints"] = trailer["hints"]
         return ("sev", name, sev)
 
     def sev_out_dsev(self, c):
-        _, name, display_label, dsev, trailer = c
+        _, name, as_label, dsev, trailer = c
         dsev["name"] = name
-        dsev.update(display_label)
+        dsev.update(as_label)
         dsev["note"] = trailer["note"]
         dsev["hints"] = trailer["hints"]
         return ("sev", name, dsev)
@@ -1242,8 +1242,8 @@ class UnderwritingTransformer(Transformer):
         for the cession (or ``None``). ``reins_list`` splits these into parallel
         spec keys.
         """
-        layer, premium, cede, reinst, variable, display_label = c
-        label = display_label.get("display_label")
+        layer, premium, cede, reinst, variable, as_label = c
+        label = as_label.get("label")
         if cede is not None and premium is None:
             raise ValueError(
                 "DecL: 'cede' (ceding commission) needs a ceded-premium clause "
@@ -1434,7 +1434,7 @@ class UnderwritingTransformer(Transformer):
 
     # ----- severity (continuous) ------------------------------------
     def sev_clause_sev(self, c):
-        _sev, sev, display_label = c
+        _sev, sev, as_label = c
         if sev.get("sev_reflect", False):
             # A reflected severity (``-X`` / ``shift - X``) is inherently signed
             # -- it carries negative support. The plain ``sev`` clause builds a
@@ -1444,7 +1444,7 @@ class UnderwritingTransformer(Transformer):
             raise ValueError(
                 "DecL: a reflected (signed) severity needs 'ssev', not 'sev' "
                 "(reflection produces negative support; use 'ssev' to keep it)")
-        sev["_severity_label"] = display_label.get("display_label")
+        sev["_severity_label"] = as_label.get("label")
         return sev
 
     def sev_clause_ssev(self, c):
@@ -1452,22 +1452,22 @@ class UnderwritingTransformer(Transformer):
         # negative loss. Same spec as sev, flagged so the Severity keeps its
         # negative support instead of clamping x<0 -> 0. Orthogonal to
         # value_type (does NOT imply payoff). See dev/plan-negative-x-agg.md.
-        _ssev, sev, display_label = c
+        _ssev, sev, as_label = c
         sev['sev_signed'] = True
-        sev["_severity_label"] = display_label.get("display_label")
+        sev["_severity_label"] = as_label.get("label")
         return sev
 
     def sev_clause_dsev(self, c):
-        dsev, display_label = c
-        dsev["_severity_label"] = display_label.get("display_label")
+        dsev, as_label = c
+        dsev["_severity_label"] = as_label.get("label")
         return dsev
 
     def sev_clause_builtin(self, c):
-        builtin, display_label = c
+        builtin, as_label = c
         b = self.safe_lookup(builtin)
         if "name" in b:
             del b["name"]
-        b["_severity_label"] = display_label.get("display_label")
+        b["_severity_label"] = as_label.get("label")
         return b
 
     def sev_unconditional(self, c):
@@ -1750,9 +1750,9 @@ class UnderwritingTransformer(Transformer):
 
     # ----- layers ----------------------------------------------------
     def layers_xs(self, c):
-        limit, _xs, attach, display_label = c
+        limit, _xs, attach, as_label = c
         return {"exp_attachment": attach, "exp_limit": limit,
-                "_layer_label": display_label.get("display_label")}
+                "_layer_label": as_label.get("label")}
 
     def layers_tower(self, c):
         tower = c[0]
@@ -1790,31 +1790,31 @@ class UnderwritingTransformer(Transformer):
 
     # ----- exposures -------------------------------------------------
     def exposures_claims(self, c):
-        numbers, _claims, display_label = c
+        numbers, _claims, as_label = c
         return {"exp_en": numbers,
-                "_exposure_label": display_label.get("display_label")}
+                "_exposure_label": as_label.get("label")}
 
     def exposures_loss(self, c):
-        numbers, _loss, display_label = c
+        numbers, _loss, as_label = c
         return {"exp_el": numbers,
-                "_exposure_label": display_label.get("display_label")}
+                "_exposure_label": as_label.get("label")}
 
     def exposures_premium_lr(self, c):
-        prem, _premium, display_label, _at, lr, _lr = c
+        prem, _premium, as_label, _at, lr, _lr = c
         return {
             "exp_premium": prem,
             "exp_lr": lr,
             "exp_el": np.array(prem) * np.array(lr),
-            "_exposure_label": display_label.get("display_label"),
+            "_exposure_label": as_label.get("label"),
         }
 
     def exposures_exposure_rate(self, c):
-        exp_, _exposure, display_label, _at, rate, _rate = c
+        exp_, _exposure, as_label, _at, rate, _rate = c
         return {
             "exp_premium": exp_,
             "exp_lr": rate,
             "exp_el": np.array(exp_) * np.array(rate),
-            "_exposure_label": display_label.get("display_label"),
+            "_exposure_label": as_label.get("label"),
         }
 
     # ----- ids -------------------------------------------------------
@@ -1885,12 +1885,12 @@ class UnderwritingTransformer(Transformer):
     def name(self, c):
         return c[0]
 
-    def display_label_some(self, c):
+    def as_label_some(self, c):
         # c = [AS token, label value]; surfaced as a spec key that objects merge
-        # (``**display_label``) and the premium head / expense group read out.
-        return {"display_label": c[1]}
+        # (``**as_label``) and the premium head / expense group read out.
+        return {"label": c[1]}
 
-    def display_label_none(self, c):
+    def as_label_none(self, c):
         return {}
 
     def label_id(self, c):

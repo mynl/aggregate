@@ -13,19 +13,19 @@ The idea: a DecL program is a **tree** of named things, and each node carries
 
 * a **handle** -- the ID-shaped bareword ``name`` (the identity, the reference
   target, the dict key), and
-* an optional **label** -- ``display_label`` (the human string, the DecL ``as``
-  clause), plus
+* an optional **label** -- the private ``_label`` slot (the human string, the
+  DecL ``as`` clause), read through the resolved :attr:`label` property, plus
 * interior **labels** -- ``label_map`` for the sub-object sites (exposure,
   layer, inline severity clause, cessions) that have no Python class of their
-  own and so cannot hold their own ``display_label``.
+  own and so cannot hold their own ``_label``.
 
 Resolution is a chain that is **never blank**::
 
     explicit label  ->  derived default  ->  handle
 
-The object-level label uses this chain in :attr:`display_name`; the interior
-sites use it in :attr:`renamer` (the ``{handle: label}`` dict exhibits apply as
-a final ``df.rename()``).
+The object-level label uses this chain in the :attr:`label` property; the
+interior sites use it in :attr:`renamer` (the ``{handle: label}`` dict exhibits
+apply as a final ``df.rename()``).
 
 Notes
 -----
@@ -70,14 +70,14 @@ class _LabelView:
 
 
 class LabeledMixin:
-    """Shared label surface: ``display_label`` / :attr:`display_name` /
+    """Shared label surface: private ``_label`` / resolved :attr:`label` /
     ``label_map`` / :attr:`labels` / :attr:`renamer` / :attr:`use_labels`.
 
     Hosts supply the specifics via three small hooks, all with harmless
     defaults so a host that only wants the object-level label need override
     nothing:
 
-    * :meth:`_display_default` -- a derived object-level label (e.g. Distortion's
+    * :meth:`_label_default` -- a derived object-level label (e.g. Distortion's
       auto-pretty ``'PH(0.9)'``); default ``None``.
     * :meth:`_label_handles` -- the handles the object's exhibits key off (units
       for a Portfolio, legs for a PnL, sub-parts for an Aggregate); default
@@ -87,22 +87,24 @@ class LabeledMixin:
     """
 
     # ---- initialization -------------------------------------------------
-    def _init_labels(self, *, display_label=None, label_map=None):
+    def _init_labels(self, *, label=None, label_map=None):
         """Populate label state from the spec. Called explicitly by each host
         ``__init__`` (no cooperative ``super()`` -- see the module docstring).
 
         Parameters
         ----------
-        display_label : str or None
+        label : str or None
             The object-level human label (DecL ``as``); ``None`` means fall
-            back to the derived default, then the handle.
+            back to the derived default, then the handle. Stored privately as
+            ``_label``; read back through the resolved :attr:`label` property.
         label_map : dict or None
             Interior labels keyed by site (``'exposure'``, ``'severity'``,
             ``'layer'``, ``'occ_reins'``, ``'agg_reins'``). ``None`` -> empty.
         """
-        #: Optional object-level human label (the DecL ``as`` clause).
-        #: Presentation only; ``name`` stays the identity handle.
-        self.display_label = display_label
+        #: Optional explicit object-level human label (the DecL ``as`` clause),
+        #: or ``None``. Presentation only; ``name`` stays the identity handle.
+        #: Read through the resolved :attr:`label` property, never directly.
+        self._label = label
         #: Interior labels keyed by sub-object site; see :class:`_LabelView`.
         self.label_map = dict(label_map) if label_map else {}
         #: Per-object label switch (no module global -- see ``dev/plan-labels.md``
@@ -114,16 +116,16 @@ class LabeledMixin:
 
     # ---- object-level label --------------------------------------------
     @property
-    def display_name(self):
-        """The resolved object label: explicit ``display_label`` -> derived
-        default (:meth:`_display_default`) -> ``name`` handle.
+    def label(self):
+        """The resolved object label: explicit ``_label`` -> derived default
+        (:meth:`_label_default`) -> ``name`` handle. Never blank.
 
         Presentation only -- repr and exhibit titles prefer it; ``name`` stays
         the identity / reference handle.
         """
-        return self.display_label or self._display_default() or self.name
+        return self._label or self._label_default() or self.name
 
-    def _display_default(self):
+    def _label_default(self):
         """Derived object-level default label, or ``None``.
 
         Overridden by hosts that can pretty-print themselves from structure
@@ -135,7 +137,7 @@ class LabeledMixin:
     def _title_name(self):
         """Exhibit-title form: ``label (handle)`` when an explicit label is set
         (human label leads, identity handle stays visible), else the handle."""
-        return f'{self.display_label} ({self.name})' if self.display_label \
+        return f'{self.label} ({self.name})' if self._label is not None \
             else self.name
 
     # ---- interior labels ------------------------------------------------

@@ -692,7 +692,7 @@ def _render_agg(name: str, spec: dict) -> _Block:
     :class:`_Block` (head ``agg NAME``, the clauses its children) so it renders
     terse on one line or spread with each clause on its own indented line.
     """
-    return _Block(f'agg {name}{_render_label(spec.get("display_label"))}', [
+    return _Block(f'agg {name}{_render_label(spec.get("label"))}', [
         _render_exposure(spec),
         _render_layers(spec),
         _render_sev_clause(spec),
@@ -737,7 +737,7 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl') -> _Block:
     else:
         premium_head = f'{_fmt_seq(consideration)} premium'
     premium_head += _render_label(spec.get('consideration_label'))
-    obj_label = _render_label(spec.get('display_label'))
+    obj_label = _render_label(spec.get('label'))
 
     port_engine = spec.get('_engine_port')
     if port_engine is not None:
@@ -752,7 +752,7 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl') -> _Block:
         # inline engine -- the merged loss structure round-trips identically.)
         # The engine's own ``as`` label names the P&L's loss leg
         # (dev/plan-yapnl.md label plumbing), so it must round-trip.
-        engine_label = _render_label(spec.get('engine_display_label'))
+        engine_label = _render_label(spec.get('engine_label'))
         engine = _Block(f'agg {name}_e{engine_label}', [
             _render_exposure(spec),
             _render_layers(spec),
@@ -785,7 +785,7 @@ def _render_agg_or_pnl(kind: str, name: str, spec: dict) -> _Block:
 def _render_sev_out(name: str, spec: dict) -> str:
     """Render a standalone severity definition (``sev NAME ...``)."""
     body = _render_dsev(spec) if _is_dsev(spec) else _render_dist(spec)
-    return _join([f'sev {name}{_render_label(spec.get("display_label"))}',
+    return _join([f'sev {name}{_render_label(spec.get("label"))}',
                   body, _render_trailer(spec)])
 
 
@@ -799,7 +799,7 @@ def _render_port(name: str, spec: dict) -> _Block:
     clauses spread one level deeper. Either way the preprocessor folds the
     indented continuation back into one logical statement on re-parse.
     """
-    head = _join([f'port {name}{_render_label(spec.get("display_label"))}',
+    head = _join([f'port {name}{_render_label(spec.get("label"))}',
                   _render_trailer(spec)])
     units = [_render_agg_or_pnl(kind, sub_name, sub_spec)
              for kind, sub_name, sub_spec in spec['spec']]

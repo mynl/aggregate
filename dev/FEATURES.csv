@@ -27,8 +27,7 @@ df-bounds,tvar_df,attribute,DataFrame,TVaR by p_knots,,,,,,,,,Y,
 df-bounds,weight_df,attribute,DataFrame,Bracketing-pair weights,,,,,,,,,Y,
 str-narrative,info,property,str,Fixed-layout multi-line object summary (text),Y,Y,Y,,Y,,,,,WRINKLE: not on PnL/Severity/Frequency.
 str-narrative,name,attribute,str,Object name,Y,Y,Y,Y,,,Y,,Y,Frequency has no name.
-str-narrative,display_label,attribute,str,Optional human display label from the DecL 'as' clause (None if unset) [DecL-Labels],Y,Y,,Y,,,Y,,,"a124. Presentation only; None falls back to name. Not on Biv/Frequency/analyses."
-str-narrative,display_name,property,str,Display label if set else name (repr/exhibit titles prefer it) [DecL-Labels],Y,Y,,Y,,,Y,,,"a124/a128. Now resolves label -> derived default -> handle via LabeledMixin (Distortion too, not a column here)."
+str-narrative,label,property,str,Resolved human label: _label -> derived default -> name (never blank); the DecL 'as' clause [Label-Canonical],Y,Y,,Y,,,Y,,,"a133. Via LabeledMixin; presentation only (repr/exhibit titles prefer it). Was display_label attr + display_name property (a124-a132); explicit label stored privately as _label. Distortion resolves to auto-pretty; copula too (neither a column here)."
 str-narrative,label_map,attribute,dict,Interior sub-object labels keyed by site (exposure/layer/severity) [DecL-Labels-Everywhere],Y,Y,,Y,,,Y,,,"a128. Via LabeledMixin. {} when no interior labels. Populated by the DecL 'as' clause on sub-object sites."
 str-narrative,labels,property,namespace,Read-only view over label_map: a.labels.exposure / .layer / .severity [DecL-Labels-Everywhere],Y,Y,,Y,,,Y,,,"a128. Via LabeledMixin. Missing sites resolve to None, never raise."
 str-narrative,renamer,property,dict,"{handle: display} map exhibits rename through at serve time [DecL-Labels-Everywhere]",Y,Y,,Y,,,Y,,,"a128. Via LabeledMixin. Portfolio -> units(+total); identity for an unlabeled object. Portfolio.unit_renamer is a thin alias."

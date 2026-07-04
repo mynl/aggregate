@@ -101,14 +101,14 @@ class Portfolio(LabeledMixin):
 
     """
 
-    def __init__(self, name, spec_list, uw=None, display_label=None, label_map=None):
+    def __init__(self, name, spec_list, uw=None, label=None, label_map=None):
         """
         Create a new :class:`Portfolio` object.
 
         :param name: The name of the portfolio. No spaces or underscores.
-        :param display_label: optional human display label (the DecL ``as``
+        :param label: optional human display label (the DecL ``as``
            clause); presentation only, preferred over ``name`` in repr / exhibit
-           titles via :attr:`display_name`. See dev/plan-decl-labels.md.
+           titles via :attr:`label`. See dev/plan-decl-labels.md.
         :param spec_list: A list of
 
            1. dictionary: Aggregate object dictionary specifications or
@@ -124,7 +124,7 @@ class Portfolio(LabeledMixin):
         # Object-level display label + interior label_map (unit-level labels
         # ride on the member Aggregates). Presentation only; ``name`` stays the
         # identity handle. See dev/plan-labels.md ([DecL-Labels-Everywhere]).
-        self._init_labels(display_label=display_label, label_map=label_map)
+        self._init_labels(label=label, label_map=label_map)
         self.agg_list = []
         self.unit_names = []
         self._valid = None
@@ -576,7 +576,7 @@ class Portfolio(LabeledMixin):
             float_cols = df.select_dtypes(include=['float64']).columns
             df[float_cols] = remove_fuzz_util(df, eps)[float_cols]
 
-    # ``display_name`` / ``_title_name`` come from ``LabeledMixin`` (the shared
+    # ``label`` / ``_title_name`` come from ``LabeledMixin`` (the shared
     # label surface); ``name`` stays the identity handle. See dev/plan-labels.md.
 
     def __repr__(self):
@@ -588,7 +588,7 @@ class Portfolio(LabeledMixin):
         # this messes up when port = self has been enhanced...
 
         # cannot use ex, etc. because object may not have been updated
-        return f'{self.display_name} at {super().__repr__()}'
+        return f'{self.label} at {super().__repr__()}'
 
     def _validation_passes(self) -> bool:
         """Whether the portfolio clears validation (clean *or* cleanly reinsured).
@@ -2734,10 +2734,10 @@ class Portfolio(LabeledMixin):
         """
         if isinstance(distortion, str):
             distortion = self.distortions[distortion]
-        # display_name is the label-or-pretty-or-kind resolver; it keys the cache
+        # label is the label-or-pretty-or-kind resolver; it keys the cache
         # so distortions of the same kind but different shape (TVaR(0.9) vs
         # TVaR(0.99)) stay distinct -- the bare kind handle would collide.
-        name = distortion.display_name
+        name = distortion.label
         key = (name, view, self._is_loss_value, S_calculation, allocation)
         if key not in self._augmented_dfs:
             self._augmented_dfs[key] = self._build_augmented(
@@ -3302,7 +3302,7 @@ class Portfolio(LabeledMixin):
         # one-row audit, same orientation as every other readout: descriptors
         # (dname/dshape) lead, the pentagon octet is the trailing [-8:].
         audit_df = pd.DataFrame(
-            {'dname': distortion.display_name, 'dshape': distortion.shape,
+            {'dname': distortion.label, 'dshape': distortion.shape,
              'L': pricing_df.loc['total', 'L'],
              'M': pricing_df.loc['total', 'M'],
              'P': pricing_df.loc['total', 'P'],
@@ -3430,7 +3430,7 @@ class Portfolio(LabeledMixin):
     # ------------------------------------------------------------------
     # Label surface (LabeledMixin hooks) -- the exhibit axis is the member
     # units plus ``total``; each unit's label is its member Aggregate's
-    # resolved ``display_name``. See dev/plan-labels.md ([DecL-Labels-Everywhere]).
+    # resolved ``label``. See dev/plan-labels.md ([DecL-Labels-Everywhere]).
     # ------------------------------------------------------------------
     def _label_handles(self):
         """The exhibit axis: member-unit handles plus ``total``."""
@@ -3442,7 +3442,7 @@ class Portfolio(LabeledMixin):
         themselves, so an unlabeled portfolio's exhibits are unchanged."""
         for a in self.agg_list:
             if a.name == handle:
-                return a.display_name
+                return a.label
         return handle
 
     @property

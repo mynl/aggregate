@@ -259,13 +259,13 @@ pnl PnLprem.Claims 100 prem less agg PnLprem.Claims_e 10 claims sev lognorm 8 cv
 pnl PnLprem.Loss   100 prem less agg PnLprem.Loss_e 85 loss sev lognorm 8 cv 1.5 poisson                                         note{expected-loss form: E[loss]=85, margin 15};
 pnl PnLprem.Vec    [100 200 100] prem less agg PnLprem.Vec_e [100 200 100] prem at .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson           note{vector consideration sums to 400; mean 80 = sum premium_i (1-lr)};
 # Engine-source forms (1.0.0a125): a pnl / xpnl wraps a COMPLETE engine.
-# ``inherit premium`` copies the engine's technical premium; ``xpnl`` returns the
-# exploded marginal perspective stack. The stored-``agg.NAME`` / ``port.NAME``
+# ``inherit premium`` copies the engine's technical premium; ``xpnl`` returns
+# the multi-group step walk (a136). The stored-``agg.NAME`` / ``port.NAME``
 # source forms need a loaded referent, so they live in
 # tests/test_pnl_engine_source.py (this corpus round-trips each line in
 # isolation). See dev/done/plan-pnl-engine-source.md.
 pnl  ES.Inherit inherit premium less agg ES.Inherit_e 8000 prem at 65% lr sev lognorm 100 cv 2 poisson            note{inherit copies the engine's 8000 technical premium; margin 8000 - 5200};
-xpnl ES.Tower   1000 prem less agg ES.Tower_e 1000 prem at 70% lr sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 poisson  note{exploded gross/net-occ marginal perspective stack};
+xpnl ES.Tower   1000 prem less agg ES.Tower_e 1000 prem at 70% lr sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 poisson  note{the xpnl walk: gross -> occ cover -> Total, marginal-stitched};
 # [PnL-Generic-Final] (dev/plan-yapnl.md example programs, 1.0.0a129-a131): a
 # pnl is a source plus a signed GROUP LEDGER -- cash-flow-parts rows, EX adds
 # down the sheet. The acceptance pair (YAPNL.Gross vs YAPNL.Retro) shares one
@@ -273,13 +273,13 @@ xpnl ES.Tower   1000 prem less agg ES.Tower_e 1000 prem at 70% lr sev lognorm 10
 # leg's function. See tests/test_variable_rating_decl.py and tests/test_pnl*.py.
 pnl YAPNL.Gross as "Gross Book PNL" inherit premium as "Gross Premium" less agg YAPNL.Gross_e as "Gross Loss" 10000 premium at 85% lr sev lognorm 50 cv 3 poisson less 5% loss expense as LAE 100 fixed expense and 10% premium expense as "Fixed & Acq Exp"  note{acceptance pair 1: plain gross book ledger, LAE stochastic};
 pnl YAPNL.Retro as "Retro Rated Gross PNL" retro basic 2000 lcm 1.1 min 8000 max 14000 premium as "Retro Premium" less agg YAPNL.Retro_e as "Gross Loss" 10000 premium at 85% lr sev lognorm 50 cv 3 poisson less 5% loss expense as LAE 100 fixed expense as "Fixed Exp" 10% premium expense as "Acq Exp"  note{acceptance pair 2: same shape, stochastic retro premium};
-pnl YAPNL.AggCeded 10000 premium less agg YAPNL.AggCeded_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 500 cede 10% less 20% premium expense  note{two-group ledger: gross sell + agg cession buy group, per-atom exact waterfall};
+pnl YAPNL.AggCeded 10000 premium less agg YAPNL.AggCeded_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 500 cede 10% less 20% premium expense  note{consolidated pnl: net premium vs net loss; the two-group walk is the xpnl face (a136)};
 pnl YAPNL.OccReinst 10000 premium less agg YAPNL.OccReinst_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 occurrence net of 24500 xs 500 deposit 1000 reinstatements [1] mixed gamma 0.25 less 20% premium expense  note{2-D ledger over the (L, R) joint; ceded premium D + h(R) stochastic};
-pnl YAPNL.Swing 10000 premium less agg YAPNL.Swing_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 swing basic 0 lcm 1.1 min 300 max 1000 less 20% premium expense  note{one changed leg: stochastic swing ceded premium};
-pnl YAPNL.Slide 10000 premium less agg YAPNL.Slide_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80% less 20% premium expense  note{one changed leg: sliding commission on the cession};
-pnl YAPNL.PC 10000 premium less agg YAPNL.PC_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 1500 pc 50% after 10% less 20% premium expense  note{one changed leg: profit commission on the cession};
-pnl YAPNL.Corridor 10000 premium less agg YAPNL.Corridor_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 500 corridor 50% po 30% xs 20% less 20% premium expense  note{one changed leg: corridor-adjusted recovery};
-xpnl YAPNL.Onion 10000 premium less agg YAPNL.Onion_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 occurrence net of 24500 xs 500 deposit 1000 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 200 less 20% premium expense  note{guaranteed-cost onion: the marginal perspective stack across reins_density_df marginals};
+pnl YAPNL.Swing 10000 premium less agg YAPNL.Swing_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 swing basic 0 lcm 1.1 min 300 max 1000 less 20% premium expense  note{consolidated: stochastic swing ceded premium folds into the net premium leg};
+pnl YAPNL.Slide 10000 premium less agg YAPNL.Slide_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80% less 20% premium expense  note{consolidated: sliding commission credit rides the net premium leg};
+pnl YAPNL.PC 10000 premium less agg YAPNL.PC_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 1500 pc 50% after 10% less 20% premium expense  note{consolidated: profit commission credit rides the net premium leg};
+pnl YAPNL.Corridor 10000 premium less agg YAPNL.Corridor_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 500 corridor 50% po 30% xs 20% less 20% premium expense  note{consolidated: corridor-adjusted recovery shapes the net loss leg};
+xpnl YAPNL.Onion 10000 premium less agg YAPNL.Onion_e 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 occurrence net of 24500 xs 500 deposit 1000 mixed gamma 0.25 aggregate net of 5000 xs 10000 deposit 200 less 20% premium expense  note{the guaranteed-cost walk: gross -> occ -> agg -> Total, every row an affine of a reins_density_df marginal};
 # (Portfolios of pnl units -- book-level P&L -- are deferred; a pnl is the
 # standalone PnL veneer, not a portfolio unit. See dev/plan-pnl.md.)
 # Signed loss severity (dsev negative atom / ssev) under pnl (1.0.0a45): the
@@ -672,3 +672,19 @@ agg LB.Claims 100 claims as "Claim count" sev lognorm 100 cv 2 poisson          
 agg LB.Layer 100 claims 1000 xs 500 as "Working Layer" sev lognorm 100 cv 2 poisson                                    note{layer label -> label_map[layer]; S2 ambiguity guard vs following sev};
 agg LB.SevClause 100 claims sev lognorm 100 cv 2 as "ISO ME B" poisson                                                 note{inline severity-clause label -> label_map[severity]};
 agg LB.AllInterior 10000 premium as GWP at 0.65 lr 1000 xs 500 as "Layer 1" sev lognorm 100 cv 2 as "ISO" poisson      note{all three interior labels combine};
+
+# ============================================================
+# Z. Reins economics on a plain agg (ignored + warned)
+#                                   (tests/test_agg_ignored_clauses.py)
+# ============================================================
+# [Reins-Economics-On-Agg-Ignore-Warn]: a pure aggregate accepts every
+# reinsurance decoration -- ceded premium (deposit / rol / rate), cede,
+# reinstatements, variable-rating features -- builds the loss structure only,
+# and emits one IgnoredDecLClauseWarning naming the ignored clauses. The
+# knowledge base keeps the full spec, so `pnl X <prem> less agg.NAME`
+# re-injects the economics (the knowledge-injection route). See
+# dev/plan-pnl-consolidated-xpnl-walk.md Phase 1.
+agg IG.Deposit 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 deposit 160 cede 25%          note{ceded premium + cede on a plain agg: ignored with warning, retained for injection};
+agg IG.Rate 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rate 30%                          note{rate has no base on a bare agg; resolves against the premium of a wrapping pnl};
+agg IG.Reinst 100 claims sev lognorm 50 cv 1.5 occurrence net of 500 xs 500 deposit 150 reinstatements 1 at 100% poisson  note{reinstatement schedule on a plain agg: ignored with warning};
+agg IG.Swing 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 swing basic 500 lcm 0.5          note{variable-rating feature on a plain agg: ignored with warning};

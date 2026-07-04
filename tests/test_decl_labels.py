@@ -161,15 +161,16 @@ def test_labeled_group_combines_multiple_terms():
 # Reins-clause label -> cession leg / group labels in the ledger
 # ----------------------------------------------------------------------
 def test_reins_label_names_cession_rows():
-    # an occ guaranteed-cost program books its ceded premium as a constant
-    # leg named by the reins ``as`` label
-    p = build('pnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
+    # the consolidated pnl nets the cession out
+    # ([Decision-PnL-Is-Consolidated]); the reins ``as`` label names the
+    # cover's step and its legs on the xpnl walk
+    p = build('xpnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
               'occurrence net of 100 xs 200 deposit 50 as "Cat XL" poisson')
     assert 'Cat XL premium' in _lines(p)
     assert 'ceded occ premium' not in _lines(p)
-    # an agg cession is a real buy group named by its label: it becomes the
-    # step; its result / running net live at (step, 'Margin', ...)
-    q = build('pnl RQ 1000 premium less agg RQ_e 850 loss sev lognorm 100 cv 1 '
+    # the cover's label becomes the step; its result / running net live at
+    # (step, 'Margin', ...)
+    q = build('xpnl RQ 1000 premium less agg RQ_e 850 loss sev lognorm 100 cv 1 '
               'poisson aggregate net of 500 xs 1000 deposit 50 as "Stop Loss"')
     lines = _lines(q)
     for row in ('Stop Loss premium', 'Stop Loss recovery'):
@@ -180,7 +181,7 @@ def test_reins_label_names_cession_rows():
 
 
 def test_reins_no_label_keeps_structural_rows():
-    p = build('pnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
+    p = build('xpnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
               'occurrence net of 100 xs 200 deposit 50 poisson')
     assert 'ceded occ premium' in _lines(p)
 

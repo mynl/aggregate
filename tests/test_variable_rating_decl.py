@@ -2,13 +2,13 @@
 
 ``build('pnl ... aggregate net of <layer> <feature>')`` parses to the locked
 ``agg_reins_<feature>`` spec key, attaches the matching ``ContractTerms``, and
-returns an :class:`~aggregate.PnL` value object (the always-PnL face) with the
+returns an :class:`~aggregate.PnL` value object with the
 :class:`~aggregate.variable_rating.VariableRatingAnalysis` attached as
-``.analysis``. The returned P&L carries its own fixed exhibits (the
-``summary_df`` card and the ``stats_df`` ledger sheet); the Gross/Ceded/Net
-waterfall (``gcn_df``) and the treaty maps live on ``.analysis``. Retro (account-level
-rating clause) varies the gross premium and is the 1-D case with no
-reinsurance.
+``.analysis``. ``pnl`` is the **consolidated** single-group net view
+([Decision-PnL-Is-Consolidated]: net premium / net loss with the feature's
+map folded in); the two-group step ledger is the ``xpnl`` **walk**. The
+treaty maps and waterfall live on ``.analysis``. Retro (account-level rating
+clause) varies the gross premium and is the 1-D case with no reinsurance.
 """
 
 import warnings
@@ -62,10 +62,17 @@ def test_swing_build():
     assert (terms.basic, terms.lcm, terms.minimum, terms.maximum) == \
         (500.0, 0.5, 500.0, 3000.0)
     assert _means_add(p)
-    # ceded premium is the stochastic leg -- in the ledger and the engine
-    assert _leg(p, 'ceded agg premium')['SD'] > 0
+    # consolidated: the stochastic ceded premium folds into the net premium
+    assert _leg(p, 'net premium')['SD'] > 0
     assert p.analysis._stats_df.loc['ceded_premium', 'cv'] > 0
     _assert_gained(p)
+    # the walk (xpnl) shows the ceded premium as its own stochastic leg
+    x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
+              + 'swing basic 500 lcm 0.5 min 500 max 3000')
+    assert [g.label for g in x.groups] == ['gross', 'ceded agg']
+    assert _leg(x, 'ceded agg premium')['SD'] > 0
+    # the two faces agree on the net position
+    assert abs(p.mean - x.mean) < 1e-9
 
 
 def test_swing_bare_collar_defaults():
@@ -85,10 +92,15 @@ def test_slide_build():
     assert terms.anchors == ((0.45, 0.60), (0.25, 0.70), (0.19, 0.80))
     assert _means_add(p)
     assert p.analysis.ceded_premium == pytest.approx(1500.0)  # deposit denom
-    # the sliding commission is the one changed leg (stochastic, received)
-    assert _leg(p, 'sliding commission')['SD'] > 0
+    # consolidated: the sliding commission credit makes the net premium
+    # stochastic
+    assert _leg(p, 'net premium')['SD'] > 0
     assert p.analysis._stats_df.loc['commission', 'cv'] > 0
     _assert_gained(p)
+    # the walk shows the sliding commission as its own received leg
+    x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
+              + 'deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80%')
+    assert _leg(x, 'sliding commission')['SD'] > 0
 
 
 # ----------------------------------------------------------------------
@@ -100,9 +112,13 @@ def test_pc_build():
     assert isinstance(terms, ProfitCommissionTerms)
     assert (terms.share, terms.allowance) == (0.25, 0.10)
     assert _means_add(p)
-    assert _leg(p, 'profit commission')['SD'] > 0
+    # consolidated: the profit commission credit rides the net premium
+    assert _leg(p, 'net premium')['SD'] > 0
     assert p.analysis._stats_df.loc['commission', 'cv'] > 0
     _assert_gained(p)
+    x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
+              + 'deposit 1500 pc 25% after 10%')
+    assert _leg(x, 'profit commission')['SD'] > 0
 
 
 # ----------------------------------------------------------------------
@@ -114,10 +130,17 @@ def test_corridor_build():
     assert isinstance(terms, CorridorTerms)
     assert (terms.share, terms.width, terms.attachment) == (0.50, 0.30, 0.20)
     assert _means_add(p)
-    # corridor reduces the cession -> the recovery is the changed leg
-    assert _leg(p, 'ceded agg recovery')['SD'] > 0
+    # consolidated: fixed net premium (corridor keeps the deposit split);
+    # the corridor-adjusted recovery shapes the net loss
+    assert _leg(p, 'net premium')['SD'] == 0
+    assert _leg(p, 'loss (net)')['SD'] > 0
     assert p.analysis._stats_df.loc['ceded_loss', 'cv'] > 0
     _assert_gained(p)
+    # the walk shows the corridor-adjusted recovery as the changed leg
+    x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
+              + 'deposit 1500 corridor 50% po 30% xs 20%')
+    assert _leg(x, 'ceded agg recovery')['SD'] > 0
+    assert abs(p.mean - x.mean) < 1e-9
 
 
 # ----------------------------------------------------------------------

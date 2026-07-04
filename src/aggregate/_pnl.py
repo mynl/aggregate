@@ -40,6 +40,28 @@ Evaluation invariants
   source with 1-D legs is fine (they read axis 0). Only one latent dimension
   exists.
 
+Two faces: pnl and xpnl
+-----------------------
+
+The DecL builders serve two objects for two questions
+(``dev/plan-pnl-consolidated-xpnl-walk.md``):
+
+* **``pnl`` -- "what is my position?"** The consolidated net-in-to-net-out
+  view: always one group, always the flat three-row card. Ceded economics
+  are netted out and not shown -- a reinsured aggregate's default output is
+  its net.
+* **``xpnl`` -- "how did I get there?"** The walk: gross -> each cover ->
+  Total, a plain multi-group :class:`PnL` (a way of building, not a new
+  type) carrying the exploded ``(Step, View)`` card and
+  ``(Step, View, Line)`` stats sheet.
+
+**Kappa shared-source rule** ([Decision-Kappa-Shared-Source-Rule]): scenario
+(``κ``) ladder columns exist exactly when the ledger shares one source --
+``pnl`` (single source, trivially) and per-atom towers get them; a
+marginal-stitched guaranteed-cost ``xpnl`` (and the massive one-sweep route)
+has no joint, so its ladder stays **marginal** under plain ``P`` headers.
+The header *is* the flag.
+
 Reading the P&L sheets
 ----------------------
 
@@ -51,13 +73,19 @@ Two exhibits, deliberately different in kind:
   the card answers "how big is each total" (range feel). Marginal quantiles
   never add, so the card's percentile cells do **not** foot down the card;
   that is a property of quantiles, not an error.
-* :attr:`PnL.stats_df` -- the **sheet**: every ledger row, and percentile
+* :attr:`PnL.stats_df` -- the **sheet**: every ledger row, and ``κ`` ladder
   columns that are **scenario states** anchored on the grand result
-  ([Kappa-Scenario-Percentiles]): column ``Pq`` shows every row's
+  ([Kappa-Scenario-Percentiles]): column ``κq`` shows every row's
   conditional mean given the result lands at its ``q``-quantile, so each
   column is one internally consistent state and **foots exactly** down the
-  sheet. Small ``p`` is bad for the holder, full stop -- a loss-sensitive
-  premium correctly shows high in the bad columns.
+  sheet. P&Ls are always in payoff sign convention, **left tail bad**
+  ([Decision-Kappa-Outcome-Direction]): ``κ01`` is the adverse state, full
+  stop -- a loss-sensitive premium correctly shows high in the bad columns.
+  The header signals the semantics: a ``κ`` column *means* conditioning
+  happened; ladders with no shared source (the massive one-sweep route,
+  :func:`stack_marginal_pnls`, the stitched guaranteed-cost tower) stay
+  **marginal** and keep plain ``P`` headers
+  ([Decision-Kappa-Shared-Source-Rule]).
 
 Where the result is non-monotone in the source (slides, swings, humps -- the
 "switcheroo") a scenario cell is the exact mean over the level set of that
@@ -82,10 +110,11 @@ __all__ = ['Leg', 'Group', 'PnL', 'stack_marginal_pnls']
 #: The detailed percentile ladder used by :attr:`PnL.stats_df` /
 #: :attr:`PnL.scaled_stats_df` and :func:`stack_marginal_pnls`. On the stats
 #: sheets the ladder columns are **scenario states** (conditional means given
-#: the grand result lands at its ``q``-quantile -- [Kappa-Scenario-Percentiles]);
-#: in :func:`stack_marginal_pnls` they stay marginal (independent perspectives
-#: share no joint). The headline :attr:`PnL.summary_df` card computes its own
-#: marginal ``P1`` / ``Median`` / ``P99`` -- deliberately different in kind
+#: the grand result lands at its ``q``-quantile -- [Kappa-Scenario-Percentiles])
+#: and carry ``κ`` headers; in :func:`stack_marginal_pnls` they stay marginal
+#: (independent perspectives share no joint) under plain ``P`` headers. The
+#: headline :attr:`PnL.summary_df` card computes its own marginal ``P01`` /
+#: ``Median`` / ``P99`` -- deliberately different in kind
 #: ([Decision-Card-Percentiles-Stay-Marginal]). The exact ladder is
 #: standardized in ``[Reporting-Guidelines]``.
 PERCENTILE_LADDER = (0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99)
@@ -455,6 +484,60 @@ class _EvaluatedLeg:
         return [m, sd, cv, skew] + [float(gd.q(q)) for q in PERCENTILE_LADDER]
 
 
+class _DeltaGD:
+    """Quantile shim for a :class:`_DeltaRow`: ``q(p)`` is the **difference of
+    the two rows' quantiles**, not the quantile of the difference (which would
+    need a joint the stitched route does not have)."""
+
+    __slots__ = ('_t', '_b')
+
+    def __init__(self, target_gd, base_gd):
+        self._t = target_gd
+        self._b = base_gd
+
+    def q(self, p, kind='lower'):
+        return float(self._t.q(p, kind)) - float(self._b.q(p, kind))
+
+
+class _DeltaRow:
+    """A per-statistic delta ledger row: ``target - base``, cell by cell.
+
+    Serves the rows of a **stitched** ledger that no engine marginal backs
+    (the ``total impact`` of a marginal-stitched tower: grand result and first
+    step ride *different* marginals, and their difference has no distribution
+    without a joint). Semantics follow the historical
+    :func:`stack_marginal_pnls` impact rows: every statistic is the plain
+    difference of the two rows' statistics -- the mean is exact by linearity;
+    SD / CV / Skew / percentile cells are **deltas of row statistics**, not
+    statistics of the delta.
+    """
+
+    def __init__(self, label, target, base):
+        self.label = label
+        self._t = target
+        self._b = base
+        self.bs = 0.0
+        self.sign = 1.0
+        self.values = None
+        self.probs = None
+
+    @property
+    def gd(self):
+        return _DeltaGD(self._t.gd, self._b.gd)
+
+    @property
+    def moments(self):
+        return tuple(a - b for a, b in zip(self._t.moments, self._b.moments))
+
+    @property
+    def mean(self):
+        return self.moments[0]
+
+    def stat_vector(self):
+        return [a - b for a, b in
+                zip(self._t.stat_vector(), self._b.stat_vector())]
+
+
 class _EvaluatedGroup:
     """One evaluated :class:`Group`: its signed leg rows + derived rows."""
 
@@ -533,18 +616,50 @@ def _ledger_plan(groups, result_name):
 
 
 def _pct_label(q):
-    """Percentile row/column label: ``f'P{q*100:.3g}'`` (``P1`` / ``P50`` / ``P99.5``)."""
-    return f'P{q * 100:.3g}'
+    """Marginal percentile column label, zero-padded: ``P01`` / ``P50`` /
+    ``P99`` (``.3g`` fallback for fractional points: ``P99.5``).
+
+    The header signals the semantics ([Decision-Ladder-Column-Names]): a plain
+    ``P`` column is a **marginal** quantile / statistic of that row; a ``κ``
+    column (:func:`_kappa_label`) means conditioning happened.
+    """
+    v = q * 100
+    return f'P{v:02.0f}' if float(v).is_integer() else f'P{v:.3g}'
 
 
-def _stat_names():
-    """Column labels for a ledger row: ``EX / SD / CV / Skew`` + the ladder."""
-    return ['EX', 'SD', 'CV', 'Skew'] + [_pct_label(q) for q in PERCENTILE_LADDER]
+def _kappa_label(q):
+    """Scenario (kappa) column label: ``κ01`` / ``κ50`` / ``κ99`` (``.3g``
+    fallback for fractional points).
+
+    The ``κ`` marks the [Kappa-Scenario-Percentiles] semantics on the sheet
+    itself: the column is the conditional mean of each row given the grand
+    result lands at its ``q``-quantile -- the library's kappa function
+    ``E[X_i | X = x]`` applied to the ledger. P&Ls are always in payoff sign
+    convention, **left tail bad**: ``κ01`` is the adverse state, ``κ99`` the
+    favorable one ([Decision-Kappa-Outcome-Direction]).
+    """
+    v = q * 100
+    return f'κ{v:02.0f}' if float(v).is_integer() else f'κ{v:.3g}'
+
+
+def _stat_names(scenario=False):
+    """Column labels for a ledger row: ``EX / SD / CV / Skew`` + the ladder.
+
+    ``scenario=True`` gives the ladder ``κ`` headers (the conditional
+    [Kappa-Scenario-Percentiles] columns of the in-memory
+    :attr:`PnL.stats_df`); the default plain ``P`` headers mark a **marginal**
+    ladder (the massive one-sweep route, :func:`stack_marginal_pnls`, the
+    stitched guaranteed-cost ``xpnl`` tower). Positional access or
+    ``df.filter(like=...)`` avoids typing the ``κ`` glyph.
+    """
+    lab = _kappa_label if scenario else _pct_label
+    return ['EX', 'SD', 'CV', 'Skew'] + [lab(q) for q in PERCENTILE_LADDER]
 
 
 #: Fixed column set of the :attr:`PnL.summary_df` card (headline moments +
-#: the three marginal range percentiles).
-_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99']
+#: the three marginal range percentiles; ``P01`` zero-pads to pair with
+#: ``P99`` -- [Decision-Ladder-Column-Names]).
+_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
 
 
 #: Default ``View`` level names for the :attr:`PnL.stats_df` row MultiIndex,
@@ -618,7 +733,8 @@ class PnL(LabeledMixin):
 
     def __init__(self, *, name, source, groups=None, role=None,
                  consideration=None, obligation=None, scale=None,
-                 result_name='result', label=None, label_map=None):
+                 result_name='result', label=None, label_map=None,
+                 stitched_rows=None):
         if groups is None:
             if role is None:
                 raise ValueError(
@@ -650,13 +766,29 @@ class PnL(LabeledMixin):
         #: drill-down only -- no exhibit is forwarded from it. ``None`` on a
         #: plain P&L.
         self.analysis = None
+        #: The resolved cession economics dict (``pc_occ`` / ``pc_agg`` /
+        #: ``c_occ`` / ``c_agg`` / ``gross`` / ``ceded``) -- the observable of
+        #: the DecL ``deposit`` / ``rol`` / ``rate`` / ``cede`` resolution,
+        #: set by the reinsurance builders. ``None`` on a plain P&L.
+        self.economics = None
+        # Construction narratives ([Construction-Introspection]): recorded by
+        # the DecL builders at construction (they alone know the why); the
+        # resolved properties fall back to a generic structural narrative so
+        # a hand-built kernel P&L is never without one.
+        self._construction_description = None
+        self._construction_explanation = None
         #: matplotlib figure handle set by :meth:`plot`.
         self.figure = None
         self._group_specs = groups
         self._source = source
-        #: the shared row template -- one source of truth for both routes
+        #: stitched ledgers carry gd-backed rows with no shared atoms
+        #: (no per-atom values, no ``+`` composition) -- see :meth:`_init_stitched`.
+        self._stitched = stitched_rows is not None
+        #: the shared row template -- one source of truth for all routes
         self._plan = _ledger_plan(groups, self.result_name)
-        if _is_massive(source):
+        if stitched_rows is not None:
+            self._init_stitched(groups, stitched_rows)
+        elif _is_massive(source):
             self._init_massive(source, groups)
         else:
             coords, probs, shape, source_bs, is2d = _source_atoms(source)
@@ -874,6 +1006,75 @@ class PnL(LabeledMixin):
         self._grand_obl = grand_total_rows.get('obl') \
             or self._card_side_row(0, 'obl')
 
+    # ------------------------------------------------------------------
+    # ledger assembly (stitched gd-backed route -- internal)
+    # ------------------------------------------------------------------
+    def _init_stitched(self, groups, entries):
+        """Materialize the ledger from **caller-supplied gd-backed rows**
+        ([GC-Tower-Marginal-Stitch]; internal -- not a public construction
+        surface).
+
+        The marginal-stitched route: every plan row arrives as its own exact
+        :class:`GridDistribution` + exact mean / sd (the same shape the
+        massive one-sweep route returns), with **no shared atoms** -- the
+        builder reads each row off an engine marginal (an affine transform of
+        ``reins_density_df``), never off cross-row sums, which do not exist
+        without a joint. ``entries`` maps every :func:`_ledger_plan` row label
+        to either
+
+        * ``(gd, exact_mean, exact_sd)`` -- a gd-backed row, or
+        * ``('delta', target_label, base_label)`` -- a :class:`_DeltaRow`
+          (per-statistic difference; targets must precede in plan order).
+
+        Consequences of having no atoms: the stats ladder is **marginal**
+        (plain ``P`` headers -- the on-sheet signature of
+        [Decision-Kappa-Shared-Source-Rule]), ``+`` composition is
+        unavailable, and :meth:`evaluate` is not supported.
+        """
+        self._coords = None
+        self._shape = None
+        self._source_bs = None
+        self._is2d_source = False
+        self._probs = None
+        rows = OrderedDict()
+        self._egroups = []
+        self._group_result_rows = []
+        self._by_kind = {}
+        grand_total_rows = {}
+        group_rows = {gi: {'cons': [], 'obl': []} for gi in range(len(groups))}
+        for label, kind, payload in self._plan:
+            try:
+                e = entries[label]
+            except KeyError:                       # pragma: no cover
+                raise ValueError(
+                    f'stitched construction: no entry supplied for ledger row '
+                    f'{label!r}; the builder must supply every plan row.')
+            if e[0] == 'delta':
+                row = _DeltaRow(label, rows[e[1]], rows[e[2]])
+            else:
+                gd, m, sd = e
+                row = _EvaluatedLeg(label, gd=gd, exact_mean=m, exact_sd=sd)
+            rows[label] = row
+            self._by_kind[(kind, payload)] = row
+            if kind == 'leg':
+                gi, side, _li = payload
+                group_rows[gi][side].append(row)
+            elif kind == 'group_result':
+                self._group_result_rows.append(row)
+            elif kind == 'grand_total':
+                grand_total_rows[payload] = row
+        for gi, g in enumerate(groups):
+            self._egroups.append(_EvaluatedGroup(
+                g.label, g.role, group_rows[gi]['cons'],
+                group_rows[gi]['obl'], None))
+        self._rows = rows
+        self._grand_result = (rows[self.result_name] if len(groups) > 1
+                              else self._group_result_rows[0])
+        self._grand_cons = grand_total_rows.get('cons') \
+            or self._card_side_row(0, 'cons')
+        self._grand_obl = grand_total_rows.get('obl') \
+            or self._card_side_row(0, 'obl')
+
     def _resolve_scale(self, scale):
         """Commit the exhibit scale at construction.
 
@@ -901,6 +1102,11 @@ class PnL(LabeledMixin):
         """Concatenate two group ledgers over the **same** source."""
         if not isinstance(other, PnL):
             return NotImplemented
+        if self._stitched or other._stitched:
+            raise ValueError(
+                'a stitched P&L carries gd-backed rows with no shared atoms, '
+                'so its ledger cannot concatenate with another; rebuild from '
+                'the engine instead.')
         same = self._source is other._source
         if not same and self._probs is not None and other._probs is not None:
             same = (self._shape == other._shape
@@ -1089,7 +1295,7 @@ class PnL(LabeledMixin):
         ledger key only).
 
         Columns ``EX`` / ``Scaled`` (``EX`` over the committed :attr:`scale`)
-        / ``SD`` / ``CV`` / ``Skew`` / ``P1`` / ``Median`` / ``P99``. The
+        / ``SD`` / ``CV`` / ``Skew`` / ``P01`` / ``Median`` / ``P99``. The
         percentiles are **marginal quantiles of each card row's own
         distribution** -- the card answers "how big is each total" (range),
         so its percentile cells do **not** add down the card (marginal
@@ -1203,7 +1409,7 @@ class PnL(LabeledMixin):
         probability-weighted mean of every row's signed values over the
         slice::
 
-            cell(row, Pq) = E[row | result == x_q]
+            cell(row, κq) = E[row | result == x_q]
 
         This is the library's kappa function ``E[X_i | X = x]`` (Portfolio's
         ``exeqa_*``) applied to the ledger. By linearity of conditional
@@ -1236,31 +1442,39 @@ class PnL(LabeledMixin):
         a tower. Columns are ``EX`` / ``SD`` / ``CV`` / ``Skew`` and the full
         :data:`PERCENTILE_LADDER`.
 
-        The percentile columns are **scenario states, not per-row
-        quantiles**: column ``Pq`` is the state in which the grand result
+        The ``κ`` ladder columns are **scenario states, not per-row
+        quantiles**: column ``κq`` is the state in which the grand result
         lands at its ``q``-quantile, and each cell is the conditional mean
-        ``E[row | result == x_q]`` (:meth:`_scenario_ladder`). Consequences:
+        ``E[row | result == x_q]`` (:meth:`_scenario_ladder`). The header
+        signals the semantics ([Decision-Ladder-Column-Names]): ``κ`` *means*
+        conditioning happened. Consequences:
 
         * every column **foots** -- legs -> totals -> result add down the
           sheet to ``x_q``;
-        * direction is uniform: a column is one state ordered by how good it
-          is for the holder (small ``p`` is bad, full stop) -- so e.g. a
-          loss-sensitive (retro) premium correctly shows *high* in the bad
-          columns;
+        * direction is uniform ([Decision-Kappa-Outcome-Direction]): a column
+          is one state ordered by the **outcome** -- payoff sign convention,
+          left tail bad, so ``κ01`` is the adverse state, full stop -- and
+          e.g. a loss-sensitive (retro) premium correctly shows *high* in the
+          bad columns. (This is deliberately reversed from the usual
+          actuarial *loss* view, where the right tail is bad.)
         * the grand-result row's cells are its own marginal quantiles.
 
         ``EX / SD / CV / Skew`` are row properties and stay **marginal**.
         Per-row marginal quantiles remain one line away via
-        ``density_df[row].q(p)``.
+        ``density_df[row].q(p)``. Positional access or
+        ``df.filter(like='κ')`` avoids typing the glyph.
 
         Two subtleties, documented rather than engineered away: where the
         result is **non-monotone** in the source (slides, swings, humps --
         the "switcheroo") the cell is the exact mean over the level set
         ``{result == x_q}``, well-defined but subtler to interpret; and a
         **constant** grand result (fully hedged) makes the conditioning event
-        everything, so every cell equals its ``EX``. A **massive** (one-sweep)
-        source keeps **marginal** ladders -- conditioning needs a second
-        sweep ([Massive-Kappa-Second-Sweep] in ``dev/TODO.md``).
+        everything, so every cell equals its ``EX``. Ledgers with **no shared
+        atoms** keep **marginal** ladders under plain ``P`` headers
+        ([Decision-Kappa-Shared-Source-Rule]): a massive (one-sweep) source
+        (conditioning needs a second sweep -- [Massive-Kappa-Second-Sweep] in
+        ``dev/TODO.md``) and the stitched guaranteed-cost ``xpnl`` tower
+        (independent marginals, no joint).
 
         Returns
         -------
@@ -1271,16 +1485,20 @@ class PnL(LabeledMixin):
         --------
         summary_df : the fixed headline card (marginal range percentiles).
         """
-        if self._probs is None:               # massive: marginal ladder
+        if self._probs is None:               # no shared atoms: marginal
+            # ladder, plain ``P`` headers (the massive one-sweep route and
+            # the stitched guaranteed-cost tower -- the on-sheet signature of
+            # [Decision-Kappa-Shared-Source-Rule]).
             data = [[_snap_noise(v) for v in row.stat_vector()]
                     for row in self._rows.values()]
+            cols = _stat_names()
         else:
             ladder = self._scenario_ladder()
             data = [[_snap_noise(v) for v in
                      list(row.moments) + ladder[label]]
                     for label, row in self._rows.items()]
-        return pd.DataFrame(data, index=self._view_index(),
-                            columns=_stat_names())
+            cols = _stat_names(scenario=True)
+        return pd.DataFrame(data, index=self._view_index(), columns=cols)
 
     @property
     def scaled_stats_df(self):
@@ -1445,6 +1663,84 @@ class PnL(LabeledMixin):
         """
         from .plots import plot_pnl
         return plot_pnl(self, axd=axd, **kwargs)
+
+    # ------------------------------------------------------------------
+    # Construction introspection ([Construction-Introspection])
+    # ------------------------------------------------------------------
+    def _route_name(self):
+        """The evaluation route this ledger was built on, for narratives."""
+        if self._stitched:
+            return 'marginal-stitched (gd-backed rows, no shared atoms)'
+        if self._probs is None:
+            return 'massive one-sweep pushforward'
+        return 'per-atom in-memory'
+
+    def _generic_construction_description(self):
+        """The structural fallback narrative for a hand-built kernel P&L."""
+        ng = len(self._egroups)
+        nl = sum(len(g.cons) + len(g.obl) for g in self._egroups)
+        ladder = ('scenario (κ, conditional on the grand result)'
+                  if self._probs is not None
+                  else 'marginal (plain P headers)')
+        return (f'Hand-built P&L {self.label!r}: {ng} group(s), {nl} declared '
+                f'leg(s) over a {type(self._source).__name__} source; '
+                f'{self._route_name()} evaluation; stats ladder {ladder}.')
+
+    def _replay_block(self):
+        """The closing executable-replay block of
+        :attr:`construction_explanation`: the literal ``PnL(...)`` call that
+        reproduces the object from its retained ``_group_specs`` and source
+        reference. Constant legs render verbatim; function legs render as
+        ``<fn>`` placeholders (a lambda has no literal form)."""
+        def fn_repr(f):
+            if callable(f):
+                fname = getattr(f, '__name__', '<lambda>')
+                return fname if fname != '<lambda>' else '<fn>'
+            return repr(f)
+
+        def legs_repr(legs):
+            return '[' + ', '.join(
+                f'Leg({leg.label!r}, {fn_repr(leg.func)}'
+                + (f', bs={leg.bs:g}' if leg.bs else '')
+                + (', is2d=True' if leg.is2d else '') + ')'
+                for leg in legs) + ']'
+
+        groups = ',\n        '.join(
+            f'Group({g.label!r}, {g.role!r}, '
+            f'consideration={legs_repr(g.consideration)}, '
+            f'obligation={legs_repr(g.obligation)})'
+            for g in self._group_specs)
+        return (f'Replay (function legs as <fn> placeholders):\n'
+                f'    PnL(name={self.name!r},\n'
+                f'        source=<{type(self._source).__name__}'
+                f' {getattr(self._source, "name", "")}>,\n'
+                f'        groups=[{groups}],\n'
+                f'        result_name={self.result_name!r})')
+
+    @property
+    def construction_description(self):
+        """One paragraph: how this P&L was built -- route, source, group
+        count. Recorded by the DecL builders at construction; a hand-built
+        kernel P&L gets a generic structural narrative, so the property is
+        never absent. The full story is
+        :attr:`construction_explanation`."""
+        return (self._construction_description
+                or self._generic_construction_description())
+
+    @property
+    def construction_explanation(self):
+        """The full construction story, recorded by the builder that made
+        this P&L: the engine and its clauses; the economics resolution
+        (``deposit 2000 -> pc_occ = 2000``); which source each row reads; the
+        booking signs; whether the stats ladder is scenario (``κ``) or
+        marginal (``P``) and why; any ignored clauses (same wording as the
+        :class:`~aggregate.constants.IgnoredDecLClauseWarning`). Closes with
+        the executable replay block. Hand-built kernel P&Ls get a minimal
+        generic narrative."""
+        if self._construction_explanation is not None:
+            return self._construction_explanation
+        return (self._generic_construction_description() + '\n\n'
+                + self._replay_block())
 
     # ``label`` comes from ``LabeledMixin`` (the shared label surface);
     # ``name`` stays the identity handle. See dev/done/plan-labels.md.

@@ -2743,19 +2743,21 @@ class Aggregate(LabeledMixin):
         """Wrap this aggregate as the risky leg of a :class:`PnL` position.
 
         Object sugar delegating to the builders in
-        :mod:`aggregate._pnl_builders`. Two construction modes:
+        :mod:`aggregate._pnl_builders`. Two construction modes, both the
+        **consolidated** (single-group) pnl face
+        ([Decision-PnL-Is-Consolidated]):
 
         * **plain** -- ``make_pnl(consideration=C)``: a one-group ``sell``
           ledger over this aggregate's own density (for a reinsurance-bearing
           aggregate that is the *net* density -- what comes out of the
           aggregate).
-        * **group ledger** -- ``make_pnl(gross=Pg, ceded=Pc)`` on a
-          reinsurance-bearing aggregate: the per-atom Gross / Ceded / Net
-          **group ledger** (:func:`~aggregate._pnl_builders.build_gcn_pnl`) --
-          an aggregate-only cession books as a real ``buy`` group over the
-          gross marginal; an occurrence program books over the net-of-occ
-          marginal with the occ economics as constants (its risk transfer is
-          the ``xpnl`` exhibit).
+        * **consolidated reinsurance** -- ``make_pnl(gross=Pg, ceded=Pc)`` on
+          a reinsurance-bearing aggregate
+          (:func:`~aggregate._pnl_builders.build_consolidated_pnl`): one
+          net-premium consideration leg (gross - ceded premiums +
+          commissions) against the engine's net loss over its deepest net
+          marginal. The per-step walk (gross -> each cover -> Total) is the
+          DecL ``xpnl`` face.
 
         Parameters
         ----------
@@ -2785,19 +2787,21 @@ class Aggregate(LabeledMixin):
         ``build('pnl NAME C premium less <body>')`` is sugar for
         ``build('agg NAME <body>').make_pnl(consideration=C)``.
         """
-        from ._pnl_builders import build_plain_pnl, build_gcn_pnl
+        from ._pnl_builders import build_plain_pnl, build_consolidated_pnl
         if gross is not None or ceded is not None:
             if gross is None or ceded is None:
                 raise ValueError(
-                    'a Gross/Ceded/Net PnL needs both gross= and ceded= premiums.')
+                    'a consolidated reinsurance PnL needs both gross= and '
+                    'ceded= premiums.')
             if consideration is not None:
                 raise ValueError(
                     'pass either consideration= or gross=/ceded=, not both.')
             if self.agg_reins is None and self.occ_reins is None:
                 raise ValueError(
-                    'the Gross/Ceded/Net view requires reinsurance on the risky '
-                    'leg; the aggregate carries no occurrence / aggregate treaty.')
-            return build_gcn_pnl(
+                    'the consolidated reinsurance view requires reinsurance on '
+                    'the risky leg; the aggregate carries no occurrence / '
+                    'aggregate treaty.')
+            return build_consolidated_pnl(
                 self, gross=gross, ceded=ceded, gcn_economics=gcn_economics,
                 expense_spec=expense_spec,
                 consideration_label=consideration_label,

@@ -62,8 +62,10 @@ The P&L kernel and its insurance builders
 
 The domain-agnostic group-ledger kernel (``Leg`` / ``Group`` / ``PnL`` /
 ``stack_marginal_pnls``, re-exported at the top level) and the DecL builders
-that translate insurance programs into sources plus signed groups. See
-``dev/done/plan-yapnl.md``.
+that translate insurance programs into sources plus signed groups: ``pnl``
+is the consolidated net position (always one group), ``xpnl`` the multi-group
+step walk. See ``dev/done/plan-yapnl.md`` and
+``dev/done/plan-pnl-consolidated-xpnl-walk.md``.
 
 .. automodule:: aggregate._pnl
 

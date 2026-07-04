@@ -123,6 +123,28 @@
    plus the "Reading the P&L sheets" education notes. View labels stay
    defaults-only (serve-time `df.rename(..., level='View')` recipe
    documented).
+2c. **[PnL-Consolidated-XPnL-Walk]** ✅ **DONE (`1.0.0a135`–`a136`,
+   `dev/done/plan-pnl-consolidated-xpnl-walk.md`).** Two objects, two
+   questions: **`pnl` = the consolidated net position** (always one group,
+   always the flat card: net premium / net loss + own expenses; the a125/a129
+   premium-clause promotion removed) and **`xpnl` = the walk** (a plain
+   multi-group `PnL` — gross → each cover → Total; no `XPnL` class). Phase 1
+   (`a135`): plain `agg`s accept + ignore economics clauses with one
+   `IgnoredDecLClauseWarning` (knowledge-injection route unblocked). `a136`:
+   [GC-Tower-Marginal-Stitch] (kernel stitched gd-backed construction; every
+   walk row an affine of a `reins_density_df` marginal; EX foots by
+   linearity), [Decision-Ladder-Column-Names] (`P1`→`P01`; scenario columns
+   `κ01…κ99`, marginal ladders keep `P` headers — the on-sheet
+   [Decision-Kappa-Shared-Source-Rule] flag), variable-rating pnl
+   consolidates (walk = its xpnl face), [Construction-Introspection]
+   (`construction_description` / `construction_explanation` on every P&L).
+   **Retired:** `build_gcn_pnl` → `build_consolidated_pnl`;
+   `build_xpnl_stack` (the 4-row onion DataFrame) → `build_xpnl_walk`
+   (`stack_marginal_pnls` stays — generic public no-joint assembler).
+   **Deferred:** the 2-D consolidated routes ([2D-Deferred] — reinstatement
+   pnl keeps the per-atom tower; design settled on paper incl.
+   [Gross-Anchored-Kappa-Insight]); massive-source `xpnl`;
+   [Accounting-Summary-DF] (pended below).
 2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
    for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
    fixed** (it does not morph as the object gains properties), columns are
@@ -147,6 +169,15 @@
 
 **Sequenced around the above:**
 
+- **[Accounting-Summary-DF]** `beta` (pended 2026-07-04, from
+  `dev/plan-pnl-consolidated-xpnl-walk.md`) — the gross/ceded-**split**
+  consolidated-P&L card, `accounting_summary_df`: Consideration gross premium
+  / ceded premium / total; Obligation gross loss / ceded loss / total;
+  Margin total. Strictly correct (consideration and obligation cannot be
+  netted) and supports GAAP / STAT / IFRS reporting shapes. The plain
+  `summary_df` stays the simple net card ("summary" means summary); this is
+  the detail view between it and the full `xpnl` walk. Unblocked:
+  [PnL-Consolidated-XPnL-Walk] landed at `1.0.0a136`.
 - **[Display-Mode]** `beta` — a presentation-only `user` / `dev` repr toggle (a
   `ReprMixin`) that chooses *which* view an object renders without changing any
   computed value. **Deferred until after `[Reporting-Guidelines]`** — what it
@@ -179,8 +210,12 @@
   `1.0.0a134`) — bring the kappa scenario percentiles to the massive one-sweep
   P&L route. Conditioning needs the joint per atom *and* the grand-result
   quantiles before indicator-weighted means can accumulate — a second band
-  sweep. Until then the massive `stats_df` keeps **marginal** ladders
-  (docstring-flagged in `_EvaluatedLeg.stat_vector` / `PnL.stats_df`).
+  sweep. Until then the massive `stats_df` keeps **marginal** ladders — since
+  `a136` visibly so: plain `P01…P99` headers vs the in-memory scenario `κ`
+  columns ([Decision-Kappa-Shared-Source-Rule]). Note the 2-D follow-up's
+  [Gross-Anchored-Kappa-Insight] (G-slices are axis-aligned row averages,
+  one-pass even on the massive route) may largely dissolve this for the
+  variable-feature exhibits.
 
 ## Backlog — bugs & investigations
 

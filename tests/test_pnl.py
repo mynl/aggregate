@@ -264,7 +264,7 @@ def test_bivariate_with_pnl_component_rejected():
 # ----------------------------------------------------------------------
 # summary_df: the fixed card (Consideration / Obligation / Margin)
 # ----------------------------------------------------------------------
-_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99']
+_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
 
 
 def test_summary_df_fixed_card_and_additive_result():
@@ -365,12 +365,12 @@ def test_evaluate_function_consideration_runs():
 
 
 # ----------------------------------------------------------------------
-# Reinsurance-aware Gross / Ceded / Net group ledger
+# Reinsurance-aware consolidated pnl + the stitched xpnl walk
 # ----------------------------------------------------------------------
 _REINS = 'agg R 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000'
 
-#: the agg-only two-group stats template (gross sell + agg cession buy)
-_GCN_ROWS = [
+#: the agg-only walk stats template (gross sell + agg cession buy)
+_WALK_ROWS = [
     ('gross', 'Consideration', 'premium'),
     ('gross', 'Obligation', 'loss'),
     ('gross', 'Margin', 'Total'),
@@ -384,17 +384,55 @@ _GCN_ROWS = [
     ('Total', 'Margin', 'Impact')]
 
 
-def test_gcn_ledger_rows_and_means_add():
-    """The agg-only program is a two-group per-atom ledger over the gross
-    marginal: gross ``sell`` group + agg cession ``buy`` group. The EX column
-    adds down the sheet (covariance carried per atom); the resolved economics
-    ride on ``pnl.economics``.
-    """
-    pnl = build(_REINS).make_pnl(gross=5500, ceded=1800)
+def test_consolidated_pnl_single_group_net_view():
+    """make_pnl(gross=, ceded=) on a reinsured aggregate returns the
+    consolidated single-group net view ([Decision-PnL-Is-Consolidated]):
+    net premium consideration, net loss obligation, flat card. The walk is
+    the xpnl face."""
+    agg = build(_REINS)
+    pnl = agg.make_pnl(gross=5500, ceded=1800)
     assert isinstance(pnl, PnL)
+    assert len(pnl.groups) == 1
     s = pnl.stats_df
-    assert list(s.index) == _GCN_ROWS
-    # group results are step deltas; the grand result sums them
+    assert list(s.index) == [('Consideration', 'net premium'),
+                             ('Obligation', 'loss (net)'),
+                             ('Margin', 'Total')]
+    assert s.loc[('Consideration', 'net premium'), 'EX'] == \
+        pytest.approx(3700.0)
+    # the net loss reads the engine's deepest net marginal
+    e_net = float((agg.xs * agg.agg_density_net).sum())
+    assert s.loc[('Obligation', 'loss (net)'), 'EX'] == \
+        pytest.approx(-e_net, rel=1e-6)
+    # the resolved economics carry the scalar-API premiums
+    assert pnl.economics['gross'] == pytest.approx(5500.0)
+    assert pnl.economics['ceded'] == pytest.approx(1800.0)
+
+
+def test_consolidated_net_position_drives_moments():
+    """The margin is the net position, driving moments / q; the card is the
+    flat three-row shape with Consideration = net premium."""
+    agg = build(_REINS)
+    p = agg.make_pnl(gross=5500, ceded=1800)
+    e_net = float((agg.xs * agg.agg_density_net).sum())
+    assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
+    df = p.summary_df
+    assert list(df.index) == ['Consideration', 'Obligation', 'Margin']
+    assert df.loc['Consideration', 'EX'] == pytest.approx(3700.0)
+    # q delegates to the grand result GridDistribution
+    assert p.q(0.5) == pytest.approx(p.gd.q(0.5))
+
+
+def test_xpnl_walk_rows_and_means_add():
+    """The agg-only walk is a two-group stitched tower: gross ``sell`` +
+    agg cession ``buy``; the EX column adds down the sheet by linearity;
+    the impact row is the cession's step delta; the ladder stays marginal
+    (plain P headers -- no shared joint)."""
+    from aggregate._pnl_builders import build_xpnl_walk
+    agg = build(_REINS)
+    x = build_xpnl_walk(agg, gross=5500, ceded=1800)
+    assert isinstance(x, PnL)
+    s = x.stats_df
+    assert list(s.index) == _WALK_ROWS
     assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
         s.loc[('gross', 'Margin', 'Total'), 'EX']
         + s.loc[('ceded agg', 'Margin', 'Total'), 'EX'], abs=1e-6)
@@ -405,30 +443,14 @@ def test_gcn_ledger_rows_and_means_add():
     assert s.loc[('ceded agg', 'Consideration', 'ceded agg premium'), 'EX'] \
         == pytest.approx(-1800.0)
     assert s.loc[('ceded agg', 'Obligation', 'ceded agg recovery'), 'EX'] > 0
-    # the resolved economics carry the scalar-API premiums
-    assert pnl.economics['gross'] == pytest.approx(5500.0)
-    assert pnl.economics['ceded'] == pytest.approx(1800.0)
-
-
-def test_gcn_net_position_drives_moments():
-    """The grand result is the net position, driving moments / q; the grand
-    total consideration books gross - ceded."""
-    agg = build(_REINS)
-    p = agg.make_pnl(gross=5500, ceded=1800)
-    e_net = float((agg.xs * agg.agg_density_net).sum())
-    assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
-    s = p.stats_df
-    assert s.loc[('Total', 'Consideration', 'Total'), 'EX'] == \
-        pytest.approx(3700.0)
-    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(p.mean)
-    # the card mirrors the grand rows
-    assert p.summary_df.loc[('Total', 'Consideration'), 'EX'] == \
-        pytest.approx(3700.0)
-    # q delegates to the grand result GridDistribution
-    assert p.q(0.5) == pytest.approx(p.gd.q(0.5))
+    assert 'P01' in s.columns and 'κ01' not in s.columns
     # SDs do not add: the cession trims the tail
     assert s.loc[('Total', 'Margin', 'Total'), 'SD'] < \
         s.loc[('gross', 'Margin', 'Total'), 'SD']
+    # the walk's grand result mean = the consolidated pnl's margin
+    p = agg.make_pnl(gross=5500, ceded=1800)
+    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == \
+        pytest.approx(p.mean, abs=1e-9)
 
 
 def test_net_only_on_reins_agg():
@@ -443,22 +465,24 @@ def test_net_only_on_reins_agg():
     assert list(p.density_df) == ['consideration', 'loss', 'margin']
 
 
-def test_gcn_requires_both_premiums_and_agg_reins():
+def test_consolidated_requires_both_premiums_and_reins():
     agg = build(_REINS)
     with pytest.raises(ValueError, match='both gross'):
         agg.make_pnl(gross=5500)
     with pytest.raises(ValueError, match='not both'):
         agg.make_pnl(consideration=100, gross=5500, ceded=1800)
-    # no reinsurance at all -> no gross/ceded/net views
+    # no reinsurance at all -> nothing to consolidate over
     plain = build('agg P 100 claims sev lognorm 50 cv 1.5 poisson')
     with pytest.raises(ValueError, match='requires reinsurance'):
         plain.make_pnl(gross=5500, ceded=1800)
 
 
-def test_gcn_plot_runs():
+def test_consolidated_and_walk_plots_run():
     import matplotlib
     matplotlib.use('Agg')
-    p = build(_REINS).make_pnl(gross=5500, ceded=1800)
-    fig = p.plot()
-    # the tower forwards the net-perspective plot: density + distribution
-    assert len(fig.axes) == 2
+    from aggregate._pnl_builders import build_xpnl_walk
+    agg = build(_REINS)
+    p = agg.make_pnl(gross=5500, ceded=1800)
+    assert len(p.plot().axes) == 2
+    x = build_xpnl_walk(agg, gross=5500, ceded=1800)
+    assert len(x.plot().axes) == 2

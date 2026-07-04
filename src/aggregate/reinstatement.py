@@ -544,7 +544,7 @@ class ReinstatementAnalysis:
     def _exp_mag(self):
         """Per-perspective deterministic expense / commission magnitude.
 
-        Mirrors :meth:`PnL._gcn_magnitudes`: the gross expense ``E_G`` books on
+        The per-side expense split: the gross expense ``E_G`` books on
         the gross column; each cession credits its commission, so net expense is
         ``E_G - c_occ - c_agg``. The reinstatement premium ``h(R)`` is
         non-commissionable, so these stay deterministic (Phase 3 makes the

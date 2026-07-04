@@ -648,7 +648,7 @@ def test_massive_pnl_one_sweep_ledger(tmp_path):
         pytest.approx(float(loss_gd.q(0.5)))
     # the massive card carries full marginal percentiles (grand rows reused
     # from the sweep's own ledger rows -- no NaN holes)
-    assert not pm.summary_df[['P1', 'Median', 'P99']].isna().any().any()
+    assert not pm.summary_df[['P01', 'Median', 'P99']].isna().any().any()
     # every declared leg is bs > 0 and audited (linear scheme: means match)
     v = pm.validation_df
     assert set(v.index) == {'premium', 'loss', 'ceded premium', 'recovery'}

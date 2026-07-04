@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 import re
 from typing import Any
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -17,6 +18,7 @@ from .config import (get_settings, reload_settings as _reload_settings,
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .spectral import Distortion
+from .constants import IgnoredDecLClauseWarning
 from .parser import UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM
 from .utilities import (qd, agg_help)
 
@@ -38,6 +40,63 @@ class _Unset:
 
 
 _UNSET = _Unset()
+
+
+#: The non-loss knowledge keys a pure ``agg`` accepts and **ignores** (with an
+#: :class:`~aggregate.constants.IgnoredDecLClauseWarning`): reinsurance
+#: economics (ceded premium / commission), reinstatement schedules, the
+#: variable-rating features and their decorated-layer indices, and the retro
+#: rating clause. They need a P&L premium context to activate; a plain
+#: Aggregate builds the loss structure only. The knowledge base keeps the full
+#: spec, so an ``agg.NAME`` reference inside a ``pnl`` / ``xpnl`` re-injects
+#: them ([Reins-Economics-On-Agg-Ignore-Warn]).
+_AGG_IGNORED_ECONOMICS_KEYS = (
+    'occ_reins_premium', 'occ_reins_cede',
+    'agg_reins_premium', 'agg_reins_cede',
+    'occ_reins_reinst',
+    'agg_reins_swing', 'agg_reins_swing_layer',
+    'agg_reins_slide', 'agg_reins_slide_layer',
+    'agg_reins_pc', 'agg_reins_pc_layer',
+    'agg_reins_corridor', 'agg_reins_corridor_layer',
+    'retro_terms',
+)
+
+#: Human clause names for the ignored-economics warning, in reporting order.
+#: Each entry maps the spec keys that signal the clause to its DecL name.
+_IGNORED_CLAUSE_NAMES = (
+    (('occ_reins_premium', 'agg_reins_premium'),
+     'ceded premium (deposit / rol / rate)'),
+    (('occ_reins_cede', 'agg_reins_cede'), 'cede'),
+    (('occ_reins_reinst',), 'reinstatements'),
+    (('agg_reins_swing',), 'swing'),
+    (('agg_reins_slide',), 'slide'),
+    (('agg_reins_pc',), 'pc'),
+    (('agg_reins_corridor',), 'corridor'),
+    (('retro_terms',), 'retro'),
+)
+
+
+def ignored_clauses_message(name, spec):
+    """The ignored-economics message for a plain ``agg``, or ``''`` if none.
+
+    Names each present-but-unusable clause (ceded premium, cede,
+    reinstatements, a variable-rating feature, retro) and the remedy: fold the
+    agg into a ``pnl`` / ``xpnl`` by reference to activate the economics. One
+    source of truth for the wording -- emitted as an
+    :class:`~aggregate.constants.IgnoredDecLClauseWarning` by the factory and
+    replayed by ``PnL.construction_explanation``
+    ([Reins-Economics-On-Agg-Ignore-Warn]).
+    """
+    clauses = [label for keys, label in _IGNORED_CLAUSE_NAMES
+               if any(k in spec for k in keys)]
+    if not clauses:
+        return ''
+    plural = 's' if len(clauses) > 1 else ''
+    return (f"{name}: ignoring the {', '.join(clauses)} clause{plural} -- a "
+            "plain 'agg' has no premium context, so only the loss structure "
+            f"builds. The stored program keeps the full declaration: fold it "
+            f"into a 'pnl' / 'xpnl' by reference (e.g. \"pnl {name}_pnl "
+            f"<premium> premium less agg.{name}\") to activate the economics.")
 
 
 # Write order for to_agg: .agg files load sequentially and named references
@@ -940,12 +999,18 @@ class Underwriter(object):
         kind, name, spec, program = parsed.kind, parsed.name, parsed.spec, parsed.program
 
         if kind == 'agg':
-            if any(k in spec for k in ('occ_reins_premium', 'occ_reins_cede',
-                                       'agg_reins_premium', 'agg_reins_cede')):
-                raise ValueError(
-                    f"{name}: ceded-premium clauses (deposit / rol / rate / cede) "
-                    "need a 'pnl' (a P&L context with a gross premium); a plain "
-                    "'agg' has no premium. Declare it as 'pnl ...'.")
+            # A pure aggregate ignores what it cannot use and says so: the
+            # reinsurance-economics / feature clauses parse everywhere (the
+            # shared agg body), but activating them needs a P&L premium
+            # context. Filter a COPY -- ``parsed.spec`` *is* the stored
+            # knowledge entry, and the retained keys are exactly what an
+            # ``agg.NAME`` reference inside a ``pnl`` / ``xpnl`` re-injects
+            # ([Reins-Economics-On-Agg-Ignore-Warn]).
+            msg = ignored_clauses_message(name, spec)
+            if msg:
+                warnings.warn(msg, IgnoredDecLClauseWarning, stacklevel=2)
+                spec = {k: v for k, v in spec.items()
+                        if k not in _AGG_IGNORED_ECONOMICS_KEYS}
             obj = Aggregate(**spec)
             obj.program = program
             # With ``program`` now populated, fold the method-of-moments
@@ -964,9 +1029,9 @@ class Underwriter(object):
             # **recipe**; the eager P&L value object is *snapshotted* from the
             # recipe only after the inner Aggregate is updated (build the engine
             # first, then snapshot -- a PnL retains no engine). ``build_many``
-            # calls :meth:`_snapshot_pnl` after the update loop. ``xpnl`` returns
-            # the exploded marginal perspective stack instead of the collapsed
-            # :class:`PnL`; a ``port`` engine takes the dedicated path below.
+            # calls :meth:`_snapshot_pnl` after the update loop. ``pnl`` returns
+            # the consolidated single-group net view; ``xpnl`` the multi-group
+            # step walk; a ``port`` engine takes the dedicated path below.
             is_tower = (kind == 'xpnl')
             port_engine = spec.pop('_engine_port', None)
             # The engine's own note (inline agg) is inner-Aggregate presentation
@@ -1090,8 +1155,8 @@ class Underwriter(object):
                     'consideration': consideration,
                     'consideration_label': consideration_label,
                     'loss_label': loss_label}
-            # ``xpnl`` returns the exploded marginal perspective stack rather
-            # than the collapsed PnL; carried on the recipe so
+            # ``xpnl`` returns the multi-group step walk rather than the
+            # consolidated single-group PnL; carried on the recipe so
             # :meth:`_snapshot_pnl` selects that face after the inner engine is
             # updated.
             inner._pnl_recipe['is_tower'] = is_tower
@@ -1541,16 +1606,27 @@ class Underwriter(object):
 
         Called by :meth:`build_many` after the inner engine is updated (build
         the engine first, then snapshot). A thin dispatcher over the builders
-        in :mod:`aggregate._pnl_builders`: a plain consideration ->
-        :func:`~aggregate._pnl_builders.build_plain_pnl`; Gross/Ceded/Net
-        economics -> the per-atom group ledger
-        (:func:`~aggregate._pnl_builders.build_gcn_pnl`), or the exploded
-        marginal stack (:func:`~aggregate._pnl_builders.build_xpnl_stack`) for
-        ``xpnl``; reinstatements / variable-rating features -> the analysis
-        builders (their net face, analysis attached as ``.analysis``).
+        in :mod:`aggregate._pnl_builders` -- two faces, two questions
+        (``dev/plan-pnl-consolidated-xpnl-walk.md``):
+
+        * ``pnl`` -- the **consolidated** net view, always one group:
+          :func:`~aggregate._pnl_builders.build_plain_pnl` (no cessions),
+          :func:`~aggregate._pnl_builders.build_consolidated_pnl`
+          (guaranteed-cost reinsurance economics), the consolidated face of
+          :func:`~aggregate._pnl_builders.build_variable_pnl`
+          (variable-rating features), or -- the transitional [2D-Deferred]
+          carve-out -- :func:`~aggregate._pnl_builders.build_reinstatement_pnl`
+          (still the per-atom 2-D tower).
+        * ``xpnl`` -- the **walk**, a multi-group :class:`PnL`:
+          :func:`~aggregate._pnl_builders.build_xpnl_walk` (guaranteed-cost,
+          marginal-stitched), the walk face of ``build_variable_pnl``, or the
+          reinstatement 2-D tower re-homed. A plain engine (or retro, which
+          has no cover) has nothing to step through and errors.
+
+        The drill-down analyses ride on ``pnl.analysis``.
         """
-        from ._pnl_builders import (build_plain_pnl, build_gcn_pnl,
-                                    build_xpnl_stack, build_variable_pnl,
+        from ._pnl_builders import (build_plain_pnl, build_consolidated_pnl,
+                                    build_xpnl_walk, build_variable_pnl,
                                     build_reinstatement_pnl, resolve_expense)
         kind = recipe['kind']
         if kind == 'port_plain':
@@ -1577,29 +1653,39 @@ class Underwriter(object):
                 expense_spec=recipe.get('expense_spec'), name=inner.name)
             return face
         is_tower = recipe.get('is_tower', False)
-        if is_tower and kind != 'gcn':
-            # ``xpnl`` explodes the Gross/net-occ/net-agg marginal stack, which
-            # only exists when the engine carries reinsurance economics. A
-            # plain / var / reinstatement engine has no stack to explode.
+        if is_tower and kind == 'plain':
+            # ``xpnl`` walks gross -> each cover -> Total; a plain engine has
+            # no cover to step through.
             raise NotImplementedError(
-                f"{inner.name}: 'xpnl' (the exploded marginal stack) requires a "
-                "wrapped engine with reinsurance economics -- occurrence and/or "
-                "aggregate cessions with a ceded-premium clause (deposit / cede "
-                "/ rol / rate). The engine here is plain; use 'pnl'.")
+                f"{inner.name}: 'xpnl' (the step walk) requires a wrapped "
+                'engine with reinsurance economics -- occurrence and/or '
+                'aggregate cessions with a ceded-premium clause (deposit / '
+                "cede / rol / rate), or a variable-rating feature. The "
+                "engine here is plain; use 'pnl'.")
         if kind == 'var':
+            if is_tower and inner.variable_layer is None:
+                # retro varies the gross premium of an unreinsured book:
+                # there is no cover to step through.
+                raise NotImplementedError(
+                    f"{inner.name}: 'xpnl' over a retro program is not "
+                    'supported -- retro has no cession to walk through. '
+                    "Use 'pnl'.")
             # the scalar E_G feeds the analysis's own domain extras (tail_df
             # shifts); the LEDGER books expense legs via the split resolver.
             inner.variable_gross_expense = resolve_expense(
                 inner, recipe['expense_spec'], inner.variable_gross_premium)
             analysis = inner.variable_rating_analysis()
             face = build_variable_pnl(
-                inner, expense_spec=recipe['expense_spec'],
+                inner, walk=is_tower, expense_spec=recipe['expense_spec'],
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
                 label=inner.label)
             face.analysis = analysis
             return face
         if kind == 'reins':
+            # the 2-D per-atom tower serves both faces: it IS the xpnl walk
+            # (re-homed), and -- transitional [2D-Deferred] carve-out -- the
+            # pnl face too, until the consolidated 2-D route lands.
             econ = recipe['econ']
             analysis = inner.reinstatement_analysis(
                 agg_ceded_premium=float(econ.get('pc_agg', 0.0)),
@@ -1615,14 +1701,17 @@ class Underwriter(object):
         if kind == 'gcn':
             econ = recipe['econ']
             if is_tower:
-                # ``xpnl`` -> the marginal perspective stack (one PnL per
-                # reins_density_df marginal, stacked into one frame).
-                return build_xpnl_stack(
+                # ``xpnl`` -> the marginal-stitched step walk (a plain
+                # multi-group PnL).
+                return build_xpnl_walk(
                     inner, gross=econ['gross'], ceded=econ['ceded'],
                     gcn_economics=econ,
-                    expense_spec=recipe['expense_spec'], name=inner.name)
-            # ``pnl`` -> the per-atom group ledger.
-            return build_gcn_pnl(
+                    expense_spec=recipe['expense_spec'],
+                    consideration_label=recipe.get('consideration_label'),
+                    loss_label=recipe.get('loss_label'), name=inner.name,
+                    label=inner.label)
+            # ``pnl`` -> the consolidated single-group net view.
+            return build_consolidated_pnl(
                 inner, gross=econ['gross'], ceded=econ['ceded'],
                 gcn_economics=econ, expense_spec=recipe['expense_spec'],
                 consideration_label=recipe.get('consideration_label'),

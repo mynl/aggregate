@@ -1,5 +1,97 @@
 # Changelog
 
+## 1.0.0a136
+
+**[PnL-Consolidated-XPnL-Walk]** — Phases 2–5 of
+`dev/done/plan-pnl-consolidated-xpnl-walk.md`: two objects, two questions, no
+conditional shapes.
+
+- **[Decision-PnL-Is-Consolidated]** — **breaking**: `build('pnl …')` always
+  returns a **single-group** consolidated net view: `Consideration` = net
+  premium (gross − ceded premiums + commissions, one constant leg for
+  guaranteed cost), `Obligation` = net loss (the deepest `reins_density_df`
+  net marginal) + the pnl's own expenses, `Margin`. The a125/a129
+  premium-clause promotion to the Gross/Ceded/Net group ledger is removed
+  from the pnl route. `Aggregate.make_pnl(gross=, ceded=)` follows
+  (`build_gcn_pnl` → `build_consolidated_pnl`). Leg labels per
+  [Flag-Net-Premium-Leg-Label]: `'net premium'` / `'loss (net)'`, a declared
+  label qualifying as `'<label> (net)'`. Variable-rating programs (retro /
+  swing / slide / pc / corridor — 1-D) consolidate too: the feature's map
+  folds into the net premium / net loss legs
+  ([Decision-2D-Is-Computation-Only]); reinstatements keep the per-atom 2-D
+  tower for now ([2D-Deferred] transitional carve-out). `pnl.economics` and
+  `pnl.analysis` ride along (both now always-present attributes, `None` when
+  absent). The gross/ceded-split card is pended as
+  **[Accounting-Summary-DF]** in `dev/TODO.md`.
+- **[Decision-XPnL-Is-A-Recipe]** — **breaking return type**:
+  `build('xpnl …')` returns a plain **multi-group `PnL`** (the walk: gross →
+  each cover → Total with per-step results, running nets, and the closing
+  impact), replacing the bare 4-row `stack_marginal_pnls` DataFrame. No
+  `XPnL` class. Guaranteed-cost walks are **marginal-stitched**
+  ([GC-Tower-Marginal-Stitch]): every row is an affine transform of one
+  exact engine marginal, derived rows read the engine's own net marginals
+  (never cross-row sums), the EX column foots exactly by linearity, SDs /
+  percentiles are exact per row, loss-basis LAE books deterministic
+  (all-marginal, no hybrid), and the `total impact` row is a per-statistic
+  delta. Variable-rating `xpnl` = the two-group per-atom ledger (scenario
+  ladder — one shared source); reinstatement `xpnl` = the 2-D tower
+  re-homed. Plain and retro engines have nothing to step through and error.
+  Step labels per [Decision-Total-Step-Stays-Total] (base step = engine
+  label, fallback `'gross'`). `build_xpnl_stack` retired
+  (`stack_marginal_pnls` stays — generic public no-joint assembler);
+  massive-source `xpnl` out of scope. Kernel: internal **stitched
+  construction mode** (`stitched_rows=` gd-backed plan rows, an extension of
+  the sweep-backed path; no `+` composition, no `evaluate`).
+- **[Decision-Ladder-Column-Names]** — the card `P1` → **`P01`**
+  (zero-padded pair with `P99`); the `stats_df` / `scaled_stats_df`
+  **scenario** columns `P01…P99` → **`κ01…κ99`** — they are kappas
+  (conditional means given the result at its percentile), and the header now
+  *is* the [Decision-Kappa-Shared-Source-Rule] flag: marginal ladders (the
+  stitched walk, the massive route, `stack_marginal_pnls`) keep plain
+  `P01…P99` headers. Direction unchanged ([Decision-Kappa-Outcome-Direction]:
+  payoff convention, left tail bad — a pure relabel, no reversal).
+- **[Construction-Introspection]** — `PnL.construction_description` (one
+  paragraph: route / source / groups) and `PnL.construction_explanation`
+  (the full story: engine and clauses, economics resolution, per-row source,
+  booking signs, scenario-vs-marginal ladder and why, closing executable
+  replay block), recorded by the builders at construction; hand-built kernel
+  P&Ls get a generic structural narrative.
+- **Docs & tests** — `_pnl.py` module docstring gains the pnl-vs-xpnl
+  ("position vs walk") and kappa shared-source paragraphs; the reins pnl
+  suites migrated to consolidated + walk asserts; new
+  `tests/test_pnl_consolidated_walk.py` pins the motivating `Cat` acceptance
+  case (card `Consideration = 9000`, walk steps
+  `Gross Book1 / Occ Cover / Agg Cover / Total`, rows = engine marginals,
+  EX foots, ladder marginal + flagged) plus stitched correctness and the
+  construction smoke; `decl-testers.agg` notes updated; `dev/FEATURES.csv`
+  re-audited (`construction_*` / `economics` rows). Docs pending a manual
+  rebuild (standing rule).
+
+## 1.0.0a135
+
+**[Reins-Economics-On-Agg-Ignore-Warn]** — Phase 1 of
+`dev/plan-pnl-consolidated-xpnl-walk.md`: a pure aggregate ignores what it
+cannot use and says so.
+
+- **Plain `agg`s accept every reinsurance decoration** — ceded-premium
+  clauses (`deposit` / `rol` / `rate`), ceding commissions (`cede`),
+  `reinstatements`, and the variable-rating features (`swing` / `slide` /
+  `pc` / `corridor`) no longer hard-error on a bare `agg`. The factory builds
+  the loss structure only (byte-identical to the undecorated build) and emits
+  **one `IgnoredDecLClauseWarning`** (new, `aggregate.constants`) naming the
+  ignored clauses and the remedy.
+- **Knowledge injection**: the stored spec keeps the full decorated program,
+  so `pnl X <premium> less agg.NAME` re-injects and resolves the economics
+  (`deposit` / `rol` / `cede` verbatim; `rate` against the *pnl's* premium —
+  exactly why the bare agg must ignore it). Build the agg standalone, get it
+  working, then fold it into a `pnl` / `xpnl` by reference.
+- The factory filters a **copy** of the spec (the parsed spec aliases the
+  knowledge entry — popping would destroy the knowledge the feature exists to
+  retain). New corpus section `Z.` in `decl-testers.agg`; new suite
+  `tests/test_agg_ignored_clauses.py`;
+  `test_premium_clause_on_plain_agg_errors` and
+  `test_standalone_agg_cede_still_errors` flipped raises → warns.
+
 ## 1.0.0a134
 
 **[PnL-Punchups-01]** — kappa scenario percentiles, the fixed summary card, and

@@ -1,21 +1,22 @@
 """Ceded premium (``deposit`` / ``rol`` / ``rate``) and ceding commission
-(``cede``) on a ``pnl`` (signed group-ledger form).
+(``cede``) on a ``pnl`` / ``xpnl``.
 
-A premium clause on any reinsurance layer promotes the ``pnl`` to the
-Gross/Ceded/Net **group ledger** (``dev/plan-yapnl.md``): an aggregate cession
-is a real ``buy`` group over the gross marginal (its rows book contra:
-``-premium / +recovery / +commission``); an occurrence guaranteed-cost program
-books over the net-of-occ marginal with the occ ceded premium as a constant
-leg (the occ risk transfer is the ``xpnl`` exhibit). The premium resolves to
-currency (``deposit`` an amount, ``rol`` = share x rol x limit, ``rate`` =
-rate x gross premium); the commission ``cede x ceded_premium`` books as a
-received leg on the cession. The resolved economics ride on
-:attr:`PnL.economics` (keys ``pc_occ`` / ``pc_agg`` = occ / agg ceded premium,
-``c_occ`` / ``c_agg`` = commissions, ``gross`` / ``ceded`` = totals).
+``pnl`` is the **consolidated** net view ([Decision-PnL-Is-Consolidated],
+``dev/plan-pnl-consolidated-xpnl-walk.md``): always one group -- consideration
+= net premium (gross - ceded premiums + commissions), obligation = net loss +
+own expenses. The per-step split is the ``xpnl`` **walk** (gross -> each
+cover -> Total), whose cession groups book contra (``-premium / +recovery /
++commission``). The premium resolves to currency (``deposit`` an amount,
+``rol`` = share x rol x limit, ``rate`` = rate x gross premium); the
+commission is ``cede x ceded_premium`` per layer. The resolved economics ride
+on :attr:`PnL.economics` (keys ``pc_occ`` / ``pc_agg`` = occ / agg ceded
+premium, ``c_occ`` / ``c_agg`` = commissions, ``gross`` / ``ceded`` =
+totals).
 """
 import pytest
 
 from aggregate import build, PnL
+from aggregate.constants import IgnoredDecLClauseWarning
 
 TOL = 1e-3
 _BASE = 'pnl T 5000 prem less agg T_e 100 claims sev lognorm 50 cv 1.5 '
@@ -47,83 +48,101 @@ def test_deposit_and_rol_coincide_when_equal():
     assert rol.economics['ceded'] == pytest.approx(dep.economics['ceded'])
 
 
-def test_cede_books_commission_leg_on_the_cession():
+def test_cede_books_commission_into_the_net_premium():
     p = build(_BASE + 'poisson aggregate net of 2000 xs 3000 rol 8% cede 25%')
     assert p.economics['c_agg'] == pytest.approx(0.25 * 160)
-    # the commission is a received leg on the buy group: +40 in the ledger
-    assert _leg(p, 'ceded agg commission')['EX'] == pytest.approx(40.0)
+    # the commission received folds into the consolidated net premium:
+    # 5000 - 160 + 40
+    assert _leg(p, 'net premium')['EX'] == pytest.approx(5000 - 160 + 40)
+    # ...and stays a visible leg on the xpnl walk
+    x = build(_BASE.replace('pnl T', 'xpnl TX', 1)
+              + 'poisson aggregate net of 2000 xs 3000 rol 8% cede 25%')
+    assert _leg(x, 'ceded agg commission')['EX'] == pytest.approx(40.0)
 
 
-def test_any_premium_clause_promotes_to_ledger():
+def test_any_premium_clause_yields_consolidated_pnl():
     # no premium clause -> ordinary single-group (net-only) plain pnl
     plain = build(_BASE + 'poisson aggregate net of 2000 xs 3000')
     assert isinstance(plain, PnL)
-    assert not hasattr(plain, 'economics')
+    assert plain.economics is None
     assert list(plain.stats_df.index.names) == ['View', 'Line']
-    # a premium clause -> the two-group ledger with a real cession group
+    # a premium clause -> STILL a single-group pnl: the consolidated net view
+    # ([Decision-PnL-Is-Consolidated]); the walk is one xpnl away
     p = build(_BASE + 'poisson aggregate net of 2000 xs 3000 deposit 1500')
     assert isinstance(p, PnL)
-    s = p.stats_df
-    for row in (('ceded agg', 'Consideration', 'ceded agg premium'),
-                ('ceded agg', 'Obligation', 'ceded agg recovery'),
-                ('ceded agg', 'Margin', 'Total'),
-                ('ceded agg', 'Margin', 'Net'),
-                ('Total', 'Margin', 'Total'),
-                ('Total', 'Margin', 'Impact')):
-        assert row in s.index, row
-    # the cession books contra and its result is the step delta
-    assert s.loc[('ceded agg', 'Consideration', 'ceded agg premium'), 'EX'] \
-        == pytest.approx(-1500.0)
-    assert s.loc[('ceded agg', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('Total', 'Margin', 'Impact'), 'EX'], abs=1e-9)
+    assert list(p.stats_df.index.names) == ['View', 'Line']
+    assert list(p.summary_df.index) == ['Consideration', 'Obligation',
+                                        'Margin']
+    # consideration = net premium: 5000 - 1500
+    assert _leg(p, 'net premium')['EX'] == pytest.approx(3500.0)
+    assert p.economics['pc_agg'] == pytest.approx(1500.0)
 
 
-def test_occurrence_only_books_constants_over_net_occ():
-    """An occ guaranteed-cost program books over the net-of-occ marginal:
-    the occ ceded premium is a constant leg (the occ risk transfer is the
-    ``xpnl`` exhibit)."""
+def test_occurrence_only_consolidates_over_net_occ():
+    """An occ guaranteed-cost program consolidates over the net-of-occ
+    marginal: one net-premium leg, the net loss; the occ risk transfer is
+    the ``xpnl`` walk."""
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 10% poisson')
-    assert _leg(p, 'ceded occ premium')['EX'] == pytest.approx(-(0.10 * 100))
-    assert 'loss (net occ)' in _lines(p)
+    assert _leg(p, 'net premium')['EX'] == pytest.approx(5000 - 0.10 * 100)
+    assert 'loss (net)' in _lines(p)
     assert p.economics['pc_occ'] == pytest.approx(0.10 * 100)
     assert p.economics['pc_agg'] == 0.0
-    # single-group ledger (the occ cession is not measurable per atom here)
     assert list(p.stats_df.index.names) == ['View', 'Line']
 
 
-def test_both_sides_split_and_full_ledger():
+def test_both_sides_split_and_walk_ledger():
+    # the pnl consolidates; the per-side split shows on the economics and,
+    # step by step, on the xpnl walk
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     e = p.economics
     assert e['pc_occ'] == pytest.approx(0.05 * 100)
     assert e['pc_agg'] == pytest.approx(0.08 * 2000)
     assert e['c_agg'] == pytest.approx(0.20 * 160)
-    # net-of-occ sell group + real agg cession buy group
-    lines = _lines(p)
-    for row in ('premium', 'loss (net occ)', 'ceded occ premium',
+    assert _leg(p, 'net premium')['EX'] == pytest.approx(
+        5000 - 5 - 160 + 32)
+    x = build(_BASE.replace('pnl T', 'xpnl TX', 1)
+              + 'occurrence net of 100 xs 200 rol 5% poisson '
+              'aggregate net of 2000 xs 3000 rol 8% cede 20%')
+    lines = _lines(x)
+    for row in ('premium', 'loss', 'ceded occ premium', 'ceded occ recovery',
                 'ceded agg premium', 'ceded agg recovery',
                 'ceded agg commission'):
         assert row in lines, row
-    steps = list(p.stats_df.index.get_level_values('Step'))
-    assert 'net occ' in steps and 'ceded agg' in steps and 'Total' in steps
+    steps = list(x.stats_df.index.get_level_values('Step'))
+    assert 'gross' in steps and 'ceded occ' in steps \
+        and 'ceded agg' in steps and 'Total' in steps
 
 
-def test_ledger_means_add_down_the_sheet():
+def test_walk_means_add_down_the_sheet():
+    x = build(_BASE.replace('pnl T', 'xpnl TX', 1)
+              + 'occurrence net of 100 xs 200 rol 5% poisson '
+              'aggregate net of 2000 xs 3000 rol 8% cede 20%')
+    s = x.stats_df
+    # step results foot to their signed legs (means add by linearity)
+    assert s.loc[('gross', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        _leg(x, 'premium')['EX'] + _leg(x, 'loss')['EX'], abs=1e-9)
+    assert s.loc[('ceded agg', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        _leg(x, 'ceded agg premium')['EX']
+        + _leg(x, 'ceded agg recovery')['EX']
+        + _leg(x, 'ceded agg commission')['EX'], abs=1e-9)
+    # the grand result sums the step results exactly
+    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        s.loc[('gross', 'Margin', 'Total'), 'EX']
+        + s.loc[('ceded occ', 'Margin', 'Total'), 'EX']
+        + s.loc[('ceded agg', 'Margin', 'Total'), 'EX'], abs=1e-9)
+    # running nets read the engine's own net marginals
+    assert s.loc[('ceded agg', 'Margin', 'Net'), 'EX'] == pytest.approx(
+        s.loc[('Total', 'Margin', 'Total'), 'EX'], abs=1e-9)
+    # the consolidated pnl's margin equals the walk's grand result -- to
+    # engine accuracy: the occ marginals come from separate FFTs, so the
+    # gross = ceded + net identity across them holds to FFT accuracy, not
+    # exactly (the walk's EX takes linearity over its own legs; the
+    # consolidated margin reads the net marginal directly)
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
-    s = p.stats_df
-    # group results are per-atom sums of their signed legs
-    assert s.loc[('net occ', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        _leg(p, 'premium')['EX'] + _leg(p, 'loss (net occ)')['EX']
-        + _leg(p, 'ceded occ premium')['EX'], abs=1e-2)
-    assert s.loc[('ceded agg', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        _leg(p, 'ceded agg premium')['EX']
-        + _leg(p, 'ceded agg recovery')['EX']
-        + _leg(p, 'ceded agg commission')['EX'], abs=1e-2)
-    # the grand result sums the group results
-    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('net occ', 'Margin', 'Total'), 'EX']
-        + s.loc[('ceded agg', 'Margin', 'Total'), 'EX'], abs=1e-2)
+    assert p.mean == pytest.approx(
+        s.loc[('Total', 'Margin', 'Total'), 'EX'], rel=1e-6)
 
 
 def test_cede_without_premium_errors():
@@ -136,7 +155,10 @@ def test_rol_without_finite_limit_errors():
         build(_BASE + 'poisson aggregate ceded to inf xs 3000 rol 8%')
 
 
-def test_premium_clause_on_plain_agg_errors():
-    with pytest.raises(ValueError, match='pnl'):
-        build('agg Z 100 claims sev lognorm 50 cv 1.5 poisson '
-              'aggregate net of 2000 xs 3000 rol 8%')
+def test_premium_clause_on_plain_agg_warns_and_builds():
+    # [Reins-Economics-On-Agg-Ignore-Warn]: a pure aggregate ignores what it
+    # cannot use and says so -- the economics need a pnl / xpnl to activate.
+    with pytest.warns(IgnoredDecLClauseWarning, match='pnl'):
+        a = build('agg Z 100 claims sev lognorm 50 cv 1.5 poisson '
+                  'aggregate net of 2000 xs 3000 rol 8%')
+    assert type(a).__name__ == 'Aggregate'

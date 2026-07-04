@@ -81,11 +81,12 @@ def test_buy_role_flips_every_row_and_percentiles():
               consideration=4.0, obligation=lambda x: np.minimum(x, 20) * 0.5)
     assert sell.mean == pytest.approx(-buy.mean, abs=TOL)
     ss, bs = sell.stats_df, buy.stats_df
-    pcols = [c for c in ss.columns if c.startswith('P')]
+    pcols = [c for c in ss.columns if c.startswith('κ')]
+    assert len(pcols) == 9                   # the scenario ladder is present
     for row in ss.index:
         assert ss.loc[row, 'EX'] == pytest.approx(-bs.loc[row, 'EX'], abs=TOL)
         assert ss.loc[row, 'SD'] == pytest.approx(bs.loc[row, 'SD'], abs=TOL)
-        # exact scenario reflection: cell_buy(Pq) = -cell_sell(P(1-q))
+        # exact scenario reflection: cell_buy(κq) = -cell_sell(κ(1-q))
         for c, rc in zip(pcols, reversed(pcols)):
             assert bs.loc[row, c] == pytest.approx(-ss.loc[row, rc], abs=TOL)
 
@@ -396,7 +397,9 @@ def test_count_axis_fixed_plus_variable_cost():
 # ----------------------------------------------------------------------
 # [Kappa-Scenario-Percentiles]: stats_df ladder columns are states
 # ----------------------------------------------------------------------
-_PCOLS = ['P1', 'P5', 'P10', 'P25', 'P50', 'P75', 'P90', 'P95', 'P99']
+# scenario (kappa) ladder headers -- the κ marks conditioning on the sheet
+# ([Decision-Ladder-Column-Names]); marginal ladders keep plain P01... headers
+_KCOLS = ['κ01', 'κ05', 'κ10', 'κ25', 'κ50', 'κ75', 'κ90', 'κ95', 'κ99']
 
 
 def _assert_columns_foot(pnl):
@@ -409,7 +412,7 @@ def _assert_columns_foot(pnl):
             for lbl in [leg.label]]
     result_key = (('Total', 'Margin', 'Total') if multi
                   else ('Margin', 'Total'))
-    for c, q in zip(_PCOLS, (.01, .05, .10, .25, .50, .75, .90, .95, .99)):
+    for c, q in zip(_KCOLS, (.01, .05, .10, .25, .50, .75, .90, .95, .99)):
         leg_sum = sum(float(s.xs(lbl, level='Line')[c].iloc[0])
                       for lbl in legs)
         cell = float(s.loc[result_key, c])
@@ -445,10 +448,10 @@ def test_scenario_direction_retro_premium_high_in_bad_columns():
     s = p.stats_df
     prem = s.loc[('Consideration', 'retro premium')]
     # result = 10 - 0.5x is decreasing in x: bad state (P1) = big loss = big premium
-    assert prem['P1'] > prem['P50'] > prem['P99']
+    assert prem['κ01'] > prem['κ50'] > prem['κ99']
     # and the loss row is high (very negative) in the same bad columns
     loss = s.loc[('Obligation', 'loss')]
-    assert loss['P1'] < loss['P99']
+    assert loss['κ01'] < loss['κ99']
 
 
 def test_scenario_monotone_1d_cells_evaluate_at_state():
@@ -456,7 +459,7 @@ def test_scenario_monotone_1d_cells_evaluate_at_state():
     every leg at the state'."""
     p = _simple('sell')                      # result = 15 - x, monotone
     s = p.stats_df
-    for c, q in zip(_PCOLS, (.01, .05, .10, .25, .50, .75, .90, .95, .99)):
+    for c, q in zip(_KCOLS, (.01, .05, .10, .25, .50, .75, .90, .95, .99)):
         x_q = float(p.gd.q(q))
         x_atom = 15.0 - x_q                  # invert the state
         assert s.loc[('Obligation', 'obligation'), c] == \
@@ -474,9 +477,9 @@ def test_scenario_switcheroo_level_set_means():
     # result = 10 pools atoms {10, 20} (prob .3/.2): loss cell -5
     lo = float(p.gd.q(0.01))            # 0, the bad-side level set
     assert lo == pytest.approx(0.0, abs=TOL)
-    assert s.loc[('Obligation', 'obligation'), 'P1'] == \
+    assert s.loc[('Obligation', 'obligation'), 'κ01'] == \
         pytest.approx(-15.0, abs=TOL)
-    assert s.loc[('Obligation', 'obligation'), 'P99'] == \
+    assert s.loc[('Obligation', 'obligation'), 'κ99'] == \
         pytest.approx(-5.0, abs=TOL)
     _assert_columns_foot(p)
 
@@ -489,7 +492,7 @@ def test_scenario_constant_result_cells_equal_ex():
             obligation={'loss': lambda x: x})
     s = p.stats_df
     for key in s.index:
-        for c in _PCOLS:
+        for c in _KCOLS:
             assert s.loc[key, c] == pytest.approx(s.loc[key, 'EX'], abs=TOL)
 
 
@@ -507,7 +510,7 @@ def test_scenario_moment_columns_stay_marginal():
 # ----------------------------------------------------------------------
 # [Summary-Fixed-Card]: summary_df is the fixed headline card
 # ----------------------------------------------------------------------
-_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99']
+_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
 
 
 def test_card_single_group_fixed_three_rows():
@@ -524,7 +527,7 @@ def test_card_single_group_fixed_three_rows():
     assert df.loc['Obligation', 'EX'] == pytest.approx(-13.0)
     assert df.loc['Margin', 'EX'] == pytest.approx(2.0)
     # marginal percentiles: the Margin row is the result's own quantile
-    assert df.loc['Margin', 'P1'] == pytest.approx(float(p.gd.q(0.01)))
+    assert df.loc['Margin', 'P01'] == pytest.approx(float(p.gd.q(0.01)))
     assert df.loc['Margin', 'Median'] == pytest.approx(float(p.gd.q(0.5)))
 
 
@@ -580,7 +583,7 @@ def test_card_marginal_vs_stats_scenario_differ_on_dependent_legs():
     # comonotone with it. Card P99 (best state for the result) vs the
     # obligation's own marginal 99th differ.
     card = p.summary_df.loc['Obligation', 'P99']            # marginal: 0
-    scen = p.stats_df.loc[('Obligation', 'Total'), 'P99']   # state: -10
+    scen = p.stats_df.loc[('Obligation', 'Total'), 'κ99']   # state: -10
     assert card == pytest.approx(0.0, abs=TOL)
     assert scen == pytest.approx(-10.0, abs=TOL)
     assert card != scen
@@ -594,7 +597,7 @@ def test_card_empty_side_posts_zero_row():
     df = p.summary_df
     assert df.loc['Consideration', 'EX'] == 0.0
     assert df.loc['Consideration', 'SD'] == 0.0
-    assert df.loc['Consideration', 'P1'] == 0.0
+    assert df.loc['Consideration', 'P01'] == 0.0
 
 
 # ----------------------------------------------------------------------

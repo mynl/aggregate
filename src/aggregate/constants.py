@@ -26,6 +26,7 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
            'Validation', 'DefectiveDistributionWarning',
            'DefectiveDistributionError', 'InfiniteVarianceError',
+           'IgnoredDecLClauseWarning',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
            'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row']
@@ -119,6 +120,25 @@ class DefectiveDistributionWarning(UserWarning):
     two pricing answers therefore differ by exactly the deficit. Surface the
     deficit at construction time so the divergence in `Distortion.price` is
     never silent.
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
+
+
+class IgnoredDecLClauseWarning(UserWarning):
+    """Emitted when a DecL declaration ignores clauses it cannot use.
+
+    A pure ``agg`` accepts every reinsurance decoration -- ceded-premium
+    clauses (``deposit`` / ``rol`` / ``rate``), ceding commissions
+    (``cede``), ``reinstatements``, and the variable-rating features -- but
+    it has no premium context to activate them, so it builds the loss
+    structure only and says so with one warning naming the ignored clauses.
+    The knowledge base retains the full decorated spec, so folding the agg
+    into a ``pnl`` / ``xpnl`` by reference (``pnl X <premium> less agg.NAME``)
+    activates the economics (the knowledge-injection route). See
+    ``dev/plan-pnl-consolidated-xpnl-walk.md``
+    ([Reins-Economics-On-Agg-Ignore-Warn]).
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).

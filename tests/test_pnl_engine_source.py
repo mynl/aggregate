@@ -3,8 +3,9 @@
 The breaking ``pnl NAME <premium> less <engine> [less <expenses>]`` syntax, where
 the engine is an inline ``agg``, a stored ``agg.NAME``, or a stored ``port.NAME``.
 Covers the ``inherit premium`` head, the two-independent-premiums feature, the
-``xpnl`` marginal perspective stack, and the deferred/error edges. See
-dev/plan-pnl-engine-source.md and dev/plan-yapnl.md.
+``xpnl`` multi-group walk ([Decision-XPnL-Is-A-Recipe]), and the
+deferred/error edges. See dev/plan-pnl-engine-source.md and
+dev/plan-pnl-consolidated-xpnl-walk.md.
 """
 
 import numpy as np
@@ -127,21 +128,29 @@ def test_port_engine_expenses_supported(uw):
 
 
 # ----------------------------------------------------------------------
-# xpnl -> the marginal perspective stack
+# xpnl -> the multi-group stitched walk ([Decision-XPnL-Is-A-Recipe])
 # ----------------------------------------------------------------------
-def test_xpnl_returns_marginal_stack_over_gcn_engine(uw):
-    """``xpnl`` over an engine with reinsurance economics returns the
-    perspective x stats frame (gross / ceded / net rows + the impact delta)."""
+def test_xpnl_returns_walk_pnl_over_gcn_engine(uw):
+    """``xpnl`` over an engine with reinsurance economics returns a plain
+    **multi-group PnL** -- the step walk (gross -> cover -> Total) with the
+    exploded (Step, View) card and (Step, View, Line) stats sheet."""
     t = uw('xpnl X 1000 premium less agg e 1000 premium at 0.7 lr '
            'sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 '
            'poisson')
-    assert isinstance(t, pd.DataFrame)
-    assert list(t.index) == ['gross', 'ceded', 'net', 'impact']
-    # means add across the perspective rows (the onion peel)
-    assert t.loc['net', 'EX'] == pytest.approx(
-        t.loc['gross', 'EX'] + t.loc['ceded', 'EX'], abs=1e-6)
-    assert t.loc['impact', 'EX'] == pytest.approx(
-        t.loc['net', 'EX'] - t.loc['gross', 'EX'], abs=1e-6)
+    assert isinstance(t, PnL)
+    assert [g.label for g in t.groups] == ['gross', 'ceded occ']
+    s = t.stats_df
+    assert list(s.index.names) == ['Step', 'View', 'Line']
+    # means add down the walk (linearity); running net = the grand result
+    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        s.loc[('gross', 'Margin', 'Total'), 'EX']
+        + s.loc[('ceded occ', 'Margin', 'Total'), 'EX'], abs=1e-6)
+    assert s.loc[('Total', 'Margin', 'Impact'), 'EX'] == pytest.approx(
+        s.loc[('ceded occ', 'Margin', 'Total'), 'EX'], abs=1e-6)
+    # stitched: the ladder is marginal (plain P headers), no κ columns
+    assert 'P01' in s.columns and 'κ01' not in s.columns
+    # the card is the exploded (Step, View) blocks + closing Total block
+    assert list(t.summary_df.index.names) == ['Step', 'View']
 
 
 def test_xpnl_over_plain_engine_not_implemented(uw):
@@ -160,10 +169,15 @@ def test_xpnl_over_port_not_implemented(uw):
 
 
 # ----------------------------------------------------------------------
-# Standalone-agg guard unchanged (decision 7)
+# Standalone-agg economics: ignored with a warning
+# ([Reins-Economics-On-Agg-Ignore-Warn]; supersedes the decision-7 hard error)
 # ----------------------------------------------------------------------
-def test_standalone_agg_cede_still_errors(uw):
-    """A bare ``agg`` with a ceded-premium clause still errors (needs a pnl)."""
-    with pytest.raises(ValueError, match='pnl|premium'):
-        uw('agg A 1000 premium at 0.7 lr sev lognorm 100 cv 2 '
-           'occurrence ceded to 500 xs 500 deposit 100 poisson')
+def test_standalone_agg_cede_warns_and_builds(uw):
+    """A bare ``agg`` with a ceded-premium clause builds its loss structure,
+    warning that the economics are ignored (fold into a pnl to activate)."""
+    from aggregate.constants import IgnoredDecLClauseWarning
+    with pytest.warns(IgnoredDecLClauseWarning, match='ceded premium'):
+        a = uw('agg A 1000 premium at 0.7 lr sev lognorm 100 cv 2 '
+               'occurrence ceded to 500 xs 500 deposit 100 poisson')
+    assert type(a).__name__ == 'Aggregate'
+    assert a.occ_reins is not None

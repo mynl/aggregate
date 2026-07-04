@@ -39,6 +39,32 @@ Evaluation invariants
   shared joint; an ``is2d`` leg over a 1-D source is an error, and a 2-D
   source with 1-D legs is fine (they read axis 0). Only one latent dimension
   exists.
+
+Reading the P&L sheets
+----------------------
+
+Two exhibits, deliberately different in kind:
+
+* :attr:`PnL.summary_df` -- the **card**: fixed rows (``Consideration`` /
+  ``Obligation`` / ``Margin`` per step) that never vary with the ledger. Its
+  percentiles are **marginal** quantiles of each row's own distribution --
+  the card answers "how big is each total" (range feel). Marginal quantiles
+  never add, so the card's percentile cells do **not** foot down the card;
+  that is a property of quantiles, not an error.
+* :attr:`PnL.stats_df` -- the **sheet**: every ledger row, and percentile
+  columns that are **scenario states** anchored on the grand result
+  ([Kappa-Scenario-Percentiles]): column ``Pq`` shows every row's
+  conditional mean given the result lands at its ``q``-quantile, so each
+  column is one internally consistent state and **foots exactly** down the
+  sheet. Small ``p`` is bad for the holder, full stop -- a loss-sensitive
+  premium correctly shows high in the bad columns.
+
+Where the result is non-monotone in the source (slides, swings, humps -- the
+"switcheroo") a scenario cell is the exact mean over the level set of that
+result value; well-defined, but read with care. The default ``View`` labels
+(``Consideration`` / ``Obligation`` / ``Margin``) rename at serve time::
+
+    pnl.stats_df.rename({'Obligation': 'Loss & LAE'}, level='View')
 """
 from __future__ import annotations
 
@@ -54,10 +80,14 @@ __all__ = ['Leg', 'Group', 'PnL', 'stack_marginal_pnls']
 
 
 #: The detailed percentile ladder used by :attr:`PnL.stats_df` /
-#: :attr:`PnL.scaled_stats_df` and :func:`stack_marginal_pnls` (the full
-#: ladder; the headline :attr:`PnL.summary_df` reports only ``P1`` / ``Median``
-#: / ``P99`` off it). The exact ladder is standardized in
-#: ``[Reporting-Guidelines]``.
+#: :attr:`PnL.scaled_stats_df` and :func:`stack_marginal_pnls`. On the stats
+#: sheets the ladder columns are **scenario states** (conditional means given
+#: the grand result lands at its ``q``-quantile -- [Kappa-Scenario-Percentiles]);
+#: in :func:`stack_marginal_pnls` they stay marginal (independent perspectives
+#: share no joint). The headline :attr:`PnL.summary_df` card computes its own
+#: marginal ``P1`` / ``Median`` / ``P99`` -- deliberately different in kind
+#: ([Decision-Card-Percentiles-Stay-Marginal]). The exact ladder is
+#: standardized in ``[Reporting-Guidelines]``.
 PERCENTILE_LADDER = (0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99)
 
 #: Distortion families evaluated by :meth:`PnL.evaluate` (the standard set minus
@@ -410,7 +440,16 @@ class _EvaluatedLeg:
         return self.moments[0]
 
     def stat_vector(self):
-        """``[EX, SD, CV, Skew] + percentile ladder`` -- one exhibit row."""
+        """``[EX, SD, CV, Skew] + marginal percentile ladder`` -- one row.
+
+        The ladder here is **marginal** (each ``Pq`` is this row's own
+        quantile). Serves :func:`stack_marginal_pnls` (independent
+        perspectives share no joint, so there is nothing to condition on) and
+        the massive one-sweep :attr:`PnL.stats_df` (conditioning needs a
+        second sweep -- [Massive-Kappa-Second-Sweep] in ``dev/TODO.md``); the
+        in-memory :attr:`PnL.stats_df` ladder is the conditional
+        [Kappa-Scenario-Percentiles] pass instead.
+        """
         m, sd, cv, skew = self.moments
         gd = self.gd
         return [m, sd, cv, skew] + [float(gd.q(q)) for q in PERCENTILE_LADDER]
@@ -503,6 +542,11 @@ def _stat_names():
     return ['EX', 'SD', 'CV', 'Skew'] + [_pct_label(q) for q in PERCENTILE_LADDER]
 
 
+#: Fixed column set of the :attr:`PnL.summary_df` card (headline moments +
+#: the three marginal range percentiles).
+_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99']
+
+
 #: Default ``View`` level names for the :attr:`PnL.stats_df` row MultiIndex,
 #: keyed by the internal side codes (``margin`` covers every result-flavored
 #: row: group results, running nets, the grand result, total impact).
@@ -554,7 +598,9 @@ class PnL(LabeledMixin):
         ``None`` (default) uses the expected signed grand total consideration;
         a number is an explicit scale; a string names a consideration leg.
     result_name : str, default 'result'
-        Label for the grand result row.
+        Label for the grand result row -- the flat ledger key only
+        (:attr:`density_df`, the sweep result keys). The card and stats
+        sheets display ``Margin`` / ``'Total'`` regardless.
     label : str, optional
         Optional human display label (the DecL ``as`` clause); presentation
         only, preferred over ``name`` in repr / titles.
@@ -667,6 +713,9 @@ class PnL(LabeledMixin):
             net_after.append(running)
         rows = OrderedDict()
         self._group_result_rows = []
+        #: ``(kind, payload) -> row`` -- structural access for the fixed card
+        #: (:attr:`summary_df` reads rows by ledger role, not label).
+        self._by_kind = {}
         grand_total_rows = {}
         for label, kind, payload in self._plan:
             if kind == 'leg':
@@ -696,6 +745,7 @@ class PnL(LabeledMixin):
                                     net_after[-1] - egs[0].result_values,
                                     probs)
             rows[label] = row
+            self._by_kind[(kind, payload)] = row
         self._rows = rows
         # grand references -- always available (the scale and the accessors
         # read them); on a single-group sheet they are not ledger rows.
@@ -789,6 +839,7 @@ class PnL(LabeledMixin):
         rows = OrderedDict()
         self._egroups = []
         self._group_result_rows = []
+        self._by_kind = {}
         grand_total_rows = {}
         group_rows = {gi: {'cons': [], 'obl': []} for gi in range(len(groups))}
         for label, kind, payload in self._plan:
@@ -798,6 +849,7 @@ class PnL(LabeledMixin):
                 exact_mean=audit.loc[label, 'EX'],
                 exact_sd=audit.loc[label, 'SD'])
             rows[label] = row
+            self._by_kind[(kind, payload)] = row
             if kind == 'leg':
                 gi, side, _li = payload
                 group_rows[gi][side].append(row)
@@ -812,14 +864,15 @@ class PnL(LabeledMixin):
         self._rows = rows
         self._grand_result = (rows[self.result_name] if len(groups) > 1
                               else self._group_result_rows[0])
-        # grand totals for the scale / accessors: expectations are linear, so
-        # the exact means sum across the constituent legs -- no extra sweep
-        # keys needed on a single-group sheet.
-        from types import SimpleNamespace
-        self._grand_cons = grand_total_rows.get('cons') or SimpleNamespace(
-            mean=float(sum(r.mean for g in self._egroups for r in g.cons)))
-        self._grand_obl = grand_total_rows.get('obl') or SimpleNamespace(
-            mean=float(sum(r.mean for g in self._egroups for r in g.obl)))
+        # grand totals for the scale / accessors / the summary card. On a
+        # multi-group sheet these are the grand_total sweep rows; single-group
+        # they coincide with the group's own side total, which is always
+        # reachable without extra sweep keys (>1 legs -> the group_total row;
+        # exactly 1 -> the leg row *is* the total; 0 -> a constant zero).
+        self._grand_cons = grand_total_rows.get('cons') \
+            or self._card_side_row(0, 'cons')
+        self._grand_obl = grand_total_rows.get('obl') \
+            or self._card_side_row(0, 'obl')
 
     def _resolve_scale(self, scale):
         """Commit the exhibit scale at construction.
@@ -972,51 +1025,145 @@ class PnL(LabeledMixin):
     # ------------------------------------------------------------------
     # the row ledger, three views
     # ------------------------------------------------------------------
+    def _zero_row(self):
+        """A constant-zero ledger row -- the side total of a group with no
+        legs on that side (e.g. a pure hedge declares no consideration)."""
+        if self._probs is not None:
+            return _EvaluatedLeg('zero', np.zeros(len(self._probs)),
+                                 self._probs)
+        from ._grid_distribution import GridDistribution
+        return _EvaluatedLeg(
+            'zero', gd=GridDistribution(np.array([0.0]), np.array([1.0]),
+                                        bs=None, name='zero',
+                                        is_loss_value=False),
+            exact_mean=0.0, exact_sd=0.0)
+
+    def _card_side_row(self, gi, side):
+        """Group ``gi``'s total row for one side (``'cons'`` / ``'obl'``).
+
+        Always resolvable from the ledger as evaluated -- no extra
+        computation (and, on the massive route, no extra sweep keys): with
+        more than one leg the ``group_total`` row exists; with exactly one
+        the leg row *is* the side total; with none the total is a constant
+        zero.
+        """
+        row = self._by_kind.get(('group_total', (gi, side)))
+        if row is not None:
+            return row
+        g = self._egroups[gi]
+        side_rows = g.cons if side == 'cons' else g.obl
+        return side_rows[0] if side_rows else self._zero_row()
+
+    def _card_stat_row(self, row):
+        """One :attr:`summary_df` card row: ``EX / Scaled / SD / CV / Skew``
+        + **marginal** ``P1 / Median / P99`` of the row's own distribution."""
+        denom = self._scale_value
+        scalable = denom and abs(denom) > VALIDATION_NOISE
+        m, sd, cv, skew = row.moments
+        gd = row.gd
+        return [m, (m / denom if scalable else float('nan')),
+                _snap_noise(sd), cv, _snap_noise(skew),
+                float(gd.q(0.01)), float(gd.q(0.50)), float(gd.q(0.99))]
+
     @property
     def summary_df(self):
-        """The headline ledger: one row per ledger line, headline columns.
+        """The headline card: fixed rows that never vary with the ledger.
 
-        Rows = the ledger (legs, totals, results, running nets, grand rows --
-        see :meth:`_assemble_rows`); columns ``EX`` / ``Scaled`` (``EX`` over
-        the committed :attr:`scale`) / ``SD`` / ``CV`` / ``Skew`` / ``P1`` /
-        ``Median`` / ``P99``. Signed cash flows; the ``EX`` column adds down
-        the sheet to the result rows.
+        Single-group: a flat three-row card ``Consideration`` /
+        ``Obligation`` / ``Margin`` read from the grand references -- the
+        exact structural mirror of the flat :attr:`Aggregate.summary_df`.
+        Multi-group (a tower): one ``(Step, View)`` block per step plus a
+        closing ``'Total'`` block, mirroring the per-unit blocks of
+        :attr:`Portfolio.summary_df`::
+
+            ('gross',     'Consideration' | 'Obligation' | 'Margin')
+            ('ceded occ', 'Consideration' | 'Obligation' | 'Margin' | 'Net')
+            ('Total',     'Consideration' | 'Obligation' | 'Margin' | 'Impact')
+
+        Per step, ``Margin`` is the group result (the step delta) and ``Net``
+        the running net through the step (omitted on the first step, where
+        net = margin); the ``'Total'`` block closes with ``Impact`` = grand
+        result minus the first step's result. Rows scale with steps, never
+        with legs -- the fixed-shape contract. The card always displays
+        ``Margin`` regardless of :attr:`result_name` (which names the flat
+        ledger key only).
+
+        Columns ``EX`` / ``Scaled`` (``EX`` over the committed :attr:`scale`)
+        / ``SD`` / ``CV`` / ``Skew`` / ``P1`` / ``Median`` / ``P99``. The
+        percentiles are **marginal quantiles of each card row's own
+        distribution** -- the card answers "how big is each total" (range),
+        so its percentile cells do **not** add down the card (marginal
+        quantiles never add). The footing sheet is :attr:`stats_df`, whose
+        scenario columns condition on the grand result and foot exactly.
+        With scale = premium the ``Scaled`` column reads as a combined-ratio
+        decomposition: ``1.00`` / ``-(loss & expense ratio)`` /
+        ``margin ratio``.
 
         Returns
         -------
         pandas.DataFrame
-            Indexed by row label (index name ``'P&L'``).
+            Flat index named ``'View'`` (single group) or a ``(Step, View)``
+            MultiIndex (tower); columns as above.
+
+        See Also
+        --------
+        stats_df : the full ledger sheet (every leg, footing columns).
         """
-        denom = self._scale_value
-        scalable = denom and abs(denom) > VALIDATION_NOISE
-        rows = OrderedDict()
-        for label, row in self._rows.items():
-            m, sd, cv, skew = row.moments
-            gd = row.gd
-            rows[label] = [
-                m, (m / denom if scalable else float('nan')),
-                _snap_noise(sd), cv, _snap_noise(skew),
-                float(gd.q(0.01)), float(gd.q(0.50)), float(gd.q(0.99))]
-        df = pd.DataFrame.from_dict(
-            rows, orient='index',
-            columns=['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99'])
-        df.index.name = 'P&L'
-        return df
+        if len(self._egroups) == 1:
+            rows = OrderedDict((
+                ('Consideration', self._grand_cons),
+                ('Obligation', self._grand_obl),
+                ('Margin', self._grand_result)))
+            df = pd.DataFrame.from_dict(
+                {k: self._card_stat_row(r) for k, r in rows.items()},
+                orient='index', columns=_CARD_COLS)
+            df.index.name = 'View'
+            return df
+        recs = []
+        index = []
+        for gi, g in enumerate(self._group_specs):
+            index.append((g.label, 'Consideration'))
+            recs.append(self._card_stat_row(self._card_side_row(gi, 'cons')))
+            index.append((g.label, 'Obligation'))
+            recs.append(self._card_stat_row(self._card_side_row(gi, 'obl')))
+            index.append((g.label, 'Margin'))
+            recs.append(self._card_stat_row(
+                self._by_kind[('group_result', gi)]))
+            if gi > 0:
+                index.append((g.label, 'Net'))
+                recs.append(self._card_stat_row(
+                    self._by_kind[('running_net', gi)]))
+        for view, row in (('Consideration', self._grand_cons),
+                          ('Obligation', self._grand_obl),
+                          ('Margin', self._grand_result),
+                          ('Impact', self._by_kind[('total_impact', None)])):
+            index.append(('Total', view))
+            recs.append(self._card_stat_row(row))
+        return pd.DataFrame(
+            recs, columns=_CARD_COLS,
+            index=pd.MultiIndex.from_tuples(index, names=['Step', 'View']))
 
     def _view_index(self):
-        """The ``(View, Line)`` row MultiIndex for :attr:`stats_df` /
-        :attr:`scaled_stats_df`, aligned with the ledger plan order.
+        """The row MultiIndex for :attr:`stats_df` / :attr:`scaled_stats_df`,
+        aligned with the ledger plan order.
 
-        ``View`` buckets every ledger row: legs and totals under their side
-        (:data:`_VIEW_DEFAULTS` -- ``Consideration`` / ``Obligation``), all
-        result-flavored rows (group results, running nets, the grand result,
-        total impact) under ``Margin``. ``Line`` is the presentation label:
-        leg labels as declared; total rows read ``Total`` (qualified as
-        ``'<group> total'`` per group on a multi-group sheet); group results
-        read the group label; the grand result reads ``Total``. Presentation
-        only -- the flat plan labels stay the canonical row keys everywhere
-        else (:attr:`summary_df`, :attr:`density_df`, :attr:`validation_df`,
-        the sweep result keys).
+        Single-group: two-level ``(View, Line)``. ``View`` buckets every
+        ledger row: legs and totals under their side (:data:`_VIEW_DEFAULTS`
+        -- ``Consideration`` / ``Obligation``), the result under ``Margin``.
+        ``Line`` is the presentation label: leg labels as declared; total
+        rows and the result read ``Total``.
+
+        Multi-group (a tower): three-level ``(Step, View, Line)``. ``Step``
+        is the group label, in ledger order; the grand rows close the sheet
+        under step ``'Total'``. Group results sit at
+        ``(step, 'Margin', 'Total')``, running nets at
+        ``(step, 'Margin', 'Net')``, the total impact at
+        ``('Total', 'Margin', 'Impact')`` -- the a132 qualified-string lines
+        (``'<group> total'``, ``'Net through <g>'``) became levels.
+
+        Presentation only -- the flat plan labels stay the canonical row keys
+        everywhere else (:attr:`density_df`, :attr:`validation_df`, the sweep
+        result keys).
         """
         groups = self._group_specs
         multi = len(groups) > 1
@@ -1024,47 +1171,114 @@ class PnL(LabeledMixin):
         tuples = []
         for label, kind, payload in self._plan:
             if kind == 'leg':
-                _gi, side, _li = payload
-                t = (v[side], label)
+                gi, side, _li = payload
+                t = (groups[gi].label, v[side], label)
             elif kind == 'group_total':
                 gi, side = payload
-                t = (v[side],
-                     f'{groups[gi].label} total' if multi else 'Total')
+                t = (groups[gi].label, v[side], 'Total')
             elif kind == 'group_result':
-                t = (v['margin'],
-                     groups[payload].label if multi else 'Total')
+                t = (groups[payload].label, v['margin'], 'Total')
             elif kind == 'running_net':
-                t = (v['margin'], f'Net through {groups[payload].label}')
+                t = (groups[payload].label, v['margin'], 'Net')
             elif kind == 'grand_total':
-                t = (v[payload], 'Total')
+                t = ('Total', v[payload], 'Total')
             elif kind == 'grand_result':
-                t = (v['margin'], 'Total')
+                t = ('Total', v['margin'], 'Total')
             else:                                     # 'total_impact'
-                t = (v['margin'], 'Total impact')
+                t = ('Total', v['margin'], 'Impact')
             tuples.append(t)
-        return pd.MultiIndex.from_tuples(tuples, names=['View', 'Line'])
+        if not multi:
+            return pd.MultiIndex.from_tuples(
+                [t[1:] for t in tuples], names=['View', 'Line'])
+        return pd.MultiIndex.from_tuples(
+            tuples, names=['Step', 'View', 'Line'])
+
+    def _scenario_ladder(self):
+        """The [Kappa-Scenario-Percentiles] pass: ``{label: [cell per q]}``.
+
+        For each ladder point ``q``, anchor the scenario on the **grand
+        result**: ``x_q = gd.q(q)`` off the grand-result GD, form the exact
+        atom slice ``result == x_q`` (the GD support *is* the set of exact
+        result values, so float equality is exact), and take the
+        probability-weighted mean of every row's signed values over the
+        slice::
+
+            cell(row, Pq) = E[row | result == x_q]
+
+        This is the library's kappa function ``E[X_i | X = x]`` (Portfolio's
+        ``exeqa_*``) applied to the ledger. By linearity of conditional
+        expectation every column **foots exactly** -- legs -> totals ->
+        result add down the sheet to ``x_q``; the grand-result cell is
+        automatically its own marginal quantile (``E[result | result = x] =
+        x``), no special case. In-memory atoms route only (the massive
+        one-sweep route keeps marginal ladders --
+        [Massive-Kappa-Second-Sweep]).
+        """
+        res_vals = self._grand_result.values
+        gd = self._grand_result.gd
+        slices = []
+        for q in PERCENTILE_LADDER:
+            mask = res_vals == float(gd.q(q))
+            pw = self._probs[mask]
+            slices.append((mask, pw, float(pw.sum())))
+        return {label: [float((row.values[mask] * pw).sum() / pm)
+                        for mask, pw, pm in slices]
+                for label, row in self._rows.items()}
 
     @property
     def stats_df(self):
-        """The full ledger x metrics table, in currency units.
+        """The full ledger x metrics sheet, in currency units -- the
+        alignment/footing exhibit.
 
-        Same rows as :attr:`summary_df` (ledger order preserved), indexed by
-        the two-level ``(View, Line)`` MultiIndex of :meth:`_view_index`:
-        ``View`` groups the sheet into ``Consideration`` / ``Obligation`` /
-        ``Margin``, ``Line`` is the presentation row label (leg labels as
-        declared; total rows read ``Total``, so ``'total obligation'``
-        displays as ``('Obligation', 'Total')`` and the result as
-        ``('Margin', 'Total')``). Columns are ``EX`` / ``SD`` / ``CV`` /
-        ``Skew`` and the full :data:`PERCENTILE_LADDER` (``P1`` ... ``P99``).
+        Rows = the whole ledger (legs, totals, results, running nets, grand
+        rows), in ledger order, indexed by :meth:`_view_index`: two-level
+        ``(View, Line)`` single-group, three-level ``(Step, View, Line)`` on
+        a tower. Columns are ``EX`` / ``SD`` / ``CV`` / ``Skew`` and the full
+        :data:`PERCENTILE_LADDER`.
+
+        The percentile columns are **scenario states, not per-row
+        quantiles**: column ``Pq`` is the state in which the grand result
+        lands at its ``q``-quantile, and each cell is the conditional mean
+        ``E[row | result == x_q]`` (:meth:`_scenario_ladder`). Consequences:
+
+        * every column **foots** -- legs -> totals -> result add down the
+          sheet to ``x_q``;
+        * direction is uniform: a column is one state ordered by how good it
+          is for the holder (small ``p`` is bad, full stop) -- so e.g. a
+          loss-sensitive (retro) premium correctly shows *high* in the bad
+          columns;
+        * the grand-result row's cells are its own marginal quantiles.
+
+        ``EX / SD / CV / Skew`` are row properties and stay **marginal**.
+        Per-row marginal quantiles remain one line away via
+        ``density_df[row].q(p)``.
+
+        Two subtleties, documented rather than engineered away: where the
+        result is **non-monotone** in the source (slides, swings, humps --
+        the "switcheroo") the cell is the exact mean over the level set
+        ``{result == x_q}``, well-defined but subtler to interpret; and a
+        **constant** grand result (fully hedged) makes the conditioning event
+        everything, so every cell equals its ``EX``. A **massive** (one-sweep)
+        source keeps **marginal** ladders -- conditioning needs a second
+        sweep ([Massive-Kappa-Second-Sweep] in ``dev/TODO.md``).
 
         Returns
         -------
         pandas.DataFrame
-            ``(View, Line)`` MultiIndexed rows in ledger order; columns the
-            metric names.
+            MultiIndexed rows in ledger order; columns the metric names.
+
+        See Also
+        --------
+        summary_df : the fixed headline card (marginal range percentiles).
         """
-        data = [[_snap_noise(v) for v in row.stat_vector()]
-                for row in self._rows.values()]
+        if self._probs is None:               # massive: marginal ladder
+            data = [[_snap_noise(v) for v in row.stat_vector()]
+                    for row in self._rows.values()]
+        else:
+            ladder = self._scenario_ladder()
+            data = [[_snap_noise(v) for v in
+                     list(row.moments) + ladder[label]]
+                    for label, row in self._rows.items()]
         return pd.DataFrame(data, index=self._view_index(),
                             columns=_stat_names())
 
@@ -1073,10 +1287,12 @@ class PnL(LabeledMixin):
         """The statistics of ``X / scale`` -- :attr:`stats_df` unitized.
 
         ``EX`` / ``SD`` and every percentile divide by the committed
-        :attr:`scale`; ``CV`` and ``Skew`` are scale-invariant and pass
-        through unchanged. Every cell defined (a break-even scale yields
-        ``nan`` in the divided columns -- there is no unit to measure in).
-        Carries the same ``(View, Line)`` row MultiIndex as :attr:`stats_df`.
+        :attr:`scale` (conditional means scale linearly, so the scenario
+        columns divide through like everything else); ``CV`` and ``Skew``
+        are scale-invariant and pass through unchanged. Every cell defined
+        (a break-even scale yields ``nan`` in the divided columns -- there
+        is no unit to measure in). Carries the same row MultiIndex as
+        :attr:`stats_df`.
         """
         df = self.stats_df
         denom = self._scale_value
@@ -1267,7 +1483,9 @@ def stack_marginal_pnls(perspectives, *, impacts=None, name=None):
     groups. Each perspective contributes its grand-result statistics as a row;
     ``impacts`` add per-statistic delta rows (``target - base``). Means add
     across the stack; SDs and percentiles are per-row ("means add, SDs
-    don't").
+    don't"). The ladder columns here are **marginal by construction** --
+    independent perspectives share no joint, so there is nothing to
+    condition on (contrast the scenario columns of :attr:`PnL.stats_df`).
 
     Parameters
     ----------

@@ -318,6 +318,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     from .distributions import Aggregate
     from .portfolio import Portfolio
     from .reinstatement import ReinstatementAnalysis
+    from ._pnl import PnL
     if ff is None:
         ff = lambda x: f'{x:.5g}'
     elif ff == 'basic':
@@ -350,6 +351,11 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             qd(x.tail_df().fillna(''), accuracy=accuracy, **kwargs)
             if not x._validation_passes():
                 print(f'\nVALIDATION FAILS: {x.validation_explanation}')
+        elif isinstance(x, PnL):
+            # P&L headline: the repr then the fixed summary card (marginal
+            # range percentiles; the footing sheet is stats_df).
+            print(repr(x))
+            qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
         elif isinstance(x, pd.DataFrame):
             # 100 line width matches rtd html format
             args = {'line_width': 100,

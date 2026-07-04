@@ -108,6 +108,21 @@
    **Retired:** `create_pnl` / `create_pnl_tower` / `PnLTower` /
    `PnL.margin_df` / `.tower` / `.stochastic_engine` / `make_pnl(net=)` /
    the analyses' bespoke exhibits.
+2b. **[PnL-Punchups-01]** ✅ **DONE (`1.0.0a134`,
+   `dev/done/plan-pnl-punchups-01.md`).** Three P&L reporting punch-ups in one
+   bump: **[Kappa-Scenario-Percentiles]** (the `stats_df` /
+   `scaled_stats_df` ladder columns are scenario states — conditional means
+   `E[row | result == x_q]` on the exact grand-result slice — so every column
+   foots and direction is uniform; massive route stays marginal, see
+   [Massive-Kappa-Second-Sweep] below); **[Stats-Tower-Step-Level]**
+   (multi-group stats rows are `(Step, View, Line)`; the a132
+   qualified-string lines became levels); **[Summary-Fixed-Card]**
+   (`summary_df` is the fixed `Consideration / Obligation / Margin` card —
+   flat single-group, `(Step, View)` blocks on a tower — with **marginal**
+   range percentiles, deliberately different in kind from the footing sheet);
+   plus the "Reading the P&L sheets" education notes. View labels stay
+   defaults-only (serve-time `df.rename(..., level='View')` recipe
+   documented).
 2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
    for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
    fixed** (it does not morph as the object gains properties), columns are
@@ -160,6 +175,12 @@
   zero `lb` not consistent with attachment equals zero; flag **fixed** frequency
   with a non-integer expected value; flag **mixing** with an inconsistent
   frequency distribution.
+- **[Massive-Kappa-Second-Sweep]** `beta` (from `[PnL-Punchups-01]`,
+  `1.0.0a134`) — bring the kappa scenario percentiles to the massive one-sweep
+  P&L route. Conditioning needs the joint per atom *and* the grand-result
+  quantiles before indicator-weighted means can accumulate — a second band
+  sweep. Until then the massive `stats_df` keeps **marginal** ladders
+  (docstring-flagged in `_EvaluatedLeg.stat_vector` / `PnL.stats_df`).
 
 ## Backlog — bugs & investigations
 

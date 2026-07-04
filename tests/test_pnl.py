@@ -54,7 +54,8 @@ def test_build_pnl_returns_pnl():
 def test_obligation_books_signed():
     """The obligation row books the signed loss (-E[X] = -700), and EX foots."""
     a = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
-    assert a.summary_df.loc['loss', 'EX'] == pytest.approx(-700.0, rel=TOL)
+    assert a.stats_df.loc[('Obligation', 'loss'), 'EX'] == \
+        pytest.approx(-700.0, rel=TOL)
     # net = 1000 - 700 = 300
     assert a.mean == pytest.approx(300.0, rel=TOL, abs=2.0)
 
@@ -261,38 +262,38 @@ def test_bivariate_with_pnl_component_rejected():
 
 
 # ----------------------------------------------------------------------
-# summary_df: one row per leg, EX magnitudes + the signed result
+# summary_df: the fixed card (Consideration / Obligation / Margin)
 # ----------------------------------------------------------------------
-_SUMMARY_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99']
+_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P1', 'Median', 'P99']
 
 
-def test_summary_df_leg_rows_and_additive_result():
-    """A sold cover: signed rows, result = consideration + obligation (EX foots)."""
+def test_summary_df_fixed_card_and_additive_result():
+    """A sold cover: the fixed three-row card; the EX column adds down it."""
     a = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     df = a.summary_df
-    assert list(df.index) == ['consideration', 'loss', 'margin']
-    assert list(df.columns) == _SUMMARY_COLS
-    assert df.loc['consideration', 'EX'] == pytest.approx(1000.0)
+    assert list(df.index) == ['Consideration', 'Obligation', 'Margin']
+    assert list(df.columns) == _CARD_COLS
+    assert df.loc['Consideration', 'EX'] == pytest.approx(1000.0)
     # a constant consideration renormalizes to SD exactly 0 (no spurious spread)
-    assert df.loc['consideration', 'SD'] == 0.0
-    assert df.loc['loss', 'EX'] == pytest.approx(-700.0, rel=TOL)  # signed
-    # the defining identity: the EX column adds down the sheet
-    assert df.loc['margin', 'EX'] == pytest.approx(
-        df.loc['consideration', 'EX'] + df.loc['loss', 'EX'], abs=1e-6)
-    # Scaled divides by the committed E[total consideration]
-    assert df.loc['loss', 'Scaled'] == pytest.approx(-0.70, rel=TOL)
+    assert df.loc['Consideration', 'SD'] == 0.0
+    assert df.loc['Obligation', 'EX'] == pytest.approx(-700.0, rel=TOL)
+    # the defining identity: the EX column adds down the card
+    assert df.loc['Margin', 'EX'] == pytest.approx(
+        df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX'], abs=1e-6)
+    # Scaled divides by the committed E[total consideration]: -(loss ratio)
+    assert df.loc['Obligation', 'Scaled'] == pytest.approx(-0.70, rel=TOL)
     # the margin SD is the loss SD (constant consideration adds no spread)
-    assert df.loc['margin', 'SD'] == pytest.approx(df.loc['loss', 'SD'])
+    assert df.loc['Margin', 'SD'] == pytest.approx(df.loc['Obligation', 'SD'])
 
 
 def test_summary_df_negative_consideration():
     """A negative consideration passes through signed; the EX column foots."""
     b = build('agg P 5 claims sev gamma 8 cv .5 poisson').make_pnl(-100)
     df = b.summary_df
-    assert df.loc['consideration', 'EX'] == pytest.approx(-100.0)
-    assert df.loc['loss', 'EX'] < 0                       # signed sold loss
-    assert df.loc['margin', 'EX'] == pytest.approx(
-        df.loc['consideration', 'EX'] + df.loc['loss', 'EX'], abs=1e-6)
+    assert df.loc['Consideration', 'EX'] == pytest.approx(-100.0)
+    assert df.loc['Obligation', 'EX'] < 0                 # signed sold loss
+    assert df.loc['Margin', 'EX'] == pytest.approx(
+        df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX'], abs=1e-6)
 
 
 def test_summary_df_function_consideration_has_spread():
@@ -300,9 +301,9 @@ def test_summary_df_function_consideration_has_spread():
     base = build('agg L 5 claims sev gamma 100 cv 0.5 poisson')
     swing = base.make_pnl(lambda x: 100.0 + 0.5 * x)
     df = swing.summary_df
-    assert df.loc['consideration', 'SD'] > 0              # f(X) varies
-    assert df.loc['margin', 'EX'] == pytest.approx(
-        df.loc['consideration', 'EX'] + df.loc['loss', 'EX'], abs=1e-6)
+    assert df.loc['Consideration', 'SD'] > 0              # f(X) varies
+    assert df.loc['Margin', 'EX'] == pytest.approx(
+        df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX'], abs=1e-6)
 
 
 # ----------------------------------------------------------------------
@@ -368,12 +369,19 @@ def test_evaluate_function_consideration_runs():
 # ----------------------------------------------------------------------
 _REINS = 'agg R 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000'
 
-#: the agg-only two-group ledger row template (gross sell + agg cession buy)
-_GCN_ROWS = ['premium', 'loss', 'gross result',
-             'ceded agg premium', 'ceded agg recovery', 'ceded agg result',
-             'net through ceded agg',
-             'total consideration', 'total obligation', 'margin',
-             'total impact']
+#: the agg-only two-group stats template (gross sell + agg cession buy)
+_GCN_ROWS = [
+    ('gross', 'Consideration', 'premium'),
+    ('gross', 'Obligation', 'loss'),
+    ('gross', 'Margin', 'Total'),
+    ('ceded agg', 'Consideration', 'ceded agg premium'),
+    ('ceded agg', 'Obligation', 'ceded agg recovery'),
+    ('ceded agg', 'Margin', 'Total'),
+    ('ceded agg', 'Margin', 'Net'),
+    ('Total', 'Consideration', 'Total'),
+    ('Total', 'Obligation', 'Total'),
+    ('Total', 'Margin', 'Total'),
+    ('Total', 'Margin', 'Impact')]
 
 
 def test_gcn_ledger_rows_and_means_add():
@@ -384,18 +392,19 @@ def test_gcn_ledger_rows_and_means_add():
     """
     pnl = build(_REINS).make_pnl(gross=5500, ceded=1800)
     assert isinstance(pnl, PnL)
-    s = pnl.summary_df
+    s = pnl.stats_df
     assert list(s.index) == _GCN_ROWS
     # group results are step deltas; the grand result sums them
-    assert s.loc['margin', 'EX'] == pytest.approx(
-        s.loc['gross result', 'EX'] + s.loc['ceded agg result', 'EX'],
-        abs=1e-6)
+    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        s.loc[('gross', 'Margin', 'Total'), 'EX']
+        + s.loc[('ceded agg', 'Margin', 'Total'), 'EX'], abs=1e-6)
     # total impact = the cession's step delta (result vs the gross result)
-    assert s.loc['total impact', 'EX'] == pytest.approx(
-        s.loc['ceded agg result', 'EX'], abs=1e-6)
+    assert s.loc[('Total', 'Margin', 'Impact'), 'EX'] == pytest.approx(
+        s.loc[('ceded agg', 'Margin', 'Total'), 'EX'], abs=1e-6)
     # the cession books contra: -premium, +recovery
-    assert s.loc['ceded agg premium', 'EX'] == pytest.approx(-1800.0)
-    assert s.loc['ceded agg recovery', 'EX'] > 0
+    assert s.loc[('ceded agg', 'Consideration', 'ceded agg premium'), 'EX'] \
+        == pytest.approx(-1800.0)
+    assert s.loc[('ceded agg', 'Obligation', 'ceded agg recovery'), 'EX'] > 0
     # the resolved economics carry the scalar-API premiums
     assert pnl.economics['gross'] == pytest.approx(5500.0)
     assert pnl.economics['ceded'] == pytest.approx(1800.0)
@@ -408,13 +417,18 @@ def test_gcn_net_position_drives_moments():
     p = agg.make_pnl(gross=5500, ceded=1800)
     e_net = float((agg.xs * agg.agg_density_net).sum())
     assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
-    s = p.summary_df
-    assert s.loc['total consideration', 'EX'] == pytest.approx(3700.0)
-    assert s.loc['margin', 'EX'] == pytest.approx(p.mean)
+    s = p.stats_df
+    assert s.loc[('Total', 'Consideration', 'Total'), 'EX'] == \
+        pytest.approx(3700.0)
+    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(p.mean)
+    # the card mirrors the grand rows
+    assert p.summary_df.loc[('Total', 'Consideration'), 'EX'] == \
+        pytest.approx(3700.0)
     # q delegates to the grand result GridDistribution
     assert p.q(0.5) == pytest.approx(p.gd.q(0.5))
     # SDs do not add: the cession trims the tail
-    assert s.loc['margin', 'SD'] < s.loc['gross result', 'SD']
+    assert s.loc[('Total', 'Margin', 'Total'), 'SD'] < \
+        s.loc[('gross', 'Margin', 'Total'), 'SD']
 
 
 def test_net_only_on_reins_agg():
@@ -424,7 +438,9 @@ def test_net_only_on_reins_agg():
     assert isinstance(p, PnL)
     e_net = float((agg.xs * agg.agg_density_net).sum())
     assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
-    assert list(p.summary_df.index) == ['consideration', 'loss', 'margin']
+    # single-group: a flat card and a two-level stats sheet
+    assert list(p.summary_df.index) == ['Consideration', 'Obligation', 'Margin']
+    assert list(p.density_df) == ['consideration', 'loss', 'margin']
 
 
 def test_gcn_requires_both_premiums_and_agg_reins():

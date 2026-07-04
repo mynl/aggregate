@@ -17,22 +17,32 @@ TOL = 1e-3
 _BASE = 'pnl A 1000 prem less agg A_e 8 claims sev lognorm 50 cv 1 poisson'  # E[loss] = 8 * 50 = 400
 
 
+def _leg(pnl, label):
+    """The stats_df row of one declared leg, looked up by its Line label
+    (leg-level detail lives on the stats sheet; summary_df is the fixed card)."""
+    return pnl.stats_df.xs(label, level='Line').iloc[0]
+
+
+def _lines(pnl):
+    return list(pnl.stats_df.index.get_level_values('Line'))
+
+
 def test_expense_absent_defaults_to_zero():
     # no expense clause -> no expense obligation leg
-    assert 'expense' not in build(_BASE).summary_df.index
+    assert 'expense' not in _lines(build(_BASE))
 
 
 def test_expense_three_explicit_forms():
     # premium basis: 25% of the 1000 gross premium, booked signed (-)
-    assert build(_BASE + ' less 25% premium expenses').summary_df.loc[
-        'expense', 'EX'] == pytest.approx(-250.0)
+    assert _leg(build(_BASE + ' less 25% premium expenses'), 'expense')['EX'] \
+        == pytest.approx(-250.0)
     # loss basis: a fraction of the ACTUAL loss (stochastic -- rate * loss per
     # atom); its EX is rate * E[loss] = 0.30 * 400 = 120, booked -120
-    assert build(_BASE + ' less 30% loss expenses').summary_df.loc[
-        'expense', 'EX'] == pytest.approx(-120.0, rel=TOL)
+    assert _leg(build(_BASE + ' less 30% loss expenses'), 'expense')['EX'] \
+        == pytest.approx(-120.0, rel=TOL)
     # fixed basis: a currency amount
-    assert build(_BASE + ' less 200 fixed expenses').summary_df.loc[
-        'expense', 'EX'] == pytest.approx(-200.0)
+    assert _leg(build(_BASE + ' less 200 fixed expenses'), 'expense')['EX'] \
+        == pytest.approx(-200.0)
 
 
 def test_loss_basis_expense_is_stochastic():
@@ -41,9 +51,10 @@ def test_loss_basis_expense_is_stochastic():
     The expense leg is ``rate * loss`` per atom, so it carries the loss's spread:
     its CV equals the loss CV (an old point mass at ``rate * E[loss]`` had CV 0).
     """
-    df = build(_BASE + ' less 30% loss expenses').summary_df
-    assert df.loc['expense', 'SD'] > 0
-    assert df.loc['expense', 'CV'] == pytest.approx(df.loc['loss', 'CV'], rel=TOL)
+    p = build(_BASE + ' less 30% loss expenses')
+    assert _leg(p, 'expense')['SD'] > 0
+    assert _leg(p, 'expense')['CV'] == \
+        pytest.approx(_leg(p, 'loss')['CV'], rel=TOL)
 
 
 def test_expense_basis_is_resolved_by_basis():
@@ -61,18 +72,17 @@ def test_expense_basis_is_resolved_by_basis():
 
 def test_expense_singular_alias():
     # ``expense`` and ``expenses`` are both accepted
-    assert build(_BASE + ' less 200 fixed expense').summary_df.loc[
-        'expense', 'EX'] == pytest.approx(-200.0)
+    assert _leg(build(_BASE + ' less 200 fixed expense'), 'expense')['EX'] \
+        == pytest.approx(-200.0)
 
 
 def test_multiple_expense_terms_sum():
     # ``and``-joined terms sum: 25% of 1000 premium + 1000 fixed = 1250 (signed)
     p = build(_BASE + ' less 25% premium expense and 1000 fixed expense')
-    assert p.summary_df.loc['expense', 'EX'] == pytest.approx(
-        -(0.25 * 1000 + 1000.0))
+    assert _leg(p, 'expense')['EX'] == pytest.approx(-(0.25 * 1000 + 1000.0))
     # three terms, mixing all bases (E[loss] = 400)
     p3 = build(_BASE + ' less 10% premium expense and 5% loss expense and 50 fixed expense')
-    assert p3.summary_df.loc['expense', 'EX'] == pytest.approx(
+    assert _leg(p3, 'expense')['EX'] == pytest.approx(
         -(0.10 * 1000 + 0.05 * 400 + 50.0), rel=TOL)
 
 
@@ -82,25 +92,27 @@ def test_single_tuple_expense_spec_still_accepted_via_api():
     a = build('agg R 100 claims sev lognorm 50 cv 1.5 poisson '
               'aggregate net of 2000 xs 3000')
     p = a.make_pnl(gross=5500, ceded=1800, expense_spec=('fixed', 300.0))
-    assert p.summary_df.loc['expense', 'EX'] == pytest.approx(-300.0)
+    assert _leg(p, 'expense')['EX'] == pytest.approx(-300.0)
 
 
 def test_expense_reduces_margin_and_drives_combined_ratio():
     p = build(_BASE + ' less 200 fixed expenses')
-    df = p.summary_df
-    assert df.loc['expense', 'EX'] == pytest.approx(-200.0)  # signed cost
-    assert df.loc['expense', 'SD'] == pytest.approx(0.0, abs=1e-2)  # deterministic
+    s = p.stats_df
+    assert s.loc[('Obligation', 'expense'), 'EX'] == pytest.approx(-200.0)
+    assert s.loc[('Obligation', 'expense'), 'SD'] == \
+        pytest.approx(0.0, abs=1e-2)                     # deterministic
     # obligation legs add: loss + expense = total obligation (signed)
-    assert (df.loc['loss', 'EX'] + df.loc['expense', 'EX']
-            == pytest.approx(df.loc['total obligation', 'EX'], abs=1e-6))
+    assert (s.loc[('Obligation', 'loss'), 'EX']
+            + s.loc[('Obligation', 'expense'), 'EX']
+            == pytest.approx(s.loc[('Obligation', 'Total'), 'EX'], abs=1e-6))
     # the EX column foots: margin = consideration + total obligation
-    assert (df.loc['margin', 'EX']
-            == pytest.approx(df.loc['consideration', 'EX']
-                             + df.loc['total obligation', 'EX'], abs=1e-6))
-    # combined ratio = (loss + expense) / premium = 600 / 1000
-    combined = (-(df.loc['loss', 'EX'] + df.loc['expense', 'EX'])
-                / df.loc['consideration', 'EX'])
-    assert combined == pytest.approx((400 + 200) / 1000, rel=TOL)
+    assert (s.loc[('Margin', 'Total'), 'EX']
+            == pytest.approx(s.loc[('Consideration', 'consideration'), 'EX']
+                             + s.loc[('Obligation', 'Total'), 'EX'], abs=1e-6))
+    # the card tells the same story: combined ratio off the Scaled column
+    card = p.summary_df
+    assert -card.loc['Obligation', 'Scaled'] == \
+        pytest.approx((400 + 200) / 1000, rel=TOL)
 
 
 def test_expense_in_gcn_ledger():
@@ -108,7 +120,7 @@ def test_expense_in_gcn_ledger():
               'aggregate net of 2000 xs 3000')
     p = a.make_pnl(gross=5500, ceded=1800, expense_spec=('premium', 0.2))
     # the expense books on the gross group: -0.2 * 5500
-    assert p.summary_df.loc['expense', 'EX'] == pytest.approx(-1100.0)
+    assert _leg(p, 'expense')['EX'] == pytest.approx(-1100.0)
     # the expense ratio reads off the gross premium (economics on the PnL)
     assert 1100.0 / p.economics['gross'] == pytest.approx(0.2, rel=TOL)
 

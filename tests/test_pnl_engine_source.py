@@ -122,7 +122,7 @@ def test_port_engine_expenses_supported(uw):
            'and 50 fixed expense')
     assert isinstance(p, PnL)
     # one obligation leg for the and-joined group, booked signed
-    assert p.summary_df.loc['expense', 'EX'] == pytest.approx(
+    assert p.stats_df.loc[('Obligation', 'expense'), 'EX'] == pytest.approx(
         -(0.10 * 1000 + 50.0))
 
 

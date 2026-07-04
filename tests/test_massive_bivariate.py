@@ -629,17 +629,26 @@ def test_massive_pnl_one_sweep_ledger(tmp_path):
     massive, incore = _tiny_massive(tmp_path)
     pm = PnL(name='massive', source=massive, groups=_ledger_groups(bs=1.0))
     pi = PnL(name='incore', source=incore, groups=_ledger_groups())
-    # identical row template (the shared _ledger_plan)
+    # identical row template (the shared _ledger_plan) on sheet and card
+    assert list(pm.stats_df.index) == list(pi.stats_df.index)
     assert list(pm.summary_df.index) == list(pi.summary_df.index)
     # the sweep's exact means match the in-core exact means, row by row
-    for row in pm.summary_df.index:
-        assert pm.summary_df.loc[row, 'EX'] == pytest.approx(
-            pi.summary_df.loc[row, 'EX'], abs=1e-12), row
+    for row in pm.stats_df.index:
+        assert pm.stats_df.loc[row, 'EX'] == pytest.approx(
+            pi.stats_df.loc[row, 'EX'], abs=1e-12), row
     # mean(result) == sum of signed leg means -- the derived row is pushed as
     # its own signed-sum function, never a sum of bucketed legs
-    leg_means = sum(pm.summary_df.loc[r, 'EX']
+    leg_means = sum(pm.stats_df.xs(r, level='Line')['EX'].iloc[0]
                     for r in ('premium', 'loss', 'ceded premium', 'recovery'))
     assert abs(pm.mean - leg_means) < 10 * VALIDATION_NOISE
+    # [Massive-Kappa-Second-Sweep]: the massive ladder stays MARGINAL (each
+    # cell the row's own quantile), unlike the in-core scenario columns
+    loss_gd = pm.density_df['loss']
+    assert pm.stats_df.xs('loss', level='Line')['P50'].iloc[0] == \
+        pytest.approx(float(loss_gd.q(0.5)))
+    # the massive card carries full marginal percentiles (grand rows reused
+    # from the sweep's own ledger rows -- no NaN holes)
+    assert not pm.summary_df[['P1', 'Median', 'P99']].isna().any().any()
     # every declared leg is bs > 0 and audited (linear scheme: means match)
     v = pm.validation_df
     assert set(v.index) == {'premium', 'loss', 'ceded premium', 'recovery'}

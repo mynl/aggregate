@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.0.0a134
+
+**[PnL-Punchups-01]** — kappa scenario percentiles, the fixed summary card, and
+the three-level tower stats index (`dev/done/plan-pnl-punchups-01.md`; executes
+[Kappa-Scenario-Percentiles] / [Stats-Tower-Step-Level] / [Summary-Fixed-Card]
+/ [Docs-And-Education] as one bump).
+
+- **[Kappa-Scenario-Percentiles]** — the `PnL.stats_df` /
+  `scaled_stats_df` percentile columns are now **scenario states, not per-row
+  quantiles**: column `Pq` conditions on the exact grand-result slice
+  `result == gd.q(q)` and each cell is the conditional mean
+  `E[row | result == x_q]` — the library's kappa function applied to the
+  ledger. Columns **foot exactly** (legs → totals → result add down the sheet
+  to `x_q`); direction is uniform (small `p` is bad for the holder — the
+  motivating retro bug, a premium-low cell next to a loss-high cell, is an
+  impossible state and gone); the grand-result row remains its own marginal
+  quantile automatically. `EX / SD / CV / Skew` stay marginal. Non-monotone
+  results ("switcheroo") give exact level-set means — documented, not
+  engineered away. The **massive one-sweep route keeps marginal ladders**
+  (conditioning needs a second sweep — tracked as
+  **[Massive-Kappa-Second-Sweep]** in `dev/TODO.md`);
+  `stack_marginal_pnls` is marginal by construction.
+- **[Stats-Tower-Step-Level]** — multi-group `stats_df` / `scaled_stats_df`
+  rows are three-level `(Step, View, Line)` (step = group label, grand block
+  under step `'Total'`); the a132 qualified-string lines (`'base total'`,
+  `'Net through cover'`, `'total impact'`) became levels:
+  `(step, view, 'Total')` / `(step, 'Margin', 'Net')` /
+  `('Total', 'Margin', 'Impact')`. Single-group sheets stay two-level
+  `(View, Line)`.
+- **[Summary-Fixed-Card]** — **breaking reshape**: `PnL.summary_df` is now the
+  fixed headline card, not the ledger dump. Single-group: a flat three-row
+  `Consideration / Obligation / Margin` card (mirror of the flat
+  `Aggregate.summary_df`); tower: one `(Step, View)` block per step + a
+  closing `Total` block with `Net` / `Impact` rows (mirror of the per-unit
+  `Portfolio.summary_df` blocks). Rows scale with steps, never legs. Columns
+  unchanged (`EX / Scaled / SD / CV / Skew / P1 / Median / P99`); the card
+  percentiles are **marginal** quantiles of each row's own distribution
+  ([Decision-Card-Percentiles-Stay-Marginal]) and deliberately do **not**
+  foot — the footing sheet is `stats_df`. With scale = premium the `Scaled`
+  column reads as a combined-ratio decomposition. Leg-level detail moved to
+  `stats_df` (tests migrated wholesale). On the **massive route** the card is
+  complete with no extra sweep keys: a side total is the `group_total` row
+  (>1 leg), the leg row itself (1 leg), or a constant zero (0 legs) — the
+  single-group grand-reference `SimpleNamespace` stubs are gone.
+- **[Docs-And-Education]** — "Reading the P&L sheets" section in the
+  `aggregate._pnl` module docstring (rendered via the Internal Architecture
+  autodoc page): card vs sheet (range vs alignment), why marginal percentiles
+  don't add, the switcheroo caveat, the serve-time view-rename recipe
+  (`df.rename({'Obligation': 'Loss & LAE'}, level='View')` — view labels
+  stay defaults-only per [Decision-View-Labels-Scope]). No DecL / grammar /
+  snapshot changes.
+
 ## 1.0.0a133
 
 **[Label-Canonical]** — one human-facing `label`, no `display_` twins. The

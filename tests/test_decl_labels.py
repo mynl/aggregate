@@ -91,16 +91,26 @@ def test_as_is_reserved(uw):
 # ----------------------------------------------------------------------
 # Premium label -> consideration leg key
 # ----------------------------------------------------------------------
+def _lines(pnl):
+    """The declared-leg Line labels of the stats sheet (leg-level labels
+    live there; summary_df is the fixed card)."""
+    return list(pnl.stats_df.index.get_level_values('Line'))
+
+
+def _leg(pnl, label):
+    return pnl.stats_df.xs(label, level='Line').iloc[0]
+
+
 def test_premium_label_names_consideration_leg():
     p = build(_PNL_BASE.replace('1000 premium', '1000 premium as "GWP"'))
-    assert 'GWP' in p.summary_df.index
-    assert 'consideration' not in p.summary_df.index
-    assert p.summary_df.loc['GWP', 'EX'] == pytest.approx(1000.0)
+    assert 'GWP' in _lines(p)
+    assert 'consideration' not in _lines(p)
+    assert _leg(p, 'GWP')['EX'] == pytest.approx(1000.0)
 
 
 def test_premium_no_label_keeps_default_leg():
     p = build(_PNL_BASE)
-    assert 'consideration' in p.summary_df.index
+    assert 'consideration' in _lines(p)
 
 
 # ----------------------------------------------------------------------
@@ -109,44 +119,42 @@ def test_premium_no_label_keeps_default_leg():
 def test_single_group_and_joined_is_one_leg():
     # backward compatible: and-joined terms sum into one leg named 'expense'
     p = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense')
-    assert 'expense' in p.summary_df.index
+    assert 'expense' in _lines(p)
     # ledger rows are signed: a sold expense books negative
-    assert p.summary_df.loc['expense', 'EX'] == pytest.approx(
-        -(0.25 * 1000 + 200))
+    assert _leg(p, 'expense')['EX'] == pytest.approx(-(0.25 * 1000 + 200))
 
 
 def test_juxtaposed_groups_are_separate_legs():
     p = build(_PNL_BASE + ' less 25% premium expense 200 fixed expense')
-    idx = p.summary_df.index
+    lines = _lines(p)
     # two separate legs, default basis-derived names
-    assert 'premium expense' in idx
-    assert 'fixed expense' in idx
-    assert 'expense' not in idx
-    assert p.summary_df.loc['premium expense', 'EX'] == pytest.approx(-250.0)
-    assert p.summary_df.loc['fixed expense', 'EX'] == pytest.approx(-200.0)
+    assert 'premium expense' in lines
+    assert 'fixed expense' in lines
+    assert 'expense' not in lines
+    assert _leg(p, 'premium expense')['EX'] == pytest.approx(-250.0)
+    assert _leg(p, 'fixed expense')['EX'] == pytest.approx(-200.0)
 
 
 def test_labeled_expense_groups():
     p = build(_PNL_BASE + ' less 25% premium expense as acq 30% loss expense as lae')
-    idx = p.summary_df.index
-    assert 'acq' in idx and 'lae' in idx
-    assert p.summary_df.loc['acq', 'EX'] == pytest.approx(-250.0)
+    lines = _lines(p)
+    assert 'acq' in lines and 'lae' in lines
+    assert _leg(p, 'acq')['EX'] == pytest.approx(-250.0)
 
 
 def test_combine_vs_separate_total_matches():
     # combined (and) vs separate (juxtaposition) must give the same total expense
     combined = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense')
     separate = build(_PNL_BASE + ' less 25% premium expense 200 fixed expense')
-    tot_c = combined.summary_df.loc['total obligation', 'EX']
-    tot_s = separate.summary_df.loc['total obligation', 'EX']
+    tot_c = combined.stats_df.loc[('Obligation', 'Total'), 'EX']
+    tot_s = separate.stats_df.loc[('Obligation', 'Total'), 'EX']
     assert tot_c == pytest.approx(tot_s, rel=TOL)
 
 
 def test_labeled_group_combines_multiple_terms():
     p = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense as "acquisition"')
-    assert 'acquisition' in p.summary_df.index
-    assert p.summary_df.loc['acquisition', 'EX'] == pytest.approx(
-        -(0.25 * 1000 + 200))
+    assert 'acquisition' in _lines(p)
+    assert _leg(p, 'acquisition')['EX'] == pytest.approx(-(0.25 * 1000 + 200))
 
 
 # ----------------------------------------------------------------------
@@ -157,21 +165,24 @@ def test_reins_label_names_cession_rows():
     # leg named by the reins ``as`` label
     p = build('pnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
               'occurrence net of 100 xs 200 deposit 50 as "Cat XL" poisson')
-    idx = p.summary_df.index
-    assert 'Cat XL premium' in idx
-    assert 'ceded occ premium' not in idx
-    # an agg cession is a real buy group named by its label
+    assert 'Cat XL premium' in _lines(p)
+    assert 'ceded occ premium' not in _lines(p)
+    # an agg cession is a real buy group named by its label: it becomes the
+    # step; its result / running net live at (step, 'Margin', ...)
     q = build('pnl RQ 1000 premium less agg RQ_e 850 loss sev lognorm 100 cv 1 '
               'poisson aggregate net of 500 xs 1000 deposit 50 as "Stop Loss"')
-    for row in ('Stop Loss premium', 'Stop Loss recovery', 'Stop Loss result',
-                'net through Stop Loss'):
-        assert row in q.summary_df.index, row
+    lines = _lines(q)
+    for row in ('Stop Loss premium', 'Stop Loss recovery'):
+        assert row in lines, row
+    s = q.stats_df
+    assert ('Stop Loss', 'Margin', 'Total') in s.index
+    assert ('Stop Loss', 'Margin', 'Net') in s.index
 
 
 def test_reins_no_label_keeps_structural_rows():
     p = build('pnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
               'occurrence net of 100 xs 200 deposit 50 poisson')
-    assert 'ceded occ premium' in p.summary_df.index
+    assert 'ceded occ premium' in _lines(p)
 
 
 # ----------------------------------------------------------------------

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0a137
+
+**[PnL-Engine-Name-Roundtrip]** — bug fix. `format_program`/`pprogram` on a
+`pnl` (or `xpnl`) program no longer rewrites the backing loss engine's name:
+the parser preserves the source engine name under `spec['engine_name']`
+(alongside the existing `engine_note`/`engine_label` carve-outs), the writer
+renders it instead of always synthesizing `NAME_e`, and the underwriter pops it
+before the inner Aggregate build. `pnl NetOcc … agg A:NetOcc …` now round-trips
+as `agg A:NetOcc` rather than `agg NetOcc_e`. The engine name remains cosmetic
+(discarded at build); `NAME_e` stays as the fallback for specs built without an
+engine name.
+
 ## 1.0.0a136
 
 **[PnL-Consolidated-XPnL-Walk]** — Phases 2–5 of

@@ -722,8 +722,10 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl') -> _Block:
     intact; the loss engine renders as a nested ``agg NAME_e`` sub-block (sharing
     the ordinary :func:`_render_exposure` / severity / reinsurance / frequency /
     ``approximate`` renderers), and any gross-expense clause follows after a second
-    ``less`` at the P&L level. The synthetic engine name (``NAME_e``) is cosmetic
-    --- it is discarded at build --- but must stay a valid identifier.
+    ``less`` at the P&L level. The engine name round-trips when the source
+    carried one (``spec['engine_name']``); otherwise a synthetic ``NAME_e`` is
+    used. Either way it is cosmetic --- discarded at build --- but must stay a
+    valid identifier.
     """
     from .parser import INHERIT_PREMIUM
     retro = spec.get('retro_terms')
@@ -753,7 +755,8 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl') -> _Block:
         # The engine's own ``as`` label names the P&L's loss leg
         # (dev/plan-yapnl.md label plumbing), so it must round-trip.
         engine_label = _render_label(spec.get('engine_label'))
-        engine = _Block(f'agg {name}_e{engine_label}', [
+        engine_name = spec.get('engine_name', f'{name}_e')
+        engine = _Block(f'agg {engine_name}{engine_label}', [
             _render_exposure(spec),
             _render_layers(spec),
             _render_sev_clause(spec),

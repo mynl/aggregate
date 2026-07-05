@@ -1039,6 +1039,7 @@ class Underwriter(object):
             # label names the **loss leg** in the P&L ledger, so pop it into
             # the recipe (dev/plan-yapnl.md label plumbing).
             spec.pop('engine_note', None)
+            spec.pop('engine_name', None)
             loss_label = spec.pop('engine_label', None)
             consideration = spec.pop('consideration')
             expense_spec = spec.pop('expense_spec', None)

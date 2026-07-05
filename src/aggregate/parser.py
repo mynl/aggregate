@@ -579,6 +579,11 @@ class UnderwritingTransformer(Transformer):
                 spec["engine_note"] = espec["note"]
             if "label" in espec:
                 spec["engine_label"] = espec["label"]
+            # The engine's own name is cosmetic (discarded at build) but is
+            # preserved so it round-trips through the writer instead of being
+            # re-synthesized as ``NAME_e``.
+            if ename:
+                spec["engine_name"] = ename
         self._attach_pnl_head(spec, premium)
         return (kind, name, spec)
 

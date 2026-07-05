@@ -31,10 +31,63 @@ import pandas as pd
 
 from .contract_terms import ContractTerms
 
-__all__ = ['ReinstatementTerms', 'ReinstatementAnalysis']
+__all__ = ['ReinstatementTerms', 'ReinstatementAnalysis',
+           'JOINT_KINK_MIN_BUCKETS']
 
 #: Adverse-tail levels for the headline ``summary_df`` (pre-plan section 13).
 SUMMARY_PERCENTILES = (0.90, 0.95, 0.99, 0.995, 0.996, 0.999)
+
+#: Grid-adequacy floor ([Reinst-Joint-Grid-Adequacy], dev/PLAN-A.md): warn
+#: with :class:`~aggregate.constants.CoarseJointGridWarning` when a treaty
+#: kink region (the occurrence fill width ``y``; an aggregate cover's layer
+#: width) spans fewer than this many buckets of the 2-D joint. A kinked map
+#: on too few buckets carries a Jensen-type O(bs) bias the internal audits
+#: cannot see. Author decision 2026-07-05: 20.
+JOINT_KINK_MIN_BUCKETS = 20
+
+
+def check_joint_grid_adequacy(bs_x, bs_y, terms, agg_reins=None, *,
+                              stacklevel=3):
+    """Warn when the joint grid under-resolves a treaty kink region.
+
+    Parameters
+    ----------
+    bs_x, bs_y : float
+        The joint's axis-0 (gross loss) / axis-1 (unlimited ceded) bucket
+        sizes.
+    terms : ReinstatementTerms or None
+        The occurrence basis; its fill width ``y = terms.limit`` is the occ
+        tier's kink scale (read on axis 1). ``None`` for a guaranteed-cost
+        occurrence joint (no reinstatement kink -- the per-atom ``xpnl``
+        walks reuse this check for their aggregate tier).
+    agg_reins : list of (share, limit, attach), optional
+        A subsequent aggregate cover's layers; each finite width
+        ``share * limit`` is a kink scale of the derived net ``L - A(R)``
+        (or ``L - C``), resolved no better than ``max(bs_x, bs_y)``.
+    """
+    import warnings as _warnings
+    from .constants import CoarseJointGridWarning
+    short = []
+    if terms is not None:
+        n_occ = terms.limit / bs_y
+        if np.isfinite(terms.limit) and n_occ < JOINT_KINK_MIN_BUCKETS:
+            short.append(f'occurrence fill width {terms.limit:g} spans '
+                         f'{n_occ:.1f} buckets (axis-1 bs {bs_y:g})')
+    bs_net = max(bs_x, bs_y)
+    for share, limit, _attach in (agg_reins or []):
+        width = share * limit
+        n_agg = width / bs_net
+        if np.isfinite(width) and n_agg < JOINT_KINK_MIN_BUCKETS:
+            short.append(f'aggregate-cover layer width {width:g} spans '
+                         f'{n_agg:.1f} buckets (bs {bs_net:g})')
+    if short:
+        _warnings.warn(
+            'coarse reinstatement joint: ' + '; '.join(short)
+            + f'. Kinked treaty maps need >= {JOINT_KINK_MIN_BUCKETS} '
+            'buckets across each kink region for grid-accurate recoveries; '
+            'refine with reinstatement_analysis(bs=, log2_x=, log2_y=) '
+            '(forwarded to occ_bivariate).',
+            CoarseJointGridWarning, stacklevel=stacklevel)
 
 
 @dataclass(frozen=True)
@@ -374,6 +427,7 @@ class ReinstatementAnalysis:
     def __init__(self, source, terms, gross_premium, *,
                  percentiles=SUMMARY_PERCENTILES, joint_aggregate=None,
                  agg_recovery=None, agg_ceded_premium=0.0,
+                 agg_feature_terms=None,
                  gross_expense=0.0, occ_commission=0.0, agg_commission=0.0):
         self.source = source
         self.terms = terms
@@ -387,6 +441,16 @@ class ReinstatementAnalysis:
         #: deterministic aggregate-cover ceded premium (the agg layer's
         #: ``deposit | rol | rate``); ``0`` when unknown (programmatic path).
         self.agg_ceded_premium = float(agg_ceded_premium)
+        #: optional variable-rating feature on the aggregate cover
+        #: ([Var-Feature-Composed-With-Occ-Program], reinstatement row of the
+        #: composition matrix): a :class:`~aggregate.contract_terms.SwingTerms`
+        #: / ``SlideTerms`` / ``ProfitCommissionTerms`` / ``CorridorTerms``
+        #: whose map rides the SAME joint via the agg-tier recovery
+        #: ``g(max(L - A(R), 0))`` -- a swing premium ``phi(g_rec)``, a
+        #: sliding / profit commission ``phi(g_rec / P_C) * P_C`` (stochastic,
+        #: folded into the uw legs; the scalar ``agg_commission`` stays 0), or
+        #: a corridor-adjusted recovery. ``None`` => guaranteed-cost tier.
+        self.agg_feature_terms = agg_feature_terms
         #: deterministic Phase-1 expense / commission economics threaded from the
         #: ``PnL`` (gross expense ``E_G``; ceding commissions ``c_occ`` on the
         #: reinstated layer's deposit and ``c_agg`` on the agg cover). All ``0``
@@ -448,34 +512,91 @@ class ReinstatementAnalysis:
         }
         if self.agg_recovery is not None:
             # The agg cover attaches on the net-of-occurrence loss L - A(R)
-            # (occurrence inures to aggregate). ``g`` is its ceder; the agg
-            # recovery g(L - A(R)) and the twice-net loss are deterministic
-            # pushforwards of the same joint. Premium pc_agg is deterministic.
-            # The ceder input is clipped at 0: off-support joint cells (r > l)
-            # carry ~no mass but still evaluate, and the piecewise-linear ceder
-            # is only defined on [0, inf).
-            g0 = self.agg_recovery
-            pc = self.agg_ceded_premium
-
-            def g_rec(l, r):
-                return g0(np.maximum(l - A(r), 0.0))
-
+            # (occurrence inures to aggregate); all three tier cash flows --
+            # recovery REC, premium P, commission K -- are deterministic
+            # pushforwards of the same joint (:meth:`_agg_tier_maps`). A
+            # guaranteed-cost tier has constant P = pc_agg and no K; a
+            # variable feature swaps exactly one map
+            # ([Var-Feature-Composed-With-Occ-Program]).
+            rec, prem, comm = self._agg_tier_maps()
             legs.update({
-                'ceded_agg_loss':  (lambda l, r: g_rec(l, r), True),
-                'net_agg_loss':    (lambda l, r: (l - A(r)) - g_rec(l, r), True),
-                'net_agg_premium': (lambda l, r: P_G - D - h(r) - pc, True),
-                # ceded-agg column UW = recovery - agg ceded premium
-                'ceded_agg_uw':    (lambda l, r: g_rec(l, r) - pc, False),
-                # net-of-everything UW
-                'net_agg_uw':      (lambda l, r: P_G - D - h(r) - pc
-                                    - (l - A(r)) + g_rec(l, r), False),
+                'ceded_agg_loss':  (lambda l, r: rec(l, r), True),
+                'net_agg_loss':    (lambda l, r: (l - A(r)) - rec(l, r), True),
+                'net_agg_premium': (lambda l, r: P_G - D - h(r)
+                                    - prem(l, r), True),
                 # total cession across both tiers (the headline Ceded column)
-                'total_ceded_premium': (lambda l, r: D + h(r) + pc, True),
-                'total_ceded_loss':    (lambda l, r: A(r) + g_rec(l, r), True),
-                'total_ceded_uw':      (lambda l, r: (A(r) + g_rec(l, r))
-                                        - (D + h(r) + pc), False),
+                'total_ceded_premium': (lambda l, r: D + h(r) + prem(l, r),
+                                        True),
+                'total_ceded_loss':    (lambda l, r: A(r) + rec(l, r), True),
             })
+            if comm is None:
+                legs.update({
+                    # ceded-agg column UW = recovery - agg ceded premium
+                    'ceded_agg_uw': (lambda l, r: rec(l, r) - prem(l, r),
+                                     False),
+                    # net-of-everything UW
+                    'net_agg_uw':   (lambda l, r: P_G - D - h(r) - prem(l, r)
+                                     - (l - A(r)) + rec(l, r), False),
+                    'total_ceded_uw': (lambda l, r: (A(r) + rec(l, r))
+                                       - (D + h(r) + prem(l, r)), False),
+                })
+            else:
+                # stochastic sliding / profit commission: a real leg, folded
+                # into the uw columns (a constant expense shift cannot carry
+                # it; the scalar ``agg_commission`` stays 0).
+                legs.update({
+                    'ceded_agg_commission': (lambda l, r: comm(l, r), True),
+                    'ceded_agg_uw': (lambda l, r: rec(l, r) + comm(l, r)
+                                     - prem(l, r), False),
+                    'net_agg_uw':   (lambda l, r: P_G - D - h(r) - prem(l, r)
+                                     - (l - A(r)) + rec(l, r) + comm(l, r),
+                                     False),
+                    'total_ceded_uw': (lambda l, r: (A(r) + rec(l, r)
+                                                     + comm(l, r))
+                                       - (D + h(r) + prem(l, r)), False),
+                })
         return legs
+
+    def _agg_tier_maps(self):
+        """The aggregate tier's three cash-flow maps over the ``(L, R)`` joint.
+
+        Returns ``(recovery, premium, commission)`` -- vectorized
+        ``f(l, r)`` closures (``commission`` is ``None`` when there is no
+        stochastic commission). The raw tier recovery is
+        ``g(max(L - A(R), 0))`` (the ceder input clipped at 0: off-support
+        joint cells ``r > l`` carry ~no mass but still evaluate, and the
+        piecewise-linear ceder is only defined on ``[0, inf)``). A variable
+        feature ([Var-Feature-Composed-With-Occ-Program]) swaps one map:
+
+        * swing (``target_leg == 'ceded_premium'``): premium
+          ``phi(g_rec)``;
+        * slide / profit commission (``'expense'``): commission
+          ``phi(g_rec / P_C) * P_C``;
+        * corridor (``'ceded_loss'``): recovery ``phi(g_rec / P_C) * P_C``.
+
+        Guaranteed cost: premium is the constant ``agg_ceded_premium``
+        (returned broadcast-shaped so composite legs stay vectorized).
+        """
+        A = self.terms.recovery
+        g0 = self.agg_recovery
+        pc = self.agg_ceded_premium
+        ft = self.agg_feature_terms
+
+        def g_raw(l, r):
+            return g0(np.maximum(l - A(r), 0.0))
+
+        tl = getattr(ft, 'target_leg', None)
+        if tl == 'ceded_loss':                    # corridor
+            rec = lambda l, r: ft.phi(g_raw(l, r) / pc) * pc
+        else:
+            rec = g_raw
+        if tl == 'ceded_premium':                 # swing
+            prem = lambda l, r: ft.phi(g_raw(l, r))
+        else:
+            prem = lambda l, r: pc + 0.0 * np.asarray(r)
+        comm = ((lambda l, r: ft.phi(g_raw(l, r) / pc) * pc)
+                if tl == 'expense' else None)
+        return rec, prem, comm
 
     # ------------------------------------------------------------------
     # the leg evaluation: pushforwards + exact moments over the (L, R) joint.

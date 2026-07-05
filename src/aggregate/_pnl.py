@@ -580,7 +580,9 @@ def _ledger_plan(groups, result_name):
     Kinds and payloads: ``'leg'`` ``(gi, side, li)``; ``'group_total'``
     ``(gi, side)``; ``'group_result'`` / ``'running_net'`` ``gi``;
     ``'grand_total'`` ``side``; ``'grand_result'`` / ``'total_impact'``
-    ``None``. Duplicate labels raise here, once, for both routes.
+    ``None``. Duplicate labels raise here, once, for both routes. (A forced
+    single-group tower -- the one-step walk -- keeps this single-group
+    template: the tower shape is presentation only, no grand rows.)
     """
     multi = len(groups) > 1
     plan = []
@@ -734,7 +736,7 @@ class PnL(LabeledMixin):
     def __init__(self, *, name, source, groups=None, role=None,
                  consideration=None, obligation=None, scale=None,
                  result_name='result', label=None, label_map=None,
-                 stitched_rows=None):
+                 stitched_rows=None, force_tower=False):
         if groups is None:
             if role is None:
                 raise ValueError(
@@ -766,6 +768,13 @@ class PnL(LabeledMixin):
         #: drill-down only -- no exhibit is forwarded from it. ``None`` on a
         #: plain P&L.
         self.analysis = None
+        #: The wrapped stochastic engine (the DecL ``pnl`` / ``xpnl`` inner
+        #: :class:`Aggregate` / :class:`Portfolio`), kept for drill-down --
+        #: the ``source`` is the *simplest sufficient object* (a
+        #: GridDistribution / bivariate joint), this is the full engine
+        #: behind it ([Engine-Reference-On-PnL], ``dev/PLAN-A.md``). ``None``
+        #: on a hand-built kernel P&L.
+        self.engine = None
         #: The resolved cession economics dict (``pc_occ`` / ``pc_agg`` /
         #: ``c_occ`` / ``c_agg`` / ``gross`` / ``ceded``) -- the observable of
         #: the DecL ``deposit`` / ``rol`` / ``rate`` / ``cede`` resolution,
@@ -784,6 +793,11 @@ class PnL(LabeledMixin):
         #: stitched ledgers carry gd-backed rows with no shared atoms
         #: (no per-atom values, no ``+`` composition) -- see :meth:`_init_stitched`.
         self._stitched = stitched_rows is not None
+        #: tower presentation: multi-group, or a forced single-group walk
+        #: ([Decision-XPnL-Plain-Is-One-Step-Walk] -- ``force_tower=True``
+        #: presents the one-group ledger as its single (Step, View) block /
+        #: (Step, View, Line) sheet; no grand rows, no impact).
+        self._tower = len(groups) > 1 or bool(force_tower)
         #: the shared row template -- one source of truth for all routes
         self._plan = _ledger_plan(groups, self.result_name)
         if stitched_rows is not None:
@@ -887,7 +901,7 @@ class PnL(LabeledMixin):
         self._grand_obl = grand_total_rows.get('obl') or _EvaluatedLeg(
             'total obligation',
             sum((g.obl_total_values for g in egs), np.zeros(n)), probs)
-        self._grand_result = (rows[self.result_name] if len(egs) > 1
+        self._grand_result = (rows[self.result_name] if self._tower
                               else self._group_result_rows[0])
 
     # ------------------------------------------------------------------
@@ -994,7 +1008,7 @@ class PnL(LabeledMixin):
                 g.label, g.role, group_rows[gi]['cons'],
                 group_rows[gi]['obl'], None))
         self._rows = rows
-        self._grand_result = (rows[self.result_name] if len(groups) > 1
+        self._grand_result = (rows[self.result_name] if self._tower
                               else self._group_result_rows[0])
         # grand totals for the scale / accessors / the summary card. On a
         # multi-group sheet these are the grand_total sweep rows; single-group
@@ -1068,7 +1082,7 @@ class PnL(LabeledMixin):
                 g.label, g.role, group_rows[gi]['cons'],
                 group_rows[gi]['obl'], None))
         self._rows = rows
-        self._grand_result = (rows[self.result_name] if len(groups) > 1
+        self._grand_result = (rows[self.result_name] if self._tower
                               else self._group_result_rows[0])
         self._grand_cons = grand_total_rows.get('cons') \
             or self._card_side_row(0, 'cons')
@@ -1279,20 +1293,22 @@ class PnL(LabeledMixin):
         ``Obligation`` / ``Margin`` read from the grand references -- the
         exact structural mirror of the flat :attr:`Aggregate.summary_df`.
         Multi-group (a tower): one ``(Step, View)`` block per step plus a
-        closing ``'Total'`` block, mirroring the per-unit blocks of
+        closing ``'All'`` block (the a140 author rename -- too many things
+        were already called Total), mirroring the per-unit blocks of
         :attr:`Portfolio.summary_df`::
 
-            ('gross',     'Consideration' | 'Obligation' | 'Margin')
+            ('Gross',     'Consideration' | 'Obligation' | 'Margin')
             ('ceded occ', 'Consideration' | 'Obligation' | 'Margin' | 'Net')
-            ('Total',     'Consideration' | 'Obligation' | 'Margin' | 'Impact')
+            ('All',       'Consideration' | 'Obligation' | 'Margin' | 'Impact')
 
         Per step, ``Margin`` is the group result (the step delta) and ``Net``
         the running net through the step (omitted on the first step, where
-        net = margin); the ``'Total'`` block closes with ``Impact`` = grand
-        result minus the first step's result. Rows scale with steps, never
-        with legs -- the fixed-shape contract. The card always displays
-        ``Margin`` regardless of :attr:`result_name` (which names the flat
-        ledger key only).
+        net = margin); the ``'All'`` block closes with ``Impact`` = grand
+        result minus the first step's result. A forced single-group tower
+        (the one-step walk) is just its one block -- no ``'All'`` block, no
+        impact. Rows scale with steps, never with legs -- the fixed-shape
+        contract. The card always displays ``Margin`` regardless of
+        :attr:`result_name` (which names the flat ledger key only).
 
         Columns ``EX`` / ``Scaled`` (``EX`` over the committed :attr:`scale`)
         / ``SD`` / ``CV`` / ``Skew`` / ``P01`` / ``Median`` / ``P99``. The
@@ -1315,7 +1331,7 @@ class PnL(LabeledMixin):
         --------
         stats_df : the full ledger sheet (every leg, footing columns).
         """
-        if len(self._egroups) == 1:
+        if not self._tower:
             rows = OrderedDict((
                 ('Consideration', self._grand_cons),
                 ('Obligation', self._grand_obl),
@@ -1339,12 +1355,17 @@ class PnL(LabeledMixin):
                 index.append((g.label, 'Net'))
                 recs.append(self._card_stat_row(
                     self._by_kind[('running_net', gi)]))
-        for view, row in (('Consideration', self._grand_cons),
-                          ('Obligation', self._grand_obl),
-                          ('Margin', self._grand_result),
-                          ('Impact', self._by_kind[('total_impact', None)])):
-            index.append(('Total', view))
-            recs.append(self._card_stat_row(row))
+        if len(self._group_specs) > 1:
+            # the closing grand block ('All' since a140 -- too many things
+            # were already called Total); a forced single-group tower (the
+            # one-step walk) is just its one block.
+            for view, row in (('Consideration', self._grand_cons),
+                              ('Obligation', self._grand_obl),
+                              ('Margin', self._grand_result),
+                              ('Impact',
+                               self._by_kind[('total_impact', None)])):
+                index.append(('All', view))
+                recs.append(self._card_stat_row(row))
         return pd.DataFrame(
             recs, columns=_CARD_COLS,
             index=pd.MultiIndex.from_tuples(index, names=['Step', 'View']))
@@ -1361,18 +1382,21 @@ class PnL(LabeledMixin):
 
         Multi-group (a tower): three-level ``(Step, View, Line)``. ``Step``
         is the group label, in ledger order; the grand rows close the sheet
-        under step ``'Total'``. Group results sit at
+        under step ``'All'`` (the a140 author rename -- too many things were
+        already called Total). Group results sit at
         ``(step, 'Margin', 'Total')``, running nets at
         ``(step, 'Margin', 'Net')``, the total impact at
-        ``('Total', 'Margin', 'Impact')`` -- the a132 qualified-string lines
-        (``'<group> total'``, ``'Net through <g>'``) became levels.
+        ``('All', 'Margin', 'Impact')`` -- the a132 qualified-string lines
+        (``'<group> total'``, ``'Net through <g>'``) became levels. A forced
+        single-group tower (the one-step walk) is just its one block -- no
+        grand rows, no impact.
 
         Presentation only -- the flat plan labels stay the canonical row keys
         everywhere else (:attr:`density_df`, :attr:`validation_df`, the sweep
         result keys).
         """
         groups = self._group_specs
-        multi = len(groups) > 1
+        multi = self._tower
         v = _VIEW_DEFAULTS
         tuples = []
         for label, kind, payload in self._plan:
@@ -1387,11 +1411,11 @@ class PnL(LabeledMixin):
             elif kind == 'running_net':
                 t = (groups[payload].label, v['margin'], 'Net')
             elif kind == 'grand_total':
-                t = ('Total', v[payload], 'Total')
+                t = ('All', v[payload], 'Total')
             elif kind == 'grand_result':
-                t = ('Total', v['margin'], 'Total')
+                t = ('All', v['margin'], 'Total')
             else:                                     # 'total_impact'
-                t = ('Total', v['margin'], 'Impact')
+                t = ('All', v['margin'], 'Impact')
             tuples.append(t)
         if not multi:
             return pd.MultiIndex.from_tuples(
@@ -1534,7 +1558,7 @@ class PnL(LabeledMixin):
         out = OrderedDict()
         for r in self._iter_legs():
             out[r.label] = r.gd
-        if len(self._egroups) > 1:
+        if self._tower:
             for r in self._group_result_rows:
                 out[r.label] = r.gd
         out[self._grand_result.label] = self._grand_result.gd

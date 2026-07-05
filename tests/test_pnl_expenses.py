@@ -54,7 +54,7 @@ def test_loss_basis_expense_is_stochastic():
     p = build(_BASE + ' less 30% loss expenses')
     assert _leg(p, 'expense')['SD'] > 0
     assert _leg(p, 'expense')['CV'] == \
-        pytest.approx(_leg(p, 'loss')['CV'], rel=TOL)
+        pytest.approx(_leg(p, 'Loss')['CV'], rel=TOL)
 
 
 def test_expense_basis_is_resolved_by_basis():
@@ -102,12 +102,12 @@ def test_expense_reduces_margin_and_drives_combined_ratio():
     assert s.loc[('Obligation', 'expense'), 'SD'] == \
         pytest.approx(0.0, abs=1e-2)                     # deterministic
     # obligation legs add: loss + expense = total obligation (signed)
-    assert (s.loc[('Obligation', 'loss'), 'EX']
+    assert (s.loc[('Obligation', 'Loss'), 'EX']
             + s.loc[('Obligation', 'expense'), 'EX']
             == pytest.approx(s.loc[('Obligation', 'Total'), 'EX'], abs=1e-6))
     # the EX column foots: margin = consideration + total obligation
     assert (s.loc[('Margin', 'Total'), 'EX']
-            == pytest.approx(s.loc[('Consideration', 'consideration'), 'EX']
+            == pytest.approx(s.loc[('Consideration', 'premium'), 'EX']
                              + s.loc[('Obligation', 'Total'), 'EX'], abs=1e-6))
     # the card tells the same story: combined ratio off the Scaled column
     card = p.summary_df

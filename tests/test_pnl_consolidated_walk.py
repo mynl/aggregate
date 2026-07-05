@@ -1,12 +1,13 @@
-"""[PnL-Consolidated-XPnL-Walk] acceptance and stitched-tower correctness.
+"""[PnL-Consolidated-XPnL-Walk] acceptance and per-atom walk correctness.
 
 Pins the plan's motivating example (the ``Cat`` occ-tower program of
 2026-07-04): the consolidated ``pnl`` card reads net premium against net loss
 -- never "gross premium next to higher loss" -- and the ``xpnl`` walk steps
-gross -> Occ Cover -> Agg Cover -> Total with every row an affine transform
-of an exact engine marginal ([GC-Tower-Marginal-Stitch]). Plus the
-[Construction-Introspection] smoke tests. See
-``dev/plan-pnl-consolidated-xpnl-walk.md``.
+gross -> Occ Cover -> Agg Cover -> All as a per-atom tower over the
+occurrence (gross, ceded) joint (a141: the marginal stitch retired in favor
+of a footing scenario-κ ladder; walk means are joint-grid accurate). Plus
+the [Construction-Introspection] smoke tests. See
+``dev/plan-pnl-consolidated-xpnl-walk.md`` and ``dev/PLAN-A.md``.
 """
 
 import numpy as np
@@ -70,11 +71,10 @@ def test_acceptance_walk_steps(cat):
     _p, x, _a = cat
     assert isinstance(x, PnL)
     # base step = the engine's declared label; cover steps = the reins
-    # ``as`` labels; the grand step key stays the structural 'Total'
-    # ([Decision-Total-Step-Stays-Total])
+    # ``as`` labels; the grand step key is 'All' (a140 rename)
     steps = list(dict.fromkeys(
         x.stats_df.index.get_level_values('Step')))
-    assert steps == ['Gross Book1', 'Occ Cover', 'Agg Cover', 'Total']
+    assert steps == ['Gross Book1', 'Occ Cover', 'Agg Cover', 'All']
 
 
 def test_walk_rows_read_engine_marginals(cat):
@@ -87,12 +87,14 @@ def test_walk_rows_read_engine_marginals(cat):
         return float((xs * pv).sum() / pv.sum())
 
     s = x.stats_df
-    # occ recovery row mean = the engine's ceded-occ marginal mean
+    # the walk rides the occurrence (gross, ceded) joint, so its rows agree
+    # with the engine's exact 1-D marginals to JOINT-GRID accuracy (the
+    # joint runs on a budget-sized common bucket size): tight for linear
+    # rows, ~1e-2 for the kinked agg-tier map
     assert s.loc[('Occ Cover', 'Obligation', 'Occ Cover recovery'), 'EX'] \
-        == pytest.approx(marg_mean('p_agg_ceded_occ'), rel=1e-9)
+        == pytest.approx(marg_mean('p_agg_ceded_occ'), rel=1e-3)
     assert s.loc[('Agg Cover', 'Obligation', 'Agg Cover recovery'), 'EX'] \
-        == pytest.approx(marg_mean('p_agg_ceded'), rel=1e-9)
-    # per-row SDs come off the engine marginal too (exact per row)
+        == pytest.approx(marg_mean('p_agg_ceded'), rel=2e-2)
     def marg_sd(col):
         pv = rd[col].to_numpy()
         pv = pv / pv.sum()
@@ -100,7 +102,7 @@ def test_walk_rows_read_engine_marginals(cat):
         return float(np.sqrt((xs * xs * pv).sum() - m * m))
 
     assert s.loc[('Occ Cover', 'Obligation', 'Occ Cover recovery'), 'SD'] \
-        == pytest.approx(marg_sd('p_agg_ceded_occ'), rel=1e-9)
+        == pytest.approx(marg_sd('p_agg_ceded_occ'), rel=1e-2)
 
 
 def test_walk_running_nets_and_footing(cat):
@@ -110,56 +112,51 @@ def test_walk_running_nets_and_footing(cat):
     # the EX column foots exactly (means add by linearity)
     legs = [i for i in s.index if i[2] not in ('Total', 'Net', 'Impact')]
     assert ex.loc[legs].sum() == pytest.approx(
-        ex.loc[('Total', 'Margin', 'Total')], abs=1e-9)
+        ex.loc[('All', 'Margin', 'Total')], abs=1e-9)
     # running nets are cumulative step results
     assert ex.loc[('Occ Cover', 'Margin', 'Net')] == pytest.approx(
         ex.loc[('Gross Book1', 'Margin', 'Total')]
         + ex.loc[('Occ Cover', 'Margin', 'Total')], abs=1e-9)
     assert ex.loc[('Agg Cover', 'Margin', 'Net')] == pytest.approx(
-        ex.loc[('Total', 'Margin', 'Total')], abs=1e-9)
-    # ...and their distributions read the engine's own net marginals: the
-    # final running net's median = affine of the net-net marginal
-    rd = a.reins_density_df
-    from aggregate._grid_distribution import GridDistribution
-    xs = rd['loss'].to_numpy()
-    pn = rd['p_agg_net'].to_numpy()
-    gd_net = GridDistribution(xs, pn / pn.sum())
-    run = x.density_df['margin']
-    # margin = const - net loss: medians map through the affine transform
-    const = float(run.q(0.5)) + float(gd_net.q(0.5))
-    assert run.q(0.25) == pytest.approx(const - float(gd_net.q(0.75)),
-                                        abs=1e-6)
+        ex.loc[('All', 'Margin', 'Total')], abs=1e-9)
+    # ...and every κ column foots too (per-atom conditional means)
+    k = [c for c in s.columns if c.startswith('κ')][0]
+    assert s[k].loc[legs].sum() == pytest.approx(
+        s.loc[('All', 'Margin', 'Total'), k], abs=1e-6)
 
 
-def test_walk_ladder_marginal_and_flagged(cat):
+def test_walk_ladder_scenario_and_flagged(cat):
     _p, x, _a = cat
     s = x.stats_df
-    # marginal ladder, plain P headers -- the on-sheet signature of
-    # [Decision-Kappa-Shared-Source-Rule]
-    assert 'P01' in s.columns and 'κ01' not in s.columns
+    # one shared joint -> the scenario (κ) ladder
+    # ([Decision-Kappa-Shared-Source-Rule])
+    assert 'κ01' in s.columns and 'P01' not in s.columns
     # ...and flagged in the narrative
-    assert 'marginal' in x.construction_description
+    assert 'κ' in x.construction_description
 
 
-def test_walk_impact_row_is_stat_delta(cat):
+def test_walk_impact_row_is_per_atom_delta(cat):
     _p, x, _a = cat
     s = x.stats_df
-    # impact = grand result - gross step result, per statistic
-    for col in ('EX', 'SD', 'P01', 'P99'):
-        assert s.loc[('Total', 'Margin', 'Impact'), col] == pytest.approx(
-            s.loc[('Total', 'Margin', 'Total'), col]
-            - s.loc[('Gross Book1', 'Margin', 'Total'), col], abs=1e-9)
+    # impact = grand result - gross step result: a TRUE per-atom difference
+    # (its SD / percentiles are of the difference distribution, not deltas
+    # of statistics -- richer than the retired stitched per-stat delta)
+    assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
+        s.loc[('All', 'Margin', 'Total'), 'EX']
+        - s.loc[('Gross Book1', 'Margin', 'Total'), 'EX'], abs=1e-9)
+    assert s.loc[('All', 'Margin', 'Impact'), 'SD'] >= 0
 
 
-def test_walk_has_no_shared_atoms_no_compose():
+
+def test_walk_shares_atoms():
+    # the per-atom walk restored shared atoms (the stitched tower had none):
+    # a per-atom probability vector exists and the ledger is not stitched
     a = build('agg WR 100 claims sev lognorm 50 cv 1.5 poisson '
               'aggregate net of 2000 xs 3000')
     from aggregate._pnl_builders import build_xpnl_walk
     x = build_xpnl_walk(a, gross=5500, ceded=1800)
-    with pytest.raises(ValueError, match='stitched'):
-        x + x
-    with pytest.raises(NotImplementedError):
-        x.evaluate()
+    assert not x._stitched
+    assert x._probs is not None and x._probs.sum() == pytest.approx(1.0)
 
 
 # ----------------------------------------------------------------------
@@ -175,7 +172,7 @@ def test_construction_narratives_present(cat):
     for text, needles in ((p.construction_explanation,
                            ('p_agg_net', 'scenario', 'Replay', 'PnL(name=')),
                           (x.construction_explanation,
-                           ('p_agg_ceded_occ', 'marginal', 'Replay',
+                           ('occ_bivariate', 'foot', 'Replay',
                             'PnL(name='))):
         for needle in needles:
             assert needle in text, needle

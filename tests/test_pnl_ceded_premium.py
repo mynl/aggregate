@@ -60,14 +60,20 @@ def test_cede_books_commission_into_the_net_premium():
     assert _leg(x, 'ceded agg commission')['EX'] == pytest.approx(40.0)
 
 
-def test_any_premium_clause_yields_consolidated_pnl():
-    # no premium clause -> ordinary single-group (net-only) plain pnl
-    plain = build(_BASE + 'poisson aggregate net of 2000 xs 3000')
+def test_any_reinsurance_yields_consolidated_pnl():
+    # reinsurance presence (not economics presence) drives the face
+    # ([XPnL-Zero-Premium-Cessions]): no premium clause -> the SAME
+    # consolidated net view at zero ceded premium, with one warning
+    from aggregate.constants import ZeroPremiumCessionWarning
+    with pytest.warns(ZeroPremiumCessionWarning, match='aggregate cession'):
+        plain = build(_BASE + 'poisson aggregate net of 2000 xs 3000')
     assert isinstance(plain, PnL)
-    assert plain.economics is None
+    assert plain.economics['pc_agg'] == 0.0
     assert list(plain.stats_df.index.names) == ['View', 'Line']
-    # a premium clause -> STILL a single-group pnl: the consolidated net view
-    # ([Decision-PnL-Is-Consolidated]); the walk is one xpnl away
+    # zero ceded premium: net premium = the full gross premium
+    assert _leg(plain, 'net premium')['EX'] == pytest.approx(5000.0)
+    assert 'Loss (net)' in _lines(plain)
+    # a premium clause -> the same consolidated face, priced
     p = build(_BASE + 'poisson aggregate net of 2000 xs 3000 deposit 1500')
     assert isinstance(p, PnL)
     assert list(p.stats_df.index.names) == ['View', 'Line']
@@ -76,6 +82,23 @@ def test_any_premium_clause_yields_consolidated_pnl():
     # consideration = net premium: 5000 - 1500
     assert _leg(p, 'net premium')['EX'] == pytest.approx(3500.0)
     assert p.economics['pc_agg'] == pytest.approx(1500.0)
+    # the two faces differ ONLY by the ceded premium constant
+    assert _leg(plain, 'net premium')['EX'] - 1500.0 == pytest.approx(
+        _leg(p, 'net premium')['EX'])
+
+
+def test_zero_premium_cession_walks():
+    """The zero-premium cession is walkable: xpnl books the cover at zero
+    premium with the real recovery ([XPnL-Zero-Premium-Cessions])."""
+    from aggregate.constants import ZeroPremiumCessionWarning
+    with pytest.warns(ZeroPremiumCessionWarning):
+        x = build(_BASE.replace('pnl T', 'xpnl TX', 1)
+                  + 'poisson aggregate net of 2000 xs 3000')
+    s = x.stats_df
+    steps = list(dict.fromkeys(s.index.get_level_values('Step')))
+    assert steps == ['Gross', 'ceded agg', 'All']
+    assert _leg(x, 'ceded agg premium')['EX'] == 0.0
+    assert _leg(x, 'ceded agg recovery')['EX'] > 0
 
 
 def test_occurrence_only_consolidates_over_net_occ():
@@ -84,7 +107,7 @@ def test_occurrence_only_consolidates_over_net_occ():
     the ``xpnl`` walk."""
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 10% poisson')
     assert _leg(p, 'net premium')['EX'] == pytest.approx(5000 - 0.10 * 100)
-    assert 'loss (net)' in _lines(p)
+    assert 'Loss (net)' in _lines(p)
     assert p.economics['pc_occ'] == pytest.approx(0.10 * 100)
     assert p.economics['pc_agg'] == 0.0
     assert list(p.stats_df.index.names) == ['View', 'Line']
@@ -105,13 +128,13 @@ def test_both_sides_split_and_walk_ledger():
               + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     lines = _lines(x)
-    for row in ('premium', 'loss', 'ceded occ premium', 'ceded occ recovery',
+    for row in ('premium', 'Loss', 'ceded occ premium', 'ceded occ recovery',
                 'ceded agg premium', 'ceded agg recovery',
                 'ceded agg commission'):
         assert row in lines, row
     steps = list(x.stats_df.index.get_level_values('Step'))
-    assert 'gross' in steps and 'ceded occ' in steps \
-        and 'ceded agg' in steps and 'Total' in steps
+    assert 'Gross' in steps and 'ceded occ' in steps \
+        and 'ceded agg' in steps and 'All' in steps
 
 
 def test_walk_means_add_down_the_sheet():
@@ -120,29 +143,28 @@ def test_walk_means_add_down_the_sheet():
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     s = x.stats_df
     # step results foot to their signed legs (means add by linearity)
-    assert s.loc[('gross', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        _leg(x, 'premium')['EX'] + _leg(x, 'loss')['EX'], abs=1e-9)
+    assert s.loc[('Gross', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        _leg(x, 'premium')['EX'] + _leg(x, 'Loss')['EX'], abs=1e-9)
     assert s.loc[('ceded agg', 'Margin', 'Total'), 'EX'] == pytest.approx(
         _leg(x, 'ceded agg premium')['EX']
         + _leg(x, 'ceded agg recovery')['EX']
         + _leg(x, 'ceded agg commission')['EX'], abs=1e-9)
     # the grand result sums the step results exactly
-    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('gross', 'Margin', 'Total'), 'EX']
+    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        s.loc[('Gross', 'Margin', 'Total'), 'EX']
         + s.loc[('ceded occ', 'Margin', 'Total'), 'EX']
         + s.loc[('ceded agg', 'Margin', 'Total'), 'EX'], abs=1e-9)
     # running nets read the engine's own net marginals
     assert s.loc[('ceded agg', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('Total', 'Margin', 'Total'), 'EX'], abs=1e-9)
+        s.loc[('All', 'Margin', 'Total'), 'EX'], abs=1e-9)
     # the consolidated pnl's margin equals the walk's grand result -- to
-    # engine accuracy: the occ marginals come from separate FFTs, so the
-    # gross = ceded + net identity across them holds to FFT accuracy, not
-    # exactly (the walk's EX takes linearity over its own legs; the
-    # consolidated margin reads the net marginal directly)
+    # joint-grid accuracy: the walk rides the occurrence (gross, ceded)
+    # joint (budget-sized common bs), the consolidated margin reads the
+    # engine's exact net marginal
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     assert p.mean == pytest.approx(
-        s.loc[('Total', 'Margin', 'Total'), 'EX'], rel=1e-6)
+        s.loc[('All', 'Margin', 'Total'), 'EX'], rel=5e-3)
 
 
 def test_cede_without_premium_errors():

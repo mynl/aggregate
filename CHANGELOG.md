@@ -1,5 +1,138 @@
 # Changelog
 
+## 1.0.0a141
+
+**[Kappa-Walks] + [Single-Block-One-Step-Walk] + [All-Gross-Loss-Renames]** —
+author feedback on a140 (three items, `dev/PLAN-A.md` addendum).
+
+- **Every DecL `xpnl` walk is now per-atom with a footing scenario (κ)
+  ladder** — the a136 marginal stitch ([GC-Tower-Marginal-Stitch]) is retired
+  from the walks. The source is picked by the occurrence tier: no occ program
+  → the engine's exact gross marginal (1-D atoms; an aggregate cover's legs
+  are functions `g(x)`); occ program → the occurrence `(gross, ceded)` joint
+  from `occ_bivariate` (the ceded-occ aggregate is NOT a function of the
+  gross aggregate, so no 1-D source can carry a footing walk). Consequences:
+  every column — EX and each κ — **foots exactly** down the sheet; the
+  impact row is a true per-atom difference (its SD/percentiles are of the
+  difference distribution, not per-stat deltas); loss-basis LAE books
+  stochastic `rate·l` on all walks (the stitch was all-marginal); running
+  nets carry real covariance. **Trade-off:** occ-bearing walks now run on
+  the joint's budget-sized common bucket size, so their EX values are
+  joint-grid accurate (~1e-3 rel typical; kinked agg-tier maps worse —
+  `CoarseJointGridWarning` now guards these joints too) rather than
+  marginal-exact; the consolidated `pnl` keeps the exact marginals, and
+  builds are slower by one 2-D FFT. The kernel's `stitched_rows` mode stays
+  (the designated no-joint assembly seam, e.g. a future massive-source
+  xpnl; covered by a direct kernel test) but the stitched builder helpers
+  are gone.
+- **One-step walk is a single block** — `xpnl` over a plain engine now
+  renders just its `Gross` block: no duplicated grand rows, no zero impact
+  (`force_tower` is presentation-only; `_ledger_plan(force_grand=)`
+  removed).
+- **Renames (author picks):** the walk base step fallback is **`Gross`**
+  (capital G); the closing grand step's index key is **`All`** (too many
+  things were already called Total) on stats_df, summary_df and every tower
+  — including the massive route; the default loss leg label is **`Loss`**
+  (and `Loss (net)` on the consolidated faces). **Breaking** for code
+  addressing `('Total', 'Margin', …)` tuples, the `'gross'` step or the
+  `'loss'` row default; declared `as` labels are untouched.
+
+## 1.0.0a140
+
+**[Engine-Reference-On-PnL] + [Reinst-Joint-Grid-Adequacy]** — Phases 3–4 of
+`dev/PLAN-A.md`.
+
+- **`PnL.engine`** — every DecL-assembled P&L (and `make_pnl`) now keeps a
+  reference to the wrapped stochastic engine (the inner
+  `Aggregate`/`Portfolio`); `None` on hand-built kernel P&Ls. The `source`
+  stays the *simplest sufficient object*: the plain face now normalizes an
+  engine source to its density as a `GridDistribution` (uniform with the
+  reinsurance faces — "GD in, engine ref kept").
+- **One canonical premium-leg default** — the plain `pnl`'s consideration leg
+  default is now `'premium'` (matching the walk's gross step);
+  `'consideration'` retired as the DecL default. **Breaking** for code
+  addressing the default row label.
+- **`CoarseJointGridWarning`** (new in `constants`) — the reinstatement joint
+  runs on a budget-sized common bucket size; a kinked treaty map across too
+  few buckets carries a Jensen-type O(bs) bias the internal audits cannot
+  see (they compare on the same grid). `reinstatement_analysis` now warns
+  when a kink region — the occurrence fill width, an aggregate cover's layer
+  width — spans fewer than `reinstatement.JOINT_KINK_MIN_BUCKETS` (= 20)
+  buckets, naming the `bs=`/`log2_x=`/`log2_y=` knobs as the remedy.
+- Deferred pending an author format pick: [Walk-Step-Default-Labels]
+  (undeclared cover steps still read `'ceded occ'`/`'ceded agg'`; proposal
+  in `dev/PLAN-A.md` is the layer descriptor, e.g. `'occ 4750 xs 250'`).
+
+## 1.0.0a139
+
+**[Consolidated-Reinstatement-PnL]** — Phase 2 of `dev/PLAN-A.md`: `pnl` over
+a reinstatements program is now the **consolidated single-group net view**
+([Decision-PnL-Is-Consolidated]), closing the [2D-Deferred] carve-out. One
+sell group of 2-D legs over the same (L, R) joint the walk uses: a stochastic
+**net premium** `P_G − D − h(R) − P_agg(L,R) + commissions` (the reinstatement
+premium — and a swing/slide/pc-rated aggregate tier — ride along) against
+**loss (net)** `−(L − A(R) − REC_agg(L,R))`, plus expenses. Loss-basis LAE
+stays stochastic `rate·l` (axis 0 carries the gross loss — nothing off-source
+here, cf. [Consolidated-LAE-Off-Source]). Because both faces are pushforwards
+of the ONE joint, `pnl.mean` equals the `xpnl` walk's grand result **exactly**
+(no engine-drift tolerance). Scenario (κ) ladder; committed scale stays
+`gross − deposit − pc_agg`; `economics` now attached on both reinstatement
+faces. **Breaking:** the step tower is `xpnl`-only — reinstatement programs
+wanting the tower under `pnl` must switch to `xpnl` (the
+`test_reinstatement_decl.py` ledger tests did exactly that).
+
+## 1.0.0a138
+
+**[One-Classifier-Fix]** — Phase 1 of `dev/PLAN-A.md` ([PnL-Faces-Punchlist]):
+the pnl/xpnl assembly now classifies the **occurrence tier**
+{none | gc | reinstatements} and the **aggregate tier** {none | gc | feature}
+independently and dispatches on the pair. The old single-kind elif chain let a
+feature branch shadow the reinstatements clause and mis-scope an inuring
+occurrence program; every cell of the composition matrix is now correct (see
+`tests/test_composition_matrix.py`).
+
+- **(GC occ, feature agg)** — previously silently wrong in both faces
+  ([Var-Feature-Composed-With-Occ-Program]): the walk booked the net-of-occ
+  loss under the gross label and dropped the occ step; the consolidated net
+  premium omitted `- pc_occ + c_occ`. Now: the consolidated face folds the
+  inuring program's constants into the net premium (source = the net-of-occ
+  atoms, the feature's true subject; scenario κ ladder); the walk is the
+  stitched four-block tower gross → ceded occ → feature cover → Total, the
+  feature rows exact pushforwards of the net-of-occ marginal
+  (`_fn_marginal_entry`; marginal P ladder; loss-basis LAE deterministic).
+- **(reinstatements occ, feature agg)** — previously the feature branch won
+  and the reinstatements clause was **silently dropped** (annual cap gone,
+  net-as-gross, occ economics lost; margins could flip sign)
+  ([Reinstatements-Dropped-By-Feature-Branch]). Now the reinstatement branch
+  wins and the feature rides the same (L, R) joint via the tier maps:
+  `ReinstatementAnalysis(agg_feature_terms=)` swaps exactly one map — swing
+  premium `phi(g_rec)`, slide/pc commission `phi(g_rec/P_C)*P_C` (a real
+  stochastic leg, folded into the uw columns; the scalar commission shift
+  stays 0), corridor-adjusted recovery. Both faces remain the 2-D tower
+  ([2D-Deferred]).
+- **[XPnL-Zero-Premium-Cessions]** — reinsurance presence, not economics
+  presence, now drives the face: a cession side with no
+  `deposit`/`rol`/`rate` books at **zero ceded premium** with one
+  `ZeroPremiumCessionWarning` (new in `constants`). `pnl` over an unpriced
+  cession is the consolidated net view (was: the plain face with
+  `consideration`/`loss` labels); `xpnl` walks it (was: NotImplementedError).
+  Feature-decorated sides and reinstated occ layers are exempt (they own /
+  require their premium clause).
+- **[Decision-XPnL-Plain-Is-One-Step-Walk]** — `xpnl` over a plain engine
+  returns the trivial one-step walk (gross → Total; grand rows duplicate the
+  step, impact identically zero) instead of erroring. Kernel:
+  `PnL(force_tower=True)` presents a single-group ledger in the tower shape
+  (`_ledger_plan(force_grand=)`); `build_plain_pnl(walk=)`. `xpnl` over a
+  `port` stays rejected (the total hides its units).
+- Internals: the guaranteed-cost walk's row descriptions are now tagged
+  (`('const', b)` / `('affine', persp, a, b)` / `('fn', persp, f)`) and
+  assembled by the shared `_stitch_ledger`; `build_variable_pnl` gained
+  `econ=`; `Aggregate.reinstatement_analysis` gained `agg_feature_terms=`.
+- Tests: new `tests/test_composition_matrix.py` (hand-pushforward exactness
+  for the composed cells, the reinstatement-cap survival, matrix routing);
+  `test_pnl_ceded_premium` zero-premium flips; the plain-xpnl test asserts
+  the one-step walk.
+
 ## 1.0.0a137
 
 **[PnL-Engine-Name-Roundtrip]** — bug fix. `format_program`/`pprogram` on a

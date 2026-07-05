@@ -69,7 +69,7 @@ def test_swing_build():
     # the walk (xpnl) shows the ceded premium as its own stochastic leg
     x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
               + 'swing basic 500 lcm 0.5 min 500 max 3000')
-    assert [g.label for g in x.groups] == ['gross', 'ceded agg']
+    assert [g.label for g in x.groups] == ['Gross', 'ceded agg']
     assert _leg(x, 'ceded agg premium')['SD'] > 0
     # the two faces agree on the net position
     assert abs(p.mean - x.mean) < 1e-9
@@ -133,7 +133,7 @@ def test_corridor_build():
     # consolidated: fixed net premium (corridor keeps the deposit split);
     # the corridor-adjusted recovery shapes the net loss
     assert _leg(p, 'net premium')['SD'] == 0
-    assert _leg(p, 'loss (net)')['SD'] > 0
+    assert _leg(p, 'Loss (net)')['SD'] > 0
     assert p.analysis._stats_df.loc['ceded_loss', 'cv'] > 0
     _assert_gained(p)
     # the walk shows the corridor-adjusted recovery as the changed leg

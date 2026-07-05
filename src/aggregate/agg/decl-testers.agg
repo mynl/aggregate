@@ -688,3 +688,22 @@ agg IG.Deposit 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs
 agg IG.Rate 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 rate 30%                          note{rate has no base on a bare agg; resolves against the premium of a wrapping pnl};
 agg IG.Reinst 100 claims sev lognorm 50 cv 1.5 occurrence net of 500 xs 500 deposit 150 reinstatements 1 at 100% poisson  note{reinstatement schedule on a plain agg: ignored with warning};
 agg IG.Swing 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 swing basic 500 lcm 0.5          note{variable-rating feature on a plain agg: ignored with warning};
+
+# ============================================================
+# AA. The pnl/xpnl composition matrix ([One-Classifier-Fix])
+#                                   (tests/test_composition_matrix.py)
+# ============================================================
+# Two-tier classification (dev/PLAN-A.md): the occurrence tier
+# {none | gc | reinstatements} and the aggregate tier {none | gc | feature}
+# classify independently and dispatch on the pair. The previously
+# silently-wrong cells: a feature on the aggregate cover composed with an
+# inuring occurrence program -- guaranteed-cost
+# ([Var-Feature-Composed-With-Occ-Program]) or reinstated
+# ([Reinstatements-Dropped-By-Feature-Branch]) -- plus zero-premium cessions
+# (booked at zero ceded premium with a ZeroPremiumCessionWarning) and the
+# one-step plain walk ([Decision-XPnL-Plain-Is-One-Step-Walk]).
+pnl CM.GcFeat inherit premium less agg CM.GcFeat_e 12500 premium at 80% lr 5000 xs 0 sev 200 * pareto 1.6 - 200 occurrence net of 4750 xs 250 rate 55% cede 10% as "Cat Program" poisson aggregate net of 1000 xs 3100 swing basic 100 lcm 1.5 min 200 max 500 as "Swing Program"    note{GC occ + swing agg: consolidated folds - pc_occ + c_occ into the net premium; the feature's subject is the net-of-occ aggregate};
+xpnl CM.GcFeatWalk inherit premium less agg CM.GcFeatWalk_e 12500 premium at 80% lr 5000 xs 0 sev 200 * pareto 1.6 - 200 occurrence net of 4750 xs 250 rate 55% cede 10% as "Cat Program" poisson aggregate net of 1000 xs 3100 swing basic 100 lcm 1.5 min 200 max 500 as "Swing Program"    note{the stitched walk: gross -> ceded occ -> feature cover -> Total; feature rows are pushforwards of the net-occ marginal};
+xpnl CM.ReinstFeat inherit premium less agg CM.ReinstFeat_e 12500 premium at 80% lr 5000 xs 0 sev 200 * pareto 1.6 - 200 occurrence net of 4750 xs 250 rate 55% no reinstatements as "Cat Program" poisson aggregate net of 1000 xs 3100 swing basic 100 lcm 1.5 min 200 max 500 as "Swing Program"    note{reinstated occ + swing agg: the reinstatement branch wins; the swing map rides the same (L, R) joint; the annual cap survives};
+pnl CM.ZeroPrem 5000 premium less agg CM.ZeroPrem_e 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000    note{cession with no premium clause: consolidated at zero ceded premium + ZeroPremiumCessionWarning};
+xpnl CM.OneStep 1000 premium less agg CM.OneStep_e 100 claims sev lognorm 100 cv 2 poisson    note{xpnl over a plain engine: the trivial one-step walk (gross -> Total, impact 0)};

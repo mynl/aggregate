@@ -1145,6 +1145,7 @@ class Aggregate(LabeledMixin):
 
     def reinstatement_analysis(self, gross_premium=None, terms=None, *,
                                percentiles=None, agg_ceded_premium=0.0,
+                               agg_feature_terms=None,
                                gross_expense=0.0, occ_commission=0.0,
                                agg_commission=0.0, bs=None,
                                log2_x=None, log2_y=None):
@@ -1170,8 +1171,18 @@ class Aggregate(LabeledMixin):
             by a DecL ``reinstatements`` clause) if present, else required.
         percentiles : tuple of float, optional
             Adverse-tail levels for the summary table.
+        agg_feature_terms : ContractTerms, optional
+            A variable-rating feature (swing / slide / pc / corridor) on the
+            subsequent aggregate cover; its map rides the same joint via the
+            tier recovery ([Var-Feature-Composed-With-Occ-Program]).
         bs, log2_x, log2_y : optional
-            Forwarded to :meth:`occ_bivariate` for the joint grid.
+            Forwarded to :meth:`occ_bivariate` for the joint grid. The joint
+            runs on a common bucket size far coarser than the 1-D engine
+            grid; a :class:`~aggregate.constants.CoarseJointGridWarning`
+            fires when a treaty kink region (the occurrence fill width, an
+            aggregate cover's layer width) spans fewer than
+            :data:`~aggregate.reinstatement.JOINT_KINK_MIN_BUCKETS` buckets
+            -- these knobs are the remedy ([Reinst-Joint-Grid-Adequacy]).
 
         Returns
         -------
@@ -1213,6 +1224,13 @@ class Aggregate(LabeledMixin):
                 'on the aggregate to default from).')
         biv = self.occ_bivariate(views=('gross', 'ceded'), bs=bs,
                                  log2_x=log2_x, log2_y=log2_y)
+        # [Reinst-Joint-Grid-Adequacy]: warn when a treaty kink region spans
+        # too few buckets of the (coarse, budget-sized) joint -- a kinked map
+        # on too few buckets carries an O(bs) bias the audits cannot see.
+        from .reinstatement import check_joint_grid_adequacy
+        check_joint_grid_adequacy(biv.bivariate.bs_ceded,
+                                  biv.bivariate.bs_net, terms,
+                                  self.agg_reins)
         # decision 3: a subsequent aggregate cover is a deterministic pushforward
         # of the SAME joint via the net-of-occurrence loss L - A(R). Build its
         # ceder g (the recovery map) so the analysis can populate the agg-tier
@@ -1225,6 +1243,7 @@ class Aggregate(LabeledMixin):
         return ReinstatementAnalysis(biv.bivariate, terms, gross_premium,
                                      joint_aggregate=biv, agg_recovery=agg_recovery,
                                      agg_ceded_premium=agg_ceded_premium,
+                                     agg_feature_terms=agg_feature_terms,
                                      gross_expense=gross_expense,
                                      occ_commission=occ_commission,
                                      agg_commission=agg_commission, **kw)
@@ -2801,21 +2820,25 @@ class Aggregate(LabeledMixin):
                     'the consolidated reinsurance view requires reinsurance on '
                     'the risky leg; the aggregate carries no occurrence / '
                     'aggregate treaty.')
-            return build_consolidated_pnl(
+            face = build_consolidated_pnl(
                 self, gross=gross, ceded=ceded, gcn_economics=gcn_economics,
                 expense_spec=expense_spec,
                 consideration_label=consideration_label,
                 loss_label=loss_label, name=self.name,
                 label=self.label)
+            face.engine = self
+            return face
         if consideration is None:
             raise ValueError(
                 'PnL needs a consideration= (or gross=/ceded= for the '
                 'Gross/Ceded/Net view).')
-        return build_plain_pnl(
+        face = build_plain_pnl(
             self, consideration=consideration,
             consideration_label=consideration_label, loss_label=loss_label,
             expense_spec=expense_spec, name=self.name,
             label=self.label)
+        face.engine = self
+        return face
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
                x_min='auto', x_max=None, window_convention=None, **kwargs):

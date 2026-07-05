@@ -145,22 +145,22 @@ def test_group_results_are_step_deltas_and_grand_result_sums():
     of the group results; means add but SDs do not (covariance per atom)."""
     t = _two_group()
     s = t.stats_df
-    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
+    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
         s.loc[('base', 'Margin', 'Total'), 'EX']
         + s.loc[('cover', 'Margin', 'Total'), 'EX'], abs=1e-9)
     assert s.loc[('cover', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('Total', 'Margin', 'Total'), 'EX'], abs=TOL)
+        s.loc[('All', 'Margin', 'Total'), 'EX'], abs=TOL)
     # SDs do not add (the cover trims the tail, so net SD < base SD)
-    assert s.loc[('Total', 'Margin', 'Total'), 'SD'] < \
+    assert s.loc[('All', 'Margin', 'Total'), 'SD'] < \
         s.loc[('base', 'Margin', 'Total'), 'SD']
     # total impact = grand result - first group's result
-    assert s.loc[('Total', 'Margin', 'Impact'), 'EX'] == pytest.approx(
-        s.loc[('Total', 'Margin', 'Total'), 'EX']
+    assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
+        s.loc[('All', 'Margin', 'Total'), 'EX']
         - s.loc[('base', 'Margin', 'Total'), 'EX'], abs=TOL)
     # grand totals foot to the result
-    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('Total', 'Consideration', 'Total'), 'EX']
-        + s.loc[('Total', 'Obligation', 'Total'), 'EX'], abs=1e-9)
+    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        s.loc[('All', 'Consideration', 'Total'), 'EX']
+        + s.loc[('All', 'Obligation', 'Total'), 'EX'], abs=1e-9)
 
 
 def test_plus_composition_concatenates_ledgers():
@@ -212,7 +212,7 @@ def test_stats_df_multiindex_multigroup():
     the group label, in ledger order; per-step totals / results / running
     nets read ('Total') / ('Total') / ('Net') under their step; the grand
     rows close under step 'Total' with the impact at
-    ('Total', 'Margin', 'Impact')."""
+    ('All', 'Margin', 'Impact')."""
     t = PnL(name='m', source=(_VALS, _PROBS), groups=[
         Group('base', 'sell', {'premium': 15.0, 'fee': 1.0},
               {'loss': lambda x: x}),
@@ -230,8 +230,8 @@ def test_stats_df_multiindex_multigroup():
         ('cover', 'Consideration', 'ceded premium'),
         ('cover', 'Obligation', 'recovery'),
         ('cover', 'Margin', 'Total'), ('cover', 'Margin', 'Net'),
-        ('Total', 'Consideration', 'Total'), ('Total', 'Obligation', 'Total'),
-        ('Total', 'Margin', 'Total'), ('Total', 'Margin', 'Impact')]
+        ('All', 'Consideration', 'Total'), ('All', 'Obligation', 'Total'),
+        ('All', 'Margin', 'Total'), ('All', 'Margin', 'Impact')]
     # single-group frames stay two-level; scaled index always matches
     assert list(_simple().stats_df.index.names) == ['View', 'Line']
     assert t.scaled_stats_df.index.equals(s.index)
@@ -410,7 +410,7 @@ def _assert_columns_foot(pnl):
     legs = [lbl for g in pnl.groups
             for leg in (g.consideration + g.obligation)
             for lbl in [leg.label]]
-    result_key = (('Total', 'Margin', 'Total') if multi
+    result_key = (('All', 'Margin', 'Total') if multi
                   else ('Margin', 'Total'))
     for c, q in zip(_KCOLS, (.01, .05, .10, .25, .50, .75, .90, .95, .99)):
         leg_sum = sum(float(s.xs(lbl, level='Line')[c].iloc[0])
@@ -540,18 +540,18 @@ def test_card_tower_blocks():
         ('base', 'Consideration'), ('base', 'Obligation'), ('base', 'Margin'),
         ('cover', 'Consideration'), ('cover', 'Obligation'),
         ('cover', 'Margin'), ('cover', 'Net'),
-        ('Total', 'Consideration'), ('Total', 'Obligation'),
-        ('Total', 'Margin'), ('Total', 'Impact')]
+        ('All', 'Consideration'), ('All', 'Obligation'),
+        ('All', 'Margin'), ('All', 'Impact')]
     assert list(df.index.names) == ['Step', 'View']
     # per-step Margin = the step delta; Total block foots on EX
     s = t.stats_df
     assert df.loc[('base', 'Margin'), 'EX'] == pytest.approx(
         s.loc[('base', 'Margin', 'Total'), 'EX'])
-    assert df.loc[('Total', 'Margin'), 'EX'] == pytest.approx(
-        df.loc[('Total', 'Consideration'), 'EX']
-        + df.loc[('Total', 'Obligation'), 'EX'], abs=1e-9)
-    assert df.loc[('Total', 'Impact'), 'EX'] == pytest.approx(
-        df.loc[('Total', 'Margin'), 'EX'] - df.loc[('base', 'Margin'), 'EX'],
+    assert df.loc[('All', 'Margin'), 'EX'] == pytest.approx(
+        df.loc[('All', 'Consideration'), 'EX']
+        + df.loc[('All', 'Obligation'), 'EX'], abs=1e-9)
+    assert df.loc[('All', 'Impact'), 'EX'] == pytest.approx(
+        df.loc[('All', 'Margin'), 'EX'] - df.loc[('base', 'Margin'), 'EX'],
         abs=1e-9)
 
 
@@ -617,3 +617,51 @@ def test_stack_marginal_pnls_rows_and_impacts():
     assert 'EX' in df.columns and 'P99' in df.columns
     assert df.loc['impact', 'EX'] == pytest.approx(
         df.loc['trimmed', 'EX'] - df.loc['base', 'EX'], abs=1e-9)
+
+
+# ----------------------------------------------------------------------
+# the stitched kernel mode (gd-backed rows, no shared atoms) -- kept as the
+# no-joint assembly seam (e.g. a future massive-source xpnl) after the DecL
+# walks moved to per-atom construction (a141); covered here directly
+# ----------------------------------------------------------------------
+def test_stitched_rows_kernel_mode_direct():
+    from aggregate._grid_distribution import GridDistribution
+    from aggregate._pnl import Group, Leg
+
+    def gd(vals, probs):
+        return GridDistribution(np.asarray(vals, dtype=float),
+                                np.asarray(probs, dtype=float), bs=None,
+                                is_loss_value=False)
+
+    groups = [Group('base', 'sell', [Leg('premium', 15.0)],
+                    [Leg('loss', lambda x: x)]),
+              Group('cover', 'buy', [Leg('cover premium', 3.0)],
+                    [Leg('cover recovery', lambda x: x)])]
+    entries = {
+        'premium': (gd([15.0], [1.0]), 15.0, 0.0),
+        'loss': (gd([-30.0, -10.0, 0.0], [0.25, 0.5, 0.25]), -12.5, 10.9),
+        'base result': (gd([-15.0, 5.0, 15.0], [0.25, 0.5, 0.25]), 2.5, 10.9),
+        'cover premium': (gd([-3.0], [1.0]), -3.0, 0.0),
+        'cover recovery': (gd([0.0, 5.0], [0.5, 0.5]), 2.5, 2.5),
+        'cover result': (gd([-3.0, 2.0], [0.5, 0.5]), -0.5, 2.5),
+        'net through cover': (gd([-10.0, 4.0, 12.0], [0.25, 0.5, 0.25]),
+                              2.0, 8.0),
+        'total consideration': (gd([12.0], [1.0]), 12.0, 0.0),
+        'total obligation': (gd([-25.0, -5.0, 0.0], [0.25, 0.5, 0.25]),
+                             -10.0, 9.0),
+        'result': (gd([-10.0, 4.0, 12.0], [0.25, 0.5, 0.25]), 2.0, 8.0),
+        'total impact': ('delta', 'result', 'base result'),
+    }
+    p = PnL(name='stitched', source=None, groups=groups,
+            result_name='result', stitched_rows=entries)
+    assert p._stitched
+    s = p.stats_df
+    # marginal ladder (plain P headers) -- no shared atoms, no kappa
+    assert 'P01' in s.columns and '\u03ba01' not in s.columns
+    # supplied exact means surface on EX; the impact row is a per-stat delta
+    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(2.0)
+    assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
+        2.0 - 2.5)
+    # no shared atoms: + composition refuses
+    with pytest.raises(ValueError, match='stitched'):
+        p + p

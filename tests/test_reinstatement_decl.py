@@ -30,6 +30,9 @@ def _spec(program):
 _HUMAN = ('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
           'occurrence net of 95% po 100 xs 100 rol 18% '
           'reinstatements 1 free and 1 at 50% and 2 at 100% poisson')
+# the walk (xpnl) face: the 2-D step tower the ledger tests assert
+# ([Decision-PnL-Is-Consolidated]: the pnl face is the consolidated net view)
+_HUMANX = _HUMAN.replace('pnl Cat', 'xpnl Cat', 1)
 
 
 # ----------------------------------------------------------------------
@@ -189,37 +192,37 @@ def test_terms_carry_share_scaled_limit_and_base_premium():
 
 
 def test_ledger_rows_and_means_add():
-    """The reinstatement pnl is a two-group ledger over the (L, R) joint:
-    gross sell group + occ cession buy group; the EX column adds down the
-    sheet and the total impact is the cession's step delta."""
-    p = build(_HUMAN)
+    """The reinstatement walk (xpnl) is a two-group ledger over the (L, R)
+    joint: gross sell group + occ cession buy group; the EX column adds down
+    the sheet and the total impact is the cession's step delta."""
+    p = build(_HUMANX)
     s = p.stats_df
-    for row in (('gross', 'Consideration', 'premium'),
-                ('gross', 'Obligation', 'loss'),
-                ('gross', 'Margin', 'Total'),
+    for row in (('Gross', 'Consideration', 'premium'),
+                ('Gross', 'Obligation', 'Loss'),
+                ('Gross', 'Margin', 'Total'),
                 ('ceded occ', 'Consideration', 'ceded occ premium'),
                 ('ceded occ', 'Obligation', 'ceded occ recovery'),
                 ('ceded occ', 'Margin', 'Total'),
                 ('ceded occ', 'Margin', 'Net'),
-                ('Total', 'Margin', 'Total'),
-                ('Total', 'Margin', 'Impact')):
+                ('All', 'Margin', 'Total'),
+                ('All', 'Margin', 'Impact')):
         assert row in s.index, row
-    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('gross', 'Margin', 'Total'), 'EX']
+    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        s.loc[('Gross', 'Margin', 'Total'), 'EX']
         + s.loc[('ceded occ', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
-    assert s.loc[('Total', 'Margin', 'Impact'), 'EX'] == pytest.approx(
+    assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
         s.loc[('ceded occ', 'Margin', 'Total'), 'EX'], abs=1e-9)
 
 
 def test_ceded_premium_is_stochastic_in_exhibit():
-    p = build(_HUMAN)
+    p = build(_HUMANX)
     s = p.stats_df
     # the headline effect: the stochastic ceded premium D + h(R) shows a
     # nonzero SD on its ledger row, while the gross premium is fixed...
     assert s.loc[('ceded occ', 'Consideration', 'ceded occ premium'), 'SD'] \
         > 0.0
-    assert s.loc[('gross', 'Consideration', 'premium'), 'SD'] == 0.0
+    assert s.loc[('Gross', 'Consideration', 'premium'), 'SD'] == 0.0
     # ...and the analysis's exact engine agrees.
     assert p.analysis._stats_df.loc['ceded_premium', 'cv'] > 0.0
     assert p.analysis._stats_df.loc['gross_premium', 'cv'] == 0.0
@@ -227,7 +230,7 @@ def test_ceded_premium_is_stochastic_in_exhibit():
 
 def test_ledger_mean_check_ceded_premium():
     """E[ceded occ premium row] = -(D + E[h(R)]) -- the plan's mean check."""
-    p = build(_HUMAN)
+    p = build(_HUMANX)
     a = p.analysis
     e_h = a._stats_df.loc['reinstatement_premium', 'mean']
     assert p.stats_df.loc[
@@ -250,7 +253,7 @@ def test_arg_free_programmatic_entry_point():
 # ----------------------------------------------------------------------
 def test_subsequent_aggregate_cover_builds():
     p = build(
-        'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
+        'xpnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] '
         'poisson aggregate net of 85% po 1500 xs 7000 deposit 600')
     # the reinstated occurrence layer + a genuine subsequent agg cover both build;
@@ -264,21 +267,21 @@ def test_subsequent_aggregate_cover_builds():
     # decision 3: the ledger extends to the inuring both-tiers form -- a third
     # buy group over the SAME joint (no new dimension).
     s = p.stats_df
-    for row in (('gross', 'Margin', 'Total'),
+    for row in (('Gross', 'Margin', 'Total'),
                 ('ceded occ', 'Margin', 'Total'),
                 ('ceded occ', 'Margin', 'Net'),
                 ('ceded agg', 'Consideration', 'ceded agg premium'),
                 ('ceded agg', 'Obligation', 'ceded agg recovery'),
                 ('ceded agg', 'Margin', 'Total'),
                 ('ceded agg', 'Margin', 'Net'),
-                ('Total', 'Margin', 'Total')):
+                ('All', 'Margin', 'Total')):
         assert row in s.index, row
     # means add tier by tier down the sheet
     assert s.loc[('ceded occ', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('gross', 'Margin', 'Total'), 'EX']
+        s.loc[('Gross', 'Margin', 'Total'), 'EX']
         + s.loc[('ceded occ', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
-    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
+    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
         s.loc[('ceded occ', 'Margin', 'Net'), 'EX']
         + s.loc[('ceded agg', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
@@ -292,19 +295,19 @@ def test_expense_and_cede_book_as_ledger_legs():
     # a reinstatement pnl with gross expenses + a flat ceding commission books
     # them as cash-flow legs: the and-joined expense group on the gross group,
     # the commission as a received leg on the cession.
-    p = build('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
+    p = build('xpnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% cede 20% reinstatements [0 1] '
               'poisson less 500 fixed expense and 10% premium expense')
     a = p.analysis
     assert a.gross_expense == pytest.approx(1500.0)        # 500 + 10% * 10000
     assert a.occ_commission == pytest.approx(3.6)          # 20% * (18% * 100)
     s = p.stats_df
-    assert s.loc[('gross', 'Obligation', 'expense'), 'EX'] == \
+    assert s.loc[('Gross', 'Obligation', 'expense'), 'EX'] == \
         pytest.approx(-1500.0)
     assert s.loc[('ceded occ', 'Obligation', 'ceded occ commission'),
                  'EX'] == pytest.approx(3.6)
     # the gross group result books the whole expense vs the pure gross UW
-    assert s.loc[('gross', 'Margin', 'Total'), 'EX'] == pytest.approx(
+    assert s.loc[('Gross', 'Margin', 'Total'), 'EX'] == pytest.approx(
         a._stats_df.loc['gross_uw', 'mean'] - 1500.0, rel=1e-6, abs=1e-6)
     # and the cession result credits its commission vs the pure ceded UW
     assert s.loc[('ceded occ', 'Margin', 'Total'), 'EX'] == pytest.approx(
@@ -314,10 +317,43 @@ def test_expense_and_cede_book_as_ledger_legs():
 def test_no_expense_leaves_ledger_pure():
     # without expenses the gross group result is the pure gross underwriting
     # mean (P_G - L).
-    p = build('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
+    p = build('xpnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] poisson')
     a = p.analysis
     assert a.gross_expense == pytest.approx(0.0)
     assert a.occ_commission == pytest.approx(0.0)
-    assert p.stats_df.loc[('gross', 'Margin', 'Total'), 'EX'] == \
+    assert p.stats_df.loc[('Gross', 'Margin', 'Total'), 'EX'] == \
         pytest.approx(a._stats_df.loc['gross_uw', 'mean'], rel=1e-6, abs=1e-6)
+
+
+# ----------------------------------------------------------------------
+# the consolidated (pnl) face ([Decision-PnL-Is-Consolidated]; closes
+# [2D-Deferred]): one sell group of 2-D legs over the SAME joint
+# ----------------------------------------------------------------------
+def test_consolidated_face_shape_and_exact_means():
+    p = build(_HUMAN)
+    s = p.stats_df
+    assert list(s.index.names) == ['View', 'Line']
+    assert list(p.summary_df.index) == ['Consideration', 'Obligation',
+                                        'Margin']
+    a = p.analysis._stats_df
+    # net premium = P_G - D - E[h(R)]; stochastic (the reinstatement premium)
+    row = s.xs('net premium', level='Line').iloc[0]
+    assert row['EX'] == pytest.approx(a.loc['net_premium', 'mean'], rel=1e-9)
+    assert row['SD'] > 0
+    # loss (net) = -E[L - A(R)]
+    assert s.xs('Loss (net)', level='Line').iloc[0]['EX'] == pytest.approx(
+        -a.loc['net_loss', 'mean'], rel=1e-9)
+    # one shared joint -> scenario ladder
+    assert 'κ01' in s.columns
+    assert p.economics['pc_occ'] == pytest.approx(17.1)
+
+
+def test_consolidated_agrees_with_walk_exactly():
+    """Both faces are pushforwards of the ONE joint, so the consolidated
+    net position equals the walk's grand result exactly -- no engine-drift
+    tolerance (unlike the guaranteed-cost occ case)."""
+    p = build(_HUMAN)
+    x = build(_HUMANX)
+    assert p.mean == pytest.approx(
+        x.stats_df.loc[('All', 'Margin', 'Total'), 'EX'], abs=1e-12)

@@ -18,24 +18,29 @@ questions (``dev/plan-pnl-consolidated-xpnl-walk.md``):
     consideration leg (gross - ceded premiums + commissions), the net loss,
     the pnl's own expenses ([Decision-PnL-Is-Consolidated]).
   * :func:`build_variable_pnl` (``walk=False``) -- a variable-rating program
-    consolidated over the gross density: the net premium / net loss legs are
-    the feature's maps folded together.
+    consolidated over the engine's density (the feature's subject: gross, or
+    net-of-occ when an occurrence program inures): the net premium / net
+    loss legs are the feature's maps folded together.
+  * :func:`build_reinstatement_pnl` (``walk=False``) -- a reinstatements
+    program consolidated as one sell group of 2-D legs over the (L, R)
+    joint ([2D-Deferred] closed); agrees with the walk exactly (one joint).
 
 * **``xpnl`` -- "how did I get there?"** The walk: gross -> each cover ->
-  Total, a multi-group :class:`PnL` ([Decision-XPnL-Is-A-Recipe] -- a way of
+  All, a multi-group :class:`PnL` ([Decision-XPnL-Is-A-Recipe] -- a way of
   building, not a new type).
 
-  * :func:`build_xpnl_walk` -- the guaranteed-cost walk,
-    **marginal-stitched** ([GC-Tower-Marginal-Stitch]): every row is an
-    affine transform of an exact ``reins_density_df`` marginal, derived rows
-    read the engine's own net marginals (never cross-row sums), means foot by
-    linearity, the ladder stays marginal (plain ``P`` headers).
+  * :func:`build_xpnl_walk` -- the guaranteed-cost walk, **per-atom** over
+    one shared source: the exact gross marginal when only an aggregate
+    cover exists, the occurrence ``(gross, ceded)`` joint when an
+    occurrence program does (the ceded-occ aggregate is not a function of
+    the gross aggregate). Scenario (``κ``) ladder; every column foots.
   * :func:`build_variable_pnl` (``walk=True``) -- the variable-rating
-    two-group per-atom ledger over the gross density.
-  * :func:`build_reinstatement_pnl` -- the occurrence-reinstatements per-atom
-    2-D ledger over the ``(L, R)`` joint; serves ``xpnl``, and (transitional
-    [2D-Deferred] carve-out) ``pnl`` as well until the consolidated 2-D route
-    lands.
+    two-group per-atom ledger over the shared atoms, or the per-atom tower
+    over the occurrence joint when a guaranteed-cost occurrence program
+    inures ([Var-Feature-Composed-With-Occ-Program]).
+  * :func:`build_reinstatement_pnl` (``walk=True``) -- the
+    occurrence-reinstatements per-atom 2-D step tower over the ``(L, R)``
+    joint.
 
 The expense resolvers (:func:`resolve_expense` / :func:`_resolve_expense_split`)
 relocated here from ``_pnl.py`` unchanged: ``_resolve_expense_split`` is the
@@ -47,7 +52,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ._pnl import Leg, Group, PnL, _ledger_plan
+from ._pnl import Leg, Group, PnL
 
 __all__ = ['build_plain_pnl', 'build_consolidated_pnl', 'build_xpnl_walk',
            'build_variable_pnl', 'build_reinstatement_pnl', 'resolve_expense']
@@ -271,52 +276,11 @@ def _marginal_gd(agg, perspective):
 
 
 # ----------------------------------------------------------------------
-# Stitched-row helpers ([GC-Tower-Marginal-Stitch]): every guaranteed-cost
-# walk row is a signed affine transform of one exact engine marginal
-# ----------------------------------------------------------------------
-def _affine_marginal_entry(agg, perspective, a, b, label):
-    """One stitched ledger row ``a * X + b`` of an exact engine marginal.
-
-    Returns the ``(GridDistribution, exact_mean, exact_sd)`` triple the
-    kernel's stitched construction consumes. The marginal's probabilities are
-    normalized (a clipped tail is a discretization artifact -- the same
-    rationale as the kernel's atoms route); the transform is monotone, so the
-    pushforward is a relabeling of the grid (reversed when ``a < 0``), exact
-    -- no re-gridding, ever.
-    """
-    from ._grid_distribution import GridDistribution
-    rd = agg.reins_density_df
-    x = rd['loss'].to_numpy(dtype=float)
-    p = rd[_GCN_LOSS_MARGINAL[perspective]].to_numpy(dtype=float)
-    tot = float(p.sum())
-    if tot > 0:
-        p = p / tot
-    v = a * x + b
-    if a < 0:
-        v = v[::-1]
-        p = p[::-1]
-    m = float((v * p).sum())
-    var = float((v * v * p).sum()) - m * m
-    sd = var ** 0.5 if var > 0 else 0.0
-    gd = GridDistribution(v, p, bs=None, name=label, is_loss_value=False)
-    return gd, m, sd
-
-
-def _constant_entry(b, label):
-    """A constant stitched ledger row (a fixed premium / expense): a
-    one-atom :class:`GridDistribution` with exact mean ``b`` and sd 0."""
-    from ._grid_distribution import GridDistribution
-    gd = GridDistribution(np.array([float(b)]), np.array([1.0]), bs=None,
-                          name=label, is_loss_value=False)
-    return gd, float(b), 0.0
-
-
-# ----------------------------------------------------------------------
 # The builders
 # ----------------------------------------------------------------------
 def build_plain_pnl(engine, *, consideration, consideration_label=None,
                     loss_label=None, expense_spec=None, name=None,
-                    label=None):
+                    label=None, walk=False):
     """A plain book as a one-group :class:`PnL` over the engine's own density.
 
     Parameters
@@ -329,7 +293,8 @@ def build_plain_pnl(engine, *, consideration, consideration_label=None,
         The book premium: a constant, or a loss-sensitive ``f(x)``.
     consideration_label : str, optional
         The premium leg label (the DecL premium ``as`` clause); default
-        ``'consideration'``.
+        ``'premium'`` (one name across faces -- the walk's gross step uses
+        the same default).
     loss_label : str, optional
         The loss leg label (the engine ``as`` clause); default ``'loss'``.
     expense_spec : list or tuple, optional
@@ -337,6 +302,12 @@ def build_plain_pnl(engine, *, consideration, consideration_label=None,
         terms stochastic (``rate * x``).
     name, label : str, optional
         The P&L handle and its optional human label.
+    walk : bool, default False
+        ``True`` presents the same one-group ledger as a **one-step walk**
+        ([Decision-XPnL-Plain-Is-One-Step-Walk]): the (Step, View) card and
+        (Step, View, Line) sheet with the single gross step and closing
+        grand rows (which duplicate it; the impact is identically zero).
+        The ``xpnl`` face of a plain engine -- boring but uniform.
 
     Returns
     -------
@@ -348,18 +319,39 @@ def build_plain_pnl(engine, *, consideration, consideration_label=None,
     else:
         cons = float(np.sum(np.asarray(consideration, dtype=float)))
         gp = cons
-    loss_key = loss_label or 'loss'
+    # the source is the SIMPLEST sufficient object ([Engine-Reference-On-PnL]):
+    # the engine's own density as a GridDistribution -- what comes out of the
+    # engine, uniform with the reinsurance faces. The full engine stays
+    # reachable via ``pnl.engine`` (set by the DecL dispatch / make_pnl).
+    source = engine
+    if hasattr(engine, 'density_df'):
+        from ._grid_distribution import GridDistribution
+        dd = engine.density_df
+        xs = (dd['loss'].to_numpy(dtype=float) if 'loss' in dd.columns
+              else dd.index.to_numpy(dtype=float))
+        source = GridDistribution(
+            xs, dd['p_total'].to_numpy(dtype=float),
+            bs=getattr(engine, 'bs', None) or None,
+            name=getattr(engine, 'name', None))
+    loss_key = loss_label or 'Loss'
     obligation = [Leg(loss_key, lambda x: x)]
     obligation += _expense_legs(engine, expense_spec, gp,
                                 on_source_loss=True, taken={loss_key})
-    pnl = PnL(name=name, role='sell', source=engine,
-              consideration=[Leg(consideration_label or 'consideration',
-                                 cons)],
-              obligation=obligation, result_name='margin',
-              label=label)
+    prem_key = consideration_label or 'premium'
+    if walk:
+        pnl = PnL(name=name, source=source,
+                  groups=[Group('Gross', 'sell', [Leg(prem_key, cons)],
+                                obligation)],
+                  result_name='margin', label=label, force_tower=True)
+    else:
+        pnl = PnL(name=name, role='sell', source=source,
+                  consideration=[Leg(prem_key, cons)],
+                  obligation=obligation, result_name='margin',
+                  label=label)
+    face = 'one-step walk (xpnl)' if walk else 'consolidated'
     pnl._construction_description = (
-        f'Plain pnl: one sell group over the engine\'s own density '
-        f'({type(engine).__name__}); consideration '
+        f'Plain pnl, {face} face: one sell group over the engine\'s own '
+        f'density ({type(engine).__name__}); consideration '
         f'{"loss-sensitive f(x)" if callable(cons) else f"{cons:g}"}; '
         'scenario (κ) ladder (single shared source).')
     pnl._construction_explanation = (
@@ -367,7 +359,11 @@ def build_plain_pnl(engine, *, consideration, consideration_label=None,
         'Booking: sell -- +consideration, -obligation; loss-basis LAE is '
         'stochastic rate * x (the loss is on-source). For a '
         'reinsurance-bearing engine the density here is the net -- what '
-        'comes out of the engine.\n\n' + pnl._replay_block())
+        'comes out of the engine.'
+        + ('\nOne-step walk: no cover to step through -- the grand rows '
+           'duplicate the gross step and the impact is zero '
+           '([Decision-XPnL-Plain-Is-One-Step-Walk]).' if walk else '')
+        + '\n\n' + pnl._replay_block())
     return pnl
 
 
@@ -412,7 +408,7 @@ def build_consolidated_pnl(agg, *, gross, ceded, gcn_economics=None,
     net_premium = p_gross - pc_occ - pc_agg + c_occ + c_agg
     prem_key = (f'{consideration_label} (net)' if consideration_label
                 else 'net premium')
-    loss_key = f'{loss_label or "loss"} (net)'
+    loss_key = f'{loss_label or "Loss"} (net)'
     persp = 'net_agg' if has_agg else 'net_occ'
     source = _marginal_gd(agg, persp)
     cons = [Leg(prem_key, net_premium)]
@@ -475,32 +471,34 @@ def _consolidated_explanation(agg, pnl, persp, p_gross, pc_occ, pc_agg,
 def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
                     expense_spec=None, consideration_label=None,
                     loss_label=None, name=None, label=None):
-    """The guaranteed-cost ``xpnl`` **walk**: a marginal-stitched multi-group
-    :class:`PnL` ([XPnL-Walk-Recipe] with [GC-Tower-Marginal-Stitch]).
+    """The guaranteed-cost ``xpnl`` **walk**: a per-atom multi-group
+    :class:`PnL` over one shared source ([XPnL-Walk-Recipe]).
 
-    The step tower -- gross -> each cover -> Total -- assembled over the
-    generic group ledger the kernel already has. No joint exists (the
-    cessions are not functions of one observable), so every row is supplied
-    **gd-backed**: an affine transform of one exact engine marginal from
-    ``reins_density_df`` (gross, ceded-occ, net-occ, ceded-agg, net-net).
-    Derived rows (step results, running nets, grand rows) read the engine's
-    own net marginals -- never cross-row sums, which do not exist without
-    atoms. Consequences, all documented on the sheets:
+    The step tower -- gross -> each cover -> All -- books every leg as a
+    function of the ONE shared source, so the stats ladder is the scenario
+    (``\u03ba``) pass and every column **foots** exactly (legs -> totals ->
+    result add down the sheet; [Decision-Kappa-Shared-Source-Rule]). The
+    source is picked by the occurrence tier:
 
-    * means foot by linearity; SDs / percentiles are exact **per row**;
-    * the stats ladder stays **marginal** (plain ``P`` headers -- the
-      on-sheet signature of [Decision-Kappa-Shared-Source-Rule]);
-    * a loss-basis (LAE) expense books as its deterministic
-      ``rate * E[gross loss]`` (any stitched tower is all-marginal -- no
-      hybrid, even where a sub-chain could be per-atom);
-    * the ``total impact`` row is a per-statistic delta (grand result and
-      gross step ride different marginals): the mean is exact, the other
-      cells are deltas of row statistics.
+    * **no occurrence program** -- the engine's exact gross marginal
+      (1-D atoms off ``reins_density_df``); an aggregate cover's legs are
+      functions ``g(x)`` of it.
+    * **occurrence program** -- the occurrence ``(gross, ceded)`` joint from
+      :meth:`~aggregate.Aggregate.occ_bivariate`: the ceded-occ aggregate is
+      NOT a function of the gross aggregate (the random claim count
+      decouples them), so no 1-D source can carry a footing walk. The joint
+      runs on a budget-sized common bucket size -- coarser than the engine
+      grid; :class:`~aggregate.constants.CoarseJointGridWarning` guards
+      kinked aggregate-tier maps ([Reinst-Joint-Grid-Adequacy]). A
+      subsequent aggregate cover recovers ``g(max(L - C, 0))`` on the same
+      joint.
 
-    Step labels per [Decision-Total-Step-Stays-Total]: the base step is the
-    engine's declared label (fallback ``'gross'``); cover steps are the reins
-    ``as`` labels (fallback ``'ceded occ'`` / ``'ceded agg'``); the grand
-    step's index key stays the structural ``'Total'``.
+    Loss-basis LAE books stochastic ``rate * l`` (the gross loss is
+    on-source -- an improvement over the retired marginal stitch, which was
+    all-marginal). Step labels: the base step is the engine's declared label
+    (fallback ``'Gross'``); cover steps are the reins ``as`` labels
+    (fallback ``'ceded occ'`` / ``'ceded agg'``); the closing grand step's
+    index key is ``'All'`` (a140 rename).
 
     Returns
     -------
@@ -508,6 +506,7 @@ def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
         A plain multi-group :class:`PnL` -- xpnl is a way of building, not a
         new type ([Decision-XPnL-Is-A-Recipe]).
     """
+    from . import _reinsurance
     rd = agg.reins_density_df
     if rd is None:
         raise ValueError(
@@ -519,173 +518,88 @@ def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
         agg, gross, ceded, gcn_economics)
     occ_base = _first_reins_label(agg, 'occ_reins') or 'ceded occ'
     agg_base = _first_reins_label(agg, 'agg_reins') or 'ceded agg'
-    base_step = loss_label or 'gross'
+    base_step = loss_label or 'Gross'
     prem_key = consideration_label or 'premium'
-    loss_key = loss_label or 'loss'
+    loss_key = loss_label or 'Loss'
 
-    # the gross sell group; LAE books deterministic (all-marginal, no hybrid)
-    gross_obl = [Leg(loss_key, lambda x: x)]
+    gross_obl = [Leg(loss_key, lambda l: l)]     # reads axis 0 on a joint
     gross_obl += _expense_legs(agg, expense_spec, p_gross,
-                               on_source_loss=False,
+                               on_source_loss=True,
                                taken={prem_key, loss_key})
-    e_const = float(sum(leg.func for leg in gross_obl[1:]))
     groups = [Group(base_step, 'sell', [Leg(prem_key, p_gross)], gross_obl)]
-    # one buy group per cover, walk order: occ inures before agg
-    covers = []                    # (group index, perspective, pc, commission)
     if has_occ:
-        obl = [Leg(f'{occ_base} recovery', lambda x: x)]
+        # the occurrence (gross, ceded) joint -- built per walk
+        biv = agg.occ_bivariate(views=('gross', 'ceded'))
+        from .reinstatement import check_joint_grid_adequacy
+        check_joint_grid_adequacy(biv.bivariate.bs_ceded,
+                                  biv.bivariate.bs_net, None, agg.agg_reins)
+        source = biv.bivariate
+        occ_obl = [Leg(f'{occ_base} recovery', lambda l, c: c, is2d=True)]
         if c_occ:
-            obl.append(Leg(f'{occ_base} commission', c_occ))
+            occ_obl.append(Leg(f'{occ_base} commission', c_occ))
         groups.append(Group(occ_base, 'buy',
-                            [Leg(f'{occ_base} premium', pc_occ)], obl))
-        covers.append((len(groups) - 1, 'ceded_occ', 'net_occ', pc_occ,
-                       c_occ))
-    if has_agg:
-        obl = [Leg(f'{agg_base} recovery', lambda x: x)]
+                            [Leg(f'{occ_base} premium', pc_occ)], occ_obl))
+        if has_agg:
+            g_agg, _netter = _reinsurance.make_ceder_netter(agg.agg_reins)
+
+            def agg_rec(l, c):
+                # clip at 0: off-support joint cells (c > l) carry ~no mass
+                # but still evaluate.
+                return g_agg(np.maximum(l - c, 0.0))
+
+            a_obl = [Leg(f'{agg_base} recovery', agg_rec, is2d=True)]
+            if c_agg:
+                a_obl.append(Leg(f'{agg_base} commission', c_agg))
+            groups.append(Group(agg_base, 'buy',
+                                [Leg(f'{agg_base} premium', pc_agg)], a_obl))
+    else:
+        # aggregate cover only: everything is a function of the gross atoms
+        source = _marginal_gd(agg, 'gross')
+        g_agg, _netter = _reinsurance.make_ceder_netter(agg.agg_reins)
+        a_obl = [Leg(f'{agg_base} recovery', g_agg)]
         if c_agg:
-            obl.append(Leg(f'{agg_base} commission', c_agg))
+            a_obl.append(Leg(f'{agg_base} commission', c_agg))
         groups.append(Group(agg_base, 'buy',
-                            [Leg(f'{agg_base} premium', pc_agg)], obl))
-        covers.append((len(groups) - 1, 'ceded_agg', 'net_agg', pc_agg,
-                       c_agg))
-    final_net = 'net_agg' if has_agg else 'net_occ'
-
-    # ------------------------------------------------------------------
-    # supply every plan row as (marginal perspective | constant, a, b):
-    # the sum of a stage's rows is always measurable on one engine marginal
-    # (loss_g - R_occ = X_net-occ, etc.) -- the stitch's footing contract.
-    # The exact MEAN of every derived row is the signed sum of its
-    # constituent leg means (linearity -- the EX column foots exactly); its
-    # distribution (SD / percentiles) reads the engine's own marginal, which
-    # agrees with that mean up to the engine's FFT / tail-clipping dust
-    # (the massive-route pattern: exact mean alongside the realized gd).
-    # ------------------------------------------------------------------
-    result_name = 'margin'
-    plan = _ledger_plan(groups, result_name)
-    # per-cover running constants: premium in, expenses and ceded premiums
-    # out, commissions back in
-    desc = {}
-    # gross group (index 0)
-    desc[('leg', (0, 'cons', 0))] = (None, 0.0, p_gross)
-    desc[('leg', (0, 'obl', 0))] = ('gross', -1.0, 0.0)
-    for li, leg in enumerate(gross_obl[1:], start=1):
-        desc[('leg', (0, 'obl', li))] = (None, 0.0, -float(leg.func))
-    desc[('group_total', (0, 'cons'))] = (None, 0.0, p_gross)
-    desc[('group_total', (0, 'obl'))] = ('gross', -1.0, -e_const)
-    desc[('group_result', 0)] = ('gross', -1.0, p_gross - e_const)
-    run_const = p_gross - e_const
-    for gi, ceded_persp, net_persp, pc, comm in covers:
-        desc[('leg', (gi, 'cons', 0))] = (None, 0.0, -pc)
-        desc[('leg', (gi, 'obl', 0))] = (ceded_persp, 1.0, 0.0)
-        if comm:
-            desc[('leg', (gi, 'obl', 1))] = (None, 0.0, comm)
-        desc[('group_total', (gi, 'cons'))] = (None, 0.0, -pc)
-        desc[('group_total', (gi, 'obl'))] = (ceded_persp, 1.0, comm)
-        desc[('group_result', gi)] = (ceded_persp, 1.0, comm - pc)
-        run_const += comm - pc
-        desc[('running_net', gi)] = (net_persp, -1.0, run_const)
-    desc[('grand_total', 'cons')] = (None, 0.0, p_gross - pc_occ - pc_agg)
-    desc[('grand_total', 'obl')] = (final_net, -1.0,
-                                    -e_const + c_occ + c_agg)
-    desc[('grand_result', None)] = (final_net, -1.0, run_const)
-
-    # exact leg means, then derived means by linearity (the EX column
-    # foots exactly by construction)
-    leg_mean = {}
-    for key, (persp, a, b) in desc.items():
-        if key[0] != 'leg':
-            continue
-        if persp is None:
-            leg_mean[key[1]] = b
-        else:
-            _gd, m, _sd = _affine_marginal_entry(agg, persp, a, b, 'tmp')
-            leg_mean[key[1]] = m
-
-    def _side_mean(gi, side, n_legs):
-        return sum(leg_mean[(gi, side, li)] for li in range(n_legs))
-
-    group_mean = {}
-    for gi, g in enumerate(groups):
-        group_mean[gi] = (_side_mean(gi, 'cons', len(g.consideration))
-                          + _side_mean(gi, 'obl', len(g.obligation)))
-
-    def _linear_mean(kind, payload):
-        if kind == 'leg':
-            return leg_mean[payload]
-        if kind == 'group_total':
-            gi, side = payload
-            g = groups[gi]
-            return _side_mean(gi, side, len(g.consideration if side == 'cons'
-                                            else g.obligation))
-        if kind == 'group_result':
-            return group_mean[payload]
-        if kind == 'running_net':
-            return sum(group_mean[gi] for gi in range(payload + 1))
-        if kind == 'grand_total':
-            return sum(_side_mean(gi, payload,
-                                  len(g.consideration if payload == 'cons'
-                                      else g.obligation))
-                       for gi, g in enumerate(groups))
-        return sum(group_mean.values())          # grand_result
-
-    entries = {}
-    for row_label, kind, payload in plan:
-        if kind == 'total_impact':
-            entries[row_label] = ('delta', result_name,
-                                  f'{groups[0].label} result')
-            continue
-        persp, a, b = desc[(kind, payload)]
-        gd, _m, sd = (_constant_entry(b, row_label) if persp is None
-                      else _affine_marginal_entry(agg, persp, a, b,
-                                                  row_label))
-        entries[row_label] = (gd, _linear_mean(kind, payload), sd)
-
-    pnl = PnL(name=name or agg.name, source=agg, groups=groups,
-              result_name=result_name, label=label, stitched_rows=entries)
+                            [Leg(f'{agg_base} premium', pc_agg)], a_obl))
+    pnl = PnL(name=name or agg.name, source=source, groups=groups,
+              result_name='margin', label=label)
     pnl.economics = dict(gcn_economics) if gcn_economics is not None \
         else {'gross': float(gross), 'ceded': float(ceded)}
+    src_desc = ('the occurrence (gross, ceded) joint' if has_occ
+                else 'the exact gross marginal')
     pnl._construction_description = (
-        f'xpnl walk: {len(groups)}-step marginal-stitched tower '
-        f'({" -> ".join(g.label for g in groups)} -> Total) over the exact '
-        'reins_density_df marginals; means foot by linearity, SDs / '
-        'percentiles exact per row; marginal (P) ladder -- no shared joint.')
-    pnl._construction_explanation = _walk_explanation(
-        agg, pnl, groups, covers, p_gross, e_const, final_net)
+        f'xpnl walk: {len(groups)}-step per-atom tower '
+        f'({" -> ".join(g.label for g in groups)} -> All) over '
+        f'{src_desc}; scenario (\u03ba) ladder -- every column foots.')
+    pnl._construction_explanation = _walk_explanation(agg, pnl, has_occ,
+                                                      src_desc)
     return pnl
 
 
-def _walk_explanation(agg, pnl, groups, covers, p_gross, e_const, final_net):
-    """The full [Construction-Introspection] story for a stitched walk."""
+def _walk_explanation(agg, pnl, has_occ, src_desc):
+    """The full [Construction-Introspection] story for a per-atom walk."""
     econ = pnl.economics
-    step_lines = [
-        f"  step {groups[0].label!r} (sell): premium {p_gross:g} in; loss "
-        "reads reins_density_df['p_agg_gross']; expenses "
-        f'{e_const:g} (loss-basis LAE deterministic -- off-source on a '
-        'stitched tower).']
-    for gi, ceded_persp, net_persp, pc, comm in covers:
-        step_lines.append(
-            f'  step {groups[gi].label!r} (buy): ceded premium {pc:g} out; '
-            f'recovery reads '
-            f'reins_density_df[{_GCN_LOSS_MARGINAL[ceded_persp]!r}]'
-            + (f'; commission {comm:g} back' if comm else '')
-            + f'; running net reads '
-              f'reins_density_df[{_GCN_LOSS_MARGINAL[net_persp]!r}].')
     lines = [
-        f'xpnl walk {pnl.label!r} ([XPnL-Walk-Recipe], marginal-stitched).',
+        f'xpnl walk {pnl.label!r} ([XPnL-Walk-Recipe], per-atom).',
         f'Engine: {agg.name!r}'
         + (f' -- occurrence reinsurance {agg.occ_reins}'
            if agg.occ_reins is not None else '')
         + (f' -- aggregate reinsurance {agg.agg_reins}'
            if agg.agg_reins is not None else '') + '.',
         f'Economics resolution: {econ!r}.',
-        'Rows, and the marginal each reads:',
-        *step_lines,
+        f'Source: {src_desc}'
+        + (' (occ_bivariate; the ceded-occ aggregate is not a function of '
+           'the gross aggregate, so a footing walk needs the joint -- built '
+           'on a budget-sized common bucket size, coarser than the engine '
+           'grid; CoarseJointGridWarning guards kinked aggregate-tier maps).'
+           if has_occ else
+           ' (1-D atoms; every cover leg is a function g(x) of it).'),
         'Booking: sell books +consideration / -obligation, buy the contra; '
-        'the EX column adds down the sheet exactly (linearity).',
-        'Ladder: marginal (plain P headers) -- the rows ride separate '
-        'engine marginals, so there is no joint to condition on '
-        '([Decision-Kappa-Shared-Source-Rule]); the total impact row is a '
-        'per-statistic delta (mean exact).',
+        'every ledger row is a per-atom partial sum, so the EX column and '
+        'every \u03ba column foot exactly; loss-basis LAE is stochastic '
+        'rate * l (the gross loss is on-source).',
+        'Ladder: scenario (\u03ba) -- one shared source '
+        '([Decision-Kappa-Shared-Source-Rule]).',
         '',
         pnl._replay_block(),
     ]
@@ -697,7 +611,37 @@ def _walk_explanation(agg, pnl, groups, covers, p_gross, e_const, final_net):
 # ([Builders-Variable-Features]: a feature never changes the machinery --
 #  it changes one leg's function)
 # ----------------------------------------------------------------------
-def build_variable_pnl(agg, *, walk=False, expense_spec=None,
+def _feature_maps(terms, tl, g_ceder, P_C, C):
+    """The three signed-magnitude cash-flow maps of an aggregate feature.
+
+    Returns ``(prem_f, rec_f, comm_f)`` -- positive-magnitude vectorized
+    functions of the feature's subject loss ``x`` (the aggregate the
+    decorated layer attaches to): the ceded premium (swing's
+    ``phi(g(x))``, else the constant deposit), the recovery (corridor's
+    adjusted cession, else the layer ceder), and the commission credit
+    (slide / pc's ``phi(LR) * P_C``, else the constant ``cede``
+    commission). Constants are wrapped as functions so callers can compose
+    without case analysis.
+    """
+    def _const(v):
+        return lambda x: np.full(np.shape(x), float(v), dtype=float)
+
+    if tl == 'ceded_premium':                # swing supplies the premium
+        prem_f = lambda x: terms.phi(g_ceder(x))
+    else:
+        prem_f = _const(P_C)
+    if tl == 'ceded_loss':                   # corridor: adjusted recovery
+        rec_f = lambda x: terms.phi(g_ceder(x) / P_C) * P_C
+    else:
+        rec_f = g_ceder
+    if tl == 'expense':                      # slide / pc: stochastic credit
+        comm_f = lambda x: terms.phi(g_ceder(x) / P_C) * P_C
+    else:
+        comm_f = _const(C)
+    return prem_f, rec_f, comm_f
+
+
+def build_variable_pnl(agg, *, walk=False, econ=None, expense_spec=None,
                        consideration_label=None, loss_label=None, name=None,
                        label=None):
     """A retro / swing / slide / pc / corridor program as a :class:`PnL`.
@@ -705,25 +649,34 @@ def build_variable_pnl(agg, *, walk=False, expense_spec=None,
     Reads the feature attached to ``agg`` by the underwriter
     (``variable_terms`` / ``variable_layer`` / ``variable_gross_premium`` /
     ``variable_ceded_premium`` / ``variable_commission``) and books the
-    cash-flow parts over the **gross** 1-D density. Two faces
-    ([Decision-2D-Is-Computation-Only] -- these features stay 1-D):
+    cash-flow parts over the engine's 1-D density. The feature's subject is
+    **what the engine emits**: the gross aggregate on an unreinsured book,
+    the net-of-occurrence aggregate when a guaranteed-cost occurrence
+    program inures ([Var-Feature-Composed-With-Occ-Program],
+    ``dev/PLAN-A.md``). Two faces ([Decision-2D-Is-Computation-Only] --
+    these features stay 1-D):
 
     * ``walk=False`` (the ``pnl`` face) -- the **consolidated** single-group
       net view: one net-premium consideration leg (the feature's map folded
-      in: ``P_G - phi(ceded(x))`` for swing, the sliding / profit commission
-      credited, the fixed split otherwise) and the net loss
-      (``x - recovery(x)``, corridor-adjusted where applicable). Retro has no
-      cession, so its consolidated ledger is the plain shape with the
-      stochastic ``terms.phi`` premium (the acceptance pair).
-    * ``walk=True`` (the ``xpnl`` face) -- the step tower: the gross ``sell``
-      group plus a real cession ``buy`` group, with exactly **one** leg
-      swapped for the feature's ``terms.phi``-driven map (stochastic ceded
-      premium; sliding / profit commission; the corridor-adjusted recovery).
+      in, plus the inuring occurrence program's constants
+      ``- pc_occ + c_occ``) and the net loss (``x - recovery(x)``,
+      corridor-adjusted where applicable). Retro has no cession, so its
+      consolidated ledger is the plain shape with the stochastic
+      ``terms.phi`` premium (the acceptance pair).
+    * ``walk=True`` (the ``xpnl`` face) -- the step tower. With no
+      occurrence program: the per-atom two-group ledger over the shared
+      atoms. With an inuring occurrence program: the per-atom tower over
+      the occurrence ``(gross, ceded)`` joint, gross -> ceded occ ->
+      feature cover -> All (the feature's subject is the net-of-occ
+      ``max(L - C, 0)``). Scenario (``κ``) ladder either way -- every
+      column foots.
 
-    Either face rides the gross atoms (one shared source), so the stats
-    ladder is the scenario (``κ``) pass and loss-basis LAE stays stochastic
-    ``rate * x``. Attach the drill-down analysis afterwards
-    (``pnl.analysis``).
+    Parameters
+    ----------
+    econ : dict, optional
+        The resolved cession economics (``pc_occ`` / ``c_occ`` for the
+        inuring occurrence program; ``pc_agg`` / ``c_agg`` mirror the
+        feature deposit / commission). ``None`` -> all zero.
 
     Returns
     -------
@@ -734,39 +687,77 @@ def build_variable_pnl(agg, *, walk=False, expense_spec=None,
     P_C = float(getattr(agg, 'variable_ceded_premium', 0.0))
     C = float(getattr(agg, 'variable_commission', 0.0))
     layer = getattr(agg, 'variable_layer', None)
+    pc_occ = float(econ.get('pc_occ', 0.0)) if econ else 0.0
+    c_occ = float(econ.get('c_occ', 0.0)) if econ else 0.0
+    has_occ = getattr(agg, 'occ_reins', None) is not None
     prem_key = consideration_label or 'premium'
-    loss_key = loss_label or 'loss'
+    loss_key = loss_label or 'Loss'
     tl = terms.target_leg
     feature = type(terms).__name__
     if layer is None or not walk:
         pnl = _build_variable_consolidated(
             agg, terms, P_G, P_C, C, layer, tl, expense_spec,
-            consideration_label, prem_key, loss_key, name, label)
+            consideration_label, prem_key, loss_key, name, label,
+            pc_occ=pc_occ, c_occ=c_occ)
+    elif has_occ:
+        pnl = _build_variable_walk_occ(
+            agg, terms, P_G, P_C, C, layer, tl, expense_spec, prem_key,
+            loss_key, name, label, pc_occ=pc_occ, c_occ=c_occ)
     else:
         pnl = _build_variable_walk(
             agg, terms, P_G, P_C, C, layer, tl, expense_spec, prem_key,
             loss_key, name, label)
-    face = 'walk (xpnl)' if walk and layer is not None else 'consolidated'
+    if econ is not None:
+        pnl.economics = dict(econ)
+    subject = ('the net-of-occurrence density' if has_occ
+               else 'the gross density')
+    if walk and layer is not None and has_occ:
+        face, ladder = ('per-atom walk over the occurrence joint (xpnl)',
+                        'scenario (κ) ladder -- one shared joint')
+    elif walk and layer is not None:
+        face, ladder = ('walk (xpnl)',
+                        'scenario (κ) ladder -- one shared source')
+    else:
+        face, ladder = ('consolidated',
+                        'scenario (κ) ladder -- one shared source')
     pnl._construction_description = (
-        f'Variable-rating {feature} pnl, {face} face over the gross density '
-        f'(one shared source -> scenario (κ) ladder); the feature changes '
-        'one leg\'s map, never the machinery.')
+        f'Variable-rating {feature} pnl, {face} face; the feature\'s subject '
+        f'is {subject}; {ladder}; the feature changes one leg\'s map, never '
+        'the machinery.')
     pnl._construction_explanation = (
         pnl._construction_description + '\n'
-        f'Economics: gross premium {P_G:g}, ceded premium {P_C:g}, '
-        f'commission {C:g}; terms {terms!r}.\n'
+        f'Economics: gross premium {P_G:g}, feature deposit {P_C:g}, '
+        f'commission {C:g}'
+        + (f'; inuring occurrence program ceded premium {pc_occ:g}, '
+           f'commission {c_occ:g}' if has_occ else '')
+        + f'; terms {terms!r}.\n'
         'Booking: sell books +consideration / -obligation'
         + (', buy the contra' if walk and layer is not None else '')
-        + '; loss-basis LAE is stochastic rate * x (the gross loss is '
-        'on-source).\n\n' + pnl._replay_block())
+        + ('; loss-basis LAE books deterministic rate * E[gross loss] on '
+           'the consolidated face (the gross loss is not measurable on the '
+           'net-of-occurrence subject) and stochastic rate * l on the walk '
+           '(axis 0 of the joint carries it).'
+           if has_occ else
+           '; loss-basis LAE is stochastic rate * x (the gross loss is '
+           'on-source).')
+        + '\n\n' + pnl._replay_block())
     return pnl
 
 
 def _build_variable_consolidated(agg, terms, P_G, P_C, C, layer, tl,
                                  expense_spec, consideration_label, prem_key,
-                                 loss_key, name, label):
-    """The consolidated (single-group) face of a variable-rating program."""
+                                 loss_key, name, label, *, pc_occ=0.0,
+                                 c_occ=0.0):
+    """The consolidated (single-group) face of a variable-rating program.
+
+    The source is the engine's own density -- the feature's subject (gross,
+    or net-of-occ when an occurrence program inures). The inuring program's
+    guaranteed-cost economics fold into the net premium as the constants
+    ``- pc_occ + c_occ``; loss-basis LAE books deterministic when the gross
+    loss is off-source ([Var-Feature-Composed-With-Occ-Program]).
+    """
     from . import _reinsurance
+    has_occ = getattr(agg, 'occ_reins', None) is not None
     if layer is None:
         # retro: nothing is ceded, so the ledger is the plain shape with the
         # stochastic phi premium; labels stay untouched
@@ -782,19 +773,22 @@ def _build_variable_consolidated(agg, terms, P_G, P_C, C, layer, tl,
     net_prem_key = (f'{consideration_label} (net)' if consideration_label
                     else 'net premium')
     net_loss_key = f'{loss_key} (net)'
+    occ_shift = c_occ - pc_occ            # the inuring GC occ constants
     if tl == 'ceded_premium':                # swing: stochastic ceded premium
-        net_prem = lambda x: P_G - terms.phi(g_ceder(x)) + C
+        net_prem = lambda x: P_G + occ_shift - terms.phi(g_ceder(x)) + C
     elif tl == 'expense':                    # slide / pc: stochastic credit
-        net_prem = lambda x: P_G - P_C + terms.phi(g_ceder(x) / P_C) * P_C
+        net_prem = lambda x: (P_G + occ_shift - P_C
+                              + terms.phi(g_ceder(x) / P_C) * P_C)
     else:                                    # corridor: fixed split
-        net_prem = P_G - P_C + C
+        net_prem = P_G + occ_shift - P_C + C
     if tl == 'ceded_loss':                   # corridor: adjusted recovery
         net_loss = lambda x: x - terms.phi(g_ceder(x) / P_C) * P_C
     else:
         net_loss = lambda x: x - g_ceder(x)
     cons = [Leg(net_prem_key, net_prem)]
     obl = [Leg(net_loss_key, net_loss)]
-    obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
+    obl += _expense_legs(agg, expense_spec, P_G,
+                         on_source_loss=not has_occ,
                          taken={net_prem_key, net_loss_key})
     return PnL(name=name or agg.name, role='sell', source=agg,
                consideration=cons, obligation=obl, result_name='margin',
@@ -810,7 +804,7 @@ def _build_variable_walk(agg, terms, P_G, P_C, C, layer, tl, expense_spec,
     obl = [Leg(loss_key, lambda x: x)]
     obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
                          taken={leg.label for leg in cons + obl})
-    groups = [Group('gross', 'sell', cons, obl)]
+    groups = [Group('Gross', 'sell', cons, obl)]
     g_ceder, _netter = _reinsurance.make_ceder_netter([layer])
     base = _first_reins_label(agg, 'agg_reins') or 'ceded agg'
     if tl == 'ceded_premium':            # swing: stochastic ceded premium
@@ -836,19 +830,94 @@ def _build_variable_walk(agg, terms, P_G, P_C, C, layer, tl, expense_spec,
                result_name='margin', label=label)
 
 
-def build_reinstatement_pnl(agg, analysis, *, expense_spec=None,
+def _build_variable_walk_occ(agg, terms, P_G, P_C, C, layer, tl,
+                             expense_spec, prem_key, loss_key, name, label,
+                             *, pc_occ=0.0, c_occ=0.0):
+    """The walk face of a variable-rating program with an inuring
+    guaranteed-cost occurrence program: a per-atom tower over the
+    occurrence ``(gross, ceded)`` joint
+    ([Var-Feature-Composed-With-Occ-Program]).
+
+    Gross -> ceded occ -> feature cover -> All, every leg a function of the
+    one joint (the feature's subject is the net-of-occ ``max(L - C, 0)``),
+    so the ladder is the scenario (``\u03ba``) pass and every column foots.
+    LAE books stochastic ``rate * l``. The joint's grid caveat and the
+    :class:`~aggregate.constants.CoarseJointGridWarning` guard apply as for
+    the guaranteed-cost walk.
+    """
+    from . import _reinsurance
+    from .reinstatement import check_joint_grid_adequacy
+    g_ceder, _netter = _reinsurance.make_ceder_netter([layer])
+    prem_f, rec_f, comm_f = _feature_maps(terms, tl, g_ceder, P_C, C)
+    occ_base = _first_reins_label(agg, 'occ_reins') or 'ceded occ'
+    agg_base = _first_reins_label(agg, 'agg_reins') or 'ceded agg'
+    biv = agg.occ_bivariate(views=('gross', 'ceded'))
+    check_joint_grid_adequacy(biv.bivariate.bs_ceded, biv.bivariate.bs_net,
+                              None, [layer])
+
+    def n(l, c):
+        # the feature's subject: the net-of-occ aggregate (clip at 0 for
+        # off-support joint cells c > l, which carry ~no mass)
+        return np.maximum(l - c, 0.0)
+
+    gross_obl = [Leg(loss_key, lambda l: l)]
+    gross_obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
+                               taken={prem_key, loss_key})
+    groups = [Group('Gross', 'sell', [Leg(prem_key, P_G)], gross_obl)]
+    occ_obl = [Leg(f'{occ_base} recovery', lambda l, c: c, is2d=True)]
+    if c_occ:
+        occ_obl.append(Leg(f'{occ_base} commission', c_occ))
+    groups.append(Group(occ_base, 'buy',
+                        [Leg(f'{occ_base} premium', pc_occ)], occ_obl))
+    feat_obl = [Leg(f'{agg_base} recovery',
+                    lambda l, c: rec_f(n(l, c)), is2d=True)]
+    if tl == 'expense':
+        comm_key = ('sliding commission'
+                    if type(terms).__name__ == 'SlideTerms'
+                    else 'profit commission')
+        feat_obl.append(Leg(comm_key, lambda l, c: comm_f(n(l, c)),
+                            is2d=True))
+    elif C:
+        feat_obl.append(Leg(f'{agg_base} commission', C))
+    if tl == 'ceded_premium':                     # swing
+        feat_cons = [Leg(f'{agg_base} premium',
+                         lambda l, c: prem_f(n(l, c)), is2d=True)]
+    else:
+        feat_cons = [Leg(f'{agg_base} premium', P_C)]
+    groups.append(Group(agg_base, 'buy', feat_cons, feat_obl))
+    return PnL(name=name or agg.name, source=biv.bivariate, groups=groups,
+               result_name='margin', label=label)
+
+
+def build_reinstatement_pnl(agg, analysis, *, walk=False, expense_spec=None,
+                            gcn_economics=None,
                             consideration_label=None, loss_label=None,
                             name=None, label=None):
-    """An occurrence-reinstatements program as a 2-D group ledger.
+    """An occurrence-reinstatements program as a :class:`PnL`, either face.
 
-    Books over the one shared ``(L, R)`` joint ([One-2D-Source]): the gross
-    ``sell`` group (fixed premium; the gross loss reads axis 0, so loss-basis
-    LAE stays stochastic ``rate * l``), the occurrence cession ``buy`` group
-    with the genuinely stochastic ceded premium ``D + h(R)`` and recovery
-    ``A(R)``, and -- for a subsequent aggregate cover -- a third ``buy``
-    group whose recovery ``g(max(L - A(R), 0))`` rides the same joint (no new
-    dimension). The committed ``Scaled`` denominator is the deterministic
-    ``gross - deposit - pc_agg``.
+    Both faces are per-atom ledgers over the one shared ``(L, R)`` joint
+    ([One-2D-Source]) -- gross annual loss ``L`` on axis 0, unlimited
+    occurrence recovery ``R`` on axis 1 -- so the stats ladder is the
+    scenario (``κ``) pass and loss-basis LAE stays stochastic ``rate * l``
+    in both:
+
+    * ``walk=True`` (the ``xpnl`` face) -- the step tower: the gross
+      ``sell`` group, the occurrence cession ``buy`` group with the
+      genuinely stochastic ceded premium ``D + h(R)`` and recovery ``A(R)``,
+      and -- for a subsequent aggregate cover -- a third ``buy`` group whose
+      cash flows ride the same joint via the tier maps (no new dimension;
+      a variable feature swaps exactly one map,
+      [Var-Feature-Composed-With-Occ-Program]).
+    * ``walk=False`` (the ``pnl`` face) -- the **consolidated** single-group
+      net view ([Decision-PnL-Is-Consolidated], closing [2D-Deferred]): one
+      stochastic net-premium leg ``P_G - D - h(R) - P_agg(L, R) +
+      commissions`` and the net-of-everything loss
+      ``L - A(R) - REC_agg(L, R)``, both deterministic pushforwards of the
+      same joint -- so the two faces agree on the net position **exactly**
+      (no engine drift; one joint).
+
+    The committed ``Scaled`` denominator is the deterministic
+    ``gross - deposit - pc_agg`` on both faces.
 
     Parameters
     ----------
@@ -857,11 +926,22 @@ def build_reinstatement_pnl(agg, analysis, *, expense_spec=None,
     analysis : ReinstatementAnalysis
         The constructed analysis carrying the joint, terms and economics;
         attached to the returned P&L as ``pnl.analysis``.
+    walk : bool, default False
+        ``True`` -> the step tower (``xpnl``); ``False`` -> the consolidated
+        net view (``pnl``).
+    gcn_economics : dict, optional
+        The resolved cession economics; attached as ``pnl.economics``.
 
     Returns
     -------
     PnL
     """
+    if not walk:
+        return _build_reinstatement_consolidated(
+            agg, analysis, expense_spec=expense_spec,
+            gcn_economics=gcn_economics,
+            consideration_label=consideration_label, loss_label=loss_label,
+            name=name, label=label)
     t = analysis.terms
     P_G, D = analysis.gross_premium, t.deposit
     A, h = t.recovery, t.reinstatement_premium
@@ -870,12 +950,12 @@ def build_reinstatement_pnl(agg, analysis, *, expense_spec=None,
     agg_base = _first_reins_label(agg, 'agg_reins') \
         or 'ceded agg'
     prem_key = consideration_label or 'premium'
-    loss_key = loss_label or 'loss'
+    loss_key = loss_label or 'Loss'
     cons = [Leg(prem_key, P_G)]
     obl = [Leg(loss_key, lambda l: l)]       # 1-D: reads axis 0 = gross loss
     obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
                          taken={leg.label for leg in cons + obl})
-    groups = [Group('gross', 'sell', cons, obl)]
+    groups = [Group('Gross', 'sell', cons, obl)]
     occ_obl = [Leg(f'{occ_base} recovery', lambda l, r: A(r), is2d=True)]
     if analysis.occ_commission:
         occ_obl.append(Leg(f'{occ_base} commission', analysis.occ_commission))
@@ -885,30 +965,43 @@ def build_reinstatement_pnl(agg, analysis, *, expense_spec=None,
         occ_obl))
     pc = 0.0
     if analysis.agg_recovery is not None:
-        g0, pc = analysis.agg_recovery, analysis.agg_ceded_premium
-
-        def g_rec(l, r):
-            # clip at 0: off-support joint cells (r > l) carry ~no mass but
-            # still evaluate, and the piecewise-linear ceder is only defined
-            # on [0, inf).
-            return g0(np.maximum(l - A(r), 0.0))
-
-        a_obl = [Leg(f'{agg_base} recovery', g_rec, is2d=True)]
-        if analysis.agg_commission:
+        # the tier's three cash-flow maps ride the same joint; a variable
+        # feature on the agg cover swaps exactly one of them
+        # ([Var-Feature-Composed-With-Occ-Program]).
+        pc = analysis.agg_ceded_premium
+        rec, prem, comm = analysis._agg_tier_maps()
+        ft = analysis.agg_feature_terms
+        a_obl = [Leg(f'{agg_base} recovery', rec, is2d=True)]
+        if comm is not None:
+            comm_key = ('sliding commission'
+                        if type(ft).__name__ == 'SlideTerms'
+                        else 'profit commission')
+            a_obl.append(Leg(comm_key, comm, is2d=True))
+        elif analysis.agg_commission:
             a_obl.append(Leg(f'{agg_base} commission',
                              analysis.agg_commission))
-        groups.append(Group(agg_base, 'buy',
-                            [Leg(f'{agg_base} premium', pc)], a_obl))
+        if getattr(ft, 'target_leg', None) == 'ceded_premium':   # swing
+            a_cons = [Leg(f'{agg_base} premium', prem, is2d=True)]
+        else:
+            a_cons = [Leg(f'{agg_base} premium', pc)]
+        groups.append(Group(agg_base, 'buy', a_cons, a_obl))
     pnl = PnL(name=name or agg.name, source=analysis.source, groups=groups,
               result_name='margin', scale=float(P_G - D - pc),
               label=label)
     pnl.analysis = analysis
+    if gcn_economics is not None:
+        pnl.economics = dict(gcn_economics)
+    feat = type(analysis.agg_feature_terms).__name__ \
+        if analysis.agg_feature_terms is not None else None
     pnl._construction_description = (
-        f'Occurrence-reinstatements 2-D group ledger over the shared (L, R) '
-        f'joint ([One-2D-Source]): {len(groups)} groups; the ceded premium '
-        f'D + h(R) = {D:g} + reinstatement premium is genuinely stochastic; '
-        'scenario (κ) ladder (one shared joint). Serves pnl and xpnl alike '
-        'until the consolidated 2-D route lands ([2D-Deferred]).')
+        f'Occurrence-reinstatements walk (xpnl): 2-D group ledger over the '
+        f'shared (L, R) joint ([One-2D-Source]): {len(groups)} groups; the '
+        f'ceded premium D + h(R) = {D:g} + reinstatement premium is '
+        'genuinely stochastic; '
+        + (f'the aggregate cover is {feat}-rated (its map rides the same '
+           'joint); ' if feat else '')
+        + 'scenario (κ) ladder (one shared joint). The consolidated net '
+        'view is the pnl face.')
     pnl._construction_explanation = (
         pnl._construction_description + '\n'
         f'Economics: gross premium {P_G:g}, deposit {D:g}'
@@ -919,4 +1012,79 @@ def build_reinstatement_pnl(agg, analysis, *, expense_spec=None,
         'D + h(R) read axis 1; a subsequent aggregate cover recovers '
         'g(max(L - A(R), 0)) on the same joint (no new dimension).\n\n'
         + pnl._replay_block())
+    return pnl
+
+
+def _build_reinstatement_consolidated(agg, analysis, *, expense_spec=None,
+                                      gcn_economics=None,
+                                      consideration_label=None,
+                                      loss_label=None, name=None,
+                                      label=None):
+    """The consolidated (``pnl``) face of a reinstatements program.
+
+    One ``sell`` group of 2-D legs over the same ``(L, R)`` joint the walk
+    uses ([Decision-PnL-Is-Consolidated], closing [2D-Deferred]):
+
+    * **net premium** ``P_G - D - h(R) - P_agg(L, R) + c_occ +
+      commissions`` -- genuinely stochastic (the reinstatement premium, and
+      a swing-rated or slide/pc-commissioned aggregate tier ride along);
+    * **loss (net)** ``-(L - A(R) - REC_agg(L, R))`` -- net of everything;
+    * expenses; loss-basis LAE stays stochastic ``rate * l`` (axis 0
+      carries the gross loss -- unlike the guaranteed-cost consolidated
+      face, nothing is off-source here; cf. [Consolidated-LAE-Off-Source]).
+
+    Because both faces are pushforwards of the ONE joint, the consolidated
+    net position equals the walk's grand result **exactly**.
+    """
+    t = analysis.terms
+    P_G, D = analysis.gross_premium, t.deposit
+    A, h = t.recovery, t.reinstatement_premium
+    c_occ = analysis.occ_commission
+    c_agg = analysis.agg_commission
+    prem_key = (f'{consideration_label} (net)' if consideration_label
+                else 'net premium')
+    loss_key = f'{loss_label or "Loss"} (net)'
+    if analysis.agg_recovery is not None:
+        pc = analysis.agg_ceded_premium
+        rec, prem, comm = analysis._agg_tier_maps()
+        if comm is not None:
+            net_prem = lambda l, r: (P_G - D - h(r) - prem(l, r)
+                                     + c_occ + comm(l, r))
+        else:
+            net_prem = lambda l, r: (P_G - D - h(r) - prem(l, r)
+                                     + c_occ + c_agg)
+        net_loss = lambda l, r: (l - A(r)) - rec(l, r)
+    else:
+        pc = 0.0
+        net_prem = lambda l, r: P_G - D - h(r) + c_occ
+        net_loss = lambda l, r: l - A(r)
+    cons = [Leg(prem_key, net_prem, is2d=True)]
+    obl = [Leg(loss_key, net_loss, is2d=True)]
+    obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
+                         taken={prem_key, loss_key})
+    pnl = PnL(name=name or agg.name, role='sell', source=analysis.source,
+              consideration=cons, obligation=obl, result_name='margin',
+              scale=float(P_G - D - pc), label=label)
+    pnl.analysis = analysis
+    if gcn_economics is not None:
+        pnl.economics = dict(gcn_economics)
+    feat = type(analysis.agg_feature_terms).__name__ \
+        if analysis.agg_feature_terms is not None else None
+    pnl._construction_description = (
+        'Consolidated reinstatements pnl over the shared (L, R) joint '
+        '([Decision-PnL-Is-Consolidated], closing [2D-Deferred]): one sell '
+        f'group; net premium P_G - D - h(R){" - P_agg" if pc or feat else ""}'
+        ' + commissions is genuinely stochastic; '
+        + (f'the aggregate cover is {feat}-rated (its map rides the same '
+           'joint); ' if feat else '')
+        + 'scenario (κ) ladder (one shared joint). The step walk is one '
+        'xpnl away, and agrees on the net position exactly (one joint).')
+    pnl._construction_explanation = (
+        pnl._construction_description + '\n'
+        f'Economics: gross premium {P_G:g}, deposit {D:g}'
+        + (f', aggregate ceded premium {pc:g}' if pc else '')
+        + f'; committed scale = gross - deposit - pc_agg = {P_G - D - pc:g}.'
+        '\nBooking: net premium and net loss are deterministic pushforwards '
+        'of the joint; loss-basis LAE is stochastic rate * l (axis 0 '
+        'carries the gross loss).\n\n' + pnl._replay_block())
     return pnl

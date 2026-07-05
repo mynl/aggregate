@@ -128,36 +128,49 @@ def test_port_engine_expenses_supported(uw):
 
 
 # ----------------------------------------------------------------------
-# xpnl -> the multi-group stitched walk ([Decision-XPnL-Is-A-Recipe])
+# xpnl -> the per-atom multi-group walk ([Decision-XPnL-Is-A-Recipe])
 # ----------------------------------------------------------------------
 def test_xpnl_returns_walk_pnl_over_gcn_engine(uw):
     """``xpnl`` over an engine with reinsurance economics returns a plain
-    **multi-group PnL** -- the step walk (gross -> cover -> Total) with the
-    exploded (Step, View) card and (Step, View, Line) stats sheet."""
+    **multi-group PnL** -- the step walk (gross -> cover -> All) with the
+    exploded (Step, View) card and (Step, View, Line) stats sheet, per-atom
+    over the occurrence (gross, ceded) joint."""
     t = uw('xpnl X 1000 premium less agg e 1000 premium at 0.7 lr '
            'sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 '
            'poisson')
     assert isinstance(t, PnL)
-    assert [g.label for g in t.groups] == ['gross', 'ceded occ']
+    assert [g.label for g in t.groups] == ['Gross', 'ceded occ']
     s = t.stats_df
     assert list(s.index.names) == ['Step', 'View', 'Line']
-    # means add down the walk (linearity); running net = the grand result
-    assert s.loc[('Total', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('gross', 'Margin', 'Total'), 'EX']
+    # means add down the walk exactly (per-atom partial sums)
+    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        s.loc[('Gross', 'Margin', 'Total'), 'EX']
         + s.loc[('ceded occ', 'Margin', 'Total'), 'EX'], abs=1e-6)
-    assert s.loc[('Total', 'Margin', 'Impact'), 'EX'] == pytest.approx(
+    assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
         s.loc[('ceded occ', 'Margin', 'Total'), 'EX'], abs=1e-6)
-    # stitched: the ladder is marginal (plain P headers), no κ columns
-    assert 'P01' in s.columns and 'κ01' not in s.columns
-    # the card is the exploded (Step, View) blocks + closing Total block
+    # one shared joint -> the scenario (κ) ladder; every column foots
+    assert 'κ01' in s.columns and 'P01' not in s.columns
+    # the card is the exploded (Step, View) blocks + closing All block
     assert list(t.summary_df.index.names) == ['Step', 'View']
 
 
-def test_xpnl_over_plain_engine_not_implemented(uw):
-    """``xpnl`` over a plain engine (no economics to explode) is NotImplemented."""
-    with pytest.raises(NotImplementedError, match='xpnl'):
-        uw('xpnl X 1000 premium less agg e 100 claims sev lognorm 100 cv 2 '
+def test_xpnl_over_plain_engine_one_step_walk(uw):
+    """``xpnl`` over a plain engine is the trivial **one-step walk**
+    ([Decision-XPnL-Plain-Is-One-Step-Walk]): the (Step, View, Line) sheet
+    with the single Gross block -- no grand rows, no impact."""
+    t = uw('xpnl X 1000 premium less agg e 100 claims sev lognorm 100 cv 2 '
            'poisson')
+    assert isinstance(t, PnL)
+    s = t.stats_df
+    assert list(s.index.names) == ['Step', 'View', 'Line']
+    steps = list(dict.fromkeys(s.index.get_level_values('Step')))
+    assert steps == ['Gross']
+    assert ('All', 'Margin', 'Total') not in s.index
+    assert list(t.summary_df.index) == [
+        ('Gross', 'Consideration'), ('Gross', 'Obligation'),
+        ('Gross', 'Margin')]
+    # shared atoms -> the ladder stays the scenario (κ) pass
+    assert 'κ01' in s.columns
 
 
 def test_xpnl_over_port_not_implemented(uw):

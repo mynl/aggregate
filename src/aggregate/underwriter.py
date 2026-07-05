@@ -18,7 +18,7 @@ from .config import (get_settings, reload_settings as _reload_settings,
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .spectral import Distortion
-from .constants import IgnoredDecLClauseWarning
+from .constants import IgnoredDecLClauseWarning, ZeroPremiumCessionWarning
 from .parser import UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM
 from .utilities import (qd, agg_help)
 
@@ -982,6 +982,23 @@ class Underwriter(object):
         return {'gross': pg, 'ceded': pc_occ + pc_agg,
                 'pc_occ': pc_occ, 'pc_agg': pc_agg, 'c_occ': c_occ, 'c_agg': c_agg}
 
+    @staticmethod
+    def _make_feature_terms(var_feat, var_params):
+        """Instantiate the ContractTerms for a parsed variable feature.
+
+        ``var_feat`` is the feature key (``'swing'`` / ``'slide'`` / ``'pc'``
+        / ``'corridor'``) popped from the spec, ``var_params`` its parsed
+        parameter dict; returns the terms object, or ``None`` when no
+        feature is present.
+        """
+        if var_feat is None:
+            return None
+        from .contract_terms import (
+            CorridorTerms, ProfitCommissionTerms, SlideTerms, SwingTerms)
+        return {'swing': SwingTerms, 'slide': SlideTerms,
+                'pc': ProfitCommissionTerms,
+                'corridor': CorridorTerms}[var_feat](**var_params)
+
     def _factory(self, parsed):
         """
         Internal: construct the object described by a :class:`ParsedProgram`.
@@ -1074,10 +1091,41 @@ class Underwriter(object):
             # Retro (Phase 3): the account-level rating clause varying the *gross*
             # premium as a collared affine map of net account loss. Pop the collar.
             retro_collar = spec.pop('retro_terms', None)
-            # Ceded-premium clauses promote the pnl to the Gross/Ceded/Net view
-            # (any-clause -> GCN): resolve them to per-side economics and pop the
-            # spec keys so the inner Aggregate sees only the loss structure.
+            # --------------------------------------------------------------
+            # Two-tier classification ([One-Classifier-Fix], dev/PLAN-A.md):
+            # the occurrence tier is {none | gc | reinstatements}, the
+            # aggregate tier {none | gc | feature}, classified INDEPENDENTLY
+            # -- the old single-kind elif chain let a feature branch shadow
+            # the reinstatements clause and mis-scope an inuring occurrence
+            # program. Ceded-premium clauses resolve to per-side economics;
+            # a side with cession layers but NO premium clause books at zero
+            # ceded premium with one warning ([XPnL-Zero-Premium-Cessions])
+            # -- reinsurance presence, not economics presence, drives the
+            # face. Exempt: a feature-decorated aggregate side (the feature
+            # owns its premium slot) and a reinstated occurrence layer
+            # (which requires a base premium clause -- error below).
+            # --------------------------------------------------------------
+            has_occ = bool(spec.get('occ_reins'))
+            has_agg = bool(spec.get('agg_reins'))
+            occ_noclause = has_occ and 'occ_reins_premium' not in spec
+            agg_noclause = has_agg and 'agg_reins_premium' not in spec
             econ = self._resolve_reins_economics(spec, consideration)
+            if econ is None and (has_occ or has_agg):
+                econ = {'gross': float(consideration), 'ceded': 0.0,
+                        'pc_occ': 0.0, 'pc_agg': 0.0,
+                        'c_occ': 0.0, 'c_agg': 0.0}
+            zero_sides = []
+            if occ_noclause and reinst is None:
+                zero_sides.append('occurrence')
+            if agg_noclause and var_feat is None:
+                zero_sides.append('aggregate')
+            if zero_sides and retro_collar is None:
+                warnings.warn(
+                    f"{name}: the {' and '.join(zero_sides)} cession"
+                    f"{'s have' if len(zero_sides) > 1 else ' has'} no "
+                    "ceded-premium clause (deposit / rol / rate); booking at "
+                    "zero ceded premium. Price the cover to silence this.",
+                    ZeroPremiumCessionWarning, stacklevel=2)
             if retro_collar is not None:
                 # Retro varies the gross premium; the snapshot is a
                 # VariableRatingAnalysis over the gross density. The clean 1-D case
@@ -1101,36 +1149,18 @@ class Underwriter(object):
                                      'consideration': consideration,
                                      'consideration_label': consideration_label,
                                      'loss_label': loss_label}
-            elif var_feat is not None:
-                # The variable feature snapshots a VariableRatingAnalysis over the
-                # GROSS aggregate density, so do NOT apply the agg reinsurance in
-                # the inner Aggregate; keep the decorated layer for the analysis
-                # ceder.
-                var_layer = spec['agg_reins'][var_layer_idx]
-                spec.pop('agg_reins', None)
-                spec.pop('agg_kind', None)
-                inner = Aggregate(**spec)
-                from .contract_terms import (
-                    CorridorTerms, ProfitCommissionTerms, SlideTerms, SwingTerms)
-                terms = {'swing': SwingTerms, 'slide': SlideTerms,
-                         'pc': ProfitCommissionTerms,
-                         'corridor': CorridorTerms}[var_feat](**var_params)
-                inner.variable_terms = terms
-                inner.variable_layer = var_layer
-                inner.variable_gross_premium = float(consideration)
-                inner.variable_ceded_premium = float(econ['pc_agg']) if econ else 0.0
-                inner.variable_commission = float(econ['c_agg']) if econ else 0.0
-                inner._pnl_recipe = {'kind': 'var', 'expense_spec': expense_spec,
-                                     'consideration': consideration,
-                                     'consideration_label': consideration_label,
-                                     'loss_label': loss_label}
             elif reinst is not None:
                 # Reinstatements (stochastic ceded premium D + h(R)) snapshot a
                 # ReinstatementAnalysis (the joint-sourced tower builder). The base
                 # premium D = the layer's resolved occurrence premium
                 # (econ['pc_occ']); effective occ limit y = share x limit.
+                # This branch precedes the feature branch
+                # ([Reinstatements-Dropped-By-Feature-Branch] fix): the occ
+                # tier owns the (L, R) joint, and a feature on the aggregate
+                # cover rides the SAME joint via the tier maps
+                # (``agg_feature_terms`` on the analysis).
                 from .reinstatement import ReinstatementTerms
-                if econ is None:                        # pragma: no cover
+                if occ_noclause:
                     raise ValueError(
                         f"{name}: 'reinstatements' require a base premium clause "
                         "(deposit / rol / rate) on the occurrence layer.")
@@ -1143,6 +1173,34 @@ class Underwriter(object):
                 inner.reinstatement_gross_premium = float(econ['gross'])
                 inner._pnl_recipe = {'kind': 'reins', 'expense_spec': expense_spec,
                                      'econ': econ,
+                                     'agg_feature_terms':
+                                         self._make_feature_terms(var_feat,
+                                                                  var_params),
+                                     'consideration_label': consideration_label,
+                                     'loss_label': loss_label}
+            elif var_feat is not None:
+                # A feature on the aggregate tier over a plain or GC-occ
+                # engine. The feature's subject is what the engine emits --
+                # the gross aggregate, or the net-of-occurrence aggregate
+                # when a guaranteed-cost occurrence program inures
+                # ([Var-Feature-Composed-With-Occ-Program]) -- so do NOT
+                # apply the agg reinsurance in the inner Aggregate; keep the
+                # decorated layer for the analysis ceder. The occ program
+                # (if any) stays in the engine; its GC economics ride the
+                # recipe ``econ`` into the builders.
+                var_layer = spec['agg_reins'][var_layer_idx]
+                spec.pop('agg_reins', None)
+                spec.pop('agg_kind', None)
+                inner = Aggregate(**spec)
+                terms = self._make_feature_terms(var_feat, var_params)
+                inner.variable_terms = terms
+                inner.variable_layer = var_layer
+                inner.variable_gross_premium = float(consideration)
+                inner.variable_ceded_premium = float(econ['pc_agg']) if econ else 0.0
+                inner.variable_commission = float(econ['c_agg']) if econ else 0.0
+                inner._pnl_recipe = {'kind': 'var', 'expense_spec': expense_spec,
+                                     'econ': econ,
+                                     'consideration': consideration,
                                      'consideration_label': consideration_label,
                                      'loss_label': loss_label}
             else:
@@ -1151,7 +1209,7 @@ class Underwriter(object):
                     _desc = inner._approx_description()
                     inner.note = f"{inner.note}; {_desc}" if inner.note else _desc
                 inner._pnl_recipe = {
-                    'kind': 'gcn' if econ is not None else 'plain',
+                    'kind': 'gcn' if (has_occ or has_agg) else 'plain',
                     'expense_spec': expense_spec, 'econ': econ,
                     'consideration': consideration,
                     'consideration_label': consideration_label,
@@ -1613,16 +1671,20 @@ class Underwriter(object):
         * ``pnl`` -- the **consolidated** net view, always one group:
           :func:`~aggregate._pnl_builders.build_plain_pnl` (no cessions),
           :func:`~aggregate._pnl_builders.build_consolidated_pnl`
-          (guaranteed-cost reinsurance economics), the consolidated face of
-          :func:`~aggregate._pnl_builders.build_variable_pnl`
-          (variable-rating features), or -- the transitional [2D-Deferred]
-          carve-out -- :func:`~aggregate._pnl_builders.build_reinstatement_pnl`
-          (still the per-atom 2-D tower).
+          (guaranteed-cost reinsurance economics), or the consolidated face
+          of :func:`~aggregate._pnl_builders.build_variable_pnl`
+          (variable-rating features) /
+          :func:`~aggregate._pnl_builders.build_reinstatement_pnl`
+          (reinstatements: one sell group of 2-D legs over the (L, R)
+          joint -- [2D-Deferred] closed).
         * ``xpnl`` -- the **walk**, a multi-group :class:`PnL`:
           :func:`~aggregate._pnl_builders.build_xpnl_walk` (guaranteed-cost,
-          marginal-stitched), the walk face of ``build_variable_pnl``, or the
-          reinstatement 2-D tower re-homed. A plain engine (or retro, which
-          has no cover) has nothing to step through and errors.
+          marginal-stitched), the walk face of ``build_variable_pnl`` (the
+          per-atom two-group ledger, or the stitched three-step walk when a
+          GC occurrence program inures), or the reinstatement 2-D tower
+          re-homed. A plain engine gets the same one-group ledger presented
+          as a **one-step walk** ([Decision-XPnL-Plain-Is-One-Step-Walk]);
+          retro (no cover at all) errors.
 
         The drill-down analyses ride on ``pnl.analysis``.
         """
@@ -1652,17 +1714,9 @@ class Underwriter(object):
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=loss_label,
                 expense_spec=recipe.get('expense_spec'), name=inner.name)
+            face.engine = inner
             return face
         is_tower = recipe.get('is_tower', False)
-        if is_tower and kind == 'plain':
-            # ``xpnl`` walks gross -> each cover -> Total; a plain engine has
-            # no cover to step through.
-            raise NotImplementedError(
-                f"{inner.name}: 'xpnl' (the step walk) requires a wrapped "
-                'engine with reinsurance economics -- occurrence and/or '
-                'aggregate cessions with a ceded-premium clause (deposit / '
-                "cede / rol / rate), or a variable-rating feature. The "
-                "engine here is plain; use 'pnl'.")
         if kind == 'var':
             if is_tower and inner.variable_layer is None:
                 # retro varies the gross premium of an unreinsured book:
@@ -1677,53 +1731,74 @@ class Underwriter(object):
                 inner, recipe['expense_spec'], inner.variable_gross_premium)
             analysis = inner.variable_rating_analysis()
             face = build_variable_pnl(
-                inner, walk=is_tower, expense_spec=recipe['expense_spec'],
+                inner, walk=is_tower, econ=recipe.get('econ'),
+                expense_spec=recipe['expense_spec'],
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
                 label=inner.label)
             face.analysis = analysis
+            face.engine = inner
             return face
         if kind == 'reins':
-            # the 2-D per-atom tower serves both faces: it IS the xpnl walk
-            # (re-homed), and -- transitional [2D-Deferred] carve-out -- the
-            # pnl face too, until the consolidated 2-D route lands.
+            # both faces are per-atom ledgers over the one (L, R) joint:
+            # ``xpnl`` the step tower, ``pnl`` the consolidated net view
+            # ([Decision-PnL-Is-Consolidated]; [2D-Deferred] closed). A
+            # feature on the aggregate cover rides the same joint
+            # ([Var-Feature-Composed-With-Occ-Program]); its stochastic
+            # commission (slide / pc) lives in the legs, so the scalar
+            # ``agg_commission`` is forced to 0 then.
             econ = recipe['econ']
+            ft = recipe.get('agg_feature_terms')
             analysis = inner.reinstatement_analysis(
                 agg_ceded_premium=float(econ.get('pc_agg', 0.0)),
+                agg_feature_terms=ft,
                 gross_expense=resolve_expense(
                     inner, recipe['expense_spec'], float(econ['gross'])),
                 occ_commission=float(econ.get('c_occ', 0.0)),
-                agg_commission=float(econ.get('c_agg', 0.0)))
-            return build_reinstatement_pnl(
-                inner, analysis, expense_spec=recipe['expense_spec'],
+                agg_commission=(0.0 if getattr(ft, 'target_leg', None)
+                                == 'expense'
+                                else float(econ.get('c_agg', 0.0))))
+            face = build_reinstatement_pnl(
+                inner, analysis, walk=is_tower,
+                expense_spec=recipe['expense_spec'], gcn_economics=econ,
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
                 label=inner.label)
+            face.engine = inner
+            return face
         if kind == 'gcn':
             econ = recipe['econ']
             if is_tower:
                 # ``xpnl`` -> the marginal-stitched step walk (a plain
                 # multi-group PnL).
-                return build_xpnl_walk(
+                face = build_xpnl_walk(
                     inner, gross=econ['gross'], ceded=econ['ceded'],
                     gcn_economics=econ,
                     expense_spec=recipe['expense_spec'],
                     consideration_label=recipe.get('consideration_label'),
                     loss_label=recipe.get('loss_label'), name=inner.name,
                     label=inner.label)
-            # ``pnl`` -> the consolidated single-group net view.
-            return build_consolidated_pnl(
-                inner, gross=econ['gross'], ceded=econ['ceded'],
-                gcn_economics=econ, expense_spec=recipe['expense_spec'],
-                consideration_label=recipe.get('consideration_label'),
-                loss_label=recipe.get('loss_label'), name=inner.name,
-                label=inner.label)
-        return build_plain_pnl(
+            else:
+                # ``pnl`` -> the consolidated single-group net view.
+                face = build_consolidated_pnl(
+                    inner, gross=econ['gross'], ceded=econ['ceded'],
+                    gcn_economics=econ, expense_spec=recipe['expense_spec'],
+                    consideration_label=recipe.get('consideration_label'),
+                    loss_label=recipe.get('loss_label'), name=inner.name,
+                    label=inner.label)
+            face.engine = inner
+            return face
+        # kind == 'plain': the consolidated one-group ledger; ``xpnl`` gets
+        # the same ledger presented as a one-step walk
+        # ([Decision-XPnL-Plain-Is-One-Step-Walk]).
+        face = build_plain_pnl(
             inner, consideration=recipe['consideration'],
             consideration_label=recipe.get('consideration_label'),
             loss_label=recipe.get('loss_label'),
             expense_spec=recipe['expense_spec'], name=inner.name,
-            label=inner.label)
+            label=inner.label, walk=is_tower)
+        face.engine = inner
+        return face
 
     def build(self, program, update=None, log2=0, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
         """

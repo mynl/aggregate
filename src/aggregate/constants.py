@@ -26,7 +26,8 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
            'Validation', 'DefectiveDistributionWarning',
            'DefectiveDistributionError', 'InfiniteVarianceError',
-           'IgnoredDecLClauseWarning',
+           'IgnoredDecLClauseWarning', 'ZeroPremiumCessionWarning',
+           'CoarseJointGridWarning',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
            'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row']
@@ -139,6 +140,43 @@ class IgnoredDecLClauseWarning(UserWarning):
     activates the economics (the knowledge-injection route). See
     ``dev/plan-pnl-consolidated-xpnl-walk.md``
     ([Reins-Economics-On-Agg-Ignore-Warn]).
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
+
+
+class ZeroPremiumCessionWarning(UserWarning):
+    """Emitted when a ``pnl`` / ``xpnl`` cession has no ceded-premium clause.
+
+    A cession side (occurrence / aggregate) with reinsurance layers but no
+    ``deposit`` / ``rol`` / ``rate`` clause books at **zero ceded premium**:
+    the recovery is real, the premium is zero, and the program still routes
+    through the full guaranteed-cost machinery (consolidated ``pnl`` /
+    ``xpnl`` walk) rather than degrading to the plain face
+    ([XPnL-Zero-Premium-Cessions], ``dev/PLAN-A.md``). The warning names the
+    side(s); silence it by pricing the cover. Feature-decorated sides are
+    exempt (the feature owns the premium slot), as is a reinstated
+    occurrence layer (which *requires* a base premium clause).
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
+
+
+class CoarseJointGridWarning(UserWarning):
+    """Emitted when a reinstatement joint's grid under-resolves a treaty kink.
+
+    The 2-D ``(L, R)`` joint runs on a common bucket size far coarser than
+    the 1-D engine grid (a cell budget, not an accuracy target). A kinked
+    treaty map -- a layer, a collar -- evaluated across too few buckets
+    picks up a Jensen-type O(bs) bias that the internal audits cannot see
+    (they check pushforward-vs-exact on the *same* grid). Warn when a kink
+    region spans fewer than
+    :data:`~aggregate.reinstatement.JOINT_KINK_MIN_BUCKETS` buckets
+    ([Reinst-Joint-Grid-Adequacy], ``dev/PLAN-A.md``); the remedy is the
+    grid knobs -- ``Aggregate.reinstatement_analysis(bs=, log2_x=,
+    log2_y=)`` (forwarded to :meth:`~aggregate.Aggregate.occ_bivariate`).
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).

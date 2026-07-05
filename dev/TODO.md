@@ -141,10 +141,40 @@
    **Retired:** `build_gcn_pnl` → `build_consolidated_pnl`;
    `build_xpnl_stack` (the 4-row onion DataFrame) → `build_xpnl_walk`
    (`stack_marginal_pnls` stays — generic public no-joint assembler).
-   **Deferred:** the 2-D consolidated routes ([2D-Deferred] — reinstatement
-   pnl keeps the per-atom tower; design settled on paper incl.
-   [Gross-Anchored-Kappa-Insight]); massive-source `xpnl`;
-   [Accounting-Summary-DF] (pended below).
+   **Deferred:** massive-source `xpnl`; [Accounting-Summary-DF] (pended
+   below). ([2D-Deferred] CLOSED at `1.0.0a139` — see
+   [PnL-Faces-Punchlist] next.)
+2b. **[PnL-Faces-Punchlist]** ✅ **DONE** (`1.0.0a138`–`a141`, 2026-07-05;
+   plan: `dev/PLAN-A.md`, author handle PLAN-A). **[One-Classifier-Fix]**
+   (`a138`): the pnl/xpnl assembly classifies the occ tier
+   {none | gc | reinstatements} and agg tier {none | gc | feature}
+   independently — fixes the two silently-wrong composition cells: (GC occ,
+   feature agg) mis-scoped the feature's subject and dropped the occ
+   economics ([Var-Feature-Composed-With-Occ-Program]; consolidated gains
+   the occ constants, the walk is the stitched gross → ceded occ → feature
+   → Total tower with `_fn_marginal_entry` pushforward rows); (reinstated
+   occ, feature agg) silently DROPPED the reinstatements clause
+   ([Reinstatements-Dropped-By-Feature-Branch]; the feature now rides the
+   (L, R) joint via `ReinstatementAnalysis(agg_feature_terms=)`). Plus
+   [XPnL-Zero-Premium-Cessions] (zero ceded premium + warning; reinsurance
+   presence drives the face) and the one-step plain walk.
+   **[Consolidated-Reinstatement-PnL]** (`a139`): reinstatement `pnl` =
+   consolidated 2-D net view over the joint; agrees with the `xpnl` tower
+   exactly; closes [2D-Deferred]. `a140`: `PnL.engine` reference
+   ([Engine-Reference-On-PnL]); plain-face GD source; `'premium'` as the
+   one default consideration label; `CoarseJointGridWarning`
+   ([Reinst-Joint-Grid-Adequacy], floor 20 buckets per kink region).
+   `a141` (author feedback): **[Kappa-Walks]** — every DecL `xpnl` walk is
+   per-atom with a footing scenario (κ) ladder (gross atoms, or the
+   occurrence `(gross, ceded)` joint when an occ program inures;
+   [GC-Tower-Marginal-Stitch] retired from the builders — the kernel
+   `stitched_rows` mode stays as the massive-xpnl seam); one-step walks are
+   a single `Gross` block; renames `'gross'`→`'Gross'`, grand step
+   `'Total'`→`'All'`, default loss leg `'loss'`→`'Loss'`.
+   **Still open from PLAN-A:** [Walk-Step-Default-Labels] (needs an author
+   format pick — proposal: the DecL layer descriptor `'occ 4750 xs 250'`);
+   logged problems [Consolidated-LAE-Off-Source] and
+   [Aggregate-Summary-DF-Useless] (below).
 2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
    for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
    fixed** (it does not morph as the object gains properties), columns are
@@ -219,6 +249,27 @@
 
 ## Backlog — bugs & investigations
 
+- **[Walk-Step-Default-Labels]** `beta` (from `dev/PLAN-A.md`, 2026-07-05) —
+  undeclared cover steps in the walks default to `'ceded occ'` /
+  `'ceded agg'`; the author asked for better ("labeling for step could be
+  improved"). Proposal: the DecL layer descriptor when the side has exactly
+  one layer (`'occ 4750 xs 250'`, `'agg 95% po 100 xs 100'`), the generic
+  name otherwise. **Needs the author's format pick** — it renames Step index
+  keys and the derived plan rows (`'<label> result'`,
+  `'net through <label>'`) in every undeclared program, so it should land
+  deliberately, with the test churn in one sweep.
+- **[Consolidated-LAE-Off-Source]** `beta` (logged 2026-07-05, PLAN-A
+  decision 2) — the guaranteed-cost consolidated `pnl` books loss-basis LAE
+  deterministically (`rate * E[gross loss]`): its source is the net
+  marginal and the gross loss is not measurable there. The reinstatement
+  consolidated face does NOT have this problem (axis 0 of the joint carries
+  the gross loss — LAE stochastic). Candidate fixes: a (gross, net)
+  bivariate source for the GC consolidated face, or a stitched extra row
+  off the gross marginal.
+- **[Aggregate-Summary-DF-Useless]** `alpha` (author verdict 2026-07-05, the
+  CatBook example) — `Aggregate.summary_df` on a decorated engine judged
+  "USELESS and needs improving". Scope with [Reporting-Guidelines] /
+  [Accounting-Summary-DF] — reconcile the three before redesigning.
 - **[ZT-ZM-Frequency-Fix]** `alpha` — zero-truncated / zero-modified frequency is
   broken (`poisson zt` → NaN solver for every parameterization; `zm` builds but
   the semantics are wrong — it inverts a post-modification mean). Redesign: the

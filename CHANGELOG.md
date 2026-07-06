@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.0a143
+
+**[Reins-Premium-Placement-Scaling]** — reinsurance premiums in a `pnl` / `xpnl`
+are quoted at **100% placement** and scaled down by the fraction actually placed
+(the layer's `share of` / `part of`).
+
+- **`deposit` and `rate` now scale by the placement share.** In
+  `Underwriter._resolve_reins_economics`, a `deposit` resolves to `share ×
+  amount` and a `rate` to `share × rate × gross_premium` (previously both used
+  the full 100% figure). `rol` was already correct — `share × rol × limit` is
+  the placed premium — and is unchanged (adding another factor would
+  double-count). `cede` is a fraction of the *placed* premium, so the ceding
+  commission scales automatically. Reinstatements read the resolved occurrence
+  premium (`econ['pc_occ']`), so their base premium scales too. A 100% placement
+  (`… xs …`, share = 1) is unaffected.
+- **`swing` collar currency terms scale by share.** `basic` / `min` / `max`
+  (entered at 100%) are multiplied by the decorated layer's placement share
+  before building `SwingTerms`; `lcm` (a dimensionless loss multiplier applied
+  to the already-placed ceded loss) is left unchanged, so the ceded premium
+  `clip(share·basic + lcm·A, share·min, share·max)` is the placed figure.
+- **Breaking (intended):** any `pnl` / `xpnl` with a non-100% `deposit` / `rate`
+  cession, or a placed `swing`, now books a smaller (correctly-placed) ceded
+  premium. Example (`50% so 2000 xs 3000`): `deposit 1500` → 750, `rate 30%` of
+  5000 → 750, `deposit 1500 cede 25%` commission → 187.5. `rol` figures are
+  unchanged.
+
 ## 1.0.0a142
 
 **[Help-Everywhere] + [Summary-Computed-Moments] + [Repr-Trim]** — a batch of

@@ -933,9 +933,12 @@ class Underwriter(object):
         Pops the ``occ_reins_premium`` / ``occ_reins_cede`` /
         ``agg_reins_premium`` / ``agg_reins_cede`` keys from ``spec`` (so the
         inner :class:`Aggregate` sees only the loss structure) and resolves each
-        layer's premium to currency: ``deposit`` is the amount, ``rol`` is
-        ``share x rol x limit``, ``rate`` is ``rate x gross_premium``. The ceding
-        commission is ``cede x ceded_premium`` per layer. Returns
+        layer's premium to currency **at the layer's placement share** -- all
+        forms are quoted at 100% placement and scaled down by the fraction
+        placed (``share``): ``deposit`` is ``share x amount``, ``rol`` is
+        ``share x rol x limit``, ``rate`` is ``share x rate x gross_premium``.
+        The ceding commission is ``cede x ceded_premium`` per layer -- a fraction
+        of the *placed* premium, so it scales automatically. Returns
         ``{'gross', 'ceded', 'pc_occ', 'pc_agg', 'c_occ', 'c_agg'}`` for the GCN
         view, or ``None`` when no ceded-premium clause is present.
 
@@ -964,12 +967,16 @@ class Underwriter(object):
                     continue
                 basis, val = p
                 share, limit, _attach = layers[i]
+                # All premium forms are quoted at 100% placement and scaled by
+                # the fraction placed (``share``). ``rol`` already carries the
+                # share in ``share x rol x limit``; ``deposit`` and ``rate`` are
+                # 100% figures that need the explicit factor.
                 if basis == 'deposit':
-                    layer_pc = val
+                    layer_pc = share * val
                 elif basis == 'rol':
                     layer_pc = share * val * limit
                 elif basis == 'rate':
-                    layer_pc = val * pg
+                    layer_pc = share * val * pg
                 else:                                   # pragma: no cover
                     raise ValueError(f'unknown ceded-premium basis {basis!r}')
                 pc += layer_pc
@@ -983,18 +990,32 @@ class Underwriter(object):
                 'pc_occ': pc_occ, 'pc_agg': pc_agg, 'c_occ': c_occ, 'c_agg': c_agg}
 
     @staticmethod
-    def _make_feature_terms(var_feat, var_params):
+    def _make_feature_terms(var_feat, var_params, share=1.0):
         """Instantiate the ContractTerms for a parsed variable feature.
 
         ``var_feat`` is the feature key (``'swing'`` / ``'slide'`` / ``'pc'``
         / ``'corridor'``) popped from the spec, ``var_params`` its parsed
         parameter dict; returns the terms object, or ``None`` when no
         feature is present.
+
+        ``share`` is the placement fraction of the decorated layer. For
+        ``swing`` the currency terms -- ``basic`` / ``minimum`` / ``maximum``,
+        quoted at 100% placement -- are scaled by it (``lcm``, a dimensionless
+        loss multiplier applied to the already-placed ceded loss, is left
+        unchanged), so the ceded premium ``clip(share*basic + lcm*A,
+        share*min, share*max)`` is the placed figure. The other features are
+        percentage-based (loss ratios / commission fractions) and need no
+        scaling.
         """
         if var_feat is None:
             return None
         from .contract_terms import (
             CorridorTerms, ProfitCommissionTerms, SlideTerms, SwingTerms)
+        if var_feat == 'swing' and share != 1.0:
+            var_params = dict(var_params)
+            for k in ('basic', 'minimum', 'maximum'):
+                if var_params.get(k) is not None:
+                    var_params[k] = float(share) * float(var_params[k])
         return {'swing': SwingTerms, 'slide': SlideTerms,
                 'pc': ProfitCommissionTerms,
                 'corridor': CorridorTerms}[var_feat](**var_params)
@@ -1174,8 +1195,12 @@ class Underwriter(object):
                 inner._pnl_recipe = {'kind': 'reins', 'expense_spec': expense_spec,
                                      'econ': econ,
                                      'agg_feature_terms':
-                                         self._make_feature_terms(var_feat,
-                                                                  var_params),
+                                         self._make_feature_terms(
+                                             var_feat, var_params,
+                                             share=(spec['agg_reins']
+                                                    [var_layer_idx][0]
+                                                    if var_feat is not None
+                                                    else 1.0)),
                                      'consideration_label': consideration_label,
                                      'loss_label': loss_label}
             elif var_feat is not None:
@@ -1192,7 +1217,8 @@ class Underwriter(object):
                 spec.pop('agg_reins', None)
                 spec.pop('agg_kind', None)
                 inner = Aggregate(**spec)
-                terms = self._make_feature_terms(var_feat, var_params)
+                terms = self._make_feature_terms(var_feat, var_params,
+                                                 share=var_layer[0])
                 inner.variable_terms = terms
                 inner.variable_layer = var_layer
                 inner.variable_gross_premium = float(consideration)

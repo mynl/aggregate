@@ -261,7 +261,9 @@ def test_subsequent_aggregate_cover_builds():
     a = p.analysis
     assert a.terms is not None
     assert a.agg_recovery is not None
-    assert a.agg_ceded_premium == pytest.approx(600.0)   # threaded from the pnl
+    # threaded from the pnl; the 100%-quoted deposit 600 scaled by the 85%
+    # placement -> 510
+    assert a.agg_ceded_premium == pytest.approx(510.0)
     # the agg cover actually recovers on the net-of-occurrence loss L - A(R)
     assert a._stats_df.loc['ceded_agg_loss', 'mean'] > 0
     # decision 3: the ledger extends to the inuring both-tiers form -- a third

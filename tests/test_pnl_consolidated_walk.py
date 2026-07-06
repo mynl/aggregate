@@ -41,9 +41,11 @@ def test_acceptance_pnl_consolidated_card(cat):
     df = p.summary_df
     # always the flat three-row card, whatever the program
     assert list(df.index) == ['Consideration', 'Obligation', 'Margin']
-    # Consideration = net premium 12000 - 2000 - 1000; no gross premium
-    # booked against a higher-than-net loss
-    assert df.loc['Consideration', 'EX'] == pytest.approx(9000.0)
+    # Consideration = net premium 12000 - 1500 - 800; the ceded premiums are
+    # the 100%-quoted deposits scaled by placement (occ 75% x 2000 = 1500,
+    # agg 80% x 1000 = 800); no gross premium booked against a higher-than-net
+    # loss
+    assert df.loc['Consideration', 'EX'] == pytest.approx(9700.0)
     # the card foots on EX
     assert df.loc['Margin', 'EX'] == pytest.approx(
         df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX'], abs=1e-9)
@@ -165,7 +167,7 @@ def test_walk_shares_atoms():
 def test_construction_narratives_present(cat):
     p, x, _a = cat
     assert 'Consolidated pnl' in p.construction_description
-    assert 'net premium 9000' in p.construction_description
+    assert 'net premium 9700' in p.construction_description
     assert 'xpnl walk' in x.construction_description
     # the explanation names the route, the source columns, the ladder rule,
     # and closes with the executable replay

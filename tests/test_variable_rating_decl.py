@@ -82,6 +82,26 @@ def test_swing_bare_collar_defaults():
     assert np.isinf(terms.maximum)                       # uncapped
 
 
+def test_swing_terms_scale_by_placement_share():
+    # swing basic / min / max are quoted at 100% placement and scaled by the
+    # share placed; lcm (a dimensionless loss multiplier on the already-placed
+    # ceded loss) is unchanged. At 50% the collar currency terms halve.
+    head = ('pnl V 10000 premium less agg V_e 10000 prem at 85% lr sev lognorm '
+            '50 cv 3 poisson aggregate net of ')
+    sw = ' swing basic 500 lcm 0.5 min 500 max 3000'
+    half = build(head + '50% so 5000 xs 4000' + sw)
+    t = half.analysis.terms
+    assert t.basic == pytest.approx(250.0)               # 0.5 x 500
+    assert t.minimum == pytest.approx(250.0)             # 0.5 x 500
+    assert t.maximum == pytest.approx(1500.0)            # 0.5 x 3000
+    assert t.lcm == pytest.approx(0.5)                   # unchanged
+    # end to end: the ceded premium (gross - net premium) halves vs 100%
+    full = build(head + '5000 xs 4000' + sw)
+    ceded_full = 10000 - _leg(full, 'net premium')['EX']
+    ceded_half = 10000 - _leg(half, 'net premium')['EX']
+    assert ceded_half == pytest.approx(0.5 * ceded_full, rel=1e-6)
+
+
 # ----------------------------------------------------------------------
 # slide -- replaces cede; stochastic commission (expense credit)
 # ----------------------------------------------------------------------

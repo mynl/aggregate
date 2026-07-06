@@ -363,7 +363,7 @@ def plot_bivariate_massive_slice(bd, x=None, y=None, ax=None, log=False):
     from ._style import make_grid
     gd = bd.slice(x=x, y=y)
     if ax is None:
-        _, ax = make_grid(1, 1, figsize=(FIG_W, FIG_H), squeeze=True)
+        _, ax = make_grid(1, 1, squeeze=True)
     ax.plot(gd.x, gd.p, lw=1.0, drawstyle='steps-mid')
     ax.fill_between(gd.x, 0.0, gd.p, step='mid', alpha=0.3)
     if log:

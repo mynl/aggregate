@@ -341,7 +341,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             td = x.tail_df()
             if td is not None:
                 qd(td.fillna(''), accuracy=accuracy, **kwargs)
-            if x.density_df is not None and not x._validation_passes():
+            if x.density_df is not None and not x.valid.passes:
                 print(f'\nVALIDATION FAILS: {x.validation_explanation}')
         elif isinstance(x, ReinstatementAnalysis):
             # Reinstatement analysis: treaty intro then the return-period
@@ -564,14 +564,15 @@ def _help_target(fmt):
     return 'ansi' if _in_jupyter() else 'text'
 
 
-def agg_help(self, regex, lod='short', values='short', fmt='auto'):
+def agg_help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
     """
     Investigate ``self`` for public names matching ``regex`` and display each
     one's documentation and (optionally) its value or no-argument call result.
 
     Module-level free function backing the ``.help(regex, ...)`` method on
-    :class:`Aggregate`, :class:`Portfolio`, :class:`Underwriter`, and the
-    bivariate classes. Named ``agg_help`` (not ``help``) to avoid shadowing
+    :class:`Aggregate`, :class:`Portfolio`, :class:`Underwriter`,
+    :class:`Severity`, :class:`Distortion`, :class:`Bounds`, :class:`PnL`, and
+    the bivariate classes. Named ``agg_help`` (not ``help``) to avoid shadowing
     Python's builtin ``help`` at module / package scope. Fka ``more``.
 
     Parameters
@@ -580,13 +581,13 @@ def agg_help(self, regex, lod='short', values='short', fmt='auto'):
         The instance to introspect.
     regex : str
         Regular expression; names matching it (via :func:`re.search`) are shown.
-    lod : {'short', 'terse', 'all'}, default 'short'
+    lod : {'terse', 'short', 'all'}, default 'terse'
         Level of *documentation* detail per match:
 
         * ``'terse'`` -- name (and method signature) only, no docstring;
         * ``'short'`` -- the first few lines of the docstring;
         * ``'all'`` -- the full docstring.
-    values : {'short', 'none', 'all'}, default 'short'
+    values : {'none', 'short', 'all'}, default 'none'
         How much of each name's *value* to display -- the attribute value, or a
         method's no-argument call result (methods needing arguments are
         skipped):
@@ -595,6 +596,10 @@ def agg_help(self, regex, lod='short', values='short', fmt='auto'):
         * ``'short'`` -- show values, but a :class:`pandas.DataFrame` or
           :class:`pandas.Series` is truncated to ``.head(5)``;
         * ``'all'`` -- show values in full.
+    private : bool, default False
+        When ``False`` (the default) names beginning with an underscore
+        (``_private`` and ``__dunder__``) are skipped -- the public surface
+        only. Pass ``True`` to include them.
     fmt : {'auto', 'text', 'ansi', 'html'}, default 'auto'
         Render *target*:
 
@@ -609,9 +614,9 @@ def agg_help(self, regex, lod='short', values='short', fmt='auto'):
     -----
     ``lod``, ``values`` and ``fmt`` are three orthogonal axes: ``lod`` governs
     the docstring detail, ``values`` how much of the value / call result, and
-    ``fmt`` the render target. ``lod='terse', values='none'`` is a bare name
-    listing. Documentation is shown for methods and properties only (a plain
-    field carries no useful docstring).
+    ``fmt`` the render target. The default ``lod='terse', values='none'`` is a
+    bare public-name listing (``private=False``). Documentation is shown for
+    methods and properties only (a plain field carries no useful docstring).
     """
     if lod not in ('terse', 'short', 'all'):
         raise ValueError(f"lod must be 'terse', 'short', or 'all'; got {lod!r}")
@@ -666,6 +671,8 @@ def agg_help(self, regex, lod='short', values='short', fmt='auto'):
             print(msg)
 
     for name in dir(self):
+        if not private and name.startswith('_'):
+            continue
         if not re.search(regex, name):
             continue
         # classify off the *class* so a raising property does not abort the walk

@@ -1356,6 +1356,23 @@ class Severity(LabeledMixin, ss.rv_continuous):
         return np.array([ex1, var, skew, np.nan])
 
     @lru_cache
+    def help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
+        """Lookup help on methods and properties matching ``regex``.
+
+        Thin wrapper over :func:`aggregate.utilities.agg_help` (prefixed to
+        avoid shadowing the builtin ``help``). Four axes: ``lod``
+        (``'terse'|'short'|'all'``) controls how much docstring is shown;
+        ``values`` (``'none'|'short'|'all'``) how much of each value or
+        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
+        rows under ``'short'``); ``private`` (``False``) whether ``_``-prefixed
+        names are included; ``fmt`` (``'auto'|'text'|'ansi'|'html'``) the
+        render target (``auto`` = ANSI in Jupyter, plain text in a terminal).
+        The default ``lod='terse', values='none', private=False`` is a bare
+        public-name listing.
+        """
+        from .utilities import agg_help
+        agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
+
     def moms(self):
         """First three moments of the layered severity ``X(a, d) = min(d, (X-a)+)``.
 

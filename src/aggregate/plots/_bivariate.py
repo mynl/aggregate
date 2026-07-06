@@ -12,7 +12,7 @@ single-consumer case).
 
 import numpy as np
 
-from ._style import make_grid, FIG_W, FIG_H
+from ._style import make_grid
 
 
 def _contourf(ax, xgrid, ygrid, Z, title, xlabel, ylabel, levels, log,
@@ -62,7 +62,7 @@ def plot_bivariate(biv, axs=None, levels=14, log=False, **kwargs):
     """
     biv._require_density()
     if axs is None:
-        biv.figure, axs = make_grid(1, 2, figsize=(2 * FIG_W, FIG_H), squeeze=True)
+        biv.figure, axs = make_grid(1, 2, squeeze=True)
     else:
         biv.figure = np.asarray(axs).flat[0].figure
     ax0, ax1 = np.asarray(axs).flat[:2]
@@ -97,7 +97,7 @@ def plot_bivariate_distribution(bd, ax=None, levels=14, log=False, **kwargs):
         The axes drawn on.
     """
     if ax is None:
-        _, ax = make_grid(1, 1, figsize=(FIG_W, FIG_H), squeeze=True)
+        _, ax = make_grid(1, 1, squeeze=True)
     names = bd.meta.get('axis_names', ('ceded', 'net'))
     return _contourf(ax, bd.ceded, bd.net, bd.density,
                      f'Joint density\n{bd.meta.get("name", "")}',

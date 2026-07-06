@@ -183,8 +183,7 @@ def plot_pnl(pnl, axd=None, **kwargs):
     import numpy as np
     import pandas as pd
     if axd is None:
-        if 'figsize' not in kwargs:
-            kwargs['figsize'] = (2 * FIG_W, FIG_H)
+        # make_grid defaults to the house (2*FIG_W, FIG_H) for a 1x2 grid
         pnl.figure, axs = make_grid(1, 2, **kwargs)
         axd = {'A': axs[0], 'B': axs[1]}
     else:
@@ -225,7 +224,7 @@ def plot_reins_occ(agg, axs=None, **kwargs):
         logger.warning('reins_occ_plot called with no occurrence reinsurance.')
         return
     if axs is None:
-        fig, axs = make_grid(1, 2, figsize=(2 * FIG_W, FIG_H))
+        fig, axs = make_grid(1, 2)
         agg.figure = fig
     ax0, ax1 = axs.flat
 

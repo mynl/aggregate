@@ -155,7 +155,10 @@ def make_mosaic(layout, *, figsize=None, **kwargs):
     layout : str or list
         Mosaic specification, e.g. ``'ABC'`` or ``'AB\\nCD'``.
     figsize : tuple of float, optional
-        Figure size in inches. Defaults to matplotlib's ``figure.figsize``.
+        Figure size in inches. Defaults to the house grid size
+        ``(ncols * FIG_W, nrows * FIG_H)``, where the grid shape is read from
+        ``layout`` (newline-separated rows for a string; nested rows for a
+        list) -- one panel-sized cell per mosaic position.
     **kwargs
         Forwarded to :func:`matplotlib.pyplot.subplot_mosaic`.
 
@@ -165,6 +168,15 @@ def make_mosaic(layout, *, figsize=None, **kwargs):
     axd : dict of str to matplotlib.axes.Axes
     """
     kwargs.setdefault('layout', 'constrained')
+    if figsize is None:
+        if isinstance(layout, str):
+            rows = [r for r in layout.split('\n') if r.strip() != ''] or ['']
+            nrows = len(rows)
+            ncols = max(len(r) for r in rows)
+        else:
+            nrows = len(layout)
+            ncols = max((len(r) for r in layout), default=1)
+        figsize = (ncols * FIG_W, nrows * FIG_H)
     return plt.subplot_mosaic(layout, figsize=figsize, **kwargs)
 
 
@@ -180,7 +192,9 @@ def make_grid(nrows, ncols, *, figsize=None, squeeze=True, **kwargs):
     nrows, ncols : int
         Grid shape.
     figsize : tuple of float, optional
-        Figure size in inches.
+        Figure size in inches. Defaults to the house grid size
+        ``(ncols * FIG_W, nrows * FIG_H)`` -- one panel-sized cell per grid
+        position -- so ``make_grid(1, 3)`` is three panels wide by default.
     squeeze : bool, default True
         Passed through to :func:`matplotlib.pyplot.subplots`; pass ``False`` to
         always get a 2-D ``Axes`` array.
@@ -192,5 +206,7 @@ def make_grid(nrows, ncols, *, figsize=None, squeeze=True, **kwargs):
     fig : matplotlib.figure.Figure
     axs : matplotlib.axes.Axes or ndarray of Axes
     """
+    if figsize is None:
+        figsize = (ncols * FIG_W, nrows * FIG_H)
     return plt.subplots(nrows, ncols, figsize=figsize,
                         constrained_layout=True, squeeze=squeeze, **kwargs)

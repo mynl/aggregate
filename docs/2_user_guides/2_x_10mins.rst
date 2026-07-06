@@ -1003,7 +1003,7 @@ The ``info`` dataframe contains information about the frequency and severity sto
 The ``summary_df`` Dataframe
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``summary_df`` dataframe contains gross analytic and estimated (net or ceded) statistics. When there is no reinsurance, comparison of analytic and estimated moments provides a test of computational accuracy (first case). It should always be reviewed after updating. When there is reinsurance, empirical is net (second case).
+The ``summary_df`` dataframe is the at-a-glance risk view and the daily-driver headline printed by ``qd``: the **computed** (realised FFT-grid) mean, standard deviation, CV, and skewness, plus the key percentiles ``P01 / Median / P99``, on ``Freq`` / ``Sev`` / ``Agg`` rows (and per unit plus a total block for a :class:`Portfolio`). The ``Freq`` row moments are PGF-exact; the ``Sev`` and ``Agg`` rows report the estimate the model actually produced (the same value validation audits against). The moment-error QA frame — analytic vs. estimated moments, the computational-accuracy test that should always be reviewed after updating — is now :attr:`validation_df` (under reinsurance its middle column is the net or ceded output).
 
 .. ipython:: python
     :okwarning:

@@ -56,7 +56,7 @@ Proportion of expected loss by unit.
 
 .. ipython:: python
 
-    bb = p.summary_df.xs('Agg', axis=0, level=1)[['EX']]
+    bb = p.summary_df.xs('Agg', axis=0, level=1)[['Mean']]
     qd(bb / bb.iloc[-1,0])
 
 

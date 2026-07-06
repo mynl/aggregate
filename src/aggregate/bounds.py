@@ -444,6 +444,23 @@ class Bounds:
     # Plots
     # ------------------------------------------------------------------
 
+    def help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
+        """Lookup help on methods and properties matching ``regex``.
+
+        Thin wrapper over :func:`aggregate.utilities.agg_help` (prefixed to
+        avoid shadowing the builtin ``help``). Four axes: ``lod``
+        (``'terse'|'short'|'all'``) controls how much docstring is shown;
+        ``values`` (``'none'|'short'|'all'``) how much of each value or
+        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
+        rows under ``'short'``); ``private`` (``False``) whether ``_``-prefixed
+        names are included; ``fmt`` (``'auto'|'text'|'ansi'|'html'``) the
+        render target (``auto`` = ANSI in Jupyter, plain text in a terminal).
+        The default ``lod='terse', values='none', private=False`` is a bare
+        public-name listing.
+        """
+        from .utilities import agg_help
+        agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
+
     def plot_envelope(self, *, axs=None, n_resamples=0, alpha=0.05,
                       distortions='ordered', title='',
                       lim=(-0.025, 1.025)):
@@ -770,6 +787,24 @@ class _HullEngine:
     _curve_label = r'$a_i(p)$ vs $T(p)$'
     _xlabel = '$T(p)$ = total premium'
     _ylabel = 'NA premium'
+
+    def help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
+        """Lookup help on methods and properties matching ``regex``.
+
+        Thin wrapper over :func:`aggregate.utilities.agg_help` (prefixed to
+        avoid shadowing the builtin ``help``); inherited by
+        :class:`AllocationBounds` and :class:`PricingBounds`. Four axes: ``lod``
+        (``'terse'|'short'|'all'``) controls how much docstring is shown;
+        ``values`` (``'none'|'short'|'all'``) how much of each value or
+        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
+        rows under ``'short'``); ``private`` (``False``) whether ``_``-prefixed
+        names are included; ``fmt`` (``'auto'|'text'|'ansi'|'html'``) the
+        render target (``auto`` = ANSI in Jupyter, plain text in a terminal).
+        The default ``lod='terse', values='none', private=False`` is a bare
+        public-name listing.
+        """
+        from .utilities import agg_help
+        agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
 
     def _init_engine(self, T, A, p_vert, S, y_names):
         """Store the vertex table and build the per-item convex envelopes."""

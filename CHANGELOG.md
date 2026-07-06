@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.0.0a142
+
+**[Help-Everywhere] + [Summary-Computed-Moments] + [Repr-Trim]** — a batch of
+short display punchups.
+
+- **`.help` on every first-class citizen.** Added the `.help(regex, ...)`
+  lookup to `Distortion`, `Bounds`, `PnL`, `Severity`, and the two bounds
+  engines `AllocationBounds` / `PricingBounds` (via their shared `_HullEngine`
+  base) — it was already on `Aggregate`, `Portfolio`, `BivariateAggregate`,
+  `Underwriter`. The backing `agg_help` gained a **`private=False`** axis (skip
+  `_`-prefixed names unless asked) and its defaults changed to **`lod='terse',
+  values='none', private=False`** — so a bare `.help('regex')` is now a clean
+  public-name listing rather than dumping docstrings, values, and private
+  members. The `.help` methods on all classes default to the same.
+- **`Validation.passes` predicate.** The passing test (clean
+  `NOT_UNREASONABLE`, or only `REINSURANCE`) moved onto the `Validation` flag as
+  a `.passes` property; the duplicated private `Aggregate._validation_passes` /
+  `Portfolio._validation_passes` helpers are gone (`qd` now reads
+  `x.valid.passes`).
+- **`summary_df` reports computed moments.** `Aggregate.summary_df` and
+  `Portfolio.summary_df` now show the **realised (FFT-grid) `est_*`** moments
+  for the `Sev` / `Agg` / `total` rows — the same values validation audits
+  against — not the analytic (theoretical) moments. The `Freq` row stays
+  PGF-exact (the engine estimates no count distribution); before `update()` the
+  whole frame falls back to theoretical. The `E[X]` column is renamed
+  **`Mean`** (friendlier), and the percentile columns are renamed **`P01` /
+  `Median` / `P99`** (matching the `PnL` card headers), from the old `p0.01 /
+  p0.50 / p0.99`.
+- **`_repr_html_` trimmed and validation always shown.** `Aggregate` and
+  `Portfolio` HTML reprs now render just the intro + `summary_df` headline (the
+  `tail_df` return-period table is dropped from the inline repr — still
+  available via `.tail_df()`). The intro always closes with the validation
+  result inline (`Validation: {validation_explanation}.`), replacing the
+  fail-only red block.
+- **`make_grid` / `make_mosaic` default to house sizing.** When `figsize` is
+  omitted, `aggregate.plots.make_grid(nrows, ncols)` now sizes the figure as
+  `(ncols * FIG_W, nrows * FIG_H)` (one panel-sized cell per grid position)
+  instead of falling back to matplotlib's global `figure.figsize` — so
+  `make_grid(1, 3)` is three panels wide out of the box. `make_mosaic` gets the
+  same default, reading the grid shape from its `layout`. Explicit `figsize=`
+  still wins. The internal callers already passed exactly this size, so their
+  now-redundant `figsize=` arguments were removed (KISS); only direct
+  interactive `make_grid`/`make_mosaic` calls change.
+
 ## 1.0.0a141
 
 **[Kappa-Walks] + [Single-Block-One-Step-Walk] + [All-Gross-Loss-Renames]** —

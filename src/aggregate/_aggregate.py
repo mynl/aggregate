@@ -25,8 +25,7 @@ from .constants import (DefectiveDistributionWarning,
                         INFO_NA, info_row,
                         InfiniteVarianceError,
                         REINS_LABEL_GROSS, REINS_LABEL_NET,
-                        REINS_LABEL_CEDED, REINS_LABEL_OUTPUT,
-                        Validation)
+                        REINS_LABEL_CEDED, REINS_LABEL_OUTPUT)
 from .config import get_settings
 from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_mwrangler,
@@ -74,6 +73,17 @@ DEFAULT_RETURN_PERIODS = (2, 5, 10, 25, 50, 100, 200, 250, 500, 1000)
 
 #: Key percentiles carried by the summary ``summary_df`` (low / median / high).
 SUMMARY_PERCENTILES = (0.01, 0.50, 0.99)
+
+
+def _summary_pct_label(p):
+    """Column label for a ``summary_df`` percentile: ``P01`` / ``Median`` /
+    ``P99`` (0.50 reads as ``Median``; the zero-padded ``P``-headers match the
+    :attr:`PnL.summary_df` card, ``.3g`` fallback for fractional points).
+    """
+    if p == 0.50:
+        return 'Median'
+    v = p * 100
+    return f'P{v:02.0f}' if float(v).is_integer() else f'P{v:.3g}'
 
 #: Relative floor below which ``CV = SD / E[X]`` is left blank in ``summary_df``:
 #: the mean is treated as indistinguishable from zero when ``|E[X]| < tol * SD``
@@ -2273,20 +2283,23 @@ class Aggregate(LabeledMixin):
         # s.append(super().__repr__())
         return '\n'.join(s)
 
-    def help(self, regex, lod='short', values='short', fmt='auto'):
+    def help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
         """
         Lookup help on methods and properties matching ``regex``.
 
         Thin wrapper over :func:`aggregate.utilities.agg_help` — the free
         function is prefixed to avoid shadowing Python's builtin ``help`` at
-        module / package scope. Three orthogonal axes: ``lod``
+        module / package scope. Four axes: ``lod``
         (``'terse'|'short'|'all'``) controls how much docstring is shown;
         ``values`` (``'none'|'short'|'all'``) how much of each value or
         no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
-        rows under ``'short'``); ``fmt`` (``'auto'|'text'|'ansi'|'html'``) the
+        rows under ``'short'``); ``private`` (``False``) whether ``_``-prefixed
+        names are included; ``fmt`` (``'auto'|'text'|'ansi'|'html'``) the
         render target (``auto`` = ANSI in Jupyter, plain text in a terminal).
+        The default ``lod='terse', values='none', private=False`` is a bare
+        public-name listing.
         """
-        agg_help(self, regex, lod=lod, values=values, fmt=fmt)
+        agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
 
     def _approx_description(self):
         """One-line description of the method-of-moments fit, or ``''`` if none.
@@ -2403,29 +2416,29 @@ class Aggregate(LabeledMixin):
         return _validation.validation_explanation(self)
 
     def _html_info_blob(self):
-        """Short HTML intro for ``_repr_html_`` -- identity, grid, *and a
-        validation flag only when the object fails*.
+        """Short HTML intro for ``_repr_html_`` -- identity, grid, and the
+        validation result.
 
-        The headline tables (``summary_df`` / ``tail_df``) carry the risk view;
-        this blob is the one-glance context. Validation is **silent on pass**
-        (a clean or cleanly-reinsured subject says nothing) and surfaces a red
-        block only on a genuine failure -- the same convention as :meth:`qd`.
+        The headline table (``summary_df``) carries the risk view; this blob is
+        the one-glance context. The validation result is always stated inline as
+        the closing sentence (``Validation: {validation_explanation}.``) -- a
+        clean object reads "not unreasonable", a failing one names the offending
+        moment.
         """
-        s = [f'<h3>Aggregate object: {self._title_name}</h3>']
-        s.append(f'<p>{self.frequency.freq_name} frequency distribution.')
+        parts = [f'{self.frequency.freq_name} frequency distribution.']
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
-            s.append(f'Severity {sv.long_name} distribution, {sv.support_description}.')
+            parts.append(
+                f'Severity {sv.long_name} distribution, {sv.support_description}.')
         else:
-            s.append(f'Severity with {n} components.')
+            parts.append(f'Severity with {n} components.')
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
-            s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.</p>')
-        if self.agg_density is not None and not self._validation_passes():
-            s.append('<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div><pre>\n'
-                     f'{self.validation_explanation}</pre></p>')
-        return '\n'.join(s)
+            parts.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
+        parts.append(f'Validation: {self.validation_explanation}.')
+        return (f'<h3>Aggregate object: {self._title_name}</h3>\n'
+                f'<p>{" ".join(parts)}</p>')
 
     def _text_info_blob(self) -> str:
         """Short plain-text intro (the text twin of :meth:`_html_info_blob`).
@@ -2448,29 +2461,15 @@ class Aggregate(LabeledMixin):
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
         return '\n'.join(s)
 
-    def _validation_passes(self) -> bool:
-        """Whether the object clears validation (clean *or* cleanly reinsured).
-
-        ``True`` for a ``NOT_UNREASONABLE`` result and for ``REINSURANCE`` (the
-        subject validated and reinsurance makes the moment audit n/a). Used by
-        the display surfaces (:meth:`_html_info_blob`, :meth:`qd`) to stay silent
-        on a pass and only flag a genuine failure.
-        """
-        r = self.valid
-        return bool(r == Validation.NOT_UNREASONABLE or (r & Validation.REINSURANCE))
-
     def _repr_html_(self):
-        """HTML view: short intro, the ``summary_df`` headline, the ``tail_df``
-        return-period table, and a validation flag only on failure.
+        """HTML view: short intro (with the inline validation result) and the
+        ``summary_df`` headline. The ``tail_df`` return-period table is served
+        on demand via :meth:`tail_df`, not inlined here.
         """
         fmt = lambda x: f'{x:,.5g}'
         out = [self._html_info_blob(),
                '<h4>Summary</h4>',
                self.summary_df.to_html(float_format=fmt, na_rep='')]
-        td = self.tail_df()
-        if td is not None:
-            out.append('<h4>Tail &mdash; return period (exact, not simulated)</h4>')
-            out.append(td.to_html(float_format=fmt, na_rep=''))
         return '\n'.join(out)
 
     # ================================================================
@@ -4042,15 +4041,19 @@ class Aggregate(LabeledMixin):
 
         **Index** ``Freq`` / ``Sev`` / ``Agg`` (the ``X`` index).
 
-        **Columns** ``E[X] | SD | CV | Skew | p0.01 | p0.50 | p0.99``.
+        **Columns** ``Mean | SD | CV | Skew | P01 | Median | P99``.
 
         - ``SD`` and ``CV`` are **both always present** (stable layout).
-          ``CV = SD / E[X]`` is blank when ``|E[X]|`` is ~0 relative to ``SD``
+          ``CV = SD / Mean`` is blank when ``|Mean|`` is ~0 relative to ``SD``
           (a signed / near-break-even position -- see :meth:`_cv_or_nan`); ``SD``
           never blanks. ``Skew`` is well defined even at mean 0, so it stays.
-        - Moments are the analytic (theoretical) moments from
-          :attr:`stats_df`, so the ``Freq`` × ``Sev`` = ``Agg`` mean identity is
-          exact.
+        - Moments are the **computed** (realised FFT-grid) moments for the
+          ``Sev`` and ``Agg`` rows -- ``Mean`` is the ``est_*`` estimate, the
+          same value validation audits against, not the analytic moment. The
+          ``Freq`` row stays PGF-exact (the engine never materializes a count
+          distribution to estimate from, so analytic *is* the realised value).
+          **Before** :meth:`update` there is no grid, so the whole frame falls
+          back to the analytic (theoretical) moments from :attr:`stats_df`.
         - Percentiles come from the FFT grid (exact, not simulated): ``Agg`` via
           :meth:`q`, ``Sev`` via :meth:`q_sev` (mixtures included, already on the
           grid). They populate only **after** :meth:`update`.
@@ -4066,18 +4069,30 @@ class Aggregate(LabeledMixin):
         Returns
         -------
         pandas.DataFrame
-            Three-row Freq / Sev / Agg frame, ``E[X]`` carried in ``.attrs``.
+            Three-row Freq / Sev / Agg frame, ``Mean`` carried in ``.attrs``.
         """
         st = self.stats_df['mixed']
         rows = ['Freq', 'Sev', 'Agg']
         comps = ['freq', 'sev', 'agg']
-        means = [float(st[(c, 'mean')]) for c in comps]
-        cvs = [float(st[(c, 'cv')]) for c in comps]
-        sds = [m * cv if np.isfinite(cv) else np.nan for m, cv in zip(means, cvs)]
-        skews = [float(st[(c, 'skew')]) for c in comps]
+        updated = self.agg_density is not None
+        # Theoretical (analytic) moments: the permanent source for the Freq row
+        # (PGF-exact) and the whole-frame fallback before update().
+        th_means = [float(st[(c, 'mean')]) for c in comps]
+        th_cvs = [float(st[(c, 'cv')]) for c in comps]
+        th_sds = [m * cv if np.isfinite(cv) else np.nan
+                  for m, cv in zip(th_means, th_cvs)]
+        th_skews = [float(st[(c, 'skew')]) for c in comps]
+        if updated:
+            # Computed (realised FFT-grid) moments for Sev / Agg; Freq stays
+            # theoretical (the engine estimates no count distribution).
+            means = [th_means[0], self.est_sev_m, self.est_m]
+            sds = [th_sds[0], self.est_sev_sd, self.est_sd]
+            skews = [th_skews[0], self.est_sev_skew, self.est_skew]
+        else:
+            means, sds, skews = th_means, th_sds, th_skews
         df = pd.DataFrame(
             {
-                'E[X]': means,
+                'Mean': means,
                 'SD': sds,
                 'CV': [self._cv_or_nan(m, sd) for m, sd in zip(means, sds)],
                 'Skew': skews,
@@ -4087,14 +4102,14 @@ class Aggregate(LabeledMixin):
         df.index.name = 'X'
         # Percentiles from the realised grid (exact, not simulated); Freq blank
         # by design (PGF, no materialized count distribution); pre-update blank.
-        pcols = [f'p{p:.2f}' for p in SUMMARY_PERCENTILES]
+        pcols = [_summary_pct_label(p) for p in SUMMARY_PERCENTILES]
         for pc in pcols:
             df[pc] = np.nan
-        if self.agg_density is not None:
+        if updated:
             for p, pc in zip(SUMMARY_PERCENTILES, pcols):
                 df.loc['Sev', pc] = self.q_sev(p)
                 df.loc['Agg', pc] = self.q(p)
-        for c in ('E[X]', 'SD', 'Skew', *pcols):
+        for c in ('Mean', 'SD', 'Skew', *pcols):
             df[c] = _snap_noise(df[c])
         df.attrs['mean'] = means[-1]
         return df

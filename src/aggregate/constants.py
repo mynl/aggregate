@@ -109,6 +109,18 @@ class Validation(Flag):
     REINSURANCE = auto()
     NOT_UPDATED = auto()
 
+    @property
+    def passes(self):
+        """Whether this result clears validation (clean *or* cleanly reinsured).
+
+        ``True`` for a clean ``NOT_UNREASONABLE`` object and for one whose only
+        concern is ``REINSURANCE`` (the subject validated under the hood; the
+        cession makes the realised moment audit n/a). Display surfaces (``qd``,
+        the HTML reprs) read it to flag only a genuine failure.
+        """
+        return (self == Validation.NOT_UNREASONABLE
+                or bool(self & Validation.REINSURANCE))
+
 
 class DefectiveDistributionWarning(UserWarning):
     """Emitted when an aggregate empirical PMF carries a genuine deficit.

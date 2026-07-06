@@ -11,7 +11,7 @@ import warnings
 
 from .constants import (DefectiveDistributionWarning,
                         FIG_H, FIG_W, INFO_NA, info_row,
-                        REINS_LABEL_OUTPUT, Validation)
+                        REINS_LABEL_OUTPUT)
 from .config import get_settings
 from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
                             _flat_col_to_stats_index, approximate_from_mcvsk,
@@ -42,7 +42,8 @@ from .utilities import (ft, ift,
                         remove_fuzz as remove_fuzz_util)
 from ._grid_distribution import GridDistribution
 from ._labeled import LabeledMixin
-from ._aggregate import return_period_frame, SUMMARY_PERCENTILES
+from ._aggregate import (return_period_frame, SUMMARY_PERCENTILES,
+                         _summary_pct_label)
 from . import _pricing
 from . import _reinsurance
 from . import _bucket_window
@@ -301,19 +302,21 @@ class Portfolio(LabeledMixin):
 
         self.validation_eps = get_settings().validation.eps
 
-    def help(self, regex, lod='short', values='short', fmt='auto'):
+    def help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
         """
         Lookup help on methods and properties matching ``regex``.
 
-        Three orthogonal axes: ``lod`` (``'terse'|'short'|'all'``) controls how
-        much docstring is shown; ``values`` (``'none'|'short'|'all'``) how much
-        of each value or no-argument call result (a ``DataFrame`` / ``Series``
-        is headed to 5 rows under ``'short'``); ``fmt``
+        Four axes: ``lod`` (``'terse'|'short'|'all'``) controls how much
+        docstring is shown; ``values`` (``'none'|'short'|'all'``) how much of
+        each value or no-argument call result (a ``DataFrame`` / ``Series`` is
+        headed to 5 rows under ``'short'``); ``private`` (``False``) whether
+        ``_``-prefixed names are included; ``fmt``
         (``'auto'|'text'|'ansi'|'html'``) the render target (``auto`` = ANSI in
-        Jupyter, plain text in a terminal). See
+        Jupyter, plain text in a terminal). The default ``lod='terse',
+        values='none', private=False`` is a bare public-name listing. See
         :func:`aggregate.utilities.agg_help`.
         """
-        agg_help(self, regex, lod=lod, values=values, fmt=fmt)
+        agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
 
     def add_exa_sample(self, sample, S_calculation='forwards'):
         """Compute a sample-based ``density_df`` with ``E[X_i | X]`` from a sample.
@@ -590,16 +593,6 @@ class Portfolio(LabeledMixin):
         # cannot use ex, etc. because object may not have been updated
         return f'{self.label} at {super().__repr__()}'
 
-    def _validation_passes(self) -> bool:
-        """Whether the portfolio clears validation (clean *or* cleanly reinsured).
-
-        Display twin of :meth:`Aggregate._validation_passes` -- lets
-        :meth:`_repr_html_` and :meth:`qd` stay silent on a pass and flag only a
-        genuine failure.
-        """
-        r = self.valid
-        return bool(r == Validation.NOT_UNREASONABLE or (r & Validation.REINSURANCE))
-
     def _text_info_blob(self) -> str:
         """Short plain-text intro for :meth:`qd` -- identity, unit count, grid.
 
@@ -616,28 +609,23 @@ class Portfolio(LabeledMixin):
         return '\n'.join(s)
 
     def _repr_html_(self):
-        """HTML view: short intro, the ``summary_df`` headline, the ``tail_df``
-        return-period table, and a validation flag only on failure.
+        """HTML view: short intro (with the inline validation result) and the
+        ``summary_df`` headline. The ``tail_df`` return-period table is served
+        on demand via :meth:`tail_df`, not inlined here.
         """
         _n = len(self.agg_list)
         _s = '' if _n == 1 else 's'
-        s = [f'<h3>Portfolio object: {self._title_name}</h3>',
-             f'<p>Portfolio contains {_n} aggregate component{_s}.']
+        parts = [f'Portfolio contains {_n} aggregate component{_s}.']
         if self.bs > 0:
-            s.append(f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.</p>')
-        else:
-            s.append('</p>')
-        if self.density_df is not None and not self._validation_passes():
-            s.append('<p>Validation: <div style="color: #f00; font-weight:bold;">fails</div>'
-                     f'<pre>\n{self.validation_explanation}</pre></p>')
+            parts.append(
+                f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
+        parts.append(f'Validation: {self.validation_explanation}.')
+        s = [f'<h3>Portfolio object: {self._title_name}</h3>',
+             '<p>' + ' '.join(parts) + '</p>']
         fmt = lambda x: f'{x:,.5g}'
         out = ['\n'.join(s),
                '<h4>Summary</h4>',
                self.summary_df.to_html(float_format=fmt, na_rep='')]
-        td = self.tail_df()
-        if td is not None:
-            out.append('<h4>Tail &mdash; return period (exact, not simulated)</h4>')
-            out.append(td.to_html(float_format=fmt, na_rep=''))
         return '\n'.join(out)
 
     def __str__(self):
@@ -1225,9 +1213,12 @@ class Portfolio(LabeledMixin):
         unit's own :attr:`Aggregate.summary_df` -- Freq / Sev / Agg moments and
         percentiles) plus a ``total`` block carrying the **Agg row only** (a
         portfolio has no single Freq / Sev). The ``total`` Agg row is the
-        portfolio's "what's my number" line: ``E[X] / SD / CV / Skew`` from the
-        canonical ``stats_df`` total, and ``p0.01 / p0.50 / p0.99`` from the
-        realised portfolio grid (:meth:`q`).
+        portfolio's "what's my number" line: the **computed** (realised
+        FFT-grid) ``Mean / SD / CV / Skew`` (the ``est_*`` estimates), and
+        ``P01 / Median / P99`` from the realised portfolio grid (:meth:`q`).
+        Each per-unit block is that unit's own :attr:`Aggregate.summary_df`, so
+        its moments are likewise computed. **Before** :meth:`update` the whole
+        frame falls back to the analytic (theoretical) moments.
 
         The moment-error QA frame is now :attr:`validation_df`; the return-period
         table is :attr:`tail_df`; the tail-behavior classifier is
@@ -1236,27 +1227,31 @@ class Portfolio(LabeledMixin):
         Returns
         -------
         pandas.DataFrame
-            ``MultiIndex (unit, X)`` rows; columns ``E[X] | SD | CV | Skew |
-            p0.01 | p0.50 | p0.99``.
+            ``MultiIndex (unit, X)`` rows; columns ``Mean | SD | CV | Skew |
+            P01 | Median | P99``.
         """
         blocks = [a.summary_df for a in self]
         keys = [a.name for a in self]
-        # ``total`` block: the Agg row only (no portfolio Freq / Sev).
-        m = float(self.agg_m)
-        sd = float(self.agg_sd)
+        # ``total`` block: the Agg row only (no portfolio Freq / Sev). Computed
+        # (realised) moments when updated; theoretical fallback before update.
+        updated = self.density_df is not None
+        if updated:
+            m, sd, skew = float(self.est_m), float(self.est_sd), float(self.est_skew)
+        else:
+            m, sd, skew = float(self.agg_m), float(self.agg_sd), float(self.agg_skew)
         total = pd.DataFrame(
             {
-                'E[X]': [m],
+                'Mean': [m],
                 'SD': [sd],
                 'CV': [Aggregate._cv_or_nan(m, sd)],
-                'Skew': [float(self.agg_skew)],
+                'Skew': [skew],
             },
             index=pd.Index(['Agg'], name='X'),
         )
-        pcols = [f'p{p:.2f}' for p in SUMMARY_PERCENTILES]
+        pcols = [_summary_pct_label(p) for p in SUMMARY_PERCENTILES]
         for p, pc in zip(SUMMARY_PERCENTILES, pcols):
-            total[pc] = self.q(p) if self.density_df is not None else np.nan
-        for c in ('E[X]', 'SD', 'Skew', *pcols):
+            total[pc] = self.q(p) if updated else np.nan
+        for c in ('Mean', 'SD', 'Skew', *pcols):
             total[c] = _snap_noise(total[c])
         total.attrs['mean'] = m
         blocks.append(total)

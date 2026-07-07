@@ -5,15 +5,14 @@ realized loss quantity that fills **one** leg of a Gross / Ceded / Net P&L (the
 legs model, ``dev/plan-variable-rating-appendix.md`` section 1). Pushed forward
 over the loss distribution -- 1-D on an aggregate basis, 2-D on an occurrence
 basis (appendix section 2) -- it makes that leg stochastic. Six features share
-this shape: reinstatement premium
-(:class:`aggregate.reinstatement.ReinstatementTerms`), retro, swing, slide,
-profit commission and corridor.
+this shape: reinstatement premium (:class:`ReinstatementTerms`), retro, swing,
+slide, profit commission and corridor.
 
-This module holds the thin :class:`ContractTerms` base and the five Phase-3
-single-leg features. The reinstatement specialization is a **two-map** feature
-(a premium decorator ``h(R)`` *and* the annual-cap loss transform ``A(R)``) and
-lives with its analysis engine in ``reinstatement.py``; it subclasses
-:class:`ContractTerms` there.
+This module holds the thin :class:`ContractTerms` base and the six single-leg
+features. Five are pure single-leg maps (retro, swing, slide, profit
+commission, corridor); :class:`ReinstatementTerms` is the one **two-map**
+feature (a premium decorator ``h(R)`` *and* the annual-cap loss transform
+``A(R)``), consumed by the reinstatements P&L builders.
 
 Each feature owns its vectorized :meth:`~ContractTerms.phi`, the P&L leg it fills
 (:attr:`~ContractTerms.target_leg`) and the loss quantity ``phi`` reads
@@ -27,8 +26,8 @@ Submodule access only (no top-level re-export)::
     from aggregate.contract_terms import SwingTerms
 """
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Callable, Optional
 
 import numpy as np
 
@@ -39,6 +38,7 @@ __all__ = [
     'SlideTerms',
     'ProfitCommissionTerms',
     'CorridorTerms',
+    'ReinstatementTerms',
 ]
 
 #: The P&L legs a contract term may fill (appendix section 1).
@@ -459,3 +459,284 @@ class CorridorTerms(ContractTerms):
         """Retained loss ratio ``LR - share * clip(LR - attachment, 0, width)``."""
         lr = np.asarray(loss_ratio, dtype=float)
         return lr - self.share * np.clip(lr - self.attachment, 0.0, self.width)
+
+
+@dataclass(frozen=True)
+class ReinstatementTerms(ContractTerms):
+    r"""Immutable terms of one occurrence reinstatement basis.
+
+    Describes a ``y`` xs ``a`` occurrence layer with ``m`` paid reinstatements,
+    pro rata as to amount but not as to time. The reinstatement premium charged
+    on tranche ``j`` of unlimited recovery is ``alpha_j`` times the base rate on
+    line ``r = deposit / limit``; the annual recovery is capped at ``(m+1) y``.
+
+    Parameters
+    ----------
+    limit : float
+        Occurrence limit ``y`` (also the base for the rate on line ``r`` and the
+        default reinstatement tranche width).
+    rates : tuple of float
+        Price multipliers ``(alpha_1, ..., alpha_m)`` relative to ``r``; ``len``
+        is the number of reinstatements ``m``. ``0`` is a free reinstatement,
+        ``1`` a full-rate one, ``0.5`` half rate. The **empty** tuple is the
+        zero-reinstatements case (``m = 0``): a single annual limit ``y`` with no
+        reinstatement premium (DecL ``no reinstatements``).
+    deposit : float
+        Base (deposit) ceded premium ``D`` in currency -- the layer's
+        Phase-1 ``deposit | rol | rate`` premium. The base rate on line is
+        ``r = deposit / limit``.
+    widths : tuple of float, optional
+        Per-tranche widths ``(w_1, ..., w_m)`` for irregular schedules. Default
+        (``None``) is equal full-limit reinstatements (``w_j = limit``). Set by
+        :meth:`from_tranches`.
+    recovery_cap : float, optional
+        Total annual recovery capacity ``Y``. Default (``None``) is
+        ``limit + sum(widths)`` (``= (m+1) y`` for equal full reinstatements).
+    premium_function : callable, optional
+        Escape hatch: an arbitrary vectorized nondecreasing ``h(R)`` overriding
+        the tranche sum (set by :meth:`from_callable`).
+
+    Notes
+    -----
+    The reinstatement-premium function is the tranche sum (pre-plan section 5.1)
+
+    .. math::
+
+        h(R) = r \sum_{j=1}^m \alpha_j \big[(R - b_j)_+ \wedge w_j\big],
+        \qquad b_j = \sum_{i<j} w_i,
+
+    nonnegative, nondecreasing and piecewise linear, constant once all
+    reinstatement capacity ``sum(w_j)`` is consumed. Recovery is
+    ``A(R) = R \wedge Y``. Both are deterministic nondecreasing functions of the
+    single random variable ``R``, hence comonotone (``dev/reinstatements.md``).
+
+    Reinstatement is the one **two-map** :class:`ContractTerms` feature:
+    :meth:`reinstatement_premium` is the premium decorator exposed as the base
+    :meth:`phi` (filling the ceded-premium leg), while :meth:`recovery` is the
+    annual-cap loss transform consumed separately by the reinstatements P&L
+    builders.
+    """
+
+    #: ``ContractTerms`` metadata: ``h(R)`` fills the ceded-premium leg, reading
+    #: the unlimited annual occurrence recovery ``R`` (appendix sections 1, 4).
+    target_leg = 'ceded_premium'
+    loss_basis = 'occurrence_recovery'
+
+    limit: float
+    rates: tuple
+    deposit: float
+    widths: Optional[tuple] = None
+    recovery_cap: Optional[float] = None
+    premium_function: Optional[Callable] = field(default=None, repr=False)
+
+    # ------------------------------------------------------------------
+    # validation
+    # ------------------------------------------------------------------
+    def __post_init__(self):
+        if not (self.limit > 0 and np.isfinite(self.limit)):
+            raise ValueError(
+                f'ReinstatementTerms: limit must be finite and > 0, '
+                f'got {self.limit!r}.')
+        if not (self.deposit >= 0 and np.isfinite(self.deposit)):
+            raise ValueError(
+                f'ReinstatementTerms: deposit must be finite and >= 0, '
+                f'got {self.deposit!r}.')
+        rates = tuple(float(a) for a in self.rates)
+        object.__setattr__(self, 'rates', rates)
+        if self.premium_function is None:
+            # An empty ``rates`` tuple is the *zero-reinstatements* case: ``m = 0``,
+            # a single annual limit ``y``, no reinstatement premium (DecL ``no
+            # reinstatements``). The omitted-clause / free + unlimited case carries
+            # no terms object at all, so it never reaches here.
+            if any((not np.isfinite(a)) or a < 0 for a in rates):
+                raise ValueError(
+                    f'ReinstatementTerms: rates must be finite and nonnegative, '
+                    f'got {rates!r}.')
+        if self.widths is not None:
+            widths = tuple(float(w) for w in self.widths)
+            object.__setattr__(self, 'widths', widths)
+            if len(widths) != len(rates):
+                raise ValueError(
+                    f'ReinstatementTerms: widths ({len(widths)}) and rates '
+                    f'({len(rates)}) must have the same length.')
+            if any((not np.isfinite(w)) or w <= 0 for w in widths):
+                raise ValueError(
+                    f'ReinstatementTerms: widths must be finite and > 0, '
+                    f'got {widths!r}.')
+        if self.recovery_cap is not None and not (
+                self.recovery_cap > 0 and np.isfinite(self.recovery_cap)):
+            raise ValueError(
+                f'ReinstatementTerms: recovery_cap must be finite and > 0, '
+                f'got {self.recovery_cap!r}.')
+        if self.premium_function is not None:
+            self._validate_callable()
+
+    def _validate_callable(self):
+        """Check the escape-hatch ``premium_function`` is vectorized, finite,
+        nonnegative and nondecreasing on a sample of the recovery range.
+
+        Delegates to the shared :meth:`ContractTerms._check_vectorized` probe.
+        """
+        self._check_vectorized(
+            self.premium_function, 0.0, self.total_recovery_capacity,
+            where='ReinstatementTerms.from_callable: premium_function',
+            nonnegative=True, nondecreasing=True)
+
+    # ------------------------------------------------------------------
+    # alternative constructors
+    # ------------------------------------------------------------------
+    @classmethod
+    def from_tranches(cls, *, limit, widths, rates, deposit, recovery_cap=None):
+        """Build terms with general (possibly unequal) reinstatement tranche widths.
+
+        Parameters
+        ----------
+        limit : float
+            Occurrence limit ``y`` (base for ``r = deposit / limit``).
+        widths : sequence of float
+            Reinstatement tranche widths ``(w_1, ..., w_m)``.
+        rates : sequence of float
+            Price multipliers, same length as ``widths``.
+        deposit : float
+            Base ceded premium ``D``.
+        recovery_cap : float, optional
+            Total recovery capacity; default ``limit + sum(widths)``.
+        """
+        return cls(limit=float(limit), rates=tuple(rates), deposit=float(deposit),
+                   widths=tuple(widths), recovery_cap=recovery_cap)
+
+    @classmethod
+    def from_callable(cls, *, limit, premium_function, deposit, recovery_cap):
+        """Build terms from an arbitrary vectorized nondecreasing ``h(R)``.
+
+        For advanced / irregular reinstatement pricing that the tranche schedule
+        cannot express. ``premium_function`` must accept and return a NumPy
+        array and be nonnegative and nondecreasing over ``[0, recovery_cap]``
+        (validated; :class:`ValueError` otherwise).
+
+        Parameters
+        ----------
+        limit : float
+            Occurrence limit ``y``.
+        premium_function : callable
+            Vectorized ``h(R) -> reinstatement premium``.
+        deposit : float
+            Base ceded premium ``D``.
+        recovery_cap : float
+            Total annual recovery capacity ``Y``.
+        """
+        return cls(limit=float(limit), rates=(), deposit=float(deposit),
+                   recovery_cap=float(recovery_cap),
+                   premium_function=premium_function)
+
+    # ------------------------------------------------------------------
+    # derived quantities
+    # ------------------------------------------------------------------
+    @property
+    def rol(self):
+        """Base rate on line ``r = deposit / limit`` ([decl-rol])."""
+        return self.deposit / self.limit
+
+    @property
+    def n_reinstatements(self):
+        """Number of reinstatements ``m = len(rates)``."""
+        return len(self.rates)
+
+    @property
+    def _tranche_widths(self):
+        """Per-tranche widths array (defaulting to equal full limits)."""
+        if self.widths is not None:
+            return np.asarray(self.widths, dtype=float)
+        return np.full(self.n_reinstatements, float(self.limit))
+
+    @property
+    def _breakpoints(self):
+        """Recovery consumed before each tranche, ``b_j = sum_{i<j} w_i``."""
+        w = self._tranche_widths
+        return np.concatenate(([0.0], np.cumsum(w)[:-1])) if len(w) else \
+            np.zeros(0)
+
+    @property
+    def reinstatement_capacity(self):
+        """Reinstated capacity ``sum(w_j)`` (``= m * y`` for full reinstatements)."""
+        if self.premium_function is not None:
+            return self.total_recovery_capacity - self.limit
+        return float(self._tranche_widths.sum())
+
+    @property
+    def total_recovery_capacity(self):
+        """Total annual recovery capacity ``Y`` (``= (m+1) y`` standard)."""
+        if self.recovery_cap is not None:
+            return float(self.recovery_cap)
+        return float(self.limit + self._tranche_widths.sum())
+
+    @property
+    def maximum_reinstatement_premium(self):
+        """Largest reinstatement premium ``h(Y)`` (all capacity consumed)."""
+        return float(self.reinstatement_premium(self.total_recovery_capacity))
+
+    # ------------------------------------------------------------------
+    # the deterministic maps (vectorized, no Python loops)
+    # ------------------------------------------------------------------
+    def recovery(self, R):
+        r"""Actual annual recovery ``A(R) = R \wedge Y``.
+
+        Parameters
+        ----------
+        R : float or ndarray
+            Unlimited annual occurrence recovery.
+
+        Returns
+        -------
+        float or ndarray
+            ``min(R, total_recovery_capacity)``.
+        """
+        return np.minimum(np.asarray(R, dtype=float),
+                          self.total_recovery_capacity)
+
+    def reinstatement_premium(self, R):
+        r"""Reinstatement premium ``h(R)`` (the tranche sum, or the callable).
+
+        Parameters
+        ----------
+        R : float or ndarray
+            Unlimited annual occurrence recovery.
+
+        Returns
+        -------
+        float or ndarray
+            ``r * sum_j alpha_j [(R - b_j)_+ wedge w_j]`` (pre-plan section 5.1),
+            or ``premium_function(R)`` for the escape-hatch form.
+        """
+        R = np.asarray(R, dtype=float)
+        if self.premium_function is not None:
+            return self.premium_function(R)
+        a = np.asarray(self.rates, dtype=float)
+        b = self._breakpoints
+        w = self._tranche_widths
+        # broadcast R over the m tranches; clip each into [0, w_j]
+        tranche = np.clip(R[..., None] - b, 0.0, w)
+        return self.rol * np.sum(a * tranche, axis=-1)
+
+    def ceded_premium(self, R):
+        """Total ceded premium ``D + h(R)`` (deposit plus reinstatement premium)."""
+        return self.deposit + self.reinstatement_premium(R)
+
+    def phi(self, R):
+        """``ContractTerms`` leg map: the reinstatement premium ``h(R)``.
+
+        The premium decorator filling the ceded-premium leg (the annual-cap loss
+        transform :meth:`recovery` is the feature's second map, handled separately
+        by the reinstatements P&L builders).
+        """
+        return self.reinstatement_premium(R)
+
+    def __repr__(self):
+        if self.premium_function is not None:
+            return (f'ReinstatementTerms(limit={self.limit:g}, callable h, '
+                    f'deposit={self.deposit:g}, '
+                    f'Y={self.total_recovery_capacity:g})')
+        return (f'ReinstatementTerms(limit={self.limit:g}, '
+                f'rates={self.rates}, deposit={self.deposit:g}, '
+                f'rol={self.rol:.4g}, m={self.n_reinstatements}, '
+                f'Y={self.total_recovery_capacity:g})')

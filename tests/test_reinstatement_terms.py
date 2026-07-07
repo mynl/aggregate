@@ -1,4 +1,4 @@
-"""Tests for :class:`aggregate.reinstatement.ReinstatementTerms`.
+"""Tests for :class:`aggregate.contract_terms.ReinstatementTerms`.
 
 The worked numbers are the **corrected** values from ``dev/reinstatements.md``
 (the pre-plan's section 7 paste was numerically corrupted):
@@ -13,7 +13,7 @@ for a 100 xs 100 layer with one 100% reinstatement, deposit 10, rol 10%.
 import numpy as np
 import pytest
 
-from aggregate.reinstatement import ReinstatementTerms
+from aggregate.contract_terms import ReinstatementTerms
 
 
 # 100 xs 100, one reinstatement at 100%, deposit 10 -> rol 10%

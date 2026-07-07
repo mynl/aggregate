@@ -762,12 +762,6 @@ class PnL(LabeledMixin):
         # the identity handle. See dev/done/plan-labels.md.
         self._init_labels(label=label, label_map=label_map)
         self.result_name = result_name
-        #: The attached domain analysis object (a
-        #: :class:`~aggregate.reinstatement.ReinstatementAnalysis` /
-        #: :class:`~aggregate.variable_rating.VariableRatingAnalysis`), for
-        #: drill-down only -- no exhibit is forwarded from it. ``None`` on a
-        #: plain P&L.
-        self.analysis = None
         #: The wrapped stochastic engine (the DecL ``pnl`` / ``xpnl`` inner
         #: :class:`Aggregate` / :class:`Portfolio`), kept for drill-down --
         #: the ``source`` is the *simplest sufficient object* (a

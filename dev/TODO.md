@@ -175,6 +175,17 @@
    format pick — proposal: the DecL layer descriptor `'occ 4750 xs 250'`);
    logged problems [Consolidated-LAE-Off-Source] and
    [Aggregate-Summary-DF-Useless] (below).
+   **[Decommission-Analysis-Classes]** ✅ **DONE (`1.0.0a144`,
+   `dev/done/plan-decommission-analysis-classes.md`).** The generic P&L made
+   `ReinstatementAnalysis` and `VariableRatingAnalysis` redundant: both classes
+   (and `variable_rating.py` / `reinstatement.py`), the two
+   `Aggregate.*_analysis` methods, `plot_reinstatement`, the `qd` analysis
+   branch and the `pnl.analysis` attribute are removed. `ReinstatementTerms`
+   folded into `contract_terms.py`; `check_joint_grid_adequacy` /
+   `JOINT_KINK_MIN_BUCKETS` / new `agg_tier_maps` + `build_reinstatement_source`
+   moved to `_pnl_builders.py`; `build_reinstatement_pnl` takes explicit args.
+   Numbers unchanged; decl suites repointed onto `stats_df` / `p._source`.
+   No public API break (submodule-access only).
 2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
    for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
    fixed** (it does not morph as the object gains properties), columns are
@@ -246,6 +257,42 @@
   [Gross-Anchored-Kappa-Insight] (G-slices are axis-aligned row averages,
   one-pass even on the massive route) may largely dissolve this for the
   variable-feature exhibits.
+- **[Joint-Padding-Window-Tradeoff]** `alpha` (logged 2026-07-07, from the
+  a141 κ-walk discussion) — the in-core occurrence joint already *computes* a
+  padded transform 4x the retained grid (`padding = 1` doubles each axis;
+  `build_netceded_joint` inherits the engine's padding, `bivariate.py:868`).
+  Flipping to `padding = 0` spends the same flops on **retained** cells:
+  half the `bs`, or twice the window, per axis — the massive path's settled
+  design (plan-bv §4.4: measured window to `10**-window_nines`; deficit as
+  guard). The catch: with `padding = 0`, clipped tail mass **wraps onto the
+  body and is invisible to the deficit** (the a126 caution), so the flip
+  requires (a) the massive window discipline on the in-core netceded sizing
+  (the `balanced_window` measurement already exists — raise its nines
+  target), and (b) the decisive cheap guard: compare the joint's marginal
+  means against the engine's exact 1-D marginal means at build time (wrap
+  hides from the deficit, never from the means). Tail-thickness caveat:
+  thin/moderate tails win cleanly; a `pareto 1.2` cat book needs an
+  astronomical window to the nines, where `padding = 1`'s honest-clip stays
+  competitive — so keep it a knob, not a silent default flip. Plumbing:
+  `occ_bivariate` does not expose `padding=` (add a pass-through).
+  **Phase 2, own investigation — NOT a rider**: mixed-radix axis lengths
+  `3 * 2**k` (scipy FFT handles radix 3 within ~10–20% of a power of two)
+  give a 1.5x window at unchanged binary `bs` — the "√2 step" — but `log2`
+  is stored as an *exponent* throughout the library (`1 << log2`
+  arithmetic, window sizing, the massive chunker, `bs_window_df` audits),
+  so the blast radius is large; author flagged this explicitly
+  (2026-07-07). Scope it standalone before touching anything.
+- **[Walk-Validation-DF]** `beta` (logged 2026-07-07, from the a141 κ-walk
+  discussion) — joint-sourced walks (GC occ `xpnl`, the composed feature
+  walks) have no attached exact-vs-realized audit; the reinstatement route
+  has one (`analysis.validation_df`) and the guaranteed-cost walk's only
+  runtime guards are the joint's deficit bookkeeping and
+  `CoarseJointGridWarning`. Add a `validation_df` for joint-sourced walks:
+  each row's realized EX against the engine's exact `reins_density_df`
+  marginal mean — the per-program version of what
+  `tests/test_pnl_consolidated_walk.py` asserts, and the same computation
+  as [Joint-Padding-Window-Tradeoff]'s means guard (build once, serve
+  both).
 
 ## Backlog — bugs & investigations
 

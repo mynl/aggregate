@@ -1148,10 +1148,10 @@ class Underwriter(object):
                     "zero ceded premium. Price the cover to silence this.",
                     ZeroPremiumCessionWarning, stacklevel=2)
             if retro_collar is not None:
-                # Retro varies the gross premium; the snapshot is a
-                # VariableRatingAnalysis over the gross density. The clean 1-D case
-                # is retro with no inuring reinsurance (net account loss = gross
-                # loss); retro + reinsurance is a follow-up.
+                # Retro varies the gross premium via the collar map over the
+                # gross density. The clean 1-D case is retro with no inuring
+                # reinsurance (net account loss = gross loss); retro +
+                # reinsurance is a follow-up.
                 if var_feat is not None or spec.get('occ_reins') or \
                         spec.get('agg_reins'):
                     raise ValueError(
@@ -1171,16 +1171,16 @@ class Underwriter(object):
                                      'consideration_label': consideration_label,
                                      'loss_label': loss_label}
             elif reinst is not None:
-                # Reinstatements (stochastic ceded premium D + h(R)) snapshot a
-                # ReinstatementAnalysis (the joint-sourced tower builder). The base
+                # Reinstatements (stochastic ceded premium D + h(R)) route
+                # through the joint-sourced reinstatement builders. The base
                 # premium D = the layer's resolved occurrence premium
                 # (econ['pc_occ']); effective occ limit y = share x limit.
                 # This branch precedes the feature branch
                 # ([Reinstatements-Dropped-By-Feature-Branch] fix): the occ
                 # tier owns the (L, R) joint, and a feature on the aggregate
                 # cover rides the SAME joint via the tier maps
-                # (``agg_feature_terms`` on the analysis).
-                from .reinstatement import ReinstatementTerms
+                # (``agg_feature_terms`` passed to the builder).
+                from .contract_terms import ReinstatementTerms
                 if occ_noclause:
                     raise ValueError(
                         f"{name}: 'reinstatements' require a base premium clause "
@@ -1712,11 +1712,12 @@ class Underwriter(object):
           as a **one-step walk** ([Decision-XPnL-Plain-Is-One-Step-Walk]);
           retro (no cover at all) errors.
 
-        The drill-down analyses ride on ``pnl.analysis``.
+        The wrapped engine rides on ``pnl.engine`` for drill-down.
         """
         from ._pnl_builders import (build_plain_pnl, build_consolidated_pnl,
                                     build_xpnl_walk, build_variable_pnl,
-                                    build_reinstatement_pnl, resolve_expense)
+                                    build_reinstatement_pnl,
+                                    build_reinstatement_source)
         kind = recipe['kind']
         if kind == 'port_plain':
             # ``inner`` is an updated Portfolio; wrap its net-net total loss as
@@ -1751,18 +1752,14 @@ class Underwriter(object):
                     f"{inner.name}: 'xpnl' over a retro program is not "
                     'supported -- retro has no cession to walk through. '
                     "Use 'pnl'.")
-            # the scalar E_G feeds the analysis's own domain extras (tail_df
-            # shifts); the LEDGER books expense legs via the split resolver.
-            inner.variable_gross_expense = resolve_expense(
-                inner, recipe['expense_spec'], inner.variable_gross_premium)
-            analysis = inner.variable_rating_analysis()
+            # the LEDGER books the expense legs via the split resolver
+            # (expense_spec); the builder is the real engine.
             face = build_variable_pnl(
                 inner, walk=is_tower, econ=recipe.get('econ'),
                 expense_spec=recipe['expense_spec'],
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
                 label=inner.label)
-            face.analysis = analysis
             face.engine = inner
             return face
         if kind == 'reins':
@@ -1775,17 +1772,18 @@ class Underwriter(object):
             # ``agg_commission`` is forced to 0 then.
             econ = recipe['econ']
             ft = recipe.get('agg_feature_terms')
-            analysis = inner.reinstatement_analysis(
+            source, terms, gross_premium, agg_recovery = \
+                build_reinstatement_source(inner)
+            face = build_reinstatement_pnl(
+                inner, source=source, terms=terms, gross_premium=gross_premium,
+                agg_recovery=agg_recovery,
                 agg_ceded_premium=float(econ.get('pc_agg', 0.0)),
                 agg_feature_terms=ft,
-                gross_expense=resolve_expense(
-                    inner, recipe['expense_spec'], float(econ['gross'])),
                 occ_commission=float(econ.get('c_occ', 0.0)),
                 agg_commission=(0.0 if getattr(ft, 'target_leg', None)
                                 == 'expense'
-                                else float(econ.get('c_agg', 0.0))))
-            face = build_reinstatement_pnl(
-                inner, analysis, walk=is_tower,
+                                else float(econ.get('c_agg', 0.0))),
+                walk=is_tower,
                 expense_spec=recipe['expense_spec'], gcn_economics=econ,
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,

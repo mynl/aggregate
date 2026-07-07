@@ -15,7 +15,7 @@ import numpy as np
 
 from .._grid_distribution import GridDistribution
 from ..utilities import nice_multiple
-from ._style import plt, ticker, make_mosaic, make_grid, FIG_W, FIG_H
+from ._style import ticker, make_mosaic, make_grid, FIG_W, FIG_H
 from ._quantile import plot_quantile
 
 logger = logging.getLogger(__name__)
@@ -254,107 +254,3 @@ def plot_reins_occ(agg, axs=None, **kwargs):
                               is_loss_value=agg._is_loss_value)
         plot_quantile(ax1, gd, label=c, **kwargs)
     ax1.legend()
-
-
-def plot_reinstatement(an, axd=None, **kwargs):
-    """One mosaic telling the reinstatement story (pre-plan section 18).
-
-    Four panels of a :class:`aggregate.reinstatement.ReinstatementAnalysis`:
-
-    - **A** the joint ``(L, R)`` log density with the reinstatement breakpoints,
-      the reinstated-capacity line ``m*y`` and the recovery cap ``(m+1)*y``;
-    - **B** the deterministic maps ``A(R)`` (recovery), ``h(R)`` (reinstatement
-      premium), ``D + h(R)`` (ceded premium) and ``D + h - A`` (the ceded
-      underwriting drag), all as functions of the unlimited recovery ``R``;
-    - **C** gross vs net underwriting-result return-period (Lee) curves; and
-    - **D** the cession impact ``q_p(net) - q_p(gross)`` across ``p``.
-
-    Parameters
-    ----------
-    an : ReinstatementAnalysis
-        The (built) analysis to plot.
-    axd : dict of str to Axes, optional
-        Mosaic keys ``'A'``/``'B'``/``'C'``/``'D'``; a new figure is created if
-        omitted and stored on ``an.figure``.
-    **kwargs
-        Passed to the canvas creator (e.g. ``figsize``).
-
-    Returns
-    -------
-    matplotlib.figure.Figure
-    """
-    if axd is None:
-        kwargs.setdefault('figsize', (2 * FIG_W, 2 * FIG_H))
-        an.figure, axd = make_mosaic('AB\nCD', **kwargs)
-    else:
-        an.figure = axd['A'].figure
-
-    t = an.terms
-    src = an.source
-    L = np.asarray(src.axis0, dtype=float)        # gross loss
-    R = np.asarray(src.axis1, dtype=float)        # unlimited ceded recovery
-    dens = src.density
-    xname, yname = src.axis_names
-    Y = t.total_recovery_capacity                 # (m+1) y
-    m_y = t.reinstatement_capacity                # m y
-
-    # --- Panel A: joint (L, R) log density, L clipped to the occupied range ---
-    axA = axd['A']
-    m_L = dens.sum(axis=1)
-    cum = np.cumsum(m_L) / max(m_L.sum(), 1e-300)
-    hi = int(np.searchsorted(cum, 0.995)) + 1
-    hi = min(max(hi, 2), len(L))
-    stride = max(1, hi // 300)                     # keep the contour grid light
-    Li = L[:hi:stride]
-    Zi = dens[:hi:stride, :]
-    with np.errstate(divide='ignore'):
-        Z = np.log10(np.where(Zi.T > 0, Zi.T, np.nan))
-    if np.isfinite(Z).any():
-        axA.contourf(Li, R, Z, levels=14)
-    for b in t._breakpoints[1:]:                   # premium tranche breakpoints
-        axA.axhline(b, lw=0.5, color='C7', ls=':')
-    axA.axhline(m_y, lw=0.9, color='C3', ls='--', label=f'm·y={m_y:g}')
-    axA.axhline(Y, lw=0.9, color='C1', ls='--', label=f'(m+1)·y={Y:g}')
-    axA.set(xlabel=f'{xname} loss L', ylabel=f'{yname} recovery R',
-            title='Joint (L, R) log density')
-    axA.legend(loc='upper right', fontsize='small')
-
-    # --- Panel B: the deterministic recovery / premium maps vs R ---
-    axB = axd['B']
-    rr = np.linspace(0.0, Y * 1.15, 400)
-    A = t.recovery(rr)
-    h = t.reinstatement_premium(rr)
-    D = t.deposit
-    axB.plot(rr, A, label='A(R) recovery')
-    axB.plot(rr, h, label='h(R) reinst. premium')
-    axB.plot(rr, D + h, label='D + h(R) ceded premium')
-    axB.plot(rr, D + h - A, label='D + h − A (ceded UW −)')
-    axB.axvline(m_y, lw=0.5, color='C3', ls='--')
-    axB.axvline(Y, lw=0.5, color='C1', ls='--')
-    axB.set(xlabel='Unlimited recovery R', ylabel='Currency',
-            title='Reinstatement economics')
-    axB.legend(fontsize='small')
-
-    # --- Panel C: gross vs net underwriting result, return-period (Lee) ---
-    # Net of the deterministic expense / commission (a constant shift), so the
-    # curves match the gcn_df / summary UW.
-    axC = axd['C']
-    net_leg = an._final_net_uw            # net of everything (agg cover aware)
-    net_persp = 'net_agg' if an.agg_recovery is not None else 'net_occ'
-    gross_uw = an._uw_with_expense('gross_uw', 'gross', False)
-    net_uw = an._uw_with_expense(net_leg, net_persp, False)
-    for gd, lbl in [(gross_uw, 'gross'), (net_uw, 'net')]:
-        plot_quantile(axC, gd, label=lbl)
-    axC.set(title='Underwriting result: gross vs net')
-    axC.legend(fontsize='small')
-
-    # --- Panel D: cession impact q_p(net) - q_p(gross) ---
-    axD = axd['D']
-    p = np.linspace(0.001, 0.999, 200)
-    gw = np.asarray(gross_uw.q(p), dtype=float)
-    nw = np.asarray(net_uw.q(p), dtype=float)
-    axD.plot(p, nw - gw)
-    axD.axhline(0.0, lw=0.6, color='C7', ls='--')
-    axD.set(xlabel='Non-exceedance probability p',
-            ylabel='net − gross UW result', title='Cession impact')
-    return an.figure

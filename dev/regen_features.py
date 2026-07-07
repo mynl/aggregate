@@ -50,11 +50,9 @@ CSV_PATH = Path(__file__).with_name('FEATURES.csv')
 # CSV class columns, in order. Keys are the CSV header labels; values the short
 # tags used in the grouped ``--inventory`` dump.
 CLASS_COLS = ['Aggregate', 'Portfolio', 'BivariateAggregate', 'PnL',
-              'ReinstatementAnalysis', 'VariableRatingAnalysis',
               'Severity', 'Frequency', 'Bounds']
 SHORT = {'Aggregate': 'Agg', 'Portfolio': 'Port', 'BivariateAggregate': 'Biv',
-         'PnL': 'PnL', 'ReinstatementAnalysis': 'Reinst',
-         'VariableRatingAnalysis': 'VarRt', 'Severity': 'Sev',
+         'PnL': 'PnL', 'Severity': 'Sev',
          'Frequency': 'Freq', 'Bounds': 'Bnd'}
 
 
@@ -76,16 +74,6 @@ def build_objects() -> dict:
         'agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 '
         'copula gumbel 0.4 poisson')
     objs['PnL'] = build('pnl Deal 1000 premium less agg Deal_e 1000 prem at 70% lr sev lognorm 100 cv 2 poisson')
-    # the two backing analysis engines (a116 / a119). ``build('pnl ...
-    # reinstatements/<feature> ...')`` now ALWAYS returns a ``PnL`` value object
-    # (the always-PnL routing); the analysis is attached as ``pnl.analysis``.
-    objs['ReinstatementAnalysis'] = build(
-        'pnl RI.Human 10000 premium less agg RI.Human_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
-        'occurrence net of 95% po 100 xs 100 rol 18% reinstatements '
-        '1 free and 1 at 50% and 2 at 100% poisson').analysis
-    objs['VariableRatingAnalysis'] = build(
-        'pnl VR.Swing 10000 premium less agg VR.Swing_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson '
-        'aggregate net of 5000 xs 4000 swing basic 500 lcm 0.5 min 500 max 3000').analysis
     objs['Severity'] = a.sevs[0]
     objs['Frequency'] = a.frequency
     try:

@@ -55,7 +55,61 @@ import numpy as np
 from ._pnl import Leg, Group, PnL
 
 __all__ = ['build_plain_pnl', 'build_consolidated_pnl', 'build_xpnl_walk',
-           'build_variable_pnl', 'build_reinstatement_pnl', 'resolve_expense']
+           'build_variable_pnl', 'build_reinstatement_pnl',
+           'build_reinstatement_source', 'resolve_expense']
+
+
+#: Grid-adequacy floor ([Reinst-Joint-Grid-Adequacy], dev/PLAN-A.md): warn
+#: with :class:`~aggregate.constants.CoarseJointGridWarning` when a treaty
+#: kink region (the occurrence fill width ``y``; an aggregate cover's layer
+#: width) spans fewer than this many buckets of the 2-D joint. A kinked map
+#: on too few buckets carries a Jensen-type O(bs) bias the internal audits
+#: cannot see. Author decision 2026-07-05: 20.
+JOINT_KINK_MIN_BUCKETS = 20
+
+
+def check_joint_grid_adequacy(bs_x, bs_y, terms, agg_reins=None, *,
+                              stacklevel=3):
+    """Warn when the joint grid under-resolves a treaty kink region.
+
+    Parameters
+    ----------
+    bs_x, bs_y : float
+        The joint's axis-0 (gross loss) / axis-1 (unlimited ceded) bucket
+        sizes.
+    terms : ReinstatementTerms or None
+        The occurrence basis; its fill width ``y = terms.limit`` is the occ
+        tier's kink scale (read on axis 1). ``None`` for a guaranteed-cost
+        occurrence joint (no reinstatement kink -- the per-atom ``xpnl``
+        walks reuse this check for their aggregate tier).
+    agg_reins : list of (share, limit, attach), optional
+        A subsequent aggregate cover's layers; each finite width
+        ``share * limit`` is a kink scale of the derived net ``L - A(R)``
+        (or ``L - C``), resolved no better than ``max(bs_x, bs_y)``.
+    """
+    import warnings as _warnings
+    from .constants import CoarseJointGridWarning
+    short = []
+    if terms is not None:
+        n_occ = terms.limit / bs_y
+        if np.isfinite(terms.limit) and n_occ < JOINT_KINK_MIN_BUCKETS:
+            short.append(f'occurrence fill width {terms.limit:g} spans '
+                         f'{n_occ:.1f} buckets (axis-1 bs {bs_y:g})')
+    bs_net = max(bs_x, bs_y)
+    for share, limit, _attach in (agg_reins or []):
+        width = share * limit
+        n_agg = width / bs_net
+        if np.isfinite(width) and n_agg < JOINT_KINK_MIN_BUCKETS:
+            short.append(f'aggregate-cover layer width {width:g} spans '
+                         f'{n_agg:.1f} buckets (bs {bs_net:g})')
+    if short:
+        _warnings.warn(
+            'coarse reinstatement joint: ' + '; '.join(short)
+            + f'. Kinked treaty maps need >= {JOINT_KINK_MIN_BUCKETS} '
+            'buckets across each kink region for grid-accurate recoveries; '
+            'refine the joint grid (bs / log2_x / log2_y forwarded to '
+            'occ_bivariate).',
+            CoarseJointGridWarning, stacklevel=stacklevel)
 
 
 # ----------------------------------------------------------------------
@@ -530,7 +584,6 @@ def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
     if has_occ:
         # the occurrence (gross, ceded) joint -- built per walk
         biv = agg.occ_bivariate(views=('gross', 'ceded'))
-        from .reinstatement import check_joint_grid_adequacy
         check_joint_grid_adequacy(biv.bivariate.bs_ceded,
                                   biv.bivariate.bs_net, None, agg.agg_reins)
         source = biv.bivariate
@@ -846,7 +899,6 @@ def _build_variable_walk_occ(agg, terms, P_G, P_C, C, layer, tl,
     the guaranteed-cost walk.
     """
     from . import _reinsurance
-    from .reinstatement import check_joint_grid_adequacy
     g_ceder, _netter = _reinsurance.make_ceder_netter([layer])
     prem_f, rec_f, comm_f = _feature_maps(terms, tl, g_ceder, P_C, C)
     occ_base = _first_reins_label(agg, 'occ_reins') or 'ceded occ'
@@ -889,10 +941,142 @@ def _build_variable_walk_occ(agg, terms, P_G, P_C, C, layer, tl,
                result_name='margin', label=label)
 
 
-def build_reinstatement_pnl(agg, analysis, *, walk=False, expense_spec=None,
-                            gcn_economics=None,
-                            consideration_label=None, loss_label=None,
-                            name=None, label=None):
+def agg_tier_maps(terms, agg_recovery, agg_ceded_premium, agg_feature_terms):
+    """The aggregate tier's three cash-flow maps over the ``(L, R)`` joint.
+
+    Relocated off ``ReinstatementAnalysis._agg_tier_maps`` at the
+    [Decommission-Analysis-Classes] refactor. Returns
+    ``(recovery, premium, commission)`` -- vectorized ``f(l, r)`` closures
+    (``commission`` is ``None`` when there is no stochastic commission). The
+    raw tier recovery is ``g(max(L - A(R), 0))`` (the ceder input clipped at
+    0: off-support joint cells ``r > l`` carry ~no mass but still evaluate,
+    and the piecewise-linear ceder is only defined on ``[0, inf)``). A
+    variable feature ([Var-Feature-Composed-With-Occ-Program]) swaps one map:
+
+    * swing (``target_leg == 'ceded_premium'``): premium ``phi(g_rec)``;
+    * slide / profit commission (``'expense'``): commission
+      ``phi(g_rec / P_C) * P_C``;
+    * corridor (``'ceded_loss'``): recovery ``phi(g_rec / P_C) * P_C``.
+
+    Guaranteed cost: premium is the constant ``agg_ceded_premium`` (returned
+    broadcast-shaped so composite legs stay vectorized).
+
+    Parameters
+    ----------
+    terms : ReinstatementTerms
+        The occurrence basis owning the annual-cap recovery ``A(R)``.
+    agg_recovery : callable
+        The aggregate cover's vectorized ceder ``g`` on the net-of-occurrence
+        loss.
+    agg_ceded_premium : float
+        The deterministic aggregate ceded premium ``P_C``.
+    agg_feature_terms : ContractTerms or None
+        A variable feature on the aggregate cover, or ``None`` (guaranteed cost).
+    """
+    A = terms.recovery
+    g0 = agg_recovery
+    pc = agg_ceded_premium
+    ft = agg_feature_terms
+
+    def g_raw(l, r):
+        return g0(np.maximum(l - A(r), 0.0))
+
+    tl = getattr(ft, 'target_leg', None)
+    if tl == 'ceded_loss':                    # corridor
+        rec = lambda l, r: ft.phi(g_raw(l, r) / pc) * pc
+    else:
+        rec = g_raw
+    if tl == 'ceded_premium':                 # swing
+        prem = lambda l, r: ft.phi(g_raw(l, r))
+    else:
+        prem = lambda l, r: pc + 0.0 * np.asarray(r)
+    comm = ((lambda l, r: ft.phi(g_raw(l, r) / pc) * pc)
+            if tl == 'expense' else None)
+    return rec, prem, comm
+
+
+def build_reinstatement_source(agg, *, terms=None, gross_premium=None,
+                               bs=None, log2_x=None, log2_y=None):
+    r"""Build the ``(L, R)`` joint source and resolved economics for a
+    reinstatements program.
+
+    Relocated off ``Aggregate.reinstatement_analysis`` at the
+    [Decommission-Analysis-Classes] refactor -- the orchestration the P&L
+    builders need. Validates the single occurrence layer, resolves the
+    reinstatement terms and gross premium from the engine (or the passed
+    overrides), builds the ``('gross', 'ceded')`` occurrence joint (axis 0
+    gross loss ``L``, axis 1 unlimited ceded recovery ``R``), runs the
+    joint-grid adequacy guard, and builds the subsequent-aggregate-cover
+    ceder ``g``.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        The reinstated engine (carries ``occ_reins`` / ``agg_reins`` and the
+        DecL-attached ``reinstatement_terms`` / ``reinstatement_gross_premium``).
+    terms : ReinstatementTerms, optional
+        Override for ``agg.reinstatement_terms``.
+    gross_premium : float, optional
+        Override for the resolved gross premium ``P_G``.
+    bs, log2_x, log2_y : optional
+        Forwarded to :meth:`Aggregate.occ_bivariate` for the joint grid.
+
+    Returns
+    -------
+    (source, terms, gross_premium, agg_recovery)
+        The ``BivariateDistribution`` joint, the resolved terms, the resolved
+        gross premium, and the aggregate-cover ceder (``None`` if no agg cover).
+    """
+    from . import _reinsurance
+    if agg.occ_reins is None:
+        raise ValueError(
+            'reinstatements require occurrence reinsurance; none configured '
+            'on this aggregate.')
+    if len(agg.occ_reins) != 1:
+        raise ValueError(
+            f'reinstatements require a single occurrence layer; found '
+            f'{len(agg.occ_reins)} ([reins-single-layer]). A reinstated '
+            'layer cannot share the occurrence tier with other variable '
+            'layers (the engine ceiling is the 2-D (L, R) joint).')
+    if terms is None:
+        terms = getattr(agg, 'reinstatement_terms', None)
+    if terms is None:
+        raise ValueError(
+            'reinstatements need a ReinstatementTerms, or a DecL '
+            'reinstatements clause that sets self.reinstatement_terms.')
+    if gross_premium is None:
+        # the gross premium stashed by a DecL ``pnl ... reinstatements``
+        # build (the consideration), then the exposure ``premium`` clause.
+        gross_premium = getattr(agg, 'reinstatement_gross_premium', None)
+    if gross_premium is None:
+        gross_premium = getattr(agg, 'exp_premium', None)
+    if gross_premium is None or gross_premium == 0:
+        raise ValueError(
+            'reinstatements need a gross premium (no premium clause on the '
+            'aggregate to default from).')
+    biv = agg.occ_bivariate(views=('gross', 'ceded'), bs=bs,
+                            log2_x=log2_x, log2_y=log2_y)
+    # [Reinst-Joint-Grid-Adequacy]: warn when a treaty kink region spans too
+    # few buckets of the (coarse, budget-sized) joint -- a kinked map on too
+    # few buckets carries an O(bs) bias the audits cannot see.
+    check_joint_grid_adequacy(biv.bivariate.bs_ceded, biv.bivariate.bs_net,
+                              terms, agg.agg_reins)
+    # a subsequent aggregate cover is a deterministic pushforward of the SAME
+    # joint via the net-of-occurrence loss L - A(R); build its ceder g. R
+    # stays unlimited (the cap lives only in terms).
+    agg_recovery = None
+    if agg.agg_reins is not None:
+        ceder, _netter = _reinsurance.make_ceder_netter(agg.agg_reins)
+        agg_recovery = ceder
+    return biv.bivariate, terms, gross_premium, agg_recovery
+
+
+def build_reinstatement_pnl(agg, *, source, terms, gross_premium,
+                            agg_recovery=None, agg_ceded_premium=0.0,
+                            agg_feature_terms=None, occ_commission=0.0,
+                            agg_commission=0.0, walk=False, expense_spec=None,
+                            gcn_economics=None, consideration_label=None,
+                            loss_label=None, name=None, label=None):
     """An occurrence-reinstatements program as a :class:`PnL`, either face.
 
     Both faces are per-atom ledgers over the one shared ``(L, R)`` joint
@@ -922,10 +1106,21 @@ def build_reinstatement_pnl(agg, analysis, *, walk=False, expense_spec=None,
     Parameters
     ----------
     agg : Aggregate
-        The engine (label source: ``occ_reins_label`` / ``agg_reins_label``).
-    analysis : ReinstatementAnalysis
-        The constructed analysis carrying the joint, terms and economics;
-        attached to the returned P&L as ``pnl.analysis``.
+        The engine (label source: ``occ_reins`` / ``agg_reins`` labels).
+    source : BivariateDistribution
+        The ``(L, R)`` joint (from :func:`build_reinstatement_source`).
+    terms : ReinstatementTerms
+        The reinstatement basis owning ``recovery`` / ``reinstatement_premium``.
+    gross_premium : float
+        Fixed gross premium ``P_G``.
+    agg_recovery : callable, optional
+        The subsequent aggregate cover's ceder ``g`` (``None`` if no agg tier).
+    agg_ceded_premium : float, default 0.0
+        The aggregate cover's deterministic ceded premium ``P_C``.
+    agg_feature_terms : ContractTerms, optional
+        A variable feature on the aggregate cover (rides the same joint).
+    occ_commission, agg_commission : float, default 0.0
+        Deterministic ceding commissions on the occurrence / aggregate covers.
     walk : bool, default False
         ``True`` -> the step tower (``xpnl``); ``False`` -> the consolidated
         net view (``pnl``).
@@ -938,12 +1133,15 @@ def build_reinstatement_pnl(agg, analysis, *, walk=False, expense_spec=None,
     """
     if not walk:
         return _build_reinstatement_consolidated(
-            agg, analysis, expense_spec=expense_spec,
+            agg, source=source, terms=terms, gross_premium=gross_premium,
+            agg_recovery=agg_recovery, agg_ceded_premium=agg_ceded_premium,
+            agg_feature_terms=agg_feature_terms, occ_commission=occ_commission,
+            agg_commission=agg_commission, expense_spec=expense_spec,
             gcn_economics=gcn_economics,
             consideration_label=consideration_label, loss_label=loss_label,
             name=name, label=label)
-    t = analysis.terms
-    P_G, D = analysis.gross_premium, t.deposit
+    t = terms
+    P_G, D = gross_premium, t.deposit
     A, h = t.recovery, t.reinstatement_premium
     occ_base = _first_reins_label(agg, 'occ_reins') \
         or 'ceded occ'
@@ -957,42 +1155,41 @@ def build_reinstatement_pnl(agg, analysis, *, walk=False, expense_spec=None,
                          taken={leg.label for leg in cons + obl})
     groups = [Group('Gross', 'sell', cons, obl)]
     occ_obl = [Leg(f'{occ_base} recovery', lambda l, r: A(r), is2d=True)]
-    if analysis.occ_commission:
-        occ_obl.append(Leg(f'{occ_base} commission', analysis.occ_commission))
+    if occ_commission:
+        occ_obl.append(Leg(f'{occ_base} commission', occ_commission))
     groups.append(Group(
         occ_base, 'buy',
         [Leg(f'{occ_base} premium', lambda l, r: D + h(r), is2d=True)],
         occ_obl))
     pc = 0.0
-    if analysis.agg_recovery is not None:
+    if agg_recovery is not None:
         # the tier's three cash-flow maps ride the same joint; a variable
         # feature on the agg cover swaps exactly one of them
         # ([Var-Feature-Composed-With-Occ-Program]).
-        pc = analysis.agg_ceded_premium
-        rec, prem, comm = analysis._agg_tier_maps()
-        ft = analysis.agg_feature_terms
+        pc = agg_ceded_premium
+        rec, prem, comm = agg_tier_maps(terms, agg_recovery, agg_ceded_premium,
+                                        agg_feature_terms)
+        ft = agg_feature_terms
         a_obl = [Leg(f'{agg_base} recovery', rec, is2d=True)]
         if comm is not None:
             comm_key = ('sliding commission'
                         if type(ft).__name__ == 'SlideTerms'
                         else 'profit commission')
             a_obl.append(Leg(comm_key, comm, is2d=True))
-        elif analysis.agg_commission:
-            a_obl.append(Leg(f'{agg_base} commission',
-                             analysis.agg_commission))
+        elif agg_commission:
+            a_obl.append(Leg(f'{agg_base} commission', agg_commission))
         if getattr(ft, 'target_leg', None) == 'ceded_premium':   # swing
             a_cons = [Leg(f'{agg_base} premium', prem, is2d=True)]
         else:
             a_cons = [Leg(f'{agg_base} premium', pc)]
         groups.append(Group(agg_base, 'buy', a_cons, a_obl))
-    pnl = PnL(name=name or agg.name, source=analysis.source, groups=groups,
+    pnl = PnL(name=name or agg.name, source=source, groups=groups,
               result_name='margin', scale=float(P_G - D - pc),
               label=label)
-    pnl.analysis = analysis
     if gcn_economics is not None:
         pnl.economics = dict(gcn_economics)
-    feat = type(analysis.agg_feature_terms).__name__ \
-        if analysis.agg_feature_terms is not None else None
+    feat = type(agg_feature_terms).__name__ \
+        if agg_feature_terms is not None else None
     pnl._construction_description = (
         f'Occurrence-reinstatements walk (xpnl): 2-D group ledger over the '
         f'shared (L, R) joint ([One-2D-Source]): {len(groups)} groups; the '
@@ -1015,7 +1212,10 @@ def build_reinstatement_pnl(agg, analysis, *, walk=False, expense_spec=None,
     return pnl
 
 
-def _build_reinstatement_consolidated(agg, analysis, *, expense_spec=None,
+def _build_reinstatement_consolidated(agg, *, source, terms, gross_premium,
+                                      agg_recovery=None, agg_ceded_premium=0.0,
+                                      agg_feature_terms=None, occ_commission=0.0,
+                                      agg_commission=0.0, expense_spec=None,
                                       gcn_economics=None,
                                       consideration_label=None,
                                       loss_label=None, name=None,
@@ -1036,17 +1236,18 @@ def _build_reinstatement_consolidated(agg, analysis, *, expense_spec=None,
     Because both faces are pushforwards of the ONE joint, the consolidated
     net position equals the walk's grand result **exactly**.
     """
-    t = analysis.terms
-    P_G, D = analysis.gross_premium, t.deposit
+    t = terms
+    P_G, D = gross_premium, t.deposit
     A, h = t.recovery, t.reinstatement_premium
-    c_occ = analysis.occ_commission
-    c_agg = analysis.agg_commission
+    c_occ = occ_commission
+    c_agg = agg_commission
     prem_key = (f'{consideration_label} (net)' if consideration_label
                 else 'net premium')
     loss_key = f'{loss_label or "Loss"} (net)'
-    if analysis.agg_recovery is not None:
-        pc = analysis.agg_ceded_premium
-        rec, prem, comm = analysis._agg_tier_maps()
+    if agg_recovery is not None:
+        pc = agg_ceded_premium
+        rec, prem, comm = agg_tier_maps(terms, agg_recovery, agg_ceded_premium,
+                                        agg_feature_terms)
         if comm is not None:
             net_prem = lambda l, r: (P_G - D - h(r) - prem(l, r)
                                      + c_occ + comm(l, r))
@@ -1062,14 +1263,13 @@ def _build_reinstatement_consolidated(agg, analysis, *, expense_spec=None,
     obl = [Leg(loss_key, net_loss, is2d=True)]
     obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
                          taken={prem_key, loss_key})
-    pnl = PnL(name=name or agg.name, role='sell', source=analysis.source,
+    pnl = PnL(name=name or agg.name, role='sell', source=source,
               consideration=cons, obligation=obl, result_name='margin',
               scale=float(P_G - D - pc), label=label)
-    pnl.analysis = analysis
     if gcn_economics is not None:
         pnl.economics = dict(gcn_economics)
-    feat = type(analysis.agg_feature_terms).__name__ \
-        if analysis.agg_feature_terms is not None else None
+    feat = type(agg_feature_terms).__name__ \
+        if agg_feature_terms is not None else None
     pnl._construction_description = (
         'Consolidated reinstatements pnl over the shared (L, R) joint '
         '([Decision-PnL-Is-Consolidated], closing [2D-Deferred]): one sell '

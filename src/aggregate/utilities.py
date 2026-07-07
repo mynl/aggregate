@@ -317,7 +317,6 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     """
     from .distributions import Aggregate
     from .portfolio import Portfolio
-    from .reinstatement import ReinstatementAnalysis
     from ._pnl import PnL
     if ff is None:
         ff = lambda x: f'{x:.5g}'
@@ -342,14 +341,6 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             if td is not None:
                 qd(td.fillna(''), accuracy=accuracy, **kwargs)
             if x.density_df is not None and not x.valid.passes:
-                print(f'\nVALIDATION FAILS: {x.validation_explanation}')
-        elif isinstance(x, ReinstatementAnalysis):
-            # Reinstatement analysis: treaty intro then the return-period
-            # tail_df (the Gross/Ceded/Net exhibit is the owning PnL's ledger);
-            # validation flagged only on a genuine failure.
-            print(x._text_info_blob())
-            qd(x.tail_df().fillna(''), accuracy=accuracy, **kwargs)
-            if not x._validation_passes():
                 print(f'\nVALIDATION FAILS: {x.validation_explanation}')
         elif isinstance(x, PnL):
             # P&L headline: the repr then the fixed summary card (marginal

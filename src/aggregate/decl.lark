@@ -352,7 +352,7 @@ count: NUMBER   -> count_number
 //   * corridor -- a loss-ratio band the cedant retains: ``corridor <share> po
 //                 <width> xs <attach>`` (reusing the ``po`` / ``xs`` layer words).
 // The transformer attaches the feature to the layer; the underwriter builds the
-// matching ContractTerms and the VariableRatingAnalysis. See
+// matching ContractTerms and the variable-rating PnL. See
 // dev/plan-variable-rating.md.
 reins_variable: SWING collar                       -> reins_var_swing
               | SLIDE slide_anchors                 -> reins_var_slide

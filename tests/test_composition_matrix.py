@@ -144,7 +144,7 @@ def test_reinst_feat_routes_through_joint_and_keeps_cap(uw):
     stochastic premium off the same joint."""
     a = _build(uw, 'xpnl', 'CBRN')       # occ 'no reinstatements', no agg
     b = _build(uw, 'xpnl', 'CBRF')       # same + swing agg cover
-    assert type(b.analysis).__name__ == 'ReinstatementAnalysis'
+    assert type(b.engine.reinstatement_terms).__name__ == 'ReinstatementTerms'
     assert type(b._source).__name__ == 'BivariateDistribution'
     sa, sb = a.stats_df, b.stats_df
     # every row of the feature-less walk reappears identically
@@ -153,17 +153,18 @@ def test_reinst_feat_routes_through_joint_and_keeps_cap(uw):
             continue                      # grand rows shift with the cover
         assert sb.loc[idx, 'EX'] == pytest.approx(sa.loc[idx, 'EX'],
                                                   abs=1e-9), idx
-    # the annual cap holds: recovery = E[min(R, 4750)], NOT E[R]
+    # the annual cap holds: recovery = E[A(R)] = E[min(R, 4750)], NOT E[R].
+    # Both are exact moments off the SAME joint the ledger rides.
+    bv = b._source
+    A = b.engine.reinstatement_terms.recovery
     rec = sb.loc[('Cat Program', 'Obligation', 'Cat Program recovery'), 'EX']
-    exact = b.analysis._stats_df
-    assert rec == pytest.approx(exact.loc['ceded_loss', 'mean'], abs=1e-9)
-    assert exact.loc['ceded_loss', 'mean'] \
-        < exact.loc['unlimited_ceded_loss', 'mean']
+    e_capped = bv.transformed_moments(lambda l, r: A(r))['mean']
+    e_unlimited = bv.transformed_moments(lambda l, r: r)['mean']
+    assert rec == pytest.approx(e_capped, abs=1e-9)
+    assert e_capped < e_unlimited
     # the swing tier: collared stochastic premium, exact off the joint
     prem = sb.loc[('Swing Program', 'Consideration', 'Swing Program premium')]
     assert 200.0 <= -prem['EX'] <= 500.0 and prem['SD'] > 0
-    bv = b.analysis.source
-    A = b.analysis.terms.recovery
     mm = bv.transformed_moments(
         lambda l, r: _phi(_g(np.maximum(l - A(r), 0.0))))
     assert -prem['EX'] == pytest.approx(mm['mean'], abs=1e-9)
@@ -177,12 +178,16 @@ def test_reinst_feat_routes_through_joint_and_keeps_cap(uw):
     assert pb.stats_df.xs('net premium', level='Line').iloc[0]['SD'] > 0
 
 
-def test_reinst_feat_analysis_identities(uw):
-    """The analysis's uw identities hold with the feature folded in
-    (the stochastic premium rides net_agg_premium / the uw legs)."""
+def test_reinst_feat_consolidated_foots(uw):
+    """The consolidated pnl with the feature folded in foots: the leg means
+    sum to the grand net result (the additive uw identity the old analysis
+    audit checked, now read off the ledger)."""
     b = _build(uw, 'pnl', 'CBRF')
-    v = b.analysis.validation_df
-    assert (v['rel_err'] < 1e-8).all()
+    s = b.stats_df
+    legs = [i for i in s.index if i[1] != 'Total']   # exclude subtotal rows
+    assert s.loc[('Margin', 'Total'), 'EX'] == pytest.approx(
+        s.loc[legs, 'EX'].sum(), abs=1e-6)
+    assert b.mean == pytest.approx(s.loc[('Margin', 'Total'), 'EX'], abs=1e-9)
 
 
 def test_engine_reference_on_every_face(uw):
@@ -227,7 +232,7 @@ def test_coarse_joint_grid_warning():
 # routing: every matrix cell lands on the right face
 # ----------------------------------------------------------------------
 def test_matrix_routing(uw):
-    """One assert per cell: face shape and analysis type."""
+    """One assert per cell: each matrix cell lands on the right face shape."""
     u = Underwriter(databases=None, update=True)
     base = '5000 prem at 70% lr sev lognorm 100 cv 2 '
     occ = {'none': '', 'gc': 'occurrence net of 400 xs 100 rate 10% ',
@@ -237,18 +242,16 @@ def test_matrix_routing(uw):
            'feat': ('aggregate net of 500 xs 2000 swing basic 100 lcm 1 '
                     'min 100 max 400')}
     expect = {
-        # (occ, agg, face) -> (index_names, analysis type name)
-        ('none', 'none', 'pnl'): (['View', 'Line'], 'NoneType'),
-        ('none', 'none', 'xpnl'): (['Step', 'View', 'Line'], 'NoneType'),
-        ('gc', 'feat', 'pnl'): (['View', 'Line'], 'VariableRatingAnalysis'),
-        ('gc', 'feat', 'xpnl'): (['Step', 'View', 'Line'],
-                                 'VariableRatingAnalysis'),
-        ('reinst', 'feat', 'pnl'): (['View', 'Line'],
-                                    'ReinstatementAnalysis'),
-        ('reinst', 'feat', 'xpnl'): (['Step', 'View', 'Line'],
-                                     'ReinstatementAnalysis'),
+        # (occ, agg, face) -> stats_df index names (no analysis object exists
+        # post-[Decommission-Analysis-Classes])
+        ('none', 'none', 'pnl'): ['View', 'Line'],
+        ('none', 'none', 'xpnl'): ['Step', 'View', 'Line'],
+        ('gc', 'feat', 'pnl'): ['View', 'Line'],
+        ('gc', 'feat', 'xpnl'): ['Step', 'View', 'Line'],
+        ('reinst', 'feat', 'pnl'): ['View', 'Line'],
+        ('reinst', 'feat', 'xpnl'): ['Step', 'View', 'Line'],
     }
-    for (o, ag, face), (names, ana) in expect.items():
+    for (o, ag, face), names in expect.items():
         prog = (f'{face} M{o}{ag}{face} 5000 premium less agg E{o}{ag}{face} '
                 + base + occ[o] + 'poisson ' + agg[ag])
         with warnings.catch_warnings():
@@ -256,5 +259,4 @@ def test_matrix_routing(uw):
             p = u(prog)
         assert isinstance(p, PnL)
         assert list(p.stats_df.index.names) == names, (o, ag, face)
-        assert type(getattr(p, 'analysis', None)).__name__ == ana, \
-            (o, ag, face)
+        assert not hasattr(p, 'analysis'), (o, ag, face)

@@ -185,10 +185,10 @@ class CoarseJointGridWarning(UserWarning):
     picks up a Jensen-type O(bs) bias that the internal audits cannot see
     (they check pushforward-vs-exact on the *same* grid). Warn when a kink
     region spans fewer than
-    :data:`~aggregate.reinstatement.JOINT_KINK_MIN_BUCKETS` buckets
+    :data:`~aggregate._pnl_builders.JOINT_KINK_MIN_BUCKETS` buckets
     ([Reinst-Joint-Grid-Adequacy], ``dev/PLAN-A.md``); the remedy is the
-    grid knobs -- ``Aggregate.reinstatement_analysis(bs=, log2_x=,
-    log2_y=)`` (forwarded to :meth:`~aggregate.Aggregate.occ_bivariate`).
+    joint grid knobs (``bs`` / ``log2_x`` / ``log2_y``, forwarded to
+    :meth:`~aggregate.Aggregate.occ_bivariate`).
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).

@@ -2,8 +2,11 @@
 
 Covers the ``pnl ... occurrence net of <layer> <premium> reinstatements ...``
 grammar, the transformer spec keys, the three locked validation rules, and the
-``build() -> PnL`` plumbing that backs the GCN exhibit with a lazily built
-:class:`~aggregate.reinstatement.ReinstatementAnalysis`.
+``build() -> PnL`` plumbing. The reinstatement terms live on the engine
+(``p.engine.reinstatement_terms``); every stochastic-cession fact is read off
+the PnL's own ``stats_df`` (the group ledger) and the ``(L, R)`` joint source
+(``p._source``) -- there is no separate analysis object
+([Decommission-Analysis-Classes]).
 
 These DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` under
 the ``RI.*`` section. Because that corpus predates the SLY snapshot, the spec
@@ -17,7 +20,7 @@ import pytest
 
 import aggregate
 from aggregate import PnL, build
-from aggregate.reinstatement import ReinstatementAnalysis, ReinstatementTerms
+from aggregate.contract_terms import ReinstatementTerms
 
 _UW = aggregate.Underwriter()
 
@@ -25,6 +28,21 @@ _UW = aggregate.Underwriter()
 def _spec(program):
     """Parse one DecL program to its ``(kind, name, spec)`` triple."""
     return _UW.parser.parse(program)
+
+
+def _joint_mean(pnl, fn):
+    """Exact ``E[fn(L, R)]`` off the PnL's own ``(L, R)`` joint (``p._source``).
+
+    Replaces the deleted analysis's ``_stats_df`` exact-moment store: the
+    walk / consolidated ledgers ride this same joint, so a leg's exact mean is
+    ``transformed_moments`` of its map straight off it.
+    """
+    return pnl._source.transformed_moments(fn)['mean']
+
+
+def _leg(pnl, label):
+    """One ledger leg's stats_df row, by ``Line`` label."""
+    return pnl.stats_df.xs(label, level='Line').iloc[0]
 
 
 _HUMAN = ('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
@@ -87,22 +105,22 @@ def test_no_reinstatements_marker():
 def test_no_reinstatements_is_a_single_annual_limit():
     # zero reinstatements: recovery capped at the single occurrence limit y, no
     # reinstatement premium, so the ceded premium is the deterministic deposit.
-    # build returns a PnL; the analysis is attached as p.analysis.
+    # build returns a PnL; the terms live on the engine.
     p = build(
         'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% no reinstatements poisson')
-    a = p.analysis
-    t = a.terms
+    t = p.engine.reinstatement_terms
     assert t.n_reinstatements == 0
     assert t.total_recovery_capacity == pytest.approx(100.0)   # single limit y
     assert t.recovery(250.0) == pytest.approx(100.0)
     assert t.reinstatement_premium(250.0) == pytest.approx(0.0)
-    # deterministic ceded premium (= the deposit; h(R) == 0) => the exact ceded
-    # premium has zero variance, vs a materially nonzero CV when reinstatements
-    # are paid.
-    assert a._stats_df.loc['reinstatement_premium', 'mean'] == pytest.approx(0.0)
-    assert a._stats_df.loc['ceded_premium', 'sd'] == pytest.approx(0.0, abs=1e-6)
-    assert a._stats_df.loc['ceded_premium', 'cv'] == pytest.approx(0.0, abs=1e-6)
+    # deterministic ceded premium (= the deposit; h(R) == 0): with no
+    # reinstatement premium and no aggregate cover, the consolidated net premium
+    # P_G - D is fully deterministic, so its ledger row has zero variance (vs a
+    # materially nonzero SD when reinstatements are paid).
+    assert _joint_mean(p, lambda l, r: t.reinstatement_premium(r)) == \
+        pytest.approx(0.0)
+    assert _leg(p, 'net premium')['SD'] == pytest.approx(0.0, abs=1e-6)
 
 
 def test_number_words_are_not_reserved_as_identifiers():
@@ -120,13 +138,14 @@ def test_no_clause_means_no_terms():
         'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% poisson')
     assert 'occ_reins_reinst' not in spec
-    # no reinstatements clause + a base premium clause -> a plain PnLTower, NOT a
-    # ReinstatementAnalysis: it carries no reinstatement terms / analysis surface.
+    # no reinstatements clause + a base premium clause -> a plain guaranteed-cost
+    # reinsurance PnL: the engine carries no reinstatement terms.
     p = build(
         'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
         'occurrence net of 100 xs 100 rol 18% poisson')
-    assert not isinstance(p, ReinstatementAnalysis)
+    assert isinstance(p, PnL)
     assert not hasattr(p, 'terms')
+    assert not hasattr(p.engine, 'reinstatement_terms')
 
 
 # ----------------------------------------------------------------------
@@ -168,22 +187,23 @@ def test_negative_rate_rejected():
 
 
 # ----------------------------------------------------------------------
-# build() return: an analysis-backed PnL (p.analysis IS the analysis)
+# build() return: a PnL wrapping the reinstated engine (terms on the engine)
 # ----------------------------------------------------------------------
-def test_build_returns_analysis_backed_pnl():
+def test_build_returns_pnl_wrapping_engine():
     p = build(_HUMAN)
-    # build now returns a PnL value object, with the ReinstatementAnalysis
-    # attached as p.analysis.
+    # build returns a PnL value object wrapping the reinstated engine; the
+    # terms and gross premium live on p.engine.
     assert isinstance(p, PnL)
-    assert isinstance(p.analysis, ReinstatementAnalysis)
-    assert p.analysis.gross_premium == 10000.0
+    assert type(p.engine).__name__ == 'Aggregate'
+    assert isinstance(p.engine.reinstatement_terms, ReinstatementTerms)
+    assert p.engine.reinstatement_gross_premium == 10000.0
 
 
 def test_terms_carry_share_scaled_limit_and_base_premium():
     # 95% po 100 xs 100 rol 18%: effective limit y = share*limit = 95; base
     # premium D = share*rol*limit = 17.1; base rate r = D/y = 0.18 = the rol.
     p = build(_HUMAN)
-    t = p.analysis.terms
+    t = p.engine.reinstatement_terms
     assert isinstance(t, ReinstatementTerms)
     assert t.limit == pytest.approx(95.0)
     assert t.deposit == pytest.approx(17.1)
@@ -223,29 +243,25 @@ def test_ceded_premium_is_stochastic_in_exhibit():
     assert s.loc[('ceded occ', 'Consideration', 'ceded occ premium'), 'SD'] \
         > 0.0
     assert s.loc[('Gross', 'Consideration', 'premium'), 'SD'] == 0.0
-    # ...and the analysis's exact engine agrees.
-    assert p.analysis._stats_df.loc['ceded_premium', 'cv'] > 0.0
-    assert p.analysis._stats_df.loc['gross_premium', 'cv'] == 0.0
 
 
 def test_ledger_mean_check_ceded_premium():
     """E[ceded occ premium row] = -(D + E[h(R)]) -- the plan's mean check."""
     p = build(_HUMANX)
-    a = p.analysis
-    e_h = a._stats_df.loc['reinstatement_premium', 'mean']
+    t = p.engine.reinstatement_terms
+    e_h = _joint_mean(p, lambda l, r: t.reinstatement_premium(r))
     assert p.stats_df.loc[
         ('ceded occ', 'Consideration', 'ceded occ premium'), 'EX'] == \
-        pytest.approx(-(a.terms.deposit + e_h), rel=1e-9)
+        pytest.approx(-(t.deposit + e_h), rel=1e-9)
 
 
-def test_arg_free_programmatic_entry_point():
-    # build attaches terms + gross premium and calls the programmatic entry point
-    # arg-free internally, so the attached analysis already carries both.
+def test_terms_and_premium_attached_to_engine():
+    # build attaches the terms + gross premium to the engine and calls the
+    # source builder arg-free internally, so the engine carries both.
     p = build(_HUMAN)
     assert isinstance(p, PnL)
-    assert isinstance(p.analysis, ReinstatementAnalysis)
-    assert p.analysis.gross_premium == 10000.0
-    assert p.analysis.terms.rates == (0.0, 0.5, 1.0, 1.0)
+    assert p.engine.reinstatement_gross_premium == 10000.0
+    assert p.engine.reinstatement_terms.rates == (0.0, 0.5, 1.0, 1.0)
 
 
 # ----------------------------------------------------------------------
@@ -257,18 +273,18 @@ def test_subsequent_aggregate_cover_builds():
         'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] '
         'poisson aggregate net of 85% po 1500 xs 7000 deposit 600')
     # the reinstated occurrence layer + a genuine subsequent agg cover both build;
-    # the attached analysis carries the agg tier threaded from the pnl economics.
-    a = p.analysis
-    assert a.terms is not None
-    assert a.agg_recovery is not None
+    # the agg tier is threaded from the pnl economics and rides the same joint.
+    assert p.engine.reinstatement_terms is not None
     # threaded from the pnl; the 100%-quoted deposit 600 scaled by the 85%
     # placement -> 510
-    assert a.agg_ceded_premium == pytest.approx(510.0)
-    # the agg cover actually recovers on the net-of-occurrence loss L - A(R)
-    assert a._stats_df.loc['ceded_agg_loss', 'mean'] > 0
+    assert p.economics['pc_agg'] == pytest.approx(510.0)
+    # the agg cover actually recovers on the net-of-occurrence loss L - A(R):
+    # its ledger recovery row carries a nonzero mean.
+    s = p.stats_df
+    assert abs(s.loc[('ceded agg', 'Obligation', 'ceded agg recovery'),
+                     'EX']) > 0
     # decision 3: the ledger extends to the inuring both-tiers form -- a third
     # buy group over the SAME joint (no new dimension).
-    s = p.stats_df
     for row in (('Gross', 'Margin', 'Total'),
                 ('ceded occ', 'Margin', 'Total'),
                 ('ceded occ', 'Margin', 'Net'),
@@ -287,10 +303,6 @@ def test_subsequent_aggregate_cover_builds():
         s.loc[('ceded occ', 'Margin', 'Net'), 'EX']
         + s.loc[('ceded agg', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
-    # the additive audit (incl. the agg-tier identities) still passes
-    assert a.validation_df['abs_err'].max() < 1e-6
-    # the final net (tail) is net of everything
-    assert a._final_net_uw == 'net_agg_uw'
 
 
 def test_expense_and_cede_book_as_ledger_legs():
@@ -300,20 +312,25 @@ def test_expense_and_cede_book_as_ledger_legs():
     p = build('xpnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% cede 20% reinstatements [0 1] '
               'poisson less 500 fixed expense and 10% premium expense')
-    a = p.analysis
-    assert a.gross_expense == pytest.approx(1500.0)        # 500 + 10% * 10000
-    assert a.occ_commission == pytest.approx(3.6)          # 20% * (18% * 100)
+    assert p.economics['c_occ'] == pytest.approx(3.6)      # 20% * (18% * 100)
     s = p.stats_df
     assert s.loc[('Gross', 'Obligation', 'expense'), 'EX'] == \
-        pytest.approx(-1500.0)
+        pytest.approx(-1500.0)                             # 500 + 10% * 10000
     assert s.loc[('ceded occ', 'Obligation', 'ceded occ commission'),
                  'EX'] == pytest.approx(3.6)
     # the gross group result books the whole expense vs the pure gross UW
+    # (premium + loss legs)
+    pure_gross = (s.loc[('Gross', 'Consideration', 'premium'), 'EX']
+                  + s.loc[('Gross', 'Obligation', 'Loss'), 'EX'])
     assert s.loc[('Gross', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        a._stats_df.loc['gross_uw', 'mean'] - 1500.0, rel=1e-6, abs=1e-6)
+        pure_gross - 1500.0, rel=1e-6, abs=1e-6)
     # and the cession result credits its commission vs the pure ceded UW
+    # (ceded premium + recovery legs)
+    pure_ceded = (
+        s.loc[('ceded occ', 'Consideration', 'ceded occ premium'), 'EX']
+        + s.loc[('ceded occ', 'Obligation', 'ceded occ recovery'), 'EX'])
     assert s.loc[('ceded occ', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        a._stats_df.loc['ceded_uw', 'mean'] + 3.6, rel=1e-6, abs=1e-6)
+        pure_ceded + 3.6, rel=1e-6, abs=1e-6)
 
 
 def test_no_expense_leaves_ledger_pure():
@@ -321,11 +338,15 @@ def test_no_expense_leaves_ledger_pure():
     # mean (P_G - L).
     p = build('xpnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] poisson')
-    a = p.analysis
-    assert a.gross_expense == pytest.approx(0.0)
-    assert a.occ_commission == pytest.approx(0.0)
-    assert p.stats_df.loc[('Gross', 'Margin', 'Total'), 'EX'] == \
-        pytest.approx(a._stats_df.loc['gross_uw', 'mean'], rel=1e-6, abs=1e-6)
+    s = p.stats_df
+    # no expense / commission legs on the ledger
+    assert ('Gross', 'Obligation', 'expense') not in s.index
+    assert p.economics.get('c_occ', 0.0) == pytest.approx(0.0)
+    # the gross group result is the pure gross underwriting mean (premium + loss)
+    pure_gross = (s.loc[('Gross', 'Consideration', 'premium'), 'EX']
+                  + s.loc[('Gross', 'Obligation', 'Loss'), 'EX'])
+    assert s.loc[('Gross', 'Margin', 'Total'), 'EX'] == \
+        pytest.approx(pure_gross, rel=1e-6, abs=1e-6)
 
 
 # ----------------------------------------------------------------------
@@ -338,14 +359,17 @@ def test_consolidated_face_shape_and_exact_means():
     assert list(s.index.names) == ['View', 'Line']
     assert list(p.summary_df.index) == ['Consideration', 'Obligation',
                                         'Margin']
-    a = p.analysis._stats_df
-    # net premium = P_G - D - E[h(R)]; stochastic (the reinstatement premium)
+    t = p.engine.reinstatement_terms
+    P_G = p.engine.reinstatement_gross_premium
+    # net premium = P_G - D - E[h(R)] (no cede here); stochastic (h(R))
+    e_h = _joint_mean(p, lambda l, r: t.reinstatement_premium(r))
     row = s.xs('net premium', level='Line').iloc[0]
-    assert row['EX'] == pytest.approx(a.loc['net_premium', 'mean'], rel=1e-9)
+    assert row['EX'] == pytest.approx(P_G - t.deposit - e_h, rel=1e-9)
     assert row['SD'] > 0
     # loss (net) = -E[L - A(R)]
+    e_net_loss = _joint_mean(p, lambda l, r: l - t.recovery(r))
     assert s.xs('Loss (net)', level='Line').iloc[0]['EX'] == pytest.approx(
-        -a.loc['net_loss', 'mean'], rel=1e-9)
+        -e_net_loss, rel=1e-9)
     # one shared joint -> scenario ladder
     assert 'κ01' in s.columns
     assert p.economics['pc_occ'] == pytest.approx(17.1)

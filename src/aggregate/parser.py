@@ -643,7 +643,7 @@ class UnderwritingTransformer(Transformer):
         the keyword-first collar dict under ``_retro``; it is recorded as the
         account-level ``retro_terms`` spec key and uses the collar ``basic`` as the
         representative consideration (the actual gross premium is the variable map,
-        resolved by the VariableRatingAnalysis). Either may carry an optional
+        resolved by the variable-rating builder). Either may carry an optional
         ``_label`` -- the consideration leg's display label, recorded as
         the ``consideration_label`` spec key.
         """

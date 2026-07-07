@@ -630,8 +630,8 @@ pnl RI.NoReinst 10000 premium less agg RI.NoReinst_e 10000 prem at 85% lr sev lo
 # Variable rating (Phase 3, decision 0: at most ONE variable feature per program,
 # no stacking). swing / slide / pc / corridor decorate ONE aggregate layer; each
 # makes one P&L leg stochastic via a ContractTerms pushed forward over the gross
-# density (1-D aggregate basis). build() returns a PnL whose GCN exhibit is backed
-# by a VariableRatingAnalysis. See tests/test_variable_rating_decl.py and
+# density (1-D aggregate basis). build() returns a PnL whose GCN exhibit is the
+# group ledger. See tests/test_variable_rating_decl.py and
 # dev/plan-variable-rating.md.
 #   * swing    replaces deposit/rol/rate: ceded premium = clip(basic + lcm*A, min, max)
 #   * slide    replaces cede: commission slides down a ceded-LR scale from anchors

@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.0.0a144
+
+**[Decommission-Analysis-Classes]** — the `ReinstatementAnalysis` and
+`VariableRatingAnalysis` drill-down classes are removed. The generic P&L (a
+signed group ledger over `GridDistribution`s, assembled in `_pnl_builders.py`)
+made them redundant: the domain math already lives on the *terms* objects and
+`Aggregate.occ_bivariate`, and the builders read that directly. No public API
+break — neither class was ever re-exported (submodule-access only).
+
+- **`variable_rating.py` deleted** along with `Aggregate.variable_rating_analysis`.
+  The `kind == 'var'` DecL dispatch never read the analysis; the builder was
+  always the engine.
+- **`reinstatement.py` deleted** along with `Aggregate.reinstatement_analysis`.
+  The three load-bearing pieces relocated: `ReinstatementTerms` folded into
+  `contract_terms.py` (alongside its `ContractTerms` siblings — import it from
+  there now); `check_joint_grid_adequacy` + `JOINT_KINK_MIN_BUCKETS` and the new
+  `agg_tier_maps` / `build_reinstatement_source` helpers moved to
+  `_pnl_builders.py`. `build_reinstatement_pnl` now takes the joint source,
+  terms and economics as explicit arguments instead of an analysis object.
+- **`pnl.analysis` attribute removed** — the wrapped engine is reachable via
+  `pnl.engine` for drill-down; the terms live on `pnl.engine.reinstatement_terms`
+  / `pnl.engine.variable_terms`. `plot_reinstatement` and the `qd`
+  `ReinstatementAnalysis` branch are gone.
+- **Numbers unchanged.** The builder paths are untouched; every P&L exhibit
+  (`stats_df`, `economics`, leg means, `pnl`↔`xpnl` agreement) is identical. The
+  decl regression suites were repointed onto the PnL's own surface (leg SDs off
+  `stats_df`, exact means off the `(L, R)` joint `p._source`), not weakened.
+- Docs pending a rebuild (no `.rst` referenced the removed submodule symbols).
+
 ## 1.0.0a143
 
 **[Reins-Premium-Placement-Scaling]** — reinsurance premiums in a `pnl` / `xpnl`

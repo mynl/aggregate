@@ -1,14 +1,14 @@
 """End-to-end DecL tests for the four aggregate-basis variable-rating features.
 
 ``build('pnl ... aggregate net of <layer> <feature>')`` parses to the locked
-``agg_reins_<feature>`` spec key, attaches the matching ``ContractTerms``, and
-returns an :class:`~aggregate.PnL` value object with the
-:class:`~aggregate.variable_rating.VariableRatingAnalysis` attached as
-``.analysis``. ``pnl`` is the **consolidated** single-group net view
-([Decision-PnL-Is-Consolidated]: net premium / net loss with the feature's
-map folded in); the two-group step ledger is the ``xpnl`` **walk**. The
-treaty maps and waterfall live on ``.analysis``. Retro (account-level rating
-clause) varies the gross premium and is the 1-D case with no reinsurance.
+``agg_reins_<feature>`` spec key, attaches the matching ``ContractTerms`` to the
+engine, and returns an :class:`~aggregate.PnL` value object. ``pnl`` is the
+**consolidated** single-group net view ([Decision-PnL-Is-Consolidated]: net
+premium / net loss with the feature's map folded in); the two-group step ledger
+is the ``xpnl`` **walk**. The feature's terms live on the engine
+(``p.engine.variable_terms``); the treaty maps and waterfall are read off the
+PnL's own ``stats_df``. Retro (account-level rating clause) varies the gross
+premium and is the 1-D case with no reinsurance.
 """
 
 import warnings
@@ -24,7 +24,6 @@ from aggregate.contract_terms import (
     SlideTerms,
     SwingTerms,
 )
-from aggregate.variable_rating import VariableRatingAnalysis
 
 warnings.filterwarnings('ignore', message='.*heavy right tail.*')
 
@@ -44,28 +43,19 @@ def _leg(pnl, label):
     return pnl.stats_df.xs(label, level='Line').iloc[0]
 
 
-def _assert_gained(pnl):
-    """Smoke the analysis drill-down surface (the kept domain extra)."""
-    assert list(pnl.analysis.tail_df().columns) == \
-        ['gross_uw', 'net_uw', 'benefit']
-
-
 # ----------------------------------------------------------------------
 # swing -- replaces the premium clause; stochastic ceded premium
 # ----------------------------------------------------------------------
 def test_swing_build():
     p = build(_HEAD + 'swing basic 500 lcm 0.5 min 500 max 3000')
     assert isinstance(p, PnL)
-    assert isinstance(p.analysis, VariableRatingAnalysis)
-    terms = p.analysis.terms
+    terms = p.engine.variable_terms
     assert isinstance(terms, SwingTerms)
     assert (terms.basic, terms.lcm, terms.minimum, terms.maximum) == \
         (500.0, 0.5, 500.0, 3000.0)
     assert _means_add(p)
     # consolidated: the stochastic ceded premium folds into the net premium
     assert _leg(p, 'net premium')['SD'] > 0
-    assert p.analysis._stats_df.loc['ceded_premium', 'cv'] > 0
-    _assert_gained(p)
     # the walk (xpnl) shows the ceded premium as its own stochastic leg
     x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
               + 'swing basic 500 lcm 0.5 min 500 max 3000')
@@ -77,7 +67,7 @@ def test_swing_build():
 
 def test_swing_bare_collar_defaults():
     p = build(_HEAD + 'swing basic 500 lcm 0.5')
-    terms = p.analysis.terms
+    terms = p.engine.variable_terms
     assert terms.minimum == pytest.approx(500.0)         # defaults to basic
     assert np.isinf(terms.maximum)                       # uncapped
 
@@ -90,7 +80,7 @@ def test_swing_terms_scale_by_placement_share():
             '50 cv 3 poisson aggregate net of ')
     sw = ' swing basic 500 lcm 0.5 min 500 max 3000'
     half = build(head + '50% so 5000 xs 4000' + sw)
-    t = half.analysis.terms
+    t = half.engine.variable_terms
     assert t.basic == pytest.approx(250.0)               # 0.5 x 500
     assert t.minimum == pytest.approx(250.0)             # 0.5 x 500
     assert t.maximum == pytest.approx(1500.0)            # 0.5 x 3000
@@ -107,17 +97,15 @@ def test_swing_terms_scale_by_placement_share():
 # ----------------------------------------------------------------------
 def test_slide_build():
     p = build(_HEAD + 'deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80%')
-    terms = p.analysis.terms
+    terms = p.engine.variable_terms
     assert isinstance(terms, SlideTerms)
     assert terms.anchors == ((0.45, 0.60), (0.25, 0.70), (0.19, 0.80))
     assert _means_add(p)
-    assert p.analysis.ceded_premium == pytest.approx(1500.0)  # deposit denom
+    assert p.engine.variable_ceded_premium == pytest.approx(1500.0)  # deposit denom
     # consolidated: the sliding commission credit makes the net premium
     # stochastic
     assert _leg(p, 'net premium')['SD'] > 0
-    assert p.analysis._stats_df.loc['commission', 'cv'] > 0
-    _assert_gained(p)
-    # the walk shows the sliding commission as its own received leg
+    # the walk shows the sliding commission as its own stochastic received leg
     x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
               + 'deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80%')
     assert _leg(x, 'sliding commission')['SD'] > 0
@@ -128,14 +116,12 @@ def test_slide_build():
 # ----------------------------------------------------------------------
 def test_pc_build():
     p = build(_HEAD + 'deposit 1500 pc 25% after 10%')
-    terms = p.analysis.terms
+    terms = p.engine.variable_terms
     assert isinstance(terms, ProfitCommissionTerms)
     assert (terms.share, terms.allowance) == (0.25, 0.10)
     assert _means_add(p)
     # consolidated: the profit commission credit rides the net premium
     assert _leg(p, 'net premium')['SD'] > 0
-    assert p.analysis._stats_df.loc['commission', 'cv'] > 0
-    _assert_gained(p)
     x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
               + 'deposit 1500 pc 25% after 10%')
     assert _leg(x, 'profit commission')['SD'] > 0
@@ -146,7 +132,7 @@ def test_pc_build():
 # ----------------------------------------------------------------------
 def test_corridor_build():
     p = build(_HEAD + 'deposit 1500 corridor 50% po 30% xs 20%')
-    terms = p.analysis.terms
+    terms = p.engine.variable_terms
     assert isinstance(terms, CorridorTerms)
     assert (terms.share, terms.width, terms.attachment) == (0.50, 0.30, 0.20)
     assert _means_add(p)
@@ -154,9 +140,7 @@ def test_corridor_build():
     # the corridor-adjusted recovery shapes the net loss
     assert _leg(p, 'net premium')['SD'] == 0
     assert _leg(p, 'Loss (net)')['SD'] > 0
-    assert p.analysis._stats_df.loc['ceded_loss', 'cv'] > 0
-    _assert_gained(p)
-    # the walk shows the corridor-adjusted recovery as the changed leg
+    # the walk shows the corridor-adjusted recovery as the changed stochastic leg
     x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
               + 'deposit 1500 corridor 50% po 30% xs 20%')
     assert _leg(x, 'ceded agg recovery')['SD'] > 0
@@ -170,8 +154,7 @@ def test_retro_build():
     p = build('pnl R retro basic 3000 lcm 1.1 min 3500 max 8000 premium '
               'less agg R_e 1000 loss sev lognorm 100 cv 2 poisson')
     assert isinstance(p, PnL)
-    assert isinstance(p.analysis, VariableRatingAnalysis)
-    terms = p.analysis.terms
+    terms = p.engine.variable_terms
     assert isinstance(terms, RetroTerms)
     assert (terms.basic, terms.lcm, terms.minimum, terms.maximum) == \
         (3000.0, 1.1, 3500.0, 8000.0)
@@ -180,7 +163,6 @@ def test_retro_build():
     assert prem['SD'] > 0
     assert 3500.0 <= prem['EX'] <= 8000.0
     assert _means_add(p)
-    _assert_gained(p)
 
 
 # ----------------------------------------------------------------------
@@ -234,7 +216,7 @@ def test_acceptance_pair_gross_vs_retro_same_shape():
 def test_retro_bare_collar():
     p = build('pnl R retro basic 3000 lcm 1.1 premium '
               'less agg R_e 1000 loss sev lognorm 100 cv 2 poisson')
-    terms = p.analysis.terms
+    terms = p.engine.variable_terms
     assert terms.minimum == pytest.approx(3000.0)        # defaults to basic
     assert np.isinf(terms.maximum)                       # uncapped
 

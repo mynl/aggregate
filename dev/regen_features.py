@@ -180,7 +180,20 @@ def scipy_inherited() -> set:
 
 def load_csv() -> list:
     with open(CSV_PATH, newline='', encoding='utf-8') as fh:
-        return list(csv.DictReader(fh))
+        rows = list(csv.DictReader(fh))
+    # Skip metadata/comment rows (group starting with '#'), e.g. the
+    # ``# table-version`` stamp -- they are not class members and must not be
+    # audited as one.
+    return [r for r in rows if not (r.get('group') or '').startswith('#')]
+
+
+def read_version_stamp() -> str | None:
+    """The ``__version__`` the CSV was last stamped against (the ``# table-version`` row)."""
+    with open(CSV_PATH, newline='', encoding='utf-8') as fh:
+        for row in csv.reader(fh):
+            if row and row[0].startswith('#') and len(row) > 1:
+                return row[1].strip()
+    return None
 
 
 def audit(inv, rows, include_all) -> int:
@@ -284,6 +297,16 @@ def main(argv):
     if '--inventory' in argv:
         dump_inventory(inv, include_all)
         return 0
+    try:
+        from aggregate import __version__ as live_version
+    except Exception:                               # pragma: no cover - defensive
+        live_version = '?'
+    stamp = read_version_stamp()
+    print(f'# table-version stamp: {stamp}  |  live aggregate: {live_version}')
+    if stamp and stamp != live_version:
+        print(f"# NOTE: stamp {stamp} != live {live_version} -- bump the "
+              f"'# table-version' row if a public surface changed this release.")
+    print()
     failures = audit(inv, load_csv(), include_all)
     if failures:
         print(f'DRIFT: {failures} mismatch/stale item(s) contradict the code -- '

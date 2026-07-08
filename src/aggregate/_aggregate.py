@@ -4457,11 +4457,11 @@ class Aggregate(LabeledMixin):
     def _exact_discrete_window(self):
         """Exact aggregate support for a fully-discrete ``dfreq``/``fixed`` x ``dsev``.
 
-        Returns ``(A_min, A_max, bs_lattice)`` when the frequency is discrete-
-        finite (``dfreq`` -> ``empirical``, or ``fixed``) **and** every severity
-        component is a discrete histogram on an integer lattice; otherwise
-        ``None``. The aggregate then takes values exactly on the integer lattice
-        and its support is finite and exactly computable.
+        Returns ``(A_min, A_max, bs_lattice, logp_lo, logp_hi)`` when the
+        frequency is discrete-finite (``dfreq`` -> ``empirical``, or ``fixed``)
+        **and** every severity component is a discrete histogram on an integer
+        lattice; otherwise ``None``. The aggregate then takes values exactly on
+        the integer lattice and its support is finite and exactly computable.
 
         Notes
         -----
@@ -4475,13 +4475,40 @@ class Aggregate(LabeledMixin):
           if ``0`` is a count atom.
 
         ``bs_lattice`` is 1 for integer atoms (the common case).
+
+        **Corner reachability (``logp_lo`` / ``logp_hi``).** The exact support is
+        only a trustworthy grid extent if the aggregate can *attain* its
+        extremes. A non-zero corner ``B = N_ach·s_ext`` is reached only when the
+        realized count is exactly ``N_ach`` **and** every one of those claims
+        lands on the extreme atom ``s_ext``, so
+
+        .. math::
+
+            \\log_{10} P(\\text{corner})
+              = \\log_{10} P(N = N_{ach}) + N_{ach}\\,\\log_{10} P(X = s_{ext}),
+
+        where ``N_ach`` is the count that *realizes* that corner -- ``N_max`` for
+        the outer extreme (largest positive ``s_max`` / most-negative ``s_min``),
+        ``N_min`` for the inner extreme (a positive ``s_min`` / negative
+        ``s_max``): the low bound of a non-negative book is the *fewest* claims of
+        the smallest atom, far more likely than ``N_max`` of it. A corner pinned
+        at ``0`` (an ``s = 0`` atom, or a zero count atom giving the empty sum) is
+        always reachable, so its ``logp`` is ``0``. ``P(X = s_ext)`` is the
+        (mixture) single-claim probability at the extreme atom, taken as the max
+        over components (an upper bound, so the guard never over-rejects). For a
+        large fixed/So count both corners underflow (a near-normal aggregate whose
+        combinatorial support is vast but whose mass the CLT concentrates); the
+        caller (:func:`_bucket_window.bs_window`) rejects ``exact_discrete`` when
+        both fall below ``exact_discrete_reach_logp``.
         """
         freq = self.frequency
         if freq.freq_name == 'empirical':
             n_atoms = np.asarray(freq.freq_a, dtype=float)
+            n_probs = np.asarray(freq.freq_b, dtype=float)
             has_zero = bool(np.any(n_atoms == 0))
         elif freq.freq_name == 'fixed':
             n_atoms = np.array([float(self.n)])
+            n_probs = np.array([1.0])
             has_zero = (self.n == 0)
         else:
             return None
@@ -4507,7 +4534,39 @@ class Aggregate(LabeledMixin):
         if has_zero:
             hi = max(hi, 0.0)
             lo = min(lo, 0.0)
-        return float(lo), float(hi), 1.0
+
+        # ---- corner reachability (log10 probabilities) ------------------
+        def _freq_logp(n):
+            """log10 P(N = n) from the (empirical) count law; 0 for fixed."""
+            mask = np.isclose(n_atoms, n)
+            pn = float(n_probs[mask].sum()) if mask.any() else 0.0
+            return np.log10(pn) if pn > 0.0 else -np.inf
+
+        def _sev_atom_logp(v):
+            """log10 (upper bound on) P(one claim == v) across mixture components."""
+            pv = 0.0
+            for s in self.sevs:
+                fz = getattr(s, 'fz', None)
+                xk = getattr(fz, 'xk', None)
+                pk = getattr(fz, 'pk', None)
+                if xk is None or pk is None:
+                    continue
+                m = np.isclose(np.asarray(xk, dtype=float), v)
+                if m.any():
+                    pv = max(pv, float(np.asarray(pk, dtype=float)[m].sum()))
+            return np.log10(pv) if pv > 0.0 else -np.inf
+
+        def _corner_logp(bound, s_ext, n_ach):
+            # a bound pinned at 0 (0 atom / empty sum) is always attainable.
+            if bound == 0.0:
+                return 0.0
+            return _freq_logp(n_ach) + n_ach * _sev_atom_logp(s_ext)
+
+        n_hi = n_max if s_max >= 0 else n_min   # count realizing A_max
+        n_lo = n_max if s_min <= 0 else n_min   # count realizing A_min
+        logp_hi = _corner_logp(hi, s_max, n_hi)
+        logp_lo = _corner_logp(lo, s_min, n_lo)
+        return float(lo), float(hi), 1.0, float(logp_lo), float(logp_hi)
 
     def _bounded_severity_window(self, p):
         """Window for a bounded severity with a (possibly small) claim count.

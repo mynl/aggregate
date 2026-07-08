@@ -50,10 +50,12 @@ CSV_PATH = Path(__file__).with_name('FEATURES.csv')
 # CSV class columns, in order. Keys are the CSV header labels; values the short
 # tags used in the grouped ``--inventory`` dump.
 CLASS_COLS = ['Aggregate', 'Portfolio', 'BivariateAggregate', 'PnL',
-              'Severity', 'Frequency', 'Bounds']
+              'Severity', 'Frequency', 'Bounds', 'AllocationBounds',
+              'PricingBounds']
 SHORT = {'Aggregate': 'Agg', 'Portfolio': 'Port', 'BivariateAggregate': 'Biv',
          'PnL': 'PnL', 'Severity': 'Sev',
-         'Frequency': 'Freq', 'Bounds': 'Bnd'}
+         'Frequency': 'Freq', 'Bounds': 'Bnd',
+         'AllocationBounds': 'AllB', 'PricingBounds': 'PrcB'}
 
 
 def build_objects() -> dict:
@@ -65,9 +67,10 @@ def build_objects() -> dict:
     a = build('agg E 100 claims sev lognorm 100 cv 2 '
               'occurrence net of 50 xs 50 poisson')
     objs['Aggregate'] = a
-    objs['Portfolio'] = build(
+    port = build(
         'port P agg A 100 claims sev lognorm 100 cv 2 poisson '
         'agg B 50 claims sev gamma 50 cv 1 poisson')
+    objs['Portfolio'] = port
     objs['BivariateAggregate'] = build(
         'bivariate MV 25 claims '
         'agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 '
@@ -80,6 +83,17 @@ def build_objects() -> dict:
         objs['Bounds'] = Bounds(a, premium=a.agg_m * 1.1)
     except Exception as e:                      # pragma: no cover - defensive
         print(f'# WARNING: Bounds construction failed: {e}', file=sys.stderr)
+    # AllocationBounds / PricingBounds share the _HullEngine slice geometry but
+    # are distinct classes (not Bounds subclasses); build both off the Portfolio
+    # total, capped at p=0.99 so the deep-tail vertices stay well-conditioned.
+    try:
+        objs['AllocationBounds'] = port.allocation_bounds(p=0.99)
+    except Exception as e:                      # pragma: no cover - defensive
+        print(f'# WARNING: AllocationBounds construction failed: {e}', file=sys.stderr)
+    try:
+        objs['PricingBounds'] = port.pricing_bounds(port.agg_list[0], p=0.99)
+    except Exception as e:                      # pragma: no cover - defensive
+        print(f'# WARNING: PricingBounds construction failed: {e}', file=sys.stderr)
     return objs
 
 

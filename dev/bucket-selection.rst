@@ -118,7 +118,40 @@ power-of-two grid is reported in the ``used`` row.
     ``A_hi = max(N_max*s_max, N_min*s_max)`` (and the mirror for ``A_lo``,
     including ``0`` when ``0`` is a count atom), ``bs = 1``, and the *minimal*
     ``log2`` that holds it (never more than the cap). It is exact, so it has top
-    selection priority.
+    selection priority -- **but only when its support is reachable** (the guard
+    below).
+
+    *Reachability guard.* The combinatorial support is exact but can be a gross
+    *overstatement*: for a large count the extreme corner ``A_hi = N*s_max`` needs
+    *every* one of ``N`` claims to land on the single largest atom, an
+    astronomically improbable event, so the mass sits nowhere near ``A_hi`` (a
+    near-normal aggregate whose support is vast but whose spread the CLT
+    concentrates to a few ``sd``). Sizing the grid to that fictional support then
+    forces ``bs`` far past the lattice step to fit the cap, and the coarse ``bs``
+    **aliases the severity** (the reported case: ``dfreq[1000000] dsev[-1000 20]``
+    coarsened ``bs`` from ``1`` to ``20000`` and the estimated ``sd`` came out
+    ``6.3x`` too big). So each corner carries a ``log10`` *attainment probability*
+
+    .. math::
+
+        \log_{10} P(\text{corner})
+          = \log_{10} P(N = N_{ach}) + N_{ach}\,\log_{10} P(X = s_{ext}),
+
+    where ``N_ach`` is the count that *realizes* that corner -- ``N_max`` for the
+    outer extreme (``s_max > 0`` above, ``s_min < 0`` below), ``N_min`` for the
+    inner extreme (a positive ``s_min``, a negative ``s_max``); the low bound of a
+    non-negative book is the *fewest* claims of the smallest atom, far likelier
+    than ``N_max`` of it. A corner pinned at ``0`` (a ``0`` severity atom, or the
+    empty sum when ``0`` is a count atom) is always reachable. The method keeps
+    its top priority only when **at least one corner is reachable**
+    (``max(logp_lo, logp_hi) >= exact_discrete_reach_logp``, default ``-20``);
+    when **both** corners fall below the floor the support is fictional and the
+    row is marked inapplicable -- recorded in ``_bs_window_df`` for inspection
+    (``coverage = 'support unreachable (rejected)'``, the two ``logp`` in
+    ``note``) but not selected, so the sizer falls through to ``bounded_small`` /
+    ``moment``. A genuine small-count discrete book has corners near
+    ``10**-3``..``10**-6`` and is untouched (byte-stable); an asymmetric book with
+    one reachable corner (e.g. a ``0`` lower bound) keeps its exact support.
 
 ``bounded_small`` -- when every severity is bounded
     Uses the hard support bound ``[min(0, N_hi*s_min), N_hi*s_max]`` from a high
@@ -174,9 +207,13 @@ Selection and combination
 
 The methods combine in a fixed order.
 
-1. **Pick the base window.** ``exact_discrete`` if present; else
-   ``bounded_small`` when it is no wider than ``1.5x`` the moment window; else
-   ``moment``.
+1. **Pick the base window.** ``exact_discrete`` if present **and reachable**
+   (at least one corner's ``log10`` attainment probability ``>=
+   exact_discrete_reach_logp``); else ``bounded_small`` when it is no wider than
+   ``1.5x`` the moment window; else ``moment``. A ``dfreq`` / ``fixed`` x ``dsev``
+   book whose combinatorial support is *fictional* (both corners below the floor,
+   e.g. a large fixed count) therefore skips its exact support and sizes on the
+   moment window -- avoiding the ``bs`` coarsening that would alias the severity.
 
 2. **Let ``windowed`` override.** If the windowed row *applies* (a single
    severity fits its extent) and is **no coarser** than the base pick
@@ -271,6 +308,13 @@ Controls
      - ``1e-14``
      - deepest severity probe depth ``1 - p**`` for the single-big-jump floor
        (guards ``q_X(p**) -> inf`` for a large ``E[N]``).
+   * - ``exact_discrete_reach_logp``
+     - ``-20``
+     - ``log10`` attainment-probability floor for the ``exact_discrete`` support
+       corners. When both corners fall below it the exact support is fictional
+       (unreachable extremes) and the method is rejected in favour of the moment
+       window. Well below floating-point noise, well above a genuine small-count
+       discrete book.
 
 Module constant ``WINDOW_LOG2_GROWTH = 4`` bounds how far a *windowed*
 integer-lattice book may grow ``log2`` past the cap to preserve an exact ``bs``

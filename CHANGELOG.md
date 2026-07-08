@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.0.0a145
+
+**[Exact-Discrete-Reachability-Guard]** — the `exact_discrete` grid-sizing method
+no longer has *unconditional* top priority; it must now clear a reachability
+guard. A fully-discrete `dfreq`/`fixed` × `dsev` aggregate has a finite,
+exactly-computable combinatorial support `[N·s_min, N·s_max]`, but for a large
+count that support is a gross *overstatement*: each extreme corner needs *every*
+one of `N` claims to land on the same extreme atom, an astronomically improbable
+event, so the mass sits nowhere near it (a near-normal aggregate whose support is
+vast but whose spread the CLT concentrates). Sizing the grid to the fictional
+support then coarsened `bs` far past the lattice step and **aliased the
+severity** — e.g. `agg L dfreq[1000000] dsev[-1000 20] [0.019 .981]` coarsened
+`bs` from `1` to `20000` and the estimated `sd` came out 6.3× too large, tripping
+`ALIASING` / `AGG_CV` / `AGG_SKEW`.
+
+- Each support corner now carries a `log10` *attainment probability*
+  `log10 P(N=N_ach) + N_ach·log10 P(X=s_ext)`, where `N_ach` is the count that
+  realizes that corner (`N_max` for the outer extreme, `N_min` for the inner one;
+  a corner pinned at `0` is always reachable). `exact_discrete` keeps top priority
+  only when at least one corner is reachable; when **both** fall below
+  `discretization.exact_discrete_reach_logp` (new setting, default `-20`) the row
+  is recorded in `_bs_window_df` for inspection (`coverage = 'support unreachable
+  (rejected)'`, both `logp` in `note`) but not selected, and the sizer falls
+  through to `bounded_small` / `moment`. The reported life-insurance case now
+  sizes on the moment window (`bs=40`, mean exact to 1e-10, `sd` within 1%).
+- Genuine small-count discrete books (dice, coins) have corners near
+  `10**-3`..`10**-6`, well above the floor — unchanged and byte-stable. An
+  asymmetric book with one reachable corner keeps its exact support.
+- `Aggregate._exact_discrete_window` now returns `(A_lo, A_hi, bs_lattice,
+  logp_lo, logp_hi)`. Design doc `dev/bucket-selection.rst` updated in lockstep.
+
 ## 1.0.0a144
 
 **[Decommission-Analysis-Classes]** — the `ReinstatementAnalysis` and

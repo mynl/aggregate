@@ -172,6 +172,19 @@ class DiscretizationSettings:
         The lower tail ``1 - p**`` is floored here at the deepest level the
         severity is numerically meaningful (default ``1e-14``, about
         ``window_nines + 2`` nines). See ``dev/plan-bucket-window-2.md`` §1A-fix.
+    exact_discrete_reach_logp : float
+        Reachability floor (``log10`` probability) for the ``exact_discrete``
+        support. A fully-discrete ``dfreq``/``fixed`` x ``dsev`` aggregate has a
+        finite combinatorial support ``[N*s_min, N*s_max]``, but for a large
+        count each extreme corner (*every* claim on the same extreme atom) is
+        astronomically improbable, so the "exact" support grossly overstates the
+        extent the mass actually occupies -- and coarsening ``bs`` to fit it
+        aliases the severity. The method keeps its top selection priority only
+        when at least one support corner is reachable, i.e. its ``log10``
+        attainment probability is ``>=`` this floor; otherwise it is rejected and
+        the sizer falls through to ``bounded_small`` / ``moment``. Default
+        ``-20`` (comfortably below floating-point noise, well above a genuine
+        small-count discrete book whose corners sit near ``10**-3``..``10**-6``).
     """
 
     reins_bucket: str = 'linear'
@@ -184,6 +197,7 @@ class DiscretizationSettings:
     window_slack_thick: float = 0.75
     concentration_cv: float = 0.1
     sbj_tail_floor: float = 1e-14
+    exact_discrete_reach_logp: float = -20.0
 
 
 @dataclass(frozen=True)

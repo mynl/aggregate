@@ -68,6 +68,17 @@ WINDOW_SLACK_THICK = get_settings().discretization.window_slack_thick
 BUCKET_SIZING_P = get_settings().discretization.bucket_sizing_p
 
 
+# EXACT_DISCRETE_REACH_LOGP: reachability floor (log10 probability) for the
+# exact-discrete support corners. The finite combinatorial support of a
+# fully-discrete aggregate is only a trustworthy grid extent when the mass can
+# actually reach an extreme; a large fixed/So count makes every corner
+# astronomically improbable (a near-normal aggregate whose support is vast but
+# whose mass the CLT concentrates), so the exact support overstates the extent
+# and coarsening bs to fit it aliases the severity. When both corners fall below
+# this floor the method is rejected (see the selection block below).
+EXACT_DISCRETE_REACH_LOGP = get_settings().discretization.exact_discrete_reach_logp
+
+
 # SBJ_TAIL_FLOOR: deepest lower-tail probability (1 - p**) the single-big-jump
 # extent floor will probe the severity at. The SBJ adjustment p** = 1 -
 # (1-p*)/E[N] deepens with E[N]; this floors 1 - p** so q_X(p**) stays finite
@@ -588,10 +599,29 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     # ---- exact_discrete ---------------------------------------------
     ed = agg._exact_discrete_window()
     if ed is not None:
-        a_lo, a_hi, bs_lat = ed
+        a_lo, a_hi, bs_lat, logp_lo, logp_hi = ed
         r = _row(a_lo, a_hi, bs_lat, 'exact', 'dfreq/fixed x dsev integer lattice')
         if not np.isclose(r['bs'], bs_lat):
             r['coverage'] = 'support exact, bs coarsened'
+        # Reachability guard: the exact support is only trustworthy as a grid
+        # extent when the aggregate can actually attain an extreme. Each corner
+        # ``N*s`` needs every one of ``N`` claims on the same extreme atom
+        # (``logp_lo`` / ``logp_hi``, log10 attainment probability; a corner at 0
+        # is always reachable). For a large fixed/So count both corners underflow
+        # -- the "exact" support is a gross overstatement whose ``bs`` coarsening
+        # aliases the severity -- so mark the row inapplicable (recorded for
+        # inspection, not selected -> falls through to bounded_small / moment).
+        # An asymmetric book with one reachable corner keeps its exact support.
+        reach = max(float(logp_lo), float(logp_hi))
+        r['applies'] = bool(reach >= EXACT_DISCRETE_REACH_LOGP)
+        r['note'] += f'; logp_lo={logp_lo:.4g}, logp_hi={logp_hi:.4g}'
+        if not r['applies']:
+            r['coverage'] = 'support unreachable (rejected)'
+            logger.info(
+                '%s: exact-discrete support [%.6g, %.6g] is unreachable '
+                '(log10 P(corner): lo=%.4g, hi=%.4g < %g); using the moment '
+                'window instead.', agg.name, a_lo, a_hi, logp_lo, logp_hi,
+                EXACT_DISCRETE_REACH_LOGP)
         rows['exact_discrete'] = r
 
     # ---- bounded_small ----------------------------------------------
@@ -702,7 +732,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     # bounded_small is selected a bit permissively -- it is a hard support
     # bound, so accept it even when modestly wider (1.5x) than the moment
     # window. With high coverage it is typically the tighter of the two.
-    if 'exact_discrete' in rows:
+    if 'exact_discrete' in rows and rows['exact_discrete']['applies']:
         selected = 'exact_discrete'
     elif ('bounded_small' in rows
           and rows['bounded_small']['W'] <= 1.5 * rows['moment']['W']):

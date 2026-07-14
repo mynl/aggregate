@@ -1,0 +1,33 @@
+<!-- _09_01_massive.qmd — Massive bivariate — NOT auto-run -->
+
+## Massive bivariate {#sec-massive-bivariate}
+
+*This is a recipe for* the disk-backed (out-of-core) bivariate:
+`update(store_dir=...)` streams the joint density to `zarr` so grids too large
+for memory still resolve, with a pyramid down-sampling for visualization.
+
+::: {.callout-warning}
+This page is **not executed on render** — it writes gigabytes to disk and takes
+minutes. Every code cell carries `#| eval: false`; run it by hand in JupyterLab
+with the `massive` and `viz` extras installed.
+:::
+
+**Beats 1 & 2 — build to a store.**
+
+```{python}
+#| eval: false
+# TODO(author): update(store_dir=...) on a large-log2 bivariate; the dict pushforward.
+```
+
+**Beat 3 — exhibits.**
+
+```{python}
+#| eval: false
+# TODO(author): the pyramid viz (holoviews/datashader). padding=0 wrap hides from
+# the deficit — compare means, not deficit.
+```
+
+**Beat 4 — the check.** [Check-Reconciliation]
+
+<!-- TODO(author): the store-backed total mean matches the in-memory computation;
+     compare MEANS (padding=0 wrap masks the deficit). -->

@@ -1,0 +1,37 @@
+<!-- _04_02_insurance.qmd — Aggregate: insurance book -->
+
+## An insurance book {#sec-aggregate-insurance}
+
+*This is a recipe for* a realistically-calibrated insurance aggregate — plan
+premium at a target loss ratio, a basic limit, a thick-tailed severity, a
+mixed-Poisson count. This is the **house book**, and the `show` flow here is the
+one every later page reuses.
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.**
+
+```{python}
+pp(house('Gross'))
+```
+
+**Beats 2 & 3 — build, validate, exhibits.**
+
+```{python}
+gross = build(house('Gross'))
+show(gross)
+```
+
+**Beat 4 — the check.** [Check-Reconciliation] + [Check-Independent-Oracle]
+
+```{python}
+# aggregate mean ≈ E[N] × E[X]; est vs theoretic to grid accuracy
+print(f'agg mean       {gross.agg_m:,.1f}')
+print(f'E[N] × E[X]    {gross.n * gross.sev_m:,.1f}')
+print(f'est vs theoretic mean  {gross.est_m:,.2f}  vs  {gross.agg_m:,.2f}')
+```
+
+<!-- TODO(author): confirm attribute names (agg_m / n / sev_m / est_m) against the
+     calibrated book; add a CV/skew line. -->

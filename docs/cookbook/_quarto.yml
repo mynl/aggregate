@@ -1,0 +1,38 @@
+# Quarto website project for the aggregate cookbook.
+# Render:  cd docs/cookbook && uv run quarto render      (or `quarto preview`)
+# Output lands in _site/ ; open _site/cookbook.html (the only content page —
+# the _NN_*.qmd fragments are pulled in via {{< include >}} and, being
+# underscore-prefixed, are not rendered as standalone pages).
+project:
+  type: website
+  output-dir: _site
+  render:
+    - cookbook.qmd
+
+website:
+  title: "The aggregate Cookbook"
+  sidebar:
+    style: floating
+    contents:
+      - cookbook.qmd
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    toc-location: right
+    number-sections: true
+    code-fold: false
+    df-print: paged
+
+# House standing order: every authored Quarto page references the master bib.
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+
+# Cache executed cells so a re-render doesn't re-run the whole book; the two
+# bivariate pages additionally mark their heavy cells `#| eval: false`.
+execute:
+  freeze: auto
+
+jupyter: python3

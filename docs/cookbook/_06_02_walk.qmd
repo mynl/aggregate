@@ -1,0 +1,29 @@
+<!-- _06_02_walk.qmd — PnL walk (xpnl) -->
+
+## The PnL walk (xpnl) {#sec-pnl-walk}
+
+*This is a recipe for* the step-by-step story behind the consolidated `pnl`: an
+`xpnl` walks gross → each cession → Total, each cover a signed group
+(−premium / +recovery / +commission). Rows foot by linearity; the κ scenario
+columns sit beside the P marginal percentiles.
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.**
+
+```{python}
+pp(pnl(house('Book', occ=OCC_LAYER), walk=True))
+```
+
+**Beats 2 & 3 — build, validate, the walk.**
+
+<!-- TODO(author): build; show the multi-level stats_df (Step, View, Line) and
+     that means add down the sheet. -->
+
+**Beat 4 — the check.** [Check-Reconciliation] + [Check-Round-Trip]
+
+<!-- TODO(author): step means foot to their signed legs; the consolidated pnl
+     margin == the walk's grand result to joint-grid accuracy (rel ~5e-3 on
+     occ). -->

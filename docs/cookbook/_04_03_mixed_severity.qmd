@@ -1,0 +1,26 @@
+<!-- _04_03_mixed_severity.qmd — Aggregate: mixed severity -->
+
+## Mixed severity {#sec-aggregate-mixed-severity}
+
+*This is a recipe for* an aggregate whose severity is itself a mixture — an
+attritional component plus a large-loss component, each with its own
+distribution and weight. This is where the DecL earns its keep, and where the
+aggregate turns multi-modal.
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.**
+
+<!-- TODO(author): a weighted two-component severity (e.g. attritional lognorm +
+     large pareto) with weights, calibrated to the house scale. -->
+
+**Beats 2 & 3 — build, validate, exhibits.**
+
+<!-- TODO(author): show the component structure and the blended density. -->
+
+**Beat 4 — the check.** [Check-Reconciliation]
+
+<!-- TODO(author): the mixture mean is the weighted mean of the components; the
+     component weights recover from the spec. -->

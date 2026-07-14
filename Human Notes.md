@@ -1,3 +1,29 @@
+# NOTES 2026-07-14
+
+- [ ] new features in Cookbook 
+  - [ ] bv related 
+  - [ ] pnl, xpnl related 
+  - [ ] Bounds, PricingBounds, AllocationBounds
+  - [ ] Consistent FCC
+    - [ ] Definition of FCC
+      * help, 
+    - [ ] Who are FCCs
+  - [ ] Rebuild docs 
+
+- [ ] Beta DOD
+  - [ ] All F
+
+- [ ] Potential issues
+  - [ ] window with dfreq/dsev (life insurance examples) 
+  - [ ] _sev_label crashes on array-valued sevs (ValueError: truth value of an array…) — Human Notes "hygiene-3".
+  - [ ] [Signed-Bounded-Window] — int(inf) overflow in the sizer + silently-ignored layer on signed severity (has a draft plan).
+  - [ ] [ZT-ZM-Frequency-Fix] — zero-truncated/modified frequency broken.
+  - [ ] [Input-Guards] — non-integer fixed count, inconsistent mixing freq.
+  - [ ] Port with no negative severity should have _bs_window_df is None.
+  - [ ] The remove-fuzz df.mask(df.abs() < eps, 0.0) cleanup — done in Agg/Port but only called in Portfolio.
+
+  
+*** 
 
 ## Rebuild Docs
 

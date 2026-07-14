@@ -1,0 +1,26 @@
+<!-- _04_04_limit_profile.qmd — Aggregate: limit profile -->
+
+## Limit profile {#sec-aggregate-limit-profile}
+
+*This is a recipe for* an **exposure/limit profile** — the same severity written
+across several limits (and attachments) with premium or count weights, the
+bread-and-butter of commercial rating. One `agg` carries the whole profile.
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.**
+
+<!-- TODO(author): a multi-limit profile, e.g. limits [1000 5000 10000] with
+     exposure weights, one severity curve; calibrated. -->
+
+**Beats 2 & 3 — build, validate, exhibits.**
+
+<!-- TODO(author): show the per-limit breakdown and the blended aggregate; the
+     increased-limits behavior. -->
+
+**Beat 4 — the check.** [Check-Reconciliation]
+
+<!-- TODO(author): the profile's expected loss equals the exposure-weighted sum of
+     the per-limit expected losses. -->

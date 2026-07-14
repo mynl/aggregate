@@ -1,0 +1,14 @@
+<!-- _06_00_pnl.qmd — PnL (section landing) -->
+
+# PnL {#sec-pnl}
+
+*This section covers* the bottom line — wrapping a complete engine in a profit
+model. Two views of the same economics:
+
+- **@sec-pnl-consolidated** — the `pnl`: one consolidated net group
+  (consideration / obligation / margin), the summary card.
+- **@sec-pnl-walk** — the `xpnl`: the step-by-step walk gross → each cession →
+  Total, showing how the consolidated view is built.
+
+Both inherit premium from the wrapped book and read scenario (κ) columns beside
+the marginal (P) percentiles.

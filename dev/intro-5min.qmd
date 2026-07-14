@@ -50,7 +50,7 @@ once computed by hand:
 
 ```{python}
 dice = build('agg Dice dfreq [3] dsev [1:6]')
-qd(dice.describe)
+qd(dice.summary_df)
 ```
 
 The error columns are zero: for discrete inputs the FFT method is exact, not
@@ -96,7 +96,7 @@ cession's impact on each moment:
 re = build('agg Book 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
            'occurrence net of 50% po 300 xs 200 and 100% po 500 xs 500 '
            'poisson')
-qd(re.describe)
+qd(re.validation_df)
 ```
 
 ## Portfolios diversify

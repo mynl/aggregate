@@ -1,0 +1,29 @@
+<!-- _07_bounds.qmd — Bounds -->
+
+# Bounds {#sec-bounds}
+
+*This is a recipe for* pricing **bounds** — the range of prices consistent with a
+set of calibration constraints (the IME 2022 methodology, @Mildenhall2022).
+`Bounds` computes them; `AllocationBounds` and `PricingBounds` specialize to the
+allocation and pricing questions. (If this grows, it splits into `07_01`,
+`07_02`, … without disturbing its neighbors.)
+
+```{python}
+from _setup import *
+from aggregate.bounds import Bounds  # submodule import (not top-level re-exported)
+```
+
+**Beat 1 — the setup.**
+
+<!-- TODO(author): construct a Bounds on the house aggregate; state the
+     calibration constraints. -->
+
+**Beats 2 & 3 — compute, exhibits.**
+
+<!-- TODO(author): show the bound surface / the max/min price; AllocationBounds
+     and PricingBounds variants. -->
+
+**Beat 4 — the check.** [Check-Limiting-Case]
+
+<!-- TODO(author): a distortion price from @sec-aggregate-pricing falls inside
+     [lower, upper]; the bounds tighten as constraints are added. -->

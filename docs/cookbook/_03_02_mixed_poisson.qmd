@@ -1,0 +1,29 @@
+<!-- _03_02_mixed_poisson.qmd — Frequency: mixed Poisson -->
+
+## Poisson & mixed Poisson {#sec-frequency-mixed-poisson}
+
+*This is a recipe for* the workhorse counts: the plain `poisson`, and the
+gamma-mixed Poisson (a negative binomial) written `mixed gamma <cv>`. The mixing
+CV — the *contagion* — is how much the annual frequency over-disperses beyond
+Poisson, and it is usually the single most important tail assumption in the book.
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.** The house book uses `mixed gamma 0.25`:
+
+```{python}
+pp(house('FreqDemo'))
+```
+
+**Beats 2 & 3 — build, validate, exhibits.**
+
+<!-- TODO(author): poisson vs mixed-gamma(0.10) vs mixed-gamma(0.25) on the same
+     severity; show how the aggregate CV and tail move with the mixing CV. -->
+
+**Beat 4 — the check.** [Check-Independent-Oracle]
+
+<!-- TODO(author): the aggregate variance matches the analytic mixed-Poisson
+     formula Var(S) = E[N]E[X^2] + c^2 E[N]^2 E[X]^2 (contagion term); est vs
+     theoretic. -->

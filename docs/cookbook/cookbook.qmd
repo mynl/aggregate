@@ -1,0 +1,91 @@
+---
+title: "The `aggregate` Cookbook"
+subtitle: "One recipe per feature — SUVA-use: specify, update, validate, adjust, use."
+author: "Stephen J. Mildenhall"
+date: today
+---
+
+<!-- format / toc / bibliography / kernel are set project-wide in _quarto.yml -->
+
+# How to read this cookbook {#sec-how-to-read .unnumbered}
+
+This is a chef's cookbook, not the reference manual. Every recipe is one feature
+on the same five-beat rhythm:
+
+0. **This is a recipe for…** — what dish, and why you'd cook it.
+1. **The DecL** — the program, pretty-printed, aiming to be self-explanatory.
+2. **Build & validate** — `build`, then `.valid` and `.validation_explanation`.
+3. **Exhibits** — `summary_df` / `stats_df` / `.plot()` / the relevant
+   `*_explanation`.
+4. **The check** — the invariant, made visible. This is the point: you *see* the
+   thing the pytest suite asserts, so you can trust the suite.
+
+Everything shares one calibrated *house book* (`_setup.py`, the single source of
+truth for the example numbers) so the figures carry across pages. Each page also
+runs standalone in JupyterLab — open any `_NN_*.qmd` and go.
+
+The pricing background (distortions, bounds, allocation) follows
+@Mildenhall2022a; the FFT compound-distribution engine follows @Mildenhall2024, which in turn was based on @Grubel1999.
+
+**Organization.** Sections own a number; recipes within a section are `N.M`, so
+adding an example never renumbers its neighbors.
+
+```{python}
+from _setup import *
+version
+```
+ads
+
+<!-- 1  Distortions --------------------------------------------------- -->
+{{< include _01_distortions.qmd >}}
+
+<!-- 2  Severity ------------------------------------------------------ -->
+{{< include _02_00_severity.qmd >}}
+{{< include _02_01_discrete.qmd >}}
+{{< include _02_02_scipy_continuous.qmd >}}
+
+<!-- 3  Frequency ----------------------------------------------------- -->
+{{< include _03_00_frequency.qmd >}}
+{{< include _03_01_discrete.qmd >}}
+{{< include _03_02_mixed_poisson.qmd >}}
+{{< include _03_03_other.qmd >}}
+
+<!-- 4  Aggregate ----------------------------------------------------- -->
+{{< include _04_00_aggregate.qmd >}}
+{{< include _04_01_discrete.qmd >}}
+{{< include _04_02_insurance.qmd >}}
+{{< include _04_03_mixed_severity.qmd >}}
+{{< include _04_04_limit_profile.qmd >}}
+{{< include _04_05_pricing.qmd >}}
+
+<!-- 5  Reinsurance --------------------------------------------------- -->
+{{< include _05_00_reinsurance.qmd >}}
+{{< include _05_01_occurrence.qmd >}}
+{{< include _05_02_aggregate.qmd >}}
+{{< include _05_03_reinstatements.qmd >}}
+{{< include _05_04_variable_rating.qmd >}}
+{{< include _05_05_placement.qmd >}}
+
+<!-- 6  PnL ----------------------------------------------------------- -->
+{{< include _06_00_pnl.qmd >}}
+{{< include _06_01_consolidated.qmd >}}
+{{< include _06_02_walk.qmd >}}
+{{< include _06_03_ir_modeling.qmd >}}
+
+<!-- 7  Bounds -------------------------------------------------------- -->
+{{< include _07_bounds.qmd >}}
+
+<!-- 8  Portfolio ----------------------------------------------------- -->
+{{< include _08_00_portfolio.qmd >}}
+{{< include _08_01_construction.qmd >}}
+{{< include _08_02_pricing.qmd >}}
+{{< include _08_03_samples.qmd >}}
+
+<!-- 9  Bivariate (NOT auto-run) -------------------------------------- -->
+{{< include _09_00_bivariate.qmd >}}
+{{< include _09_01_massive.qmd >}}
+
+## References {#refs .unnumbered}
+
+::: {#refs}
+:::

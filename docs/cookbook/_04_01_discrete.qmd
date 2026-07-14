@@ -1,0 +1,30 @@
+<!-- _04_01_discrete.qmd — Aggregate: discrete -->
+
+## Discrete aggregate {#sec-aggregate-discrete}
+
+*This is a recipe for* a fully discrete compound distribution — discrete
+frequency × discrete severity. Because both parts are exact, so is the result:
+the ideal first sight of the FFT machinery, with nothing to blame on
+discretization.
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.**
+
+```{python}
+pp('agg Dice dfreq [1:6] dsev [1:6]')   # sum of a die-many dice
+```
+
+**Beats 2 & 3 — build, validate, exhibits.**
+
+```{python}
+dice = build('agg Dice dfreq [1:6] dsev [1:6]')
+show(dice)
+```
+
+**Beat 4 — the check.** [Check-Independent-Oracle]
+
+<!-- TODO(author): the exact pmf matches a direct convolution / hand calculation;
+     est_m equals the theoretic mean to machine precision (no grid error). -->

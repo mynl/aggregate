@@ -1,0 +1,31 @@
+<!-- _05_01_occurrence.qmd — Occurrence reinsurance -->
+
+## Occurrence reinsurance {#sec-occ-reins}
+
+*This is a recipe for* a per-occurrence layer: `occurrence net of L xs A`, with
+`share of` / `part of` placement and the premium forms `deposit` / `rol` /
+`rate` / `cede`. The engine tracks gross, ceded, and net occurrence margins.
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.**
+
+```{python}
+# OCC_LAYER is the calibrated occurrence clause from _setup (source of truth)
+pp(house('OccNet', occ=OCC_LAYER))
+```
+
+**Beats 2 & 3 — build, validate, exhibits.**
+
+```{python}
+occ = build(house('OccNet', occ=OCC_LAYER))
+show(occ)
+qd(getattr(occ, 'reins_summary_df', None))
+```
+
+**Beat 4 — the check.** [Check-Reconciliation]
+
+<!-- TODO(author): net + ceded = gross on the occurrence margin; the ceded
+     premium resolves to share × rol × limit. -->

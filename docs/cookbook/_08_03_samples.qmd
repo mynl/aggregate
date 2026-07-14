@@ -1,0 +1,27 @@
+<!-- _08_03_samples.qmd — Portfolio samples & the switcheroo -->
+
+## Samples & the switcheroo {#sec-portfolio-samples}
+
+*This is a recipe for* **dependence**. The independent FFT path assumes units are
+independent; the sample path couples them with a copula (Iman–Conover) and reads
+the result back as a sample — the *switcheroo* (`create_from_sample`,
+`swap_density_df`). Allocation numerics are unchanged because they work off
+`exeqa`, not raw losses (the switcheroo invariant).
+
+```{python}
+from _setup import *
+```
+
+**Beats 1 & 2 — build a dependent portfolio.**
+
+<!-- TODO(author): create_from_sample with a correlation structure; update. -->
+
+**Beat 3 — exhibits.**
+
+<!-- TODO(author): contrast independent vs post-switcheroo total; the
+     independent_stats_df snapshot vs the empirical post-switcheroo moments. -->
+
+**Beat 4 — the check.** [Check-Independent-Oracle]
+
+<!-- TODO(author): empirical (post-switcheroo) marginal moments recover each
+     unit's independent marginal; only the dependence (total tail) changes. -->

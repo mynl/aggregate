@@ -1,0 +1,23 @@
+<!-- _03_03_other.qmd — Frequency: other -->
+
+## Other frequencies {#sec-frequency-other}
+
+*This is a recipe for* the rest of the frequency menu — binomial, geometric, and
+the other named counts — and when each is the natural choice (e.g. binomial for a
+fixed exposure of independent risks).
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.**
+
+<!-- TODO(author): one binomial and one geometric example, calibrated. -->
+
+**Beats 2 & 3 — build, validate, exhibits.**
+
+<!-- TODO(author): show the count pmf and the resulting aggregate for each. -->
+
+**Beat 4 — the check.** [Check-Independent-Oracle]
+
+<!-- TODO(author): each count's mean/variance matches its closed form. -->

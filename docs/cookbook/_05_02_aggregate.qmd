@@ -1,0 +1,28 @@
+<!-- _05_02_aggregate.qmd — Aggregate reinsurance -->
+
+## Aggregate reinsurance {#sec-agg-reins}
+
+*This is a recipe for* a layer on the aggregate loss: `aggregate net of L xs A`.
+Same placement and premium grammar as the occurrence layer, but applied to the
+annual total — and the two compose (occurrence *then* aggregate).
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.**
+
+```{python}
+# AGG_LAYER is the calibrated aggregate clause from _setup (source of truth)
+pp(house('AggNet', agg=AGG_LAYER))
+```
+
+**Beats 2 & 3 — build, validate, exhibits.**
+
+<!-- TODO(author): build; show reins_summary_df; then compose occ + agg via
+     house(occ=OCC_LAYER, agg=AGG_LAYER) and show the layered net. -->
+
+**Beat 4 — the check.** [Check-Reconciliation]
+
+<!-- TODO(author): reins_summary_df foots (gross = ceded + net) on the aggregate
+     margin; occ-then-agg composes as expected. -->

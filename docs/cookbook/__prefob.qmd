@@ -1,0 +1,16 @@
+<!-- this file provides setup so that the cookbook previews in writedown -->
+
+```{python}
+import sys
+sys.path.append('T:\\worktrees\\aggregate_REFACTOR\\docs\\cookbook')
+
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+import aggregate.style
+aggregate.style.use()
+from aggregate.plots import make_grid
+%config InlineBackend.figure_format = 'svg'
+from aggregate.utilities import silence_warnings
+# silence_warnings()
+```

@@ -1,0 +1,15 @@
+<!-- _04_00_aggregate.qmd — Aggregate (section landing) -->
+
+# Aggregate {#sec-aggregate}
+
+*This section covers* the core object — a compound distribution, frequency ×
+severity via FFT. It is the heart of the library, so it gets several recipes:
+
+- **@sec-aggregate-discrete** — a fully discrete aggregate (the `Dice` idiom);
+  exact, no discretization error, the cleanest place to trust the machinery.
+- **@sec-aggregate-insurance** — a realistically-calibrated insurance book (the
+  house book); the `show` flow you reuse everywhere.
+- **@sec-aggregate-mixed-severity** — mixed / multi-component severities.
+- **@sec-aggregate-limit-profile** — an exposure/limit profile (several limits
+  with weights), the bread-and-butter of commercial rating.
+- **@sec-aggregate-pricing** — put a distortion on the aggregate to get a price.

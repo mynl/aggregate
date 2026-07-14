@@ -1,0 +1,19 @@
+<!-- _05_00_reinsurance.qmd — Reinsurance (section landing) -->
+
+# Reinsurance {#sec-reinsurance}
+
+*This section covers* risk transfer on the book: per-occurrence and aggregate
+layers, and the economics that price them. The engine tracks gross, ceded, and
+net margins throughout. Recipes:
+
+- **@sec-occ-reins** — a per-occurrence layer.
+- **@sec-agg-reins** — a layer on the annual aggregate; how occ and agg compose.
+- **@sec-reinstatements** — reinstatement premium on an occurrence layer.
+- **@sec-variable-rating** — premium that depends on realized loss (swing, slide,
+  profit commission, corridor).
+- **@sec-placement** — partial placements: premium is quoted at 100% and scaled
+  by the share placed.
+
+Shared grammar across all layers: `net of` / `ceded to` a layer `L xs A`, an
+optional placement `share of` / `part of`, and a premium form
+(`deposit` / `rol` / `rate`) with an optional `cede` commission.

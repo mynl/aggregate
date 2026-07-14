@@ -1,0 +1,60 @@
+<!-- _02_01_discrete.qmd — Severity: discrete -->
+
+## Discrete severity {#sec-severity-discrete}
+
+*This is a recipe for* an empirical / discrete severity — outcomes and their
+probabilities given explicitly with `dsev`. The building block behind the classic
+`dfreq [...] dsev [...]` teaching examples (a die, a small loss table).
+
+```{python}
+from _setup import *
+```
+
+**Beat 1 — the DecL.**
+
+```{python}
+decl = 'agg Dice dfreq [2] dsev [1 2 3 4 5 6]'
+pp(decl)
+```
+
+**Beats 2 & 3 — build, validate, exhibits.**
+
+<!-- TODO(author): a uniform die and a weighted loss table dsev [x] [p]; show the
+     exact pmf and that it is finite/discrete. -->
+
+```{python}
+a = build(decl) 
+qd(a.summary_df)
+```
+
+Sure this is correct? There are two ways to test. First, validation process compares first three FFT-computed moments with actual. An automated version of the result is encoded in the `valid` property with `validation_explanation`. 
+
+```{python}
+a = build(decl) 
+qd(a.validation_df)
+print(a.valid, a.validation_explanation, sep='\n')
+```
+Second, look at the implied probabilities. 
+
+```{python}
+bit = a.density[['p_total', 'F', 'S']]
+bit.index = bit.index.astype(int)
+# bit['36 * p_total'] = bit.p_total * 36
+# bit['36 * p_total'] = bit['36 * p_total'].astype(int)
+bit *= 36
+bit = bit.round(0).astype(int)
+qd(bit)
+```
+  
+**Beat 4 — the check.** [Check-Reconciliation]
+
+<!-- TODO(author): the discrete mean/variance foot exactly against the hand sum
+     over outcomes (no discretization error — it is already discrete). -->
+
+```{python}
+print(f'Mean = {a.agg_m} and variance = {a.agg_var}')
+
+m = (bit.index * bit.p_total).sum() / 36
+ex2 = (bit.index ** 2 * bit.p_total).sum() / 36
+print(f'Manual mean = {m} and variance = {ex2 - m*m}')
+```

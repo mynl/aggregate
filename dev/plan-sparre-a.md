@@ -53,10 +53,17 @@ falls back to exp/log for large exponents).
 - Canonical name **`renewal`**: `freq_name='renewal'`, class `FrequencyRenewal`.
 - Negative wait mass: collapses into the 0 bucket + warning stating the resulting P(W=0); all mass
   ≤ 0 ⇒ error. Zero-wait mass p0 = P(W ≤ 0) (atoms at 0, e.g. `dwait [0 …]`, plus collapsed
-  negative mass): exact geometric-batch factor-out — compute count M for `W|W>0`, then
-  `N = Σ_{i≤M} Gᵢ`, `G ~ Geom{1,2,…}`, `P(G=g)=(1−p0)p0^{g−1}`. (Continuous rounding mass in
-  `(0, h/2)` stays in bucket 0 of the *transform*, as in `sparre` — it is O(h) discretization noise,
-  not a batch atom.)
+  negative mass): exact geometric-batch factor-out — remove the atom, **renormalize the remaining
+  pmf by (1−p0)** (a true splice defect survives as the genuine conditional defect), compute count
+  M for the conditional law `W|W>0`, then `N = Σ_{i=1}^{M+1} Gᵢ − 1`, `G ~ Geom{1,2,…}`,
+  `P(G=g)=(1−p0)p0^{g−1}`. The (M+1)-th batch is the run of zero-waits riding at the last epoch
+  ≤ T (equivalently the leading zeros at time 0) — it always counts; dropping it (the plan's
+  original `N = Σ_{i≤M} Gᵢ`) is WRONG (check case `dwait [0 1] [.5 .5]`, T=1: exact
+  P(N=m) = m/2^{m+1}, boundary-dropped version gives 2^{−m}). Composed pmf:
+  `P(N=n) = Σ_m P(M=m)·C(n,m)·(1−p0)^{m+1}·p0^{n−m}`, support n ≥ m; p0=0 ⇒ identity; formula
+  unchanged for defective waits (the zeros before the terminating draw still count, and their run
+  length is independent of the terminator type). (Continuous rounding mass in `(0, h/2)` stays in
+  bucket 0 of the *transform*, as in `sparre` — it is O(h) discretization noise, not a batch atom.)
 - Defective waits (`wait expon splice [0 1.1] !`): total mass < 1 = terminating renewal process;
   count pmf still proper. Verified `_severity.py:1101` `_apply_lb_ub` ALWAYS renormalizes splices
   (`!` only affects layer attachment), so defectiveness is a grid-level post-pass (below), not a
@@ -168,18 +175,22 @@ the renewal computation only ever *produces* that vector pair. Two views, kept d
      tilt `exp(−θx)`, `θ = tilt_total/(m·bs)`; two forward rffts; Plancherel vector `c` with rfft
      weights `[1,2,…,2,1]`; loop `v *= p̂`, `F[k] = Re(v @ c)`; `pN = clip(−diff(F), 0, None)`.
      Readout weight: half-bucket (continuous) vs full-bucket (`lattice=True`). Require `m·bs > T`.
-   - `geometric_batch_compose(pmf_M, p0) -> pmf_N` — shifted-negative-binomial accumulation
-     `P(Σ_m G = n) = C(n−1, m−1)(1−p0)^m p0^{n−m}` (O(kmax²), exact).
+   - `geometric_batch_compose(pmf_M, p0) -> pmf_N` — boundary-batch-corrected accumulation
+     `P(N=n) = Σ_m pmf_M[m]·C(n, m)·(1−p0)^{m+1}·p0^{n−m}` (i.e. `N = Σ_{i≤M+1} Gᵢ − 1`;
+     O(kmax²), exact; p0=0 ⇒ identity).
    - `wait_grid(mu, sigma, T, atoms=None) -> (bs, log2, lattice)` — the sizing rules above,
      building `_renewal_bs_df` as a side product.
    - Orchestrator `wait_count_pmf(components, weights, T, ...)`: kernel-discretize each component
      on the common grid, post-passes (p0 split / defective window mask / truncate at T),
-     weight-combine, kmax, `renewal_count_pmf`, `geometric_batch_compose` if p0>0.
+     weight-combine, renormalize by (1−p0), kmax, `renewal_count_pmf`,
+     `geometric_batch_compose` if p0>0.
 3. Tests `tests/test_renewal.py` (no DecL): expon→Poisson(λT); gamma(a, rate λ) →
    `P(N≥k) = gammainc(k·a, λT)`; uniform(0,1) T=1 → `P(N=k) = k/(k+1)!`; inverse Gaussian closed
-   form; deterministic `pm=[1]` bs=1 T=3 → N≡3 (lattice boundary); Richardson halve-h convergence
-   (O(h²) observed); defective q<1 (proper pmf, terminating tail); `geometric_batch_compose` vs
-   brute-force enumeration for W ∈ {0, 1}.
+   form; deterministic `pm=[0,1]` (atom at x=1) bs=1 T=3 → N≡3 (lattice boundary); Richardson
+   halve-h convergence (O(h²) observed); defective q<1 (proper pmf, terminating tail);
+   `geometric_batch_compose` vs brute-force enumeration for W ∈ {0, 1}; direct-vs-factored
+   cross-check (kernel run with the 0-atom left in ≈ factored composition, ~1e-12 — the atom
+   convolves exactly at lattice index 0, so both routes model clustering identically).
 
 ### Stage 1 — [Empirical-PGF-Horner-Dispatch] (independent of Stage 0)
 

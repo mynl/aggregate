@@ -56,7 +56,7 @@ from . import _bucket_window
 from ._validation import VALIDATION_NOISE, ALIASING_RATIO, explain_validation
 from . import _validation
 from . import _reinsurance
-from ._aggregate_compute import freq_sev_convolution
+from ._aggregate_compute import discretize_severities, freq_sev_convolution
 from . import _pricing
 
 logger = logging.getLogger(__name__)
@@ -2490,86 +2490,14 @@ class Aggregate(LabeledMixin):
 
         # Severity is discretised on ``xs_sev`` (physical 0 at index i0), which
         # equals ``self.xs`` on the default 0-based grid. ``i0 > 0`` means the
-        # severity reaches below 0 (signed mode).
+        # severity reaches below 0 (signed mode). The math lives in the pure
+        # kernel ``discretize_severities`` (``_aggregate_compute``) so other
+        # consumers (the renewal waiting-time path) can reuse it.
         xs_sev = self.xs_sev if self.xs_sev is not None else self.xs
-        signed = self.i0 > 0
-
-        if sev_calc == 'discrete' or sev_calc == 'round':
-            # adj_xs = np.hstack((xs_sev - self.bs / 2, np.inf))
-            # mass at the end undesirable. can be put in with reinsurance layer in spec
-            # note the first bucket is negative
-            adj_xs = np.hstack((xs_sev - self.bs / 2, xs_sev[-1] + self.bs / 2))
-        elif sev_calc == 'forward' or sev_calc == 'continuous':
-            adj_xs = np.hstack((xs_sev, xs_sev[-1] + self.bs))
-        elif sev_calc == 'backward':
-            adj_xs = np.hstack((xs_sev[0] - self.bs, xs_sev))  # , np.inf))
-        elif sev_calc == 'moment':
-            raise NotImplementedError(
-                'Moment matching discretization not implemented. Embrechts says it is not worth it.')
-            #
-            # adj_xs = np.hstack((xs_sev, np.inf))
-        else:
-            raise ValueError(
-                f'Invalid parameter {sev_calc} passed to discretize; options are discrete, continuous, or raw.')
-
-        if not signed:
-            # Non-negative severity: the first bucket must include all mass at
-            # and below 0. Capture the whole left tail from -inf, exactly as
-            # before (byte-for-byte unchanged on the default path).
-            adj_xs[0] = -np.inf
-        # Signed mode: the leftmost bucket is treated identically to every
-        # other bucket (a finite ``xs_sev[0] - bs/2`` edge, set above) -- no
-        # -inf catch. Any residual mass below it (<= 1e-12 by construction of
-        # i0) is dropped and absorbed by the optional renormalisation below.
-
-        # bed = bucketed empirical distribution. A signed Severity carries
-        # identity layering, so its own cdf/sf are already un-clamped; an
-        # unsigned component keeps the clamp-at-0 layering. So per-component
-        # ``sev.cdf`` / ``sev.sf`` are correct on the signed grid with no special
-        # casing (an unsigned component simply contributes 0 to negative
-        # buckets). Occurrence reinsurance on a signed severity is out of scope
-        # (plan §6).
-        beds = []
-        for sev in self.sevs:
-            if (self.dsev_bucket == 'linear'
-                    and sev.sev_kind in ('dhistogram', 'fixed')
-                    and sev.exp_attachment is None):
-                # Unlayered discrete severity: place the atoms on the grid with
-                # the mean-preserving linear scatter, so the discretized first
-                # moment equals Σ xₖ pₖ exactly. The default cdf-difference path
-                # (below) snaps each atom to its nearest bucket (== 'nearest'),
-                # biasing the mean by up to bs/2 per atom when atoms are off-grid
-                # (empirical samples, non-integer bs). On-grid atoms give f == 0
-                # so this reduces to nearest -- the dice / integer-bs case is
-                # unchanged. ``sev.fz`` is the _DiscreteRV holding the validated,
-                # sorted atoms (xk) and masses (pk). ``exp_attachment is None``
-                # is the truly-unlayered test (a discrete sev always has a finite
-                # ``detachment`` = max atom, so a ``== np.inf`` test never fires).
-                # Layered discrete severities fall through to the cdf-diff path
-                # (Phase 1; see dsev_bucket). The bed is indexed on ``xs_sev``,
-                # so the scatter origin is the severity grid origin ``xs_sev[0]``
-                # (== -i0·bs), NOT the output-window origin ``x_min`` -- the two
-                # differ when the output window is forced wider than the atom
-                # support (e.g. an explicit ``x_min`` below the smallest atom).
-                appx = self._rebucket_to_grid(sev.fz.xk, sev.fz.pk,
-                                              scheme='linear', origin=xs_sev[0])
-            elif discretization_calc == 'both':
-                # see comments: we rescale each severity...
-                appx = np.maximum(np.diff(sev.cdf(adj_xs)), -np.diff(sev.sf(adj_xs)))
-            elif discretization_calc == 'survival':
-                appx = -np.diff(sev.sf(adj_xs))
-                # beds.append(appx / np.sum(appx))
-            elif discretization_calc == 'distribution':
-                appx = np.diff(sev.cdf(adj_xs))
-                # beds.append(appx / np.sum(appx))
-            else:
-                raise ValueError(
-                    f'Invalid options {discretization_calc} to double_diff; options are density, survival or both')
-            if normalize:
-                beds.append(appx / np.sum(appx))
-            else:
-                beds.append(appx)
-        return beds
+        return discretize_severities(
+            self.sevs, xs_sev, self.bs, i0=self.i0, sev_calc=sev_calc,
+            discretization_calc=discretization_calc, normalize=normalize,
+            dsev_bucket=self.dsev_bucket, rebucket=self._rebucket_to_grid)
 
     def snap(self, x):
         """

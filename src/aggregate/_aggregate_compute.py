@@ -117,3 +117,126 @@ def freq_sev_convolution(sev_density, freq_pgf, n, *, N, bs, i0=0, x_min=0.0,
     # (j0 may be negative when x_min < 0), then keep the first N.
     agg = np.roll(a, -j0)[:N]
     return agg, ftagg
+
+
+def discretize_severities(sevs, xs, bs, *, i0=0, sev_calc='discrete',
+                          discretization_calc='survival', normalize=True,
+                          dsev_bucket=None, rebucket=None):
+    """Discretize severity distributions onto a fixed grid.
+
+    The pure kernel behind :meth:`Aggregate.discretize`, extracted so other
+    consumers (the renewal waiting-time path) can discretize a list of
+    :class:`Severity` objects without an :class:`Aggregate` instance.
+
+    Parameters
+    ----------
+    sevs : iterable of Severity
+        Components to discretize. Each must expose ``cdf`` / ``sf`` (and, for
+        the linear-scatter branch, ``sev_kind``, ``exp_attachment`` and a
+        frozen ``fz`` with ``xk`` / ``pk`` atoms).
+    xs : ndarray
+        The severity grid (physical 0 at index ``i0``); equally spaced with
+        step ``bs``.
+    bs : float
+        Bucket size.
+    i0 : int, default 0
+        Number of negative buckets; ``i0 > 0`` flags the signed grid.
+    sev_calc : str, default 'discrete'
+        ``discrete``/``round`` (half-bucket shift), ``forward``/``continuous``,
+        or ``backward`` bucket-edge scheme.
+    discretization_calc : str, default 'survival'
+        ``survival`` (backward differences of sf, best right-tail),
+        ``distribution`` (forward differences of cdf, best left-tail), or
+        ``both`` (elementwise max of the two).
+    normalize : bool, default True
+        Rescale each component to sum to 1. Pass False when short mass is
+        intended (e.g. a waiting-time pmf truncated at the horizon).
+    dsev_bucket : str, optional
+        ``'linear'`` routes unlayered discrete severities through the
+        mean-preserving linear scatter (requires ``rebucket``).
+    rebucket : callable, optional
+        ``rebucket(values, mass, scheme=, origin=)`` implementing the scatter
+        (:meth:`Aggregate._rebucket_to_grid`).
+
+    Returns
+    -------
+    list of ndarray
+        One pmf vector per component, aligned to ``xs``.
+    """
+    signed = i0 > 0
+
+    if sev_calc == 'discrete' or sev_calc == 'round':
+        # adj_xs = np.hstack((xs - bs / 2, np.inf))
+        # mass at the end undesirable. can be put in with reinsurance layer in spec
+        # note the first bucket is negative
+        adj_xs = np.hstack((xs - bs / 2, xs[-1] + bs / 2))
+    elif sev_calc == 'forward' or sev_calc == 'continuous':
+        adj_xs = np.hstack((xs, xs[-1] + bs))
+    elif sev_calc == 'backward':
+        adj_xs = np.hstack((xs[0] - bs, xs))  # , np.inf))
+    elif sev_calc == 'moment':
+        raise NotImplementedError(
+            'Moment matching discretization not implemented. Embrechts says it is not worth it.')
+        #
+        # adj_xs = np.hstack((xs, np.inf))
+    else:
+        raise ValueError(
+            f'Invalid parameter {sev_calc} passed to discretize; options are discrete, continuous, or raw.')
+
+    if not signed:
+        # Non-negative severity: the first bucket must include all mass at
+        # and below 0. Capture the whole left tail from -inf, exactly as
+        # before (byte-for-byte unchanged on the default path).
+        adj_xs[0] = -np.inf
+    # Signed mode: the leftmost bucket is treated identically to every
+    # other bucket (a finite ``xs[0] - bs/2`` edge, set above) -- no
+    # -inf catch. Any residual mass below it (<= 1e-12 by construction of
+    # i0) is dropped and absorbed by the optional renormalisation below.
+
+    # bed = bucketed empirical distribution. A signed Severity carries
+    # identity layering, so its own cdf/sf are already un-clamped; an
+    # unsigned component keeps the clamp-at-0 layering. So per-component
+    # ``sev.cdf`` / ``sev.sf`` are correct on the signed grid with no special
+    # casing (an unsigned component simply contributes 0 to negative
+    # buckets). Occurrence reinsurance on a signed severity is out of scope
+    # (plan §6).
+    beds = []
+    for sev in sevs:
+        if (dsev_bucket == 'linear'
+                and rebucket is not None
+                and sev.sev_kind in ('dhistogram', 'fixed')
+                and sev.exp_attachment is None):
+            # Unlayered discrete severity: place the atoms on the grid with
+            # the mean-preserving linear scatter, so the discretized first
+            # moment equals the exact atom mean. The default cdf-difference
+            # path (below) snaps each atom to its nearest bucket
+            # (== 'nearest'), biasing the mean by up to bs/2 per atom when
+            # atoms are off-grid (empirical samples, non-integer bs). On-grid
+            # atoms give f == 0 so this reduces to nearest -- the dice /
+            # integer-bs case is unchanged. ``sev.fz`` is the _DiscreteRV
+            # holding the validated, sorted atoms (xk) and masses (pk).
+            # ``exp_attachment is None`` is the truly-unlayered test (a
+            # discrete sev always has a finite ``detachment`` = max atom, so
+            # a ``== np.inf`` test never fires). Layered discrete severities
+            # fall through to the cdf-diff path (Phase 1; see dsev_bucket).
+            # The bed is indexed on ``xs``, so the scatter origin is the
+            # severity grid origin ``xs[0]`` (== -i0*bs), NOT the
+            # output-window origin ``x_min`` -- the two differ when the
+            # output window is forced wider than the atom support (e.g. an
+            # explicit ``x_min`` below the smallest atom).
+            appx = rebucket(sev.fz.xk, sev.fz.pk, scheme='linear', origin=xs[0])
+        elif discretization_calc == 'both':
+            # see comments: we rescale each severity...
+            appx = np.maximum(np.diff(sev.cdf(adj_xs)), -np.diff(sev.sf(adj_xs)))
+        elif discretization_calc == 'survival':
+            appx = -np.diff(sev.sf(adj_xs))
+        elif discretization_calc == 'distribution':
+            appx = np.diff(sev.cdf(adj_xs))
+        else:
+            raise ValueError(
+                f'Invalid options {discretization_calc} to double_diff; options are density, survival or both')
+        if normalize:
+            beds.append(appx / np.sum(appx))
+        else:
+            beds.append(appx)
+    return beds

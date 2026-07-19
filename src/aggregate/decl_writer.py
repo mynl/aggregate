@@ -325,6 +325,10 @@ def _render_freq(spec: dict) -> str:
     fn = spec.get('freq_name')
     if fn is None or fn == 'empirical':
         return ''
+    if fn == 'renewal':
+        # the wait clause renders in the freq slot via _render_wait; the
+        # 'renewal' name itself is never a DecL keyword (never in _FREQ_WORDS)
+        return ''
 
     if fn in _FREQ_WORDS:
         s = fn
@@ -339,6 +343,44 @@ def _render_freq(spec: dict) -> str:
         p0 = spec.get('freq_p0', 0.0)
         s += ' zt' if float(p0) == 0.0 else f' zm {_fmt_num(p0)}'
     return s
+
+
+def _is_dwait(spec: dict) -> bool:
+    """True if the wait law is a bare ``dwait`` clause (not the ``wait`` form).
+
+    Mirrors :func:`_is_dsev`: a ``dwait`` transforms straight to
+    ``{wait_name: 'dhistogram', wait_xs, wait_ps}`` and never passes through
+    the weighted ``sev`` chain, so it lacks ``wait_wt``.
+    """
+    return (spec.get('wait_name') == 'dhistogram'
+            and 'wait_xs' in spec and 'wait_wt' not in spec)
+
+
+def _render_wait(spec: dict) -> str:
+    """Render the renewal waiting-time clause (``wait ...`` / ``dwait ...``).
+
+    Sits in the freq slot of an ``agg_body_renewal``. The continuous form
+    builds a ``sev_*`` view of the ``wait_*`` keys and reuses
+    :func:`_render_dist`, so every severity-mini-language feature (scale,
+    mixtures, splice, ``!``) round-trips through one code path. Returns ``''``
+    for a non-renewal spec.
+    """
+    if spec.get('freq_name') != 'renewal':
+        return ''
+    label = _render_label(spec.get('label_map', {}).get('wait'))
+    if _is_dwait(spec):
+        s = f'dwait {_fmt_seq(spec["wait_xs"])}'
+        ps = np.atleast_1d(np.asarray(spec['wait_ps'], dtype=float))
+        if not np.allclose(ps, ps[0]) or spec.get('wait_conditional') is False:
+            # defective probs must always render explicitly -- a uniform
+            # sub-stochastic vector (e.g. [.45 .45] !) cannot fall back to
+            # the uniform-default sugar, which re-parses to sum 1
+            s += f' {_fmt_seq(spec["wait_ps"])}'
+        if spec.get('wait_conditional') is False:
+            s += ' !'
+        return s + label
+    view = {'sev_' + k[5:]: v for k, v in spec.items() if k.startswith('wait_')}
+    return f'wait {_render_dist(view)}{label}'
 
 
 # ======================================================================
@@ -369,6 +411,14 @@ def _render_exposure(spec: dict) -> str:
     # Interior ``exposure`` label rides in ``label_map`` (dev/plan-labels.md S1);
     # it prints right after the amount/keyword unit, before any ``at ... lr/rate``.
     label = _render_label(spec.get('label_map', {}).get('exposure'))
+    if spec.get('freq_name') == 'renewal':
+        # FIRST: a ``years at rate`` spec also carries ``exp_premium`` and
+        # would otherwise mis-render as ``premium at lr``. ``exp_rate`` is
+        # stored by the parser precisely for this byte-exact round-trip.
+        s = f'{_fmt_seq(spec["exp_years"])} years{label}'
+        if 'exp_rate' in spec:
+            s += f' at {_fmt_seq(spec["exp_rate"])} rate'
+        return s
     if 'exp_premium' in spec:
         return (f'{_fmt_seq(spec["exp_premium"])} premium{label} '
                 f'at {_fmt_seq(spec["exp_lr"])} lr')
@@ -697,7 +747,7 @@ def _render_agg(name: str, spec: dict) -> _Block:
         _render_layers(spec),
         _render_sev_clause(spec),
         _render_reins(spec, 'occurrence', 'occ_reins', 'occ_kind'),
-        _render_freq(spec),
+        _render_freq(spec) or _render_wait(spec),
         _render_reins(spec, 'aggregate', 'agg_reins', 'agg_kind'),
         _render_approx(spec),
         _render_orientation(spec),
@@ -761,7 +811,7 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl') -> _Block:
             _render_layers(spec),
             _render_sev_clause(spec),
             _render_reins(spec, 'occurrence', 'occ_reins', 'occ_kind'),
-            _render_freq(spec),
+            _render_freq(spec) or _render_wait(spec),
             _render_reins(spec, 'aggregate', 'agg_reins', 'agg_kind'),
             _render_approx(spec),
         ])

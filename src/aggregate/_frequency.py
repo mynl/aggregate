@@ -12,6 +12,7 @@ from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize import NoConvergence  # noqa
 from . import tail as _tail
 
+from ._aggregate_compute import evaluate_pgf_polynomial
 from ._severity import validate_discrete_distribution
 
 logger = logging.getLogger(__name__)
@@ -585,7 +586,10 @@ class FrequencyEmpirical(Frequency):
         return en, en2, en3
 
     def freq_pgf(self, n, z):
-        return self.freq_b @ np.power(z, self.freq_a.reshape((self.freq_a.shape[0], 1)))
+        # Horner / sorted-gap square-and-multiply dispatch; fractional
+        # outcomes fall back to the legacy matrix expression. See
+        # ``evaluate_pgf_polynomial`` ([Empirical-PGF-Horner-Dispatch]).
+        return evaluate_pgf_polynomial(self.freq_a, self.freq_b, z)
 
 
 class _FrequencyMixedPoisson(Frequency):

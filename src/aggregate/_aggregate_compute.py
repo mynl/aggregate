@@ -119,6 +119,97 @@ def freq_sev_convolution(sev_density, freq_pgf, n, *, N, bs, i0=0, x_min=0.0,
     return agg, ftagg
 
 
+def evaluate_pgf_polynomial(atoms, weights, z):
+    """Evaluate the empirical pgf ``P(z) = sum_i w_i z^(a_i)`` elementwise in ``z``.
+
+    Drop-in replacement for the legacy matrix expression
+    ``weights @ np.power(z, atoms.reshape(-1, 1))``, which materializes an
+    ``n_atoms x len(z)`` complex matrix (memory-heavy and, for large
+    exponents, poorly conditioned -- complex ``np.power`` falls back to
+    exp/log). Non-negative-integer supports dispatch on an operation-count
+    model; anything else (fractional / negative outcomes, which parse
+    today) takes the legacy path verbatim.
+
+    Parameters
+    ----------
+    atoms : array-like
+        Support (the ``freq_a`` outcomes).
+    weights : array-like
+        Probability masses (the ``freq_b`` vector).
+    z : scalar or 1-D array, real or complex
+        Evaluation points (e.g. an rfft vector).
+
+    Returns
+    -------
+    ndarray
+        ``P(z)``, 1-D; a scalar ``z`` returns shape ``(1,)`` exactly like
+        the legacy matrix expression.
+
+    Notes
+    -----
+    Cost model with sorted exponents ``k_1 < ... < k_K`` and gaps
+    ``d_i = k_i - k_(i-1)`` (``k_0 = 0``): **Horner** over scattered dense
+    coefficients ``0..k_max`` costs ``k_max`` vector fused multiply-adds;
+    **sorted-gap square-and-multiply** costs
+    ``sum_i max(2 ceil(log2 d_i), 1)`` vector multiplies. Both are
+    O(len(z)) memory, so compare the two integers and pick the smaller;
+    ties go to Horner (better conditioned: a single accumulator, no
+    explicit large powers). A dense support ``0..K`` therefore takes
+    Horner; a sparse ``[0 1 2 1000]`` takes powers. Squaring is explicit
+    (never ``np.power`` on large exponents).
+    """
+    a = np.asarray(atoms, dtype=float)
+    w = np.asarray(weights, dtype=float)
+    if a.size == 0 or not (np.all(np.isfinite(a))
+                           and np.all(a == np.floor(a))
+                           and np.all(a >= 0)
+                           and np.all(a <= 2.0 ** 53)):
+        # legacy matrix path verbatim
+        return w @ np.power(z, a.reshape((a.shape[0], 1)))
+
+    zv = np.atleast_1d(np.asarray(z))
+    order = np.argsort(a)
+    k = a[order].astype(np.int64)
+    wk = w[order]
+    kmax = int(k[-1])
+    gaps = np.diff(np.concatenate((np.zeros(1, dtype=np.int64), k)))
+    pos = gaps[gaps > 0]
+    cost_powers = int(np.sum(np.maximum(
+        2 * np.ceil(np.log2(pos)), 1))) if len(pos) else 0
+    out_dtype = np.result_type(zv.dtype, w.dtype)
+
+    if kmax <= cost_powers:
+        # dense Horner: scatter the weights onto coefficients 0..kmax and
+        # run one fused multiply-add per degree with a single accumulator
+        c = np.zeros(kmax + 1)
+        np.add.at(c, k, wk)
+        acc = np.full(zv.shape, c[kmax], dtype=out_dtype)
+        for j in range(kmax - 1, -1, -1):
+            acc *= zv
+            if c[j]:
+                acc += c[j]
+        return acc
+
+    # sparse sorted-gap square-and-multiply: cache z^(2^j) once, then walk
+    # the gaps accumulating z^(k_i) incrementally by explicit squarings
+    pow2 = [zv.astype(out_dtype)]
+    max_gap = int(gaps.max())
+    while (1 << len(pow2)) <= max_gap:
+        pow2.append(pow2[-1] * pow2[-1])
+    zpow = np.ones(zv.shape, dtype=out_dtype)
+    acc = np.zeros(zv.shape, dtype=out_dtype)
+    for gap, w_i in zip(gaps, wk):
+        g = int(gap)
+        j = 0
+        while g:
+            if g & 1:
+                zpow = zpow * pow2[j]
+            g >>= 1
+            j += 1
+        acc += w_i * zpow
+    return acc
+
+
 def discretize_severities(sevs, xs, bs, *, i0=0, sev_calc='discrete',
                           discretization_calc='survival', normalize=True,
                           dsev_bucket=None, rebucket=None):

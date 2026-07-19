@@ -20,6 +20,8 @@
 # M. Case Studies from Pricing Insurance Risk book
 # N. Proxies for US Lines
 # O. Novelties (the logo mixed distribution)
+# Y. Renewal frequencies (Sparre-Andersen wait clause)
+#    (P..X are reserved by decl-testers.agg)
 
 
 # Default severity used in many other examples
@@ -271,4 +273,27 @@ sev N.Comm.Auto.MED [2.764e3 24.548e3 275.654e3 1.917469e6 10e6] * expon 1 wts [
 # Novelties
 # =========
 agg O.Logo 1 claim [10:250:10] xs 0 sev lognorm 100 cv 1 fixed
+
+# Y. Renewal frequencies (Sparre-Andersen wait clause)
+# ====================================================
+# ``T years`` exposure paired with a ``wait``/``dwait`` waiting-time law; the
+# claim count is the renewal count N(T). ``at NUMBER rate`` books an
+# informational premium. See [Renewal-Frequency-Wait-Clause].
+agg Y.Renewal.Expon     10 years sev lognorm 100 cv 1 wait expon note{Equivalent to "10 claims sev lognorm 100 cv 1 poisson".}
+
+agg Y.Renewal.Rate      1 year at 500 rate sev lognorm 100 cv 1 wait 0.1 * expon note{Rate 10/yr; exp_premium = 500 is informational.}
+
+agg Y.Renewal.Gamma     5 years sev lognorm 10 cv .3 wait gamma 2
+
+agg Y.Renewal.Determin  3 years dsev [1] dwait [1]
+
+agg Y.Renewal.Cluster   2 years dsev [1] dwait [0 1] [.5 .5] note{Zero waits arrive in geometric clusters.}
+
+agg Y.Renewal.Defective 2 years dsev [1] dwait [1 2] [.4 .5] ! note{Terminating renewal process, defect 0.1.}
+
+agg Y.Renewal.Splice    2 years sev lognorm 10 cv .3 wait expon splice [0 1.1] ! note{Waits beyond 1.1 terminate the process.}
+
+agg Y.Renewal.Mixture   5 years sev gamma 10 cv .3 wait [.6 .4] * expon wts [.5 .5]
+
+agg Y.Renewal.Labels    10 years as decade dsev [1] dwait [1:3] as slow_waits
 

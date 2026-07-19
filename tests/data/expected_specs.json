@@ -5466,5 +5466,256 @@
       "note": "",
       "hints": ""
     }
+  },
+  "agg Y.Renewal.Expon     10 years sev lognorm 100 cv 1 wait expon note{Equivalent to \"10 claims sev lognorm 100 cv 1 poisson\".}": {
+    "kind": "agg",
+    "name": "Y.Renewal.Expon",
+    "spec": {
+      "name": "Y.Renewal.Expon",
+      "exp_years": 10.0,
+      "sev_name": "lognorm",
+      "sev_mean": 100.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "wait_name": "expon",
+      "wait_scale": 1.0,
+      "wait_wt": 1.0,
+      "wait_lb": 0.0,
+      "wait_ub": "__inf__",
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "Equivalent to \"10 claims sev lognorm 100 cv 1 poisson\".",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.Rate      1 year at 500 rate sev lognorm 100 cv 1 wait 0.1 * expon note{Rate 10/yr; exp_premium = 500 is informational.}": {
+    "kind": "agg",
+    "name": "Y.Renewal.Rate",
+    "spec": {
+      "name": "Y.Renewal.Rate",
+      "exp_years": 1.0,
+      "exp_rate": 500.0,
+      "exp_premium": 500.0,
+      "sev_name": "lognorm",
+      "sev_mean": 100.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "wait_name": "expon",
+      "wait_scale": 0.1,
+      "wait_wt": 1.0,
+      "wait_lb": 0.0,
+      "wait_ub": "__inf__",
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "Rate 10/yr; exp_premium = 500 is informational.",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.Gamma     5 years sev lognorm 10 cv .3 wait gamma 2": {
+    "kind": "agg",
+    "name": "Y.Renewal.Gamma",
+    "spec": {
+      "name": "Y.Renewal.Gamma",
+      "exp_years": 5.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.3,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "wait_name": "gamma",
+      "wait_a": 2.0,
+      "wait_scale": 1.0,
+      "wait_wt": 1.0,
+      "wait_lb": 0.0,
+      "wait_ub": "__inf__",
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.Determin  3 years dsev  [1]  dwait  [1]": {
+    "kind": "agg",
+    "name": "Y.Renewal.Determin",
+    "spec": {
+      "name": "Y.Renewal.Determin",
+      "exp_years": 3.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "wait_name": "dhistogram",
+      "wait_xs": [
+        1.0
+      ],
+      "wait_ps": [
+        1.0
+      ],
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.Cluster   2 years dsev  [1]  dwait  [0 1]   [.5 .5]  note{Zero waits arrive in geometric clusters.}": {
+    "kind": "agg",
+    "name": "Y.Renewal.Cluster",
+    "spec": {
+      "name": "Y.Renewal.Cluster",
+      "exp_years": 2.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "wait_name": "dhistogram",
+      "wait_xs": [
+        0.0,
+        1.0
+      ],
+      "wait_ps": [
+        0.5,
+        0.5
+      ],
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "Zero waits arrive in geometric clusters.",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.Defective 2 years dsev  [1]  dwait  [1 2]   [.4 .5]  ! note{Terminating renewal process, defect 0.1.}": {
+    "kind": "agg",
+    "name": "Y.Renewal.Defective",
+    "spec": {
+      "name": "Y.Renewal.Defective",
+      "exp_years": 2.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "wait_name": "dhistogram",
+      "wait_xs": [
+        1.0,
+        2.0
+      ],
+      "wait_ps": [
+        0.4,
+        0.5
+      ],
+      "wait_conditional": false,
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "Terminating renewal process, defect 0.1.",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.Splice    2 years sev lognorm 10 cv .3 wait expon splice  [0 1.1]  ! note{Waits beyond 1.1 terminate the process.}": {
+    "kind": "agg",
+    "name": "Y.Renewal.Splice",
+    "spec": {
+      "name": "Y.Renewal.Splice",
+      "exp_years": 2.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.3,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "wait_name": "expon",
+      "wait_scale": 1.0,
+      "wait_wt": 1.0,
+      "wait_lb": [
+        0.0
+      ],
+      "wait_ub": [
+        1.1
+      ],
+      "wait_conditional": false,
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "Waits beyond 1.1 terminate the process.",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.Mixture   5 years sev gamma 10 cv .3 wait  [.6 .4]  * expon wts  [.5 .5]": {
+    "kind": "agg",
+    "name": "Y.Renewal.Mixture",
+    "spec": {
+      "name": "Y.Renewal.Mixture",
+      "exp_years": 5.0,
+      "sev_name": "gamma",
+      "sev_mean": 10.0,
+      "sev_cv": 0.3,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "wait_name": "expon",
+      "wait_scale": [
+        0.6,
+        0.4
+      ],
+      "wait_wt": [
+        0.5,
+        0.5
+      ],
+      "wait_lb": 0.0,
+      "wait_ub": "__inf__",
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.Labels    10 years as decade dsev  [1]  dwait  [1:3]  as slow_waits": {
+    "kind": "agg",
+    "name": "Y.Renewal.Labels",
+    "spec": {
+      "name": "Y.Renewal.Labels",
+      "exp_years": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "wait_name": "dhistogram",
+      "wait_xs": [
+        1.0,
+        2.0,
+        3.0
+      ],
+      "wait_ps": [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "label_map": {
+        "exposure": "decade",
+        "wait": "slow_waits"
+      },
+      "note": "",
+      "hints": ""
+    }
   }
 }

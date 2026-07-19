@@ -408,6 +408,7 @@ class UnderwritingTransformer(Transformer):
         "_exposure_label": "exposure",
         "_layer_label": "layer",
         "_severity_label": "severity",
+        "_wait_label": "wait",
     }
 
     def _pop_interior_labels(self, spec):
@@ -441,6 +442,25 @@ class UnderwritingTransformer(Transformer):
         spec = {
             **dfreq, **layers, **sev_clause, **occ_reins, **agg_reins,
             **self._check_approx(approx, occ_reins), **orientation,
+        }
+        label_map = self._pop_interior_labels(spec)
+        if label_map:
+            spec["label_map"] = label_map
+        return spec
+
+    def agg_body_renewal(self, c):
+        # Sparre-Andersen renewal: ``T years`` exposure paired (strictly, at
+        # the grammar level) with a ``wait``/``dwait`` clause in the freq
+        # slot. ``exp_en = -1`` is the empirical sentinel (exactly like
+        # ``dfreq``): the expected count is derived from the realized count
+        # pmf. See dev/plan-sparre-a.md [Renewal-Frequency-Wait-Clause].
+        (exposures, layers, sev_clause, occ_reins, wait_clause, agg_reins,
+         approx, orientation) = c
+        spec = {
+            **exposures, **layers, **sev_clause, **occ_reins, **wait_clause,
+            **agg_reins, **self._check_approx(approx, occ_reins), **orientation,
+            "freq_name": "renewal",
+            "exp_en": -1,
         }
         label_map = self._pop_interior_labels(spec)
         if label_map:
@@ -1627,6 +1647,70 @@ class UnderwritingTransformer(Transformer):
             "exp_en": -1,
         }
 
+    # ----- wait / dwait (renewal waiting-time clause) ----------------
+    @staticmethod
+    def _sev_to_wait(d):
+        """Rename a parsed severity fragment into the flat ``wait_*`` keys.
+
+        The ``wait`` clause reuses the full severity mini-language, so the
+        sub-parse arrives as ``sev_*`` keys; the wait law stores them as the
+        mirrored ``wait_*`` family. A ``sev.NAME`` lookup's identity baggage
+        (``name``/``note``/``hints``/``label``/``label_map``) is dropped --
+        the wait borrows the distribution, not the object. Picks and
+        signed/reflected forms are rejected: neither is meaningful for a
+        non-negative waiting time.
+        """
+        if any(k.startswith("sev_pick") and d[k] is not None for k in d):
+            raise ValueError(
+                "DecL: picks are not meaningful on a wait clause")
+        if d.get("sev_signed", False) or d.get("sev_reflect", False):
+            raise ValueError(
+                "DecL: a wait clause cannot be signed or reflected "
+                "(waiting times are non-negative)")
+        drop = {"name", "note", "hints", "label", "label_map",
+                "sev_signed", "sev_reflect"}
+        out = {}
+        for k, v in d.items():
+            if k in drop or k.startswith("sev_pick"):
+                continue
+            out["wait_" + k[4:] if k.startswith("sev_") else k] = v
+        return out
+
+    def wait_clause_wait(self, c):
+        _wait, sev, as_label = c
+        spec = self._sev_to_wait(sev)
+        spec["_wait_label"] = as_label.get("label")
+        return spec
+
+    def wait_clause_dwait(self, c):
+        # prob-sum policy (checked here, once the optional trailing ``!`` is
+        # known): conditional renormalizes with a warning when off by more
+        # than 1e-6; defective (``!``) accepts sum <= 1, errors above.
+        dwait, as_label = c
+        ps = np.asarray(dwait["wait_ps"], dtype=float)
+        s = float(ps.sum())
+        if dwait.get("wait_conditional", True):
+            if abs(s - 1.0) > 1e-6:
+                logger.warning(
+                    'dwait probabilities sum to %.8g != 1; renormalizing', s)
+                dwait["wait_ps"] = ps / s
+        elif s > 1.0 + 1e-12:
+            raise ValueError(
+                f'defective dwait probabilities sum to {s:.8g} > 1')
+        dwait["_wait_label"] = as_label.get("label")
+        return dwait
+
+    def dwait_main(self, c):
+        _dwait, doutcomes, dprobs = c
+        ps = np.ones_like(doutcomes) / len(doutcomes) if len(dprobs) == 0 else dprobs
+        return {"wait_name": "dhistogram", "wait_xs": doutcomes,
+                "wait_ps": ps}
+
+    def dwait_unconditional(self, c):
+        dwait = c[0]
+        dwait["wait_conditional"] = False
+        return dwait
+
     # ----- dbvsev (discrete bivariate severity) ---------------------
     # Every dbvsev surface form (dense / dense-uniform / sparse) normalises to
     # the SAME partial spec ``{dbv_xs, dbv_ys, dbv_S}`` -- the joint per-claim
@@ -1822,6 +1906,32 @@ class UnderwritingTransformer(Transformer):
             "_exposure_label": as_label.get("label"),
         }
 
+    @staticmethod
+    def _check_years_scalar(value, what):
+        """Renewal exposure terms are scalars -- there is one clock."""
+        if not np.isscalar(value):
+            raise ValueError(
+                f'DecL: {what} in a years (renewal) exposure must be a '
+                f'scalar, not a vector')
+        return float(value)
+
+    def exposures_years(self, c):
+        numbers, _years, as_label = c
+        return {"exp_years": self._check_years_scalar(numbers, 'years'),
+                "_exposure_label": as_label.get("label")}
+
+    def exposures_years_rate(self, c):
+        # ``T years at r rate``: informational premium T*r (feeds PnL gross
+        # premium / lr); the claim count comes solely from the wait law.
+        # ``exp_rate`` is stored for byte-exact writer round-trip.
+        years, _years, as_label, _at, rate, _rate = c
+        years = self._check_years_scalar(years, 'years')
+        rate = self._check_years_scalar(rate, 'the rate')
+        return {"exp_years": years,
+                "exp_rate": rate,
+                "exp_premium": years * rate,
+                "_exposure_label": as_label.get("label")}
+
     # ----- ids -------------------------------------------------------
     def ids_list(self, c):
         return c[0]
@@ -1842,6 +1952,15 @@ class UnderwritingTransformer(Transformer):
         expr, _at, bagg = c
         bid = bagg.copy()
         bid["name"] += "_i_scaled"
+        if bid.get("freq_name") == "renewal":
+            # the count of a renewal aggregate comes solely from the wait
+            # law over the fixed horizon -- exposure cannot scale it (and
+            # exp_en is the -1 empirical sentinel, not a count)
+            logger.warning(
+                "'@' inhomogeneous scaling is a frequency no-op for a "
+                "renewal (wait-clause) aggregate %s; spec left unscaled",
+                bid.get("name", ""))
+            return bid
         bid["exp_en"] = _check_vectorizable(bid.get("exp_en", 0)) * expr
         bid["exp_el"] = _check_vectorizable(bid.get("exp_el", 0)) * expr
         bid["exp_premium"] = _check_vectorizable(bid.get("exp_premium", 0)) * expr

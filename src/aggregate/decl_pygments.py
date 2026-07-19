@@ -116,7 +116,7 @@ class AggLexer(RegexLexer):
                 suffix=r'\b'
             ), Name.Namespace),
             # discrete / histogram severity declarations
-            (words(('dhistogram', 'chistogram', 'dsev', 'dbvsev',
+            (words(('dhistogram', 'chistogram', 'dsev', 'dbvsev', 'dwait',
                     ),
                    suffix=r'\b'
                    ), Name.Label),
@@ -142,7 +142,9 @@ class AggLexer(RegexLexer):
                     'reinstatements', 'reinstatement', 'free', 'no',
                     # variable rating (Phase 3)
                     'swing', 'slide', 'retro', 'corridor', 'basic', 'lcm',
-                    'min', 'max', 'pc', 'after', ),
+                    'min', 'max', 'pc', 'after',
+                    # renewal frequency ([Renewal-Frequency-Wait-Clause])
+                    'wait', 'years', 'year', ),
                 suffix=r'\b'
             ), Keyword),
         ],

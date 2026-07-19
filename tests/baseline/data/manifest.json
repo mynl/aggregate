@@ -1,12 +1,12 @@
 {
   "env": {
-    "aggregate": "1.0.0a56",
+    "aggregate": "1.0.0a145",
     "numpy": "2.4.5",
     "scipy": "1.17.1",
     "pandas": "3.0.3",
-    "python": "3.14.3"
+    "python": "3.14.5"
   },
-  "commit": "e20b131f98c212bab86ef72af13cfe7912b55b06",
+  "commit": "64d1562cdb983af728c8b6b64ecf7dc81bd5fff5",
   "tolerance": {
     "rtol": 1e-12,
     "atol": 1e-14
@@ -290,7 +290,7 @@
         "q_0.9": 3861.25,
         "q_0.99": 4467.5,
         "q_0.999": 4725.25,
-        "tvar_0.99": 4586.561103972301
+        "tvar_0.99": 4586.5611039722435
       },
       "distortions": [
         {
@@ -307,13 +307,13 @@
           "pricing": [
             {
               "method": "linear",
-              "price": 2751.374336284234,
+              "price": 2751.374336284235,
               "a_reg": 4467.5,
               "reg_p": 0.99
             },
             {
               "method": "lifted",
-              "price": 2751.374336284234,
+              "price": 2751.374336284235,
               "a_reg": 4467.5,
               "reg_p": 0.99
             }

@@ -29,6 +29,7 @@ __all__ = [
     'FrequencyNeymanA',
     'FrequencyPascal',
     'FrequencyEmpirical',
+    'FrequencyRenewal',
     'FrequencyGammaMixed',
     'FrequencyDelaporteMixed',
     'FrequencyIGMixed',
@@ -590,6 +591,94 @@ class FrequencyEmpirical(Frequency):
         # outcomes fall back to the legacy matrix expression. See
         # ``evaluate_pgf_polynomial`` ([Empirical-PGF-Horner-Dispatch]).
         return evaluate_pgf_polynomial(self.freq_a, self.freq_b, z)
+
+
+class FrequencyRenewal(FrequencyEmpirical):
+    """
+    Sparre-Andersen renewal count: the claim count is ``N(T)``, the number
+    of renewals of an iid waiting-time law ``W`` over ``years = T``.
+
+    Constructed DIRECTLY (never through the ``Frequency(name, ...)``
+    factory) with the wait-law payload; ``_build`` computes the count pmf
+    via :func:`aggregate._renewal.wait_count_pmf` and then the object *is*
+    an ordinary empirical frequency: ``freq_a = 0..kmax``, ``freq_b = pN``
+    is exactly the ``dfreq [k...] [p_k...]`` representation, and every
+    downstream consumer (Horner pgf, moments, the ``exp_en = -1`` count
+    derivation, count support, ``freq_pmf``) runs the inherited empirical
+    logic. The renewal computation only ever *produces* that vector pair.
+
+    Parameters
+    ----------
+    wait_components : list of (Severity, lb, ub, conditional)
+        The wait law mixture components (see
+        :func:`aggregate._renewal.wait_count_pmf`).
+    wait_weights : array-like
+        Mixture weights; may sum to < 1 (the shortfall is defect mass --
+        a terminating renewal process).
+    years : float
+        The horizon ``T``.
+
+    Notes
+    -----
+    Diagnostics stored for repr / drill-down: ``wait_bs``, ``wait_log2``,
+    ``wait_lattice``, ``wait_p0`` (zero-wait cluster mass), ``wait_defect``
+    (terminating mass), ``kmax``, ``years``, and ``_renewal_bs_df`` (the
+    grid-sizing constraint table, mirroring the aggregate ``_bs_window_df``
+    idiom). ``convergence_check()`` is the explicit-opt-in Richardson
+    diagnostic. Zero modification is meaningless for a renewal count
+    (``supports_zm = False``, inherited).
+    """
+
+    freq_name = 'renewal'
+
+    def __init__(self, wait_components, wait_weights, years):
+        # stash the payload BEFORE super().__init__, which calls _build
+        self.wait_components = wait_components
+        self.wait_weights = wait_weights
+        self.years = years
+        self.wait_bs = None
+        self.wait_log2 = None
+        self.wait_lattice = None
+        self.wait_p0 = None
+        self.wait_defect = None
+        self.kmax = None
+        self._renewal_bs_df = None
+        super().__init__('renewal', None, None, False, np.nan)
+
+    def _build(self):
+        from ._renewal import wait_count_pmf
+        k, pN, info = wait_count_pmf(self.wait_components,
+                                     self.wait_weights, self.years)
+        self.freq_a = k.astype(float)
+        self.freq_b = pN
+        self.wait_bs = info['bs']
+        self.wait_log2 = info['log2']
+        self.wait_lattice = info['lattice']
+        self.wait_p0 = info['p0']
+        self.wait_defect = info['defect']
+        self.kmax = info['kmax']
+        self._renewal_bs_df = info['bs_df']
+        # inherited empirical validation (sorts, checks mass, dedups)
+        super()._build()
+
+    def convergence_check(self):
+        """Richardson-style grid diagnostic: recompute the count pmf at h/2.
+
+        Explicit opt-in (never run automatically). Returns ``max |delta
+        p_k|`` between the production count pmf and one recomputed on a
+        grid with half the bucket size (one extra log2). O(h^2)
+        convergence means the reported delta is ~4x the remaining error
+        of the *refined* pmf. Meaningless (and skipped -- returns 0.0) on
+        an exact lattice, which has no discretization error.
+        """
+        from ._renewal import wait_count_pmf
+        if self.wait_lattice:
+            return 0.0
+        k2, pN2, _ = wait_count_pmf(
+            self.wait_components, self.wait_weights, self.years,
+            grid=(self.wait_bs / 2, self.wait_log2 + 1, False))
+        n = min(len(pN2), len(self.freq_b))
+        return float(np.abs(pN2[:n] - self.freq_b[:n]).max())
 
 
 class _FrequencyMixedPoisson(Frequency):

@@ -128,7 +128,8 @@ CONCENTRATION_CV = get_settings().discretization.concentration_cv
 # ----------------------------------------------------------------------------
 
 # Frequencies with bounded support.
-_BOUNDED_FREQS = frozenset({'fixed', 'bernoulli', 'binomial', 'empirical'})
+_BOUNDED_FREQS = frozenset({'fixed', 'bernoulli', 'binomial', 'empirical',
+                            'renewal'})
 
 # scipy.stats families with bounded support. Conservative: only the standard
 # finite-support members.
@@ -263,6 +264,7 @@ FREQ_TAIL: dict[str, tuple[TailClass, Optional[bool]]] = {
     'bernoulli':    (TailClass.BOUNDED, True),
     'binomial':     (TailClass.BOUNDED, True),
     'empirical':    (TailClass.BOUNDED, None),
+    'renewal':      (TailClass.BOUNDED, None),   # realized count = empirical
     'poisson':      (TailClass.SUPER_EXPONENTIAL, True),
     'geometric':    (TailClass.EXPONENTIAL, True),
     'negbin':       (TailClass.EXPONENTIAL, True),

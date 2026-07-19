@@ -44,7 +44,7 @@ from . import tail as _tail
 from .tail import TailClass
 
 from ._fits import (_approximate_sev_kwargs, approximate_from_mcvsk)
-from ._frequency import Frequency
+from ._frequency import Frequency, FrequencyRenewal
 from ._severity import Severity
 # Phase 1b shared concerns (leaf/near-leaf; never import back into _aggregate).
 from ._bucket_window import (
@@ -696,7 +696,7 @@ class Aggregate(LabeledMixin):
             return n, n, False
         if fname == 'bernoulli':
             return 0.0, 1.0, False
-        if fname == 'empirical':
+        if fname in ('empirical', 'renewal'):
             atoms = getattr(self.frequency, 'freq_a', None)
             if atoms is not None and len(atoms):
                 return float(np.min(atoms)), float(np.max(atoms)), False
@@ -1404,6 +1404,10 @@ class Aggregate(LabeledMixin):
                  sev_pick_attachments=None, sev_pick_losses=None,
                  occ_reins=None, occ_kind='', occ_reins_label=None,
                  freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
+                 exp_years=0.0, exp_rate=0.0,
+                 wait_name='', wait_a=np.nan, wait_b=0.0, wait_mean=0.0, wait_cv=0.0,
+                 wait_loc=0.0, wait_scale=0.0, wait_xs=None, wait_ps=None,
+                 wait_wt=1.0, wait_lb=0.0, wait_ub=np.inf, wait_conditional=True,
                  agg_reins=None, agg_kind='', agg_reins_label=None,
                  reins_bucket=None, dsev_bucket=None,
                  value_type='loss',
@@ -1452,6 +1456,32 @@ class Aggregate(LabeledMixin):
         :param freq_b:          claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
         :param freq_zm:         True/False zero modified flag
         :param freq_p0:         if freq_zm, provides the modified value of p0; default is nan
+        :param exp_years:       renewal horizon T (the DecL ``T years`` exposure);
+                                requires ``freq_name='renewal'`` and a ``wait_*``
+                                law (strict pairing). The claim count is the
+                                Sparre-Andersen renewal count N(T) of the wait law.
+        :param exp_rate:        informational premium rate (``at NUMBER rate``):
+                                sets ``exp_premium = exp_years * exp_rate``; never
+                                sizes the count. Stored for writer round-trip.
+        :param wait_name:       waiting-time distribution name; the ``wait_*``
+                                family mirrors ``sev_*`` exactly (the wait clause
+                                reuses the severity mini-language on the time axis)
+        :param wait_a:          wait shape parameter (as ``sev_a``)
+        :param wait_b:          wait shape parameter (as ``sev_b``)
+        :param wait_mean:       wait mean (as ``sev_mean``)
+        :param wait_cv:         wait cv (as ``sev_cv``)
+        :param wait_loc:        wait location (as ``sev_loc``)
+        :param wait_scale:      wait scale (as ``sev_scale``)
+        :param wait_xs:         ``dwait`` outcomes (as ``sev_xs``)
+        :param wait_ps:         ``dwait`` probabilities; may sum to q < 1 for a
+                                defective (terminating) renewal process (``dwait
+                                ... !``)
+        :param wait_wt:         wait mixture weight (as ``sev_wt``)
+        :param wait_lb:         wait splice lower bound (as ``sev_lb``)
+        :param wait_ub:         wait splice upper bound (as ``sev_ub``)
+        :param wait_conditional: as ``sev_conditional``; False = defective splice
+                                window (mass outside ``[lb, ub]`` terminates the
+                                process rather than renormalizing)
         :param agg_reins:       layers
         :param agg_kind:        ceded to or net of
         :param value_type:      ``'loss'`` (default) or ``'payoff'``; the DecL
@@ -1583,10 +1613,35 @@ class Aggregate(LabeledMixin):
             f'Aggregate.__init__ | creating new Aggregate {self.name}')
         # Composition: an Aggregate *has* a frequency model, not *is* one.
         # ``Frequency(...)`` dispatches via ``__new__`` to the correct
-        # ``Frequency<Kind>`` subclass.
-        self.frequency = Frequency(
-            get_value(freq_name), get_value(freq_a), get_value(freq_b),
-            get_value(freq_zm), get_value(freq_p0))
+        # ``Frequency<Kind>`` subclass. A renewal frequency is constructed
+        # DIRECTLY (never via factory dispatch) from the wait-law payload.
+        if get_value(freq_name) == 'renewal':
+            # strict pairing (the grammar enforces this for DecL; this guards
+            # programmatic construction)
+            if not exp_years or exp_years <= 0:
+                raise ValueError(
+                    f'{self.name}: a renewal frequency requires exp_years > 0 '
+                    f'(the DecL "T years" exposure head)')
+            if wait_name == '' or wait_name is None:
+                raise ValueError(
+                    f'{self.name}: a renewal frequency requires a wait law '
+                    f'(the DecL wait/dwait clause)')
+            self.frequency = self._build_renewal_frequency(
+                exp_years, wait_name, wait_a, wait_b, wait_mean, wait_cv,
+                wait_loc, wait_scale, wait_xs, wait_ps, wait_wt, wait_lb,
+                wait_ub, wait_conditional)
+        else:
+            # the MoM-approximate path rewrites freq_name to 'fixed' but the
+            # wait/years locals survive -- exempt it from strict pairing
+            if (not getattr(self, '_approx_fit', None)
+                    and (exp_years or wait_name)):
+                raise ValueError(
+                    f'{self.name}: years/wait inputs require '
+                    f"freq_name='renewal' (strict pairing), got "
+                    f'{get_value(freq_name)!r}')
+            self.frequency = Frequency(
+                get_value(freq_name), get_value(freq_a), get_value(freq_b),
+                get_value(freq_zm), get_value(freq_p0))
         # Spec pass through from constructor arguments
         self.note = note
         # Exposure premium / loss ratio, retained for the P&L path: a ``pnl``
@@ -1597,6 +1652,11 @@ class Aggregate(LabeledMixin):
         # ``np.sum``. See dev/plan-pnl-engine-source.md.
         self.exp_premium = exp_premium
         self.exp_lr = exp_lr
+        # Renewal exposure: the horizon T and the informational premium rate
+        # (``T years at r rate`` books exp_premium = T*r; the count comes
+        # solely from the wait law). 0.0 for every other exposure form.
+        self.exp_years = exp_years
+        self.exp_rate = exp_rate
         # Raw `hints{...}` settings string; consumed by the underwriter build
         # path (caller-wins merge), retained here for round-tripping / repr.
         self.hints = hints
@@ -1792,16 +1852,21 @@ class Aggregate(LabeledMixin):
                     _en = _el / sev1
                 # neither of these options can be triggered, by a dfreq dsev, for example.
 
+                # for empirical/renewal freq claim count entered as -1;
+                # resolved BEFORE the premium/lr reconciliation below so a
+                # ``years at rate`` (premium-carrying) renewal records the
+                # per-component lr correctly. Regression-neutral: no legacy
+                # path pairs _en < 0 with _pr > 0 or _lr > 0 (a dfreq body
+                # has no exposure clause).
+                if _en < 0:
+                    _en = np.sum(self.frequency.freq_a * self.frequency.freq_b)
+                    _el = _en * sev1
+
                 # if premium compute loss ratio, if loss ratio compute premium
                 if _pr > 0:
                     _lr = _el / _pr
                 elif _lr > 0:
                     _pr = _el / _lr
-
-                # for empirical freq claim count entered as -1
-                if _en < 0:
-                    _en = np.sum(self.frequency.freq_a * self.frequency.freq_b)
-                    _el = _en * sev1
 
                 # scale for the mix - OK because we have split the exposure and severity components
                 _pr *= _swt
@@ -2021,6 +2086,56 @@ class Aggregate(LabeledMixin):
         self.sev_skew = float(_mixed[('sev', 'skew')])
         self.sev_var = max(float(_mixed[('sev', 'ex2')]) - self.sev_m ** 2, 0.0)
         self.sev_sd = math.sqrt(self.sev_var)
+
+    @staticmethod
+    def _build_renewal_frequency(exp_years, wait_name, wait_a, wait_b,
+                                 wait_mean, wait_cv, wait_loc, wait_scale,
+                                 wait_xs, wait_ps, wait_wt, wait_lb, wait_ub,
+                                 wait_conditional):
+        """Build the :class:`FrequencyRenewal` from the flat ``wait_*`` spec.
+
+        Broadcasts the wait mixture terms (mirroring the severity broadcast,
+        but with no exposure product and no layers: ``exp_attachment=None``,
+        unlimited) and constructs one :class:`Severity` per component:
+
+        - ``dhistogram`` (``dwait``): the atom probabilities may sum to
+          ``q < 1`` (defective ``dwait ... !``); the Severity gets the
+          normalized pmf and the shortfall rides the component *weight* --
+          the orchestrator treats missing weight as terminating mass.
+        - conditional splice: ``lb/ub`` pass into the Severity as usual
+          (``_apply_lb_ub`` renormalizes -- correct for a conditional law).
+        - unconditional splice (``splice ... !``): the Severity is built
+          WITHOUT ``lb/ub`` (the layer machinery would renormalize) and the
+          window is masked on the wait grid -- the escaping mass is the
+          defect. See :func:`aggregate._renewal.wait_count_pmf`.
+        """
+        bc = [np.atleast_1d(a) for a in np.broadcast_arrays(
+            wait_name, wait_a, wait_b, wait_mean, wait_cv, wait_loc,
+            wait_scale, wait_wt, wait_lb, wait_ub)]
+        components, weights = [], []
+        for _wn, _wa, _wb, _wm, _wcv, _wloc, _wsc, _wwt, _wlb, _wub in zip(*bc):
+            _wn = str(_wn)
+            if _wn == 'dhistogram':
+                ps = np.asarray(wait_ps, dtype=float)
+                mass = float(ps.sum())
+                sev_w = Severity('dhistogram', None, np.inf,
+                                 sev_xs=np.asarray(wait_xs, dtype=float),
+                                 sev_ps=ps / mass)
+                components.append((sev_w, 0.0, np.inf, True))
+                weights.append(float(_wwt) * mass)
+            elif not wait_conditional:
+                sev_w = Severity(_wn, None, np.inf, _wm, _wcv, _wa, _wb,
+                                 _wloc, _wsc, None, None, _wwt,
+                                 0.0, np.inf, True)
+                components.append((sev_w, float(_wlb), float(_wub), False))
+                weights.append(float(_wwt))
+            else:
+                sev_w = Severity(_wn, None, np.inf, _wm, _wcv, _wa, _wb,
+                                 _wloc, _wsc, None, None, _wwt,
+                                 float(_wlb), float(_wub), True)
+                components.append((sev_w, float(_wlb), float(_wub), True))
+                weights.append(float(_wwt))
+        return FrequencyRenewal(components, weights, float(exp_years))
 
     def _init_stats_df(self, comp_cols):
         """Pre-create the empty ``stats_df`` (NaN-filled).
@@ -3702,6 +3817,17 @@ class Aggregate(LabeledMixin):
         new['sev_ps'] = [1.0]
         return spec_to_decl(new, kind='agg', name=name)
 
+    @property
+    def _renewal_bs_df(self):
+        """Wait-grid sizing constraint table for a renewal frequency.
+
+        Delegates to :attr:`FrequencyRenewal._renewal_bs_df` (one row per
+        sizing constraint, ``selected`` marking the binding one; final
+        grid / kmax / p0 / defect in ``.attrs``). ``None`` for every other
+        frequency kind. Mirrors the aggregate ``_bs_window_df`` idiom.
+        """
+        return getattr(self.frequency, '_renewal_bs_df', None)
+
     def _frequency_program(self, name):
         """Render the count-distribution DecL by re-parsing :attr:`program`.
 
@@ -3709,6 +3835,14 @@ class Aggregate(LabeledMixin):
         (``spec_to_decl`` wants the transformer spec, not the dense
         ``Aggregate._spec`` constructor dict), then handed to
         :meth:`_count_program` with the resolved :attr:`n`.
+
+        A renewal (wait-clause) frequency emits the **realized** count --
+        the materialized ``dfreq [0:kmax] [pN...]`` program built from
+        ``self.frequency.freq_a / freq_b`` -- not the wait clause: the
+        returned object runs the ordinary dfreq machinery with no
+        recomputation of the renewal kernel (the dfreq-conversion view;
+        the *model* round-trip via ``spec`` / the writer keeps the wait
+        clause).
 
         Raises
         ------
@@ -3723,6 +3857,13 @@ class Aggregate(LabeledMixin):
                 f'program).')
         from .underwriter import build
         _kind, _name, spec = build.parser.parse(self.program)
+        if getattr(self.frequency, 'freq_name', '') == 'renewal':
+            spec = {k: v for k, v in spec.items()
+                    if not (k.startswith('wait_')
+                            or k in ('exp_years', 'exp_rate'))}
+            spec['freq_name'] = 'empirical'
+            spec['freq_a'] = np.asarray(self.frequency.freq_a)
+            spec['freq_b'] = np.asarray(self.frequency.freq_b)
         return self._count_program(spec, self.n, name)
 
     def create_frequency(self):
@@ -4430,7 +4571,9 @@ class Aggregate(LabeledMixin):
         both fall below ``exact_discrete_reach_logp``.
         """
         freq = self.frequency
-        if freq.freq_name == 'empirical':
+        if freq.freq_name in ('empirical', 'renewal'):
+            # a renewal count IS an empirical frequency post-build (freq_a =
+            # 0..kmax, freq_b = pN), so it gets the same exact-discrete window
             n_atoms = np.asarray(freq.freq_a, dtype=float)
             n_probs = np.asarray(freq.freq_b, dtype=float)
             has_zero = bool(np.any(n_atoms == 0))

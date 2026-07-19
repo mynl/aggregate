@@ -1,5 +1,69 @@
 # Changelog
 
+## 1.0.0a146
+
+**[Renewal-Frequency-Wait-Clause]** — the claim-generation process can now be a
+general Sparre-Andersen renewal process: any iid waiting-time law, not just
+exponential ⇒ Poisson. New DecL surface: a `T years [at r rate]` exposure head
+strictly paired (at the grammar level) with a `wait <severity-expression>` /
+`dwait [outcomes] [probs] [!]` clause in the frequency slot:
+
+```
+agg Ren 10 years sev lognorm 100 cv 1 wait expon        # ≡ 10 claims … poisson
+agg Det 3 years dsev [1] dwait [1]                      # N ≡ 3
+agg Clu 2 years dsev [1] dwait [0 1] [.5 .5]            # geometric claim clusters
+agg Ter 2 years dsev [1] wait expon splice [0 1.1] !    # terminating (defective)
+```
+
+- **Engine** (`_renewal.py`, ported from the author's `sparre` notes library):
+  the count pmf comes from `{N(T) ≥ k} = {S_k ≤ T}` via a Plancherel /
+  no-inverse-FFT method — two forward rffts, then one vector multiply + one dot
+  per k, with exponential tilting (`θL = 20`, the float64 optimum) damping
+  circular wrap. Discretization REUSES the severity kernel
+  (`discretize_severities`, extracted verbatim from `Aggregate.discretize` into
+  `_aggregate_compute.py`). Grid sizing (shape / accuracy / coverage rules,
+  exact-lattice override for commensurable `dwait`, log2 window [16, 24]) is
+  recorded in `_renewal_bs_df`, mirroring the `_bs_window_df` idiom.
+- **Zero waits = claim clusters**: `P(W ≤ 0)` (atoms at 0 plus collapsed
+  negative mass, warned) is factored out exactly and recomposed as geometric
+  batches — `N = Σ_{i≤M+1} G_i − 1`, including the boundary batch riding at the
+  last epoch ≤ T (the plan's original composition dropped it; caught in review
+  against the `dwait [0 1] [.5 .5]` enumeration `P(N=m) = m/2^{m+1}`).
+  Defective waits (splice `!` windows, `dwait` probs summing < 1) terminate the
+  process; the count pmf stays proper.
+- **`wait` reuses the severity mini-language** (scaling, mixtures, splice, `!`,
+  `sev.NAME`); flat `wait_*` spec keys mirror `sev_*` as `Aggregate.__init__`
+  kwargs (+ `exp_years`, `exp_rate`). `at r rate` books informational premium
+  `T·r` (feeds PnL `inherit premium`); the count comes solely from the wait law.
+- **Post-build the renewal frequency IS an empirical frequency**
+  (`FrequencyRenewal(FrequencyEmpirical)`, `freq_a = 0..kmax`, `freq_b = pN`):
+  moments, pgf, count support, `freq_pmf`, validation and grid sizing all run
+  the ordinary dfreq machinery; `create_frequency()` emits the realized
+  `dfreq [0:kmax] [pN…]` with no kernel recomputation. `Frequency.convergence_check()`
+  is the explicit-opt-in Richardson h/2 diagnostic. Writer round-trips the wait
+  clause (`_render_wait` via a `sev_*` view through `_render_dist`).
+- Anchors verified in tests: `10 years wait expon` ≡ `10 claims poisson`
+  (same grid, densities to 1e-8, identical q(0.99)); gamma → `gammainc(ka, λT)`;
+  uniform(0,1) T=1 → `k/(k+1)!`; inverse Gaussian closed form; O(h²) Richardson;
+  cluster/defective enumerations; mixture mean hits the second-order renewal
+  expansion `T/μ + (σ²−μ²)/2μ²`.
+
+**[Empirical-PGF-Horner-Dispatch]** — `FrequencyEmpirical.freq_pgf` no longer
+materializes the `n_atoms × len(z)` complex matrix. `evaluate_pgf_polynomial`
+(`_aggregate_compute.py`) dispatches on an operation-count model: dense supports
+→ Horner (one fused multiply-add per degree, single accumulator); sparse
+supports → sorted-gap square-and-multiply with an explicit power-of-two cache
+(never complex `np.power` on large exponents). Fractional/negative outcomes keep
+the legacy matrix path verbatim. Baselines re-captured: summation reordering
+moves densities ≤ 2e-20/bucket, but `Port.Bounded`'s lifted/mass pricing
+surfaces read the numerical sup inside the bounded book's noise plateau, which
+relocated a few buckets (`test_baseline`, spotchecks, `numerics3_precapture`).
+
+Also: the `_en < 0` empirical-count sentinel now resolves *before* the
+premium/lr reconciliation in the limit-profile broadcast arm, so a
+premium-carrying empirical/renewal exposure records per-component `lr`
+correctly (no legacy path paired the two).
+
 ## 1.0.0a145
 
 **[Exact-Discrete-Reachability-Guard]** — the `exact_discrete` grid-sizing method

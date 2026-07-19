@@ -419,6 +419,14 @@
 
 ## Related plans (shipped → context)
 
+- **[Renewal-Frequency-Wait-Clause] + [Empirical-PGF-Horner-Dispatch]**
+  (`dev/done/plan-sparre-a.md`) — shipped a146: Sparre-Andersen renewal claim
+  generation (`T years [at r rate]` + `wait`/`dwait`, Plancherel count kernel
+  in `_renewal.py`, `FrequencyRenewal`, exact geometric-batch clusters for
+  zero waits, defective/terminating processes) and the Horner / sorted-gap
+  square-and-multiply empirical pgf dispatch. Delayed/equilibrium
+  (stationary) first wait and ruin/Wiener-Hopf machinery documented as out
+  of scope.
 - **Numerics program** (`dev/done/plan-numerics-0-meta.md` + `-1`…`-4`) —
   complete; the apply-distortion calcs shipped a55–a57, windowed combine via
   `dev/done/plan-mv.md` (a72/a76).

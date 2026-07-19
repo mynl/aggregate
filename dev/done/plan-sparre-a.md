@@ -1,7 +1,10 @@
 # [Renewal-Frequency-Wait-Clause] + [Empirical-PGF-Horner-Dispatch]
 
-Status: not yet executed (planned 2026-07-19). On completion move to
-`dev/done/` and bump the version (plan-based change).
+Status: EXECUTED 2026-07-19/20, shipped as 1.0.0a146 (see CHANGELOG). The
+geometric-batch composition was corrected during pre-execution review (the
+boundary batch — see the settled-decisions bullet); everything else landed as
+planned. Delayed/equilibrium first wait and ruin/Wiener-Hopf remain out of
+scope (dev/TODO.md).
 
 ## Context
 

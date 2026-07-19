@@ -22,6 +22,7 @@
     answer: sev_out          -> answer_sev
           | agg_out          -> answer_agg
           | pnl_out          -> answer_pnl
+          | xpnl_out         -> answer_xpnl
           | port_out         -> answer_port
           | bv_out           -> answer_bv
           | distortion_out   -> answer_distortion
@@ -49,7 +50,7 @@
     // Portfolio
     // ======================================================================
     
-    port_out: PORT name trailer agg_list
+    port_out: PORT name as_label trailer agg_list
     
     agg_list: agg_list port_item   -> agg_list_cons
             | port_item            -> agg_list_one
@@ -66,11 +67,33 @@
     // Aggregate
     // ======================================================================
     
-    agg_out: AGG name exposures layers sev_clause occ_reins freq agg_reins approx_clause trailer  -> agg_out_full
-           | AGG name dfreq      layers sev_clause occ_reins         agg_reins approx_clause trailer  -> agg_out_dfreq
-           | AGG name TWEEDIE expr expr expr trailer                                    -> agg_out_tweedie
-           | AGG name builtin_agg occ_reins agg_reins trailer                           -> agg_out_rename
-           | builtin_agg agg_reins trailer                                              -> agg_out_builtin
+    agg_out: AGG name as_label agg_body trailer   -> agg_out_named
+           | builtin_agg agg_reins trailer              -> agg_out_builtin
+    
+    // The shared aggregate body -- everything after ``AGG name as_label`` and
+    // before the trailer. Factored out of ``agg_out`` so the embedded engine of a
+    // ``pnl`` / ``xpnl`` (see ``agg_source``) reuses the *identical* body: a P&L
+    // wraps a complete aggregate, not a forked half-body ("no bastards"). The four
+    // alternatives mirror the old ``agg_out`` variants (full / discrete-freq /
+    // tweedie / rename-a-builtin). See dev/plan-pnl-engine-source.md.
+    agg_body: exposures layers sev_clause occ_reins freq agg_reins approx_clause orientation  -> agg_body_full
+            | dfreq      layers sev_clause occ_reins       agg_reins approx_clause orientation  -> agg_body_dfreq
+            | exposures_years layers sev_clause occ_reins wait_clause agg_reins approx_clause orientation -> agg_body_renewal
+            | TWEEDIE expr expr expr                                                             -> agg_body_tweedie
+            | builtin_agg occ_reins agg_reins                                                    -> agg_body_rename
+    
+    // Orientation suffix on an ``agg`` -- the variable's sign convention / role.
+    // ``payoff`` marks an asset-return / direct-payoff primitive ("more is
+    // better"); the omitted clause (or explicit ``loss``) is the default actuarial
+    // loss convention ("more is worse"). Pure orientation: it sets ``value_type``
+    // only -- NO reflection or shift (that affine is the ``pnl`` wrapper). It flips
+    // pricing to the dual distortion via the existing ``_is_loss_value`` path.
+    // Placed last, immediately before the ``note``/``hints`` trailer (after
+    // freq/reins/approximate) so the ``loss`` keyword cannot collide with the
+    // ``loss`` *exposure* keyword in the exposure head. See dev/plan-pnl.md S4.
+    orientation: PAYOFF   -> orientation_payoff
+               | LOSS     -> orientation_loss
+               |          -> orientation_none
     
     // Method-of-moments approximation directive. ``approximate KIND`` (KIND in
     // {exact, sgamma, slognorm}) replaces the freq x sev convolution with a single
@@ -84,21 +107,79 @@
     // ======================================================================
     // Profit-and-loss aggregate (premium minus loss)
     // ----------------------------------------------------------------------
-    // ``pnl NAME <premium> prem - <loss-agg-body>`` is a sibling of ``agg``.
-    // The premium is a single deterministic amount subtracted ONCE for the
-    // book (an aggregate-level affine shift), as opposed to a constant inside
-    // sev/dsev/ssev which is per-claim (multiplied by frequency). The body
-    // after ``prem -`` is an ordinary aggregate; only the exposure head is
-    // specialised so a bare ``lr`` can bind to the stated premium. See
-    // dev/done/plan-pnl-premium.md.
+    // ``pnl NAME <premium> less <engine> [less <expenses>]``. A P&L wraps a
+    // **complete stochastic engine** and reads its loss out ("what comes out of
+    // the sausage maker"). The engine (``agg_source``) is a complete aggregate --
+    // an inline named ``agg NAME <body>``, a stored ``agg.NAME`` reference, or a
+    // stored ``port.NAME`` reference -- never an anonymous half-body. The premium
+    // is the *consideration* (what you book); the engine's own ``premium at lr``
+    // is a separate *sizing* input. ``less`` is a dedicated keyword (not ``-``) so
+    // the split never collides with severity arithmetic (``ssev 20 - lognorm``); a
+    // **second** ``less`` is the hard anchor introducing the (optional) expense
+    // clause -- the embedded engine's tail cannot cross a ``less``. ``xpnl`` is the
+    // exploded sibling: same syntax, returns the Gross/net-occ/net-agg
+    // :class:`PnLTower`. See dev/plan-pnl-engine-source.md,
+    // dev/done/plan-pnl-premium.md, dev/done/plan-pnl-expenses-ceded-premium.md.
     // ======================================================================
     
-    pnl_out: PNL name numbers PREMIUM MINUS pnl_exposures layers sev_clause occ_reins freq agg_reins approx_clause trailer  -> pnl_out_full
-           | PNL name numbers PREMIUM MINUS dfreq layers sev_clause occ_reins              agg_reins approx_clause trailer  -> pnl_out_dfreq
+    pnl_out:  PNL  name as_label pnl_premium LESS agg_source expense_less trailer  -> pnl_out_engine
+    xpnl_out: XPNL name as_label pnl_premium LESS agg_source expense_less trailer  -> xpnl_out_engine
     
-    pnl_exposures: numbers CLAIMS   -> pnl_exp_claims
-                 | numbers LOSS     -> pnl_exp_loss
-                 | numbers LR       -> pnl_exp_lr
+    // The wrapped engine: a complete aggregate. ``agg NAME <body>`` reuses the
+    // shared ``agg_body`` (identical to a standalone ``agg``, minus the trailer,
+    // which the wrapping pnl/xpnl owns); ``agg.NAME`` / ``port.NAME`` reference a
+    // stored object. A ``port`` source reads the net-net portfolio total.
+    agg_source: AGG name as_label agg_body   -> agg_source_inline
+              | builtin_agg                        -> agg_source_ref_agg
+              | BUILTIN_PORT                        -> agg_source_ref_port
+    
+    // The gross-premium head: a fixed amount ``<num> premium``, ``inherit premium``
+    // (copy the engine's technical premium -- ``Aggregate.exp_premium`` / the
+    // accumulated portfolio premium; a build error if the engine has none), or the
+    // account-level retrospective-rating clause ``retro <collar> premium``. The
+    // trailing ``premium`` keeps the ``premium less`` divider. See
+    // dev/plan-variable-rating.md and dev/plan-pnl-engine-source.md.
+    pnl_premium: numbers PREMIUM as_label        -> pnl_premium_fixed
+               | INHERIT PREMIUM as_label         -> pnl_premium_inherit
+               | RETRO collar PREMIUM as_label   -> pnl_premium_retro
+    
+    // The optional second-``less`` expense clause (the hard anchor). Omit when no
+    // expenses; ``less <expense-groups>`` otherwise.
+    expense_less: LESS expense_groups   -> expense_less_some
+                |                         -> expense_less_none
+    
+    // Gross expenses on a ``pnl`` (the base is explicit -- decision 1): each term is
+    // a fraction of premium (``25% premium expenses``), a fraction of expected loss
+    // (``25% loss expenses``), or a fixed currency amount (``2000 fixed expenses``).
+    // ``expense`` and ``expenses`` are both accepted. Multiple terms join with
+    // ``and`` (the reinsurance precedent -- ``25% premium expense and 1000 fixed
+    // expense``) and sum; the whole clause is optional. The expense books a gross
+    // obligation; net expense = gross - commission (appendix S1). Placed after
+    // ``approx_clause`` (before the trailer), and the terms sit after all reins, so
+    // the inter-term ``and`` never competes with a reinsurance cession ``and``.
+    // Expenses are a **two-level** list. Terms joined by ``and`` **combine** into one
+    // reported item (one obligation leg); juxtaposed groups (no ``and``) stay
+    // **separate** items -- the same combine-vs-separate distinction the rest of DecL
+    // draws (layers inside one ``occurrence net of`` joined by ``and`` consolidate to
+    // a single net; separate clauses are juxtaposed). Each group carries an optional
+    // ``as`` label (attached to the group, not each term); the default name is the
+    // basis (``premium expense`` / ``loss expense`` / ``fixed expense``) or a generic
+    // ``expense`` for a single or mixed-basis group. Backward compatible: today's
+    // ``and``-joined expenses are one unlabeled group summing to one leg. Each term is
+    // anchored by the ``expense[s]`` keyword, so ``and`` (continue the group) vs a
+    // bare ``numbers`` (start a new group) vs ``as`` (label the group) fully
+    // disambiguates. See dev/plan-decl-labels.md.
+    expense_groups: expense_groups expense_group   -> expense_groups_cons
+                  | expense_group                    -> expense_groups_one
+    
+    expense_group: expense_terms as_label   -> expense_group
+    
+    expense_terms: expense_terms AND expense_term   -> expense_terms_cons
+                 | expense_term                       -> expense_terms_one
+    
+    expense_term: numbers PREMIUM EXPENSES   -> expense_premium
+                | numbers LOSS EXPENSES      -> expense_loss
+                | numbers FIXED EXPENSES     -> expense_fixed
     
     // ======================================================================
     // Bivariate aggregate (copula-coupled, strictly two-axis)
@@ -177,8 +258,8 @@
     // Severity output (standalone `sev X ...` definitions)
     // ======================================================================
     
-    sev_out: SEV name sev trailer    -> sev_out_sev
-           | SEV name dsev trailer   -> sev_out_dsev
+    sev_out: SEV name as_label sev trailer    -> sev_out_sev
+           | SEV name as_label dsev trailer   -> sev_out_dsev
     
     // ======================================================================
     // Frequency
@@ -191,6 +272,19 @@
         | FREQ expr expr           -> freq_two
         | FREQ expr                -> freq_one
         | FREQ                     -> freq_zero
+    
+    // Renewal waiting-time clause (sits in the freq slot of ``agg_body_renewal``).
+    // ``wait`` takes the full severity mini-language (scaling, mixtures, splice,
+    // ``!``, ``sev.NAME``): the wait law is a distribution like any severity, just
+    // on the time axis. ``dwait`` mirrors ``dsev`` (discrete outcomes/probs;
+    // trailing ``!`` = defective/terminating allowed). WAIT/DWAIT are disjoint
+    // from FREQ/MIXED/ZM/ZT/AGGREGATE in this slot, and the reused ``sev`` subtree
+    // terminates before any following keyword clause, so the split is Earley-safe.
+    wait_clause: WAIT sev as_label    -> wait_clause_wait
+               | dwait as_label       -> wait_clause_dwait
+    
+    dwait: DWAIT doutcomes dprobs   -> dwait_main
+         | dwait "!"                -> dwait_unconditional
     
     // ======================================================================
     // Reinsurance
@@ -208,19 +302,107 @@
               | reins_clause                  -> reins_list_one
               | tower                         -> reins_list_tower
     
-    reins_clause: expr XS expr                   -> reins_clause_xs
-                | expr SHARE_OF expr XS expr     -> reins_clause_share
-                | expr PART_OF expr XS expr      -> reins_clause_part
-                | expr OF expr XS expr           -> reins_clause_of
+    // A priced layer: the loss structure (``reins_layer``, unchanged) plus an
+    // optional ceded-premium decorator, an optional ceding commission (decision
+    // 3, appendix S3), and an optional reinstatement schedule (the property-cat
+    // stochastic-ceded feature). The premium forms are mutually exclusive:
+    // ``deposit`` is a currency amount, ``rol`` a rate-on-line (x share x limit),
+    // ``rate`` a fraction of gross premium. ``cede`` is the commission fraction,
+    // valid only with a premium. Entered gross of commission. The loss layer feeds
+    // the reinsurance engine exactly as before; the premium / cede / reinstatements
+    // ride alongside for the P&L.
+    reins_clause: reins_layer reins_premium reins_cede reins_reinst reins_variable as_label   -> reins_clause
+    
+    reins_layer: expr XS expr                   -> reins_clause_xs
+               | expr SHARE_OF expr XS expr     -> reins_clause_share
+               | expr PART_OF expr XS expr      -> reins_clause_part
+               | expr OF expr XS expr           -> reins_clause_of
+    
+    reins_premium: DEPOSIT expr   -> reins_premium_deposit
+                 | ROL expr       -> reins_premium_rol
+                 | RATE expr      -> reins_premium_rate
+                 |                -> reins_premium_none
+    
+    reins_cede: CEDE expr   -> reins_cede_some
+              |             -> reins_cede_none
+    
+    // Optional reinstatement schedule decorating ONE occurrence layer (the
+    // stochastic-ceded property-cat feature). Two surface forms, both feeding the
+    // ``reinstatement_rates`` tuple of price multipliers alpha_j (relative to the
+    // base rate on line r = base_premium / limit, supplied by ``reins_premium``):
+    //   * an explicit list ``reinstatements [0 .5 1 1]`` (escape hatch); and
+    //   * the treaty-language group chain ``reinstatements 1 free and 1 at 50% and
+    //     2 at 100%`` -- ``free`` = ``at 0%``, ``at p%`` a multiplier of r, counts
+    //     given as digits OR the number-words one..five (an ordinary ID read as a
+    //     count only in this position, so the words are NOT reserved elsewhere).
+    // ``no reinstatements`` is the third "how much annual cover" case: zero
+    // reinstatements, i.e. a single annual limit y (recovery capped at y, no
+    // reinstatement premium) -- distinct from omitting the clause, which keeps the
+    // existing free + unlimited behaviour. (m reinstatements = m+1 annual limits,
+    // so ``no reinstatements`` = 1 limit.) A base premium clause is required
+    // ([reins-premium]); the single-layer / one-clause constraints
+    // ([reins-single-layer] / [reins-one-clause]) are enforced in the transformer.
+    // See dev/plan-reinstatements.md.
+    reins_reinst: REINSTATEMENTS "[" numberl "]"   -> reins_reinst_list
+                | REINSTATEMENTS reinst_groups      -> reins_reinst_groups
+                | NO REINSTATEMENTS                  -> reins_reinst_zero
+                |                                    -> reins_reinst_none
+    
+    reinst_groups: reinst_groups AND reinst_group   -> reinst_groups_cons
+                 | reinst_group                      -> reinst_groups_one
+    
+    reinst_group: count FREE        -> reinst_group_free
+                | count AT expr      -> reinst_group_at
+    
+    count: NUMBER   -> count_number
+         | ID       -> count_word
+    
+    // Variable rating (Phase 3, decision 0: at most ONE variable feature per
+    // program, no stacking). One of these optionally decorates the layer:
+    //   * swing    -- replaces the deposit/rol/rate premium with a collared affine
+    //                 ceded premium of ceded loss:
+    //                 ``swing basic <b> lcm <m> [min <lo>] [max <hi>]``
+    //   * slide    -- replaces ``cede`` with a sliding-scale ceding commission of the
+    //                 ceded loss ratio, from ``<comm> at <lr>`` anchors joined by ``and``
+    //   * pc       -- a profit commission ``pc <share> after <allowance>``
+    //   * corridor -- a loss-ratio band the cedant retains: ``corridor <share> po
+    //                 <width> xs <attach>`` (reusing the ``po`` / ``xs`` layer words).
+    // The transformer attaches the feature to the layer; the underwriter builds the
+    // matching ContractTerms and the variable-rating PnL. See
+    // dev/plan-variable-rating.md.
+    reins_variable: SWING collar                       -> reins_var_swing
+                  | SLIDE slide_anchors                 -> reins_var_slide
+                  | PROFITCOMM expr AFTER expr          -> reins_var_pc
+                  | CORRIDOR expr PART_OF expr XS expr  -> reins_var_corridor
+                  |                                     -> reins_var_none
+    
+    // Collared affine premium ``clip(basic + lcm * loss, min, max)``; min / max
+    // optional (default basic-floor / uncapped, resolved in ContractTerms).
+    collar: BASIC expr LCM expr collar_min collar_max   -> collar
+    
+    collar_min: MIN expr   -> collar_min_some
+              |            -> collar_min_none
+    
+    collar_max: MAX expr   -> collar_max_some
+              |            -> collar_max_none
+    
+    // Sliding-scale anchors ``<commission> at <loss_ratio>`` joined by ``and``.
+    slide_anchors: slide_anchors AND slide_anchor   -> slide_anchors_cons
+                 | slide_anchor                       -> slide_anchors_one
+    
+    slide_anchor: expr AT expr   -> slide_anchor
     
     // ======================================================================
     // Severity (continuous: scipy.stats wrappers)
     // ======================================================================
     
-    sev_clause: SEV sev          -> sev_clause_sev
-              | SSEV sev         -> sev_clause_ssev
-              | dsev             -> sev_clause_dsev
-              | BUILTIN_SEV      -> sev_clause_builtin
+    // ``as_label`` (optional ``as "..."``) names the inline severity clause;
+    // appended as the last child (dev/plan-labels.md S3). AS is disjoint from what
+    // follows a sev_clause (occ_reins / freq / agg_reins), so it is Earley-safe.
+    sev_clause: SEV sev as_label          -> sev_clause_sev
+              | SSEV sev as_label         -> sev_clause_ssev
+              | dsev as_label             -> sev_clause_dsev
+              | BUILTIN_SEV as_label      -> sev_clause_builtin
     
     sev: sev "!"                 -> sev_unconditional
        | sev picks               -> sev_picks
@@ -270,9 +452,14 @@
     // Layers
     // ======================================================================
     
-    layers: numbers XS numbers   -> layers_xs
-          | tower                -> layers_tower
-          |                      -> layers_none
+    // ``as_label`` (optional ``as "..."``) names the occurrence layer, appended
+    // as the last child (dev/plan-labels.md S2). The one real hazard is the following
+    // ``sev_clause``: AS is disjoint from SEV/SSEV/dsev/BUILTIN_SEV (and from the
+    // numbers a bare layer is otherwise followed by), so the split is Earley-safe --
+    // guarded by an explicit ambiguity test.
+    layers: numbers XS numbers as_label   -> layers_xs
+          | tower                              -> layers_tower
+          |                                    -> layers_none
     
     tower: TOWER doutcomes
     
@@ -302,10 +489,24 @@
     // Exposures
     // ======================================================================
     
-    exposures: numbers CLAIMS                       -> exposures_claims
-             | numbers LOSS                         -> exposures_loss
-             | numbers PREMIUM AT numbers LR        -> exposures_premium_lr
-             | numbers EXPOSURE AT numbers RATE     -> exposures_exposure_rate
+    // ``as_label`` (the optional ``as "..."``) names the sizing basis; it
+    // sits right after the amount/keyword unit (before ``at ... lr/rate``), the
+    // natural reading spot -- see dev/plan-labels.md S1. AS is disjoint from AT and
+    // from what follows a bare exposures clause, so the placement is Earley-safe.
+    exposures: numbers CLAIMS as_label                    -> exposures_claims
+             | numbers LOSS as_label                      -> exposures_loss
+             | numbers PREMIUM as_label AT numbers LR      -> exposures_premium_lr
+             | numbers EXPOSURE as_label AT numbers RATE   -> exposures_exposure_rate
+    
+    // Renewal (Sparre-Andersen) exposure head: ``T years`` sets the horizon; the
+    // claim count comes solely from the paired ``wait``/``dwait`` clause (strict
+    // pairing enforced by the separate ``agg_body_renewal`` alternative -- a
+    // ``years`` head with an ordinary freq clause, or a ``claims`` head with a
+    // wait clause, fails to parse). ``at NUMBER rate`` books an informational
+    // premium ``exp_premium = years * rate`` (feeds PnL gross premium); it never
+    // sizes the count. See dev/plan-sparre-a.md [Renewal-Frequency-Wait-Clause].
+    exposures_years: numbers YEARS as_label                    -> exposures_years
+                   | numbers YEARS as_label AT numbers RATE    -> exposures_years_rate
     
     // ======================================================================
     // IDs (severity-name lists or singletons)
@@ -328,10 +529,25 @@
                | BUILTIN_AGG                         -> builtin_agg_lookup
     
     // ======================================================================
-    // Name (single identifier wrapper)
+    // Name (single identifier wrapper) + optional human display label
+    // ----------------------------------------------------------------------
+    // ``name`` is the bareword *identity* (the knowledge-base key / reference
+    // target); it stays ID-shaped. ``as_label`` is the optional *presentation*
+    // string introduced by the reserved word ``as`` -- ``as lae`` (a bareword skips
+    // the quote tax) or ``as "Loss Adjustment Expense"`` (quotes carry spaces). This
+    // is the same identity-vs-presentation split as the ``_description`` /
+    // ``_explanation`` convention, NOT a synonym for one concept. The clause is
+    // reused wherever a label may attach (objects, the premium head, expense groups).
+    // See dev/plan-decl-labels.md.
     // ======================================================================
     
     name: ID
+    
+    as_label: AS label   -> as_label_some
+                 |             -> as_label_none
+    
+    label: ID       -> label_id
+         | STRING   -> label_string
     
     // ======================================================================
     // Numbers (vectors and scalars)
@@ -396,14 +612,41 @@
     MIXED.2:      /mixed(?![a-zA-Z0-9._:~\-])/
     PICKS.2:      /picks(?![a-zA-Z0-9._:~\-])/
     CLAIMS.2:     /(?:claims|claim)(?![a-zA-Z0-9._:~\-])/
+    EXPENSES.2:   /(?:expenses|expense)(?![a-zA-Z0-9._:~\-])/
+    FIXED.2:      /fixed(?![a-zA-Z0-9._:~\-])/
     SPLICE.2:     /splice(?![a-zA-Z0-9._:~\-])/
     CEDED.2:      /ceded(?![a-zA-Z0-9._:~\-])/
+    CEDE.2:       /cede(?![a-zA-Z0-9._:~\-])/
+    LESS.2:       /less(?![a-zA-Z0-9._:~\-])/
+    DEPOSIT.2:    /deposit(?![a-zA-Z0-9._:~\-])/
+    ROL.2:        /rol(?![a-zA-Z0-9._:~\-])/
+    REINSTATEMENTS.2: /(?:reinstatements|reinstatement)(?![a-zA-Z0-9._:~\-])/
+    FREE.2:       /free(?![a-zA-Z0-9._:~\-])/
+    NO.2:         /no(?![a-zA-Z0-9._:~\-])/
+    // Variable rating (Phase 3): swing / slide / profit-commission / corridor
+    // decorate one reinsurance layer; retro is the account-level rating clause.
+    SWING.2:      /swing(?![a-zA-Z0-9._:~\-])/
+    SLIDE.2:      /slide(?![a-zA-Z0-9._:~\-])/
+    RETRO.2:      /retro(?![a-zA-Z0-9._:~\-])/
+    CORRIDOR.2:   /corridor(?![a-zA-Z0-9._:~\-])/
+    BASIC.2:      /basic(?![a-zA-Z0-9._:~\-])/
+    LCM.2:        /lcm(?![a-zA-Z0-9._:~\-])/
+    MIN.2:        /min(?![a-zA-Z0-9._:~\-])/
+    MAX.2:        /max(?![a-zA-Z0-9._:~\-])/
+    PROFITCOMM.2: /pc(?![a-zA-Z0-9._:~\-])/
+    AFTER.2:      /after(?![a-zA-Z0-9._:~\-])/
     DBVSEV.2:     /dbvsev(?![a-zA-Z0-9._:~\-])/
     DFREQ.2:      /dfreq(?![a-zA-Z0-9._:~\-])/
     DSEV.2:       /dsev(?![a-zA-Z0-9._:~\-])/
+    WAIT.2:       /wait(?![a-zA-Z0-9._:~\-])/
+    DWAIT.2:      /dwait(?![a-zA-Z0-9._:~\-])/
+    YEARS.2:      /(?:years|year)(?![a-zA-Z0-9._:~\-])/
     SSEV.2:       /ssev(?![a-zA-Z0-9._:~\-])/
     LOSS.2:       /loss(?![a-zA-Z0-9._:~\-])/
+    PAYOFF.2:     /payoff(?![a-zA-Z0-9._:~\-])/
     PNL.2:        /pnl(?![a-zA-Z0-9._:~\-])/
+    XPNL.2:       /xpnl(?![a-zA-Z0-9._:~\-])/
+    INHERIT.2:    /inherit(?![a-zA-Z0-9._:~\-])/
     PORT.2:       /port(?![a-zA-Z0-9._:~\-])/
     RATE.2:       /rate(?![a-zA-Z0-9._:~\-])/
     NET.2:        /net(?![a-zA-Z0-9._:~\-])/
@@ -412,6 +655,7 @@
     XPS.2:        /xps(?![a-zA-Z0-9._:~\-])/
     WEIGHTS.2:    /wts(?![a-zA-Z0-9._:~\-])/
     AND.2:        /and(?![a-zA-Z0-9._:~\-])/
+    AS.2:         /as(?![a-zA-Z0-9._:~\-])/
     EXP.2:        /exp(?![a-zA-Z0-9._:~\-])/
     AT.2:         /at(?![a-zA-Z0-9._:~\-])/
     CV.2:         /cv(?![a-zA-Z0-9._:~\-])/
@@ -430,10 +674,18 @@
     // agg.X / sev.X / dist(ortion).X / note{...} — priority 3 outranks the
     // AGG / SEV / DISTORTION / ID alternatives that share their prefix.
     BUILTIN_AGG.3:  /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+    BUILTIN_PORT.3: /port\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
     BUILTIN_SEV.3:  /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
     BUILTIN_DIST.3: /(?:distortion|dist)\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
     NOTE.3:         /note\{[^}]*\}/
     HINTS.3:        /hints\{[^}]*\}/
+    
+    // A quoted display label. Delimited by double quotes, no embedded newline (an
+    // unbalanced quote fails on its own line rather than swallowing the program) and
+    // no escape handling (add `\"` only if a label ever needs a literal quote).
+    // A fresh lexical class -- DecL is otherwise quote-free -- so it cannot collide
+    // with keywords / ID / numbers. See dev/plan-decl-labels.md.
+    STRING: /"[^"\n]*"/
     
     // NUMBER absorbs an optional leading minus so `-3` is one token rather than
     // MINUS NUMBER. Priority 2 keeps it ahead of the standalone MINUS terminal.
@@ -462,7 +714,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|approximate|approx|at|bernoulli|binomial|bivariate|bv|ceded|claim|claims|clash|copula|cv|dbvsev|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|so|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

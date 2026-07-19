@@ -3,7 +3,7 @@
 # Distortions {#sec-distortions}
 
 *This is a recipe for* pricing risk with a **distortion** — a function
-$g:[0,1]\to[0,1]$ with $g(0)=0$, $g(1)=1$, increasing and concave, that reweights
+$g:[0,1]\to[0,1]$ with $g(0)=0$, $g(1)=1$, increasing and concave, that re-weights
 the survival function to load for risk [@Mildenhall2022a]. Distortions are the
 simplest first-class citizen and they turn up everywhere downstream (aggregate
 pricing @sec-aggregate-pricing, bounds @sec-bounds, portfolio allocation

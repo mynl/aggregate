@@ -1,9 +1,11 @@
 """Tests for ``Frequency.freq_df`` and resolved ``Aggregate.en``.
 
-``freq_df`` is an on-demand cached comparison table: the (empirical-family)
-count pmf against the mean-matched Poisson pmf. Parametric kinds have no
-fixed mean and raise. ``Aggregate.en`` must hold the resolved per-component
-claim count -- not the ``-1`` empirical/renewal spec sentinel.
+``freq_df`` is an on-demand cached comparison table: the count pmf against
+the mean-matched Poisson pmf. Parametric kinds read ``Frequency.en`` (the
+unconditional expected count the owning Aggregate stamps at construction)
+and invert their pgf; the empirical family uses its exact materialized pmf.
+``Aggregate.en`` must hold the resolved per-component claim count -- not
+the ``-1`` empirical/renewal spec sentinel.
 """
 
 import numpy as np
@@ -40,16 +42,46 @@ def test_freq_df_cached_and_on_demand():
     assert fr.freq_df is df
 
 
-def test_freq_df_parametric_raises():
+def test_freq_df_parametric_poisson():
+    # the Aggregate stamps its resolved en onto the frequency; the PGF
+    # inversion then reproduces the mean-matched Poisson exactly
     a = build('agg P 10 claims dsev [1] poisson', update=False)
-    with pytest.raises(ValueError, match='parametric'):
-        a.frequency.freq_df
+    assert a.frequency.en == pytest.approx(10.0)
+    df = a.frequency.freq_df
+    assert np.abs(df.p - df.po_p).max() < 1e-12
+    assert df.p.sum() == pytest.approx(1.0, abs=1e-12)
+
+
+def test_freq_df_mixed_gamma_overdispersed():
+    # gamma-mixed Poisson (negbin): variance ratio = 1 + cv^2 * n, mean
+    # matched to the Poisson column
+    a = build('agg G 10 claims dsev [1] mixed gamma 0.5', update=False)
+    df = a.frequency.freq_df
+    k = np.arange(len(df))
+    m1 = float(k @ df.p)
+    var = float((k * k) @ df.p) - m1 * m1
+    assert m1 == pytest.approx(10.0, abs=1e-9)
+    assert var / m1 == pytest.approx(1 + 0.5 ** 2 * 10, abs=1e-9)
+    assert df.p.sum() == pytest.approx(1.0, abs=1e-12)
+
+
+def test_freq_df_standalone_needs_en():
+    from aggregate import Frequency
+    fr = Frequency('poisson', 0, 0, False, np.nan)
+    with pytest.raises(ValueError, match='standalone'):
+        fr.freq_df
+    fr.en = 3.0
+    df = fr.freq_df
+    assert np.abs(df.p - df.po_p).max() < 1e-12
 
 
 def test_freq_df_mean_guard():
     a = build('agg B dfreq [2000] dsev [1]', update=False)
     with pytest.raises(ValueError, match='1000'):
         a.frequency.freq_df
+    p = build('agg BP 1500 claims dsev [1] poisson', update=False)
+    with pytest.raises(ValueError, match='1000'):
+        p.frequency.freq_df
 
 
 def test_freq_df_fractional_support_raises():

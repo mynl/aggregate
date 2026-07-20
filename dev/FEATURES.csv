@@ -153,7 +153,7 @@ grid-attr,x_min,attribute,scalar,Grid lower bound,Y,,,,,,,,,
 grid-attr,x_max,attribute,scalar,Grid upper bound,Y,,,,,,,,,
 grid-attr,xs,attribute,ndarray,The bucket grid (outcome values),Y,,,,,,,,,
 grid-attr,n,attribute,scalar,Expected claim count,Y,,,,,,,,,
-grid-attr,en,attribute,ndarray,Per-component expected claim counts,Y,,Y,,,,,,,
+grid-attr,en,attribute,ndarray,Per-component expected claim counts,Y,,Y,,,Y,,,,"a148: on Frequency a scalar -- the unconditional EN stamped by the owning Aggregate at construction (None standalone); feeds freq_df. On Aggregate now always the RESOLVED counts (the -1 empirical/renewal sentinel and loss-entered 0 are written back)."
 data-attr,agg_density,attribute,ndarray,Aggregate PMF on the grid,Y,,,,,,,,,agg_density_gross/ceded/net under reins.
 data-attr,ftagg_density,attribute,ndarray,FT of the aggregate density (for copula combine),Y,,,,,,,,,
 data-attr,sev_density,attribute,ndarray,Severity PMF on the grid,Y,,,,,,,,,
@@ -179,7 +179,7 @@ severity-api,fz,attribute,object,Underlying frozen scipy.stats distribution,,,,,
 severity-api,moms,method,tuple,First three moments of the layered severity X(a d),,,,,Y,,,,,
 frequency-api,freq_pgf,method,callable,Probability generating function,,,,,,Y,,,,"Freq core; never materializes a count dist (see create_frequency). a146 [Empirical-PGF-Horner-Dispatch]: empirical evaluates via Horner / sorted-gap square-and-multiply (evaluate_pgf_polynomial), legacy matrix path only for fractional outcomes."
 frequency-api,freq_moms,method,tuple,Frequency moments,,,,,,Y,,,,
-frequency-api,freq_df,property,DataFrame,Count pmf vs mean-matched Poisson comparison table,,,,,,Y,,,,"a148: on-demand cached (functools.cached_property); index n, columns p/po_p. Computable only on the empirical family (dfreq/renewal) -- parametric kinds have no fixed mean and raise ValueError (use Aggregate.freq_pmf). Guards: integer support, mean <= 1000 (toy diagnostic)."
+frequency-api,freq_df,property,DataFrame,Count pmf vs mean-matched Poisson comparison table,,,,,,Y,,,,"a148: on-demand cached (functools.cached_property); index n, columns p/po_p. All kinds: parametric inverts freq_pgf at Frequency.en (the unconditional EN the owning Aggregate stamps at construction; standalone raises until en set); empirical family (dfreq/renewal) uses its exact pmf and intrinsic mean. Guards: mean <= 1000 (toy diagnostic), integer support on the empirical path."
 frequency-api,freq_name,attribute,str,Frequency family name,,,Y,,,Y,,,,
 #frequency-api,convergence_check,method,scalar,Richardson h/2 diagnostic for the renewal count pmf,,,,,,Y,,,,"a146 [Renewal-Frequency-Wait-Clause]: FrequencyRenewal ONLY (subclass member -- the auditor sees the Frequency base class, hence the # row). Explicit opt-in, never automatic; 0.0 on an exact dwait lattice. Sizing constraint table in _renewal_bs_df (surfaced on the owning Aggregate); wait_p0/wait_defect/wait_snapped/kmax/years diagnostics on the instance. a147 [Wait-Clause-Layers]: layered waits (wait y xs a) snap the cap atom to the lattice (hard_atom_snap row, closed readout); check keeps closed readout at h/2."
 legs,E_consideration,property,scalar,E[total consideration] (signed; the default scale),,,,Y,,,,,,a129 [PnL-Generic-Final].

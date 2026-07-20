@@ -2082,6 +2082,10 @@ class Aggregate(LabeledMixin):
             )
 
         self.n = ma.tot_freq_1
+        # stamp the resolved unconditional claim count onto the frequency:
+        # a parametric Frequency is a family until the exposure fixes its
+        # mean; this is what freq_df (and any standalone use) reads
+        self.frequency.en = float(self.n)
         # Pull the headline moments off the canonical stats_df mixed column.
         _mixed = self.stats_df['mixed']
         self.agg_m = float(_mixed[('agg', 'mean')])

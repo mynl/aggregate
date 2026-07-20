@@ -9,6 +9,7 @@ import logging
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
+from .utilities import ft, ift
 from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize import NoConvergence  # noqa
@@ -278,6 +279,11 @@ class Frequency(object):
         self.freq_p0 = freq_p0
         self.panjer_ab = None
         self.unmodified_mean = None
+        # expected claim count (the unconditional EN): a parametric frequency
+        # is a family until the exposure fixes its mean, so the owning
+        # Aggregate stamps its resolved total n here at construction. None
+        # for a standalone frequency (set it manually to use freq_df).
+        self.en = None
 
         # ``__new__`` dispatches ``Frequency(name, ...)`` to the matching
         # registered ``Frequency<Kind>``. Direct construction on the base
@@ -323,17 +329,42 @@ class Frequency(object):
         (over/under-dispersion, cluster fatness, renewal regularity).
         Computed on first access and cached.
 
-        Only the empirical family (``dfreq`` / ``renewal``) materializes
-        its own count distribution and mean; parametric kinds take the
-        expected count from the Aggregate exposure at use time, so this
-        base implementation raises ``ValueError`` -- use
-        :meth:`Aggregate.freq_pmf` for a parametric count pmf.
+        A parametric frequency is a family until the exposure fixes its
+        mean, so the pmf uses ``self.en`` -- the unconditional expected
+        claim count the owning :class:`Aggregate` stamps at construction
+        (a standalone frequency raises until ``en`` is set). The pmf
+        inverts ``freq_pgf`` on a power-of-two FFT grid sized by the
+        frequency's own moments (mean + 10 sd); trailing rows where both
+        columns are below 1e-15 are trimmed. The empirical family
+        (``dfreq`` / ``renewal``) overrides with its exact materialized
+        pmf and intrinsic mean. Guard: mean <= 1000 (a toy, small-count
+        diagnostic).
         """
-        raise ValueError(
-            f'freq_df: a parametric {self.freq_name!r} frequency has no '
-            f'fixed expected claim count (n comes from the Aggregate '
-            f'exposure); freq_df is available on dfreq/renewal (empirical) '
-            f'frequencies -- use Aggregate.freq_pmf(log2) here')
+        if self.en is None:
+            raise ValueError(
+                f'freq_df: this standalone {self.freq_name!r} frequency has '
+                f'no expected claim count yet -- the owning Aggregate stamps '
+                f'.en at construction; set fr.en = n to use it standalone')
+        en = float(self.en)
+        if en > 1000:
+            raise ValueError(
+                f'freq_df: mean frequency {en:.6g} > 1000 -- the comparison '
+                f'table is a small-count diagnostic')
+        ex1, ex2, _ = self.freq_moms(en)
+        sd = np.sqrt(max(ex2 - ex1 * ex1, 0.0))
+        log2 = max(int(np.ceil(np.log2(ex1 + 10.0 * sd + 21.0))), 3)
+        z = np.zeros(1 << log2)
+        z[1] = 1.0
+        p = np.real(ift(self.freq_pgf(en, ft(z, 0)), 0))
+        # one-sided defuzz, as in Aggregate.freq_pmf: a count pmf has no
+        # legitimate negatives
+        p[p < np.finfo(float).eps] = 0.0
+        po_p = ss.poisson.pmf(np.arange(len(p)), ex1)
+        keep = np.nonzero((p > 1e-15) | (po_p > 1e-15))[0]
+        last = int(keep[-1]) if len(keep) else 0
+        df = pd.DataFrame({'p': p[:last + 1], 'po_p': po_p[:last + 1]})
+        df.index.name = 'n'
+        return df
 
 
 # ---------------------------------------------------------------------------

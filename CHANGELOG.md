@@ -14,10 +14,15 @@
   first access): a comparison table with index `n`, columns `p` (the count
   pmf) and `po_p` (the mean-matched Poisson pmf) — an eyeball diagnostic for
   dispersion, cluster fatness, and renewal regularity (`wait expon` shows
-  `p ≡ po_p` to the kernel noise floor). Computable on the empirical family
-  (`dfreq` / `renewal`); parametric kinds have no fixed mean and raise
-  `ValueError` pointing at `Aggregate.freq_pmf(log2)`. Guards: non-negative
-  integer support, mean ≤ 1000 (a toy, small-count diagnostic).
+  `p ≡ po_p` to the kernel noise floor; `mixed gamma ν` shows var/mean
+  = 1 + ν²n exactly). Works for **every** frequency kind: the Aggregate
+  stamps its resolved unconditional claim count onto the new
+  `Frequency.en` attribute at construction, and parametric kinds invert
+  their own pgf on an FFT grid sized by their moments (a standalone
+  frequency raises until `en` is set); the empirical family (`dfreq` /
+  `renewal`) uses its exact materialized pmf and intrinsic mean. Guards:
+  mean ≤ 1000 (a toy, small-count diagnostic); integer support for the
+  empirical path.
 
 ## 1.0.0a147
 

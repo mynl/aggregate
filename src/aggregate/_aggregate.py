@@ -1408,6 +1408,7 @@ class Aggregate(LabeledMixin):
                  wait_name='', wait_a=np.nan, wait_b=0.0, wait_mean=0.0, wait_cv=0.0,
                  wait_loc=0.0, wait_scale=0.0, wait_xs=None, wait_ps=None,
                  wait_wt=1.0, wait_lb=0.0, wait_ub=np.inf, wait_conditional=True,
+                 wait_attachment=None, wait_limit=np.inf,
                  agg_reins=None, agg_kind='', agg_reins_label=None,
                  reins_bucket=None, dsev_bucket=None,
                  value_type='loss',
@@ -1479,7 +1480,15 @@ class Aggregate(LabeledMixin):
         :param wait_wt:         wait mixture weight (as ``sev_wt``)
         :param wait_lb:         wait splice lower bound (as ``sev_lb``)
         :param wait_ub:         wait splice upper bound (as ``sev_ub``)
-        :param wait_conditional: as ``sev_conditional``; False = defective splice
+        :param wait_conditional: as ``sev_conditional``; False = defective splice,
+                                or the unconditional layer when a wait layer is set
+        :param wait_attachment: wait layer attachment ``a`` (DecL ``wait y xs a``);
+                                as ``exp_attachment`` on the wait law -- conditional
+                                ``(W - a | W > a)`` by default, ``min((W - a)+, y)``
+                                with ``wait_conditional=False`` (zero waits cluster).
+                                Cannot combine with a splice window
+        :param wait_limit:      wait layer limit ``y`` -- caps the (layered) wait,
+                                an atom at ``y`` of the escaping mass
                                 window (mass outside ``[lb, ub]`` terminates the
                                 process rather than renormalizing)
         :param agg_reins:       layers
@@ -1629,7 +1638,7 @@ class Aggregate(LabeledMixin):
             self.frequency = self._build_renewal_frequency(
                 exp_years, wait_name, wait_a, wait_b, wait_mean, wait_cv,
                 wait_loc, wait_scale, wait_xs, wait_ps, wait_wt, wait_lb,
-                wait_ub, wait_conditional)
+                wait_ub, wait_conditional, wait_attachment, wait_limit)
         else:
             # the MoM-approximate path rewrites freq_name to 'fixed' but the
             # wait/years locals survive -- exempt it from strict pairing
@@ -2091,17 +2100,24 @@ class Aggregate(LabeledMixin):
     def _build_renewal_frequency(exp_years, wait_name, wait_a, wait_b,
                                  wait_mean, wait_cv, wait_loc, wait_scale,
                                  wait_xs, wait_ps, wait_wt, wait_lb, wait_ub,
-                                 wait_conditional):
+                                 wait_conditional, wait_attachment=None,
+                                 wait_limit=np.inf):
         """Build the :class:`FrequencyRenewal` from the flat ``wait_*`` spec.
 
         Broadcasts the wait mixture terms (mirroring the severity broadcast,
-        but with no exposure product and no layers: ``exp_attachment=None``,
-        unlimited) and constructs one :class:`Severity` per component:
+        but with no exposure product) and constructs one :class:`Severity`
+        per component:
 
         - ``dhistogram`` (``dwait``): the atom probabilities may sum to
           ``q < 1`` (defective ``dwait ... !``); the Severity gets the
           normalized pmf and the shortfall rides the component *weight* --
           the orchestrator treats missing weight as terminating mass.
+        - layered (``wait y xs a ...``): the severity layer transform lives
+          entirely INSIDE the Severity (``exp_attachment``/``exp_limit``
+          with ``sev_conditional`` deciding ``(W-a | W>a) ^ y`` vs
+          ``min((W-a)+, y)``); the orchestrator sees an ordinary component
+          -- the unconditional zero-wait atom rides ``sev.cdf(0)`` into the
+          cluster machinery. Cannot combine with a splice window.
         - conditional splice: ``lb/ub`` pass into the Severity as usual
           (``_apply_lb_ub`` renormalizes -- correct for a conditional law).
         - unconditional splice (``splice ... !``): the Severity is built
@@ -2111,11 +2127,22 @@ class Aggregate(LabeledMixin):
         """
         bc = [np.atleast_1d(a) for a in np.broadcast_arrays(
             wait_name, wait_a, wait_b, wait_mean, wait_cv, wait_loc,
-            wait_scale, wait_wt, wait_lb, wait_ub)]
+            wait_scale, wait_wt, wait_lb, wait_ub,
+            wait_attachment, wait_limit)]
         components, weights = [], []
-        for _wn, _wa, _wb, _wm, _wcv, _wloc, _wsc, _wwt, _wlb, _wub in zip(*bc):
+        for (_wn, _wa, _wb, _wm, _wcv, _wloc, _wsc, _wwt, _wlb, _wub,
+             _watt, _wlim) in zip(*bc):
             _wn = str(_wn)
+            layered = _watt is not None or float(_wlim) != np.inf
+            if layered and (float(_wlb) != 0.0 or float(_wub) != np.inf):
+                raise ValueError(
+                    'a wait clause cannot combine a splice window [lb ub] '
+                    'with a layer (y xs a); use one or the other')
             if _wn == 'dhistogram':
+                if layered:
+                    raise ValueError(
+                        'layers (y xs a) are not supported on dwait; '
+                        'write the clamped outcomes directly')
                 ps = np.asarray(wait_ps, dtype=float)
                 mass = float(ps.sum())
                 sev_w = Severity('dhistogram', None, np.inf,
@@ -2123,6 +2150,14 @@ class Aggregate(LabeledMixin):
                                  sev_ps=ps / mass)
                 components.append((sev_w, 0.0, np.inf, True))
                 weights.append(float(_wwt) * mass)
+            elif layered:
+                sev_w = Severity(_wn,
+                                 None if _watt is None else float(_watt),
+                                 float(_wlim), _wm, _wcv, _wa, _wb,
+                                 _wloc, _wsc, None, None, _wwt,
+                                 0.0, np.inf, bool(wait_conditional))
+                components.append((sev_w, 0.0, np.inf, True))
+                weights.append(float(_wwt))
             elif not wait_conditional:
                 sev_w = Severity(_wn, None, np.inf, _wm, _wcv, _wa, _wb,
                                  _wloc, _wsc, None, None, _wwt,

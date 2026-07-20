@@ -1682,6 +1682,24 @@ class UnderwritingTransformer(Transformer):
         spec["_wait_label"] = as_label.get("label")
         return spec
 
+    def wait_clause_layer(self, c):
+        # ``wait y xs a <dist>``: the severity layer transform on the wait
+        # law. Unpack order matches ``layers_xs`` (limit xs attachment).
+        # Splice + layer on the same wait is rejected -- the defective-window
+        # (splice ``!``) and layer (atom at 0 / cap at y) semantics of ``!``
+        # would collide on one flag.
+        _wait, limit, _xs, attach, sev, as_label = c
+        spec = self._sev_to_wait(sev)
+        if (np.any(np.atleast_1d(spec.get("wait_lb", 0)) != 0)
+                or np.any(np.atleast_1d(spec.get("wait_ub", np.inf)) != np.inf)):
+            raise ValueError(
+                "DecL: a wait clause cannot combine a splice window "
+                "[lb ub] with a layer (y xs a); use one or the other")
+        spec["wait_limit"] = limit
+        spec["wait_attachment"] = attach
+        spec["_wait_label"] = as_label.get("label")
+        return spec
+
     def wait_clause_dwait(self, c):
         # prob-sum policy (checked here, once the optional trailing ``!`` is
         # known): conditional renormalizes with a warning when off by more

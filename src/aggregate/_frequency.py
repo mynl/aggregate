@@ -4,9 +4,11 @@ Extracted from ``distributions.py`` (Phase 1, kind split). Imported through the
 ``distributions`` facade so every existing import path keeps working.
 """
 
-from functools import wraps
+from functools import cached_property, wraps
 import logging
 import numpy as np
+import pandas as pd
+import scipy.stats as ss
 from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize import NoConvergence  # noqa
@@ -311,6 +313,28 @@ class Frequency(object):
         rung, _ = _tail.classify_frequency(self)
         return f'{self.freq_name} frequency, {_tail.tail_class_label(rung)} count'
 
+    @cached_property
+    def freq_df(self):
+        """Count pmf vs mean-matched Poisson comparison table (on demand).
+
+        Index ``n`` (count), columns ``p`` (this frequency's pmf) and
+        ``po_p`` (the Poisson pmf with the same mean) -- an eyeball
+        diagnostic for how far the count law sits from Poisson
+        (over/under-dispersion, cluster fatness, renewal regularity).
+        Computed on first access and cached.
+
+        Only the empirical family (``dfreq`` / ``renewal``) materializes
+        its own count distribution and mean; parametric kinds take the
+        expected count from the Aggregate exposure at use time, so this
+        base implementation raises ``ValueError`` -- use
+        :meth:`Aggregate.freq_pmf` for a parametric count pmf.
+        """
+        raise ValueError(
+            f'freq_df: a parametric {self.freq_name!r} frequency has no '
+            f'fixed expected claim count (n comes from the Aggregate '
+            f'exposure); freq_df is available on dfreq/renewal (empirical) '
+            f'frequencies -- use Aggregate.freq_pmf(log2) here')
+
 
 # ---------------------------------------------------------------------------
 # Concrete Frequency<Kind> subclasses. Each declares its registry key as a
@@ -591,6 +615,35 @@ class FrequencyEmpirical(Frequency):
         # outcomes fall back to the legacy matrix expression. See
         # ``evaluate_pgf_polynomial`` ([Empirical-PGF-Horner-Dispatch]).
         return evaluate_pgf_polynomial(self.freq_a, self.freq_b, z)
+
+    @cached_property
+    def freq_df(self):
+        """Count pmf vs mean-matched Poisson comparison table (on demand).
+
+        Index ``n = 0..max(support)`` (holes in a sparse support carry
+        ``p = 0``); columns ``p`` (this frequency's pmf) and ``po_p``
+        (the Poisson pmf with the same mean). Computed on first access
+        and cached. A small-count eyeball diagnostic: guards require a
+        non-negative integer support and mean <= 1000.
+        """
+        a = np.asarray(self.freq_a, dtype=float)
+        b = np.asarray(self.freq_b, dtype=float)
+        mean = float(a @ b)
+        if mean > 1000:
+            raise ValueError(
+                f'freq_df: mean frequency {mean:.6g} > 1000 -- the '
+                f'comparison table is a small-count diagnostic')
+        k = np.rint(a).astype(int)
+        if np.any(np.abs(a - k) > 1e-9) or np.any(k < 0):
+            raise ValueError(
+                'freq_df: the Poisson comparison needs a non-negative '
+                'integer count support')
+        p = np.zeros(k.max() + 1)
+        np.add.at(p, k, b)
+        df = pd.DataFrame({'p': p,
+                           'po_p': ss.poisson.pmf(np.arange(len(p)), mean)})
+        df.index.name = 'n'
+        return df
 
 
 class FrequencyRenewal(FrequencyEmpirical):

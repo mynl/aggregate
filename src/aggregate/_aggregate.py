@@ -1831,7 +1831,11 @@ class Aggregate(LabeledMixin):
             all_arrays = zip(exp_el, exp_premium, exp_lr, en, attachment, limit,
                              sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale,
                              sev_wt, sev_lb, sev_ub)
-            self.en = en
+            # writable copy: the loop below writes the RESOLVED per-component
+            # count back (broadcast views are read-only; the raw input can
+            # hold the empirical/renewal -1 sentinel or 0 for loss-entered
+            # exposure), mirroring the product arm's ``self.en[r] = _en0``
+            self.en = np.array(en, dtype=float)
             self.attachment = attachment
             self.limit = limit
             # these all have the same length because have been broadcast
@@ -1886,6 +1890,7 @@ class Aggregate(LabeledMixin):
                 self._record_component(self._comp_cols[r], ma, _at, _y, _scv,
                                        _en, _el, _pr, _lr,
                                        mix_cv, sev1, sev2, sev3)
+                self.en[r] = _en
                 r += 1
 
         else:

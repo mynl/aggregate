@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.0a148
+
+**[Resolved-En-Plus-Freq-Df]** — two small frequency-surface items.
+
+- **`Aggregate.en` now holds the resolved per-component claim count** for
+  empirical and renewal frequencies. The limit-profile broadcast arm never
+  wrote the resolved count back, so `a.en` leaked the `-1` spec sentinel (for
+  any `dfreq` body, predating the renewal work) while `a.n` and the stats were
+  correct. The arm now mirrors the mixture-product arm's write-back;
+  `Aggregate.freq_pmf` and the `en`-consuming paths see the true count.
+- **`Frequency.freq_df`** — new on-demand cached property (computed only on
+  first access): a comparison table with index `n`, columns `p` (the count
+  pmf) and `po_p` (the mean-matched Poisson pmf) — an eyeball diagnostic for
+  dispersion, cluster fatness, and renewal regularity (`wait expon` shows
+  `p ≡ po_p` to the kernel noise floor). Computable on the empirical family
+  (`dfreq` / `renewal`); parametric kinds have no fixed mean and raise
+  `ValueError` pointing at `Aggregate.freq_pmf(log2)`. Guards: non-negative
+  integer support, mean ≤ 1000 (a toy, small-count diagnostic).
+
 ## 1.0.0a147
 
 **[Wait-Clause-Layers]** — the severity layer transform `y xs a` is now

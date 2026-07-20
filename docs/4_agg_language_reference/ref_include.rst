@@ -280,8 +280,14 @@
     // trailing ``!`` = defective/terminating allowed). WAIT/DWAIT are disjoint
     // from FREQ/MIXED/ZM/ZT/AGGREGATE in this slot, and the reused ``sev`` subtree
     // terminates before any following keyword clause, so the split is Earley-safe.
-    wait_clause: WAIT sev as_label    -> wait_clause_wait
-               | dwait as_label       -> wait_clause_dwait
+    // The layered form ``wait y xs a <dist>`` applies the severity layer transform
+    // to the wait law -- conditional ((W-a | W>a) ^ y) by default, unconditional
+    // (min((W-a)+, y), P(W<=a) collapsing to a zero-wait cluster atom) with ``!``.
+    // The XS keyword disambiguates from the plain-sev alternative (``xs`` is
+    // ID-excluded), mirroring the exposures layer clause ``y xs a``.
+    wait_clause: WAIT sev as_label                     -> wait_clause_wait
+               | WAIT numbers XS numbers sev as_label  -> wait_clause_layer
+               | dwait as_label                        -> wait_clause_dwait
     
     dwait: DWAIT doutcomes dprobs   -> dwait_main
          | dwait "!"                -> dwait_unconditional

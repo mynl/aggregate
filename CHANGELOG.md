@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.0.0a147
+
+**[Wait-Clause-Layers]** — the severity layer transform `y xs a` is now
+available on the renewal wait clause: `wait y xs a <dist> [!]` (layer term
+before the distribution, mirroring the exposures layer clause).
+
+- **Semantics.** Conditional by default — `W' = ((W − a) | W > a) ∧ y`, short
+  raw waits conditioned away, cap atom at `y`. With `!` the unconditional
+  transform `W' = min((W − a)+, y)`: raw waits ≤ `a` collapse to a zero-wait
+  atom (mass `P(W ≤ a)`) that rides the existing geometric-batch machinery as
+  **simultaneous-claim clusters**. Exact anchor (memorylessness):
+  `wait inf xs a expon !` ≡ `geometric_batch_compose(Poisson counts, 1 − e^{−a/μ})`.
+- **Plumbing.** New `Aggregate` kwargs `wait_attachment` / `wait_limit`
+  (broadcast like every other `wait_*` term — vector layers give a mixture of
+  differently layered waits). The layer lives entirely inside the component
+  `Severity` (`exp_attachment`/`exp_limit`); the kernel consumes the atom at 0
+  via the existing `p0` extraction with no changes. Splice + layer on one wait
+  is rejected (`ValueError`); layers on `dwait` are not supported (write the
+  clamped outcomes directly).
+- **Hard-atom grid snap.** A finite cap `y` is a genuine atom in an otherwise
+  continuous wait law. When `{y, T}` are commensurable, `wait_grid` refines the
+  continuous bucket size to `step / 2^j` (new `hard_atoms` argument, new
+  `hard_atom_snap` row in `_renewal_bs_df`) so the atom sits exactly on the
+  lattice, and the kernel switches to the **closed-interval readout**: sums
+  `S_k` landing exactly at `T` count in full (the half-bucket convention would
+  halve that atom mass — e.g. `min(W, 0.5)` waits at `T = 10` gave `EN = 19.5`
+  instead of 20). Incommensurable caps fall back to the continuous grid with a
+  documented O(h/2) placement smear. Diagnostics: `FrequencyRenewal.wait_snapped`;
+  `convergence_check()` keeps the closed readout at h/2 on snapped grids
+  (O(h) continuous convergence, delta ≈ 2× remaining error).
+- Writer round-trips the layer term; corpus lines `Y.Renewal.Layer*` /
+  `AB.Renewal.Layer*`; spec snapshot re-captured (additive).
+
 ## 1.0.0a146
 
 **[Renewal-Frequency-Wait-Clause]** — the claim-generation process can now be a

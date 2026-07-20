@@ -427,6 +427,12 @@
   square-and-multiply empirical pgf dispatch. Delayed/equilibrium
   (stationary) first wait and ruin/Wiener-Hopf machinery documented as out
   of scope.
+- **[Wait-Clause-Layers]** — shipped a147: severity layer transform on the
+  wait clause (`wait y xs a <dist> [!]`; conditional default, `!` =
+  unconditional with zero-wait clusters), `wait_attachment`/`wait_limit`
+  kwargs, hard-atom grid snap + closed-interval readout for the cap atom
+  (`hard_atom_snap` row, `wait_snapped` diagnostic). Splice+layer and
+  dwait+layer rejected.
 - **Numerics program** (`dev/done/plan-numerics-0-meta.md` + `-1`…`-4`) —
   complete; the apply-distortion calcs shipped a55–a57, windowed combine via
   `dev/done/plan-mv.md` (a72/a76).

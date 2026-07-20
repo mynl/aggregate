@@ -274,7 +274,8 @@ def test_orchestrator_defective_window():
 def test_wait_grid_bs_df_structure():
     bs, log2, lattice, bs_df = wait_grid(1.0, 1.0, 10.0)
     assert list(bs_df.index) == ['coverage', 'shape', 'accuracy',
-                                 'exact_lattice', 'log2_cap']
+                                 'exact_lattice', 'hard_atom_snap',
+                                 'log2_cap']
     assert bs_df.selected.sum() == 1
     assert not lattice
     assert int(round(10.0 / bs)) * bs == pytest.approx(10.0, rel=1e-12)

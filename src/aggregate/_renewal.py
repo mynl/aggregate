@@ -288,7 +288,8 @@ def _lattice_step(atoms, T, max_n1=3 << 22):
     return step
 
 
-def wait_grid(mu, sigma, T, atoms=None, *, z=10.0, tol=1e-9, kappa=64.0):
+def wait_grid(mu, sigma, T, atoms=None, *, z=10.0, tol=1e-9, kappa=64.0,
+              hard_atoms=None):
     """Size the wait-discretization grid ``(bs, log2)`` for horizon ``T``.
 
     Parameters
@@ -312,6 +313,14 @@ def wait_grid(mu, sigma, T, atoms=None, *, z=10.0, tol=1e-9, kappa=64.0):
         when ``sigma >= mu/10``; below that a near-deterministic continuous
         wait would blow up log2 -- truly discrete waits take the
         exact-lattice path).
+    hard_atoms : array-like, optional
+        Isolated atoms of an otherwise continuous wait law (e.g. the cap
+        atom at ``y`` of a layered wait). When commensurable with ``T`` the
+        continuous bucket size is refined to ``step / 2**j`` (the coarsest
+        such at or below the continuous bound) so every hard atom sits
+        exactly on the lattice -- phase alignment only; the grid stays fine
+        and the half-bucket readout still applies. Incommensurable atoms
+        fall back to the continuous sizing (O(h/2) placement smear).
 
     Returns
     -------
@@ -324,10 +333,10 @@ def wait_grid(mu, sigma, T, atoms=None, *, z=10.0, tol=1e-9, kappa=64.0):
         True when the exact-lattice override applies (full-bucket readout).
     bs_df : DataFrame
         One row per sizing constraint (``coverage``, ``shape``,
-        ``accuracy``, ``exact_lattice``, ``log2_cap``) with the implied
-        ``bs``/``log2``/``n1``, a ``feasible`` flag and a ``selected``
-        marker on the binding constraint; the final choice and the
-        a-priori ``kmax`` estimate are in ``bs_df.attrs``.
+        ``accuracy``, ``exact_lattice``, ``hard_atom_snap``, ``log2_cap``)
+        with the implied ``bs``/``log2``/``n1``, a ``feasible`` flag and a
+        ``selected`` marker on the binding constraint; the final choice and
+        the a-priori ``kmax`` estimate are in ``bs_df.attrs``.
     """
     if mu <= 0:
         raise ValueError(f'conditional wait mean mu = {mu} must be positive')
@@ -368,6 +377,25 @@ def wait_grid(mu, sigma, T, atoms=None, *, z=10.0, tol=1e-9, kappa=64.0):
         else:
             n1_final, l2_final, bs_final = n1_lat, l2_lat, T / n1_lat
 
+    # hard-atom snap: phase-align the fine continuous grid so isolated atoms
+    # (a layered wait's cap at y) land exactly on the lattice. bs = step/2^j
+    # (coarsest at or below the continuous bound) keeps n1 = T/bs exactly
+    # integer since T is a multiple of step.
+    snapped = False
+    snap_step = None
+    if not lattice and hard_atoms is not None and len(hard_atoms) > 0:
+        snap_step = _lattice_step(hard_atoms, T)
+        if snap_step is not None:
+            j = max(int(ceil(_log2(snap_step / h_cand))), 0)
+            bs_snap = snap_step / (1 << j)
+            n1_snap = round(T / bs_snap)
+            l2_snap = max(int(ceil(_log2(n1_snap * 4.0 / 3.0))), 3)
+            if l2_snap <= WAIT_LOG2_CAP:
+                snapped = True
+                bs_final, n1_final, l2_final = bs_snap, n1_snap, l2_snap
+            else:
+                snap_step = None
+
     if not lattice and l2_raw > WAIT_LOG2_CAP:
         warnings.warn(
             f'wait grid wants log2 = {l2_raw}, capped at {WAIT_LOG2_CAP}; '
@@ -376,6 +404,7 @@ def wait_grid(mu, sigma, T, atoms=None, *, z=10.0, tol=1e-9, kappa=64.0):
             f'fall short of tol = {tol}.')
 
     selected = ('exact_lattice' if lattice
+                else 'hard_atom_snap' if snapped
                 else 'log2_cap' if clamped
                 else binding)
 
@@ -400,6 +429,12 @@ def wait_grid(mu, sigma, T, atoms=None, *, z=10.0, tol=1e-9, kappa=64.0):
              lattice,
              'atoms and T commensurable' if lattice
              else 'no commensurable discrete support'),
+        _row('hard_atom_snap', bs_final if snapped else np.nan,
+             l2_final if snapped else np.nan,
+             n1_final if snapped else np.nan,
+             snapped,
+             f'bs = step/2^j, step = {snap_step:.6g}' if snapped
+             else 'no hard atoms commensurable with T'),
         _row('log2_cap', bs_final, l2_final, n1_final,
              WAIT_LOG2_FLOOR <= l2_raw <= WAIT_LOG2_CAP,
              f'raw log2 = {l2_raw}, window [{WAIT_LOG2_FLOOR}, '
@@ -407,8 +442,8 @@ def wait_grid(mu, sigma, T, atoms=None, *, z=10.0, tol=1e-9, kappa=64.0):
     ]
     bs_df = pd.DataFrame(rows).set_index('constraint')
     bs_df.attrs.update(bs=bs_final, log2=l2_final, n1=n1_final,
-                       lattice=lattice, kmax_est=kmax_est, z=z, tol=tol,
-                       kappa=kappa)
+                       lattice=lattice, snapped=snapped, kmax_est=kmax_est,
+                       z=z, tol=tol, kappa=kappa)
     return bs_final, l2_final, lattice, bs_df
 
 
@@ -440,10 +475,11 @@ def wait_count_pmf(components, weights, T, *, z=10.0, tilt_total=20.0,
         Horizon (years).
     z, tilt_total, tol, kappa : float
         Passed through to :func:`wait_grid` / :func:`renewal_count_pmf`.
-    grid : (bs, log2, lattice), optional
+    grid : (bs, log2, closed), optional
         Override the automatic grid sizing (used by ``convergence_check``);
-        ``bs_df`` then records the automatic recommendation, not the
-        override.
+        the third element is the readout convention (closed interval when
+        True). ``bs_df`` then records the automatic recommendation, not
+        the override.
 
     Returns
     -------
@@ -452,9 +488,11 @@ def wait_count_pmf(components, weights, T, *, z=10.0, tilt_total=20.0,
     pN : ndarray
         ``P(N(T) = k)``.
     info : dict
-        Diagnostics: ``bs``, ``log2``, ``n1``, ``lattice``, ``p0``,
-        ``defect``, ``kmax``, ``bs_df``, ``pm`` (the combined conditional
-        positive-wait pmf actually fed to the kernel).
+        Diagnostics: ``bs``, ``log2``, ``n1``, ``lattice``, ``snapped``
+        (hard-atom phase alignment -- closed readout, like the exact
+        lattice), ``p0``, ``defect``, ``kmax``, ``bs_df``, ``pm`` (the
+        combined conditional positive-wait pmf actually fed to the
+        kernel).
 
     Notes
     -----
@@ -518,10 +556,26 @@ def wait_count_pmf(components, weights, T, *, z=10.0, tilt_total=20.0,
         atoms = np.concatenate([np.asarray(sev.fz.xk, dtype=float)
                                 for sev, *_ in components])
 
+    # cap atoms of layered components (finite limit with escaping mass) are
+    # genuine atoms in an otherwise continuous law -- phase-align the grid
+    hard_atoms = [float(sev.limit) for sev, *_ in components
+                  if np.isfinite(getattr(sev, 'limit', np.inf))
+                  and getattr(sev, 'pdetach', 0.0) > 0.0] or None
+
     bs, log2, lattice, bs_df = wait_grid(m1, sigma, T, atoms,
-                                         z=z, tol=tol, kappa=kappa)
+                                         z=z, tol=tol, kappa=kappa,
+                                         hard_atoms=hard_atoms)
+    # readout convention: closed interval [0, T] whenever wait atoms sit
+    # exactly on the lattice -- exact-lattice grids AND snapped grids (a
+    # layered cap at y): sums S_k landing exactly at T belong to N(T).
+    # Half-bucket centering would halve that atom mass (a O(1) error);
+    # the closed readout's O(h/2) continuous overshoot is negligible on
+    # the fine snapped grid.
+    snapped = bool(bs_df.attrs.get('snapped', False))
+    closed = lattice or snapped
     if grid is not None:
-        bs, log2, lattice = grid
+        bs, log2, closed = grid
+        lattice, snapped = closed, False
     m = 1 << log2
     n1 = int(round(T / bs))
     xs = np.arange(m) * bs
@@ -554,13 +608,13 @@ def wait_count_pmf(components, weights, T, *, z=10.0, tilt_total=20.0,
     pm = pm / (1.0 - p0)
 
     kmax = _kmax_from_pmf(pm, bs, T, z=z)
-    k, pM = renewal_count_pmf(pm, bs, T, lattice=lattice, z=z,
+    k, pM = renewal_count_pmf(pm, bs, T, lattice=closed, z=z,
                               tilt_total=tilt_total, kmax=kmax)
     pN = geometric_batch_compose(pM, p0) if p0 > 0 else pM
     k = np.arange(len(pN))
 
     bs_df.attrs.update(kmax=kmax, p0=p0, defect=defect,
                        est_count_error=kmax * bs * bs)
-    info = dict(bs=bs, log2=log2, n1=n1, lattice=lattice, p0=p0,
-                defect=defect, kmax=kmax, bs_df=bs_df, pm=pm)
+    info = dict(bs=bs, log2=log2, n1=n1, lattice=lattice, snapped=snapped,
+                p0=p0, defect=defect, kmax=kmax, bs_df=bs_df, pm=pm)
     return k, pN, info

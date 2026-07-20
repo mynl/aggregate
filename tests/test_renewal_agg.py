@@ -186,7 +186,8 @@ def test_renewal_bs_df_structure():
     a = build('agg RBS 10 years dsev [1] wait expon')
     df = a._renewal_bs_df
     assert list(df.index) == ['coverage', 'shape', 'accuracy',
-                              'exact_lattice', 'log2_cap']
+                              'exact_lattice', 'hard_atom_snap',
+                              'log2_cap']
     assert df.selected.sum() == 1
     for key in ('bs', 'log2', 'n1', 'kmax', 'p0', 'defect',
                 'est_count_error'):

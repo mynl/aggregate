@@ -621,8 +621,10 @@ class FrequencyRenewal(FrequencyEmpirical):
     Notes
     -----
     Diagnostics stored for repr / drill-down: ``wait_bs``, ``wait_log2``,
-    ``wait_lattice``, ``wait_p0`` (zero-wait cluster mass), ``wait_defect``
-    (terminating mass), ``kmax``, ``years``, and ``_renewal_bs_df`` (the
+    ``wait_lattice``, ``wait_snapped`` (layered cap atom phase-aligned to
+    the lattice, closed readout), ``wait_p0`` (zero-wait cluster mass),
+    ``wait_defect`` (terminating mass), ``kmax``, ``years``, and
+    ``_renewal_bs_df`` (the
     grid-sizing constraint table, mirroring the aggregate ``_bs_window_df``
     idiom). ``convergence_check()`` is the explicit-opt-in Richardson
     diagnostic. Zero modification is meaningless for a renewal count
@@ -639,6 +641,7 @@ class FrequencyRenewal(FrequencyEmpirical):
         self.wait_bs = None
         self.wait_log2 = None
         self.wait_lattice = None
+        self.wait_snapped = None
         self.wait_p0 = None
         self.wait_defect = None
         self.kmax = None
@@ -654,6 +657,7 @@ class FrequencyRenewal(FrequencyEmpirical):
         self.wait_bs = info['bs']
         self.wait_log2 = info['log2']
         self.wait_lattice = info['lattice']
+        self.wait_snapped = info['snapped']
         self.wait_p0 = info['p0']
         self.wait_defect = info['defect']
         self.kmax = info['kmax']
@@ -669,14 +673,19 @@ class FrequencyRenewal(FrequencyEmpirical):
         grid with half the bucket size (one extra log2). O(h^2)
         convergence means the reported delta is ~4x the remaining error
         of the *refined* pmf. Meaningless (and skipped -- returns 0.0) on
-        an exact lattice, which has no discretization error.
+        an exact lattice, which has no discretization error. On a snapped
+        grid (layered cap atom phase-aligned to the lattice) the closed
+        readout is kept at h/2 -- bs still divides the atom step -- and
+        the continuous part converges at O(h), so the delta is ~2x the
+        remaining error.
         """
         from ._renewal import wait_count_pmf
         if self.wait_lattice:
             return 0.0
         k2, pN2, _ = wait_count_pmf(
             self.wait_components, self.wait_weights, self.years,
-            grid=(self.wait_bs / 2, self.wait_log2 + 1, False))
+            grid=(self.wait_bs / 2, self.wait_log2 + 1,
+                  bool(self.wait_snapped)))
         n = min(len(pN2), len(self.freq_b))
         return float(np.abs(pN2[:n] - self.freq_b[:n]).max())
 

@@ -379,8 +379,17 @@ def _render_wait(spec: dict) -> str:
         if spec.get('wait_conditional') is False:
             s += ' !'
         return s + label
-    view = {'sev_' + k[5:]: v for k, v in spec.items() if k.startswith('wait_')}
-    return f'wait {_render_dist(view)}{label}'
+    # layered wait (``wait y xs a <dist>``): the layer term renders between
+    # ``wait`` and the distribution, mirroring the exposures layer clause
+    layer = ''
+    if 'wait_limit' in spec or 'wait_attachment' in spec:
+        attach = spec.get('wait_attachment')
+        layer = (f'{_fmt_seq(spec.get("wait_limit", np.inf))} xs '
+                 f'{_fmt_seq(0 if attach is None else attach)} ')
+    view = {'sev_' + k[5:]: v for k, v in spec.items()
+            if k.startswith('wait_') and k not in ('wait_limit',
+                                                   'wait_attachment')}
+    return f'wait {layer}{_render_dist(view)}{label}'
 
 
 # ======================================================================

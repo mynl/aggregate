@@ -5717,5 +5717,93 @@
       "note": "",
       "hints": ""
     }
+  },
+  "agg Y.Renewal.Layer     10 years sev lognorm 100 cv 1 wait 2 xs 0.25 expon note{Conditional layered wait (W-a given W>a, capped at 2); cap atom at 2.}": {
+    "kind": "agg",
+    "name": "Y.Renewal.Layer",
+    "spec": {
+      "name": "Y.Renewal.Layer",
+      "exp_years": 10.0,
+      "sev_name": "lognorm",
+      "sev_mean": 100.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "wait_name": "expon",
+      "wait_scale": 1.0,
+      "wait_wt": 1.0,
+      "wait_lb": 0.0,
+      "wait_ub": "__inf__",
+      "wait_limit": 2.0,
+      "wait_attachment": 0.25,
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "Conditional layered wait (W-a given W>a, capped at 2); cap atom at 2.",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.LayerCl   10 years sev lognorm 100 cv 1 wait 2 xs 0.25 expon ! note{Unconditional layered wait min((W-a)+, 2); P(W<=a) clusters at 0.}": {
+    "kind": "agg",
+    "name": "Y.Renewal.LayerCl",
+    "spec": {
+      "name": "Y.Renewal.LayerCl",
+      "exp_years": 10.0,
+      "sev_name": "lognorm",
+      "sev_mean": 100.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "wait_name": "expon",
+      "wait_scale": 1.0,
+      "wait_wt": 1.0,
+      "wait_lb": 0.0,
+      "wait_ub": "__inf__",
+      "wait_conditional": false,
+      "wait_limit": 2.0,
+      "wait_attachment": 0.25,
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "Unconditional layered wait min((W-a)+, 2); P(W<=a) clusters at 0.",
+      "hints": ""
+    }
+  },
+  "agg Y.Renewal.LayerMix  5 years sev gamma 10 cv .3 wait  [1 2]  xs  [0 0.5]  expon wts  [.6 .4]  note{Broadcast vector layer: mixture of differently layered waits.}": {
+    "kind": "agg",
+    "name": "Y.Renewal.LayerMix",
+    "spec": {
+      "name": "Y.Renewal.LayerMix",
+      "exp_years": 5.0,
+      "sev_name": "gamma",
+      "sev_mean": 10.0,
+      "sev_cv": 0.3,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "wait_name": "expon",
+      "wait_scale": 1.0,
+      "wait_wt": [
+        0.6,
+        0.4
+      ],
+      "wait_lb": 0.0,
+      "wait_ub": "__inf__",
+      "wait_limit": [
+        1.0,
+        2.0
+      ],
+      "wait_attachment": [
+        0.0,
+        0.5
+      ],
+      "freq_name": "renewal",
+      "exp_en": -1,
+      "note": "Broadcast vector layer: mixture of differently layered waits.",
+      "hints": ""
+    }
   }
 }

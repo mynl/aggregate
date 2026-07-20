@@ -224,3 +224,81 @@ def test_strict_pairing_programmatic():
         Aggregate('BadR2', freq_name='renewal', exp_en=-1,
                   sev_name='lognorm', sev_mean=100, sev_cv=1,
                   wait_name='expon', wait_scale=1.0)
+
+
+# ---------------------------------------------------------------------------
+# layered waits (wait y xs a <dist>)  [Wait-Clause-Layers]
+# ---------------------------------------------------------------------------
+
+def test_layered_wait_memoryless_identity():
+    # (W - a | W > a) ~ W for W ~ expon: the conditional layered wait
+    # (no finite cap) reproduces the plain expon renewal counts exactly
+    base = build('agg LB 10 years dsev [1] wait expon')
+    cond = build('agg LC 10 years dsev [1] wait inf xs 0.5 expon')
+    fb, fc = base.frequency, cond.frequency
+    assert not fc.wait_snapped   # no finite cap, nothing to snap
+    n = min(len(fb.freq_b), len(fc.freq_b))
+    assert np.abs(fb.freq_b[:n] - fc.freq_b[:n]).max() < 1e-9
+
+
+def test_layered_wait_unconditional_cluster_formula():
+    # min((W - a)+, inf) for W ~ expon(1): zero-wait atom p0 = 1 - e^{-a},
+    # and by memorylessness the conditional positive part is expon(1) again,
+    # so the count is exactly geometric_batch_compose(plain counts, p0)
+    from aggregate._renewal import geometric_batch_compose
+    att = 0.5
+    base = build('agg LB2 10 years dsev [1] wait expon')
+    unco = build('agg LU 10 years dsev [1] wait inf xs 0.5 expon !')
+    fu = unco.frequency
+    p0 = 1 - np.exp(-att)
+    assert fu.wait_p0 == pytest.approx(p0, abs=1e-12)
+    composed = geometric_batch_compose(base.frequency.freq_b, p0)
+    n = min(len(composed), len(fu.freq_b))
+    assert np.abs(fu.freq_b[:n] - composed[:n]).max() < 1e-9
+
+
+def test_layered_wait_degenerate_equals_plain():
+    # attachment 0, limit inf: the layer transform is the identity
+    plain = build('agg LP 5 years dsev [1] wait gamma 2')
+    layer = build('agg LL 5 years dsev [1] wait inf xs 0 gamma 2')
+    n = min(len(plain.frequency.freq_b), len(layer.frequency.freq_b))
+    assert np.abs(plain.frequency.freq_b[:n]
+                  - layer.frequency.freq_b[:n]).max() < 1e-14
+
+
+def test_layered_wait_cap_deterministic():
+    # W ~ expon(1e4) capped at 0.5: the wait is essentially the atom at 0.5,
+    # so N(10) = 20 a.s. The cap atom snaps the grid (0.5 | 10) and the
+    # closed readout counts sums landing exactly at T = 10 in full --
+    # the half-bucket convention would halve that atom (EN = 19.5).
+    a = build('agg LD 10 years dsev [1] wait 0.5 xs 0 10000 * expon')
+    fr = a.frequency
+    assert fr.wait_snapped
+    assert fr._renewal_bs_df.loc['hard_atom_snap', 'selected']
+    assert fr._renewal_bs_df.selected.sum() == 1
+    assert fr.freq_b[20] > 0.999
+    assert fr.freq_a @ fr.freq_b == pytest.approx(20.0, abs=1e-5)
+
+
+def test_layered_wait_mixture_broadcast():
+    # vector layer broadcasts into a mixture of differently layered waits;
+    # both caps (1 and 2) are commensurable with T = 5 -> snapped
+    a = build('agg LM 5 years dsev [1] '
+              'wait [1 2] xs [0 0.5] expon wts [.6 .4]')
+    fr = a.frequency
+    assert len(fr.wait_components) == 2
+    assert fr.wait_snapped
+    assert fr.freq_b.sum() == pytest.approx(1.0, abs=1e-8)
+
+
+def test_layered_wait_programmatic_guards():
+    from aggregate import Aggregate
+    with pytest.raises(ValueError, match='splice'):
+        Aggregate('BadL1', freq_name='renewal', exp_en=-1, exp_years=5,
+                  sev_name='dhistogram', sev_xs=[1], sev_ps=[1],
+                  wait_name='expon', wait_limit=2.0, wait_ub=1.0)
+    with pytest.raises(ValueError, match='dwait'):
+        Aggregate('BadL2', freq_name='renewal', exp_en=-1, exp_years=5,
+                  sev_name='dhistogram', sev_xs=[1], sev_ps=[1],
+                  wait_name='dhistogram', wait_xs=[1], wait_ps=[1],
+                  wait_limit=2.0)

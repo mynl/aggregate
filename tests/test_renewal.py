@@ -296,3 +296,29 @@ def test_wait_grid_incommensurable_falls_back():
         1.0, 0.5, 1.0, atoms=[np.sqrt(0.1), 1.0])
     assert not lattice
     assert bs_df.selected.sum() == 1
+
+
+def test_wait_grid_hard_atom_snap():
+    # a layered cap at 0.5 with T = 10: step 0.5, bs refined to step / 2^j
+    # at or below the continuous bound -- atom and T exactly on the lattice
+    bs, log2, lattice, bs_df = wait_grid(0.5, 0.1, 10.0, hard_atoms=[0.5])
+    assert not lattice
+    assert bs_df.attrs['snapped']
+    assert bs_df.loc['hard_atom_snap', 'selected']
+    assert bs_df.selected.sum() == 1
+    r = 0.5 / bs
+    assert r == round(r) and (int(r) & (int(r) - 1)) == 0  # power of two
+    assert round(10.0 / bs) * bs == 10.0
+    assert round(0.5 / bs) * bs == 0.5
+    # the snap refines, never coarsens, the accuracy rule bound
+    # h_acc = sqrt(tol / kmax_est) (the rule itself, not the implied row
+    # bs, which the log2 floor pushes below the bound)
+    assert bs <= np.sqrt(bs_df.attrs['tol'] / bs_df.attrs['kmax_est'])
+
+
+def test_wait_grid_hard_atom_incommensurable():
+    bs, log2, lattice, bs_df = wait_grid(
+        0.5, 0.1, 10.0, hard_atoms=[np.sqrt(2) / 3])
+    assert not bs_df.attrs['snapped']
+    assert not bs_df.loc['hard_atom_snap', 'feasible']
+    assert bs_df.selected.sum() == 1

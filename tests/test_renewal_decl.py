@@ -135,3 +135,50 @@ def test_yearly_still_valid_id(parser):
     name, spec = _spec(parser, 'agg yearly 1 claims sev lognorm 10 cv .3 fixed')
     assert name == 'yearly'
     assert spec['freq_name'] == 'fixed'
+
+
+# ---------------------------------------------------------------------------
+# layered waits (wait y xs a <dist>)  [Wait-Clause-Layers]
+# ---------------------------------------------------------------------------
+
+def test_wait_layer_spec(parser):
+    name, spec = _spec(parser,
+                       'agg L1 10 years dsev [1] wait 2 xs 0.25 expon')
+    assert spec['wait_limit'] == 2.0
+    assert spec['wait_attachment'] == 0.25
+    assert spec['wait_name'] == 'expon'
+    assert spec.get('wait_conditional', True) is True
+
+
+def test_wait_layer_unconditional(parser):
+    name, spec = _spec(parser,
+                       'agg L2 10 years dsev [1] wait 2 xs 0.25 expon !')
+    assert spec['wait_conditional'] is False
+    assert spec['wait_limit'] == 2.0
+    assert spec['wait_attachment'] == 0.25
+
+
+def test_wait_layer_vector(parser):
+    name, spec = _spec(parser, 'agg L3 5 years dsev [1] '
+                               'wait [1 2] xs [0 0.5] expon wts [.6 .4]')
+    assert np.array_equal(spec['wait_limit'], [1.0, 2.0])
+    assert np.array_equal(spec['wait_attachment'], [0.0, 0.5])
+
+
+def test_wait_layer_label(parser):
+    name, spec = _spec(parser, 'agg L4 10 years dsev [1] '
+                               'wait 2 xs 0.25 expon as capped')
+    assert spec['label_map'] == {'wait': 'capped'}
+    assert spec['wait_limit'] == 2.0
+
+
+def test_wait_layer_splice_rejected(parser):
+    with pytest.raises(ValueError, match='splice'):
+        parser.parse('agg L5 10 years dsev [1] '
+                     'wait 2 xs 0.25 expon splice [0 3]')
+
+
+def test_wait_layer_dwait_not_grammatical(parser):
+    # the layered alternative takes a sev subtree; dwait has no layer form
+    with pytest.raises(ValueError):
+        parser.parse('agg L6 10 years dsev [1] wait 2 xs 1 dwait [1 2]')

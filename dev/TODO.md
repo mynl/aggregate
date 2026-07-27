@@ -303,6 +303,14 @@
   considerations, and `pnl` units *inside* a `port` (still a
   `NotImplementedError` gate). Parked design:
   `dev/deferred/plan-pnl-portfolio-DEFERRED.md`.
+- **[Paper-Reproductions]** — reproduce published worked examples as cookbook
+  recipes with beat 4 = *"matches the published value"*: the strongest available
+  evidence the engine is right. Ranked candidate assessment (18 papers, three
+  tiers, parameters transcribed) in `dev/plan-examples.md`; first targets
+  Venter1983 and Mack2003, then the exact benchmarks Bruno2006 / Jin2016. Six
+  papers' severity curves are already harvested into
+  `actuarial-severity-curves.agg` §F, and all citation keys are confirmed present
+  in `uber-library.bib`.
 
 > *Rejected, so it is not re-proposed cold:* DecL colorization (aesthetic-only,
 > structurally weak) and the `dev`/`user` **display mode** `ReprMixin` (not worth

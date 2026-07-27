@@ -1,10 +1,16 @@
-# Example-library candidates — batch 1 assessment
+# [Paper-Reproductions] — candidate assessment
 
-Assessment of the references in `bibtex-export.bib` for suitability as
-`aggregate` reproductions / examples. Each paper is rated on how well its
-worked example(s) map onto what `aggregate` does: compound (frequency ×
-severity) distributions via FFT, severity layers/limits, reinsurance,
-stop-loss, risk measures, distortion pricing, and capital allocation.
+**Status:** a curated backlog, not an execution plan — nothing here is scheduled.
+A reproduction now lands as a **cookbook recipe** (`docs/cookbook/`, see
+`docs/cookbook/plan.md`) on the standard five beats, with beat 4 = *"matches the
+published value."* The retired `docs/example_library/` Quarto-website scaffold
+that this assessment was written for is gone; only the assessment survives.
+
+Assessment of eighteen references for suitability as `aggregate` reproductions /
+examples. Each paper is rated on how well its worked example(s) map onto what
+`aggregate` does: compound (frequency × severity) distributions via FFT, severity
+layers/limits, reinsurance, stop-loss, risk measures, distortion pricing, and
+capital allocation.
 
 Two kinds of fit:
 
@@ -42,6 +48,7 @@ author-supplied PDF and added to the archivum store.
 | 3 | **Provost2005** | Weak | General-statistics moment approximation; no insurance content. |
 | 3 | **Hilbe2014** | Weak | Count *regression* textbook; reference for frequency math, not a reproduction. |
 | — | **Lindsay2000** | n/a | No full-text extract available; generic moment-mixture statistics — likely Tier 3. |
+| — | **Braithwaite1997** | n/a | ECO / excess-of-policy-limits pricing in clash treaties. **Not assessed** — surfaced only as the conceptual pair to Bodoff2017; read it before ranking. |
 
 **Recommended first reproductions:** Venter1983 and Mack2003 (model papers,
 on-theme), then Bruno2006 and Jin2016 (exact benchmarks with input + output
@@ -219,14 +226,50 @@ tables).
 
 ---
 
+## Already harvested — severity curves in the shipped library
+
+Section F of `src/aggregate/agg/actuarial-severity-curves.agg` already carries
+reusable `sev` objects named `<CitationKey>.<Curve>`, transcribed from this
+assessment, for six of the papers:
+
+| Key | Objects |
+|---|---|
+| Berens1997 | `Lognorm`, `Pareto` |
+| Mack2003 | `Lognorm`, `RiebesellPareto`, `AmericanPareto` |
+| Mata2005 | `Lognorm` |
+| Bodoff2017 | `Pareto` |
+| Jin2016 | `Gamma`, `Pareto` |
+| Kang2019 | `Pareto` |
+
+So a reproduction of any of those six starts from a named severity rather than
+from scratch. The library is **not** in the default `build` databases
+(`build.databases` is `('examples',)`), so load it explicitly, and give the
+heavy members a limit — `Bodoff2017.Pareto` and `Mack2003.RiebesellPareto` have
+no finite variance (α=1.5, α=0.737) and raise `InfiniteVarianceError` unbounded:
+
+```python
+uw = Underwriter(databases='actuarial-severity-curves')
+uw.build('agg t 1 claim 1000000 xs 0 sev.Bodoff2017.Pareto fixed')   # mean 78,178
+uw.build('agg v 3 claims sev.Jin2016.Gamma poisson')                 # mean 18, thin: no limit needed
+```
+
+The Tier-1 targets with **nothing** harvested yet are **Venter1983**
+(piecewise-linear CDF + discrete PDF at \$500 intervals, Poisson λ=13.7376) and
+**Bruno2006** (14-point discrete severity), both of which need the severity
+transcribed first.
+
 ## Notes / housekeeping for the author
 
+- **Citation keys are confirmed.** All eighteen keys above exist verbatim in
+  `C:/s/TELOS/Biblio/uber-library.bib` (checked 2026-07-27, one entry each):
+  `Venter1983`, `Berens1997`, `Braithwaite1997`, `Clark2005`, `Goffard2020`,
+  `Vernic1999`, `Mack2003`, `Mata2005`, `Bodoff2017`, `Hilbe2014`, `Jin2016`,
+  `Nadarajah2016`, `Lau1984`, `Bruno2006`, `Bakar2022`, `Provost2005`,
+  `Lindsay2000`, `Kang2019`. Cite them directly — no re-verification needed, and
+  nothing needs adding via archivum.
 - **Venter1983 added.** PDF copied into the archivum store at
   `…/archivum/docs/42/4280F0882F_1983_Venter_transformed beta gamma
-  distributions aggregate losses.pdf`; the broken `.crdownload` link in
-  `bibtex-export.bib` was updated to point to the `.pdf`. (A full-text extract
-  under `…/full-text/42/` will appear when archivum next processes it.)
+  distributions aggregate losses.pdf`, replacing a broken `.crdownload` link. (A
+  full-text extract under `…/full-text/42/` will appear when archivum next
+  processes it.)
 - **Lindsay2000** has no full-text extract in `…/full-text/25/`; not assessed.
-- All keys in `bibtex-export.bib` are local-export keys; the canonical citation
-  keys must still be confirmed against `uber-library.bib` before any post cites
-  them.

@@ -166,11 +166,11 @@ agg E.Beta 1 claim sev 100000 * beta 2 5 fixed note{Beta on [0, 100000] -- bound
 
 
 # ----------------------------------------------------------------------
-# F. Severity curves from cited papers (example-library review, batch 1)
+# F. Severity curves from cited papers (paper-reproduction candidates)
 # ----------------------------------------------------------------------
-# Explicit published severity curves harvested from the batch-1 paper
-# assessment (docs/example_library/batch-1.md). Unlike sections A-E these
-# are reusable `sev` OBJECTS, named <CitationKey>.<Curve>, so a post can
+# Explicit published severity curves harvested from the paper-reproduction
+# assessment (dev/plan-examples.md). Unlike sections A-E these
+# are reusable `sev` OBJECTS, named <CitationKey>.<Curve>, so a recipe can
 # plug one into any frequency/limit, e.g. Bodoff's XPL mixture:
 #     agg X [n1 n2] claims [inf 1000000] xs 0 sev.Bodoff2017.Pareto ...
 # To inspect one on its own:  qd(build('agg t 1 claim sev.<Name> fixed')).

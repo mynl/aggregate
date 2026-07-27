@@ -2616,13 +2616,13 @@ class Aggregate(HelpMixin, LabeledMixin):
         does, so the two renderings say the same thing.
         """
         s = [f'Aggregate object: {self._title_name}.',
-             f'{self.frequency.freq_name} frequency distribution.']
+             f'Frequency distribution: {self.frequency.freq_name}.']
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
-            s.append(f'Severity {sv.tail_description}.')
+            s.append(f'Severity: {sv.tail_description}.')
         else:
-            s.append(f'Severity with {n} components.')
+            s.append(f'Mixed severity with {n} components.')
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')

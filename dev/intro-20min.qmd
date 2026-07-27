@@ -222,7 +222,7 @@ wrong number:
 ```{python}
 heavy = build('agg Heavy 10 claims sev 100 * pareto 1.3 - 100 poisson '
               'hints{bs=0.25; log2=16;}')
-print(heavy.validation_explanation())
+print(heavy.validation_explanation)
 ```
 
 ## 7. Limits, attachments, and increased limits

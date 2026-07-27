@@ -924,7 +924,7 @@ def plot_ruin_surplus_paths(port):
 
 
 def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
-                 n_steps=None, t_plot=None, show_default_times=False,
+                 n_steps=None, t_plot=None, show_default_times=True,
                  seed=None):
     """
     Build a complete eventual-ruin example for an :class:`~aggregate.Aggregate`.
@@ -969,9 +969,10 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
     t_plot : float, optional
         Calendar-time horizon of the graph; if None, derived from the
         exact psi curve (residual ruin beyond it ~ 1e-3).
-    show_default_times : bool, default False
-        If True, add a rug of ``'|'`` ticks on the x axis at the ruin time
-        of every simulated path that dies.
+    show_default_times : bool, default True
+        If True, add a rug of ``'|'`` ticks below the zero line at the
+        ruin time of every simulated path that dies -- shows where the
+        full simulation falls, not just the ``n_plot`` drawn paths.
     seed : int, optional
         rng seed.
 
@@ -980,7 +981,9 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
     (summary, fig)
         One-column DataFrame of useful quantities (exact and simulated
         psi, safety loading, LIL variance rate, horizons, grid
-        diagnostics), and the matplotlib figure.
+        diagnostics), and the matplotlib figure: sample paths on the
+        left, ``psi(u)`` against initial surplus on the right (linear
+        solid, log-scale dashed twin, marker at ``(u0, psi(u0))``).
     """
     if rho <= 0:
         raise ValueError(
@@ -1085,8 +1088,10 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
                                + 6 * np.sqrt(t_plot * var_w / mw ** 3)
                                + 10))
 
-    # --- plot n_plot sample paths -------------------------------------
-    fig, ax = plt.subplots(figsize=(9, 5))
+    # --- plot n_plot sample paths (left) + psi(u) (right) -------------
+    fig, (ax, ax_psi) = plt.subplots(1, 2, figsize=(FIG_W * 3, FIG_H * 2),
+                                     width_ratios=[2, 1],
+                                     layout='constrained')
     n_fail = 0
     for i in range(n_plot):
         w = sample_w(n_steps_plot)
@@ -1135,7 +1140,26 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
         f"Simulated {n_ruin} of {n_sims} = {p_sim:0.0%}, "
         f"exact rate {psi_u0:0.2%}")
     ax.legend(loc='upper left')
-    fig.tight_layout()
+
+    # --- psi(u) against initial surplus (right panel) -----------------
+    # x-range capped where psi falls below 1e-5 (or the grid top) -- the
+    # interesting range, not the whole 2**log2 grid
+    i_psi = min(int(np.searchsorted(-psi, -1e-5)), n - 1)
+    u_top = max(float(ruin.index[i_psi]), 1.25 * u0)
+    bit_psi = ruin.loc[:u_top]
+    ax_log = ax_psi.twinx()
+    bit_psi.plot(ax=ax_psi, c='C0')
+    bit_psi.plot(ax=ax_log, ls='--', lw=1, c='C0')
+    ax_log.set(ylim=[0.5e-6, 2], yscale='log', ylabel='log probability')
+    ax_log.yaxis.set_minor_locator(ticker.LogLocator(subs='all', numticks=20))
+    ax_psi.axhline(psi_u0, lw=0.5, c='C7')
+    ax_psi.axvline(u0, lw=0.5, c='C7')
+    ax_psi.plot(u0, psi_u0, 'o', c='C3', ms=5, zorder=5)
+    ax_psi.set(xlim=[-u_top / 50, u_top], ylim=[-0.05, 1.05],
+               xlabel='initial surplus',
+               ylabel='probability of eventual ruin',
+               title=f'psi({u0:.6g}) = {psi_u0:0.2%}')
+    ax_log.set(xlim=[-u_top / 50, u_top])
 
     # --- summary dataframe --------------------------------------------
     summary = pd.DataFrame({'value': {

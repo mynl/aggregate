@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.0a155
+
+**[Ruin-Example-Punchups]** — `pedagogy.ruin_example` figure polish, straight
+after the a153 ship.
+
+- **Ruin-time rug on by default** — `show_default_times` (the `'|'` rug below
+  the zero line marking the ruin time of *every* simulated path that dies, not
+  just the drawn ones) now defaults `True`; it shows at a glance where the
+  full simulation falls.
+- **psi(u) panel, always on** — the figure is now two panels: sample paths on
+  the left (the wide hero panel, unchanged), psi against initial surplus on
+  the right in the `5_x_pk.rst` / PIR-Fig-9.1 style — linear solid plus a
+  dashed log-scale twin (a straight line under the Lundberg regime), marker
+  and crosshair at `(u0, psi(u0))`, x-range auto-capped where psi falls below
+  1e-5 rather than showing the whole `2**log2` grid.
+- **House figure conventions** — size from the `FIG_W` / `FIG_H` constants
+  (`(FIG_W * 3, FIG_H * 2)`), created with `layout='constrained'` (the
+  author's edit, folded in); no `tight_layout` anywhere. Standing rule going
+  forward: figures are created `layout='constrained'`, never
+  `fig.tight_layout()`.
+
 ## 1.0.0a154
 
 **[Program-Mixin]** — the DecL round-trip surface (`program` / `pprogram` /

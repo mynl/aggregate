@@ -189,9 +189,12 @@ def test_pedagogy_dispatch(po_agg, re_agg):
 
 def test_ruin_example_smoke(re_agg):
     from aggregate.pedagogy import ruin_example
+    # defaults exercise the ruin-time rug (show_default_times=True)
     summary, fig = ruin_example(re_agg, 0.2, 8.0, n_sims=2000, n_plot=10,
                                 seed=42)
     try:
+        # paths panel + psi(u) panel + its log-scale twin
+        assert len(fig.axes) == 3
         v = summary['value']
         assert v['frequency kind'] == 'renewal'
         for key in ('premium rate c', 'psi(0) exact', 'psi(u0) exact',

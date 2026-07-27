@@ -1,5 +1,72 @@
 # Changelog
 
+## 1.0.0a153
+
+**[Ruin-Wiener-Hopf]** — eventual-ruin probabilities for renewal (Sparre-
+Andersen) aggregates, and a strict Poisson guard on the classical solver.
+Plan: `dev/done/plan-ruin-wiener-hopf.md`.
+
+### `Aggregate.wiener_hopf(rho, kind='index', log2=None)`
+
+The renewal counterpart of `pollaczeck_khinchine`: for a `years ... wait ...`
+frequency, computes `psi(u)` = probability of eventual ruin as a function of
+initial surplus, via cepstral Wiener-Hopf factorization of the per-claim
+random walk `Y = X - cW` (severity minus premium accrued over the wait,
+`c = (1 + rho) E[X] / E[W]` so `rho` keeps its PK margin-to-loss meaning).
+The kernel `ruin_cepstral` lives in `_renewal.py` (four complex FFTs:
+Spitzer identity, support separation in the cepstrum, `z = 1` regularization
+by dividing out `1 - z^{-1}`), ported from the author's `ruin-probabilities`
+notes. Severity rides the existing discretized `sev_density_df.p_sev`; the
+wait mixture is discretized on the money grid by the same rounding scheme
+(`_discretize_wait_pmf`, following `wait_count_pmf`). psi is returned on the
+severity u-grid (`log2` widens the circle for heavy tails; a warning fires
+when the top-of-grid psi exceeds 1e-6). Guards: renewal frequency only,
+non-defective wait law, nonnegative severity grid, net profit condition
+checked on the grid. For exponential waits it agrees with PK up to
+discretization (WH is O(bs^2)-accurate, PK O(bs)-biased); with exponential
+severity it reproduces the Lundberg form `psi(u) = psi(0) exp(-beta
+(1 - psi(0)) u)` for any wait law — both are pinned by `tests/test_ruin.py`.
+
+### `pollaczeck_khinchine` requires Poisson
+
+**BREAKING:** the docstring always said "assumes frequency is Poisson"; now
+it is enforced — any other frequency (including fixed and the mixed Poissons
+gamma/delaporte/...) raises `ValueError`, with a pointer to `wiener_hopf`
+for renewal frequencies. The Pareto example in `5_x_pk.rst` switches its
+carrier frequency from `fixed` to `poisson` (identical PK output — the
+method reads only severity).
+
+### Shared `RuinFunction` named tuple
+
+Both solvers now return `RuinFunction(ruin, find_u, mean, density)`
+(clearing a long-standing TODO): psi as a pd.Series, the capital-lookup
+closure, the discretized severity mean, and the method's u-grid density
+vector — the integrated-severity (equilibrium) density for PK, the pmf of
+the all-time maximum for WH. A namedtuple is a tuple, so existing positional
+unpacking is unchanged. The `find_u` closure construction is factored into
+`_ruin_find_u`, shared by both.
+
+### Pedagogy
+
+- **`ruin_example(agg, rho, u0, ...)`** — general, single-unit successor to
+  `plot_ruin_surplus_paths`, ported from the notes' example builder: exact
+  psi (auto-dispatch poisson→PK, renewal→WH), Monte Carlo validation
+  simulating the walk at claim instants (severity and renewal waits sampled
+  from the *same discretized model* the solver prices, so sim-vs-exact is
+  apples-to-apples), sample-path plot with expected trend, law-of-the-
+  iterated-logarithm funnel and ruin-time markers, and a summary DataFrame
+  (exact vs simulated psi, safety loading, LIL variance rate, horizons, grid
+  diagnostics). Horizons are auto-derived from the exact psi curve.
+- **`_ruin_function`** dispatch helper routes `ClassicalPremium.illustrate`,
+  `plot_ruin_surplus_paths` and `natural_scale` by frequency kind (poisson →
+  PK, renewal → WH, else `ValueError`). `plot_ruin_surplus_paths` no longer
+  computes PK twice per unit (psi computed once at `padding=2`, capital
+  passed to `illustrate` as `K` — numerically identical to before), and its
+  docstring now documents the required `PZTest` portfolio shape.
+
+Docs pending rebuild (`5_x_pk.rst` example edit). Tests: `tests/test_ruin.py`
+(13 cases); DecL programs mirrored in `decl-testers.agg` (AD.*).
+
 ## 1.0.0a152
 
 **[ZT-ZM-Frequency-Fix]** — zero-truncated / zero-modified frequency

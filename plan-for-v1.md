@@ -66,9 +66,9 @@ Existing docs use nice header format
 
 - [ ] FEATURES.csv defines the public interface coverage table and provides an automated check: iterate until it is correct.
 - [ ] Known punch list
-    - [ ] pollaczeck_khinchine audits poisson freq
-    - [ ] Weiner-Hopf factorization extension of PK
-    - [ ] pedagogy w-h version
+    - [x] pollaczeck_khinchine audits poisson freq (a153, `[Ruin-Wiener-Hopf]`)
+    - [x] Wiener-Hopf factorization extension of PK (a153, `Aggregate.wiener_hopf`)
+    - [x] pedagogy w-h version (a153, `pedagogy.ruin_example`)
     - [ ] ZM and ZT frequency adjustments
 - [ ] Extend `tests/test_agg_libraries.py`. Today it only checks each example **parses**.
       It should check the example **builds**, and that the result has the methods it should

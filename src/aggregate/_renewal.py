@@ -19,6 +19,9 @@ the renewal process; the count pmf stays proper.
 Ported and generalized (t = 1 -> T, pre-discretized pmf input, exact-lattice
 readout, zero/negative/defective mass handling) from the author's ``sparre``
 notes library (``sparre/renewal.py``, ``theory.md`` sections 1-5, 7, 11).
+:func:`ruin_cepstral`, the eventual-ruin (Sparre-Andersen random walk)
+kernel, is ported from the author's ``ruin-probabilities`` notes
+(``ruin.py`` / ``ruin.qmd``).
 
 A leaf module: numpy / scipy / pandas and the ``discretize_severities``
 kernel only; it never imports ``_aggregate`` or the parser.
@@ -32,13 +35,16 @@ from math import ceil, gcd, log, log2 as _log2
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
+# complex transforms: ruin_cepstral needs the full circle (phase unwrap),
+# not the rfft half-spectrum used elsewhere
+from scipy.fft import fft, ifft
 
 from ._aggregate_compute import discretize_severities
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['renewal_count_pmf', 'geometric_batch_compose', 'wait_grid',
-           'wait_count_pmf']
+__all__ = ['renewal_count_pmf', 'geometric_batch_compose', 'ruin_cepstral',
+           'wait_grid', 'wait_count_pmf']
 
 # Series-tail cutoff: contributions below this are dropped when sizing the
 # count support (kmax, geometric tail length). Well under float64 resolution.
@@ -618,3 +624,98 @@ def wait_count_pmf(components, weights, T, *, z=10.0, tilt_total=20.0,
     info = dict(bs=bs, log2=log2, n1=n1, lattice=lattice, snapped=snapped,
                 p0=p0, defect=defect, kmax=kmax, bs_df=bs_df, pm=pm)
     return k, pN, info
+
+
+def ruin_cepstral(fy, mean_y):
+    r"""Pmf of the all-time maximum of a random walk via cepstral Wiener-Hopf.
+
+    The eventual-ruin kernel for the Sparre-Andersen (renewal) risk model.
+    Ruin can only occur at claim instants, so the continuous-time surplus
+    problem collapses to the random walk with per-claim step
+    ``Y = X - cW`` (severity minus premium accrued over the wait), partial
+    sums ``S_n``, and ``psi(u) = P(M > u)`` where
+    ``M = max(0, S_1, S_2, ...)``. ``M`` satisfies the Lindley fixed point
+    ``M =d= max(0, M + Y)`` (the GI/G/1 stationary waiting time) and is
+    finite exactly when ``E[Y] < 0`` -- the net profit condition.
+
+    Parameters
+    ----------
+    fy : ndarray
+        Wrapped step pmf of ``Y`` on the circular lattice ``0..M-1``,
+        ``M`` even: nonnegative lags at indices ``0..M/2 - 1``, negative
+        lag ``-k`` at index ``M - k`` (usual FFT convention). Should come
+        from a *rounding* discretization -- it keeps the mean correct to
+        ``O(bs^2)`` and makes the lattice walk aperiodic, so
+        ``1 - phi_Y`` has no unit-circle zeros besides ``z = 1``.
+    mean_y : float
+        Mean step in bucket units on the wrapped grid (``signed @ fy``
+        with ``signed = where(k < M/2, k, k - M)``); must be strictly
+        negative.
+
+    Returns
+    -------
+    pmf_M : ndarray, length M
+        Pmf of the all-time maximum ``M`` on the lattice.
+    psi : ndarray, length M
+        ``1 - cumsum(pmf_M)``: ``psi[j]`` = probability of eventual ruin
+        from initial surplus ``j`` buckets. Valid for ``j < M/2``; the
+        value at the top of the usable half-grid is the wrap-around
+        (mass-beyond-grid) diagnostic.
+
+    Notes
+    -----
+    ``M`` is a geometric number of iid ascending ladder heights, but
+    outside the Poisson world the ladder height law has no closed form;
+    it is encoded in the Wiener-Hopf factorization
+    ``1 - phi_Y = (1 - chi_+)(1 - chi_-)`` with ``chi_+`` the (defective)
+    first strictly ascending ladder height transform. The factorization,
+    intractable multiplicatively, is a trivial *additive* split after
+    taking logs: expanding ``log(1 - chi_+) = -sum chi_+^k / k`` shows its
+    Fourier coefficients (quefrencies) are supported entirely on the
+    strictly positive lattice, and ``log(1 - chi_-)``'s on the
+    nonpositive one. The two never overlap, so zeroing the nonpositive
+    half of the cepstrum of ``1 - phi_Y`` recovers ``log(1 - chi_+)``
+    exactly. This is Spitzer's identity in disguise: the quefrency at
+    lattice point ``k`` is ``-sum_n P(S_n = k h)/n``, and the single
+    logarithm performs the infinite Spitzer sum.
+
+    One singularity needs care: ``phi_Y(1) = 1`` gives the symbol
+    ``G = 1 - phi_Y`` a simple zero at ``z = 1``, so ``log G`` blows up
+    and the phase has nonzero winding number. Dividing out
+    ``1 - z^{-1}`` -- the transform of a unit mass at ``-1``, hence
+    entirely a *minus* factor, leaving the plus quefrencies untouched --
+    repairs it; the removed value is ``lim G/(1 - z^{-1}) = -E[Y]``
+    (l'Hopital), strictly positive under net profit, so the corrected
+    symbol is zero-free with zero winding, ``np.unwrap`` closes the
+    phase, and the cepstrum is real. The geometric ladder compounding
+    ``phi_M = (1 - p)/(1 - chi_+)`` with ``p = chi_+(1)`` is assembled in
+    log space: ``log(1 - p)`` is the plus-quefrency series at ``z = 1``,
+    i.e. the plain sum of the retained coefficients -- the normalizing
+    constant comes for free. Four FFTs total.
+
+    Numerical diagnostics (caller's responsibility): the pmf of the
+    maximum must die out well before index ``M/2``; the cepstrum
+    coefficients decay like the severity tail, so heavy-tailed ``X``
+    needs a wider grid before wrap-around contamination; and the grid
+    mean ``E[Y]`` can be checked against the analytic
+    ``E[X] - c E[W]``.
+
+    See Embrechts, Kluppelberg, Mikosch (1997) chapter 1 for the model
+    and Spitzer (1956) for the identity. Ported from the author's
+    ``ruin-probabilities`` notes (``ruin.py`` / ``ruin.qmd``).
+    """
+    M = len(fy)
+    k = np.arange(M)
+    G = 1.0 - fft(fy)
+    d = 1.0 - np.exp(2j * np.pi * k / M)
+    Gt = np.empty(M, dtype=complex)
+    Gt[1:] = G[1:] / d[1:]
+    Gt[0] = -mean_y
+    logGt = np.log(np.abs(Gt)) + 1j * np.unwrap(np.angle(Gt))
+    c_ = np.real(ifft(logGt))
+    cplus = np.zeros(M)
+    cplus[1:M // 2] = c_[1:M // 2]
+    log_phi_M = cplus.sum() - fft(cplus)
+    pmf_M = np.real(ifft(np.exp(log_phi_M)))
+    psi = 1.0 - np.cumsum(pmf_M)
+    return pmf_M, psi

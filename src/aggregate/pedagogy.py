@@ -655,6 +655,40 @@ def plot_tvar_quantile():
     ax.legend().set(visible=False)
 
 
+def _ruin_function(ag, margin, *, kind, padding=1):
+    """Dispatch the eventual-ruin computation on the frequency kind.
+
+    Poisson frequency routes to
+    :meth:`~aggregate.Aggregate.pollaczeck_khinchine`; renewal
+    (wait-clause) frequency to :meth:`~aggregate.Aggregate.wiener_hopf`
+    (``padding`` does not apply there). Any other frequency raises.
+
+    Parameters
+    ----------
+    ag : Aggregate
+        The unit whose ruin function is wanted.
+    margin : float
+        Margin-to-loss ratio ``rho``.
+    kind : str
+        ``find_u`` convention (``'index'`` or ``'interpolate'``).
+    padding : int, default 1
+        FFT padding, Poisson path only.
+
+    Returns
+    -------
+    RuinFunction
+        The shared named tuple ``(ruin, find_u, mean, density)``.
+    """
+    fname = getattr(ag.frequency, 'freq_name', '')
+    if fname == 'poisson':
+        return ag.pollaczeck_khinchine(margin, kind=kind, padding=padding)
+    if fname == 'renewal':
+        return ag.wiener_hopf(margin, kind=kind)
+    raise ValueError(
+        f'no eventual-ruin solver for a {fname!r} frequency: need poisson '
+        f'(pollaczeck_khinchine) or renewal (wiener_hopf)')
+
+
 class ClassicalPremium:
     """Classical (pre-spectral) premium principles, calibrated to a target premium.
 
@@ -783,8 +817,8 @@ class ClassicalPremium:
             raise ValueError('Cannot use total in ClassicalPremium.illustrate.')
         ag = self.ports[port_name][unit_name]
         if p and K == 0:
-            self.ruin, self.u, self.mean, self._dfi = ag.pollaczeck_khinchine(
-                margin, kind='interpolate', padding=padding)
+            self.ruin, self.u, self.mean, self._dfi = _ruin_function(
+                ag, margin, kind='interpolate', padding=padding)
             K = self.u(p)
         elif K == 0:
             raise ValueError('Must input one of K and p')
@@ -831,7 +865,20 @@ def plot_ruin_surplus_paths(port):
 
     Originally ``fig_9_1`` (PIR Figure 9.1). Used by
     ``docs/5_technical_guides/5_x_pk.rst``. Depends on
-    :class:`ClassicalPremium` in this module.
+    :class:`ClassicalPremium` in this module. For a general, single-unit
+    version taking any poisson or renewal :class:`~aggregate.Aggregate`,
+    see :func:`ruin_example`.
+
+    Parameters
+    ----------
+    port : Portfolio
+        Highly specialized: the ``PZTest`` portfolio of
+        ``5_x_pk.rst`` -- it must contain units named exactly ``Limit1``
+        and ``Limit10`` (0.1 claims, ``sev lognorm 50000 cv 10`` under
+        1M / 10M xs 0 occurrence limits, poisson), built with ``bs=500,
+        log2=18, padding=1``. The unit names, x-limits, per-unit sample
+        counts, calibration premium (110) and margin (0.1) are all
+        hard-coded to reproduce the PIR figure.
     """
     port_name = 'gross'
     unit_names = ['Limit1', 'Limit10']
@@ -841,8 +888,11 @@ def plot_ruin_surplus_paths(port):
     dfis = {}
     for unit_name in unit_names:
         ag = port[unit_name]
-        ruins[unit_name], find_us[unit_name], mean, dfi = ag.pollaczeck_khinchine(
-            margin, kind='interpolate')
+        # padding=2 matches what illustrate used internally when it
+        # recomputed this; K below is then identical to the historical
+        # double computation
+        ruins[unit_name], find_us[unit_name], mean, dfi = _ruin_function(
+            ag, margin, kind='interpolate', padding=2)
         dfis[unit_name] = pd.Series(dfi, index=ruins[unit_name].index)
     xmaxs = {'Limit1': 10e6, 'Limit10': 50e6}
     limit_dict = {f'Limit{n}': n * 1e6 for n in [1, 10]}
@@ -868,8 +918,251 @@ def plot_ruin_surplus_paths(port):
         ax_.set(xlim=[-xmax / 50, xmax])
         p_default = 0.05
         cp.illustrate(port_name, unit_name, ax1, margin,
-                      p=p_default, n_big=n_big_dict[unit_name], n_sample=100)
+                      K=find_us[unit_name](p_default),
+                      n_big=n_big_dict[unit_name], n_sample=100)
         ax1.set(xlabel='Volume or time')
+
+
+def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
+                 n_steps=None, t_plot=None, show_default_times=False,
+                 seed=None):
+    """
+    Build a complete eventual-ruin example for an :class:`~aggregate.Aggregate`.
+
+    The general, single-unit successor to :func:`plot_ruin_surplus_paths`,
+    ported from the author's ``ruin-probabilities`` notes (``ruin.py``).
+    The surplus process is ``U(t) = u0 + c t - sum of X_i over claims in
+    (0, t]``: compute the exact probability of eventual ruin ``psi(u)``
+    (Poisson frequency via
+    :meth:`~aggregate.Aggregate.pollaczeck_khinchine`, renewal frequency
+    via :meth:`~aggregate.Aggregate.wiener_hopf`; anything else raises),
+    validate it by simulating surplus paths, and plot a sample of paths
+    with the expected trend line and law-of-the-iterated-logarithm
+    funnel. Ruin times are marked on the x axis.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        Updated aggregate with a poisson or renewal frequency. Severity is
+        sampled from its discretized ``sev_density_df.p_sev``; waits are
+        exponential (rate ``agg.n`` per year) for poisson, or sampled from
+        the discretized wait law for renewal -- so the simulated model is
+        exactly the model the psi computation prices, and the sim-vs-exact
+        comparison in the summary is apples-to-apples.
+    rho : float
+        Margin-to-loss ratio; the premium rate is
+        ``c = (1 + rho) E[X] / E[W]``. Must be positive (net profit).
+    u0 : float
+        Initial surplus at which the exact and simulated ruin
+        probabilities are compared.
+    log2 : int, optional
+        Renewal path only: half-grid exponent forwarded to
+        :meth:`~aggregate.Aggregate.wiener_hopf` for heavy tails.
+        Raises if supplied with a poisson frequency.
+    n_sims : int, default 100_000
+        Number of simulated paths for the reasonableness check.
+    n_plot : int, default 50
+        Number of sample paths drawn on the graph.
+    n_steps : int, optional
+        Claims per simulated path (horizon); if None, chosen so the
+        remaining drift makes late ruin negligible.
+    t_plot : float, optional
+        Calendar-time horizon of the graph; if None, derived from the
+        exact psi curve (residual ruin beyond it ~ 1e-3).
+    show_default_times : bool, default False
+        If True, add a rug of ``'|'`` ticks on the x axis at the ruin time
+        of every simulated path that dies.
+    seed : int, optional
+        rng seed.
+
+    Returns
+    -------
+    (summary, fig)
+        One-column DataFrame of useful quantities (exact and simulated
+        psi, safety loading, LIL variance rate, horizons, grid
+        diagnostics), and the matplotlib figure.
+    """
+    if rho <= 0:
+        raise ValueError(
+            f'net profit condition requires rho > 0, got {rho}')
+    rng = np.random.default_rng(seed)
+
+    # --- exact eventual ruin probability (dispatch on frequency) ------
+    fname = getattr(agg.frequency, 'freq_name', '')
+    if log2 is not None and fname != 'renewal':
+        raise ValueError(
+            'log2 applies to the renewal (wiener_hopf) path only')
+    if fname == 'renewal':
+        rf = agg.wiener_hopf(rho, kind='index', log2=log2)
+    else:
+        rf = _ruin_function(agg, rho, kind='index')
+    ruin = rf.ruin
+    psi = ruin.to_numpy()
+    bs = agg.bs
+    n = len(ruin)
+    iu = int(round(u0 / bs))
+    if iu >= n:
+        raise ValueError(
+            f'u0 = {u0} lies beyond the represented grid top '
+            f'{ruin.index[-1]:.6g}')
+    psi_u0 = psi[iu]
+
+    # --- model moments (discretized severity; exact wait mixture) -----
+    bit = agg.sev_density_df.p_sev
+    p_x = bit.to_numpy()
+    xs_x = bit.index.to_numpy()
+    mx = float(p_x @ xs_x)
+    var_x = float(p_x @ xs_x ** 2) - mx * mx
+    if fname == 'renewal':
+        freq = agg.frequency
+        ws = np.atleast_1d(np.asarray(freq.wait_weights, dtype=float))
+        moms = np.array([list(sev.moms())[:2]
+                         for sev, *_ in freq.wait_components], dtype=float)
+        mw = float(ws @ moms[:, 0])
+        var_w = float(ws @ moms[:, 1]) - mw * mw
+    else:
+        # poisson rate agg.n per year: exponential waits
+        mw = 1.0 / agg.n
+        var_w = mw * mw
+    c = (1.0 + rho) * mx / mw            # premium rate per unit time
+    # per-claim step Y = X - cW: drift and sd, analytic moments
+    mu = c * mw - mx                     # = rho * mx > 0
+    sd = np.sqrt(var_x + c * c * var_w)
+
+    # --- samplers: the discretized model, not the continuum -----------
+    cdf_x = np.cumsum(p_x / p_x.sum())
+    if fname == 'renewal':
+        fcw = agg._discretize_wait_pmf(c, n)
+        tw = np.arange(n, dtype=float) * bs / c    # time units
+        cdf_w = np.cumsum(fcw / fcw.sum())
+
+        def sample_w(size):
+            return tw[np.searchsorted(cdf_w, rng.random(size))]
+    else:
+        def sample_w(size):
+            return rng.exponential(mw, size)
+
+    def sample_x(size):
+        return xs_x[np.searchsorted(cdf_x, rng.random(size))]
+
+    # --- simulation check (ruin can only occur at claim instants) -----
+    if n_steps is None:
+        # Horizon such that a surviving path is, with ~3 sigma margin,
+        # deep enough that its residual ruin probability is < 1e-5:
+        # solve |P(Y)| n - 3 sd sqrt(n) = u_safe for n, where u_safe is
+        # read off the exact psi just computed.
+        i_safe = np.searchsorted(-psi, -1e-5)     # psi is decreasing
+        u_safe = max(u0 + i_safe * bs, 10 * mx)
+        r = (3 * sd + np.sqrt(9 * sd ** 2 + 4 * mu * u_safe)) / (2 * mu)
+        n_steps = min(int(np.ceil(r ** 2)), 50_000)
+    ruined = np.zeros(n_sims, dtype=bool)
+    ruin_time = np.full(n_sims, np.nan)           # calendar time of ruin
+    chunk = max(1, int(2e7) // n_steps)           # cap memory use
+    for lo in range(0, n_sims, chunk):
+        m = min(chunk, n_sims - lo)
+        w = sample_w((m, n_steps))
+        x = sample_x((m, n_steps))
+        t = np.cumsum(w, axis=1)
+        surplus = u0 + c * t - np.cumsum(x, axis=1)
+        below = surplus < 0
+        hit = below.any(axis=1)
+        ruined[lo:lo + m] = hit
+        first = np.argmax(below, axis=1)
+        ruin_time[lo:lo + m] = np.where(hit, t[np.arange(m), first], np.nan)
+    n_ruin = int(ruined.sum())
+    p_sim = n_ruin / n_sims
+    se_sim = np.sqrt(p_sim * (1 - p_sim) / n_sims)
+
+    # --- plot horizon -------------------------------------------------
+    if t_plot is None:
+        # residual ruin beyond the window ~ 1e-3, invisible at n_plot scale
+        i3 = np.searchsorted(-psi, -1e-3 * max(psi_u0, 1e-6))
+        u3 = max(u0 + i3 * bs, 10 * mx)
+        r3 = (3 * sd + np.sqrt(9 * sd ** 2 + 4 * mu * u3)) / (2 * mu)
+        t_plot = min(int(np.ceil(r3 ** 2)), n_steps) * mw
+    # claims needed to cover t_plot with a fluctuation margin
+    n_steps_plot = int(np.ceil(t_plot / mw
+                               + 6 * np.sqrt(t_plot * var_w / mw ** 3)
+                               + 10))
+
+    # --- plot n_plot sample paths -------------------------------------
+    fig, ax = plt.subplots(figsize=(9, 5))
+    n_fail = 0
+    for i in range(n_plot):
+        w = sample_w(n_steps_plot)
+        x = sample_x(n_steps_plot)
+        t = np.cumsum(w)
+        u_pre = u0 + c * t - np.concatenate(([0.0], np.cumsum(x)[:-1]))
+        u_post = u_pre - x                        # surplus just after claim
+        # interleave (pre, post) values at each claim time for the path
+        tt = np.repeat(t, 2)
+        uu = np.empty(2 * n_steps_plot)
+        uu[0::2], uu[1::2] = u_pre, u_post
+        tt = np.concatenate(([0.0], tt))
+        uu = np.concatenate(([u0], uu))
+        hit = np.argmax(uu < 0) if (uu < 0).any() else 0
+        if hit and tt[hit] <= t_plot:
+            n_fail += 1
+            ax.plot(tt[:hit + 1], uu[:hit + 1], lw=0.6, alpha=0.6, c='C3')
+            ax.plot(tt[hit], 0, '|', c='C3', ms=6, mew=0.5,
+                    clip_on=False, zorder=5)
+        else:
+            ax.plot(tt, uu, lw=0.6, alpha=0.5, c='C0')
+
+    # --- expected trend and LIL funnel --------------------------------
+    # renewal-reward CLT rate: sigma2 = Var(X - (PX/PW) W) / PW
+    sigma2 = (var_x + (mx / mw) ** 2 * var_w) / mw
+    tg = np.linspace(0, t_plot, 400)
+    trend = u0 + (c - mx / mw) * tg
+    ax.plot(tg, trend, 'k--', lw=1.5, label='expected trend')
+    tl = tg[tg > np.e]                            # ln ln t defined
+    band = np.sqrt(2 * sigma2 * tl * np.log(np.log(tl)))
+    base = u0 + (c - mx / mw) * tl
+    ax.plot(tl, base + band, c='green', lw=1.2, label='LIL upper')
+    ax.plot(tl, base - band, c='orange', lw=1.2, label='LIL lower')
+
+    # --- rug of ruin times from the full simulation -------------------
+    if show_default_times:
+        rt = ruin_time[ruined & (ruin_time <= t_plot)]
+        ax.plot(rt, -u0 * np.ones(len(rt)), '|', c='C3', ms=6, mew=0.5,
+                alpha=0.10, clip_on=False, zorder=4)
+
+    ax.axhline(0, c='k', lw=0.75)
+    ax.set(xlabel='time', ylabel='surplus', xlim=(0, t_plot))
+    ax.set_title(
+        f"{n_plot} sample paths, {n_fail} failures, "
+        f"rate {n_fail / n_plot:0.2%}\n"
+        f"Simulated {n_ruin} of {n_sims} = {p_sim:0.0%}, "
+        f"exact rate {psi_u0:0.2%}")
+    ax.legend(loc='upper left')
+    fig.tight_layout()
+
+    # --- summary dataframe --------------------------------------------
+    summary = pd.DataFrame({'value': {
+        'frequency kind': fname,
+        'premium rate c': c,
+        'initial surplus u0': u0,
+        'mean severity P(X)': mx,
+        'mean waiting P(W)': mw,
+        'cv2 waiting': var_w / mw ** 2,
+        'safety loading rho': rho,
+        'mean step P(Y)': -mu,
+        'LIL variance rate sigma2': sigma2,
+        'psi(0) exact': psi[0],
+        'psi(u0) exact': psi_u0,
+        'psi(u0) simulated': p_sim,
+        'sim ruins': n_ruin,
+        'sim trials': n_sims,
+        'sim std error': se_sim,
+        'sim horizon (claims)': n_steps,
+        'plot horizon t_plot': t_plot,
+        'mean ruin time | ruin': np.nanmean(ruin_time),
+        'grid points n': n,
+        'bucket size bs': bs,
+        'grid top (orig units)': ruin.index[-1],
+        'mass beyond grid (psi at top)': psi[-1],
+    }})
+    return summary, fig
 
 
 def natural_scale(port):
@@ -890,8 +1183,8 @@ def natural_scale(port):
         ag_ex = ag.actual_m
         for margin in margins:
             try:
-                ruin, find_u, mean, dfi = ag.pollaczeck_khinchine(
-                    margin, kind='index', padding=2)
+                ruin, find_u, mean, dfi = _ruin_function(
+                    ag, margin, kind='index', padding=2)
                 dfi = pd.Series(dfi, index=ruin.index)
                 ex = np.sum(dfi * dfi.index)
                 ex2 = np.sum(dfi * dfi.index ** 2)

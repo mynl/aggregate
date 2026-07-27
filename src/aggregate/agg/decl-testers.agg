@@ -750,3 +750,20 @@ agg AC.ZM.Geometric 4 claims dsev [1] geometric zm .5                           
 agg AC.ZM.Binomial 4 claims dsev [1] binomial 0.6 zm .5                                       note{ZM binomial, per-trial probability 0.6};
 agg AC.ZM.Logarithmic 4 claims dsev [1] logarithmic zm .5                                     note{Logarithmic already has p0 = 0, so zm only adds mass at zero};
 agg AC.ZM.LossPin 1000 loss sev lognorm 10 cv 1 poisson zm 0.5 !                              note{Monetary exposure with !: hits E[X] = 1000; without ! it warns and delivers 500};
+
+# ============================================================
+# AD. Eventual-ruin solvers ([Ruin-Wiener-Hopf])
+#     (tests/test_ruin.py)
+# ============================================================
+# pollaczeck_khinchine requires poisson (guard); wiener_hopf requires a
+# renewal wait-clause frequency and a proper (non-defective) wait law.
+# AD.Ruin.Poisson and AD.Ruin.Renewal are the SAME model, the WH-vs-PK
+# cross-validation anchor; AD.Ruin.ExponSev is the non-Poisson Lundberg
+# closed form psi(u) = psi(0) exp(-beta (1 - psi(0)) u).
+agg AD.Ruin.Poisson 10 claims sev gamma 2 poisson                                             note{PK path; equivalent to AD.Ruin.Renewal (exponential waits = compound Poisson)};
+agg AD.Ruin.Renewal 10 years sev gamma 2 wait expon                                           note{WH path; same model as AD.Ruin.Poisson};
+agg AD.Ruin.ExponSev 5 years sev 10 * expon wait gamma 2                                      note{Exponential severity, gamma-2 waits: exact geometric ladder heights, Lundberg slope beta (1 - psi(0))};
+agg AD.Ruin.MixWait 5 years sev 10 * expon wait [.6 .4] * expon wts [.5 .5]                   note{Hyperexponential mixture wait through the multi-component _discretize_wait_pmf path; Lundberg form still exact};
+agg AD.Ruin.Fixed 10 claims sev gamma 2 fixed                                                 note{Rejected by BOTH solvers (neither poisson nor renewal)};
+agg AD.Ruin.Binomial 10 claims sev gamma 2 binomial 0.5                                       note{Rejected by pollaczeck_khinchine (strict poisson guard)};
+agg AD.Ruin.Defective 2 years dsev [1] dwait [1 2] [.4 .5] !                                  note{Rejected by wiener_hopf: defective (terminating) wait law};

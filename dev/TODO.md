@@ -94,16 +94,6 @@
   **forward** (no solver); ship documented shift helpers (both directions). Two
   examples are commented out in `examples.agg` until then. Named in
   `plan-for-v1.md` §1; pairs with `[Doc-Gaps]`.
-- **[PK-Poisson-Freq-Audit]** (from `plan-for-v1.md` §1) — `pollaczeck_khinchine`
-  (`_aggregate.py:3755`) audits Poisson frequency: confirm the method rejects, or
-  correctly handles, a non-Poisson frequency rather than silently returning a
-  ruin curve computed off the wrong compound. Also used by three `pedagogy.py`
-  figure generators (`:786`, `:844`, `:893`), so fix the audit before extending.
-- **[Wiener-Hopf-PK-Extension]** (from `plan-for-v1.md` §1) — Wiener-Hopf
-  factorization as the extension of Pollaczeck-Khinchine. Scope first: the
-  Sparre-Andersen work explicitly documented ruin / Wiener-Hopf machinery as out
-  of scope (`dev/done/plan-sparre-a.md`), so this is new ground, not a rider.
-  `[Pedagogy-Wiener-Hopf]` (beta) is its figure.
 - **[Joint-Padding-Window-Tradeoff]** (logged 2026-07-07) — the in-core
   occurrence joint already *computes* a padded transform 4× the retained grid
   (`padding = 1` doubles each axis; `build_netceded_joint` inherits the engine's
@@ -276,8 +266,6 @@
 
 ### Docs
 
-- **[Pedagogy-Wiener-Hopf]** (from `plan-for-v1.md` §1) — the pedagogy
-  Wiener-Hopf figure. Needs `[Wiener-Hopf-PK-Extension]` first.
 - **[Reinsurance-Case-Study-Docs]** (#16) — rebuild `bahnemann` / `enterprise
   risk` / `other_misc` per-layer exhibits from `reins_stats_df`, verify against
   published (numerics now stable).

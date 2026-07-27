@@ -47,6 +47,7 @@ from .tail import TailClass
 
 from ._fits import (_approximate_sev_kwargs, approximate_from_mcvsk)
 from ._frequency import Frequency, FrequencyRenewal
+from ._renewal import ruin_cepstral
 from ._severity import Severity
 # Phase 1b shared concerns (leaf/near-leaf; never import back into _aggregate).
 from ._bucket_window import (
@@ -418,6 +419,51 @@ _STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
     ],
     names=['component', 'measure'],
 )
+
+
+#: Shared return type of the two eventual-ruin solvers,
+#: :meth:`Aggregate.pollaczeck_khinchine` and :meth:`Aggregate.wiener_hopf`.
+#: A namedtuple IS a tuple, so legacy positional unpacking
+#: ``ruin, find_u, mean, dfi = ...`` keeps working. ``ruin`` is the pd.Series
+#: ``psi(u)`` on the u-grid; ``find_u`` the capital-lookup closure; ``mean``
+#: the discretized severity mean; ``density`` the method's u-grid density
+#: vector -- the integrated-severity (equilibrium, ladder-height) density
+#: ``dfi`` for Pollaczeck-Khinchine, the pmf of the all-time maximum for
+#: Wiener-Hopf.
+RuinFunction = namedtuple('RuinFunction', ['ruin', 'find_u', 'mean', 'density'])
+
+
+def _ruin_find_u(ruin, kind):
+    """Capital-lookup closure ``p -> u`` over a decreasing ruin Series.
+
+    Parameters
+    ----------
+    ruin : pd.Series
+        ``psi(u)`` indexed by initial surplus ``u``, decreasing in ``u``.
+    kind : str
+        ``'index'`` snaps to the grid point; anything else linearly
+        interpolates between the bracketing grid points.
+
+    Returns
+    -------
+    callable
+        ``find_u(p)`` returning the initial surplus with eventual ruin
+        probability ``p``.
+    """
+    if kind == 'index':
+        def find_u(p):
+            idx = len(ruin) - ruin[::-1].searchsorted(p, 'left')
+            return ruin.index[idx]
+    else:
+        def find_u(p):
+            below = len(ruin) - ruin[::-1].searchsorted(p, 'left')
+            above = below - 1
+            q_below = ruin.index[below]
+            q_above = ruin.index[above]
+            p_below = ruin.iloc[below]
+            p_above = ruin.iloc[above]
+            return q_below + (p - p_below) / (p_above - p_below) * (q_above - q_below)
+    return find_u
 
 
 class Aggregate(HelpMixin, LabeledMixin):
@@ -3755,11 +3801,10 @@ class Aggregate(HelpMixin, LabeledMixin):
     def pollaczeck_khinchine(self, rho, cap=0, excess=0, stop_loss=0, kind='index', padding=1):
         """
         Return the Pollaczeck-Khinchine Capital function relating surplus to eventual probability of ruin.
-        Assumes frequency is Poisson.
+        Requires a Poisson frequency (raises ``ValueError`` otherwise); for a
+        renewal (wait-clause) frequency use :meth:`wiener_hopf`.
 
         See Embrechts, Kluppelberg, Mikosch 1.2, page 28 Formula 1.11
-
-        TODO: Should return a named tuple.
 
         :param rho: rho = prem / loss - 1 is the margin-to-loss ratio
         :param cap: cap = cap severity at cap, which replaces severity with X | X <= cap
@@ -3768,10 +3813,19 @@ class Aggregate(HelpMixin, LabeledMixin):
           with Pr(X > stop_loss) mass
         :param kind:
         :param padding: for update (the frequency tends to be high, so more padding may be needed)
-        :return: ruin vector as pd.Series and function to lookup (no interpolation if
-          kind==index; else interp) capitals
+        :return: :class:`RuinFunction` named tuple ``(ruin, find_u, mean, density)``:
+          ruin vector as pd.Series, function to lookup capitals (no interpolation
+          if kind==index; else interp), discretized severity mean, and the
+          integrated-severity (equilibrium) density ``dfi``. Unpacks positionally
+          like the historical bare tuple.
         """
-
+        fname = getattr(self.frequency, 'freq_name', '')
+        if fname != 'poisson':
+            hint = (' -- for a renewal (wait-clause) frequency use wiener_hopf'
+                    if fname == 'renewal' else '')
+            raise ValueError(
+                f'pollaczeck_khinchine assumes a Poisson frequency, '
+                f'got {fname!r}{hint}')
         if self.sev_density is None:
             raise ValueError("Must recalc before computing Cramer Lundberg distribution.")
 
@@ -3803,24 +3857,216 @@ class Aggregate(HelpMixin, LabeledMixin):
         f = np.real(f) * rho / (1 + rho)
         f = np.cumsum(f)
         ruin = pd.Series(1 - f, index=bit.index)
+        find_u = _ruin_find_u(ruin, kind)
+        return RuinFunction(ruin, find_u, mean, dfi)
 
-        if kind == 'index':
-            def find_u(p):
-                idx = len(ruin) - ruin[::-1].searchsorted(p, 'left')
-                return ruin.index[idx]
-        else:
-            def find_u(p):
-                below = len(ruin) - ruin[::-1].searchsorted(p, 'left')
-                above = below - 1
-                q_below = ruin.index[below]
-                q_above = ruin.index[above]
-                p_below = ruin.iloc[below]
-                p_above = ruin.iloc[above]
-                q = q_below + (p - p_below) / (p_above - p_below) * (q_above - q_below)
-                return q
+    def _discretize_wait_pmf(self, c, n):
+        """Discretize the renewal wait law, scaled by ``c``, on the money grid.
 
-        return ruin, find_u, mean, dfi  # , ruin2
+        Rounding pmf of the scaled waiting time ``cW`` on ``n`` buckets of
+        width ``self.bs`` -- equivalently the wait law itself on time
+        buckets of width ``bs / c``. Bucket 0 holds ``P(W <= h/2)`` (any
+        zero-wait atom and collapsed negative mass ride along); bucket
+        ``j`` holds ``P((j-1/2) h < W <= (j+1/2) h)`` with ``h = bs/c``;
+        mass beyond the last edge is dropped (the caller's grid must be
+        long enough for the drop to be negligible).
 
+        Follows :func:`aggregate._renewal.wait_count_pmf` (the renewal
+        count discretization) -- same :func:`discretize_severities` call
+        and unconditional-window masking -- but with **no** truncation at
+        the horizon ``T`` and **no** zero-wait removal: the ruin random
+        walk needs the whole law. Used by :meth:`wiener_hopf` and by
+        ``pedagogy.ruin_example`` (wait sampling for simulated paths).
+
+        Parameters
+        ----------
+        c : float
+            Premium rate per unit time (the scale factor).
+        n : int
+            Number of buckets.
+
+        Returns
+        -------
+        ndarray, length n
+            Weighted-combined pmf of ``cW`` on ``arange(n) * bs``. Sums to
+            1 less the dropped tail (and any defect, which
+            :meth:`wiener_hopf` refuses).
+        """
+        freq = self.frequency
+        weights = np.atleast_1d(np.asarray(freq.wait_weights, dtype=float))
+        bsw = self.bs / c
+        xsw = np.arange(n, dtype=float) * bsw
+        beds = discretize_severities(
+            [sev for sev, *_ in freq.wait_components], xsw, bsw,
+            sev_calc='discrete', discretization_calc='survival',
+            normalize=False)
+        fcw = np.zeros(n)
+        for (sev, lb, ub, conditional), w_, bed in zip(
+                freq.wait_components, weights, beds):
+            bed = np.asarray(bed, dtype=float)
+            if not conditional:
+                # unconditional splice window, masked on the grid (mass-
+                # neutral under the wiener_hopf defect guard; keeps the
+                # wait_count_pmf pattern)
+                eps = 1e-12 * max(1.0, abs(lb), abs(ub))
+                bed[(xsw < lb - eps) | (xsw > ub + eps)] = 0.0
+            fcw += w_ * bed
+        return fcw
+
+    def wiener_hopf(self, rho, kind='index', log2=None):
+        r"""
+        Eventual ruin probability for a Sparre-Andersen (renewal) model by
+        cepstral Wiener-Hopf factorization.
+
+        The renewal counterpart of :meth:`pollaczeck_khinchine`: the
+        frequency must be a renewal (``years ... wait ...``) frequency, and
+        the premium rate is ``c = (1 + rho) E[X] / E[W]`` -- the loaded
+        long-run loss rate, so ``rho`` keeps its PK margin-to-loss meaning.
+
+        Parameters
+        ----------
+        rho : float
+            Margin-to-loss ratio: premium = ``(1 + rho)`` times the expected
+            loss rate ``E[X] / E[W]``.
+        kind : {'index', 'interpolate'}
+            ``find_u`` lookup convention, as in :meth:`pollaczeck_khinchine`:
+            ``'index'`` snaps to the grid, anything else interpolates.
+        log2 : int, optional
+            Half-grid exponent. The wrapped circle has ``2**(log2 + 1)``
+            buckets and psi is returned on ``u = arange(2**log2) * bs``.
+            Defaults to ``self.log2``, so the u-grid coincides with the
+            severity grid (and with the PK u-grid). Must be at least
+            ``self.log2``; raise it for heavy-tailed severities (see the
+            wrap-around warning).
+
+        Returns
+        -------
+        RuinFunction
+            Named tuple ``(ruin, find_u, mean, density)``: ``psi(u)`` as a
+            pd.Series on the u-grid, the capital-lookup closure, the
+            discretized severity mean, and the pmf of the all-time maximum
+            of the loss walk on the u-grid. Unpacks positionally exactly
+            like :meth:`pollaczeck_khinchine`.
+
+        Raises
+        ------
+        ValueError
+            If the frequency is not renewal (for Poisson use
+            :meth:`pollaczeck_khinchine`); if the object has not been
+            updated; if the severity grid is signed; if the wait law is
+            defective (terminating renewal process); or if the net profit
+            condition ``E[Y] < 0`` fails on the grid (margin too small).
+
+        Notes
+        -----
+        Sparre-Andersen surplus ``U(t) = u + ct - sum_{i <= N(t)} X_i`` with
+        iid waits ``W``. Ruin can occur only at claim instants, so the
+        problem collapses to the random walk with per-claim step
+        ``Y = X - cW``: ``psi(u) = P(M > u)`` with ``M`` the all-time
+        maximum of the partial sums -- the Lindley / GI-G-1 stationary
+        waiting time, finite iff ``E[Y] < 0`` (net profit condition
+        ``c E[W] > E[X]``, i.e. ``rho > 0``).
+
+        ``M`` is still a geometric number of iid ascending ladder heights,
+        but outside the Poisson world the ladder height law has no closed
+        form -- the two pieces of Poisson magic behind PK (ladder heights
+        = the equilibrium distribution, ladder epoch probability
+        ``1/(1+rho)``) do not survive. Instead the ladder structure is
+        extracted numerically from the Wiener-Hopf factorization of the
+        walk by the cepstral method: see
+        :func:`aggregate._renewal.ruin_cepstral` for the algorithm (Spitzer
+        identity, support separation in the cepstrum, ``z = 1``
+        regularization).
+
+        Discretization: the severity rides its existing rounding pmf
+        (``sev_density_df.p_sev``, exactly as PK); the scaled wait ``cW``
+        is discretized by the same rounding scheme via
+        :meth:`_discretize_wait_pmf`. Rounding keeps means correct to
+        ``O(bs^2)`` and makes the lattice walk aperiodic, so the symbol
+        ``1 - phi_Y`` has no unit-circle zeros besides ``z = 1``. The
+        kernel's ``z = 1`` patch uses the **grid** mean step (``signed @
+        fy``), which also absorbs the (negligible) wait mass dropped
+        beyond the grid top. psi is valid for ``u`` below ``2**log2 * bs``;
+        ``psi`` at the top of the grid is the wrap-around diagnostic --
+        the cepstrum coefficients decay like the severity tail, so a
+        heavy-tailed severity needs a wider grid (larger ``log2``) before
+        wrap-around contamination sets in, and a warning is issued when
+        the top-of-grid psi exceeds 1e-6.
+
+        For exponential waits the model is compound Poisson and this
+        method agrees with :meth:`pollaczeck_khinchine` up to
+        discretization. See Embrechts, Kluppelberg, Mikosch 1.2 for the
+        model and Spitzer (1956) for the identity.
+        """
+        fname = getattr(self.frequency, 'freq_name', '')
+        if fname != 'renewal':
+            hint = (' -- for a Poisson frequency use pollaczeck_khinchine'
+                    if fname == 'poisson' else '')
+            raise ValueError(
+                f'wiener_hopf requires a renewal (wait-clause) frequency, '
+                f'got {fname!r}{hint}')
+        if self.sev_density is None:
+            raise ValueError(
+                'Must update before computing the Wiener-Hopf ruin function.')
+        if self.i0:
+            raise ValueError(
+                'wiener_hopf requires a nonnegative severity grid '
+                '(signed severities unsupported)')
+        defect = float(self.frequency.wait_defect or 0.0)
+        if defect > 1e-12:
+            raise ValueError(
+                f'wiener_hopf requires a proper waiting-time law; this one '
+                f'is defective (terminating renewal process), '
+                f'wait_defect = {defect:.6g}')
+        if log2 is None:
+            log2 = self.log2
+        elif log2 < self.log2:
+            raise ValueError(
+                f'log2 = {log2} < self.log2 = {self.log2} would truncate '
+                f'the severity')
+        n = 1 << log2          # usable half grid = u-grid length
+        M = 2 * n              # wrapped circle
+        bs = self.bs
+
+        # severity: reuse the discretized rounding pmf, exactly as PK
+        bit = self.sev_density_df.p_sev
+        mean = float(np.sum(bit * bit.index))
+
+        # exact unconditional wait mean; the defect guard guarantees any
+        # unconditional window loses no mass, so moms() is the true E[W]
+        freq = self.frequency
+        weights = np.atleast_1d(np.asarray(freq.wait_weights, dtype=float))
+        m1 = np.array([list(sev.moms())[0] for sev, *_ in freq.wait_components])
+        mean_wait = float(weights @ m1)
+        c = (1.0 + rho) * mean / mean_wait   # premium rate per unit time
+
+        fcw = self._discretize_wait_pmf(c, n)
+
+        # wrapped step pmf of Y = X - cW: X on 0..len(bit)-1, cW reflected
+        # into the wrapped negative indices M-1..M-n+1 (index n = M/2 unused)
+        X = np.zeros(M)
+        X[:len(bit)] = bit.to_numpy()
+        Wn = np.zeros(M)
+        Wn[0] = fcw[0]
+        Wn[M - n + 1:] = fcw[1:][::-1]
+        fy = np.real(sfft.ifft(sfft.fft(X) * sfft.fft(Wn)))
+        kk = np.arange(M)
+        signed = np.where(kk < n, kk, kk - M)
+        mean_y = float(signed @ fy)          # bucket units
+        if mean_y >= 0:
+            raise ValueError(
+                f'net profit condition fails on the grid: mean per-claim '
+                f'step {mean_y * bs:.6g} >= 0; increase the margin rho')
+
+        pmf_max, psi = ruin_cepstral(fy, mean_y)
+        if psi[n - 1] > 1e-6:
+            warnings.warn(
+                f'wiener_hopf: psi at the top of the grid = {psi[n - 1]:.3g} '
+                f'> 1e-6; the all-time maximum has material mass beyond the '
+                f'represented range. Re-run with log2 >= {log2 + 1}.')
+        ruin = pd.Series(psi[:n], index=np.arange(n, dtype=float) * bs)
+        find_u = _ruin_find_u(ruin, kind)
+        return RuinFunction(ruin, find_u, mean, pmf_max[:n])
 
     def plot(self, axd=None, xmax=0, **kwargs):
         """

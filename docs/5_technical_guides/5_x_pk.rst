@@ -212,7 +212,7 @@ The second uses a Pareto severity, where the integrated distribution can be comp
 .. ipython:: python
     :okwarning:
 
-    a = build('agg Actuar2 1 claim sev 4 * pareto 5 - 4 fixed')
+    a = build('agg Actuar2 1 claim sev 4 * pareto 5 - 4 poisson')
     qd(a)
     ruins, find_us, mean, dfi  = a.pollaczeck_khinchine(.2)
     ruins.name = 'Prob'

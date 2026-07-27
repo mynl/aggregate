@@ -640,7 +640,7 @@ def test_massive_pnl_one_sweep_ledger(tmp_path):
     # its own signed-sum function, never a sum of bucketed legs
     leg_means = sum(pm.stats_df.xs(r, level='Line')['EX'].iloc[0]
                     for r in ('premium', 'loss', 'ceded premium', 'recovery'))
-    assert abs(pm.mean - leg_means) < 10 * VALIDATION_NOISE
+    assert abs(pm.est_m - leg_means) < 10 * VALIDATION_NOISE
     # [Massive-Kappa-Second-Sweep]: the massive ladder stays MARGINAL (each
     # cell the row's own quantile), unlike the in-core scenario columns
     loss_gd = pm.density_df['loss']
@@ -654,7 +654,7 @@ def test_massive_pnl_one_sweep_ledger(tmp_path):
     assert set(v.index) == {'premium', 'loss', 'ceded premium', 'recovery'}
     assert v['abs_err'].max() < 10 * VALIDATION_NOISE
     # accessors ride the grand result
-    assert pm.prob_loss == pytest.approx(pi.prob_loss, abs=1e-12)
+    assert pm.prob_eq_0 == pytest.approx(pi.prob_eq_0, abs=1e-12)
     assert pm.q(0.5) == pytest.approx(pi.q(0.5), abs=1.0)  # bucketed grid
 
 

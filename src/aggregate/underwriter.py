@@ -281,8 +281,10 @@ def _row_stats(a, summary_cols):
     row = {col: None for col in summary_cols}
     if isinstance(a, (Aggregate, Portfolio)):
         row.update(log2=a.log2, bs=a.bs,
-                   agg_m=a.agg_m, agg_cv=a.agg_cv, agg_sd=a.agg_sd, agg_skew=a.agg_skew,
-                   emp_m=a.est_m, emp_cv=a.est_cv, emp_sd=a.est_sd, emp_skew=a.est_skew,
+                   actual_m=a.actual_m, actual_cv=a.actual_cv,
+                   actual_sd=a.actual_sd, actual_skew=a.actual_skew,
+                   emp_m=a.est_m, emp_cv=a.est_cv, emp_sd=a.est_sd,
+                   emp_skew=a.est_skew,
                    valid=a.validation_explanation)
     elif isinstance(a, Severity):
         # theoretical moments only; severity has no discretization. Use the
@@ -300,7 +302,7 @@ def _row_stats(a, summary_cols):
                 skew = mu3 / sd ** 3
             else:
                 skew = None
-            row.update(agg_m=m, agg_sd=sd, agg_cv=cv, agg_skew=skew)
+            row.update(actual_m=m, actual_sd=sd, actual_cv=cv, actual_skew=skew)
         except Exception as e:
             logger.debug('Severity %s: moms unavailable (%s)', getattr(a, 'name', '?'), e)
     # Distortion: nothing applies — all fields left as None
@@ -2090,7 +2092,7 @@ class Underwriter(object):
         # Initialize as object dtype to avoid pandas LossySetitemError on the
         # mixed-type .loc assignment below (modern pandas refuses to coerce a
         # non-bool result of validation_explanation into a bool column).
-        summary_cols = ['log2', 'bs', 'agg_m', 'agg_cv', 'agg_sd', 'agg_skew',
+        summary_cols = ['log2', 'bs', 'actual_m', 'actual_cv', 'actual_sd', 'actual_skew',
                         'emp_m', 'emp_cv', 'emp_sd', 'emp_skew', 'valid']
         for col in summary_cols:
             df[col] = pd.Series([None] * len(df), index=df.index, dtype=object)

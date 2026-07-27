@@ -229,4 +229,4 @@ def test_splice_unbounded_base_builds_finite_window():
     # honest support: the spliced distribution lives on [1, 100]
     assert a.sevs[0].fz.support() == (1.0, 100.0)
     # finite, positive aggregate mean; all mass sits inside the bounded window
-    assert 0 < a.agg_m < np.inf
+    assert 0 < a.actual_m < np.inf

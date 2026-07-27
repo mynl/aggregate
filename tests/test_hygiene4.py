@@ -92,7 +92,7 @@ AGG_INFO_LABELS = [
     'aggregate object name', 'value_type', 'claim count',
     'frequency distribution', 'severity distribution', 'approximate',
     'bs', 'log2', 'padding', 'sev_calc', 'dsev_bucket', 'normalize',
-    'x_min', 'x_max', 'premium', 'expected loss', 'loss ratio', 'P(loss)',
+    'x_min', 'x_max', 'premium', 'expected loss', 'loss ratio', 'P(X=0)',
     'validation_eps', 'reinsurance', 'occurrence reinsurance',
     'aggregate reinsurance', 'validation', 'frequency tail',
     'severity tail', 'aggregate tail', 'bounded', 'id',
@@ -101,8 +101,8 @@ AGG_INFO_LABELS = [
 PORT_INFO_LABELS = [
     'portfolio object name', 'value_type', 'aggregate objects',
     'allocation_method', 'bs', 'log2', 'padding', 'sev_calc', 'normalize',
-    'x_min', 'x_max', 'premium', 'expected loss', 'loss ratio',
-    'aggregate tail', 'bounded', 'last update', 'id',
+    'x_min', 'x_max', 'premium', 'expected loss', 'loss ratio', 'P(X=0)',
+    'reinsurance', 'aggregate tail', 'bounded', 'last update', 'id',
 ]
 
 DIST_INFO_LABELS = [

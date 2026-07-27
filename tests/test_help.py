@@ -19,9 +19,9 @@ def a():
 
 
 def test_help_text_is_plain(a, capsys):
-    a.help('agg_m', fmt='text')
+    a.help('actual_m', fmt='text')
     out = capsys.readouterr().out
-    assert 'agg_m' in out                       # the matched name appears
+    assert 'actual_m' in out                       # the matched name appears
     assert '\x1b[' not in out                   # no ANSI escapes
     assert '<span' not in out                   # no HTML
     assert 'Markdown object' not in out         # not a stray IPython repr
@@ -29,46 +29,46 @@ def test_help_text_is_plain(a, capsys):
 
 def test_help_values_renamed(a, capsys):
     # the new keyword works ...
-    a.help('agg_m', values='none', fmt='text')
-    assert 'agg_m' in capsys.readouterr().out
+    a.help('actual_m', values='none', fmt='text')
+    assert 'actual_m' in capsys.readouterr().out
     # ... and the old keyword is gone (rename is real, not aliased)
     with pytest.raises(TypeError):
-        a.help('agg_m', output='none', fmt='text')
+        a.help('actual_m', output='none', fmt='text')
 
 
 def test_help_bad_values_raises(a):
     with pytest.raises(ValueError):
-        a.help('agg_m', values='lots', fmt='text')
+        a.help('actual_m', values='lots', fmt='text')
 
 
 def test_help_ansi_has_escape(a, capsys):
-    a.help('agg_m', fmt='ansi')
+    a.help('actual_m', fmt='ansi')
     assert '\x1b[' in capsys.readouterr().out
 
 
 def test_help_auto_resolves(a, capsys, monkeypatch):
     # auto delegates to the resolver: ANSI inside Jupyter, plain text outside
     monkeypatch.setattr(u, '_in_jupyter', lambda: True)
-    a.help('agg_m', fmt='auto')
+    a.help('actual_m', fmt='auto')
     assert '\x1b[' in capsys.readouterr().out
 
     monkeypatch.setattr(u, '_in_jupyter', lambda: False)
-    a.help('agg_m', fmt='auto')
+    a.help('actual_m', fmt='auto')
     assert '\x1b[' not in capsys.readouterr().out
 
 
 def test_help_explicit_wins_over_auto(a, capsys, monkeypatch):
     # an explicit fmt is honored even when _in_jupyter would say otherwise
     monkeypatch.setattr(u, '_in_jupyter', lambda: True)
-    a.help('agg_m', fmt='text')
+    a.help('actual_m', fmt='text')
     assert '\x1b[' not in capsys.readouterr().out
 
 
 def test_help_bad_fmt_raises(a):
     with pytest.raises(ValueError):
-        a.help('agg_m', fmt='xml')
+        a.help('actual_m', fmt='xml')
 
 
 def test_help_html_runs(a):
     pytest.importorskip('IPython')
-    a.help('agg_m', fmt='html')   # rich display path executes without error
+    a.help('actual_m', fmt='html')   # rich display path executes without error

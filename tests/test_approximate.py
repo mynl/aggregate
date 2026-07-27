@@ -33,7 +33,7 @@ REL = 1e-3
 
 
 def _theory(a):
-    return np.array([a.agg_m, a.agg_cv, a.agg_skew])
+    return np.array([a.actual_m, a.actual_cv, a.actual_skew])
 
 
 def _empirical(a):
@@ -86,7 +86,7 @@ def test_left_skew_reflect_matches_exact(kind):
         warnings.simplefilter("ignore")
         exact = build("agg EL 1 claim sev 100 * beta 5 1.3 fixed")
         approx = build(f"agg AL 1 claim sev 100 * beta 5 1.3 fixed approximate {kind}")
-    assert exact.agg_skew < 0
+    assert exact.actual_skew < 0
     assert approx.sevs[0].sev_reflect is True
     assert approx._signed_sev is True
     np.testing.assert_allclose(_empirical(approx), _theory(exact), rtol=REL)
@@ -98,7 +98,7 @@ def test_symmetric_uses_normal_limit():
         warnings.simplefilter("ignore")
         exact = build("agg ES dfreq [3] dsev [1 2 3]")
         approx = build("agg AS dfreq [3] dsev [1 2 3] approximate sgamma")
-    assert abs(exact.agg_skew) < 1e-9
+    assert abs(exact.actual_skew) < 1e-9
     assert approx.sevs[0].sev_name == "norm"
     np.testing.assert_allclose(_empirical(approx)[:2], _theory(exact)[:2], rtol=REL)
     assert abs(approx.est_skew) < 1e-6
@@ -150,7 +150,7 @@ def test_pnl_approximate_loss_part_fitted():
     # the approximation is applied to the loss leg before the PnL snapshots it;
     # observably, E[margin] = consideration - E[loss] = 600000 - 500000 and the
     # net result mass is conserved (the eager group-by loses no mass).
-    assert approx.mean == pytest.approx(100000.0, rel=1e-3)
+    assert approx.est_m == pytest.approx(100000.0, rel=1e-3)
     assert approx.result.to_series().sum() == pytest.approx(1.0, abs=1e-6)
 
 
@@ -170,7 +170,7 @@ def test_portfolio_combine_conserves_mass():
     # total mass and mean track the exact-member portfolio
     assert approx.density_df.p_total.sum() == pytest.approx(
         exact.density_df.p_total.sum(), abs=1e-6)
-    assert approx.agg_m == pytest.approx(exact.agg_m, rel=1e-4)
+    assert approx.actual_m == pytest.approx(exact.actual_m, rel=1e-4)
 
 
 def test_exact_default_is_inert():
@@ -202,7 +202,7 @@ def test_approximate_method_not_shadowed_by_attribute():
     fz = a.approximate("slognorm")                       # the MoM surrogate
     assert hasattr(fz, "cdf") and hasattr(fz, "ppf")     # frozen scipy rv
     # mean of the fit tracks the aggregate mean
-    assert fz.mean() == pytest.approx(a.agg_m, rel=1e-3)
+    assert fz.mean() == pytest.approx(a.actual_m, rel=1e-3)
     # ``approximate('all')`` returns the dict of five fits
     allfits = a.approximate("all")
     assert set(allfits) == {"norm", "gamma", "lognorm", "sgamma", "slognorm"}
@@ -283,7 +283,7 @@ def test_method_symmetric_shifted_degenerates_to_normal_with_warning():
     with pytest.warns(UserWarning, match="symmetric"):
         fz = a.approximate("slognorm", output="scipy")
     # a real normal, not nonsense
-    assert np.isfinite(fz.mean()) and fz.mean() == pytest.approx(a.agg_m, rel=1e-6)
+    assert np.isfinite(fz.mean()) and fz.mean() == pytest.approx(a.actual_m, rel=1e-6)
     assert np.isfinite(fz.cdf(40))
     # the explicit normal is identical and silent
     with warnings.catch_warnings():
@@ -300,7 +300,7 @@ def test_method_all_symmetric_is_quiet_and_admissible():
         allfits = a.approximate("all")
     assert {"norm", "gamma", "lognorm", "sgamma", "slognorm"} == set(allfits)
     # the shifted families degenerated to the normal limit
-    assert allfits["slognorm"].mean() == pytest.approx(a.agg_m, rel=1e-6)
+    assert allfits["slognorm"].mean() == pytest.approx(a.actual_m, rel=1e-6)
 
 
 def test_method_reflected_fit_representability():

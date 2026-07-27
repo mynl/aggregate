@@ -11,7 +11,10 @@
 > `1.0.0b1`; `beta` = fine just after the alpha→beta cut. GitHub issue numbers
 > kept in parentheses as the stable external cross-reference.
 >
-> **Last updated: 2026-06-30** — Retired the cryptic track-code system for
+> **Last updated: 2026-07-27** — Added `[FCC-Surface-Sweep]` (step 1 of
+> `plan-for-v1.md`, pass 1 landed at `1.0.0a149`).
+>
+> **2026-06-30** — Retired the cryptic track-code system for
 > descriptive labels and added the active P&L / reporting sequence on top. Pruned
 > the shipped god-module, P&L-expenses, variable-rating, reinstatement, and
 > bivariate-leg-kernel work (now in `CHANGELOG.md`, through `1.0.0a121`).
@@ -207,6 +210,20 @@
    — wrong-sign distraction for the UW/finance audience). Plan:
    `dev/plan-plotting-punchups.md`. Pairs with `[PnL-API]` plotting; do
    alongside / after. (Related, separate: `[Plot-Severity-Outside-Window]` below.)
+
+5. **[FCC-Surface-Sweep]** `alpha` — **pass 1 DONE (`1.0.0a149`)**, step 1 of
+   `plan-for-v1.md`: work `dev/FEATURES.csv` class by class until the
+   first-class-citizen surface is complete and consistent across the nine
+   classes. Landed: `agg_*` → `actual_*` (so the moment families are
+   `actual_*` theory vs `est_*` grid); `PnL.mean/sd/cv/skew` → `est_*`;
+   `prob_loss` → `prob_eq_0` on Agg/Port/PnL; `tail_df` a property everywhere
+   (+ `tail_periods_df`); `info` on all nine; `pprogram`/`_html` on every
+   DecL-creatable class; `Severity.actual_*`; `tail_explanation` on
+   Sev/Freq/Biv; `Portfolio.reins_*` look-throughs; one-line
+   `_text_info_blob` with the validation result. Executable half:
+   `tests/test_fcc_surface.py`. **Still open:** the audit's UNDOCUMENTED list
+   (24 Portfolio/Aggregate capabilities with no CSV row — decide row or
+   private), and whether `Aggregate.sev_*` should follow `actual_*` naming.
 
 **Sequenced around the above:**
 

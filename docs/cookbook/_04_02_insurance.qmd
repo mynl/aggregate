@@ -28,10 +28,10 @@ show(gross)
 
 ```{python}
 # aggregate mean ≈ E[N] × E[X]; est vs theoretic to grid accuracy
-print(f'agg mean       {gross.agg_m:,.1f}')
+print(f'agg mean       {gross.actual_m:,.1f}')
 print(f'E[N] × E[X]    {gross.n * gross.sev_m:,.1f}')
-print(f'est vs theoretic mean  {gross.est_m:,.2f}  vs  {gross.agg_m:,.2f}')
+print(f'est vs theoretic mean  {gross.est_m:,.2f}  vs  {gross.actual_m:,.2f}')
 ```
 
-<!-- TODO(author): confirm attribute names (agg_m / n / sev_m / est_m) against the
+<!-- TODO(author): confirm attribute names (actual_m / n / sev_m / est_m) against the
      calibrated book; add a CV/skew line. -->

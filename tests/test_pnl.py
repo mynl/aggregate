@@ -57,7 +57,7 @@ def test_obligation_books_signed():
     assert a.stats_df.loc[('Obligation', 'Loss'), 'EX'] == \
         pytest.approx(-700.0, rel=TOL)
     # net = 1000 - 700 = 300
-    assert a.mean == pytest.approx(300.0, rel=TOL, abs=2.0)
+    assert a.est_m == pytest.approx(300.0, rel=TOL, abs=2.0)
 
 
 # ----------------------------------------------------------------------
@@ -71,18 +71,18 @@ def test_obligation_books_signed():
 def test_mean_across_exposure_forms(program, consid, e_loss):
     """net mean = consideration - E[loss] for lr / claims / loss heads."""
     a = build(program)
-    assert a.mean == pytest.approx(consid - e_loss, rel=TOL, abs=TOL)
+    assert a.est_m == pytest.approx(consid - e_loss, rel=TOL, abs=TOL)
 
 
 def test_sd_invariant_skew_flips():
     """sd unchanged, skew sign-flipped relative to the bare loss aggregate."""
     pnl = build('pnl X 1000 prem less agg X_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     loss = build('agg L 1000 prem at 0.7 lr sev gamma 100 cv 0.5 poisson')
-    assert pnl.mean == pytest.approx(1000 - loss.est_m, rel=TOL, abs=TOL)
+    assert pnl.est_m == pytest.approx(1000 - loss.est_m, rel=TOL, abs=TOL)
     # spread invariant under the consideration shift + reflection
-    assert pnl.sd == pytest.approx(loss.est_sd, rel=TOL)
+    assert pnl.est_sd == pytest.approx(loss.est_sd, rel=TOL)
     # reflection flips the skew sign
-    assert pnl.skew == pytest.approx(-loss.est_skew, rel=2e-2, abs=1e-3)
+    assert pnl.est_skew == pytest.approx(-loss.est_skew, rel=2e-2, abs=1e-3)
 
 
 def test_make_pnl_equivalence():
@@ -90,8 +90,8 @@ def test_make_pnl_equivalence():
     direct = build('pnl X 100 prem less agg X_e 7 claims sev gamma 100 cv 0.5 poisson')
     via = build('agg L 7 claims sev gamma 100 cv 0.5 poisson').make_pnl(100)
     assert isinstance(via, PnL)
-    assert via.mean == pytest.approx(direct.mean, rel=TOL, abs=TOL)
-    assert via.sd == pytest.approx(direct.sd, rel=TOL)
+    assert via.est_m == pytest.approx(direct.est_m, rel=TOL, abs=TOL)
+    assert via.est_sd == pytest.approx(direct.est_sd, rel=TOL)
 
 
 # ----------------------------------------------------------------------
@@ -102,16 +102,17 @@ def test_vector_consideration():
     a = build('pnl X [100 200 100] prem less agg X_e [100 200 100] prem at .8 lr [1000 2000 5000] xs 0 '
               'sev lognorm 500 cv 2 poisson')
     # consideration = sum = 400; mean = 400 - 0.8 * 400 = 80
-    assert a.mean == pytest.approx(80.0, rel=TOL, abs=0.5)
+    assert a.est_m == pytest.approx(80.0, rel=TOL, abs=0.5)
 
 
 # ----------------------------------------------------------------------
-# P(loss) = P(net < 0) = loss survival at the consideration
+# prob_eq_0 = P(net == 0) = the break-even atom
 # ----------------------------------------------------------------------
-def test_prob_loss_matches_loss_survival():
-    pnl = build('pnl X 100 prem less agg X_e 7 claims sev gamma 100 cv 0.5 poisson')
-    loss = build('agg L 7 claims sev gamma 100 cv 0.5 poisson')
-    assert pnl.prob_loss == pytest.approx(float(loss.sf(100)), rel=2e-2, abs=2e-3)
+def test_prob_eq_0_is_the_break_even_atom():
+    """A discrete P&L breaks even exactly when the loss equals the premium."""
+    pnl = build('pnl X 100 prem less agg X_e dfreq [1] dsev [0 100 250] [.2 .5 .3]')
+    # net in {100, 0, -150}; break-even <=> loss == 100, probability 0.5
+    assert pnl.prob_eq_0 == pytest.approx(0.5, abs=1e-12)
 
 
 # ----------------------------------------------------------------------
@@ -121,9 +122,9 @@ def test_per_claim_vs_once_distinction():
     """``pnl 100 prem less 5 claims`` (once) differs from a per-claim constant."""
     once = build('pnl P 100 prem less agg P_e 5 claims sev gamma 8 cv 0.5 poisson')
     per_claim = build('agg S 5 claims ssev 100 - gamma 8 cv 0.5 poisson')
-    assert once.mean == pytest.approx(100 - 5 * 8, rel=TOL, abs=0.5)
+    assert once.est_m == pytest.approx(100 - 5 * 8, rel=TOL, abs=0.5)
     assert per_claim.est_m == pytest.approx(5 * (100 - 8), rel=2e-2, abs=1.0)
-    assert abs(once.mean - per_claim.est_m) > 100
+    assert abs(once.est_m - per_claim.est_m) > 100
 
 
 # ----------------------------------------------------------------------
@@ -134,7 +135,7 @@ def test_mass_conserved_and_grid_straddles_zero():
     gd = a.result
     assert gd.p.sum() == pytest.approx(1.0, abs=1e-6)
     net = gd.x
-    assert net.min() < a.mean < net.max()
+    assert net.min() < a.est_m < net.max()
     assert net.min() < 0 < net.max()           # a P&L can be a loss
 
 
@@ -145,8 +146,12 @@ def test_cdf_q_sf_consistent():
     a = build('pnl X 1000 prem less agg X_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     # sf is exactly 1 - cdf
     assert a.sf(50.0) == pytest.approx(1 - a.cdf(50.0), abs=1e-12)
-    # prob_loss = P(net<0); cdf(0) = P(net<=0): equal up to the atom at 0 (one bucket)
-    assert a.prob_loss == pytest.approx(a.cdf(0.0), abs=5e-3)
+    # prob_eq_0 = the atom at exactly 0; cdf(0) = P(net <= 0) includes it, so the
+    # two agree up to the mass strictly below 0. Cross-checks the atom-backed
+    # property against the group-by-value result GridDistribution.
+    gd = a.result
+    assert a.prob_eq_0 == pytest.approx(float(gd.p[gd.x == 0].sum()), abs=1e-12)
+    assert 0.0 <= a.prob_eq_0 <= a.cdf(0.0)
     # median bracketed by the grid; cdf at the median ~ 0.5
     med = a.q(0.5)
     assert a.cdf(med) >= 0.5 - 1e-9
@@ -194,9 +199,9 @@ def test_function_valued_consideration():
     flat = base.make_pnl(100.0)
     swing = base.make_pnl(lambda x: 100.0 + 0.5 * x)
     # net mean: flat = 100 - E[X]; swing = 100 - 0.5 E[X]
-    assert swing.mean == pytest.approx(100.0 - 0.5 * base.agg_m, rel=TOL, abs=1.0)
+    assert swing.est_m == pytest.approx(100.0 - 0.5 * base.actual_m, rel=TOL, abs=1.0)
     # the swing absorbs half the loss volatility -> SD halved
-    assert swing.sd == pytest.approx(0.5 * flat.sd, rel=1e-2)
+    assert swing.est_sd == pytest.approx(0.5 * flat.est_sd, rel=1e-2)
     assert swing.result.to_series().sum() == pytest.approx(1.0, abs=1e-6)
 
 
@@ -215,9 +220,9 @@ def test_signed_dsev_pnl_exact():
     assert gd.p.sum() == pytest.approx(1.0, abs=1e-12)
     np.testing.assert_allclose(support, [2.0, 4.0, 6.0, 8.0])
     np.testing.assert_allclose(probs, [0.125, 0.375, 0.375, 0.125], atol=1e-12)
-    assert a.mean == pytest.approx(5.0, abs=1e-9)
-    assert a.sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
-    assert a.skew == pytest.approx(0.0, abs=1e-9)
+    assert a.est_m == pytest.approx(5.0, abs=1e-9)
+    assert a.est_sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
+    assert a.est_skew == pytest.approx(0.0, abs=1e-9)
 
 
 def test_signed_dsev_pnl_asymmetric_mean():
@@ -227,7 +232,7 @@ def test_signed_dsev_pnl_asymmetric_mean():
         a = build('pnl Y 10 premium less agg Y_e dfreq[2] dsev[-2 1 3] [.5 .3 .2]', bs=1)
     # per-claim E[X] = -2(.5) + 1(.3) + 3(.2) = -0.1; two claims -> E[L] = -0.2
     assert a.result.p.sum() == pytest.approx(1.0, abs=1e-12)
-    assert a.mean == pytest.approx(10.0 - 2 * (-0.1), abs=1e-9)
+    assert a.est_m == pytest.approx(10.0 - 2 * (-0.1), abs=1e-9)
 
 
 def test_signed_ssev_pnl_mass_and_mean():
@@ -237,7 +242,7 @@ def test_signed_ssev_pnl_mass_and_mean():
         a = build('pnl Z 100 premium less agg Z_e 5 claims ssev 20 - lognorm 10 cv 0.5 poisson')
     assert a.result.p.sum() == pytest.approx(1.0, abs=1e-5)
     # loss sev = 20 - lognorm(mean 10) -> per-claim mean 10; 5 claims -> E[L]=50
-    assert a.mean == pytest.approx(100 - 50, abs=0.5)
+    assert a.est_m == pytest.approx(100 - 50, abs=0.5)
 
 
 # ----------------------------------------------------------------------
@@ -414,7 +419,7 @@ def test_consolidated_net_position_drives_moments():
     agg = build(_REINS)
     p = agg.make_pnl(gross=5500, ceded=1800)
     e_net = float((agg.xs * agg.agg_density_net).sum())
-    assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
+    assert p.est_m == pytest.approx(3700.0 - e_net, rel=1e-3)
     df = p.summary_df
     assert list(df.index) == ['Consideration', 'Obligation', 'Margin']
     assert df.loc['Consideration', 'EX'] == pytest.approx(3700.0)
@@ -450,7 +455,7 @@ def test_xpnl_walk_rows_and_means_add():
     # the walk's grand result mean = the consolidated pnl's margin
     p = agg.make_pnl(gross=5500, ceded=1800)
     assert s.loc[('All', 'Margin', 'Total'), 'EX'] == \
-        pytest.approx(p.mean, abs=1e-9)
+        pytest.approx(p.est_m, abs=1e-9)
 
 
 def test_net_only_on_reins_agg():
@@ -459,7 +464,7 @@ def test_net_only_on_reins_agg():
     p = agg.make_pnl(consideration=3700)
     assert isinstance(p, PnL)
     e_net = float((agg.xs * agg.agg_density_net).sum())
-    assert p.mean == pytest.approx(3700.0 - e_net, rel=1e-3)
+    assert p.est_m == pytest.approx(3700.0 - e_net, rel=1e-3)
     # single-group: a flat card and a two-level stats sheet; the premium leg
     # default is 'premium' (one canonical name across faces)
     assert list(p.summary_df.index) == ['Consideration', 'Obligation', 'Margin']

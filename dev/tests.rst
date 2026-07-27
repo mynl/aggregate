@@ -27,7 +27,7 @@ library and either passes (the fact holds) or fails (it doesn't). For example:
 
    def test_dice_mean_is_3point5():
        a = build('agg D dfreq [1] dsev [1:6]')   # one roll of a fair die
-       assert abs(a.agg_m - 3.5) < 1e-12          # the mean should be 3.5
+       assert abs(a.actual_m - 3.5) < 1e-12          # the mean should be 3.5
 
 The magic word is ``assert``: "I assert that this is true." If it isn't, the
 test fails and you find out *immediately* that a change broke something. A

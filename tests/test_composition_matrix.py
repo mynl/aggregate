@@ -127,7 +127,7 @@ def test_gc_feat_walk_has_occ_step_and_true_gross(uw):
     # ...and the consolidated pnl (exact net-occ marginal) agrees with the
     # joint-riding walk to joint-grid accuracy
     p = _build(uw, 'pnl', 'CBGF')
-    assert p.mean == pytest.approx(
+    assert p.est_m == pytest.approx(
         s.loc[('All', 'Margin', 'Total'), 'EX'], rel=5e-3)
     # one shared joint -> the scenario ladder
     assert 'κ01' in s.columns and 'P01' not in s.columns
@@ -172,7 +172,7 @@ def test_reinst_feat_routes_through_joint_and_keeps_cap(uw):
     # ([Decision-PnL-Is-Consolidated]); agrees with the walk exactly
     pb = _build(uw, 'pnl', 'CBRF')
     assert list(pb.stats_df.index.names) == ['View', 'Line']
-    assert pb.mean == pytest.approx(
+    assert pb.est_m == pytest.approx(
         sb.loc[('All', 'Margin', 'Total'), 'EX'], abs=1e-12)
     # the swing premium rides the net-premium leg (stochastic)
     assert pb.stats_df.xs('net premium', level='Line').iloc[0]['SD'] > 0
@@ -187,7 +187,7 @@ def test_reinst_feat_consolidated_foots(uw):
     legs = [i for i in s.index if i[1] != 'Total']   # exclude subtotal rows
     assert s.loc[('Margin', 'Total'), 'EX'] == pytest.approx(
         s.loc[legs, 'EX'].sum(), abs=1e-6)
-    assert b.mean == pytest.approx(s.loc[('Margin', 'Total'), 'EX'], abs=1e-9)
+    assert b.est_m == pytest.approx(s.loc[('Margin', 'Total'), 'EX'], abs=1e-9)
 
 
 def test_engine_reference_on_every_face(uw):

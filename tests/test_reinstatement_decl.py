@@ -381,5 +381,5 @@ def test_consolidated_agrees_with_walk_exactly():
     tolerance (unlike the guaranteed-cost occ case)."""
     p = build(_HUMAN)
     x = build(_HUMANX)
-    assert p.mean == pytest.approx(
+    assert p.est_m == pytest.approx(
         x.stats_df.loc[('All', 'Margin', 'Total'), 'EX'], abs=1e-12)

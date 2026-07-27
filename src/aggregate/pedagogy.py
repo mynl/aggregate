@@ -381,21 +381,21 @@ def mixing_convergence(freq_cv, sev_cv, bs=1 / 64):
     a = build('agg M 1 claims sev gamma 1 cv ' + str(sev_cv) +
               ' mixed gamma ' + str(freq_cv), log2=16, bs=bs)
     dfnb = a.density_df[['p']].rename(columns={'p': 1})
-    assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
+    assert np.abs(a.est_m / a.actual_m - 1) < 1e-3
     for freq in [2, 5, 10, 20, 50, 100, 200]:
         a = build(f'agg M {freq} claims sev gamma 1 cv {sev_cv} '
                   f'mixed gamma {freq_cv}', log2=16, bs=bs)
         dfnb[freq] = a.density_df[['p']]
-        assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
+        assert np.abs(a.est_m / a.actual_m - 1) < 1e-3
 
     a = build(f'agg M 1 claims sev gamma 1 cv {sev_cv} poisson', log2=16, bs=bs)
     dfp = a.density_df[['p']].rename(columns={'p': 1})
-    assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
+    assert np.abs(a.est_m / a.actual_m - 1) < 1e-3
     for freq in [2, 5, 10, 20, 50, 100, 200]:
         a = build(f'agg M {freq} claims sev gamma 1 cv {sev_cv} poisson',
                   log2=16, bs=bs)
         dfp[freq] = a.density_df[['p']]
-        assert np.abs(a.est_m / a.agg_m - 1) < 1e-3
+        assert np.abs(a.est_m / a.actual_m - 1) < 1e-3
 
     fig, axs = plt.subplots(2, 2, figsize=(2 * FIG_W, 2 * FIG_H),
                             constrained_layout=True)
@@ -816,7 +816,7 @@ class ClassicalPremium:
         lln = np.nan_to_num(np.log(abs(np.log(ns))))
         lln[lln < 0] = 0
         if show_bounds:
-            var_a = (ag.agg_m * ag.agg_cv) ** 2
+            var_a = (ag.actual_m * ag.actual_cv) ** 2
             lb = means - np.sqrt(2.0 * var_a * ns * lln)
             ub = means + np.sqrt(2.0 * var_a * ns * lln)
             ax.plot(ns, lb, '--', lw=1)
@@ -887,7 +887,7 @@ def natural_scale(port):
     counter = count(0, 1)
     for unit_name in port.unit_names[:3]:
         ag = port[unit_name]
-        ag_ex = ag.agg_m
+        ag_ex = ag.actual_m
         for margin in margins:
             try:
                 ruin, find_u, mean, dfi = ag.pollaczeck_khinchine(

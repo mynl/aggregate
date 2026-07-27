@@ -80,7 +80,7 @@ def build_objects() -> dict:
     objs['Severity'] = a.sevs[0]
     objs['Frequency'] = a.frequency
     try:
-        objs['Bounds'] = Bounds(a, premium=a.agg_m * 1.1)
+        objs['Bounds'] = Bounds(a, premium=a.actual_m * 1.1)
     except Exception as e:                      # pragma: no cover - defensive
         print(f'# WARNING: Bounds construction failed: {e}', file=sys.stderr)
     # AllocationBounds / PricingBounds share the _HullEngine slice geometry but

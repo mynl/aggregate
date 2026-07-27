@@ -86,7 +86,7 @@ def test_fat_tailed_multiline_port_coarsens_via_span():
 
 # ---------------------------------------------------------------------------
 # Plan B -- the non-zero aggregate output window for high-mean / thin-tail
-# aggregates. A concentrated aggregate (agg_cv < 1/z, so its mass band clears 0)
+# aggregates. A concentrated aggregate (actual_cv < 1/z, so its mass band clears 0)
 # is computed on a two-sided window far from 0 via the benign FFT wrap: the
 # severity is laid at period M*bs and the finished aggregate relabelled by
 # round(x_min/bs) (modular np.roll). See dev/done/plan-bucket-window.md.
@@ -106,8 +106,8 @@ def test_window_discrete_high_mean_bs_one():
     assert bool(df.loc['windowed', 'selected'])
     assert a.bs == 1.0, f'expected bs=1 on the integer lattice, got {a.bs}'
     assert a.x_min > 14_000_000
-    assert a.est_m == pytest.approx(a.agg_m, rel=1e-6)
-    assert a.est_cv == pytest.approx(a.agg_cv, rel=1e-3)
+    assert a.est_m == pytest.approx(a.actual_m, rel=1e-6)
+    assert a.est_cv == pytest.approx(a.actual_cv, rel=1e-3)
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
 
 
@@ -128,14 +128,14 @@ def test_window_point_mass_severity_windows():
     assert bool(df.loc['windowed', 'selected'])
     assert a.bs == 1.0, f'expected bs=1 on the integer lattice, got {a.bs}'
     assert a.x_min > 900_000
-    assert a.est_m == pytest.approx(a.agg_m, rel=1e-6)
+    assert a.est_m == pytest.approx(a.actual_m, rel=1e-6)
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
 
 
 def test_window_continuous_high_mean_matches_moments():
     """A high-mean continuous book windows and reproduces its moments.
 
-    ``100000 claims sev lognorm 100 cv 0.5`` has mean 10M, agg_cv ~ 0.0035 --
+    ``100000 claims sev lognorm 100 cv 0.5`` has mean 10M, actual_cv ~ 0.0035 --
     well below ``1/z`` -- so the band clears 0 and the windowed grid is strictly
     finer than the 0-based moment grid. The continuous severity (no lattice)
     sizes ``bs`` from the band width, not from ``x_max``.
@@ -143,8 +143,8 @@ def test_window_continuous_high_mean_matches_moments():
     a = build('agg HM 100000 claims sev lognorm 100 cv 0.5 poisson')
     assert bool(a._bs_window_df.loc['windowed', 'selected'])
     assert a.x_min > 9_000_000
-    assert a.est_m == pytest.approx(a.agg_m, rel=1e-4)
-    assert a.est_cv == pytest.approx(a.agg_cv, rel=1e-3)
+    assert a.est_m == pytest.approx(a.actual_m, rel=1e-4)
+    assert a.est_cv == pytest.approx(a.actual_cv, rel=1e-3)
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
 
 
@@ -181,7 +181,7 @@ def test_window_severity_overflow_falls_back():
     assert not bool(approx._bs_window_df.loc['windowed', 'applies'])
     assert not bool(approx._bs_window_df.loc['windowed', 'selected'])
     assert approx.x_min == 0.0
-    assert approx.est_m == pytest.approx(approx.agg_m, rel=1e-3)
+    assert approx.est_m == pytest.approx(approx.actual_m, rel=1e-3)
 
 
 def test_window_occ_reins_not_windowed():
@@ -201,7 +201,7 @@ def test_window_occ_reins_not_windowed():
 
 
 def test_window_ordinary_aggregate_unchanged():
-    """An ordinary aggregate (agg_cv > 1/z) is untouched: 0-based, no window.
+    """An ordinary aggregate (actual_cv > 1/z) is untouched: 0-based, no window.
 
     Its two-sided window would include 0, so the windowed candidate never
     clears the ``w_lo > 0`` gate; the grid stays byte-for-byte the legacy
@@ -291,7 +291,7 @@ def test_window_asymmetric_skews_to_thick_tail():
     and the payoff reading. The tail shape, not the convention, dictates the
     split (contrast the symmetric book, where the payoff reading flips it).
 
-    The book needs a *materially skewed* aggregate (here ``agg_skew ~ 0.26``):
+    The book needs a *materially skewed* aggregate (here ``actual_skew ~ 0.26``):
     too many claims and the CLT makes the aggregate near-symmetric, where the
     convention tie-breaker dominates instead (the symmetric test above).
     """
@@ -323,7 +323,7 @@ def test_window_heavy_severity_reclaimed_via_sbj_floor():
     assert a.x_min > 0.0                                   # lifted off 0
     assert a.x_min + a.bs * (1 << a.log2) > 1.2e6          # captures the sbj reach
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
-    assert a.est_m == pytest.approx(a.agg_m, rel=1e-2)
+    assert a.est_m == pytest.approx(a.actual_m, rel=1e-2)
 
 
 # ----------------------------------------------------------------------
@@ -346,7 +346,7 @@ def test_sbj_signed_severity_recovers_mass_no_alias():
         a = build('agg LNS 10 claims ssev 100 - lognorm 10 cv 2.5 poisson')
     assert a.x_min < 0.0                                  # grid reaches below 0
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
-    assert a.est_m == pytest.approx(a.agg_m, rel=1e-3)
+    assert a.est_m == pytest.approx(a.actual_m, rel=1e-3)
     # the sbj row is recorded and its lower edge drove the (negative) origin
     assert 'sbj' in a._bs_window_df.index
     assert float(a._bs_window_df.loc['sbj', 'x_min']) < 0.0
@@ -364,7 +364,7 @@ def test_sbj_positive_heavy_extends_when_log2_allows():
         warnings.simplefilter('ignore')
         a = build('agg T5 5000 claims sev lognorm 100 cv 2 poisson', log2=19)
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
-    assert a.est_m == pytest.approx(a.agg_m, rel=1e-4)
+    assert a.est_m == pytest.approx(a.actual_m, rel=1e-4)
     assert float(a._bs_window_df.loc['sbj', 'x_max']) > 7e5
 
 
@@ -393,7 +393,7 @@ def test_sbj_big_en_guard_finite_extent():
         warnings.simplefilter('ignore')
         a = build('agg BigEN 5000 claims sev lognorm 100 cv 2 poisson')
     sbj_hi = float(a._bs_window_df.loc['sbj', 'x_max'])
-    assert np.isfinite(sbj_hi) and sbj_hi > a.agg_m
+    assert np.isfinite(sbj_hi) and sbj_hi > a.actual_m
 
 
 def test_sbj_light_book_byte_stable():
@@ -407,7 +407,7 @@ def test_sbj_light_book_byte_stable():
         warnings.simplefilter('ignore')
         a = build('agg Light 50 claims sev gamma 100 cv 1 poisson')
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
-    assert a.est_m == pytest.approx(a.agg_m, rel=1e-5)
+    assert a.est_m == pytest.approx(a.actual_m, rel=1e-5)
 
 
 def test_sbj_thin_tail_gated_off():
@@ -468,7 +468,7 @@ def test_signed_two_sided_reach_no_collision():
     assert a.x_min < 0.0                                   # negative origin
     assert a.x_min + a.bs * (1 << a.log2) > 5000           # covers the positive reach
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-9)
-    assert a.est_m == pytest.approx(a.agg_m, rel=1e-3)
+    assert a.est_m == pytest.approx(a.actual_m, rel=1e-3)
 
 
 # ----------------------------------------------------------------------
@@ -596,7 +596,7 @@ def test_1p_ordering_mm_le_rms_le_sum_for_light_iid():
 def test_1p_sbj_look_through_floors_extent():
     """A heavy unit floors the combine extent via the SBJ look-through (max_k).
 
-    The ``sbj`` candidate row carries ``agg_m + max_k(sbj_hi_k - ES_k)`` -- the
+    The ``sbj`` candidate row carries ``actual_m + max_k(sbj_hi_k - ES_k)`` -- the
     heaviest unit's one big claim on the combined bulk -- and the realised grid
     top covers it (no clip).
     """

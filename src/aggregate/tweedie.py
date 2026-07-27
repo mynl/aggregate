@@ -676,7 +676,7 @@ class Tweedie:
     def stats(self):
         """Empirical moments of the distribution."""
         if isinstance(self.fz, Aggregate):
-            return self.fz.agg_m, self.fz.agg_var, self.fz.agg_skew
+            return self.fz.actual_m, self.fz.actual_var, self.fz.actual_skew
         elif self.fz:
             return self.fz.stats('mvs')
         else:

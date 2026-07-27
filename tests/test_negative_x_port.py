@@ -206,9 +206,9 @@ def test_describe_mixed_signed_forces_sd_everywhere():
     cols = list(d.columns)
     for u in units:
         assert list(d.xs(u, level='unit').columns) == cols
-    # the unsigned unit's own SD is finite and matches its agg_sd
+    # the unsigned unit's own SD is finite and matches its actual_sd
     plain = p['Plain']
-    assert np.isclose(d.loc[('Plain', 'Agg'), 'SD'], plain.agg_sd)
+    assert np.isclose(d.loc[('Plain', 'Agg'), 'SD'], plain.actual_sd)
 
 
 def test_describe_unsigned_portfolio_uses_cv():

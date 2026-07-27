@@ -161,7 +161,7 @@ power-of-two grid is reported in the ``used`` row.
     ``1.5x`` the moment window**.
 
 ``windowed`` -- the left-tail-aware placement for a *concentrated* book
-    A concentrated aggregate -- ``agg_cv < 1/z`` with
+    A concentrated aggregate -- ``actual_cv < 1/z`` with
     ``z = norm.isf(10**-window_nines)``, equivalently a lower window edge that
     clears ``0`` -- has its whole mass band sitting far above the origin. This
     method computes a *two-sided* window ``[w_lo, w_hi]``
@@ -172,7 +172,7 @@ power-of-two grid is reported in the ``used`` row.
     buckets, which is exact for random frequency (it carries no ``N*s`` shift).
     Eligibility is deliberately narrow: auto origin only
     (``x_min`` not pinned), non-signed, non-affine, finite positive sd, the
-    conservative ``concentrated`` flag from the tail report (``agg_cv <
+    conservative ``concentrated`` flag from the tail report (``actual_cv <
     CONCENTRATION_CV``, ~0.1; a64), and no *occurrence* reinsurance (whose
     severity rides the output grid). A **severity-fit guard** then marks the row
     applicable only when a single occurrence fits the windowed extent

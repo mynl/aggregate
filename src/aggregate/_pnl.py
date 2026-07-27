@@ -101,6 +101,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
+from .constants import INFO_NA, info_row
 from .moments import VALIDATION_NOISE, _snap_noise
 from ._labeled import LabeledMixin
 
@@ -769,6 +770,9 @@ class PnL(LabeledMixin):
         #: behind it ([Engine-Reference-On-PnL], ``dev/PLAN-A.md``). ``None``
         #: on a hand-built kernel P&L.
         self.engine = None
+        # Backing store for the ``program`` property: ``build`` stamps the
+        # declaration here; it otherwise falls back to the engine's.
+        self._program = ''
         #: The resolved cession economics dict (``pc_occ`` / ``pc_agg`` /
         #: ``c_occ`` / ``c_agg`` / ``gross`` / ``ceded``) -- the observable of
         #: the DecL ``deposit`` / ``rol`` / ``rate`` / ``cede`` resolution,
@@ -1174,35 +1178,56 @@ class PnL(LabeledMixin):
         distribution."""
         return self._grand_result.gd
 
+    # The four moments carry the ``est_`` prefix, not ``actual_``: a P&L is
+    # evaluated per-atom over the *source's realised grid*, so every moment
+    # inherits that grid's discretization. (Within the ledger those per-atom
+    # values are exact -- that is the ``EX`` basis ``validation_df`` audits a
+    # rebucketed ``bs > 0`` leg against -- but relative to the analytic
+    # ``actual_*`` moments of the generating Aggregate they are estimates.)
     @property
-    def mean(self):
-        """``E[result]`` (signed grand net)."""
+    def est_m(self):
+        """``E[result]`` (signed grand net), off the realised grid."""
         return self._grand_result.moments[0]
 
     @property
-    def sd(self):
+    def est_sd(self):
         """SD of the grand result."""
         return self._grand_result.moments[1]
 
     @property
-    def cv(self):
+    def est_cv(self):
         """CV of the grand result (meaningless near break-even; reported for
         symmetry)."""
         return self._grand_result.moments[2]
 
     @property
-    def skew(self):
+    def est_skew(self):
         """Skewness of the grand result."""
         return self._grand_result.moments[3]
 
     @property
-    def prob_loss(self):
-        """``P(result < 0)`` -- the probability the position loses money."""
+    def prob_eq_0(self):
+        """``P(result == 0)`` -- the probability the position exactly breaks even.
+
+        The sign-neutral break-even probability, shared with
+        :attr:`~aggregate.distributions.Aggregate.prob_eq_0` and
+        :attr:`~aggregate.portfolio.Portfolio.prob_eq_0`. On a loss object it
+        reads as "no loss"; on a payoff / P&L object as "exactly break even".
+
+        Notes
+        -----
+        Replaces the old ``prob_loss`` (``P(result < 0)``), which had no
+        meaning on a loss-valued object -- the probability of *a loss* and the
+        probability of *losing money* are opposite tails of the same number.
+        Mass is summed over the atoms at exactly zero, so a continuous P&L
+        straddling zero reports ``0.0``; the atom is genuine (and often large)
+        for discrete and reinsurance-net books.
+        """
         if self._probs is None:                # sweep-backed (massive source)
             gd = self._grand_result.gd
-            return float(gd.p[gd.x < 0].sum())
+            return float(gd.p[gd.x == 0].sum())
         v = self._grand_result.values
-        return float(self._probs[v < 0].sum())
+        return float(self._probs[v == 0].sum())
 
     def q(self, p, kind='lower'):
         """Quantile (value at risk) of the result. Delegates to the result GD."""
@@ -1776,6 +1801,74 @@ class PnL(LabeledMixin):
             return self._construction_explanation
         return (self._generic_construction_description() + '\n\n'
                 + self._replay_block())
+
+    @property
+    def info(self):
+        """Fixed-layout multi-line summary string (terse).
+
+        Every row is always present, in the same order, for every ``PnL``; a
+        value that does not apply (no engine, no economics) renders as
+        ``n/a``. Shares the label/value convention
+        (:func:`aggregate.constants.info_row`) with ``Aggregate`` /
+        ``Portfolio``. The row catalogue is documented in
+        ``dev/info-strings.rst``; the narrative twin is
+        :attr:`construction_description`.
+        """
+        scale_value, scale_label = self.scale
+        engine = self.engine
+        rows = [
+            ('pnl object name', self.name),
+            ('label', self.label),
+            ('groups', len(self._egroups)),
+            ('legs', sum(len(g.cons) + len(g.obl) for g in self._egroups)),
+            ('role', self.role or 'multi-group'),
+            ('result name', self.result_name),
+            ('scale', f'{scale_value:,.6g} ({scale_label})'),
+            ('E[result]', f'{self.est_m:,.6g}'),
+            ('SD(result)', f'{self.est_sd:,.6g}'),
+            ('CV(result)', f'{self.est_cv:,.6g}'),
+            ('skew(result)', f'{self.est_skew:,.6g}'),
+            ('P(X=0)', f'{self.prob_eq_0:.6g}'),
+            ('engine', f'{type(engine).__name__} {engine.name}'
+                       if engine is not None else INFO_NA),
+            ('source', type(self._source).__name__),
+            ('economics', 'resolved' if self.economics else INFO_NA),
+        ]
+        return '\n'.join(info_row(label, value) for label, value in rows)
+
+    @property
+    def program(self) -> str:
+        """The DecL text this P&L was declared with.
+
+        ``build`` stamps the declaration here directly; a P&L snapshotted from
+        an engine falls back to :attr:`engine`'s program (the inner
+        ``Aggregate`` / ``Portfolio`` the DecL ``pnl`` / ``xpnl`` statement
+        built). ``''`` for a hand-built kernel P&L with neither.
+        """
+        return self._program or getattr(self.engine, 'program', '') or ''
+
+    @program.setter
+    def program(self, value):
+        self._program = value or ''
+
+    @property
+    def pprogram(self) -> str:
+        """Canonical DecL program text, rendered from the parsed spec.
+
+        The P&L twin of :attr:`~aggregate.distributions.Aggregate.pprogram`:
+        re-parses :attr:`program` (the declaration carried on :attr:`engine`)
+        and renders it through
+        :func:`aggregate.decl_writer.format_program`. ``''`` for a hand-built
+        kernel P&L.
+        """
+        from .decl_writer import format_program
+        return format_program(self.program, fmt='text')
+
+    @property
+    def pprogram_html(self) -> str:
+        """Syntax-highlighted DecL program for IPython / Jupyter display."""
+        from .decl_writer import format_program
+        return format_program(self.program, fmt='html')
 
     # ``label`` comes from ``LabeledMixin`` (the shared label surface);
     # ``name`` stays the identity handle. See dev/done/plan-labels.md.

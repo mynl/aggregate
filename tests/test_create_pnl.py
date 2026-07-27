@@ -79,7 +79,7 @@ def test_buy_role_flips_every_row_and_percentiles():
                consideration=4.0, obligation=lambda x: np.minimum(x, 20) * 0.5)
     buy = PnL(name='b', source=(_VALS, probs), role='buy',
               consideration=4.0, obligation=lambda x: np.minimum(x, 20) * 0.5)
-    assert sell.mean == pytest.approx(-buy.mean, abs=TOL)
+    assert sell.est_m == pytest.approx(-buy.est_m, abs=TOL)
     ss, bs = sell.stats_df, buy.stats_df
     pcols = [c for c in ss.columns if c.startswith('κ')]
     assert len(pcols) == 9                   # the scenario ladder is present
@@ -317,8 +317,8 @@ def test_derived_rows_stay_exact_alongside_bs_legs():
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
             consideration=15.0,
             obligation=[Leg('loss', lambda x: x, bs=10.0)])
-    assert p.mean == pytest.approx(5.0, abs=TOL)
-    assert p.sd == pytest.approx(10.0, abs=1e-9)
+    assert p.est_m == pytest.approx(5.0, abs=TOL)
+    assert p.est_sd == pytest.approx(10.0, abs=1e-9)
 
 
 # ----------------------------------------------------------------------
@@ -391,7 +391,7 @@ def test_count_axis_fixed_plus_variable_cost():
     # E[cost] = 50*E[N] + 1.5*E[X] = 50*1 + 1.5*100 = 200, booked -200
     assert plant.stats_df.loc[('Obligation', 'cost'), 'EX'] == \
         pytest.approx(-200.0)
-    assert plant.mean == pytest.approx(400.0 - 200.0)
+    assert plant.est_m == pytest.approx(400.0 - 200.0)
 
 
 # ----------------------------------------------------------------------

@@ -109,8 +109,8 @@ everywhere) and double as the gentle intro to the common FCC surface.
 | 8 | `_08_00_portfolio` + `_01_construction`, `_02_pricing`, `_03_samples` | multi-unit build; distortion pricing + allocation; the **switcheroo** | Reconciliation, Cross-Object, Independent-Oracle |
 | 9 | `_09_00_bivariate` + `_01_massive` | occ view-pairs (`netceded`/…); disk-backed zarr — **both not auto-run** | Cross-Object, Reconciliation |
 
-Aggregate moment attributes verified on the house book (`agg_m`, `est_m`,
-`sev_m`, `n`, `agg_cv`, `est_cv`) reconcile: `agg_m` = 7500 = 10000 × 75% lr,
+Aggregate moment attributes verified on the house book (`actual_m`, `est_m`,
+`sev_m`, `n`, `actual_cv`, `est_cv`) reconcile: `actual_m` = 7500 = 10000 × 75% lr,
 `n × sev_m` ≈ 7500. Used live in `_04_02_insurance` beat 4.
 
 ## [Cookbook-Decisions] (resolved 2026-07-07)

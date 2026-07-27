@@ -133,13 +133,13 @@ The function ``lognorm_lev`` computes limited expected values for the lognormal.
 
     from aggregate import lognorm_lev
 
-    mu, sigma = lognorm_fit(a01.agg_m, a01.agg_cv)
+    mu, sigma = lognorm_fit(a01.actual_m, a01.actual_cv)
     lev = lognorm_lev(mu, sigma, 1, 2500)
     lev_agg = a01.density_df.loc[2500, 'lev']
-    default = a01.agg_m - lev
+    default = a01.actual_m - lev
     epd = default / a01.est_m
     default_agg = a01.est_m - lev_agg
-    bit = pd.DataFrame((lev, default, lev_agg, default_agg, epd, default_agg / a01.agg_m),
+    bit = pd.DataFrame((lev, default, lev_agg, default_agg, epd, default_agg / a01.actual_m),
                  index=pd.Index(['Lognorm LEV', 'Lognorm Default', 'Agg LEV',
                  'Agg Default', 'Lognorm EPD', 'Agg EPD'],
                  name='Item'),

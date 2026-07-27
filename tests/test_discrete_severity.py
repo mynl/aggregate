@@ -147,9 +147,9 @@ def test_dice_aggregate_exact_severity_moments():
     # the per-claim severity mean is exactly 3.5 (a fair die)
     assert a.sevs[0].moms()[0] == 3.5
     # one claim => aggregate mean equals severity mean, exact
-    assert a.agg_m == pytest.approx(3.5, abs=1e-9)
+    assert a.actual_m == pytest.approx(3.5, abs=1e-9)
 
 
 def test_layered_dsev_aggregate_builds():
     a = build("agg DISC.Layer 3 claims 5 xs 3 dsev [1 4 8] [.5 .3 .2] fixed")
-    assert a is not None and a.agg_m > 0
+    assert a is not None and a.actual_m > 0

@@ -14,6 +14,7 @@ from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov, brentq
 from scipy.optimize import NoConvergence  # noqa
 from . import tail as _tail
+from .constants import INFO_NA, info_row
 
 from ._aggregate_compute import evaluate_pgf_polynomial
 from ._severity import validate_discrete_distribution
@@ -308,6 +309,52 @@ class Frequency(object):
         return f'Frequency object of type {self.freq_name}\n{super(Frequency, self).__repr__()}'
 
     @property
+    def info(self):
+        """Fixed-layout multi-line summary string (terse).
+
+        Every row is always present, in the same order, for every
+        ``Frequency``; a value that does not apply -- or that needs the
+        exposure the owning :class:`Aggregate` supplies (the moment rows before
+        :attr:`en` is stamped) -- renders as ``n/a``. Shares the label/value
+        convention (:func:`aggregate.constants.info_row`) with ``Aggregate`` /
+        ``Portfolio`` / ``Severity``. The row catalogue is documented in
+        ``dev/info-strings.rst``.
+        """
+        if self.en is None:
+            en_s = sd_s = vm_s = INFO_NA
+        else:
+            en = float(self.en)
+            ex1, ex2, _ = self.freq_moms(en)
+            var = max(ex2 - ex1 * ex1, 0.0)
+            en_s = f'{ex1:,.6g}'
+            sd_s = f'{var ** 0.5:,.6g}'
+            vm_s = f'{var / ex1:,.6g}' if ex1 > 0 else INFO_NA
+        rows = [
+            ('frequency object name', self.name),
+            ('frequency distribution', self.freq_name),
+            ('freq_a', f'{self.freq_a:,.6g}' if self.freq_a else INFO_NA),
+            ('freq_b', f'{self.freq_b:,.6g}' if self.freq_b else INFO_NA),
+            ('zero modified', bool(self.freq_zm)),
+            ('freq_p0', f'{self.freq_p0:,.6g}' if self.freq_zm else INFO_NA),
+            ('E[N]', en_s),
+            ('SD(N)', sd_s),
+            ('var / mean', vm_s),
+        ]
+        s = [info_row(label, value) for label, value in rows]
+        s.append(info_row('frequency tail', self.tail_description))
+        return '\n'.join(s)
+
+    @property
+    def name(self) -> str:
+        """Object name -- the frequency family (``'poisson'``, ``'negbin'``, ...).
+
+        Read-only alias of :attr:`freq_name`, so every first-class class
+        answers to ``name``. A frequency has no user-settable identity of its
+        own: it *is* its family plus its parameters.
+        """
+        return self.freq_name
+
+    @property
     def tail_description(self) -> str:
         """One line: this frequency family's right-tail class (count layer).
 
@@ -315,9 +362,57 @@ class Frequency(object):
         depends on the exposure (the aggregate's ``n``), so a standalone
         frequency reports only its family class; the full count support appears
         in the aggregate's :attr:`~aggregate.distributions.Aggregate.tail_behavior_df`.
+        The verbose form is :attr:`tail_explanation`.
         """
         rung, _ = _tail.classify_frequency(self)
         return f'{self.freq_name} frequency, {_tail.tail_class_label(rung)} count'
+
+    @property
+    def tail_explanation(self) -> str:
+        """Verbose prose over the count law: family, dispersion, tail class.
+
+        The Frequency twin of
+        :attr:`~aggregate.distributions.Aggregate.tail_explanation`: the family
+        and its parameters, the zero-modification if any, how the count tail
+        classifies (and hence whether the *aggregate* tail can be set by the
+        frequency rather than the severity), and -- once the owning
+        :class:`~aggregate.distributions.Aggregate` has stamped :attr:`en` --
+        the mean, SD and variance-to-mean ratio that says over- or
+        under-dispersed relative to Poisson.
+        """
+        rung, log_concave = _tail.classify_frequency(self)
+        label = _tail.tail_class_label(rung)
+        article = 'an' if label[:1].lower() in 'aeiou' else 'a'
+        out = [f'{self.freq_name.capitalize()} frequency with {article} '
+               f'{label} count tail.']
+        if self.freq_zm:
+            out.append(f'Zero-modified with P(N = 0) = {self.freq_p0:.6g}.')
+        if self.en is not None:
+            en = float(self.en)
+            ex1, ex2, _ = self.freq_moms(en)
+            var = max(ex2 - ex1 * ex1, 0.0)
+            sd = var ** 0.5
+            out.append(f'E[N] = {ex1:,.6g}, SD(N) = {sd:,.6g}.')
+            if ex1 > 0:
+                vm = var / ex1
+                if abs(vm - 1.0) <= 1e-6:
+                    disp = 'Poisson-dispersed (var / mean = 1)'
+                elif vm > 1.0:
+                    disp = f'over-dispersed relative to Poisson (var / mean = {vm:,.4g})'
+                else:
+                    disp = f'under-dispersed relative to Poisson (var / mean = {vm:,.4g})'
+                out.append(f'It is {disp}.')
+        else:
+            out.append('A parametric frequency is a family until the exposure '
+                       'fixes its mean, so no moments are reported here (the '
+                       'owning Aggregate stamps en at construction).')
+        if _tail.is_thick(rung):
+            out.append('A thick count tail can set the aggregate tail on its '
+                       'own, even under a thin severity.')
+        elif log_concave:
+            out.append('The count law is log-concave, so the aggregate tail '
+                       'follows the severity.')
+        return ' '.join(out)
 
     @cached_property
     def freq_df(self):

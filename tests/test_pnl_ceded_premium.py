@@ -183,7 +183,7 @@ def test_walk_means_add_down_the_sheet():
     # engine's exact net marginal
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
-    assert p.mean == pytest.approx(
+    assert p.est_m == pytest.approx(
         s.loc[('All', 'Margin', 'Total'), 'EX'], rel=5e-3)
 
 

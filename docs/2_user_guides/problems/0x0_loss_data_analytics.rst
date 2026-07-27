@@ -297,7 +297,7 @@ recognize the severity is limited by the second excess layer and proceed as foll
           'occurrence net of 0.15 so 5000 xs 0 '
           'fixed')
     qd(a)
-    print('\n', a.agg_m, a.agg_sd)
+    print('\n', a.actual_m, a.actual_sd)
 
 .. _lda aggregate loss distributions:
 
@@ -352,7 +352,7 @@ Your budget for prizes equals the expected aggregate cash prizes plus the standa
               'dsev [0 100 1000] [.2 .7 .1]', update=False)
     display(a)
     mv(a)
-    a.agg_m + a.agg_sd
+    a.actual_m + a.actual_sd
 
 .. _lda geometric discrete:
 
@@ -429,7 +429,7 @@ Here are the moments for the approximation. The ``approximate`` function returns
 .. ipython:: python
     :okwarning:
 
-    print(a.sf(2000), a.agg_m, a.agg_var)
+    print(a.sf(2000), a.actual_m, a.actual_var)
 
     fz = a.approximate('norm')
     fz.sf(2000), a.sf(2000)
@@ -705,7 +705,7 @@ The spacing in the agg programs is for clarity. We could also program using ``df
     pfs = [retained, insured, total]
     answers = pd.DataFrame(columns=['retained', 'insured', 'total'])
     answers.index.name = 'statistic'
-    answers.loc['expected claim amount'] = [x.agg_m for x in pfs]
+    answers.loc['expected claim amount'] = [x.actual_m for x in pfs]
     for p in [.8, .9, .95, .99]:
         answers.loc[f'claim p_{p:.2f}'] = [x.q(p) for x in pfs]
     qd(answers)

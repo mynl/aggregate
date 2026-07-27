@@ -583,7 +583,7 @@ An :class:`Aggregate` object acts like a discrete probability distribution. Ther
 .. ipython:: python
     :okwarning:
 
-    print(a02.agg_m, a02.agg_sd, a02.agg_cv, a02.agg_skew)
+    print(a02.actual_m, a02.actual_sd, a02.actual_cv, a02.actual_skew)
     print(a02.est_m, a02.est_sd, a02.est_cv, a02.est_skew)
     print(a02.sev_m, a02.sev_sd, a02.sev_cv, a02.sev_skew)
     print(a02.est_sev_m, a02.est_sev_sd, a02.est_sev_cv, a02.est_sev_skew)
@@ -817,7 +817,7 @@ A :class:`Portfolio` object acts like a discrete probability distribution, the s
 .. ipython:: python
     :okwarning:
 
-    print(p07.agg_m, p07.agg_sd, p07.agg_cv, p07.agg_skew)
+    print(p07.actual_m, p07.actual_sd, p07.actual_cv, p07.actual_skew)
     print(p07.est_m, p07.est_sd, p07.est_cv, p07.est_skew)
 
 They have probability mass, cumulative distribution, survival, and quantile (inverse of distribution) functions.
@@ -835,7 +835,7 @@ The :class:`Aggregate` objects in the :class:`Portfolio` can be iterated over.
     :okwarning:
 
     for u in p07:
-        print(u.name, u.agg_m, u.est_m)
+        print(u.name, u.actual_m, u.est_m)
 
 .. _10 min est bs:
 
@@ -1137,9 +1137,9 @@ Further control over updating is available, as described in REF.
 Statistical Functions
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-:class:`Aggregate` and :class:`Portfolio` objects include basic mean, CV, standard deviation, variance, and skewness statistics as attributes. Those prefixed ``agg`` are based on exact calculations:
+:class:`Aggregate` and :class:`Portfolio` objects include basic mean, CV, standard deviation, variance, and skewness statistics as attributes. Those prefixed ``actual`` are based on exact calculations:
 
-* ``agg_m``, ``agg_cv``, ``agg_sd``, ``agg_var``, and ``agg_skew``
+* ``actual_m``, ``actual_cv``, ``actual_sd``, ``actual_var``, and ``actual_skew``
 
 and prefixed ``est`` are based on the estimated numerical statistics:
 

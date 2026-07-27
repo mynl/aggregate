@@ -291,12 +291,12 @@ class Portfolio(LabeledMixin):
         self._combine_x_min = None      # windowed combine origin (Plan B) or None
 
         # for consistency with Aggregates
-        self.agg_m = self.stats_df.loc[('agg', 'ex1'), 'total']
-        self.agg_cv = self.stats_df.loc[('agg', 'cv'), 'total']
-        self.agg_skew = self.stats_df.loc[('agg', 'skew'), 'total']
+        self.actual_m = self.stats_df.loc[('agg', 'ex1'), 'total']
+        self.actual_cv = self.stats_df.loc[('agg', 'cv'), 'total']
+        self.actual_skew = self.stats_df.loc[('agg', 'skew'), 'total']
         # variance and sd come up in exam questions
-        self.agg_sd = self.agg_m * self.agg_cv
-        self.agg_var = self.agg_sd * self.agg_sd
+        self.actual_sd = self.actual_m * self.actual_cv
+        self.actual_var = self.actual_sd * self.actual_sd
         # these are set when the object is updated
         self.est_m = self.est_cv = self.est_skew = self.est_sd = self.est_var = 0
 
@@ -594,19 +594,23 @@ class Portfolio(LabeledMixin):
         return f'{self.label} at {super().__repr__()}'
 
     def _text_info_blob(self) -> str:
-        """Short plain-text intro for :meth:`qd` -- identity, unit count, grid.
+        """Short plain-text intro for :meth:`qd` -- identity, unit count, grid,
+        validation.
 
-        The portfolio twin of :meth:`Aggregate._text_info_blob`; no validation
-        line (the caller flags a failure separately).
+        The portfolio twin of :meth:`Aggregate._text_info_blob`: **one line**
+        of space-joined sentences, closing with
+        ``Validation: {validation_explanation}.`` exactly as
+        :meth:`_repr_html_` does.
         """
         _n = len(self.agg_list)
         _s = '' if _n == 1 else 's'
-        s = [f'Portfolio object: {self._title_name}',
-             f'Portfolio contains {_n} aggregate component{_s}.']
+        s = [f'Portfolio object: {self._title_name}.',
+             f'Contains {_n} aggregate component{_s}.']
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1 / self.bs)}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
-        return '\n'.join(s)
+        s.append(f'Validation: {self.validation_explanation}.')
+        return ' '.join(s)
 
     def _repr_html_(self):
         """HTML view: short intro (with the inline validation result) and the
@@ -779,6 +783,59 @@ class Portfolio(LabeledMixin):
                 f'(worst-of under independence{driver_txt}). Units -- {units}.')
 
     @property
+    def reins_kinds(self) -> str:
+        """Kinds of reinsurance applied, unit by unit (a look-through).
+
+        Reinsurance lives on the unit, so the portfolio surface is the
+        concatenation of the units'
+        :attr:`~aggregate.distributions.Aggregate.reins_kinds`::
+
+            Unit A: occurrence only. Unit B: none.
+
+        Collapses to a single ``'None'`` when no unit cedes, matching the
+        aggregate's own answer for a clean book so ``info`` reads the same
+        either way.
+
+        Returns
+        -------
+        str
+        """
+        if not self.agg_list:
+            return 'None'
+        kinds = [a.reins_kinds for a in self.agg_list]
+        if all(k == 'None' for k in kinds):
+            return 'None'
+        return ' '.join(f'Unit {a.name}: {k.lower()}.'
+                        for a, k in zip(self.agg_list, kinds))
+
+    @property
+    def reins_description(self) -> str:
+        """Short reinsurance description, unit by unit (a look-through).
+
+        The portfolio twin of
+        :attr:`~aggregate.distributions.Aggregate.reins_description`: one
+        sentence per unit, in ledger order, each naming the unit and then its
+        own cession text::
+
+            Unit A: net of 500 xs 500 per occurrence. Unit B: no reinsurance.
+
+        Non-ceding units are named too, so the sentence covers the whole book
+        rather than silently skipping the clean units. Collapses to
+        ``'No reinsurance'`` when no unit cedes.
+
+        Returns
+        -------
+        str
+        """
+        if not self.agg_list:
+            return 'No reinsurance'
+        descs = [a.reins_description for a in self.agg_list]
+        if all(d == 'No reinsurance' for d in descs):
+            return 'No reinsurance'
+        return ' '.join(f'Unit {a.name}: {d[0].lower()}{d[1:].rstrip(".")}.'
+                        for a, d in zip(self.agg_list, descs))
+
+    @property
     def bs_window_df(self) -> 'pd.DataFrame':
         """Curated, read-only view of the portfolio combine grid (``[bs-reporting]``).
 
@@ -877,7 +934,7 @@ class Portfolio(LabeledMixin):
         if tot['right_tail'] == 'bounded' and np.isfinite(hi):
             parts.append(f'It has a natural upper support bound of {hi:g}.')
 
-        conc_flag, conc_cv = _tail.concentration(float(self.agg_m), float(self.agg_sd))
+        conc_flag, conc_cv = _tail.concentration(float(self.actual_m), float(self.actual_sd))
         if conc_flag and conc_cv is not None and np.isfinite(conc_cv):
             parts.append(f'The distribution is concentrated with a CV of {conc_cv:g}.')
 
@@ -928,7 +985,7 @@ class Portfolio(LabeledMixin):
         rows = {a.name: a.tail_behavior_df.loc['aggregate'] for a in self.agg_list}
         df = pd.DataFrame(rows).T
         worst = self.tail_class
-        conc_flag, conc_cv = _tail.concentration(float(self.agg_m), float(self.agg_sd))
+        conc_flag, conc_cv = _tail.concentration(float(self.actual_m), float(self.actual_sd))
         total = pd.Series(INFO_NA, index=df.columns, dtype=object)
 
         def _worst_side(col):
@@ -984,6 +1041,36 @@ class Portfolio(LabeledMixin):
             self._allocation_method = value
 
     @property
+    def prob_eq_0(self):
+        """``P(X == 0)`` -- the probability the portfolio total is exactly zero.
+
+        On demand, from the realised combined grid, after :meth:`update`. On a
+        **loss** book this reads as "no loss anywhere" (every unit at zero); on
+        a **payoff** book as "exactly break even". Shared, sign-neutral surface
+        with :attr:`~aggregate.distributions.Aggregate.prob_eq_0` and
+        :attr:`~aggregate._pnl.PnL.prob_eq_0`.
+
+        Returns
+        -------
+        float or None
+            ``None`` before :meth:`update`.
+
+        Notes
+        -----
+        Reads the mass at the zero grid point through the canonical
+        :class:`~aggregate._grid_distribution.GridDistribution` (``pmf(0)``).
+        Under an independent combine this is the product of the units' own
+        ``prob_eq_0``; under a copula combine it is not, which makes the
+        comparison a cheap dependence read. As on
+        :attr:`~aggregate.distributions.Aggregate.prob_eq_0`, a continuous
+        severity's zero bucket also absorbs everything that discretizes to
+        zero.
+        """
+        if self.density_df is None:
+            return None
+        return float(self._grid_distribution().pmf(0.0))
+
+    @property
     def value_type(self):
         """Sign convention for the portfolio: ``'loss'`` or ``'payoff'``.
 
@@ -1034,6 +1121,11 @@ class Portfolio(LabeledMixin):
             elif prem > 0:
                 e_loss = prem - float(self.est_m)
         h = self.hash_rep_at_last_update
+        # The look-through ``reins_kinds`` already carries per-unit casing, so
+        # only the collapsed clean-book answer is lower-cased (matching
+        # ``Aggregate.info``'s ``none``).
+        rk = self.reins_kinds
+        rk = 'none' if rk == 'None' else rk
         rows = [
             ('portfolio object name', self.name),
             ('value_type', self.value_type),
@@ -1050,6 +1142,8 @@ class Portfolio(LabeledMixin):
             ('expected loss', f'{e_loss:,.6g}' if e_loss is not None else INFO_NA),
             ('loss ratio', f'{e_loss / prem:.1%}'
              if prem > 0 and e_loss is not None else INFO_NA),
+            ('P(X=0)', f'{self.prob_eq_0:.6g}' if updated else INFO_NA),
+            ('reinsurance', rk),
         ]
         s = [info_row(label, value) for label, value in rows]
         # Footer: tail, bounded, last update, id -- matching Aggregate.info
@@ -1238,7 +1332,7 @@ class Portfolio(LabeledMixin):
         if updated:
             m, sd, skew = float(self.est_m), float(self.est_sd), float(self.est_skew)
         else:
-            m, sd, skew = float(self.agg_m), float(self.agg_sd), float(self.agg_skew)
+            m, sd, skew = float(self.actual_m), float(self.actual_sd), float(self.actual_skew)
         total = pd.DataFrame(
             {
                 'Mean': [m],
@@ -1264,12 +1358,27 @@ class Portfolio(LabeledMixin):
         df.attrs['mean'] = m
         return df
 
-    def tail_df(self, periods=None):
+    @property
+    def tail_df(self):
+        """Return-period / exceedance table on the default ladder (a property).
+
+        The first-class-citizen form of :meth:`tail_periods_df`: no arguments,
+        the standard :data:`~aggregate.distributions.DEFAULT_RETURN_PERIODS`
+        ladder. Pass your own ladder with ``tail_periods_df(periods=...)``.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            ``None`` before :meth:`update`.
+        """
+        return self.tail_periods_df()
+
+    def tail_periods_df(self, periods=None):
         """Return-period / exceedance table -- per unit plus the portfolio total.
 
-        The portfolio analogue of :meth:`Aggregate.tail_df`. A leading ``unit``
-        index level: each unit's aggregate return-period table
-        (:meth:`Aggregate.tail_df`) stacked under its name, plus a ``total``
+        The portfolio analogue of :meth:`Aggregate.tail_periods_df`. A leading
+        ``unit`` index level: each unit's aggregate return-period table
+        (:meth:`Aggregate.tail_periods_df`) stacked under its name, plus a ``total``
         block computed from the realised portfolio grid (:meth:`q` / :meth:`tvar`
         / :meth:`est_m`). Columns ``p | VaR | TVaR | xsVaR | VaR/Mean``; the
         numbers are exact (FFT grid, not simulated).
@@ -1291,7 +1400,7 @@ class Portfolio(LabeledMixin):
             return None
         blocks, keys = [], []
         for a in self:
-            ut = a.tail_df(periods)
+            ut = a.tail_periods_df(periods)
             if ut is not None:
                 blocks.append(ut)
                 keys.append(a.name)

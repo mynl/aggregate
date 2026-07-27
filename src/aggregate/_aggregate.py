@@ -66,7 +66,7 @@ __all__ = [
 ]
 
 #: Default return-period ladder for the summary ``tail_df`` (overridable via
-#: ``tail_df(periods=...)``). The Solvency II ``1-in-200`` (99.5%) and US
+#: ``tail_periods_df(periods=...)``). The Solvency II ``1-in-200`` (99.5%) and US
 #: capital-adequacy / rating ``1-in-250`` (99.6%) anchors are both included and
 #: highlighted in the HTML rendering.
 DEFAULT_RETURN_PERIODS = (2, 5, 10, 25, 50, 100, 200, 250, 500, 1000)
@@ -112,8 +112,9 @@ def value_type_label(is_loss_value):
 def return_period_frame(q, tvar, mean, is_loss_value, periods=None):
     """Build a return-period / exceedance table from quantile and TVaR functions.
 
-    Shared by :meth:`Aggregate.tail_df` and :meth:`Portfolio.tail_df` so the
-    aggregate and portfolio-total tables read one implementation.
+    Shared by :meth:`Aggregate.tail_periods_df` and
+    :meth:`Portfolio.tail_periods_df` so the aggregate and portfolio-total
+    tables read one implementation.
 
     Parameters
     ----------
@@ -366,7 +367,7 @@ def _integral_by_doubling(func, x0, err=1e-8):
 # ``Aggregate.stats_df`` is the canonical (component, measure) × view
 # DataFrame holding theoretical + empirical moments. ``MomentAggregator``
 # emits its per-component / totals statistics as flat names like ``freq_1``,
-# ``agg_m``; ``_flat_col_to_stats_index`` maps each to the
+# ``actual_m``; ``_flat_col_to_stats_index`` maps each to the
 # ``(component, measure)`` tuple used by the ``stats_df`` row MultiIndex.
 
 _STATS_META_NAMES = frozenset({
@@ -381,7 +382,7 @@ _STATS_MEASURE_MAP = {'1': 'ex1', '2': 'ex2', '3': 'ex3', 'm': 'mean'}
 def _flat_col_to_stats_index(col):
     """Map a flat ``MomentAggregator`` moment name to ``(component, measure)``.
 
-    Examples: ``'freq_1' → ('freq', 'ex1')``, ``'agg_m' → ('agg', 'mean')``,
+    Examples: ``'freq_1' → ('freq', 'ex1')``, ``'actual_m' → ('agg', 'mean')``,
     ``'limit' → ('meta', 'limit')``.
 
     Used to bridge the flat moment names emitted by
@@ -677,7 +678,7 @@ class Aggregate(LabeledMixin):
         return _tail.build_tail_rows(
             self.frequency, self.sevs,
             freq_min=freq_min, freq_max=freq_max, freq_zero_truncated=freq_zt,
-            agg_m=self.agg_m, agg_sd=self.agg_sd,
+            actual_m=self.actual_m, actual_sd=self.actual_sd,
             occ_reins=self.occ_reins,
         )
 
@@ -1593,7 +1594,7 @@ class Aggregate(LabeledMixin):
                     "reinsurance (the method-of-moments fit bypasses the "
                     "per-occurrence convolution); use aggregate reinsurance instead.")
             _orig = Aggregate(**{**self._spec, 'approximate': 'exact'})
-            _m, _cv, _sk = _orig.agg_m, _orig.agg_cv, _orig.agg_skew
+            _m, _cv, _sk = _orig.actual_m, _orig.actual_cv, _orig.actual_skew
             _fit = _approximate_sev_kwargs(_m, _cv, _sk, approximate)
             # frequency -> fixed 1; exposure -> a single deterministic claim
             freq_name, freq_a, freq_b, freq_zm, freq_p0 = 'fixed', 0.0, 0.0, False, np.nan
@@ -2088,16 +2089,16 @@ class Aggregate(LabeledMixin):
         self.frequency.en = float(self.n)
         # Pull the headline moments off the canonical stats_df mixed column.
         _mixed = self.stats_df['mixed']
-        self.agg_m = float(_mixed[('agg', 'mean')])
-        self.agg_cv = float(_mixed[('agg', 'cv')])
-        self.agg_skew = float(_mixed[('agg', 'skew')])
+        self.actual_m = float(_mixed[('agg', 'mean')])
+        self.actual_cv = float(_mixed[('agg', 'cv')])
+        self.actual_skew = float(_mixed[('agg', 'skew')])
         # variance and sd come up in exam questions. Derive them directly from
         # the second moment (var = ex2 - mean^2), NOT as mean*cv: at mean 0 the
         # CV is legitimately nan, which would poison sd = mean*cv -> nan for a
         # signed (P&L) aggregate whose sd is perfectly well defined. The clamp
         # absorbs fp dust when a symmetric ex2 - mean^2 lands slightly negative.
-        self.agg_var = max(float(_mixed[('agg', 'ex2')]) - self.agg_m ** 2, 0.0)
-        self.agg_sd = math.sqrt(self.agg_var)
+        self.actual_var = max(float(_mixed[('agg', 'ex2')]) - self.actual_m ** 2, 0.0)
+        self.actual_sd = math.sqrt(self.actual_var)
         # severity exact moments
         self.sev_m = float(_mixed[('sev', 'mean')])
         self.sev_cv = float(_mixed[('sev', 'cv')])
@@ -2371,7 +2372,7 @@ class Aggregate(LabeledMixin):
         n_sev = len(self.sevs)
         if n_sev == 1:
             sv = self.sevs[0]
-            sev_desc = f'{sv.long_name}, {sv.support_description}.'
+            sev_desc = sv.tail_description
         else:
             sev_desc = f'{n_sev} components'
         if updated:
@@ -2380,12 +2381,14 @@ class Aggregate(LabeledMixin):
             bss = INFO_NA
         # premium / expected loss / loss ratio: populated when a premium is
         # known (the DecL exposure clause states one) and the object is updated.
-        # ``P(loss)`` is a P&L concept and lives on the :class:`PnL` veneer.
+        # ``P(X=0)`` is the sign-neutral break-even / no-loss atom
+        # (:attr:`prob_eq_0`), so it is meaningful on a loss and a payoff alike.
         prem = float(self.stats_df.loc[('meta', 'prem'), 'mixed'])
         e_loss = None
-        p_loss = INFO_NA
+        p_eq_0 = INFO_NA
         if updated and self.agg_density is not None:
             e_loss = float(self.est_m)
+            p_eq_0 = f'{self.prob_eq_0:.6g}'
         rows = [
             ('aggregate object name', self.name),
             ('value_type', self.value_type),
@@ -2406,7 +2409,7 @@ class Aggregate(LabeledMixin):
             ('expected loss', f'{e_loss:,.6g}' if e_loss is not None else INFO_NA),
             ('loss ratio', f'{e_loss / prem:.1%}'
              if prem > 0 and e_loss is not None else INFO_NA),
-            ('P(loss)', p_loss),
+            ('P(X=0)', p_eq_0),
             ('validation_eps', self.validation_eps),
             ('reinsurance', self.reins_kinds.lower()),
             ('occurrence reinsurance', self._reins_description('occ').lower()),
@@ -2445,8 +2448,7 @@ class Aggregate(LabeledMixin):
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
-            parts.append(
-                f'Severity {sv.long_name} distribution, {sv.support_description}.')
+            parts.append(f'Severity {sv.tail_description}.')
         else:
             parts.append(f'Severity with {n} components.')
         if self.bs > 0:
@@ -2459,23 +2461,26 @@ class Aggregate(LabeledMixin):
     def _text_info_blob(self) -> str:
         """Short plain-text intro (the text twin of :meth:`_html_info_blob`).
 
-        Object identity, the frequency / severity families, and the realised
-        grid -- the one-glance context :meth:`qd` prints above the headline
-        ``summary_df`` / ``tail_df``. **No validation line** (the caller flags
-        a failure separately, staying silent on a pass).
+        Object identity, the frequency / severity families, the realised grid,
+        and the validation result -- the one-glance context :meth:`qd` prints
+        above the headline ``summary_df``. **One line**: the sentences are
+        space-joined (not stacked), and the blob closes with
+        ``Validation: {validation_explanation}.`` exactly as the HTML twin
+        does, so the two renderings say the same thing.
         """
-        s = [f'Aggregate object: {self._title_name}',
+        s = [f'Aggregate object: {self._title_name}.',
              f'{self.frequency.freq_name} frequency distribution.']
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
-            s.append(f'Severity {sv.long_name} distribution, {sv.support_description}.')
+            s.append(f'Severity {sv.tail_description}.')
         else:
             s.append(f'Severity with {n} components.')
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
-        return '\n'.join(s)
+        s.append(f'Validation: {self.validation_explanation}.')
+        return ' '.join(s)
 
     def _repr_html_(self):
         """HTML view: short intro (with the inline validation result) and the
@@ -2667,6 +2672,37 @@ class Aggregate(LabeledMixin):
         """
         ix = self.density_df.index.get_indexer([x], 'nearest')[0]
         return self.density_df.iloc[ix, 0]
+
+    @property
+    def prob_eq_0(self):
+        """``P(X == 0)`` -- the probability the outcome is exactly zero.
+
+        On demand, from the realised grid, after :meth:`update`. On a **loss**
+        object this reads as "no loss" (the ground-up ``P(N = 0)``, plus any
+        severity atom at zero and any mass the reinsurance nets to zero); on a
+        **payoff** / P&L object as "exactly break even". Shared, sign-neutral
+        surface with :attr:`Portfolio.prob_eq_0` and
+        :attr:`~aggregate._pnl.PnL.prob_eq_0`.
+
+        Returns
+        -------
+        float or None
+            ``None`` before :meth:`update` (there is no realised grid yet).
+
+        Notes
+        -----
+        Reads the mass at the zero grid point through the canonical
+        :class:`~aggregate._grid_distribution.GridDistribution` (``pmf(0)``) --
+        identical to :meth:`pmf` at zero. On a **discrete** book that is the
+        exact atom. On a **continuous** severity the zero bucket also absorbs
+        every outcome that discretizes to zero (losses below ``bs``, or below
+        ``bs / 2`` under the round scheme), so the answer is ``P(N = 0)`` plus
+        that sliver -- the usual FFT-grid reading, and it tightens as ``bs``
+        shrinks.
+        """
+        if self.agg_density is None:
+            return None
+        return float(self._grid_distribution().pmf(0.0))
 
     @property
     def value_type(self):
@@ -3286,14 +3322,14 @@ class Aggregate(LabeledMixin):
             used to determine the effective support [L, R]. R-L must fit in the
             space available, i.e., R-L <= N * self.bs.
         :param audit: If audit, return comparison of empirical moments of shifted
-            answer with a.agg_m etc. analytic moments.
+            answer with a.actual_m etc. analytic moments.
         :return: Unwrap named tuple containing fields y the density as a Series,
             mode of shifting/unwrapping, prob_captured the probability in the
             effective support (which should be close to 1), L, R the boundary of the
             effective support.
         """
         # figure bounds from method of moments estimates
-        m, cv, skew = self.agg_m, self.agg_cv, self.agg_skew
+        m, cv, skew = self.actual_m, self.actual_cv, self.actual_skew
         sc = self.bs
         L, R = _estimate_agg_percentile(m, cv, skew, p=(p, 1 - p))
         # snap to grid in both cases (can't use self.snap because outside index!)
@@ -3731,7 +3767,7 @@ class Aggregate(LabeledMixin):
             # No FFT output yet; estimate the 0.999 quantile from the theoretical
             # mixed-total agg moments.
             try:
-                p999 = _estimate_agg_percentile(self.agg_m, self.agg_cv, self.agg_skew, 0.999)
+                p999 = _estimate_agg_percentile(self.actual_m, self.actual_cv, self.actual_skew, 0.999)
             except ValueError:
                 p999 = np.inf
             return f(p999)
@@ -4084,7 +4120,22 @@ class Aggregate(LabeledMixin):
         df.attrs['mean'] = means[-1]
         return df
 
-    def tail_df(self, periods=None):
+    @property
+    def tail_df(self):
+        """Return-period / exceedance table on the default ladder (a property).
+
+        The first-class-citizen form of :meth:`tail_periods_df`: no arguments,
+        the standard :data:`DEFAULT_RETURN_PERIODS` ladder. Pass your own
+        ladder with ``tail_periods_df(periods=...)``.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            ``None`` before :meth:`update`.
+        """
+        return self.tail_periods_df()
+
+    def tail_periods_df(self, periods=None):
         """Return-period / exceedance table for the aggregate (the centerpiece).
 
         The language of reinsurance submissions, cat-model output, and
@@ -4247,12 +4298,12 @@ class Aggregate(LabeledMixin):
         # so the moments are in their native frame -- no display transform.
         freq_sd = st[('freq', 'mean')] * st[('freq', 'cv')]
         sev_sd = self.sev_sd
-        agg_sd = self.agg_sd
+        actual_sd = self.actual_sd
         df = pd.DataFrame(
             {
                 'EX': [st[('freq', 'mean')], st[('sev', 'mean')],
                        st[('agg', 'mean')]],
-                'SD': [freq_sd, sev_sd, agg_sd],
+                'SD': [freq_sd, sev_sd, actual_sd],
                 'Sk': [st[('freq', 'skew')], st[('sev', 'skew')],
                        st[('agg', 'skew')]],
             },
@@ -4504,7 +4555,7 @@ class Aggregate(LabeledMixin):
             sev_m = float(self.stats_df['mixed'][('sev', 'mean')])
         except (KeyError, ValueError, TypeError):
             return None
-        es = float(self.agg_m)
+        es = float(self.actual_m)
         if not (np.isfinite(sev_m) and np.isfinite(es)):
             return None
         # p** with the author's numerical-depth guard: 1 - p** = (1-p*)/E[N]
@@ -4552,7 +4603,7 @@ class Aggregate(LabeledMixin):
             sev_m = float(self.stats_df['mixed'][('sev', 'mean')])
         except (KeyError, ValueError, TypeError):
             return np.nan
-        es = float(self.agg_m)
+        es = float(self.actual_m)
         if not (np.isfinite(en) and en >= 1.0
                 and np.isfinite(sev_m) and np.isfinite(es)):
             return np.nan
@@ -4739,13 +4790,13 @@ class Aggregate(LabeledMixin):
         cself = Aggregate(**self.spec)
 
         if bs2_from is None:
-            if cself.agg_cv == np.inf:
+            if cself.actual_cv == np.inf:
                 raise ValueError('Distribution must have variance to guess bucket size. '
                                  'Input bs2_from')
             # ``recommend_bucket`` retired (W10); size a starting bs from the
             # analytic 3-moment output window (``estimate_agg_window``) instead.
             _, _, _w = estimate_agg_window(
-                self.agg_m, self.agg_m * self.agg_cv, self.agg_skew)
+                self.actual_m, self.actual_m * self.actual_cv, self.actual_skew)
             bs = round_bucket(_w / (1 << log2))
             bs2 = int(np.log2(bs))
             bss = 2. ** np.arange(bs2 - 3, bs2 + 4)
@@ -4753,7 +4804,7 @@ class Aggregate(LabeledMixin):
             bss = 2. ** np.arange(bs2_from, bs2_from + 7)
 
         # analytic aggregate mean
-        m = cself.agg_m
+        m = cself.actual_m
         # aggregate analysis
         agg_ans = []
         for bs in bss:
@@ -4762,7 +4813,7 @@ class Aggregate(LabeledMixin):
                             cself.est_m - m, cself.est_m / m - 1])
 
         agg_df = pd.DataFrame(agg_ans,
-                              columns=['bs', 'agg_m', 'est_m',
+                              columns=['bs', 'actual_m', 'est_m',
                                        'abs_m', 'rel_m', ])
         m = cself.sev_m
         agg_df['rel_h'] = agg_df.bs / 2 / m

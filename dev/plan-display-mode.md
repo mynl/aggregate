@@ -146,7 +146,7 @@ surface lands ([[project_features_csv]]).
   percentiles. `info` (bs / log2 / value_type) appears in **both** modes. Both
   views, all three of Agg/Port/PnL.
 - **Numeric invariance (the invariant):** for a fixed object, every public
-  numeric attribute / frame (`agg_m`, `est_m`, `density_df`, `summary_df`,
+  numeric attribute / frame (`actual_m`, `est_m`, `density_df`, `summary_df`,
   `validation_df`, …) is identical under `dev` and `user`. Mode changes display
   only.
 - **Resolution order:** instance override beats runtime global beats config

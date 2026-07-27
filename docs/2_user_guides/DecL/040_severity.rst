@@ -231,7 +231,7 @@ uniform`` ground-up.
                  'sev 20 * uniform ! '
                  'fixed')
     qd(uncd)
-    print(uncd.sevs[0].fz.sf(8), uncd.agg_m / cond.agg_m)
+    print(uncd.sevs[0].fz.sf(8), uncd.actual_m / cond.actual_m)
 
 
 .. _available sev dists:

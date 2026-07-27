@@ -99,8 +99,8 @@ def test_binary_pnl_negative_mean_auto_window():
     a = build('agg PnL.Lump 1e6 claims dsev [-1 10] [15/16 1/16] poisson',
               update=False)
     # analytic checks
-    assert abs(a.agg_m - (-312500.0)) < 1.0
-    sd = abs(a.agg_m * a.agg_cv)
+    assert abs(a.actual_m - (-312500.0)) < 1.0
+    sd = abs(a.actual_m * a.actual_cv)
     assert abs(sd - np.sqrt(1e6 * 115 / 16)) < 1.0
     a.update(log2=16, x_min=None)
     assert a._signed_sev
@@ -122,7 +122,7 @@ def test_ssev_continuous_signed():
     """``ssev`` declares a never-clamp continuous severity (a P&L)."""
     a = build('agg P 1 claim ssev 10 * norm fixed', update=False)
     assert a.sevs[0].signed                    # severity carries the flag
-    assert abs(a.agg_m) < 1e-9                  # norm(0, 10): mean 0
+    assert abs(a.actual_m) < 1e-9                  # norm(0, 10): mean 0
     assert a._signed()                          # aggregate derives signed
     a.update(log2=12)                           # x_min='auto' -> auto window
     assert a.i0 > 0 and a.x_min < 0             # signed grid, brackets 0
@@ -162,7 +162,7 @@ def test_ssev_constant_minus_dist():
     assert sev_cv == pytest.approx(0.8, abs=1e-6)         # 0.2 * 80 / 20
     assert sev_mean == pytest.approx(
         float(verbose.stats_df.loc[('sev', 'mean'), 'mixed']))
-    assert float(pml.agg_m) == pytest.approx(100.0, abs=1e-6)  # 5 * 20
+    assert float(pml.actual_m) == pytest.approx(100.0, abs=1e-6)  # 5 * 20
 
 
 def test_ssev_constant_minus_scaled_dist():
@@ -338,7 +338,7 @@ def test_bs_window_bounded_small_selected():
 def test_bs_window_large_count_windows():
     """Large claim count: LLN concentrates -> the windowed grid is finer.
 
-    A 5000-claim book has ``agg_cv ~ 0.016 < 1/z``, so its whole mass band
+    A 5000-claim book has ``actual_cv ~ 0.016 < 1/z``, so its whole mass band
     clears 0 and the two-sided ``windowed`` method (a non-zero origin computed
     via the benign FFT wrap) lands a strictly finer bucket than the 0-based
     moment / bounded grids. Plan B: this case used to select ``moment``; it now
@@ -349,8 +349,8 @@ def test_bs_window_large_count_windows():
     df = a._bs_window_df
     assert bool(df.loc['windowed', 'selected'])
     assert a.x_min > 0
-    assert a.est_m == pytest.approx(a.agg_m, rel=1e-4)
-    assert a.est_cv == pytest.approx(a.agg_cv, rel=1e-3)
+    assert a.est_m == pytest.approx(a.actual_m, rel=1e-4)
+    assert a.est_cv == pytest.approx(a.actual_cv, rel=1e-3)
     assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-6)
 
 
@@ -472,12 +472,12 @@ def test_density_property_portfolio():
 def test_zero_mean_signed_sd_is_finite():
     """``dsev [-1 1]`` x 3 fixed: sev SD 1, agg SD sqrt(3) -- not NaN."""
     a = build('agg A2 dfreq [3] dsev [-1 1]')
-    assert a.sev_m == 0.0 and a.agg_m == 0.0       # genuinely mean 0
+    assert a.sev_m == 0.0 and a.actual_m == 0.0       # genuinely mean 0
     # theoretical
     assert a.sev_sd == pytest.approx(1.0, abs=1e-9)
     assert a.sev_var == pytest.approx(1.0, abs=1e-9)
-    assert a.agg_sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
-    assert a.agg_var == pytest.approx(3.0, abs=1e-9)
+    assert a.actual_sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
+    assert a.actual_var == pytest.approx(3.0, abs=1e-9)
     # empirical (FFT) moments agree
     assert a.est_sev_sd == pytest.approx(1.0, abs=1e-9)
     assert a.est_sd == pytest.approx(np.sqrt(3.0), abs=1e-9)
@@ -496,9 +496,9 @@ def test_positive_mean_sd_unchanged():
     a = build('agg Dice dfreq [3] dsev [1:6]')
     # the two routes to the SD must coincide to fp on the common path
     ex2 = float(a.stats_df['mixed'][('agg', 'ex2')])
-    assert a.agg_sd == pytest.approx(np.sqrt(ex2 - a.agg_m ** 2), rel=1e-12)
-    assert a.agg_sd == pytest.approx(a.agg_m * a.agg_cv, rel=1e-12)
-    assert a.agg_var == pytest.approx(a.agg_sd ** 2, rel=1e-12)
+    assert a.actual_sd == pytest.approx(np.sqrt(ex2 - a.actual_m ** 2), rel=1e-12)
+    assert a.actual_sd == pytest.approx(a.actual_m * a.actual_cv, rel=1e-12)
+    assert a.actual_var == pytest.approx(a.actual_sd ** 2, rel=1e-12)
 
 
 # ---------------------------------------------------------------------------

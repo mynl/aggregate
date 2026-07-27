@@ -215,7 +215,7 @@ def recentering_convolution_example(sev_clause, en, log2, agg_log2=0, bs=1,
         qd(ag)
         print('-'*80)
         # percentiles - help determining log2 needed for hi freq calculation
-        qd(pd.Series([ag.agg_sd, ag.q(0.001), ag.q(0.999),
+        qd(pd.Series([ag.actual_sd, ag.q(0.001), ag.q(0.999),
                       ag.q(0.999999) - ag.q(0.000001)],
                      index=['std dev', 'p001', 'p999', 'range']))
         print('-'*80)

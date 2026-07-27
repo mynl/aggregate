@@ -1239,7 +1239,7 @@ def frequency_tail_row(frequency, *, n_min: float = 0.0,
 
 def aggregate_tail_row(info: TailInfo, *, agg_min: float, agg_max: float,
                        left_decay: TailClass, right_decay: TailClass,
-                       agg_m: float = np.nan, agg_sd: float = np.nan) -> TailRow:
+                       actual_m: float = np.nan, actual_sd: float = np.nan) -> TailRow:
     """Build the aggregate :class:`TailRow` from the structural support + decays.
 
     Parameters
@@ -1253,7 +1253,7 @@ def aggregate_tail_row(info: TailInfo, *, agg_min: float, agg_max: float,
     left_decay, right_decay : TailClass
         The aggregate's per-side decay rungs (used only at an infinite end),
         already affine-mapped (swapped under a reflecting ``pnl``).
-    agg_m, agg_sd : float
+    actual_m, actual_sd : float
         Loss-space aggregate mean / sd (drive :func:`concentration`).
 
     Returns
@@ -1263,7 +1263,7 @@ def aggregate_tail_row(info: TailInfo, *, agg_min: float, agg_max: float,
     """
     left = _side_class(np.isfinite(agg_min), left_decay)
     right = _side_class(np.isfinite(agg_max), right_decay)
-    conc, conc_cv = concentration(agg_m, agg_sd)
+    conc, conc_cv = concentration(actual_m, actual_sd)
     family = f'{info.driver}-driven' if info.driver != 'undetermined' else ''
     note = _power_note(info.alpha) if right == TailClass.POWER_LAW else ''
     return TailRow(
@@ -1297,7 +1297,7 @@ def _agg_support(n_lo: float, n_hi: float,
 
 def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
                     freq_max: float = np.inf, freq_zero_truncated: bool = False,
-                    agg_m: float = np.nan, agg_sd: float = np.nan,
+                    actual_m: float = np.nan, actual_sd: float = np.nan,
                     occ_reins=None) -> list[TailRow]:
     """Assemble the layered tail report as an ordered list of :class:`TailRow`.
 
@@ -1320,7 +1320,7 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
         Claim-count support (the caller knows the exposure).
     freq_zero_truncated : bool
         Genuine zero-truncation flag for the frequency note.
-    agg_m, agg_sd : float
+    actual_m, actual_sd : float
         Loss-space aggregate mean / sd (drive concentration).
     occ_reins : sequence of (share, limit, attach), optional
         The occurrence-reinsurance layers (``Aggregate.occ_reins``). When given,
@@ -1360,7 +1360,7 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
     rows.append(aggregate_tail_row(
         info, agg_min=agg_min, agg_max=agg_max,
         left_decay=left_decay, right_decay=right_decay,
-        agg_m=agg_m, agg_sd=agg_sd))
+        actual_m=actual_m, actual_sd=actual_sd))
     return rows
 
 

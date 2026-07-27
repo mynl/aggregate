@@ -21,7 +21,7 @@ def _freq_moments(agg):
 
 def _count_moments(freq_agg):
     """Return (mean, cv, skew) of a materialized count distribution."""
-    return float(freq_agg.agg_m), float(freq_agg.agg_cv), float(freq_agg.agg_skew)
+    return float(freq_agg.actual_m), float(freq_agg.actual_cv), float(freq_agg.actual_skew)
 
 
 @pytest.mark.parametrize('program', [
@@ -60,8 +60,8 @@ def test_exposure_derived_count_collapses_to_n():
     """``500 loss`` with a mean-50 severity is 10 claims, not 500."""
     a = build('agg L 500 loss sev lognorm 50 cv 1 poisson')
     fa = a.create_frequency()
-    assert fa.agg_m == pytest.approx(a.n, rel=1e-6)
-    assert fa.agg_m == pytest.approx(10.0, rel=1e-6)
+    assert fa.actual_m == pytest.approx(a.n, rel=1e-6)
+    assert fa.actual_m == pytest.approx(10.0, rel=1e-6)
 
 
 def test_empirical_dfreq_is_reproduced():
@@ -83,8 +83,8 @@ def test_portfolio_total_is_total_count():
     assert pf.name == 'Book.freq'
     assert pf.unit_names == ['A.freq', 'B.freq']
     total_n = sum(a.n for a in port.agg_list)
-    assert pf.agg_m == pytest.approx(total_n, rel=1e-3)
-    per_unit = {u.name: u.agg_m for u in pf.agg_list}
+    assert pf.actual_m == pytest.approx(total_n, rel=1e-3)
+    per_unit = {u.name: u.actual_m for u in pf.agg_list}
     assert per_unit['A.freq'] == pytest.approx(100.0, rel=1e-3)
     assert per_unit['B.freq'] == pytest.approx(50.0, rel=1e-3)
 

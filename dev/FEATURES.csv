@@ -1,8 +1,9 @@
 group,name,kind,returns,description,Aggregate,Portfolio,BivariateAggregate,PnL,Severity,Frequency,Bounds,AllocationBounds,PricingBounds,notes
-# table-version,1.0.0a148,,,Version this matrix reflects -- audit/regen: uv run python dev/regen_features.py; '#' rows are skipped by the auditor,,,,,,,,,,
+# table-version,1.0.0a149,,,Version this matrix reflects -- audit/regen: uv run python dev/regen_features.py; '#' rows are skipped by the auditor,,,,,,,,,,
 discovery,help,method,None,Regex discovery of the public surface -- the universal FCC entry point,Y,Y,Y,Y,Y,,Y,Y,Y,"KEY FCC FEATURE (row 1): the front door to every object -- .help('regex') lists matching methods/properties. a142: added to PnL/Severity/Bounds and (via _HullEngine) AllocationBounds/PricingBounds -- both now carry their own columns (a145); Distortion has it too (not a column here); gained a private=False axis; defaults now lod='terse'/values='none'/private=False -- a bare public-name listing. Not on Frequency/Reinst/VarRt."
 df-headline,summary_df,property,DataFrame,At-a-glance risk view: moments + key percentiles (Freq/Sev/Agg),Y,Y,Y*,Y*,,,,,,"WRINKLE: PnL = the FIXED CARD (a134 [Summary-Fixed-Card]): flat Consideration/Obligation/Margin single-group, (Step, View) blocks + closing 'All' block on a tower (a141 rename; a forced one-step walk is just its single block); columns EX/Scaled/SD/CV/Skew/P01/Median/P99 (a136 zero-pad), percentiles MARGINAL (do not foot -- the footing sheet is stats_df); a136: pnl is ALWAYS the flat single-group consolidated card, the (Step, View) tower card is the xpnl walk; Agg/Port = COMPUTED (est_*) moments+percentiles, cols Mean/SD/CV/Skew/P01/Median/P99 (a142 rename from E[X]/p0.01..p0.99; Sev/Agg/total rows use the realised est_* estimates, Freq row stays PGF-exact, pre-update falls back to theory); Biv = theory-vs-realised. Reinst/VarRt demoted a130: no bespoke exhibits."
-df-headline,tail_df,method,DataFrame,Return-period / exceedance table (p VaR TVaR xsVaR VaR/Mean),Y,Y,Y*,,,,,,,"WRINKLE: Agg/Port = return-period table, METHOD. Biv = per-axis support, PROPERTY. Reinst/VarRt = net-UW return-period, METHOD (VarRt gained a122). PnL: none."
+df-headline,tail_df,property,DataFrame,Return-period / exceedance table (p VaR TVaR xsVaR VaR/Mean),Y,Y,Y*,,,,,,,"a149 [FCC-Surface-Sweep]: a PROPERTY on Agg/Port too (was a method) -- the FCC form takes no arguments; the custom-ladder worker is tail_periods_df(periods=). WRINKLE: Biv = per-axis realised support, not a return-period table. PnL: none."
+df-headline,tail_periods_df,method,DataFrame,Return-period table on a caller-supplied ladder,Y,Y,,,,,,,,"a149: the parametrized worker behind tail_df; defaults to DEFAULT_RETURN_PERIODS. None before update."
 df-headline,validation_df,property,DataFrame,"Moment-vs-estimate QA table (theory vs FFT estimate, rel error)",Y,Y,,Y,,,,,,a113 rename of old summary_df. Biv keeps its validation inside summary_df (not migrated). PnL (a129): Est-vs-EX audit for bs>0 legs (empty when every leg is exact); Reinst: the joint-grid pushforward audit (a kept domain extra).
 df-headline,tail_behavior_df,property,DataFrame,Layered tail report: support + per-side tail class + concentration,Y,Y,,,,,,,,a113 rename of old tail_df.
 df-headline,stats_df,attribute,DataFrame,Single source of truth for moments (component x measure x view),Y,Y,Y,Y,,,,,,"Canonical moment store; summary_df/validation_df read from it. On PnL it is a PROPERTY: rows = ledger as (View, Line) / (Step, View, Line) on a tower; columns EX/SD/CV/Skew + the ladder: kappa SCENARIO STATES E[row | result == x_q] under a136 kappa headers (foot exactly; a134 [Kappa-Scenario-Percentiles]) exactly when the ledger shares one source; no-shared-atoms ledgers (massive route; the kernel stitched mode) stay MARGINAL under plain P01..P99 headers -- since a141 every DecL xpnl walk is per-atom (gross atoms, or the occurrence joint) so it carries the footing kappa ladder; tower grand step key is 'All' (a141). Reinst/VarRt demoted a130 (exact engine private)."
@@ -10,7 +11,7 @@ df-headline,density_df,property,DataFrame,Per-bucket density / distribution / ri
 df-headline,density,property,DataFrame,The live (positive-mass) rows of density_df,Y,Y,Y,,,,,,,"WRINKLE: VariableRatingAnalysis.density is the INPUT gross-density array, not the density_df live slice -- name collision."
 df-headline,sev_density_df,property,DataFrame,Per-bucket severity density on the severity grid,Y,,,,,,,,,Severity-grid analogue of density_df.
 df-headline,bs_window_df,property,DataFrame,Curated bucket/window sizing decision [bs-reporting],Y,Y,Y,,,,,,,Grid-selection audit; None before update.
-df-headline,result,property,GridDistribution,The net (result) leg distribution of a P&L,,,,Y,,,,,,"The exact net GridDistribution (replaces pnl_df, a122); q/cdf/sf/mean/sd/prob_loss delegate to it."
+df-headline,result,property,GridDistribution,The net (result) leg distribution of a P&L,,,,Y,,,,,,"The exact net GridDistribution (replaces pnl_df, a122); q/cdf/sf/est_m/est_sd/prob_eq_0 delegate to it."
 df-headline,scaled_stats_df,property,DataFrame,The statistics of X / scale (stats_df unitized),,,,Y,,,,,,"a129 [PnL-Generic-Final]: EX/SD/percentiles divide by the committed scale, CV/Skew scale-invariant and pass through. a134: same index + kappa scenario columns as stats_df (conditional means scale linearly)."
 df-headline,dependency_df,property,DataFrame,Joint dependence (cov / corr / tau) by level,,,Y,,,,,,,Bivariate-only.
 df-reins,reins_summary_df,property,DataFrame,Per-stage reinsurance summary (economic view of validation_df cols),Y,Y,,,,,,,,None when no reinsurance. Mirrors validation_df 8-col layout.
@@ -38,47 +39,44 @@ bounds-hull,na_grid,method,DataFrame,TVaR and natural allocations at arbitrary p
 bounds-hull,additivity_error,attribute,scalar,Max additivity error max_p |sum_i a_i(p) - T(p)|,,,,,,,,Y,,"AllocationBounds-only. Inherited from density_df exeqa noise -- bounds the absolute accuracy (~1e-6 rel, deep tail)."
 bounds-hull,mean_kusuoka_level,method,scalar,Mean Kusuoka level 2P-1 for the uniform (Gini) reference,,,,,,,,,Y,"PricingBounds-only: the Gini lens, where TVaR_p(X)=(1+p)/2 and the pricing constraint becomes E_mu[p]=2P-1."
 bounds-hull,gini_level,attribute,scalar,2P-1 mean Kusuoka level; None unless X is the uniform reference,,,,,,,,,Y,PricingBounds-only. None for a non-uniform reference risk.
-str-narrative,info,property,str,Fixed-layout multi-line object summary (text),Y,Y,Y,,,,,,,WRINKLE: not on PnL/Severity/Frequency.
-str-narrative,name,attribute,str,Object name,Y,Y,Y,Y,Y,,Y,,,Frequency has no name.
+str-narrative,info,property,str,Fixed-layout multi-line object summary (text),Y,Y,Y,Y,Y,Y,Y,Y,Y,"a149 [FCC-Surface-Sweep]: completed across every first-class class (was Agg/Port/Biv only). Terse on the six new hosts. Distortion has it too (not a column here). Row catalogues in dev/info-strings.rst; contract tested in tests/test_fcc_surface.py."
+str-narrative,name,attribute,str,Object name,Y,Y,Y,Y,Y,Y,Y,,,"a149: Frequency gained a read-only name (alias of freq_name) -- a frequency IS its family. AllocationBounds/PricingBounds name their source object in info instead."
 str-narrative,label,property,str,Resolved human label: _label -> derived default -> name (never blank); the DecL 'as' clause [Label-Canonical],Y,Y,,Y,Y,,,,,a133. Via LabeledMixin; presentation only (repr/exhibit titles prefer it). Was display_label attr + display_name property (a124-a132); explicit label stored privately as _label. Distortion resolves to auto-pretty; copula too (neither a column here).
 str-narrative,label_map,attribute,dict,Interior sub-object labels keyed by site (exposure/layer/severity) [DecL-Labels-Everywhere],Y,Y,,Y,Y,,,,,a128. Via LabeledMixin. {} when no interior labels. Populated by the DecL 'as' clause on sub-object sites.
 str-narrative,labels,property,namespace,Read-only view over label_map: a.labels.exposure / .layer / .severity [DecL-Labels-Everywhere],Y,Y,,Y,Y,,,,,"a128. Via LabeledMixin. Missing sites resolve to None, never raise."
 str-narrative,renamer,property,dict,{handle: display} map exhibits rename through at serve time [DecL-Labels-Everywhere],Y,Y,,Y,Y,,,,,a128. Via LabeledMixin. Portfolio -> units(+total); identity for an unlabeled object. Portfolio.unit_renamer is a thin alias.
 state,use_labels,property,bool,Per-object switch: serve relabeled exhibits (default True; False = raw handles) [DecL-Labels-Everywhere],Y,Y,,Y,Y,,,,,a128. Via LabeledMixin. Setter invalidates the cached renamer.
 str-narrative,value_type,property,str,Sign convention: 'loss' or 'payoff',Y,Y,,,,,,,,"Backed by _is_loss_value. Not on Severity (uses .signed), Biv (per-axis), or PnL (a122: the value object is always a payoff net)."
-str-narrative,pprogram,property,str,Canonical DecL program text (rendered from spec),Y,Y,,,,,,,,WRINKLE: not on Biv/PnL though both are DecL-built.
-str-narrative,pprogram_html,property,str,Syntax-highlighted DecL program for Jupyter,Y,Y,,,,,,,,
+str-narrative,pprogram,property,str,Canonical DecL program text (rendered from spec),Y,Y,Y,Y,,,,,,"a149: added to Biv and PnL -- every DecL-creatable class now round-trips its declaration. PnL.program is stamped by build and falls back to engine.program."
+str-narrative,pprogram_html,property,str,Syntax-highlighted DecL program for Jupyter,Y,Y,Y,Y,,,,,,
 str-narrative,bs_description,property,str,One-line bucket-grid summary [bs-reporting],Y,Y,Y,,,,,,,
-str-narrative,bs_explanation,property,str,Verbose bucket-grid prose [bs-reporting],Y,Y,,,,,,,,WRINKLE: Biv has bs_description but not bs_explanation.
+str-narrative,bs_explanation,property,str,Verbose bucket-grid prose [bs-reporting],Y,Y,Y,,,,,,,"a149: Biv gained it (per-axis grid + joint cell count + deficit gate)."
 str-narrative,tail_description,property,str,Short narrative over the tail-behavior report,Y,Y,Y,,Y,Y,,,,Most widely shared narrative.
-str-narrative,tail_explanation,property,str,Verbose per-component tail prose,Y,Y,,,,,,,,WRINKLE: description widely shared but explanation only Agg/Port.
-str-narrative,validation_explanation,property,str,Long-narrative validation result,Y,Y,,,,,,,,No paired validation_description (single narrative).
-str-narrative,reins_description,property,str,Short reinsurance description,Y,,,,,,,,,Agg-only; reins lives on the unit.
-str-narrative,reins_kinds,property,str,Kinds of reinsurance applied (text),Y,,,,,,,,,
-str-narrative,support_description,property,str,Short severity support description for info,,,,,Y,,,,,Severity-only.
+str-narrative,tail_explanation,property,str,Verbose per-component tail prose,Y,Y,Y,,Y,Y,,,,"a149: the description/explanation pair is now complete wherever tail_description exists -- Sev (support + moment consequences), Freq (dispersion vs Poisson), Biv (per-axis + dependence)."
+str-narrative,validation_explanation,property,str,Long-narrative validation result,Y,Y,Y,,,,,,,"No paired validation_description (single narrative). a149: Biv gained it -- the long form of the one-line info validation row (marginal means + tail deficit)."
+str-narrative,reins_description,property,str,Short reinsurance description,Y,Y,,,,,,,,"a149: Portfolio gained a look-through -- one sentence per unit, in ledger order, naming non-ceding units too; collapses to No reinsurance on a clean book."
+str-narrative,reins_kinds,property,str,Kinds of reinsurance applied (text),Y,Y,,,,,,,,"a149: Portfolio look-through, same shape as reins_description; collapses to None on a clean book (so info reads the same either way)."
 str-narrative,dsev_bucket,property,str,Scheme for placing discrete-severity atoms on the grid,Y,,,,,,,,,
 str-narrative,reins_bucket,property,str,Rebucketing scheme for net/ceded distributions,Y,,,,,,,,,
 str-narrative,allocation_method,property,str,Natural-allocation method: 'linear' or 'lifted',,Y,,,,,,,,Portfolio-only.
-stat,agg_m,attribute,scalar,Aggregate mean (theoretical),Y,Y,,,,,,,,WRINKLE: Agg/Port name moments agg_m/agg_sd/agg_skew/agg_cv/agg_var; PnL/Severity use scipy-style mean/sd/skew/var properties.
-stat,agg_sd,attribute,scalar,Aggregate standard deviation,Y,Y,,,,,,,,
-stat,agg_cv,attribute,scalar,Aggregate coefficient of variation,Y,Y,,,,,,,,
-stat,agg_skew,attribute,scalar,Aggregate skewness,Y,Y,,,,,,,,
-stat,agg_var,attribute,scalar,Aggregate variance,Y,Y,,,,,,,,
-stat,est_m,attribute,scalar,Estimated (realised FFT) aggregate mean,Y,Y,,,,,,,,est_m/est_cv/est_sd/est_skew/est_var = empirical from the grid.
-stat,est_cv,attribute,scalar,Estimated aggregate CV,Y,Y,,,,,,,,
-stat,est_sd,attribute,scalar,Estimated aggregate SD,Y,Y,,,,,,,,
-stat,est_skew,attribute,scalar,Estimated aggregate skew,Y,Y,,,,,,,,
+stat,actual_m,attribute,scalar,Theoretical (analytic) mean,Y,Y,,,Y,,,,,"a149 [FCC-Surface-Sweep]: renamed from agg_m/agg_sd/agg_cv/agg_skew/agg_var -- actual_* (theory) vs est_* (realised grid) is now one family across the classes. On Severity these are properties off moms() (analytic, post-layer); on Agg/Port attributes set at construction. Severity has no est_* (never discretized standalone)."
+stat,actual_sd,attribute,scalar,Theoretical standard deviation,Y,Y,,,Y,,,,,
+stat,actual_cv,attribute,scalar,Theoretical coefficient of variation,Y,Y,,,Y,,,,,Severity: the ACHIEVED cv; compare sev_cv, the declared one.
+stat,actual_skew,attribute,scalar,Theoretical skewness,Y,Y,,,Y,,,,,
+stat,actual_var,attribute,scalar,Theoretical variance,Y,Y,,,Y,,,,,
+stat,est_m,attribute,scalar,Estimated (realised FFT grid) mean,Y,Y,,Y,,,,,,"est_m/est_cv/est_sd/est_skew/est_var = empirical from the grid. a149: PnL joined the family (was mean/sd/cv/skew) -- a P&L is evaluated per-atom over the SOURCE grid, so its moments are estimates relative to the generating Aggregate."
+stat,est_cv,attribute,scalar,Estimated CV,Y,Y,,Y,,,,,,
+stat,est_sd,attribute,scalar,Estimated SD,Y,Y,,Y,,,,,,
+stat,est_skew,attribute,scalar,Estimated skew,Y,Y,,Y,,,,,,
 stat,est_var,attribute,scalar,Estimated aggregate variance,Y,Y,,,,,,,,
 stat,sev_m,attribute,scalar,Severity mean (theoretical),Y,,,,,,,,,WRINKLE: Agg exposes sev_m/sev_sd/sev_skew/sev_cv; Severity itself uses sev_mean + scipy mean() (sev_cv is shared).
 stat,sev_sd,attribute,scalar,Severity standard deviation,Y,,,,,,,,,
 stat,sev_cv,attribute,scalar,Severity CV,Y,,,,Y,,,,,
 stat,sev_skew,attribute,scalar,Severity skewness,Y,,,,,,,,,
 stat,est_sev_m,attribute,scalar,Estimated (realised) severity mean,Y,,,,,,,,,est_sev_* = empirical severity moments.
-stat,mean,property,scalar,Mean (scipy-style),,,,Y,Y,,,,,WRINKLE: PnL/Severity expose mean/sd/skew as properties; Agg/Port do not (use agg_m...).
-stat,sd,property,scalar,Standard deviation (scipy-style),,,,Y,,,,,,"WRINKLE: PnL exposes sd; Severity uses scipy std()/sev_sd, not sd."
-stat,skew,property,scalar,Skewness (scipy-style),,,,Y,,,,,,
+stat,mean,method,scalar,Mean (scipy rv_continuous),,,,,Y,,,,,"Severity-only, and inherited from scipy -- the aggregate library surface is actual_m. a149: PnL dropped mean/sd/cv/skew for est_m/est_sd/est_cv/est_skew."
 stat,corr,property,scalar,Pearson correlation of the two component aggregates,,,Y,,,,,,,Bivariate-only.
-stat,prob_loss,property,scalar,P(net < 0): probability the position loses money,,,,Y,,,,,,
+stat,prob_eq_0,property,scalar,P(X == 0): the break-even / no-loss atom,Y,Y,,Y,,,,,,"a149: replaces the PnL-only prob_loss (P(net < 0)), which had no meaning on a loss-valued object; prob_eq_0 is sign-neutral -- no loss on a loss object, exactly break even on a payoff. On demand, after update (None before). Continuous severity: the zero bucket also absorbs everything that discretizes to zero."
 stat,tail_class,property,scalar,(freq sev agg) TailClass triple,Y,Y,,,Y,,,,,
 stat,bounded,property,bool,Whether support is bounded,Y,Y,,,Y,,,,,
 dist-fn,q,method,scalar,Quantile / VaR: q(p),Y,Y,,Y,,,,,,WRINKLE: Severity uses ppf (scipy) not q; PnL has q not ppf.

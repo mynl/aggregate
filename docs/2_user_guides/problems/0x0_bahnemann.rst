@@ -346,7 +346,7 @@ Layer Premium, Example 6.4
 Risk Loads, Example 6.5
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Example 6.5, computes risk loads as a percentage of standard deviation. ``aggregate`` can compute multiple limits at once, and the ``report_df`` dataframe returns individual severity and aggregate distribution statistics. The risk loads can be deduced from these. The risk load can be computed as ``k' * ex2`` or ``k * agg_cv`` (not shown).
+Example 6.5, computes risk loads as a percentage of standard deviation. ``aggregate`` can compute multiple limits at once, and the ``report_df`` dataframe returns individual severity and aggregate distribution statistics. The risk loads can be deduced from these. The risk load can be computed as ``k' * ex2`` or ``k * actual_cv`` (not shown).
 
 The following code reproduces Table 6.3. First, define the controlling variables, and then set up the tower of limits within one object, using :doc:`../DecL/070_vectorization`.
 
@@ -376,7 +376,7 @@ Next, extract the required columns from ``stats_df`` and manipulate to compute t
     bit = bl.stats_df.loc[
         [('sev', 'mean'), ('sev', 'cv'), ('agg', 'mean'), ('agg', 'cv')]
     ].iloc[:, :-4].T
-    bit.columns = ['sev_m', 'sev_cv', 'agg_m', 'agg_cv']
+    bit.columns = ['sev_m', 'sev_cv', 'actual_m', 'actual_cv']
     bit.index = limits
     bit.index.name = 'limit'
     bit['vx'] = (bit.sev_m * bit.sev_cv) ** 2
@@ -484,7 +484,7 @@ Next, manipulate the ``stats_df`` dataframe to compute the required quantities. 
     bit = bl.stats_df.iloc[:, :-4].loc[
         [('meta', 'attachment'), ('freq', 'mean'), ('sev', 'mean'), ('agg', 'mean')]
     ].T
-    bit.columns = ['attachment', 'freq_m', 'sev_m', 'agg_m']
+    bit.columns = ['attachment', 'freq_m', 'sev_m', 'actual_m']
     bit = bit.rename(columns={'attachment': 'deductible'}).set_index('deductible')
     bit['F(d)'] = np.array([bl.sevs[0].fz.cdf(i) for i in bit.index])
     bit['freq_m'] = bit.loc[0, 'freq_m'] * (1 - bit['F(d)'])

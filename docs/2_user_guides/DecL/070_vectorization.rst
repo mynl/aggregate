@@ -36,7 +36,7 @@ dataframe shows the components (transposed extract shown). The mixture weights a
         [('meta', 'limit'), ('meta', 'attachment'),
          ('freq', 'mean'), ('agg', 'mean'), ('agg', 'cv')]
     ].iloc[:, :-4].T
-    df.columns = ['limit', 'attachment', 'freq_m', 'agg_m', 'agg_cv']
+    df.columns = ['limit', 'attachment', 'freq_m', 'actual_m', 'actual_cv']
     qd(df)
 
 
@@ -65,7 +65,7 @@ The ``report_df`` shows all 20 components: 4 limits x 5 mixture components.
         [('meta', 'limit'), ('meta', 'attachment'),
          ('freq', 'mean'), ('agg', 'mean'), ('agg', 'cv')]
     ].iloc[:, :-4].T
-    df.columns = ['limit', 'attachment', 'freq_m', 'agg_m', 'agg_cv']
+    df.columns = ['limit', 'attachment', 'freq_m', 'actual_m', 'actual_cv']
     qd(df)
 
 
@@ -127,7 +127,7 @@ The next two examples illustrate the different behavior.
        [('meta', 'limit'), ('meta', 'attachment'),
         ('freq', 'mean'), ('agg', 'mean'), ('agg', 'cv')]
    ].iloc[:, :-4].T
-   df.columns = ['limit', 'attachment', 'freq_m', 'agg_m', 'agg_cv']
+   df.columns = ['limit', 'attachment', 'freq_m', 'actual_m', 'actual_cv']
    qd(df)
 
 
@@ -149,6 +149,6 @@ The next two examples illustrate the different behavior.
        [('meta', 'limit'), ('meta', 'attachment'),
         ('freq', 'mean'), ('agg', 'mean'), ('agg', 'cv')]
    ].iloc[:, :-4].T
-   df.columns = ['limit', 'attachment', 'freq_m', 'agg_m', 'agg_cv']
+   df.columns = ['limit', 'attachment', 'freq_m', 'actual_m', 'actual_cv']
    qd(df)
 

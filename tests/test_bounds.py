@@ -28,7 +28,7 @@ def bdd_at_tvar50():
     a = port.q(1)
     prem = float(port.tvar(0.5))
     capital = a - prem
-    loss = port.agg_m
+    loss = port.actual_m
     margin = prem - loss
     coc = margin / capital
     port.calibrate_distortions(coc, p=1)

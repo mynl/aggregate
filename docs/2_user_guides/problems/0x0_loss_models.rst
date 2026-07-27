@@ -138,7 +138,7 @@ that the ratio of aggregate claims to expected claims will exceed 3.0.
     kpw_9_19 = build('agg KPW.9.19 dfreq [0 1 3] [.5 .4 .1] '
                     'dsev [1 10] [.9 .1]')
     qd(kpw_9_19)
-    m = kpw_9_19.agg_m
+    m = kpw_9_19.actual_m
     print(f'mean        {m:.5g}\nprobability {kpw_9_19.sf(3 * m):.4g}')
 
 .. _exercise 9_23:
@@ -173,7 +173,7 @@ The employer purchases aggregate stop-loss coverage that limits the employer’s
     qd(kpw_9_24)
 
     net = kpw_9_24.summary_df.iloc[-1, 1]
-    print(f'\ngross loss    {kpw_9_24.agg_m:.5g}\nretained loss {net:.5g}\n'
+    print(f'\ngross loss    {kpw_9_24.actual_m:.5g}\nretained loss {net:.5g}\n'
           f'premium       {net + 1.472:.5g}')
 
 Working in thousands.
@@ -328,8 +328,8 @@ Must use a :class:`Portfolio`. Work in thousands.
                      '\tagg B 60 claims dsev [20] poisson\n'
                      '\tagg C 30 claims dsev [40] poisson\n')
     qd(kpw_9_40)
-    qd(pd.Series({'expected payment': kpw_9_40.agg_m,
-                 'sd payment': kpw_9_40.agg_sd,
+    qd(pd.Series({'expected payment': kpw_9_40.actual_m,
+                 'sd payment': kpw_9_40.actual_sd,
                  'Pr > 3000': kpw_9_40.sf(3000)}).to_frame('value'),
                  accuracy=5)
 
@@ -383,9 +383,9 @@ For a premium of 6, an insurer covers aggregate claims and agrees to pay a divid
     qd(bit.head(10), accuracy=4)
     exp_div = (bit.dividend * bit.p).sum()
     print(f'prem      = {6:.5g}\n'
-          f'exp loss  = {kpw_9_47.agg_m:.5g}\n'
+          f'exp loss  = {kpw_9_47.actual_m:.5g}\n'
           f'dividend  = {exp_div:.5g}\n'
-          f'excess    = {6 - kpw_9_47.agg_m - exp_div:.5g}')
+          f'excess    = {6 - kpw_9_47.actual_m - exp_div:.5g}')
 
 .. _exercise 9_57 and 9_58:
 
@@ -718,7 +718,7 @@ Here are the FFT-exact, and various approximations to the required probability. 
     qd(kpw_9_16p)
     mv(kpw_9_16p)
     appx = kpw_9_16p.approximate('all')
-    premium = 1.45 * kpw_9_16p.agg_m
+    premium = 1.45 * kpw_9_16p.actual_m
     ans = {k: v.sf(premium) for k, v in appx.items()}
     ans['FFT'] = kpw_9_16p.sf(premium)
     qd(pd.DataFrame(ans.values(),

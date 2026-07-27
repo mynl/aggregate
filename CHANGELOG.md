@@ -1,5 +1,104 @@
 # Changelog
 
+## 1.0.0a149
+
+**[FCC-Surface-Sweep]** — the first pass of step 1 of `plan-for-v1.md`: work
+`dev/FEATURES.csv` class by class and close the gaps and inconsistencies in the
+first-class-citizen surface. Nine classes are in scope — `Aggregate`,
+`Portfolio`, `BivariateAggregate`, `PnL`, `Severity`, `Frequency`, `Bounds`,
+`AllocationBounds`, `PricingBounds`. **Several renames are breaking**; there
+are no deprecation aliases (pre-beta).
+
+### Breaking renames
+
+- **`agg_m` / `agg_sd` / `agg_cv` / `agg_skew` / `agg_var` → `actual_*`** on
+  `Aggregate` and `Portfolio`. The moment surface is now two symmetric
+  families — **`actual_*`** (theoretical / analytic) and **`est_*`** (realised
+  FFT grid) — instead of one prefix that read like the class name. The
+  `Underwriter` knowledge-base summary frame renames its columns to match
+  (`actual_m`, `actual_cv`, `actual_sd`, `actual_skew`); `tests/data/peg_baseline.json`
+  keys renamed with it (values unchanged).
+- **`PnL.mean` / `.sd` / `.cv` / `.skew` → `est_m` / `est_sd` / `est_cv` /
+  `est_skew`.** `est_`, not `actual_`: a P&L is evaluated per-atom over the
+  *source's realised grid*, so every moment inherits that grid's
+  discretization. (Within the ledger those per-atom values are exact — the
+  `EX` basis `validation_df` audits a rebucketed `bs > 0` leg against — but
+  relative to the generating `Aggregate`'s analytic moments they are
+  estimates.)
+- **`PnL.prob_loss` → `prob_eq_0`, with new semantics `P(result == 0)`**, and
+  the property added to `Aggregate` and `Portfolio`. `prob_loss` could not
+  travel: "the probability of a loss" and "the probability of losing money"
+  are opposite tails of the same number depending on `value_type`.
+  `prob_eq_0` is sign-neutral — *no loss* on a loss object, *exactly break
+  even* on a payoff. On demand from the realised grid, `None` before `update`.
+  On a continuous severity the zero bucket also absorbs everything that
+  discretizes to zero, so the reading is `P(N = 0)` plus that sliver.
+  The `Aggregate.info` row `P(loss)` (which was always `n/a`) becomes `P(X=0)`;
+  `Portfolio.info` gains the same row.
+- **`Aggregate.tail_df` / `Portfolio.tail_df` are now properties.** The
+  first-class form takes no arguments and uses the standard
+  `DEFAULT_RETURN_PERIODS` ladder; the parametrized worker is the new
+  **`tail_periods_df(periods=None)`**. `BivariateAggregate.tail_df` was already
+  a property, so `tail_df` is uniform across the matrix.
+- **`Severity.support_description` deleted.** Its content — the declared layer
+  form, atom listing, or signed support — now reads out through
+  `Severity.tail_description` (appended when it says something the interval
+  does not) and the new `tail_explanation`, i.e. through the narrative pair
+  every class carries rather than a Severity-only name.
+
+### Added
+
+- **`info` on every first-class class.** Was `Aggregate` / `Portfolio` /
+  `BivariateAggregate` (plus `Distortion`); now also `PnL`, `Severity`,
+  `Frequency`, `Bounds`, `AllocationBounds`, `PricingBounds` — terse, but the
+  same fixed-layout contract (`info_row`, no conditional rows, `n/a`
+  placeholder). `AllocationBounds` and `PricingBounds` share the slice-geometry
+  block via `_HullEngine._hull_info_rows`. Row catalogues in
+  `dev/info-strings.rst`.
+- **`pprogram` / `pprogram_html` on `BivariateAggregate` and `PnL`** — every
+  DecL-creatable class now round-trips its declaration. `PnL.program` is
+  stamped by `build` and falls back to `engine.program`.
+- **`Severity.actual_m` / `actual_sd` / `actual_cv` / `actual_var` /
+  `actual_skew`** — the analytic post-layer moments, cached off `moms()`.
+  There is no `est_*` counterpart: a standalone `Severity` is never
+  discretized. scipy's inherited `mean()` / `std()` / `var()` / `stats()` are
+  untouched. Note `actual_cv` is the *achieved* CV; `sev_cv` is the *declared*
+  one, and they differ under a layer, splice or shift.
+- **`tail_explanation` on `Severity` and `Frequency`**, completing the
+  short/long narrative pair wherever `tail_description` exists. Severity walks
+  support → declared layer → what the tail class means for the moments (the
+  power-law index and the first infinite moment). Frequency walks family →
+  zero-modification → `E[N]` / `SD(N)` / dispersion vs Poisson → whether the
+  count tail can set the aggregate tail on its own.
+- **`bs_explanation`, `tail_explanation` and `validation_explanation` on
+  `BivariateAggregate`** — per-axis grid and joint cell count with the deficit
+  gate; per-axis realised tails plus correlation and copula tau; and the long
+  form of the one-line `info` validation row.
+- **`Frequency.name`** — read-only alias of `freq_name`, so every first-class
+  class answers to `name`.
+- **`Portfolio.reins_description` / `Portfolio.reins_kinds`** — look-throughs
+  over the units (`Unit A: net of 500 xs 500 per occurrence. Unit B: no
+  reinsurance.`), naming non-ceding units too so the sentence covers the whole
+  book; both collapse to the aggregate's own clean-book answer when no unit
+  cedes. `Portfolio.info` gains a `reinsurance` row.
+
+### Changed
+
+- **`Aggregate._text_info_blob` / `Portfolio._text_info_blob` are one line**
+  (space-joined sentences, not stacked) and close with
+  `Validation: {validation_explanation}.` — exactly what `_repr_html_`
+  already did. `qd` no longer prints its own separate validation block, so
+  text and HTML now say the same thing once.
+
+### Notes
+
+- `tests/test_fcc_surface.py` is new: the executable half of
+  `dev/FEATURES.csv`, checking the shared surfaces exist and agree across the
+  nine classes.
+- `uv run python dev/regen_features.py` reports 0 mismatches / 0 stale.
+- Docs (`.rst` / `.qmd` sources) updated for the `agg_*` → `actual_*` rename;
+  the doc build is pending.
+
 ## 1.0.0a148
 
 **[Resolved-En-Plus-Freq-Df]** — two small frequency-surface items.

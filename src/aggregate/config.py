@@ -148,7 +148,7 @@ class DiscretizationSettings:
         requested cap to preserve an exact integer-lattice ``bs`` (e.g. keep
         ``bs=1`` for a high-mean ``dsev`` rather than coarsening to ``bs=2`` and
         mis-placing atoms at half-integer buckets). Small and bounded because a
-        windowed band is provably narrow (``agg_cv < 1/z``); never fires for a
+        windowed band is provably narrow (``actual_cv < 1/z``); never fires for a
         genuinely wide band, which coarsens ``bs`` as before.
     window_slack_thick : float
         For an *asymmetric* windowed band (one tail thick, one thin), the

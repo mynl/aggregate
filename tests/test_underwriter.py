@@ -24,7 +24,7 @@ def test_build_aggregate_returns_aggregate():
     obj = global_build('agg PhaseZero:Dice dfreq [3] dsev [1:6]')
     assert isinstance(obj, Aggregate)
     assert hasattr(obj, 'density_df')
-    assert obj.agg_m > 0
+    assert obj.actual_m > 0
 
 
 def test_build_severity_returns_severity():
@@ -363,7 +363,7 @@ def test_discover_describe_handles_severity():
     df = global_build.discover('DiscSevTest', describe=True)
     assert 'DiscSevTest' in df.index
     # Severity has theoretical moments but no log2/bs/est_*/valid
-    assert df.loc['DiscSevTest', 'agg_m'] is not None
+    assert df.loc['DiscSevTest', 'actual_m'] is not None
     assert df.loc['DiscSevTest', 'log2'] is None
     assert df.loc['DiscSevTest', 'emp_m'] is None
     assert df.loc['DiscSevTest', 'valid'] is None
@@ -375,7 +375,7 @@ def test_discover_describe_handles_distortion():
     df = global_build.discover('DiscDistTest', describe=True)
     assert 'DiscDistTest' in df.index
     # Distortion has none of the moment fields
-    for col in ['log2', 'bs', 'agg_m', 'agg_cv', 'emp_m', 'valid']:
+    for col in ['log2', 'bs', 'actual_m', 'actual_cv', 'emp_m', 'valid']:
         assert df.loc['DiscDistTest', col] is None
 
 

@@ -18,7 +18,7 @@ Layout of the captured baseline:
 
 - ``meta``: version, captured-date, program text, build parameters
 - ``portfolio_moments``: theoretical and empirical moments of the
-  aggregate (``agg_m/cv/skew``, ``est_m/cv/skew``)
+  aggregate (``actual_m/cv/skew``, ``est_m/cv/skew``)
 - ``calibration``: per-distortion ``shape`` and ``error`` from
   ``port.distortions``
 - ``audit``: minimal calibration inputs (``a_cal = port.q(p)``, ``p``)
@@ -83,9 +83,9 @@ def main() -> None:
             'coc_calibration': COC_CAL,
         },
         'portfolio_moments': {
-            'agg_m':    float(port.agg_m),
-            'agg_cv':   float(port.agg_cv),
-            'agg_skew': float(port.agg_skew),
+            'actual_m':    float(port.actual_m),
+            'actual_cv':   float(port.actual_cv),
+            'actual_skew': float(port.actual_skew),
             'est_m':    float(port.est_m),
             'est_cv':   float(port.est_cv),
             'est_skew': float(port.est_skew),
@@ -102,7 +102,7 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(baseline, indent=2), encoding='utf-8')
     print(f'Wrote PEG baseline to {out_path}')
-    print(f'  agg_m  = {baseline["portfolio_moments"]["agg_m"]:.6f}')
+    print(f'  actual_m  = {baseline["portfolio_moments"]["actual_m"]:.6f}')
     print(f'  est_m  = {baseline["portfolio_moments"]["est_m"]:.6f}')
     print(f'  a_cal  = {baseline["audit"]["a_cal"]:.2f}')
     print(f'  dists  = {list(baseline["calibration"].keys())}')

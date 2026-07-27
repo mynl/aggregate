@@ -35,7 +35,7 @@ def _means_add(pnl):
     """The signed ledger foots: the leg means sum to the grand result."""
     dd = pnl.density_df
     legs = [k for k in dd if not k.endswith('result') and k != 'margin']
-    return abs(sum(dd[k].mean() for k in legs) - pnl.mean) < 1e-3
+    return abs(sum(dd[k].mean() for k in legs) - pnl.est_m) < 1e-3
 
 
 def _leg(pnl, label):
@@ -62,7 +62,7 @@ def test_swing_build():
     assert [g.label for g in x.groups] == ['Gross', 'ceded agg']
     assert _leg(x, 'ceded agg premium')['SD'] > 0
     # the two faces agree on the net position
-    assert abs(p.mean - x.mean) < 1e-9
+    assert abs(p.est_m - x.est_m) < 1e-9
 
 
 def test_swing_bare_collar_defaults():
@@ -144,7 +144,7 @@ def test_corridor_build():
     x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
               + 'deposit 1500 corridor 50% po 30% xs 20%')
     assert _leg(x, 'ceded agg recovery')['SD'] > 0
-    assert abs(p.mean - x.mean) < 1e-9
+    assert abs(p.est_m - x.est_m) < 1e-9
 
 
 # ----------------------------------------------------------------------

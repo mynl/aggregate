@@ -112,7 +112,7 @@ If exposures are determined via losses (directly or using premium and loss ratio
     :okwarning:
 
     a01e = build('agg DecL:01e '
-                 f'{a01.agg_m} loss '
+                 f'{a01.actual_m} loss '
                  '5000 xs 0 '
                  'sev lognorm [10 20 50 60 70] '
                  'cv [0.75 1.0 1.25 1.5 2] '

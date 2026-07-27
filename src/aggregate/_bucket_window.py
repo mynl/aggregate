@@ -34,7 +34,7 @@ WINDOW_NINES = get_settings().discretization.window_nines
 # past the requested cap to preserve an exact integer-lattice bs -- e.g. keep
 # bs=1 for a high-mean ``dsev`` rather than coarsening to bs=2 and mis-placing
 # the atoms at half-integer buckets. Small and bounded because the windowed band
-# is provably narrow (a concentrated aggregate, agg_cv < 1/z); it never fires for
+# is provably narrow (a concentrated aggregate, actual_cv < 1/z); it never fires for
 # a genuinely wide band, which coarsens bs as before.
 WINDOW_LOG2_GROWTH = get_settings().discretization.window_log2_growth
 
@@ -453,7 +453,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     - ``bounded_small`` -- bounded severity: ``[0, N_hi·s_max]`` from a high
       frequency quantile; selected only when tighter than ``moment``.
     - ``windowed`` -- non-signed high-mean / thin-spread aggregate
-      (``agg_cv < 1/z``): a convention-skewed two-sided window far from 0,
+      (``actual_cv < 1/z``): a convention-skewed two-sided window far from 0,
       computed via benign FFT wrap. Auto-origin only; selected when the
       severity fits the windowed extent and it is **no coarser** than the
       0-based pick (it then reclaims the empty space below the band and
@@ -468,13 +468,13 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     """
     N0 = 1 << log2
     agg._bs_clip = None    # cleared each sizing; set only if the tail clips
-    m = agg.agg_m
+    m = agg.actual_m
     try:
         ex2 = float(agg.stats_df['mixed'][('agg', 'ex2')])
         sd = float(np.sqrt(max(ex2 - m * m, 0.0)))
     except Exception:  # pragma: no cover - defensive
-        sd = agg.agg_sd
-    skew = agg.agg_skew
+        sd = agg.actual_sd
+    skew = agg.actual_skew
     # Convolution-grid signedness: the loss FFT is sized on the two-sided grid
     # only when the severity itself is signed (``ssev`` / negative-``dsev``).
     signed = agg._signed_severity()
@@ -577,7 +577,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     else:
         x_lo = 0.0
         try:
-            x_hi = float(_estimate_agg_percentile(m, agg.agg_cv, skew, p))
+            x_hi = float(_estimate_agg_percentile(m, agg.actual_cv, skew, p))
         except ValueError as e:
             # No finite variance (power-law / infinite-variance severity,
             # e.g. pareto shape alpha <= 2) and no explicit ``bs``: there is
@@ -632,7 +632,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                                      'bounded severity x freq quantile')
 
     # ---- windowed (non-signed high-mean / thin relative spread) -----
-    # A concentrated aggregate -- ``agg_cv = sd/m < 1/z`` with
+    # A concentrated aggregate -- ``actual_cv = sd/m < 1/z`` with
     # ``z = norm.isf(1e-WINDOW_NINES)`` -- has its whole mass band sitting a
     # long way above 0. Compute it on the two-sided window
     # ``[m - z*sd, m + z*sd]`` (``estimate_agg_window``) far from 0 and let
@@ -651,7 +651,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     #     far above the severity grid). Aggregate reinsurance is fine -- it
     #     operates on the aggregate, on the windowed ``xs``/``x_min``.
     #   - the book is **concentrated** -- the tail report's conservative
-    #     ``concentrated`` flag (``agg_cv < CONCENTRATION_CV``, i.e. ~0.1),
+    #     ``concentrated`` flag (``actual_cv < CONCENTRATION_CV``, i.e. ~0.1),
     #     the single source of truth (item 5). This replaces the looser
     #     geometric ``w_lo > 0`` (~``cv < 0.21``) gate: a band that merely
     #     grazes 0 is no longer windowed, so a borderline book reverts to the
@@ -986,16 +986,16 @@ def port_single_big_jump_window(port, p_star):
     tails, dominated by the heaviest unit:
     ``P(S_tot > x) ~ sum_k E[N_k]*P(X_k > x)``. So the single-big-jump
     scenario is one big claim in some unit ``k`` riding the *typical* bulk
-    of everything else -- the portfolio mean ``agg_m`` with one typical
+    of everything else -- the portfolio mean ``actual_m`` with one typical
     claim (unit ``k``'s severity mean) replaced by one big one::
 
-        sbj_hi_port = agg_m + max_k ( sbj_hi_k - ES_k )      # MAX, not sum
+        sbj_hi_port = actual_m + max_k ( sbj_hi_k - ES_k )      # MAX, not sum
 
     where ``sbj_hi_k`` is unit ``k``'s own
     :meth:`Aggregate._single_big_jump_window` upper edge called with the
     **portfolio** ``p_star`` (each unit forms its own
     ``p**_k = 1 - (1 - p_star)/E[N_k]`` from *its* frequency),
-    ``ES_k = a.agg_m`` is the unit's aggregate mean, and
+    ``ES_k = a.actual_m`` is the unit's aggregate mean, and
     ``sbj_hi_k - ES_k = q_{X_k}(p**_k) - mu_{X_k}`` is that unit's "jump
     excess" over a typical claim. The lower edge mirrors over **signed**
     units only (a non-negative unit reaches no lower than its 0 floor); for
@@ -1019,7 +1019,7 @@ def port_single_big_jump_window(port, p_star):
         The portfolio single-big-jump window edges, or ``None`` when no
         unit yields a finite SBJ window (no finite ``E[N]`` / variance).
     """
-    m = float(port.agg_m)
+    m = float(port.actual_m)
     if not np.isfinite(m):
         return None
     hi_excess, lo_excess = [], []
@@ -1027,7 +1027,7 @@ def port_single_big_jump_window(port, p_star):
         sbj = a._single_big_jump_window(p_star)
         if sbj is None:
             continue
-        es_k = float(a.agg_m)
+        es_k = float(a.actual_m)
         if not np.isfinite(es_k):
             continue
         hi_excess.append(float(sbj[1]) - es_k)
@@ -1050,7 +1050,7 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     diversification -- nor by root-sum-square):
 
     1. **Bulk window from Portfolio MM.** Feed the analytic compound total
-       moments (``agg_m``, ``agg_sd = agg_m*agg_cv``, ``agg_skew``; cumulants
+       moments (``actual_m``, ``actual_sd = actual_m*actual_cv``, ``actual_skew``; cumulants
        add under independence) straight into the *same*
        :func:`estimate_agg_window` the single-aggregate sizer uses. This
        gives the two-sided ``[mm_lo, mm_hi]`` where the combined mass lives.
@@ -1058,7 +1058,7 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
        bucket ``min_k bs_k`` -- a unit's own lattice must survive ("don't
        lose sev ``bs``", now portfolio-wide), never the span.
     3. **One portfolio SBJ extent floor** (the look-through,
-       :meth:`_single_big_jump_window`): ``sbj_hi_port = agg_m + max_k(
+       :meth:`_single_big_jump_window`): ``sbj_hi_port = actual_m + max_k(
        sbj_hi_k - ES_k)`` -- the heaviest unit's one big claim on the
        combined bulk, **max** not sum, so the per-unit a59 extents are not
        double-counted. Self-activating: a thin / well-diversified total has
@@ -1141,9 +1141,9 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
                              note=str(sel.get('note', ''))))
 
     # ---- the bulk window: Portfolio MM (NOT a width-combine) ----------
-    m = float(port.agg_m)
-    sd = float(port.agg_sd)
-    skew = float(port.agg_skew)
+    m = float(port.actual_m)
+    sd = float(port.actual_sd)
+    skew = float(port.actual_skew)
     try:
         mm_lo, mm_hi, _W_mm = estimate_agg_window(m, sd, skew, p_star)
     except (ValueError, FloatingPointError):
@@ -1273,7 +1273,7 @@ def port_build_bs_window_df(port, rows, bs, log2, x_min, cand, resolution, W_ext
     cand_note = {
         'mm': 'Portfolio MM bulk (3-moment fit on total) -- the live span',
         'rms': 'RMS-of-windows reference (normal approx); mm-rms = skew adj',
-        'sbj': 'single big jump look-through: agg_m + max_k(sbj_hi_k - ES_k)',
+        'sbj': 'single big jump look-through: actual_m + max_k(sbj_hi_k - ES_k)',
         'sum': 'legacy linear sum of widths (guaranteed-no-wrap bound)',
     }
     for key in ('mm', 'rms', 'sbj', 'sum'):

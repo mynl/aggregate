@@ -52,7 +52,7 @@ qd(bit)
      over outcomes (no discretization error — it is already discrete). -->
 
 ```{python}
-print(f'Mean = {a.agg_m} and variance = {a.agg_var}')
+print(f'Mean = {a.actual_m} and variance = {a.actual_var}')
 
 m = (bit.index * bit.p_total).sum() / 36
 ex2 = (bit.index ** 2 * bit.p_total).sum() / 36

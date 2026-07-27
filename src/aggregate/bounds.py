@@ -85,6 +85,7 @@ import pandas as pd
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 
+from .constants import INFO_NA, info_row
 from .spectral import Distortion
 from ._grid_distribution import GridDistribution
 
@@ -211,6 +212,33 @@ class Bounds:
         if not np.isinf(self.a) and self.premium > self.a:
             raise ValueError(
                 f'premium {self.premium} exceeds asset cap {self.a}')
+
+    @property
+    def info(self):
+        """Fixed-layout multi-line summary string (terse).
+
+        Every row is always present, in the same order, for every ``Bounds``;
+        a value that does not apply renders as ``n/a``. Shares the label/value
+        convention (:func:`aggregate.constants.info_row`) with ``Aggregate`` /
+        ``Portfolio``. The row catalogue is documented in
+        ``dev/info-strings.rst``. Deliberately cheap: it reports the grid
+        sizes rather than materialising :attr:`cloud_df`.
+        """
+        mean = float(self._dist.tvar(0))
+        rows = [
+            ('bounds object name', self.name),
+            ('kind', 'pricing bounds (IME 2022)'),
+            ('unit', self.unit),
+            ('E[X]', f'{mean:,.6g}'),
+            ('premium', f'{self.premium:,.6g}'),
+            ('margin', f'{self.premium - mean:,.6g}'),
+            ('asset cap', f'{self.a:,.6g}' if np.isfinite(self.a) else 'unlimited'),
+            ('F(a)', f'{self.Fb:.6g}'),
+            ('p_star', f'{self.p_star:.6g}'),
+            ('n_p', self.n_p),
+            ('n_s', self.n_s),
+        ]
+        return '\n'.join(info_row(label, value) for label, value in rows)
 
     # ------------------------------------------------------------------
     # Bounded TVaR — TVaR_p(min(X, a))
@@ -806,6 +834,21 @@ class _HullEngine:
         from .utilities import agg_help
         agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
 
+    def _hull_info_rows(self):
+        """The shared ``info`` rows: the slice geometry both subclasses carry.
+
+        Subclass ``info`` properties lead with their own identity rows and then
+        splice these in, so the two objects read the same below the fold.
+        """
+        lo, hi = self.premium_range
+        return [
+            ('asset cap', f'{self.a:,.6g}' if np.isfinite(self.a) else 'unlimited'),
+            (f'{self._item_label}s', ', '.join(self._y_names)),
+            ('vertices', len(self._T)),
+            ('premium range', f'[{lo:,.6g}, {hi:,.6g}]'),
+            ('s_floor', f'{self.s_floor:.3g}'),
+        ]
+
     def _init_engine(self, T, A, p_vert, S, y_names):
         """Store the vertex table and build the per-item convex envelopes."""
         self._T = np.asarray(T, dtype=float)
@@ -1265,6 +1308,25 @@ class AllocationBounds(_HullEngine):
                 f'{len(self._T)} vertices, premium range [{lo:.6g}, {hi:.6g}], '
                 f'additivity error {self.additivity_error:.3g})')
 
+    @property
+    def info(self):
+        """Fixed-layout multi-line summary string (terse).
+
+        Every row is always present, in the same order, for every
+        ``AllocationBounds``. The middle block is the shared ``_HullEngine``
+        slice geometry (:meth:`_hull_info_rows`), so this and
+        :attr:`PricingBounds.info` read alike below the identity rows. Shares
+        the label/value convention (:func:`aggregate.constants.info_row`) with
+        ``Aggregate`` / ``Portfolio``; catalogue in ``dev/info-strings.rst``.
+        """
+        rows = [
+            ('allocation bounds object', self.port.name),
+            ('kind', 'natural-allocation premium ranges by unit'),
+        ]
+        rows += self._hull_info_rows()
+        rows.append(('additivity error', f'{self.additivity_error:.3g}'))
+        return '\n'.join(info_row(label, value) for label, value in rows)
+
     # ----------------------------------------------------------------------
     # p_star — exact inversion of TVaR_p(X) = P on the grid
     # ----------------------------------------------------------------------
@@ -1599,6 +1661,31 @@ class PricingBounds(_HullEngine):
         return (f'PricingBounds(X={self._x_source.name!r}, '
                 f'Y={list(self._y_sources)}, {cap}'
                 f'{len(self._T)} vertices, premium range [{lo:.6g}, {hi:.6g}])')
+
+    @property
+    def info(self):
+        """Fixed-layout multi-line summary string (terse).
+
+        Every row is always present, in the same order, for every
+        ``PricingBounds``; the Gini rows render ``n/a`` unless the reference
+        risk X is the uniform. The middle block is the shared ``_HullEngine``
+        slice geometry (:meth:`_hull_info_rows`), so this and
+        :attr:`AllocationBounds.info` read alike below the identity rows.
+        Catalogue in ``dev/info-strings.rst``.
+        """
+        rows = [
+            ('pricing bounds object',
+             f'{self._x_source.name} vs {", ".join(self._y_names)}'),
+            ('kind', 'price ranges of risks consistent with the reference'),
+            ('reference risk', self._x_source.name),
+            ('uniform reference', bool(self._is_uniform_x)),
+        ]
+        rows += self._hull_info_rows()
+        rows.append(('n_grid', self.n_grid))
+        rows.append(('gini_level',
+                     f'{self.gini_level:.6g}' if self.gini_level is not None
+                     else INFO_NA))
+        return '\n'.join(info_row(label, value) for label, value in rows)
 
     # ----------------------------------------------------------------------
     # p_star via the X-source inverse

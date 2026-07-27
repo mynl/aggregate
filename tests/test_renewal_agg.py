@@ -145,27 +145,27 @@ def test_years_at_rate_premium_and_lr():
     assert a.exp_rate == 500.0
     assert a.n == pytest.approx(10.0, abs=1e-7)
     # loss ratio = el / premium (the sentinel-before-premium reorder fix)
-    assert a.agg_m / a.exp_premium == pytest.approx(2.0, abs=1e-6)
+    assert a.actual_m / a.exp_premium == pytest.approx(2.0, abs=1e-6)
 
 
 def test_pnl_inherit_premium_smoke():
     p = build('pnl RPL inherit premium less agg RPLe 1 year at 500 rate '
               'dsev [100] wait 0.1 * expon')
     assert p.E_consideration == 500.0
-    assert p.mean == pytest.approx(-500.0, abs=1e-5)
+    assert p.est_m == pytest.approx(-500.0, abs=1e-5)
 
 
 def test_renewal_unit_in_port():
     p = build('port RPT agg U1 3 years dsev [1] dwait [1] '
               'agg U2 dfreq [1] dsev [2]')
-    assert p.agg_m == pytest.approx(5.0, abs=1e-7)
+    assert p.actual_m == pytest.approx(5.0, abs=1e-7)
 
 
 def test_approximate_mom_path():
     a = build('agg RAP 10 years sev lognorm 100 cv 1 wait expon '
               'approximate sgamma')
     assert a.approximation == 'sgamma'
-    assert a.agg_m == pytest.approx(1000.0, rel=1e-6)
+    assert a.actual_m == pytest.approx(1000.0, rel=1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ def test_create_frequency_realized_dfreq():
     fa = a.create_frequency()
     got = fa.density_df.p_total.values[:len(a.frequency.freq_b)]
     assert np.abs(got - a.frequency.freq_b).max() < 1e-14
-    assert fa.agg_m == pytest.approx(a.n, abs=1e-12)
+    assert fa.actual_m == pytest.approx(a.n, abs=1e-12)
 
 
 def test_renewal_bs_df_structure():

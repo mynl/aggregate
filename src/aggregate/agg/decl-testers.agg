@@ -429,7 +429,7 @@ port BucketFat agg F1 100 claims sev lognorm 100 cv 2 poisson agg F2 80 claims s
 # ============================================================
 # WIN. Non-zero aggregate output window -- windowed sizing (1.0.0a51)
 # ============================================================
-# A concentrated aggregate (agg_cv < 1/z, mass band clears 0) is computed on a
+# A concentrated aggregate (actual_cv < 1/z, mass band clears 0) is computed on a
 # two-sided window far from 0 via benign FFT wrap: bs sizes off the band width,
 # not x_max, so a high-mean book resolves finely with a non-zero x_min. Window
 # is the headline 10M-claim integer case (resolves at bs=1); WinCts is the

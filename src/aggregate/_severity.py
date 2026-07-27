@@ -4,7 +4,7 @@ Extracted from ``distributions.py`` (Phase 1, kind split). Imported through the
 ``distributions`` facade so every existing import path keeps working.
 """
 
-from functools import lru_cache
+from functools import cached_property, lru_cache
 import logging
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ import scipy.stats as ss
 from scipy.optimize import newton
 from scipy.special import loggamma, binom
 from scipy.optimize import NoConvergence  # noqa
-from .constants import (FIG_H, FIG_W)
+from .constants import (FIG_H, FIG_W, INFO_NA, info_row)
 from ._grid_distribution import GridDistribution
 from ._labeled import LabeledMixin
 from . import tail as _tail
@@ -1031,9 +1031,8 @@ class Severity(LabeledMixin, ss.rv_continuous):
             f'(sev_name={self.sev_name!r}). Registered kinds: {sorted(Severity._registry)}'
         )
 
-    @property
-    def support_description(self):
-        """Short human description of the severity for ``info`` display.
+    def _support_phrase(self):
+        """Short declared-support phrase, folded into the ``tail_*`` narrative.
 
         For a histogram / discrete severity, render the **actual support** --
         ``atoms {a, b, …}`` (shortened to first/last few when there are many,
@@ -1042,6 +1041,11 @@ class Severity(LabeledMixin, ss.rv_continuous):
         or signed severity (e.g. ``dsev [-2 5]`` is *not* a ``5 xs 0`` layer).
         For a continuous severity keep the familiar ``unlimited`` /
         ``limit xs attachment`` rendering.
+
+        Private since a149: this was the public ``support_description``, whose
+        content now reads out through :attr:`tail_description` and
+        :attr:`tail_explanation` (the shared narrative pair every class
+        carries) rather than through a Severity-only name.
 
         Returns
         -------
@@ -1064,6 +1068,91 @@ class Severity(LabeledMixin, ss.rv_continuous):
         if self.limit == np.inf and self.attachment == 0:
             return 'unlimited'
         return f'{self.limit:,.0f} xs {self.attachment:,.0f}'
+
+    @property
+    def info(self):
+        """Fixed-layout multi-line summary string (terse).
+
+        Every row is always present, in the same order, for every
+        ``Severity``; a value that does not apply renders as ``n/a``. Shares
+        the label/value convention (:func:`aggregate.constants.info_row`) with
+        ``Aggregate`` / ``Portfolio`` / ``Frequency``. The row catalogue is
+        documented in ``dev/info-strings.rst``.
+        """
+        rows = [
+            ('severity object name', self.name or INFO_NA),
+            ('severity distribution', self.long_name),
+            ('declared mean', f'{self.sev_mean:,.6g}' if self.sev_mean else INFO_NA),
+            ('declared cv', f'{self.sev_cv:,.6g}' if self.sev_cv else INFO_NA),
+            ('layer', self._support_phrase()),
+            ('conditional', self.conditional),
+            ('signed', self.signed),
+            ('mean', f'{self.actual_m:,.6g}'),
+            ('cv', f'{self.actual_cv:,.6g}'),
+            ('sd', f'{self.actual_sd:,.6g}'),
+            ('skew', f'{self.actual_skew:,.6g}'),
+        ]
+        s = [info_row(label, value) for label, value in rows]
+        s.append(info_row('severity tail', self.tail_description))
+        s.append(info_row('bounded', self.bounded))
+        return '\n'.join(s)
+
+    @cached_property
+    def _actual_moments(self):
+        """``(mean, var, sd, cv, skew)`` of the layered severity, from :meth:`moms`.
+
+        Cached: :meth:`moms` may fall through to numerical integration, and the
+        five ``actual_*`` properties must not pay for it five times.
+        """
+        ex1, ex2, ex3 = (float(v) for v in self.moms())
+        with np.errstate(invalid='ignore', over='ignore'):
+            var = ex2 - ex1 * ex1 if np.isfinite(ex2) else np.inf
+            if np.isfinite(var):
+                var = max(var, 0.0)
+            sd = np.sqrt(var)
+            cv = sd / ex1 if ex1 else np.nan
+            if np.isfinite(ex3) and np.isfinite(sd) and sd > 0:
+                skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
+            else:
+                skew = np.inf if not np.isfinite(ex3) else np.nan
+        return float(ex1), float(var), float(sd), float(cv), float(skew)
+
+    # The severity moment surface is ``actual_*`` -- analytic (or exactly
+    # summed, for a discrete law), never read off a grid, which is why there is
+    # no ``est_*`` counterpart here: a standalone Severity is never
+    # discretized. (The *aggregate's* discretized severity moments live on
+    # ``Aggregate.est_sev_*``.) scipy's ``mean()`` / ``var()`` / ``std()`` /
+    # ``stats()`` remain available as the inherited rv_continuous surface.
+    @property
+    def actual_m(self):
+        """Severity mean ``E[X(a, d)]`` (analytic, post-layer, post-splice)."""
+        return self._actual_moments[0]
+
+    @property
+    def actual_var(self):
+        """Severity variance (analytic)."""
+        return self._actual_moments[1]
+
+    @property
+    def actual_sd(self):
+        """Severity standard deviation (analytic)."""
+        return self._actual_moments[2]
+
+    @property
+    def actual_cv(self):
+        """Severity coefficient of variation (analytic).
+
+        The *achieved* CV. Compare :attr:`sev_cv`, the CV **requested** in the
+        declaration -- they differ whenever a layer, splice or shift is applied
+        (and their agreement on an unlimited severity is exactly what
+        ``_validate_moments`` checks at construction).
+        """
+        return self._actual_moments[3]
+
+    @property
+    def actual_skew(self):
+        """Severity skewness (analytic)."""
+        return self._actual_moments[4]
 
     @property
     def tail_class(self):
@@ -1090,13 +1179,53 @@ class Severity(LabeledMixin, ss.rv_continuous):
 
     @property
     def tail_description(self) -> str:
-        """One line: this severity's claim-space support and per-side tail class.
+        """One line: family, declared support, claim-space support, tail class.
 
-        E.g. ``lognorm, [0, inf), subexponential right tail``. Derived from the
-        same :func:`~aggregate.tail.severity_tail_row` as the aggregate's
-        :attr:`~aggregate.distributions.Aggregate.tail_behavior_df` ``comp`` rows.
+        E.g. ``lognorm, [0, inf), subexponential right tail`` for an unlimited
+        severity, or ``lognorm, [0, 500], bounded; 500 xs 250`` once a layer is
+        declared and ``dhistogram, [1, 6], bounded; atoms [1 2 3 4 5 6]`` for a
+        ``dsev``. Derived from the same
+        :func:`~aggregate.tail.severity_tail_row` as the aggregate's
+        :attr:`~aggregate.distributions.Aggregate.tail_behavior_df` ``comp``
+        rows, with the declared layer / atom phrase appended when it says
+        something the interval does not (a149: this absorbed the old
+        ``support_description``). The verbose form is :attr:`tail_explanation`.
         """
-        return _tail.describe_row(_tail.severity_tail_row(self, 'severity'))
+        base = _tail.describe_row(_tail.severity_tail_row(self, 'severity'))
+        extra = self._support_phrase()
+        return base if extra in ('', 'unlimited') else f'{base}; {extra}'
+
+    @property
+    def tail_explanation(self) -> str:
+        """Verbose prose over this severity's support and tail behavior.
+
+        The Severity twin of
+        :attr:`~aggregate.distributions.Aggregate.tail_explanation`: the family
+        and its claim-space support and per-side classes, then the declared
+        layer / atom support, then what the tail class means for the moments
+        (the power-law tail index and the first moment that fails to exist, or
+        the guarantee that every moment is finite on a bounded support).
+        """
+        row = _tail.severity_tail_row(self, 'severity')
+        out = [_tail.explain_rows([row])]
+        extra = self._support_phrase()
+        if extra:
+            out.append(f'Declared support: {extra}.')
+        rung, _, alpha = _tail.classify_severity(self)
+        if self.bounded:
+            out.append('Support is bounded, so every moment is finite.')
+        elif rung == TailClass.POWER_LAW and alpha is not None:
+            k = int(np.floor(alpha))
+            out.append(f'Power-law right tail with index alpha ~ {alpha:.3g}: '
+                       f'moments of order < {alpha:.3g} are finite, so E[X^{k + 1}] '
+                       f'and above are infinite.')
+        elif _tail.is_thick(rung):
+            out.append('The right tail is thick (subexponential): the aggregate '
+                       'inherits it by the single big jump.')
+        else:
+            out.append('The right tail is thin (exponential or lighter): every '
+                       'moment is finite.')
+        return ' '.join(out)
 
     def _apply_lb_ub(self):
         """Wrap ``self.fz`` methods with truncation decorators for ``[lb, ub]``.
@@ -1785,7 +1914,7 @@ class SeverityDHistogram(Severity):
         if np.any(xs < 0):
             self.signed = True
         # keep the (validated, sorted) atoms for exact-support sizing and
-        # for the info display (rendered by support_description).
+        # for the info display (rendered by ``_support_phrase``).
         self.support_atoms = np.asarray(xs, dtype=float)
         self.sev1 = np.sum(xs * ps)
         self.sev2 = np.sum(xs ** 2 * ps)

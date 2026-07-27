@@ -650,7 +650,7 @@ More in the spirit of ``aggregate``: create a new :class:`Aggregate` applying th
                 'aggregate net of 360 xs 0 ')
     qd(a11)
 
-    gross = a11.agg_m; net = a11.est_m; ins_charge = net / gross
+    gross = a11.actual_m; net = a11.est_m; ins_charge = net / gross
     net, ins_charge
 
 Bear and Nemlick use a lognormal approximation to the aggregate.
@@ -658,9 +658,9 @@ Bear and Nemlick use a lognormal approximation to the aggregate.
 .. ipython:: python
     :okwarning:
 
-    mu, sigma = lognorm_fit(a10.agg_m, a10.agg_cv)
+    mu, sigma = lognorm_fit(a10.actual_m, a10.actual_cv)
     elim_approx = lognorm_lev(mu, sigma, 1, 360)
-    a11.agg_m - elim_approx, 1 - elim_approx / a11.agg_m
+    a11.actual_m - elim_approx, 1 - elim_approx / a11.actual_m
 
 The lognormal overstates the value of the AAD, resulting in a lower net premium. This is because the approximating lognormal is much more skewed.
 
@@ -698,11 +698,11 @@ Here is a summary of the different methods, compare Bear and Nemlick Table 1, ro
 .. ipython:: python
     :okwarning:
 
-    bit = pd.DataFrame([a10.agg_m,
+    bit = pd.DataFrame([a10.actual_m,
         a11.summary_df.iloc[-1, 1],
         a12.summary_df.iloc[-1, 1],
         a13.summary_df.iloc[-1, 1],
-        a11.agg_m - elim_approx],
+        a11.actual_m - elim_approx],
         columns=['Loss cost'],
         index=pd.Index(['Gross', 'NB', 'Poisson', 'c=0.05', 'lognorm'],
                       name='Method'))

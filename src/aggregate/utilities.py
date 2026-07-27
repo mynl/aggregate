@@ -328,16 +328,12 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     # split output
     for x in argv:
         if isinstance(x, (Aggregate, Portfolio)):
-            # Headline risk view: a short text intro, the moments-and-
-            # percentiles ``summary_df``, then the return-period ``tail_df``.
-            # Validation is silent on a pass and flagged only on a genuine
-            # failure (mirrors ``_repr_html_``).
+            # Headline risk view: a one-line text intro (which now carries the
+            # validation result inline, mirroring ``_repr_html_``) and the
+            # moments-and-percentiles ``summary_df``. The return-period
+            # ``tail_df`` is served on demand.
             print(x._text_info_blob())
             qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
-            if x.density_df is not None and not x.valid.passes:
-                print(f'\nVALIDATION FAILS: {x.validation_explanation}')
-            else:
-                print(f'\nValidation: not unreasonable.')
         elif isinstance(x, PnL):
             # P&L headline: the repr then the fixed summary card (marginal
             # range percentiles; the footing sheet is stats_df).
@@ -388,9 +384,9 @@ def mv(x, y=None):
     from .distributions import Aggregate
     from .portfolio import Portfolio
     if y is None and isinstance(x, (Aggregate, Portfolio)):
-        print(f'mean     = {x.agg_m:.6g}')
-        print(f'variance = {x.agg_var:.7g}')
-        print(f'std dev  = {x.agg_sd:.6g}')
+        print(f'mean     = {x.actual_m:.6g}')
+        print(f'variance = {x.actual_var:.7g}')
+        print(f'std dev  = {x.actual_sd:.6g}')
     else:
         print(f'mean     = {x:.6g}')
         print(f'variance = {y:.7g}')

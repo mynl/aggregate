@@ -135,7 +135,7 @@ creates a realistic insurance portfolio, with 5 expected claims, severity sample
 .. ipython:: python
     :okwarning:
 
-    a.agg_m, a.agg_sd, a.agg_cv, a.agg_skew
+    a.actual_m, a.actual_sd, a.actual_cv, a.actual_skew
 
 They have probability mass, cumulative distribution, survival, and quantile (inverse of distribution) functions.
 

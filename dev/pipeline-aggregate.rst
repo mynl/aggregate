@@ -78,7 +78,7 @@ a *mixed severity* (a weighted list of distributions) — into:
 * ``self.en`` / ``self.attachment`` / ``self.limit`` — per-component vectors;
 * ``self.n`` — total expected claim count;
 * ``self.stats_df`` — the canonical moment frame (see below);
-* headline scalars ``agg_m/cv/skew``, ``sev_m/cv/skew`` (theoretical).
+* headline scalars ``actual_m/cv/skew``, ``sev_m/cv/skew`` (theoretical).
 
 Spec capture
 ------------
@@ -163,7 +163,7 @@ Phase 2 — Grid choice & discretise
 
 ``recommend_bucket`` sizes the grid as
 ``max(limit/N, percentile_estimate/N)`` where the percentile is estimated
-analytically from ``(agg_m, agg_cv, agg_skew)`` (no FFT yet). Thick tails need
+analytically from ``(actual_m, actual_cv, actual_skew)`` (no FFT yet). Thick tails need
 ``p`` pushed toward ``1 - 1e-8``; an infinite limit forces that automatically.
 
 **The exact-binary ``bs`` invariant.** ``round_bucket`` is the codification of

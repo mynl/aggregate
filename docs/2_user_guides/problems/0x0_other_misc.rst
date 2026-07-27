@@ -269,7 +269,7 @@ Expected claim count 1.
                     , bs=1/1024)
     qd(gerber1)
     bit = gerber1.density_df.loc[0:21:2*1024, ['S', 'lev']]
-    bit['stop_loss'] = gerber1.agg_m - bit.lev
+    bit['stop_loss'] = gerber1.actual_m - bit.lev
     qd(bit)
 
 Expected claim count 10.
@@ -281,7 +281,7 @@ Expected claim count 10.
                     , bs=1/128)
     qd(gerber10)
     bit = gerber10.density_df.loc[15:61:5*128, ['S', 'lev']]
-    bit['stop_loss'] = gerber10.agg_m - bit.lev
+    bit['stop_loss'] = gerber10.actual_m - bit.lev
     qd(bit)
 
 Expected claim count 100.
@@ -293,7 +293,7 @@ Expected claim count 100.
                     , bs=1/16)
     qd(gerber100)
     bit = gerber100.density_df.loc[180:301:20*16, ['S', 'lev']]
-    bit['stop_loss'] = gerber100.agg_m - bit.lev
+    bit['stop_loss'] = gerber100.actual_m - bit.lev
     qd(bit)
 
 .. _richardson deferred:

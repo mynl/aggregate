@@ -1154,7 +1154,7 @@ class BivariateAggregate:
         # aggregate can be rebuilt for measure-don't-guess axis sizing (§5).
         self._freq_kwargs = dict(freq_name=freq_name, freq_a=freq_a,
                                  freq_b=freq_b, freq_zm=freq_zm, freq_p0=freq_p0)
-        self._sev_moms = [self._raw3(a.agg_m, a.agg_sd, a.agg_skew)
+        self._sev_moms = [self._raw3(a.actual_m, a.actual_sd, a.actual_skew)
                           for a in self.units]
         self.en = self._resolve_en(exp_en, exp_el, exp_premium, exp_lr)
         self._gs = None
@@ -1271,7 +1271,7 @@ class BivariateAggregate:
         self.freq_name = freq_name
         self._freq_kwargs = dict(freq_name=freq_name, freq_a=freq_a,
                                  freq_b=freq_b, freq_zm=freq_zm, freq_p0=freq_p0)
-        self._sev_moms = [self._raw3(a.agg_m, a.agg_sd, a.agg_skew)
+        self._sev_moms = [self._raw3(a.actual_m, a.actual_sd, a.actual_skew)
                           for a in self.units]
         # shared event count (an empirical dfreq carries its own mean; see
         # _resolve_en).
@@ -2387,6 +2387,26 @@ class BivariateAggregate:
         return 'not unreasonable' if not bad else 'check: ' + ', '.join(bad)
 
     @property
+    def pprogram(self) -> str:
+        """Canonical DecL program text, rendered from the parsed spec.
+
+        The bivariate twin of
+        :attr:`~aggregate.distributions.Aggregate.pprogram`: re-parses
+        :attr:`program` and renders it through
+        :func:`aggregate.decl_writer.format_program`, so equivalent programs
+        share one canonical form (sub-aggregates nested a level deeper). An
+        object built programmatically (empty ``program``) returns ``''``.
+        """
+        from .decl_writer import format_program
+        return format_program(self.program, fmt='text')
+
+    @property
+    def pprogram_html(self) -> str:
+        """Syntax-highlighted DecL program for IPython / Jupyter display."""
+        from .decl_writer import format_program
+        return format_program(self.program, fmt='html')
+
+    @property
     def bs_window_df(self):
         """Per-axis grid summary: the realized ``(kind, bs, log2, window)`` per axis.
 
@@ -2411,10 +2431,51 @@ class BivariateAggregate:
 
     @property
     def bs_description(self) -> str:
-        """One-unit summary of the chosen per-axis grids."""
+        """One-unit summary of the chosen per-axis grids.
+
+        The verbose form is :attr:`bs_explanation`.
+        """
         parts = [f'{name} bs={self._bs_str(i)} log2={int(round(np.log2(len(self.axis_xs[i]))))}'
                  for i, name in enumerate(self.unit_names)]
         return 'bivariate grid: ' + '; '.join(parts) + f' (deficit {self.deficit:.2e})'
+
+    @property
+    def bs_explanation(self) -> str:
+        """Verbose prose explaining the per-axis bivariate grid.
+
+        The bivariate twin of
+        :attr:`~aggregate.distributions.Aggregate.bs_explanation`. A bv
+        *measures* its grid rather than running the 1-D method ladder, so this
+        reports the realised per-axis ``(bs, log2, window)``, the joint memory
+        footprint the pair implies, the tail deficit (the hard correctness
+        gate: a measured grid conserves mass, so a deficit means a clipped or
+        aliased window), and what to change if the deficit is material.
+        """
+        self._require_density()
+        out = [f'Bivariate {self.mode} grid over '
+               f'{self.unit_names[0]} x {self.unit_names[1]}.']
+        cells = 1
+        for i, name in enumerate(self.unit_names):
+            xs = self.axis_xs[i]
+            log2 = int(round(np.log2(len(xs))))
+            cells *= len(xs)
+            out.append(f'Axis {i} ({name}, {self._axis_kind(i)}): bs = '
+                       f'{self._bs_str(i)}, log2 = {log2}, window '
+                       f'[{float(xs[0]):,.6g}, {float(xs[-1]):,.6g}].')
+        out.append(f'The joint grid is {cells:,d} cells.')
+        if getattr(self, '_clipped', False):
+            out.append('The window was clipped to stay inside the memory '
+                       'budget -- pass a larger budget or an explicit per-axis '
+                       'bs / log2 to widen it.')
+        deficit = self.deficit
+        if deficit > 1e-5:
+            out.append(f'Tail deficit {deficit:.2e} exceeds the 1e-5 gate: mass '
+                       f'is falling off the grid, so raise log2 (or widen the '
+                       f'window) before trusting the tail.')
+        else:
+            out.append(f'Tail deficit {deficit:.2e} is within the 1e-5 gate, so '
+                       f'the window holds essentially all the mass.')
+        return ' '.join(out)
 
     @property
     def tail_df(self):
@@ -2445,11 +2506,80 @@ class BivariateAggregate:
 
     @property
     def tail_description(self) -> str:
-        """One-unit per-axis support summary."""
+        """One-unit per-axis support summary.
+
+        The verbose form is :attr:`tail_explanation`.
+        """
         df = self.tail_df
         parts = [f'{name} [{r.support_min:.4g}, {r.support_max:.4g}]'
                  for name, r in df.iterrows()]
         return 'per-axis support: ' + '; '.join(parts)
+
+    @property
+    def tail_explanation(self) -> str:
+        """Verbose prose over the per-axis realised tails and their dependence.
+
+        The bivariate twin of
+        :attr:`~aggregate.distributions.Aggregate.tail_explanation`: each
+        axis's realised support and theoretical moments, whether it is
+        right-heavy, and then the joint reading -- the realised Pearson
+        correlation and (in copula mode) the copula's Kendall tau, which is
+        what decides whether the two tails can blow out together.
+        """
+        df = self.tail_df
+        out = []
+        for name, r in df.iterrows():
+            heavy = ('right-heavy (skew > 1)' if r.right_heavy
+                     else 'not right-heavy')
+            # bracket access: ``mean`` / ``skew`` are Series *methods*
+            out.append(f'{name} lives on [{r.support_min:,.6g}, '
+                       f'{r.support_max:,.6g}] with mean {r["mean"]:,.6g}, sd '
+                       f'{r["sd"]:,.6g}, skew {r["skew"]:,.4g}: {heavy}.')
+        out.append(f'The realised Pearson correlation is {self.corr:.4f}.')
+        if self.mode == 'copula' and self.copula is not None:
+            out.append(f'The {self.copula.name} copula has Kendall tau '
+                       f'{self.copula.tau():.4f}, which is what sets how far '
+                       f'into the joint tail the two axes travel together.')
+        elif self.mode == 'netceded':
+            out.append('The axes are comonotone views of one aggregate '
+                       '(netceded mode), so the dependence is structural, not '
+                       'modelled.')
+        out.append('The full 1-D tail-class ladder lives on each axis\'s '
+                   'standalone marginal aggregate.')
+        return ' '.join(out)
+
+    @property
+    def validation_explanation(self) -> str:
+        """Long-narrative validation result for the joint grid.
+
+        The bivariate twin of
+        :attr:`~aggregate.distributions.Aggregate.validation_explanation`, and
+        the verbose form of the one-line ``validation`` row in :attr:`info`.
+        Two checks: the **tail deficit** (the hard gate -- a measured grid
+        conserves mass, so a deficit means a clipped / aliased window) and,
+        loosely, that **each marginal reproduces its standalone aggregate**
+        (the showpiece invariant). The marginal check is deliberately loose
+        (10% relative): the budget-dependent bs-discretization error is
+        expected, and the exact per-axis errors are in :attr:`summary_df`.
+        """
+        self._require_density()
+        out = []
+        m0, m1 = self.marginals
+        for i, (name, dens) in enumerate(zip(self.unit_names, (m0, m1))):
+            mt = self._axis_theory(i)[0]
+            me = xsden_to_meancvskew(self.axis_xs[i], dens)[0]
+            if mt:
+                err = (me - mt) / abs(mt)
+                verdict = 'fails' if abs(err) > 0.10 else 'passes'
+                out.append(f'Marginal {name} mean {me:,.6g} vs standalone '
+                           f'{mt:,.6g} (rel err {err:.2e}): {verdict}.')
+        deficit = self.deficit
+        gate = 'fails' if deficit > 1e-5 else 'passes'
+        out.append(f'Tail deficit {deficit:.2e} against the 1e-5 gate: {gate}.')
+        out.append('Not unreasonable.' if self._explain_oneline() ==
+                   'not unreasonable' else
+                   f'Overall: {self._explain_oneline()}.')
+        return ' '.join(out)
 
     def plot(self, axs=None, levels=14, log=False, **kwargs):
         """Two-panel contour plot: per-claim severity (left), aggregate (right).

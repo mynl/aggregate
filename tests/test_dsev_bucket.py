@@ -15,7 +15,7 @@ On-grid atoms (integer atoms with ``bs == 1``, e.g. dice) give ``f == 0`` so
 the two schemes coincide -- the common case is invariant.
 
 The discretized-mean checks below read ``est_m`` (the *empirical* FFT mean,
-which reflects bucketing) rather than ``agg_m`` (the *theoretical* mean, which
+which reflects bucketing) rather than ``actual_m`` (the *theoretical* mean, which
 is computed from the exact severity moments and so is bias-free regardless of
 the placement scheme).
 

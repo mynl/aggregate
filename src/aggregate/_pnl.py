@@ -101,6 +101,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
+from ._help import HelpMixin
 from .constants import INFO_NA, info_row
 from .moments import VALIDATION_NOISE, _snap_noise
 from ._labeled import LabeledMixin
@@ -682,7 +683,7 @@ _SCALE_INVARIANT_STATS = frozenset({'CV', 'Skew'})
 # ----------------------------------------------------------------------
 # The P&L value object
 # ----------------------------------------------------------------------
-class PnL(LabeledMixin):
+class PnL(HelpMixin, LabeledMixin):
     """A P&L position: a source plus an ordered ledger of signed groups.
 
     A lightweight value object -- signed per-atom rows + their exact moments +
@@ -1233,6 +1234,20 @@ class PnL(LabeledMixin):
         """Quantile (value at risk) of the result. Delegates to the result GD."""
         return self._grand_result.gd.q(p, kind)
 
+    def tvar(self, p):
+        """Tail value at risk of the result. Delegates to the result GD.
+
+        Notes
+        -----
+        The P&L is a **payoff**, so the interesting tail is the *low* one: the
+        result GD carries the orientation (:attr:`GridDistribution.is_loss_value`
+        is ``False`` here) and ``tvar`` reads off the correct side, exactly as
+        ``q`` does. Added in 1.0.0a150 -- ``q`` / ``var`` / ``cdf`` / ``sf``
+        delegated from the start but ``tvar`` did not, leaving the library's
+        flagship risk measure unavailable on a P&L.
+        """
+        return self._grand_result.gd.tvar(p)
+
     def var(self, p):
         """Value at risk = lower quantile of the result."""
         return self._grand_result.gd.var(p)
@@ -1694,23 +1709,6 @@ class PnL(LabeledMixin):
     # ------------------------------------------------------------------
     # Plot: the net result density + distribution
     # ------------------------------------------------------------------
-    def help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
-        """Lookup help on methods and properties matching ``regex``.
-
-        Thin wrapper over :func:`aggregate.utilities.agg_help` (prefixed to
-        avoid shadowing the builtin ``help``). Four axes: ``lod``
-        (``'terse'|'short'|'all'``) controls how much docstring is shown;
-        ``values`` (``'none'|'short'|'all'``) how much of each value or
-        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
-        rows under ``'short'``); ``private`` (``False``) whether ``_``-prefixed
-        names are included; ``fmt`` (``'auto'|'text'|'ansi'|'html'``) the
-        render target (``auto`` = ANSI in Jupyter, plain text in a terminal).
-        The default ``lod='terse', values='none', private=False`` is a bare
-        public-name listing.
-        """
-        from .utilities import agg_help
-        agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
-
     def plot(self, axd=None, **kwargs):
         """Plot the grand result density and distribution (CDF).
 

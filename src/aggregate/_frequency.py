@@ -9,6 +9,7 @@ import logging
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
+from ._help import HelpMixin
 from .utilities import ft, ift
 from scipy.special import kv, gammaln, hyp1f1
 from scipy.optimize import broyden2, newton_krylov, brentq
@@ -69,7 +70,7 @@ def _normalize_freq_name(freq_name):
     return freq_name
 
 
-class Frequency(object):
+class Frequency(HelpMixin):
     """
     Manages Frequency distributions: creates moment function and MGF.
 

@@ -14,19 +14,35 @@ Run from anywhere (paths resolve relative to this file):
     uv run python dev/regen_features.py --all       # include scipy-inherited Severity members
 
 The CSV is a *curated subset* -- it documents the capability surface, not every
-internal attribute -- so only two kinds of drift are treated as **failures**
-(non-zero exit); a third is purely informational:
+internal attribute -- so only three kinds of drift are treated as **failures**
+(non-zero exit); two more are purely informational:
 
-* **MISMATCH** (fail) -- a ``Y`` / blank cell disagrees with the live class. This
-  is the real guard: it catches a rename, a moved method, or a member that
-  gained / lost a class.
+* **MISMATCH** (fail) -- a presence cell disagrees with the live class. This is
+  the real guard: it catches a rename, a moved method, or a member that gained /
+  lost a class.
 * **STALE** (fail) -- a CSV row whose ``name`` is on no class (a deleted member
   or a typo).
-* **UNDOCUMENTED** (info only) -- a public member absent from the CSV. Split into
-  *capabilities* (property / method -- candidates for a new row) and a count of
-  internal *attributes* (the long tail the curation deliberately omits).
-  Severity members inherited from ``scipy.stats.rv_continuous`` are summarised in
-  the CSV, so they are folded into one count unless ``--all`` is passed.
+* **KIND** (fail) -- the ``kind`` column disagrees with the live descriptor
+  (``property`` / ``method`` / ``attribute``).
+* **COLLISION** (info only) -- cells marked ``~``: the name exists on that class
+  but is *not* the documented capability (see the cell vocabulary below). Listed
+  so the deliberate collisions stay visible rather than hiding behind a ``Y``.
+* **UNDOCUMENTED** (info only) -- a public member absent from the CSV, split into
+  *capabilities* (property / method) and *attributes*, both listed by name.
+  Severity members inherited from ``scipy.stats.rv_continuous`` -- class members
+  *and* the instance attributes ``rv_continuous.__init__`` sets -- are summarised
+  in the CSV, so they are folded into one count unless ``--all`` is passed.
+
+Cell vocabulary (see the ``# legend`` row in the CSV; all three count as
+"present" for the MISMATCH check):
+
+===== =========================================================================
+``Y``  the capability, as described
+``Y*`` same concept, different shape / semantics -- see the row's ``notes``
+``~``  name collision: the name exists but is *not* this capability. The
+       canonical case is ``Distortion.tvar`` / ``.mean`` / ``.max``, which are
+       static *constructors* of a distortion, not risk measures.
+===== =========================================================================
 
 The build programs below exercise reinsurance (so the ``reins_*`` frames exist)
 and a copula bivariate; keep them parseable if the DecL grammar moves.
@@ -50,18 +66,25 @@ CSV_PATH = Path(__file__).with_name('FEATURES.csv')
 # CSV class columns, in order. Keys are the CSV header labels; values the short
 # tags used in the grouped ``--inventory`` dump.
 CLASS_COLS = ['Aggregate', 'Portfolio', 'BivariateAggregate', 'PnL',
-              'Severity', 'Frequency', 'Bounds', 'AllocationBounds',
-              'PricingBounds']
+              'Severity', 'Frequency', 'GridDistribution', 'Distortion',
+              'Bounds', 'AllocationBounds', 'PricingBounds']
 SHORT = {'Aggregate': 'Agg', 'Portfolio': 'Port', 'BivariateAggregate': 'Biv',
          'PnL': 'PnL', 'Severity': 'Sev',
-         'Frequency': 'Freq', 'Bounds': 'Bnd',
+         'Frequency': 'Freq', 'GridDistribution': 'GD', 'Distortion': 'Dist',
+         'Bounds': 'Bnd',
          'AllocationBounds': 'AllB', 'PricingBounds': 'PrcB'}
+
+#: Cell tokens that mean "the name is present on this class". ``~`` additionally
+#: means "present but *not* this capability" -- reported in its own section.
+PRESENT_TOKENS = ('Y', '~')
+COLLISION_TOKEN = '~'
 
 
 def build_objects() -> dict:
     """One live object per class column (built + updated where relevant)."""
     from aggregate import build
     from aggregate.bounds import Bounds
+    from aggregate.spectral import Distortion
 
     objs = {}
     a = build('agg E 100 claims sev lognorm 100 cv 2 '
@@ -79,6 +102,13 @@ def build_objects() -> dict:
     objs['PnL'] = build('pnl Deal 1000 premium less agg Deal_e 1000 prem at 70% lr sev lognorm 100 cv 2 poisson')
     objs['Severity'] = a.sevs[0]
     objs['Frequency'] = a.frequency
+    # The canonical quantile engine every q / tvar / cdf / sf routes through, and
+    # the return type of PnL.result -- built off the Aggregate rather than
+    # hand-rolled so it carries a real grid.
+    objs['GridDistribution'] = a._grid_distribution()
+    # A plain proportional-hazard distortion: enough to expose the whole
+    # Distortion surface (LabeledMixin, info / help / plot, the lazy frames).
+    objs['Distortion'] = Distortion('ph', 0.5)
     try:
         objs['Bounds'] = Bounds(a, premium=a.actual_m * 1.1)
     except Exception as e:                      # pragma: no cover - defensive
@@ -98,7 +128,20 @@ def build_objects() -> dict:
 
 
 def member_kind(cls, name):
-    """``property`` / ``method`` / ``classattr`` from the class MRO (no instance)."""
+    """``property`` / ``method`` / ``classattr`` from the class MRO (no instance).
+
+    Notes
+    -----
+    Any **non-data descriptor that is not callable** counts as a ``property``.
+    That is what catches :class:`functools.cached_property`, which is neither a
+    ``property`` instance nor ``callable`` -- before this test it fell through to
+    ``classattr``, mislabelling ``freq_df``, ``Distortion.info`` / ``summary_df``
+    / ``stats_df`` / ``density_df``, and the whole lazy ``Bounds`` surface
+    (``cloud_df``, ``tvar_df``, ``weight_df``, the envelopes, ``p_knots``,
+    ``s_grid``, ``tvar_hinges``, ``tvar_x_p``). From the caller's side a
+    ``cached_property`` *is* a property -- ``obj.x``, no parentheses -- so that is
+    what the CSV documents and what this reports.
+    """
     for klass in cls.__mro__:
         if name in klass.__dict__:
             v = klass.__dict__[name]
@@ -106,6 +149,8 @@ def member_kind(cls, name):
                 return 'property'
             if isinstance(v, (staticmethod, classmethod)) or callable(v):
                 return 'method'
+            if hasattr(type(v), '__get__'):      # cached_property & friends
+                return 'property'
             return 'classattr'
     return None
 
@@ -176,8 +221,25 @@ def introspect(objs) -> dict:
 
 
 def scipy_inherited() -> set:
-    """Public member names Severity inherits from scipy (summarised in the CSV)."""
-    return {n for n in dir(ss.rv_continuous) if not n.startswith('_')}
+    """Public member names Severity inherits from scipy (summarised in the CSV).
+
+    Notes
+    -----
+    Two sources, and both are needed. ``dir(rv_continuous)`` gives the *class*
+    surface (``rvs``, ``moment``, ``entropy``, ...). But ``rv_continuous.__init__``
+    also sets public **instance** attributes -- ``generic_moment``,
+    ``moment_type``, ``vecentropy``, ``xtol``, ``badvalue``, ``numargs``,
+    ``shapes`` -- which the introspector picks up off ``vars(obj)`` and which
+    used to surface as "undocumented capabilities" of :class:`Severity`. They are
+    scipy's, not this library's, so they belong in the same summary.
+    """
+    names = {n for n in dir(ss.rv_continuous) if not n.startswith('_')}
+    try:
+        bare = ss.rv_continuous()
+        names |= {n for n in vars(bare) if not n.startswith('_')}
+    except Exception:                           # pragma: no cover - defensive
+        pass
+    return names
 
 
 def load_csv() -> list:
@@ -198,11 +260,23 @@ def read_version_stamp() -> str | None:
     return None
 
 
-def audit(inv, rows, include_all) -> int:
-    """Print drift report; return the number of **failures** (mismatch + stale).
+def is_present(cell: str) -> bool:
+    """Whether a presence cell claims the member exists on that class.
 
-    Undocumented members are reported but do not count as failures: the CSV is a
-    curated subset, so a new internal attribute is not a defect.
+    ``Y``, ``Y*`` and ``~`` all mean *present*; only the reason differs (see the
+    cell vocabulary in the module docstring). Anything else -- blank, a stray
+    note -- means absent.
+    """
+    cell = cell.strip()
+    return cell.startswith('Y') or cell.startswith(COLLISION_TOKEN)
+
+
+def audit(inv, rows, include_all) -> int:
+    """Print drift report; return the number of **failures**.
+
+    Failures are MISMATCH + STALE + KIND. Collisions and undocumented members are
+    reported but do not count: the CSV is a curated subset, so a new internal
+    attribute is not a defect, and a ``~`` cell is a deliberate annotation.
     """
     csv_names = {r['name'] for r in rows}
     skip = set() if include_all else scipy_inherited()
@@ -219,9 +293,9 @@ def audit(inv, rows, include_all) -> int:
             continue
         live = inv[name]['classes']
         for c in CLASS_COLS:
-            marked = r[c].strip().startswith('Y')
-            if marked != (c in live):
-                print(f'  {name:<26} {c:<20} csv={r[c]!r:<6} live={c in live}')
+            cell = r.get(c) or ''      # .get: a not-yet-widened CSV reports, not crashes
+            if is_present(cell) != (c in live):
+                print(f'  {name:<26} {c:<20} csv={cell!r:<6} live={c in live}')
                 n += 1
     print(f'  ({n} mismatches)\n')
     failures += n
@@ -236,25 +310,65 @@ def audit(inv, rows, include_all) -> int:
     print(f'  ({n} stale rows)\n')
     failures += n
 
+    # KIND (fail): the documented descriptor kind disagrees with the live one.
+    # ``attribute`` and ``classattr`` are the same thing to a reader (plain value,
+    # no call, no descriptor), so they are accepted for each other.
+    print('## KIND (csv kind vs live descriptor) -- FAILS')
+    n = 0
+    plain = {'attribute', 'classattr'}
+    for r in rows:
+        name, csv_kind = r['name'], (r['kind'] or '').strip()
+        if name not in inv or not csv_kind:
+            continue
+        live_kind = inv[name]['kind']
+        if csv_kind == live_kind or (csv_kind in plain and live_kind in plain):
+            continue
+        # A member that is a property on one class and an attribute on another
+        # (``stats_df``) is documented by its majority kind; the row's notes carry
+        # the exception. Only flag when no class agrees with the CSV.
+        if csv_kind in inv[name]['kinds']:
+            continue
+        print(f"  {name:<26} csv={csv_kind:<10} live={live_kind:<10} "
+              f"(seen: {sorted(set(inv[name]['kinds']))})")
+        n += 1
+    print(f'  ({n} kind mismatches)\n')
+    failures += n
+
+    # COLLISION (info): ``~`` cells -- the name is there but is not the capability
+    print('## COLLISION (~ cells: name present, NOT this capability) -- info only')
+    n = 0
+    for r in rows:
+        hits = [c for c in CLASS_COLS
+                if (r.get(c) or '').strip().startswith(COLLISION_TOKEN)]
+        if hits:
+            print(f"  {r['name']:<26} {', '.join(hits)}")
+            n += 1
+    print(f'  ({n} rows carry a collision marker)\n')
+
     # UNDOCUMENTED (info): present on a class but not in the CSV
     print('## UNDOCUMENTED (in a class, missing from CSV) -- info only')
-    caps, attrs, scipy_only = [], 0, 0
+    caps, attrs, scipy_only = [], [], 0
     for name, rec in sorted(inv.items()):
         if name in csv_names:
             continue
         if rec['classes'] == {'Severity'} and name in skip:
             scipy_only += 1
             continue
-        if rec['kind'] in ('property', 'method'):
-            caps.append((name, rec))
-        else:
-            attrs += 1
+        (caps if rec['kind'] in ('property', 'method') else attrs).append((name, rec))
+
+    def show(items):
+        for name, rec in items:
+            marks = ' '.join(SHORT[c] if c in rec['classes'] else '-'
+                             for c in CLASS_COLS)
+            print(f"    {name:<26} {rec['kind']:<9} {rec['ret']:<10} "
+                  f"[{marks}]  {rec['doc'][:55]}")
+
     print('  capabilities (property/method -- candidates for a row):')
-    for name, rec in caps:
-        marks = ' '.join(SHORT[c] if c in rec['classes'] else '-' for c in CLASS_COLS)
-        print(f"    {name:<26} {rec['kind']:<9} {rec['ret']:<10} [{marks}]  {rec['doc'][:55]}")
-    print(f'  ({len(caps)} undocumented capabilities, {attrs} undocumented '
-          f'internal attributes', end='')
+    show(caps)
+    print('  attributes (the long tail the curation may deliberately omit):')
+    show(attrs)
+    print(f'  ({len(caps)} undocumented capabilities, {len(attrs)} undocumented '
+          f'attributes', end='')
     if scipy_only and not include_all:
         print(f', + {scipy_only} scipy-inherited Severity members', end='')
     print(')\n')
@@ -293,6 +407,13 @@ def dump_inventory(inv, include_all):
 
 
 def main(argv):
+    # Docstrings in this library carry maths (the Distortion surface has an
+    # integral sign), and a Windows console is cp1252 -- print what we can rather
+    # than dying halfway through the report.
+    try:
+        sys.stdout.reconfigure(errors='replace')
+    except Exception:                               # pragma: no cover - defensive
+        pass
     include_all = '--all' in argv
     objs = build_objects()
     inv = introspect(objs)

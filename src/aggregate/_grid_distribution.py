@@ -1,8 +1,15 @@
 """The shared discrete-grid distribution value type.
 
-This module is a **leaf**: it imports only numpy / pandas / scipy and nothing
-from elsewhere in :mod:`aggregate`. If it ever needs ``distributions`` or
+This module is a **leaf**: it imports only numpy / pandas / scipy, plus the one
+intra-package exception noted below. If it ever needs ``distributions`` or
 ``portfolio`` the design has gone wrong -- stop and reconsider.
+
+The exception is :mod:`aggregate._help`, for the shared ``.help()`` method. That
+module is itself a leaf -- it imports nothing at module scope, deferring
+``agg_help`` into the method body precisely so this direction of the dependency
+stays acyclic (``utilities`` imports *this* module, so ``_help`` must not import
+``utilities`` eagerly). Mixing in a zero-dependency behavioural mixin does not
+cost this module its leaf property.
 
 :class:`GridDistribution` is the single home for the marginal-vector accessors
 (``q`` / ``var`` / ``tvar`` / ``tvar_threshold`` / ``cdf`` / ``sf`` / ``pmf`` /
@@ -29,6 +36,8 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 from scipy.optimize import bisect
+
+from ._help import HelpMixin
 
 __all__ = ['GridDistribution', 'make_var_tvar', 'ProbLossAssets',
            'return_period_map']
@@ -203,7 +212,7 @@ def make_var_tvar(ser):
     return QuantileFunctions(q_lower, q_lower, q_lower, q_upper, tvar)
 
 
-class GridDistribution:
+class GridDistribution(HelpMixin):
     """A discrete distribution on a grid: mass ``p`` over index ``x``, optional ``bs``.
 
     Read-only value type owning the lazy var/tvar kernel cache and the marginal

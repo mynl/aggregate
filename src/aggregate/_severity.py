@@ -13,6 +13,7 @@ import scipy.stats as ss
 from scipy.optimize import newton
 from scipy.special import loggamma, binom
 from scipy.optimize import NoConvergence  # noqa
+from ._help import HelpMixin
 from .constants import (FIG_H, FIG_W, INFO_NA, info_row)
 from ._grid_distribution import GridDistribution
 from ._labeled import LabeledMixin
@@ -815,7 +816,7 @@ def _numerical_moms(severity):
     return ex1a, ex2a, ex3a
 
 
-class Severity(LabeledMixin, ss.rv_continuous):
+class Severity(HelpMixin, LabeledMixin, ss.rv_continuous):
     # Registry of concrete kind subclasses, populated by ``__init_subclass__``.
     # Keys are the string returned by ``_classify_sev``.
     _registry: dict = {}
@@ -1196,6 +1197,35 @@ class Severity(LabeledMixin, ss.rv_continuous):
         return base if extra in ('', 'unlimited') else f'{base}; {extra}'
 
     @property
+    def pprogram(self):
+        """Canonical DecL program text, rendered from the parsed spec.
+
+        The Severity twin of
+        :attr:`~aggregate.distributions.Aggregate.pprogram`: re-parse
+        :attr:`program` and render it back through
+        :func:`aggregate.decl_writer.format_program`, so the result is
+        *canonical* rather than verbatim -- equivalent declarations share one
+        form. A severity built programmatically, or an inline ``sev`` clause
+        inside an ``agg`` (whose ``program`` is empty because the enclosing
+        Aggregate owns the text), returns ``''``.
+
+        Notes
+        -----
+        Added in 1.0.0a150. ``a149`` put ``pprogram`` on every other
+        DecL-creatable class; ``Severity`` was missed even though
+        ``build('sev X lognorm 100 cv 2')`` is a first-class declaration that
+        stamps :attr:`program`.
+        """
+        from .decl_writer import format_program     # deferred: parser imports us
+        return format_program(self.program, fmt='text') if self.program else ''
+
+    @property
+    def pprogram_html(self):
+        """Syntax-highlighted DecL program for IPython / Jupyter display."""
+        from .decl_writer import format_program     # deferred: parser imports us
+        return format_program(self.program, fmt='html') if self.program else ''
+
+    @property
     def tail_explanation(self) -> str:
         """Verbose prose over this severity's support and tail behavior.
 
@@ -1485,23 +1515,6 @@ class Severity(LabeledMixin, ss.rv_continuous):
         return np.array([ex1, var, skew, np.nan])
 
     @lru_cache
-    def help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
-        """Lookup help on methods and properties matching ``regex``.
-
-        Thin wrapper over :func:`aggregate.utilities.agg_help` (prefixed to
-        avoid shadowing the builtin ``help``). Four axes: ``lod``
-        (``'terse'|'short'|'all'``) controls how much docstring is shown;
-        ``values`` (``'none'|'short'|'all'``) how much of each value or
-        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
-        rows under ``'short'``); ``private`` (``False``) whether ``_``-prefixed
-        names are included; ``fmt`` (``'auto'|'text'|'ansi'|'html'``) the
-        render target (``auto`` = ANSI in Jupyter, plain text in a terminal).
-        The default ``lod='terse', values='none', private=False`` is a bare
-        public-name listing.
-        """
-        from .utilities import agg_help
-        agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
-
     def moms(self):
         """First three moments of the layered severity ``X(a, d) = min(d, (X-a)+)``.
 

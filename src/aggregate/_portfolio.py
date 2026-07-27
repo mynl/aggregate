@@ -9,6 +9,7 @@ from scipy import interpolate
 from textwrap import fill
 import warnings
 
+from ._help import HelpMixin
 from .constants import (DefectiveDistributionWarning,
                         FIG_H, FIG_W, INFO_NA, info_row,
                         REINS_LABEL_OUTPUT)
@@ -91,7 +92,7 @@ _PORT_STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
 )
 
 
-class Portfolio(LabeledMixin):
+class Portfolio(HelpMixin, LabeledMixin):
     """
     Portfolio creates and manages a portfolio of Aggregate objects each modeling one
     unit of business. Applications include
@@ -301,22 +302,6 @@ class Portfolio(LabeledMixin):
         self.est_m = self.est_cv = self.est_skew = self.est_sd = self.est_var = 0
 
         self.validation_eps = get_settings().validation.eps
-
-    def help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
-        """
-        Lookup help on methods and properties matching ``regex``.
-
-        Four axes: ``lod`` (``'terse'|'short'|'all'``) controls how much
-        docstring is shown; ``values`` (``'none'|'short'|'all'``) how much of
-        each value or no-argument call result (a ``DataFrame`` / ``Series`` is
-        headed to 5 rows under ``'short'``); ``private`` (``False``) whether
-        ``_``-prefixed names are included; ``fmt``
-        (``'auto'|'text'|'ansi'|'html'``) the render target (``auto`` = ANSI in
-        Jupyter, plain text in a terminal). The default ``lod='terse',
-        values='none', private=False`` is a bare public-name listing. See
-        :func:`aggregate.utilities.agg_help`.
-        """
-        agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
 
     def add_exa_sample(self, sample, S_calculation='forwards'):
         """Compute a sample-based ``density_df`` with ``E[X_i | X]`` from a sample.
@@ -3595,6 +3580,11 @@ class Portfolio(LabeledMixin):
 
     @property
     def n_units(self):
+        """The number of units (component :class:`Aggregate` objects) in the book.
+
+        Counts :attr:`unit_names`, so it excludes the ``total`` row that the
+        exhibits add -- use :attr:`unit_names_ex` for the with-total list.
+        """
         return len(self.unit_names)
 
     def make_comonotonic_allocations(self, max_loss=-1):

@@ -110,6 +110,19 @@ def test_pprogram_and_html_on_decl_creatable(fixture, request):
     assert isinstance(html, str) and '<' in html
 
 
+def test_severity_pprogram_round_trips_a_standalone_declaration():
+    """a150: ``sev`` is DecL-creatable, so it renders a canonical program too."""
+    sev = build('sev FCC.Sev lognorm 100 cv 2')
+    assert sev.program, 'build should stamp the source text on a standalone sev'
+    assert 'FCC.Sev' in sev.pprogram
+    assert '<' in sev.pprogram_html
+
+
+def test_inline_severity_has_no_program_of_its_own(agg):
+    """An inline ``sev`` clause belongs to its Aggregate, which owns the text."""
+    assert agg.sevs[0].pprogram == ''
+
+
 def test_pnl_program_falls_back_to_the_engine(pnl):
     """The declaration is stamped on the P&L; the engine carries the same one."""
     assert pnl.program.startswith('pnl ')
@@ -302,3 +315,46 @@ def test_text_info_blob_is_one_line_and_states_validation(fixture, request):
     blob = obj._text_info_blob()
     assert '\n' not in blob
     assert blob.endswith(f'Validation: {obj.validation_explanation}.')
+
+
+# ---------------------------------------------------------------------------
+# help -- the universal discovery front door (a150 [FCC-Help-Mixin])
+# ---------------------------------------------------------------------------
+
+def test_help_on_every_column_of_the_matrix(agg, port, pnl, biv):
+    """``.help`` reaches every class with a column in ``dev/FEATURES.csv``.
+
+    Before a150 it was nine copy-pasted methods and ``Frequency`` /
+    ``GridDistribution`` had none; ``HelpMixin`` closed both holes.
+    """
+    from aggregate.bounds import AllocationBounds, PricingBounds
+    from aggregate.spectral import Distortion
+    from aggregate._grid_distribution import GridDistribution
+    from aggregate._frequency import Frequency
+
+    hosts = [agg, port, pnl, biv, agg.sevs[0], agg.frequency,
+             agg._grid_distribution(), Distortion('ph', 0.5),
+             Bounds(agg, premium=agg.actual_m * 1.1)]
+    for obj in hosts:
+        assert callable(getattr(obj, 'help', None)), \
+            f'{type(obj).__name__} has no help()'
+    # the classes too, so a future refactor cannot lose the mixin silently
+    for cls in (GridDistribution, Frequency, Distortion,
+                AllocationBounds, PricingBounds):
+        assert 'help' in dir(cls), f'{cls.__name__} lost HelpMixin'
+
+
+def test_help_runs_and_prints_matching_names(agg, capsys):
+    agg.frequency.help('freq_p')
+    out = capsys.readouterr().out
+    assert 'freq_pgf' in out and 'freq_p0' in out
+
+
+# ---------------------------------------------------------------------------
+# tvar -- the flagship risk measure, on every class that carries a quantile
+# ---------------------------------------------------------------------------
+
+def test_pnl_tvar_delegates_to_the_result_grid(pnl):
+    """a150: PnL delegated q/var/cdf/sf but not tvar -- the gap is closed."""
+    for p in (0.5, 0.9, 0.99):
+        assert pnl.tvar(p) == pnl.result.tvar(p)

@@ -11,6 +11,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from ._help import HelpMixin
 from .config import (get_settings, reload_settings as _reload_settings,
                      write_default_config as _write_default_config,
                      describe_settings, config_path,
@@ -344,7 +345,7 @@ class CannotBuild(ValueError):
     """
 
 
-class Underwriter(object):
+class Underwriter(HelpMixin):
     """
     Manage the creation of Aggregate, Severity, Portfolio, and Distortion objects.
 
@@ -2026,22 +2027,6 @@ class Underwriter(object):
         if n_errors:
             logger.error('%d parse error(s) in %s', n_errors, filename)
         return df_out
-
-    def help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
-        """
-        Lookup help on methods and properties matching ``regex``.
-
-        Four axes: ``lod`` (``'terse'|'short'|'all'``) controls how much
-        docstring is shown; ``values`` (``'none'|'short'|'all'``) how much of
-        each value or no-argument call result (a ``DataFrame`` / ``Series`` is
-        headed to 5 rows under ``'short'``); ``private`` (``False``) whether
-        ``_``-prefixed names are included; ``fmt``
-        (``'auto'|'text'|'ansi'|'html'``) the render target (``auto`` = ANSI in
-        Jupyter, plain text in a terminal). The default ``lod='terse',
-        values='none', private=False`` is a bare public-name listing. See
-        :func:`aggregate.utilities.agg_help`.
-        """
-        agg_help(self, regex, lod=lod, values=values, private=private, fmt=fmt)
 
     def discover(self, regex='', kind='', plot=False, describe=False,
                  return_objects=False, **kwargs):

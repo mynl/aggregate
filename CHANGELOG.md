@@ -1,5 +1,73 @@
 # Changelog
 
+## 1.0.0a150
+
+**[FCC-Help-Mixin]** — the additive half of pass 2 of `[FCC-Surface-Sweep]`.
+A hand read of `dev/FEATURES.csv` found the auditor's blind spots: it checks
+only the presence grid, never the `notes` prose, the `kind` column, or the
+undocumented plain attributes. This release closes the surface gaps that read
+turned up; the alias retirements it also turned up follow in `a151`. Purely
+additive — nothing is renamed or removed.
+
+- **`HelpMixin` (`src/aggregate/_help.py`)** — `.help(regex)` was a one-line
+  delegation to `utilities.agg_help` **copy-pasted into nine classes across
+  eight modules**, each with its own near-identical twelve-line docstring. It
+  now lives once, in the codebase's **second mixin** (after `LabeledMixin`;
+  same idiom — no `__init__`, so it stays transparent to each host's `super()`
+  chain, which matters because the hosts range from `object` to
+  `scipy.stats.rv_continuous`). Hosts: `Aggregate`, `Portfolio`, `PnL`,
+  `Severity`, `BivariateAggregate`, `Bounds`, `_HullEngine` (so
+  `AllocationBounds` / `PricingBounds`), `Distortion`, `Underwriter`, and — the
+  two that had no `help` at all — **`Frequency`** and **`GridDistribution`**.
+  `agg_help` is imported *inside* the method: `utilities` imports
+  `_grid_distribution`, so a module-level import would close the cycle.
+- **`PnL.tvar`** — a P&L delegated `q` / `var` / `cdf` / `sf` to its result
+  `GridDistribution` but not `tvar`, so the library's flagship risk measure was
+  unavailable on the newest first-class class. One delegation; the result GD
+  already carries the payoff orientation, so it reads the correct tail.
+- **`Severity.pprogram` / `.pprogram_html`** — `a149` claimed every
+  DecL-creatable class round-trips its declaration, but `Severity` was missed:
+  `build('sev X lognorm 100 cv 2')` stamps `program` yet could not render the
+  canonical form. An inline `sev` clause returns `''` — the enclosing
+  `Aggregate` owns the text.
+- **`Portfolio.n_units`** gained the docstring it never had.
+
+### `dev/FEATURES.csv` and its auditor
+
+The matrix is rewritten and widened; `dev/regen_features.py` grew three checks.
+No version-visible behaviour, but the table is the plan of record for the rest
+of the sweep.
+
+- **Two new columns: `GridDistribution` and `Distortion`** (nine → eleven).
+  `GridDistribution` is the engine every `q` / `var` / `tvar` / `cdf` / `sf`
+  routes through and the type of `PnL.result`; `Distortion` already carried
+  `info`, `help`, `plot` and the whole `LabeledMixin` surface — more of the FCC
+  surface than `Frequency` has — while three notes said "not a column here".
+- **A three-token cell vocabulary, with a legend row.** `Y*` ("same concept,
+  different shape") was already in use with nothing documenting it. Added `~`
+  for a **name collision**: `Distortion.tvar` / `.mean` / `.max` are static
+  *constructors* of a distortion, not risk measures, so a presence-only audit
+  would have demanded a misleading `Y` in the `tvar` row.
+- **Stale prose fixed.** Eight rows still described `ReinstatementAnalysis`,
+  `VariableRatingAnalysis` and `pnl.analysis` — deleted at `a144` — as live,
+  including a `WRINKLE` on `density` documenting a name collision that no
+  longer exists.
+- **Two rows had an unquoted comma in `notes`**, silently truncating the field
+  for any `DictReader` consumer (`na_grid`, `actual_cv`). Merged and quoted.
+- **~70 new rows**: the `gd-api` and `distortion-api` / `distortion-ctor`
+  groups, the `Bounds` lazy cloud surface, the Portfolio density/allocation
+  working set, and the incomplete stat families (`sev_var`, `est_sev_sd` /
+  `_cv` / `_skew` / `_var` — invisible before because the auditor counted
+  undocumented attributes rather than naming them). Undocumented capabilities
+  went from 65 to 2, and both remainders are the aliases `a151` deletes.
+- **`regen_features.py`**: `member_kind` now reports `functools.cached_property`
+  as a `property` (it is neither a `property` instance nor `callable`, so it
+  fell through to `classattr` — mislabelling `freq_df`, `Distortion.info` and
+  the whole lazy `Bounds` surface); the `kind` column is audited as a new
+  failure class; undocumented attributes are listed by name; the scipy skip set
+  covers `rv_continuous.__init__`'s *instance* attributes; and `~` cells get
+  their own informational COLLISION section.
+
 ## 1.0.0a149
 
 **[FCC-Surface-Sweep]** — the first pass of step 1 of `plan-for-v1.md`: work

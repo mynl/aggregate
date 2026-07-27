@@ -221,9 +221,36 @@
    DecL-creatable class; `Severity.actual_*`; `tail_explanation` on
    Sev/Freq/Biv; `Portfolio.reins_*` look-throughs; one-line
    `_text_info_blob` with the validation result. Executable half:
-   `tests/test_fcc_surface.py`. **Still open:** the audit's UNDOCUMENTED list
-   (24 Portfolio/Aggregate capabilities with no CSV row — decide row or
-   private), and whether `Aggregate.sev_*` should follow `actual_*` naming.
+   `tests/test_fcc_surface.py`.
+
+   **Pass 2 additive half DONE (`1.0.0a150`, `[FCC-Help-Mixin]`)** — from a hand
+   read of the matrix, which found what the presence-only auditor cannot see.
+   Landed: `HelpMixin` (nine copy-pasted `help` methods → one mixin, closing
+   `Frequency` and `GridDistribution`); `PnL.tvar`; `Severity.pprogram`/`_html`;
+   `Portfolio.n_units` docstring. `dev/FEATURES.csv` widened to **eleven**
+   columns (`GridDistribution`, `Distortion`), gained a `Y`/`Y*`/`~` legend and
+   ~70 rows, and had eight rows of `a144`-stale prose and two comma-truncated
+   `notes` fields fixed. `regen_features.py` gained a `kind` audit, correct
+   `cached_property` detection, named attribute reporting and a COLLISION
+   section. **This closes the old "UNDOCUMENTED list" item** (65 → 2, both being
+   aliases `a151` removes) **and the `Aggregate.sev_*` question** (`sev_*` stays:
+   the `# severity-scipy` legend row records that `Severity` inherits its odd
+   naming from the `scipy.stats` look-through, deliberately).
+
+   **Pass 2 breaking half — `[FCC-Alias-Retirement]`, next:** `var` means
+   *variance* always and VaR is `q` always, so retire `Aggregate.ppf` and the
+   VaR-flavoured `var()` on `Portfolio` / `PnL` / `GridDistribution`
+   (`Severity.ppf` / `.var` stay — scipy look-through); `pollaczeck_khinchine`
+   over `cramer_lundberg`; `prob_loss_assets` over `pla`; delete the deprecated
+   `Portfolio.unit_renamer`; `Frequency.prn_eq_0` → private `_prob_eq_0(n)` plus
+   a zero-arg `prob_eq_0` property off `en`.
+
+   **Still open (author decisions, flagged in the matrix):** the
+   `BivariateAggregate.tail_df` name collision (a per-axis support frame under
+   the name `a149` made a return-period property elsewhere — suggested
+   `axis_support_df`); `BivariateAggregate` as a `LabeledMixin` host; `info` on
+   `GridDistribution`; the `PnL.gd`/`result` alias; and whether `var_dict`
+   should follow the VaR-is-`q` rule and become `q_dict`.
 
 **Sequenced around the above:**
 

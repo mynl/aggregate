@@ -263,7 +263,16 @@ sev_out: SEV name as_label sev trailer    -> sev_out_sev
 // Frequency
 // ======================================================================
 
-freq: freq ZM expr             -> freq_zm
+// Zero modification / truncation. The exposure clause sets the *un-modified*
+// (base) mean and the (a, b, 1) reweighting shifts it forward, matching the
+// textbook parameterization (Klugman-Panjer-Willmot 2012 §6.6, and R's actuar):
+// base parameters in, mean out. Trailing ``!`` pins the mean instead -- solve
+// for the base mean whose realized E[N] equals the exposure clause. ``!`` is
+// the same *unconditional* marker used by ``sev`` / ``dsev`` / ``dwait``, and
+// the realized count mean is precisely the unconditional one.
+freq: freq ZM expr "!"         -> freq_zm_pin
+    | freq ZM expr             -> freq_zm
+    | freq ZT "!"              -> freq_zt_pin
     | freq ZT                  -> freq_zt
     | MIXED ID expr expr       -> freq_mixed_two
     | MIXED ID expr            -> freq_mixed_one

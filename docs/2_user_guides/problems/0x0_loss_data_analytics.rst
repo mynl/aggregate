@@ -525,11 +525,58 @@ Aggregate losses are modeled as follows:
 
 Calculate :math:`\mathsf{E}(N^P)` and :math:`\mathsf{Var}(N^P)`.
 
-**Solution.**
+**Solution.** This is a pure frequency question: the deductible thins the loss
+count :math:`N^L` into the payment count :math:`N^P`. The problem states the
+zero-modified Poisson the textbook way -- base parameter :math:`\lambda=3` plus
+the modified zero mass :math:`p_0^M` -- which is exactly how DecL reads it: the
+exposure clause gives the *un-modified* mean and the :math:`(a,b,1)` reweighting
+moves it. So ``3 claims ... poisson zm 0.5`` is a base Poisson(3), and
+:math:`\mathsf{E}(N^L)` is an output.
 
-.. todo::
+.. ipython:: python
+    :okwarning:
 
-    Implement ZT and ZM!
+    import scipy.stats as ss
+
+    # Burr(alpha=3, theta=50, gamma=1) is scipy's burr12(c=gamma, d=alpha)
+    burr = ss.burr12(1, 3, scale=50)
+    v = burr.sf(30)                      # survival at the deductible
+    v
+
+The frequency carries the whole calculation.
+:meth:`~aggregate.distributions.Frequency.apply_deductible` implements the
+Loss Models §8.6 map: the base parameter scales by :math:`v` and the zero mass
+becomes :math:`\alpha^* = P_{N^L}(1-v)`.
+
+.. ipython:: python
+    :okwarning:
+
+    a = build('agg LDA554 3 claims sev 50 * burr12 1 3 poisson zm 0.5')
+    loss_count = a.frequency
+    loss_count.base_mean, loss_count.modify_mean(), loss_count.prob_eq_0
+
+    pay_count = loss_count.apply_deductible(v)
+    m1, m2, _ = pay_count.freq_moms(pay_count.base_mean)
+    print(f'lambda* = {pay_count.base_mean:.6f}, p0M* = {pay_count.freq_p0:.6f}')
+    print(f'E(N^P)   = {m1:.6f}')
+    print(f'Var(N^P) = {m2 - m1 * m1:.6f}')
+
+The deductible has made "no payment this period" much more likely --
+:math:`p_0^{M*} = 0.7268` against :math:`p_0^M = 0.5` -- which is the general
+rule of Loss Models §8.6: a zero-*truncated* loss count always yields a
+zero-*modified* payment count.
+
+As a check, any independent-thinning model must satisfy
+:math:`\mathsf{E}(N^P) = v\,\mathsf{E}(N^L)` and
+:math:`\mathsf{Var}(N^P) = v^2\mathsf{Var}(N^L) + v(1-v)\mathsf{E}(N^L)`,
+which is an entirely different route to the same two numbers.
+
+.. ipython:: python
+    :okwarning:
+
+    f1, f2, _ = loss_count.freq_moms(loss_count.base_mean)
+    var_nl = f2 - f1 * f1
+    v * f1, v ** 2 * var_nl + v * (1 - v) * f1
 
 .. _lda neg bin 555:
 

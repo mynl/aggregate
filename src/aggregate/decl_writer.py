@@ -342,6 +342,9 @@ def _render_freq(spec: dict) -> str:
     if spec.get('freq_zm'):
         p0 = spec.get('freq_p0', 0.0)
         s += ' zt' if float(p0) == 0.0 else f' zm {_fmt_num(p0)}'
+        # trailing ! = pin the realized mean to the exposure clause
+        if spec.get('freq_pin_mean'):
+            s += ' !'
     return s
 
 

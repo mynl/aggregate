@@ -25,6 +25,7 @@ from ._help import HelpMixin
 from .constants import (DefectiveDistributionWarning,
                         INFO_NA, info_row,
                         InfiniteVarianceError,
+                        ZeroModifiedExposureWarning,
                         REINS_LABEL_GROSS, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT)
 from .config import get_settings
@@ -1406,6 +1407,7 @@ class Aggregate(HelpMixin, LabeledMixin):
                  sev_pick_attachments=None, sev_pick_losses=None,
                  occ_reins=None, occ_kind='', occ_reins_label=None,
                  freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
+                 freq_pin_mean=False,
                  exp_years=0.0, exp_rate=0.0,
                  wait_name='', wait_a=np.nan, wait_b=0.0, wait_mean=0.0, wait_cv=0.0,
                  wait_loc=0.0, wait_scale=0.0, wait_xs=None, wait_ps=None,
@@ -1459,6 +1461,12 @@ class Aggregate(HelpMixin, LabeledMixin):
         :param freq_b:          claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
         :param freq_zm:         True/False zero modified flag
         :param freq_p0:         if freq_zm, provides the modified value of p0; default is nan
+        :param freq_pin_mean:   DecL ``!`` after ``zm`` / ``zt``. False (default): the
+                                exposure clause sets the **un-modified (base)** mean and
+                                the (a, b, 1) reweighting shifts it, so the realized E[N]
+                                is an output -- the textbook parameterization. True: solve
+                                for the base mean whose realized E[N] matches the exposure
+                                clause instead. Ignored unless ``freq_zm``.
         :param exp_years:       renewal horizon T (the DecL ``T years`` exposure);
                                 requires ``freq_name='renewal'`` and a ``wait_*``
                                 law (strict pairing). The claim count is the
@@ -1653,6 +1661,18 @@ class Aggregate(HelpMixin, LabeledMixin):
             self.frequency = Frequency(
                 get_value(freq_name), get_value(freq_a), get_value(freq_b),
                 get_value(freq_zm), get_value(freq_p0))
+        # DecL ``!`` after zm / zt: pin the realized mean to the exposure clause
+        # rather than letting the (a, b, 1) reweighting shift it. Only meaningful
+        # when the frequency is actually zero modified.
+        self._freq_zm = bool(getattr(self.frequency, 'freq_zm', False))
+        self._freq_pin_mean = self._freq_zm and bool(get_value(freq_pin_mean))
+        # set by the broadcast loops when a component's claim count was derived
+        # from a *monetary* exposure clause (loss, premium x lr, exposure x rate)
+        # rather than ``n claims``; drives the ZeroModifiedExposureWarning below.
+        # ``_zm_requested_loss`` accumulates the money target actually asked for,
+        # so the warning can quote it against what was delivered.
+        self._zm_monetary_exposure = False
+        self._zm_requested_loss = 0.0
         # Spec pass through from constructor arguments
         self.note = note
         # Exposure premium / loss ratio, retained for the P&L path: a ``pnl``
@@ -1861,10 +1881,12 @@ class Aggregate(HelpMixin, LabeledMixin):
                 sev1, sev2, sev3 = self.sevs[r].moms()
 
                 # input claim count trumps input loss
+                _monetary = False
                 if _en > 0:
                     _el = _en * sev1
                 elif _el > 0:
                     _en = _el / sev1
+                    _monetary = True
                 # neither of these options can be triggered, by a dfreq dsev, for example.
 
                 # for empirical/renewal freq claim count entered as -1;
@@ -1876,6 +1898,18 @@ class Aggregate(HelpMixin, LabeledMixin):
                 if _en < 0:
                     _en = np.sum(self.frequency.freq_a * self.frequency.freq_b)
                     _el = _en * sev1
+
+                # Zero modification / truncation moves the mean: the exposure
+                # clause sets the BASE mean and the realized E[N] follows (or,
+                # under ``!``, invert so the realized mean meets the clause).
+                # Expected loss must track the *realized* count, so it is
+                # recomputed here -- before the premium / lr reconciliation.
+                if self._freq_zm and _en > 0:
+                    if _monetary:
+                        self._zm_monetary_exposure = True
+                        self._zm_requested_loss += _el
+                    _en = self._zm_base_count(_en)
+                    _el = self._zm_realized_count(_en) * sev1
 
                 # if premium compute loss ratio, if loss ratio compute premium
                 if _pr > 0:
@@ -1974,6 +2008,11 @@ class Aggregate(HelpMixin, LabeledMixin):
                             _y, _at, component_mean, [m[0] for m in moms])
                 if _en == 0:
                     _en = _el / component_mean
+                    # monetary exposure clause: a zero modification that shifts
+                    # the mean will miss the stated money target (see the
+                    # ZeroModifiedExposureWarning raised after the loops)
+                    self._zm_monetary_exposure = True
+                    self._zm_requested_loss += _el
 
                 # for cases where a mixture component has no losses in the layer
                 # usually because of underflow.
@@ -2027,6 +2066,18 @@ class Aggregate(HelpMixin, LabeledMixin):
                     _pr0 = _pr * _swt
                     _el0 = _el * _swt
                     _en0 = _en * _swt
+
+                    # Zero modification / truncation moves the mean. Applied to
+                    # the *weighted* per-component count -- the same value
+                    # ``_record_component`` hands to ``freq_moms`` -- so the
+                    # recorded loss and the accumulated moments agree.
+                    if self._freq_zm and _en0 > 0:
+                        _en0 = self._zm_base_count(_en0)
+                        _el0 = self._zm_realized_count(_en0) * sev1
+                        if _pr0 > 0:
+                            _lr = _el0 / _pr0
+                        elif _lr > 0:
+                            _pr0 = _el0 / _lr
 
                     self._record_component(f'e{e_idx}.m{m_idx}', ma, _at, _y, _scv,
                                            _en0, _el0, _pr0, _lr,
@@ -2088,6 +2139,25 @@ class Aggregate(HelpMixin, LabeledMixin):
         # a parametric Frequency is a family until the exposure fixes its
         # mean; this is what freq_df (and any standalone use) reads
         self.frequency.en = float(self.n)
+        # ... and the un-modified mean that ``freq_moms`` / ``freq_pgf``
+        # actually consume. These differ only under zm / zt, where ``n`` is the
+        # realized (shifted) mean and ``base_mean`` is what the exposure clause
+        # set. Everything that evaluates the PGF must use ``base_mean``.
+        self.frequency.base_mean = float(np.sum(self.en)) if self._freq_zm \
+            else float(self.n)
+        if (self._freq_zm and self._zm_monetary_exposure
+                and not self._freq_pin_mean and self._zm_requested_loss > 0):
+            # a money target was stated and the zero modification moved the mean
+            # off it; say so, and name the fix. Silent for the ``n claims`` form,
+            # where a count in / shifted count out is the documented default.
+            _base_n = float(np.sum(self.en))
+            warnings.warn(
+                f'{self.name}: the exposure clause states a monetary target of '
+                f'{self._zm_requested_loss:,.6g}, but zm/zt shifts the mean off '
+                f'it: E[N] {_base_n:,.6g} -> {self.n:,.6g} delivers '
+                f'{tot_loss:,.6g}. Append ! to the zm/zt clause to pin the '
+                f'target instead.',
+                ZeroModifiedExposureWarning, stacklevel=2)
         # Pull the headline moments off the canonical stats_df mixed column.
         _mixed = self.stats_df['mixed']
         self.actual_m = float(_mixed[('agg', 'mean')])
@@ -2222,6 +2292,54 @@ class Aggregate(HelpMixin, LabeledMixin):
         self.stats_df = pd.DataFrame(
             np.nan, index=_STATS_ROW_INDEX, columns=cols, dtype=float,
         )
+
+    @property
+    def base_mean(self):
+        """The un-modified expected claim count -- the mean ``freq_pgf`` consumes.
+
+        Equals :attr:`n` for every unmodified frequency, so ordinary code need
+        not distinguish them. Under ``zm`` / ``zt`` they part company: :attr:`n`
+        is the *realized* (shifted) ``E[N]`` that the aggregate actually has,
+        while this is the base mean the exposure clause set and the one the
+        ``(a, b, 1)`` PGF is parameterized by. Every PGF evaluation -- the FFT
+        convolution, the bivariate 2-D compound, the pedagogy transforms --
+        must pass this, not ``n``.
+
+        See :meth:`~aggregate.distributions.Frequency.modify_mean` for the map
+        between the two.
+        """
+        base = getattr(self.frequency, 'base_mean', None)
+        return float(self.n) if base is None else float(base)
+
+    def _zm_base_count(self, en):
+        """Map an exposure-clause claim count to the base mean the frequency consumes.
+
+        Under ``zm`` / ``zt`` the DecL exposure clause states the **un-modified
+        (base)** mean by default, so this is the identity. The ``!`` marker
+        (:attr:`_freq_pin_mean`) flips the reading: the clause then states the
+        *realized* ``E[N]``, and the base mean is solved for by
+        :meth:`~aggregate.distributions.Frequency.solve_base_mean`.
+
+        Returns ``en`` unchanged for an unmodified frequency, so callers can
+        apply it without branching.
+        """
+        if not self._freq_zm or not en > 0:
+            return en
+        if self._freq_pin_mean:
+            return self.frequency.solve_base_mean(en)
+        return en
+
+    def _zm_realized_count(self, base_en):
+        """The realized ``E[N]`` for a base claim count.
+
+        The forward (a, b, 1) shift; the identity for an unmodified frequency.
+        Expected loss is computed from this rather than from the base count,
+        so ``stats_df`` and the accumulated moments describe the same
+        distribution.
+        """
+        if not self._freq_zm or not base_en > 0:
+            return base_en
+        return self.frequency.modify_mean(base_en)
 
     def _record_component(self, col, ma, attach, layer, scv, en, el, prem, lr, mix_cv,
                           sev1, sev2, sev3):
@@ -3189,7 +3307,7 @@ class Aggregate(HelpMixin, LabeledMixin):
         # self-state it needs is passed explicitly so the core is testable
         # without a full update(). See aggregate._aggregate_compute.
         return freq_sev_convolution(
-            sev_density, self.frequency.freq_pgf, self.n,
+            sev_density, self.frequency.freq_pgf, self.base_mean,
             N=len(self.xs), bs=self.bs, i0=self.i0, x_min=self.x_min,
             en=self.en, freq_name=self.frequency.freq_name, padding=padding)
 
@@ -3415,7 +3533,10 @@ class Aggregate(HelpMixin, LabeledMixin):
         # frequency pmf has no legitimate negatives, so this is NOT the shared
         # two-sided ``remove_fuzz`` utility.
         dist[dist < np.finfo(float).eps] = 0
-        if not np.allclose(self.n,  self.en):
+        # ``en`` holds the per-component BASE counts, which is what freq_pgf
+        # wants; under zm / zt ``n`` is legitimately the shifted realized mean,
+        # so only flag a mismatch when the frequency is unmodified.
+        if not self._freq_zm and not np.allclose(self.n, self.en):
             logger.warning('Frequency.pmf | n %s != en %s; using en', self.n, self.en)
         return dist
 
@@ -3855,7 +3976,10 @@ class Aggregate(HelpMixin, LabeledMixin):
         when the count is *derived* from severity (``500 loss ...``, a
         ``premium at lr`` or limit profile), swapping the severity would change
         the count. ``n`` is the correct total expected count even for profiles
-        and mixed frequency. An empirical (``dfreq``) frequency already *is* the
+        and mixed frequency. Under ``zm`` / ``zt`` the caller passes the *base*
+        mean instead, because the preserved zero-modification clause re-applies
+        the shift when the rendered program is rebuilt. An empirical
+        (``dfreq``) frequency already *is* the
         count distribution, so its outcome/probability vectors are kept as the
         ``dfreq`` head and no ``claims`` exposure is synthesized.
 
@@ -3864,7 +3988,8 @@ class Aggregate(HelpMixin, LabeledMixin):
         """
         # Keep only the frequency clause; drop severity, layers and reinsurance.
         new = {'name': name}
-        for key in ('freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0'):
+        for key in ('freq_name', 'freq_a', 'freq_b', 'freq_zm', 'freq_p0',
+                    'freq_pin_mean'):
             if key in spec:
                 new[key] = spec[key]
         # An empirical (dfreq) frequency is itself the count distribution and
@@ -3925,7 +4050,11 @@ class Aggregate(HelpMixin, LabeledMixin):
             spec['freq_name'] = 'empirical'
             spec['freq_a'] = np.asarray(self.frequency.freq_a)
             spec['freq_b'] = np.asarray(self.frequency.freq_b)
-        return self._count_program(spec, self.n, name)
+        # base_mean, not n: the rendered program still carries the zm / zt
+        # clause, so its exposure number must be the *base* mean -- feeding the
+        # realized ``n`` back in would apply the modification a second time.
+        # The two coincide for every unmodified frequency.
+        return self._count_program(spec, self.base_mean, name)
 
     def create_frequency(self):
         """Materialize this object's claim-count distribution as an ``Aggregate``.
@@ -4737,7 +4866,19 @@ class Aggregate(HelpMixin, LabeledMixin):
             s_his.append(hi)
             s_los.append(lo)
         s_max, s_min = max(s_his), min(s_los)
-        f1, f2, f3 = self.frequency.freq_moms(self.n)
+        # ``freq_moms`` consumes the BASE mean (``n`` is the realized one, which
+        # under zm / zt would apply the modification a second time).
+        f1, f2, f3 = self.frequency.freq_moms(self.base_mean)
+        if self._freq_zm:
+            # A zero-modified law is ``c`` times the base law on {1, 2, ...}, so
+            # its *reach* is the base distribution's reach. The realized mean and
+            # sd are dragged toward zero by the mass at 0 and badly understate the
+            # upper quantile -- a 95%-at-zero count would size a 4-bucket grid for
+            # a Poisson(4) body. Recover the base moments (``f_j = c * base_j``)
+            # and take the quantile from those.
+            c = self.frequency._zm_weight(self.base_mean)
+            if c > 0:
+                f1, f2 = f1 / c, f2 / c
         fsd = float(np.sqrt(max(f2 - f1 * f1, 0.0)))
         zN = ss.norm.isf(1 - p)
         n_hi = f1 + zN * fsd

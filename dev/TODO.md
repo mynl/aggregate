@@ -364,12 +364,6 @@
   CatBook example) — `Aggregate.summary_df` on a decorated engine judged
   "USELESS and needs improving". Scope with [Reporting-Guidelines] /
   [Accounting-Summary-DF] — reconcile the three before redesigning.
-- **[ZT-ZM-Frequency-Fix]** `alpha` — zero-truncated / zero-modified frequency is
-  broken (`poisson zt` → NaN solver for every parameterization; `zm` builds but
-  the semantics are wrong — it inverts a post-modification mean). Redesign: the
-  user inputs the **un-truncated/un-modified base mean** and we apply the shift
-  **forward** (no solver); ship documented shift helpers (both directions). Two
-  examples are commented out in `examples.agg` until then. Pairs with `[Doc-Gaps]`.
 - **[bs_describe-Wart]** `beta` — investigate the `bs_describe` / `bs_explain`
   module workers (the `color=` workers behind `bs_description` /
   `bs_explanation`): purpose, the local-`line` accumulator, and whether they earn
@@ -423,8 +417,8 @@
   super-exp / exp / sub-exp descriptors for freq **and** sev, plus the
   bounded/unbounded indicator; with tests.
 - **[Doc-Gaps]** `alpha` (#58–#62) — custom errors; syntax checker / better error
-  reporting; stale "site" database refs; ZT/ZM zero-truncation/modification;
-  splice examples. No code dependency.
+  reporting; stale "site" database refs; splice examples. No code dependency.
+  (ZT/ZM zero-truncation/modification done at a152, `[ZT-ZM-Frequency-Fix]`.)
 - **[API-Docstring-Coverage]** `alpha` — every public function/class carries a
   NumPy-style docstring that renders in the API reference. The doc side of
   `[Docstring-Sweep-NumPy]`.
@@ -465,6 +459,20 @@
 ---
 
 ## Related plans (shipped → context)
+
+- **[ZT-ZM-Frequency-Fix]** — shipped a152: zero-truncated / zero-modified
+  frequency reparameterized to the textbook `(a, b, 1)` form (exposure clause
+  = un-modified base mean, closed-form forward shift, realized `E[N]` an
+  output), with `!` opting back in to a pinned mean and a
+  `ZeroModifiedExposureWarning` on the monetary exposure forms. Fixes the NaN
+  solver that broke *every* `zt` and the whole zero-deflation half of `zm`,
+  plus three separate double-application bugs (grid window, `remix`,
+  `create_frequency`). Shift helpers `modify_mean` / `solve_base_mean` and the
+  Loss Models §8.6 `apply_deductible` map are public. Closes the ZT/ZM half of
+  `[Doc-Gaps]`. **Out of scope, still open:** the extended `(a, b, 1)` members
+  (ETNB with `-1 < r < 0`, Sibuya), and compound frequencies with a
+  zero-truncated *secondary* (Loss Models Example 9.12 — `pascal` has no way
+  to truncate its secondary negbin).
 
 - **[Renewal-Frequency-Wait-Clause] + [Empirical-PGF-Horner-Dispatch]**
   (`dev/done/plan-sparre-a.md`) — shipped a146: Sparre-Andersen renewal claim

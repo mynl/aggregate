@@ -188,10 +188,17 @@ agg D.Binomial
     binomial 0.5
     note{Bounded claim count -- binomial (here n = 20, p = 0.5).}
 
-# Zero-modified Poisson -- inflate the no-claim probability. COMMENTED
-# OUT pending the ZT/ZM redesign (TODO B4: input the base mean, ship a
-# shift helper); counts toward the set but does not run in tests.
-# agg D.ZMPoisson 4 claims dsev [1] poisson zm 0.5 note{Zero-modified Poisson -- inflate the probability of a no-claim year.}
+agg D.ZMPoisson
+    4 claims
+    dsev [1]
+    poisson zm 0.5
+    note{Zero-modified Poisson -- inflate the no-claim probability to 0.5. The 4 is the UN-MODIFIED base mean; reweighting leaves E[N] = 2.0373. Append ! to pin E[N] = 4 instead.}
+
+agg D.ZTPoisson
+    4 claims
+    dsev [1]
+    poisson zt
+    note{Zero-truncated Poisson -- at least one claim, so E[N] = 4/(1-exp(-4)) = 4.0746.}
 
 # ----------------------------------------------------------------------
 # E. Exposure and limit profiles

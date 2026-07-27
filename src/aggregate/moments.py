@@ -35,7 +35,8 @@ class MomentAggregator:
     __slots__ = ['freq_1', 'freq_2', 'freq_3', 'sev_1', 'sev_2', 'sev_3', 'agg_1', 'agg_2', 'agg_3',
                  'tot_freq_1', 'tot_freq_2', 'tot_freq_3',
                  'tot_sev_1', 'tot_sev_2', 'tot_sev_3',
-                 'tot_agg_1', 'tot_agg_2', 'tot_agg_3', 'freq_moms'
+                 'tot_agg_1', 'tot_agg_2', 'tot_agg_3', 'freq_moms',
+                 'tot_freq_base'
                  ]
 
     def __init__(self, freq_moms=None):
@@ -46,6 +47,13 @@ class MomentAggregator:
         self.tot_freq_1 = self.tot_freq_2 = self.tot_freq_3 = 0
         self.sev_1 = self.sev_2 = self.sev_3 = 0
         self.tot_sev_1 = self.tot_sev_2 = self.tot_sev_3 = 0
+        # running total of the *inputs* to freq_moms, i.e. the un-modified
+        # (base) claim counts. Identical to tot_freq_1 for every frequency
+        # whose freq_moms preserves the mean -- which is all of them except
+        # the zero-modified forms, where freq_moms deliberately shifts it.
+        # ``get_fsa_stats(remix=True)`` re-enters freq_moms and must feed the
+        # base back in, not the already-shifted total.
+        self.tot_freq_base = 0
         # function to comptue frequency moments, hence can call add_f1s(...)
         self.freq_moms = freq_moms
 
@@ -117,7 +125,10 @@ class MomentAggregator:
         :return:
         """
 
-        # fill in the frequency moments and store away
+        # fill in the frequency moments and store away. ``f1`` in is the base
+        # (un-modified) count; ``f1`` out is the realized mean, which the zero-
+        # modified wrappers shift.
+        self.tot_freq_base += f1
         f1, f2, f3 = self.freq_moms(f1)
         self.add_fs(f1, f2, f3, s1, s2, s3)
 
@@ -134,8 +145,10 @@ class MomentAggregator:
 
         if total:
             if remix:
-                # recompute the frequency moments; all local variables
-                f1 = self.tot_freq_1
+                # recompute the frequency moments; all local variables.
+                # Re-enter freq_moms with the accumulated BASE count: feeding
+                # tot_freq_1 back in would apply a zero modification twice.
+                f1 = self.tot_freq_base if self.tot_freq_base else self.tot_freq_1
                 f1, f2, f3 = self.freq_moms(f1)
                 s1, s2, s3 = self.tot_sev_1 / f1, self.tot_sev_2 / f1, self.tot_sev_3 / f1
                 a1, a2, a3 = self.agg_from_fs(f1, f2, f3, s1, s2, s3)

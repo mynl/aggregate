@@ -869,7 +869,8 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
         pad = agg.padding
         s_shape = (n0 << pad, n1 << pad)
         z = _sfft.rfft2(sev2, s=s_shape)
-        ftagg = agg.frequency.freq_pgf(agg.n, z.ravel()).reshape(z.shape)
+        # base_mean, not n: under zm / zt these differ (n is the shifted mean)
+        ftagg = agg.frequency.freq_pgf(agg.base_mean, z.ravel()).reshape(z.shape)
         density = np.real(_sfft.irfft2(ftagg, s=s_shape))[:n0, :n1]
 
     density[np.abs(density) < 1e-15] = 0.0
@@ -1698,7 +1699,7 @@ class BivariateAggregate(HelpMixin):
             pyramid = PyramidBuilder(store_dir, n0, n1,
                                      row_chunk=row_chunk, col_chunk=col_chunk)
             res = massive_bivariate_convolution(
-                sev2, a.frequency.freq_pgf, float(a.n),
+                sev2, a.frequency.freq_pgf, float(a.base_mean),
                 N0=n0, N1=n1, bs0=bs_c, bs1=bs_c,
                 i0=(0, 0), j0=(0, 0), mlog2=mlog2,
                 store_dir=store_dir, xs0=gx, xs1=gy,

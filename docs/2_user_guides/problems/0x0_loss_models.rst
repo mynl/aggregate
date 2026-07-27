@@ -340,8 +340,37 @@ ZM Binomial, Example 9.11
 
 A compound distribution has a zero-modified binomial distribution with 𝑚 = 3, :math:`q = 0.3`, and :math:`p_0^M = 0.4`. Individual payments are 0, 50, and 150, with probabilities 0.3, 0.5, and 0.2, respectively. Use the recursive formula to determine the probability distribution of :math:`S`.
 
-.. todo::
-    Implement ZM and ZT.
+**Solution.** ``aggregate`` parameterizes the binomial by the per-trial
+probability ``q`` and the *mean*, so :math:`m = 3` trials at :math:`q = 0.3` is
+entered as :math:`mq = 0.9` claims. That figure is the **un-modified** base
+mean: ``zm 0.4`` then reweights the base binomial, exactly as in the
+:math:`(a,b,1)` construction of §6.6, and the realized :math:`\mathsf{E}(N)`
+follows from it rather than being pinned to 0.9.
+
+.. ipython:: python
+    :okwarning:
+
+    kpw_9_11 = build('agg KPW.9.11 0.9 claims '
+                     'dsev [0 50 150] [.3 .5 .2] '
+                     'binomial 0.3 zm 0.4')
+    qd(kpw_9_11)
+
+The count distribution is the reweighted binomial, with
+:math:`p_k^M = \frac{1-p_0^M}{1-p_0}\,p_k` for :math:`k \ge 1` and
+:math:`p_0 = 0.7^3 = 0.343`:
+
+.. ipython:: python
+    :okwarning:
+
+    qd(kpw_9_11.frequency.freq_df.head(4), accuracy=6)
+
+and the aggregate is exact -- the severity lattice is a multiple of 50, so the
+FFT reproduces the recursion to machine precision:
+
+.. ipython:: python
+    :okwarning:
+
+    qd(kpw_9_11.density_df.query('p_total > 1e-12').p_total.to_frame(), accuracy=6)
 
 .. _example 9_12:
 
@@ -350,9 +379,17 @@ ETNB, Example 9.12
 
 The number of claims has a Poisson–ETNB distribution with Poisson parameter 𝜆 = 2 and ETNB parameters :math:`\beta = 3` and :math:`r = 0.2`. The claim size distribution has probabilities 0.3, 0.5, and 0.2 at 0, 10, and 20, respectively. Determine the total claims distribution recursively.
 
-
 .. todo::
-    Implement ZM and ZT.
+
+    Needs a **compound** frequency with a zero-truncated secondary -- a Poisson
+    stopped sum of ZT negative binomials. Zero truncation itself is available
+    since 1.0.0a152 (see :ref:`Example 9.11 <example 9_11>`), and here
+    :math:`r = 0.2 > 0`, so this is an ordinary ZT negative binomial rather
+    than the genuinely *extended* :math:`-1 < r < 0` case. What is missing is
+    the frequency-compounding slot: ``pascal`` is a Poisson stopped sum of an
+    *un-truncated* negative binomial, and DecL has no way to zero-truncate the
+    secondary distribution of a compound frequency. Tracked separately from
+    ``[ZT-ZM-Frequency-Fix]``.
 
 .. _exercise 9_45:
 

@@ -158,6 +158,28 @@ class IgnoredDecLClauseWarning(UserWarning):
     """
 
 
+class ZeroModifiedExposureWarning(UserWarning):
+    """Emitted when ``zm`` / ``zt`` shifts the mean off a monetary exposure target.
+
+    Zero truncation and zero modification are the (a, b, 1) construction of
+    Klugman, Panjer and Willmot (2012) §6.6: the base distribution is held
+    fixed and reweighted, so the mean *moves* -- that is what the modification
+    is for. DecL follows the textbook (and R's ``actuar``) in reading the
+    exposure clause as the **un-modified base mean**, which is exactly right
+    when the clause states a claim count.
+
+    A *monetary* clause (``1000 loss``, ``1000 premium at 0.65 lr``,
+    ``100 exposure at 0.05 rate``) is different: it states a money target that
+    the shifted mean will miss. This warning names the requested amount, what
+    was delivered, and the base -> realized count move. Append ``!`` to the
+    ``zm`` / ``zt`` clause to pin the target instead (``poisson zm 0.5 !``),
+    which solves for the base mean that hits it.
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
+
+
 class ZeroPremiumCessionWarning(UserWarning):
     """Emitted when a ``pnl`` / ``xpnl`` cession has no ceded-premium clause.
 

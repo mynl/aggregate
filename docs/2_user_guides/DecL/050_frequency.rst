@@ -96,7 +96,94 @@ specifies a negative binomial (gamma-mixed Poisson) frequency respectively. The 
 Zero Modification and Zero Truncation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo::
+A frequency clause can be followed by ``zm P0`` (zero modified) or ``zt`` (zero
+truncated, the special case ``P0 = 0``)::
 
-    Not yet implemented.
+    <freq clause> zm P0
+    <freq clause> zt
+
+These build the :math:`(a,b,1)` class: the base distribution is held fixed and
+its positive-count probabilities are rescaled so that :math:`\mathsf{P}(N=0)`
+takes the requested value :math:`p_0^M`,
+
+.. math::
+
+    p_k^M = \frac{1 - p_0^M}{1 - p_0}\, p_k, \quad k \ge 1,
+    \qquad
+    G^M(z) = p_0^M + \frac{1 - p_0^M}{1 - p_0}\,[G(z) - p_0].
+
+Supported for ``poisson``, ``binomial``, ``negbin``, ``geometric`` and
+``logarithmic``. Every :math:`p_0^M` in :math:`[0, 1)` is admissible: above the
+natural :math:`p_0` this *inflates* the zero mass (the classic excess-zeros
+model), below it *deflates* it.
+
+.. important::
+
+    **The exposure clause states the un-modified (base) mean, and the
+    modification moves it.** Rescaling by :math:`(1-p_0^M)/(1-p_0)` changes the
+    mean --- that is what a zero modification is *for* --- so
+    :math:`\mathsf{E}(N)` is an **output**, not the number you typed. This is
+    the parameterization used by :cite:t:`Klugman2012` §6.6,
+    :cite:t:`Frees2018a` ch. 2, and R's ``actuar`` (``dzmpois(x, lambda, p0)``
+    takes the base ``lambda``), so textbook problems transcribe directly.
+
+.. ipython:: python
+    :okwarning:
+
+    zm = build('agg DecL:ZM 4 claims dsev [1] poisson zm 0.5')
+    zm.frequency.base_mean, zm.n, zm.frequency.prob_eq_0
+
+The base Poisson has mean 4; reweighting to :math:`p_0^M=0.5` leaves
+:math:`\mathsf{E}(N) = 0.5 \times 4 / (1 - e^{-4}) = 2.0373`. Zero truncation
+pushes the other way:
+
+.. ipython:: python
+    :okwarning:
+
+    zt = build('agg DecL:ZT 4 claims dsev [1] poisson zt')
+    zt.frequency.base_mean, zt.n
+
+To pin the mean instead, append ``!`` --- the same *unconditional* marker used
+by ``sev`` and ``dsev``, and the realized count mean is the unconditional one.
+``aggregate`` then solves for the base mean whose realized :math:`\mathsf{E}(N)`
+equals the exposure clause:
+
+.. ipython:: python
+    :okwarning:
+
+    pin = build('agg DecL:ZMPin 4 claims dsev [1] poisson zm 0.5 !')
+    pin.frequency.base_mean, pin.n
+
+Use ``!`` when the exposure clause states **money** --- ``1000 loss``,
+``1000 premium at 0.65 lr``, ``100 exposure at 0.05 rate`` --- since a shifted
+mean would silently miss that target. Without it those forms raise a
+:class:`~aggregate.constants.ZeroModifiedExposureWarning` naming the shortfall.
+The plain ``n claims`` form is silent: a count in and a shifted count out is the
+documented default.
+
+Not every mean is reachable when pinning. A zero-truncated count has at least
+one claim, so its mean always exceeds 1; more generally
+:math:`\mathsf{E}(N) > 1 - p_0^M`. Asking for less raises, quoting the bound.
+
+.. warning::
+
+    No member of the :math:`(a,b,1)` class is preserved under a change of
+    exposure :cite:p:`Klugman2012` §7.4 --- a sum of zero-modified counts is a
+    *compound* distribution, not a zero-modified one. Zero modification is a
+    per-risk, per-period model: it describes one policy that may never claim
+    (duplicate coverage, a no-claims-discount incentive to self-report), or
+    corrects a claims database that records no zero rows. In practice it is
+    fitted at the individual-risk level in ratemaking regressions
+    :cite:p:`Boucher2007`, not used as a portfolio-level aggregate frequency.
+    If you need a count that scales with exposure *and* places large mass at
+    zero, use a compound model instead.
+
+**Shift helpers.** The two directions are public on
+:class:`~aggregate.distributions.Frequency`:
+:meth:`~aggregate.distributions.Frequency.modify_mean` maps a base mean to the
+realized :math:`\mathsf{E}(N)` (closed form), and
+:meth:`~aggregate.distributions.Frequency.solve_base_mean` inverts it --- what
+``!`` calls internally. :meth:`~aggregate.distributions.Frequency.apply_deductible`
+implements the Loss Models §8.6 thinning map from a loss count to a payment
+count; see the :ref:`zero-modified Poisson/Burr example <lda zmpoisson burr>`.
 

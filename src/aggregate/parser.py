@@ -998,16 +998,35 @@ class UnderwritingTransformer(Transformer):
         return ("sev", name, dsev)
 
     # ----- frequency -------------------------------------------------
+    # Zero modification / truncation. The bare forms leave ``freq_pin_mean``
+    # unset: the exposure clause supplies the *base* mean and the realized
+    # E[N] is whatever the (a, b, 1) reweighting makes it. The ``!`` variants
+    # pin the mean instead -- Aggregate then solves for the base mean whose
+    # realized E[N] equals the exposure clause.
     def freq_zm(self, c):
         freq, _zm, expr = c
         freq["freq_zm"] = True
         freq["freq_p0"] = expr
         return freq
 
+    def freq_zm_pin(self, c):
+        freq, _zm, expr = c
+        freq["freq_zm"] = True
+        freq["freq_p0"] = expr
+        freq["freq_pin_mean"] = True
+        return freq
+
     def freq_zt(self, c):
         freq, _zt = c
         freq["freq_zm"] = True
         freq["freq_p0"] = 0.0
+        return freq
+
+    def freq_zt_pin(self, c):
+        freq, _zt = c
+        freq["freq_zm"] = True
+        freq["freq_p0"] = 0.0
+        freq["freq_pin_mean"] = True
         return freq
 
     def freq_mixed_two(self, c):

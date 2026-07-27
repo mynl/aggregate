@@ -729,3 +729,24 @@ agg AB.Renewal.Labels 10 years as decade dsev [1] dwait [1:3] as slow_waits     
 agg AB.Renewal.Layer 10 years sev lognorm 100 cv 1 wait 2 xs 0.25 expon                       note{Conditional layered wait (W-a given W>a, capped at 2); cap atom at 2 snaps the grid};
 agg AB.Renewal.LayerCl 10 years sev lognorm 100 cv 1 wait 2 xs 0.25 expon !                   note{Unconditional layered wait min((W-a)+, 2); P(W<=a) clusters at 0};
 agg AB.Renewal.LayerMix 5 years sev gamma 10 cv .3 wait [1 2] xs [0 0.5] expon wts [.6 .4]    note{Broadcast vector layer: mixture of differently layered waits};
+
+# ============================================================
+# AC. Zero-truncated / zero-modified frequency ([ZT-ZM-Frequency-Fix])
+#     (tests/test_frequency_zm.py)
+# ============================================================
+# The (a, b, 1) class of Klugman-Panjer-Willmot 2012 section 6.6. The exposure
+# clause sets the UN-MODIFIED (base) mean and the reweighting shifts it
+# forward, so the realized E[N] is an output -- the textbook parameterization,
+# matching Loss Data Analytics and R's actuar. A trailing "!" pins the mean
+# instead: solve for the base mean whose realized E[N] equals the clause.
+agg AC.ZM.Poisson 4 claims dsev [1] poisson zm 0.5                                            note{Base Poisson(4) reweighted to p0=0.5; realized E[N] = 2.0373, not 4};
+agg AC.ZM.PoissonPin 4 claims dsev [1] poisson zm 0.5 !                                       note{Trailing ! pins E[N] = 4 exactly; the base mean solves to 7.9973};
+agg AC.ZT.Poisson 4 claims dsev [1] poisson zt                                                note{Zero-truncated Poisson(4): E[N] = 4/(1-exp(-4)) = 4.0746};
+agg AC.ZT.PoissonSmall 0.5 claims dsev [1] poisson zt                                         note{Base mean below 1 is fine; the ZT mean is 1.2707 (a ZT count cannot average below 1)};
+agg AC.ZT.PoissonPin 4 claims dsev [1] poisson zt !                                           note{Pinned ZT: E[N] = 4, base mean 3.9207};
+agg AC.ZM.Deflate 4 claims dsev [1] poisson zm 0.005                                          note{Zero DEFLATION: p0 below the natural exp(-4) = 0.0183 raises the mean};
+agg AC.ZM.Negbin 4 claims dsev [1] negbin 3 zm .5                                             note{ZM negative binomial; freq_a is the variance multiplier 1+beta};
+agg AC.ZM.Geometric 4 claims dsev [1] geometric zm .5                                         note{ZM geometric};
+agg AC.ZM.Binomial 4 claims dsev [1] binomial 0.6 zm .5                                       note{ZM binomial, per-trial probability 0.6};
+agg AC.ZM.Logarithmic 4 claims dsev [1] logarithmic zm .5                                     note{Logarithmic already has p0 = 0, so zm only adds mass at zero};
+agg AC.ZM.LossPin 1000 loss sev lognorm 10 cv 1 poisson zm 0.5 !                              note{Monetary exposure with !: hits E[X] = 1000; without ! it warns and delivers 500};

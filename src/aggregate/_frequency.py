@@ -216,47 +216,208 @@ class Frequency(HelpMixin):
             return object.__new__(cls)
         return object.__new__(subclass)
 
-    def _solve_n_base(self, n):
-        """
-        Solve for ``n_base`` such that the ZM-adjusted mean equals ``n``.
+    # Lower bracket for ``solve_base_mean``. The forward map has a removable
+    # 0/0 singularity at a base mean of zero, so the search starts just above
+    # it; 1e-8 is comfortably inside float64's accurate range for the
+    # ``m / (1 - _prob_eq_0(m))`` ratio that sets the infimum.
+    _ZM_MEAN_FLOOR = 1e-8
 
-        The ZM construction reweights an unmodified distribution of mean
-        ``n_base`` so that its probability at 0 becomes ``freq_p0``. The
-        new mean is ``(1 - freq_p0) n_base / (1 - _prob_eq_0(n_base))``;
-        invert that to recover ``n_base``.
+    def _zm_weight(self, base_mean):
         """
-        p0 = self.freq_p0
-        f = lambda x: (1 - p0) * x / (1 - self._prob_eq_0(x)) - n
-        if p0 < self._prob_eq_0(n):
-            # ZM has higher mean than the unmodified distribution: search left of n.
-            n_base = brentq(f, a=0, b=n)
+        The (a, b, 1) reweighting constant :math:`c = (1 - p_0^M)/(1 - p_0)`.
+
+        ``p0 = _prob_eq_0(base_mean)`` is the natural (un-modified) probability
+        of no claims at ``base_mean``; ``p0M = freq_p0`` is the requested
+        modified value. Every positive-count probability is multiplied by ``c``
+        (Klugman, Panjer and Willmot 2012, eq. 6.5), hence so is every raw
+        moment.
+
+        Degenerate inputs -- a non-positive base mean, or a family whose
+        natural ``p0`` is already 1 -- return ``1.0``, so the wrappers reduce to
+        the identity instead of dividing by zero.
+        """
+        if not np.isfinite(base_mean) or base_mean <= 0:
+            return 1.0
+        p0 = self._prob_eq_0(base_mean)
+        if p0 >= 1.0:
+            return 1.0
+        return (1.0 - self.freq_p0) / (1.0 - p0)
+
+    def modify_mean(self, base_mean=None):
+        """
+        Forward map: the realized ``E[N]`` for an un-modified (base) mean.
+
+        The zero-modified construction holds the base distribution fixed and
+        reweights it, so the realized mean is an *output*:
+        :math:`E[N^M] = c\\,E[N]` with ``c`` from :meth:`_zm_weight`. Closed
+        form, defined for every ``p0M`` in ``[0, 1)`` -- no solver, and no
+        infeasible region.
+
+        Parameters
+        ----------
+        base_mean : float, optional
+            The un-modified mean. Defaults to :attr:`base_mean`, the value in
+            force for this object.
+
+        Returns
+        -------
+        float
+            The realized ``E[N]``. Returns ``base_mean`` unchanged when the
+            frequency is not zero modified, so callers need not special-case.
+        """
+        if base_mean is None:
+            base_mean = self.base_mean
+        if base_mean is None:
+            raise ValueError(
+                f'modify_mean: this standalone {self.freq_name!r} frequency has '
+                f'no base mean yet -- pass one explicitly, or let the owning '
+                f'Aggregate stamp .base_mean at construction')
+        base_mean = float(base_mean)
+        if not self.freq_zm:
+            return base_mean
+        return self._zm_weight(base_mean) * base_mean
+
+    def solve_base_mean(self, target_mean):
+        """
+        Inverse map: the base mean whose realized ``E[N]`` is ``target_mean``.
+
+        The opt-in counterpart of :meth:`modify_mean`, reached from DecL only
+        through the ``!`` marker (``poisson zm 0.5 !``). This is the one place a
+        numerical solve survives in the zero-modification path.
+
+        Notes
+        -----
+        :meth:`modify_mean` increases in the base mean from a finite infimum
+        :math:`L = (1 - p_0^M)\\lim_{m \\to 0} m / (1 - p_0(m))`, so a target at
+        or below ``L`` is genuinely unattainable -- for a zero-truncated
+        Poisson ``L = 1``, which is why a ZT count can never average fewer than
+        one claim. The bracket is located by evaluating at a small positive
+        floor and doubling upwards, so it stays family-agnostic.
+
+        Raises
+        ------
+        ValueError
+            If ``target_mean`` lies at or below the attainable infimum.
+        """
+        target_mean = float(target_mean)
+        if not self.freq_zm:
+            return target_mean
+        lo = self._ZM_MEAN_FLOOR
+        floor_mean = self.modify_mean(lo)
+        if target_mean <= floor_mean:
+            raise ValueError(
+                f'solve_base_mean: {self.freq_name!r} with p0 = '
+                f'{self.freq_p0:.6g} cannot reach a mean of {target_mean:.6g}; '
+                f'zero modification admits only E[N] > {floor_mean:.6g}. Drop '
+                f'the ! to let the mean shift, or raise the claim count.')
+        hi = max(target_mean, 1.0)
+        for _ in range(200):
+            if self.modify_mean(hi) >= target_mean:
+                break
+            hi *= 2.0
+        else:  # pragma: no cover - unreachable for admissible targets
+            raise ValueError(
+                f'solve_base_mean: failed to bracket a base mean for target '
+                f'{target_mean:.6g} ({self.freq_name!r}, p0 = {self.freq_p0:.6g})')
+        return brentq(lambda m: self.modify_mean(m) - target_mean, lo, hi)
+
+    def apply_deductible(self, survival):
+        """
+        Loss Models §8.6: the payment count ``N^P`` implied by this loss count.
+
+        A deductible thins each loss independently with retention probability
+        ``v = S(d)``. For a frequency whose pgf takes the form
+
+        .. math::
+
+            P_{N^L}(z; \\theta, \\alpha)
+                = \\alpha + (1 - \\alpha)
+                  \\frac{\\phi[\\theta(1 - z)] - \\phi(\\theta)}{1 - \\phi(\\theta)}
+
+        the payment count is the same family with :math:`\\theta \\to v\\theta`
+        and a fresh zero mass :math:`\\alpha^* = P_{N^L}(1 - v)` (Klugman,
+        Panjer and Willmot 2012, eq. 8.3 ff.). A zero-*truncated* loss count
+        therefore yields a zero-*modified* payment count: periods with no
+        payment become possible again.
+
+        Parameters
+        ----------
+        survival : float
+            :math:`v = S(d)`, the probability that a loss exceeds the deductible.
+
+        Returns
+        -------
+        Frequency
+            A new frequency of the same kind with :attr:`base_mean` and
+            :attr:`en` set, describing ``N^P``.
+
+        Raises
+        ------
+        ValueError
+            If ``survival`` is outside ``(0, 1]``, or :attr:`base_mean` is unset.
+        NotImplementedError
+            For families whose base parameter does not scale linearly under
+            thinning (currently ``logarithmic``).
+        """
+        if not 0 < survival <= 1:
+            raise ValueError(
+                f'apply_deductible: survival must lie in (0, 1], not {survival!r}')
+        if self.base_mean is None:
+            raise ValueError(
+                'apply_deductible: base_mean is unset -- set it, or build the '
+                'frequency through an Aggregate, before thinning')
+        # theta -> v theta; how that lands on freq_a is family specific.
+        if self.freq_name in ('poisson', 'geometric'):
+            # single parameter, carried entirely by the mean
+            freq_a = self.freq_a
+        elif self.freq_name == 'negbin':
+            # beta -> v beta at fixed r; freq_a is the variance multiplier 1 + beta
+            freq_a = 1.0 + survival * (self.freq_a - 1.0)
+        elif self.freq_name == 'binomial':
+            # q -> v q at fixed trial count m
+            freq_a = survival * self.freq_a
         else:
-            # search right
-            n_base = brentq(f, a=n, b=n / (1 - p0))
-        self.unmodified_mean = n_base
-        return n_base
+            raise NotImplementedError(
+                f'apply_deductible is not defined for {self.freq_name!r}; '
+                f'supported: poisson, geometric, negbin, binomial')
+        # alpha* = P_NL(1 - v) on the *current* (possibly modified) pgf at the
+        # current base mean: the new probability of no payment, which always
+        # exceeds the old probability of no loss.
+        p0_star = float(np.real(self.freq_pgf(self.base_mean, 1.0 - survival)))
+        out = Frequency(self.freq_name, freq_a, self.freq_b, True, p0_star)
+        out.base_mean = survival * self.base_mean
+        out.en = out.modify_mean()
+        return out
 
     def _install_zm_wrappers(self):
         """
-        Replace ``self.freq_moms`` and ``self.freq_pgf`` with ZM-adjusted
-        versions. The wrapped form is a weighted average of the trivial
-        (point-mass at 0) component and the original distribution.
+        Replace ``freq_moms`` / ``freq_pgf`` with their zero-modified forms.
+
+        Both wrappers interpret their ``n`` argument as the **un-modified
+        (base) mean**. The (a, b, 1) construction holds the base distribution
+        fixed and reweights it, so with ``c = (1 - p0M) / (1 - p0)``
+
+        .. math::
+
+            G^M(z) = p_0^M + c\\,[G(z) - p_0] = (1 - c) + c\\,G(z)
+
+        and every raw moment scales by ``c``, because moving mass to and from
+        zero contributes nothing to :math:`E[N^j]` for :math:`j \\ge 1`. Closed
+        form throughout -- the solver that used to invert this map now lives in
+        :meth:`solve_base_mean` and fires only under the DecL ``!`` marker.
         """
         orig_moms = self.freq_moms
         orig_pgf = self.freq_pgf
-        freq_p0 = self.freq_p0
 
         @wraps(orig_moms)
         def wrapped_moms(n):
-            n_base = self._solve_n_base(n)
-            ans = np.array(orig_moms(n_base))
-            return (1 - freq_p0) / (1 - self._prob_eq_0(n_base)) * ans
+            c = self._zm_weight(n)
+            return tuple(c * np.asarray(orig_moms(n), dtype=float))
 
         @wraps(orig_pgf)
         def wrapped_pgf(n, z):
-            n_base = self._solve_n_base(n)
-            wt = (1 - freq_p0) / (1 - self._prob_eq_0(n_base))
-            return (1 - wt) + wt * orig_pgf(n_base, z)
+            c = self._zm_weight(n)
+            return (1 - c) + c * orig_pgf(n, z)
 
         self.freq_moms = wrapped_moms
         self.freq_pgf = wrapped_pgf
@@ -280,7 +441,11 @@ class Frequency(HelpMixin):
         self.freq_zm = freq_zm
         self.freq_p0 = freq_p0
         self.panjer_ab = None
-        self.unmodified_mean = None
+        # the un-modified mean: what ``freq_moms`` / ``freq_pgf`` consume. For
+        # an unmodified frequency this equals ``en``; under ``zm`` / ``zt`` the
+        # exposure clause sets it and the realized mean follows from
+        # ``modify_mean()``. Stamped by the owning Aggregate; None standalone.
+        self.base_mean = None
         # expected claim count (the unconditional EN): a parametric frequency
         # is a family until the exposure fixes its mean, so the owning
         # Aggregate stamps its resolved total n here at construction. None
@@ -321,11 +486,14 @@ class Frequency(HelpMixin):
         ``Portfolio`` / ``Severity``. The row catalogue is documented in
         ``dev/info-strings.rst``.
         """
-        if self.en is None:
+        # ``freq_moms`` consumes the BASE mean: under zm / zt the realized E[N]
+        # it returns is the shifted one, so feeding ``en`` back in would apply
+        # the modification twice.
+        base = self.base_mean if self.base_mean is not None else self.en
+        if base is None:
             en_s = sd_s = vm_s = INFO_NA
         else:
-            en = float(self.en)
-            ex1, ex2, _ = self.freq_moms(en)
+            ex1, ex2, _ = self.freq_moms(float(base))
             var = max(ex2 - ex1 * ex1, 0.0)
             en_s = f'{ex1:,.6g}'
             sd_s = f'{var ** 0.5:,.6g}'
@@ -337,6 +505,8 @@ class Frequency(HelpMixin):
             ('freq_b', f'{self.freq_b:,.6g}' if self.freq_b else INFO_NA),
             ('zero modified', bool(self.freq_zm)),
             ('freq_p0', f'{self.freq_p0:,.6g}' if self.freq_zm else INFO_NA),
+            ('base mean', f'{float(base):,.6g}'
+                if (self.freq_zm and base is not None) else INFO_NA),
             ('E[N]', en_s),
             ('SD(N)', sd_s),
             ('var / mean', vm_s),
@@ -386,11 +556,19 @@ class Frequency(HelpMixin):
         article = 'an' if label[:1].lower() in 'aeiou' else 'a'
         out = [f'{self.freq_name.capitalize()} frequency with {article} '
                f'{label} count tail.']
+        base = self.base_mean if self.base_mean is not None else self.en
         if self.freq_zm:
-            out.append(f'Zero-modified with P(N = 0) = {self.freq_p0:.6g}.')
-        if self.en is not None:
-            en = float(self.en)
-            ex1, ex2, _ = self.freq_moms(en)
+            kind = 'Zero-truncated' if self.freq_p0 == 0 else 'Zero-modified'
+            out.append(f'{kind} with P(N = 0) = {self.freq_p0:.6g}.')
+            if base is not None:
+                out.append(
+                    f'The exposure clause sets the un-modified base mean '
+                    f'{float(base):,.6g}; the modification shifts it to the '
+                    f'realized E[N] below (append ! in DecL to pin the mean '
+                    f'instead).')
+        if base is not None:
+            # freq_moms consumes the base mean and returns the realized moments
+            ex1, ex2, _ = self.freq_moms(float(base))
             var = max(ex2 - ex1 * ex1, 0.0)
             sd = var ** 0.5
             out.append(f'E[N] = {ex1:,.6g}, SD(N) = {sd:,.6g}.')
@@ -424,9 +602,16 @@ class Frequency(HelpMixin):
         :attr:`~aggregate.distributions.Aggregate.prob_eq_0` (``P(X = 0)``),
         under the same name and the same zero-argument shape.
 
-        Evaluated at :attr:`en`, the unconditional expected claim count the
-        owning :class:`Aggregate` stamps at construction, exactly as
-        :attr:`freq_df` does; a standalone frequency raises until ``en`` is set.
+        Evaluated at :attr:`base_mean`, the un-modified mean the owning
+        :class:`Aggregate` stamps at construction; a standalone frequency
+        raises until it is set. For an unmodified frequency ``base_mean``
+        equals :attr:`en`, so this is simply ``P(N = 0)`` at the expected claim
+        count.
+
+        Under ``zm`` / ``zt`` the answer is ``freq_p0`` **by construction** --
+        that is what zero modification *means* -- not ``_prob_eq_0`` evaluated
+        at any mean. Reading it back is the cheapest check that a zero
+        modification took.
 
         Returns
         -------
@@ -438,15 +623,15 @@ class Frequency(HelpMixin):
         ValueError
             If this kind has no closed-form zero probability (the class-level
             ``_prob_eq_0`` default is ``None``; only the zero-modifiable kinds
-            override it -- see :attr:`supports_zm`), or if ``en`` is not set.
+            override it -- see :attr:`supports_zm`), or if the mean is not set.
 
         Notes
         -----
         Renamed from ``prn_eq_0(n)`` at 1.0.0a151. The parametrized worker
         survives as the private ``_prob_eq_0(n)``: ``Aggregate`` calls it per
         mixture component at that component's mean, and the ZM machinery
-        (:meth:`_solve_n_base`) inverts it at trial means, so the argument form
-        is genuinely needed internally. This mirrors the a149 ``tail_df``
+        (:meth:`_zm_weight`) evaluates it at the base mean, so the argument
+        form is genuinely needed internally. This mirrors the a149 ``tail_df``
         (no-argument property) / ``tail_periods_df(periods=)`` (parametrized
         worker) split.
         """
@@ -454,12 +639,16 @@ class Frequency(HelpMixin):
             raise ValueError(
                 f'prob_eq_0: the {self.freq_name!r} frequency has no '
                 f'closed-form P(N = 0)')
-        if self.en is None:
+        if self.freq_zm:
+            # the defining property of the (a, b, 1) construction
+            return float(self.freq_p0)
+        mean = self.base_mean if self.base_mean is not None else self.en
+        if mean is None:
             raise ValueError(
                 f'prob_eq_0: this standalone {self.freq_name!r} frequency has '
                 f'no expected claim count yet -- the owning Aggregate stamps '
                 f'.en at construction; set fr.en = n to use it standalone')
-        return float(self._prob_eq_0(float(self.en)))
+        return float(self._prob_eq_0(float(mean)))
 
     @cached_property
     def freq_df(self):
@@ -472,32 +661,35 @@ class Frequency(HelpMixin):
         Computed on first access and cached.
 
         A parametric frequency is a family until the exposure fixes its
-        mean, so the pmf uses ``self.en`` -- the unconditional expected
-        claim count the owning :class:`Aggregate` stamps at construction
-        (a standalone frequency raises until ``en`` is set). The pmf
-        inverts ``freq_pgf`` on a power-of-two FFT grid sized by the
-        frequency's own moments (mean + 10 sd); trailing rows where both
-        columns are below 1e-15 are trimmed. The empirical family
-        (``dfreq`` / ``renewal``) overrides with its exact materialized
-        pmf and intrinsic mean. Guard: mean <= 1000 (a toy, small-count
-        diagnostic).
+        mean, so the pmf uses ``self.base_mean`` -- the un-modified mean the
+        owning :class:`Aggregate` stamps at construction, which equals
+        ``en`` unless ``zm`` / ``zt`` is in force (a standalone frequency
+        raises until one of them is set). The pmf inverts ``freq_pgf`` on a
+        power-of-two FFT grid sized by the frequency's own moments (mean +
+        10 sd); trailing rows where both columns are below 1e-15 are
+        trimmed. The Poisson comparison column is matched to the *realized*
+        mean, so a zero-modified row reads against the Poisson an observer
+        would fit to the same data. The empirical family (``dfreq`` /
+        ``renewal``) overrides with its exact materialized pmf and intrinsic
+        mean. Guard: mean <= 1000 (a toy, small-count diagnostic).
         """
-        if self.en is None:
+        base = self.base_mean if self.base_mean is not None else self.en
+        if base is None:
             raise ValueError(
                 f'freq_df: this standalone {self.freq_name!r} frequency has '
                 f'no expected claim count yet -- the owning Aggregate stamps '
                 f'.en at construction; set fr.en = n to use it standalone')
-        en = float(self.en)
-        if en > 1000:
+        base = float(base)
+        if base > 1000:
             raise ValueError(
-                f'freq_df: mean frequency {en:.6g} > 1000 -- the comparison '
+                f'freq_df: mean frequency {base:.6g} > 1000 -- the comparison '
                 f'table is a small-count diagnostic')
-        ex1, ex2, _ = self.freq_moms(en)
+        ex1, ex2, _ = self.freq_moms(base)
         sd = np.sqrt(max(ex2 - ex1 * ex1, 0.0))
         log2 = max(int(np.ceil(np.log2(ex1 + 10.0 * sd + 21.0))), 3)
         z = np.zeros(1 << log2)
         z[1] = 1.0
-        p = np.real(ift(self.freq_pgf(en, ft(z, 0)), 0))
+        p = np.real(ift(self.freq_pgf(base, ft(z, 0)), 0))
         # one-sided defuzz, as in Aggregate.freq_pmf: a count pmf has no
         # legitimate negatives
         p[p < np.finfo(float).eps] = 0.0

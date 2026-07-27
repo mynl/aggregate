@@ -1624,7 +1624,8 @@ def tilted_aggregate_density(agg, *, log2, bs, padding=0, tilt=None,
     # Classic tilted transform, kept local: z*tilt -> rfft -> freq_pgf -> irfft
     # -> /tilt. Padding is handled by the rfft length (N << padding).
     z = sfft.rfft(p * tv if tv is not None else p, N << padding)
-    ftagg = agg.frequency.freq_pgf(agg.n, z)
+    # base_mean, not n: under zm / zt these differ (n is the shifted mean)
+    ftagg = agg.frequency.freq_pgf(agg.base_mean, z)
     a = np.real(sfft.irfft(ftagg, N << padding))
     if padding:
         a = a[:N]

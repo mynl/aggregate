@@ -1,5 +1,85 @@
 # Changelog
 
+## 1.0.0a152
+
+**[ZT-ZM-Frequency-Fix]** — zero-truncated / zero-modified frequency
+reparameterized to the textbook form, and fixed. `zt` previously raised
+`ValueError: function value at x=0.0 is NaN` for **every** parameterization,
+and so did every `zm` that *reduced* the zero mass; only zero-inflation worked.
+
+### The rule
+
+**The exposure clause states the un-modified (base) mean; the modification
+moves it.** The `(a, b, 1)` construction holds the base distribution fixed and
+rescales its positive-count probabilities, so `E[N]` is an *output*:
+
+```
+p_k^M = (1 - p0M)/(1 - p0) p_k,  k >= 1        G^M(z) = (1 - c) + c G(z)
+```
+
+This is the parameterization of Klugman-Panjer-Willmot (2012) §6.6, Loss Data
+Analytics ch. 2, and R's `actuar` (`dzmpois(x, lambda, p0)` takes the base
+`lambda`), so textbook problems now transcribe directly. It is also always
+feasible — every `p0M` in `[0, 1)` is admissible — and closed form, where the
+old mean-matching solve had a non-rectangular feasible region (a ZT count can
+never average below 1) and could invert to absurd base means (a mean-4
+aggregate with 95% zeros needed a base Poisson of mean **80**).
+
+**BREAKING:** `4 claims ... poisson zm 0.5` now has `E[N] = 2.0373`, not 4.
+
+### `!` pins the mean
+
+Append `!` to the `zm` / `zt` clause to opt back in to the old behaviour:
+`aggregate` solves for the base mean whose realized `E[N]` equals the exposure
+clause. `!` is the existing DecL *unconditional* marker (`sev !`, `dsev !`,
+`dwait !`), and the realized count mean is the unconditional one.
+
+Use it when the exposure clause states **money**. `1000 loss`,
+`1000 premium at 0.65 lr` and `100 exposure at 0.05 rate` state a target a
+shifted mean would silently miss, so those forms now raise a
+**`ZeroModifiedExposureWarning`** naming the shortfall and the fix. The plain
+`n claims` form stays silent — count in, shifted count out is the default.
+
+### Added
+
+- **`Frequency.base_mean`** (attribute) — the un-modified mean, what
+  `freq_moms` / `freq_pgf` consume. Renames `unmodified_mean`.
+- **`Frequency.modify_mean(base_mean=None)`** — forward shift, closed form.
+- **`Frequency.solve_base_mean(target_mean)`** — the inverse; the only
+  surviving solve, reached only under `!`. Raises with the attainable bound
+  (`E[N] > 1 - p0M`) when a target is unreachable.
+- **`Frequency.apply_deductible(survival)`** — Loss Models §8.6: the payment
+  count `N^P` implied by a loss count under a deductible. Base parameter scales
+  by `v = S(d)`, zero mass becomes `P_{N^L}(1 - v)`; a zero-*truncated* loss
+  count yields a zero-*modified* payment count. Poisson / geometric / negbin /
+  binomial.
+- **`Aggregate.base_mean`** (property) — `n` for an unmodified frequency, the
+  base mean under `zm` / `zt`. Every PGF evaluation now routes through it.
+
+### Fixed
+
+- `Frequency.prob_eq_0` returned `_prob_eq_0(en)` for a zero-modified
+  frequency; under `zm` / `zt` the answer is `freq_p0` by construction.
+- `_bounded_severity_window` fed the realized mean back into `freq_moms`,
+  applying the modification twice and sizing a **4-bucket** grid for a
+  zero-modified Poisson(4) body. It now uses the base moments, whose reach is
+  what the aggregate support actually needs.
+- `MomentAggregator.get_fsa_stats(remix=True)` re-entered `freq_moms` with the
+  accumulated total, double-applying the shift; it now carries
+  `tot_freq_base`.
+- `create_frequency()` rebuilt the count program from the realized `n` while
+  preserving the `zm` clause — a third double-application.
+
+### Docs
+
+Three `.. todo:: Implement ZT and ZM!` blocks replaced with executed
+solutions: **Loss Data Analytics 5.5.4** (ZM Poisson/Burr under a deductible,
+cross-checked against the elementary thinning identities), **Loss Models
+Example 9.11** (ZM binomial, exact to machine precision), and the empty
+`DecL/050_frequency.rst` section. Loss Models 9.12 keeps its todo, now stating
+the real gap — a compound frequency with a zero-truncated *secondary*, which is
+unrelated to this change. Two `examples.agg` programs uncommented.
+
 ## 1.0.0a151
 
 **[FCC-Alias-Retirement]** — the breaking half of pass 2 of

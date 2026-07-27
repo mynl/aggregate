@@ -1270,7 +1270,8 @@ class Underwriter(HelpMixin):
                     "the unit as a plain agg.")
             agg_list = [k for i, j, k in spec['spec']]
             obj = Portfolio(name, agg_list, uw=self,
-                            label=spec.get('label'))
+                            label=spec.get('label'),
+                            note=spec.get('note', ''))
             obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:

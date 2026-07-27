@@ -6,7 +6,6 @@ import pandas as pd
 from pathlib import Path
 import re
 from scipy import interpolate
-from textwrap import fill
 import warnings
 
 from ._help import HelpMixin
@@ -36,7 +35,7 @@ from .pentagon import (PENTAGON_STATS, PENTAGON_DTYPE, complete_pentagon,
                        Pentagon)
 from .moments import (MomentAggregator, xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
-from .decl_writer import format_program
+from ._program import ProgramMixin
 from .utilities import (ft, ift,
                         round_bucket,
                         agg_help, explain_validation,
@@ -92,7 +91,7 @@ _PORT_STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
 )
 
 
-class Portfolio(HelpMixin, LabeledMixin):
+class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
     """
     Portfolio creates and manages a portfolio of Aggregate objects each modeling one
     unit of business. Applications include
@@ -103,7 +102,8 @@ class Portfolio(HelpMixin, LabeledMixin):
 
     """
 
-    def __init__(self, name, spec_list, uw=None, label=None, label_map=None):
+    def __init__(self, name, spec_list, uw=None, label=None, label_map=None,
+                 note=''):
         """
         Create a new :class:`Portfolio` object.
 
@@ -111,6 +111,10 @@ class Portfolio(HelpMixin, LabeledMixin):
         :param label: optional human display label (the DecL ``as``
            clause); presentation only, preferred over ``name`` in repr / exhibit
            titles via :attr:`label`. See dev/plan-decl-labels.md.
+        :param note: optional free text from the DecL ``note{...}`` trailer.
+           Stored so a ``port`` matches ``Aggregate`` / ``Severity`` /
+           ``BivariateAggregate``, all of which retain theirs; the writer
+           already rendered a portfolio note it could not read back.
         :param spec_list: A list of
 
            1. dictionary: Aggregate object dictionary specifications or
@@ -281,6 +285,8 @@ class Portfolio(HelpMixin, LabeledMixin):
         # LabeledMixin and cached in ``self._renamer`` (set by _init_labels).
         # if created by uw it stores the program here
         self.program = ''
+        #: Free text from the DecL ``note{...}`` trailer ('' when none).
+        self.note = note
         self.distortions = None
         self.distortion_df = None
         self.calibration_df = None
@@ -2402,24 +2408,10 @@ class Portfolio(HelpMixin, LabeledMixin):
             axis=1
         )
 
-    @property
-    def pprogram(self):
-        """Canonical DecL program text, rendered from the parsed spec.
-
-        Re-parses :attr:`program` and renders through
-        :func:`aggregate.decl_writer.format_program` (the inverse of the
-        parser). Rendered in the default ``spread`` layout: a ``port`` head line,
-        each unit two-space-indented, and each unit's clauses one level deeper.
-        Canonical rather than verbatim. Call ``format_program(self.program,
-        layout='terse')`` for the historical single-line-per-unit form. A
-        portfolio built programmatically (empty ``program``) returns ``''``.
-        """
-        return format_program(self.program, fmt='text')
-
-    @property
-    def pprogram_html(self):
-        """Syntax-highlighted DecL program for IPython / Jupyter display."""
-        return format_program(self.program, fmt='html')
+    # ``program`` / ``format_program`` / ``pprogram`` / ``pprogram_html`` come
+    # from ``ProgramMixin`` (the shared DecL round-trip surface). A portfolio's
+    # units render nested one level deeper; ``format_program(trailer=False)``
+    # drops their notes too. See dev/done/plan-program-mixin.md.
 
     def _limits(self, stat='range', kind='linear', zero_mass='include'):
         """
@@ -3523,13 +3515,6 @@ class Portfolio(HelpMixin, LabeledMixin):
             if a.name == handle:
                 return a.label
         return handle
-
-    def nice_program(self, wrap_col=90):
-        """
-        return wrapped version of port program
-        :return:
-        """
-        return fill(self.program, wrap_col, subsequent_indent='\t\t', replace_whitespace=False)
 
 
     def bodoff(self, *, p=0.99, a=0):

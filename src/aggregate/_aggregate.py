@@ -39,7 +39,8 @@ from .utilities import (ft, ift,
                         agg_help, remove_fuzz, value_type_role)
 from ._grid_distribution import GridDistribution, return_period_map, period_to_p
 from ._labeled import LabeledMixin
-from .decl_writer import format_program, spec_to_decl
+from .decl_writer import spec_to_decl
+from ._program import ProgramMixin
 import aggregate.random_agg as ar
 from .spectral import choquet_weights
 from . import tail as _tail
@@ -466,7 +467,7 @@ def _ruin_find_u(ruin, kind):
     return find_u
 
 
-class Aggregate(HelpMixin, LabeledMixin):
+class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
     """Compound (aggregate) probability distribution.
 
     Implements the FFT-based algorithm of Mildenhall (2024): discretize
@@ -4162,25 +4163,9 @@ class Aggregate(HelpMixin, LabeledMixin):
     # Display reports, diagnostics, queries, risk measures, pricing
     # ================================================================
 
-    @property
-    def pprogram(self):
-        """Canonical DecL program text, rendered from the parsed spec.
-
-        Derived by re-parsing :attr:`program` and rendering through
-        :func:`aggregate.decl_writer.format_program` (the inverse of the
-        parser). It is canonical, not verbatim --- equivalent programs share one
-        form. Rendered in the default ``spread`` layout (each clause on its own
-        two-space-indented line); call ``format_program(self.program,
-        layout='terse')`` for the single-line form. For the raw input as supplied
-        to ``build`` use :attr:`program`. An object built programmatically (empty
-        ``program``) returns ``''``.
-        """
-        return format_program(self.program, fmt='text')
-
-    @property
-    def pprogram_html(self):
-        """Syntax-highlighted DecL program for IPython / Jupyter display."""
-        return format_program(self.program, fmt='html')
+    # ``program`` / ``format_program`` / ``pprogram`` / ``pprogram_html`` come
+    # from ``ProgramMixin`` (the shared DecL round-trip surface). See
+    # dev/done/plan-program-mixin.md ([Program-Mixin]).
 
     @staticmethod
     def _count_program(spec, n, name):

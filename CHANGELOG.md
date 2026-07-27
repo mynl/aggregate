@@ -1,5 +1,93 @@
 # Changelog
 
+## 1.0.0a154
+
+**[Program-Mixin]** — the DecL round-trip surface (`program` / `pprogram` /
+`pprogram_html`) collapses into the codebase's **third mixin**, and gains the
+render axis that motivated the work: `format_program(trailer=False)` renders a
+declaration **without its `note{...}` / `hints{...}` trailer**. Plan:
+`dev/done/plan-program-mixin.md`.
+
+### `trailer=` — the bare declaration
+
+```python
+>>> a = build('agg X 10 claims sev lognorm 50 cv 1 poisson note{a stored note}')
+>>> print(a.format_program(layout='terse', trailer=False))
+agg X 10 claims sev lognorm 50 cv 1 poisson
+```
+
+One flag, not two: `note{...}` and `hints{...}` are one grammar construct
+(`decl.lark`) emitted by one function, so one switch governs both. It applies
+through the whole tree — a portfolio's units and a bivariate's components lose
+their trailers too, not just the head line. This is the form to print in a
+paper, a docstring or an exhibit, where a stored note or a build hint is noise.
+
+`trailer` is the one render axis that is **not** round-trip safe: `fmt` and
+`layout` re-parse to the identical spec, `trailer=False` re-parses to the same
+spec with `note` and `hints` blanked. Nothing else moves — in particular the
+semantic `!` markers (unconditional severity, the zero-modified mean pin,
+defective `dwait`) are clause syntax rather than trailer and always survive.
+`spec_to_decl` is untouched, so `to_agg` and the round-trip snapshot contract
+are unaffected.
+
+### `ProgramMixin` (`src/aggregate/_program.py`)
+
+`pprogram` / `pprogram_html` were **ten near-identical properties across five
+classes and five files**, each a three-line delegation to
+`decl_writer.format_program`; `pprogram_html` was byte-identical on
+`Aggregate` / `Portfolio` and again on `PnL` / `BivariateAggregate`. They now
+live once. Same idiom as `LabeledMixin` and `HelpMixin` — no `__init__`, so it
+stays transparent to each host's `super()` chain, which matters because the
+hosts range from `object` to `scipy.stats.rv_continuous`.
+
+The duplication had stopped being tidiness and started blocking capability:
+every host hard-coded the render options in its own property body, so a new
+axis cost an edit per class. That is why `trailer` ships with the mixin and not
+before it.
+
+Hosts: `Aggregate`, `Portfolio`, `PnL`, `Severity`, `BivariateAggregate`, and
+— the hole this closed — **`Distortion`**, which is DecL-creatable (the writer
+has always had a `'distortion'` kind renderer, and `build` has always stamped
+`obj.program`) but declared neither the attribute nor `pprogram`. Exactly the
+gap `HelpMixin` closed for `Frequency` / `GridDistribution` at `a150`.
+
+The mixin is deliberately **narrower** than `HelpMixin`: `help` is on all
+eleven matrix columns, a DecL declaration on six. `Frequency`,
+`GridDistribution` and the three `Bounds` classes are not hosts and must never
+gain `pprogram`; `tests/test_fcc_surface.py` asserts that in both directions.
+
+An object-bound `format_program(fmt=, layout=, trailer=)` is the parametrized
+worker — the twin of the free function, binding `self.program`, mirroring
+`HelpMixin.help` over `utilities.agg_help`. `pprogram` and `pprogram_html` are
+that method at fixed defaults and are unchanged.
+
+**Considered and rejected: an `InfoMixin`.** Ten `info` properties with the
+same five-sentence docstring look like the bigger prize, but per class the
+genuinely shared code is two lines — the `info_row` comprehension and the
+`'\n'.join`. Everything else is payload, and even the footers diverge. It would
+relocate ≈20 lines and force ten hosts through a hook to do it. What `info`
+shares is its *contract*, and that already has two homes: `dev/info-strings.rst`
+and `tests/test_fcc_surface.py`.
+
+### Also
+
+- **`Portfolio.nice_program` retired.** A `textwrap.fill` over the *raw*
+  program — method not property, non-NumPy docstring, zero call sites in
+  `src/`, `tests/` or `docs/`. The last surviving non-`decl_writer` program
+  printer. Use `format_program(layout='terse')` for a compact form.
+- **`Portfolio.note`.** The parser produced `note` for a `port` spec and the
+  writer rendered it, but `Portfolio` never stored one — so a portfolio note
+  could be written and never read back. `Aggregate`, `Severity` and
+  `BivariateAggregate` all retained theirs. `Portfolio.__init__` takes `note=`
+  and `build` passes it.
+- **`dev/FEATURES.csv`**: `pprogram` / `pprogram_html` / `program` gain their
+  `Distortion` column; new `format_program` row; `nice_program` row deleted;
+  `note` and `hints` promoted from undocumented attributes to documented rows
+  (undocumented attributes 90 → 88, undocumented capabilities still **zero**).
+
+**No behaviour change at defaults** — verified byte-for-byte over all 1204
+renders of every statement in every shipped `.agg` file, in both layouts.
+
 ## 1.0.0a153
 
 **[Ruin-Wiener-Hopf]** — eventual-ruin probabilities for renewal (Sparre-

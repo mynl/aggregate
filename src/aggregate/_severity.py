@@ -17,6 +17,7 @@ from ._help import HelpMixin
 from .constants import (FIG_H, FIG_W, INFO_NA, info_row)
 from ._grid_distribution import GridDistribution
 from ._labeled import LabeledMixin
+from ._program import ProgramMixin
 from . import tail as _tail
 from .tail import TailClass
 
@@ -816,7 +817,7 @@ def _numerical_moms(severity):
     return ex1a, ex2a, ex3a
 
 
-class Severity(HelpMixin, LabeledMixin, ss.rv_continuous):
+class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
     # Registry of concrete kind subclasses, populated by ``__init_subclass__``.
     # Keys are the string returned by ``_classify_sev``.
     _registry: dict = {}
@@ -1196,34 +1197,10 @@ class Severity(HelpMixin, LabeledMixin, ss.rv_continuous):
         extra = self._support_phrase()
         return base if extra in ('', 'unlimited') else f'{base}; {extra}'
 
-    @property
-    def pprogram(self):
-        """Canonical DecL program text, rendered from the parsed spec.
-
-        The Severity twin of
-        :attr:`~aggregate.distributions.Aggregate.pprogram`: re-parse
-        :attr:`program` and render it back through
-        :func:`aggregate.decl_writer.format_program`, so the result is
-        *canonical* rather than verbatim -- equivalent declarations share one
-        form. A severity built programmatically, or an inline ``sev`` clause
-        inside an ``agg`` (whose ``program`` is empty because the enclosing
-        Aggregate owns the text), returns ``''``.
-
-        Notes
-        -----
-        Added in 1.0.0a150. ``a149`` put ``pprogram`` on every other
-        DecL-creatable class; ``Severity`` was missed even though
-        ``build('sev X lognorm 100 cv 2')`` is a first-class declaration that
-        stamps :attr:`program`.
-        """
-        from .decl_writer import format_program     # deferred: parser imports us
-        return format_program(self.program, fmt='text') if self.program else ''
-
-    @property
-    def pprogram_html(self):
-        """Syntax-highlighted DecL program for IPython / Jupyter display."""
-        from .decl_writer import format_program     # deferred: parser imports us
-        return format_program(self.program, fmt='html') if self.program else ''
+    # ``program`` / ``format_program`` / ``pprogram`` / ``pprogram_html`` come
+    # from ``ProgramMixin``. The mixin's ``if not self.program: return ''``
+    # guard is what a Severity always needed: an inline ``sev`` clause has no
+    # program of its own (the enclosing Aggregate owns the text).
 
     @property
     def tail_explanation(self) -> str:

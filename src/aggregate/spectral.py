@@ -42,6 +42,7 @@ from .config import get_settings
 from .constants import (DefectiveDistributionError,
                         FIG_H, FIG_W, INFO_NA, info_row)
 from ._labeled import LabeledMixin
+from ._program import ProgramMixin
 from .random_agg import RANDOM
 
 # Resolved once per session from config. VALIDATION_NOISE is the absolute dust
@@ -517,7 +518,7 @@ def bitvar_ra(probs, x, p0, p1, w):
 # Base Distortion class: registry, factory dispatch, and shared methods.
 # ---------------------------------------------------------------------------
 
-class Distortion(HelpMixin, LabeledMixin):
+class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     """
     Base class for distortion functions.
 

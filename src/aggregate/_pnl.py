@@ -105,6 +105,7 @@ from ._help import HelpMixin
 from .constants import INFO_NA, info_row
 from .moments import VALIDATION_NOISE, _snap_noise
 from ._labeled import LabeledMixin
+from ._program import ProgramMixin
 
 __all__ = ['Leg', 'Group', 'PnL', 'stack_marginal_pnls']
 
@@ -683,7 +684,7 @@ _SCALE_INVARIANT_STATS = frozenset({'CV', 'Skew'})
 # ----------------------------------------------------------------------
 # The P&L value object
 # ----------------------------------------------------------------------
-class PnL(HelpMixin, LabeledMixin):
+class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     """A P&L position: a source plus an ordered ledger of signed groups.
 
     A lightweight value object -- signed per-atom rows + their exact moments +
@@ -1846,24 +1847,9 @@ class PnL(HelpMixin, LabeledMixin):
     def program(self, value):
         self._program = value or ''
 
-    @property
-    def pprogram(self) -> str:
-        """Canonical DecL program text, rendered from the parsed spec.
-
-        The P&L twin of :attr:`~aggregate.distributions.Aggregate.pprogram`:
-        re-parses :attr:`program` (the declaration carried on :attr:`engine`)
-        and renders it through
-        :func:`aggregate.decl_writer.format_program`. ``''`` for a hand-built
-        kernel P&L.
-        """
-        from .decl_writer import format_program
-        return format_program(self.program, fmt='text')
-
-    @property
-    def pprogram_html(self) -> str:
-        """Syntax-highlighted DecL program for IPython / Jupyter display."""
-        from .decl_writer import format_program
-        return format_program(self.program, fmt='html')
+    # ``format_program`` / ``pprogram`` / ``pprogram_html`` come from
+    # ``ProgramMixin``; the ``program`` property above overrides the mixin's
+    # class-level default so a snapshotted P&L falls through to its engine.
 
     # ``label`` comes from ``LabeledMixin`` (the shared label surface);
     # ``name`` stays the identity handle. See dev/done/plan-labels.md.

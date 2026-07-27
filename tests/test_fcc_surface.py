@@ -123,6 +123,121 @@ def test_inline_severity_has_no_program_of_its_own(agg):
     assert agg.sevs[0].pprogram == ''
 
 
+def test_distortion_round_trips_a_declaration():
+    """a154: ``Distortion`` is DecL-creatable, so it renders a program too.
+
+    The writer always had a ``'distortion'`` kind renderer and ``build`` always
+    stamped ``program``, but the class carried neither the attribute nor
+    ``pprogram`` until ``ProgramMixin``.
+    """
+    d = build('distortion FCC.Dist ph 0.5')
+    assert d.program == 'distortion FCC.Dist ph 0.5'
+    assert d.pprogram == 'distortion FCC.Dist ph 0.5'
+    assert '<' in d.pprogram_html
+
+
+def test_distortion_built_directly_has_no_program():
+    """Never stamped -> the mixin's empty class-level default, not AttributeError."""
+    from aggregate.spectral import Distortion
+    assert Distortion('ph', 0.5).program == ''
+    assert Distortion('ph', 0.5).pprogram == ''
+
+
+def test_program_mixin_hosts_and_non_hosts():
+    """The mixin cannot be dropped silently, and cannot spread to a non-host.
+
+    ``ProgramMixin`` is deliberately narrower than ``HelpMixin``: only the
+    DecL-creatable classes have a declaration to round-trip. ``Frequency`` /
+    ``GridDistribution`` have ``help`` but must never gain ``pprogram``.
+    """
+    from aggregate._program import ProgramMixin
+    from aggregate._aggregate import Aggregate
+    from aggregate._portfolio import Portfolio
+    from aggregate._severity import Severity
+    from aggregate._pnl import PnL
+    from aggregate.bivariate import BivariateAggregate
+    from aggregate.spectral import Distortion
+    from aggregate._frequency import Frequency
+    from aggregate._grid_distribution import GridDistribution
+
+    for cls in (Aggregate, Portfolio, Severity, PnL, BivariateAggregate,
+                Distortion):
+        assert issubclass(cls, ProgramMixin), f'{cls.__name__} lost ProgramMixin'
+        for member in ('program', 'format_program', 'pprogram', 'pprogram_html'):
+            assert member in dir(cls), f'{cls.__name__} lost {member}'
+    for cls in (Frequency, GridDistribution, Bounds):
+        assert not issubclass(cls, ProgramMixin), \
+            f'{cls.__name__} is not DecL-creatable and must not carry pprogram'
+
+
+def test_portfolio_nice_program_is_retired(port):
+    """a154: one canonical name -- the raw textwrap printer is gone."""
+    assert not hasattr(port, 'nice_program')
+
+
+# ---------------------------------------------------------------------------
+# format_program -- the object-bound worker and the trailer axis
+# ---------------------------------------------------------------------------
+
+def test_pprogram_is_format_program_at_defaults(agg, port, pnl, biv):
+    """The properties are the method at fixed defaults, on every host."""
+    for obj in (agg, port, pnl, biv):
+        assert obj.pprogram == obj.format_program(fmt='text')
+        assert obj.pprogram_html == obj.format_program(fmt='html')
+
+
+def test_format_program_trailer_drops_note_and_hints():
+    a = build('agg FCC.Note 10 claims sev lognorm 50 cv 1 poisson '
+              'note{a stored note} hints{log2=16}', update=False)
+    assert 'note{a stored note}' in a.pprogram
+    assert 'hints{log2=16}' in a.pprogram
+    bare = a.format_program(trailer=False)
+    assert 'note{' not in bare and 'hints{' not in bare
+    # the declaration itself is untouched
+    assert 'sev lognorm 50 cv 1' in bare and 'poisson' in bare
+
+
+def test_format_program_trailer_reaches_portfolio_units():
+    """``trailer=False`` applies through the tree, not just the head line."""
+    p = build('port FCC.NoteP '
+              'agg N1 5 claims sev lognorm 10 cv 1 poisson note{unit one} '
+              'agg N2 3 claims sev gamma 5 cv .5 poisson note{unit two}',
+              update=False)
+    assert 'note{unit one}' in p.pprogram
+    assert 'note{' not in p.format_program(trailer=False)
+
+
+def test_trailer_false_reparses_to_the_same_spec_less_note_and_hints():
+    """The one axis that is not round-trip safe -- and exactly how it differs."""
+    from aggregate.underwriter import build as uw
+    text = ('agg FCC.RT 10 claims sev lognorm 50 cv 1 poisson '
+            'note{hello} hints{log2=16}')
+    _, _, source = uw.parser.parse(text)
+    a = build(text, update=False)
+    _, _, kept = uw.parser.parse(a.format_program(layout='terse'))
+    _, _, dropped = uw.parser.parse(a.format_program(layout='terse', trailer=False))
+    assert kept == source                                   # default is exact
+    assert dropped == {**source, 'note': '', 'hints': ''}    # only the trailer goes
+
+
+def test_semantic_bang_markers_survive_trailer_false():
+    """``!`` is clause syntax, not trailer -- suppressing notes must not eat it."""
+    a = build('agg FCC.Pin 10 claims sev lognorm 50 cv 1 poisson zm 0.5 ! '
+              'note{drop me}', update=False)
+    bare = ' '.join(a.format_program(trailer=False).split())
+    assert 'zm 0.5 !' in bare
+    assert 'note{' not in bare
+
+
+def test_format_program_returns_empty_without_a_program():
+    """No declaration -> '' on every axis, never a raise."""
+    a = build('agg FCC.NoProg 5 claims sev lognorm 50 cv 1 poisson', update=False)
+    a.program = ''
+    assert a.format_program() == ''
+    assert a.format_program(trailer=False, layout='terse') == ''
+    assert a.pprogram == '' and a.pprogram_html == ''
+
+
 def test_pnl_program_falls_back_to_the_engine(pnl):
     """The declaration is stamped on the P&L; the engine carries the same one."""
     assert pnl.program.startswith('pnl ')

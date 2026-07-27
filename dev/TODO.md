@@ -58,6 +58,28 @@
   the three bivariate classes all define one). The residue of
   `dev/done/plan-pnl-first-class-SUPERSEDED.md`; land it with
   `[Reporting-Guidelines]` so the card it renders is the settled one.
+- **[Display-Surface-Incidentals]** — four unrelated small defects found while
+  surveying the duplicated presentation surface for `[Program-Mixin]`
+  (`1.0.0a154`). None is urgent; none has a visible symptom today. Grouped so
+  they are not re-discovered:
+  1. `tweedie.py:850` defines **`__repr_html__`** — the wrong dunder (IPython
+     looks for `_repr_html_`), so the method is unreachable. No symptom only
+     because `_repr_mimebundle_` (`:866`) serves the same HTML — i.e. it is
+     silently dead code, not a broken display.
+  2. `Copula` (`copula.py:64`) is the only class carrying `LabeledMixin` but
+     **not `HelpMixin`** — the one asymmetric mixin host.
+  3. `Underwriter.__repr__` (`underwriter.py:906-929`) **hand-rolls the `info`
+     layout** — 13 label/value rows padded to a hardcoded 19 columns instead of
+     `info_row` / `INFO_LABEL_WIDTH = 25`. Invisible to both the matrix and
+     `test_fcc_surface.py` because `Underwriter` is not a FEATURES column and
+     has no `info`.
+  4. `regen_features.py:200` skips every `_`-prefixed name, so the matrix is
+     **structurally blind to `__repr__` / `_repr_html_` / `_text_info_blob`** —
+     exactly the most-duplicated part of the presentation surface. Widening
+     that filter is the prerequisite for auditing display consistency at all.
+  *(A fifth suspect was checked and cleared: `Distortion.program` **does**
+  survive pickling — the class has no `__reduce__`, so default `__dict__`
+  pickling carries it.)*
 - **[Plotting-Punchups]** — plotting polish; lead item: a `pnl` aggregate plots
   the aggregate **only** (no loss-convention severity overlaid on a payoff —
   a wrong-sign distraction for the UW/finance audience). Gate on

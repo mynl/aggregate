@@ -57,6 +57,7 @@ import scipy.fft as sfft
 import scipy.sparse as ssp
 
 from ._help import HelpMixin
+from ._program import ProgramMixin
 from .constants import DefectiveDistributionWarning, info_row, INFO_NA
 from .config import get_settings
 from .moments import (MomentAggregator, xsden_to_mwrangler, xsden_to_meancvskew,
@@ -1015,7 +1016,7 @@ def _dense_1d(v):
     return np.asarray(v, dtype=float).ravel()
 
 
-class BivariateAggregate(HelpMixin):
+class BivariateAggregate(HelpMixin, ProgramMixin):
     """Joint (bivariate) aggregate of two copula-coupled component aggregates.
 
     Declared in DecL with the ``bivariate`` keyword::
@@ -2388,25 +2389,8 @@ class BivariateAggregate(HelpMixin):
             bad.append('tail deficit')
         return 'not unreasonable' if not bad else 'check: ' + ', '.join(bad)
 
-    @property
-    def pprogram(self) -> str:
-        """Canonical DecL program text, rendered from the parsed spec.
-
-        The bivariate twin of
-        :attr:`~aggregate.distributions.Aggregate.pprogram`: re-parses
-        :attr:`program` and renders it through
-        :func:`aggregate.decl_writer.format_program`, so equivalent programs
-        share one canonical form (sub-aggregates nested a level deeper). An
-        object built programmatically (empty ``program``) returns ``''``.
-        """
-        from .decl_writer import format_program
-        return format_program(self.program, fmt='text')
-
-    @property
-    def pprogram_html(self) -> str:
-        """Syntax-highlighted DecL program for IPython / Jupyter display."""
-        from .decl_writer import format_program
-        return format_program(self.program, fmt='html')
+    # ``program`` / ``format_program`` / ``pprogram`` / ``pprogram_html`` come
+    # from ``ProgramMixin``; the two components render nested a level deeper.
 
     @property
     def bs_window_df(self):

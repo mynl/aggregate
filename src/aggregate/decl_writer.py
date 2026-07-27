@@ -586,8 +586,16 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
 # Trailer + approximate
 # ======================================================================
 
-def _render_trailer(spec: dict) -> str:
-    """Render the ``note{...}`` / ``hints{...}`` trailer, preserved verbatim."""
+def _render_trailer(spec: dict, trailer: bool = True) -> str:
+    """Render the ``note{...}`` / ``hints{...}`` trailer, preserved verbatim.
+
+    ``trailer=False`` suppresses both. They are one grammar construct (see the
+    ``decl.lark`` trailer rule) and one code path, so one flag governs them.
+    The result no longer re-parses to the same spec --- that is the caller's
+    choice, made explicitly at the call site.
+    """
+    if not trailer:
+        return ''
     parts = []
     if spec.get('note'):
         parts.append(f'note{{{spec["note"]}}}')
@@ -745,7 +753,7 @@ def _render_spread(node, depth: int = 0, indent: str = '  ') -> str:
 # Top-level kind renderers
 # ======================================================================
 
-def _render_agg(name: str, spec: dict) -> _Block:
+def _render_agg(name: str, spec: dict, trailer: bool = True) -> _Block:
     """Render an ordinary loss aggregate (``agg NAME ...``).
 
     Clause order mirrors ``agg_out_full`` / ``agg_out_dfreq``: exposure (or
@@ -753,6 +761,8 @@ def _render_agg(name: str, spec: dict) -> _Block:
     ``dfreq``), aggregate reinsurance, ``approximate``, trailer. Returns a
     :class:`_Block` (head ``agg NAME``, the clauses its children) so it renders
     terse on one line or spread with each clause on its own indented line.
+
+    ``trailer=False`` drops the ``note{...}`` / ``hints{...}`` tail.
     """
     return _Block(f'agg {name}{_render_label(spec.get("label"))}', [
         _render_exposure(spec),
@@ -763,11 +773,12 @@ def _render_agg(name: str, spec: dict) -> _Block:
         _render_reins(spec, 'aggregate', 'agg_reins', 'agg_kind'),
         _render_approx(spec),
         _render_orientation(spec),
-        _render_trailer(spec),
+        _render_trailer(spec, trailer),
     ])
 
 
-def _render_pnl(name: str, spec: dict, kind: str = 'pnl') -> _Block:
+def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
+                trailer: bool = True) -> _Block:
     """Render a profit-and-loss aggregate (``pnl NAME <premium> premium less ...``).
 
     Inverts ``pnl_out_*`` / ``_attach_pnl``. The premium is ``consideration``;
@@ -832,29 +843,30 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl') -> _Block:
     return _Block(f'{keyword} {name}{obj_label} {premium_head} less', [
         engine,
         f'less {expense}' if expense else '',
-        _render_trailer(spec),
+        _render_trailer(spec, trailer),
     ])
 
 
-def _render_agg_or_pnl(kind: str, name: str, spec: dict) -> _Block:
+def _render_agg_or_pnl(kind: str, name: str, spec: dict,
+                       trailer: bool = True) -> _Block:
     """Render an aggregate, dispatching to ``pnl`` when a consideration is set.
 
     A ``pnl`` declaration transforms to ``("pnl", name, spec)`` with a
     ``consideration`` key (set by ``_attach_pnl``); an ``agg`` has neither.
     """
     if kind in ('pnl', 'xpnl') or 'consideration' in spec:
-        return _render_pnl(name, spec, kind=kind)
-    return _render_agg(name, spec)
+        return _render_pnl(name, spec, kind=kind, trailer=trailer)
+    return _render_agg(name, spec, trailer)
 
 
-def _render_sev_out(name: str, spec: dict) -> str:
+def _render_sev_out(name: str, spec: dict, trailer: bool = True) -> str:
     """Render a standalone severity definition (``sev NAME ...``)."""
     body = _render_dsev(spec) if _is_dsev(spec) else _render_dist(spec)
     return _join([f'sev {name}{_render_label(spec.get("label"))}',
-                  body, _render_trailer(spec)])
+                  body, _render_trailer(spec, trailer)])
 
 
-def _render_port(name: str, spec: dict) -> _Block:
+def _render_port(name: str, spec: dict, trailer: bool = True) -> _Block:
     """Render a portfolio: ``port NAME [trailer]`` then one indented unit per line.
 
     Sub-units are ``agg`` / ``pnl`` tuples; each becomes a child :class:`_Block`.
@@ -865,8 +877,8 @@ def _render_port(name: str, spec: dict) -> _Block:
     indented continuation back into one logical statement on re-parse.
     """
     head = _join([f'port {name}{_render_label(spec.get("label"))}',
-                  _render_trailer(spec)])
-    units = [_render_agg_or_pnl(kind, sub_name, sub_spec)
+                  _render_trailer(spec, trailer)])
+    units = [_render_agg_or_pnl(kind, sub_name, sub_spec, trailer)
              for kind, sub_name, sub_spec in spec['spec']]
     return _Block(head, units, tab=True)
 
@@ -898,7 +910,7 @@ def _render_dbvsev(spec: dict) -> str:
     return f'dbvsev {_fmt_seq(xs)} {_fmt_seq(ys)} [{rows}]'
 
 
-def _render_bvagg(name: str, spec: dict) -> _Block:
+def _render_bvagg(name: str, spec: dict, trailer: bool = True) -> _Block:
     """Render a bivariate (copula-coupled) aggregate or a ``netceded`` agg.
 
     Inverts ``bv_out_copula`` / ``bv_out_copula_nofreq`` / ``bv_out_copula_dfreq``,
@@ -914,7 +926,7 @@ def _render_bvagg(name: str, spec: dict) -> _Block:
             _render_exposure(spec),
             _render_dbvsev(spec),
             _render_freq(spec),
-            _render_trailer(spec),
+            _render_trailer(spec, trailer),
         ])
     if 'clash' in spec:
         # Re-derive the clash surface from the stored (na, nb, nc); each
@@ -927,7 +939,7 @@ def _render_bvagg(name: str, spec: dict) -> _Block:
             _join([_render_layers(sa), _render_sev_clause(sa)]),
             _join([_render_layers(sb), _render_sev_clause(sb)]),
             _render_freq(spec),
-            _render_trailer(spec),
+            _render_trailer(spec, trailer),
         ])
 
     if spec.get('mode') == 'netceded':
@@ -937,27 +949,30 @@ def _render_bvagg(name: str, spec: dict) -> _Block:
         views = tuple(spec.get('nc_views') or ('net', 'ceded'))
         kw = _kw_for.get(views, 'netceded')
         kind, sub_name, sub_spec = spec['units'][0]
-        unit = _render_agg_or_pnl(kind, sub_name, sub_spec)
+        unit = _render_agg_or_pnl(kind, sub_name, sub_spec, trailer)
         # prepend the view keyword to the unit's head line
         return _Block(f'{kw} {unit.head}', unit.children, unit.sep, unit.tab)
 
-    components = [_render_agg_or_pnl(k, n, s) for k, n, s in spec['units']]
+    components = [_render_agg_or_pnl(k, n, s, trailer) for k, n, s in spec['units']]
     return _Block(f'bivariate {name}', [
         _render_exposure(spec),
         *components,
         _render_copula(spec['copula']),
         _render_freq(spec),
-        _render_trailer(spec),
+        _render_trailer(spec, trailer),
     ])
 
 
-def _render_distortion(name: str, spec: dict) -> str:
+def _render_distortion(name: str, spec: dict, trailer: bool = True) -> str:
     """Render a distortion definition (``distortion NAME kind n1 n2 ...``).
 
     Inverts ``Distortion.decl_spec``: the flat number list is recovered from the
     kind's ``decl_params`` ordering. The ``minimum`` / ``mixture`` combinators
     take distortion *references* whose names are not retained on the constructed
     children, so they cannot round-trip and raise here.
+
+    ``trailer`` is accepted for uniform dispatch and ignored: a distortion
+    statement has no ``note{...}`` / ``hints{...}`` tail.
     """
     from .spectral import Distortion
 
@@ -976,9 +991,9 @@ def _render_distortion(name: str, spec: dict) -> str:
 
 
 _KIND_RENDERERS = {
-    'agg': lambda name, spec: _render_agg_or_pnl('agg', name, spec),
-    'pnl': lambda name, spec: _render_agg_or_pnl('pnl', name, spec),
-    'xpnl': lambda name, spec: _render_agg_or_pnl('xpnl', name, spec),
+    'agg': lambda name, spec, trailer: _render_agg_or_pnl('agg', name, spec, trailer),
+    'pnl': lambda name, spec, trailer: _render_agg_or_pnl('pnl', name, spec, trailer),
+    'xpnl': lambda name, spec, trailer: _render_agg_or_pnl('xpnl', name, spec, trailer),
     'sev': _render_sev_out,
     'port': _render_port,
     'bvagg': _render_bvagg,
@@ -986,7 +1001,8 @@ _KIND_RENDERERS = {
 }
 
 
-def _spec_to_node(spec: dict, kind: str = 'agg', name: str | None = None):
+def _spec_to_node(spec: dict, kind: str = 'agg', name: str | None = None,
+                  trailer: bool = True):
     """Dispatch a spec to its kind renderer, returning a ``_Block`` or ``str``.
 
     The shared front half of :func:`spec_to_decl` (terse) and
@@ -995,6 +1011,9 @@ def _spec_to_node(spec: dict, kind: str = 'agg', name: str | None = None):
     Renderers with sub-clause nesting (``agg`` / ``pnl`` / ``port`` / ``bvagg``)
     return a :class:`_Block`; the flat ones (``sev`` / ``distortion``) return a
     ``str``, which both walkers pass through unchanged.
+
+    ``trailer=False`` drops every ``note{...}`` / ``hints{...}`` in the tree,
+    including those on a portfolio's units and a bivariate's components.
 
     Raises
     ------
@@ -1009,7 +1028,7 @@ def _spec_to_node(spec: dict, kind: str = 'agg', name: str | None = None):
         raise ValueError(
             f"spec_to_decl: unknown kind {kind!r}; expected one of "
             f"{sorted(_KIND_RENDERERS)}.") from None
-    return renderer(name, spec)
+    return renderer(name, spec, trailer)
 
 
 def spec_to_decl(spec: dict, kind: str = 'agg', name: str | None = None) -> str:
@@ -1087,7 +1106,7 @@ def _colorize(text: str, fmt: str) -> str:
     return highlight(text, AggLexer(), formatter).rstrip('\n')
 
 
-def _render_statement(underwriter, statement: str):
+def _render_statement(underwriter, statement: str, trailer: bool = True):
     """Parse one statement and return its render node, or the text verbatim.
 
     Returns a :class:`_Block` / ``str`` node (which the caller renders in the
@@ -1095,10 +1114,13 @@ def _render_statement(underwriter, statement: str):
     (hence ``pprogram``) from raising when a program references a builtin that
     the default underwriter cannot resolve --- e.g. a ``sev.X`` defined only in a
     custom knowledge base. A plain ``str`` renders identically in both layouts.
+
+    Note the fallback is *verbatim*, so it also escapes ``trailer=False``: a
+    statement that cannot be parsed keeps whatever trailer its source text had.
     """
     try:
         kind, name, spec = underwriter.parser.parse(statement)
-        return _spec_to_node(spec, kind, name)
+        return _spec_to_node(spec, kind, name, trailer)
     except Exception:
         # Display fallback: a parse error (malformed text) or an unresolved
         # builtin reference (defined only in a custom underwriter, or a lark
@@ -1107,7 +1129,7 @@ def _render_statement(underwriter, statement: str):
 
 
 def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
-                   width=None) -> str:
+                   trailer: bool = True, width=None) -> str:
     """Render a DecL program in canonical form, optionally colorized.
 
     The public entry point backing ``pprogram`` / ``pprogram_html`` and the
@@ -1134,6 +1156,17 @@ def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
         ``to_agg`` produce. Both layouts re-parse to the same spec --- the
         preprocessor collapses intra-statement newlines and indentation to a
         single space.
+    trailer : bool, default True
+        Emit the ``note{...}`` / ``hints{...}`` trailer. They are one grammar
+        construct, so one flag governs both. ``False`` gives the bare
+        declaration --- the form to print in a paper, a docstring or an exhibit,
+        where a stored note or a build hint is noise.
+
+        Unlike ``fmt`` and ``layout``, this axis is **not** round-trip safe:
+        ``trailer=False`` output re-parses to the same spec *minus* ``note``
+        and ``hints``. The semantic ``!`` markers (unconditional severity, the
+        zero-modified mean pin, defective ``dwait``) are clause syntax, not
+        trailer, and are never affected.
     width : int, optional
         Reserved for future per-line wrapping of long clauses; currently ignored
         (``layout`` is structural --- one clause per line, not width-driven).
@@ -1160,13 +1193,13 @@ def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
         # default underwriter carries the configured knowledge base so most
         # builtin references in the text resolve.
         from .underwriter import build as _build
-        nodes = [_render_statement(_build, line)
+        nodes = [_render_statement(_build, line, trailer)
                  for line in _split_statements(text)]
     elif isinstance(spec_or_text, tuple):
         kind, name, spec = spec_or_text
-        nodes = [_spec_to_node(spec, kind, name)]
+        nodes = [_spec_to_node(spec, kind, name, trailer)]
     else:
-        nodes = [_spec_to_node(spec_or_text)]
+        nodes = [_spec_to_node(spec_or_text, trailer=trailer)]
 
     # Join top-level statements with a blank line: a lone '\n' is not a statement
     # separator (the preprocessor folds it into the preceding statement), so the

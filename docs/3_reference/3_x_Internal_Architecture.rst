@@ -70,7 +70,7 @@ occurrence tier {none | guaranteed-cost | reinstatements} and the aggregate
 tier {none | guaranteed-cost | feature} independently and dispatches on the
 pair; the wrapped engine stays reachable via ``pnl.engine``. See
 ``dev/done/plan-yapnl.md``, ``dev/done/plan-pnl-consolidated-xpnl-walk.md``
-and ``dev/PLAN-A.md``.
+and ``dev/done/plan-pnl-faces-punchlist.md``.
 
 .. automodule:: aggregate._pnl
 

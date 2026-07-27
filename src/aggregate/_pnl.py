@@ -768,7 +768,8 @@ class PnL(HelpMixin, LabeledMixin):
         #: :class:`Aggregate` / :class:`Portfolio`), kept for drill-down --
         #: the ``source`` is the *simplest sufficient object* (a
         #: GridDistribution / bivariate joint), this is the full engine
-        #: behind it ([Engine-Reference-On-PnL], ``dev/PLAN-A.md``). ``None``
+        #: behind it ([Engine-Reference-On-PnL],
+        #: ``dev/done/plan-pnl-faces-punchlist.md``). ``None``
         #: on a hand-built kernel P&L.
         self.engine = None
         # Backing store for the ``program`` property: ``build`` stamps the

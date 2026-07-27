@@ -1,8 +1,12 @@
 # `aggregate` beta-gate review — summary
 
-Condensed findings from the 2026-06-21 objective review. Full verbatim text:
-[`dev/beta-review-2026-06-21.md`](beta-review-2026-06-21.md). This page is the
+Condensed findings from the 2026-06-21 objective review. This page is the
 working checklist; we'll come back to it.
+
+> **Note (2026-07-27):** the verbatim source this page condensed,
+> `dev/beta-review-2026-06-21.md`, is no longer in the tree — this summary is
+> the surviving record. Recover the original from git history if the detail is
+> ever wanted.
 
 ## Verdict in one line
 The engine and the pricing/allocation science are beta-ready and genuinely

@@ -1116,7 +1116,8 @@ class Underwriter(HelpMixin):
             # premium as a collared affine map of net account loss. Pop the collar.
             retro_collar = spec.pop('retro_terms', None)
             # --------------------------------------------------------------
-            # Two-tier classification ([One-Classifier-Fix], dev/PLAN-A.md):
+            # Two-tier classification ([One-Classifier-Fix],
+            # dev/done/plan-pnl-faces-punchlist.md):
             # the occurrence tier is {none | gc | reinstatements}, the
             # aggregate tier {none | gc | feature}, classified INDEPENDENTLY
             # -- the old single-kind elif chain let a feature branch shadow

@@ -127,13 +127,17 @@ Aliasing/moment-matching validation is controlled by flags in `constants.py` and
 
 **Mixins use the `<Role>Mixin` suffix form.** The `Base<Kind>` rule above is for
 sibling *taxonomies*; a mixin is a different idiom, so the `…Mixin` suffix is the
-clear signal. The first (and so far only) mixin is `LabeledMixin`
-(`_labeled.py`) — the shared label surface (`display_label` / `display_name` /
-`label_map` / `labels` / `renamer` / `use_labels`) mixed into `Aggregate`,
-`Portfolio`, `PnL`, `Severity`, and `Distortion`, which share no common base.
-Mixins define **no `__init__`** (they stay transparent to the host's `super()`
-chain); each host calls an explicit `self._init_labels(...)` when ready. See
-`dev/plan-labels.md` (`[DecL-Labels-Everywhere]`).
+clear signal. There are two: `LabeledMixin` (`_labeled.py`) — the shared label
+surface (`label` / `label_map` / `labels` / `renamer` / `use_labels`) mixed into
+`Aggregate`, `Portfolio`, `PnL`, `Severity`, `Distortion`, and `Copula`, which
+share no common base — and `HelpMixin` (`_help.py`), the one `help(regex, ...)`
+implementation that replaced nine copy-pasted copies across the first-class
+classes. Mixins define **no `__init__`** (they stay transparent to the host's
+`super()` chain); each `LabeledMixin` host calls an explicit
+`self._init_labels(...)` when ready. See `dev/done/plan-labels.md`
+(`[DecL-Labels-Everywhere]`) and `dev/done/plan-label-canonical.md`, which
+collapsed the old `display_label` / `display_name` twins onto the single
+resolved `label` property.
 
 **No cryptic codes — label everything with a descriptive bracketed name.** Every
 task, plan, workstream, TODO item, and phase carries a self-describing bracketed

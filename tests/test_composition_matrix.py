@@ -2,7 +2,8 @@
 
 The pnl/xpnl assembly classifies the occurrence tier {none | gc |
 reinstatements} and the aggregate tier {none | gc | feature} independently
-and dispatches on the pair (``dev/PLAN-A.md``). These tests pin the two
+and dispatches on the pair (``dev/done/plan-pnl-faces-punchlist.md``). These
+tests pin the two
 previously silently-wrong cells -- a feature on the aggregate cover composed
 with an inuring occurrence program, guaranteed-cost
 ([Var-Feature-Composed-With-Occ-Program]) or reinstated
@@ -21,8 +22,8 @@ from aggregate._pnl import PnL
 
 warnings.filterwarnings('ignore', message='.*heavy right tail.*')
 
-# the author's CatBook acceptance program (dev/PLAN-A.md), tempered tail for
-# test speed (pareto 1.6 vs 1.2 -- same structure, smaller grid)
+# the author's CatBook acceptance program (dev/done/plan-pnl-faces-punchlist.md),
+# tempered tail for test speed (pareto 1.6 vs 1.2 -- same structure, smaller grid)
 _ENGINE = ('agg CB{tag} as "Gross Loss" 12500 premium as "Plan Premium" '
            'at 80% lr 5000 xs 0 as "Basic Limits" '
            'sev 200 * pareto 1.6 - 200 '

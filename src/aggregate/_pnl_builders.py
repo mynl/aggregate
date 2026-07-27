@@ -59,7 +59,8 @@ __all__ = ['build_plain_pnl', 'build_consolidated_pnl', 'build_xpnl_walk',
            'build_reinstatement_source', 'resolve_expense']
 
 
-#: Grid-adequacy floor ([Reinst-Joint-Grid-Adequacy], dev/PLAN-A.md): warn
+#: Grid-adequacy floor ([Reinst-Joint-Grid-Adequacy],
+#: dev/done/plan-pnl-faces-punchlist.md): warn
 #: with :class:`~aggregate.constants.CoarseJointGridWarning` when a treaty
 #: kink region (the occurrence fill width ``y``; an aggregate cover's layer
 #: width) spans fewer than this many buckets of the 2-D joint. A kinked map
@@ -706,7 +707,8 @@ def build_variable_pnl(agg, *, walk=False, econ=None, expense_spec=None,
     **what the engine emits**: the gross aggregate on an unreinsured book,
     the net-of-occurrence aggregate when a guaranteed-cost occurrence
     program inures ([Var-Feature-Composed-With-Occ-Program],
-    ``dev/PLAN-A.md``). Two faces ([Decision-2D-Is-Computation-Only] --
+    ``dev/done/plan-pnl-faces-punchlist.md``). Two faces
+    ([Decision-2D-Is-Computation-Only] --
     these features stay 1-D):
 
     * ``walk=False`` (the ``pnl`` face) -- the **consolidated** single-group

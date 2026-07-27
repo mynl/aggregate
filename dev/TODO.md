@@ -1,514 +1,304 @@
 # TODO
 
-> The v1.0 backlog. **Active sequence first** (the ordered P&L → reporting path),
-> then the remaining backlog grouped by theme, then post-v1.0 ideas. Snappy
-> entries only — details live in the plan files (`dev/`, `dev/done/`) and the git
-> log; **what's landed is in `CHANGELOG.md`** and removed from here.
+> **Live items only.** What has landed is in `CHANGELOG.md` and the git log, and
+> is **removed from here**. The master narrative — the six steps to v1.0, the
+> beta-tag checklist, the show-off example, the monograph/cookbook plan — is
+> `../plan-for-v1.md`; this file carries the item-level detail behind it.
 >
-> **Labels, not codes.** Every item has a descriptive `[Bracket-Label]`; the old
-> single-letter track codes (`N6`, `H4`, `T2`, …) are retired (CLAUDE.md, Naming
-> conventions — 2026-06-30). Phase: `alpha` = must finish before cutting
-> `1.0.0b1`; `beta` = fine just after the alpha→beta cut. GitHub issue numbers
-> kept in parentheses as the stable external cross-reference.
+> **Phase.** `alpha` = must finish before cutting `1.0.0b1`; `beta` = fine just
+> after the alpha→beta cut. Release mechanics (version/CHANGELOG/LICENSE
+> agreement, the `uv run pytest -m 'slow or not slow'` green run, fresh-env
+> install, tagging, the branch merge) live in `plan-for-v1.md` §1 and are not
+> repeated here.
 >
-> **Last updated: 2026-07-27** — Added `[FCC-Surface-Sweep]` (step 1 of
-> `plan-for-v1.md`, pass 1 landed at `1.0.0a149`).
+> **Labels, not codes.** Every item has a descriptive `[Bracket-Label]` (CLAUDE.md,
+> Naming conventions). GitHub issue numbers are kept in parentheses as the stable
+> external cross-reference.
 >
-> **2026-06-30** — Retired the cryptic track-code system for
-> descriptive labels and added the active P&L / reporting sequence on top. Pruned
-> the shipped god-module, P&L-expenses, variable-rating, reinstatement, and
-> bivariate-leg-kernel work (now in `CHANGELOG.md`, through `1.0.0a121`).
+> **Where plans live.** `dev/` = live · `dev/deferred/` = parked past the beta,
+> not closed · `dev/done/` = closed (shipped, `-REJECTED`, or `-SUPERSEDED`).
+>
+> **Last updated: 2026-07-27** — rebuilt from scratch. The previous file, with the
+> full `1.0.0a122`–`a151` done-history, is archived at
+> `dev/done/TODO-2026-07-27.md`. Struck: `[Display-Mode]` (rejected — see
+> `dev/done/plans-considered-and-rejected.md`). Added the seven beta-gate items
+> that `plan-for-v1.md` §1 named but this file never carried, plus
+> `[PnL-Repr-HTML]` from the superseded first-class-PnL plan.
 
 ---
 
-## Active sequence — making P&L a first-class citizen (in order)
+## Beta gate — blocks `1.0.0b1`
 
-> The current focus, in dependency order. Item 1 *defines* the target; items 2–4
-> build to it. The three "sequenced around" items are slotted by the author:
-> `[Display-Mode]` waits on item 1, `[Signed-Bounded-Window]` is anytime,
-> `[Doc-Fix]` is last.
+### Interface & reporting
 
-1. **[PnL-API]** ✅ **DONE (`1.0.0a122`, `dev/done/plan-pnl-api.md`).**
-   `create_pnl(source, *, consideration, obligation, role, …)` + `create_pnl_tower`
-   / `PnLTower`: the **domain-agnostic** P&L constructor over the pushforward
-   engine (labels-as-data; consideration/obligation/result → exact GDs + the four
-   FCC reports). `PnL` reshaped into an engine-free value object.
-   The a121 leg wrappers (`legs.py` / `_insurance_view.py`) and
-   `gcn_assemble_column` / `_gcn_*` are removed; the pushforward primitives stay.
-   `gcn_df` adopted the new-canonical stats×waterfall schema (byte-identical bar
-   relaxed by the author). DecL unchanged.
-1b. **[PnL-Exhibits]** ✅ **DONE (`1.0.0a123`, `dev/done/plan-pnl-exhibits.md`).**
-   Makes the `PnL` value object **generic and self-describing** and advances
-   `[Reporting-Guidelines]` for the P&L surface: `build('pnl …')` **always
-   returns a `PnL`** (the domain-specific `PnLTower` / `ReinstatementAnalysis` /
-   `VariableRatingAnalysis` return types are gone — attached as `pnl.tower` /
-   `pnl.analysis`). Fixed-shape `summary_df` (`% Consid`→`Scaled`, `P01`→`P1`,
-   constant legs exact via prob-renormalization + dust-snap); `stats_df` a
-   **property** with a construction-committed scale; new `margin_df` (the cession
-   waterfall), `stochastic_engine`, `scale`, `tower`, `analysis`; `loss`-basis
-   expense stochastic in the plain path. DecL unchanged.
-1c. **[DecL-Labels]** ✅ **DONE (`1.0.0a124`, `dev/done/plan-decl-labels.md`).**
-   Human display labels (`as "…"` / bareword), a `STRING` terminal, the reserved
-   word `as`, and **two-level expense grouping** (`and` combines into one leg;
-   juxtaposition makes separate legs, each with an optional label). Labels land on
-   `agg` / `pnl` / `sev` / `port` objects (`display_label` attr + `display_name`),
-   the premium head (consideration leg key), reins cessions (`margin_df` column),
-   and expense groups; full unparser round-trip. Additive, presentation-only —
-   no computed value changes. **Deferred:** per-component labels inside a
-   *mixture* severity (needs invasive severity mini-language changes for marginal
-   value — object-level `sev` label delivered). Landed **before**
-   `[PnL-Engine-Source]` so that plan's program sweep is written once against final
-   syntax. DecL grammar extended (additive).
-1d. **[DecL-Labels-Everywhere]** ✅ **DONE (`1.0.0a128`, `dev/plan-labels.md`,
-   Phases 0–4).** Broadened the `as "…"` label to three interior sub-object sites
-   (exposure — mid-clause; occurrence layer; inline severity clause) → gathered
-   into `Aggregate.label_map`, read via the `labels` namespace (`a.labels.exposure`
-   / `.layer` / `.severity`); full unparser round-trip; S2 layer ambiguity guarded
-   by a test. All five labelable classes (`Aggregate` / `Portfolio` / `PnL` /
-   `Severity` / `Distortion`) now share one `LabeledMixin` (the repo's first mixin;
-   `_labeled.py`). Distortion naming realigned (D6): `name` = kind handle,
-   `display_name` = resolved property (label → auto-pretty → handle). Portfolio
-   exhibits (`summary_df`, unit-density frames, `analyze_distortion(s)` pricing
-   frames, `plot` legend) route the unit axis through a label-sourced `renamer`
-   (per-object `use_labels` switch, default on); `unit_renamer`'s heuristic
-   removed. Presentation-only, no computed value changes. **Deferred to a future
-   pass (D3):** **S4** per-component labels inside a *mixture* severity (invasive
-   severity mini-language — still the a124 deferral above) and **S5** frequency
-   labels (low value). Plan retains Phases 5–6 for that pass.
-1e. **[Label-Canonical]** ✅ **DONE (`1.0.0a133`, `dev/done/plan-label-canonical.md`).**
-   Collapsed the `LabeledMixin` twin names onto one resolved `label` property
-   (private stored slot `_label`); `display_name` / `display_label` and the
-   `display_label=` kwarg / spec key are gone (constructors + spec key now
-   `label`, `engine_display_label` → `engine_label`). Grammar wrapper rule
-   `display_label` → `as_label` (inner `label: ID` capture unchanged). Copula
-   folded onto `LabeledMixin` (drops its hand-rolled `display_name` sentinel;
-   `name` handle + kind-based `_label_default`). Carve-out: `_pnl.Leg`/`Group`
-   keep their single `self.label`. `ref_include.rst` unaffected (rule names not
-   emitted there). Breaking rename, pre-1.0.
-2. **[PnL-Engine-Source]** ✅ **DONE** `1.0.0a125` — a P&L wraps a **complete**
-   engine (`pnl NAME <prem> less <agg|agg.NAME|port.NAME> [less <expenses>]`);
-   deleted the "half-baked agg inside a pnl" fork, added `inherit premium` /
-   `xpnl` (→ `PnLTower`) / `port` sourcing + `Portfolio.exp_premium`, subsumes
-   `[Portfolio-of-PnL]` (below). Breaking `pnl` syntax; all `.agg` databases +
-   test suite swept. Plan moved to `dev/done/plan-pnl-engine-source.md`.
-   Its deferrals (stochastic loss-basis expense everywhere; expenses on a
-   port-sourced P&L) closed at `[PnL-Generic-Final]`; `retro` over a reinsured
-   engine remains a NotImplementedError.
-2a. **[PnL-Generic-Final]** ✅ **DONE (`1.0.0a129`–`a131`,
-   `dev/done/plan-yapnl.md`).** The last structural step before beta: the P&L
-   kernel rewritten as a **source plus signed group ledger** (`Leg` / `Group` /
-   public `PnL(*, name, source, groups=…)` + single-group sugar + `+`
-   composition + `stack_marginal_pnls`; insurance semantics in the new
-   `_pnl_builders.py`). Signed exhibits throughout (rows = ledger, columns =
-   metrics: `summary_df` / `stats_df` / `scaled_stats_df` / `density_df` /
-   `validation_df`); exact irregular legs by default, `bs>0` rebuckets +
-   audit; a reinsurance `pnl` returns the per-atom group ledger (agg cession
-   a real `buy` group; occ guaranteed-cost over the net-of-occ marginal);
-   `xpnl` = the marginal perspective stack (a DataFrame); the six variable
-   features are one-changed-leg builders (retro acceptance pair = same shape
-   as plain, a test); analyses demoted to drill-down (`pnl.analysis`); a
-   massive source evaluates the whole ledger in one pushforward band sweep.
-   **Retired:** `create_pnl` / `create_pnl_tower` / `PnLTower` /
-   `PnL.margin_df` / `.tower` / `.stochastic_engine` / `make_pnl(net=)` /
-   the analyses' bespoke exhibits.
-2b. **[PnL-Punchups-01]** ✅ **DONE (`1.0.0a134`,
-   `dev/done/plan-pnl-punchups-01.md`).** Three P&L reporting punch-ups in one
-   bump: **[Kappa-Scenario-Percentiles]** (the `stats_df` /
-   `scaled_stats_df` ladder columns are scenario states — conditional means
-   `E[row | result == x_q]` on the exact grand-result slice — so every column
-   foots and direction is uniform; massive route stays marginal, see
-   [Massive-Kappa-Second-Sweep] below); **[Stats-Tower-Step-Level]**
-   (multi-group stats rows are `(Step, View, Line)`; the a132
-   qualified-string lines became levels); **[Summary-Fixed-Card]**
-   (`summary_df` is the fixed `Consideration / Obligation / Margin` card —
-   flat single-group, `(Step, View)` blocks on a tower — with **marginal**
-   range percentiles, deliberately different in kind from the footing sheet);
-   plus the "Reading the P&L sheets" education notes. View labels stay
-   defaults-only (serve-time `df.rename(..., level='View')` recipe
-   documented).
-2c. **[PnL-Consolidated-XPnL-Walk]** ✅ **DONE (`1.0.0a135`–`a136`,
-   `dev/done/plan-pnl-consolidated-xpnl-walk.md`).** Two objects, two
-   questions: **`pnl` = the consolidated net position** (always one group,
-   always the flat card: net premium / net loss + own expenses; the a125/a129
-   premium-clause promotion removed) and **`xpnl` = the walk** (a plain
-   multi-group `PnL` — gross → each cover → Total; no `XPnL` class). Phase 1
-   (`a135`): plain `agg`s accept + ignore economics clauses with one
-   `IgnoredDecLClauseWarning` (knowledge-injection route unblocked). `a136`:
-   [GC-Tower-Marginal-Stitch] (kernel stitched gd-backed construction; every
-   walk row an affine of a `reins_density_df` marginal; EX foots by
-   linearity), [Decision-Ladder-Column-Names] (`P1`→`P01`; scenario columns
-   `κ01…κ99`, marginal ladders keep `P` headers — the on-sheet
-   [Decision-Kappa-Shared-Source-Rule] flag), variable-rating pnl
-   consolidates (walk = its xpnl face), [Construction-Introspection]
-   (`construction_description` / `construction_explanation` on every P&L).
-   **Retired:** `build_gcn_pnl` → `build_consolidated_pnl`;
-   `build_xpnl_stack` (the 4-row onion DataFrame) → `build_xpnl_walk`
-   (`stack_marginal_pnls` stays — generic public no-joint assembler).
-   **Deferred:** massive-source `xpnl`; [Accounting-Summary-DF] (pended
-   below). ([2D-Deferred] CLOSED at `1.0.0a139` — see
-   [PnL-Faces-Punchlist] next.)
-2b. **[PnL-Faces-Punchlist]** ✅ **DONE** (`1.0.0a138`–`a141`, 2026-07-05;
-   plan: `dev/PLAN-A.md`, author handle PLAN-A). **[One-Classifier-Fix]**
-   (`a138`): the pnl/xpnl assembly classifies the occ tier
-   {none | gc | reinstatements} and agg tier {none | gc | feature}
-   independently — fixes the two silently-wrong composition cells: (GC occ,
-   feature agg) mis-scoped the feature's subject and dropped the occ
-   economics ([Var-Feature-Composed-With-Occ-Program]; consolidated gains
-   the occ constants, the walk is the stitched gross → ceded occ → feature
-   → Total tower with `_fn_marginal_entry` pushforward rows); (reinstated
-   occ, feature agg) silently DROPPED the reinstatements clause
-   ([Reinstatements-Dropped-By-Feature-Branch]; the feature now rides the
-   (L, R) joint via `ReinstatementAnalysis(agg_feature_terms=)`). Plus
-   [XPnL-Zero-Premium-Cessions] (zero ceded premium + warning; reinsurance
-   presence drives the face) and the one-step plain walk.
-   **[Consolidated-Reinstatement-PnL]** (`a139`): reinstatement `pnl` =
-   consolidated 2-D net view over the joint; agrees with the `xpnl` tower
-   exactly; closes [2D-Deferred]. `a140`: `PnL.engine` reference
-   ([Engine-Reference-On-PnL]); plain-face GD source; `'premium'` as the
-   one default consideration label; `CoarseJointGridWarning`
-   ([Reinst-Joint-Grid-Adequacy], floor 20 buckets per kink region).
-   `a141` (author feedback): **[Kappa-Walks]** — every DecL `xpnl` walk is
-   per-atom with a footing scenario (κ) ladder (gross atoms, or the
-   occurrence `(gross, ceded)` joint when an occ program inures;
-   [GC-Tower-Marginal-Stitch] retired from the builders — the kernel
-   `stitched_rows` mode stays as the massive-xpnl seam); one-step walks are
-   a single `Gross` block; renames `'gross'`→`'Gross'`, grand step
-   `'Total'`→`'All'`, default loss leg `'loss'`→`'Loss'`.
-   **Still open from PLAN-A:** [Walk-Step-Default-Labels] (needs an author
-   format pick — proposal: the DecL layer descriptor `'occ 4750 xs 250'`);
-   logged problems [Consolidated-LAE-Off-Source] and
-   [Aggregate-Summary-DF-Useless] (below).
-   **[Decommission-Analysis-Classes]** ✅ **DONE (`1.0.0a144`,
-   `dev/done/plan-decommission-analysis-classes.md`).** The generic P&L made
-   `ReinstatementAnalysis` and `VariableRatingAnalysis` redundant: both classes
-   (and `variable_rating.py` / `reinstatement.py`), the two
-   `Aggregate.*_analysis` methods, `plot_reinstatement`, the `qd` analysis
-   branch and the `pnl.analysis` attribute are removed. `ReinstatementTerms`
-   folded into `contract_terms.py`; `check_joint_grid_adequacy` /
-   `JOINT_KINK_MIN_BUCKETS` / new `agg_tier_maps` + `build_reinstatement_source`
-   moved to `_pnl_builders.py`; `build_reinstatement_pnl` takes explicit args.
-   Numbers unchanged; decl suites repointed onto `stats_df` / `p._source`.
-   No public API break (submodule-access only).
-2. **[Reporting-Guidelines]** `alpha` — *define what "first-class citizen" means*
-   for a reporting object, against the `[PnL-API]` shapes: a report's **rows are
-   fixed** (it does not morph as the object gains properties), columns are
-   **pure** (one unit per column — currency and ratios never mixed), headings are
-   **presentation-ready**, and the `summary` (what *is* this?) vs `validation`
-   (= the old `summary`: is it calculating right?) vs `reins_<flavor>` (only when
-   reinsurance present) split is settled. Plan: `dev/reporting-guidelines.md`.
-   (The first fix it named, the `summary_df`→`gcn_df` morph, landed in
-   `1.0.0a121`.) Depends on `[PnL-API]`.
-3. **[Portfolio-of-PnL]** ✅ **SUBSUMED** by `[PnL-Engine-Source]` (`1.0.0a125`).
-   The constant-consideration case is delivered: `pnl NAME <prem> less port.NAME`
-   builds a `create_pnl` over the portfolio net-net total (`port.exp_premium`
-   accumulated for `inherit premium`). No bespoke `PortPnL`. Still deferred: the
-   loss-sensitive net-then-combine (per-unit netting before FFT combine, which
-   loses premium attribution) and pnl *units inside* a port (the pre-existing
-   `NotImplementedError` gate). Old plan: `dev/plan-pnl-portfolio.md`.
-4. **[Plotting-Punchups]** `alpha` — plotting polish; lead item: a `pnl` aggregate
-   plots the aggregate **only** (no loss-convention severity overlaid on a payoff
-   — wrong-sign distraction for the UW/finance audience). Plan:
-   `dev/plan-plotting-punchups.md`. Pairs with `[PnL-API]` plotting; do
-   alongside / after. (Related, separate: `[Plot-Severity-Outside-Window]` below.)
+- **[Reporting-Guidelines]** — *define what "first-class citizen" means* for a
+  reporting object: a report's **rows are fixed** (it does not morph as the
+  object gains properties), columns are **pure** (one unit per column — currency
+  and ratios never mixed), headings are **presentation-ready**, and the `summary`
+  (what *is* this?) vs `validation` (is it calculating right?) vs `reins_<flavor>`
+  (only when reinsurance present) split is settled. Plan:
+  `dev/reporting-guidelines.md`. Gates `[Aggregate-Summary-DF-Useless]` and
+  `[Accounting-Summary-DF]` — scope the three together before redesigning any of
+  them.
+- **[FCC-Surface-Sweep]** — passes 1 and 2 shipped (`1.0.0a149`–`a151`;
+  `dev/FEATURES.csv` now reports **zero** undocumented capabilities, and the
+  executable half is `tests/test_fcc_surface.py`). **What is left is five author
+  decisions**, all flagged in the matrix:
+  1. the `BivariateAggregate.tail_df` name collision — a per-axis support frame
+     under the name `a149` made a return-period property elsewhere
+     (`bivariate.py:2483` vs `_portfolio.py:1347`); suggested `axis_support_df`;
+  2. `BivariateAggregate` as a `LabeledMixin` host;
+  3. `info` on `GridDistribution`;
+  4. the `PnL.gd` / `PnL.result` alias (`_pnl.py:1172`, `:1177`) — one canonical
+     name;
+  5. whether `var_dict` follows the VaR-is-`q` rule and becomes `q_dict`
+     (`_portfolio.py:3025`).
+- **[PnL-Repr-HTML]** — `PnL` is the **only** first-class citizen with no
+  `_repr_html_`, so it does not render in Jupyter (`Aggregate`, `Portfolio` and
+  the three bivariate classes all define one). The residue of
+  `dev/done/plan-pnl-first-class-SUPERSEDED.md`; land it with
+  `[Reporting-Guidelines]` so the card it renders is the settled one.
+- **[Plotting-Punchups]** — plotting polish; lead item: a `pnl` aggregate plots
+  the aggregate **only** (no loss-convention severity overlaid on a payoff —
+  a wrong-sign distraction for the UW/finance audience). Gate on
+  `_agg_affine_active()` / `_signed()` in `plots/_aggregate.py`, both the
+  discrete and continuous branches. Plan: `dev/plan-plotting-punchups.md`.
+- **[Aggregate-Summary-DF-Useless]** (author verdict 2026-07-05, the CatBook
+  example) — `Aggregate.summary_df` on a decorated engine judged "USELESS and
+  needs improving". Scope with `[Reporting-Guidelines]` /
+  `[Accounting-Summary-DF]`.
 
-5. **[FCC-Surface-Sweep]** `alpha` — **pass 1 DONE (`1.0.0a149`)**, step 1 of
-   `plan-for-v1.md`: work `dev/FEATURES.csv` class by class until the
-   first-class-citizen surface is complete and consistent across the nine
-   classes. Landed: `agg_*` → `actual_*` (so the moment families are
-   `actual_*` theory vs `est_*` grid); `PnL.mean/sd/cv/skew` → `est_*`;
-   `prob_loss` → `prob_eq_0` on Agg/Port/PnL; `tail_df` a property everywhere
-   (+ `tail_periods_df`); `info` on all nine; `pprogram`/`_html` on every
-   DecL-creatable class; `Severity.actual_*`; `tail_explanation` on
-   Sev/Freq/Biv; `Portfolio.reins_*` look-throughs; one-line
-   `_text_info_blob` with the validation result. Executable half:
-   `tests/test_fcc_surface.py`.
+### Correctness & bugs
 
-   **Pass 2 additive half DONE (`1.0.0a150`, `[FCC-Help-Mixin]`)** — from a hand
-   read of the matrix, which found what the presence-only auditor cannot see.
-   Landed: `HelpMixin` (nine copy-pasted `help` methods → one mixin, closing
-   `Frequency` and `GridDistribution`); `PnL.tvar`; `Severity.pprogram`/`_html`;
-   `Portfolio.n_units` docstring. `dev/FEATURES.csv` widened to **eleven**
-   columns (`GridDistribution`, `Distortion`), gained a `Y`/`Y*`/`~` legend and
-   ~70 rows, and had eight rows of `a144`-stale prose and two comma-truncated
-   `notes` fields fixed. `regen_features.py` gained a `kind` audit, correct
-   `cached_property` detection, named attribute reporting and a COLLISION
-   section. **This closes the old "UNDOCUMENTED list" item** (65 → 2, both being
-   aliases `a151` removes) **and the `Aggregate.sev_*` question** (`sev_*` stays:
-   the `# severity-scipy` legend row records that `Severity` inherits its odd
-   naming from the `scipy.stats` look-through, deliberately).
-
-   **Pass 2 breaking half DONE (`1.0.0a151`, `[FCC-Alias-Retirement]`)** — one
-   name per concept. **`var` = variance always, VaR = `q` always, no `ppf`.**
-   Removed: `var()`-as-VaR on `Portfolio`/`PnL`/`GridDistribution`,
-   `Aggregate.ppf`, `pla` ×3, `cramer_lundberg`, `Portfolio.unit_renamer`.
-   Kept deliberately: `Severity.ppf`/`.var` (scipy look-through — which also
-   settles the `Aggregate.sev_*` question: it stays). Renamed
-   `Frequency.prn_eq_0(n)` → zero-arg `prob_eq_0` property off `en`, worker
-   private as `_prob_eq_0(n)`. **`dev/FEATURES.csv` now reports zero
-   undocumented capabilities**, so the sweep's original goal — a complete and
-   consistent first-class surface — is met.
-
-   **Still open (author decisions, flagged in the matrix):** the
-   `BivariateAggregate.tail_df` name collision (a per-axis support frame under
-   the name `a149` made a return-period property elsewhere — suggested
-   `axis_support_df`); `BivariateAggregate` as a `LabeledMixin` host; `info` on
-   `GridDistribution`; the `PnL.gd`/`result` alias; and whether `var_dict`
-   should follow the VaR-is-`q` rule and become `q_dict`.
-
-**Sequenced around the above:**
-
-- **[Accounting-Summary-DF]** `beta` (pended 2026-07-04, from
-  `dev/plan-pnl-consolidated-xpnl-walk.md`) — the gross/ceded-**split**
-  consolidated-P&L card, `accounting_summary_df`: Consideration gross premium
-  / ceded premium / total; Obligation gross loss / ceded loss / total;
-  Margin total. Strictly correct (consideration and obligation cannot be
-  netted) and supports GAAP / STAT / IFRS reporting shapes. The plain
-  `summary_df` stays the simple net card ("summary" means summary); this is
-  the detail view between it and the full `xpnl` walk. Unblocked:
-  [PnL-Consolidated-XPnL-Walk] landed at `1.0.0a136`.
-- **[Display-Mode]** `beta` — a presentation-only `user` / `dev` repr toggle (a
-  `ReprMixin`) that chooses *which* view an object renders without changing any
-  computed value. **Deferred until after `[Reporting-Guidelines]`** — what it
-  toggles between depends on the report shapes decided there. Plan:
-  `dev/plan-display-mode.md`.
-- **[Signed-Bounded-Window]** `alpha` — robustness fix: kill the `int(inf)`
-  overflow in the bucket/window sizer and guard the silently-ignored layer on a
-  signed severity. Independent — **do whenever** (regression bar: ordinary
-  aggregates byte-for-byte unchanged). Plan:
-  `dev/plan-signed-bounded-window-overflow.md`.
-- **[Doc-Fix]** `beta` — clear the executed-cell `*Error`s in the docs build.
-  **Last — after the code has settled** (it churns with every API change). Plan:
-  `dev/doc-fix.md`.
-
----
-
-## Backlog — numerics & pricing core
-
-- **[Validation-Calc-Review]** `alpha` (#49) — audit the validation algorithm vs
-  the published *Aggregate* paper and make the docs match the actual algo. The
+- **[Signed-Bounded-Window]** — robustness: kill the `int(inf)` `OverflowError`
+  in the bucket/window sizer and resolve the silently half-applied layer on a
+  signed severity. **Needs the author's D1 pick** (F3-A implement the clamp /
+  F3-B reject the contradictory clause (the plan's lean) / F3-C honest metadata)
+  before it can execute. Independent of everything else — do whenever; the
+  regression bar is "ordinary aggregates byte-for-byte unchanged". The repro
+  still crashes today. Plan: `dev/plan-signed-bounded-window-overflow.md`.
+- **[Validation-Calc-Review]** (#49) — audit the validation algorithm against the
+  published *Aggregate* paper and make the docs match the actual algo. The
   "all switches → config" sub-goal is done (`eps`/`noise`, `aliasing_ratio`,
   `exeqa_noise_floor`, `deficit_materiality`); remaining: fix the false-positive
   *agg-mean-error ≫ sev-error / aliasing* failure (try larger `bs`; revisit the
   too-tight tolerance, now an `aliasing_ratio` config edit).
-- **[Input-Guards]** `alpha` (ported from README) — three correctness/guard items:
-  zero `lb` not consistent with attachment equals zero; flag **fixed** frequency
-  with a non-integer expected value; flag **mixing** with an inconsistent
-  frequency distribution.
-- **[Massive-Kappa-Second-Sweep]** `beta` (from `[PnL-Punchups-01]`,
-  `1.0.0a134`) — bring the kappa scenario percentiles to the massive one-sweep
-  P&L route. Conditioning needs the joint per atom *and* the grand-result
-  quantiles before indicator-weighted means can accumulate — a second band
-  sweep. Until then the massive `stats_df` keeps **marginal** ladders — since
-  `a136` visibly so: plain `P01…P99` headers vs the in-memory scenario `κ`
-  columns ([Decision-Kappa-Shared-Source-Rule]). Note the 2-D follow-up's
-  [Gross-Anchored-Kappa-Insight] (G-slices are axis-aligned row averages,
-  one-pass even on the massive route) may largely dissolve this for the
-  variable-feature exhibits.
-- **[Joint-Padding-Window-Tradeoff]** `alpha` (logged 2026-07-07, from the
-  a141 κ-walk discussion) — the in-core occurrence joint already *computes* a
-  padded transform 4x the retained grid (`padding = 1` doubles each axis;
-  `build_netceded_joint` inherits the engine's padding, `bivariate.py:868`).
-  Flipping to `padding = 0` spends the same flops on **retained** cells:
-  half the `bs`, or twice the window, per axis — the massive path's settled
-  design (plan-bv §4.4: measured window to `10**-window_nines`; deficit as
-  guard). The catch: with `padding = 0`, clipped tail mass **wraps onto the
-  body and is invisible to the deficit** (the a126 caution), so the flip
-  requires (a) the massive window discipline on the in-core netceded sizing
-  (the `balanced_window` measurement already exists — raise its nines
-  target), and (b) the decisive cheap guard: compare the joint's marginal
-  means against the engine's exact 1-D marginal means at build time (wrap
-  hides from the deficit, never from the means). Tail-thickness caveat:
-  thin/moderate tails win cleanly; a `pareto 1.2` cat book needs an
-  astronomical window to the nines, where `padding = 1`'s honest-clip stays
-  competitive — so keep it a knob, not a silent default flip. Plumbing:
-  `occ_bivariate` does not expose `padding=` (add a pass-through).
-  **Phase 2, own investigation — NOT a rider**: mixed-radix axis lengths
-  `3 * 2**k` (scipy FFT handles radix 3 within ~10–20% of a power of two)
-  give a 1.5x window at unchanged binary `bs` — the "√2 step" — but `log2`
-  is stored as an *exponent* throughout the library (`1 << log2`
-  arithmetic, window sizing, the massive chunker, `bs_window_df` audits),
-  so the blast radius is large; author flagged this explicitly
-  (2026-07-07). Scope it standalone before touching anything.
-- **[Walk-Validation-DF]** `beta` (logged 2026-07-07, from the a141 κ-walk
-  discussion) — joint-sourced walks (GC occ `xpnl`, the composed feature
-  walks) have no attached exact-vs-realized audit; the reinstatement route
-  has one (`analysis.validation_df`) and the guaranteed-cost walk's only
-  runtime guards are the joint's deficit bookkeeping and
-  `CoarseJointGridWarning`. Add a `validation_df` for joint-sourced walks:
-  each row's realized EX against the engine's exact `reins_density_df`
-  marginal mean — the per-program version of what
-  `tests/test_pnl_consolidated_walk.py` asserts, and the same computation
-  as [Joint-Padding-Window-Tradeoff]'s means guard (build once, serve
-  both).
+- **[Input-Guards]** (ported from README) — three correctness/guard items: zero
+  `lb` not consistent with attachment equals zero; flag **fixed** frequency with
+  a non-integer expected value; flag **mixing** with an inconsistent frequency
+  distribution.
+- **[ZT-ZM-Frequency-Fix]** — zero-truncated / zero-modified frequency is broken
+  (`poisson zt` → NaN solver for every parameterization; `zm` builds but the
+  semantics are wrong — it inverts a post-modification mean). Redesign: the user
+  inputs the **un-truncated/un-modified base mean** and we apply the shift
+  **forward** (no solver); ship documented shift helpers (both directions). Two
+  examples are commented out in `examples.agg` until then. Named in
+  `plan-for-v1.md` §1; pairs with `[Doc-Gaps]`.
+- **[PK-Poisson-Freq-Audit]** (from `plan-for-v1.md` §1) — `pollaczeck_khinchine`
+  (`_aggregate.py:3755`) audits Poisson frequency: confirm the method rejects, or
+  correctly handles, a non-Poisson frequency rather than silently returning a
+  ruin curve computed off the wrong compound. Also used by three `pedagogy.py`
+  figure generators (`:786`, `:844`, `:893`), so fix the audit before extending.
+- **[Wiener-Hopf-PK-Extension]** (from `plan-for-v1.md` §1) — Wiener-Hopf
+  factorization as the extension of Pollaczeck-Khinchine. Scope first: the
+  Sparre-Andersen work explicitly documented ruin / Wiener-Hopf machinery as out
+  of scope (`dev/done/plan-sparre-a.md`), so this is new ground, not a rider.
+  `[Pedagogy-Wiener-Hopf]` (beta) is its figure.
+- **[Joint-Padding-Window-Tradeoff]** (logged 2026-07-07) — the in-core
+  occurrence joint already *computes* a padded transform 4× the retained grid
+  (`padding = 1` doubles each axis; `build_netceded_joint` inherits the engine's
+  padding, `bivariate.py:868`). Flipping to `padding = 0` spends the same flops
+  on **retained** cells: half the `bs`, or twice the window, per axis — the
+  massive path's settled design. The catch: with `padding = 0`, clipped tail mass
+  **wraps onto the body and is invisible to the deficit** (the a126 caution), so
+  the flip requires (a) the massive window discipline on the in-core netceded
+  sizing (the `balanced_window` measurement already exists — raise its nines
+  target), and (b) the decisive cheap guard: compare the joint's marginal means
+  against the engine's exact 1-D marginal means at build time (wrap hides from
+  the deficit, never from the means). Tail-thickness caveat: thin/moderate tails
+  win cleanly; a `pareto 1.2` cat book needs an astronomical window to the nines,
+  where `padding = 1`'s honest clip stays competitive — so keep it a knob, not a
+  silent default flip. Plumbing: `occ_bivariate` does not expose `padding=` (add
+  a pass-through).
+  **Phase 2, its own investigation — NOT a rider:** mixed-radix axis lengths
+  `3 * 2**k` (scipy FFT handles radix 3 within ~10–20% of a power of two) give a
+  1.5× window at unchanged binary `bs` — the "√2 step" — but `log2` is stored as
+  an *exponent* throughout the library (`1 << log2` arithmetic, window sizing,
+  the massive chunker, `bs_window_df` audits), so the blast radius is large;
+  author flagged this explicitly (2026-07-07). Scope it standalone before
+  touching anything.
 
-## Backlog — bugs & investigations
+### Tests & example libraries
 
-- **[Walk-Step-Default-Labels]** `beta` (from `dev/PLAN-A.md`, 2026-07-05) —
-  undeclared cover steps in the walks default to `'ceded occ'` /
-  `'ceded agg'`; the author asked for better ("labeling for step could be
-  improved"). Proposal: the DecL layer descriptor when the side has exactly
-  one layer (`'occ 4750 xs 250'`, `'agg 95% po 100 xs 100'`), the generic
-  name otherwise. **Needs the author's format pick** — it renames Step index
-  keys and the derived plan rows (`'<label> result'`,
-  `'net through <label>'`) in every undeclared program, so it should land
-  deliberately, with the test churn in one sweep.
-- **[Consolidated-LAE-Off-Source]** `beta` (logged 2026-07-05, PLAN-A
-  decision 2) — the guaranteed-cost consolidated `pnl` books loss-basis LAE
-  deterministically (`rate * E[gross loss]`): its source is the net
-  marginal and the gross loss is not measurable there. The reinstatement
-  consolidated face does NOT have this problem (axis 0 of the joint carries
-  the gross loss — LAE stochastic). Candidate fixes: a (gross, net)
-  bivariate source for the GC consolidated face, or a stitched extra row
-  off the gross marginal.
-- **[Aggregate-Summary-DF-Useless]** `alpha` (author verdict 2026-07-05, the
-  CatBook example) — `Aggregate.summary_df` on a decorated engine judged
-  "USELESS and needs improving". Scope with [Reporting-Guidelines] /
-  [Accounting-Summary-DF] — reconcile the three before redesigning.
-- **[bs_describe-Wart]** `beta` — investigate the `bs_describe` / `bs_explain`
-  module workers (the `color=` workers behind `bs_description` /
-  `bs_explanation`): purpose, the local-`line` accumulator, and whether they earn
-  their place / want reshaping. **Reconcile with `dev/done/plan-consistent-naming.md`
-  §3** (the deferred rename of the verb workers that shadow the noun properties by
-  one letter, e.g. → `_format_bs_grid`). Do the two together. *Standing reminder —
-  surface periodically until scoped.*
-
-## Backlog — hygiene (module organization)
-
-- **[Docstring-Sweep-NumPy]** `alpha` (#18) — Sphinx `:param:` → NumPy style in
-  `iman_conover.py` / `moments.py` (and pockets elsewhere); public surface first.
-  Feeds `[API-Docstring-Coverage]`.
-- **[Pedagogy-Migrations]** `beta` (#19) — move figure generators out of `ft.py` /
-  `tweedie.py` into `pedagogy.py` so those stay API-focused. Feeds
-  `[Pedagogy-Docs-Punchup]`.
-
-> The god-module refactor (the `GridDistribution` value type, the `plots/`
-> subsystem + matplotlib defer, the `distributions.py` / `portfolio.py` kind/
-> subsystem splits, and the shared-concern modules `_validation` /
-> `_bucket_window` / `_pricing` / `_reinsurance`) is **complete** — shipped
-> `1.0.0a90`–`a95`, see `CHANGELOG.md`. Post-beta / conditional leftovers: the
-> plots visual refresh, `ReinsuranceProgram` composition, the sample-subsystem
-> (correlation / switcheroo) review.
-
-## Backlog — tests
-
-- **[Rationalize-Tests]** `alpha` (#51) — needed vs no-longer-needed; untangle and
-  re-wire how the suite *consumes* the single test library (the `conftest`
+- **[Agg-Library-Build-Check]** (from `plan-for-v1.md` §1 — *"the one change that
+  makes step 1.2 real"*) — `tests/test_agg_libraries.py` today only checks each
+  example **parses**. Extend it to check the example **builds**, that the result
+  carries the surface it should (`valid`, `validation_explanation`, `summary_df`,
+  `stats_df`, `plot`), and that its check passes. This is what turns "the
+  interface is fixed" from an assertion into a test.
+- **[Cookbook-Feature-Coverage]** (from `plan-for-v1.md` §1) — `cookbook.agg`
+  covers every feature being frozen, and `decl-testers.agg` still fails exactly
+  where it is meant to fail. The two files are for **testing**; `examples.agg` is
+  for **showing** — keep the split.
+- **[Showcase-Examples-Tune]** (from `plan-for-v1.md` §1) — the section-A showcase
+  examples are still marked draft; tune them, extend `examples.agg` notes with
+  tags / keywords / purpose, and make `aggregate_api/examples.py` read them.
+  Feeds the playground dropdown and the 5-minute intro from one source.
+- **[Rationalize-Tests]** (#51) — needed vs no-longer-needed; untangle and re-wire
+  how the suite *consumes* the single test library (the `conftest`
   parametrization of every `test_suite.agg` line, the SLY snapshot regression)
-  without losing coverage.
-- **[Switcheroo-Sample-Regression]** `beta` (#12) — a `Port.Sample` regression
-  case guarding the kappa-replacement path.
+  without losing coverage. Overlaps `[Scaffold-Retirement]` — do them in that
+  order.
 
-## Backlog — docs & packaging
+### Docs & packaging
 
-> Most of these have **no code dependency** — ready whenever the docs cycle opens.
+> None of these has a code dependency — ready whenever the docs cycle opens.
 
-- **[README-Stable-Body]** `alpha` (#39, #13, #14) — rewrite the README body for
-  the stable-v1.0 audience (what / who / install / one-liner DecL); the
-  `README.md` + `CHANGELOG.md` split is done, only the body remains.
-- **[v1-Journey-Philosophy]** `alpha` (#15) — the v1.0 intro / "Journey" page +
-  statements of philosophy (user manages logging / warnings / matplotlib; the
-  distribution **is** `pᵢ` at `xᵢ`, no jump detection; `qd` is the doc-only
-  fixed-font exception); cover the v1.0 shifts (linear allocation default, bounded
+- **[README-Stable-Body]** (#39, #13, #14) — rewrite the README body for the
+  stable-v1.0 audience (what / who / install / one-liner DecL); the `README.md` +
+  `CHANGELOG.md` split is done, only the body remains. One known copy fix
+  (`plan-for-v1.md`): the opening line says the library builds
+  **approximations**, which fights the *exact, not approximate* claim — the
+  honest version is exact **compared to simulation**.
+- **[v1-Journey-Philosophy]** (#15) — the v1.0 intro / "Journey" page + statements
+  of philosophy (user manages logging / warnings / matplotlib; the distribution
+  **is** `pᵢ` at `xᵢ`, no jump detection; `qd` is the doc-only fixed-font
+  exception); cover the v1.0 shifts (linear allocation default, bounded
   detection, forwards-`S`, pentagon columns, `DefectiveDistributionWarning`).
-- **[Grammar-Reference-From-Lark]** `alpha` (#17) — regenerate
-  `docs/4_agg_language_reference/` from `decl.lark` / `grammar(add_to_doc=True)`
-  (it still describes the SLY-era grammar). No code dependency.
-- **[Tail-Descriptor-Docs-Tests]** `alpha` (#41, #42) — bounded / log-concave /
-  super-exp / exp / sub-exp descriptors for freq **and** sev, plus the
-  bounded/unbounded indicator; with tests.
-- **[Doc-Gaps]** `alpha` (#58–#62) — custom errors; syntax checker / better error
-  reporting; stale "site" database refs; splice examples. No code dependency.
-  (ZT/ZM zero-truncation/modification done at a152, `[ZT-ZM-Frequency-Fix]`.)
-- **[API-Docstring-Coverage]** `alpha` — every public function/class carries a
-  NumPy-style docstring that renders in the API reference. The doc side of
+- **[Grammar-Reference-From-Lark]** (#17) — regenerate
+  `docs/4_agg_language_reference/` from `decl.lark` via `grammar(add_to_doc=True)`
+  (it still describes the SLY-era grammar). The generator writes straight to the
+  real `docs/` path — just run it and commit.
+- **[Tail-Descriptor-Docs-Tests]** (#41, #42) — bounded / log-concave / super-exp
+  / exp / sub-exp descriptors for freq **and** sev, plus the bounded/unbounded
+  indicator; with tests.
+- **[Doc-Gaps]** (#58–#62) — custom errors; syntax checker / better error
+  reporting; stale "site" database refs; ZT/ZM zero-truncation/modification;
+  splice examples.
+- **[API-Docstring-Coverage]** — every public function/class carries a NumPy-style
+  docstring that renders in the API reference. The doc side of
   `[Docstring-Sweep-NumPy]`.
-- **[Reinsurance-Case-Study-Docs]** `beta` (#16) — rebuild `bahnemann` /
-  `enterprise risk` / `other_misc` per-layer exhibits from `reins_stats_df`,
-  verify vs published (numerics now stable).
-- **[Pedagogy-Docs-Punchup]** `beta` (#40) — punch up `pedagogy` and integrate
-  with docs; possible minor renames. Needs `[Pedagogy-Migrations]`.
-- **[Reinsurance-Structure-Diagrams]** `beta` (#45) — under-specified; confirm
-  source / scope (PMIR code?).
-- **[Cheat-Sheet-Tweaks]** `beta` — at the alpha→beta cut, re-run `introspect` per
-  class, reconcile any renames/removals, and apply pending wording/layout tweaks
-  (incl. whether to densify DecL pages 2–3). Held until first beta.
-- **[Plot-Severity-Outside-Window]** `beta` (#8) — plot severity when its grid
-  doesn't overlap the aggregate window (inset, broken axis, or separate figure;
-  `info` already warns). Approach undecided.
+- **[Docstring-Sweep-NumPy]** (#18) — Sphinx `:param:` → NumPy style in
+  `iman_conover.py` / `moments.py` (and pockets elsewhere); public surface first.
 
-## Backlog — pre-beta scaffold retirement (do at the `1.0.0b1` cut)
+### At the cut
 
-> The `.agg` libraries were split (a71) into a **shipped** set (`examples`,
-> `actuarial-severity-curves`, `decl-testers`, `cookbook`) and a temporary
-> SLY-parity scaffold (`_test_suite.agg`, `_test_suite2.agg`). The scaffold has
-> done its job (proving the Lark parser matches the retired SLY parser); the
-> surviving net is `tests/test_agg_libraries.py`.
-
-- **[Scaffold-Retirement]** `alpha` (at b1) — delete `_test_suite.agg` /
-  `_test_suite2.agg` and retire their dependents: the SLY snapshot
-  (`tests/data/expected_specs.json` + `capture_sly_snapshot.py`),
-  `test_decl_parser.py`, `test_splice_suite.py`, the `conftest`
-  `test_suite_lines` / `underwriter` fixtures, `config.py` `TEST_SUITE_FILENAME` +
-  `Underwriter.test_suite_file` + `interpret_file`'s default, the
-  `freeze_knowledge.py` / `bucket_baseline.py` `DEFAULT_DATABASES`, the default
-  toml `_test_suite` line, and the docs "Test Suite Programs" `literalinclude`.
-  Confirm `test_agg_libraries.py` covers the shipped libraries (optionally extend
-  to a build smoke test); decide whether `decl-testers.agg` needs its own
+- **[Scaffold-Retirement]** (do at the `1.0.0b1` cut) — the `.agg` libraries were
+  split (a71) into a **shipped** set (`examples`, `actuarial-severity-curves`,
+  `decl-testers`, `cookbook`) and a temporary SLY-parity scaffold
+  (`_test_suite.agg`, `_test_suite2.agg`). The scaffold has done its job (proving
+  the Lark parser matches the retired SLY parser). Delete both files and retire
+  their dependents: the SLY snapshot (`tests/data/expected_specs.json` +
+  `capture_sly_snapshot.py`), `test_decl_parser.py`, `test_splice_suite.py`, the
+  `conftest` `test_suite_lines` / `underwriter` fixtures, `config.py`
+  `TEST_SUITE_FILENAME` + `Underwriter.test_suite_file` + `interpret_file`'s
+  default, the `freeze_knowledge.py` / `bucket_baseline.py` `DEFAULT_DATABASES`,
+  the default toml `_test_suite` line, and the docs "Test Suite Programs"
+  `literalinclude`. Then fix the Testing section of `CLAUDE.md`, which still
+  calls the snapshot the main test. Confirm `[Agg-Library-Build-Check]` covers
+  the shipped libraries; decide whether `decl-testers.agg` needs its own
   permanent parse harness.
 
 ---
 
-## Related plans (shipped → context)
+## After the cut — `beta`
 
-- **[ZT-ZM-Frequency-Fix]** — shipped a152: zero-truncated / zero-modified
-  frequency reparameterized to the textbook `(a, b, 1)` form (exposure clause
-  = un-modified base mean, closed-form forward shift, realized `E[N]` an
-  output), with `!` opting back in to a pinned mean and a
-  `ZeroModifiedExposureWarning` on the monetary exposure forms. Fixes the NaN
-  solver that broke *every* `zt` and the whole zero-deflation half of `zm`,
-  plus three separate double-application bugs (grid window, `remix`,
-  `create_frequency`). Shift helpers `modify_mean` / `solve_base_mean` and the
-  Loss Models §8.6 `apply_deductible` map are public. Closes the ZT/ZM half of
-  `[Doc-Gaps]`. **Out of scope, still open:** the extended `(a, b, 1)` members
-  (ETNB with `-1 < r < 0`, Sibuya), and compound frequencies with a
-  zero-truncated *secondary* (Loss Models Example 9.12 — `pascal` has no way
-  to truncate its secondary negbin).
+### Reporting
 
-- **[Renewal-Frequency-Wait-Clause] + [Empirical-PGF-Horner-Dispatch]**
-  (`dev/done/plan-sparre-a.md`) — shipped a146: Sparre-Andersen renewal claim
-  generation (`T years [at r rate]` + `wait`/`dwait`, Plancherel count kernel
-  in `_renewal.py`, `FrequencyRenewal`, exact geometric-batch clusters for
-  zero waits, defective/terminating processes) and the Horner / sorted-gap
-  square-and-multiply empirical pgf dispatch. Delayed/equilibrium
-  (stationary) first wait and ruin/Wiener-Hopf machinery documented as out
-  of scope.
-- **[Wait-Clause-Layers]** — shipped a147: severity layer transform on the
-  wait clause (`wait y xs a <dist> [!]`; conditional default, `!` =
-  unconditional with zero-wait clusters), `wait_attachment`/`wait_limit`
-  kwargs, hard-atom grid snap + closed-interval readout for the cap atom
-  (`hard_atom_snap` row, `wait_snapped` diagnostic). Splice+layer and
-  dwait+layer rejected.
-- **Numerics program** (`dev/done/plan-numerics-0-meta.md` + `-1`…`-4`) —
-  complete; the apply-distortion calcs shipped a55–a57, windowed combine via
-  `dev/done/plan-mv.md` (a72/a76).
-- **Bivariate firm-up** (`dev/done/plan-mv.md`) — shipped a70–a80.
-- **`prob_loss_assets` / `pla`** (`dev/done/plan-pla.md`) — free capital anchor
-  over `{p, L, a}` + `price_pentagon_ex`, shipped a97.
-- **First-class P&L (Stages A–E)** (`dev/done/plan-pnl.md`) — the `PnL` veneer the
-  `[PnL-First-Class]` work builds on.
-- **P&L expenses / variable rating / reinstatements / bivariate leg kernel** —
-  shipped a114–a121 (`dev/done/plan-pnl-expenses-ceded-premium.md`,
-  `plan-reinstatements.md`, `plan-variable-rating.md`, `plan-bivariate-legs.md`).
-  The leg kernel (`aggregate.legs`) + insurance View (`aggregate._insurance_view`)
-  are the foundation `[Portfolio-of-PnL]` composes over.
-- `dev/done/` — the remaining shipped plans (config, pentagon, database loading,
-  bucket-window, allocation/pricing bounds, decl-unparser, bibliography, …).
+- **[Accounting-Summary-DF]** (pended 2026-07-04) — the gross/ceded-**split**
+  consolidated-P&L card, `accounting_summary_df`: Consideration gross premium /
+  ceded premium / total; Obligation gross loss / ceded loss / total; Margin
+  total. Strictly correct (consideration and obligation cannot be netted) and
+  supports GAAP / STAT / IFRS reporting shapes. The plain `summary_df` stays the
+  simple net card ("summary" means summary); this is the detail view between it
+  and the full `xpnl` walk. Unblocked since `1.0.0a136`.
+- **[Walk-Step-Default-Labels]** (from `dev/done/plan-pnl-faces-punchlist.md`,
+  2026-07-05) — undeclared cover steps in the walks default to `'ceded occ'` /
+  `'ceded agg'` (`_pnl_builders.py:573`, `:904`, `:1147`); the author asked for
+  better. Proposal: the DecL layer descriptor when the side has exactly one layer
+  (`'occ 4750 xs 250'`, `'agg 95% po 100 xs 100'`), the generic name otherwise.
+  **Needs the author's format pick** — it renames Step index keys and the derived
+  plan rows (`'<label> result'`, `'net through <label>'`) in every undeclared
+  program, so it should land deliberately, with the test churn in one sweep.
+- **[Doc-Fix]** — clear the executed-cell `*Error`s in the docs build. **Last —
+  after the code has settled** (it churns with every API change). Plan:
+  `dev/doc-fix.md`.
+
+### Numerics & pricing core
+
+- **[Massive-Kappa-Second-Sweep]** (from `[PnL-Punchups-01]`, `1.0.0a134`) — bring
+  the kappa scenario percentiles to the massive one-sweep P&L route.
+  Conditioning needs the joint per atom *and* the grand-result quantiles before
+  indicator-weighted means can accumulate — a second band sweep. Until then the
+  massive `stats_df` keeps **marginal** ladders — since `a136` visibly so: plain
+  `P01…P99` headers vs the in-memory scenario `κ` columns
+  ([Decision-Kappa-Shared-Source-Rule]). Note the 2-D follow-up's
+  [Gross-Anchored-Kappa-Insight] (G-slices are axis-aligned row averages,
+  one-pass even on the massive route) may largely dissolve this for the
+  variable-feature exhibits.
+- **[Walk-Validation-DF]** (logged 2026-07-07) — joint-sourced walks (GC occ
+  `xpnl`, the composed feature walks) have no attached exact-vs-realized audit;
+  their only runtime guards are the joint's deficit bookkeeping and
+  `CoarseJointGridWarning`. Add a `validation_df` for joint-sourced walks: each
+  row's realized EX against the engine's exact `reins_density_df` marginal mean —
+  the per-program version of what `tests/test_pnl_consolidated_walk.py` asserts,
+  and the same computation as `[Joint-Padding-Window-Tradeoff]`'s means guard
+  (build once, serve both).
+- **[Consolidated-LAE-Off-Source]** (logged 2026-07-05) — the guaranteed-cost
+  consolidated `pnl` books loss-basis LAE deterministically (`rate * E[gross
+  loss]`): its source is the net marginal and the gross loss is not measurable
+  there. The reinstatement consolidated face does NOT have this problem (axis 0
+  of the joint carries the gross loss — LAE stochastic). Candidate fixes: a
+  (gross, net) bivariate source for the GC consolidated face, or a stitched extra
+  row off the gross marginal.
+
+### Hygiene & tests
+
+> The god-module refactor (the `GridDistribution` value type, the `plots/`
+> subsystem + matplotlib defer, the `distributions.py` / `portfolio.py` splits,
+> and the shared-concern modules `_validation` / `_bucket_window` / `_pricing` /
+> `_reinsurance`) is **complete** — shipped `1.0.0a90`–`a95`. Conditional
+> leftovers: the plots visual refresh, `ReinsuranceProgram` composition, and the
+> sample-subsystem (correlation / switcheroo) review.
+
+- **[bs_describe-Wart]** — investigate the `bs_describe` / `bs_explain` module
+  workers (the `color=` workers behind `bs_description` / `bs_explanation`):
+  purpose, the local-`line` accumulator, and whether they earn their place or
+  want reshaping. **Reconcile with `dev/done/plan-consistent-naming.md` §3** (the
+  deferred rename of the verb workers that shadow the noun properties by one
+  letter, e.g. → `_format_bs_grid`). Do the two together. *Standing reminder —
+  surface periodically until scoped.*
+- **[Pedagogy-Migrations]** (#19) — move figure generators out of `ft.py` /
+  `tweedie.py` into `pedagogy.py` so those stay API-focused. Feeds
+  `[Pedagogy-Docs-Punchup]`.
+- **[Switcheroo-Sample-Regression]** (#12) — a `Port.Sample` regression case
+  guarding the kappa-replacement path.
+
+### Docs
+
+- **[Pedagogy-Wiener-Hopf]** (from `plan-for-v1.md` §1) — the pedagogy
+  Wiener-Hopf figure. Needs `[Wiener-Hopf-PK-Extension]` first.
+- **[Reinsurance-Case-Study-Docs]** (#16) — rebuild `bahnemann` / `enterprise
+  risk` / `other_misc` per-layer exhibits from `reins_stats_df`, verify against
+  published (numerics now stable).
+- **[Pedagogy-Docs-Punchup]** (#40) — punch up `pedagogy` and integrate with docs;
+  possible minor renames. Needs `[Pedagogy-Migrations]`.
+- **[Reinsurance-Structure-Diagrams]** (#45) — under-specified; confirm source /
+  scope (PMIR code?).
+- **[Cheat-Sheet-Tweaks]** — at the alpha→beta cut, re-run `introspect` per class,
+  reconcile any renames/removals, and apply pending wording/layout tweaks (incl.
+  whether to densify DecL pages 2–3). Held until first beta.
+- **[Plot-Severity-Outside-Window]** (#8) — plot severity when its grid doesn't
+  overlap the aggregate window (inset, broken axis, or separate figure; `info`
+  already warns). Approach undecided.
+
+---
 
 ## Post-v1.0 ideas
 
 - **[Multi-Resolution-Portfolio-Combine]** (#20) — compute each unit on its own
-  `bs`, decimate onto the shared grid before the Fourier product (the real fix for
-  the coarse shared-`bs` deficit). Deficit accepted / surfaced for now.
+  `bs`, decimate onto the shared grid before the Fourier product (the real fix
+  for the coarse shared-`bs` deficit). Deficit accepted / surfaced for now.
 - **[Premium-Loss-Algebra-DecL]** (#21, v2.0) — constant aggregates and full
   aggregate arithmetic (`agg.A - agg.B`, `agg.A + c`); `pnl` covers the common
   case for v1.0.
@@ -516,9 +306,17 @@
   distortion kinds so `PnL.evaluate` can surface the *named* indices (`dual`
   already *is* MINVAR). `@Cherny2009a`.
 - **[Rate-Based-Reins-Clauses]** — extend reinsurance clauses to accept e.g.
-  `net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros` (rate on subject =
-  quota share).
+  `net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros` (rate on subject
+  = quota share).
 - **[Reinstatement-Event-Date-Terms]** — reinstatement terms depending on event
   date (pro-rata as to time); from `dev/done/pre-plan-reinstatements.md`.
-- *(rejected: DecL colorization — aesthetic-only and structurally weak; see
-  `dev/done/plans-considered-and-rejected.md`.)*
+- **[Portfolio-of-PnL]** (loss-sensitive half) — the constant-consideration case
+  shipped at `1.0.0a125`; what remains is net-then-combine for loss-sensitive
+  considerations, and `pnl` units *inside* a `port` (still a
+  `NotImplementedError` gate). Parked design:
+  `dev/deferred/plan-pnl-portfolio-DEFERRED.md`.
+
+> *Rejected, so it is not re-proposed cold:* DecL colorization (aesthetic-only,
+> structurally weak) and the `dev`/`user` **display mode** `ReprMixin` (not worth
+> the effort — both views are already one attribute away). Reasoning:
+> `dev/done/plans-considered-and-rejected.md`.

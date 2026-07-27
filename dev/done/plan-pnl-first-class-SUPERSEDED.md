@@ -1,4 +1,26 @@
-# Plan — first-class `PnL`: a distribution object like `Aggregate`
+# Plan — first-class `PnL`: a distribution object like `Aggregate` — SUPERSEDED
+
+> **SUPERSEDED 2026-07-27 by `[PnL-Generic-Final]`** (yapnl, `1.0.0a129`–`a131`,
+> `dev/done/plan-yapnl.md`). This plan assumes `PnL = agg + consideration` with
+> a `pnl.agg` risky leg; that shape no longer exists — a `PnL` wraps a complete
+> engine (`pnl.engine`), and `density_df` is deliberately an `OrderedDict` of
+> per-leg `GridDistribution`s, **not** the "full `Aggregate` schema on the net
+> grid" that D1 below specifies. The goals landed in a different shape:
+>
+> | Item | Outcome |
+> |---|---|
+> | A1 `pnl_df` → `density_df` | superseded — `pnl_df` retired; `density_df` is a GD dict by design |
+> | A2 `stats_df` net | delivered in the ledger shape (`a129`–`a134`) |
+> | A3 `var` / `tvar` / `q` / `cdf` / `sf` | delivered; `var` = **variance** since `a151` (VaR is `q`) |
+> | B4 `PnL.info` | delivered (`a149`) |
+> | B5 `qd(pnl)` | delivered (`utilities.py:337`) |
+> | C6 `PnL._repr_html_` | **NOT delivered** — the one live residue |
+> | C7 `summary_df` quantiles | delivered as the fixed card with marginal `P01…P99` (`a134`) |
+>
+> The residue is carried forward as **`[PnL-Repr-HTML]`** in `dev/TODO.md`:
+> `PnL` is the only first-class citizen with no `_repr_html_`, so it does not
+> render in Jupyter. Text below is the original draft, unedited — read it for
+> the *reasoning*, not the surface names.
 
 > **Status: DRAFT — not executed.** Builds on the landed `PnL` veneer (Stages
 > A–E, `dev/done/plan-pnl.md`). Goal: make `PnL` a *first-class* object whose

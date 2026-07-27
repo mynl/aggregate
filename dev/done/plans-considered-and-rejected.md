@@ -7,6 +7,43 @@ Append new entries at the top.
 
 ---
 
+## `dev` / `user` display mode via a `ReprMixin` (rejected 2026-07-27)
+
+**Origin.** `dev/plan-display-mode.md` (drafted, gated behind
+`[Reporting-Guidelines]`, never executed; retired to
+`dev/done/plan-display-mode-REJECTED.md`). A presentation-only mode toggle with
+two values — `user` (the current `summary_df` + `tail_df` headline) and `dev`
+(the old moment-vs-estimate `validation_df` QA view). A `ReprMixin` would own
+the dispatch for `_repr_html_` and `__str__`; each of `Aggregate`, `Portfolio`
+and `PnL` would supply two renderers apiece. Mode resolved at *display* time
+through a three-layer cascade: instance override / `build(mode=)` → a runtime
+module global → a new `DisplaySettings.mode` config field with an
+`AGGREGATE_DISPLAY_MODE` env entry.
+
+**Why rejected.** Author's verdict: **"not worth the effort."** The cost is a
+new mixin, six renderers, a config section, an env allow-list entry, a runtime
+global on top of the frozen `Settings` singleton (needed only because that
+singleton is read-once), and a test file — all to render a frame the user can
+already ask for by name. Both views are one attribute access away today
+(`a.validation_df`, `a.summary_df`), so the toggle buys **keystrokes, not
+capability**, and it does so by adding a hidden piece of global state that
+changes what an object looks like without changing what it is. That is exactly
+the "magic" the house rule argues against: an explicit `qd(a.validation_df)`
+beats a mode flag set three layers away.
+
+**What we do instead.** Nothing new. `validation_df` and `summary_df` keep their
+names and meanings and stay directly reachable. The one genuinely durable idea
+in the plan — declaring the *required* display surface every first-class object
+must expose, so consistency is enforced rather than hand-checked — is already
+delivered by `dev/FEATURES.csv` plus the executable half,
+`tests/test_fcc_surface.py` (`[FCC-Surface-Sweep]`, `1.0.0a149`–`a151`). The
+question of what each report *should* contain lives on as
+`[Reporting-Guidelines]` (`dev/reporting-guidelines.md`), which is the work that
+actually moves the needle. Revisit only if a concrete audience asks for the old
+QA view by default — and then as a named option, not a mode axis.
+
+---
+
 ## Unified DecL colorization (rejected 2026-06-19)
 
 **Origin.** `dev/tentative-plan-decl-colorization.md` (drafted, then DEFERRED

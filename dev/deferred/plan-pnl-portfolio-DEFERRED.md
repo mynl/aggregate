@@ -1,4 +1,15 @@
-# Plan — `PortPnL`: portfolios of P&L positions
+# Plan — `PortPnL`: portfolios of P&L positions — DEFERRED
+
+> **DEFERRED past `1.0.0b1` (author, 2026-07-27).** Not in scope for the beta.
+> The **constant-consideration** case (option 1 below) is already delivered
+> another way: `[PnL-Engine-Source]` (`1.0.0a125`) subsumed `[Portfolio-of-PnL]`
+> — `pnl NAME <prem> less port.NAME` builds over the portfolio net-net total,
+> with `port.exp_premium` accumulated for `inherit premium`. No bespoke
+> `PortPnL` class was needed. What this file still holds open is **option 2**,
+> the loss-sensitive case (net-then-combine ≠ combine-then-net once
+> considerations depend on the loss) plus `pnl` *units inside* a `port`, which
+> keeps its existing `NotImplementedError` gate. Text below is the original
+> design exploration, unedited.
 
 > **Status: DRAFT — design exploration.** Deferred from the v1.0 PnL plan
 > (`dev/done/plan-pnl.md` §3.2). Today a `pnl` unit in a `port`/`bivariate`

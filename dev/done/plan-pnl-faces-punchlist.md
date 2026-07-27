@@ -1,4 +1,18 @@
-# PLAN-A — [PnL-Faces-Punchlist]
+# [PnL-Faces-Punchlist]
+
+> **CLOSED 2026-07-27 — executed in full.** Archived from `dev/PLAN-A.md`;
+> renamed to the house form (CLAUDE.md forbids cryptic labels — the author's
+> session handle for this plan was **PLAN-A**, and that name still greps here).
+>
+> **"Any remaining bugs?" — no.** Every defect and design gap in the inventory
+> below was fixed and is under test: `tests/test_composition_matrix.py` plus the
+> four `test_pnl*` suites run green (78 passed, 2026-07-27), and the two-tier
+> classifier is live at `underwriter.py:1119`. Three items survive and are all
+> carried in `dev/TODO.md`, so nothing is lost by closing this file:
+> **[Walk-Step-Default-Labels]** (still needs the author's format pick — the
+> fallback is still `'ceded occ'` / `'ceded agg'`, `_pnl_builders.py:573`,
+> `:904`, `:1147`), **[Consolidated-LAE-Off-Source]**, and
+> **[Aggregate-Summary-DF-Useless]**.
 
 Status: EXECUTED 2026-07-05 — Phase 0 (audit) + Phase 1 [One-Classifier-Fix]
 = `1.0.0a138`, Phase 2 [Consolidated-Reinstatement-PnL] = `1.0.0a139`,

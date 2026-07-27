@@ -556,7 +556,7 @@ short display punchups.
 ## 1.0.0a141
 
 **[Kappa-Walks] + [Single-Block-One-Step-Walk] + [All-Gross-Loss-Renames]** —
-author feedback on a140 (three items, `dev/PLAN-A.md` addendum).
+author feedback on a140 (three items, `dev/done/plan-pnl-faces-punchlist.md` addendum).
 
 - **Every DecL `xpnl` walk is now per-atom with a footing scenario (κ)
   ladder** — the a136 marginal stitch ([GC-Tower-Marginal-Stitch]) is retired
@@ -593,7 +593,7 @@ author feedback on a140 (three items, `dev/PLAN-A.md` addendum).
 ## 1.0.0a140
 
 **[Engine-Reference-On-PnL] + [Reinst-Joint-Grid-Adequacy]** — Phases 3–4 of
-`dev/PLAN-A.md`.
+`dev/done/plan-pnl-faces-punchlist.md`.
 
 - **`PnL.engine`** — every DecL-assembled P&L (and `make_pnl`) now keeps a
   reference to the wrapped stochastic engine (the inner
@@ -614,11 +614,11 @@ author feedback on a140 (three items, `dev/PLAN-A.md` addendum).
   buckets, naming the `bs=`/`log2_x=`/`log2_y=` knobs as the remedy.
 - Deferred pending an author format pick: [Walk-Step-Default-Labels]
   (undeclared cover steps still read `'ceded occ'`/`'ceded agg'`; proposal
-  in `dev/PLAN-A.md` is the layer descriptor, e.g. `'occ 4750 xs 250'`).
+  in `dev/done/plan-pnl-faces-punchlist.md` is the layer descriptor, e.g. `'occ 4750 xs 250'`).
 
 ## 1.0.0a139
 
-**[Consolidated-Reinstatement-PnL]** — Phase 2 of `dev/PLAN-A.md`: `pnl` over
+**[Consolidated-Reinstatement-PnL]** — Phase 2 of `dev/done/plan-pnl-faces-punchlist.md`: `pnl` over
 a reinstatements program is now the **consolidated single-group net view**
 ([Decision-PnL-Is-Consolidated]), closing the [2D-Deferred] carve-out. One
 sell group of 2-D legs over the same (L, R) joint the walk uses: a stochastic
@@ -636,7 +636,7 @@ wanting the tower under `pnl` must switch to `xpnl` (the
 
 ## 1.0.0a138
 
-**[One-Classifier-Fix]** — Phase 1 of `dev/PLAN-A.md` ([PnL-Faces-Punchlist]):
+**[One-Classifier-Fix]** — Phase 1 of `dev/done/plan-pnl-faces-punchlist.md` ([PnL-Faces-Punchlist]):
 the pnl/xpnl assembly now classifies the **occurrence tier**
 {none | gc | reinstatements} and the **aggregate tier** {none | gc | feature}
 independently and dispatches on the pair. The old single-kind elif chain let a
@@ -768,7 +768,7 @@ conditional shapes.
 ## 1.0.0a135
 
 **[Reins-Economics-On-Agg-Ignore-Warn]** — Phase 1 of
-`dev/plan-pnl-consolidated-xpnl-walk.md`: a pure aggregate ignores what it
+`dev/done/plan-pnl-consolidated-xpnl-walk.md`: a pure aggregate ignores what it
 cannot use and says so.
 
 - **Plain `agg`s accept every reinsurance decoration** — ceded-premium
@@ -940,7 +940,7 @@ drill-down objects.
 
 **[PnL-Generic-Final] phases [Kernel-Group-Ledger] + [Builders-Plain-GCN-Port]**
 — the P&L kernel rewritten as a **source plus signed group ledger**
-(`dev/plan-yapnl.md`); insurance semantics moved out to a new
+(`dev/done/plan-yapnl.md`); insurance semantics moved out to a new
 `_pnl_builders.py`. **Breaking (pre-beta, deliberate):**
 
 - New kernel surface: `Leg(label, func, bs=0, is2d=False)`,
@@ -986,7 +986,7 @@ sites, route Portfolio exhibits through them, and give every labelable class one
 shared label surface. Follow-on to the a124 `[DecL-Labels]` object-level pass.
 Pure presentation — **no computed value changes**; labels land in attributes,
 dict keys, and rendered text, never in the FFT. (Phases 0–4 of
-`dev/plan-labels.md`; the S4/S5 mixture-component and frequency labels stay
+`dev/done/plan-labels.md`; the S4/S5 mixture-component and frequency labels stay
 deferred.)
 
 - **One `LabeledMixin`** (`_labeled.py`, the repo's first mixin) now carries the
@@ -1114,7 +1114,7 @@ density living **on disk only** (zarr) and RAM bounded by a band.
 ## 1.0.0a125
 
 **[PnL-Engine-Source]** — a P&L wraps a **complete stochastic engine** (no more
-"half-baked agg inside a pnl"). Executes `dev/plan-pnl-engine-source.md`.
+"half-baked agg inside a pnl"). Executes `dev/done/plan-pnl-engine-source.md`.
 **Breaking `pnl` syntax.** Also subsumes the `[Portfolio-of-PnL]` TODO: point a
 `pnl` at a `port` rather than build a bespoke `PortPnL`.
 
@@ -1157,7 +1157,7 @@ shipped `.agg` databases and the test suite were swept.
 **[DecL-Labels]** — human display labels, quoted names, and expense grouping.
 Additive and presentation-only: no computed value changes, labels land in dict
 keys, column headers, and repr / exhibit titles. Executes
-`dev/plan-decl-labels.md`. (Companion to the pending `[PnL-Engine-Source]`
+`dev/done/plan-decl-labels.md`. (Companion to the pending `[PnL-Engine-Source]`
 refactor; landed first so that plan's program sweep is written once against final
 syntax.)
 
@@ -1195,7 +1195,7 @@ syntax.)
 self-describing**: fixed-shape exhibits driven only by the constructor args, and
 **`build('pnl …')` always returns a `PnL`** (never a `PnLTower` /
 `ReinstatementAnalysis` / `VariableRatingAnalysis` — domain-specific return types
-were removed). Executes `dev/plan-pnl-exhibits.md`.
+were removed). Executes `dev/done/plan-pnl-exhibits.md`.
 
 - **Always-`PnL` routing.** Every `pnl` program returns the **net** `PnL`. The
   Gross/Ceded/Net waterfall / reinstatement / variable-rating machinery is now
@@ -1234,7 +1234,7 @@ were removed). Executes `dev/plan-pnl-exhibits.md`.
 `PnL` value object. A P&L is *money in minus money out* over a random state:
 group each component map's values over the source atoms by output value and sum
 probability, and you get three **exact** `GridDistribution` legs (consideration,
-obligation, result). Executes `dev/plan-pnl-api.md`; **supersedes** the a121 leg
+obligation, result). Executes `dev/done/plan-pnl-api.md`; **supersedes** the a121 leg
 kernel (`legs.py` / `_insurance_view.py`), which are removed. Insurance becomes
 one *caller* of the general API, not a special case.
 
@@ -1284,7 +1284,7 @@ P4 — the **bivariate leg kernel**: a domain-free engine for the P&L leg model,
 with insurance as a View on top. Collapses the ad-hoc leg machinery that
 `VariableRatingAnalysis` and `ReinstatementAnalysis` each carried onto one
 shared core, so "1-D vs 2-D" is now just a source swap and a feature only fills
-a leg. Executes `dev/plan-bivariate-legs.md` (moved to `dev/done/`); behavior is
+a leg. Executes `dev/done/plan-bivariate-legs.md` (moved to `dev/done/`); behavior is
 preserved except the intended `summary_df` no-morph change.
 
 - **`aggregate.legs` (new, domain-free kernel).** A `Leg` is one cash-flow
@@ -1355,7 +1355,7 @@ all five now run through `build('...')`.
 ## 1.0.0a119
 
 Phase 3 variable rating — the `[analysis]` engine and the `[decl]` surface for the
-four aggregate-basis features (`dev/plan-variable-rating.md`). The four now run
+four aggregate-basis features (`dev/done/plan-variable-rating.md`). The four now run
 end-to-end through `build('...')`; retro stays programmatic pending a rating-clause
 syntax decision, and occurrence-basis (2-D) variable rating is a follow-up.
 
@@ -1388,7 +1388,7 @@ syntax decision, and occurrence-basis (2-D) variable rating is a follow-up.
 ## 1.0.0a118
 
 Starts **Phase 3 (variable rating)** with the `[terms]` workstream — the pure,
-engine-free contract-terms layer (`dev/plan-variable-rating.md`). No analysis or
+engine-free contract-terms layer (`dev/done/plan-variable-rating.md`). No analysis or
 DecL wiring yet; that follows.
 
 - **New `ContractTerms` taxonomy** (`aggregate.contract_terms`, submodule access
@@ -1907,7 +1907,7 @@ and a DecL swing/slide builder land in later stages.
 
 ### DecL `payoff` / `loss` orientation suffix on `agg` (Stage A of `PnL`)
 
-First stage of the first-class `PnL` work (`dev/plan-pnl.md`). An `agg`
+First stage of the first-class `PnL` work (`dev/done/plan-pnl.md`). An `agg`
 declaration may now carry a trailing **`payoff`** or **`loss`** keyword that sets
 the variable's sign-convention role (`value_type`) — *pure orientation*, with
 **no reflect/shift** (that affine remains the `pnl` wrapper):
@@ -2198,7 +2198,7 @@ vector-valued `q`. Use `port.q(p)` / `port['unit'].q(p)` for quantiles.
 
 ### Distortion calibration on a single distribution — `Aggregate`/`Portfolio` parity
 
-Phase 1c of the `distributions.py` split (`dev/plan-split-distributions.md`).
+Phase 1c of the `distributions.py` split (`dev/done/plan-split-distributions.md`).
 The pricing-distortion *family calibration loop* moves onto `Distortion`, and an
 `Aggregate` can now calibrate a distortion set directly — no more wrapping it in
 a one-unit `Portfolio`.
@@ -2267,7 +2267,7 @@ version-bumped; recorded here for orientation.
 
 ### Plotting subsystem — single matplotlib boundary (Pass A)
 
-The library-wide plotting refactor (`dev/plan-plots-subsystem.md`), **Pass A**:
+The library-wide plotting refactor (`dev/done/plan-plots-subsystem.md`), **Pass A**:
 a behavior-preserving port of every plot body into a new `aggregate.plots`
 subpackage organized as canvas × content × class. No version bump (pure moves
 plus a behavior-adjacent import-timing change); figure output is unchanged.
@@ -2362,7 +2362,7 @@ as `interp1d` callables, so they are not pure var/tvar plumbing). **Phase 6
 (Bivariate)** is deferred: it is a purely *additive* exposure (Bivariate has no
 existing `q` / `tvar`), the joint-vs-marginal quantile semantics are a design
 question, and Bivariate's structural treatment is already deferred per
-`dev/plan-README.md`.
+`dev/done/plan-README.md`.
 
 ## 1.0.0a90
 
@@ -2605,7 +2605,7 @@ breaks, since pre-1.0 is the one chance to make the names right.
 
 ### config Phase 2 — numerics floors + stranded sizing knobs (breaking)
 
-Completes the `dev/plan-config.md` work: the last hard-coded numerics floors and
+Completes the `dev/done/plan-config.md` work: the last hard-coded numerics floors and
 a few half-migrated sizing knobs move out of `constants.py` into
 `aggregate.config`, and one dead constant is removed. Wiring follows the
 established pattern — a module-level `UPPERCASE` constant captured from
@@ -2614,7 +2614,7 @@ each value moves.
 
 - **`FT_NOISE_FLOOR` removed.** It had no live call site: the experimental
   `min|ft| < FT_NOISE_FLOOR` switch was abandoned during the numerics review with
-  zero accuracy benefit (`dev/audit-numerics-2-findings.md`). Dropped from
+  zero accuracy benefit (`dev/done/audit-numerics-2-findings.md`). Dropped from
   `constants.py` (constant + `__all__`), not migrated.
 - **`[validation]` gains `aliasing_ratio` (10), `exeqa_noise_floor` (1e-4),
   `deficit_materiality` (1e-4).** Formerly `constants.ALIASING_RATIO` /
@@ -2969,7 +2969,7 @@ wasted ~⅔ of each axis (≈89% of the 2-D cells).
 
 ### Bivariate axis sizing: measure, don't guess (MV-2)
 
-Stage MV-2 of the bivariate firm-up (`dev/plan-mv.md`). Fixes the motivating
+Stage MV-2 of the bivariate firm-up (`dev/done/plan-mv.md`). Fixes the motivating
 aliasing bug — a signed (`ssev`) bivariate book that lost **54% of its mass** to
 wrap-around because each axis was sized for its *single-event* severity, not its
 *marginal* support.
@@ -3030,7 +3030,7 @@ retire safely. Docs pending a rebuild.
 
 ### `balanced_window` + `Aggregate.focus` (bivariate sizing foundation)
 
-Stage MV-1 of the bivariate firm-up (`dev/plan-mv.md`). A *measure-don't-guess*
+Stage MV-1 of the bivariate firm-up (`dev/done/plan-mv.md`). A *measure-don't-guess*
 windowing primitive, pure 1-D — the foundation the bivariate axis sizing (MV-2/3)
 is built on. No bivariate behaviour changes yet.
 
@@ -3198,7 +3198,7 @@ bound that the FFT doubling-padding absorbs.
 
 ### Bucket-selection 1A-bucket — making the grid choice legible (`[bs-reporting]`)
 
-Fourth task of `dev/plan-univariate-bucket.md`. The bucket-grid decision is the
+Fourth task of `dev/done/plan-univariate-bucket.md`. The bucket-grid decision is the
 #1 numerical choice; this surfaces it. Pure reporting -- no change to the grid.
 
 - **`_bs_window_df` enriched** with two derived columns: `log2_need` (the log2 a
@@ -3226,7 +3226,7 @@ Fourth task of `dev/plan-univariate-bucket.md`. The bucket-grid decision is the
 
 ### Bucket-selection 1A-bucket — wiring the tail report into sizing (`[use-selection]`)
 
-Third task of `dev/plan-univariate-bucket.md`. The bucket sizer (`_bs_window`)
+Third task of `dev/done/plan-univariate-bucket.md`. The bucket sizer (`_bs_window`)
 now consults the layered tail report (`_loss_tail_classes`, `concentration`)
 instead of ad-hoc geometric proxies. Six changes, each byte-stability-gated
 against the full suite and `test_bucket_sizing.py`:
@@ -3322,7 +3322,7 @@ the tail classifier yet, so this remains report-only.
 
 ### Bucket-selection 1A-bucket — the narrative tail report (`[tail-narrative]`)
 
-Second task of `dev/plan-univariate-bucket.md`. The `tail_description` (short,
+Second task of `dev/done/plan-univariate-bucket.md`. The `tail_description` (short,
 aligned) and `tail_explanation` (verbose) properties now narrate the **layered**
 a61 `tail_df` — support and per-side tail class, not the old single-rung
 sentence. Built from one shared `Aggregate._tail_rows()` (the same `TailRow`
@@ -3415,7 +3415,7 @@ Still **byte-stable** — selection does not read the report yet.
 
 ### Bucket-selection 1A-bucket — the layered thick/thin tail report (`tail_df`)
 
-First task of `dev/plan-univariate-bucket.md` (`[tail-report]`). A new
+First task of `dev/done/plan-univariate-bucket.md` (`[tail-report]`). A new
 first-class, **spec-only** report of tail shape, built bottom-up across the
 layers that determine grid choice. `Aggregate.tail_df` returns a DataFrame with
 one row per layer — `frequency`; one per severity mix component (`comp0` …); the
@@ -3447,7 +3447,7 @@ the report yet (that is the next task, `[use-selection]`).
 
 ### Bucket-window 1A-fix — single-big-jump extent floor (heavy / signed severities)
 
-Second part of `dev/plan-bucket-window-2.md` (§1A-fix). The 3-moment
+Second part of `dev/done/plan-bucket-window-2.md` (§1A-fix). The 3-moment
 method-of-moments output window is blind to a tail the first three moments do
 not capture. Two failure faces, one root cause, are addressed by flooring the
 selected window's *extent* (not its resolution) by a single big claim on an
@@ -3499,7 +3499,7 @@ already flagged by `DefectiveDistribution`.
 
 ### Bucket-window 1A — convention-aware aggregate output windowing
 
-First step of `dev/plan-bucket-window-2.md` (Step 1, part 1A: the
+First step of `dev/done/plan-bucket-window-2.md` (Step 1, part 1A: the
 `Aggregate` sizer; part 1P, the `Portfolio` combine, follows). The automatic
 output window for a concentrated aggregate (mass band clears 0) is now
 symmetric in its estimator and oriented by the sign convention, and the band
@@ -3712,7 +3712,7 @@ audit with measured verdicts in `dev/done/audit-numerics-2-findings.md`.
 ### Numerics-1 — unit-density decoupling
 
 First plan of the numerics program (`dev/done/plan-numerics-1-unit-density.md`;
-target architecture in `dev/plan-numerics-0-meta.md`). Pure-additive accessors
+target architecture in `dev/done/plan-numerics-0-meta.md`). Pure-additive accessors
 plus migration of the display readers off the legacy
 `Portfolio.density_df['p_{unit}']` columns. No compute change; no distortion
 surface touched.
@@ -3741,7 +3741,7 @@ surface touched.
 - **Fix:** `ClassicalPremium.distribution` referenced the removed
   `Portfolio.audit_df`; empirical moments now computed directly from the pmf.
 - Stale plan pointer in the signed-path `update` warning repointed to
-  `dev/plan-numerics-2-objective.md`.
+  `dev/done/plan-numerics-2-objective.md`.
 - Tests: `tests/test_unit_density.py` (native-grid accessors, disjoint-support
   signed book, exact legacy parity gate, windowed-clip warning, and
   stripped-frame proofs that the migrated readers no longer need `p_{unit}`).
@@ -4735,7 +4735,7 @@ annotation**; a dedicated `hints{...}` clause carries build settings.
   settings emits a one-time warning (the note is treated as pure text).
 - **Migration.** The bundled `test_suite.agg` / `test_decl.agg` corpora moved
   their settings-in-notes into `hints{}`; built grids are unchanged. See
-  `dev/plan-note-parse.md`.
+  `dev/done/plan-note-parse.md`.
 
 ## 1.0.0a24
 
@@ -4747,7 +4747,7 @@ marginals. `multivariate` makes that a first-class object: two component
 `agg` / `pnl` severity factories whose per-claim severities are coupled by a
 **copula**, accumulated by a **shared** outer frequency through a 2D FFT. It
 subsumes the `1.0.0a20` `occ_bivariate` backbone into a modelled,
-DecL-declared facility. See `dev/plan-multivariate.md`.
+DecL-declared facility. See `dev/done/plan-multivariate.md`.
 
 - **Syntax.** :
 
@@ -4860,7 +4860,7 @@ combine landed in `1.0.0a22`). See `dev/done/plan-pnl-premium.md`.
 ### Portfolio combine on signed (profit/loss) support
 
 Second half (`Portfolio` scope) of the negative-x work in
-`dev/plan-negative-x-port.md` — the *combine*. A portfolio of independent
+`dev/done/plan-negative-x-port.md` — the *combine*. A portfolio of independent
 signed (P&L) units now aggregates correctly onto a shared signed grid, so a
 book that straddles 0 is a first-class object alongside the single-unit P&L
 landed in `1.0.0a21`.
@@ -4916,7 +4916,7 @@ landed in `1.0.0a21`.
 ### Negative-support (profit/loss) severity and the output window
 
 First half (`Aggregate` scope) of the negative-x work in
-`dev/plan-negative-x-agg.md`. A *profit is a negative loss*, so an aggregate
+`dev/done/plan-negative-x-agg.md`. A *profit is a negative loss*, so an aggregate
 can now live on a signed grid, making profit/loss (P&L) distributions a
 first-class object.
 
@@ -4979,7 +4979,7 @@ first-class object.
   declaration only -- the `ssev` keyword is the **only** DecL change, and there
   is no `signed=` argument. New `tests/test_negative_x.py` (28 cases).
 
-- **Deferred to the Portfolio half** (`dev/plan-negative-x-port.md`):
+- **Deferred to the Portfolio half** (`dev/done/plan-negative-x-port.md`):
   portfolio combine on signed support, the full `Portfolio.density_df` column
   audit (esp. the price column / `add_exa`), and distortion/pricing
   consumption of `value_type`. The `ft.py` recentering helpers are not yet
@@ -5132,7 +5132,7 @@ first-class object.
   `augmented_df` / `pricing_at` / `price()` to parquet at
   `rtol=1e-12`, with a pinned manifest recording versions + commit SHA.
   `tests/test_baseline.py` runs every case before reporting, collecting
-  all divergences into one summary (see `dev/plan-baseline-harness.md`).
+  all divergences into one summary (see `dev/done/plan-baseline-harness.md`).
   Adds `pyarrow>=15` to dev extras.
 - Pandas Copy-on-Write is now opted in at package import for pandas 2.x
   (pandas \>= 3.0 has CoW on as the default, so the option-setter is a

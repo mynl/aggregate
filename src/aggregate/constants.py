@@ -188,7 +188,8 @@ class ZeroPremiumCessionWarning(UserWarning):
     the recovery is real, the premium is zero, and the program still routes
     through the full guaranteed-cost machinery (consolidated ``pnl`` /
     ``xpnl`` walk) rather than degrading to the plain face
-    ([XPnL-Zero-Premium-Cessions], ``dev/PLAN-A.md``). The warning names the
+    ([XPnL-Zero-Premium-Cessions],
+    ``dev/done/plan-pnl-faces-punchlist.md``). The warning names the
     side(s); silence it by pricing the cover. Feature-decorated sides are
     exempt (the feature owns the premium slot), as is a reinstated
     occurrence layer (which *requires* a base premium clause).
@@ -208,7 +209,8 @@ class CoarseJointGridWarning(UserWarning):
     (they check pushforward-vs-exact on the *same* grid). Warn when a kink
     region spans fewer than
     :data:`~aggregate._pnl_builders.JOINT_KINK_MIN_BUCKETS` buckets
-    ([Reinst-Joint-Grid-Adequacy], ``dev/PLAN-A.md``); the remedy is the
+    ([Reinst-Joint-Grid-Adequacy],
+    ``dev/done/plan-pnl-faces-punchlist.md``); the remedy is the
     joint grid knobs (``bs`` / ``log2_x`` / ``log2_y``, forwarded to
     :meth:`~aggregate.Aggregate.occ_bivariate`).
 

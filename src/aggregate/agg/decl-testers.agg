@@ -693,7 +693,7 @@ agg IG.Swing 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3
 # AA. The pnl/xpnl composition matrix ([One-Classifier-Fix])
 #                                   (tests/test_composition_matrix.py)
 # ============================================================
-# Two-tier classification (dev/PLAN-A.md): the occurrence tier
+# Two-tier classification (dev/done/plan-pnl-faces-punchlist.md): the occurrence tier
 # {none | gc | reinstatements} and the aggregate tier {none | gc | feature}
 # classify independently and dispatch on the pair. The previously
 # silently-wrong cells: a feature on the aggregate cover composed with an

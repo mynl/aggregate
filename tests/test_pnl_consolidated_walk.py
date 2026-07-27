@@ -7,7 +7,8 @@ gross -> Occ Cover -> Agg Cover -> All as a per-atom tower over the
 occurrence (gross, ceded) joint (a141: the marginal stitch retired in favor
 of a footing scenario-κ ladder; walk means are joint-grid accurate). Plus
 the [Construction-Introspection] smoke tests. See
-``dev/plan-pnl-consolidated-xpnl-walk.md`` and ``dev/PLAN-A.md``.
+``dev/done/plan-pnl-consolidated-xpnl-walk.md`` and
+``dev/done/plan-pnl-faces-punchlist.md``.
 """
 
 import numpy as np

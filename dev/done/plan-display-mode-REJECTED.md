@@ -1,4 +1,13 @@
-# Plan — `dev` / `user` display mode via a `ReprMixin`
+# Plan — `dev` / `user` display mode via a `ReprMixin` — REJECTED
+
+> **REJECTED 2026-07-27 (author): "not worth effort."** Never executed — there
+> is no `ReprMixin` or `display_mode` anywhere in `src/`. The `[Display-Mode]`
+> item is struck from `dev/TODO.md`; the reasoning is summarized in
+> `dev/done/plans-considered-and-rejected.md`. The one durable idea inside it —
+> a *required* display surface every first-class object must expose — is already
+> served by `dev/FEATURES.csv` + `tests/test_fcc_surface.py`, and the
+> report-shape question it was gated behind lives on as `[Reporting-Guidelines]`
+> (`dev/reporting-guidelines.md`). Text below is the original draft, unedited.
 
 > **Status: DRAFT — not executed.** A **presentation-only** mode toggle that
 > chooses *which* view a first-class object renders, without changing any

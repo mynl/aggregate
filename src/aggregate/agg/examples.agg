@@ -2,29 +2,23 @@
 # examples.agg  --  the curated DecL example library for v1.0
 # ======================================================================
 #
-# Version: 2
+# Version: 3
 #   (Bump on every meaningful change to the example set. Just count up.)
 #
 # PURPOSE
 # -------
 # The small, hand-picked set of examples that is the public face of
-# `aggregate`. It is used in three places, so every line earns its keep:
+# `aggregate`. It is used in three places:
 #
 #   1. The DEFAULT `build` Underwriter -- what users get out of the box
 #      ([build] databases = ["examples"] in config; this is now the
 #      shipped default).
-#   2. The "aggregate in twenty minutes" intro (dev/intro-20min.qmd),
-#      which walks ~16 of these at roughly one per minute.
-#   3. The Examples dropdown of the aggregate_api SPA playground
+#   2. The Cookbook walks through many of these examples
+#   3. The Examples dropdown of the aggregate_api (aLL) SPA playground
 #      (parsed by aggregate_api/examples.py via GET /v1/examples).
 #
 # It is deliberately NOT comprehensive -- it shows the IMPORTANT ideas,
 # not every DecL feature. Full feature coverage lives in `cookbook.agg`.
-#
-# COMPOSITION (~36): 4 showcase heroes (section A), 2 severities, 2
-# distortions (PH + a minimum of two -- the minimum consumes a second
-# leaf, so three `dist` lines), ~21 aggregates, 8 portfolios (two
-# reserved for the sample-driven cases).
 #
 # FORMAT (read by aggregate_api/examples.py)
 # ------------------------------------------
@@ -42,31 +36,12 @@
 #   * A statement may span multiple lines with any indentation (used by the
 #     portfolios for readability); its lines fold into one logical statement.
 #
-# DESIGN -- two crossing axes
-# ---------------------------
-#   * DecL CAPABILITY: exposure (claims / loss / premium-at-lr, incl. the
-#     premium x limit x loss-ratio table that derives implied counts),
-#     limit profiles, severity mixtures / empirical / spliced, mixed
-#     frequency, shared mixing (common shock), occurrence vs aggregate
-#     reinsurance, ceded/net, portfolios, P&L (signed) support,
-#     dependence (copula), dfreq/dsev.
-#   * NUMERICAL CHARACTER: thin vs thick tails (and bounded-but-thick),
-#     left- vs right-concentrated mass, frequency- vs severity-driven
-#     thickness, power-law vs lognormal sub-exponential tails, windowing
-#     of a concentrated high-mean book, and the cases where the
-#     auto-sizer refuses to guess.
-#
-# 20-MINUTE INTRO COVERAGE (~16): B.ThreeDice, B.Basic, C.Pareto,
-#   D.Poisson + D.MixedGamma (the pair), E.ByLoss, E.LimitProfile,
-#   E.Mixed, F.OccXOL, F.AggStop, G.Book, G.ThickThin, H.PnL, I.Copula,
-#   J.Heavy, J.Windowed, K.PH. (The rest are reference depth.)
-#
 # Contents
 # --------
 # A. Showcase -- real-world books (landing-page heroes)
 # B. Getting started
 # C. Severity objects
-# D. Frequency -- Poisson is an opinion
+# D. Frequency -- Poisson and beyond
 # E. Exposure and limit profiles
 # F. Reinsurance, gross to net
 # G. Portfolios, capital, and a first price
@@ -79,7 +54,7 @@
 # ----------------------------------------------------------------------
 # A. Showcase
 # ----------------------------------------------------------------------
-# The landing-page heroes -- four real-world books that show the range in
+# The landing-page heroes -- examples that show the range in
 # one line each: a cat ILW tower, a P&C portfolio, an exposure-rated
 # limit profile, and a net/ceded XOL view. (Drafts -- amounts and grids
 # still being tuned; some carry heavy-severity validation notes.)
@@ -140,13 +115,26 @@ agg Tweedie
 # ----------------------------------------------------------------------
 # Discrete inputs make the method's promise concrete: the answer is
 # EXACT and the validation error columns are identically zero.
-agg B.ThreeDice dfreq [3] dsev [1:6] note{Sum of three dice -- exact discrete aggregate; zero validation error.};
+agg B.ThreeDice
+    dfreq [3]
+    dsev [1:6]
+    note{Sum of three dice -- exact discrete aggregate; zero validation error.};
+
 # Two more discrete idioms: explicit [outcomes] [probabilities] for the
 # frequency, and a stepped range [start:stop:step] for the severity.
-agg B.Discrete dfreq [1 2 3] [.5 .3 .2] dsev [2:10:2] note{Explicit [outcomes] [probs] frequency; severity on the stepped grid 2, 4, 6, 8, 10.};
+agg B.Discrete
+    dfreq [1 2 3] [.5 .3 .2]
+    dsev [2:10:2]
+    note{Explicit [outcomes] [probs] frequency; severity on the stepped grid 2, 4, 6, 8, 10.};
+
 # The canonical continuous compound: Poisson frequency, lognormal
 # severity, capped per occurrence -- the book used throughout the intro.
-agg B.Basic 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson note{Plain Poisson / lognormal aggregate -- the workhorse compound distribution.}
+agg B.Basic
+    250 claims
+    1000 xs 0
+    sev lognorm 100 cv 1.5
+    poisson
+    note{Plain Poisson / lognormal aggregate -- the workhorse compound distribution.}
 
 
 # ----------------------------------------------------------------------
@@ -158,46 +146,81 @@ agg B.Basic 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson note{Plain Poiss
 #
 # Pareto: the classic cat / large-loss curve, parameterized scale * shape
 # then shifted to ground-up support. Heavy and a little fiddly.
-sev C.Pareto 1000 * pareto 1.8 - 1000 note{Single-parameter Pareto large-loss curve (scale 1000, shape 1.8), shifted to ground-up.};
+sev C.Pareto
+    1000 * pareto 1.8 - 1000
+    note{Single-parameter Pareto large-loss curve (scale 1000, shape 1.8), shifted to ground-up.};
+
 # Mixed exponential: the curve US actuaries know from ISO/Verisk size-of-
 # loss tables. NOTE this one CANNOT be materialized as a standalone Sev
 # object (a mixture has no single frozen scipy rv) -- aggregate stores
 # the spec and you fold it into an `agg`, e.g. the E.Mixed pattern. A bit
 # grungy, but it is what it is.
-sev C.MixedExp [10 50 200] * expon wts [.6 .3 .1] note{Mixed exponential (ISO/Verisk style). Can't stand alone as a Sev -- fold it into an agg.}
-
+sev C.MixedExp
+    [10 50 200] * expon wts [.6 .3 .1]
+    note{Mixed exponential (ISO/Verisk style). Can't stand alone as a Sev -- fold it into an agg.}
 
 # ----------------------------------------------------------------------
-# D. Frequency -- Poisson is an opinion
+# D. Frequency -- Poisson and beyond
 # ----------------------------------------------------------------------
 # Same severity, two frequency assumptions, side by side. Real claim
 # counts are over-dispersed: years differ for shared reasons (weather,
 # inflation, the legal climate). `mixed gamma 0.4` puts a gamma
 # multiplier (CV 0.4) on the Poisson mean -- a negative binomial by
 # another road -- and it drives required capital up materially.
-agg D.Poisson    100 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson note{Poisson frequency -- the no-contagion baseline.};
-agg D.MixedGamma 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 mixed gamma 0.4 note{Same severity, over-dispersed counts (gamma-mixed Poisson = negative binomial).};
+agg D.Poisson
+    100 claims
+    1000 xs 0
+    sev lognorm 100 cv 1.5
+    poisson
+    note{Poisson frequency -- the no-contagion baseline.};
+
+agg D.MixedGamma
+    100 claims
+    1000 xs 0
+    sev lognorm 100 cv 1.5
+    mixed gamma 0.4
+    note{Same severity, over-dispersed counts (gamma-mixed Poisson = negative binomial).};
+
 # A bounded count: binomial n = 20, p = 0.5 (mean 10).
-agg D.Binomial 10 claims dsev [1] binomial 0.5 note{Bounded claim count -- binomial (here n = 20, p = 0.5).}
+agg D.Binomial
+    10 claims
+    dsev [1]
+    binomial 0.5
+    note{Bounded claim count -- binomial (here n = 20, p = 0.5).}
+
 # Zero-modified Poisson -- inflate the no-claim probability. COMMENTED
 # OUT pending the ZT/ZM redesign (TODO B4: input the base mean, ship a
 # shift helper); counts toward the set but does not run in tests.
 # agg D.ZMPoisson 4 claims dsev [1] poisson zm 0.5 note{Zero-modified Poisson -- inflate the probability of a no-claim year.}
-
 
 # ----------------------------------------------------------------------
 # E. Exposure and limit profiles
 # ----------------------------------------------------------------------
 # Volume can be a claim count, an expected loss, or a premium-at-a-loss-
 # ratio -- and these vectorize into a profile.
-agg E.ByLoss 500 loss sev lognorm 50 cv 0.8 poisson note{State expected loss; the claim count is derived.};
+agg E.ByLoss
+    500 loss
+    sev lognorm 50 cv 0.8
+    poisson
+    note{State expected loss; the claim count is derived.};
+
 # THE BIG ONE: a premium x limit x loss-ratio table (the shape every
 # pricing actuary already has). aggregate derives the implied claim
 # count per row so the limit bands are weighted correctly.
-agg E.LimitProfile [1000 2000 500] prem at [.8 .7 .5] lr [1000 2000 5000] xs 0 sev lognorm 50 cv 1.5 poisson note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.};
+agg E.LimitProfile
+    [1000 2000 500] prem at [.8 .7 .5] lr
+    [1000 2000 5000] xs 0
+    sev lognorm 50 cv 1.5
+    poisson
+    note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.};
+
 # Mixed exposure + mixed severity + mixed frequency in one book: the
 # shared frequency mixer correlates the components (visible in stats_df).
-agg E.Mixed [1000 2000 500] prem at [.8 .7 .5] lr sev lognorm 10 cv [.35 .5] wts [5/8 3/8] mixed gamma 0.5 note{Mixed exposure, severity, and frequency -- shared mixing shows up in stats_df.}
+agg E.Mixed
+    [1000 2000 500] prem at [.8 .7 .5] lr
+    sev lognorm 10 cv [.35 .5] wts [5/8 3/8]
+    mixed gamma 0.5
+    note{Mixed exposure, severity, and frequency -- shared mixing shows up in stats_df.}
 
 
 # ----------------------------------------------------------------------
@@ -206,12 +229,48 @@ agg E.Mixed [1000 2000 500] prem at [.8 .7 .5] lr sev lognorm 10 cv [.35 .5] wts
 # Occurrence (per-claim) and aggregate (per-year) programs are each one
 # clause. Shares read naturally: "50% po 2500 xs 2500" is half of the
 # 2500-xs-2500 layer (po = part of).
-agg F.OccXOL 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Occurrence excess-of-loss program, net view.};
-agg F.Ceded 1250 premium at 80% lr 1000 xs 0 sev lognorm 80 cv 1.675 occurrence ceded to 125 xs 0 and 50% po 125 xs 125 and 20% po 250 xs 250 and 5% po 500 xs 500 poisson note{Layered occurrence reinsurance tower, ceded view.};
-agg F.AggStop 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson aggregate net of 5000 xs 30000 note{Aggregate stop-loss -- net of an annual 5000-xs-30000 layer.};
-# The joint gross / ceded / net law of a reinsured book in one object.
-netceded agg F.NetCeded 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Joint gross / ceded / net view of the reinsured book.}
+agg F.OccXOL
+    15 claims
+    10000 xs 0
+    sev lognorm 1500 cv 1.0
+    occurrence net of
+        50% po 2500 xs 2500 and
+        90% po 5000 xs 5000
+    mixed gamma 0.25
+    note{Occurrence excess-of-loss program, net view.};
 
+agg F.Ceded
+    1250 premium at 80% lr
+    1000 xs 0 sev
+    lognorm 80 cv 1.675
+    occurrence ceded to
+        125 xs 0 and
+        50% po 125 xs 125 and
+        20% po 250 xs 250 and
+        5% po 500 xs 500
+    poisson
+    note{Layered occurrence reinsurance tower, ceded view.};
+
+agg F.AggStop
+    100 claims
+    1000 xs 0
+    sev lognorm 100 cv 1.5
+    poisson
+    aggregate net of
+        5000 xs 30000
+    note{Aggregate stop-loss -- net of an annual 5000-xs-30000 layer.};
+
+# The joint gross / ceded / net law of a reinsured book in one object.
+netceded
+    agg F.NetCeded
+        15 claims
+        10000 xs 0
+        sev lognorm 1500 cv 1.0
+        occurrence net of
+            50% po 2500 xs 2500 and
+            90% po 5000 xs 5000
+        mixed gamma 0.25
+        note{Joint gross / ceded / net view of the reinsured book.}
 
 # ----------------------------------------------------------------------
 # G. Portfolios, capital, and a first price
@@ -226,6 +285,7 @@ port G.Book
     agg Property 80 claims  500 xs 0 sev lognorm  50 cv 1.2 poisson
     agg Casualty 20 claims 2000 xs 0 sev lognorm 250 cv 2.0 mixed gamma 0.4
     note{Two-unit book: thin property + mixed-frequency casualty. Capital and price downstream.};
+
 # thick + thin: a heavy but BOUNDED cat line (limited, so finite moments,
 # yet genuinely fat in the body) diversifying a stable attritional line.
 # This is where the interesting allocation behaviour lives.
@@ -233,30 +293,35 @@ port G.ThickThin
     agg NonCat 200 claims 100 xs 0 sev gamma   8 cv 0.30 poisson
     agg Cat      2 claims 5000 xs 0 sev lognorm 500 cv 4.0 poisson
     note{Thin attritional + bounded-but-thick cat -- the rich diversification case.};
+
 # thin + thin: two tightly concentrated units (the PIR Tame shape);
 # the total is nearly Gaussian.
 port G.ThinThin
     agg A 1 claim sev gamma 50 cv 0.10 fixed
     agg B 1 claim sev gamma 50 cv 0.15 fixed
     note{Two thin, concentrated units -- nearly Gaussian total.};
+
 # thick + thick: two unbounded heavy lognormals; diversification is weak
 # and the tail dominates.
 port G.ThickThick
     agg A 100 claims sev lognorm 50 cv 3.0 poisson
     agg B 100 claims sev lognorm 80 cv 3.5 poisson
     note{Two unbounded heavy-tailed units -- little diversification, tail-driven.};
+
 # Common shock: two units sharing the SAME gamma frequency mixer are
 # positively correlated (the dependence cat modelers expect).
 port G.Shared
     agg A 100 claims sev lognorm 50 cv 1.5 mixed gamma 0.4
     agg B 120 claims sev lognorm 60 cv 1.5 mixed gamma 0.4
     note{Shared frequency mixer = common shock; correlated units on one grid.};
+
 # A discrete allocation thought-experiment (Bodoff): bounded atoms make
 # capital allocation hand-checkable.
 port G.Bodoff
     agg Wind  1 claim dsev [0 99]  [0.80 0.20] fixed
     agg Quake 1 claim dsev [0 100] [0.95 0.05] fixed
     note{Bodoff thought-experiment -- discrete two-peril allocation.}
+
 # PLACEHOLDERS for the two sample-driven portfolios (build-from-sample
 # and the Sample "switcheroo"). These are a Python-API construction, not
 # pure DecL, so they are reserved here pending the sampling redesign
@@ -271,7 +336,7 @@ port G.Bodoff
 # A profit is a negative loss. The `pnl` keyword builds premium-minus-
 # loss; a dsev with a negative atom carries genuine signed support and
 # auto-windows around a possibly-negative mean.
-pnl H.PnL 1000 prem less agg H.PnL_e 1000 prem at 70% lr sev lognorm 100 cv 2 poisson note{Premium minus loss: E[loss] = 700, expected margin 300.};
+
 agg H.Signed dfreq [3] dsev [-2 5] [.5 .5] note{Signed severity -- negative outcomes allowed (closed-form support).}
 
 

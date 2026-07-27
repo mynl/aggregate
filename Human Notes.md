@@ -1,20 +1,71 @@
+# Running docs - reminder
+
+```bash
+# html doc from REFACTOR
+$log = "T:\tmp\build-log-$(Get-Date -Format yyyyMMdd-HHmmss).log"
+.\doc-test-uv.ps1 -Lenient 2>&1 | Tee-Object -FilePath $log
+```
+
+# The Plan - in English (2026-07-27)
+## Steps to Release
+Key clarifying point (adapted): distinguish
+
+- **Programs that exercise the API** carry almost all the design signal.
+- **Programs that explain the API** carries essentially none.
+
+> Prose written about an unfrozen API is what gets thrown away. Programs written against an unfrozen API are what freezes it.
+
+A note on docs: docs blend code-generated contents (ch 3 and 4) with custom written examples and theory (ch 2 and 5). Plan calls for chs 2 and 5 material to be stripped out and placed in a separate Monograph document (to be submitted to the CAS for publication). A stripped down version of the monograph becomes an AAS-software series paper - which extends the existing AAS paper on just the `Aggregate` class. With that background, here is my **proposed timeline**:
+
+1. Publish a Beta tag, which requires
+	1. Fixed interface
+	2. Interface validated through automated ability to check FCC &c coverage -> requires complete set of programs that **exercise** the API
+	3. Docs build with complete auto-code coverage (ch 3 and 4), but no extension to existing Ch 2 and 5 (and see below)
+	4. Example exercising-libraries complete - extended use of existing `notes{...}` capability for tags, keywords, narrative purpose, groups. Illustrating features bs stress testing all options. Type of example?
+	5. Update cheat sheets (auto and easy)
+	6. Update README as GitHub front-door
+	7. After tagging 1.0.0b1: Merge refactor branch, start new beta branch
+	8. No release publicity
+
+2. API finalized against beta w heroes and example explain-libraries; first publicity opportunity
+
+3. We then finalize supporting materials
+	1. **Traditional Docs** (rst) excluding ch 2 and 5, leaving a cleaner documentation build; (semi auto and reasonably easy; they already build w beta tag)
+	2. Build CAS **Monograph** (quarto qmd format) (semi auto) (theory / practice=Cookbook)
+		1. Base = Ch 2 and 5 of docs -> can you do a rst to qmd port?
+		2. Cookbook formalism and consistent examples (recipe objective; decl; build & validate; exhibits; the check ("beat 4")) (covers 2.5 to 2.13 of current docs)
+		3. Reproducing/extending published examples folded into same cookbook design/process (each becomes a recipe)
+	3. **AAS** draft "white" paper (semi auto) = much shorter, tighter version of Monograph
+	5. **Education manifesto** and CAS entry (9/18 deadline) = learning objective wrap around Monograph (separate and non-blocking for v1.0)
+
+4. Finalize v1.0 and "quiet publish" push to GHub
+
+5. Publicity and press release kit for whole launch (agg, API, docs + Monograph/Cookbook, strong draft for monograph,  strong draft for AAS)
+
+6. Release v1.0 with all supporting material
+
+Monograph chapters
+1. general theory
+2. class overview
+3. DecL
+4. Cookbook
+
+
 # NOTES 2026-07-14
 
-- [ ] new features in Cookbook 
-  - [ ] bv related 
-  - [ ] pnl, xpnl related 
+- [ ] new features in Cookbook
+  - [ ] bv related
+  - [ ] pnl, xpnl related
   - [ ] Bounds, PricingBounds, AllocationBounds
   - [ ] Consistent FCC
     - [ ] Definition of FCC
-      * help, 
+      * help,
     - [ ] Who are FCCs
-  - [ ] Rebuild docs 
+  - [ ] Rebuild docs
 
-- [ ] Beta DOD
-  - [ ] All F
 
 - [ ] Potential issues
-  - [ ] window with dfreq/dsev (life insurance examples) 
+  - [ ] window with dfreq/dsev (life insurance examples)
   - [ ] _sev_label crashes on array-valued sevs (ValueError: truth value of an array…) — Human Notes "hygiene-3".
   - [ ] [Signed-Bounded-Window] — int(inf) overflow in the sizer + silently-ignored layer on signed severity (has a draft plan).
   - [ ] [ZT-ZM-Frequency-Fix] — zero-truncated/modified frequency broken.
@@ -22,10 +73,10 @@
   - [ ] Port with no negative severity should have _bs_window_df is None.
   - [ ] The remove-fuzz df.mask(df.abs() < eps, 0.0) cleanup — done in Agg/Port but only called in Portfolio.
 
-  
-*** 
 
-## Rebuild Docs
+***
+
+## UV Tips and Tricks
 
 ```bash
 $env:UV_LINK_MODE = "copy"
@@ -38,31 +89,16 @@ uv sync --extra dev --extra notebook
 uv run jupyter lab
 ```
 
-## Rebuild quarto 
-```bash 
+Rebuild quarto
+
+```bash
 cd T:\tmp\quarto
 $env:QUARTO_PYTHON = "T:\worktrees\aggregate_REFACTOR\.venv\Scripts\python.exe"
 quarto preview        # live-reload in the browser; or just open _site\index.html
+```
 
 The QUARTO_PYTHON line matters — it points Quarto at the repo venv so import aggregate resolves
-```
 
-SWIM - see what i mean
-AQIN - ask questions if needed
-gummage -> ! 
-
-Comprehensive remove fuzz improvements. what is done for Portfolio (which columns)? Mask approach seems best. This is done in Aggregate and Portfolio - but only called as a function in Portfolio. 
-
-```python
-df.mask(df.abs() < eps, 0.0)
-```
-
-
-1. Test Pricing Bounds and Pricing Allocation; impacts on gini p
-2. Test mv, pnl, ssev etc. (new decl terms)
-3. docs/2_user_guides/2_x_re_pricing.rst (~lines 210–216) listing removed by-layer names like reinsurance_audit_df  
-4.  `decl_pprint` is a bit mystifying 
-5. port with no neg sev should have a None _bs_window_df
 
 ***
 ### Nits and Gnats
@@ -73,11 +109,6 @@ df.mask(df.abs() < eps, 0.0)
            ^^^^^^^^^
 ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
 
-### Juggling Balls
-
-- [ ] freeze testing - see ipynb - seems to work... 
-
-***
 
 ### Build Docs  / Run Tests
 ```python
@@ -88,7 +119,7 @@ uv run pytest -q 2>&1 | tail -40 (24s)
 $log = "T:\tmp\build-log-$(Get-Date -Format yyyyMMdd-HHmmss).log"
 .\doc-test-uv.ps1 -Lenient 2>&1 | Tee-Object -FilePath $log
 
-# text mode 
+# text mode
  $log = "T:\tmp\build-log-text-$(Get-Date -Format yyyyMMdd-HHmmss).log"
 .\doc-test-uv.ps1 -Text -Lenient -OutputDir T:\doc-diff\agg-doc-diff\text 2>&1 | Tee-Object -FilePath $log
 ```
@@ -111,7 +142,7 @@ uv run --project "$here" --with uber_shell --with-editable "$here\hacks" uber
 
 ***
 
-This takes a weirdly long time to compute. The individual aggs don't? 
+This takes a weirdly long time to compute. The individual aggs don't?
 
 ```python
 port = build('port Test2 '
@@ -139,25 +170,25 @@ a3
 Pricing Bounds
 =================
 
-Read the following for background. It contains a way to determine the range of natural allocations to each unit consistent with a given price for the total. This goes via determining the graphs (TvaR(X), NA to Xi) which is done by the first function. that function appears to work quite well. Then there is the next step of determining the convex hulls of the graphs. that step the proposal looks a bit long  and im not sure it makes the most of what we know about the input data (which will come from Portfolio.density_df in the obvs. way). This is all heading towards re-writing Portfolio.pricing_bounds. There is probably overlap with bounds.py too. 
+Read the following for background. It contains a way to determine the range of natural allocations to each unit consistent with a given price for the total. This goes via determining the graphs (TvaR(X), NA to Xi) which is done by the first function. that function appears to work quite well. Then there is the next step of determining the convex hulls of the graphs. that step the proposal looks a bit long  and im not sure it makes the most of what we know about the input data (which will come from Portfolio.density_df in the obvs. way). This is all heading towards re-writing Portfolio.pricing_bounds. There is probably overlap with bounds.py too.
 
-The ask is this: I want a clean, fast and efficient implmentation of a pricing_bounds function. I think ideally it returns a function of the total premium which when called on P returns the upper and lower bounds by unit, along with information about the bitvars that achieve each. I'm open to exact shape and form. I'd like to try this out in a hackathon. I want you to 1) digest, 2) confirm/clarify understanding, 3) sketch your approach, using or not the code below, 4) implement your code in a function(s) in ./hacks/pb.py that i can play around with (import pb; ans = pb.<do work>(port); etc.). Once we are all set on that, it can be integrated into bounds.py and/or portfolio.py. 
+The ask is this: I want a clean, fast and efficient implmentation of a pricing_bounds function. I think ideally it returns a function of the total premium which when called on P returns the upper and lower bounds by unit, along with information about the bitvars that achieve each. I'm open to exact shape and form. I'd like to try this out in a hackathon. I want you to 1) digest, 2) confirm/clarify understanding, 3) sketch your approach, using or not the code below, 4) implement your code in a function(s) in ./hacks/pb.py that i can play around with (import pb; ans = pb.<do work>(port); etc.). Once we are all set on that, it can be integrated into bounds.py and/or portfolio.py.
 
 Good to go?
 
 ---
 
 
-Background: in my paper on similar risks  i identify all distortions g that price a given risk X to a price P. the idea is that the set of such g is the closed convex hull of bitvars that achieve P and these are easy to identify. there is a p* st TVaR(p*)(X) = P. Then given any p1 < p < p2 we can find a w so that the p1, p2 bitvar with weight w (usually on p2 by my convention in Aggregate) achieves P. These are the extreme points of G_P := { g | g(X) = P }. Now, i am interested in determining the range of natural allocations in this sense. X = sum X_i is a decomposition into a finite number of units i. For g we have the natural alloc premium to unit i which equals P(X_i g'(S(X))) (plus modification for non-diff). Since everything is linear the NA to a weighted g is the weighted NA, so the NA of unit i is the co conv of the bitvar allocs. thus to determine the range of NAs we just need to calc all the bitvar NAs. The extreme points will also be boundary points - so the extreme na occurs at a bitvar. 
+Background: in my paper on similar risks  i identify all distortions g that price a given risk X to a price P. the idea is that the set of such g is the closed convex hull of bitvars that achieve P and these are easy to identify. there is a p* st TVaR(p*)(X) = P. Then given any p1 < p < p2 we can find a w so that the p1, p2 bitvar with weight w (usually on p2 by my convention in Aggregate) achieves P. These are the extreme points of G_P := { g | g(X) = P }. Now, i am interested in determining the range of natural allocations in this sense. X = sum X_i is a decomposition into a finite number of units i. For g we have the natural alloc premium to unit i which equals P(X_i g'(S(X))) (plus modification for non-diff). Since everything is linear the NA to a weighted g is the weighted NA, so the NA of unit i is the co conv of the bitvar allocs. thus to determine the range of NAs we just need to calc all the bitvar NAs. The extreme points will also be boundary points - so the extreme na occurs at a bitvar.
 
---> 
+-->
 
 Yes -- for a scalar natural allocation, I concur, with one qualification.
 
 Let $T(p)=\operatorname{TVaR}_p(X)$ and let $a_i(p)$ be the TVaR natural allocation to unit $i$. A pricing distortion represented by a Kusuoka measure $\mu$ has
 
-$$  
-\rho_\mu(X)=\int T(p)\mu(dp), \qquad A_i(\mu)=\int a_i(p)\mu(dp).  
+$$
+\rho_\mu(X)=\int T(p)\mu(dp), \qquad A_i(\mu)=\int a_i(p)\mu(dp).
 $$
 
 The constraint $\rho_\mu(X)=P$ is one affine constraint on probability measures. Your paper uses exactly the corresponding hyperplane/simplex geometry: the extreme consistent measures are the pure $p^_$ TVaR and two-point TVaR mixtures with $p_1\le p^_\le p_2$, with weight chosen to hit $P$. The proof uses Dubins/Bauer to reduce extrema of affine functionals to those extreme points.
@@ -168,14 +199,14 @@ The Clever Reduction
 
 For unit $i$, the bitvar allocation from $p_1,p_2$ is just the height at $T=P$ of the chord joining the two points $(T(p_1),a_i(p_1))$ and $(T(p_2),a_i(p_2))$:
 
-$$  
-B_i(p_1,p_2)=a_i(p_1)+{P-T(p_1)\over T(p_2)-T(p_1)}{a_i(p_2)-a_i(p_1)}.  
+$$
+B_i(p_1,p_2)=a_i(p_1)+{P-T(p_1)\over T(p_2)-T(p_1)}{a_i(p_2)-a_i(p_1)}.
 $$
 
 Therefore, the allocation range for unit $i$ is the vertical slice at $T=P$ through the convex hull of the parametric curve
 
-$$  
-C_i={(T(p),a_i(p)):0\le p\le 1}.  
+$$
+C_i={(T(p),a_i(p)):0\le p\le 1}.
 $$
 
 So we do not need a 2D sweep over all $(p_1,p_2)$. Compute the lower and upper convex envelopes of the curve $a_i$ as a function of $T$. The lower envelope at $P$ gives the minimum allocation, and the upper envelope at $P$ gives the maximum allocation. The edge of the hull that crosses $T=P$ identifies the two optimal TVaR levels $p_1,p_2$ and the weight $w$.
@@ -184,8 +215,8 @@ Practical Algorithm
 
 Compute a grid $p_j$, including $0$, $1$, $p^*$, and all important CDF breakpoints. For each $p_j$, compute $T_j=\operatorname{TVaR}_{p_j}(X)$ and $a_{ij}=\operatorname{NA}_i(\operatorname{TVaR}_{p_j})$. Sort the points $(T_j,a_{ij})$ by $T_j$. For each unit $i$, run a monotone-chain convex hull algorithm on those 2D points. Intersect the lower and upper hulls with the vertical line $T=P$. If the relevant hull edge joins $j,k$, then the optimal bitvar is $(p_j,p_k,w)$ with
 
-$$  
-w={P-T_j\over T_k-T_j}.  
+$$
+w={P-T_j\over T_k-T_j}.
 $$
 
 This changes the calculation from an $O(n^2)$ pair sweep to roughly $O(n\log n)$, or $O(n)$ after sorting. For an Aggregate-style discrete distribution, using the CDF breakpoints should often be exact for the discretized distribution, because TVaR and the canonical TVaR allocation vary linearly with one another inside a probability atom.
@@ -194,8 +225,8 @@ Dual View
 
 The same method is the LP dual in geometric form. The lower allocation is
 
-$$  
-\sup_{\alpha,\beta}{\alpha+\beta P:\alpha+\beta T(p)\le a_i(p)\ \text{for all }p},  
+$$
+\sup_{\alpha,\beta}{\alpha+\beta P:\alpha+\beta T(p)\le a_i(p)\ \text{for all }p},
 $$
 
 and the upper allocation replaces $\le$ by $\ge$ and takes the corresponding infimum. The optimizing bitvar endpoints are the contact points of the supporting line. In a smooth continuous case, those contacts satisfy the equal-slope condition $a_i'(p)/T'(p)=\beta$ at both endpoints, but the hull method is more robust numerically.
@@ -589,6 +620,6 @@ def slice_na_hulls(hulls, prices, price_atol=None):
           .set_index(["price", "unit"])
           .sort_index()
     )
-    
+
 ```
 

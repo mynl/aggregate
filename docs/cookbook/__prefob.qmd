@@ -1,3 +1,7 @@
+---
+wd-python:  T:/worktrees/aggregate_REFACTOR/.venv/Scripts/python.exe
+---
+
 <!-- this file provides setup so that the cookbook previews in writedown -->
 
 ```{python}

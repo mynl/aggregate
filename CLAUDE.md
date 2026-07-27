@@ -239,14 +239,38 @@ These are standing rules — follow them without being re-asked:
 - **Keep `dev/TODO.md` current.** When a tracked item lands, mark it done (and
   note the version / `dev/done/plan-*.md`); when scope shifts, edit the entry.
   Move a completed plan from `dev/` to `dev/done/`.
-- **The author does the commits — frequently, without announcing them. Run
-  `git status` / `git log` before writing anything about what is or isn't
-  committed.** Do not commit unless explicitly asked. The author commits each
-  task themselves, often immediately, so a "still uncommitted, want me to
-  commit?" note written from memory is routinely *wrong* by the time it is read.
-  So: never assert commit state from what happened earlier in the session —
-  check the actual git status first, and only mention uncommitted work if the
-  working tree really is dirty (e.g. an *expected* commit is missing). When in
+- **Claude commits version bumps; the author commits everything else.** Every
+  version bump is committed by Claude as its own commit, at the moment it lands.
+  A multi-step implementation that bumps three times leaves three commits, so
+  the history stays **bisectable** — one bump, one commit, never batched, never
+  deferred to the end. Anything that does *not* bump the version (pure tidying,
+  file moves, doc-only edits, work in progress) is left uncommitted for the
+  author to handle.
+- **Version-bump commit messages are ONE LINE.** House format, unchanged from
+  existing history:
+
+  ```
+  [Descriptive-Label] a149: terse summary of what landed
+  ```
+
+  Subject only — **no body, no trailers, no `Co-Authored-By`**. `CHANGELOG.md`
+  *is* the full commit message; the one-liner is the index into it. If the
+  summary will not fit on one line, either the commit is too big or the
+  CHANGELOG entry is not doing its job.
+- **A version-bump commit is one coherent unit.** It carries the code change,
+  the `pyproject.toml` bump, the `CHANGELOG.md` section, and whatever release
+  hygiene the change implies — `dev/TODO.md`, `dev/FEATURES.csv` (via
+  `dev/regen_features.py`), grammar-reference regen, moving a finished plan to
+  `dev/done/`. Never split those across commits, and never let a version land in
+  a different commit from its CHANGELOG section — that is what breaks bisect.
+- **Never push; never bypass.** Pushing to GitHub is the author's, on explicit
+  request only. No `--no-verify`, no `--amend` of anything already pushed —
+  prefer a new commit to rewriting one.
+- **Check git state before asserting it — never from memory.** The author also
+  commits frequently without announcing it, so any claim about what is or isn't
+  committed written from session memory is routinely *wrong* by the time it is
+  read. Run `git status` / `git log` first; mention uncommitted work only when
+  the tree really is dirty (e.g. an *expected* commit is missing). When in
   doubt, stay silent about commits rather than nag.
 
 ## TODO

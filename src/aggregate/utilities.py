@@ -301,11 +301,9 @@ def nice_multiple(mx):
 
 def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     """
-    Endless quest for a robust display format!
+    Generic printer for a list of aggregate-related objects.
 
-    Quick display (qd) a list of objects.
-    Dataframes handled in text with reasonable defaults.
-    For use in documentation.
+    Dataframes handled in text with reasonable defaults. For use in documentation.
 
     :param: argv: list of objects to print
     :param: accuracy: number of decimal places to display
@@ -313,7 +311,6 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     :param: trim: legacy trailing-zero trim flag (currently no-op)
     :param: ff: if not None, use this function to format floats, or 'basic', or 'binary'
     :kwargs: passed to pd.DataFrame.to_string for dataframes only. e.g., pass dict of formatters by column.
-
     """
     from .distributions import Aggregate
     from .portfolio import Portfolio
@@ -337,11 +334,10 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             # failure (mirrors ``_repr_html_``).
             print(x._text_info_blob())
             qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
-            td = x.tail_df()
-            if td is not None:
-                qd(td.fillna(''), accuracy=accuracy, **kwargs)
             if x.density_df is not None and not x.valid.passes:
                 print(f'\nVALIDATION FAILS: {x.validation_explanation}')
+            else:
+                print(f'\nValidation: not unreasonable.')
         elif isinstance(x, PnL):
             # P&L headline: the repr then the fixed summary card (marginal
             # range percentiles; the footing sheet is stats_df).

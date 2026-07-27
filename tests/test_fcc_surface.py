@@ -358,3 +358,53 @@ def test_pnl_tvar_delegates_to_the_result_grid(pnl):
     """a150: PnL delegated q/var/cdf/sf but not tvar -- the gap is closed."""
     for p in (0.5, 0.9, 0.99):
         assert pnl.tvar(p) == pnl.result.tvar(p)
+
+
+# ---------------------------------------------------------------------------
+# one canonical name (a151 [FCC-Alias-Retirement])
+# ---------------------------------------------------------------------------
+
+def test_var_means_variance_and_var_is_q(agg, port, pnl):
+    """``var`` = VARIANCE always; VaR = ``q`` always.
+
+    The VaR-flavoured ``var()`` is gone from Portfolio / PnL / GridDistribution
+    (Aggregate never had one). ``Severity.var`` stays -- it is scipy's variance,
+    reached through the look-through, and means the other thing.
+    """
+    for obj in (agg, port, pnl):
+        assert not hasattr(obj, 'var'), f'{type(obj).__name__}.var survived'
+    assert not hasattr(agg._grid_distribution(), 'var')
+    sev = agg.sevs[0]
+    assert sev.var() == pytest.approx(sev.actual_sd ** 2, rel=1e-6)
+
+
+def test_retired_aliases_are_gone(agg, port):
+    """One name per concept: ppf, pla, cramer_lundberg, unit_renamer."""
+    assert not hasattr(agg, 'ppf'), 'Aggregate.ppf survived (q is the quantile)'
+    assert not hasattr(agg, 'cramer_lundberg')
+    assert callable(agg.pollaczeck_khinchine)
+    for obj in (agg, port, agg._grid_distribution()):
+        assert not hasattr(obj, 'pla'), f'{type(obj).__name__}.pla survived'
+        assert callable(obj.prob_loss_assets)
+    assert not hasattr(port, 'unit_renamer')
+    assert isinstance(port.renamer, dict)
+
+
+def test_frequency_prob_eq_0_joins_the_family(agg):
+    """a151: ``prn_eq_0(n)`` -> zero-arg ``prob_eq_0``, off the stamped ``en``."""
+    freq = agg.frequency
+    assert not hasattr(freq, 'prn_eq_0')
+    assert freq.prob_eq_0 == pytest.approx(np.exp(-freq.en))   # Poisson
+    # the parametrized worker survives privately -- Aggregate needs it per component
+    assert freq._prob_eq_0(2.0) == pytest.approx(np.exp(-2.0))
+
+
+def test_frequency_prob_eq_0_raises_without_a_mean():
+    """A standalone frequency is a family until an exposure fixes its mean."""
+    from aggregate._frequency import Frequency
+    freq = Frequency('poisson', freq_a=0, freq_b=0, freq_zm=False, freq_p0=0)
+    assert freq.en is None
+    with pytest.raises(ValueError, match='no expected claim count'):
+        freq.prob_eq_0
+    freq.en = 3.0                       # what the owning Aggregate stamps
+    assert freq.prob_eq_0 == pytest.approx(np.exp(-3.0))

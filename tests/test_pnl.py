@@ -178,11 +178,12 @@ def test_q_cdf_tvar_delegate_to_grid_distribution():
     assert a.cdf(a.q(0.99)) >= 0.99 - 1e-9
     cs = a.cdf([a.q(0.01), a.q(0.99)])
     assert np.shape(cs) == (2,)
-    # var is the lower-quantile alias
-    assert a.var(0.9) == pytest.approx(a.q(0.9))
-    # the GridDistribution is the canonical object (tvar reached there, with the
-    # payoff orientation in mind -- deliberately not a bare pnl.tvar)
+    # a151: the VaR-flavoured var() alias is gone -- q is the quantile
+    assert not hasattr(a, 'var')
+    # the GridDistribution is the canonical object; a150 added the PnL
+    # delegation, which must agree with it
     assert a.gd.tvar(0.9) >= a.gd.q(0.9)
+    assert a.tvar(0.9) == a.gd.tvar(0.9)
 
 
 # ----------------------------------------------------------------------

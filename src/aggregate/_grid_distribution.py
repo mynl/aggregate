@@ -366,10 +366,6 @@ class GridDistribution(HelpMixin):
         qf = self._funcs()
         return qf.q_lower(p) if kind == 'lower' else qf.q_upper(p)
 
-    def var(self, p):
-        """Value at risk = lower quantile (alias for ``q(p, 'lower')``)."""
-        return self.q(p, 'lower')
-
     def tvar(self, p):
         """Tail value at risk (expected shortfall) at level ``p``. Vectorizes."""
         return self._funcs().tvar(p)
@@ -610,8 +606,6 @@ class GridDistribution(HelpMixin):
             L = self.lev(a)
         return ProbLossAssets(float(p), float(L), float(a))
 
-    # alias
-    pla = prob_loss_assets
 
     # ------------------------------------------------------------------
     # width-dependent ops: require bs (raise if bs is None)

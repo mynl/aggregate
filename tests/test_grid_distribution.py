@@ -71,8 +71,9 @@ def test_quantiles_lower_upper(die):
     np.testing.assert_array_equal(die.q([1 / 6, 0.5, 0.99]), [1.0, 3.0, 6.0])
 
 
-def test_var_alias(die):
-    assert die.var(0.5) == die.q(0.5, 'lower')
+def test_var_alias_is_gone(die):
+    """a151: var means VARIANCE; VaR is q. The VaR-flavoured alias is gone."""
+    assert not hasattr(die, 'var')
 
 
 def test_cdf_sf(die):

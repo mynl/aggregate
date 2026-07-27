@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.0.0a151
+
+**[FCC-Alias-Retirement]** — the breaking half of pass 2 of
+`[FCC-Surface-Sweep]`, and the end of that sweep. One name per concept: the
+matrix read turned up six live alias pairs, and one row (`var`) covering two
+incompatible meanings. **All removals, no deprecation shims** (pre-beta).
+
+### The rule
+
+**`var` means VARIANCE, always. VaR is `q`, always. There is no `ppf`.**
+`var` had been VaR on `Portfolio` / `PnL` / `GridDistribution`, *variance* on
+`Severity` (scipy), and deliberately absent on `Aggregate` — that absence is
+what made the collision visible.
+
+### Removed
+
+- **`Portfolio.var`, `PnL.var`, `GridDistribution.var`** (all VaR aliases of
+  `q`). Use `q`.
+- **`Aggregate.ppf`** (alias of `q`).
+- **`Aggregate.pla`, `Portfolio.pla`, `GridDistribution.pla`** — the canonical
+  name is `prob_loss_assets`.
+- **`Aggregate.cramer_lundberg`** — `pollaczeck_khinchine` was always the
+  definition and is now the only name.
+- **`Portfolio.unit_renamer`** — deprecated alias of `renamer` since `a128`;
+  the tail of `a133 [Label-Canonical]`.
+
+**Kept, deliberately:** `Severity.ppf` and `Severity.var`. `Severity` wraps a
+frozen `scipy.stats` rv and inherits its surface — that is where the odd naming
+comes from (`mean()`, `var()` = variance, `ppf`, `rvs` vs `sample`, `sev_mean`
+vs `Aggregate.sev_m`), and it is not this library's to rename. `dev/FEATURES.csv`
+records it in a `# severity-scipy` legend row so it stops reading as drift.
+This also closes the old open question of whether `Aggregate.sev_*` should
+follow `actual_*`: it should not.
+
+### Renamed
+
+- **`Frequency.prn_eq_0(n)` → `prob_eq_0`**, a **zero-argument property**
+  evaluated at `en` (the unconditional expected count the owning `Aggregate`
+  stamps at construction, as `freq_df` already used). It joins the `prob_eq_0`
+  family — `P(N = 0)` is the same question one level down from `P(X = 0)` on
+  `Aggregate` / `Portfolio` / `PnL` — and raises if `en` is unset or the kind
+  has no closed form. The parametrized worker survives as the private
+  `_prob_eq_0(n)`, which `Aggregate` calls per mixture component and the
+  zero-modification solver inverts at trial means; the split mirrors `a149`'s
+  `tail_df` (property) vs `tail_periods_df(periods=)` (worker).
+
+### Call sites
+
+`pedagogy.py` (Cramér–Lundberg ruin figures) and
+`docs/5_technical_guides/5_x_pk.rst` move to `pollaczeck_khinchine`; four test
+modules move off the retired aliases and now assert they are gone.
+`dev/FEATURES.csv` drops the `pla` and `prn_eq_0` rows and re-stamps — its
+**undocumented-capability count is now zero**. Docs are edited in lockstep but
+a rebuild is pending.
+
 ## 1.0.0a150
 
 **[FCC-Help-Mixin]** — the additive half of pass 2 of `[FCC-Surface-Sweep]`.

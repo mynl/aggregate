@@ -3700,8 +3700,6 @@ class Aggregate(HelpMixin, LabeledMixin):
 
         return ruin, find_u, mean, dfi  # , ruin2
 
-    # for backwards compatibility
-    cramer_lundberg = pollaczeck_khinchine
 
     def plot(self, axd=None, xmax=0, **kwargs):
         """
@@ -4922,9 +4920,6 @@ class Aggregate(HelpMixin, LabeledMixin):
 
         return self._grid_distribution().q(p, kind)
 
-    # for consistency with scipy
-    ppf = q
-
     def _grid_distribution(self):
         """The :class:`GridDistribution` view over the aggregate ``p_total`` grid.
 
@@ -5401,7 +5396,6 @@ class Aggregate(HelpMixin, LabeledMixin):
         delegator to
         :meth:`~aggregate._grid_distribution.GridDistribution.prob_loss_assets`
         over this aggregate's ``p_total`` grid (the single ``lev`` source).
-        Aliased :meth:`pla`.
 
         Returns
         -------
@@ -5411,7 +5405,6 @@ class Aggregate(HelpMixin, LabeledMixin):
         """
         return self._grid_distribution().prob_loss_assets(p=p, L=L, a=a)
 
-    pla = prob_loss_assets
 
     def price_pentagon_ex(self, *, p=None, a=None, L=None,
                           M=None, P=None, Q=None, LR=None, PQ=None, ROE=None):

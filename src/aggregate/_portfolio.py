@@ -1816,15 +1816,6 @@ class Portfolio(HelpMixin, LabeledMixin):
             return 0.0
             # raise KeyError(f'Value {x} must be in index for probability mass function.')
 
-    def var(self, p):
-        """
-        value at risk = alias for quantile function
-
-        :param p:
-        :return:
-        """
-        return self.q(p)
-
     def tvar(self, p, kind=''):
         """
         Compute the tail value at risk at threshold p. Revised June 2023.
@@ -3319,7 +3310,7 @@ class Portfolio(HelpMixin, LabeledMixin):
         :meth:`~aggregate._grid_distribution.GridDistribution.prob_loss_assets`
         over the portfolio total ``p_total`` grid (the single ``lev`` source,
         matching the ``exa_total`` / ``add_exa`` convention). Aliased
-        :meth:`pla`.
+        :meth:`prob_loss_assets`.
 
         Returns
         -------
@@ -3329,7 +3320,6 @@ class Portfolio(HelpMixin, LabeledMixin):
         """
         return self._grid_distribution().prob_loss_assets(p=p, L=L, a=a)
 
-    pla = prob_loss_assets
 
     def price_pentagon_ex(self, *, p=None, a=None, L=None,
                           M=None, P=None, Q=None, LR=None, PQ=None, ROE=None):
@@ -3533,18 +3523,6 @@ class Portfolio(HelpMixin, LabeledMixin):
             if a.name == handle:
                 return a.label
         return handle
-
-    @property
-    def unit_renamer(self):
-        """Deprecated alias for :attr:`renamer` (the label-sourced ``{handle:
-        display}`` map units render through).
-
-        The old handle-guessing heuristic (``.`` / ``:`` title-casing, ``X1`` ->
-        TeX subscripting) was removed in ``1.0.0a128`` -- an explicit
-        ``as "..."`` label on the member unit now supplies the display name, and
-        an unlabeled unit falls back to its handle. See dev/plan-labels.md D4.
-        """
-        return self.renamer
 
     def nice_program(self, wrap_col=90):
         """

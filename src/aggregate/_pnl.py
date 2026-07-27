@@ -1248,10 +1248,6 @@ class PnL(HelpMixin, LabeledMixin):
         """
         return self._grand_result.gd.tvar(p)
 
-    def var(self, p):
-        """Value at risk = lower quantile of the result."""
-        return self._grand_result.gd.var(p)
-
     def cdf(self, x):
         """``P(result <= x)``."""
         return self._grand_result.gd.cdf(x)

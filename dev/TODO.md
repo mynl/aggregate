@@ -237,13 +237,16 @@
    the `# severity-scipy` legend row records that `Severity` inherits its odd
    naming from the `scipy.stats` look-through, deliberately).
 
-   **Pass 2 breaking half — `[FCC-Alias-Retirement]`, next:** `var` means
-   *variance* always and VaR is `q` always, so retire `Aggregate.ppf` and the
-   VaR-flavoured `var()` on `Portfolio` / `PnL` / `GridDistribution`
-   (`Severity.ppf` / `.var` stay — scipy look-through); `pollaczeck_khinchine`
-   over `cramer_lundberg`; `prob_loss_assets` over `pla`; delete the deprecated
-   `Portfolio.unit_renamer`; `Frequency.prn_eq_0` → private `_prob_eq_0(n)` plus
-   a zero-arg `prob_eq_0` property off `en`.
+   **Pass 2 breaking half DONE (`1.0.0a151`, `[FCC-Alias-Retirement]`)** — one
+   name per concept. **`var` = variance always, VaR = `q` always, no `ppf`.**
+   Removed: `var()`-as-VaR on `Portfolio`/`PnL`/`GridDistribution`,
+   `Aggregate.ppf`, `pla` ×3, `cramer_lundberg`, `Portfolio.unit_renamer`.
+   Kept deliberately: `Severity.ppf`/`.var` (scipy look-through — which also
+   settles the `Aggregate.sev_*` question: it stays). Renamed
+   `Frequency.prn_eq_0(n)` → zero-arg `prob_eq_0` property off `en`, worker
+   private as `_prob_eq_0(n)`. **`dev/FEATURES.csv` now reports zero
+   undocumented capabilities**, so the sweep's original goal — a complete and
+   consistent first-class surface — is met.
 
    **Still open (author decisions, flagged in the matrix):** the
    `BivariateAggregate.tail_df` name collision (a per-axis support frame under

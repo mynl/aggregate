@@ -196,7 +196,7 @@ The first is based on a mean 10 Poisson compound with shape 2 gamma severity. Th
     a.density_df.F.plot(ax=ax, xlim=[0, 60], title='Po-Gamma distribution function');
     qd(a.density_df.p_total.head(20).reset_index(drop=False), float_format=lambda x: f'   {x:<12.5g}' if 0 < x < .1 else f'{x:10.1f}')
     qd(a.tvar([.9, .95, .99]))
-    ruins, find_us, mean, dfi  = a.cramer_lundberg(.2)
+    ruins, find_us, mean, dfi  = a.pollaczeck_khinchine(.2)
     ax0.plot(np.cumsum(dfi), label='integrated')
     ax0.plot(a.sev_density_df.p_sev.cumsum(), label='severity')
     ax0.set(xlim=[0, 40], title='Severity and integrated severity distributions')
@@ -214,7 +214,7 @@ The second uses a Pareto severity, where the integrated distribution can be comp
 
     a = build('agg Actuar2 1 claim sev 4 * pareto 5 - 4 fixed')
     qd(a)
-    ruins, find_us, mean, dfi  = a.cramer_lundberg(.2)
+    ruins, find_us, mean, dfi  = a.pollaczeck_khinchine(.2)
     ruins.name = 'Prob'
     bit = ruins.loc[np.arange(0, 51, 5)].to_frame()
     bit.index = bit.index.astype(int)

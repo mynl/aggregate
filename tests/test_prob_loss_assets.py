@@ -69,9 +69,9 @@ def test_pla_matches_exa_column(agg):
     assert np.isclose(t.L, agg.density_df.loc[t.a, 'exa'])
 
 
-def test_pla_alias(agg):
-    """``pla`` is the same callable as ``prob_loss_assets``."""
-    assert agg.pla(p=0.9) == agg.prob_loss_assets(p=0.9)
+def test_pla_alias_is_gone(agg):
+    """a151: ``pla`` retired -- ``prob_loss_assets`` is the only name."""
+    assert not hasattr(agg, 'pla')
 
 
 # ---------------------------------------------------------------- pla: L-anchor accuracy

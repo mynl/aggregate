@@ -140,7 +140,7 @@ def price_pentagon_ex(agg, *, p=None, a=None, L=None,
     configuration of ``{p, a, L, M, P, Q, LR, PQ, ROE}``, errors on the
     impossible ones, and **warns** when the solve leaned on accounting losses
     that the distribution does not reconcile. ``price_pentagon`` / ``solve_obj``
-    are unchanged underneath; this is :meth:`Pentagon.solve` plus the ``pla``
+    are unchanged underneath; this is :meth:`Pentagon.solve` plus the ``prob_loss_assets``
     distributional bridge (``L = lev(a)``) and a ``p`` readout.
 
     The :class:`~aggregate.pentagon.Pentagon` engine is the gatekeeper:
@@ -193,7 +193,7 @@ def price_pentagon_ex(agg, *, p=None, a=None, L=None,
     The injection rule, after translating ``p -> a``: count the supplied
     pentagon quantities. If exactly two are supplied and one anchors a capital
     level (``a`` known, or ``L`` given), inject the curve equation -- resolve
-    the consistent ``(p, L, a)`` via ``pla`` -- to complete the triple. If three
+    the consistent ``(p, L, a)`` via ``prob_loss_assets`` -- to complete the triple. If three
     are already supplied, hand straight to :meth:`Pentagon.solve` (``L`` is
     whatever the accounting yields). Fewer than three with no determinable level
     is under-determined and ``solve`` raises.

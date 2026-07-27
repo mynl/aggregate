@@ -783,7 +783,7 @@ class ClassicalPremium:
             raise ValueError('Cannot use total in ClassicalPremium.illustrate.')
         ag = self.ports[port_name][unit_name]
         if p and K == 0:
-            self.ruin, self.u, self.mean, self._dfi = ag.cramer_lundberg(
+            self.ruin, self.u, self.mean, self._dfi = ag.pollaczeck_khinchine(
                 margin, kind='interpolate', padding=padding)
             K = self.u(p)
         elif K == 0:
@@ -841,7 +841,7 @@ def plot_ruin_surplus_paths(port):
     dfis = {}
     for unit_name in unit_names:
         ag = port[unit_name]
-        ruins[unit_name], find_us[unit_name], mean, dfi = ag.cramer_lundberg(
+        ruins[unit_name], find_us[unit_name], mean, dfi = ag.pollaczeck_khinchine(
             margin, kind='interpolate')
         dfis[unit_name] = pd.Series(dfi, index=ruins[unit_name].index)
     xmaxs = {'Limit1': 10e6, 'Limit10': 50e6}

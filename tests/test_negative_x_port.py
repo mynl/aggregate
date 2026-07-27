@@ -127,9 +127,9 @@ def test_signed_quantiles(pnl):
 
 def test_var_tvar_signed(pnl):
     """VaR/TVaR are well-defined on the signed grid (monotone index)."""
-    assert float(pnl.var(0.99)) > 0
+    assert float(pnl.q(0.99)) > 0
     # TVaR at a high level exceeds the VaR there.
-    assert float(pnl.tvar(0.99)) >= float(pnl.var(0.99))
+    assert float(pnl.tvar(0.99)) >= float(pnl.q(0.99))
 
 
 # ---------------------------------------------------------------------------

@@ -181,13 +181,13 @@ class Frequency(HelpMixin):
 
     # Subclass contract — overridden on each ``Frequency<Kind>``:
     #   freq_name: registry key (e.g. 'poisson'). Empty on the base class.
-    #   supports_zm: True iff the subclass defines ``prn_eq_0`` and supports
+    #   supports_zm: True iff the subclass defines ``_prob_eq_0`` and supports
     #     zero modification.
-    #   prn_eq_0: class-level default ``None``; ZM subclasses override with
+    #   _prob_eq_0: class-level default ``None``; ZM subclasses override with
     #     a method that returns P(N = 0 | mean = n).
     freq_name = ''
     supports_zm = False
-    prn_eq_0 = None
+    _prob_eq_0 = None
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -222,12 +222,12 @@ class Frequency(HelpMixin):
 
         The ZM construction reweights an unmodified distribution of mean
         ``n_base`` so that its probability at 0 becomes ``freq_p0``. The
-        new mean is ``(1 - freq_p0) n_base / (1 - prn_eq_0(n_base))``;
+        new mean is ``(1 - freq_p0) n_base / (1 - _prob_eq_0(n_base))``;
         invert that to recover ``n_base``.
         """
         p0 = self.freq_p0
-        f = lambda x: (1 - p0) * x / (1 - self.prn_eq_0(x)) - n
-        if p0 < self.prn_eq_0(n):
+        f = lambda x: (1 - p0) * x / (1 - self._prob_eq_0(x)) - n
+        if p0 < self._prob_eq_0(n):
             # ZM has higher mean than the unmodified distribution: search left of n.
             n_base = brentq(f, a=0, b=n)
         else:
@@ -250,12 +250,12 @@ class Frequency(HelpMixin):
         def wrapped_moms(n):
             n_base = self._solve_n_base(n)
             ans = np.array(orig_moms(n_base))
-            return (1 - freq_p0) / (1 - self.prn_eq_0(n_base)) * ans
+            return (1 - freq_p0) / (1 - self._prob_eq_0(n_base)) * ans
 
         @wraps(orig_pgf)
         def wrapped_pgf(n, z):
             n_base = self._solve_n_base(n)
-            wt = (1 - freq_p0) / (1 - self.prn_eq_0(n_base))
+            wt = (1 - freq_p0) / (1 - self._prob_eq_0(n_base))
             return (1 - wt) + wt * orig_pgf(n_base, z)
 
         self.freq_moms = wrapped_moms
@@ -415,6 +415,52 @@ class Frequency(HelpMixin):
                        'follows the severity.')
         return ' '.join(out)
 
+    @property
+    def prob_eq_0(self):
+        """``P(N = 0)`` -- the probability of no claims.
+
+        The frequency-level member of the ``prob_eq_0`` family: the same
+        question one level down from
+        :attr:`~aggregate.distributions.Aggregate.prob_eq_0` (``P(X = 0)``),
+        under the same name and the same zero-argument shape.
+
+        Evaluated at :attr:`en`, the unconditional expected claim count the
+        owning :class:`Aggregate` stamps at construction, exactly as
+        :attr:`freq_df` does; a standalone frequency raises until ``en`` is set.
+
+        Returns
+        -------
+        float
+            ``P(N = 0)`` at the current mean.
+
+        Raises
+        ------
+        ValueError
+            If this kind has no closed-form zero probability (the class-level
+            ``_prob_eq_0`` default is ``None``; only the zero-modifiable kinds
+            override it -- see :attr:`supports_zm`), or if ``en`` is not set.
+
+        Notes
+        -----
+        Renamed from ``prn_eq_0(n)`` at 1.0.0a151. The parametrized worker
+        survives as the private ``_prob_eq_0(n)``: ``Aggregate`` calls it per
+        mixture component at that component's mean, and the ZM machinery
+        (:meth:`_solve_n_base`) inverts it at trial means, so the argument form
+        is genuinely needed internally. This mirrors the a149 ``tail_df``
+        (no-argument property) / ``tail_periods_df(periods=)`` (parametrized
+        worker) split.
+        """
+        if self._prob_eq_0 is None:
+            raise ValueError(
+                f'prob_eq_0: the {self.freq_name!r} frequency has no '
+                f'closed-form P(N = 0)')
+        if self.en is None:
+            raise ValueError(
+                f'prob_eq_0: this standalone {self.freq_name!r} frequency has '
+                f'no expected claim count yet -- the owning Aggregate stamps '
+                f'.en at construction; set fr.en = n to use it standalone')
+        return float(self._prob_eq_0(float(self.en)))
+
     @cached_property
     def freq_df(self):
         """Count pmf vs mean-matched Poisson comparison table (on demand).
@@ -466,7 +512,7 @@ class Frequency(HelpMixin):
 # ---------------------------------------------------------------------------
 # Concrete Frequency<Kind> subclasses. Each declares its registry key as a
 # class-level ``freq_name`` and implements ``_build``, ``freq_moms``,
-# ``freq_pgf``, and (for kinds that support ZM) ``prn_eq_0``.
+# ``freq_pgf``, and (for kinds that support ZM) ``_prob_eq_0``.
 # ---------------------------------------------------------------------------
 
 
@@ -485,7 +531,7 @@ class FrequencyPoisson(Frequency):
         # No precomputation; freq_a is unused for pure Poisson.
         return None
 
-    def prn_eq_0(self, n):
+    def _prob_eq_0(self, n):
         return np.exp(-n)
 
     def freq_moms(self, n):
@@ -550,7 +596,7 @@ class FrequencyBinomial(Frequency):
         # is derived at evaluation time from the requested mean.
         return None
 
-    def prn_eq_0(self, n):
+    def _prob_eq_0(self, n):
         p = self.freq_a
         N = n / p
         return (1 - p) ** N
@@ -584,7 +630,7 @@ class FrequencyNegbin(Frequency):
     def _build(self):
         self._beta = self.freq_a - 1
 
-    def prn_eq_0(self, n):
+    def _prob_eq_0(self, n):
         beta = self._beta
         r = n / beta
         return (1 + beta) ** -r
@@ -615,7 +661,7 @@ class FrequencyGeometric(Frequency):
     def _build(self):
         return None
 
-    def prn_eq_0(self, n):
+    def _prob_eq_0(self, n):
         return 1 / (n + 1)
 
     def freq_moms(self, n):
@@ -635,7 +681,7 @@ class FrequencyLogarithmic(Frequency):
     Logarithmic series (``logser``) supported on 1, 2, 3, ... with mean
     ``n``; the parameter ``θ`` is solved numerically by
     :func:`_logarithmic_theta`. Supports zero modification (with
-    ``prn_eq_0 = 0`` for the unmodified form, so ZM only adds mass at zero).
+    ``_prob_eq_0 = 0`` for the unmodified form, so ZM only adds mass at zero).
     """
 
     freq_name = 'logarithmic'
@@ -644,7 +690,7 @@ class FrequencyLogarithmic(Frequency):
     def _build(self):
         return None
 
-    def prn_eq_0(self, n):
+    def _prob_eq_0(self, n):
         return 0.
 
     def freq_moms(self, n):

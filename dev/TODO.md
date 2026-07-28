@@ -163,10 +163,13 @@
   distortion trailer, ambiguity guards) landed in **a157**; phase 2 (the
   `aggregate.recipe` runtime, `Underwriter.recipe()` / `.recipes`, the cookbook
   `recipe()` verb) in **a158**; phase 3 (the merged 186-entry `library.agg`
-  with unique names and tags, `discover(tags=)`) in **a159**. Remaining:
-  **phase 4** `tests/test_library_recipes.py` running every entry's Check,
-  **phase 5** the Problem / Solution / Discussion cookbook rewrite, **phase 6**
-  writing `doc{{{}}}` bodies recipe by recipe (186 entries, 1 written).
+  with unique names and tags, `discover(tags=)`) in **a159**; phase 4 (the
+  `tests/test_library_recipes.py` harness + the first four recipes) in
+  **a160**. Remaining: **phase 5** the Problem / Solution / Discussion cookbook
+  rewrite, and **phase 6** writing the remaining `doc{{{}}}` bodies — 4 of 186
+  entries documented so far. `build.recipes.query('not doc')` is the worklist;
+  `build.recipes.query('doc and n_asserts == 0')` catches a recipe that
+  describes without testing.
 - **[Rationalize-Tests]** (#51) — needed vs no-longer-needed; untangle and re-wire
   how the suite *consumes* the single test library (the `conftest`
   parametrization of every `test_suite.agg` line, the SLY snapshot regression)

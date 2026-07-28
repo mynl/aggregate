@@ -59,7 +59,50 @@
 # Builtin references resolve by sequential load, so these come first.
 # ----------------------------------------------------------------------
 dist DualDistortion dual 2.5 note{Dual-power distortion; the second leaf for the minimum below.} tags{distortion};
-dist PHDistortion ph 0.7 note{Proportional-hazard distortion (universally understood).} tags{distortion};
+dist PHDistortion ph 0.7 note{Proportional-hazard distortion (universally understood).} tags{distortion, intro, check:limiting-case}
+doc{{{
+## Problem
+
+You want to load expected loss into a price in a way that charges more for the
+tail than for the body, and you want the loading to be a *property of the
+measure* rather than a judgement applied case by case.
+
+## Solution
+
+```python
+import numpy as np
+g = build('dist PHDistortion ph 0.7')
+s = np.linspace(0, 1, 11)
+qd(pd.DataFrame({'s': s, 'g(s)': g.g(s)}).set_index('s'))
+```
+
+## Discussion
+
+The proportional-hazard distortion is `g(s) = s**rho` with `rho = 0.7 < 1`.
+Applied to the survival function, it stretches small exceedance probabilities
+upward -- a 1-in-100 event is priced as though it were more likely than it is --
+and leaves certainty alone.
+
+Concavity is what makes it a coherent risk measure: the premium it produces is
+subadditive, so combining two books never costs more than pricing them apart.
+`rho = 1` is the identity (pure expected loss, no load); smaller `rho` loads
+more heavily.
+
+## Check
+
+```python
+# a distortion is a probability-to-probability map: g(0)=0, g(1)=1
+assert abs(g.g(0.0)) < 1e-12
+assert abs(g.g(1.0) - 1.0) < 1e-12
+# increasing, and CONCAVE (the coherence property)
+s = np.linspace(0, 1, 201)
+gs = g.g(s)
+assert np.all(np.diff(gs) >= -1e-12)
+assert np.all(np.diff(gs, 2) <= 1e-9)
+# a load, never a discount: g(s) >= s everywhere
+assert np.all(gs >= s - 1e-12)
+```
+}}};
 sev UnitSeverity dsev [1] tags{severity};
 
 # ----------------------------------------------------------------------
@@ -68,7 +111,58 @@ sev UnitSeverity dsev [1] tags{severity};
 agg CatXOLTower 1.74 claims sev lognorm 8.501 cv 14.624 occurrence net of 90% po 200 xs 200 and 95% po 400 xs 400 poisson hints{bs=2;log2=16;normalize=False;} note{ILW model on US Cat, amounts in billions.} tags{hero, reinsurance};
 bivariate CopulaWindFlood 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson note{Gumbel-copula dependence between Wind and Flood.} tags{hero, bivariate};
 agg ExposureRating [100 200 1000 50] premium  at [.9 .85 .9 .8] lr [250 500 1000 2000] xs 0 sev lognorm 120 cv 12 occurrence ceded to 750 xs 750 mixed gamma .2 note{Exposure rating on a small portfolio with limits profile, amounts in 000s.} tags{hero, aggregate};
-agg LimitProfile [1000 2000 500] prem at [.8 .7 .5] lr [1000 2000 5000] xs 0 sev lognorm 50 cv 1.5 poisson note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.} tags{hero, aggregate};
+agg LimitProfile [1000 2000 500] prem at [.8 .7 .5] lr [1000 2000 5000] xs 0 sev lognorm 50 cv 1.5 poisson note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.} tags{hero, aggregate, check:reconciliation}
+doc{{{
+## Problem
+
+You have the shape every pricing actuary already has: a table of premium by
+limit band, each band with its own expected loss ratio. You want one aggregate
+distribution for the whole book, with the bands correctly weighted -- not three
+separate models you then have to add up by hand.
+
+## Solution
+
+```python
+a = build('''
+agg LimitProfile
+    [1000 2000 500] prem at [.8 .7 .5] lr
+    [1000 2000 5000] xs 0
+    sev lognorm 50 cv 1.5
+    poisson
+''')
+qd(a.summary_df)
+```
+
+## Discussion
+
+The three vectors line up positionally: 1000 of premium at an 80% loss ratio
+written at a 1000 limit, 2000 at 70% at a 2000 limit, 500 at 50% at a 5000
+limit. One severity curve is written across all three bands, and the *limit* is
+what differs -- so the severity is the same lognormal capped at three different
+points.
+
+The claim count is an **output**, not an input. `aggregate` knows the expected
+loss in each band (premium x loss ratio) and the expected severity in that band
+(the lognormal limited at that band's limit), so it derives the implied count
+per band and adds them. That is the whole point of the exposure clause: you
+give it what you actually have -- premium and a loss ratio -- and it solves for
+the count rather than making you do it.
+
+Read `a.n` back to see the implied total count, and `a.sev_m` for the
+exposure-weighted average severity across the bands.
+
+## Check
+
+```python
+# the aggregate mean IS the premium-weighted expected loss, exactly:
+# 1000x0.8 + 2000x0.7 + 500x0.5 = 2450
+assert abs(a.actual_m - 2450.0) < 1e-9
+# and the FFT estimate agrees to grid accuracy
+assert abs(a.est_m / a.actual_m - 1) < 1e-6
+# E[A] = E[N] x E[X] still holds across the blended profile
+assert abs(a.n * a.sev_m - a.actual_m) < 1e-6
+```
+}}};
 port PropertyCasualty tags{hero, portfolio} note{Portfolio of property and casualty risks, amounts in 000s.} agg Casualty 5000 premium at 90% lr 5000 xs 0 sev lognorm 200 cv 8 mixed gamma .45 agg Property 4000 premium at 85% lr 10000 xs 0 sev lognorm 250 cv 12 mixed gamma .15;
 agg TweedieBook 25 claims sev gamma 1 cv .05 poisson note{Tweedie - Poisson sum of gammas. Extreme case, severity has low CV.} tags{hero, aggregate};
 port TwoLineBook tags{hero, portfolio} agg Property 80 claims  500 xs 0 sev lognorm  50 cv 1.2 poisson agg Casualty 20 claims 2000 xs 0 sev lognorm 250 cv 2.0 mixed gamma 0.4 note{Two-unit book: thin property + mixed-frequency casualty. Capital and price downstream.};
@@ -143,7 +237,43 @@ agg ExposureByPremium 500 loss sev lognorm 50 cv 0.8 poisson note{specify expect
 agg InverseGaussianMixed 10 claims sev.UnitSeverity mixed ig .65 note{inverse Gaussian mixing distribution} tags{aggregate};
 agg LimitProfileSimple [5 10 8 2] claims [1 5 10 20] xs 0 sev lognorm 10 cv 1.2 mixed gamma 0.2 note{limit profile, single severity} tags{aggregate};
 agg PremiumMinusLoss 5000 claims ssev 100 - lognorm 80 cv .2 poisson note{High-frequency premium-minus-loss payoff -- near-Gaussian on a signed window.} tags{aggregate};
-agg ThreeDice dfreq [3] dsev [1:6] note{Sum of three dice -- exact discrete aggregate; zero validation error.} tags{aggregate, intro};
+agg ThreeDice dfreq [3] dsev [1:6] note{Sum of three dice -- exact discrete aggregate; zero validation error.} tags{aggregate, intro, check:independent-oracle}
+doc{{{
+## Problem
+
+You want to see what `aggregate` computes on something you can check in your
+head. Three dice: a fixed frequency of 3, a severity uniform on 1..6.
+
+## Solution
+
+```python
+a = build('agg ThreeDice dfreq [3] dsev [1:6]')
+qd(a.summary_df)
+```
+
+## Discussion
+
+Everything here is discrete and lands exactly on the grid, so this is the one
+case where the FFT is not an approximation at all -- the aggregate PMF is the
+exact three-fold convolution of the die. That is why it is the first recipe: it
+separates "is the method right" from "is the discretization fine", which every
+later recipe has to hold apart.
+
+`dfreq [3]` is an explicit outcome list with a single outcome, so N = 3 with
+probability one. `dsev [1:6]` is the inclusive range 1, 2, ..., 6 with equal
+weights.
+
+## Check
+
+```python
+# E[A] = 3 x 3.5 = 10.5, and the estimate is EXACT, not merely close
+assert abs(a.actual_m - 10.5) < 1e-12
+assert abs(a.est_m - 10.5) < 1e-9
+# support runs 3..18; each extreme has probability (1/6)^3
+assert abs(a.density_df.loc[3, 'p_total'] - (1 / 6) ** 3) < 1e-12
+assert abs(a.density_df.loc[18, 'p_total'] - (1 / 6) ** 3) < 1e-12
+```
+}}};
 agg ThreeDiceSum dfreq [3] dsev [1:6] note{Sum of the rolls of three dice.} tags{aggregate};
 agg TweedieCompound tweedie 1 1.005 0.1 note{Tweedie by mean, power p, and dispersion (variance = dispersion * mean**p).} tags{aggregate};
 agg TweedieDirect 10.050251256281404 claims sev gamma 0.0995 cv 0.07088812050083283 poisson note{Tweedie defined by claim count, gamma mean and cv} tags{aggregate};
@@ -157,7 +287,61 @@ agg TweedieSimple tweedie 1 1.005 0.1 note{Tweedie via mean, p, dispersion; vari
 agg AggregateStopLoss 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson aggregate net of 5000 xs 30000 note{Aggregate stop-loss -- net of an annual 5000-xs-30000 layer.} tags{reinsurance};
 agg BasicXOL 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Occurrence excess-of-loss program, net view.} tags{reinsurance};
 agg CededLayer 1250 premium at 80% lr 1000 xs 0 sev lognorm 80 cv 1.675 occurrence ceded to 125 xs 0 and 50% po 125 xs 125 and 20% po 250 xs 250 and 5% po 500 xs 500 poisson note{Layered occurrence reinsurance tower, ceded view.} tags{reinsurance};
-agg OccurrenceXOL 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Occurrence excess-of-loss program, net view.} tags{reinsurance};
+agg OccurrenceXOL 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Occurrence excess-of-loss program, net view.} tags{reinsurance, check:reconciliation}
+doc{{{
+## Problem
+
+You have a two-layer per-occurrence excess programme with partial placements,
+and you want the *net* aggregate -- with gross and ceded still visible, so you
+can see where the cession went instead of taking the net on faith.
+
+## Solution
+
+```python
+a = build('''
+agg OccurrenceXOL
+    15 claims
+    10000 xs 0
+    sev lognorm 1500 cv 1.0
+    occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000
+    mixed gamma 0.25
+''')
+qd(a.reins_summary_df)
+```
+
+## Discussion
+
+`occurrence net of ...` applies the programme claim by claim, before the
+frequency convolution -- which is what "per occurrence" means and why it cannot
+be done by adjusting the aggregate afterwards.
+
+`po` is *part of*: `50% po 2500 xs 2500` cedes half of the 2500-excess-2500
+layer, `90% po 5000 xs 5000` cedes nine tenths of the layer above it. The
+`and` chains them into one programme.
+
+`reins_summary_df` is the exhibit that matters here: three stages (gross,
+ceded, net) x three components (freq, sev, agg), with theoretic `EX` next to
+the FFT `Est EX`. The frequency row is identical across the three views --
+occurrence cover changes what each claim costs, never how many there are.
+
+## Check
+
+```python
+# net + ceded = gross, on both severity and aggregate, to grid accuracy
+est = a.reins_summary_df['Est EX'].xs('occ')
+for component in ('sev', 'agg'):
+    gross = est[('gross', component)]
+    net = est[('net', component)]
+    ceded = est[('ceded', component)]
+    assert abs(net + ceded - gross) < 1e-6 * gross
+# occurrence cover leaves the claim COUNT alone. Read this off the theoretic
+# EX column: the gross frequency has no separate FFT estimate (Est EX is NaN
+# there -- there is nothing to estimate, the count is an input).
+ex = a.reins_summary_df['EX'].xs('occ')
+assert abs(ex[('net', 'freq')] - ex[('gross', 'freq')]) < 1e-9
+assert abs(ex[('ceded', 'freq')] - ex[('gross', 'freq')]) < 1e-9
+```
+}}};
 agg ReinsuranceAggregateLayer 5 claims 120 xs 0 sev 120 * uniform poisson aggregate net of 100 xs 240 note{aggregate reinsurance} tags{reinsurance};
 agg ReinsuranceLayered 1250 premium at 80% lr 1000 xs 0 sev lognorm 80 cv 1.675 occurrence ceded to 125 xs 0 and 50% po 125 xs 125 and 20% po 250 xs 250 and 5% po 500 xs 500 poisson note{Layered occurrence reinsurance, ceded view.} tags{reinsurance};
 agg ReinsuranceOccurrenceTower 5 claims 120 xs 0 sev 120 * uniform occurrence net of 50% so 25 xs 25 and 90% po 50 xs 50 poisson note{occurrence reinsurance; note over the top exposure} tags{reinsurance};

@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.0.0a160
+
+**[Recipe-Library]** — phase 4 of `dev/plan-meta-data.md`: **the library tests
+itself.** New `tests/test_library_recipes.py` turns every documented entry into
+a test case — the Solution block executes, then the Check block runs in the same
+namespace and its assertions must hold.
+
+Before this, the shipped example library had exactly **one** assertion against
+it: that the file loaded. Nothing in it was ever `build()`-ed, so an entry could
+parse cleanly and still produce garbage moments or fail validation with no test
+signal. The library's own stated invariants are now the test.
+
+Entries tagged `slow` are quarantined behind the `slow` marker, matching the
+suite-wide fast-by-default policy. A doc with no runnable ```python block, or a
+Check section with no `assert`, fails — a recipe that cannot be executed cannot
+be trusted, and an invariant that is stated but not tested is the exact failure
+mode the mechanism exists to prevent.
+
+### First four recipes
+
+`library.agg` gains real `doc{{{...}}}` bodies on four entries, one per check
+archetype, 15 assertions between them:
+
+- **`ThreeDice`** *(check:independent-oracle)* — the discrete case where the FFT
+  is exact, not approximate. Asserts `E[A] = 10.5` to 1e-12 and both extreme
+  probabilities equal `(1/6)^3`.
+- **`LimitProfile`** *(check:reconciliation)* — the premium x limit x loss-ratio
+  table. Asserts the aggregate mean *is* the premium-weighted expected loss
+  (`1000x0.8 + 2000x0.7 + 500x0.5 = 2450`) exactly, and that `E[N] x E[X]`
+  still reconciles across the blended profile.
+- **`PHDistortion`** *(check:limiting-case)* — asserts `g(0)=0`, `g(1)=1`,
+  increasing, **concave** (the coherence property), and `g(s) >= s` — a load,
+  never a discount.
+- **`OccurrenceXOL`** *(check:reconciliation)* — two-layer partial placement.
+  Asserts `net + ceded = gross` on both severity and aggregate, and that
+  occurrence cover leaves the claim count alone.
+
+That last one is worth a note: the count check reads the *theoretic* `EX`
+column, because gross frequency has no `Est EX` (it is an input, so there is
+nothing to estimate and the cell is NaN). Writing the check found that.
+
 ## 1.0.0a159
 
 **[Recipe-Library]** — phase 3 of `dev/plan-meta-data.md`: **three shipped

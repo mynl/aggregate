@@ -158,25 +158,30 @@
   works. **Still open:** tune the `hero` entries themselves (they were marked
   draft), and rewrite `aggregate_api/examples.py` against the new library —
   it re-lexed the old `FORMAT` header and the entry names have all changed.
-- **[Recipe-Library]** (`dev/plan-meta-data.md`, `dev/plan-recipes.md`) —
+- **[Recipe-Library]** (`dev/plan-meta-data.md`; `dev/done/plan-recipes.md`) —
   notes-driven describe / test / audit. Phase 1 (the `tags{}` / `doc{{{}}}`
   trailer clauses, distortion trailer, ambiguity guards) landed in **a157**;
-  phase 2 (the `aggregate.recipe` runtime, `Underwriter.recipe()` / `.recipes`,
-  the cookbook `recipe()` verb) in **a158**; phase 3 (the merged 186-entry
-  `library.agg` with unique names and tags, `discover(tags=)`) in **a159**;
-  phase 4 (the `tests/test_library_recipes.py` harness + the first four
-  recipes) in **a160**; tag namespacing in **a161**; `<<decl>>` substitution in
-  **a163**; `[Recipe-Is-The-Entry]` (one `Recipe` class, `knowledge` → `recipes`
-  throughout) in **a164**.
-  Remaining: **phase 5**, the Problem / Solution / Discussion cookbook rewrite,
-  now generator-based — see `[Cookbook-Generate]` in `dev/plan-recipes.md`.
+  phase 2 (the `aggregate.recipe` runtime, `Underwriter.recipe()` / `.recipes`)
+  in **a158**; phase 3 (the merged 186-entry `library.agg` with unique names and
+  tags, `discover(tags=)`) in **a159**; phase 4 (the
+  `tests/test_library_recipes.py` harness + the first four recipes) in
+  **a160**; tag namespacing in **a161**; `<<decl>>` substitution in **a163**;
+  `[Recipe-Is-The-Entry]` (one `Recipe` class, `knowledge` → `recipes`
+  throughout) in **a164**; `[Cookbook-Generate]` (`dev/generate_cookbook.py`,
+  native Quarto cells, `_setup.recipe()` retired) in **a165**.
+  **Remaining: phase 5** — convert the hand-written five-beat stub pages to
+  generated recipes, page by page with author reaction. The mechanism is done;
+  what is left is writing the `doc{{{}}}` for the entries each page teaches and
+  pruning that page's `{{< include >}}`. Start from
+  `build.recipes.query('doc')` (4 entries, 3 pages) against `[Cookbook-Pages]`
+  in `docs/cookbook/plan.md`.
   **There is no phase 6 backlog.** A `note{}` is the norm and is all `discover`
   and the object dropdown need; a `doc{{{}}}` is for the cookbook-worthy few,
   so `build.recipes.query('not doc')` is a **directory**, not a worklist. What
   *is* worth hunting is `build.recipes.query('doc and n_asserts == 0')` — a
   recipe that describes without testing. When writing one, use `<<decl>>`
   rather than retyping the program, and plain ` ```python ` fences — both
-  documented in the `library.agg` header.
+  documented in the `library.agg` header — then re-run the generator.
 - **[Rationalize-Tests]** (#51) — needed vs no-longer-needed; untangle and re-wire
   how the suite *consumes* the single test library (the `conftest`
   parametrization of every `test_suite.agg` line, the SLY snapshot regression)

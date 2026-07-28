@@ -125,6 +125,14 @@ s = np.linspace(0, 1, 11)
 qd(pd.DataFrame({'s': s, 'g(s)': g.g(s)}).set_index('s'))
 ```
 
+The curve is the clearer statement of the same thing -- it bows above the
+diagonal everywhere, which *is* the loading:
+
+```python
+#| fig-cap: "PH distortion, rho = 0.7. Above the diagonal is the load."
+g.plot()
+```
+
 ## Discussion
 
 The proportional-hazard distortion is `g(s) = s**rho` with `rho = 0.7 < 1`.

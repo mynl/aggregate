@@ -8,7 +8,7 @@ the survival function to load for risk [@Mildenhall2022a]. Distortions are the
 simplest first-class citizen and they turn up everywhere downstream (aggregate
 pricing @sec-aggregate-pricing, bounds @sec-bounds, portfolio allocation
 @sec-portfolio-pricing), so we meet them first — and use them to introduce the
-surface every citizen shares. C
+surface every citizen shares.
 
 ```{python}
 from _setup import *

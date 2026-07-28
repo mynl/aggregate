@@ -1,8 +1,26 @@
 # [Recipe-Is-The-Entry] + [Cookbook-Generate]
 
-**Status:** approved, NOT started (2026-07-28). Follows `dev/plan-meta-data.md`
-phases 1–4, which shipped as **a157–a163**. Written to survive a context
-compaction: everything needed to execute is below.
+**Status: DONE 2026-07-28.** Part A + Part C shipped as **a164**, Part B as
+**a165**. Follows `dev/plan-meta-data.md` phases 1–4 (**a157–a163**), whose
+phases 5–6 remain open — see `[Recipe-Library]` in `dev/TODO.md`.
+
+Executed as written, with three notes:
+
+- **A1 name collision, resolved.** `Recipe.program` (a158) meant the *doc-free*
+  rendering while `ParsedProgram.program` meant the *verbatim source line*.
+  Merging the classes forced a choice: `program` keeps the verbatim meaning
+  (what every other caller assumes) and the doc-free canonical rendering became
+  the new `Recipe.decl` — the name `<<decl>>` already implied. `parse_doc`'s
+  `program=` kwarg became `decl=`.
+- **A3 frame width.** Resolved by column order — identity and audit flags
+  first, `program` / `spec` last; `build.recipes.iloc[:, :9]` is the readable
+  slice, and the docs use it.
+- **B: additive, not a rewrite.** Generated fragments are included at the end of
+  their section under their own `#sec-recipe-…` anchors rather than replacing
+  the hand-written five-beat stubs. Retiring those is phase 5, page by page with
+  author reaction — doing it here would have silently discarded the author's
+  in-page TODO notes. `_setup.recipe()` turned out to be dead code: no page ever
+  called it.
 
 ---
 

@@ -10,15 +10,26 @@ date: today
 # How to read this cookbook {#sec-how-to-read .unnumbered}
 
 This is a chef's cookbook, not the reference manual. Every recipe is one feature
-on the same five-beat rhythm:
+on the same rhythm, borrowed from Beazley & Jones:
 
-0. **This is a recipe for…** — what dish, and why you'd cook it.
-1. **The DecL** — the program, pretty-printed, aiming to be self-explanatory.
-2. **Build & validate** — `build`, then `.valid` and `.validation_explanation`.
-3. **Exhibits** — `summary_df` / `stats_df` / `.plot()` / the relevant
-   `*_explanation`.
-4. **The check** — the invariant, made visible. This is the point: you *see* the
-   thing the pytest suite asserts, so you can trust the suite.
+- **Problem** — what you are trying to do, and why you would.
+- **Solution** — the code that does it, written self-contained so you can copy
+  it straight out of the page.
+- **Discussion** — why it works, and what to watch for.
+- **The check** — the invariant, made visible. This is the point: you *see* the
+  thing the pytest suite asserts, so you can trust the suite. It is collapsed
+  by default, and it really runs — a broken invariant fails this render.
+
+A recipe is **not written here**. It lives in its library entry's `doc{{{…}}}`
+in `src/aggregate/agg/library.agg`, and the page is generated from it by
+`dev/generate_cookbook.py`. The same text is executed by
+`tests/test_library_recipes.py`, so the page you are reading and the test that
+guards it cannot drift apart — they are the same source. Fetch one directly with
+`build.recipe('LimitProfile')`, or survey them with `build.recipes`.
+
+> **Conversion in progress.** Pages carrying `**Beat 1 —**`-style headings are
+> the earlier five-beat drafts, being converted recipe by recipe. Their content
+> is sound; the framing is what is changing.
 
 Everything shares one calibrated *house book* (`_setup.py`, the single source of
 truth for the example numbers) so the figures carry across pages. Each page also
@@ -34,10 +45,13 @@ adding an example never renumbers its neighbors.
 from _setup import *
 version
 ```
-ads
+
+<!-- Pages named _recipes_NN_*.qmd are GENERATED from library.agg by
+     dev/generate_cookbook.py; do not hand-edit them. -->
 
 <!-- 1  Distortions --------------------------------------------------- -->
 {{< include _01_distortions.qmd >}}
+{{< include _recipes_01_distortions.qmd >}}
 
 <!-- 2  Severity ------------------------------------------------------ -->
 {{< include _02_00_severity.qmd >}}
@@ -57,6 +71,7 @@ ads
 {{< include _04_03_mixed_severity.qmd >}}
 {{< include _04_04_limit_profile.qmd >}}
 {{< include _04_05_pricing.qmd >}}
+{{< include _recipes_04_aggregate.qmd >}}
 
 <!-- 5  Reinsurance --------------------------------------------------- -->
 {{< include _05_00_reinsurance.qmd >}}
@@ -65,6 +80,7 @@ ads
 {{< include _05_03_reinstatements.qmd >}}
 {{< include _05_04_variable_rating.qmd >}}
 {{< include _05_05_placement.qmd >}}
+{{< include _recipes_05_reinsurance.qmd >}}
 
 <!-- 6  PnL ----------------------------------------------------------- -->
 {{< include _06_00_pnl.qmd >}}

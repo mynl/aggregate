@@ -1,0 +1,64 @@
+<!-- GENERATED from library.agg by dev/generate_cookbook.py -- do not hand-edit. -->
+<!-- Edit the entry's doc{{{...}}} in src/aggregate/agg/library.agg and re-run the generator. -->
+
+```{python}
+#| echo: false
+from _setup import *
+```
+
+## Occurrence excess of loss {#sec-recipe-reinsurance-occurrence-xol}
+
+You have a two-layer per-occurrence excess programme with partial placements,
+and you want the *net* aggregate -- with gross and ceded still visible, so you
+can see where the cession went instead of taking the net on faith.
+
+```{python}
+a = build('''agg OccurrenceXOL
+  15 claims
+  10000 xs 0
+  sev lognorm 1500 cv 1
+  occurrence net of
+    50% so 2500 xs 2500 and
+    90% so 5000 xs 5000
+  mixed gamma 0.25
+  note{Occurrence excess-of-loss program, net view.} tags{topic:reinsurance, check:reconciliation}''')
+qd(a.reins_summary_df)
+```
+
+`occurrence net of ...` applies the programme claim by claim, before the
+frequency convolution -- which is what "per occurrence" means and why it cannot
+be done by adjusting the aggregate afterwards.
+
+`50% so 2500 xs 2500` cedes half of the 2500-excess-2500 layer, `90% so 5000 xs
+5000` nine tenths of the layer above it; `and` chains them into one programme.
+
+Note the program above is the **canonical** form. Partial placements can be
+written `so` (*share of*) or `po` (*part of*) and with a percentage or an
+absolute amount; all of them normalise to the `<pct>% so <limit> xs <attach>`
+spelling you see here, which is why what you wrote and what the library shows
+back can differ without anything having changed.
+
+`reins_summary_df` is the exhibit that matters here: three stages (gross,
+ceded, net) x three components (freq, sev, agg), with theoretic `EX` next to
+the FFT `Est EX`. The frequency row is identical across the three views --
+occurrence cover changes what each claim costs, never how many there are.
+
+::: {.callout-note collapse="true" title="The check"}
+
+```{python}
+# net + ceded = gross, on both severity and aggregate, to grid accuracy
+est = a.reins_summary_df['Est EX'].xs('occ')
+for component in ('sev', 'agg'):
+    gross = est[('gross', component)]
+    net = est[('net', component)]
+    ceded = est[('ceded', component)]
+    assert abs(net + ceded - gross) < 1e-6 * gross
+# occurrence cover leaves the claim COUNT alone. Read this off the theoretic
+# EX column: the gross frequency has no separate FFT estimate (Est EX is NaN
+# there -- there is nothing to estimate, the count is an input).
+ex = a.reins_summary_df['EX'].xs('occ')
+assert abs(ex[('net', 'freq')] - ex[('gross', 'freq')]) < 1e-9
+assert abs(ex[('ceded', 'freq')] - ex[('gross', 'freq')]) < 1e-9
+```
+
+:::

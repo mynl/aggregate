@@ -1,0 +1,9 @@
+# Quarto render output and caches. The _recipes_NN_*.qmd fragments ARE
+# committed -- they are generated from library.agg by dev/generate_cookbook.py,
+# but they are diffable input to the build, not output of it.
+/.quarto/
+_site/
+site_libs/
+_freeze/
+cookbook_files/
+__pycache__/

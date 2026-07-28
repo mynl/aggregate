@@ -1,0 +1,55 @@
+<!-- GENERATED from library.agg by dev/generate_cookbook.py -- do not hand-edit. -->
+<!-- Edit the entry's doc{{{...}}} in src/aggregate/agg/library.agg and re-run the generator. -->
+
+```{python}
+#| echo: false
+from _setup import *
+```
+
+## Proportional-hazard distortion {#sec-recipe-distortions-ph-distortion}
+
+You want to load expected loss into a price in a way that charges more for the
+tail than for the body, and you want the loading to be a *property of the
+measure* rather than a judgement applied case by case.
+
+```{python}
+import numpy as np
+g = build('''distortion PHDistortion ph 0.7 note{Proportional-hazard distortion (universally understood).} tags{topic:distortion, role:intro, check:limiting-case}''')
+s = np.linspace(0, 1, 11)
+qd(pd.DataFrame({'s': s, 'g(s)': g.g(s)}).set_index('s'))
+```
+
+The curve is the clearer statement of the same thing -- it bows above the
+diagonal everywhere, which *is* the loading:
+
+```{python}
+#| fig-cap: "PH distortion, rho = 0.7. Above the diagonal is the load."
+g.plot()
+```
+
+The proportional-hazard distortion is `g(s) = s**rho` with `rho = 0.7 < 1`.
+Applied to the survival function, it stretches small exceedance probabilities
+upward -- a 1-in-100 event is priced as though it were more likely than it is --
+and leaves certainty alone.
+
+Concavity is what makes it a coherent risk measure: the premium it produces is
+subadditive, so combining two books never costs more than pricing them apart.
+`rho = 1` is the identity (pure expected loss, no load); smaller `rho` loads
+more heavily.
+
+::: {.callout-note collapse="true" title="The check"}
+
+```{python}
+# a distortion is a probability-to-probability map: g(0)=0, g(1)=1
+assert abs(g.g(0.0)) < 1e-12
+assert abs(g.g(1.0) - 1.0) < 1e-12
+# increasing, and CONCAVE (the coherence property)
+s = np.linspace(0, 1, 201)
+gs = g.g(s)
+assert np.all(np.diff(gs) >= -1e-12)
+assert np.all(np.diff(gs, 2) <= 1e-9)
+# a load, never a discount: g(s) >= s everywhere
+assert np.all(gs >= s - 1e-12)
+```
+
+:::

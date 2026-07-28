@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.0.0a165
+
+**[Cookbook-Generate]** — cookbook recipe pages are generated from
+`library.agg` into native Quarto cells. `_setup.recipe()` is retired.
+
+`recipe('X')` (a158) rendered a recipe by `display(Markdown(...))`-ing its prose
+and `exec`-ing its code, all inside **one** cell. That reimplements a slice of
+Quarto, and badly:
+
+- **per-block cell options cannot exist** — `#| echo`, `#| fig-cap`,
+  `#| warning` are Quarto's, and there were no Quarto blocks to put them on;
+- **figures landed in the wrong place** — the inline backend flushes a figure
+  that was merely *created* at **cell end**, so a plotting recipe drew its plot
+  after the Discussion instead of inside the Solution.
+
+`dev/generate_cookbook.py` emits real ` ```{python} ` cells instead. Quarto then
+does the work it is for: figures land where they are created, `#|` options work
+per block, a failure is a Quarto cell error, and `freeze` caches per cell.
+
+The transform is deliberately thin. Prose passes through verbatim; each fenced
+python block has its fence rewritten from ` ```python ` to ` ```{python} `.
+Nothing else. Because the code is untouched, **the page and the pytest harness
+execute byte-identical text** — `tests/test_cookbook_generate.py` asserts that
+fence by fence, and it is the whole reason for generating rather than
+hand-writing. It also means a doc can open a fence with `#| fig-cap: "..."`,
+which Quarto honours and `Recipe.run` sees as a comment.
+
+Verified in a real render, not assumed: in `_site/cookbook.html` the PH
+distortion recipe emits heading → Problem → solution table → lead-in prose →
+**figure** → caption → Discussion → collapsed check, in that order.
+
+- **Pages are grouped by `topic:` tag** into `_recipes_NN_<slug>.qmd`, committed
+  (diffable; a docs build should not have to run a generator first) and
+  idempotent. `--check` exits 1 if any is stale.
+- **Additive, not a rewrite.** Generated fragments are included at the end of
+  their section under their own `#sec-recipe-…` anchors, so they cannot collide
+  with a hand-written page. Retiring the five-beat stubs is phase 5 of
+  `dev/plan-meta-data.md`, page by page with author reaction — not done here.
+- **A documented entry whose topic maps to no section is logged, not dropped.**
+- `_setup.py`'s star-import now supplies exactly the names
+  `Recipe.namespace()` seeds (`aggregate`, `build`, `qd`, `np`, `pd`), so the
+  equivalence above is structural rather than coincidental. `recipe()` is gone;
+  `qd` / `cbqd` / `pp` / `show` and the calibrated house book stay.
+- Fixed while rendering: `_05_05_placement.qmd` called `PnL.valid`, which does
+  not exist and broke the build — validation belongs to the engine a PnL wraps
+  (`p.engine.valid`). Also the stray `C` in `_01_distortions.qmd` and the stray
+  `ads` in `cookbook.qmd`.
+
 ## 1.0.0a164
 
 **[Recipe-Is-The-Entry]** — one class, one registry. `knowledge` is gone.

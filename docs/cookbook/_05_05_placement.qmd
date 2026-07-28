@@ -30,7 +30,9 @@ pp(BASE.format(pct=50))
 
 ```{python}
 p = build(BASE.format(pct=50))
-print(f'valid={p.valid}')
+# a PnL is a value snapshot, not a fitted distribution -- validation belongs to
+# the stochastic engine it wraps
+print(f'engine valid={p.engine.valid}')
 p.economics
 ```
 

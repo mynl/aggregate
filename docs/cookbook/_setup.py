@@ -5,21 +5,37 @@ idempotent, so the master ``cookbook.qmd`` re-running it once per Quarto
 ``{{< include >}}`` costs nothing; and each page therefore runs **standalone in
 JupyterLab**.
 
+The star-import deliberately supplies **exactly the names**
+:meth:`aggregate.recipe.Recipe.namespace` seeds — ``build``, ``qd``, ``np``,
+``pd``, ``aggregate`` — plus the cookbook's own display helpers. That is what
+lets a generated recipe page (``dev/generate_cookbook.py``) and the pytest
+harness (``tests/test_library_recipes.py``) run the *same* code from the *same*
+source: a recipe's Solution may assume those names and nothing else.
+
 This module is the **single source of truth for example calibration**
 ([Cookbook-Open-Questions] #3): the house-book parameters and the reusable DecL
-snippets live here, and pages compose them. A page's beat 1 still pretty-prints
-the fully-resolved program (via :func:`pp`), so it stays self-explanatory even
+snippets live here, and pages compose them. A page still pretty-prints the
+fully-resolved program (via :func:`pp`), so it stays self-explanatory even
 though the numbers are centralized here. **Calibration is PROVISIONAL — the
 author tunes it.**
 
 Tables render through :func:`qd`, the generic quick-display verb, wired here to
 ``greater_tables.GT`` for crisp HTML ([Cookbook-Open-Questions] #2). It degrades
 to a plain ``display`` if ``greater_tables`` is not installed.
+
+.. note::
+   There is no ``recipe()`` verb here. It existed from 1.0.0a158 to a164 and
+   rendered a recipe by ``exec``-ing its code and ``display``-ing its prose
+   inside one cell — which meant no per-block ``#|`` options and a figure
+   flushed at *cell end*, after the prose rather than inside the Solution.
+   Recipe pages are **generated** into native ``{python}`` cells instead; see
+   ``dev/generate_cookbook.py``.
 """
 from IPython.display import Markdown, display
 
 from textwrap import fill
 
+import aggregate
 from aggregate import build, format_program
 from aggregate import __version__ as version
 
@@ -39,9 +55,12 @@ import numpy as np
 import warnings
 
 __all__ = [
-    'build', 'format_program', 'version', 'IgnoredDecLClauseWarning',
-    'warnings', 'display', 'pd',
-    'qd', 'cbqd', 'pp', 'show', 'recipe',
+    # the recipe namespace -- keep in step with Recipe.namespace()
+    'aggregate', 'build', 'qd', 'np', 'pd',
+    # cookbook extras
+    'format_program', 'version', 'IgnoredDecLClauseWarning',
+    'warnings', 'display', 'Markdown',
+    'cbqd', 'pp', 'show',
     # calibrated DecL library (the source of truth)
     'HOUSE_PREM', 'HOUSE_SEV', 'HOUSE_FREQ', 'house',
     'OCC_LAYER', 'AGG_LAYER', 'SWING', 'REINST', 'pnl',
@@ -64,71 +83,6 @@ def qd(x, **kwargs):
         display(GT(x.to_frame() if isinstance(x, pd.Series) else x, **kwargs))
     else:
         display(x)
-
-
-def recipe(name, *, uw=None, run=True, show_check=True):
-    """Render one library recipe: Problem, Solution (with output), Discussion, Check.
-
-    **The one cookbook verb.** A recipe page is a heading plus a call to this;
-    everything else comes from the entry's ``doc{{{...}}}`` in the shipped
-    library, so the page and the pytest harness read the same source and cannot
-    drift apart.
-
-    Output is emitted through ``IPython.display`` rather than Quarto's
-    ``#| output: asis``, deliberately: asis text and rich display output do not
-    interleave reliably within one cell, and a recipe needs its tables and plots
-    to appear *between* its prose sections, in order.
-
-    Parameters
-    ----------
-    name : str
-        Library entry name, the same string you would pass to ``build``.
-    uw : Underwriter, optional
-        Knowledge base to read from; the default ``build`` underwriter by
-        default.
-    run : bool, default True
-        Execute the Solution and Check. ``False`` renders the prose and the
-        code without running anything — useful for an expensive recipe on a
-        page you want to render fast.
-    show_check : bool, default True
-        Render the Check block. It is the point of the cookbook, so this
-        defaults on; pass ``False`` for a page where the invariant is discussed
-        in prose instead.
-
-    Returns
-    -------
-    dict or None
-        The namespace the recipe's code left behind (``None`` when
-        ``run=False``), so a page can carry on from where the recipe stopped.
-    """
-    uw = uw or build
-    r = uw.recipe(name)
-
-    display(Markdown(f'**Problem.** {r.problem}' if r.problem
-                     else f'*(no Problem section for `{name}`)*'))
-
-    # Beat 1: the declaration itself, pretty-printed, trailer suppressed --
-    # the note/tags/doc are what produced this page, not part of the example.
-    display(Markdown('**Solution.**\n\n' + (r.solution or '')))
-    if r.program:
-        display(Markdown(f'```\n{format_program(r.program, fmt="text")}\n```'))
-
-    ns = None
-    if run and r.is_runnable:
-        ns = r.namespace()
-        exec(compile(r.solution_code, f'<recipe {name}:solution>', 'exec'), ns)
-
-    if r.discussion:
-        display(Markdown(f'**Discussion.** {r.discussion}'))
-
-    if show_check and r.check:
-        display(Markdown(
-            '::: {.callout-note collapse="true" title="The check"}\n\n'
-            f'{r.check}\n\n:::'))
-        if run and r.check_code:
-            exec(compile(r.check_code, f'<recipe {name}:check>', 'exec'),
-                 ns if ns is not None else r.namespace())
-    return ns
 
 
 def cbqd(ob):

@@ -16,7 +16,8 @@ aggregate.style.use()
 from aggregate.plots import make_grid
 %config InlineBackend.figure_format = 'svg'
 from aggregate.utilities import silence_warnings
-from aggregate import __version__ as v
+from aggregate import __version__ as v, qd, build
+# optional:
 # silence_warnings()
 print(v)
 ```

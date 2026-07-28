@@ -33,7 +33,7 @@ for i, eg in enumerate(egs):
     print()
     print(fill(a._text_info_blob(), 65))
     print()
-    qd(a.summary_df)
+    qd(a.summary_df.fillna(''))
     print()
     print(f'Note: {a.note}')
     print('-' * 80)

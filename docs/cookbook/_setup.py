@@ -18,6 +18,8 @@ to a plain ``display`` if ``greater_tables`` is not installed.
 """
 from IPython.display import display
 
+from textwrap import fill
+
 from aggregate import build, format_program
 from aggregate import __version__ as version
 
@@ -39,7 +41,7 @@ import warnings
 __all__ = [
     'build', 'format_program', 'version', 'IgnoredDecLClauseWarning',
     'warnings', 'display', 'pd',
-    'qd', 'pp', 'show',
+    'qd', 'cbqd', 'pp', 'show',
     # calibrated DecL library (the source of truth)
     'HOUSE_PREM', 'HOUSE_SEV', 'HOUSE_FREQ', 'house',
     'OCC_LAYER', 'AGG_LAYER', 'SWING', 'REINST', 'pnl',
@@ -62,6 +64,18 @@ def qd(x, **kwargs):
         display(GT(x.to_frame() if isinstance(x, pd.Series) else x, **kwargs))
     else:
         display(x)
+
+
+def cbqd(ob):
+    """Cookbook qd."""
+    print(ob.format_program(fmt='text', trailer=False))
+    print()
+    print(fill(ob._text_info_blob(), 65))
+    print()
+    qd(ob.summary_df.fillna(''))
+    print()
+    if ob.note != '':
+        print(f'Note: {ob.note}')
 
 
 def pp(decl):

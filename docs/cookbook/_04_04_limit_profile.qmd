@@ -8,12 +8,27 @@ bread-and-butter of commercial rating. One `agg` carries the whole profile.
 
 ```{python}
 from _setup import *
+from textwrap import fill
+# overwrite the _setup version
+from aggregate import qd
 ```
 
 **Beat 1 — the DecL.**
 
 <!-- TODO(author): a multi-limit profile, e.g. limits [1000 5000 10000] with
      exposure weights, one severity curve; calibrated. -->
+
+```{python}
+#| echo: false
+a = build('E.LimitProfile')
+cbqd(a)
+print()
+```
+
+```{python}
+qd(a.stats_df.iloc[:, :5].filter(regex='meta|mean|cv|skew', axis=0))
+```
+
 
 **Beats 2 & 3 — build, validate, exhibits.**
 

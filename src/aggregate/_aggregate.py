@@ -2592,7 +2592,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         clean object reads "not unreasonable", a failing one names the offending
         moment.
         """
-        parts = [f'{self.frequency.freq_name} frequency distribution.']
+        parts = [f'Frequency distribution {self.frequency.freq_name}.']
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
@@ -2617,11 +2617,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         does, so the two renderings say the same thing.
         """
         s = [f'Aggregate object: {self._title_name}.',
-             f'Frequency distribution: {self.frequency.freq_name}.']
+             f'Frequency distribution {self.frequency.freq_name}.']
         n = len(self.sevs)
         if n == 1:
             sv = self.sevs[0]
-            s.append(f'Severity: {sv.tail_description}.')
+            s.append(f'Severity {sv.tail_description}.')
         else:
             s.append(f'Mixed severity with {n} components.')
         if self.bs > 0:

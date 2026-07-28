@@ -169,7 +169,26 @@ subjects, and run summaries alike.
 
 ## Documentation and docstrings
 
-All new functions and any modified existing functions must include a docstring. The project uses NumPy-style docstrings (Parameters / Returns / Notes sections). For non-trivial mathematical logic, the Notes section should explain the algorithm or formula — this is an actuarial library where the "why" is often as important as the "what". Inline comments are appropriate for non-obvious numpy/FFT operations.
+All new functions and any modified existing functions must include a docstring. The project uses NumPy-style docstrings (Parameters / Returns / Notes sections). For non-trivial mathematical logic, the Notes section should explain the algorithm or formula: this is an actuarial library where the "why" is often as important as the "what". Inline comments are appropriate for non-obvious numpy/FFT operations.
+
+**No dashes as punctuation. Ever.** Not the em dash `—`, not the ASCII
+double `--`, not a spaced hyphen ` - `. The dash-as-aside is the single
+loudest AI tell in prose, and the author does not write that way. It applies
+everywhere text is authored: docstrings, comments, `note{}` / `doc{{{}}}`
+bodies, `.rst` and `.qmd` pages, `CHANGELOG.md`, `dev/` plans, commit
+subjects, and replies in the terminal.
+
+Rewrite instead of substituting. A dash is almost always doing a job that a
+comma, a colon, parentheses, or a full stop does better:
+
+- aside or gloss, use commas or parentheses: ~~`the count is an output -- not an input`~~ to `the count is an output, not an input`
+- explanation or expansion, use a colon: ~~`one frame -- identity first`~~ to `one frame: identity first`
+- a second thought, use a second sentence: ~~`it works -- but watch the tail`~~ to `it works. Watch the tail.`
+
+Still fine, because these are not punctuation: hyphenated compounds
+(`loss-ratio`, `first-class`, `zero-truncated`), negative numbers, ranges
+written with `to`, command-line flags (`--all-extras`), and `--` inside code
+or DecL.
 
 ## Citations and bibliography (standing order)
 

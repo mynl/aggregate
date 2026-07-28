@@ -77,7 +77,7 @@ Principal Classes
 
 The ``aggregate`` package makes working with aggregate probability distributions as straightforward as working with parametric distributions even though their densities rarely have closed-form expressions. It is built around five principal classes.
 
-#. The :class:`Underwriter` class keeps track of everything in its ``knowledge`` dataframe, interprets Dec Language (DecL, pronounced like deckle, /ˈdɛk(ə)l/) programs, and acts as a helper.
+#. The :class:`Underwriter` class keeps track of everything in its ``recipes`` dataframe, interprets Dec Language (DecL, pronounced like deckle, /ˈdɛk(ə)l/) programs, and acts as a helper.
 #. The :class:`Severity` class models a size of loss distribution (a severity curve).
 #. The :class:`Aggregate` class models a single unit of business, such as a line, business unit, geography, or operating division.
 #. The :class:`Distortion` class provides a distortion function, the basis of a spectral risk measure.
@@ -94,7 +94,7 @@ The :class:`Underwriter` class is an interface into the computational functional
 
 #. Creates objects using the DecL language, and
 
-#. Maintains a library of DecL object specifications called the knowledge. New objects are automatically added to the knowledge.
+#. Maintains a library of DecL object specifications called the recipe base. New objects are automatically added to it.
 
 To get started, import ``build``, a pre-configured :class:`Underwriter` and :func:`qd`, a quick-display function. Import the usual suspects too, for good measure.
 
@@ -104,7 +104,7 @@ To get started, import ``build``, a pre-configured :class:`Underwriter` and :fun
     from aggregate import build, qd
     import pandas as pd, numpy as np, matplotlib.pyplot as plt
 
-Printing ``build`` reports its name, the number of objects in its knowledge, and other information about hyper-parameter default values. ``user_dir`` (``~/.aggregate``) is where user-installed databases live and where various outputs are stored. ``default_dir`` is for internal package data. The ``build`` object loads an extensive test suite of DecL programs with over 130 entries.
+Printing ``build`` reports its name, the number of recipes it holds, and other information about hyper-parameter default values. ``user_dir`` (``~/.aggregate``) is where user-installed databases live and where various outputs are stored. ``default_dir`` is for internal package data. The ``build`` object loads an extensive test suite of DecL programs with over 130 entries.
 
 .. ipython:: python
     :okwarning:
@@ -177,43 +177,44 @@ DecL includes a Python newline ``\``. All programs in the help are entered so th
 Object Creation from the Knowledge Database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The **knowledge** dataframe is a database of DecL programs and a parsed
-dictionaries to create objects. ``build`` loads an extensive library by
+The **recipes** dataframe is a database of DecL programs and the parsed
+dictionaries used to create objects. ``build`` loads an extensive library by
 default. Users can create and load their own databases, allowing them to share common parameters for
 
 - severity (size of loss) curves,
 - aggregate distributions (e.g., industry losses in major classes of business, or total catastrophe losses from major perils), and
 - portfolios (e.g., an insurer's reference portfolio or educational examples like Bodoff's examples and Pricing Insurance Risk case studies).
 
-It is indexed by object kind (severity, aggregate, portfolio) and name, and accessed as the read-only property :attr:`build.knowledge`. Here are the first five rows of the knowledge loaded by ``build``.
+It is indexed by object kind (severity, aggregate, portfolio) and name, and accessed as the read-only property :attr:`build.recipes`. Each row carries the entry's ``program`` and ``spec`` alongside its documentation: whether it has a one-line ``note``, its ``tags``, and whether it carries a full cookbook ``doc``. Here are the first five rows of the recipes loaded by ``build``, without the wide ``program`` / ``spec`` columns.
 
 .. ipython:: python
     :okwarning:
 
-    qd(build.knowledge.head(), justify="left", max_colwidth=60)
+    qd(build.recipes.iloc[:5, :9], justify="left", max_colwidth=60)
 
-A row in the knowledge can be accessed by name using ``build``. This example models the roll of three single dice.
+A single entry is fetched by name, either as a subscript or via :meth:`Underwriter.recipe`. This example models the roll of three single dice.
 
 .. ipython:: python
     :okwarning:
 
-    print(build['A.ThreeDice'])
+    print(build['ThreeDice'])
+    print(build.recipe('ThreeDice').note)
 
-The argument ``'A.ThreeDice'`` is passed through to the underlying dataframe's ``getitem``.
+Both return a :class:`~aggregate.recipe.Recipe`: the entry's kind, name, spec, program and provenance, plus its note, tags and (for the cookbook-worthy few) its parsed doc sections. ``object`` is ``None`` — a lookup does not build.
 
 .. _10 min create from knowledge:
 
-A row in the knowledge can be created as a Python object using:
+A recipe can be created as a Python object using:
 
 .. ipython:: python
     :okwarning:
 
-    aDice = build('A.ThreeDice')
+    aDice = build('ThreeDice')
     qd(aDice)
 
-The argument in this case is passed through to the method :meth:`Underwriter.build`, which first looks for ``A.ThreeDice`` in the knowledge. If it fails, it tries to interpret its argument as a DecL program.
+The argument in this case is passed through to the method :meth:`Underwriter.build`, which first looks for ``ThreeDice`` in the recipe base. If it fails, it tries to interpret its argument as a DecL program.
 
-The method :meth:`build.discover` searches the knowledge using a regex (regular expression) applied to the names and returns a dataframe of matching programs. By default it does no building or plotting — pass ``plot=True`` or ``describe=True`` to also build each match.
+The method :meth:`build.discover` searches the recipes using a regex (regular expression) applied to the names and returns a dataframe of matching programs. By default it does no building or plotting — pass ``plot=True`` or ``describe=True`` to also build each match. Pass ``tags=`` to filter by subject and ``kind=`` by type.
 
 .. ipython:: python
     :okwarning:
@@ -243,8 +244,8 @@ Each object has a kind property and a name property, and it can be manifest as a
 
 The primary user-facing entry points are :meth:`Underwriter.build` and :meth:`Underwriter.build_many`:
 
-* :meth:`Underwriter.build` parses a DecL program producing exactly one top-level output (or looks up an existing entry by name in the knowledge base), constructs the corresponding object, smart-updates its discrete distribution (detecting discrete severities to pick ``bs=1``, otherwise sizing from the analytic moment window), and returns the constructed object. If the program produces zero or more than one output, it raises :class:`ValueError` and points the user at :meth:`build_many`.
-* :meth:`Underwriter.build_many` is the explicit-batch counterpart: it parses a (possibly multi-output) DecL program and returns the full ``list[ParsedProgram]`` regardless of count. Use ``update=False`` to skip the smart-update step (useful when you intend to call :meth:`update` yourself with chosen bucket parameters).
+* :meth:`Underwriter.build` parses a DecL program producing exactly one top-level output (or looks up an existing entry by name in the recipe base), constructs the corresponding object, smart-updates its discrete distribution (detecting discrete severities to pick ``bs=1``, otherwise sizing from the analytic moment window), and returns the constructed object. If the program produces zero or more than one output, it raises :class:`ValueError` and points the user at :meth:`build_many`.
+* :meth:`Underwriter.build_many` is the explicit-batch counterpart: it parses a (possibly multi-output) DecL program and returns the full ``list[Recipe]`` regardless of count. Use ``update=False`` to skip the smart-update step (useful when you intend to call :meth:`update` yourself with chosen bucket parameters).
 
 For interactive parser debugging, :meth:`Underwriter.interpret_file` runs every DecL program in a ``.agg`` or ``.csv`` file through the parser without creating output, returning a DataFrame with per-line parse-error info. Call it with no arguments to run the bundled test suite (at :attr:`Underwriter.test_suite_file`).
 
@@ -295,7 +296,7 @@ The :class:`Severity` class derives from :class:`scipy.stats.rv_continuous`, see
 
 A :class:`Severity` can be created using DecL using any of the following five forms.
 
-#. ``sev NAME sev.BUILDIN_ID`` is a knowledge lookup for ``BUILTIN_ID``
+#. ``sev NAME sev.BUILDIN_ID`` is a recipe-base lookup for ``BUILTIN_ID``
 
 #. ``sev NAME DISTNAME SHAPE1 <SHAPE2>`` where ``DISTAME`` is the name of any ``scipy.stats`` continuous random variable with zero, one, or two shape parameters, see the :ref:`DecL/list of distributions`.
 
@@ -430,7 +431,7 @@ Creating an Aggregate Distribution
 
 #.  Generally, they are created using DecL by :meth:`Underwriter.build`, as shown in :ref:`10 min create from decl`.
 
-#. Objects in the knowledge can be :ref:`created by name<10mins create from knowledge>`.
+#. Recipes can be :ref:`created by name<10mins create from knowledge>`.
 
 #. Advanced users and programmers can create :class:`Aggregate` objects directly using ``kwargs``, see :ref:`Aggregate Class`.
 
@@ -1599,7 +1600,7 @@ to reach the published version of that machinery.
 Summary of Objects Created by DecL
 -------------------------------------
 
-Each of the objects created by :meth:`build` is automatically stored in the knowledge. We can list them out now.
+Each of the objects created by :meth:`build` is automatically stored as a recipe. We can list them out now.
 
 .. ipython:: python
     :okwarning:

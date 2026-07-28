@@ -5,9 +5,9 @@ Plain ``agg``s accept every reinsurance decoration -- ceded-premium clauses
 (``deposit`` / ``rol`` / ``rate``), ceding commissions (``cede``),
 ``reinstatements``, the variable-rating features -- build the loss structure
 only, and emit one :class:`~aggregate.constants.IgnoredDecLClauseWarning`
-naming the ignored clauses. The knowledge base keeps the **full** spec, so an
+naming the ignored clauses. The recipe base keeps the **full** spec, so an
 ``agg.NAME`` reference inside a ``pnl`` / ``xpnl`` re-injects the economics
-(the knowledge-injection route). See
+(the spec-injection route). See
 ``dev/plan-pnl-consolidated-xpnl-walk.md`` Phase 1.
 """
 
@@ -76,10 +76,10 @@ def test_loss_structure_identical_to_undecorated(uw):
 
 
 # ----------------------------------------------------------------------
-# knowledge injection: the stored spec keeps the economics, and an
+# spec injection: the stored spec keeps the economics, and an
 # ``agg.NAME`` reference inside a pnl activates them
 # ----------------------------------------------------------------------
-def test_knowledge_retains_the_economics(uw):
+def test_recipe_retains_the_economics(uw):
     with pytest.warns(IgnoredDecLClauseWarning):
         uw(f'agg W7 {_ENGINE} deposit 160 cede 25%')
     stored = uw[('agg', 'W7')].spec

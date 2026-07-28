@@ -63,7 +63,7 @@ PACKAGE_DATA_DIR = 'agg'
 # beta); see dev/done/plan-decl-newline.md and the agg-file rationalization.
 TEST_SUITE_FILENAME = '_test_suite.agg'
 # The shipped DecL library (lives in PACKAGE_DATA_DIR) and the default
-# knowledge base. Names in it are unique across kinds -- enforced at load by
+# recipe base. Names in it are unique across kinds -- enforced at load by
 # Underwriter._check_library_names_unique. See dev/plan-meta-data.md.
 LIBRARY_FILENAME = 'library.agg'
 
@@ -98,7 +98,7 @@ class BuildSettings:
         Database name(s) loaded on construction. ``"library"`` is the shipped
         default -- the one DecL library, which replaced the overlapping
         ``examples`` / ``cookbook`` / ``actuarial-severity-curves`` trio at
-        1.0.0a159. ``"_test_suite"`` keeps the historical ``build`` knowledge
+        1.0.0a159. ``"_test_suite"`` keeps the historical ``build`` recipe
         base; ``"default"`` would load every bundled file, ``"all"`` bundled
         plus user.
     update : bool

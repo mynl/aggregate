@@ -1,11 +1,10 @@
 from copy import deepcopy
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import datetime
 from importlib.resources import files
 import logging
 from pathlib import Path
 import re
-from typing import Any
 import warnings
 
 import numpy as np
@@ -22,6 +21,7 @@ from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .spectral import Distortion
 from .constants import IgnoredDecLClauseWarning, ZeroPremiumCessionWarning
 from .parser import UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM
+from .recipe import Recipe
 from .utilities import (qd, agg_help)
 
 logger = logging.getLogger(__name__)
@@ -44,12 +44,12 @@ class _Unset:
 _UNSET = _Unset()
 
 
-#: The non-loss knowledge keys a pure ``agg`` accepts and **ignores** (with an
+#: The non-loss spec keys a pure ``agg`` accepts and **ignores** (with an
 #: :class:`~aggregate.constants.IgnoredDecLClauseWarning`): reinsurance
 #: economics (ceded premium / commission), reinstatement schedules, the
 #: variable-rating features and their decorated-layer indices, and the retro
 #: rating clause. They need a P&L premium context to activate; a plain
-#: Aggregate builds the loss structure only. The knowledge base keeps the full
+#: Aggregate builds the loss structure only. The recipe base keeps the full
 #: spec, so an ``agg.NAME`` reference inside a ``pnl`` / ``xpnl`` re-injects
 #: them ([Reins-Economics-On-Agg-Ignore-Warn]).
 _AGG_IGNORED_ECONOMICS_KEYS = (
@@ -108,8 +108,8 @@ def ignored_clauses_message(name, spec):
 _KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'bvagg': 3, 'port': 4}
 
 
-def _entry_to_decl(pp):
-    """Render a knowledge entry to canonical DecL for :meth:`Underwriter.to_agg`.
+def _entry_to_decl(r):
+    """Render one :class:`~aggregate.recipe.Recipe` to canonical DecL for :meth:`Underwriter.to_agg`.
 
     Uses :func:`aggregate.decl_writer.spec_to_decl` (the parser's inverse) so the
     exported ``.agg`` is canonical and re-loads cleanly. Falls back to the stored
@@ -119,9 +119,9 @@ def _entry_to_decl(pp):
     """
     from .decl_writer import spec_to_decl
     try:
-        return spec_to_decl(pp.spec, pp.kind, pp.name)
+        return spec_to_decl(r.spec, r.kind, r.name)
     except NotImplementedError:
-        return pp.program
+        return r.program
 
 
 # Allow-list of build/update knobs a ``hints{...}`` clause may set. Anything
@@ -321,34 +321,12 @@ def _row_stats(a, summary_cols):
     return [row[col] for col in summary_cols]
 
 
-@dataclass
-class ParsedProgram:
-    """One DecL declaration after parsing, with optional constructed object.
-
-    Returned by :meth:`Underwriter.interpret_program` and used internally by
-    :meth:`Underwriter.factory` / :meth:`Underwriter.build`. The ``object``
-    field is ``None`` after parsing and is populated by :meth:`Underwriter.factory`
-    once the corresponding Aggregate / Severity / Portfolio / Distortion is built.
-
-    The ``source`` field records provenance: the :class:`pathlib.Path` of the
-    ``.agg`` file the entry was read from, or the sentinel ``'session'`` for an
-    entry created by an in-session ``build(...)`` call (not yet saved to any
-    file). It backs the ``source`` filter on :meth:`Underwriter.to_agg`.
-    """
-    kind: str             # 'agg' | 'sev' | 'port' | 'distortion' | 'expr'
-    name: str             # the user-given name (e.g. 'Dice', 'MyBook')
-    spec: Any             # dict of kwargs for the constructor
-    program: str          # the original DecL source line
-    object: Any = None    # the constructed object once factory has run
-    source: Any = 'session'  # originating Path, or 'session' for in-session builds
-
-
 class CannotBuild(ValueError):
     """Raised by :meth:`Underwriter.build` when a parsed spec produces no top-level object.
 
     Typically the named-mixed-severity case: a ``sev`` declaration with ``wts``
     can only live inside an :class:`Aggregate`, not standalone. Use
-    :meth:`Underwriter.build_many` to receive the :class:`ParsedProgram`
+    :meth:`Underwriter.build_many` to receive the :class:`~aggregate.recipe.Recipe`
     instead, then inspect ``.spec`` directly.
 
     Subclass of :class:`ValueError` so existing broad ``except ValueError``
@@ -360,7 +338,7 @@ class Underwriter(HelpMixin):
     """
     Manage the creation of Aggregate, Severity, Portfolio, and Distortion objects.
 
-    Maintains a database of named DecL declarations (the "knowledge base") and
+    Maintains a database of named DecL declarations — the **recipe base** — and
     exposes the user-facing :meth:`build` entry point that parses a DecL program
     and constructs the corresponding object(s).
 
@@ -369,32 +347,35 @@ class Underwriter(HelpMixin):
     - Read DecL programs from ``.agg`` files (:meth:`load`) and write a
       selection back out (:meth:`to_agg`).
     - Bridge to the parser (`UnderwritingLexer` / `UnderwritingParser`).
-    - Safe lookup of named programs from the knowledge base for the parser.
+    - Safe lookup of named programs from the recipe base for the parser.
 
     Every parsed declaration has a *kind* (one of ``'sev'``, ``'agg'``, ``'port'``,
-    ``'distortion'``) and a *name*. Parsing produces a :class:`ParsedProgram`
-    holding the kind, name, dict spec, source program, provenance, and (once
-    :meth:`factory` runs) the constructed object.
+    ``'distortion'``) and a *name*. Parsing produces a
+    :class:`~aggregate.recipe.Recipe` holding the kind, name, dict spec, source
+    program, provenance, its documentation (``note`` / ``tags`` / ``hints`` /
+    ``doc``, derived from the spec), and — once :meth:`_factory` runs — the
+    constructed object.
 
-    The knowledge base is a flat in-memory union, ``(kind, name) ->
-    ParsedProgram``, stored in ``self._knowledge`` as a plain dict. It is fed by
-    the loaded ``.agg`` files and by in-session ``build(...)`` calls; there is no
-    "active" database. ``(kind, name)`` is the unique key — a later entry with
-    the same key overrides an earlier one (last load / last build wins). Each
-    entry carries a ``source`` provenance tag (its originating file ``Path``, or
-    ``'session'`` for an in-session build). The :attr:`knowledge` property
-    exposes this as a ``(kind, name)``-indexed DataFrame, built on demand.
+    The recipe base is a flat in-memory union, ``(kind, name) -> Recipe``,
+    stored in ``self._recipes`` as a plain dict. It is fed by the loaded
+    ``.agg`` files and by in-session ``build(...)`` calls; there is no "active"
+    database. ``(kind, name)`` is the unique key — a later entry with the same
+    key overrides an earlier one (last load / last build wins). Each entry
+    carries a ``source`` provenance tag (its originating file ``Path``, or
+    ``'session'`` for an in-session build). The :attr:`recipes` property exposes
+    this as a ``(kind, name)``-indexed DataFrame, built on demand;
+    :meth:`recipe` returns one entry by name.
 
     The loading surface is: construct with a ``databases=`` request, then
     :meth:`load` (read more), :meth:`resolve_databases` (preview a request),
     :meth:`available_databases` (discover what is on disk), :attr:`databases`
-    (the resolved file ``Path``\\ s actually loaded) / :attr:`knowledge`
+    (the resolved file ``Path``\\ s actually loaded) / :attr:`recipes`
     (inspect), :meth:`to_agg` (save), and :meth:`reload` (reset to as-created).
     """
 
     def __init__(self, *, name='Rory', databases=None, update=_UNSET, log2=_UNSET, debug=False):
         """
-        Create an underwriter object. The underwriter is the interface to the knowledge base
+        Create an underwriter object. The underwriter is the interface to the recipe base
         of the aggregate system. It is the interface to the parser and the interpreter, and
         to the database of curves, portfolios and aggregates.
 
@@ -444,7 +425,7 @@ class Underwriter(HelpMixin):
         self._parser = None
 
         # The load request (what to read); resolved + read lazily on first
-        # access to .knowledge, or eagerly via .load(). Default None -> load
+        # access to .recipes, or eagerly via .load(). Default None -> load
         # nothing (bare underwriters start empty). The module-level ``build``
         # passes the configured ``build.databases`` explicitly (see below).
         self._request = databases
@@ -452,9 +433,9 @@ class Underwriter(HelpMixin):
         # do not read in until needed for faster loading
         self._default_dir = None
         self._user_dir = None
-        # Knowledge base: a flat dict {(kind, name): ParsedProgram}. The
-        # DataFrame view is built on demand by the `knowledge` property.
-        self._knowledge: dict[tuple, ParsedProgram] = {}
+        # Recipe base: a flat dict {(kind, name): Recipe}. The DataFrame view
+        # is built on demand by the `recipes` property.
+        self._recipes: dict[tuple, Recipe] = {}
         # `databases` (public) reports the resolved file Paths actually loaded;
         # `_loaded` is the honest "configured request has been read" flag.
         self.databases: list = []
@@ -623,14 +604,14 @@ class Underwriter(HelpMixin):
 
     def load(self, request=None):
         """
-        Resolve a request and read the matching ``.agg`` files into the knowledge base.
+        Resolve a request and read the matching ``.agg`` files into the recipe base.
 
         The single load verb. ``request=None`` reads the **configured** request
         (``self._request``, from the constructor or ``config.build.databases``)
-        exactly once — this is the lazy path that :attr:`knowledge` triggers on
+        exactly once — this is the lazy path that :attr:`recipes` triggers on
         first access. A given ``request`` (filename, glob, collection name, or
         list thereof) is resolved and read **additively**: its files are added
-        to the knowledge base and appended to :attr:`databases`.
+        to the recipe base and appended to :attr:`databases`.
 
         Reading "one or more" files is just a glob or a list. The search path
         and ``.agg`` suffixing rules are documented on
@@ -690,10 +671,10 @@ class Underwriter(HelpMixin):
             logger.exception('Error reading requested database %s. Ignoring.', path.name)
             return False
         logger.info('Reading database %s...', path)
-        n = len(self._knowledge)
+        n = len(self._recipes)
         self._interpret_program(program, source=path)
-        added = len(self._knowledge) - n
-        logger.info('Database %s read into knowledge, adding %d entries.', path.name, added)
+        added = len(self._recipes) - n
+        logger.info('Database %s read, adding %d recipes.', path.name, added)
         self.databases.append(path)
         if path.name == LIBRARY_FILENAME:
             self._check_library_names_unique(path)
@@ -702,7 +683,7 @@ class Underwriter(HelpMixin):
     def _check_library_names_unique(self, path):
         """Enforce globally-unique names in the shipped library.
 
-        The knowledge base is keyed ``(kind, name)``, so ``sev Pareto`` and
+        The recipe base is keyed ``(kind, name)``, so ``sev Pareto`` and
         ``agg Pareto`` can legally coexist -- and did, across the three files
         ``library.agg`` replaced. The shipped library gives that up on purpose,
         so ``build('X')`` and ``build.recipe('X')`` always mean the same entry
@@ -714,8 +695,8 @@ class Underwriter(HelpMixin):
         they reuse names across kinds deliberately.
         """
         from collections import Counter
-        names = Counter(name for (_kind, name), pp in self._knowledge.items()
-                        if getattr(pp, 'source', None) == path)
+        names = Counter(name for (_kind, name), r in self._recipes.items()
+                        if getattr(r, 'source', None) == path)
         dupes = sorted(n for n, c in names.items() if c > 1)
         if dupes:
             raise ValueError(
@@ -727,7 +708,7 @@ class Underwriter(HelpMixin):
         """
         Reset the underwriter to its as-created state and re-read the configured request.
 
-        Clears the knowledge base, the :attr:`databases` list, and the
+        Clears the recipe base, the :attr:`databases` list, and the
         ``_loaded`` flag, restores the original load request, then re-resolves
         and re-reads it from disk. This **drops** any ad-hoc ``load(...)``-ed
         files and any in-session ``build(...)`` entries — the object returns to
@@ -740,7 +721,7 @@ class Underwriter(HelpMixin):
         list[pathlib.Path]
             The files re-read.
         """
-        self._knowledge = {}
+        self._recipes = {}
         self.databases = []
         self._loaded = False
         return self.load()
@@ -792,11 +773,11 @@ class Underwriter(HelpMixin):
 
     def __getitem__(self, item):
         """
-        Look up a parsed program in the knowledge base.
+        Look up one entry in the recipe base.
 
-        Pure lookup: returns the stored :class:`ParsedProgram` recipe.
+        Pure lookup: returns the stored :class:`~aggregate.recipe.Recipe`.
         **The ``object`` field is always ``None`` on the returned
-        ParsedProgram** — :meth:`__getitem__` does not construct the
+        Recipe** — :meth:`__getitem__` does not construct the
         object. Use :meth:`__call__` / :meth:`build` /
         :meth:`build_many` (which run :meth:`_factory` after the lookup)
         when you want a live Aggregate / Severity / Portfolio /
@@ -811,9 +792,9 @@ class Underwriter(HelpMixin):
 
         Returns
         -------
-        ParsedProgram
+        aggregate.recipe.Recipe
             With ``kind`` / ``name`` / ``spec`` / ``program`` populated
-            from the knowledge frame and ``object=None``.
+            from the recipe base and ``object=None``.
 
         Raises
         ------
@@ -822,6 +803,7 @@ class Underwriter(HelpMixin):
 
         See Also
         --------
+        recipe : the same lookup by name, spelled as a verb.
         __call__ : the user-facing entry that also constructs the object.
         """
         if not isinstance(item, (str, tuple)):
@@ -833,15 +815,15 @@ class Underwriter(HelpMixin):
 
         if isinstance(item, tuple):
             try:
-                entry = self._knowledge[item]
+                entry = self._recipes[item]
             except KeyError:
                 raise KeyError(f'Item {item} not found.')
             # Hand back a copy so the caller's factory cannot mutate the stored
-            # recipe (object stays None in the knowledge base).
+            # recipe (object stays None in the recipe base).
             return replace(entry)
 
         # str: match by name across all kinds (must be unique).
-        matches = [pp for (kind, name), pp in self._knowledge.items() if name == item]
+        matches = [r for (kind, name), r in self._recipes.items() if name == item]
         if len(matches) == 1:
             return replace(matches[0])
         if not matches:
@@ -858,11 +840,11 @@ class Underwriter(HelpMixin):
             return str(path.resolve())
 
     def _format_source(self, source) -> str:
-        """Render a knowledge entry's ``source`` provenance for display.
+        """Render a recipe's ``source`` provenance for display.
 
         The dict store tags every entry with its origin: ``'session'`` (an
         in-session build) or the resolved :class:`~pathlib.Path` of the ``.agg``
-        file it was read from. Full paths print badly in the ``knowledge``
+        file it was read from. Full paths print badly in the :attr:`recipes`
         DataFrame, so collapse them by location:
 
         - a **built-in** database (under :attr:`default_dir`) shows just its
@@ -941,16 +923,16 @@ class Underwriter(HelpMixin):
         return base
 
     def __repr__(self):
-        # Count knowledge entries from the dict directly — avoid self.knowledge
-        # here, which would trigger a database read. _loaded is the honest flag.
-        n = len(self._knowledge)
+        # Count entries from the dict directly — avoid self.recipes here, which
+        # would trigger a database read. _loaded is the honest flag.
+        n = len(self._recipes)
         if not self._loaded and self._request:
             kn_line = (
-                'knowledge          0 loaded '
-                '(access .knowledge to read configured database(s))'
+                'recipes            0 loaded '
+                '(access .recipes to read configured database(s))'
             )
         else:
-            kn_line = f'knowledge          {n} programs'
+            kn_line = f'recipes            {n} programs'
         return (
             f'Underwriter        {self.name}\n'
             f'version            {self.version}\n'
@@ -963,7 +945,7 @@ class Underwriter(HelpMixin):
             f'config             {self._config_line()}\n'
             f'user dir           {self._format_dir(self.user_dir)}\n'
             f'default dir        {self._format_dir(self.default_dir)}\n'
-            f'browse             call .discover(regex) to list knowledge entries'
+            f'browse             call .discover(regex) to list recipes'
         )
 
     @staticmethod
@@ -1062,13 +1044,13 @@ class Underwriter(HelpMixin):
 
     def _factory(self, parsed):
         """
-        Internal: construct the object described by a :class:`ParsedProgram`.
+        Internal: construct the object described by a :class:`~aggregate.recipe.Recipe`.
 
         Portfolio construction needs ``self`` (passed as ``uw``), which is why
         this is not a staticmethod.
 
-        :param parsed: a :class:`ParsedProgram` with ``kind``, ``name``, ``spec``,
-            and ``program`` populated; ``object`` is None on input.
+        :param parsed: a :class:`~aggregate.recipe.Recipe` with ``kind``, ``name``,
+            ``spec``, and ``program`` populated; ``object`` is None on input.
         :return: the same ``parsed`` with ``parsed.object`` set to the
             constructed object (or left ``None`` for the named-mixed-severity
             case, which can only be created in the context of an Aggregate).
@@ -1081,7 +1063,7 @@ class Underwriter(HelpMixin):
             # reinsurance-economics / feature clauses parse everywhere (the
             # shared agg body), but activating them needs a P&L premium
             # context. Filter a COPY -- ``parsed.spec`` *is* the stored
-            # knowledge entry, and the retained keys are exactly what an
+            # recipe's spec, and the retained keys are exactly what an
             # ``agg.NAME`` reference inside a ``pnl`` / ``xpnl`` re-injects
             # ([Reins-Economics-On-Agg-Ignore-Warn]).
             msg = ignored_clauses_message(name, spec)
@@ -1334,14 +1316,14 @@ class Underwriter(HelpMixin):
         parsed.object = obj
         return parsed
 
-    def add_entry(self, kind, name, spec, program, source='session'):
+    def add_recipe(self, kind, name, spec, program, source='session'):
         """
-        Add (or overwrite) one parsed declaration in the knowledge base.
+        Add (or overwrite) one parsed declaration in the recipe base.
 
         The single public mutator of the store. ``(kind, name)`` is the unique
         key; an existing entry with the same key is overwritten (last write
         wins). Used by :meth:`_interpret_program` and by test fixtures that need
-        to seed the knowledge base directly.
+        to seed the recipe base directly.
 
         Parameters
         ----------
@@ -1357,50 +1339,115 @@ class Underwriter(HelpMixin):
             Provenance: the file the entry came from, or ``'session'`` for an
             in-session build.
         """
-        self._knowledge[(kind, name)] = ParsedProgram(
+        self._recipes[(kind, name)] = Recipe(
             kind=kind, name=name, spec=spec, program=program, source=source)
 
-    def _knowledge_frame(self):
+    #: :attr:`recipes` columns, in display order: identity and audit flags
+    #: first, the wide ``program`` / ``spec`` payload last so the frame stays
+    #: readable at a terminal.
+    _RECIPE_COLUMNS = ('note', 'tags', 'doc', 'problem', 'solution',
+                       'discussion', 'check', 'n_asserts', 'source',
+                       'program', 'spec')
+
+    def _recipes_frame(self):
         """Build the ``(kind, name)``-indexed DataFrame view of the dict store.
 
-        Columns ``program``, ``spec``, ``source`` (the historical
-        ``program``/``spec`` shape plus provenance), sorted by index. Built on
-        demand so the store itself stays a plain dict.
+        Columns are :data:`_RECIPE_COLUMNS`, sorted by index. Built on demand so
+        the store itself stays a plain dict. Only entries that actually carry a
+        ``doc{{{...}}}`` are parsed -- the section flags of an undocumented
+        entry are known to be ``False`` without looking.
         """
-        if not self._knowledge:
+        if not self._recipes:
             empty = pd.MultiIndex.from_arrays([[], []], names=['kind', 'name'])
-            return pd.DataFrame(columns=['program', 'spec', 'source'], index=empty)
-        index = pd.MultiIndex.from_tuples(list(self._knowledge.keys()),
-                                          names=['kind', 'name'])
-        df = pd.DataFrame(
-            {'program': [pp.program for pp in self._knowledge.values()],
-             'spec': [pp.spec for pp in self._knowledge.values()],
-             'source': [self._format_source(pp.source) for pp in self._knowledge.values()]},
-            index=index)
-        return df.sort_index()
+            return pd.DataFrame(columns=list(self._RECIPE_COLUMNS), index=empty)
+        rows = []
+        for (kind, name), r in self._recipes.items():
+            documented = bool(r.doc)
+            present = set(r.sections) if documented else set()
+            rows.append({
+                'kind': kind, 'name': name,
+                'note': bool(r.note),
+                'tags': r.tags,
+                'doc': documented,
+                **{s: (s in present) for s in ('problem', 'solution',
+                                               'discussion', 'check')},
+                'n_asserts': r.n_asserts if documented else 0,
+                'source': self._format_source(r.source),
+                'program': r.program,
+                'spec': r.spec,
+            })
+        df = pd.DataFrame(rows).set_index(['kind', 'name'])
+        return df[list(self._RECIPE_COLUMNS)].sort_index()
 
     @property
-    def knowledge(self):
-        """The knowledge base as a ``(kind, name)``-indexed DataFrame (lazy-loaded).
+    def recipes(self):
+        """The recipe base as a ``(kind, name)``-indexed DataFrame (lazy-loaded).
 
-        Reads the configured databases on first access (the lazy path), then
-        returns a DataFrame built on demand from the dict store, with columns
-        ``program``, ``spec``, and ``source``.
+        One row per entry. Reads the configured databases on first access (the
+        lazy path), then builds the frame on demand from the dict store. This is
+        both the directory ("what do I know about?") and the *audit* half of the
+        notes-driven describe / test / audit surface -- it answers "which
+        entries carry a recipe, and which of those actually assert anything?"
+
+        Columns
+        -------
+        note : bool
+            Has a one-line ``note{...}`` abstract.
+        tags : tuple of str
+            The entry's ``tags{...}`` slugs.
+        doc : bool
+            Has a ``doc{{{...}}}`` body. Most entries do not, by design: a doc
+            is for the cookbook-worthy few, a note is the norm.
+        problem, solution, discussion, check : bool
+            Which canonical sections the doc provides.
+        n_asserts : int
+            ``assert`` statements in the Check block. **Zero with
+            ``check=True`` means the invariant is stated but not tested** --
+            the case worth hunting.
+        source : str
+            Which ``.agg`` file the entry came from (``'session'`` for an
+            in-session build).
+        program : str
+            The DecL source line, verbatim.
+        spec : dict
+            The parsed constructor kwargs.
+
+        Examples
+        --------
+        The flags without the wide payload::
+
+            build.recipes.iloc[:, :9]
+
+        Entries carrying a cookbook recipe::
+
+            build.recipes.query('doc')
+
+        Documented but unchecked::
+
+            build.recipes.query('doc and n_asserts == 0')
+
+        See Also
+        --------
+        recipe : one entry, by name.
+        discover : filter by name / kind / tags, optionally building each match.
         """
         if not self._loaded:
             self.load()
-        return self._knowledge_frame()
+        return self._recipes_frame()
 
     def recipe(self, name, kind=''):
-        """The :class:`~aggregate.recipe.Recipe` documenting a knowledge entry.
+        """One :class:`~aggregate.recipe.Recipe` from the recipe base, by name.
 
-        Resolves by **name alone**: the knowledge base is keyed ``(kind, name)``,
+        Resolves by **name alone**: the recipe base is keyed ``(kind, name)``,
         but a recipe is addressed the way a reader would say it, and the shipped
         library keeps names unique across kinds so ``recipe('X')`` and
         ``build('X')`` always mean the same entry. If a name does happen to
-        exist under more than one kind (possible in a hand-assembled knowledge
+        exist under more than one kind (possible in a hand-assembled recipe
         base), that is an error rather than a silent pick -- pass ``kind=`` to
         disambiguate.
+
+        ``uw[name]`` is the same lookup spelled as a subscript, and takes a
+        ``(kind, name)`` tuple as well.
 
         Parameters
         ----------
@@ -1413,9 +1460,11 @@ class Underwriter(HelpMixin):
         Returns
         -------
         aggregate.recipe.Recipe
-            Parsed sections plus the entry's note, tags and program. An entry
-            with no ``doc{{{...}}}`` yields a Recipe with empty sections rather
-            than an error -- the audit reports it as undocumented.
+            The entry: spec, program and provenance, plus its note, tags and
+            (lazily parsed) doc sections. An entry with no ``doc{{{...}}}``
+            yields a Recipe with empty sections rather than an error -- the
+            audit reports it as undocumented. ``object`` is ``None``; use
+            :meth:`build` to construct.
 
         Raises
         ------
@@ -1424,102 +1473,23 @@ class Underwriter(HelpMixin):
 
         See Also
         --------
-        recipes : the audit frame over every entry.
+        recipes : the frame over every entry.
         """
-        from .decl_writer import format_program
-        from .recipe import parse_doc
-
         if not self._loaded:
             self.load()
-        hits = [(k, n) for (k, n) in self._knowledge
+        hits = [(k, n) for (k, n) in self._recipes
                 if n == name and (not kind or k == kind)]
         if not hits:
-            raise KeyError(f'no knowledge entry named {name!r}'
+            raise KeyError(f'no recipe named {name!r}'
                            + (f' of kind {kind!r}' if kind else ''))
         if len(hits) > 1:
             kinds = ', '.join(sorted(k for k, _ in hits))
             raise KeyError(
                 f'{name!r} is ambiguous across kinds ({kinds}); pass kind= to '
                 f'choose. Shipped library names are unique across kinds.')
-        pp = self._knowledge[hits[0]]
-        # The declaration WITHOUT its doc: note/tags/hints are kept (hints
-        # change how the object builds, so a copy-pasteable program needs
-        # them), doc is dropped. This is what ``<<decl>>`` expands to, and
-        # dropping the doc is what stops the doc quoting itself.
-        try:
-            decl = format_program((pp.kind, pp.name, pp.spec), fmt='text',
-                                  trailer=('note', 'tags', 'hints'))
-        except Exception:
-            # Some constructs cannot round-trip through the writer (a
-            # `minimum`/`mixture` distortion references children by name).
-            # A recipe for one of those simply gets no <<decl>> expansion
-            # rather than failing to load at all.
-            decl = ''
-        return parse_doc(pp.spec.get('doc', ''),
-                         name=pp.name, kind=pp.kind,
-                         note=pp.spec.get('note', ''),
-                         tags=pp.spec.get('tags', ()),
-                         program=decl)
-
-    @property
-    def recipes(self):
-        """Audit frame: what in the knowledge base is described, shown and checked.
-
-        One row per entry, indexed ``(kind, name)``. This is the *audit* half of
-        the notes-driven describe / test / audit surface -- it answers "which
-        entries carry a recipe, and which of those actually assert anything?"
-
-        Columns
-        -------
-        tags : tuple of str
-            The entry's ``tags{...}`` slugs.
-        note : bool
-            Has a one-line ``note{...}`` abstract.
-        doc : bool
-            Has a ``doc{{{...}}}`` body.
-        problem, solution, discussion, check : bool
-            Which canonical sections the doc provides.
-        n_asserts : int
-            ``assert`` statements in the Check block. **Zero with
-            ``check=True`` means the invariant is stated but not tested** --
-            the case worth hunting.
-        source : str
-            Which ``.agg`` file the entry came from.
-
-        Examples
-        --------
-        Undocumented entries::
-
-            build.recipes.query('not doc')
-
-        Documented but unchecked::
-
-            build.recipes.query('doc and n_asserts == 0')
-        """
-        from .recipe import parse_doc
-
-        if not self._loaded:
-            self.load()
-        rows = []
-        for (kind, name), pp in self._knowledge.items():
-            spec = pp.spec if isinstance(pp.spec, dict) else {}
-            doc = spec.get('doc', '')
-            r = parse_doc(doc, name=name, kind=kind)
-            present = set(r.sections)
-            rows.append({
-                'kind': kind, 'name': name,
-                'tags': tuple(spec.get('tags', ())),
-                'note': bool(spec.get('note', '')),
-                'doc': bool(doc),
-                **{s: (s in present) for s in ('problem', 'solution',
-                                               'discussion', 'check')},
-                'n_asserts': r.n_asserts,
-                'source': self._format_source(pp.source),
-            })
-        df = pd.DataFrame(rows)
-        if df.empty:
-            return df
-        return df.set_index(['kind', 'name']).sort_index()
+        # A copy, like __getitem__: the caller must not be able to mutate the
+        # stored entry (and a fresh copy re-derives its doc / decl caches).
+        return replace(self._recipes[hits[0]])
 
     @property
     def version(self):
@@ -1585,18 +1555,19 @@ class Underwriter(HelpMixin):
         """
         Internal: parse → factory (without smart-update). Used by :meth:`build_many`.
 
-        Tries a name lookup in the knowledge first; falls back to parsing the
+        Tries a name lookup in the recipe base first; falls back to parsing the
         program. If ``update`` is True, calls each constructed object's
         ``.update(log2, bs, **kwargs)`` with the *literal* log2/bs (no bucket
         inference — that lives in :meth:`build_many`).
 
         :param portfolio_program: a DecL program (str), or the name of a
-            previously-built object in the knowledge base.
+            previously-built object in the recipe base.
         :param log2: passed verbatim to each object's ``update``.
         :param bs: passed verbatim to each object's ``update``.
         :param update: override the class-level ``self.update`` default.
         :param kwargs: passed to each created object's ``update`` method.
-        :return: list of :class:`ParsedProgram` (one per top-level declaration).
+        :return: list of :class:`~aggregate.recipe.Recipe` (one per top-level
+            declaration).
         """
         if update is None:
             update = self.update
@@ -1613,10 +1584,10 @@ class Underwriter(HelpMixin):
             answer = self._factory(answer)
             if update:
                 answer.object.update(log2, bs, **kwargs)
-                recipe = getattr(answer.object, '_pnl_recipe', None)
-                if recipe is not None:
+                pnl_recipe = getattr(answer.object, '_pnl_recipe', None)
+                if pnl_recipe is not None:
                     prog = answer.object.program
-                    answer.object = self._snapshot_pnl(answer.object, recipe)
+                    answer.object = self._snapshot_pnl(answer.object, pnl_recipe)
                     answer.object.program = prog
             return [answer]
 
@@ -1644,15 +1615,15 @@ class Underwriter(HelpMixin):
     def _interpret_program(self, portfolio_program, source='session'):
         """
         Internal: preprocess and parse a program one line at a time, storing
-        each parsed spec in the knowledge base. No objects are constructed.
+        each parsed spec in the recipe base. No objects are constructed.
 
         :param portfolio_program: the DecL program text.
         :param source: provenance tag for the stored entries — the originating
             file :class:`~pathlib.Path` when reading a database, else
             ``'session'`` for in-session builds.
-        :return: list of :class:`ParsedProgram` (``object`` is ``None`` for
-            each). The returned programs are copies; mutating their ``object``
-            field does not touch the stored recipes.
+        :return: list of :class:`~aggregate.recipe.Recipe` (``object`` is
+            ``None`` for each). The returned recipes are copies; mutating their
+            ``object`` field does not touch the stored ones.
         """
         portfolio_program = self.lexer.preprocess(portfolio_program)
         rv = []
@@ -1670,17 +1641,17 @@ class Underwriter(HelpMixin):
                     logger.error(e)
                 raise
             else:
-                logger.info('answer out: %s object %s parsed successfully...adding to knowledge',
+                logger.info('answer out: %s object %s parsed successfully...adding a recipe',
                             kind, name)
-                self.add_entry(kind, name, spec, program_line, source=source)
+                self.add_recipe(kind, name, spec, program_line, source=source)
                 # Hand back a fresh copy: _build_work / build_many set .object
                 # on these, which must not leak into the stored recipe.
-                rv.append(replace(self._knowledge[(kind, name)]))
+                rv.append(replace(self._recipes[(kind, name)]))
         return rv
 
     def _safe_lookup(self, buildinid):
         """
-        Internal: parser callback that looks up ``kind.name`` in the knowledge
+        Internal: parser callback that looks up ``kind.name`` in the recipe base
         and returns a deepcopy of the spec.
 
         Different from :meth:`__getitem__` in that it splits the dotted id into
@@ -1696,20 +1667,20 @@ class Underwriter(HelpMixin):
         try:
             parsed = self[(kind, name)]
         except LookupError:
-            logger.error('ERROR id %s.%s not found in the knowledge.', kind, name)
+            logger.error('ERROR id %s.%s not found in the recipe base.', kind, name)
             raise
         logger.debug('UnderwritingParser.safe_lookup | retrieved %s.%s as type %s.%s',
                      kind, name, parsed.kind, parsed.name)
         if parsed.kind != kind:
             raise ValueError(f'Error: type of {name} is  {parsed.kind}, not expected {kind}')
-        # don't want to pass back the original; changes would be reflected in the knowledge
+        # don't want to pass back the original; changes would be reflected in the recipe base
         return deepcopy(parsed.spec)
 
     def build_many(self, program, update=None, log2=0, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
         """
         Parse a (possibly multi-output) DecL program, construct each object, and smart-update.
 
-        Always returns the full ``list[ParsedProgram]`` regardless of count.
+        Always returns the full ``list[Recipe]`` regardless of count.
         Use :meth:`build` instead when you expect a single output.
 
         Smart-update logic: discrete severities pick ``bs=1`` with a log2 sized
@@ -1726,7 +1697,7 @@ class Underwriter(HelpMixin):
             to 1) for thick-tailed distributions.
         :param kwargs: passed to each ``update`` call. ``force_severity=True``
             is always applied.
-        :return: list of :class:`ParsedProgram`, one per top-level output.
+        :return: list of :class:`~aggregate.recipe.Recipe`, one per top-level output.
         """
         rv = self._build_work(program, update=False, force_severity=True)
 
@@ -2027,7 +1998,7 @@ class Underwriter(HelpMixin):
         :raises CannotBuild: if the spec parses but no top-level object can be
             built standalone (e.g. a named mixture severity, which can only
             live inside an :class:`Aggregate`). Use :meth:`build_many` to
-            receive the :class:`ParsedProgram` instead.
+            receive the :class:`~aggregate.recipe.Recipe` instead.
         """
         rv = self.build_many(program, update=update, log2=log2, bs=bs,
                              bucket_sizing_p=bucket_sizing_p, **kwargs)
@@ -2042,7 +2013,7 @@ class Underwriter(HelpMixin):
                 f'build() could not construct {answer.kind} {answer.name!r}: '
                 f'spec parses but cannot be built standalone (typically a '
                 f'mixture severity — wrap it in an Aggregate, or use '
-                f'build_many() to receive the ParsedProgram).'
+                f'build_many() to receive the Recipe).'
             )
         return answer.object
 
@@ -2055,15 +2026,15 @@ class Underwriter(HelpMixin):
         Aggregate / Severity / Portfolio / Distortion. ``program`` can
         be either:
 
-        * a DecL source string (parsed, added to the knowledge base,
+        * a DecL source string (parsed, added to the recipe base,
           constructed); or
-        * the bare name of an entry already in the knowledge base
+        * the bare name of an entry already in the recipe base
           (looked up, constructed; the original DecL source is *not*
           re-parsed).
 
         The lookup branch and the parse branch both end by calling
-        :meth:`_factory` on each :class:`ParsedProgram`, so the
-        returned object is always live (never ``None``).
+        :meth:`_factory` on each :class:`~aggregate.recipe.Recipe`, so
+        the returned object is always live (never ``None``).
 
         Three access patterns, contrasted
         ---------------------------------
@@ -2071,7 +2042,7 @@ class Underwriter(HelpMixin):
         Given::
 
             from aggregate import build
-            build('dist cc1 ccoc .25')        # registers cc1 in knowledge
+            build('dist cc1 ccoc .25')        # registers cc1 as a recipe
 
         1. **Build by program text** — parse, register, construct,
            return the object::
@@ -2079,28 +2050,28 @@ class Underwriter(HelpMixin):
                 cc1 = build('dist cc1m ccoc .25')
                 assert cc1 is not None                # the Distortion
 
-        2. **Knowledge lookup, no construction** — returns the recipe
+        2. **Recipe lookup, no construction** — returns the recipe
            only; ``object`` is ``None`` because :meth:`__getitem__`
            does not run the factory::
 
-                entry = build['cc1m']                 # ParsedProgram
+                entry = build['cc1m']                 # a Recipe
                 assert entry.object is None           # *by design*
                 assert entry.spec == {'name': 'ccoc', 'r': 0.25}
 
-        3. **Build by name** — lookup in the knowledge **and**
+        3. **Build by name** — lookup in the recipe base **and**
            construct, just like (1) but with no parsing::
 
                 cc1 = build('cc1')                    # the Distortion
                 assert cc1 is not None
 
         :meth:`build_many` is the batched form of (1) / (3); it returns
-        a list of :class:`ParsedProgram` and *does* populate
+        a list of :class:`~aggregate.recipe.Recipe` and *does* populate
         ``object`` on each (factory runs as part of the build).
 
         Rationale
         ---------
 
-        The knowledge base stores DecL specs (small, picklable), not
+        The recipe base stores DecL specs (small, picklable), not
         live objects. Objects are constructed on demand for two
         reasons: (a) Portfolios need an :class:`Underwriter` reference
         which may differ between sessions, and (b) each ``build('cc1')``
@@ -2209,11 +2180,11 @@ class Underwriter(HelpMixin):
     def discover(self, regex='', kind='', tags='', plot=False, describe=False,
                  return_objects=False, **kwargs):
         """
-        Match knowledge entries against ``regex`` / ``tags`` (and optional
-        ``kind``); optionally build, plot, and describe each.
+        Match recipes against ``regex`` / ``tags`` (and optional ``kind``);
+        optionally build, plot, and describe each.
 
         Default behavior (``plot=False, describe=False``) is a lightweight
-        directory view — just filter the knowledge base and return the matching
+        directory view — just filter the recipe base and return the matching
         DataFrame. Pass ``plot=True`` or ``describe=True`` to build each match
         and visualize/describe it.
 
@@ -2234,7 +2205,7 @@ class Underwriter(HelpMixin):
             build.discover('Dice', plot=True)          # build + plot
             build.discover(tags='topic:distortion', describe=True)
 
-        :param regex: filter on the knowledge index (name); '' matches all.
+        :param regex: filter on the recipe index (name); '' matches all.
         :param kind: optional filter ('agg', 'sev', 'port', 'distortion'); ''
             matches all. **This is how you filter by type** -- there is no
             type tag.
@@ -2251,15 +2222,13 @@ class Underwriter(HelpMixin):
             ``return_objects=True``.
         """
         # base frame: optionally restricted to a kind
-        base = self.knowledge.droplevel('kind') if not kind else self.knowledge.loc[kind]
+        base = self.recipes.droplevel('kind') if not kind else self.recipes.loc[kind]
         # empty regex means "no filter" — return everything
         df = base.filter(regex=regex, axis=0).copy() if regex else base.copy()
 
         if tags:
             wanted = {t for t in re.split(r'[,\s]+', tags) if t}
-            keep = [wanted <= set((spec or {}).get('tags', ()))
-                    for spec in df['spec']]
-            df = df[keep]
+            df = df[[wanted <= set(t or ()) for t in df['tags']]]
 
         # asking for the built objects implies we must run the build loop
         do_build = plot or describe or return_objects
@@ -2269,8 +2238,11 @@ class Underwriter(HelpMixin):
             bit = df[['program']].copy()
             bit['program'] = (bit['program']
                               # doc first: its fence would survive the note
-                              # pattern and leave a dangling ``}}}``.
-                              .str.replace(r'\s*doc\{\{\{.*?\n\}\}\}', '',
+                              # pattern and leave a dangling ``}}}``. A stored
+                              # program carries the base64 one-liner the
+                              # preprocessor produced, not the raw multi-line
+                              # body -- match either.
+                              .str.replace(r'\s*doc\{\{\{.*?\}\}\}', '',
                                            regex=True, flags=re.S)
                               .str.replace(r' note\{[^}]+\}', '', regex=True)
                               .str.replace(r' tags\{[^}]+\}', '', regex=True)
@@ -2278,7 +2250,11 @@ class Underwriter(HelpMixin):
                               .str.replace(r' {2,}', ' ', regex=True))
             return bit.sort_index()
 
-        # build + plot/describe path: augment df with summary statistics.
+        # build + plot/describe path: augment df with summary statistics. Trim
+        # to the identity columns first -- the eleven statistics are the point
+        # here, and carrying the audit flags and the `spec` payload alongside
+        # them makes an unreadably wide frame.
+        df = df[['source', 'program']].copy()
         # Initialize as object dtype to avoid pandas LossySetitemError on the
         # mixed-type .loc assignment below (modern pandas refuses to coerce a
         # non-bool result of validation_explanation into a bool column).
@@ -2323,9 +2299,9 @@ class Underwriter(HelpMixin):
 
     def to_agg(self, path, pattern='.*', kind='all', source='session', mode='x'):
         """
-        Write a selection of knowledge entries to a ``.agg`` file (pandas-style export).
+        Write a selection of recipes to a ``.agg`` file (pandas-style export).
 
-        Because the knowledge base has no "active" database, "save" is an
+        Because the recipe base has no "active" database, "save" is an
         explicit export of selected entries to a named file. Each entry already
         stores its ``program`` (DecL source) line, so writing is just emitting
         those lines; the result **re-loads cleanly** via :meth:`load` —
@@ -2407,11 +2383,11 @@ class Underwriter(HelpMixin):
         # Order by kind dependency-priority, then name, so the file re-loads
         # sequentially: definitions precede the entries that reference them.
         selected = sorted(
-            (pp for (k, n), pp in self._knowledge.items()
+            (r for (k, n), r in self._recipes.items()
              if (kind in ('', 'all') or k == kind)
              and name_re.match(n)
-             and _source_match(pp.source)),
-            key=lambda pp: (_KIND_WRITE_ORDER.get(pp.kind, 99), pp.name),
+             and _source_match(r.source)),
+            key=lambda r: (_KIND_WRITE_ORDER.get(r.kind, 99), r.name),
         )
 
         out = Path(path).expanduser()
@@ -2424,7 +2400,7 @@ class Underwriter(HelpMixin):
         # Blank line between entries: under the blank-line / `;` statement rule a
         # single newline is a continuation, so entries must be paragraph-separated
         # to re-load as distinct statements (a multi-line port stays one block).
-        body = '\n\n'.join(_entry_to_decl(pp) for pp in selected)
+        body = '\n\n'.join(_entry_to_decl(r) for r in selected)
 
         if mode == 'x' and out.exists():
             raise FileExistsError(
@@ -2471,7 +2447,7 @@ def _refresh_default_underwriter():
     Called by :func:`aggregate.config.reload_settings`. Mutates the existing
     ``build`` object in place (rather than rebinding the name) so that any
     ``from aggregate import build`` references already held by callers see the
-    new configured defaults. Cached knowledge is cleared so reconfigured
+    new configured defaults. Cached recipes are cleared so reconfigured
     databases reload lazily on next access.
     """
     s = get_settings().build
@@ -2479,7 +2455,7 @@ def _refresh_default_underwriter():
     build.log2 = s.log2
     build._request = list(s.databases) or None
     # reset to as-created so the reconfigured request reloads lazily on next access
-    build._knowledge = {}
+    build._recipes = {}
     build.databases = []
     build._loaded = False
 # uncomment to create debug build, add to __init__.py

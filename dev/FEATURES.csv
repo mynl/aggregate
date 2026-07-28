@@ -196,7 +196,7 @@ build-io,picks,method,object,Adjust severity to hit layer pick targets,Y,,,,,,,,
 build-io,focus,method,DataFrame,Central window of density_df holding 1-p of mass,Y,,,,,,,,,,,
 build-io,create_from_sample,method,object,Build a portfolio from a multivariate sample,,Y,,,,,,,,,,
 build-io,json,method,str,Write spec to JSON,Y,Y,,,,,,,,,,
-build-io,save,method,None,Persist to the knowledge base,,Y,,,,,,,,,,WRINKLE: save on Portfolio only; Aggregate has json but no save.
+build-io,save,method,None,Persist to the recipe base,,Y,,,,,,,,,,WRINKLE: save on Portfolio only; Aggregate has json but no save.
 build-io,spec,property,dict,Read-only DecL spec dictionary,Y,Y,,,,,,,,,,
 build-io,spec_ex,property,dict,Full spec incl derived info,Y,Y,,,,,,,,,,
 plot,plot,method,None,Standard severity + aggregate (Lee) plots,Y,Y,Y,Y,Y,,,Y,,Y,Y,Most widely shared method. AllocationBounds/PricingBounds add plot (each item's curve + convex envelopes + optional P-slice); Bounds uses plot_envelope/plot_weights instead.

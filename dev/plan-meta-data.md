@@ -374,25 +374,23 @@ The expensive phase; it is curation, not a script.
   semantic anchors are good — keep verbatim.
 - **Rewrite `cookbook.qmd`'s "How to read"** (lines 10-25) to the new frame; fix
   the stray `ads` (line 37) and the stray `C` in `_01_distortions.qmd:11`.
-- **`_setup.py`** — add `recipe()`. The calibrated snippet library (`HOUSE_PREM`,
-  `HOUSE_SEV`, `HOUSE_FREQ`, `house()`, `OCC_LAYER`, `AGG_LAYER`, `SWING`,
-  `REINST`, `pnl()`) **moves into `library.agg`** as named entries. This resolves
-  the live tension flagged by `[Cookbook-Decisions]` #3 ("`_setup.py` is the
-  single source of truth for calibration") versus `_04_04_limit_profile.qmd`
-  already reaching for a library entry. After the move the **library** is the
-  single source of truth and `_setup.py` is just display helpers. `cbqd` folds
-  into `recipe()`; `pp` / `show` / `qd` stay.
-- **Page shape** becomes:
-
-  ```markdown
-  <!-- _04_04_limit_profile.qmd — Aggregate: limit profile -->
-
-  ## Limit profile {#sec-aggregate-limit-profile}
-
-  ```{python}
-  recipe('LimitProfile')
-  ```
-  ```
+- **`_setup.py`** — the calibrated snippet library (`HOUSE_PREM`, `HOUSE_SEV`,
+  `HOUSE_FREQ`, `house()`, `OCC_LAYER`, `AGG_LAYER`, `SWING`, `REINST`,
+  `pnl()`) **moves into `library.agg`** as named entries. This resolves the live
+  tension flagged by `[Cookbook-Decisions]` #3 ("`_setup.py` is the single
+  source of truth for calibration") versus `_04_04_limit_profile.qmd` already
+  reaching for a library entry. After the move the **library** is the single
+  source of truth and `_setup.py` is just display helpers (`qd` / `pp` /
+  `show`).
+- **Page shape.** ~~A thin page calling a runtime `recipe('X')` verb~~ —
+  **superseded**, see `[Cookbook-Generate]` in `dev/plan-recipes.md`. The
+  runtime verb `exec`'d the code itself inside one cell, which meant no
+  per-block `#|` options and a figure flushed by the inline backend at *cell
+  end*, i.e. after the prose rather than inside the Solution. Pages are instead
+  **generated** from `library.agg` into native ` ```{python} ` Quarto cells by
+  `dev/generate_cookbook.py`; `_setup.recipe()` is retired. `Recipe.run()` stays
+  — it is the pytest harness, and keeping both consumers on the same doc is what
+  makes "the page and the test run the same program" true by construction.
 
   Essay pages (`_06_03_ir_modeling.qmd` — the signed-severity trap — and
   `_02_02_scipy_continuous.qmd`) keep their hand-written prose and cite recipes
@@ -411,6 +409,13 @@ The expensive phase; it is curation, not a script.
 ---
 
 ## Phase 6 — [Recipe-Population]: fill the empty pages
+
+**Scope corrected (a164).** This was written as though all 186 entries awaited a
+doc. They do not: a `note{}` is the norm and is all `discover` and the object
+dropdown need, and a `doc{{{}}}` is for the entries the cookbook actually
+teaches from. `build.recipes.query('not doc')` is a **directory**, not a
+worklist. What follows is about the *cookbook pages*, and the recipes each one
+needs.
 
 Not a guess-list — the first task is to **produce the mapping** from
 `build.recipes` / `build.discover()` once tags exist: page → recipe name(s), with

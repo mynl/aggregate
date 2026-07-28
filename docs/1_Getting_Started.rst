@@ -110,7 +110,7 @@ The only object you need to import to get started is ``build``. The quick displa
    build
 
 ``build`` is a :class:`Underwriter` object. It  allows you to create all other
-objects and  includes a library of examples, called the knowledge.
+objects and  includes a library of examples, called the recipe base.
 
 Using ``build`` you can create an :class:`Aggregate` object using an :doc:`DecL program <2_user_guides/2_x_dec_language>`. For example, the program::
 
@@ -151,12 +151,12 @@ It is easy to check some of these calculations. The probability of the minimum o
 
     a.pmf(1), 1/15, a.pmf(15), 1/5/3**5, 5*3**5
 
-Creating an object automatically adds its specification to the knowledge, with name ``Eg1``. Use :attr:`build.knowledge` to view the knowledge dataframe.
+Creating an object automatically stores its specification as a **recipe**, with name ``Eg1``. Use :attr:`build.recipes` to view them. Each row carries the entry's program and spec plus its documentation — a one-line ``note``, its ``tags``, and whether it has a full cookbook ``doc``; here we show only the first few columns.
 
 .. ipython:: python
     :okwarning:
 
-    qd(build.knowledge.head(), line_width=73, max_colwidth=50, justify='left')
-    qd(build.knowledge.query('name == "Eg1"'), line_width=73, max_colwidth=50, justify='left')
+    qd(build.recipes.iloc[:5, :9], line_width=73, max_colwidth=50, justify='left')
+    qd(build.recipes.query('name == "Eg1"').iloc[:, :9], line_width=73, max_colwidth=50, justify='left')
 
 The :doc:`2_User_Guides` contain more details and examples.

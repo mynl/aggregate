@@ -687,7 +687,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         Parameters
         ----------
         spec : dict
-            A parsed distortion spec, e.g. from the knowledge base.
+            A parsed distortion spec, e.g. from the recipe base.
 
         Returns
         -------

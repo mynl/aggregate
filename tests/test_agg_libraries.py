@@ -1,6 +1,6 @@
 """Permanent regression net for the shipped DecL library.
 
-``library.agg`` is the one shipped library and the default knowledge base. It
+``library.agg`` is the one shipped library and the default recipe base. It
 replaced the overlapping ``examples`` / ``cookbook`` /
 ``actuarial-severity-curves`` trio at 1.0.0a159 ([Recipe-Library], phase 3 of
 ``dev/plan-meta-data.md``).
@@ -42,19 +42,19 @@ def test_shipped_library_loads(name):
     """Every statement in a shipped library parses and cross-resolves."""
     uw = Underwriter(databases=name)
     uw.load()
-    assert len(uw._knowledge) > 0, f'{name}.agg loaded no entries'
+    assert len(uw._recipes) > 0, f'{name}.agg loaded no entries'
 
 
 def test_library_names_are_unique_across_kinds(library):
     """``build('X')`` and ``build.recipe('X')`` must never be ambiguous.
 
-    The knowledge base is keyed ``(kind, name)``, so ``sev Pareto`` and
+    The recipe base is keyed ``(kind, name)``, so ``sev Pareto`` and
     ``agg Pareto`` could legally coexist -- and did, across the three files
     this library replaced. Giving that up is what lets a recipe be addressed
     by name alone. ``Underwriter._check_library_names_unique`` enforces it at
     load; this asserts the shipped file actually satisfies it.
     """
-    counts = Counter(name for _kind, name in library._knowledge)
+    counts = Counter(name for _kind, name in library._recipes)
     dupes = sorted(n for n, c in counts.items() if c > 1)
     assert not dupes, f'names used under more than one kind: {dupes}'
 
@@ -67,14 +67,14 @@ def test_library_retired_the_letter_prefixes(library):
     """
     import re
     citekey = re.compile(r'^[A-Z][a-zA-Z]+\d{4}[a-z]?\.')
-    offenders = [n for _k, n in library._knowledge
+    offenders = [n for _k, n in library._recipes
                  if re.match(r'^[A-Za-z]{1,3}\.', n) and not citekey.match(n)]
     assert not offenders, f'entries still carrying a filing prefix: {offenders}'
 
 
 def test_every_library_entry_is_tagged(library):
     """Tags are the grouping mechanism, so an untagged entry is unreachable."""
-    untagged = sorted(name for (_kind, name), pp in library._knowledge.items()
+    untagged = sorted(name for (_kind, name), pp in library._recipes.items()
                       if not pp.spec.get('tags'))
     assert not untagged, f'entries with no tags{{}}: {untagged}'
 
@@ -98,7 +98,7 @@ def test_tags_are_namespaced(library):
     kind, so ``sev UnitSeverity tags{topic:severity}`` is unambiguous.
     """
     offenders = {}
-    for (kind, name), pp in library._knowledge.items():
+    for (kind, name), pp in library._recipes.items():
         bad = [t for t in pp.spec.get('tags', ())
                if not t.startswith(TAG_NAMESPACES) and t not in BARE_TAGS]
         if bad:
@@ -120,15 +120,15 @@ def test_no_tag_restates_its_own_kind(library):
                   'pnl': 'pnl', 'xpnl': 'pnl', 'bvagg': 'bivariate',
                   'distortion': 'distortion'}
     offenders = {f'{k}:{n}': kind_words[k]
-                 for (k, n), pp in library._knowledge.items()
+                 for (k, n), pp in library._recipes.items()
                  if k in kind_words and kind_words[k] in pp.spec.get('tags', ())}
     assert not offenders, f'tags restating their own kind: {offenders}'
 
 
-def test_library_is_the_default_knowledge_base():
+def test_library_is_the_default_recipe_base():
     """``build`` with no arguments reads library.agg."""
     from aggregate import build
-    assert len(build.knowledge) > 100
+    assert len(build.recipes) > 100
     a = build('LimitProfile')
     assert 'role:hero' in a.tags
 

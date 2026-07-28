@@ -19,9 +19,9 @@ def test_suite_lines() -> list[str]:
 
 @pytest.fixture(scope="session")
 def underwriter(test_suite_lines):
-    """An Underwriter with the _test_suite.agg knowledge tolerantly preloaded.
+    """An Underwriter with the _test_suite.agg recipes tolerantly preloaded.
 
-    Each line is parsed and added to the knowledge base; parse failures are
+    Each line is parsed and added to the recipe base; parse failures are
     swallowed here so they surface as individual test failures in the
     parametrized parse tests rather than as a fixture error.
     """
@@ -31,5 +31,5 @@ def underwriter(test_suite_lines):
             kind, name, spec = uw.parser.parse(uw.lexer.tokenize(line))
         except Exception:
             continue
-        uw.add_entry(kind, name, spec, line)
+        uw.add_recipe(kind, name, spec, line)
     return uw

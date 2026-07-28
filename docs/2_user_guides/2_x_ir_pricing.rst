@@ -61,7 +61,7 @@ First, we need a severity curve. This step is very important, and would be
 customized to the state and hazard group distribution of expected losses. We
 use a simple mixture of a lognormal for small claims and a Pareto for large
 claims, with a mean of about 25 (work in 000s). Create it as an object in the
-knowledge using :meth:`build`. The parameters are selected judgmentally.
+recipe base using :meth:`build`. The parameters are selected judgmentally.
 
 
 .. ipython:: python
@@ -72,7 +72,7 @@ knowledge using :meth:`build`. The parameters are selected judgmentally.
         -0.204573975,  1.409431871, 1.633490596, 57.96737143, 0.742942461
     mean = wt * np.exp(mu + sigma**2 / 2) + (1 - wt) * scale / (shape - 1)
     # build_many because a mixture cannot be built standalone (wrap it in
-    # an Aggregate, or use build_many() to receive the ParsedProgram).
+    # an Aggregate, or use build_many() to receive the Recipe).
     build_many(f'sev IR:WC '
           f'[exp({mu}) {scale}] * [lognorm pareto] [{sigma} {shape}] '
           f'+ [0 {-scale}] wts [{wt} {1-wt}]');

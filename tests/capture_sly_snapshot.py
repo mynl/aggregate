@@ -62,8 +62,8 @@ def main() -> None:
             errors += 1
             continue
         out[line] = {"kind": kind, "name": name, "spec": jsonify(spec)}
-        # Populate knowledge so subsequent builtin lookups (sev.X, agg.X) resolve.
-        uw.add_entry(kind, name, spec, line)
+        # Populate the recipe base so builtin lookups (sev.X, agg.X) resolve.
+        uw.add_recipe(kind, name, spec, line)
 
     OUT.write_text(json.dumps(out, indent=2), encoding="utf-8")
     print(f"Wrote {len(out)} entries to {OUT.relative_to(REPO_ROOT)}")

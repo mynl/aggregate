@@ -415,7 +415,7 @@ class UnderwritingTransformer(Transformer):
 
     def _resolve_combo_children(self, ids):
         """Resolve a list of ``distortion.X`` ids to actual Distortion
-        instances by looking each up in the knowledge and constructing it
+        instances by looking each up in the recipe base and constructing it
         from its stored spec."""
         # Local import: spectral imports nothing parser-related, but the
         # parser is imported during aggregate package init before

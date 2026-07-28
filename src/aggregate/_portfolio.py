@@ -175,7 +175,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             elif isinstance(spec, str):
                 # look up object in uw return actual instance
                 # uw.build_many(spec, update=False) parses or looks up by name
-                # and returns a list[ParsedProgram] with `.object` populated but
+                # and returns a list[Recipe] with `.object` populated but
                 # not smart-updated — Portfolio handles its own update later.
                 if uw is None:
                     raise ValueError('Must pass valid Underwriter instance to create aggs by name')

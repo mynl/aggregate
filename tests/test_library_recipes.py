@@ -30,7 +30,7 @@ def _documented():
     uw = Underwriter(databases='library')
     uw.load()
     out = []
-    for (kind, name), pp in sorted(uw._knowledge.items()):
+    for (kind, name), pp in sorted(uw._recipes.items()):
         spec = pp.spec if isinstance(pp.spec, dict) else {}
         if spec.get('doc'):
             out.append((name, kind, 'slow' in (spec.get('tags') or ())))

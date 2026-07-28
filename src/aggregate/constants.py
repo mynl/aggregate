@@ -147,9 +147,9 @@ class IgnoredDecLClauseWarning(UserWarning):
     (``cede``), ``reinstatements``, and the variable-rating features -- but
     it has no premium context to activate them, so it builds the loss
     structure only and says so with one warning naming the ignored clauses.
-    The knowledge base retains the full decorated spec, so folding the agg
+    The recipe base retains the full decorated spec, so folding the agg
     into a ``pnl`` / ``xpnl`` by reference (``pnl X <premium> less agg.NAME``)
-    activates the economics (the knowledge-injection route). See
+    activates the economics (the spec-injection route). See
     ``dev/plan-pnl-consolidated-xpnl-walk.md``
     ([Reins-Economics-On-Agg-Ignore-Warn]).
 

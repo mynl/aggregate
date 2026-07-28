@@ -269,7 +269,7 @@ def test_roe_aliases_ccoc():
 
 def test_decl_minimum_combo():
     """DecL: ``dist MIN minimum dist.A dist.B`` resolves children via the
-    knowledge base and builds a MinimumDistortion."""
+    recipe base and builds a MinimumDistortion."""
     from aggregate import build
     build('dist tcc ccoc .25')
     build('dist tdu dual 2.5')
@@ -314,7 +314,7 @@ def test_decl_combo_full_prefix():
 
 
 def test_decl_combo_parsed_program_has_object():
-    """Regression: ParsedProgram.object is set for combo distortions
+    """Regression: Recipe.object is set for combo distortions
     just like for the scalar forms."""
     from aggregate import build
     build('dist tcc5 ccoc .25')

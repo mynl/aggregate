@@ -43,7 +43,7 @@ conjunction with [Student](2_x_student.qmd) or
 2. [The `Underwriter` Class](#sec-underwriter)
     - [Object Creation Using DecL and `build`](#sec-create-from-decl)
     - [Important: Formatting a DecL Program](#sec-formatting)
-    - [Object Creation from the Knowledge Database](#sec-object-creation-knowledge)
+    - [Object Creation from the Recipe Base](#sec-object-creation-knowledge)
     - [`Underwriter` Behind the Scenes](#sec-underwriter-behind-scenes)
 3. [How `aggregate` Represents Distributions](#sec-how-represents)
 4. [The `Severity` Class](#sec-severity)
@@ -93,7 +93,7 @@ as straightforward as working with parametric distributions even though their
 densities rarely have closed-form expressions. It is built around five
 principal classes.
 
-1. The `Underwriter` class keeps track of everything in its `knowledge`
+1. The `Underwriter` class keeps track of everything in its `recipes`
    dataframe, interprets Dec Language (DecL, pronounced like deckle,
    /ˈdɛk(ə)l/) programs, and acts as a helper.
 2. The `Severity` class models a size of loss distribution (a severity curve).
@@ -114,8 +114,8 @@ The `Underwriter` class is an interface into the computational functionality of
 
 1. Creates objects using the DecL language, and
 
-2. Maintains a library of DecL object specifications called the knowledge. New
-   objects are automatically added to the knowledge.
+2. Maintains a library of DecL object specifications called the recipe base.
+   New objects are automatically added to it.
 
 To get started, import `build`, a pre-configured `Underwriter` and `qd`, a
 quick-display function. Import the usual suspects too, for good measure.
@@ -125,7 +125,7 @@ from aggregate import build, qd
 import pandas as pd, numpy as np, matplotlib.pyplot as plt
 ```
 
-Printing `build` reports its name, the number of objects in its knowledge, and
+Printing `build` reports its name, the number of recipes it holds, and
 other information about hyper-parameter default values. `user_dir`
 (`~/.aggregate`) is where user-installed databases live and where various
 outputs are stored. `default_dir` is for internal package data. The `build`
@@ -210,10 +210,10 @@ which results in syntax errors.
 DecL includes a Python newline `\`. All programs in the help are entered so
 they can be cut and pasted.
 
-## Object Creation from the Knowledge Database {#sec-object-creation-knowledge}
+## Object Creation from the Recipe Base {#sec-object-creation-knowledge}
 
-The **knowledge** dataframe is a database of DecL programs and a parsed
-dictionaries to create objects. `build` loads an extensive library by default.
+The **recipes** dataframe is a database of DecL programs and the parsed
+dictionaries used to create objects. `build` loads an extensive library by default.
 Users can create and load their own databases, allowing them to share common
 parameters for
 
@@ -224,40 +224,46 @@ parameters for
   like Bodoff's examples and Pricing Insurance Risk case studies).
 
 It is indexed by object kind (severity, aggregate, portfolio) and name, and
-accessed as the read-only property `build.knowledge`. Here are the first five
-rows of the knowledge loaded by `build`.
+accessed as the read-only property `build.recipes`. Each row carries the
+entry's program and spec alongside its documentation — a one-line `note`, its
+`tags`, and whether it carries a full cookbook `doc`. Here are the first five
+rows of the recipes loaded by `build`, without the wide `program` / `spec`
+columns.
 
 ```{python}
-qd(build.knowledge.head(), justify="left", max_colwidth=60)
+qd(build.recipes.iloc[:5, :9], justify="left", max_colwidth=60)
 ```
 
-A row in the knowledge can be accessed by name using `build`. This example
-models the roll of three single dice.
+A single entry is fetched by name, as a subscript or via `build.recipe`. This
+example models the roll of three single dice.
 
 ```{python}
-print(build['A.ThreeDice'])
+print(build['ThreeDice'])
+print(build.recipe('ThreeDice').note)
 ```
 
-The argument `'A.ThreeDice'` is passed through to the underlying dataframe's
-`getitem`.
+Both return a `Recipe`: the entry's kind, name, spec, program and provenance,
+plus its note, tags and (for the cookbook-worthy few) its parsed doc sections.
+`object` is `None` — a lookup does not build.
 
 []{#sec-create-from-knowledge}
 
-A row in the knowledge can be created as a Python object using:
+A recipe can be created as a Python object using:
 
 ```{python}
-aDice = build('A.ThreeDice')
+aDice = build('ThreeDice')
 qd(aDice)
 ```
 
 The argument in this case is passed through to the method `Underwriter.build`,
-which first looks for `A.ThreeDice` in the knowledge. If it fails, it tries to
+which first looks for `ThreeDice` in the recipe base. If it fails, it tries to
 interpret its argument as a DecL program.
 
-The method `build.discover` searches the knowledge using a regex (regular
+The method `build.discover` searches the recipes using a regex (regular
 expression) applied to the names and returns a dataframe of matching programs.
 By default it does no building or plotting — pass `plot=True` or
-`describe=True` to also build each match.
+`describe=True` to also build each match. Pass `tags=` to filter by subject and
+`kind=` by type.
 
 ```{python}
 build.discover('Dice')
@@ -293,7 +299,7 @@ The primary user-facing entry points are `Underwriter.build` and
 `Underwriter.build_many`:
 
 * `Underwriter.build` parses a DecL program producing exactly one top-level
-  output (or looks up an existing entry by name in the knowledge base),
+  output (or looks up an existing entry by name in the recipe base),
   constructs the corresponding object, smart-updates its discrete distribution
   (detecting discrete severities to pick `bs=1`, otherwise sizing from the
   analytic moment window), and returns the constructed object. If the program
@@ -301,7 +307,7 @@ The primary user-facing entry points are `Underwriter.build` and
   user at `build_many`.
 * `Underwriter.build_many` is the explicit-batch counterpart: it parses a
   (possibly multi-output) DecL program and returns the full
-  `list[ParsedProgram]` regardless of count. Use `update=False` to skip the
+  `list[Recipe]` regardless of count. Use `update=False` to skip the
   smart-update step (useful when you intend to call `update` yourself with
   chosen bucket parameters).
 
@@ -376,7 +382,7 @@ quantile (Lee) functions.
 
 A `Severity` can be created using DecL using any of the following five forms.
 
-1. `sev NAME sev.BUILDIN_ID` is a knowledge lookup for `BUILTIN_ID`
+1. `sev NAME sev.BUILDIN_ID` is a recipe-base lookup for `BUILTIN_ID`
 
 2. `sev NAME DISTNAME SHAPE1 <SHAPE2>` where `DISTAME` is the name of any
    `scipy.stats` continuous random variable with zero, one, or two shape
@@ -521,7 +527,7 @@ severities by creating a separate `Severity` for each component.
 1. Generally, they are created using DecL by `Underwriter.build`, as shown in
    @sec-create-from-decl.
 
-2. Objects in the knowledge can be
+2. Recipes can be
    [created by name](#sec-create-from-knowledge).
 
 3. Advanced users and programmers can create `Aggregate` objects directly using
@@ -1716,7 +1722,7 @@ of that machinery.
 # Summary of Objects Created by DecL {#sec-summary}
 
 Each of the objects created by `build` is automatically stored in the
-knowledge. We can list them out now.
+a recipe. We can list them out now.
 
 ```{python}
 from aggregate import format_program

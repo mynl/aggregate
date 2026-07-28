@@ -1,7 +1,15 @@
-"""Recipes: the notes-driven describe / test / audit surface.
+"""Recipes: one library entry, described / tested / audited.
 
-A library entry's ``doc{{{...}}}`` trailer carries a **recipe** -- markdown on
-the *Python Cookbook* (Beazley & Jones) rhythm, plus a check:
+A **recipe** is a DecL entry: its identity (``kind``, ``name``), its parsed
+``spec``, the source ``program`` it came from, its provenance, and -- once
+the factory has run -- the constructed ``object``. :class:`Recipe` is what the
+underwriter's *recipe base* stores, what
+:meth:`aggregate.Underwriter.__getitem__` hands back, and what
+:meth:`aggregate.Underwriter.build_many` returns one of per top-level output.
+
+Most entries carry only a one-line ``note{...}`` abstract. The cookbook-worthy
+few also carry a ``doc{{{...}}}`` trailer holding markdown on the *Python
+Cookbook* (Beazley & Jones) rhythm, plus a check:
 
 ``## Problem``
     What you are trying to do, and why you would.
@@ -14,9 +22,13 @@ the *Python Cookbook* (Beazley & Jones) rhythm, plus a check:
     Pure ``assert``s -- the invariant, made visible. Runs in the same namespace
     the Solution left behind, so it can reach the objects that code built.
 
-This module turns that text into a :class:`Recipe`, which can be *rendered*
-(the cookbook page), *run* (the pytest harness), and *audited*
-(:attr:`aggregate.Underwriter.recipes`). One source, three consumers.
+Those sections are parsed **lazily**, on first access: only a handful of the
+shipped entries have a doc at all, and reading the libraries sits on the import
+path for :data:`aggregate.build`.
+
+One source, three consumers: a recipe can be *rendered* (the cookbook page),
+*run* (the pytest harness), and *audited*
+(:attr:`aggregate.Underwriter.recipes`).
 
 Anything outside the four recognised headings is preserved in
 :attr:`Recipe.extra` and rendered verbatim, so a recipe is free to add its own
@@ -31,8 +43,9 @@ sections without this parser needing to know about them.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
+import re
+from typing import Any
 
 __all__ = ['Recipe', 'parse_doc', 'SECTIONS', 'DECL_PLACEHOLDER']
 
@@ -47,7 +60,7 @@ __all__ = ['Recipe', 'parse_doc', 'SECTIONS', 'DECL_PLACEHOLDER']
 #:     a = build('''<<decl>>''')
 #:     ```
 #:
-#: and the entry's own declaration is substituted in.
+#: and :attr:`Recipe.decl` -- the entry's own declaration -- is substituted in.
 #:
 #: **The substituted declaration excludes the doc** (keeping ``note`` /
 #: ``tags`` / ``hints``, which matter -- hints change how the object builds).
@@ -92,43 +105,191 @@ def _code_of(section_text):
     return '\n'.join(m.group(2) for m in _FENCE_RE.finditer(section_text))
 
 
+def _split_sections(text, decl=''):
+    """Split a doc body into ``({section: body}, extra)``.
+
+    Splits on **every** level-2 heading, then classifies: splitting only on the
+    canonical four would silently glue a ``## References`` section onto
+    whichever section preceded it. A repeated heading concatenates rather than
+    overwrites -- losing the second copy silently would be worse than showing
+    both.
+
+    ``decl``, when non-empty, is substituted for every
+    :data:`DECL_PLACEHOLDER` **before** splitting, so the expansion works in any
+    section (a Discussion may quote the declaration too).
+    """
+    text = (text or '').strip('\n')
+    if decl and DECL_PLACEHOLDER in text:
+        # ``decl`` is the doc-free rendering, so this cannot recurse.
+        text = text.replace(DECL_PLACEHOLDER, decl)
+    bodies = {s: [] for s in SECTIONS}
+    extra = []
+
+    matches = list(_headings_outside_fences(text))
+    # Anything before the first heading is preamble.
+    head = text[:matches[0].start()] if matches else text
+    if head.strip():
+        extra.append(head.strip())
+
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        title = m.group(1).strip().lower()
+        body = text[m.end():end].strip('\n')
+        if title in bodies:
+            bodies[title].append(body)
+        else:
+            # Preserved verbatim, heading included, so a recipe may add its own
+            # sections without this parser needing to know about them.
+            extra.append(f'{text[m.start():m.end()].strip()}\n\n{body}'.strip())
+
+    merged = {s: '\n\n'.join(b).strip('\n') for s, b in bodies.items()}
+    return merged, '\n\n'.join(extra)
+
+
 @dataclass
 class Recipe:
-    """One library entry's documentation, parsed into its sections.
+    """One DecL declaration: identity, spec, source, docs, built object.
+
+    The single entry record. Stored in the underwriter's recipe base under
+    ``(kind, name)``, returned by :meth:`aggregate.Underwriter.__getitem__` and
+    :meth:`aggregate.Underwriter.recipe`, and produced one per top-level output
+    by :meth:`aggregate.Underwriter.build_many`.
 
     Attributes
     ----------
-    name, kind : str
-        Identity of the entry this recipe documents ('' when parsed from bare
-        text via :func:`parse_doc`).
-    note : str
-        The entry's one-line ``note{...}`` abstract.
-    tags : tuple of str
-        The entry's ``tags{...}`` slugs.
-    problem, solution, discussion, check : str
-        Section bodies, markdown, '' when the section is absent.
-    extra : str
-        Anything outside the four recognised sections, in document order.
+    kind : str
+        ``'agg'`` | ``'sev'`` | ``'port'`` | ``'distortion'`` | ``'bvagg'`` |
+        ``'pnl'`` | ``'xpnl'`` | ``'expr'``.
+    name : str
+        The user-given name (e.g. ``'Dice'``, ``'MyBook'``).
+    spec : dict
+        Constructor kwargs from the parser, including the DecL trailer keys
+        ``note`` / ``tags`` / ``hints`` / ``doc`` when written.
+    program : str
+        The DecL source line the entry was parsed from, verbatim.
+    object : Any
+        ``None`` after parsing; populated by
+        :meth:`aggregate.Underwriter._factory` once the corresponding
+        Aggregate / Severity / Portfolio / Distortion is built.
+    source : pathlib.Path or str
+        Provenance: the ``.agg`` file the entry was read from, or the sentinel
+        ``'session'`` for an entry created by an in-session ``build(...)``
+        call. Backs the ``source`` filter on
+        :meth:`aggregate.Underwriter.to_agg`.
+
+    Notes
+    -----
+    The documentation surface -- :attr:`note`, :attr:`tags`, :attr:`doc`, the
+    four section properties, :attr:`decl` -- is **derived from** :attr:`spec`,
+    not stored alongside it, so there is exactly one copy of every fact. The
+    doc is parsed and the declaration re-rendered on first access and cached;
+    :func:`dataclasses.replace` drops those caches, which is correct since a
+    replaced recipe may have a different spec.
     """
 
-    name: str = ''
     kind: str = ''
-    note: str = ''
-    tags: tuple = ()
-    problem: str = ''
-    solution: str = ''
-    discussion: str = ''
-    check: str = ''
-    extra: str = ''
-    #: The entry's declaration, rendered WITHOUT its doc (note/tags/hints
-    #: kept). What ``<<decl>>`` expands to, and what a page shows as "the
-    #: program". Doc-free so it can appear inside the doc without recursing.
+    name: str = ''
+    spec: Any = field(default_factory=dict)
     program: str = ''
-    _sections_present: tuple = field(default_factory=tuple)
+    object: Any = None
+    source: Any = 'session'
+
+    # Derived caches. init=False keeps them off __init__ and out of
+    # dataclasses.replace(), which is what makes replace() re-derive.
+    _sections: Any = field(default=None, init=False, repr=False, compare=False)
+    _extra: Any = field(default=None, init=False, repr=False, compare=False)
+    _decl: Any = field(default=None, init=False, repr=False, compare=False)
 
     # ------------------------------------------------------------------
-    # Derived views
+    # The DecL trailer, read straight off the spec
     # ------------------------------------------------------------------
+    @property
+    def note(self):
+        """The entry's one-line ``note{...}`` abstract ('' if none)."""
+        return (self.spec or {}).get('note', '') or ''
+
+    @property
+    def tags(self):
+        """The entry's ``tags{...}`` slugs as a tuple (empty if none)."""
+        return tuple((self.spec or {}).get('tags', ()) or ())
+
+    @property
+    def hints(self):
+        """The entry's ``hints{...}`` build settings, raw ('' if none)."""
+        return (self.spec or {}).get('hints', '') or ''
+
+    @property
+    def doc(self):
+        """The entry's ``doc{{{...}}}`` body, raw markdown ('' if none)."""
+        return (self.spec or {}).get('doc', '') or ''
+
+    @property
+    def decl(self):
+        """The entry's declaration rendered **without its doc**.
+
+        What :data:`DECL_PLACEHOLDER` expands to, and what a cookbook page
+        shows as "the program". Canonical (re-rendered from the spec by
+        :func:`aggregate.decl_writer.format_program`, the parser's inverse)
+        rather than the verbatim :attr:`program`, and doc-free so it can appear
+        inside the doc without recursing. ``note`` / ``tags`` / ``hints`` are
+        kept -- hints change how the object builds, so a copy-pasteable program
+        needs them.
+
+        ``''`` when the entry cannot be unparsed (a ``minimum`` / ``mixture``
+        combinator distortion references its children by name, and those
+        references are not retained on the spec).
+        """
+        if self._decl is None:
+            self._decl = self._render_decl()
+        return self._decl
+
+    def _render_decl(self):
+        """Re-render the declaration doc-free; '' if it cannot be unparsed."""
+        from .decl_writer import format_program
+        if not self.kind or not isinstance(self.spec, dict):
+            return ''
+        try:
+            return format_program((self.kind, self.name, self.spec), fmt='text',
+                                  trailer=('note', 'tags', 'hints'))
+        except Exception:
+            # A recipe for a construct the writer cannot invert simply gets no
+            # <<decl>> expansion rather than failing to load at all.
+            return ''
+
+    # ------------------------------------------------------------------
+    # Doc sections -- parsed lazily on first access
+    # ------------------------------------------------------------------
+    def _parse(self):
+        if self._sections is None:
+            self._sections, self._extra = _split_sections(self.doc, self.decl)
+        return self._sections
+
+    @property
+    def problem(self):
+        """The ``## Problem`` body ('' when absent)."""
+        return self._parse()['problem']
+
+    @property
+    def solution(self):
+        """The ``## Solution`` body ('' when absent)."""
+        return self._parse()['solution']
+
+    @property
+    def discussion(self):
+        """The ``## Discussion`` body ('' when absent)."""
+        return self._parse()['discussion']
+
+    @property
+    def check(self):
+        """The ``## Check`` body ('' when absent)."""
+        return self._parse()['check']
+
+    @property
+    def extra(self):
+        """Anything outside the four recognised sections, in document order."""
+        self._parse()
+        return self._extra
+
     @property
     def solution_code(self):
         """The Solution section's fenced python, concatenated."""
@@ -142,7 +303,8 @@ class Recipe:
     @property
     def sections(self):
         """The canonical sections actually present, in canonical order."""
-        return self._sections_present
+        parsed = self._parse()
+        return tuple(s for s in SECTIONS if parsed[s].strip())
 
     @property
     def n_asserts(self):
@@ -163,7 +325,7 @@ class Recipe:
     # Render
     # ------------------------------------------------------------------
     def markdown(self):
-        """Reassemble the recipe as markdown, canonical sections in order.
+        """Reassemble the doc as markdown, canonical sections in order.
 
         Round-trips a well-formed doc body; a doc whose sections were written
         out of order comes back in canonical order, which is the point.
@@ -204,6 +366,12 @@ class Recipe:
         Solution built -- that is what makes a recipe self-testing rather than
         merely self-describing.
 
+        This is the **pytest** consumer of a doc (``tests/test_library_recipes.py``);
+        the cookbook consumer is ``dev/generate_cookbook.py``, which emits the
+        same code as native Quarto cells. Both read the same doc, which is what
+        makes "the page and the test run the same program" true by construction
+        rather than by discipline.
+
         Parameters
         ----------
         ns : dict, optional
@@ -242,31 +410,36 @@ class Recipe:
         return ns
 
     def __repr__(self):
-        got = '+'.join(self.sections) or 'empty'
-        return (f'Recipe({self.name!r}, sections={got}, '
-                f'asserts={self.n_asserts})')
+        # Deliberately cheap: `doc` and `object` are dict/attribute lookups,
+        # and the section list is only computed when there is a doc to parse.
+        bits = [repr(self.kind), repr(self.name)]
+        if self.doc:
+            bits.append(f'doc={"+".join(self.sections) or "empty"}')
+        if self.object is not None:
+            bits.append(f'object={type(self.object).__name__}')
+        return f'Recipe({", ".join(bits)})'
 
 
-def parse_doc(text, *, name='', kind='', note='', tags=(), program=''):
-    """Parse a ``doc{{{...}}}`` body into a :class:`Recipe`.
+def parse_doc(text, *, name='', kind='', note='', tags=(), decl=''):
+    """Build a :class:`Recipe` from a bare ``doc{{{...}}}`` body.
 
-    Splits on level-2 headings naming the canonical sections
-    (:data:`SECTIONS`), case-insensitively. Text before the first recognised
-    heading, and any section under an unrecognised heading, is collected into
-    :attr:`Recipe.extra` so nothing is silently dropped.
+    The no-underwriter entry point: use it to parse doc text that is not (yet)
+    a library entry. A recipe read from the recipe base -- via
+    :meth:`aggregate.Underwriter.recipe` or ``build[name]`` -- already carries
+    its doc on ``spec['doc']`` and parses it itself, so this function is not
+    needed there.
 
     Parameters
     ----------
     text : str
         The doc body (markdown).
     name, kind, note, tags
-        Identity and metadata from the owning knowledge entry, copied onto the
-        recipe so a page can render the declaration without a second lookup.
-    program : str, optional
-        The entry's declaration, **rendered without its doc**. Substituted for
-        every :data:`DECL_PLACEHOLDER` in *text*, so a recipe never has to
-        retype the program it documents. :meth:`aggregate.Underwriter.recipe`
-        supplies this; pass '' to leave placeholders alone.
+        Identity and metadata to attach, as if they had come from the entry's
+        own trailer.
+    decl : str, optional
+        A declaration to substitute for every :data:`DECL_PLACEHOLDER` in
+        *text*. Default ``''`` leaves placeholders visible -- better a visible
+        ``<<decl>>`` than a silently empty Solution.
 
     Returns
     -------
@@ -280,42 +453,9 @@ def parse_doc(text, *, name='', kind='', note='', tags=(), program=''):
     >>> r.n_asserts
     1
     """
-    text = (text or '').strip('\n')
-    if program and DECL_PLACEHOLDER in text:
-        # Substituted BEFORE splitting, so it works in any section -- a
-        # Discussion may quote the declaration too. ``program`` is already the
-        # doc-free rendering (see Underwriter.recipe), so this cannot recurse.
-        text = text.replace(DECL_PLACEHOLDER, program)
-    bodies = {s: [] for s in SECTIONS}
-    extra = []
-
-    # Split on EVERY level-2 heading, then classify. Splitting only on the
-    # canonical four would silently glue a ``## References`` section onto
-    # whichever section preceded it.
-    matches = list(_headings_outside_fences(text))
-    # Anything before the first heading is preamble.
-    head = text[:matches[0].start()] if matches else text
-    if head.strip():
-        extra.append(head.strip())
-
-    for i, m in enumerate(matches):
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        title = m.group(1).strip().lower()
-        body = text[m.end():end].strip('\n')
-        if title in bodies:
-            bodies[title].append(body)
-        else:
-            # Preserved verbatim, heading included, so a recipe may add its own
-            # sections without this parser needing to know about them.
-            extra.append(f'{text[m.start():m.end()].strip()}\n\n{body}'.strip())
-
-    # A repeated heading concatenates rather than overwrites -- losing the
-    # second copy silently would be worse than showing both.
-    merged = {s: '\n\n'.join(b).strip('\n') for s, b in bodies.items()}
-    present = tuple(s for s in SECTIONS if merged[s].strip())
-
-    return Recipe(
-        name=name, kind=kind, note=note, tags=tuple(tags), program=program,
-        problem=merged['problem'], solution=merged['solution'],
-        discussion=merged['discussion'], check=merged['check'],
-        extra='\n\n'.join(extra), _sections_present=present)
+    r = Recipe(kind=kind, name=name,
+               spec={'note': note, 'tags': tuple(tags), 'doc': text or ''})
+    # '' (not None) so `decl` is taken as given rather than re-rendered from
+    # the synthetic spec, which holds no structure to render.
+    r._decl = decl or ''
+    return r

@@ -172,7 +172,10 @@ def test_underwriter_recipe_resolves_by_name_alone(uw):
     assert r.kind == 'agg'
     assert r.sections == SECTIONS
     assert r.tags == ('aggregate', 'intro', 'check:independent-oracle')
+    # `program` is the source line, verbatim; `decl` the canonical doc-free
+    # re-rendering. Both name the entry; only the first carries the doc.
     assert r.program.startswith('agg AF.Doc.Full')
+    assert r.decl.startswith('agg AF.Doc.Full')
 
 
 def test_underwriter_recipe_runs(uw):
@@ -181,13 +184,57 @@ def test_underwriter_recipe_runs(uw):
     assert 'a' in ns
 
 
+# ----------------------------------------------------------------------
+# One entry, one object ([Recipe-Is-The-Entry])
+# ----------------------------------------------------------------------
+def test_a_recipe_is_the_entry_not_a_second_view_of_it(uw):
+    """``recipe(name)`` and ``uw[name]`` return the same thing.
+
+    Before 1.0.0a164 these were different classes -- a ``ParsedProgram``
+    holding the entry and a ``Recipe`` holding its parsed doc -- so "which do
+    I use?" had no good answer. One class now carries both.
+    """
+    by_verb = uw.recipe('AF.Doc.Full')
+    by_subscript = uw[('agg', 'AF.Doc.Full')]
+    assert type(by_verb) is type(by_subscript) is Recipe
+    assert by_verb.spec == by_subscript.spec
+    assert by_verb.program == by_subscript.program
+    # the entry half and the doc half are both present on each
+    assert by_subscript.sections == SECTIONS
+    assert by_verb.source == by_subscript.source
+
+
+def test_lookup_hands_back_a_copy_so_the_store_cannot_be_mutated(uw):
+    """``.object`` is set by the factory on the caller's copy, never the store."""
+    r = uw.recipe('AF.Doc.Full')
+    r.object = 'not really an Aggregate'
+    assert uw.recipe('AF.Doc.Full').object is None
+    assert uw[('agg', 'AF.Doc.Full')].object is None
+
+
+def test_doc_metadata_is_derived_from_the_spec_not_duplicated(uw):
+    """One copy of every fact: note/tags/hints/doc read straight off ``spec``."""
+    r = uw.recipe('AF.Doc.Full')
+    assert r.note == r.spec['note']
+    assert r.tags == tuple(r.spec['tags'])
+    assert r.doc == r.spec['doc']
+
+
+def test_an_undocumented_recipe_costs_nothing_to_hold(uw):
+    """Docs parse lazily -- most entries have none, and load() is on build's path."""
+    r = uw.recipe('AF.Tags.Spaces')
+    assert r._sections is None            # untouched by construction
+    assert r.sections == ()
+    assert r._sections is not None        # ... and cached after the first ask
+
+
 @pytest.fixture(scope='module')
 def lib():
     """A private Underwriter over ``library.agg``.
 
     Deliberately NOT the global ``build`` singleton: it is mutable shared
     state, and a test that reads it can be perturbed by any other test in the
-    session that loads a database into it. Own your knowledge base.
+    session that loads a database into it. Own your recipe base.
     """
     u = Underwriter(databases='library')
     u.load()
@@ -209,13 +256,16 @@ def test_decl_placeholder_expands_to_the_entrys_own_program(lib):
 def test_expanded_decl_excludes_the_doc_but_keeps_note_tags_hints(lib):
     """The recursion guard: a doc must not quote itself.
 
-    ``hints`` is kept deliberately -- it changes how the object builds, so a
-    copy-pasteable program without it would not reproduce the recipe.
+    ``Recipe.decl`` is the doc-free rendering -- distinct from ``.program``,
+    which is the verbatim source line and *does* carry the doc. ``hints`` is
+    kept deliberately: it changes how the object builds, so a copy-pasteable
+    program without it would not reproduce the recipe.
     """
     r = lib.recipe('LimitProfile')
-    assert 'doc{{{' not in r.program
-    assert 'note{' in r.program and 'tags{' in r.program
-    # ... and the expansion inherits that, so no doc leaks into the code
+    assert 'doc{{{' in r.program          # the source line has one ...
+    assert 'doc{{{' not in r.decl         # ... the expansion never does
+    assert 'note{' in r.decl and 'tags{' in r.decl
+    # ... and the substitution inherits that, so no doc leaks into the code
     assert 'doc{{{' not in r.solution_code
 
 
@@ -237,7 +287,7 @@ def test_placeholder_is_left_alone_without_a_program():
 
 
 def test_underwriter_recipe_unknown_name_raises(uw):
-    with pytest.raises(KeyError, match='no knowledge entry'):
+    with pytest.raises(KeyError, match='no recipe named'):
         uw.recipe('DefinitelyNotAnEntry')
 
 
@@ -248,12 +298,9 @@ def test_undocumented_entry_yields_an_empty_recipe_not_an_error(uw):
     assert r.tags == ('severity', 'frequency', 'aggregate')
 
 
-def test_recipes_audit_frame_shape_and_flags(uw):
+def test_recipes_frame_shape_and_flags(uw):
     df = uw.recipes
     assert df.index.names == ['kind', 'name']
-    for col in ('tags', 'note', 'doc', 'problem', 'solution', 'discussion',
-                'check', 'n_asserts', 'source'):
-        assert col in df.columns
     row = df.loc[('agg', 'AF.Doc.Full')]
     assert row['doc'] and row['note']
     assert row['problem'] and row['solution'] and row['discussion'] and row['check']
@@ -262,9 +309,32 @@ def test_recipes_audit_frame_shape_and_flags(uw):
     assert not df.loc[('agg', 'AF.Tags.Spaces'), 'doc']
 
 
-def test_recipes_audit_supports_the_two_questions_it_exists_for(uw):
+def test_recipes_frame_carries_the_entry_as_well_as_the_audit(uw):
+    """One frame, not two: `program` / `spec` sit alongside the doc flags.
+
+    Ordered so the wide payload lands last -- an audit frame you cannot read
+    at a terminal does not get used.
+    """
+    df = uw.recipes
+    assert list(df.columns) == [
+        'note', 'tags', 'doc', 'problem', 'solution', 'discussion', 'check',
+        'n_asserts', 'source', 'program', 'spec']
+    row = df.loc[('agg', 'AF.Doc.Full')]
+    assert row['program'].startswith('agg AF.Doc.Full')
+    assert isinstance(row['spec'], dict) and row['spec']['note']
+
+
+def test_recipes_frame_supports_the_two_questions_it_exists_for(uw):
     """'What is undocumented?' and 'what is documented but unchecked?'"""
     df = uw.recipes
     assert len(df.query('not doc')) > 0
     unchecked = df.query('doc and n_asserts == 0')
     assert ('agg', 'AF.Doc.Full') not in set(unchecked.index)
+
+
+def test_empty_recipe_base_still_gives_a_well_formed_frame():
+    """A bare Underwriter loads nothing; the frame must still have its shape."""
+    df = Underwriter().recipes
+    assert df.empty
+    assert df.index.names == ['kind', 'name']
+    assert 'n_asserts' in df.columns and 'spec' in df.columns

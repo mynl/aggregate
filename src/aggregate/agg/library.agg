@@ -92,8 +92,13 @@
 # a trailer written after the last unit binds to that unit, because the
 # portfolio's trailer slot closes before the units are read.
 #
-# STATUS: names, tags and grouping are curated; doc{{{...}}} bodies are
-# being written recipe by recipe (phase 6 of dev/plan-meta-data.md).
+# HOW MUCH DOCUMENTATION: every entry carries a note{...} -- that is the
+# norm, and it is all `discover` and the object dropdown need. A
+# doc{{{...}}} is for the cookbook-worthy few: the entries the cookbook
+# actually teaches from, where a Problem / Solution / Discussion / Check
+# write-up earns its keep. So build.recipes.query('not doc') is a
+# DIRECTORY of the library, not a backlog.
+#
 # Statements are one per line here; DecL is whitespace-insensitive, so
 # reflow freely.
 # ======================================================================

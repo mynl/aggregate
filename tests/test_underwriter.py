@@ -63,7 +63,7 @@ def test_build_multi_output_contract():
 
 
 def test_build_many_returns_list():
-    """build_many always returns the full list of ParsedProgram, regardless of count."""
+    """build_many always returns the full list of Recipe, regardless of count."""
     program = (
         'agg PhaseZero:Many1 1 claim sev lognorm 10 cv 1 fixed\n\n'
         'agg PhaseZero:Many2 1 claim sev lognorm 20 cv 1 fixed'
@@ -75,7 +75,7 @@ def test_build_many_returns_list():
 
 
 # ---------------------------------------------------------------------------
-# __getitem__ / knowledge
+# __getitem__ / recipe base
 # ---------------------------------------------------------------------------
 
 def test_getitem_returns_parsed_program():
@@ -87,9 +87,9 @@ def test_getitem_returns_parsed_program():
     assert rv.program.startswith('sev PhaseZero:One')
 
 
-def test_interpret_program_returns_list_fills_knowledge():
+def test_interpret_program_returns_list_fills_recipe_base():
     """The private _interpret_program API is exercised here as a regression test —
-    it's the parse-only path that fills the knowledge base without constructing objects."""
+    it's the parse-only path that fills the recipe base without constructing objects."""
     uw = Underwriter()
     rv = uw._interpret_program('agg PhaseZero:IP 1 claim sev lognorm 10 cv 1 fixed')
     assert isinstance(rv, list)
@@ -98,26 +98,26 @@ def test_interpret_program_returns_list_fills_knowledge():
     assert parsed.kind == 'agg'
     assert parsed.name == 'PhaseZero:IP'
     assert parsed.object is None  # not built yet
-    assert ('agg', 'PhaseZero:IP') in uw._knowledge
+    assert ('agg', 'PhaseZero:IP') in uw._recipes
 
 
 # ---------------------------------------------------------------------------
 # database loading
 # ---------------------------------------------------------------------------
 
-def test_load_populates_knowledge():
+def test_load_populates_recipe_base():
     uw = Underwriter()
     uw.load('_test_suite')
-    assert len(uw._knowledge) >= 140
+    assert len(uw._recipes) >= 140
 
 
 def test_load_is_idempotent():
     """The configured lazy load runs once; a second load() is a no-op."""
     uw = Underwriter(databases='_test_suite')
-    _ = uw.knowledge  # triggers first (configured) read
-    n1 = len(uw._knowledge)
+    _ = uw.recipes  # triggers first (configured) read
+    n1 = len(uw._recipes)
     assert uw.load() == []  # second call: already loaded
-    n2 = len(uw._knowledge)
+    n2 = len(uw._recipes)
     assert n1 == n2 >= 140
 
 
@@ -141,7 +141,7 @@ def test_load_glob_no_match_warns_not_raises(caplog):
 def test_databases_reports_loaded_paths():
     """`databases` is the list of resolved Paths actually read."""
     uw = Underwriter(databases='_test_suite')
-    _ = uw.knowledge
+    _ = uw.recipes
     assert len(uw.databases) == 1
     assert isinstance(uw.databases[0], Path)
     assert uw.databases[0].name == '_test_suite.agg'
@@ -167,24 +167,24 @@ def test_available_databases_discovers_bundled():
 def test_reload_resets_to_as_created():
     """reload drops in-session builds and ad-hoc loads, restoring the request."""
     uw = Underwriter(databases='_test_suite')
-    _ = uw.knowledge
-    n0 = len(uw._knowledge)
+    _ = uw.recipes
+    n0 = len(uw._recipes)
     uw.build('agg ReloadMe 1 claim sev lognorm 10 cv 1 fixed', update=False)
-    assert ('agg', 'ReloadMe') in uw._knowledge
+    assert ('agg', 'ReloadMe') in uw._recipes
     uw.reload()
-    assert ('agg', 'ReloadMe') not in uw._knowledge
-    assert len(uw._knowledge) == n0
+    assert ('agg', 'ReloadMe') not in uw._recipes
+    assert len(uw._recipes) == n0
 
 
 def test_source_provenance():
     """Loaded entries carry their file Path; in-session builds carry 'session'."""
     uw = Underwriter(databases='_test_suite')
-    _ = uw.knowledge
+    _ = uw.recipes
     # pick any loaded entry — its source is the _test_suite file Path
-    loaded = next(iter(uw._knowledge.values()))
+    loaded = next(iter(uw._recipes.values()))
     assert isinstance(loaded.source, Path)
     uw.build('agg SessionSrc 1 claim sev lognorm 10 cv 1 fixed', update=False)
-    assert uw._knowledge[('agg', 'SessionSrc')].source == 'session'
+    assert uw._recipes[('agg', 'SessionSrc')].source == 'session'
 
 
 def test_to_agg_round_trip(tmp_path):
@@ -197,10 +197,10 @@ def test_to_agg_round_trip(tmp_path):
 
     uw2 = Underwriter(databases=None)
     uw2.load(out)
-    assert ('agg', 'RT:One') in uw2._knowledge
-    assert ('sev', 'RT:Two') in uw2._knowledge
-    assert (uw2._knowledge[('agg', 'RT:One')].spec
-            == uw._knowledge[('agg', 'RT:One')].spec)
+    assert ('agg', 'RT:One') in uw2._recipes
+    assert ('sev', 'RT:Two') in uw2._recipes
+    assert (uw2._recipes[('agg', 'RT:One')].spec
+            == uw._recipes[('agg', 'RT:One')].spec)
 
 
 def test_to_agg_kind_filter(tmp_path):
@@ -211,8 +211,8 @@ def test_to_agg_kind_filter(tmp_path):
     out = uw.to_agg(tmp_path / 'aggsonly', kind='agg')
     uw2 = Underwriter(databases=None)
     uw2.load(out)
-    assert ('agg', 'KF:A') in uw2._knowledge
-    assert ('sev', 'KF:S') not in uw2._knowledge
+    assert ('agg', 'KF:A') in uw2._recipes
+    assert ('sev', 'KF:S') not in uw2._recipes
 
 
 def test_to_agg_writes_dependencies_first(tmp_path):
@@ -231,8 +231,8 @@ def test_to_agg_writes_dependencies_first(tmp_path):
     # and it must actually re-load without a missing-reference error
     uw2 = Underwriter(databases=None)
     uw2.load(out)
-    assert ('sev', 'Dep:Sev') in uw2._knowledge
-    assert ('agg', 'Dep:Agg') in uw2._knowledge
+    assert ('sev', 'Dep:Sev') in uw2._recipes
+    assert ('agg', 'Dep:Agg') in uw2._recipes
 
 
 def test_to_agg_default_mode_x_raises_on_existing(tmp_path):
@@ -271,8 +271,8 @@ def test_to_agg_mode_a_appends_dated_block_and_round_trips(tmp_path):
 
     uw2 = Underwriter(databases=None)
     uw2.load(out)
-    assert ('sev', 'A:Sev') in uw2._knowledge
-    assert ('agg', 'A:Agg') in uw2._knowledge
+    assert ('sev', 'A:Sev') in uw2._recipes
+    assert ('agg', 'A:Agg') in uw2._recipes
 
 
 def test_to_agg_bad_mode_raises(tmp_path):
@@ -292,7 +292,7 @@ def test_repr_is_multiline_and_includes_identity():
     assert 'PhaseZeroTest' in s
     assert '\n' in s
     # no embedded help block
-    assert 'build.knowledge' not in s
+    assert 'build.recipes' not in s
     assert 'build.qshow' not in s
 
 
@@ -301,8 +301,8 @@ def test_repr_lazy_load_pending():
     uw = Underwriter(databases='_test_suite')
     s = repr(uw)
     assert '0 loaded' in s
-    # touch knowledge to trigger load
-    _ = uw.knowledge
+    # touch recipes to trigger load
+    _ = uw.recipes
     s2 = repr(uw)
     assert '0 loaded' not in s2
     assert 'programs' in s2
@@ -385,7 +385,7 @@ def test_discover_empty_regex_lists_all():
 
 
 def test_discover_describe_handles_severity():
-    """Severity in knowledge should not crash discover(describe=True)."""
+    """A Severity recipe should not crash discover(describe=True)."""
     global_build('sev DiscSevTest lognorm 100 cv 1')
     df = global_build.discover('DiscSevTest', describe=True)
     assert 'DiscSevTest' in df.index
@@ -397,7 +397,7 @@ def test_discover_describe_handles_severity():
 
 
 def test_discover_describe_handles_distortion():
-    """Distortion in knowledge should not crash discover(describe=True)."""
+    """A Distortion recipe should not crash discover(describe=True)."""
     global_build('distortion DiscDistTest ph 0.3')
     df = global_build.discover('DiscDistTest', describe=True)
     assert 'DiscDistTest' in df.index
@@ -407,7 +407,7 @@ def test_discover_describe_handles_distortion():
 
 
 def test_discover_plot_handles_all_kinds():
-    """discover(plot=True) must not crash on any kind in the knowledge.
+    """discover(plot=True) must not crash on any kind in the recipe base.
 
     Pins the regression where Distortion.plot rejected the hardcoded
     figsize=(8, 2.4) we used to pass.
@@ -443,8 +443,8 @@ def test_databases_site_token_no_longer_special(caplog):
     import logging
     uw = Underwriter(databases='site')
     with caplog.at_level(logging.WARNING, logger='aggregate.underwriter'):
-        _ = uw.knowledge  # triggers the configured load
-    assert len(uw._knowledge) == 0
+        _ = uw.recipes  # triggers the configured load
+    assert len(uw._recipes) == 0
     assert any('site' in r.getMessage() for r in caplog.records)
 
 

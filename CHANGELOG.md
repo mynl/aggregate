@@ -1,5 +1,78 @@
 # Changelog
 
+## 1.0.0a164
+
+**[Recipe-Is-The-Entry]** — one class, one registry. `knowledge` is gone.
+
+Two objects described one library entry: a `ParsedProgram` holding its kind /
+name / spec / program / source / built object, and a separate `Recipe` holding
+that same entry's parsed `doc{{{...}}}`. Two registries, two names, one thing —
+"which do I use?" had no good answer, and the overlap existed only because
+`Recipe` was bolted on in a158 rather than replacing anything.
+
+`ParsedProgram` is deleted. **`Recipe` is the entry**, whole:
+
+```python
+r = build.recipe('LimitProfile')     # or build['LimitProfile']
+r.kind, r.name, r.spec, r.program, r.source, r.object
+r.note, r.tags, r.hints, r.doc                        # the DecL trailer
+r.problem, r.solution, r.discussion, r.check          # the parsed doc
+r.decl                                                # doc-free declaration
+```
+
+The documentation surface is **derived from `spec`**, not stored alongside it,
+so there is exactly one copy of every fact. Doc sections parse **lazily**, on
+first access: four of 186 shipped entries carry a doc, and `load()` sits on
+`build`'s import path.
+
+### Breaking
+
+No alias, no deprecation shim — this is the v1.0 moment to take the old name
+out.
+
+| removed | use |
+|---|---|
+| `Underwriter.knowledge` | `Underwriter.recipes` |
+| `Underwriter.add_entry(...)` | `Underwriter.add_recipe(...)` |
+| `Underwriter._knowledge` | `Underwriter._recipes` |
+| `aggregate.underwriter.ParsedProgram` | `aggregate.recipe.Recipe` |
+| `Recipe.program` (a158–a163: the doc-free rendering) | `Recipe.decl` |
+| `parse_doc(..., program=)` | `parse_doc(..., decl=)` |
+
+`Recipe.program` now means what it means everywhere else in the package — the
+DecL source line, verbatim, doc payload and all. The doc-free canonical
+re-rendering that `<<decl>>` expands to is `Recipe.decl`.
+
+### One frame
+
+`build.recipes` merges the two frames a158 left behind. Indexed `(kind, name)`;
+identity and audit flags first, the wide payload last so it reads at a
+terminal:
+
+```
+note  tags  doc  problem  solution  discussion  check  n_asserts  source  program  spec
+```
+
+`build.recipes.iloc[:, :9]` is the readable slice.
+`build.recipes.query('doc and n_asserts == 0')` still finds a recipe that
+describes an invariant without testing it.
+
+`discover()` now reads that frame and filters tags from the `tags` column
+rather than digging into each `spec`. Its build path (`plot=` / `describe=`)
+trims to `source` / `program` before appending the eleven summary statistics —
+carrying the audit flags and `spec` alongside them made an unreadable frame.
+Its directory view also stops leaking the base64 `doc{{{...}}}` payload into
+the displayed program: the cleaner matched a multi-line fence, but a *stored*
+program carries the preprocessor's encoded one-liner.
+
+### Framing correction
+
+A `doc{{{...}}}` is for **cookbook-worthy entries only**. Most entries carry a
+`note{}` and nothing more — enough for `discover` and the object dropdown. The
+`library.agg` header and the `dev/TODO.md` `[Recipe-Library]` entry both read
+as though 182 entries were awaiting docs; they are not.
+`build.recipes.query('not doc')` is a **directory**, not a backlog.
+
 ## 1.0.0a163
 
 **[Recipe-Library]** — `<<decl>>`: a recipe never retypes the program it

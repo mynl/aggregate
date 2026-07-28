@@ -11,7 +11,7 @@ the original text (the approach the deleted ``utilities.decl_pprint`` used).
 Three layers
 ------------
 1. :func:`spec_to_decl` --- the unparser. A pure function from a **raw
-   transformer spec** dict (``parsed.spec`` / the knowledge entry's ``pp.spec``,
+   transformer spec** dict (``parsed.spec`` / a recipe's ``spec``,
    *not* the dense ``Aggregate._spec`` constructor-argument dict) to canonical
    DecL text. Built from small clause renderers (``_render_*``) that mirror the
    transformer rules one-for-one.
@@ -1079,7 +1079,7 @@ def spec_to_decl(spec: dict, kind: str = 'agg', name: str | None = None) -> str:
     Parameters
     ----------
     spec : dict
-        A **raw transformer spec** --- ``parsed.spec`` or a knowledge entry's
+        A **raw transformer spec** --- ``parsed.spec`` or a recipe's
         ``pp.spec``. *Not* the dense ``Aggregate._spec`` constructor-argument
         dict (which is a different, defaulted shape; see the module docstring).
     kind : str, default 'agg'
@@ -1153,7 +1153,7 @@ def _render_statement(underwriter, statement: str, trailer: bool = True):
     requested layout). The verbatim ``str`` fallback keeps :func:`format_program`
     (hence ``pprogram``) from raising when a program references a builtin that
     the default underwriter cannot resolve --- e.g. a ``sev.X`` defined only in a
-    custom knowledge base. A plain ``str`` renders identically in both layouts.
+    custom recipe base. A plain ``str`` renders identically in both layouts.
 
     Note the fallback is *verbatim*, so it also escapes ``trailer=False``: a
     statement that cannot be parsed keeps whatever trailer its source text had.
@@ -1230,7 +1230,7 @@ def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
             return ''
         # Lazy import: avoids a parser <-> writer import cycle and keeps the
         # ~1s Lark/pygments cost off the bare `import aggregate` path. The
-        # default underwriter carries the configured knowledge base so most
+        # default underwriter carries the configured recipe base so most
         # builtin references in the text resolve.
         from .underwriter import build as _build
         nodes = [_render_statement(_build, line, trailer)

@@ -1364,6 +1364,122 @@ class Underwriter(HelpMixin):
             self.load()
         return self._knowledge_frame()
 
+    def recipe(self, name, kind=''):
+        """The :class:`~aggregate.recipe.Recipe` documenting a knowledge entry.
+
+        Resolves by **name alone**: the knowledge base is keyed ``(kind, name)``,
+        but a recipe is addressed the way a reader would say it, and the shipped
+        library keeps names unique across kinds so ``recipe('X')`` and
+        ``build('X')`` always mean the same entry. If a name does happen to
+        exist under more than one kind (possible in a hand-assembled knowledge
+        base), that is an error rather than a silent pick -- pass ``kind=`` to
+        disambiguate.
+
+        Parameters
+        ----------
+        name : str
+            The entry name, e.g. ``'LimitProfile'``.
+        kind : str, optional
+            Restrict to one kind (``'agg'``, ``'port'``, ``'sev'``,
+            ``'distortion'``, ...). Only needed for an ambiguous name.
+
+        Returns
+        -------
+        aggregate.recipe.Recipe
+            Parsed sections plus the entry's note, tags and program. An entry
+            with no ``doc{{{...}}}`` yields a Recipe with empty sections rather
+            than an error -- the audit reports it as undocumented.
+
+        Raises
+        ------
+        KeyError
+            No such entry, or the name is ambiguous across kinds.
+
+        See Also
+        --------
+        recipes : the audit frame over every entry.
+        """
+        from .recipe import parse_doc
+
+        if not self._loaded:
+            self.load()
+        hits = [(k, n) for (k, n) in self._knowledge
+                if n == name and (not kind or k == kind)]
+        if not hits:
+            raise KeyError(f'no knowledge entry named {name!r}'
+                           + (f' of kind {kind!r}' if kind else ''))
+        if len(hits) > 1:
+            kinds = ', '.join(sorted(k for k, _ in hits))
+            raise KeyError(
+                f'{name!r} is ambiguous across kinds ({kinds}); pass kind= to '
+                f'choose. Shipped library names are unique across kinds.')
+        pp = self._knowledge[hits[0]]
+        return parse_doc(pp.spec.get('doc', ''),
+                         name=pp.name, kind=pp.kind,
+                         note=pp.spec.get('note', ''),
+                         tags=pp.spec.get('tags', ()),
+                         program=pp.program)
+
+    @property
+    def recipes(self):
+        """Audit frame: what in the knowledge base is described, shown and checked.
+
+        One row per entry, indexed ``(kind, name)``. This is the *audit* half of
+        the notes-driven describe / test / audit surface -- it answers "which
+        entries carry a recipe, and which of those actually assert anything?"
+
+        Columns
+        -------
+        tags : tuple of str
+            The entry's ``tags{...}`` slugs.
+        note : bool
+            Has a one-line ``note{...}`` abstract.
+        doc : bool
+            Has a ``doc{{{...}}}`` body.
+        problem, solution, discussion, check : bool
+            Which canonical sections the doc provides.
+        n_asserts : int
+            ``assert`` statements in the Check block. **Zero with
+            ``check=True`` means the invariant is stated but not tested** --
+            the case worth hunting.
+        source : str
+            Which ``.agg`` file the entry came from.
+
+        Examples
+        --------
+        Undocumented entries::
+
+            build.recipes.query('not doc')
+
+        Documented but unchecked::
+
+            build.recipes.query('doc and n_asserts == 0')
+        """
+        from .recipe import parse_doc
+
+        if not self._loaded:
+            self.load()
+        rows = []
+        for (kind, name), pp in self._knowledge.items():
+            spec = pp.spec if isinstance(pp.spec, dict) else {}
+            doc = spec.get('doc', '')
+            r = parse_doc(doc, name=name, kind=kind)
+            present = set(r.sections)
+            rows.append({
+                'kind': kind, 'name': name,
+                'tags': tuple(spec.get('tags', ())),
+                'note': bool(spec.get('note', '')),
+                'doc': bool(doc),
+                **{s: (s in present) for s in ('problem', 'solution',
+                                               'discussion', 'check')},
+                'n_asserts': r.n_asserts,
+                'source': self._format_source(pp.source),
+            })
+        df = pd.DataFrame(rows)
+        if df.empty:
+            return df
+        return df.set_index(['kind', 'name']).sort_index()
+
     @property
     def version(self):
         import aggregate

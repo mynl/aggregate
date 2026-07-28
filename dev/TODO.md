@@ -162,10 +162,13 @@
   `dev/plan-meta-data.md` **[Recipe-Library]**.
 - **[Recipe-Library]** (`dev/plan-meta-data.md`) — notes-driven
   describe / test / audit. Phase 1 (the `tags{}` / `doc{{{}}}` trailer clauses,
-  distortion trailer, ambiguity guards) landed in **a157**. Remaining: the
-  `Recipe` runtime (`aggregate/recipe.py`), the merged `library.agg` with unique
-  names, `tests/test_library_recipes.py` + `Underwriter.recipes`, and the
-  Problem / Solution / Discussion cookbook.
+  distortion trailer, ambiguity guards) landed in **a157**; phase 2 (the
+  `aggregate.recipe` runtime, `Underwriter.recipe()` / `.recipes`, the cookbook
+  `recipe()` verb) in **a158**. Remaining: **phase 3** the merged `library.agg`
+  with globally-unique names and applied tags (needs author curation — 14 name
+  collisions), **phase 4** `tests/test_library_recipes.py`, **phase 5** the
+  Problem / Solution / Discussion cookbook rewrite, **phase 6** populating the
+  empty pages.
 - **[Rationalize-Tests]** (#51) — needed vs no-longer-needed; untangle and re-wire
   how the suite *consumes* the single test library (the `conftest`
   parametrization of every `test_suite.agg` line, the SLY snapshot regression)

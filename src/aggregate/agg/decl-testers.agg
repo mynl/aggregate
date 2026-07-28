@@ -838,10 +838,14 @@ lines, fenced code, braces, and punctuation that DecL otherwise reserves.
 
 ## Solution
 
+Self-contained: this entry lives in `decl-testers.agg`, which is not the default
+knowledge base, so the Solution declares its own program rather than looking
+itself up by name.
+
 ```python
-a = build('AF.Doc.Full')
+a = build('agg DocFullDemo 10 claims sev lognorm 50 cv 1 poisson')
 nested = {'a': {'b': {'c': 1}}}   # inline }}} survives; the fence must be alone
-qd(a.describe)
+qd(a.summary_df)
 ```
 
 ## Discussion
@@ -852,6 +856,7 @@ step 0. A `#` here would be eaten by the comment stripper without it.
 ## Check
 
 ```python
-assert abs(a.agg_m - 500) < 1e-6
+assert abs(a.actual_m - 500) < 1e-9      # E[N] x E[X] = 10 x 50
+assert abs(a.est_m - a.actual_m) < 1e-5  # FFT estimate vs theoretic
 ```
 }}}

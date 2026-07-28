@@ -1,5 +1,67 @@
 # Changelog
 
+## 1.0.0a158
+
+**[Recipe-Library]** — phase 2 of `dev/plan-meta-data.md`: the runtime that
+turns a `doc{{{...}}}` body into something you can render, run and audit. New
+module **`aggregate.recipe`**.
+
+### `Recipe` — one source, three consumers
+
+`parse_doc(text)` splits a doc body on its level-2 headings into the
+*Python Cookbook* sections plus a check:
+
+- **`## Problem`** — what you are trying to do.
+- **`## Solution`** — the code. Written self-contained, so a reader can
+  copy-paste it off the page.
+- **`## Discussion`** — why it works.
+- **`## Check`** — pure `assert`s. **Runs in the namespace the Solution left
+  behind**, so it can assert against the objects that code just built. That is
+  what makes a recipe self-*testing* rather than merely self-describing.
+
+Anything under a non-canonical heading (`## References`, say) is preserved
+verbatim in `Recipe.extra` rather than being glued onto the preceding section,
+and headings are hunted only *outside* fenced code — so a `## banner` comment
+at the start of a line inside a ```python block stays code.
+
+`Recipe.run(ns=None)` executes Solution then Check in one namespace seeded with
+`build`, `qd`, `np`, `pd` and `aggregate`; a failure is re-raised naming the
+recipe and the block. `Recipe.markdown()` reassembles the prose in canonical
+order. `Recipe.n_asserts` is the audit metric that matters — a Check section
+with zero asserts states an invariant without testing it.
+
+### `Underwriter.recipe(name)` and `Underwriter.recipes`
+
+- **`build.recipe('X')`** returns the parsed `Recipe`, resolving **by name
+  alone**. The knowledge base is keyed `(kind, name)`, but a recipe is
+  addressed the way a reader says it; a name that exists under two kinds raises
+  rather than silently picking, and `kind=` disambiguates. An entry with no doc
+  yields an empty Recipe — absence of documentation is a fact to audit, not an
+  exception.
+- **`build.recipes`** is the audit frame, one row per entry indexed
+  `(kind, name)`, with `tags` / `note` / `doc` / `problem` / `solution` /
+  `discussion` / `check` / `n_asserts` / `source`. It exists to answer two
+  questions:
+
+  ```python
+  build.recipes.query('not doc')                  # what is undocumented?
+  build.recipes.query('doc and n_asserts == 0')   # documented but unchecked?
+  ```
+
+### Cookbook
+
+`docs/cookbook/_setup.py` gains **`recipe(name)`**, the one cookbook verb: a
+recipe page becomes a heading plus one call, and the page and the pytest
+harness read the same source so they cannot drift. Output goes through
+`IPython.display` rather than Quarto's `#| output: asis` — asis text and rich
+display output do not interleave reliably in one cell, and a recipe needs its
+tables and plots to land *between* its prose sections.
+
+`Recipe.run` executes code carried in a `.agg` file. For the shipped library
+that is the same trust level as the rest of the package; a third-party `.agg`
+deserves the same reading as a third-party Python module. Signing is recorded
+as post-v1.0 `[Recipe-Doc-Signing]`.
+
 ## 1.0.0a157
 
 **[Recipe-Library]** — phase 1 of `dev/plan-meta-data.md`: the DecL trailer

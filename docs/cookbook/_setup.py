@@ -16,7 +16,7 @@ Tables render through :func:`qd`, the generic quick-display verb, wired here to
 ``greater_tables.GT`` for crisp HTML ([Cookbook-Open-Questions] #2). It degrades
 to a plain ``display`` if ``greater_tables`` is not installed.
 """
-from IPython.display import display
+from IPython.display import Markdown, display
 
 from textwrap import fill
 
@@ -41,7 +41,7 @@ import warnings
 __all__ = [
     'build', 'format_program', 'version', 'IgnoredDecLClauseWarning',
     'warnings', 'display', 'pd',
-    'qd', 'cbqd', 'pp', 'show',
+    'qd', 'cbqd', 'pp', 'show', 'recipe',
     # calibrated DecL library (the source of truth)
     'HOUSE_PREM', 'HOUSE_SEV', 'HOUSE_FREQ', 'house',
     'OCC_LAYER', 'AGG_LAYER', 'SWING', 'REINST', 'pnl',
@@ -64,6 +64,71 @@ def qd(x, **kwargs):
         display(GT(x.to_frame() if isinstance(x, pd.Series) else x, **kwargs))
     else:
         display(x)
+
+
+def recipe(name, *, uw=None, run=True, show_check=True):
+    """Render one library recipe: Problem, Solution (with output), Discussion, Check.
+
+    **The one cookbook verb.** A recipe page is a heading plus a call to this;
+    everything else comes from the entry's ``doc{{{...}}}`` in the shipped
+    library, so the page and the pytest harness read the same source and cannot
+    drift apart.
+
+    Output is emitted through ``IPython.display`` rather than Quarto's
+    ``#| output: asis``, deliberately: asis text and rich display output do not
+    interleave reliably within one cell, and a recipe needs its tables and plots
+    to appear *between* its prose sections, in order.
+
+    Parameters
+    ----------
+    name : str
+        Library entry name, the same string you would pass to ``build``.
+    uw : Underwriter, optional
+        Knowledge base to read from; the default ``build`` underwriter by
+        default.
+    run : bool, default True
+        Execute the Solution and Check. ``False`` renders the prose and the
+        code without running anything — useful for an expensive recipe on a
+        page you want to render fast.
+    show_check : bool, default True
+        Render the Check block. It is the point of the cookbook, so this
+        defaults on; pass ``False`` for a page where the invariant is discussed
+        in prose instead.
+
+    Returns
+    -------
+    dict or None
+        The namespace the recipe's code left behind (``None`` when
+        ``run=False``), so a page can carry on from where the recipe stopped.
+    """
+    uw = uw or build
+    r = uw.recipe(name)
+
+    display(Markdown(f'**Problem.** {r.problem}' if r.problem
+                     else f'*(no Problem section for `{name}`)*'))
+
+    # Beat 1: the declaration itself, pretty-printed, trailer suppressed --
+    # the note/tags/doc are what produced this page, not part of the example.
+    display(Markdown('**Solution.**\n\n' + (r.solution or '')))
+    if r.program:
+        display(Markdown(f'```\n{format_program(r.program, fmt="text")}\n```'))
+
+    ns = None
+    if run and r.is_runnable:
+        ns = r.namespace()
+        exec(compile(r.solution_code, f'<recipe {name}:solution>', 'exec'), ns)
+
+    if r.discussion:
+        display(Markdown(f'**Discussion.** {r.discussion}'))
+
+    if show_check and r.check:
+        display(Markdown(
+            '::: {.callout-note collapse="true" title="The check"}\n\n'
+            f'{r.check}\n\n:::'))
+        if run and r.check_code:
+            exec(compile(r.check_code, f'<recipe {name}:check>', 'exec'),
+                 ns if ns is not None else r.namespace())
+    return ns
 
 
 def cbqd(ob):

@@ -167,7 +167,7 @@
   `tests/test_library_recipes.py` harness + the first four recipes) in
   **a160**; tag namespacing in **a161**; `<<decl>>` substitution in **a163**;
   `[Recipe-Is-The-Entry]` (one `Recipe` class, `knowledge` → `recipes`
-  throughout) in **a164**; `[Cookbook-Generate]` (`dev/generate_cookbook.py`,
+  throughout) in **a164**; `[Cookbook-Generate]` (the recipe-page generator,
   native Quarto cells, `_setup.recipe()` retired) in **a165**.
   **Remaining: phase 5** — convert the hand-written five-beat stub pages to
   generated recipes, page by page with author reaction. The mechanism is done;

@@ -8,7 +8,7 @@ JupyterLab**.
 The star-import deliberately supplies **exactly the names**
 :meth:`aggregate.recipe.Recipe.namespace` seeds — ``build``, ``qd``, ``np``,
 ``pd``, ``aggregate`` — plus the cookbook's own display helpers. That is what
-lets a generated recipe page (``dev/generate_cookbook.py``) and the pytest
+lets a generated recipe page (:mod:`aggregate.cookbook`) and the pytest
 harness (``tests/test_library_recipes.py``) run the *same* code from the *same*
 source: a recipe's Solution may assume those names and nothing else.
 
@@ -29,7 +29,8 @@ to a plain ``display`` if ``greater_tables`` is not installed.
    inside one cell — which meant no per-block ``#|`` options and a figure
    flushed at *cell end*, after the prose rather than inside the Solution.
    Recipe pages are **generated** into native ``{python}`` cells instead; see
-   ``dev/generate_cookbook.py``.
+   :mod:`aggregate.cookbook` (``dev/generate_cookbook.py`` is the thin
+   caller that points it at this repo).
 """
 from IPython.display import Markdown, display
 

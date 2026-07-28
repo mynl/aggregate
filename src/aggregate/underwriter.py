@@ -1334,7 +1334,8 @@ class Underwriter(HelpMixin):
         spec : dict
             The parsed constructor kwargs.
         program : str
-            The originating DecL source line.
+            The DecL statement as the parser received it, i.e. one line of
+            :meth:`UnderwritingLexer.preprocess` output, not the source text.
         source : pathlib.Path or str, default 'session'
             Provenance: the file the entry came from, or ``'session'`` for an
             in-session build.
@@ -1408,7 +1409,8 @@ class Underwriter(HelpMixin):
             Which ``.agg`` file the entry came from (``'session'`` for an
             in-session build).
         program : str
-            The DecL source line, verbatim.
+            The DecL statement as the parser received it: one line, comments
+            stripped, any ``doc{{{...}}}`` body base64-encoded.
         spec : dict
             The parsed constructor kwargs.
 

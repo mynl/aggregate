@@ -388,7 +388,7 @@ The expensive phase; it is curation, not a script.
   per-block `#|` options and a figure flushed by the inline backend at *cell
   end*, i.e. after the prose rather than inside the Solution. Pages are instead
   **generated** from `library.agg` into native ` ```{python} ` Quarto cells by
-  `dev/generate_cookbook.py`; `_setup.recipe()` is retired. `Recipe.run()` stays
+  `aggregate.cookbook`; `_setup.recipe()` is retired. `Recipe.run()` stays
   — it is the pytest harness, and keeping both consumers on the same doc is what
   makes "the page and the test run the same program" true by construction.
 

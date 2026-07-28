@@ -1,8 +1,10 @@
 """``ProgramMixin`` -- the shared DecL round-trip surface.
 
-Every object the DecL language can declare carries the text it was declared
-with (``program``) and can render that text back in canonical form
-(``pprogram`` / ``pprogram_html``). Before this mixin the render half was
+Every object the DecL language can declare carries the statement the *parser*
+was handed (``program``) and can render that statement back in canonical form
+(``pprogram`` / ``pprogram_html``). The two are not the same text and the gap
+between them is the point: ``program`` is what went in, ``pprogram`` is what
+the parser understood. Before this mixin the render half was
 **ten near-identical properties across five classes and five files** --
 ``Aggregate``, ``Portfolio``, ``Severity``, ``PnL``, ``BivariateAggregate`` --
 each a three-line delegation to :func:`aggregate.decl_writer.format_program`.
@@ -56,7 +58,24 @@ class ProgramMixin:
     never stamped inherits the empty class-level default and renders ``''``.
     """
 
-    #: The DecL source text this object was declared with, stamped by ``build``.
+    #: The DecL statement as the **parser received it**, stamped by ``build``.
+    #:
+    #: Not the text you typed. ``Underwriter._interpret_program`` stamps the
+    #: output of :meth:`aggregate.parser.UnderwritingLexer.preprocess`, so four
+    #: things have already happened to it:
+    #:
+    #: * it is **one line**, however the source was laid out, because a
+    #:   statement may span as many physical lines as its author likes;
+    #: * comments are gone, including full lines between clauses;
+    #: * runs of whitespace survive in places as double spaces (the bracket
+    #:   collapse step), so ``dfreq [3]`` can come back as ``dfreq  [3]``;
+    #: * a ``doc{{{...}}}`` body is **URL-safe base64**, not markdown. That is
+    #:   deliberate, not corruption: encoding it first (step 0) is what lets a
+    #:   doc carry ``#`` headings, blank lines and fenced code through the
+    #:   later steps. Read it back decoded via ``.doc``.
+    #:
+    #: Nobody keeps the keystrokes. For the file as written, read the ``.agg``.
+    #:
     #: A class-level default so a host that is never stamped still answers;
     #: stamped hosts shadow it with an instance attribute, and ``PnL`` shadows
     #: it with a property that falls through to ``engine.program``. Empty for an
@@ -70,9 +89,10 @@ class ProgramMixin:
         The object-bound twin of
         :func:`aggregate.decl_writer.format_program`, which it forwards
         ``self.program`` to; :attr:`pprogram` and :attr:`pprogram_html` are this
-        method at fixed defaults. Canonical rather than verbatim --- the text is
-        re-parsed and rendered from the resulting spec, so equivalent
-        declarations share one form. Returns ``''`` when there is no program.
+        method at fixed defaults. Canonical rather than as-received: the stored
+        statement is re-parsed and rendered back from the resulting spec, so
+        equivalent declarations share one form and any canonicalization the
+        parser applied becomes visible. Returns ``''`` when there is no program.
 
         Parameters
         ----------
@@ -97,11 +117,15 @@ class ProgramMixin:
 
         Notes
         -----
-        ``fmt`` and ``layout`` are round-trip safe; ``trailer`` is not --- the
+        ``fmt`` and ``layout`` are round-trip safe; ``trailer`` is not: the
         output re-parses to the same spec minus whatever was suppressed. The
         semantic ``!`` markers (unconditional severity, the zero-modified mean
         pin, defective ``dwait``) are clause syntax rather than trailer and are
         never suppressed.
+
+        A ``doc{{{...}}}`` is emitted as readable markdown here even though
+        :attr:`program` stores it base64-encoded: the writer renders from the
+        spec, which holds the decoded body.
 
         Examples
         --------
@@ -124,18 +148,27 @@ class ProgramMixin:
 
         Derived by re-parsing :attr:`program` and rendering it back through
         :func:`aggregate.decl_writer.format_program` (the inverse of the
-        parser), so it is *canonical* rather than verbatim --- equivalent
-        declarations share one form. Rendered in the default ``spread`` layout
-        (each clause on its own two-space-indented line) and **without the
-        trailer**: this is the declaration as a reader wants to see it, the
-        math and the insurance, not the ``note`` / ``tags`` / ``hints`` /
-        ``doc`` metadata around it.
+        parser), so equivalent declarations share one form. Rendered in the
+        default ``spread`` layout (each clause on its own two-space-indented
+        line) and **without the trailer**: this is the declaration as a reader
+        wants to see it, the math and the insurance, not the ``note`` /
+        ``tags`` / ``hints`` / ``doc`` metadata around it.
 
-        For the raw input as supplied to ``build`` use :attr:`program`; for the
-        metadata, read ``.note`` / ``.tags`` directly, or pass ``trailer=True``
-        to :meth:`format_program`, which also exposes the layout and markup
-        axes. An object built programmatically --- and an inline ``sev``
-        clause, whose enclosing ``Aggregate`` owns the text --- returns ``''``.
+        **Which of the two to reach for.** :attr:`program` is what the parser
+        was *handed*; this is what it *understood*. Use ``program`` when you
+        need text to feed back to ``build``, and ``pprogram`` when you want to
+        read what the object actually is. The difference between them is
+        informative rather than cosmetic: ``[1:6]`` comes back as
+        ``[1 2 3 4 5 6]``, ``50% so`` on a $10 line as ``5 so``, and a
+        ``sev.X`` reference resolved inline. What you see is the parse, which
+        is not always what the author thought they wrote.
+
+        For the metadata, read ``.note`` / ``.tags`` / ``.doc`` directly, or
+        pass ``trailer=True`` to :meth:`format_program`, which also exposes the
+        layout and markup axes. Neither property is the source file; for that,
+        read the ``.agg``. An object built programmatically, and an inline
+        ``sev`` clause whose enclosing ``Aggregate`` owns the text, returns
+        ``''``.
         """
         return self.format_program(fmt='text')
 

@@ -41,6 +41,16 @@ Recipe
 .. automodule:: aggregate.recipe
    :exclude-members: Recipe
 
+Cookbook
+--------
+
+The renderer half of the recipe surface: it turns a library's ``doc{{{...}}}``
+entries into Quarto pages, so a library that documents and tests itself also
+publishes itself. Point it at any :class:`Underwriter`, not just the shipped
+library.
+
+.. automodule:: aggregate.cookbook
+
 Underwriter class
 -----------------
 

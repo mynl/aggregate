@@ -22,7 +22,7 @@ on the same rhythm, borrowed from Beazley & Jones:
 
 A recipe is **not written here**. It lives in its library entry's `doc{{{…}}}`
 in `src/aggregate/agg/library.agg`, and the page is generated from it by
-`dev/generate_cookbook.py`. The same text is executed by
+`aggregate.cookbook`. The same text is executed by
 `tests/test_library_recipes.py`, so the page you are reading and the test that
 guards it cannot drift apart — they are the same source. Fetch one directly with
 `build.recipe('LimitProfile')`, or survey them with `build.recipes`.
@@ -47,7 +47,7 @@ version
 ```
 
 <!-- Pages named _recipes_NN_*.qmd are GENERATED from library.agg by
-     dev/generate_cookbook.py; do not hand-edit them. -->
+     aggregate.cookbook (run dev/generate_cookbook.py); do not hand-edit. -->
 
 <!-- 1  Distortions --------------------------------------------------- -->
 {{< include _01_distortions.qmd >}}

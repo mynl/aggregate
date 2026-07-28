@@ -167,7 +167,10 @@ class Recipe:
         Constructor kwargs from the parser, including the DecL trailer keys
         ``note`` / ``tags`` / ``hints`` / ``doc`` when written.
     program : str
-        The DecL source line the entry was parsed from, verbatim.
+        The DecL statement as the parser received it: one line, comments
+        stripped, any ``doc{{{...}}}`` body base64-encoded. Verbatim relative
+        to what was parsed, not to the ``.agg`` file. See :attr:`decl` for the
+        canonical re-rendering.
     object : Any
         ``None`` after parsing; populated by
         :meth:`aggregate.Underwriter._factory` once the corresponding
@@ -372,7 +375,7 @@ class Recipe:
         merely self-describing.
 
         This is the **pytest** consumer of a doc (``tests/test_library_recipes.py``);
-        the cookbook consumer is ``dev/generate_cookbook.py``, which emits the
+        the cookbook consumer is :mod:`aggregate.cookbook`, which emits the
         same code as native Quarto cells. Both read the same doc, which is what
         makes "the page and the test run the same program" true by construction
         rather than by discipline.

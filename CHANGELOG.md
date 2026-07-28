@@ -1,5 +1,94 @@
 # Changelog
 
+## 1.0.0a167
+
+**[Cookbook-Promote]** — the cookbook generator becomes package code, and
+`library.agg`'s header stops describing a design that was replaced two versions
+ago.
+
+### `aggregate.cookbook`
+
+`dev/generate_cookbook.py` was the odd one out. `recipe.py` promises "one
+source, three consumers: render, run, audit", and two of the three already
+lived in the package (`Recipe.run`, `build.recipes`). The renderer sitting in
+`dev/` was an accident of when it was written, not a decision. Its test loaded
+it with `importlib.util.spec_from_file_location`, which is the standard smell.
+
+More to the point, rendering a library is a **capability any DecL library
+should have**, not a chore private to this repo:
+
+```python
+from aggregate import Underwriter
+from aggregate.cookbook import write_cookbook
+
+uw = Underwriter(databases='my_structures')
+uw.load()
+write_cookbook('book', uw)
+```
+
+or from a shell:
+
+```
+python -m aggregate.cookbook docs/cookbook [--check]
+```
+
+Public surface, submodule access only (no top-level re-export, matching
+`bounds` / `ft` / `tweedie`):
+
+| name | what |
+|---|---|
+| `render_recipe(recipe, slug=, level=, titles=)` | one recipe to Quarto markdown |
+| `cookbook_pages(uw=None, sections=, titles=, setup=)` | a whole library to `{filename: text}`; pure, no filesystem |
+| `write_cookbook(out_dir, uw=None, check=False)` | write or check; returns `(stale, pages)` |
+| `TOPIC_SECTIONS`, `TITLE_OVERRIDES`, `DEFAULT_SETUP` | the defaults, all overridable |
+
+`dev/generate_cookbook.py` survives as a ten-line caller supplying this repo's
+library and output directory. An unplaceable recipe now logs a warning through
+`logging` rather than printing, since library code should not print.
+
+### `library.agg` header
+
+Two blocks still described the world as it was before a165 and a166:
+
+- `<<decl>>` was documented as keeping `note` / `tags` / `hints`. Since a166 it
+  carries **`hints` and nothing else**, and the header now says why: hints
+  change how the object *builds*, while the note is the recipe's Problem, the
+  tags are the page it sits on, and the doc is the page itself.
+- the plain-fence rule was justified by the retired runtime `recipe()` verb
+  "emitting them through IPython display". It now says what actually happens:
+  a doc body is **data**, and `aggregate.cookbook` rewrites each plain fence
+  into a `{python}` Quarto cell on the way out. Since the code inside is passed
+  through untouched, a fence may open with a cell option such as
+  `#| fig-cap: "..."`, which Quarto honors and `Recipe.run` sees as a comment.
+  That is documented now rather than left to be discovered.
+
+Also: "the default `build` knowledge base" became "recipe base" (missed in
+a164).
+
+### Also in this commit
+
+Two doc-only pieces that carry no behaviour change. They would not have earned
+a bump on their own, but `recipe.py` is touched by both them and the promotion
+above, so splitting the commit would have split a file.
+
+**`program` is not "the raw input".** `ProgramMixin.pprogram` said "For the raw
+input as supplied to `build` use `program`", and four other places agreed.
+What is actually stored is `UnderwritingLexer.preprocess` output: folded onto
+one line, comments stripped, extra spaces from the bracket step, and any `doc`
+body base64-encoded. Nobody keeps the keystrokes. Corrected in `_program.py`
+(module docstring, the `program` attribute, `pprogram`), both user guides,
+`Recipe.program`, `add_recipe`, and the `program` / `pprogram` rows of
+`dev/FEATURES.csv`. The attribute doc now spells out all four differences and
+says the base64 is deliberate, since that is the part that reads as a bug when
+you first hit it. The distinction itself stands: `program` is what the parser
+was handed, `pprogram` is what it understood, and the gap between them shows
+the canonicalization.
+
+**`dev/underwriter.rst`**, a new guide to the Underwriter and the recipe
+surface, covering what the 10-minute guide covers plus recipes, tags,
+`discover`, the `build(x)` / `build[x]` / `build.recipe(x)` distinction, and
+`program` versus `pprogram`. Draft, in `dev/` pending a home in the built docs.
+
 ## 1.0.0a166
 
 **[Trailer-Layout]** — the trailer gets its own lines, and formatting drops it

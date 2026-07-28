@@ -10,9 +10,9 @@
 # cookbook.agg (the feature walkthrough) and actuarial-severity-curves.agg
 # (the severity reference), which were three files with overlapping
 # purpose, three different naming conventions, and no machine-readable
-# grouping. It is the default `build` knowledge base, the source the
-# Quarto cookbook renders from, and the source the aggregate_api (aLL) SPA
-# reads for its Examples dropdown.
+# grouping. It is the default `build` recipe base, the source the Quarto
+# cookbook renders from, and the source the aggregate_api (aLL) SPA reads
+# for its Examples dropdown.
 #
 # NAMES are descriptive and GLOBALLY UNIQUE across kinds, so `build('X')`
 # and `build.recipe('X')` always mean the same entry and no `kind=`
@@ -35,7 +35,7 @@
 #                   an entry documents and tests itself. Closing fence
 #                   must be alone on its line.
 #
-# WRITING A doc -- two conventions that matter:
+# WRITING A doc: two conventions that matter.
 #
 #   <<decl>>   NEVER retype the program in the Solution. Write
 #
@@ -44,22 +44,42 @@
 #                  ```
 #
 #              and the entry's own declaration is substituted in, rendered
-#              canonically and WITHOUT its doc (note/tags/hints are kept --
-#              hints change how the object builds). Two copies of the same
-#              program in one statement would drift the first time either
-#              was edited; this is the whole point. Because the substituted
-#              form is canonical, it can differ cosmetically from what is
-#              typed above (e.g. `50% po L xs A` renders `50% so L xs A`) --
-#              that is normalisation, not a change.
+#              canonically from the spec. Two copies of one program inside a
+#              single statement would drift the first time either was edited;
+#              removing that trap is the whole point.
 #
-#   ```python  Plain fences, NOT ```{python}. Quarto never sees these as
-#              source cells: `recipe()` emits them at runtime through
-#              IPython display, and OUR code (aggregate.recipe.Recipe.run)
-#              executes them. A ```{python} fence is Quarto *source* syntax
-#              and would render as a literal label here. Plain ```python
-#              also keeps the block copy-pasteable and syntax-highlighted.
-#              A fence tagged anything else (```text) is prose and is NOT
-#              executed -- use it to show output.
+#              The substitution carries `hints{...}` and NOTHING else, because
+#              hints change how the object BUILDS: a copy-pasteable program
+#              without them would not reproduce the recipe. The note is the
+#              recipe's Problem, the tags are the page it sits on, and the doc
+#              is the page itself, so repeating any of them inside the program
+#              would be redundant. Dropping the doc is also the recursion
+#              guard: a doc must not quote itself.
+#
+#              Being canonical, the substituted form can differ cosmetically
+#              from what is typed above (e.g. `50 po L xs A` renders
+#              `50% so L xs A`). That is normalization, not a change.
+#
+#   ```python  Plain fences, NOT ```{python}. A doc body is DATA: it is stored
+#              in the .agg file, executed by aggregate.recipe.Recipe.run (the
+#              pytest harness), and rendered to a book by aggregate.cookbook,
+#              which rewrites each plain fence into a ```{python} Quarto cell
+#              on the way out. Writing ```{python} here would put Quarto
+#              source syntax into data and render as a literal label.
+#
+#              The code inside the fence is passed through untouched, which is
+#              what makes the page and the test run byte-identical programs.
+#              So a fence may open with a Quarto cell option:
+#
+#                  ```python
+#                  #| fig-cap: "The distortion, above the diagonal."
+#                  g.plot()
+#                  ```
+#
+#              Quarto honors it; Recipe.run sees a comment. Plain fences also
+#              keep the block copy-pasteable and syntax-highlighted anywhere
+#              markdown is read. A fence tagged anything else (```text) is
+#              prose and is NOT executed: use it to show output.
 #
 # TAG VOCABULARY -- namespaced, and it never restates the object's TYPE.
 #

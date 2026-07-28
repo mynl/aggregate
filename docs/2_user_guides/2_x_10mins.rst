@@ -965,7 +965,9 @@ Methods and Properties Common To :class:`Aggregate` and :class:`Portfolio` Class
 
 - ``spec_ex`` a dictionary that appends hyper-parameters to ``spec`` including ``log2`` and ``bs``.
 
-- ``program`` the DecL program used to create the object. Blank if the object has been created directly. (A given object can often be created in different ways by DecL, so there is no obvious reverse mapping from the ``spec``.)
+- ``program`` the DecL statement as the parser received it, not the text you typed: comments are gone, the statement is folded onto one line, and a ``doc{{{...}}}`` body is stored base64-encoded. Blank if the object has been created directly. (A given object can often be created in different ways by DecL, so there is no obvious reverse mapping from the ``spec``.)
+
+- ``pprogram`` the same statement re-parsed and rendered back from the ``spec``: canonical, one clause per indented line, no trailer. ``program`` is what the parser was handed; ``pprogram`` is what it understood.
 
 - ``renamer`` a dictionary used to rename columns of member dataframes to be more human readable.
 
@@ -1113,8 +1115,11 @@ object. For example, if ``a`` is an :class:`Aggregate`, then ``Aggregate
 The DecL Program
 ~~~~~~~~~~~~~~~~~~
 
-The ``program`` property returns the DecL program used to create the object.
-It is blank if the object was not created using DecL. The helper function :func:`format_program` pretty prints a program: each clause on its own indented line, and by default without the ``note{...}`` / ``tags{...}`` / ``hints{...}`` / ``doc{{{...}}}`` trailer, so what you see is the math and the insurance. Pass ``trailer=True`` to include the metadata, or an iterable such as ``trailer=('hints',)`` to keep only the clauses that change how the object builds.
+The ``program`` property returns the DecL statement **as the parser received it**: comments stripped, folded onto one line, a ``doc{{{...}}}`` body base64-encoded. It is blank if the object was not created using DecL, and it is not a record of your keystrokes; for the file as written, read the ``.agg``.
+
+The helper function :func:`format_program` renders that statement back from the parsed spec: each clause on its own indented line, and by default without the ``note{...}`` / ``tags{...}`` / ``hints{...}`` / ``doc{{{...}}}`` trailer, so what you see is the math and the insurance. Pass ``trailer=True`` to include the metadata, or an iterable such as ``trailer=('hints',)`` to keep only the clauses that change how the object builds. The object property :attr:`pprogram` is this function at its defaults.
+
+Because it renders from the spec rather than from the text, the result is *canonical*: ``[1:6]`` comes back as ``[1 2 3 4 5 6]``, ``50% so`` on a $10 line as ``5 so``, a ``sev.X`` reference resolved inline. Comparing the two is a quick way to see what the parser actually understood.
 
 .. ipython:: python
     :okwarning:

@@ -1,5 +1,5 @@
-<!-- GENERATED from library.agg by dev/generate_cookbook.py -- do not hand-edit. -->
-<!-- Edit the entry's doc{{{...}}} in src/aggregate/agg/library.agg and re-run the generator. -->
+<!-- GENERATED from a DecL library by aggregate.cookbook (do not hand-edit). -->
+<!-- Edit the entry's doc{{{...}}} in the .agg file and re-run the generator. -->
 
 ```{python}
 #| echo: false

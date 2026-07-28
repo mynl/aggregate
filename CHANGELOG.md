@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0a156
+
+**[Ruin-Example-Punchups]** — legend on the `ruin_example` psi(u) panel: the
+linear curve, the log-scale dashed curve and the `(u0, psi(u0))` marker are
+now labeled, with the twin axis's handles merged into one `fontsize='x-small'`
+legend (upper right). Folds in the author's figure-proportion tweaks
+(`FIG_W * 2` x `FIG_H`, equal panel widths, x-small paths legend).
+
 ## 1.0.0a155
 
 **[Ruin-Example-Punchups]** — `pedagogy.ruin_example` figure polish, straight

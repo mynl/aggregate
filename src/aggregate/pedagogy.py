@@ -1089,8 +1089,8 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
                                + 10))
 
     # --- plot n_plot sample paths (left) + psi(u) (right) -------------
-    fig, (ax, ax_psi) = plt.subplots(1, 2, figsize=(FIG_W * 3, FIG_H * 2),
-                                     width_ratios=[2, 1],
+    fig, (ax, ax_psi) = plt.subplots(1, 2, figsize=(FIG_W * 2, FIG_H),
+                                     width_ratios=[1, 1],
                                      layout='constrained')
     n_fail = 0
     for i in range(n_plot):
@@ -1139,7 +1139,7 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
         f"rate {n_fail / n_plot:0.2%}\n"
         f"Simulated {n_ruin} of {n_sims} = {p_sim:0.0%}, "
         f"exact rate {psi_u0:0.2%}")
-    ax.legend(loc='upper left')
+    ax.legend(loc='upper left', fontsize='x-small')
 
     # --- psi(u) against initial surplus (right panel) -----------------
     # x-range capped where psi falls below 1e-5 (or the grid top) -- the
@@ -1148,18 +1148,23 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
     u_top = max(float(ruin.index[i_psi]), 1.25 * u0)
     bit_psi = ruin.loc[:u_top]
     ax_log = ax_psi.twinx()
-    bit_psi.plot(ax=ax_psi, c='C0')
-    bit_psi.plot(ax=ax_log, ls='--', lw=1, c='C0')
+    bit_psi.plot(ax=ax_psi, c='C0', label='psi(u), linear scale')
+    bit_psi.plot(ax=ax_log, ls='--', lw=1, c='C0', label='psi(u), log scale')
     ax_log.set(ylim=[0.5e-6, 2], yscale='log', ylabel='log probability')
     ax_log.yaxis.set_minor_locator(ticker.LogLocator(subs='all', numticks=20))
     ax_psi.axhline(psi_u0, lw=0.5, c='C7')
     ax_psi.axvline(u0, lw=0.5, c='C7')
-    ax_psi.plot(u0, psi_u0, 'o', c='C3', ms=5, zorder=5)
+    ax_psi.plot(u0, psi_u0, 'o', c='C3', ms=5, zorder=5, label='psi(u0)')
     ax_psi.set(xlim=[-u_top / 50, u_top], ylim=[-0.05, 1.05],
                xlabel='initial surplus',
                ylabel='probability of eventual ruin',
                title=f'psi({u0:.6g}) = {psi_u0:0.2%}')
     ax_log.set(xlim=[-u_top / 50, u_top])
+    # one legend for both axes: merge the twin's handles into the host's
+    h_lin, l_lin = ax_psi.get_legend_handles_labels()
+    h_log, l_log = ax_log.get_legend_handles_labels()
+    ax_psi.legend(h_lin + h_log, l_lin + l_log, loc='upper right',
+                  fontsize='x-small')
 
     # --- summary dataframe --------------------------------------------
     summary = pd.DataFrame({'value': {

@@ -1,5 +1,70 @@
 # Changelog
 
+## 1.0.0a163
+
+**[Recipe-Library]** — `<<decl>>`: a recipe never retypes the program it
+documents.
+
+The four recipes shipped in a160 each **copied their own declaration** into
+their Solution block. Two copies of the same program inside one statement, and
+nothing tying them together — guaranteed to drift the first time either was
+edited. A doc writes this instead:
+
+````
+```python
+a = build('''<<decl>>''')
+```
+````
+
+and the entry's own declaration is substituted in.
+
+### The recursion guard
+
+The substituted declaration is rendered **without its doc**, keeping `note` /
+`tags` / `hints` — `hints` matters, because it changes how the object builds and
+a copy-pasteable program without it would not reproduce the recipe. Dropping
+the doc is what stops the doc from quoting itself.
+
+That needed `format_program` to suppress *one* trailer item rather than all of
+them, so **`trailer` now accepts a collection as well as a bool**:
+
+```python
+format_program(x, trailer=True)                        # all four (default)
+format_program(x, trailer=False)                       # none
+format_program(x, trailer=('note', 'tags', 'hints'))   # everything but the doc
+```
+
+An unknown item name raises rather than silently rendering nothing.
+`Recipe.program` is now this doc-free declaration (it previously held the raw
+stored program, base64 doc payload and all).
+
+### Canonical form is not a change
+
+The substitution renders **canonical** DecL, which can differ cosmetically from
+what is typed in the library: `50% po 2500 xs 2500` comes back as
+`50% so 2500 xs 2500` (the writer normalises every partial placement to the
+percentage `so` form; both mean half the layer). The `OccurrenceXOL` recipe's
+Discussion has been corrected — it explained `po`, a token the reader could no
+longer see — and now explains the normalisation itself.
+
+### Fence convention, documented
+
+Plain ` ```python `, **not** ` ```{python} `. Quarto never sees these as source
+cells: `recipe()` emits them at runtime through IPython display, and
+`Recipe.run` executes them. A ` ```{python} ` fence is Quarto *source* syntax
+and would render as a literal label. A fence tagged anything else (` ```text `)
+is prose and is not executed — use it to show output.
+
+Both conventions are written into the `library.agg` header, where a recipe
+author will actually meet them.
+
+### Also
+
+`tests/test_recipe.py`'s library-dependent tests now use their own
+`Underwriter` instead of the global `build` singleton — shared mutable state
+that any other test in the session can perturb, which showed up once as a
+parallel-only failure.
+
 ## 1.0.0a162
 
 **[Test-Loop]** — test-impact analysis for the edit loop, and a scheduling fix

@@ -595,13 +595,21 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
 # Trailer + approximate
 # ======================================================================
 
-def _render_trailer(spec: dict, trailer: bool = True) -> str:
+#: The trailer items, in render order.
+TRAILER_ITEMS = ('note', 'tags', 'hints', 'doc')
+
+
+def _render_trailer(spec: dict, trailer=True) -> str:
     """Render the ``note`` / ``tags`` / ``hints`` / ``doc`` trailer, verbatim.
 
-    ``trailer=False`` suppresses all four. They are one grammar construct (see
-    the ``decl.lark`` trailer rule) and one code path, so one flag governs them.
-    The result no longer re-parses to the same spec --- that is the caller's
-    choice, made explicitly at the call site.
+    ``trailer`` is ``True`` (all four), ``False`` (none), or an iterable naming
+    the items to keep --- e.g. ``('note', 'tags', 'hints')`` renders the
+    declaration *without its doc*, which is what
+    :meth:`aggregate.Underwriter.recipe` needs to expand a ``<<decl>>``
+    placeholder without the doc quoting itself.
+
+    Suppressing anything means the result no longer re-parses to the same spec
+    --- that is the caller's choice, made explicitly at the call site.
 
     Notes
     -----
@@ -611,16 +619,25 @@ def _render_trailer(spec: dict, trailer: bool = True) -> str:
     That is what makes the round trip work --- the writer emits a raw markdown
     body, and re-parsing re-encodes it.
     """
-    if not trailer:
+    if trailer is True:
+        wanted = TRAILER_ITEMS
+    elif not trailer:
         return ''
+    else:
+        wanted = tuple(trailer)
+        unknown = set(wanted) - set(TRAILER_ITEMS)
+        if unknown:
+            raise ValueError(
+                f'unknown trailer item(s) {sorted(unknown)}; '
+                f'expected a subset of {TRAILER_ITEMS}')
     parts = []
-    if spec.get('note'):
+    if 'note' in wanted and spec.get('note'):
         parts.append(f'note{{{spec["note"]}}}')
-    if spec.get('tags'):
+    if 'tags' in wanted and spec.get('tags'):
         parts.append(f'tags{{{", ".join(spec["tags"])}}}')
-    if spec.get('hints'):
+    if 'hints' in wanted and spec.get('hints'):
         parts.append(f'hints{{{spec["hints"]}}}')
-    if spec.get('doc'):
+    if 'doc' in wanted and spec.get('doc'):
         # Newline-delimited: the closing fence MUST be alone on its line.
         parts.append(f'doc{{{{{{\n{spec["doc"]}\n}}}}}}')
     return ' '.join(parts)
@@ -1152,7 +1169,7 @@ def _render_statement(underwriter, statement: str, trailer: bool = True):
 
 
 def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
-                   trailer: bool = True, width=None) -> str:
+                   trailer=True, width=None) -> str:
     """Render a DecL program in canonical form, optionally colorized.
 
     The public entry point backing ``pprogram`` / ``pprogram_html`` and the

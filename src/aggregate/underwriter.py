@@ -1426,6 +1426,7 @@ class Underwriter(HelpMixin):
         --------
         recipes : the audit frame over every entry.
         """
+        from .decl_writer import format_program
         from .recipe import parse_doc
 
         if not self._loaded:
@@ -1441,11 +1442,24 @@ class Underwriter(HelpMixin):
                 f'{name!r} is ambiguous across kinds ({kinds}); pass kind= to '
                 f'choose. Shipped library names are unique across kinds.')
         pp = self._knowledge[hits[0]]
+        # The declaration WITHOUT its doc: note/tags/hints are kept (hints
+        # change how the object builds, so a copy-pasteable program needs
+        # them), doc is dropped. This is what ``<<decl>>`` expands to, and
+        # dropping the doc is what stops the doc quoting itself.
+        try:
+            decl = format_program((pp.kind, pp.name, pp.spec), fmt='text',
+                                  trailer=('note', 'tags', 'hints'))
+        except Exception:
+            # Some constructs cannot round-trip through the writer (a
+            # `minimum`/`mixture` distortion references children by name).
+            # A recipe for one of those simply gets no <<decl>> expansion
+            # rather than failing to load at all.
+            decl = ''
         return parse_doc(pp.spec.get('doc', ''),
                          name=pp.name, kind=pp.kind,
                          note=pp.spec.get('note', ''),
                          tags=pp.spec.get('tags', ()),
-                         program=pp.program)
+                         program=decl)
 
     @property
     def recipes(self):

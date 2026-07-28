@@ -181,6 +181,61 @@ def test_underwriter_recipe_runs(uw):
     assert 'a' in ns
 
 
+@pytest.fixture(scope='module')
+def lib():
+    """A private Underwriter over ``library.agg``.
+
+    Deliberately NOT the global ``build`` singleton: it is mutable shared
+    state, and a test that reads it can be perturbed by any other test in the
+    session that loads a database into it. Own your knowledge base.
+    """
+    u = Underwriter(databases='library')
+    u.load()
+    return u
+
+
+def test_decl_placeholder_expands_to_the_entrys_own_program(lib):
+    """``<<decl>>`` saves a recipe from retyping the program it documents.
+
+    Two copies of the same declaration inside one statement would drift the
+    first time either was edited -- the maintenance trap this removes.
+    """
+    r = lib.recipe('LimitProfile')
+    assert '<<decl>>' not in r.solution_code
+    assert 'agg LimitProfile' in r.solution_code
+    assert "build('''" in r.solution_code
+
+
+def test_expanded_decl_excludes_the_doc_but_keeps_note_tags_hints(lib):
+    """The recursion guard: a doc must not quote itself.
+
+    ``hints`` is kept deliberately -- it changes how the object builds, so a
+    copy-pasteable program without it would not reproduce the recipe.
+    """
+    r = lib.recipe('LimitProfile')
+    assert 'doc{{{' not in r.program
+    assert 'note{' in r.program and 'tags{' in r.program
+    # ... and the expansion inherits that, so no doc leaks into the code
+    assert 'doc{{{' not in r.solution_code
+
+
+def test_expanded_decl_actually_rebuilds_the_entry(lib):
+    """The substituted program is real DecL that reproduces the object."""
+    from aggregate import build
+    r = lib.recipe('ThreeDice')
+    ns = r.run()
+    assert abs(ns['a'].actual_m - build('ThreeDice').actual_m) < 1e-12
+
+
+def test_placeholder_is_left_alone_without_a_program():
+    """``parse_doc`` with no program leaves the placeholder visible.
+
+    Better a visible ``<<decl>>`` than a silently empty Solution.
+    """
+    r = parse_doc('## Solution\n\n```python\nx = "<<decl>>"\n```')
+    assert '<<decl>>' in r.solution_code
+
+
 def test_underwriter_recipe_unknown_name_raises(uw):
     with pytest.raises(KeyError, match='no knowledge entry'):
         uw.recipe('DefinitelyNotAnEntry')

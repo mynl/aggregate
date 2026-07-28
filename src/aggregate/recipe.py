@@ -34,7 +34,26 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-__all__ = ['Recipe', 'parse_doc', 'SECTIONS']
+__all__ = ['Recipe', 'parse_doc', 'SECTIONS', 'DECL_PLACEHOLDER']
+
+#: Placeholder a doc writes instead of retyping its own DecL declaration.
+#:
+#: A recipe's Solution needs to show the program it is about. Copying the
+#: declaration into the doc would mean two copies of the same thing in the same
+#: statement, guaranteed to drift the first time the program is edited. So the
+#: doc writes::
+#:
+#:     ```python
+#:     a = build('''<<decl>>''')
+#:     ```
+#:
+#: and the entry's own declaration is substituted in.
+#:
+#: **The substituted declaration excludes the doc** (keeping ``note`` /
+#: ``tags`` / ``hints``, which matter -- hints change how the object builds).
+#: That is what stops the doc from quoting itself: without it, expanding
+#: ``<<decl>>`` inside the doc would embed the doc inside the doc.
+DECL_PLACEHOLDER = '<<decl>>'
 
 #: The recognised section headings, in canonical order.
 SECTIONS = ('problem', 'solution', 'discussion', 'check')
@@ -101,7 +120,9 @@ class Recipe:
     discussion: str = ''
     check: str = ''
     extra: str = ''
-    #: The entry's DecL program, for beat 1 of the page.
+    #: The entry's declaration, rendered WITHOUT its doc (note/tags/hints
+    #: kept). What ``<<decl>>`` expands to, and what a page shows as "the
+    #: program". Doc-free so it can appear inside the doc without recursing.
     program: str = ''
     _sections_present: tuple = field(default_factory=tuple)
 
@@ -238,9 +259,14 @@ def parse_doc(text, *, name='', kind='', note='', tags=(), program=''):
     ----------
     text : str
         The doc body (markdown).
-    name, kind, note, tags, program
+    name, kind, note, tags
         Identity and metadata from the owning knowledge entry, copied onto the
-        recipe so a page can render beat 1 without a second lookup.
+        recipe so a page can render the declaration without a second lookup.
+    program : str, optional
+        The entry's declaration, **rendered without its doc**. Substituted for
+        every :data:`DECL_PLACEHOLDER` in *text*, so a recipe never has to
+        retype the program it documents. :meth:`aggregate.Underwriter.recipe`
+        supplies this; pass '' to leave placeholders alone.
 
     Returns
     -------
@@ -255,6 +281,11 @@ def parse_doc(text, *, name='', kind='', note='', tags=(), program=''):
     1
     """
     text = (text or '').strip('\n')
+    if program and DECL_PLACEHOLDER in text:
+        # Substituted BEFORE splitting, so it works in any section -- a
+        # Discussion may quote the declaration too. ``program`` is already the
+        # doc-free rendering (see Underwriter.recipe), so this cannot recurse.
+        text = text.replace(DECL_PLACEHOLDER, program)
     bodies = {s: [] for s in SECTIONS}
     extra = []
 

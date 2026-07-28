@@ -35,6 +35,32 @@
 #                   an entry documents and tests itself. Closing fence
 #                   must be alone on its line.
 #
+# WRITING A doc -- two conventions that matter:
+#
+#   <<decl>>   NEVER retype the program in the Solution. Write
+#
+#                  ```python
+#                  a = build('''<<decl>>''')
+#                  ```
+#
+#              and the entry's own declaration is substituted in, rendered
+#              canonically and WITHOUT its doc (note/tags/hints are kept --
+#              hints change how the object builds). Two copies of the same
+#              program in one statement would drift the first time either
+#              was edited; this is the whole point. Because the substituted
+#              form is canonical, it can differ cosmetically from what is
+#              typed above (e.g. `50% po L xs A` renders `50% so L xs A`) --
+#              that is normalisation, not a change.
+#
+#   ```python  Plain fences, NOT ```{python}. Quarto never sees these as
+#              source cells: `recipe()` emits them at runtime through
+#              IPython display, and OUR code (aggregate.recipe.Recipe.run)
+#              executes them. A ```{python} fence is Quarto *source* syntax
+#              and would render as a literal label here. Plain ```python
+#              also keeps the block copy-pasteable and syntax-highlighted.
+#              A fence tagged anything else (```text) is prose and is NOT
+#              executed -- use it to show output.
+#
 # TAG VOCABULARY -- namespaced, and it never restates the object's TYPE.
 #
 # Type is what `kind` is for: build.discover(kind='sev') finds every severity
@@ -89,7 +115,7 @@ measure* rather than a judgement applied case by case.
 
 ```python
 import numpy as np
-g = build('dist PHDistortion ph 0.7')
+g = build('''<<decl>>''')
 s = np.linspace(0, 1, 11)
 qd(pd.DataFrame({'s': s, 'g(s)': g.g(s)}).set_index('s'))
 ```
@@ -141,13 +167,7 @@ separate models you then have to add up by hand.
 ## Solution
 
 ```python
-a = build('''
-agg LimitProfile
-    [1000 2000 500] prem at [.8 .7 .5] lr
-    [1000 2000 5000] xs 0
-    sev lognorm 50 cv 1.5
-    poisson
-''')
+a = build('''<<decl>>''')
 qd(a.summary_df)
 ```
 
@@ -265,7 +285,7 @@ head. Three dice: a fixed frequency of 3, a severity uniform on 1..6.
 ## Solution
 
 ```python
-a = build('agg ThreeDice dfreq [3] dsev [1:6]')
+a = build('''<<decl>>''')
 qd(a.summary_df)
 ```
 
@@ -316,14 +336,7 @@ can see where the cession went instead of taking the net on faith.
 ## Solution
 
 ```python
-a = build('''
-agg OccurrenceXOL
-    15 claims
-    10000 xs 0
-    sev lognorm 1500 cv 1.0
-    occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000
-    mixed gamma 0.25
-''')
+a = build('''<<decl>>''')
 qd(a.reins_summary_df)
 ```
 
@@ -333,9 +346,14 @@ qd(a.reins_summary_df)
 frequency convolution -- which is what "per occurrence" means and why it cannot
 be done by adjusting the aggregate afterwards.
 
-`po` is *part of*: `50% po 2500 xs 2500` cedes half of the 2500-excess-2500
-layer, `90% po 5000 xs 5000` cedes nine tenths of the layer above it. The
-`and` chains them into one programme.
+`50% so 2500 xs 2500` cedes half of the 2500-excess-2500 layer, `90% so 5000 xs
+5000` nine tenths of the layer above it; `and` chains them into one programme.
+
+Note the program above is the **canonical** form. Partial placements can be
+written `so` (*share of*) or `po` (*part of*) and with a percentage or an
+absolute amount; all of them normalise to the `<pct>% so <limit> xs <attach>`
+spelling you see here, which is why what you wrote and what the library shows
+back can differ without anything having changed.
 
 `reins_summary_df` is the exhibit that matters here: three stages (gross,
 ceded, net) x three components (freq, sev, agg), with theoretic `EX` next to

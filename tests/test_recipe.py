@@ -253,20 +253,39 @@ def test_decl_placeholder_expands_to_the_entrys_own_program(lib):
     assert "build('''" in r.solution_code
 
 
-def test_expanded_decl_excludes_the_doc_but_keeps_note_tags_hints(lib):
-    """The recursion guard: a doc must not quote itself.
+def test_expanded_decl_carries_hints_and_nothing_else(lib):
+    """``Recipe.decl`` is the program, not the metadata around it.
 
-    ``Recipe.decl`` is the doc-free rendering -- distinct from ``.program``,
-    which is the verbatim source line and *does* carry the doc. ``hints`` is
-    kept deliberately: it changes how the object builds, so a copy-pasteable
-    program without it would not reproduce the recipe.
+    ``hints`` survives because it changes how the object *builds*: a
+    copy-pasteable program without it would not reproduce the recipe. The note
+    is the recipe's Problem, the tags are the page it sits on, and the doc is
+    the page itself, so repeating any of them inside the program is redundant
+    -- and dropping the doc is also the recursion guard, since a doc must not
+    quote itself.
+
+    Contrast ``.program``, the verbatim source line, which carries the lot.
     """
     r = lib.recipe('LimitProfile')
     assert 'doc{{{' in r.program          # the source line has one ...
-    assert 'doc{{{' not in r.decl         # ... the expansion never does
-    assert 'note{' in r.decl and 'tags{' in r.decl
-    # ... and the substitution inherits that, so no doc leaks into the code
-    assert 'doc{{{' not in r.solution_code
+    for clause in ('doc{{{', 'note{', 'tags{'):
+        assert clause not in r.decl       # ... the expansion has none of it
+    # and the substitution inherits that, so none of it leaks into the code
+    for clause in ('doc{{{', 'note{', 'tags{'):
+        assert clause not in r.solution_code
+
+
+def test_expanded_decl_keeps_hints_because_they_change_the_build(lib):
+    """The one trailer clause that is part of the program, not about it."""
+    from aggregate import Underwriter
+    uw = Underwriter()
+    uw._interpret_program(
+        'agg HintedRecipe 5 claims sev lognorm 10 cv 2 poisson '
+        'note{n} tags{topic:aggregate} hints{log2=12}'
+        '\n    doc{{{\n## Solution\n\n```python\na = build(\'\'\'<<decl>>\'\'\')\n```\n}}}')
+    r = uw.recipe('HintedRecipe')
+    assert 'hints{log2=12}' in r.decl
+    assert 'hints{log2=12}' in r.solution_code
+    assert 'note{' not in r.decl and 'tags{' not in r.decl
 
 
 def test_expanded_decl_actually_rebuilds_the_entry(lib):

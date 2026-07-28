@@ -1,5 +1,64 @@
 # Changelog
 
+## 1.0.0a166
+
+**[Trailer-Layout]** — the trailer gets its own lines, and formatting drops it
+by default.
+
+### Each clause on its own line
+
+`_render_trailer` now returns one fragment per clause instead of a joined
+string, so `note` / `tags` / `hints` / `doc` each become a child of the
+enclosing block. In `spread` that puts each on its own line at the statement's
+indentation level:
+
+```
+agg Demo
+  10 claims
+  1000 xs 0
+  sev lognorm 50 cv 1.5
+  poisson
+  note{a stored note}
+  tags{topic:aggregate, role:intro}
+  hints{log2=16}
+```
+
+`terse` space-joins them back, so the single-line form, and therefore
+`spec_to_decl` and `to_agg`, is unchanged. `sev` and `distortion` became
+`_Block`s to get the same treatment (declaration as the head, trailer clauses
+as children); their terse output is byte-identical. A portfolio's own trailer
+moved out of the head line and in front of its units, which is where the
+grammar binds it; both layouts re-parse to the same spec.
+
+Only a fragment's first line is indented, so a `doc` body keeps its own column
+positions and its fenced code blocks survive.
+
+### `trailer=False` is the default
+
+**Breaking.** `format_program(...)` and `obj.format_program(...)` now default to
+`trailer=False`, so `pprogram` and `pprogram_html` show the bare declaration.
+Formatting a program is nearly always about the math and the insurance, not the
+metadata around it. Pass `trailer=True` for all four clauses, or an iterable
+such as `trailer=('hints',)` for a subset.
+
+`spec_to_decl` is untouched and still always emits the full trailer, so
+`to_agg` export and round-trip remain exact.
+
+### `<<decl>>` substitutes hints only
+
+`Recipe.decl` renders with `trailer=('hints',)`, down from
+`('note', 'tags', 'hints')`. `hints` stays because it changes how the object
+*builds*: a copy-pasteable program without it would not reproduce the recipe.
+The rest is redundant inside a recipe, where the note is the Problem, the tags
+are the page, and the doc is the page itself. Generated cookbook pages are
+correspondingly leaner:
+
+```python
+a = build('''agg ThreeDice
+  dfreq [3]
+  dsev [1 2 3 4 5 6]''')
+```
+
 ## 1.0.0a165
 
 **[Cookbook-Generate]** — cookbook recipe pages are generated from

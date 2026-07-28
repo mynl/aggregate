@@ -18,8 +18,7 @@ a = build('''agg LimitProfile
   [1000 2000 500] premium at [0.8 0.7 0.5] lr
   [1000 2000 5000] xs 0
   sev lognorm 50 cv 1.5
-  poisson
-  note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.} tags{role:hero, topic:aggregate, check:reconciliation}''')
+  poisson''')
 qd(a.summary_df)
 ```
 
@@ -61,8 +60,7 @@ head. Three dice: a fixed frequency of 3, a severity uniform on 1..6.
 ```{python}
 a = build('''agg ThreeDice
   dfreq [3]
-  dsev [1 2 3 4 5 6]
-  note{Sum of three dice -- exact discrete aggregate; zero validation error.} tags{topic:aggregate, role:intro, check:independent-oracle}''')
+  dsev [1 2 3 4 5 6]''')
 qd(a.summary_df)
 ```
 

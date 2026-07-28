@@ -87,7 +87,7 @@ def qd(x, **kwargs):
 
 def cbqd(ob):
     """Cookbook qd."""
-    print(ob.format_program(fmt='text', trailer=False))
+    print(ob.format_program(fmt='text'))
     print()
     print(fill(ob._text_info_blob(), 65))
     print()

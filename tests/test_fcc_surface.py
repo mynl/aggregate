@@ -186,25 +186,28 @@ def test_pprogram_is_format_program_at_defaults(agg, port, pnl, biv):
         assert obj.pprogram_html == obj.format_program(fmt='html')
 
 
-def test_format_program_trailer_drops_note_and_hints():
+def test_format_program_omits_the_trailer_by_default():
     a = build('agg FCC.Note 10 claims sev lognorm 50 cv 1 poisson '
               'note{a stored note} hints{log2=16}', update=False)
-    assert 'note{a stored note}' in a.pprogram
-    assert 'hints{log2=16}' in a.pprogram
-    bare = a.format_program(trailer=False)
-    assert 'note{' not in bare and 'hints{' not in bare
+    # pprogram is format_program at its defaults, and the default is bare
+    assert 'note{' not in a.pprogram and 'hints{' not in a.pprogram
+    assert a.format_program(trailer=False) == a.pprogram
     # the declaration itself is untouched
-    assert 'sev lognorm 50 cv 1' in bare and 'poisson' in bare
+    assert 'sev lognorm 50 cv 1' in a.pprogram and 'poisson' in a.pprogram
+    # ... and trailer=True brings it back, one clause per line
+    full = a.format_program(trailer=True)
+    assert 'note{a stored note}' in full and 'hints{log2=16}' in full
 
 
 def test_format_program_trailer_reaches_portfolio_units():
-    """``trailer=False`` applies through the tree, not just the head line."""
+    """The trailer axis applies through the tree, not just the head line."""
     p = build('port FCC.NoteP '
               'agg N1 5 claims sev lognorm 10 cv 1 poisson note{unit one} '
               'agg N2 3 claims sev gamma 5 cv .5 poisson note{unit two}',
               update=False)
-    assert 'note{unit one}' in p.pprogram
+    assert 'note{unit one}' in p.format_program(trailer=True)
     assert 'note{' not in p.format_program(trailer=False)
+    assert 'note{' not in p.pprogram
 
 
 def test_trailer_false_reparses_to_the_same_spec_less_note_and_hints():
@@ -214,9 +217,10 @@ def test_trailer_false_reparses_to_the_same_spec_less_note_and_hints():
             'note{hello} hints{log2=16}')
     _, _, source = uw.parser.parse(text)
     a = build(text, update=False)
-    _, _, kept = uw.parser.parse(a.format_program(layout='terse'))
-    _, _, dropped = uw.parser.parse(a.format_program(layout='terse', trailer=False))
-    assert kept == source                                   # default is exact
+    _, _, kept = uw.parser.parse(
+        a.format_program(layout='terse', trailer=True))
+    _, _, dropped = uw.parser.parse(a.format_program(layout='terse'))
+    assert kept == source                                   # trailer=True is exact
     assert dropped == {**source, 'note': '', 'hints': ''}    # only the trailer goes
 
 

@@ -14,7 +14,7 @@ measure* rather than a judgement applied case by case.
 
 ```{python}
 import numpy as np
-g = build('''distortion PHDistortion ph 0.7 note{Proportional-hazard distortion (universally understood).} tags{topic:distortion, role:intro, check:limiting-case}''')
+g = build('''distortion PHDistortion ph 0.7''')
 s = np.linspace(0, 1, 11)
 qd(pd.DataFrame({'s': s, 'g(s)': g.g(s)}).set_index('s'))
 ```

@@ -20,8 +20,7 @@ a = build('''agg OccurrenceXOL
   occurrence net of
     50% so 2500 xs 2500 and
     90% so 5000 xs 5000
-  mixed gamma 0.25
-  note{Occurrence excess-of-loss program, net view.} tags{topic:reinsurance, check:reconciliation}''')
+  mixed gamma 0.25''')
 qd(a.reins_summary_df)
 ```
 

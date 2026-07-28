@@ -64,7 +64,7 @@ class ProgramMixin:
     #: enclosing ``Aggregate`` owns the text).
     program = ''
 
-    def format_program(self, *, fmt='text', layout='spread', trailer=True):
+    def format_program(self, *, fmt='text', layout='spread', trailer=False):
         """Render :attr:`program` in canonical form, with the render axes exposed.
 
         The object-bound twin of
@@ -80,12 +80,15 @@ class ProgramMixin:
             Output markup. ``text`` is plain; the others colorize via Pygments.
         layout : {'spread', 'terse'}, default 'spread'
             Line layout. ``spread`` puts each clause on its own two-space
-            indented line; ``terse`` is the single-line-per-statement form.
-        trailer : bool, default True
-            Emit the ``note{...}`` / ``hints{...}`` trailer. ``False`` gives the
-            bare declaration --- the form to print in a paper, a docstring or an
-            exhibit. Applies through the whole tree, so a portfolio's units and
-            a bivariate's components lose theirs too.
+            indented line, the trailer clauses included; ``terse`` is the
+            single-line-per-statement form.
+        trailer : bool or iterable of str, default False
+            Emit the ``note{...}`` / ``tags{...}`` / ``hints{...}`` /
+            ``doc{{{...}}}`` trailer. The default ``False`` gives the bare
+            declaration: formatting a program is almost always about the math
+            and the insurance, not the metadata around it. ``True`` emits all
+            four; an iterable names the ones to keep. Applies through the whole
+            tree, so a portfolio's units and a bivariate's components follow.
 
         Returns
         -------
@@ -94,11 +97,11 @@ class ProgramMixin:
 
         Notes
         -----
-        ``fmt`` and ``layout`` are round-trip safe; ``trailer=False`` is not ---
-        its output re-parses to the same spec with ``note`` and ``hints``
-        blanked. The semantic ``!`` markers (unconditional severity, the
-        zero-modified mean pin, defective ``dwait``) are clause syntax rather
-        than trailer and are never suppressed.
+        ``fmt`` and ``layout`` are round-trip safe; ``trailer`` is not --- the
+        output re-parses to the same spec minus whatever was suppressed. The
+        semantic ``!`` markers (unconditional severity, the zero-modified mean
+        pin, defective ``dwait``) are clause syntax rather than trailer and are
+        never suppressed.
 
         Examples
         --------
@@ -106,9 +109,9 @@ class ProgramMixin:
         >>> a = build('agg Doc 10 claims sev lognorm 50 cv 1 poisson '
         ...           'note{a stored note}')
         >>> print(a.format_program(layout='terse'))
-        agg Doc 10 claims sev lognorm 50 cv 1 poisson note{a stored note}
-        >>> print(a.format_program(layout='terse', trailer=False))
         agg Doc 10 claims sev lognorm 50 cv 1 poisson
+        >>> print(a.format_program(layout='terse', trailer=True))
+        agg Doc 10 claims sev lognorm 50 cv 1 poisson note{a stored note}
         """
         if not self.program:
             return ''
@@ -123,13 +126,16 @@ class ProgramMixin:
         :func:`aggregate.decl_writer.format_program` (the inverse of the
         parser), so it is *canonical* rather than verbatim --- equivalent
         declarations share one form. Rendered in the default ``spread`` layout
-        (each clause on its own two-space-indented line).
+        (each clause on its own two-space-indented line) and **without the
+        trailer**: this is the declaration as a reader wants to see it, the
+        math and the insurance, not the ``note`` / ``tags`` / ``hints`` /
+        ``doc`` metadata around it.
 
-        For the raw input as supplied to ``build`` use :attr:`program`; for any
-        other layout, markup or the ``note`` / ``hints``-free form use
-        :meth:`format_program`. An object built programmatically --- and an
-        inline ``sev`` clause, whose enclosing ``Aggregate`` owns the text ---
-        returns ``''``.
+        For the raw input as supplied to ``build`` use :attr:`program`; for the
+        metadata, read ``.note`` / ``.tags`` directly, or pass ``trailer=True``
+        to :meth:`format_program`, which also exposes the layout and markup
+        axes. An object built programmatically --- and an inline ``sev``
+        clause, whose enclosing ``Aggregate`` owns the text --- returns ``''``.
         """
         return self.format_program(fmt='text')
 

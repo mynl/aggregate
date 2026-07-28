@@ -62,10 +62,11 @@ __all__ = ['Recipe', 'parse_doc', 'SECTIONS', 'DECL_PLACEHOLDER']
 #:
 #: and :attr:`Recipe.decl` -- the entry's own declaration -- is substituted in.
 #:
-#: **The substituted declaration excludes the doc** (keeping ``note`` /
-#: ``tags`` / ``hints``, which matter -- hints change how the object builds).
-#: That is what stops the doc from quoting itself: without it, expanding
-#: ``<<decl>>`` inside the doc would embed the doc inside the doc.
+#: **The substituted declaration carries ``hints{...}`` and nothing else.**
+#: Hints change how the object builds, so a program without them would not
+#: reproduce the recipe. The note, tags and doc are the surrounding page, so
+#: repeating them in the program is redundant -- and dropping the doc is also
+#: what stops it from quoting itself.
 DECL_PLACEHOLDER = '<<decl>>'
 
 #: The recognised section headings, in canonical order.
@@ -225,15 +226,19 @@ class Recipe:
 
     @property
     def decl(self):
-        """The entry's declaration rendered **without its doc**.
+        """The entry's declaration, carrying ``hints{...}`` and nothing else.
 
         What :data:`DECL_PLACEHOLDER` expands to, and what a cookbook page
         shows as "the program". Canonical (re-rendered from the spec by
         :func:`aggregate.decl_writer.format_program`, the parser's inverse)
-        rather than the verbatim :attr:`program`, and doc-free so it can appear
-        inside the doc without recursing. ``note`` / ``tags`` / ``hints`` are
-        kept -- hints change how the object builds, so a copy-pasteable program
-        needs them.
+        rather than the verbatim :attr:`program`.
+
+        ``hints`` survives because it **changes how the object builds** -- a
+        copy-pasteable program without it would not reproduce the recipe. The
+        rest of the trailer does not: inside a recipe the ``note`` is the
+        Problem, the ``tags`` are the page it sits on, and the ``doc`` is the
+        page itself, so repeating any of them in the program would be
+        redundant, and repeating the doc would make it quote itself.
 
         ``''`` when the entry cannot be unparsed (a ``minimum`` / ``mixture``
         combinator distortion references its children by name, and those
@@ -244,13 +249,13 @@ class Recipe:
         return self._decl
 
     def _render_decl(self):
-        """Re-render the declaration doc-free; '' if it cannot be unparsed."""
+        """Re-render the declaration with hints only; '' if it cannot be unparsed."""
         from .decl_writer import format_program
         if not self.kind or not isinstance(self.spec, dict):
             return ''
         try:
             return format_program((self.kind, self.name, self.spec), fmt='text',
-                                  trailer=('note', 'tags', 'hints'))
+                                  trailer=('hints',))
         except Exception:
             # A recipe for a construct the writer cannot invert simply gets no
             # <<decl>> expansion rather than failing to load at all.

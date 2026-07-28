@@ -1254,7 +1254,10 @@ pprint(a05n.spec)
 
 The `program` property returns the DecL program used to create the object. It
 is blank if the object was not created using DecL. The helper function
-`format_program` pretty prints a program.
+`format_program` pretty prints a program: each clause on its own indented
+line, and by default without the `note` / `tags` / `hints` / `doc` trailer, so
+what you see is the math and the insurance. Pass `trailer=True` to include the
+metadata, or `trailer=('hints',)` to keep only what changes the build.
 
 ```{python}
 from aggregate import format_program

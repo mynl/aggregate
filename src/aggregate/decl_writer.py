@@ -599,30 +599,40 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
 TRAILER_ITEMS = ('note', 'tags', 'hints', 'doc')
 
 
-def _render_trailer(spec: dict, trailer=True) -> str:
-    """Render the ``note`` / ``tags`` / ``hints`` / ``doc`` trailer, verbatim.
+def _render_trailer(spec: dict, trailer=True) -> list:
+    """Render the trailer as **one fragment per clause**, in render order.
+
+    Returns a list, not a joined string, so each of ``note`` / ``tags`` /
+    ``hints`` / ``doc`` becomes its own child of the enclosing
+    :class:`_Block`. That is what puts them on separate lines, each at its
+    statement's indentation level, in the ``spread`` layout; ``terse``
+    space-joins them back, so the single-line form is unchanged.
 
     ``trailer`` is ``True`` (all four), ``False`` (none), or an iterable naming
-    the items to keep --- e.g. ``('note', 'tags', 'hints')`` renders the
-    declaration *without its doc*, which is what
-    :meth:`aggregate.Underwriter.recipe` needs to expand a ``<<decl>>``
-    placeholder without the doc quoting itself.
+    the items to keep, e.g. ``('hints',)`` renders the declaration with only
+    the clause that changes how it *builds*. That is what
+    :attr:`aggregate.recipe.Recipe.decl` uses to expand a ``<<decl>>``
+    placeholder: inside a recipe the note, tags and doc are the surrounding
+    page, so repeating them in the program would be redundant, and repeating
+    the doc would make it quote itself.
 
-    Suppressing anything means the result no longer re-parses to the same spec
-    --- that is the caller's choice, made explicitly at the call site.
+    Suppressing anything means the result no longer re-parses to the same spec.
+    That is the caller's choice, made explicitly at the call site.
 
     Notes
     -----
     ``doc{{{...}}}`` is emitted last and spans lines: its opening fence ends a
     line and its closing fence sits alone on one, which is exactly the shape
     step 0 of :meth:`aggregate.parser.UnderwritingLexer.preprocess` looks for.
-    That is what makes the round trip work --- the writer emits a raw markdown
-    body, and re-parsing re-encodes it.
+    That is what makes the round trip work: the writer emits a raw markdown
+    body, and re-parsing re-encodes it. Only the fragment's *first* line is
+    indented by the layout walker, so the markdown body keeps its own column
+    positions and its fenced code blocks survive.
     """
     if trailer is True:
         wanted = TRAILER_ITEMS
     elif not trailer:
-        return ''
+        return []
     else:
         wanted = tuple(trailer)
         unknown = set(wanted) - set(TRAILER_ITEMS)
@@ -640,7 +650,7 @@ def _render_trailer(spec: dict, trailer=True) -> str:
     if 'doc' in wanted and spec.get('doc'):
         # Newline-delimited: the closing fence MUST be alone on its line.
         parts.append(f'doc{{{{{{\n{spec["doc"]}\n}}}}}}')
-    return ' '.join(parts)
+    return parts
 
 
 def _render_approx(spec: dict) -> str:
@@ -801,7 +811,9 @@ def _render_agg(name: str, spec: dict, trailer: bool = True) -> _Block:
     :class:`_Block` (head ``agg NAME``, the clauses its children) so it renders
     terse on one line or spread with each clause on its own indented line.
 
-    ``trailer=False`` drops the ``note{...}`` / ``hints{...}`` tail.
+    ``trailer=False`` drops the ``note{...}`` / ``tags{...}`` / ``hints{...}``
+    / ``doc{{{...}}}`` tail; each surviving clause is its own child, so spread
+    puts it on its own line.
     """
     return _Block(f'agg {name}{_render_label(spec.get("label"))}', [
         _render_exposure(spec),
@@ -812,7 +824,7 @@ def _render_agg(name: str, spec: dict, trailer: bool = True) -> _Block:
         _render_reins(spec, 'aggregate', 'agg_reins', 'agg_kind'),
         _render_approx(spec),
         _render_orientation(spec),
-        _render_trailer(spec, trailer),
+        *_render_trailer(spec, trailer),
     ])
 
 
@@ -882,7 +894,7 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
     return _Block(f'{keyword} {name}{obj_label} {premium_head} less', [
         engine,
         f'less {expense}' if expense else '',
-        _render_trailer(spec, trailer),
+        *_render_trailer(spec, trailer),
     ])
 
 
@@ -898,28 +910,38 @@ def _render_agg_or_pnl(kind: str, name: str, spec: dict,
     return _render_agg(name, spec, trailer)
 
 
-def _render_sev_out(name: str, spec: dict, trailer: bool = True) -> str:
-    """Render a standalone severity definition (``sev NAME ...``)."""
+def _render_sev_out(name: str, spec: dict, trailer: bool = True) -> _Block:
+    """Render a standalone severity definition (``sev NAME ...``).
+
+    The declaration is the block head (a severity has no clause nesting worth
+    spreading); the trailer clauses are its children, so ``spread`` lands each
+    on its own indented line while ``terse`` flattens to the historical single
+    line.
+    """
     body = _render_dsev(spec) if _is_dsev(spec) else _render_dist(spec)
-    return _join([f'sev {name}{_render_label(spec.get("label"))}',
-                  body, _render_trailer(spec, trailer)])
+    head = _join([f'sev {name}{_render_label(spec.get("label"))}', body])
+    return _Block(head, _render_trailer(spec, trailer))
 
 
 def _render_port(name: str, spec: dict, trailer: bool = True) -> _Block:
-    """Render a portfolio: ``port NAME [trailer]`` then one indented unit per line.
+    """Render a portfolio: ``port NAME``, its trailer, then one unit per line.
 
     Sub-units are ``agg`` / ``pnl`` tuples; each becomes a child :class:`_Block`.
     The returned block is marked ``tab=True`` so its *terse* form is the
-    historical tab-indented layout (head line, then ``\\t`` + each unit on one
-    line) byte-for-byte; spread indents the units two spaces and lets their
-    clauses spread one level deeper. Either way the preprocessor folds the
-    indented continuation back into one logical statement on re-parse.
+    historical tab-indented layout (head line, then ``\\t`` + each child on one
+    line); spread indents the children two spaces and lets the units' clauses
+    spread one level deeper. Either way the preprocessor folds the indented
+    continuation back into one logical statement on re-parse.
+
+    The portfolio's own trailer clauses come **before** the units, which is
+    where the grammar binds them: a trailer written after the last unit binds
+    to that unit instead, because the portfolio's trailer slot closes before
+    the units are read.
     """
-    head = _join([f'port {name}{_render_label(spec.get("label"))}',
-                  _render_trailer(spec, trailer)])
+    head = f'port {name}{_render_label(spec.get("label"))}'
     units = [_render_agg_or_pnl(kind, sub_name, sub_spec, trailer)
              for kind, sub_name, sub_spec in spec['spec']]
-    return _Block(head, units, tab=True)
+    return _Block(head, [*_render_trailer(spec, trailer), *units], tab=True)
 
 
 def _render_copula(copula) -> str:
@@ -965,7 +987,7 @@ def _render_bvagg(name: str, spec: dict, trailer: bool = True) -> _Block:
             _render_exposure(spec),
             _render_dbvsev(spec),
             _render_freq(spec),
-            _render_trailer(spec, trailer),
+            *_render_trailer(spec, trailer),
         ])
     if 'clash' in spec:
         # Re-derive the clash surface from the stored (na, nb, nc); each
@@ -978,7 +1000,7 @@ def _render_bvagg(name: str, spec: dict, trailer: bool = True) -> _Block:
             _join([_render_layers(sa), _render_sev_clause(sa)]),
             _join([_render_layers(sb), _render_sev_clause(sb)]),
             _render_freq(spec),
-            _render_trailer(spec, trailer),
+            *_render_trailer(spec, trailer),
         ])
 
     if spec.get('mode') == 'netceded':
@@ -998,11 +1020,11 @@ def _render_bvagg(name: str, spec: dict, trailer: bool = True) -> _Block:
         *components,
         _render_copula(spec['copula']),
         _render_freq(spec),
-        _render_trailer(spec, trailer),
+        *_render_trailer(spec, trailer),
     ])
 
 
-def _render_distortion(name: str, spec: dict, trailer: bool = True) -> str:
+def _render_distortion(name: str, spec: dict, trailer: bool = True) -> _Block:
     """Render a distortion definition (``distortion NAME kind n1 n2 ...``).
 
     Inverts ``Distortion.decl_spec``: the flat number list is recovered from the
@@ -1011,7 +1033,8 @@ def _render_distortion(name: str, spec: dict, trailer: bool = True) -> str:
     children, so they cannot round-trip and raise here.
 
     Since 1.0.0a157 a distortion carries the same trailer as every other
-    statement, so ``trailer`` is honoured rather than ignored.
+    statement, so ``trailer`` is honoured rather than ignored. Like ``sev``,
+    the declaration is the block head and the trailer clauses are its children.
     """
     from .spectral import Distortion
 
@@ -1026,8 +1049,8 @@ def _render_distortion(name: str, spec: dict, trailer: bool = True) -> str:
         raise ValueError(f"distortion {name!r}: unknown kind {kind!r}.")
     params = subclass.decl_params or (subclass.param_name,)
     numbers = ' '.join(_fmt_num(spec[p]) for p in params)
-    tail = _render_trailer(spec, trailer)
-    return f'distortion {name} {kind} {numbers}' + (f' {tail}' if tail else '')
+    return _Block(f'distortion {name} {kind} {numbers}',
+                  _render_trailer(spec, trailer))
 
 
 _KIND_RENDERERS = {
@@ -1048,12 +1071,13 @@ def _spec_to_node(spec: dict, kind: str = 'agg', name: str | None = None,
     The shared front half of :func:`spec_to_decl` (terse) and
     :func:`format_program` (either layout): it resolves the name default and the
     kind renderer, but does *not* flatten --- the caller picks the layout walker.
-    Renderers with sub-clause nesting (``agg`` / ``pnl`` / ``port`` / ``bvagg``)
-    return a :class:`_Block`; the flat ones (``sev`` / ``distortion``) return a
-    ``str``, which both walkers pass through unchanged.
+    Every renderer returns a :class:`_Block`; ``sev`` and ``distortion`` have no
+    clause nesting worth spreading, so their whole declaration is the head and
+    only the trailer clauses are children.
 
-    ``trailer=False`` drops every ``note{...}`` / ``hints{...}`` in the tree,
-    including those on a portfolio's units and a bivariate's components.
+    ``trailer=False`` drops the whole ``note`` / ``tags`` / ``hints`` / ``doc``
+    trailer throughout the tree, including on a portfolio's units and a
+    bivariate's components.
 
     Raises
     ------
@@ -1169,7 +1193,7 @@ def _render_statement(underwriter, statement: str, trailer: bool = True):
 
 
 def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
-                   trailer=True, width=None) -> str:
+                   trailer=False, width=None) -> str:
     """Render a DecL program in canonical form, optionally colorized.
 
     The public entry point backing ``pprogram`` / ``pprogram_html`` and the
@@ -1196,17 +1220,25 @@ def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
         ``to_agg`` produce. Both layouts re-parse to the same spec --- the
         preprocessor collapses intra-statement newlines and indentation to a
         single space.
-    trailer : bool, default True
-        Emit the ``note{...}`` / ``hints{...}`` trailer. They are one grammar
-        construct, so one flag governs both. ``False`` gives the bare
-        declaration --- the form to print in a paper, a docstring or an exhibit,
-        where a stored note or a build hint is noise.
+    trailer : bool or iterable of str, default False
+        Emit the ``note{...}`` / ``tags{...}`` / ``hints{...}`` /
+        ``doc{{{...}}}`` trailer. ``False`` (the default) gives the bare
+        declaration, which is what you almost always want when formatting: the
+        math and the insurance, not the metadata around it. ``True`` emits all
+        four; an iterable names the ones to keep, e.g. ``('hints',)`` for the
+        clauses that actually change how the object builds.
+
+        In ``spread`` each surviving clause takes its own line at the
+        statement's indentation level; in ``terse`` they space-join onto the
+        one line.
 
         Unlike ``fmt`` and ``layout``, this axis is **not** round-trip safe:
-        ``trailer=False`` output re-parses to the same spec *minus* ``note``
-        and ``hints``. The semantic ``!`` markers (unconditional severity, the
-        zero-modified mean pin, defective ``dwait``) are clause syntax, not
-        trailer, and are never affected.
+        the output re-parses to the same spec minus whatever was suppressed.
+        Use :func:`spec_to_decl` (which always emits the full trailer) when the
+        result has to reload identically --- that is what ``to_agg`` does. The
+        semantic ``!`` markers (unconditional severity, the zero-modified mean
+        pin, defective ``dwait``) are clause syntax, not trailer, and are never
+        affected.
     width : int, optional
         Reserved for future per-line wrapping of long clauses; currently ignored
         (``layout`` is structural --- one clause per line, not width-driven).

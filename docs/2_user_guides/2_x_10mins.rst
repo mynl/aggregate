@@ -1114,7 +1114,7 @@ The DecL Program
 ~~~~~~~~~~~~~~~~~~
 
 The ``program`` property returns the DecL program used to create the object.
-It is blank if the object was not created using DecL. The helper function :func:`format_program` pretty prints a program.
+It is blank if the object was not created using DecL. The helper function :func:`format_program` pretty prints a program: each clause on its own indented line, and by default without the ``note{...}`` / ``tags{...}`` / ``hints{...}`` / ``doc{{{...}}}`` trailer, so what you see is the math and the insurance. Pass ``trailer=True`` to include the metadata, or an iterable such as ``trailer=('hints',)`` to keep only the clauses that change how the object builds.
 
 .. ipython:: python
     :okwarning:

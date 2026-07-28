@@ -169,22 +169,57 @@ def test_doc_and_tags_round_trip_through_format_program():
     """
     program = f'{BASE} note{{abstract}} tags{{a, b}}\n    doc{{{{{{\n{HARD_DOC}}}}}}}'
     spec1 = _spec(program)
-    rendered = format_program(program, fmt='text')
+    # trailer=True is explicit: the default is False (the bare declaration is
+    # what you want nearly every time you format one), and this test is about
+    # the trailer surviving the round trip.
+    rendered = format_program(program, fmt='text', trailer=True)
     spec2 = _spec(rendered)
     assert spec2['doc'] == spec1['doc']
     assert spec2['tags'] == spec1['tags'] == ('a', 'b')
     assert spec2['note'] == spec1['note'] == 'abstract'
 
 
-def test_trailer_false_drops_all_four_clauses():
-    """One flag governs the whole trailer, doc and tags included."""
+def test_trailer_governs_all_four_clauses_and_is_off_by_default():
+    """One flag governs the whole trailer, doc and tags included.
+
+    ``False`` is the default as of 1.0.0a166: formatting a program is almost
+    always about the math and the insurance, not the metadata around it.
+    """
     a = build(f'agg TrailerOff 5 claims sev lognorm 10 cv 2 poisson '
               f'note{{n}} tags{{t}} hints{{log2=16}}', update=False)
-    bare = a.format_program(layout='terse', trailer=False)
-    for clause in ('note{', 'tags{', 'hints{', 'doc{{{'):
-        assert clause not in bare
-    full = a.format_program(layout='terse')
+    for bare in (a.format_program(layout='terse', trailer=False),
+                 a.format_program(layout='terse')):          # same thing
+        for clause in ('note{', 'tags{', 'hints{', 'doc{{{'):
+            assert clause not in bare
+    full = a.format_program(layout='terse', trailer=True)
     assert 'note{n}' in full and 'tags{t}' in full
+    # and an explicit subset keeps only what it names
+    hinted = a.format_program(layout='terse', trailer=('hints',))
+    assert 'hints{log2=16}' in hinted
+    assert 'note{' not in hinted and 'tags{' not in hinted
+
+
+def test_spread_puts_each_trailer_clause_on_its_own_line():
+    """Each of note / tags / hints / doc is its own clause, so its own line."""
+    a = build('agg TrailerLines 5 claims sev lognorm 10 cv 2 poisson '
+              'note{n} tags{t} hints{log2=16}', update=False)
+    lines = a.format_program(trailer=True).split('\n')
+    assert '  note{n}' in lines
+    assert '  tags{t}' in lines
+    assert '  hints{log2=16}' in lines
+
+
+def test_sev_and_distortion_indent_their_trailer_too():
+    """A flat statement still spreads its trailer under the declaration."""
+    for prog, head in (
+            ('sev TrailerSev lognorm 10 cv 1 note{s} tags{topic:severity}',
+             'sev TrailerSev lognorm 10 cv 1'),
+            ('dist TrailerDist ph 0.7 note{d} tags{topic:distortion}',
+             'distortion TrailerDist ph 0.7')):
+        lines = format_program(prog, trailer=True).split('\n')
+        assert lines[0] == head
+        assert lines[1].startswith('  note{')
+        assert lines[2].startswith('  tags{')
 
 
 # ----------------------------------------------------------------------
@@ -200,8 +235,9 @@ def test_distortion_carries_a_trailer():
     assert d.note == 'proportional hazard'
     assert d.tags == ('distortion', 'hero')
     assert d.doc == ''
-    assert 'note{proportional hazard}' in d.pprogram
-    assert 'tags{distortion, hero}' in d.pprogram
+    full = d.format_program(trailer=True)
+    assert 'note{proportional hazard}' in full
+    assert 'tags{distortion, hero}' in full
 
 
 def test_aggregate_carries_tags_and_doc():

@@ -2203,20 +2203,31 @@ class Underwriter(HelpMixin):
         DataFrame. Pass ``plot=True`` or ``describe=True`` to build each match
         and visualize/describe it.
 
+        ``kind`` is the **type** filter and ``tags`` the **subject** filter.
+        They are independent axes on purpose: library tags never restate an
+        entry's own kind (an ``aggregate`` tag on an ``agg`` entry would say
+        nothing ``kind='agg'`` does not), so an ``agg`` demonstrating a
+        severity form is ``kind='agg'`` *and* ``tags='topic:severity'``.
+
         Examples::
 
-            build.discover()                        # all entries
-            build.discover('Dice')                   # name contains "Dice"
-            build.discover(tags='hero')              # the landing-page heroes
-            build.discover(tags='severity reference')  # BOTH tags
-            build.discover('Dice', plot=True)        # build + plot
-            build.discover(tags='distortion', describe=True)
+            build.discover()                          # all entries
+            build.discover('Dice')                     # name contains "Dice"
+            build.discover(kind='sev')                 # by TYPE
+            build.discover(tags='role:hero')           # by SUBJECT/standing
+            build.discover(tags='topic:severity role:reference')   # BOTH tags
+            build.discover(kind='agg', tags='topic:severity')      # both axes
+            build.discover('Dice', plot=True)          # build + plot
+            build.discover(tags='topic:distortion', describe=True)
 
         :param regex: filter on the knowledge index (name); '' matches all.
-        :param kind: optional filter ('agg', 'sev', 'port', 'distortion'); '' matches all.
+        :param kind: optional filter ('agg', 'sev', 'port', 'distortion'); ''
+            matches all. **This is how you filter by type** -- there is no
+            type tag.
         :param tags: one or more tag slugs (comma- and/or space-separated). An
             entry matches when it carries **every** tag given, so tags narrow
-            rather than widen. '' matches all.
+            rather than widen. '' matches all. Shipped tags are namespaced
+            ``topic:`` / ``role:`` / ``check:`` (plus the bare ``slow``).
         :param plot: build each match and call its ``.plot()``.
         :param describe: build each match and ``qd()`` its summary table.
         :param return_objects: when building, also return the list of built

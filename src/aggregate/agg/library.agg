@@ -35,14 +35,32 @@
 #                   an entry documents and tests itself. Closing fence
 #                   must be alone on its line.
 #
-# TAG VOCABULARY
-#   domain    severity frequency aggregate reinsurance pnl portfolio
-#             distortion bivariate bounds ruin numerics
-#   role      hero intro reference paper
-#   check     check:reconciliation check:scaling-sweep
-#             check:independent-oracle check:limiting-case
-#             check:round-trip check:cross-object
-#   cost      slow
+# TAG VOCABULARY -- namespaced, and it never restates the object's TYPE.
+#
+# Type is what `kind` is for: build.discover(kind='sev') finds every severity
+# object. A tag saying `severity` on a `sev` entry would be dead weight, and
+# would invite "why does type appear twice, which do I use?". So every tag
+# carries a namespace and answers a question `kind` cannot:
+#
+#   topic:X   what the recipe is ABOUT -- severity frequency aggregate
+#             reinsurance pnl portfolio distortion bivariate bounds ruin
+#             numerics. Independent of type: an `agg` entry demonstrating a
+#             severity form is topic:severity, and that is not a restatement.
+#   role:X    where it stands -- hero (landing page) intro (teaching order)
+#             reference (a lookup table entry) paper (reproduces a published
+#             result).
+#   check:X   which invariant the doc's Check asserts -- reconciliation
+#             scaling-sweep independent-oracle limiting-case round-trip
+#             cross-object.
+#   slow      the ONE bare tag, deliberately: it names a pytest marker
+#             (tests/test_library_recipes.py maps it to @pytest.mark.slow),
+#             not a property of the subject.
+#
+# Enforced by tests/test_agg_libraries.py -- a bare, un-namespaced tag fails.
+#
+#   build.discover(kind='sev')                        # by type
+#   build.discover(tags='topic:severity')             # by subject
+#   build.discover(kind='agg', tags='topic:severity') # both
 #
 # PLACEMENT: on a `port`, the trailer goes on the `port` header line --
 # a trailer written after the last unit binds to that unit, because the
@@ -58,8 +76,8 @@
 # Shared building blocks -- referenced by name from entries below.
 # Builtin references resolve by sequential load, so these come first.
 # ----------------------------------------------------------------------
-dist DualDistortion dual 2.5 note{Dual-power distortion; the second leaf for the minimum below.} tags{distortion};
-dist PHDistortion ph 0.7 note{Proportional-hazard distortion (universally understood).} tags{distortion, intro, check:limiting-case}
+dist DualDistortion dual 2.5 note{Dual-power distortion; the second leaf for the minimum below.} tags{topic:distortion};
+dist PHDistortion ph 0.7 note{Proportional-hazard distortion (universally understood).} tags{topic:distortion, role:intro, check:limiting-case}
 doc{{{
 ## Problem
 
@@ -103,15 +121,15 @@ assert np.all(np.diff(gs, 2) <= 1e-9)
 assert np.all(gs >= s - 1e-12)
 ```
 }}};
-sev UnitSeverity dsev [1] tags{severity};
+sev UnitSeverity dsev [1] tags{topic:severity};
 
 # ----------------------------------------------------------------------
 # Showcase -- realistic books
 # ----------------------------------------------------------------------
-agg CatXOLTower 1.74 claims sev lognorm 8.501 cv 14.624 occurrence net of 90% po 200 xs 200 and 95% po 400 xs 400 poisson hints{bs=2;log2=16;normalize=False;} note{ILW model on US Cat, amounts in billions.} tags{hero, reinsurance};
-bivariate CopulaWindFlood 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson note{Gumbel-copula dependence between Wind and Flood.} tags{hero, bivariate};
-agg ExposureRating [100 200 1000 50] premium  at [.9 .85 .9 .8] lr [250 500 1000 2000] xs 0 sev lognorm 120 cv 12 occurrence ceded to 750 xs 750 mixed gamma .2 note{Exposure rating on a small portfolio with limits profile, amounts in 000s.} tags{hero, aggregate};
-agg LimitProfile [1000 2000 500] prem at [.8 .7 .5] lr [1000 2000 5000] xs 0 sev lognorm 50 cv 1.5 poisson note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.} tags{hero, aggregate, check:reconciliation}
+agg CatXOLTower 1.74 claims sev lognorm 8.501 cv 14.624 occurrence net of 90% po 200 xs 200 and 95% po 400 xs 400 poisson hints{bs=2;log2=16;normalize=False;} note{ILW model on US Cat, amounts in billions.} tags{role:hero, topic:reinsurance};
+bivariate CopulaWindFlood 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson note{Gumbel-copula dependence between Wind and Flood.} tags{role:hero, topic:bivariate};
+agg ExposureRating [100 200 1000 50] premium  at [.9 .85 .9 .8] lr [250 500 1000 2000] xs 0 sev lognorm 120 cv 12 occurrence ceded to 750 xs 750 mixed gamma .2 note{Exposure rating on a small portfolio with limits profile, amounts in 000s.} tags{role:hero, topic:aggregate};
+agg LimitProfile [1000 2000 500] prem at [.8 .7 .5] lr [1000 2000 5000] xs 0 sev lognorm 50 cv 1.5 poisson note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.} tags{role:hero, topic:aggregate, check:reconciliation}
 doc{{{
 ## Problem
 
@@ -163,81 +181,81 @@ assert abs(a.est_m / a.actual_m - 1) < 1e-6
 assert abs(a.n * a.sev_m - a.actual_m) < 1e-6
 ```
 }}};
-port PropertyCasualty tags{hero, portfolio} note{Portfolio of property and casualty risks, amounts in 000s.} agg Casualty 5000 premium at 90% lr 5000 xs 0 sev lognorm 200 cv 8 mixed gamma .45 agg Property 4000 premium at 85% lr 10000 xs 0 sev lognorm 250 cv 12 mixed gamma .15;
-agg TweedieBook 25 claims sev gamma 1 cv .05 poisson note{Tweedie - Poisson sum of gammas. Extreme case, severity has low CV.} tags{hero, aggregate};
-port TwoLineBook tags{hero, portfolio} agg Property 80 claims  500 xs 0 sev lognorm  50 cv 1.2 poisson agg Casualty 20 claims 2000 xs 0 sev lognorm 250 cv 2.0 mixed gamma 0.4 note{Two-unit book: thin property + mixed-frequency casualty. Capital and price downstream.};
+port PropertyCasualty tags{role:hero, topic:portfolio} note{Portfolio of property and casualty risks, amounts in 000s.} agg Casualty 5000 premium at 90% lr 5000 xs 0 sev lognorm 200 cv 8 mixed gamma .45 agg Property 4000 premium at 85% lr 10000 xs 0 sev lognorm 250 cv 12 mixed gamma .15;
+agg TweedieBook 25 claims sev gamma 1 cv .05 poisson note{Tweedie - Poisson sum of gammas. Extreme case, severity has low CV.} tags{role:hero, topic:aggregate};
+port TwoLineBook tags{role:hero, topic:portfolio} agg Property 80 claims  500 xs 0 sev lognorm  50 cv 1.2 poisson agg Casualty 20 claims 2000 xs 0 sev lognorm 250 cv 2.0 mixed gamma 0.4 note{Two-unit book: thin property + mixed-frequency casualty. Capital and price downstream.};
 
 # ----------------------------------------------------------------------
 # Frequency
 # ----------------------------------------------------------------------
-agg BasicPoissonSev dfreq [1:3] [.5 1/4 1/4] dsev [1 2 10] [.4 .4 .2] note{1, 2 or 3 claims; severity 1, 2 or 10 each with specified probabilities } tags{frequency};
-agg BernoulliFrequency .8 claims sev.UnitSeverity bernoulli note{Bernoulli claim count} tags{frequency};
-agg BinomialFrequency 10 claims dsev [1] binomial 0.5 note{Bounded claim count -- binomial (here n = 20, p = 0.5).} tags{frequency};
-agg BinomialSimple 10 claims sev.UnitSeverity binomial 0.5 note{binomial n=10, p=1/2 claim count} tags{frequency};
-agg FixedFrequency 10 claims sev.UnitSeverity fixed note{fixed claim count} tags{frequency};
-agg GeometricFrequency 10 claims sev.UnitSeverity geometric note{geometric claim count} tags{frequency};
-agg MixedGammaFrequency 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 mixed gamma 0.4 note{Same severity, over-dispersed counts (gamma-mixed Poisson = negative binomial).} tags{frequency};
-agg MixedSeverityAndFrequency [5 10 8 2] claims [1 5 10 20] xs 0 sev lognorm 10 cv 1.2 mixed gamma 0.2 note{Limit profile, single severity.} tags{severity, frequency};
-agg NegativeBinomialFrequency 10 claims sev.UnitSeverity negbin 3 note{negative binomial; shape parameter 3 equals variance multiplier} tags{frequency};
-agg NegativeBinomialMixed 10 claims sev.UnitSeverity mixed gamma 0.65 note{negative binomial as gamma mixed Poisson, shape parameter equals cv of mixing distribution} tags{frequency};
-agg PoissonFrequency 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson note{Poisson frequency -- the no-contagion baseline.} tags{frequency, intro};
-agg PoissonSimple 10 claims sev.UnitSeverity poisson note{Poisson claim count} tags{frequency};
-agg ZMPoissonFrequency 4 claims dsev [1] poisson zm 0.5 note{Zero-modified Poisson -- inflate the no-claim probability to 0.5. The 4 is the UN-MODIFIED base mean; reweighting leaves E[N] = 2.0373. Append ! to pin E[N] = 4 instead.} tags{frequency};
-agg ZMPoissonSimple 4 claims dsev [1] poisson zt note{zero truncated Poisson with mean 4} tags{frequency};
-agg ZTPoissonFrequency 4 claims dsev [1] poisson zt note{Zero-truncated Poisson -- at least one claim, so E[N] = 4/(1-exp(-4)) = 4.0746.} tags{frequency};
-agg ZTPoissonSimple 4 claims dsev [1] poisson zm .5 note{zero modified Poisson} tags{frequency};
+agg BasicPoissonSev dfreq [1:3] [.5 1/4 1/4] dsev [1 2 10] [.4 .4 .2] note{1, 2 or 3 claims; severity 1, 2 or 10 each with specified probabilities } tags{topic:frequency};
+agg BernoulliFrequency .8 claims sev.UnitSeverity bernoulli note{Bernoulli claim count} tags{topic:frequency};
+agg BinomialFrequency 10 claims dsev [1] binomial 0.5 note{Bounded claim count -- binomial (here n = 20, p = 0.5).} tags{topic:frequency};
+agg BinomialSimple 10 claims sev.UnitSeverity binomial 0.5 note{binomial n=10, p=1/2 claim count} tags{topic:frequency};
+agg FixedFrequency 10 claims sev.UnitSeverity fixed note{fixed claim count} tags{topic:frequency};
+agg GeometricFrequency 10 claims sev.UnitSeverity geometric note{geometric claim count} tags{topic:frequency};
+agg MixedGammaFrequency 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 mixed gamma 0.4 note{Same severity, over-dispersed counts (gamma-mixed Poisson = negative binomial).} tags{topic:frequency};
+agg MixedSeverityAndFrequency [5 10 8 2] claims [1 5 10 20] xs 0 sev lognorm 10 cv 1.2 mixed gamma 0.2 note{Limit profile, single severity.} tags{topic:severity, topic:frequency};
+agg NegativeBinomialFrequency 10 claims sev.UnitSeverity negbin 3 note{negative binomial; shape parameter 3 equals variance multiplier} tags{topic:frequency};
+agg NegativeBinomialMixed 10 claims sev.UnitSeverity mixed gamma 0.65 note{negative binomial as gamma mixed Poisson, shape parameter equals cv of mixing distribution} tags{topic:frequency};
+agg PoissonFrequency 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson note{Poisson frequency -- the no-contagion baseline.} tags{topic:frequency, role:intro};
+agg PoissonSimple 10 claims sev.UnitSeverity poisson note{Poisson claim count} tags{topic:frequency};
+agg ZMPoissonFrequency 4 claims dsev [1] poisson zm 0.5 note{Zero-modified Poisson -- inflate the no-claim probability to 0.5. The 4 is the UN-MODIFIED base mean; reweighting leaves E[N] = 2.0373. Append ! to pin E[N] = 4 instead.} tags{topic:frequency};
+agg ZMPoissonSimple 4 claims dsev [1] poisson zt note{zero truncated Poisson with mean 4} tags{topic:frequency};
+agg ZTPoissonFrequency 4 claims dsev [1] poisson zt note{Zero-truncated Poisson -- at least one claim, so E[N] = 4/(1-exp(-4)) = 4.0746.} tags{topic:frequency};
+agg ZTPoissonSimple 4 claims dsev [1] poisson zm .5 note{zero modified Poisson} tags{topic:frequency};
 
 # ----------------------------------------------------------------------
 # Severity
 # ----------------------------------------------------------------------
-sev MixedExponentialSev [10 50 200] * expon wts [.6 .3 .1] note{Mixed exponential (ISO/Verisk style). Can't stand alone as a Sev -- fold it into an agg.} tags{severity};
-agg MixedSeverityProfile [1000 2000 500] prem at [.8 .7 .5] lr sev lognorm 10 cv [.35 .5] wts [5/8 3/8] mixed gamma 0.5 note{Mixed exposure, severity, and frequency -- shared mixing shows up in stats_df.} tags{severity};
-sev ParetoSev 1000 * pareto 1.8 - 1000 note{Single-parameter Pareto large-loss curve (scale 1000, shape 1.8), shifted to ground-up.} tags{severity};
-agg SevAttached 5 claims 200 xs 0 sev 1.2343e2 * lognorm 2 ! poisson note{unconditional severity} tags{severity};
-agg SevBlend [1000 2000 500] prem at [.8 .7 .5] lr sev lognorm 10 cv [.35 .5] wts [5/8 3/8] mixed gamma 0.5 note{limit profile and mixed severity} hints{log2=17;} tags{severity};
-agg SevExponential 1 claim sev 10 * pareto 2.6 - 10 fixed note{Standard Pareto, support >= 0} tags{severity};
-agg SevGammaCV 1 claim sev 100 * invgamma 4.07 fixed note{remember must set scale or mean} tags{severity};
-agg SevLayered 5 claims 200 xs 0 sev 1.2343e2 * lognorm 2 poisson note{conditional severity} tags{severity};
-agg SevLayeredUnconditional 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2 ! poisson note{unconditional severity} tags{severity};
-agg SevLognormCV 1 claim sev lognorm 50 cv .3 fixed note{lognormal by mean and cv} tags{severity};
-agg SevMixture 8 claims sev 100 * [lognorm expon] [.5 1] wts [0.6 .4] mixed gamma 0.3 note{mixture of severities} tags{severity};
-agg SevOneParameter 1 claim sev 10 * gamma 0.3 fixed note{scaled gamma with shape} tags{severity};
-agg SevOneParameterScaled 1 claim sev gamma 12 cv .3 fixed note{gamma by mean and cv} tags{severity};
-agg SevPareto 1 claim sev 100 * weibull_min 1.5 fixed tags{severity};
-agg SevReversed 1 claim sev 50/exp(.3**2/2) * lognorm .3 fixed note{mean equals 50 and cv is slightly higher than .3} tags{severity};
-agg SevScaled 1 claim sev 100 * expon + 10 fixed note{scaled and shifted exponential} tags{severity};
-agg SevShifted 1 claim ssev 100 * norm + 50 fixed note{signed severity, scaled and shifted normal} tags{severity};
-agg SevSpliced 1 claim sev lognorm 10 cv .5 splice [5 20] fixed note{lognormal conditional on 5 <= X <= 20} tags{severity};
-agg SevTwoParameter 1 claim sev 50 * beta 3 2 + 10 fixed note{50*beta(3,2) + 10} tags{severity};
-agg SevUnconditional 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2 poisson note{conditional severity} tags{severity};
-agg SevWeibull 1 claim sev invgauss 10 cv .5 fixed tags{severity};
-agg SevZeroParameter 1 claim sev 100 * expon fixed note{scaled exponential} tags{severity};
+sev MixedExponentialSev [10 50 200] * expon wts [.6 .3 .1] note{Mixed exponential (ISO/Verisk style). Can't stand alone as a Sev -- fold it into an agg.} tags{topic:severity};
+agg MixedSeverityProfile [1000 2000 500] prem at [.8 .7 .5] lr sev lognorm 10 cv [.35 .5] wts [5/8 3/8] mixed gamma 0.5 note{Mixed exposure, severity, and frequency -- shared mixing shows up in stats_df.} tags{topic:severity};
+sev ParetoSev 1000 * pareto 1.8 - 1000 note{Single-parameter Pareto large-loss curve (scale 1000, shape 1.8), shifted to ground-up.} tags{topic:severity};
+agg SevAttached 5 claims 200 xs 0 sev 1.2343e2 * lognorm 2 ! poisson note{unconditional severity} tags{topic:severity};
+agg SevBlend [1000 2000 500] prem at [.8 .7 .5] lr sev lognorm 10 cv [.35 .5] wts [5/8 3/8] mixed gamma 0.5 note{limit profile and mixed severity} hints{log2=17;} tags{topic:severity};
+agg SevExponential 1 claim sev 10 * pareto 2.6 - 10 fixed note{Standard Pareto, support >= 0} tags{topic:severity};
+agg SevGammaCV 1 claim sev 100 * invgamma 4.07 fixed note{remember must set scale or mean} tags{topic:severity};
+agg SevLayered 5 claims 200 xs 0 sev 1.2343e2 * lognorm 2 poisson note{conditional severity} tags{topic:severity};
+agg SevLayeredUnconditional 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2 ! poisson note{unconditional severity} tags{topic:severity};
+agg SevLognormCV 1 claim sev lognorm 50 cv .3 fixed note{lognormal by mean and cv} tags{topic:severity};
+agg SevMixture 8 claims sev 100 * [lognorm expon] [.5 1] wts [0.6 .4] mixed gamma 0.3 note{mixture of severities} tags{topic:severity};
+agg SevOneParameter 1 claim sev 10 * gamma 0.3 fixed note{scaled gamma with shape} tags{topic:severity};
+agg SevOneParameterScaled 1 claim sev gamma 12 cv .3 fixed note{gamma by mean and cv} tags{topic:severity};
+agg SevPareto 1 claim sev 100 * weibull_min 1.5 fixed tags{topic:severity};
+agg SevReversed 1 claim sev 50/exp(.3**2/2) * lognorm .3 fixed note{mean equals 50 and cv is slightly higher than .3} tags{topic:severity};
+agg SevScaled 1 claim sev 100 * expon + 10 fixed note{scaled and shifted exponential} tags{topic:severity};
+agg SevShifted 1 claim ssev 100 * norm + 50 fixed note{signed severity, scaled and shifted normal} tags{topic:severity};
+agg SevSpliced 1 claim sev lognorm 10 cv .5 splice [5 20] fixed note{lognormal conditional on 5 <= X <= 20} tags{topic:severity};
+agg SevTwoParameter 1 claim sev 50 * beta 3 2 + 10 fixed note{50*beta(3,2) + 10} tags{topic:severity};
+agg SevUnconditional 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2 poisson note{conditional severity} tags{topic:severity};
+agg SevWeibull 1 claim sev invgauss 10 cv .5 fixed tags{topic:severity};
+agg SevZeroParameter 1 claim sev 100 * expon fixed note{scaled exponential} tags{topic:severity};
 
 # ----------------------------------------------------------------------
 # Aggregates
 # ----------------------------------------------------------------------
-agg BasicBook 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson note{Plain Poisson / lognormal aggregate -- the workhorse compound distribution.} tags{aggregate, intro};
-agg BasicDfreq dfreq [1:3] dsev [1 2 10] note{1, 2 or 3 claims using range notation, sev 1, 2, 10 all equally likely} tags{aggregate};
-agg BasicFixedOne dfreq [12] dsev [0 1] note{toss of 12 coins} tags{aggregate};
-agg BasicFixedTwo dfreq [12] dsev [-1 1] note{12 step random walk} tags{aggregate};
-agg BasicLognormal 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 poisson note{A plain Poisson / lognormal aggregate.} tags{aggregate, intro};
-agg BasicMixedSev dfreq [0 1 2] [.5 .3 .2] sev.UnitSeverity note{Using a built in severity} tags{aggregate};
-agg DiceOfDice dfreq [1:6] dsev [1:6] note{Roll a die for the claim count, then sum that many die rolls.} tags{aggregate};
-agg DiceOneDie dfreq [1] dsev [1:6] note{The roll of a single dice as severity.} tags{aggregate, intro};
-agg DiceOneRoll dfreq [1:6] dsev [1] note{The roll of a single dice as frequency.} tags{aggregate};
-agg DiceThreeDice dfreq [5] dsev [1:6] note{Sum of the rolls of five dice.} tags{aggregate};
-agg DiceTwoDice dfreq [2] dsev [1:6] note{Sum of the rolls of two dice.} tags{aggregate};
-agg DiscreteBook dfreq[1 2 3 4 5 6 7 20] dsev [-10 -5 -2 -1 0 1 2 3] [1/16 1/16 1/8 1/8 1/8 1/4 1/8 1/8] note{Discrete example with signed severity; empirical distributions can be used directly!} tags{aggregate};
-agg DiscreteSimple dfreq [1 2 3] [.5 .3 .2] dsev [2:10:2] note{Explicit [outcomes] [probs] frequency; severity on the stepped grid 2, 4, 6, 8, 10.} tags{aggregate, intro};
-agg ExactGamma 5000 claim sev lognorm 100 cv 2 poisson note{Exact computation} tags{aggregate};
-agg ExposureByClaimCount 10 claims sev lognorm 50 cv 0.8 poisson note{specify number of claims} tags{aggregate};
-agg ExposureByLoss 500 loss sev lognorm 50 cv 0.8 poisson note{State expected loss; the claim count is derived.} tags{aggregate};
-agg ExposureByLossVector 1000 prem at .5 lr sev lognorm 50 cv 0.8 poisson note{specify premium and loss ratio, derive number of claims} tags{aggregate};
-agg ExposureByPremium 500 loss sev lognorm 50 cv 0.8 poisson note{specify expected loss, derive number of claims} tags{aggregate};
-agg InverseGaussianMixed 10 claims sev.UnitSeverity mixed ig .65 note{inverse Gaussian mixing distribution} tags{aggregate};
-agg LimitProfileSimple [5 10 8 2] claims [1 5 10 20] xs 0 sev lognorm 10 cv 1.2 mixed gamma 0.2 note{limit profile, single severity} tags{aggregate};
-agg PremiumMinusLoss 5000 claims ssev 100 - lognorm 80 cv .2 poisson note{High-frequency premium-minus-loss payoff -- near-Gaussian on a signed window.} tags{aggregate};
-agg ThreeDice dfreq [3] dsev [1:6] note{Sum of three dice -- exact discrete aggregate; zero validation error.} tags{aggregate, intro, check:independent-oracle}
+agg BasicBook 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson note{Plain Poisson / lognormal aggregate -- the workhorse compound distribution.} tags{topic:aggregate, role:intro};
+agg BasicDfreq dfreq [1:3] dsev [1 2 10] note{1, 2 or 3 claims using range notation, sev 1, 2, 10 all equally likely} tags{topic:aggregate};
+agg BasicFixedOne dfreq [12] dsev [0 1] note{toss of 12 coins} tags{topic:aggregate};
+agg BasicFixedTwo dfreq [12] dsev [-1 1] note{12 step random walk} tags{topic:aggregate};
+agg BasicLognormal 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 poisson note{A plain Poisson / lognormal aggregate.} tags{topic:aggregate, role:intro};
+agg BasicMixedSev dfreq [0 1 2] [.5 .3 .2] sev.UnitSeverity note{Using a built in severity} tags{topic:aggregate};
+agg DiceOfDice dfreq [1:6] dsev [1:6] note{Roll a die for the claim count, then sum that many die rolls.} tags{topic:aggregate};
+agg DiceOneDie dfreq [1] dsev [1:6] note{The roll of a single dice as severity.} tags{topic:aggregate, role:intro};
+agg DiceOneRoll dfreq [1:6] dsev [1] note{The roll of a single dice as frequency.} tags{topic:aggregate};
+agg DiceThreeDice dfreq [5] dsev [1:6] note{Sum of the rolls of five dice.} tags{topic:aggregate};
+agg DiceTwoDice dfreq [2] dsev [1:6] note{Sum of the rolls of two dice.} tags{topic:aggregate};
+agg DiscreteBook dfreq[1 2 3 4 5 6 7 20] dsev [-10 -5 -2 -1 0 1 2 3] [1/16 1/16 1/8 1/8 1/8 1/4 1/8 1/8] note{Discrete example with signed severity; empirical distributions can be used directly!} tags{topic:aggregate};
+agg DiscreteSimple dfreq [1 2 3] [.5 .3 .2] dsev [2:10:2] note{Explicit [outcomes] [probs] frequency; severity on the stepped grid 2, 4, 6, 8, 10.} tags{topic:aggregate, role:intro};
+agg ExactGamma 5000 claim sev lognorm 100 cv 2 poisson note{Exact computation} tags{topic:aggregate};
+agg ExposureByClaimCount 10 claims sev lognorm 50 cv 0.8 poisson note{specify number of claims} tags{topic:aggregate};
+agg ExposureByLoss 500 loss sev lognorm 50 cv 0.8 poisson note{State expected loss; the claim count is derived.} tags{topic:aggregate};
+agg ExposureByLossVector 1000 prem at .5 lr sev lognorm 50 cv 0.8 poisson note{specify premium and loss ratio, derive number of claims} tags{topic:aggregate};
+agg ExposureByPremium 500 loss sev lognorm 50 cv 0.8 poisson note{specify expected loss, derive number of claims} tags{topic:aggregate};
+agg InverseGaussianMixed 10 claims sev.UnitSeverity mixed ig .65 note{inverse Gaussian mixing distribution} tags{topic:aggregate};
+agg LimitProfileSimple [5 10 8 2] claims [1 5 10 20] xs 0 sev lognorm 10 cv 1.2 mixed gamma 0.2 note{limit profile, single severity} tags{topic:aggregate};
+agg PremiumMinusLoss 5000 claims ssev 100 - lognorm 80 cv .2 poisson note{High-frequency premium-minus-loss payoff -- near-Gaussian on a signed window.} tags{topic:aggregate};
+agg ThreeDice dfreq [3] dsev [1:6] note{Sum of three dice -- exact discrete aggregate; zero validation error.} tags{topic:aggregate, role:intro, check:independent-oracle}
 doc{{{
 ## Problem
 
@@ -274,20 +292,20 @@ assert abs(a.density_df.loc[3, 'p_total'] - (1 / 6) ** 3) < 1e-12
 assert abs(a.density_df.loc[18, 'p_total'] - (1 / 6) ** 3) < 1e-12
 ```
 }}};
-agg ThreeDiceSum dfreq [3] dsev [1:6] note{Sum of the rolls of three dice.} tags{aggregate};
-agg TweedieCompound tweedie 1 1.005 0.1 note{Tweedie by mean, power p, and dispersion (variance = dispersion * mean**p).} tags{aggregate};
-agg TweedieDirect 10.050251256281404 claims sev gamma 0.0995 cv 0.07088812050083283 poisson note{Tweedie defined by claim count, gamma mean and cv} tags{aggregate};
-agg TweedieDispersion tweedie 1 1.005 0.1 note{Tweedie defined using mean, p, and dispersion, variance = dispersion xs mean**p} tags{aggregate};
-agg TweedieFromMoments 10.050251256281404 claims sev 0.0005 * gamma 199 poisson note{Tweedie defined by claim count, gamma scale and shape} tags{aggregate};
-agg TweedieSimple tweedie 1 1.005 0.1 note{Tweedie via mean, p, dispersion; variance = dispersion * mean**p.} tags{aggregate};
+agg ThreeDiceSum dfreq [3] dsev [1:6] note{Sum of the rolls of three dice.} tags{topic:aggregate};
+agg TweedieCompound tweedie 1 1.005 0.1 note{Tweedie by mean, power p, and dispersion (variance = dispersion * mean**p).} tags{topic:aggregate};
+agg TweedieDirect 10.050251256281404 claims sev gamma 0.0995 cv 0.07088812050083283 poisson note{Tweedie defined by claim count, gamma mean and cv} tags{topic:aggregate};
+agg TweedieDispersion tweedie 1 1.005 0.1 note{Tweedie defined using mean, p, and dispersion, variance = dispersion xs mean**p} tags{topic:aggregate};
+agg TweedieFromMoments 10.050251256281404 claims sev 0.0005 * gamma 199 poisson note{Tweedie defined by claim count, gamma scale and shape} tags{topic:aggregate};
+agg TweedieSimple tweedie 1 1.005 0.1 note{Tweedie via mean, p, dispersion; variance = dispersion * mean**p.} tags{topic:aggregate};
 
 # ----------------------------------------------------------------------
 # Reinsurance
 # ----------------------------------------------------------------------
-agg AggregateStopLoss 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson aggregate net of 5000 xs 30000 note{Aggregate stop-loss -- net of an annual 5000-xs-30000 layer.} tags{reinsurance};
-agg BasicXOL 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Occurrence excess-of-loss program, net view.} tags{reinsurance};
-agg CededLayer 1250 premium at 80% lr 1000 xs 0 sev lognorm 80 cv 1.675 occurrence ceded to 125 xs 0 and 50% po 125 xs 125 and 20% po 250 xs 250 and 5% po 500 xs 500 poisson note{Layered occurrence reinsurance tower, ceded view.} tags{reinsurance};
-agg OccurrenceXOL 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Occurrence excess-of-loss program, net view.} tags{reinsurance, check:reconciliation}
+agg AggregateStopLoss 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson aggregate net of 5000 xs 30000 note{Aggregate stop-loss -- net of an annual 5000-xs-30000 layer.} tags{topic:reinsurance};
+agg BasicXOL 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Occurrence excess-of-loss program, net view.} tags{topic:reinsurance};
+agg CededLayer 1250 premium at 80% lr 1000 xs 0 sev lognorm 80 cv 1.675 occurrence ceded to 125 xs 0 and 50% po 125 xs 125 and 20% po 250 xs 250 and 5% po 500 xs 500 poisson note{Layered occurrence reinsurance tower, ceded view.} tags{topic:reinsurance};
+agg OccurrenceXOL 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Occurrence excess-of-loss program, net view.} tags{topic:reinsurance, check:reconciliation}
 doc{{{
 ## Problem
 
@@ -342,138 +360,138 @@ assert abs(ex[('net', 'freq')] - ex[('gross', 'freq')]) < 1e-9
 assert abs(ex[('ceded', 'freq')] - ex[('gross', 'freq')]) < 1e-9
 ```
 }}};
-agg ReinsuranceAggregateLayer 5 claims 120 xs 0 sev 120 * uniform poisson aggregate net of 100 xs 240 note{aggregate reinsurance} tags{reinsurance};
-agg ReinsuranceLayered 1250 premium at 80% lr 1000 xs 0 sev lognorm 80 cv 1.675 occurrence ceded to 125 xs 0 and 50% po 125 xs 125 and 20% po 250 xs 250 and 5% po 500 xs 500 poisson note{Layered occurrence reinsurance, ceded view.} tags{reinsurance};
-agg ReinsuranceOccurrenceTower 5 claims 120 xs 0 sev 120 * uniform occurrence net of 50% so 25 xs 25 and 90% po 50 xs 50 poisson note{occurrence reinsurance; note over the top exposure} tags{reinsurance};
-agg ReinsuranceOccurrenceWithAggLimit 5 claims 120 xs 0 sev 120 * uniform occurrence ceded to 60 xs 60 poisson aggregate ceded to 180 xs 0 note{occurrence with an aggregate limit} tags{reinsurance};
+agg ReinsuranceAggregateLayer 5 claims 120 xs 0 sev 120 * uniform poisson aggregate net of 100 xs 240 note{aggregate reinsurance} tags{topic:reinsurance};
+agg ReinsuranceLayered 1250 premium at 80% lr 1000 xs 0 sev lognorm 80 cv 1.675 occurrence ceded to 125 xs 0 and 50% po 125 xs 125 and 20% po 250 xs 250 and 5% po 500 xs 500 poisson note{Layered occurrence reinsurance, ceded view.} tags{topic:reinsurance};
+agg ReinsuranceOccurrenceTower 5 claims 120 xs 0 sev 120 * uniform occurrence net of 50% so 25 xs 25 and 90% po 50 xs 50 poisson note{occurrence reinsurance; note over the top exposure} tags{topic:reinsurance};
+agg ReinsuranceOccurrenceWithAggLimit 5 claims 120 xs 0 sev 120 * uniform occurrence ceded to 60 xs 60 poisson aggregate ceded to 180 xs 0 note{occurrence with an aggregate limit} tags{topic:reinsurance};
 
 # ----------------------------------------------------------------------
 # Profit and loss (signed support)
 # ----------------------------------------------------------------------
-port PnLBook tags{portfolio, pnl} pnl Cat 2000 prem less agg Cat_e 2000 prem at 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem less agg Prop_e 5000 prem at 65% lr sev lognorm 100 cv 2 poisson;
-pnl PnLClaims 100 prem less agg PnLprem.Claims_e 10 claims sev lognorm 8 cv 1.5 poisson note{claims form: premium independent of the loss model} tags{pnl};
-pnl PnLLoss 100 prem less agg PnLprem.Loss_e 85 loss sev lognorm 8 cv 1.5 poisson note{expected-loss form: E[loss]=85, margin 15} tags{pnl};
-pnl PnLLossRatio 1000 prem less agg PnLprem.LR_e 1000 prem at 70% lr sev lognorm 100 cv 2 poisson note{loss ratio form: E[loss]=700, margin 300} tags{pnl};
-pnl PnLMixed [100 200 100] prem less agg E.PnLMix_e [100 200 100] prem at .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson note{Vector premium: shift 400, mean 80 = sum premium_i (1 - lr).} tags{pnl};
-port PnLPortfolio tags{portfolio, pnl} pnl Cat 2000 prem less agg Cat_e 2000 prem at 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem less agg Prop_e 5000 prem at 65% lr sev lognorm 100 cv 2 poisson note{Portfolio of two profit-and-loss units.};
-pnl PnLSignedAsymmetric 10 premium less agg PnLsigned.Asym_e dfreq[2] dsev[-2 1 3] [.5 .3 .2] note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2} tags{pnl};
-pnl PnLSignedDsev 5 premium less agg PnLsigned.Dsev_e dfreq[3] dsev[-1 1] note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3} tags{pnl};
-pnl PnLSignedSsev 100 premium less agg PnLsigned.Ssev_e 5 claims ssev 20 - lognorm 10 cv 0.5 poisson note{continuous signed severity: E[loss]=50, margin 50} tags{pnl};
-pnl PnLSimple 1000 prem less agg E.PNL_e 1000 prem at 90% lr 1000 xs 0 sev lognorm 120 cv 1 mixed gamma .25 note{Single profit-and-loss line.} tags{pnl};
-pnl PnLVector [100 200 100] prem less agg PnLprem.Vec_e [100 200 100] prem at .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson note{vector premium: shift 400, mean 80 = sum premium_i (1-lr)} tags{pnl};
-agg SignedFixed dfreq [3] dsev [-2 5] [.5 .5] note{fixed-3; closed form support (-6,1,8,15)} tags{pnl};
-port SignedGotcha tags{portfolio, pnl} agg A 50 claims sev 10 * norm + 5 splice [0 40] poisson agg B 50 claims sev 10 * norm - 5 splice [0 35] poisson;
-agg SignedLump 1e6 claims dsev [-1 10] [15/16 1/16] poisson note{near-Gaussian lump at a negative mean ~ -312500; auto window} tags{pnl};
-agg SignedNormal 100 claims ssev 50 * norm + 10 poisson note{continuous signed (ssev) P&L severity; never clamps} tags{pnl};
-port SignedPortfolioMixed tags{portfolio, pnl} agg Loss 30 claims sev lognorm 20 cv 0.8 poisson agg PnL 50 claims ssev 10 * norm poisson;
-port SignedPortfolioPair tags{portfolio, pnl} agg A 50 claims ssev 10 * norm + 5 poisson agg B 50 claims ssev 10 * norm - 5 poisson;
-agg SignedPremiumMinusLoss 5 claims ssev 100 - lognorm 80 cv .2 poisson note{premium minus loss: constant - dist reflects the severity (sev mean 20)} tags{pnl};
-agg SignedSeverity dfreq [3] dsev [-2 5] [.5 .5] note{Signed severity -- negative outcomes allowed (closed-form support).} tags{severity, pnl};
-agg SignedSeveritySimple dfreq [3] dsev [-2 5] [.5 .5] note{Signed severity -- negative outcomes allowed.} tags{severity, pnl};
-agg SignedStandardDeviation dfreq [3] dsev [-1 1] note{zero-mean signed; sev SD 1, agg SD sqrt(3) -- derived from ex2, not mean*cv} tags{pnl};
-agg SignedSymmetric 20 claims dsev [-1 1] [.5 .5] poisson note{symmetric P&L; mean 0} tags{pnl};
+port PnLBook tags{topic:portfolio, topic:pnl} pnl Cat 2000 prem less agg Cat_e 2000 prem at 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem less agg Prop_e 5000 prem at 65% lr sev lognorm 100 cv 2 poisson;
+pnl PnLClaims 100 prem less agg PnLprem.Claims_e 10 claims sev lognorm 8 cv 1.5 poisson note{claims form: premium independent of the loss model} tags{topic:pnl};
+pnl PnLLoss 100 prem less agg PnLprem.Loss_e 85 loss sev lognorm 8 cv 1.5 poisson note{expected-loss form: E[loss]=85, margin 15} tags{topic:pnl};
+pnl PnLLossRatio 1000 prem less agg PnLprem.LR_e 1000 prem at 70% lr sev lognorm 100 cv 2 poisson note{loss ratio form: E[loss]=700, margin 300} tags{topic:pnl};
+pnl PnLMixed [100 200 100] prem less agg E.PnLMix_e [100 200 100] prem at .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson note{Vector premium: shift 400, mean 80 = sum premium_i (1 - lr).} tags{topic:pnl};
+port PnLPortfolio tags{topic:portfolio, topic:pnl} pnl Cat 2000 prem less agg Cat_e 2000 prem at 55% lr sev lognorm 500 cv 3 poisson pnl Prop 5000 prem less agg Prop_e 5000 prem at 65% lr sev lognorm 100 cv 2 poisson note{Portfolio of two profit-and-loss units.};
+pnl PnLSignedAsymmetric 10 premium less agg PnLsigned.Asym_e dfreq[2] dsev[-2 1 3] [.5 .3 .2] note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2} tags{topic:pnl};
+pnl PnLSignedDsev 5 premium less agg PnLsigned.Dsev_e dfreq[3] dsev[-1 1] note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3} tags{topic:pnl};
+pnl PnLSignedSsev 100 premium less agg PnLsigned.Ssev_e 5 claims ssev 20 - lognorm 10 cv 0.5 poisson note{continuous signed severity: E[loss]=50, margin 50} tags{topic:pnl};
+pnl PnLSimple 1000 prem less agg E.PNL_e 1000 prem at 90% lr 1000 xs 0 sev lognorm 120 cv 1 mixed gamma .25 note{Single profit-and-loss line.} tags{topic:pnl};
+pnl PnLVector [100 200 100] prem less agg PnLprem.Vec_e [100 200 100] prem at .8 lr [1000 2000 5000] xs 0 sev lognorm 500 cv 2 poisson note{vector premium: shift 400, mean 80 = sum premium_i (1-lr)} tags{topic:pnl};
+agg SignedFixed dfreq [3] dsev [-2 5] [.5 .5] note{fixed-3; closed form support (-6,1,8,15)} tags{topic:pnl};
+port SignedGotcha tags{topic:portfolio, topic:pnl} agg A 50 claims sev 10 * norm + 5 splice [0 40] poisson agg B 50 claims sev 10 * norm - 5 splice [0 35] poisson;
+agg SignedLump 1e6 claims dsev [-1 10] [15/16 1/16] poisson note{near-Gaussian lump at a negative mean ~ -312500; auto window} tags{topic:pnl};
+agg SignedNormal 100 claims ssev 50 * norm + 10 poisson note{continuous signed (ssev) P&L severity; never clamps} tags{topic:pnl};
+port SignedPortfolioMixed tags{topic:portfolio, topic:pnl} agg Loss 30 claims sev lognorm 20 cv 0.8 poisson agg PnL 50 claims ssev 10 * norm poisson;
+port SignedPortfolioPair tags{topic:portfolio, topic:pnl} agg A 50 claims ssev 10 * norm + 5 poisson agg B 50 claims ssev 10 * norm - 5 poisson;
+agg SignedPremiumMinusLoss 5 claims ssev 100 - lognorm 80 cv .2 poisson note{premium minus loss: constant - dist reflects the severity (sev mean 20)} tags{topic:pnl};
+agg SignedSeverity dfreq [3] dsev [-2 5] [.5 .5] note{Signed severity -- negative outcomes allowed (closed-form support).} tags{topic:severity, topic:pnl};
+agg SignedSeveritySimple dfreq [3] dsev [-2 5] [.5 .5] note{Signed severity -- negative outcomes allowed.} tags{topic:severity, topic:pnl};
+agg SignedStandardDeviation dfreq [3] dsev [-1 1] note{zero-mean signed; sev SD 1, agg SD sqrt(3) -- derived from ex2, not mean*cv} tags{topic:pnl};
+agg SignedSymmetric 20 claims dsev [-1 1] [.5 .5] poisson note{symmetric P&L; mean 0} tags{topic:pnl};
 
 # ----------------------------------------------------------------------
 # Portfolios
 # ----------------------------------------------------------------------
-port BasicPortfolio tags{portfolio} agg A 50 claims 1000 xs 0 sev lognorm 100 cv 1.2 mixed gamma 0.4 agg B 65 claims 2000 xs 0 sev lognorm 150 cv 1.6 mixed gamma 0.2 note{Two-unit portfolio.};
-port SevVersusSsev tags{portfolio, severity} agg A 50 claims ssev 10 * norm + 5 poisson agg B 50 claims ssev 10 * norm - 5 poisson;
-port SharedMixPortfolio tags{portfolio} agg A 100 claims sev lognorm 50 cv 1.5 mixed gamma 0.4 agg B 120 claims sev lognorm 60 cv 1.5 mixed gamma 0.4 note{Shared frequency mixer = common shock; correlated units on one grid.};
-port ThickThickPortfolio tags{portfolio} agg A 100 claims sev lognorm 50 cv 3.0 poisson agg B 100 claims sev lognorm 80 cv 3.5 poisson note{Two unbounded heavy-tailed units -- little diversification, tail-driven.};
-port ThickThinPortfolio tags{portfolio} agg NonCat 200 claims 100 xs 0 sev gamma   8 cv 0.30 poisson agg Cat      2 claims 5000 xs 0 sev lognorm 500 cv 4.0 poisson note{Thin attritional + bounded-but-thick cat -- the rich diversification case.};
-port ThinThinPortfolio tags{portfolio} agg A 1 claim sev gamma 50 cv 0.10 fixed agg B 1 claim sev gamma 50 cv 0.15 fixed note{Two thin, concentrated units -- nearly Gaussian total.};
+port BasicPortfolio tags{topic:portfolio} agg A 50 claims 1000 xs 0 sev lognorm 100 cv 1.2 mixed gamma 0.4 agg B 65 claims 2000 xs 0 sev lognorm 150 cv 1.6 mixed gamma 0.2 note{Two-unit portfolio.};
+port SevVersusSsev tags{topic:portfolio, topic:severity} agg A 50 claims ssev 10 * norm + 5 poisson agg B 50 claims ssev 10 * norm - 5 poisson;
+port SharedMixPortfolio tags{topic:portfolio} agg A 100 claims sev lognorm 50 cv 1.5 mixed gamma 0.4 agg B 120 claims sev lognorm 60 cv 1.5 mixed gamma 0.4 note{Shared frequency mixer = common shock; correlated units on one grid.};
+port ThickThickPortfolio tags{topic:portfolio} agg A 100 claims sev lognorm 50 cv 3.0 poisson agg B 100 claims sev lognorm 80 cv 3.5 poisson note{Two unbounded heavy-tailed units -- little diversification, tail-driven.};
+port ThickThinPortfolio tags{topic:portfolio} agg NonCat 200 claims 100 xs 0 sev gamma   8 cv 0.30 poisson agg Cat      2 claims 5000 xs 0 sev lognorm 500 cv 4.0 poisson note{Thin attritional + bounded-but-thick cat -- the rich diversification case.};
+port ThinThinPortfolio tags{topic:portfolio} agg A 1 claim sev gamma 50 cv 0.10 fixed agg B 1 claim sev gamma 50 cv 0.15 fixed note{Two thin, concentrated units -- nearly Gaussian total.};
 
 # ----------------------------------------------------------------------
 # Bivariate and dependent risks
 # ----------------------------------------------------------------------
-bv BivariateCatPair 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 0.65 splice [0 250] agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 0.95 splice [0 300] mixed gamma .2 note{Common-shock bivariate (bv): Wind and Flood share frequency mixing.} tags{bivariate};
-bivariate BivariateClaytonMixed 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula clayton 0.3 mixed gamma .2 tags{bivariate};
-bivariate BivariateGumbel 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson tags{bivariate};
-bivariate BivariateGumbelPair 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson note{Gumbel-copula dependence between Wind and Flood.} tags{bivariate};
-bivariate BivariateIndependent 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson tags{bivariate};
-netceded agg BivariateNetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson tags{bivariate, reinsurance};
-netceded agg BivariateNetCededPair 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Gross / ceded / net joint view of a reinsured book.} tags{bivariate, reinsurance};
-bivariate BivariateNormal 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula normal 0.5 tags{bivariate};
-bivariate BivariatePnLAxis 25 claims agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 pnl B 900 prem less agg B_e dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson tags{bivariate};
-netceded agg NetCededJoint 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Joint gross / ceded / net view of the reinsured book.} tags{bivariate, reinsurance};
-netceded agg NetCededShowcase 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson note{Bivariate distribution of net and ceded for XOL reinsurance program.} tags{bivariate, reinsurance};
+bv BivariateCatPair 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 0.65 splice [0 250] agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 0.95 splice [0 300] mixed gamma .2 note{Common-shock bivariate (bv): Wind and Flood share frequency mixing.} tags{topic:bivariate};
+bivariate BivariateClaytonMixed 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula clayton 0.3 mixed gamma .2 tags{topic:bivariate};
+bivariate BivariateGumbel 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson tags{topic:bivariate};
+bivariate BivariateGumbelPair 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson note{Gumbel-copula dependence between Wind and Flood.} tags{topic:bivariate};
+bivariate BivariateIndependent 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson tags{topic:bivariate};
+netceded agg BivariateNetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson tags{topic:bivariate, topic:reinsurance};
+netceded agg BivariateNetCededPair 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Gross / ceded / net joint view of a reinsured book.} tags{topic:bivariate, topic:reinsurance};
+bivariate BivariateNormal 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula normal 0.5 tags{topic:bivariate};
+bivariate BivariatePnLAxis 25 claims agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 pnl B 900 prem less agg B_e dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson tags{topic:bivariate};
+netceded agg NetCededJoint 15 claims 10000 xs 0 sev lognorm 1500 cv 1.0 occurrence net of 50% po 2500 xs 2500 and 90% po 5000 xs 5000 mixed gamma 0.25 note{Joint gross / ceded / net view of the reinsured book.} tags{topic:bivariate, topic:reinsurance};
+netceded agg NetCededShowcase 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson note{Bivariate distribution of net and ceded for XOL reinsurance program.} tags{topic:bivariate, topic:reinsurance};
 
 # ----------------------------------------------------------------------
 # Distortions (risk measures)
 # ----------------------------------------------------------------------
-dist CCoCDistortion ccoc .25 tags{distortion};
-dist DualDistortionSimple dual 2.5 tags{distortion};
-dist MinimumDistortion minimum dist.PHDistortion dist.DualDistortion tags{distortion};
-dist PHDistortionSimple ph 0.65 tags{distortion};
-dist TVaRDistortion tvar 0.4 tags{distortion};
-dist WangDistortion ph 0.7 tags{distortion};
+dist CCoCDistortion ccoc .25 tags{topic:distortion};
+dist DualDistortionSimple dual 2.5 tags{topic:distortion};
+dist MinimumDistortion minimum dist.PHDistortion dist.DualDistortion tags{topic:distortion};
+dist PHDistortionSimple ph 0.65 tags{topic:distortion};
+dist TVaRDistortion tvar 0.4 tags{topic:distortion};
+dist WangDistortion ph 0.7 tags{topic:distortion};
 
 # ----------------------------------------------------------------------
 # Numerical character
 # ----------------------------------------------------------------------
-agg ApproximateAggReins 100 claim sev lognorm 100 cv 2 poisson aggregate net of 100 xs 0 approximate sgamma tags{numerics};
-agg ApproximateGamma 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma note{Shifted-gamma moment approximation.} tags{numerics};
-agg ApproximateLeftReflect 1 claim sev 100 * beta 5 1.3 fixed approximate sgamma tags{numerics};
-pnl ApproximatePnL 600000 prem less agg APX.PnL_e 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma tags{pnl, numerics};
-agg ApproximateRightSgamma 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma tags{numerics};
-agg ApproximateRightSlognorm 5000 claim sev lognorm 100 cv 2 poisson approximate slognorm tags{numerics};
-agg HeavyTailValidation 10 claims sev 100 * pareto 1.3 - 100 poisson hints{bs=0.25; log2=16} note{Infinite-variance Pareto -- the validator refuses to guess.} tags{numerics};
-agg NumericsDice dfreq [1:6] dsev [1:6] note{six-surface consistency target; choquet hand checks} tags{numerics};
-port NumericsOneDice tags{portfolio, numerics} agg D dfreq [1:6] dsev [1:6] note{one-line port: line == total};
-port NumericsPayPair tags{portfolio, numerics} pnl P1 10 prem less agg P1_e dfreq [1] dsev [2 5] [.5 .5] pnl P2 8 prem less agg P2_e dfreq [1] dsev [1 3] note{homogeneous payoff book prices through the dual};
-port NumericsSignedDiscrete tags{portfolio, pnl, numerics} agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed totals price via dot(kappa, gp); shares NaN};
-port NumericsUnbounded tags{portfolio, numerics} agg U 5 claims sev lognorm 10 cv 1 poisson note{mass-on-unbounded refused in the lifted builder (G6)};
-agg WindowContinuous 100000 claims sev lognorm 100 cv 0.5 poisson tags{numerics};
-agg WindowDiscrete 10000000 claims dsev [1 2] poisson tags{numerics};
-agg WindowedGrid 10000000 claims dsev [1 2] poisson note{Concentrated high-mean book -- resolved on a non-zero output window.} tags{numerics};
-agg WindowedSimple 10_000 claims dsev [-1 1] poisson note{Windowed / discrete severity at high frequency.} tags{numerics};
+agg ApproximateAggReins 100 claim sev lognorm 100 cv 2 poisson aggregate net of 100 xs 0 approximate sgamma tags{topic:numerics};
+agg ApproximateGamma 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma note{Shifted-gamma moment approximation.} tags{topic:numerics};
+agg ApproximateLeftReflect 1 claim sev 100 * beta 5 1.3 fixed approximate sgamma tags{topic:numerics};
+pnl ApproximatePnL 600000 prem less agg APX.PnL_e 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma tags{topic:pnl, topic:numerics};
+agg ApproximateRightSgamma 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma tags{topic:numerics};
+agg ApproximateRightSlognorm 5000 claim sev lognorm 100 cv 2 poisson approximate slognorm tags{topic:numerics};
+agg HeavyTailValidation 10 claims sev 100 * pareto 1.3 - 100 poisson hints{bs=0.25; log2=16} note{Infinite-variance Pareto -- the validator refuses to guess.} tags{topic:numerics};
+agg NumericsDice dfreq [1:6] dsev [1:6] note{six-surface consistency target; choquet hand checks} tags{topic:numerics};
+port NumericsOneDice tags{topic:portfolio, topic:numerics} agg D dfreq [1:6] dsev [1:6] note{one-line port: line == total};
+port NumericsPayPair tags{topic:portfolio, topic:numerics} pnl P1 10 prem less agg P1_e dfreq [1] dsev [2 5] [.5 .5] pnl P2 8 prem less agg P2_e dfreq [1] dsev [1 3] note{homogeneous payoff book prices through the dual};
+port NumericsSignedDiscrete tags{topic:portfolio, topic:pnl, topic:numerics} agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed totals price via dot(kappa, gp); shares NaN};
+port NumericsUnbounded tags{topic:portfolio, topic:numerics} agg U 5 claims sev lognorm 10 cv 1 poisson note{mass-on-unbounded refused in the lifted builder (G6)};
+agg WindowContinuous 100000 claims sev lognorm 100 cv 0.5 poisson tags{topic:numerics};
+agg WindowDiscrete 10000000 claims dsev [1 2] poisson tags{topic:numerics};
+agg WindowedGrid 10000000 claims dsev [1 2] poisson note{Concentrated high-mean book -- resolved on a non-zero output window.} tags{topic:numerics};
+agg WindowedSimple 10_000 claims dsev [-1 1] poisson note{Windowed / discrete severity at high frequency.} tags{topic:numerics};
 
 # ----------------------------------------------------------------------
 # Book and paper reproductions
 # ----------------------------------------------------------------------
-port BodoffOne tags{portfolio, paper} note{Bodoff Thought Experiment No. 1} agg wind1 1 claim sev dhistogram xps [0, 99] [0.80, 0.20] fixed agg quake1 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed;
-port BodoffOneNet tags{portfolio, paper} note{Bodoff Thought Experiment No. 1} agg wind1 1 claim dsev [0, 99] [0.80, 0.20] fixed agg quake1 1 claim dsev [0, 100] [0.95, 0.05] fixed;
-port BodoffThree tags{portfolio, paper} note{Bodoff Thought Experiment No. 3} agg wind3 1 claim sev dhistogram xps [0, 5] [0.80, 0.20] fixed agg quake3 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed;
-port BodoffThreeNet tags{portfolio, paper} note{Bodoff Thought Experiment No. 3} agg wind3 1 claim sev dhistogram xps [0, 5] [0.80, 0.20] fixed agg quake3 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed;
-port BodoffTwo tags{portfolio, paper} note{Bodoff Thought Experiment No. 2} agg wind2 1 claim sev dhistogram xps [0, 50] [0.80, 0.20] fixed agg quake2 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed;
-port BodoffTwoNet tags{portfolio, paper} note{Bodoff Thought Experiment No. 2} agg wind2 1 claim dsev [0, 50] [0.80, 0.20] fixed agg quake2 1 claim dsev [0, 100] [0.95, 0.05] fixed;
-port BodoffWindQuake tags{hero, portfolio, paper} agg Wind  1 claim dsev [0 99]  [0.80 0.20] fixed agg Quake 1 claim dsev [0 100] [0.95 0.05] fixed note{Bodoff thought-experiment -- discrete two-peril allocation.};
-agg DefectivePareto 1 claim sev 1000 * pareto 1.5 - 1000 fixed note{defective; no finite 2nd moment} hints{normalize=False} tags{paper};
-port NumericsBodoff tags{portfolio, paper, numerics} agg wind 1 claim sev dhistogram xps [0, 99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed note{bounded discrete; linear vs lifted; mass distortion exact};
-port PIRCatNonCatGross tags{portfolio, paper} note{PIR Cat-Noncat gross case study.} agg CNC.NonCat 1 claim sev gamma 80 cv 0.15 fixed agg CNC.Cat 1 claim sev lognorm 20 cv 1.00 fixed hints{bs=1/64; log2=16; padding=1};
-port PIRCatNonCatNet tags{portfolio, paper} note{PIR Cat-Noncat net case study.} agg CNC.Net.NonCat 1 claim sev gamma 80 cv 0.15 fixed agg CNC.Net.Cat 1 claim sev lognorm 20 cv 1.00 fixed aggregate net of 79.64 xs 41.11 hints{bs=1/64; log2=16; padding=1};
-port PIRDiscrete tags{portfolio, paper} note{PIR Discrete case study.} agg Discrete.X1 1 claim dsev [0 8 10] [1/2 1/4 1/4] fixed agg Discrete.X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed hints{bs=1; log2=8; padding=1};
-port PIRTame tags{portfolio, paper} note{PIR Tame case study. For reinsurance see text.} agg Tame.A 1 claim sev gamma 50 cv 0.10 fixed agg Tame.B 1 claim sev gamma 50 cv 0.15 fixed hints{bs=1/64; log2=16; padding=1};
+port BodoffOne tags{topic:portfolio, role:paper} note{Bodoff Thought Experiment No. 1} agg wind1 1 claim sev dhistogram xps [0, 99] [0.80, 0.20] fixed agg quake1 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed;
+port BodoffOneNet tags{topic:portfolio, role:paper} note{Bodoff Thought Experiment No. 1} agg wind1 1 claim dsev [0, 99] [0.80, 0.20] fixed agg quake1 1 claim dsev [0, 100] [0.95, 0.05] fixed;
+port BodoffThree tags{topic:portfolio, role:paper} note{Bodoff Thought Experiment No. 3} agg wind3 1 claim sev dhistogram xps [0, 5] [0.80, 0.20] fixed agg quake3 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed;
+port BodoffThreeNet tags{topic:portfolio, role:paper} note{Bodoff Thought Experiment No. 3} agg wind3 1 claim sev dhistogram xps [0, 5] [0.80, 0.20] fixed agg quake3 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed;
+port BodoffTwo tags{topic:portfolio, role:paper} note{Bodoff Thought Experiment No. 2} agg wind2 1 claim sev dhistogram xps [0, 50] [0.80, 0.20] fixed agg quake2 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed;
+port BodoffTwoNet tags{topic:portfolio, role:paper} note{Bodoff Thought Experiment No. 2} agg wind2 1 claim dsev [0, 50] [0.80, 0.20] fixed agg quake2 1 claim dsev [0, 100] [0.95, 0.05] fixed;
+port BodoffWindQuake tags{role:hero, topic:portfolio, role:paper} agg Wind  1 claim dsev [0 99]  [0.80 0.20] fixed agg Quake 1 claim dsev [0 100] [0.95 0.05] fixed note{Bodoff thought-experiment -- discrete two-peril allocation.};
+agg DefectivePareto 1 claim sev 1000 * pareto 1.5 - 1000 fixed note{defective; no finite 2nd moment} hints{normalize=False} tags{role:paper};
+port NumericsBodoff tags{topic:portfolio, role:paper, topic:numerics} agg wind 1 claim sev dhistogram xps [0, 99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed note{bounded discrete; linear vs lifted; mass distortion exact};
+port PIRCatNonCatGross tags{topic:portfolio, role:paper} note{PIR Cat-Noncat gross case study.} agg CNC.NonCat 1 claim sev gamma 80 cv 0.15 fixed agg CNC.Cat 1 claim sev lognorm 20 cv 1.00 fixed hints{bs=1/64; log2=16; padding=1};
+port PIRCatNonCatNet tags{topic:portfolio, role:paper} note{PIR Cat-Noncat net case study.} agg CNC.Net.NonCat 1 claim sev gamma 80 cv 0.15 fixed agg CNC.Net.Cat 1 claim sev lognorm 20 cv 1.00 fixed aggregate net of 79.64 xs 41.11 hints{bs=1/64; log2=16; padding=1};
+port PIRDiscrete tags{topic:portfolio, role:paper} note{PIR Discrete case study.} agg Discrete.X1 1 claim dsev [0 8 10] [1/2 1/4 1/4] fixed agg Discrete.X2 1 claim dsev [0 1 90] [1/2 1/4 1/4] fixed hints{bs=1; log2=8; padding=1};
+port PIRTame tags{topic:portfolio, role:paper} note{PIR Tame case study. For reinsurance see text.} agg Tame.A 1 claim sev gamma 50 cv 0.10 fixed agg Tame.B 1 claim sev gamma 50 cv 0.15 fixed hints{bs=1/64; log2=16; padding=1};
 
 # ----------------------------------------------------------------------
 # Severity curve reference
 # ----------------------------------------------------------------------
-sev Berens1997.Lognorm lognorm 150000 cv 0.25 note{Berens1997} tags{severity, reference, paper};
-sev Berens1997.Pareto 50000 * pareto 1.5 note{Berens1997} tags{severity, reference, paper};
-sev Bodoff2017.Pareto 50000 * lomax 1.5 note{Bodoff2017} tags{severity, reference, paper};
-agg CurveBeta 1 claim sev 100000 * beta 2 5 fixed note{Beta on [0, 100000] -- bounded severity / destruction rate, shapes a=2, b=5.} tags{severity, reference};
-agg CurveBetaPrime 1 claim sev 10000 * betaprime 3 4 fixed note{Beta-prime / beta-of-the-2nd-kind (B2) -- the GB2 representative. Cummins et al. (1990).} tags{severity, reference};
-agg CurveBurr12 1 claim sev 10000 * burr12 3 1.2 fixed note{Burr XII / Singh-Maddala (GB2, p=1), shapes c=3, d=1.2.} tags{severity, reference};
-agg CurveBurrIII 1 claim sev 10000 * burr 3 1.2 fixed note{Burr III / Dagum (GB2, q=1), shapes c=3, d=1.2.} tags{severity, reference};
-agg CurveExponential 1 claim sev 10000 * expon fixed note{Exponential: constant hazard, cv = 1. scipy expon; scale = mean.} tags{severity, reference};
-agg CurveFrechet 1 claim sev 10000 * invweibull 3 fixed note{Frechet / inverse Weibull (type II extreme value), shape c = 3.} tags{severity, reference};
-agg CurveGEV 1 claim sev 10000 * genextreme -0.2 + 20000 fixed note{Generalized extreme value (GEV), shape -0.2 (Frechet domain).} tags{severity, reference};
-agg CurveGPD 1 claim sev 10000 * genpareto 0.3 fixed note{Generalized Pareto (GPD), xi = 0.3 -- the peaks-over-threshold tail (EVT).} tags{severity, reference};
-agg CurveGamma 1 claim sev gamma 10000 cv 0.8 fixed note{Gamma severity by mean and cv (shape = 1/cv^2). Klugman et al.; Parodi.} tags{severity, reference};
-agg CurveGenGamma 1 claim sev 10000 * gengamma 2 1.5 fixed note{Generalized (transformed) gamma, shapes a=2, c=1.5 -- nests gamma/Weibull/lognormal.} tags{severity, reference};
-agg CurveGumbel 1 claim sev 5000 * gumbel_r + 20000 fixed note{Gumbel (type I extreme value) -- block maxima, light tail.} tags{severity, reference};
-agg CurveInverseGamma 1 claim sev 10000 * invgamma 4.07 fixed note{Inverse gamma, shape a = 4.07 -- heavy right tail (Klugman et al.).} tags{severity, reference};
-agg CurveInverseGaussian 1 claim sev invgauss 10000 cv 0.7 fixed note{Inverse Gaussian by mean and cv -- right-skewed, Tweedie-adjacent.} tags{severity, reference};
-agg CurveLogLogistic 1 claim sev 10000 * fisk 2.5 fixed note{Log-logistic / Fisk (GB2, p=q=1), shape c=2.5.} tags{severity, reference};
-agg CurveLognormal 1 claim sev lognorm 10000 cv 1.5 fixed note{Lognormal by mean and cv -- the default working severity.} tags{severity, reference};
-agg CurveLomax 1 claim sev 10000 * lomax 2.5 fixed note{Lomax / Pareto Type II (shifted Pareto), alpha = 2.5.} tags{severity, reference};
-agg CurvePareto 1 claim sev 10000 * pareto 2.5 - 10000 fixed note{Pareto Type I (European), alpha = 2.5, shifted ground-up.} tags{severity, reference};
-agg CurveWeibull 1 claim sev 10000 * weibull_min 1.5 fixed note{Weibull (weibull_min), shape c = 1.5: increasing hazard.} tags{severity, reference};
-sev Jin2016.Gamma gamma 6 cv 0.5774 note{Jin2016} tags{severity, reference, paper};
-sev Jin2016.Pareto 100 * lomax 20 note{Jin2016} tags{severity, reference, paper};
-sev Kang2019.Pareto 3.5 * lomax 3.5 note{Kang2019} tags{severity, reference, paper};
-sev Mack2003.AmericanPareto 10000 * lomax 1.5 note{Mack2003} tags{severity, reference, paper};
-sev Mack2003.Lognorm lognorm 10000 cv 4.953 note{Mack2003} tags{severity, reference, paper};
-sev Mack2003.RiebesellPareto 10000 * lomax 0.737 note{Mack2003} tags{severity, reference, paper};
-sev Mata2005.Lognorm 11048 * lognorm 2.29 note{Mata2005} tags{severity, reference, paper};
+sev Berens1997.Lognorm lognorm 150000 cv 0.25 note{Berens1997} tags{topic:severity, role:reference, role:paper};
+sev Berens1997.Pareto 50000 * pareto 1.5 note{Berens1997} tags{topic:severity, role:reference, role:paper};
+sev Bodoff2017.Pareto 50000 * lomax 1.5 note{Bodoff2017} tags{topic:severity, role:reference, role:paper};
+agg CurveBeta 1 claim sev 100000 * beta 2 5 fixed note{Beta on [0, 100000] -- bounded severity / destruction rate, shapes a=2, b=5.} tags{topic:severity, role:reference};
+agg CurveBetaPrime 1 claim sev 10000 * betaprime 3 4 fixed note{Beta-prime / beta-of-the-2nd-kind (B2) -- the GB2 representative. Cummins et al. (1990).} tags{topic:severity, role:reference};
+agg CurveBurr12 1 claim sev 10000 * burr12 3 1.2 fixed note{Burr XII / Singh-Maddala (GB2, p=1), shapes c=3, d=1.2.} tags{topic:severity, role:reference};
+agg CurveBurrIII 1 claim sev 10000 * burr 3 1.2 fixed note{Burr III / Dagum (GB2, q=1), shapes c=3, d=1.2.} tags{topic:severity, role:reference};
+agg CurveExponential 1 claim sev 10000 * expon fixed note{Exponential: constant hazard, cv = 1. scipy expon; scale = mean.} tags{topic:severity, role:reference};
+agg CurveFrechet 1 claim sev 10000 * invweibull 3 fixed note{Frechet / inverse Weibull (type II extreme value), shape c = 3.} tags{topic:severity, role:reference};
+agg CurveGEV 1 claim sev 10000 * genextreme -0.2 + 20000 fixed note{Generalized extreme value (GEV), shape -0.2 (Frechet domain).} tags{topic:severity, role:reference};
+agg CurveGPD 1 claim sev 10000 * genpareto 0.3 fixed note{Generalized Pareto (GPD), xi = 0.3 -- the peaks-over-threshold tail (EVT).} tags{topic:severity, role:reference};
+agg CurveGamma 1 claim sev gamma 10000 cv 0.8 fixed note{Gamma severity by mean and cv (shape = 1/cv^2). Klugman et al.; Parodi.} tags{topic:severity, role:reference};
+agg CurveGenGamma 1 claim sev 10000 * gengamma 2 1.5 fixed note{Generalized (transformed) gamma, shapes a=2, c=1.5 -- nests gamma/Weibull/lognormal.} tags{topic:severity, role:reference};
+agg CurveGumbel 1 claim sev 5000 * gumbel_r + 20000 fixed note{Gumbel (type I extreme value) -- block maxima, light tail.} tags{topic:severity, role:reference};
+agg CurveInverseGamma 1 claim sev 10000 * invgamma 4.07 fixed note{Inverse gamma, shape a = 4.07 -- heavy right tail (Klugman et al.).} tags{topic:severity, role:reference};
+agg CurveInverseGaussian 1 claim sev invgauss 10000 cv 0.7 fixed note{Inverse Gaussian by mean and cv -- right-skewed, Tweedie-adjacent.} tags{topic:severity, role:reference};
+agg CurveLogLogistic 1 claim sev 10000 * fisk 2.5 fixed note{Log-logistic / Fisk (GB2, p=q=1), shape c=2.5.} tags{topic:severity, role:reference};
+agg CurveLognormal 1 claim sev lognorm 10000 cv 1.5 fixed note{Lognormal by mean and cv -- the default working severity.} tags{topic:severity, role:reference};
+agg CurveLomax 1 claim sev 10000 * lomax 2.5 fixed note{Lomax / Pareto Type II (shifted Pareto), alpha = 2.5.} tags{topic:severity, role:reference};
+agg CurvePareto 1 claim sev 10000 * pareto 2.5 - 10000 fixed note{Pareto Type I (European), alpha = 2.5, shifted ground-up.} tags{topic:severity, role:reference};
+agg CurveWeibull 1 claim sev 10000 * weibull_min 1.5 fixed note{Weibull (weibull_min), shape c = 1.5: increasing hazard.} tags{topic:severity, role:reference};
+sev Jin2016.Gamma gamma 6 cv 0.5774 note{Jin2016} tags{topic:severity, role:reference, role:paper};
+sev Jin2016.Pareto 100 * lomax 20 note{Jin2016} tags{topic:severity, role:reference, role:paper};
+sev Kang2019.Pareto 3.5 * lomax 3.5 note{Kang2019} tags{topic:severity, role:reference, role:paper};
+sev Mack2003.AmericanPareto 10000 * lomax 1.5 note{Mack2003} tags{topic:severity, role:reference, role:paper};
+sev Mack2003.Lognorm lognorm 10000 cv 4.953 note{Mack2003} tags{topic:severity, role:reference, role:paper};
+sev Mack2003.RiebesellPareto 10000 * lomax 0.737 note{Mack2003} tags{topic:severity, role:reference, role:paper};
+sev Mata2005.Lognorm 11048 * lognorm 2.29 note{Mata2005} tags{topic:severity, role:reference, role:paper};
 

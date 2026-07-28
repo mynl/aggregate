@@ -79,12 +79,58 @@ def test_every_library_entry_is_tagged(library):
     assert not untagged, f'entries with no tags{{}}: {untagged}'
 
 
+#: Tag namespaces. Everything is namespaced except one deliberate bare tag.
+TAG_NAMESPACES = ('topic:', 'role:', 'check:')
+#: ``slow`` names a pytest marker (``test_library_recipes`` maps it to
+#: ``@pytest.mark.slow``), not a property of the subject, so namespacing it
+#: would only add a translation step.
+BARE_TAGS = {'slow'}
+
+
+def test_tags_are_namespaced(library):
+    """Every tag carries a namespace, or is the one allowed bare tag.
+
+    This is the guard against the vocabulary regrowing type-restating tags.
+    Before 1.0.0a161, 103 of 186 entries carried a tag that merely repeated
+    their own kind (``aggregate`` on an ``agg``, ``portfolio`` on a ``port``),
+    which said nothing ``discover(kind=...)`` does not already say and invited
+    "why does type appear twice?". A namespaced tag cannot be confused for a
+    kind, so ``sev UnitSeverity tags{topic:severity}`` is unambiguous.
+    """
+    offenders = {}
+    for (kind, name), pp in library._knowledge.items():
+        bad = [t for t in pp.spec.get('tags', ())
+               if not t.startswith(TAG_NAMESPACES) and t not in BARE_TAGS]
+        if bad:
+            offenders[f'{kind}:{name}'] = bad
+    assert not offenders, (
+        f'un-namespaced tags (use topic:/role:/check:, or add to BARE_TAGS '
+        f'with a reason): {offenders}')
+
+
+def test_no_tag_restates_its_own_kind(library):
+    """Belt and braces: a tag must never just name the entry's own type.
+
+    ``test_tags_are_namespaced`` already makes this impossible, but state the
+    actual invariant separately -- the namespace rule is the *mechanism*, this
+    is the *reason*, and a future bare tag added to ``BARE_TAGS`` must still
+    satisfy it.
+    """
+    kind_words = {'agg': 'aggregate', 'sev': 'severity', 'port': 'portfolio',
+                  'pnl': 'pnl', 'xpnl': 'pnl', 'bvagg': 'bivariate',
+                  'distortion': 'distortion'}
+    offenders = {f'{k}:{n}': kind_words[k]
+                 for (k, n), pp in library._knowledge.items()
+                 if k in kind_words and kind_words[k] in pp.spec.get('tags', ())}
+    assert not offenders, f'tags restating their own kind: {offenders}'
+
+
 def test_library_is_the_default_knowledge_base():
     """``build`` with no arguments reads library.agg."""
     from aggregate import build
     assert len(build.knowledge) > 100
     a = build('LimitProfile')
-    assert 'hero' in a.tags
+    assert 'role:hero' in a.tags
 
 
 def test_duplicate_names_in_a_library_are_rejected(tmp_path):

@@ -303,14 +303,25 @@ The expensive phase; it is curation, not a script.
    a duplicate bare name so the invariant can't silently rot; scope it to
    `library.agg`.
 3. **Tag vocabulary**, documented in the file header (which replaces the old
-   `FORMAT` block):
-   - domain — `severity`, `frequency`, `aggregate`, `reinsurance`, `pnl`,
-     `portfolio`, `distortion`, `bivariate`, `bounds`, `ruin`
-   - role — `hero`, `intro`, `reference`, `paper`
-   - check archetype — `check:reconciliation`, `check:scaling-sweep`,
-     `check:independent-oracle`, `check:limiting-case`, `check:round-trip`,
-     `check:cross-object` (the surviving beat-4 catalog, re-homed)
-   - cost — `slow`
+   `FORMAT` block). **Namespaced, and it never restates the object's type** —
+   revised at a161 after review; the first cut used bare words and 103 of 186
+   entries ended up carrying a tag that merely repeated their own kind:
+   - `topic:X` — what the recipe is *about*: `severity`, `frequency`,
+     `aggregate`, `reinsurance`, `pnl`, `portfolio`, `distortion`,
+     `bivariate`, `bounds`, `ruin`, `numerics`. Independent of type, so an
+     `agg` entry demonstrating a severity form is `topic:severity` and that is
+     not a restatement.
+   - `role:X` — `hero`, `intro`, `reference`, `paper`
+   - `check:X` — `reconciliation`, `scaling-sweep`, `independent-oracle`,
+     `limiting-case`, `round-trip`, `cross-object` (the beat-4 catalog,
+     re-homed)
+   - `slow` — the one deliberately bare tag; it names a pytest marker, not a
+     property of the subject.
+
+   **Type is `discover(kind=...)`, not a tag.** Enforced by
+   `tests/test_agg_libraries.py`. Explicitly rejected: a "look-through" tag
+   synthesising the kind, and auto-appending kind to tags — both recreate the
+   two-ways-to-say-it problem.
 4. **Wiring**: `config.py:105` → `databases = ('library',)` (and its docstring at
    `:92-105`); `tests/test_agg_libraries.py:22` → `['library']`. Delete the three
    old files.

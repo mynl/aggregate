@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.0.0a161
+
+**[Tag-Namespace]** — library tags are namespaced, and **no longer restate the
+object's type**.
+
+The a159 vocabulary was wrong: of 186 entries, **103 carried a tag that merely
+repeated their own kind**, and 80 of those uses carried no information at all —
+`aggregate` appeared on 31 `agg` entries and nowhere else, `portfolio` on 29
+`port` entries and nowhere else, and likewise `bivariate` and `distortion`.
+`discover(kind=...)` already filters by type, so those tags were dead weight
+that invited exactly the question *"why does type appear twice, and which do I
+use?"*
+
+They were not simply deletable, though: **42 of 55 `severity` tags sit on `agg`
+entries** (the severity zoo, the curve reference), where the word names the
+*subject*, not the type. So the fix is a namespace, not a cull:
+
+| | |
+|---|---|
+| `topic:X` | what the recipe is **about** — `severity` `frequency` `aggregate` `reinsurance` `pnl` `portfolio` `distortion` `bivariate` `bounds` `ruin` `numerics` |
+| `role:X` | where it stands — `hero` `intro` `reference` `paper` |
+| `check:X` | which invariant its Check asserts (unchanged) |
+| `slow` | the one deliberately bare tag — it names a **pytest marker**, not a property of the subject |
+
+A namespaced tag cannot be mistaken for a kind, so `sev UnitSeverity
+tags{topic:severity}` is unambiguous and legal. All 186 entries were re-tagged
+mechanically: **275 tag uses before, 275 after**, identical modulo the prefix.
+
+### `kind` and `tags` are independent axes
+
+```python
+build.discover(kind='sev')                          # by TYPE
+build.discover(tags='topic:severity')               # by SUBJECT
+build.discover(kind='agg', tags='topic:severity')   # both
+```
+
+`discover(kind=)` gains no code, only documentation saying it *is* the type
+filter. Explicitly rejected: a "look-through" tag synthesising the kind, and
+auto-appending kind to tags — both recreate the two-ways-to-say-it problem this
+removes.
+
+### Guarded
+
+Two new tests in `tests/test_agg_libraries.py`: every tag must carry a known
+namespace (or be in a one-item bare allow-list), and separately, no tag may
+name its own entry's kind. The first is the mechanism, the second is the
+reason — stated apart so a future bare tag still has to satisfy it. Verified
+against a synthetic library that a reintroduced `tags{aggregate}` fails.
+
 ## 1.0.0a160
 
 **[Recipe-Library]** — phase 4 of `dev/plan-meta-data.md`: **the library tests

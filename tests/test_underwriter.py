@@ -356,11 +356,27 @@ def test_discover_default_lists():
 
 def test_discover_by_tags():
     """``tags=`` narrows: an entry must carry EVERY tag given."""
-    heroes = global_build.discover(tags='hero')
+    heroes = global_build.discover(tags='role:hero')
     assert len(heroes) > 0
-    both = global_build.discover(tags='severity, reference')
-    assert 0 < len(both) <= len(global_build.discover(tags='severity'))
+    both = global_build.discover(tags='topic:severity, role:reference')
+    assert 0 < len(both) <= len(global_build.discover(tags='topic:severity'))
     assert len(global_build.discover(tags='no-such-tag')) == 0
+
+
+def test_discover_kind_is_the_type_filter():
+    """``kind=`` filters by TYPE; ``tags=`` by subject. They compose.
+
+    Tags deliberately never restate the object's kind (see
+    ``tests/test_agg_libraries.py``), so these are two independent axes: an
+    ``agg`` entry demonstrating a severity form is ``kind='agg'`` and
+    ``tags='topic:severity'`` at the same time.
+    """
+    sevs = global_build.discover(kind='sev')
+    topic = global_build.discover(tags='topic:severity')
+    both = global_build.discover(kind='agg', tags='topic:severity')
+    assert len(sevs) > 0 and len(topic) > 0 and len(both) > 0
+    # the subject axis reaches well beyond the `sev` type
+    assert len(topic) > len(sevs)
 
 
 def test_discover_empty_regex_lists_all():

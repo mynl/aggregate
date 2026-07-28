@@ -345,11 +345,22 @@ def test_interpret_file_runs_clean():
 
 def test_discover_default_lists():
     """discover() with no plot/describe is a lightweight DataFrame view."""
-    df = global_build.discover('^A\\.')
+    # ``^Curve`` replaces the old ``^A\.``: library.agg retired the
+    # single-letter filing prefixes at 1.0.0a159 (grouping is tags{} now).
+    df = global_build.discover('^Curve')
     import pandas as pd
     assert isinstance(df, pd.DataFrame)
     assert 'program' in df.columns
     assert len(df) > 0
+
+
+def test_discover_by_tags():
+    """``tags=`` narrows: an entry must carry EVERY tag given."""
+    heroes = global_build.discover(tags='hero')
+    assert len(heroes) > 0
+    both = global_build.discover(tags='severity, reference')
+    assert 0 < len(both) <= len(global_build.discover(tags='severity'))
+    assert len(global_build.discover(tags='no-such-tag')) == 0
 
 
 def test_discover_empty_regex_lists_all():

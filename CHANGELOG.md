@@ -1,5 +1,75 @@
 # Changelog
 
+## 1.0.0a159
+
+**[Recipe-Library]** — phase 3 of `dev/plan-meta-data.md`: **three shipped
+libraries become one.** `examples.agg` (38 entries), `cookbook.agg` (118) and
+`actuarial-severity-curves.agg` (28) are replaced by a single
+**`library.agg`** with **186 entries**, descriptive globally-unique names, and
+a tag on every entry.
+
+### Breaking
+
+- **`databases` now defaults to `('library',)`.** The out-of-the-box knowledge
+  base grows from 38 entries to 186 — `cookbook.agg` and
+  `actuarial-severity-curves.agg` were shipped but *not* loaded by default, so
+  most of this was invisible unless you asked for it. Intended, not a side
+  effect.
+- **The single-letter filing prefixes are gone.** `E.LimitProfile` is
+  `LimitProfile`, `K.PH` is `PHDistortion`, `A.CatXOLTower` is `CatXOLTower`.
+  Grouping is what `tags{}` is for; the letters were a comment convention that
+  no code ever read. Names leading with a **citekey** keep it —
+  `Mack2003.Lognorm` is a citation, not a filing code.
+- **Names are unique across kinds**, enforced at load by
+  `Underwriter._check_library_names_unique` (scoped to `library.agg`; the
+  regression corpora reuse names deliberately). This is what lets
+  `build('X')` and `build.recipe('X')` always mean the same entry, with no
+  `kind=` disambiguator anywhere.
+
+### Two entries recovered
+
+`cookbook.agg` defined `J.Re01` **three times**, so it declared 120 statements
+but loaded 118 — the last definition silently won and two examples were
+unreachable. They are now `ReinsuranceOccurrenceTower`,
+`ReinsuranceAggregateLayer` and `ReinsuranceOccurrenceWithAggLimit`.
+
+### `discover(tags=...)`
+
+```python
+build.discover(tags='hero')                # the landing-page heroes
+build.discover(tags='severity, reference') # BOTH tags -- tags narrow
+```
+
+Tag vocabulary (documented in the library header): domain (`severity`,
+`frequency`, `aggregate`, `reinsurance`, `pnl`, `portfolio`, `distortion`,
+`bivariate`, `numerics`), role (`hero`, `intro`, `reference`, `paper`), check
+archetype (`check:*`), and cost (`slow`).
+
+### Fixed
+
+- **View-pair statements now lift `tags` / `doc`, not just `note`.** A
+  `netceded agg X ... tags{...}` has no trailer of its own (the grammar is
+  `NETCEDED agg_out`), so the trailer lands on the inner agg; the parser lifted
+  only `note` onto the bivariate. Caught by the new "every entry is tagged"
+  invariant.
+
+### Notes on the merge
+
+Statements were transformed at text level rather than regenerated from specs,
+so programs and their `note{}` text survive byte-for-byte. Two things that bit
+during the merge and are worth knowing:
+
+- **`UnderwritingLexer.preprocess` is not safe for this.** Its bracket step
+  inserts a space after every `]`, rewriting `E[N]` inside a note to `E [N] `.
+  `decl_writer._split_statements` is the same splitter minus that step, written
+  for exactly this reason.
+- **A `port`'s tags go on the header line.** Appending them at the end of a
+  folded portfolio statement binds them to the last *unit* — the positional
+  rule `tests/test_trailer_attachment.py` pins.
+
+Every one of the 183 carried-over entries was verified to keep its original
+spec and note; the only differences are the intended rename and the added tags.
+
 ## 1.0.0a158
 
 **[Recipe-Library]** — phase 2 of `dev/plan-meta-data.md`: the runtime that

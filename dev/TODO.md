@@ -152,23 +152,21 @@
   covers every feature being frozen, and `decl-testers.agg` still fails exactly
   where it is meant to fail. The two files are for **testing**; `examples.agg` is
   for **showing** — keep the split.
-- **[Showcase-Examples-Tune]** (from `plan-for-v1.md` §1) — the section-A showcase
-  examples are still marked draft; tune them, extend `examples.agg` notes with
-  tags / keywords / purpose, and make `aggregate_api/examples.py` read them.
-  Feeds the playground dropdown and the 5-minute intro from one source.
-  **Partly done a157** — the `tags{...}` clause now exists and is decomposed
-  onto `spec['tags']` / `.tags`, so the letter prefixes have a real replacement;
-  applying tags across the library and rewriting the SPA reader is phase 3 of
-  `dev/plan-meta-data.md` **[Recipe-Library]**.
+- **[Showcase-Examples-Tune]** (from `plan-for-v1.md` §1) — **mostly done
+  a157–a159.** `tags{...}` exists and every one of `library.agg`'s 186 entries
+  carries tags, so the letter prefixes are retired and `discover(tags=...)`
+  works. **Still open:** tune the `hero` entries themselves (they were marked
+  draft), and rewrite `aggregate_api/examples.py` against the new library —
+  it re-lexed the old `FORMAT` header and the entry names have all changed.
 - **[Recipe-Library]** (`dev/plan-meta-data.md`) — notes-driven
   describe / test / audit. Phase 1 (the `tags{}` / `doc{{{}}}` trailer clauses,
   distortion trailer, ambiguity guards) landed in **a157**; phase 2 (the
   `aggregate.recipe` runtime, `Underwriter.recipe()` / `.recipes`, the cookbook
-  `recipe()` verb) in **a158**. Remaining: **phase 3** the merged `library.agg`
-  with globally-unique names and applied tags (needs author curation — 14 name
-  collisions), **phase 4** `tests/test_library_recipes.py`, **phase 5** the
-  Problem / Solution / Discussion cookbook rewrite, **phase 6** populating the
-  empty pages.
+  `recipe()` verb) in **a158**; phase 3 (the merged 186-entry `library.agg`
+  with unique names and tags, `discover(tags=)`) in **a159**. Remaining:
+  **phase 4** `tests/test_library_recipes.py` running every entry's Check,
+  **phase 5** the Problem / Solution / Discussion cookbook rewrite, **phase 6**
+  writing `doc{{{}}}` bodies recipe by recipe (186 entries, 1 written).
 - **[Rationalize-Tests]** (#51) — needed vs no-longer-needed; untangle and re-wire
   how the suite *consumes* the single test library (the `conftest`
   parametrization of every `test_suite.agg` line, the SLY snapshot regression)

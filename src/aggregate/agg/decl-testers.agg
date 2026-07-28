@@ -6,9 +6,11 @@
 # than building interesting aggregates: the feature surface the parser must
 # accept (every exposure/severity/frequency form, reinsurance, splicing,
 # signed / P&L, bivariate (bv), distortion constructors, hints, and
-# intentional parser-error fixtures). The companion `cookbook.agg` carries
-# the insurance-useful worked examples; `examples.agg` is the small curated
-# default set.
+# intentional parser-error fixtures). The companion `library.agg` is the
+# shipped, documented library -- the insurance-useful worked examples and the
+# default knowledge base. This file is a corpus, not a curated surface: it
+# reuses names across kinds deliberately, so the uniqueness rule that governs
+# `library.agg` does not apply here.
 #
 # KEPT IN SYNC WITH pytest: each program here mirrors one embedded in the
 # ``tests/`` tree (the Python module is the canonical source). When you add a

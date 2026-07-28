@@ -49,6 +49,7 @@ __all__ = [
     'get_settings', 'load_settings', 'reload_settings',
     'config_path', 'user_dir', 'write_default_config', 'describe_settings',
     'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME',
+    'LIBRARY_FILENAME',
 ]
 
 # --- path names (the "where things live" authority) ------------------------
@@ -61,6 +62,10 @@ PACKAGE_DATA_DIR = 'agg'
 # leading underscore marks it temporary migration scaffolding (retired before
 # beta); see dev/done/plan-decl-newline.md and the agg-file rationalization.
 TEST_SUITE_FILENAME = '_test_suite.agg'
+# The shipped DecL library (lives in PACKAGE_DATA_DIR) and the default
+# knowledge base. Names in it are unique across kinds -- enforced at load by
+# Underwriter._check_library_names_unique. See dev/plan-meta-data.md.
+LIBRARY_FILENAME = 'library.agg'
 
 # Name of the user config file (inside USER_DIR_NAME) and the shipped template.
 _CONFIG_FILENAME = 'config.toml'
@@ -90,10 +95,12 @@ class BuildSettings:
     normalize : bool
         Whether ``update`` renormalises the discretized severity.
     databases : tuple of str
-        Database name(s) loaded on construction. ``"examples"`` is the shipped
-        default (the curated v1.0 example library); ``"_test_suite"`` keeps the
-        historical ``build`` knowledge base; ``"default"`` would load every
-        bundled file, ``"all"`` bundled plus user.
+        Database name(s) loaded on construction. ``"library"`` is the shipped
+        default -- the one DecL library, which replaced the overlapping
+        ``examples`` / ``cookbook`` / ``actuarial-severity-curves`` trio at
+        1.0.0a159. ``"_test_suite"`` keeps the historical ``build`` knowledge
+        base; ``"default"`` would load every bundled file, ``"all"`` bundled
+        plus user.
     update : bool
         Whether constructed objects are auto-updated.
     """
@@ -102,7 +109,7 @@ class BuildSettings:
     bs: float = 0.0
     padding: int = 1
     normalize: bool = True
-    databases: tuple[str, ...] = ('examples',)
+    databases: tuple[str, ...] = ('library',)
     update: bool = True
 
 

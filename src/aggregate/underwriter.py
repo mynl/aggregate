@@ -15,7 +15,8 @@ from ._help import HelpMixin
 from .config import (get_settings, reload_settings as _reload_settings,
                      write_default_config as _write_default_config,
                      describe_settings, config_path,
-                     USER_DIR_NAME, PACKAGE_DATA_DIR, TEST_SUITE_FILENAME)
+                     USER_DIR_NAME, PACKAGE_DATA_DIR, TEST_SUITE_FILENAME,
+                     LIBRARY_FILENAME)
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .spectral import Distortion
@@ -694,7 +695,33 @@ class Underwriter(HelpMixin):
         added = len(self._knowledge) - n
         logger.info('Database %s read into knowledge, adding %d entries.', path.name, added)
         self.databases.append(path)
+        if path.name == LIBRARY_FILENAME:
+            self._check_library_names_unique(path)
         return True
+
+    def _check_library_names_unique(self, path):
+        """Enforce globally-unique names in the shipped library.
+
+        The knowledge base is keyed ``(kind, name)``, so ``sev Pareto`` and
+        ``agg Pareto`` can legally coexist -- and did, across the three files
+        ``library.agg`` replaced. The shipped library gives that up on purpose,
+        so ``build('X')`` and ``build.recipe('X')`` always mean the same entry
+        and no ``kind=`` disambiguator is ever needed. Checked at load so the
+        invariant cannot rot silently as entries are added.
+
+        Scoped to ``library.agg`` only: ``decl-testers.agg`` and
+        ``_test_suite.agg`` are regression corpora, not a curated surface, and
+        they reuse names across kinds deliberately.
+        """
+        from collections import Counter
+        names = Counter(name for (_kind, name), pp in self._knowledge.items()
+                        if getattr(pp, 'source', None) == path)
+        dupes = sorted(n for n, c in names.items() if c > 1)
+        if dupes:
+            raise ValueError(
+                f'{path.name}: names must be unique across kinds, but '
+                f'{dupes} appear under more than one kind. Rename one, or move '
+                f'the entry to a corpus file where reuse is allowed.')
 
     def reload(self):
         """
@@ -2165,26 +2192,31 @@ class Underwriter(HelpMixin):
             logger.error('%d parse error(s) in %s', n_errors, filename)
         return df_out
 
-    def discover(self, regex='', kind='', plot=False, describe=False,
+    def discover(self, regex='', kind='', tags='', plot=False, describe=False,
                  return_objects=False, **kwargs):
         """
-        Match knowledge entries against ``regex`` (and optional ``kind``);
-        optionally build, plot, and describe each.
+        Match knowledge entries against ``regex`` / ``tags`` (and optional
+        ``kind``); optionally build, plot, and describe each.
 
         Default behavior (``plot=False, describe=False``) is a lightweight
-        directory view — just filter the knowledge base by name and return
-        the matching DataFrame. Pass ``plot=True`` or ``describe=True`` to
-        build each match and visualize/describe it.
+        directory view — just filter the knowledge base and return the matching
+        DataFrame. Pass ``plot=True`` or ``describe=True`` to build each match
+        and visualize/describe it.
 
         Examples::
 
             build.discover()                        # all entries
-            build.discover('^A\\.')                  # entries whose name starts with "A."
+            build.discover('Dice')                   # name contains "Dice"
+            build.discover(tags='hero')              # the landing-page heroes
+            build.discover(tags='severity reference')  # BOTH tags
             build.discover('Dice', plot=True)        # build + plot
-            build.discover('^B\\.', describe=True)   # build + qd describe
+            build.discover(tags='distortion', describe=True)
 
         :param regex: filter on the knowledge index (name); '' matches all.
         :param kind: optional filter ('agg', 'sev', 'port', 'distortion'); '' matches all.
+        :param tags: one or more tag slugs (comma- and/or space-separated). An
+            entry matches when it carries **every** tag given, so tags narrow
+            rather than widen. '' matches all.
         :param plot: build each match and call its ``.plot()``.
         :param describe: build each match and ``qd()`` its summary table.
         :param return_objects: when building, also return the list of built
@@ -2197,6 +2229,12 @@ class Underwriter(HelpMixin):
         base = self.knowledge.droplevel('kind') if not kind else self.knowledge.loc[kind]
         # empty regex means "no filter" — return everything
         df = base.filter(regex=regex, axis=0).copy() if regex else base.copy()
+
+        if tags:
+            wanted = {t for t in re.split(r'[,\s]+', tags) if t}
+            keep = [wanted <= set((spec or {}).get('tags', ()))
+                    for spec in df['spec']]
+            df = df[keep]
 
         # asking for the built objects implies we must run the build loop
         do_build = plot or describe or return_objects

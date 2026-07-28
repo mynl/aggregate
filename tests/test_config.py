@@ -34,7 +34,7 @@ def _reset_settings_singleton():
 def test_defaults_no_file_no_env():
     s = config.load_settings(path=None, env={})
     assert s.build.log2 == 16
-    assert s.build.databases == ('examples',)
+    assert s.build.databases == ('library',)
     assert s.build.update is True
     assert s.discretization.reins_bucket == 'linear'
     assert s.discretization.dsev_bucket == 'linear'

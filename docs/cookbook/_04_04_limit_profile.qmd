@@ -20,7 +20,7 @@ from aggregate import qd
 
 ```{python}
 #| echo: false
-a = build('E.LimitProfile')
+a = build('LimitProfile')
 cbqd(a)
 print()
 ```

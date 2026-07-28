@@ -956,17 +956,28 @@ class UnderwritingTransformer(Transformer):
         per-occurrence aggregate of the named pair of {gross, ceded, net} as a
         ``netceded``-mode BivariateAggregate. ``views`` is the ``(x, y)`` axis
         pair the keyword names (e.g. ``('net', 'ceded')`` for ``netceded``).
+
+        The grammar here is ``NETCEDED agg_out``: the statement has no trailer
+        of its own, so a ``note`` / ``tags`` / ``hints`` / ``doc`` written on
+        the line lands on the inner ``agg`` and is lifted onto the view-pair.
+        The inner agg keeps its copy -- there is only one statement, so the two
+        describe the same thing.
         """
         _kw, agg_tuple = c          # agg_tuple = ("agg", name, spec)
         _, name, spec = agg_tuple
-        return ("bvagg", name, {
+        out = {
             "name": name,
             "mode": "netceded",
             "nc_views": views,
             "units": [agg_tuple],
             "note": spec.get("note", ""),
             "hints": spec.get("hints", ""),
-        })
+        }
+        # tags/doc are conditional keys: lift only when present.
+        for key in ("tags", "doc"):
+            if spec.get(key):
+                out[key] = spec[key]
+        return ("bvagg", name, out)
 
     def bv_out_netceded(self, c):
         """``netceded <agg>`` -> joint (x=net, y=ceded) occurrence aggregate."""

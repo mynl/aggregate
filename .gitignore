@@ -40,6 +40,11 @@ venv-agg/
 # Coverage
 .coverage
 .coverage.*
+# pytest-testmon's test-impact database. NB .pytest_cache needs no entry here:
+# pytest writes its own .pytest_cache/.gitignore containing `*`. testmon does
+# not, so this line is load-bearing.
+.testmondata
+.testmondata-journal
 htmlcov/
 .cache
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a161"
+version = "1.0.0a162"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -63,6 +63,10 @@ dev = [
     "sphinx-multitoc-numbering",
     "pytest>=7",
     "pytest-xdist>=3",
+    # Test-impact analysis for the edit loop: reruns only the tests your change
+    # actually touched. NB it traces coverage in-process, so it does NOT work
+    # under xdist -- use `pytest -n0 --testmon`. See CLAUDE.md.
+    "pytest-testmon>=2",
     "pyarrow>=15",
     "ruff>=0.6",
 ]
@@ -129,9 +133,15 @@ testpaths = ["tests"]
 # -m 'not slow' is the fast-by-default local loop: the bleeding-edge bivariate
 # suites (the multi-minute cases) are quarantined. Run EVERYTHING (gate/CI) with
 #   uv run pytest -m 'slow or not slow'
-addopts = "-ra --strict-markers -n auto -m 'not slow'"
+# --dist loadgroup keeps ungrouped tests distributed as before, but sends every
+# test sharing an `xdist_group` name to ONE worker, so they run sequentially
+# against each other. Used by the memory-heavy bivariate cases: several 2-D FFT
+# grids allocated concurrently across workers could exhaust memory, which
+# surfaced once as a numpy allocation failure in a test whose own grid is 64x64.
+addopts = "-ra --strict-markers -n auto --dist loadgroup -m 'not slow'"
 markers = [
     "slow: bleeding-edge / multi-minute cases (bivariate, massive bivariate, reins bivariate). Deselected by default via addopts; run the full suite with `-m 'slow or not slow'`.",
+    "xdist_group: pin a set of tests to one xdist worker so they do not run concurrently with each other (memory-heavy 2-D FFT cases).",
 ]
 
 #[tool.setuptools.packages.find]

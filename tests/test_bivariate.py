@@ -27,7 +27,16 @@ from aggregate.copula import (
 
 # Bleeding-edge bivariate machinery and the heaviest cases in the suite;
 # quarantined from the fast local loop (`-m 'not slow'`), still run in full/CI.
-pytestmark = pytest.mark.slow
+#
+# ``xdist_group`` additionally pins this module to a SINGLE xdist worker (see
+# ``--dist loadgroup`` in pyproject addopts): these cases each allocate a 2-D
+# FFT grid, and several running concurrently across workers can exhaust memory.
+# That surfaced once as a numpy allocation failure in
+# ``test_mv_explain_flags_clipped_book`` -- a test whose own grid is 64x64, so
+# the pressure was its neighbours, not itself. It passed standalone, passed
+# with this whole module in parallel, and passed on a full re-run; grouping
+# removes the coin-flip rather than leaving a flake to re-investigate.
+pytestmark = [pytest.mark.slow, pytest.mark.xdist_group('bivariate')]
 
 
 # ----------------------------------------------------------------------

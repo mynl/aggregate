@@ -34,6 +34,20 @@ pytest plugin mid-prune). Always sync `--all-extras`; add one tool ad hoc with
 
 After syncing, JupyterLab is available: `uv run jupyter lab`.
 
+**There are TWO virtualenvs here, and `uv run` may pick the wrong one.**
+`.venv` is the development environment — the one to work in. `.doc-venv` is for
+**building the docs only**. An ambient `UV_PROJECT_ENVIRONMENT=.doc-venv` is set
+in this shell, so a bare `uv run …` silently resolves to `.doc-venv`. Both are
+editable installs onto the same `src/`, so test *results* agree — but packages
+installed into one are invisible to the other, which is exactly how a tool can
+appear installed and still be missing. When it matters, be explicit:
+
+```
+.venv/Scripts/python.exe -m pytest          # unambiguous (Windows)
+UV_PROJECT_ENVIRONMENT=.venv uv run pytest  # or force uv to the dev env
+UV_PROJECT_ENVIRONMENT=.venv uv pip install <pkg>
+```
+
 **Run anything in the managed environment:**
 ```
 uv run python ...
@@ -184,27 +198,51 @@ Validation failures surface as warnings via `explain_validation()`; numerical is
 
 ### Running the suite efficiently (standard operating procedure)
 
-The suite is large (~2,300 cases) and a serial run takes minutes. Follow this
-layered strategy — fast selective runs while iterating, the full suite only at
-commit boundaries:
+**The suite is not bloated — measure before trimming it.** As of 1.0.0a161:
+**2,562 fast cases in ~105 s, i.e. ~41 ms per test** on FFT/numpy-bound work.
+The three parametrized corpus files (`test_decl_parser` 326 cases,
+`test_decl_unparser` 444, `test_grammar_sync` 169) are 37% of the case count but
+only ~29% of wall clock. If the suite *feels* slow, the cause is almost always
+running the whole thing inside the edit loop. Re-measure with
+`uv run pytest -m 'slow or not slow' --durations=40` before proposing a cull.
 
-- **Full runs are parallel by default.** `addopts` includes `-n auto`
-  (`pytest-xdist`), fanning the FFT/numpy-bound suite across all cores. Plain
-  `uv run pytest` is already parallel — no flag needed. Disable with `-n0` when
-  you need a `pdb` breakpoint or deterministic single-process ordering.
-- **During the edit loop, run a subset — don't re-run everything.** Pick the
-  tightest scope that covers the change:
-  - `uv run pytest tests/test_pnl.py` — one file (or `::test_name` for one test).
-  - `uv run pytest -k "pnl and not engine"` — keyword match on test names.
-  - `uv run pytest --lf` — **last-failed**: rerun only what failed last time
-    (pytest caches this in `.pytest_cache`; free, no setup). `--ff` runs failures
-    first then the rest; `-x` stops at the first failure.
-  - Typical loop: break something → `--lf` until green → then one full `uv run
-    pytest` as the gate.
-- **Do NOT rely on eyeballing blast radius as the *only* check.** Use it to pick
-  the fast local loop; always finish with a full (parallel) run before declaring
-  a change done. When in doubt about coverage, run the whole suite — `-n auto`
-  makes that cheap.
+Three tiers. Use the first one that covers the change:
+
+- **1. Edit loop — `pytest -n0 --dist no --testmon-forceselect`.**
+  `pytest-testmon` records which tests execute which source lines and reruns
+  **only those your edit touched**. Measured on this repo: a 3-file scope went
+  **10.9 s → 0.16 s** when nothing changed, and a real edit to
+  `src/aggregate/recipe.py` selected **6 of 55** in 0.71 s. The first run builds
+  the map (one full run); every run after is near-instant.
+
+  Every flag in that command is load-bearing — this is not `--testmon` alone:
+  - **`--testmon-forceselect`, not `--testmon`.** `addopts` carries
+    `-m 'not slow'`, and testmon *silently* downgrades to
+    `--testmon-noselect` (reorder, deselect nothing) whenever `-m` / `-k` /
+    `--lf` / `::test_name` is in play. Plain `--testmon` therefore looks like
+    it works — it writes `.testmondata` and prints no warning — while running
+    every test. `--testmon-forceselect` intersects the impact set with the
+    selectors, which is what you actually want.
+  - **`-n0 --dist no`.** testmon traces coverage in-process; xdist breaks it.
+    Both flags are needed to override `-n auto --dist loadgroup` in `addopts`
+    (`-p no:xdist` does *not* work — it makes those `addopts` unparseable).
+    Losing parallelism costs nothing when the point is running 6 tests.
+  - A **comment-only edit correctly selects nothing** — testmon hashes
+    executable blocks, not file mtimes. That is right, not a failure.
+  - Database is `.testmondata` (gitignored); delete it to force a rebuild.
+  - No-setup fallbacks: `pytest tests/test_pnl.py` (one file, or
+    `::test_name`), `-k "pnl and not engine"`, `--lf` (rerun last failures;
+    `--ff` failures-first, `-x` stop at first).
+- **2. Pre-commit — `uv run pytest`.** The full fast suite, parallel via
+  `-n auto`, `slow` deselected. This is the gate for "am I done", **not** an
+  edit-loop tool. Running it eight times in one session is the mistake this
+  section exists to prevent.
+- **3. Version bump — `uv run pytest -m 'slow or not slow'`.** Everything,
+  ~6 minutes. Once, at the commit boundary.
+
+**Do NOT rely on eyeballing blast radius as the *only* check.** Use tier 1 to
+iterate; always finish with tier 2 before declaring a change done, and tier 3
+before a bump.
 - **`slow` marker — fast-by-default.** `addopts` carries `-m 'not slow'`, so the
   everyday `uv run pytest` skips the quarantined heavy cases. The three
   bleeding-edge bivariate suites (`test_bivariate.py`, `test_massive_bivariate.py`,
@@ -214,7 +252,16 @@ commit boundaries:
   `uv run pytest -m 'slow or not slow'`;** run just the heavy suites with
   `-m slow`. To quarantine a new expensive case, tag it `@pytest.mark.slow` (or
   add `pytestmark` for a whole module); find candidates with
-  `uv run pytest -m 'slow or not slow' --durations=20`. `--strict-markers` is on,
+  `uv run pytest -m 'slow or not slow' --durations=20`.
+- **`xdist_group` — memory, not time.** `addopts` carries `--dist loadgroup`;
+  ungrouped tests are distributed as before, but every test sharing an
+  `xdist_group` name goes to **one** worker and so runs sequentially against its
+  group-mates. `test_bivariate.py` uses it: each case allocates a 2-D FFT grid,
+  and several running concurrently once exhausted memory (a numpy allocation
+  failure in a test whose own grid was 64x64 — the pressure was its neighbours).
+  Reach for this when tests are individually fine but collectively too large;
+  reach for `slow` when a test is simply long. Costs ~10% on the gate.
+  `--strict-markers` is on,
   so every marker must be registered in `[tool.pytest.ini_options].markers`.
 - **Sync with `uv sync --all-extras`, never a single `--extra`.** `uv sync` is an
   *exact* sync: it prunes anything outside the selected extras. The optional deps

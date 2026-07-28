@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.0.0a162
+
+**[Test-Loop]** — test-impact analysis for the edit loop, and a scheduling fix
+for the one flaky test.
+
+### `pytest-testmon` (new `dev` dependency)
+
+Reruns only the tests your edit actually touched. Measured here: a 3-file scope
+went **10.9 s → 0.16 s** with nothing changed, and a real edit to
+`src/aggregate/recipe.py` selected **6 of 55** tests in 0.71 s.
+
+The working command is **`pytest -n0 --dist no --testmon-forceselect`**, and
+every flag earns its place:
+
+- **`--testmon-forceselect`, not plain `--testmon`.** `addopts` carries
+  `-m 'not slow'`, and testmon *silently* downgrades to `--testmon-noselect`
+  (reorder, deselect nothing) whenever `-m` / `-k` / `--lf` / `::test_name` is
+  present. Plain `--testmon` therefore looks like it works — it writes
+  `.testmondata`, prints no warning — while running the entire suite. This cost
+  a diagnosis; it is now documented so it costs nobody else one.
+- **`-n0 --dist no`** to override `-n auto --dist loadgroup`; testmon traces
+  coverage in-process and xdist breaks it. (`-p no:xdist` does *not* work — it
+  makes those `addopts` unparseable.)
+
+`.testmondata` is gitignored. `.pytest_cache` needs no entry: pytest writes its
+own `.pytest_cache/.gitignore`; testmon does not.
+
+### `--dist loadgroup` and `xdist_group`
+
+`addopts` gains `--dist loadgroup`; ungrouped tests distribute as before, but
+tests sharing an `xdist_group` name go to one worker and run sequentially
+against each other. `test_bivariate.py` is now
+`pytestmark = [slow, xdist_group('bivariate')]`: each case allocates a 2-D FFT
+grid, and several concurrently once exhausted memory — a numpy allocation
+failure in a test whose own grid is 64x64, so the pressure was its neighbours.
+Costs ~10% on the gate (337 s → 373 s), which buys away a flake class that
+previously cost ~9 minutes to re-diagnose.
+
+Use `xdist_group` when tests are individually fine but collectively too large;
+use `slow` when a test is simply long.
+
+### CLAUDE.md
+
+Test guidance restructured into three explicit tiers (testmon edit loop / full
+fast suite pre-commit / everything at a version bump), with the measured
+baseline recorded — **2,562 cases in ~105 s, ~41 ms per test** — so "is the
+suite bloated?" has a number attached. It is not; the three parametrized corpus
+files are 37% of cases and ~29% of wall clock.
+
+Also documents a real trap: **there are two virtualenvs**, `.venv` (development)
+and `.doc-venv` (docs build only), and an ambient
+`UV_PROJECT_ENVIRONMENT=.doc-venv` makes a bare `uv run` resolve to the latter.
+Both are editable onto the same `src/`, so results agree — but a package
+installed in one is invisible to the other.
+
 ## 1.0.0a161
 
 **[Tag-Namespace]** — library tags are namespaced, and **no longer restate the

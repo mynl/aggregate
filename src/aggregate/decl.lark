@@ -37,9 +37,13 @@ answer: sev_out          -> answer_sev
 // and parser hold no per-kind knowledge. The ``minimum``/``mixture``
 // combinators take a list of distortion *references* instead, so they keep
 // their own productions.
-distortion_out: DISTORTION name ID numberl                                            -> distortion_out_params
-              | DISTORTION name ID buildin_dist_list                                  -> distortion_out_combo
-              | DISTORTION name ID buildin_dist_list WEIGHTS "[" numberl "]"          -> distortion_out_combo_wtd
+// A distortion carries the same `trailer` as every other statement, so it can
+// be described, tagged and documented like an aggregate. (It could not until
+// 1.0.0a157 -- the shipped library headers used to warn "note{} is NOT legal on
+// dist lines, use a comment"; that restriction is gone.)
+distortion_out: DISTORTION name ID numberl trailer                                    -> distortion_out_params
+              | DISTORTION name ID buildin_dist_list trailer                          -> distortion_out_combo
+              | DISTORTION name ID buildin_dist_list WEIGHTS "[" numberl "]" trailer  -> distortion_out_combo_wtd
 
 buildin_dist_list: buildin_dist_list BUILTIN_DIST   -> buildin_dist_list_cons
                  | BUILTIN_DIST                      -> buildin_dist_list_one
@@ -477,26 +481,40 @@ layers: numbers XS numbers as_label   -> layers_xs
 tower: TOWER doutcomes
 
 // ======================================================================
-// Trailer: optional `note{...}` annotation + `hints{...}` build settings.
+// Trailer: optional `note{...}`, `tags{...}`, `hints{...}`, `doc{{{...}}}`.
 // ----------------------------------------------------------------------
-// `note{...}` is pure free-text; `hints{...}` carries `key=value;` build
-// settings (parsed in the underwriter, not here). Both are optional and
-// order-free, at most one of each.
+// `note{...}` is a one-line free-text description; `tags{...}` is a comma- or
+// space-separated slug list used to group and select entries; `hints{...}`
+// carries `key=value;` build settings (parsed in the underwriter, not here);
+// `doc{{{...}}}` is a long-form markdown recipe that may contain fenced code.
+// All four are optional and order-free, at most one of each (a repeat is a
+// parse error, raised in the transformer).
 //
-// Spelled out as five token-distinct alternatives rather than two
-// empty-producing nonterminals (`note hints | hints note`): the latter has
-// two parses of the EMPTY trailer (note_none+hints_none vs hints_none+
-// note_none), which Earley flags as ambiguous. Here every alternative
-// matches a distinct token sequence (NOTE HINTS / HINTS NOTE / NOTE / HINTS
-// / nothing) and `note{` vs `hints{` have disjoint prefixes, so the parse
-// is unambiguous.
+// A repetition, not spelled-out alternatives. The original two-item form was
+// written out as five token-distinct alternatives because the natural spelling
+// (`note hints | hints note` over empty-producing nonterminals) gives the EMPTY
+// trailer two parses (note_none+hints_none vs hints_none+note_none), which
+// Earley flags as ambiguous. A star does not have that problem -- zero items is
+// exactly one parse -- and it scales: four order-free optional items spelled out
+// would be 65 alternatives. Every item is a distinct token with a disjoint
+// prefix (`note{` / `tags{` / `hints{` / `doc{{{`), so the parse is unambiguous.
+// Guarded by tests/test_grammar_ambiguity.py.
+//
+// NOTE on nesting: a trailing trailer binds to the OUTER object when a
+// statement nests a trailer-bearing one. This is forced for `port` (its trailer
+// sits before `agg_list`) and is a resolved ambiguity for a `bivariate` with
+// neither a copula clause nor an outer frequency -- there the last component's
+// trailer and the bivariate's are adjacent and both nullable. To annotate an
+// inner component, put the trailer on that component. Pinned by
+// tests/test_trailer_attachment.py.
 // ======================================================================
 
-trailer: NOTE HINTS   -> trailer_nh
-       | HINTS NOTE    -> trailer_hn
-       | NOTE          -> trailer_note
-       | HINTS         -> trailer_hints
-       |               -> trailer_none
+trailer: trailer_item*
+
+trailer_item: NOTE  -> trailer_item_note
+            | TAGS  -> trailer_item_tags
+            | HINTS -> trailer_item_hints
+            | DOC   -> trailer_item_doc
 
 // ======================================================================
 // Exposures
@@ -692,6 +710,15 @@ BUILTIN_SEV.3:  /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_DIST.3: /(?:distortion|dist)\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 NOTE.3:         /note\{[^}]*\}/
 HINTS.3:        /hints\{[^}]*\}/
+TAGS.3:         /tags\{[^}]*\}/
+// `doc{{{...}}}` never reaches the lexer with its body intact: step 0 of
+// UnderwritingLexer.preprocess lifts the body out and substitutes URL-safe
+// base64, whose alphabet (A-Za-z0-9-_=) contains no `#`, `//`, `}`, `[`, `]`,
+// `;` or whitespace -- so the token survives comment stripping, bracket
+// collapsing and the paragraph split byte-for-byte. That is what lets a doc
+// body carry markdown headings, blank lines and fenced code, none of which
+// could survive inside a `note{...}`. The DOC callback decodes it again.
+DOC.3:          /doc\{\{\{[A-Za-z0-9_=-]*\}\}\}/
 
 // A quoted display label. Delimited by double quotes, no embedded newline (an
 // unbalanced quote fails on its own line rather than swallowing the program) and

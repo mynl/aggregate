@@ -156,6 +156,16 @@
   examples are still marked draft; tune them, extend `examples.agg` notes with
   tags / keywords / purpose, and make `aggregate_api/examples.py` read them.
   Feeds the playground dropdown and the 5-minute intro from one source.
+  **Partly done a157** — the `tags{...}` clause now exists and is decomposed
+  onto `spec['tags']` / `.tags`, so the letter prefixes have a real replacement;
+  applying tags across the library and rewriting the SPA reader is phase 3 of
+  `dev/plan-meta-data.md` **[Recipe-Library]**.
+- **[Recipe-Library]** (`dev/plan-meta-data.md`) — notes-driven
+  describe / test / audit. Phase 1 (the `tags{}` / `doc{{{}}}` trailer clauses,
+  distortion trailer, ambiguity guards) landed in **a157**. Remaining: the
+  `Recipe` runtime (`aggregate/recipe.py`), the merged `library.agg` with unique
+  names, `tests/test_library_recipes.py` + `Underwriter.recipes`, and the
+  Problem / Solution / Discussion cookbook.
 - **[Rationalize-Tests]** (#51) — needed vs no-longer-needed; untangle and re-wire
   how the suite *consumes* the single test library (the `conftest`
   parametrization of every `test_suite.agg` line, the SLY snapshot regression)
@@ -306,6 +316,13 @@
 
 ## Post-v1.0 ideas
 
+- **[Recipe-Doc-Signing]** — optionally authenticate a `doc{{{...}}}` body with a
+  trailing `<!-- hash: ... -->` computed over the body and salted from a private
+  environment variable, so `Recipe.run()` can refuse an unsigned or tampered
+  recipe. Deliberately *not* done for v1.0: running a recipe from a `.agg` file
+  executes the code in it, and the shipped answer is a documented warning —
+  treat a third-party `.agg` like a third-party Python file. See
+  `dev/plan-meta-data.md` *Resolved questions* 2.
 - **[Multi-Resolution-Portfolio-Combine]** (#20) — compute each unit on its own
   `bs`, decimate onto the shared grid before the Fourier product (the real fix
   for the coarse shared-`bs` deficit). Deficit accepted / surfaced for now.

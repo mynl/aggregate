@@ -103,7 +103,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
     """
 
     def __init__(self, name, spec_list, uw=None, label=None, label_map=None,
-                 note=''):
+                 note='', tags=(), doc=''):
         """
         Create a new :class:`Portfolio` object.
 
@@ -287,6 +287,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self.program = ''
         #: Free text from the DecL ``note{...}`` trailer ('' when none).
         self.note = note
+        #: Tag slugs from the DecL ``tags{...}`` trailer ('()' when none).
+        self.tags = tuple(tags)
+        #: Long-form markdown recipe from ``doc{{{...}}}`` ('' when none).
+        self.doc = doc
         self.distortions = None
         self.distortion_df = None
         self.calibration_df = None

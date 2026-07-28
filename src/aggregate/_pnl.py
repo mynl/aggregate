@@ -764,6 +764,13 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         # are the ledger row keys directly). Presentation only; ``name`` stays
         # the identity handle. See dev/done/plan-labels.md.
         self._init_labels(label=label, label_map=label_map)
+        # DecL trailer metadata. A PnL is assembled by the builders rather than
+        # splatted from a spec, so these start empty and :meth:`_adopt_engine`
+        # fills them from the statement's recipe. See dev/plan-meta-data.md.
+        self.note = ''
+        self.tags = ()
+        self.hints = ''
+        self.doc = ''
         self.result_name = result_name
         #: The wrapped stochastic engine (the DecL ``pnl`` / ``xpnl`` inner
         #: :class:`Aggregate` / :class:`Portfolio`), kept for drill-down --
@@ -1842,6 +1849,32 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         built). ``''`` for a hand-built kernel P&L with neither.
         """
         return self._program or getattr(self.engine, 'program', '') or ''
+
+    def _adopt_engine(self, engine, recipe=None):
+        """Attach the wrapped engine and take the statement's trailer metadata.
+
+        The DecL ``pnl`` / ``xpnl`` statement's own ``note`` / ``tags`` /
+        ``hints`` / ``doc`` ride on its build recipe, not on the engine: for an
+        agg engine the two happen to coincide (the parser merges the pnl spec
+        into the inner :class:`Aggregate`), but for a ``port.NAME`` engine the
+        Portfolio has metadata of its *own* which is not the P&L's. Reading
+        from the recipe keeps both cases right.
+
+        Parameters
+        ----------
+        engine : Aggregate or Portfolio
+            The wrapped stochastic engine.
+        recipe : dict, optional
+            The ``_pnl_recipe`` the engine was carrying; its ``trailer_meta``
+            entry supplies the metadata. Missing or absent leaves the empty
+            defaults set in ``__init__``.
+        """
+        self.engine = engine
+        meta = (recipe or {}).get('trailer_meta') or {}
+        self.note = meta.get('note', '')
+        self.tags = tuple(meta.get('tags', ()))
+        self.hints = meta.get('hints', '')
+        self.doc = meta.get('doc', '')
 
     @program.setter
     def program(self, value):

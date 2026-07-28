@@ -212,6 +212,16 @@ def _parse_hints(txt):
 # emit a deprecation warning now that notes are pure text.
 _NOTE_SETTINGS_RE = re.compile(r'\b(?:log2|bs|padding|normalize|bucket_sizing_p)\s*=')
 
+#: The DecL trailer keys, in render order. ``note``/``hints`` are always on a
+#: spec; ``tags``/``doc`` only when written (the captured spec snapshot compares
+#: key sets exactly, so they cannot be unconditional). See dev/plan-meta-data.md.
+TRAILER_KEYS = ('note', 'tags', 'hints', 'doc')
+
+
+def _trailer_meta(spec):
+    """Extract the DecL trailer metadata from a spec, skipping absent keys."""
+    return {k: spec[k] for k in TRAILER_KEYS if spec.get(k)}
+
 
 def _resolve_hints(spec, log2, bs, bucket_sizing_p, kwargs):
     """Merge a spec's ``hints{...}`` build settings under *caller-wins* rules.
@@ -1090,7 +1100,8 @@ class Underwriter(HelpMixin):
             if port_engine is not None:
                 obj = self._build_pnl_from_port(
                     name, port_engine, consideration, expense_spec,
-                    consideration_label, loss_label, is_tower, program)
+                    consideration_label, loss_label, is_tower, program,
+                    trailer_meta=_trailer_meta(spec))
                 parsed.object = obj
                 return parsed
             # ``inherit premium``: resolve the sentinel to the engine's technical
@@ -1249,6 +1260,11 @@ class Underwriter(HelpMixin):
             # :meth:`_snapshot_pnl` selects that face after the inner engine is
             # updated.
             inner._pnl_recipe['is_tower'] = is_tower
+            # The pnl statement's own trailer. It is also splatted onto the
+            # inner Aggregate (the parser merges the specs), but the PnL face
+            # reads it from here so the port-engine path -- where the engine
+            # carries the *portfolio's* metadata -- stays correct.
+            inner._pnl_recipe['trailer_meta'] = _trailer_meta(spec)
             inner.program = program
             obj = inner
         elif kind == 'bvagg':
@@ -1283,7 +1299,7 @@ class Underwriter(HelpMixin):
                 obj = Severity(**spec)
                 obj.program = program
         elif kind == 'distortion':
-            obj = Distortion(**spec)
+            obj = Distortion.from_spec(spec)
             obj.program = program
         else:
             raise ValueError(f'Cannot build {kind} objects')
@@ -1662,7 +1678,8 @@ class Underwriter(HelpMixin):
         return total
 
     def _build_pnl_from_port(self, name, portname, consideration, expense_spec,
-                             consideration_label, loss_label, is_tower, program):
+                             consideration_label, loss_label, is_tower, program,
+                             trailer_meta=None):
         """Build a portfolio-sourced P&L: wrap a ``port.NAME`` engine's total.
 
         A ``port`` source reads the **net-net portfolio total** and sees nothing
@@ -1687,7 +1704,9 @@ class Underwriter(HelpMixin):
         engine._pnl_recipe = {'kind': 'port_plain', 'expense_spec': expense_spec,
                               'consideration': consideration,
                               'consideration_label': consideration_label,
-                              'loss_label': loss_label}
+                              'loss_label': loss_label,
+                              # The P&L's own trailer, NOT the portfolio's.
+                              'trailer_meta': trailer_meta or {}}
         return engine
 
     @staticmethod
@@ -1746,7 +1765,7 @@ class Underwriter(HelpMixin):
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=loss_label,
                 expense_spec=recipe.get('expense_spec'), name=inner.name)
-            face.engine = inner
+            face._adopt_engine(inner, recipe)
             return face
         is_tower = recipe.get('is_tower', False)
         if kind == 'var':
@@ -1765,7 +1784,7 @@ class Underwriter(HelpMixin):
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
                 label=inner.label)
-            face.engine = inner
+            face._adopt_engine(inner, recipe)
             return face
         if kind == 'reins':
             # both faces are per-atom ledgers over the one (L, R) joint:
@@ -1793,7 +1812,7 @@ class Underwriter(HelpMixin):
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
                 label=inner.label)
-            face.engine = inner
+            face._adopt_engine(inner, recipe)
             return face
         if kind == 'gcn':
             econ = recipe['econ']
@@ -1815,7 +1834,7 @@ class Underwriter(HelpMixin):
                     consideration_label=recipe.get('consideration_label'),
                     loss_label=recipe.get('loss_label'), name=inner.name,
                     label=inner.label)
-            face.engine = inner
+            face._adopt_engine(inner, recipe)
             return face
         # kind == 'plain': the consolidated one-group ledger; ``xpnl`` gets
         # the same ledger presented as a one-step walk
@@ -1826,7 +1845,7 @@ class Underwriter(HelpMixin):
             loss_label=recipe.get('loss_label'),
             expense_spec=recipe['expense_spec'], name=inner.name,
             label=inner.label, walk=is_tower)
-        face.engine = inner
+        face._adopt_engine(inner, recipe)
         return face
 
     def build(self, program, update=None, log2=0, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
@@ -2070,7 +2089,12 @@ class Underwriter(HelpMixin):
             # lightweight directory view; format the program column for readability
             bit = df[['program']].copy()
             bit['program'] = (bit['program']
+                              # doc first: its fence would survive the note
+                              # pattern and leave a dangling ``}}}``.
+                              .str.replace(r'\s*doc\{\{\{.*?\n\}\}\}', '',
+                                           regex=True, flags=re.S)
                               .str.replace(r' note\{[^}]+\}', '', regex=True)
+                              .str.replace(r' tags\{[^}]+\}', '', regex=True)
                               .str.replace(r' hints\{[^}]+\}', '', regex=True)
                               .str.replace(r' {2,}', ' ', regex=True))
             return bit.sort_index()

@@ -670,6 +670,38 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         self._common_init()
         self._build()
 
+    #: Trailer keys carried on a DecL spec but not accepted by any ``__init__``.
+    _TRAILER_KEYS = ('note', 'tags', 'hints', 'doc')
+
+    @classmethod
+    def from_spec(cls, spec):
+        """Construct from a DecL spec dict, applying any trailer metadata.
+
+        ``Distortion(**spec)`` cannot be used directly once a spec may carry
+        ``note`` / ``tags`` / ``hints`` / ``doc``: the kind subclasses take
+        strict natural-parameter signatures and raise ``TypeError`` on unknown
+        keywords. This factory separates the two concerns -- construction
+        parameters go to ``__init__``, trailer metadata is assigned afterwards
+        onto the fields :meth:`_common_init` established.
+
+        Parameters
+        ----------
+        spec : dict
+            A parsed distortion spec, e.g. from the knowledge base.
+
+        Returns
+        -------
+        Distortion
+            The constructed distortion, with ``.note`` / ``.tags`` / ``.hints``
+            / ``.doc`` populated from the spec where present.
+        """
+        spec = dict(spec)
+        meta = {k: spec.pop(k) for k in cls._TRAILER_KEYS if k in spec}
+        ob = cls(**spec)
+        for key, value in meta.items():
+            setattr(ob, key, value)
+        return ob
+
     @classmethod
     def decl_spec(cls, kind, numbers):
         """Build a ``Distortion`` spec dict from a DecL number list.
@@ -737,6 +769,14 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         self.error = 0.0
         self.premium_target = 0.0
         self.assets = 0.0
+        #: DecL trailer metadata. Set here (not in ``__init__``) because the
+        #: kind subclasses have strict ``**natural`` signatures that reject
+        #: unknown kwargs; :meth:`from_spec` applies the parsed values after
+        #: construction. See ``dev/plan-meta-data.md`` [Recipe-Library].
+        self.note = ''
+        self.tags = ()
+        self.hints = ''
+        self.doc = ''
 
     # ------------------------------------------------------------------
     # Subclass hook

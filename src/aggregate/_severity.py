@@ -859,6 +859,7 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
     def __init__(self, sev_name, exp_attachment=None, exp_limit=np.inf, sev_mean=0, sev_cv=0, sev_a=np.nan, sev_b=0,
                  sev_loc=0, sev_scale=0, sev_xs=None, sev_ps=None, sev_wt=1, sev_lb=0, sev_ub=np.inf,
                  sev_conditional=True, sev_signed=False, sev_reflect=False, name='', note='', hints='',
+                 tags=(), doc='',
                  label=None, label_map=None):
         """Continuous random variable adding layer/attachment to ``ss.rv_continuous``.
 
@@ -963,6 +964,10 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         self.long_name = sev_name
         self.note = note
         self.hints = hints
+        #: Tag slugs from the DecL ``tags{...}`` trailer ('()' when none).
+        self.tags = tuple(tags)
+        #: Long-form markdown recipe from ``doc{{{...}}}`` ('' when none).
+        self.doc = doc
         self.sev1 = self.sev2 = self.sev3 = None
         self.sev_wt = sev_wt
         self.sev_loc = sev_loc

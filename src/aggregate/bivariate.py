@@ -1078,7 +1078,8 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
         Per-axis bucket sizes.
     """
 
-    def __init__(self, name, units=None, copula=None, note='', hints='', mode='copula',
+    def __init__(self, name, units=None, copula=None, note='', hints='',
+                 tags=(), doc='', mode='copula',
                  nc_agg=None, nc_kwargs=None, nc_views=None, clash=None,
                  dbv_xs=None, dbv_ys=None, dbv_S=None,
                  exp_en=None, exp_el=None, exp_premium=None, exp_lr=None,
@@ -1092,6 +1093,10 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
         self.name = name
         self.note = note
         self.hints = hints
+        #: Tag slugs from the DecL ``tags{...}`` trailer ('()' when none).
+        self.tags = tuple(tags)
+        #: Long-form markdown recipe from ``doc{{{...}}}`` ('' when none).
+        self.doc = doc
         self.program = ''
         # clash provenance (na, nb, nc, n0, pa, pb) when built from a `clash`
         # statement; None for an ordinary copula / netceded bivariate.

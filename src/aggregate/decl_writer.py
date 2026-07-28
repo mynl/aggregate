@@ -67,14 +67,23 @@ _SEMICOLON_RE = re.compile(r";[ \t]*(\r?\n|$)")
 def _split_statements(text: str) -> list[str]:
     """Split program text into logical statements under the blank-line / ``;`` rule.
 
-    Removes full-line comments transparently (so they never separate
-    statements), strips trailing comments, turns a line-final ``;`` into a
-    paragraph break, then splits on runs of blank lines and flattens each
-    paragraph (newlines and indentation collapse to single spaces, so a
-    tab-indented portfolio folds into one statement). Mirrors
-    :meth:`UnderwritingLexer.preprocess` minus its bracket-newline step, so
-    bracketed notes survive intact.
+    Lifts ``doc{{{...}}}`` bodies out first (step 0), removes full-line comments
+    transparently (so they never separate statements), strips trailing comments,
+    turns a line-final ``;`` into a paragraph break, then splits on runs of blank
+    lines and flattens each paragraph (newlines and indentation collapse to
+    single spaces, so a tab-indented portfolio folds into one statement).
+    Mirrors :meth:`UnderwritingLexer.preprocess` minus its bracket-newline step,
+    so bracketed notes survive intact.
+
+    Step 0 is shared with the lexer rather than reimplemented: a doc body
+    legitimately contains ``#`` headings and blank lines, so without it the
+    renderer's own output would split into several statements and fail to
+    re-parse. That is exactly what a doc-carrying round-trip test catches.
     """
+    from .parser import _DOC_FENCE_RE, _encode_doc
+
+    text = _DOC_FENCE_RE.sub(
+        lambda m: f"doc{{{{{{{_encode_doc(m.group(1))}}}}}}}", text)
     text = _FULL_LINE_COMMENT_RE.sub("", text)
     text = _COMMENT_RE.sub("", text)
     text = _SEMICOLON_RE.sub("\n\n", text)
@@ -587,20 +596,33 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
 # ======================================================================
 
 def _render_trailer(spec: dict, trailer: bool = True) -> str:
-    """Render the ``note{...}`` / ``hints{...}`` trailer, preserved verbatim.
+    """Render the ``note`` / ``tags`` / ``hints`` / ``doc`` trailer, verbatim.
 
-    ``trailer=False`` suppresses both. They are one grammar construct (see the
-    ``decl.lark`` trailer rule) and one code path, so one flag governs them.
+    ``trailer=False`` suppresses all four. They are one grammar construct (see
+    the ``decl.lark`` trailer rule) and one code path, so one flag governs them.
     The result no longer re-parses to the same spec --- that is the caller's
     choice, made explicitly at the call site.
+
+    Notes
+    -----
+    ``doc{{{...}}}`` is emitted last and spans lines: its opening fence ends a
+    line and its closing fence sits alone on one, which is exactly the shape
+    step 0 of :meth:`aggregate.parser.UnderwritingLexer.preprocess` looks for.
+    That is what makes the round trip work --- the writer emits a raw markdown
+    body, and re-parsing re-encodes it.
     """
     if not trailer:
         return ''
     parts = []
     if spec.get('note'):
         parts.append(f'note{{{spec["note"]}}}')
+    if spec.get('tags'):
+        parts.append(f'tags{{{", ".join(spec["tags"])}}}')
     if spec.get('hints'):
         parts.append(f'hints{{{spec["hints"]}}}')
+    if spec.get('doc'):
+        # Newline-delimited: the closing fence MUST be alone on its line.
+        parts.append(f'doc{{{{{{\n{spec["doc"]}\n}}}}}}')
     return ' '.join(parts)
 
 
@@ -971,8 +993,8 @@ def _render_distortion(name: str, spec: dict, trailer: bool = True) -> str:
     take distortion *references* whose names are not retained on the constructed
     children, so they cannot round-trip and raise here.
 
-    ``trailer`` is accepted for uniform dispatch and ignored: a distortion
-    statement has no ``note{...}`` / ``hints{...}`` tail.
+    Since 1.0.0a157 a distortion carries the same trailer as every other
+    statement, so ``trailer`` is honoured rather than ignored.
     """
     from .spectral import Distortion
 
@@ -987,7 +1009,8 @@ def _render_distortion(name: str, spec: dict, trailer: bool = True) -> str:
         raise ValueError(f"distortion {name!r}: unknown kind {kind!r}.")
     params = subclass.decl_params or (subclass.param_name,)
     numbers = ' '.join(_fmt_num(spec[p]) for p in params)
-    return f'distortion {name} {kind} {numbers}'
+    tail = _render_trailer(spec, trailer)
+    return f'distortion {name} {kind} {numbers}' + (f' {tail}' if tail else '')
 
 
 _KIND_RENDERERS = {

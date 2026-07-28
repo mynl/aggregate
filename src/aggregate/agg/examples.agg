@@ -29,7 +29,7 @@
 #     wherever it sits in the statement. Place it on the clause it should
 #     attach to when built -- for a `port`, on the `port` header line (a
 #     trailing note attaches to the last `agg`, not the portfolio).
-#     note{} is NOT legal on `dist` lines -- use a comment.
+#     note{} is legal on every statement, `dist` lines included (1.0.0a157).
 #   * Statements are separated by a blank line or a trailing ";". A "#" /
 #     "//" comment is transparent (it never separates), so it can annotate or
 #     comment out a clause inside a multi-line statement.
@@ -381,11 +381,9 @@ agg J.Tweedie tweedie 1 1.005 0.1 note{Tweedie by mean, power p, and dispersion 
 # K. Distortion (risk measure)
 # ----------------------------------------------------------------------
 # A distortion is a spectral risk measure that loads loss into price.
-# (note{} is not legal on dist lines -- describe them in comments.)
-# Proportional-hazard distortion (universally understood).
-dist K.PH ph 0.7;
-# A dual-power distortion, the second leaf for the minimum below.
-dist K.Dual dual 2.5;
+# Since 1.0.0a157 a dist line carries the same trailer as everything else.
+dist K.PH ph 0.7 note{Proportional-hazard distortion (universally understood).};
+dist K.Dual dual 2.5 note{Dual-power distortion; the second leaf for the minimum below.};
 # A minimum (the more conservative envelope) of the two named leaves.
 # Combo distortions reference children by name, so this must come AFTER
 # K.PH and K.Dual and is resolved by sequential load (not a fresh KB).

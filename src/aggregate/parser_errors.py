@@ -163,6 +163,8 @@ _TERMINAL_LABELS: dict[str, str] = {
     "BUILTIN_DIST": "a builtin distortion (dist.X)",
     "NOTE": "a note clause (note{...})",
     "HINTS": "a hints clause (hints{...})",
+    "TAGS": "a tags clause (tags{...})",
+    "DOC": "a doc clause (doc{{{...}}}, closing fence on its own line)",
 }
 
 

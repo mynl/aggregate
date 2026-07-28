@@ -59,8 +59,8 @@ def price(agg, p, g, kind='var'):
         # just use it
         pass
     else:
-        # Distortion spec as dict
-        g = Distortion(**g)
+        # Distortion spec as dict (may carry note/tags/hints/doc metadata)
+        g = Distortion.from_spec(g)
 
     agg.apply_distortion(g)
     aug_row = agg.density_df.loc[a_reg]

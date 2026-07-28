@@ -19,8 +19,9 @@
 #
 # DecL syntax reminders honoured here:
 #   * ``port`` definitions are single-line (sub-agg clauses inlined).
-#   * ``note{...}`` is only legal on ``agg`` and ``sev`` lines; for
-#     ``dist`` / ``distortion`` we use ``#`` end-of-line comments instead.
+#   * the trailer clauses ``note{...}`` / ``tags{...}`` / ``hints{...}`` /
+#     ``doc{{{...}}}`` are legal on every statement, ``dist`` /
+#     ``distortion`` included (since 1.0.0a157).
 
 # Contents
 #
@@ -781,3 +782,76 @@ agg AD.Ruin.MixWait 5 years sev 10 * expon wait [.6 .4] * expon wts [.5 .5]     
 agg AD.Ruin.Fixed 10 claims sev gamma 2 fixed                                                 note{Rejected by BOTH solvers (neither poisson nor renewal)};
 agg AD.Ruin.Binomial 10 claims sev gamma 2 binomial 0.5                                       note{Rejected by pollaczeck_khinchine (strict poisson guard)};
 agg AD.Ruin.Defective 2 years dsev [1] dwait [1 2] [.4 .5] !                                  note{Rejected by wiener_hopf: defective (terminating) wait law};
+
+# ============================================================
+# AE. Trailer attachment ([Recipe-Library])
+#     (tests/test_trailer_attachment.py, tests/test_grammar_ambiguity.py)
+# ============================================================
+# Where a TRAILING trailer binds when the statement nests an object that ends
+# in its own trailer. The rule, in one line: a trailing trailer always binds to
+# the OUTER object; to annotate an inner component, put its trailer on that
+# component. These fixtures pin it.
+#
+# AE.Trailer.BivariateBare is the one genuinely ambiguous shape in the grammar:
+# copula_clause is nullable and bv_body ends in an agg_out that carries its own
+# trailer, so with neither a copula clause nor an outer frequency to separate
+# them, `note{...}` can parse as either. Earley's ambiguity='resolve' picks the
+# outer binding, which is the documented behaviour; test_grammar_ambiguity.py
+# holds the line. Adding a copula or a frequency clause removes the ambiguity
+# entirely (AE.Trailer.BivariateSeparated).
+#
+# port is NOT ambiguous: port_out places its trailer BEFORE agg_list, so the
+# port's slot has already closed by the time a unit is read -- which is why a
+# note written after the last unit lands on that unit, not the portfolio.
+bivariate AE.Trailer.BivariateBare 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 note{ambiguous shape: binds to the bivariate};
+bivariate AE.Trailer.BivariateSeparated 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson note{copula and freq separate the trailer: unambiguous};
+bivariate AE.Trailer.BivariateInner 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 note{inner wind} agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 note{inner flood} copula gumbel 0.4 poisson note{outer bivariate};
+netceded agg AE.Trailer.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson note{binds to the netceded view-pair};
+clash AE.Trailer.Clash 8 5 2 claims sev lognorm 50 cv 1.2 sev lognorm 60 cv 1.5 mixed gamma 0.2 note{binds to the clash};
+port AE.Trailer.Port note{on the portfolio} agg AE.Trailer.PortUnit 5 claims sev lognorm 10 cv 1 poisson note{on the last unit}
+
+# ============================================================
+# AF. tags{...} and doc{{{...}}} ([Recipe-Library])
+#     (tests/test_doc_clause.py)
+# ============================================================
+# tags{} is a comma- and/or space-separated slug list, decomposed to a tuple.
+# doc{{{...}}} is a long-form markdown recipe. Its body is lifted out by step 0
+# of the lexer preprocessor and carried as URL-safe base64, so it may contain
+# everything a note{} cannot: `#` headings (which the comment stripper would
+# eat), blank lines (which would split the statement), fenced code, braces, and
+# semicolons. The ONLY forbidden content is a line consisting solely of `}}}` --
+# the closing fence must be alone on its line, which is what makes an inline
+# `}}}` inside Python (e.g. a nested dict) harmless.
+agg AF.Tags.Spaces 5 claims sev lognorm 10 cv 1 poisson                                       tags{severity frequency aggregate}                note{space-separated tag list};
+agg AF.Tags.Commas 5 claims sev lognorm 10 cv 1 poisson                                       tags{severity, frequency, aggregate}              note{comma-separated tag list};
+agg AF.Tags.Mixed  5 claims sev lognorm 10 cv 1 poisson                                       tags{severity,frequency  aggregate, check:round-trip}  note{mixed separators and a namespaced tag};
+dist AF.Tags.Dist ph 0.7                                                                      tags{distortion, hero}                            note{distortions carry a trailer since 1.0.0a157};
+
+agg AF.Doc.Full 10 claims sev lognorm 50 cv 1 poisson
+    note{one-line abstract; the doc carries the recipe}
+    tags{aggregate, intro, check:independent-oracle}
+    doc{{{
+## Problem
+
+You want the full markdown surface inside a DecL statement: headings, blank
+lines, fenced code, braces, and punctuation that DecL otherwise reserves.
+
+## Solution
+
+```python
+a = build('AF.Doc.Full')
+nested = {'a': {'b': {'c': 1}}}   # inline }}} survives; the fence must be alone
+qd(a.describe)
+```
+
+## Discussion
+
+The body never reaches the lexer as text -- see `UnderwritingLexer.preprocess`
+step 0. A `#` here would be eaten by the comment stripper without it.
+
+## Check
+
+```python
+assert abs(a.agg_m - 500) < 1e-6
+```
+}}}

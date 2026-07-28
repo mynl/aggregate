@@ -22,8 +22,9 @@
 # de-duplicated and the section/naming scheme finalized (expect a few
 # duplicate names until that curation pass). Target ~128-256 lines.
 #
-# FORMAT: same DecL line format as examples.agg. note{} is legal on
-# agg/sev/port/pnl/bv lines, not on dist lines (use "#" comments there).
+# FORMAT: same DecL line format as examples.agg. The trailer clauses
+# note{} / tags{} / hints{} / doc{{{...}}} are legal on EVERY statement,
+# dist lines included (since 1.0.0a157).
 # ======================================================================
 
 # Default severity used in many other examples

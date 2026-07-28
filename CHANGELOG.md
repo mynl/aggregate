@@ -1,5 +1,107 @@
 # Changelog
 
+## 1.0.0a157
+
+**[Recipe-Library]** — phase 1 of `dev/plan-meta-data.md`: the DecL trailer
+grows from two clauses to four, so a library entry can carry its own
+description, grouping and executable recipe. Phases 2–6 (the recipe runtime,
+the merged `library.agg`, the recipe test harness, and the Problem / Solution /
+Discussion cookbook) follow.
+
+### `tags{...}` — grouping and selection
+
+A comma- and/or space-separated slug list, decomposed to an ordered tuple with
+duplicates dropped: `tags{severity, heavy-tail}` and
+`tags{severity heavy-tail}` are the same thing. Lands on `spec['tags']` and on
+the object as `.tags`. This is the machine-readable replacement for the
+`# A. Showcase` letter-prefix convention, which only ever existed as a comment
+that nothing in `src/aggregate` read.
+
+### `doc{{{...}}}` — a long-form markdown recipe, in the language
+
+```
+agg LimitProfile
+    [1000 2000 500] prem at [.8 .7 .5] lr
+    ...
+    note{one-line abstract}
+    tags{aggregate, intro}
+    doc{{{
+## Problem
+...
+## Solution
+```python
+a = build('LimitProfile')
+```
+}}}
+```
+
+A doc body needs everything DecL preprocessing destroys — `#` headings (step 1
+strips to end of line), blank lines (steps 4–5 split statements on them), fenced
+code, braces, semicolons. So **the body never reaches the lexer as text**: a new
+**step 0** in `UnderwritingLexer.preprocess` lifts it out and substitutes
+URL-safe base64, whose alphabet (`A-Za-z0-9-_=`) contains no `#`, `//`, `}`,
+`[`, `]`, `;` or whitespace and therefore survives steps 1–6 byte-for-byte. The
+`DOC` terminal decodes it again; `decl_writer` re-emits the raw body between
+real fences, so `format_program` output re-parses.
+
+The opening fence ends its line and **the closing fence must be alone on its
+line**. That anchor makes an inline `}}}` inside Python — `{'a': {'b': {'c':
+1}}}` — harmless; a line that *is* `}}}` is the single forbidden body content.
+
+### Breaking / behavioural
+
+- **`distortion` gains a trailer.** `dist` statements previously accepted no
+  `note{}` at all (the shipped library headers said so); they now take the full
+  trailer like every other statement, and `Distortion` carries `.note` /
+  `.tags` / `.hints` / `.doc`. New `Distortion.from_spec(spec)` replaces
+  `Distortion(**spec)` at the three construction sites — the kind subclasses
+  take strict natural-parameter signatures and reject unknown keywords, so
+  trailer metadata is applied after construction.
+- **`PnL` gains `.note` / `.tags` / `.hints` / `.doc`**, which it never had.
+  They come from the statement's build recipe via `PnL._adopt_engine`, not from
+  the wrapped engine — for a `port.NAME` engine the Portfolio's own metadata is
+  not the P&L's.
+- **`tags` and `doc` are *conditional* spec keys**, present only when written.
+  `note`/`hints` remain unconditional. The captured spec snapshot compares key
+  sets exactly, so unconditional keys would have failed all 163 cases.
+- `Underwriter.discover` strips `tags{}` and `doc{{{}}}` from its program column
+  alongside `note{}`/`hints{}`.
+
+### Grammar
+
+`trailer` is now a repetition rather than five spelled-out alternatives:
+
+```lark
+trailer: trailer_item*
+trailer_item: NOTE -> ... | TAGS -> ... | HINTS -> ... | DOC -> ...
+```
+
+The original spelled-out form existed because the natural two-item spelling
+gives the *empty* trailer two parses. A star has exactly one empty parse, and it
+scales — four order-free optional items written out would be 65 alternatives.
+Repeating a clause is a clear `ValueError` from the transformer.
+
+### Two new guards
+
+The parser runs with Lark's default `ambiguity='resolve'`, which silently picks
+one parse and never warns — so a grammar edit could change behaviour invisibly.
+Two tests close that hole, both written *before* the grammar changed so they
+record the pre-existing behaviour:
+
+- **`tests/test_grammar_ambiguity.py`** builds a second Lark with
+  `ambiguity='explicit'` and sweeps all 600+ shipped statements, asserting the
+  ambiguous set equals a pinned allow-list. Two entries are accepted:
+  `ssev -3 * lognorm ...` (parses as `scale(-3)` or `negate(scale(3))` —
+  algebraically identical, pre-existing) and the deliberate
+  `AE.Trailer.BivariateBare` fixture below.
+- **`tests/test_trailer_attachment.py`** pins *which* parse wins. A trailing
+  trailer binds to the **outer** object. For `port` that is forced positionally
+  (`port_out` puts its trailer before `agg_list`); for a `bivariate` with
+  neither a copula clause nor an outer frequency it is a genuine ambiguity —
+  the last component's trailer and the bivariate's are adjacent and both
+  nullable — resolved to the bivariate. Round-trip tests cannot catch a flipped
+  binding, because the flipped parse is still a fixed point.
+
 ## 1.0.0a156
 
 **[Ruin-Example-Punchups]** — legend on the `ruin_example` psi(u) panel: the

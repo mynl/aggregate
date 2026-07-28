@@ -40,6 +40,7 @@ REPL debugging session::
 
 from __future__ import annotations
 
+import base64
 import logging
 import re
 from pathlib import Path
@@ -59,6 +60,41 @@ __all__ = ['UnderwritingLexer', 'UnderwritingParser', 'grammar',
            'INHERIT_PREMIUM']
 
 GRAMMAR_FILE = Path(__file__).parent / "decl.lark"
+
+# ----------------------------------------------------------------------
+# doc{{{ ... }}} -- the long-form markdown recipe clause
+# ----------------------------------------------------------------------
+# A doc body carries markdown: ``#`` headings, blank lines, fenced ```python
+# blocks, braces inside code. None of that can survive DecL preprocessing --
+# step 1 strips anything after a ``#``, step 4/5 split statements on blank
+# lines, and a bare ``}`` would close a note-style clause at the first
+# occurrence.
+#
+# So the body never reaches the lexer as text. Step 0 of
+# ``UnderwritingLexer.preprocess`` lifts it out and substitutes URL-safe
+# base64, whose alphabet (``A-Za-z0-9-_=``) contains no ``#``, ``//``, ``}``,
+# ``[``, ``]``, ``;`` or whitespace -- so the substituted token is inert
+# through every later step. ``UnderwritingParser.DOC`` decodes it again, and
+# ``decl_writer`` re-emits the decoded body between real fences, so
+# ``format_program`` output re-parses (step 0 simply re-encodes it).
+#
+# The opening fence must end its line and the closing fence must be alone on
+# its line. That anchor is what makes an inline ``}}}`` inside Python -- e.g.
+# ``{'a': {'b': {'c': 1}}}`` -- harmless; only a line that *is* ``}}}`` closes
+# the block. The single forbidden body content is such a line.
+_DOC_FENCE_RE = re.compile(r"doc\{\{\{[ \t]*\r?\n(.*?)\r?\n[ \t]*\}\}\}", re.S)
+
+
+def _encode_doc(body: str) -> str:
+    """Encode a doc body as URL-safe base64 (inert through preprocessing)."""
+    return base64.urlsafe_b64encode(body.encode("utf-8")).decode("ascii")
+
+
+def _decode_doc(payload: str) -> str:
+    """Inverse of :func:`_encode_doc`; tolerates an empty payload."""
+    if not payload:
+        return ""
+    return base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8")
 
 
 class _InheritPremium:
@@ -128,8 +164,13 @@ class UnderwritingLexer:
         stay in the same statement. The corollary is that a comment cannot
         separate two statements — use a blank line or a ``;`` for that.
 
-        The preprocessor performs six steps:
+        The preprocessor performs seven steps:
 
+        0. ``doc{{{ ... }}}`` bodies are lifted out and replaced by URL-safe
+           base64, whose alphabet is inert through every later step. Done
+           **first**, so a doc body may contain ``#`` headings, blank lines,
+           fenced code and braces -- none of which would survive steps 1-6.
+           The closing fence must be alone on its line.
         1. Full-line comments (optional indent, then ``#`` / ``//``) are removed
            **entirely, including their newline**, so they leave no blank-line
            ghost and a comment inside a multi-line statement folds away. Done
@@ -155,6 +196,14 @@ class UnderwritingLexer:
         list[str]
             Non-empty, whitespace-normalised DecL statements ready for parsing.
         """
+        # 0. Lift every doc{{{...}}} body out and substitute URL-safe base64.
+        # MUST run first: the body is markdown, so it legitimately contains
+        # ``#``, blank lines, ``}`` and ``[``/``]``, every one of which the
+        # steps below would mangle. After substitution the token is pure
+        # ``[A-Za-z0-9_=-]`` and passes through them byte-for-byte.
+        program = _DOC_FENCE_RE.sub(
+            lambda m: f"doc{{{{{{{_encode_doc(m.group(1))}}}}}}}", program)
+
         # 1. Remove full-line comments ENTIRELY (line + its newline), so a
         # comment is transparent: it never separates statements and never
         # masquerades as a blank line. Done before the bracket step so a stray
@@ -279,6 +328,31 @@ class UnderwritingTransformer(Transformer):
         # strip the leading ``hints{`` (6 chars) and trailing ``}``.
         return str(tok)[6:-1]
 
+    def TAGS(self, tok):
+        """Decompose ``tags{a, b c}`` into the tuple ``('a', 'b', 'c')``.
+
+        Separators are commas and/or whitespace, so both the prose style
+        (``tags{severity, heavy-tail}``) and the terse style
+        (``tags{severity heavy-tail}``) work. Order is preserved and duplicates
+        are dropped, so a tag list is a stable, comparable value.
+        """
+        body = str(tok)[5:-1]
+        seen = {}
+        for slug in re.split(r"[,\s]+", body):
+            if slug:
+                seen.setdefault(slug, None)
+        return tuple(seen)
+
+    def DOC(self, tok):
+        """Decode the base64 placeholder left by ``preprocess`` step 0.
+
+        The token that reaches the lexer is ``doc{{{<urlsafe-base64>}}}``; the
+        real markdown body was lifted out before comment stripping so that ``#``
+        headings, blank lines and fenced code could survive. See
+        :meth:`UnderwritingLexer.preprocess`.
+        """
+        return _decode_doc(str(tok)[6:-3])
+
     def ID(self, tok):
         return str(tok)
 
@@ -327,8 +401,9 @@ class UnderwritingTransformer(Transformer):
         not here, so the parser holds no distortion-specific knowledge."""
         from .spectral import Distortion
 
-        _, name, kind_id, numbers = c
-        return ("distortion", name, Distortion.decl_spec(kind_id, numbers))
+        _, name, kind_id, numbers, trailer = c
+        return ("distortion", name,
+                {**Distortion.decl_spec(kind_id, numbers), **trailer})
 
     def buildin_dist_list_one(self, c):
         return [c[0]]
@@ -349,36 +424,36 @@ class UnderwritingTransformer(Transformer):
         children = []
         for buildinid in ids:
             spec = self.safe_lookup(buildinid)
-            children.append(Distortion(**spec))
+            children.append(Distortion.from_spec(spec))
         return children
 
     def distortion_out_combo(self, c):
-        _, name, kind_id, child_ids = c
+        _, name, kind_id, child_ids, trailer = c
         if kind_id not in ('minimum', 'mixture'):
             raise ValueError(
                 f"DecL: '{kind_id}' does not take a list of distortion "
                 f"references; only 'minimum' and 'mixture' do")
         children = self._resolve_combo_children(child_ids)
         return ("distortion", name,
-                {"name": kind_id, "distortions": children})
+                {"name": kind_id, "distortions": children, **trailer})
 
     def distortion_out_combo_wtd(self, c):
-        _, name, kind_id, child_ids, _wts_kw, wts = c
+        _, name, kind_id, child_ids, _wts_kw, wts, trailer = c
         if kind_id != 'mixture':
             raise ValueError(
                 f"DecL: weights are only meaningful for 'mixture', not "
                 f"{kind_id!r}")
         children = self._resolve_combo_children(child_ids)
         return ("distortion", name,
-                {"name": kind_id, "distortions": children, "wts": wts})
+                {"name": kind_id, "distortions": children, "wts": wts,
+                 **trailer})
 
     # ----- portfolio -------------------------------------------------
     def port_out(self, c):
         _, name, as_label, trailer, agg_list = c
         return ("port", name, {"spec": agg_list,
                                **as_label,
-                               "note": trailer["note"],
-                               "hints": trailer["hints"]})
+                               **trailer})
 
     def agg_list_cons(self, c):
         lst, ag = c
@@ -505,15 +580,13 @@ class UnderwritingTransformer(Transformer):
         # Tweedie's synthetic note wins over any (absent) user note; hints ride
         # the trailer. Non-tweedie bodies carry no ``_engine_note``.
         note = body.pop("_engine_note", None) or trailer["note"]
-        spec = {"name": name, **as_label, **body,
-                "note": note, "hints": trailer["hints"]}
+        # ``**trailer`` first so the synthetic tweedie note overrides it.
+        spec = {"name": name, **as_label, **body, **trailer, "note": note}
         return ("agg", name, spec)
 
     def agg_out_builtin(self, c):
         bagg, agg_reins, trailer = c
-        return ("agg", bagg["name"], {**bagg, **agg_reins,
-                                      "note": trailer["note"],
-                                      "hints": trailer["hints"]})
+        return ("agg", bagg["name"], {**bagg, **agg_reins, **trailer})
 
     # ----- profit-and-loss aggregate (premium minus loss) -----------
     def answer_pnl(self, c):
@@ -584,13 +657,14 @@ class UnderwritingTransformer(Transformer):
         under ``_engine_port`` for a dedicated factory path.
         """
         ekind, ename, espec = source
-        spec = {"name": name, **as_label, **expense,
-                "note": trailer["note"], "hints": trailer["hints"]}
+        spec = {"name": name, **as_label, **expense, **trailer}
         if ekind == "port":
             spec["_engine_port"] = ename
         else:
             for k, v in espec.items():
-                if k in ("name", "note", "hints", "label"):
+                # ``tags``/``doc`` join the existing skip list: the pnl owns its
+                # own metadata, and an engine's recipe is not the pnl's recipe.
+                if k in ("name", "note", "hints", "label", "tags", "doc"):
                     continue
                 spec[k] = v
             # The engine's own note (tweedie) and label are inner-Aggregate
@@ -769,8 +843,7 @@ class UnderwritingTransformer(Transformer):
             **freq,
             "units": body,
             "copula": copula,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
+            **trailer,
         }
         # Bivariate reuses the shared ``exposures`` production but is out of
         # scope for labels (dev/plan-labels.md); strip any interior-label temp
@@ -786,8 +859,7 @@ class UnderwritingTransformer(Transformer):
             "freq_name": "poisson",
             "units": body,
             "copula": copula,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
+            **trailer,
         }
         # Bivariate reuses the shared ``exposures`` production but is out of
         # scope for labels (dev/plan-labels.md); strip any interior-label temp
@@ -809,8 +881,7 @@ class UnderwritingTransformer(Transformer):
             **dfreq,
             "units": body,
             "copula": copula,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
+            **trailer,
         }
         # Bivariate reuses the shared ``exposures`` production but is out of
         # scope for labels (dev/plan-labels.md); strip any interior-label temp
@@ -832,8 +903,7 @@ class UnderwritingTransformer(Transformer):
             **exposures,
             **freq,
             **dbv,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
+            **trailer,
         }
         # Bivariate reuses the shared ``exposures`` production but is out of
         # scope for labels (dev/plan-labels.md); strip any interior-label temp
@@ -850,8 +920,7 @@ class UnderwritingTransformer(Transformer):
             **exposures,
             "freq_name": "poisson",
             **dbv,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
+            **trailer,
         }
         # Bivariate reuses the shared ``exposures`` production but is out of
         # scope for labels (dev/plan-labels.md); strip any interior-label temp
@@ -871,8 +940,7 @@ class UnderwritingTransformer(Transformer):
             "mode": "discrete",
             **dfreq,
             **dbv,
-            "note": trailer["note"],
-            "hints": trailer["hints"],
+            **trailer,
         }
         # Bivariate reuses the shared ``exposures`` production but is out of
         # scope for labels (dev/plan-labels.md); strip any interior-label temp
@@ -960,8 +1028,7 @@ class UnderwritingTransformer(Transformer):
             "copula": Copula("independent"),
             "clash": {"na": sol.na, "nb": sol.nb, "nc": sol.nc,
                       "n0": sol.n0, "pa": sol.pa, "pb": sol.pb},
-            "note": trailer["note"],
-            "hints": trailer["hints"],
+            **trailer,
         }
         # Bivariate reuses the shared ``exposures`` production but is out of
         # scope for labels (dev/plan-labels.md); strip any interior-label temp
@@ -985,16 +1052,14 @@ class UnderwritingTransformer(Transformer):
         _, name, as_label, sev, trailer = c
         sev["name"] = name
         sev.update(as_label)
-        sev["note"] = trailer["note"]
-        sev["hints"] = trailer["hints"]
+        sev.update(trailer)
         return ("sev", name, sev)
 
     def sev_out_dsev(self, c):
         _, name, as_label, dsev, trailer = c
         dsev["name"] = name
         dsev.update(as_label)
-        dsev["note"] = trailer["note"]
-        dsev["hints"] = trailer["hints"]
+        dsev.update(trailer)
         return ("sev", name, dsev)
 
     # ----- frequency -------------------------------------------------
@@ -1894,25 +1959,42 @@ class UnderwritingTransformer(Transformer):
         attach = breaks[:-1]
         return [limits, attach]
 
-    # ----- trailer (optional note{...} + hints{...}) -----------------
-    # Each method returns ``{"note": <text>, "hints": <raw settings string>}``
-    # so the order-free / present-or-absent variants collapse to one shape.
+    # ----- trailer (optional note / tags / hints / doc) ---------------
+    # Each item method returns a ``(key, value)`` pair; ``trailer`` folds them
+    # into one dict that call sites splat with ``**trailer``.
+    #
+    # ``note`` and ``hints`` are ALWAYS present (possibly empty) because every
+    # spec has carried them since 1.0.0a25 and the captured spec snapshot
+    # compares key sets exactly (tests/test_decl_parser.py). ``tags`` and ``doc``
+    # are added ONLY when written -- adding them unconditionally would put
+    # ``Extra={'tags','doc'}`` into every spec and fail all 163 snapshot cases.
+    # Hosts therefore read them with ``spec.get(...)``.
+    #
     # ``hints`` is left as a raw ``key=value;`` string here; it is parsed and
     # type-coerced in ``aggregate.underwriter`` (caller-wins merge).
-    def trailer_nh(self, c):
-        return {"note": c[0], "hints": c[1]}
+    def trailer_item_note(self, c):
+        return ("note", c[0])
 
-    def trailer_hn(self, c):
-        return {"note": c[1], "hints": c[0]}
+    def trailer_item_tags(self, c):
+        return ("tags", c[0])
 
-    def trailer_note(self, c):
-        return {"note": c[0], "hints": ""}
+    def trailer_item_hints(self, c):
+        return ("hints", c[0])
 
-    def trailer_hints(self, c):
-        return {"note": "", "hints": c[0]}
+    def trailer_item_doc(self, c):
+        return ("doc", c[0])
 
-    def trailer_none(self, c):
-        return {"note": "", "hints": ""}
+    def trailer(self, c):
+        out = {"note": "", "hints": ""}
+        seen = set()
+        for key, value in c:
+            if key in seen:
+                raise ValueError(
+                    f"repeated {key}{{...}} clause: at most one of each of "
+                    f"note, tags, hints, doc is allowed per statement.")
+            seen.add(key)
+            out[key] = value
+        return out
 
     # ----- exposures -------------------------------------------------
     def exposures_claims(self, c):

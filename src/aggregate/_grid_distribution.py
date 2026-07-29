@@ -206,9 +206,15 @@ def make_var_tvar(ser):
             # vectorized
             p = np.array(p)
             idx = np.searchsorted(cser_F_np, p, side='right')
-            return np.where(idx >= len(cser_F_np) - 1,
-                            x_np[-1],
-                           ((cser_F_np2[idx] - p) * x_np2u[idx] + tvar_unconditional[idx + 1]) / (1 - p))
+            # np.where evaluates both branches, so at p = 1 the padded tail
+            # sentinels (x_np2u[-1] and tvar_unconditional[-1], both inf) give
+            # 0 * inf = nan and a 1 / 0. The np.where discards those values;
+            # the guard only stops numpy reporting arithmetic that never
+            # reaches the result.
+            with np.errstate(divide='ignore', invalid='ignore'):
+                return np.where(idx >= len(cser_F_np) - 1,
+                                x_np[-1],
+                               ((cser_F_np2[idx] - p) * x_np2u[idx] + tvar_unconditional[idx + 1]) / (1 - p))
 
     return QuantileFunctions(q_lower, q_lower, q_lower, q_upper, tvar)
 
@@ -518,7 +524,10 @@ class GridDistribution(HelpMixin):
         if Fb >= 1.0:
             return tvar
         gap = (1.0 - Fb) * (float(self.tvar(Fb)) - a)
-        return np.where(np.asarray(p) < Fb, tvar - gap / (1.0 - np.asarray(p)), a)
+        # np.where evaluates both branches, so p = 1 divides by zero in the
+        # false branch even though the answer taken there is the cap a.
+        with np.errstate(divide='ignore', invalid='ignore'):
+            return np.where(np.asarray(p) < Fb, tvar - gap / (1.0 - np.asarray(p)), a)
 
     # ------------------------------------------------------------------
     # capital anchor: free choice over {p, L, a}

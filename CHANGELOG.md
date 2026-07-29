@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.0.0a179
+
+**[TVaR-Endpoint-Noise]** `Bounds(port, premium).weight_df` emitted
+`RuntimeWarning: invalid value encountered in multiply`. The numbers were
+always right; only the reporting was noisy. Three sites now carry the
+`np.errstate(divide='ignore', invalid='ignore')` guard the rest of the library
+already uses.
+
+`Bounds.p_knots` deliberately includes `p = 1`. The quantile kernel
+`make_var_tvar` pads its tail arrays with `inf` sentinels and selects with
+`np.where`, which evaluates *both* branches, so at the endpoint the discarded
+branch computes `0 * inf` and a `1 / 0`. The comment in that function already
+noted `np.where` does not short circuit; the guard was simply missing.
+
+This was never specific to `Bounds`. `make_var_tvar` is the kernel every
+`q` / `var` / `tvar` call routes through, so a bare
+`port.tvar(np.array([0.5, 1.0]))` warned too. The scalar branch was always
+clean because it short circuits before the padded arrays.
+
+Guarded:
+
+- `_grid_distribution.py`, the vectorized branch of `make_var_tvar`'s `tvar`.
+- `_grid_distribution.py`, `GridDistribution.tvar_of_limited`, whose false
+  branch divides by `1 - p` even where the answer taken is the cap `a`.
+- `spectral.py`, `Distortion.tvar_terms`, a nested `np.where` over
+  `min(s / (1 - p), 1)`. This is what fired on `Bounds.cloud_df` and
+  `min_envelope`.
+
+New regression cases in `tests/test_grid_distribution.py` and
+`tests/test_bounds.py` assert both the silence and the values, so a future
+refactor that lets the NaN reach the result also fails. `tests/test_bounds.py`
+had its own copy of the knot function dividing by `1 - p` at `p = 1`; it now
+calls a small `_tvar_g` helper that writes the endpoint out.
+
+### Scope
+
+This does not make the library warning free. Measured with
+`pytest -W error::RuntimeWarning`: 71 failed and 4 errors before, 52 failed and
+0 errors after. The remainder are other benign boundary sites, mostly elsewhere
+in `spectral.py` plus `moments.py`, `pedagogy.py`, and `_aggregate_compute.py`.
+They need case by case review and are tracked as **[RuntimeWarning-Census]** in
+`dev/TODO.md`. Nothing in the package promotes warnings to errors, so this
+matters only to users whose own kernel does.
+
 ## 1.0.0a178
 
 **[Library-Canonical-Layout]** `agg/library.agg` is rewritten in the canonical

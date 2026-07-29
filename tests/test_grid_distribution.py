@@ -7,6 +7,8 @@ every accessor against an independent computation (a fine numeric integral of
 the step quantile function, a direct cumulative sum, etc.).
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -261,3 +263,54 @@ def test_zero_mass_points_ignored_by_kernel():
     assert gd.q(0.25, 'lower') == 0.0
     assert gd.q(0.75, 'lower') == 3.0
     assert gd.tvar(0.5) == pytest.approx(3.0)
+
+
+# ----------------------------------------------------------------------
+# p = 1 endpoint: correct answer, and no numpy noise reporting the
+# discarded branch of the np.where (see the errstate guards in the kernel)
+# ----------------------------------------------------------------------
+def test_vectorized_tvar_at_p_one_is_quiet_and_correct(skewed):
+    """Vectorized tvar including p = 1 must not emit a RuntimeWarning.
+
+    The kernel pads its tail arrays with ``inf`` sentinels and selects with
+    ``np.where``, which evaluates both branches. At ``p = 1`` the discarded
+    branch computes ``0 * inf``; the answer is still the largest outcome.
+    """
+    p = np.array([0.0, 0.5, 0.9, 1.0])
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        out = skewed.tvar(p)
+    assert np.all(np.isfinite(out))
+    # the p = 1 entry is the max outcome, and agrees with the scalar branch
+    assert out[-1] == pytest.approx(skewed.x[-1])
+    assert out[-1] == pytest.approx(float(skewed.tvar(1.0)))
+    assert out[1] == pytest.approx(float(skewed.tvar(0.5)))
+
+
+def test_tvar_of_limited_at_p_one_is_quiet_and_correct(skewed):
+    """``tvar_of_limited`` with a finite cap and p = 1 must not warn.
+
+    Same eager-``np.where`` shape: the false branch divides by ``1 - p``.
+    Past the cap the conditional tail of ``min(X, a)`` is exactly ``a``.
+    """
+    a = 25.0
+    p = np.array([0.5, 1.0])
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        out = skewed.tvar_of_limited(p, a)
+    assert np.all(np.isfinite(out))
+    assert out[-1] == pytest.approx(a)
+
+
+def test_tvar_terms_at_endpoints_is_quiet():
+    """``Distortion.tvar_terms`` must not warn at the p = 1 / s = 0 endpoints."""
+    from aggregate.spectral import Distortion
+
+    p = np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        out = Distortion.tvar_terms(p)
+    assert np.all(np.isfinite(out))
+    assert out.shape == (len(p), len(p))
+    # knot function is a probability weight: values live in [0, 1]
+    assert out.min() >= 0.0 and out.max() <= 1.0

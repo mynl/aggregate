@@ -932,15 +932,25 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         Evaluate the TVaR knot function ``min(s / (1-p), 1)`` for a vector
         of p values. ``s = 1 - p`` in reverse order. These are the knot
         evaluations used to assemble a weighted TVaR.
+
+        Notes
+        -----
+        The two ``np.where`` guards give the correct endpoint values, but
+        ``np.where`` evaluates every branch, so ``s / (1 - p)`` is still
+        computed at ``p = 1`` (divide by zero) and at ``s = 0`` (``0 / 0``).
+        Those results are discarded. The ``errstate`` guard suppresses the
+        report of arithmetic that never reaches the answer; there is no
+        singularity here.
         """
         n = len(p_in)
         p = p_in.reshape((n, 1))
         s = (1 - p_in[::-1]).reshape((1, n))
-        return np.where(s == 0,
-                        np.zeros_like(p),
-                        np.where(p == 1,
-                                 np.ones_like(p),
-                                 np.minimum(s / (1 - p), 1)))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            return np.where(s == 0,
+                            np.zeros_like(p),
+                            np.where(p == 1,
+                                     np.ones_like(p),
+                                     np.minimum(s / (1 - p), 1)))
 
     @cached_property
     def tvar_info_df(self):

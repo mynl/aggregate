@@ -8,6 +8,8 @@ That's the closed-form anchor for the regression suite.
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -19,6 +21,18 @@ port BDD
     agg A 1 claim sev 10 * beta 2 3 fixed
     agg B 1 claim sev 15 * beta 4 2 fixed
 """
+
+
+def _tvar_g(s, p):
+    """The TVaR_p knot function ``min(1, s / (1 - p))``, endpoint included.
+
+    Written out rather than divided, because ``p = 1`` is a real knot in
+    ``Bounds.p_knots``. There the TVaR-1 distortion is ``g(s) = 1`` for
+    ``s > 0`` and ``g(0) = 0``, matching :meth:`Distortion.tvar_terms`.
+    """
+    if p >= 1.0:
+        return 1.0 if s > 0 else 0.0
+    return min(1.0, s / (1.0 - p))
 
 
 @pytest.fixture(scope='module')
@@ -92,7 +106,7 @@ def test_min_envelope_hinges_records_active_pair(bdd_at_tvar50):
         assert np.isclose(w, bd.weight_df.at[(pl, pu), 'weight'], atol=1e-12)
         # the BiTVaR closed-form at s == cloud_df value == envelope minimum
         s = row['s']
-        bitvar_g = (1 - w) * min(1, s / (1 - pl)) + w * min(1, s / (1 - pu))
+        bitvar_g = (1 - w) * _tvar_g(s, pl) + w * _tvar_g(s, pu)
         recorded = bd.cloud_df.iloc[i][(pl, pu)]
         actual_min = bd.cloud_df.iloc[i].min()
         assert np.isclose(recorded, actual_min, atol=1e-12)
@@ -139,3 +153,23 @@ def test_aggregate_input():
     prem = float(agg.tvar(0.5))
     bd = Bounds(agg, premium=prem)
     assert abs(bd.p_star - 0.5) < 1e-6
+
+
+def test_frames_emit_no_runtime_warning():
+    """``weight_df`` / ``cloud_df`` must build without numpy noise.
+
+    ``p_knots`` deliberately includes ``p = 1``, which used to trip the eager
+    ``np.where`` branches in the tvar kernel and in ``Distortion.tvar_terms``.
+    The reported NaN was always discarded, so this pins both the silence and
+    the absence of NaN in the results. Builds its own ``Bounds`` rather than
+    using the module fixture, whose cached properties may already be warm.
+    """
+    port = build(PROGRAM)
+    prem = float(port.tvar(0.5))
+    bd = Bounds(port, premium=prem)
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        wdf = bd.weight_df
+        cdf = bd.cloud_df
+    assert not wdf.isna().any().any()
+    assert not cdf.isna().any().any()

@@ -543,7 +543,9 @@ def test_text_info_blob_is_one_line_and_states_validation(fixture, request):
     obj = request.getfixturevalue(fixture)
     blob = obj._text_info_blob()
     assert '\n' not in blob
-    assert blob.endswith(f'Validation: {obj.validation_explanation}.')
+    # a172: the one-liner carries the SHORT verdict. The text it prints is
+    # unchanged -- validation_description is the old validation_explanation.
+    assert blob.endswith(f'Validation: {obj.validation_description}.')
 
 
 # ---------------------------------------------------------------------------
@@ -639,6 +641,144 @@ def test_bivariate_component_labels_reach_the_exhibits():
     # the switch turns it off, and the canonical handles come back
     b.use_labels = False
     assert list(b.axis_support_df.index) == ['Wind', 'Flood']
+
+
+# ---------------------------------------------------------------------------
+# the a172 [FCC-Contract-Gaps] batch -- the contract's declared holes, closed
+# ---------------------------------------------------------------------------
+
+def test_the_contract_has_no_outstanding_exceptions():
+    """a172: both excuse lists are empty, and must stay empty at 1.0.0b1."""
+    assert FCC_CONTRACT_EXCEPTIONS == {}
+    assert FCC_UNPAIRED_NARRATIVES == ()
+
+
+def test_portfolio_retains_its_whole_decl_trailer():
+    """a172: the parser produced them, the underwriter dropped them.
+
+    The port trailer goes right after the name (``port_out: PORT name as_label
+    trailer agg_list``); written after the last unit it binds to that unit.
+    """
+    p = build('port FCC.Trailer note{book note} tags{topic:t, role:demo} '
+              'hints{log2=16} '
+              'agg T1 5 claims sev lognorm 50 cv 1 poisson '
+              'agg T2 3 claims sev gamma 20 cv .5 poisson')
+    assert p.note == 'book note'
+    assert p.tags == ('topic:t', 'role:demo')
+    assert p.hints == 'log2=16'
+    assert p.log2 == 16                     # retention did not break the effect
+
+
+def test_bivariate_validation_df_is_the_check_table(biv):
+    """a172: one row per check, with the gate and the verdict."""
+    df = biv.validation_df
+    assert list(df.columns) == ['Est', 'Ref', 'Err', 'Gate', 'Pass']
+    assert df.index.name == 'check'
+    assert 'tail deficit' in df.index
+    for unit in biv.unit_names:
+        assert f'marginal mean {unit}' in df.index
+    assert df['Pass'].all(), 'the fixture bivariate should validate'
+    # the gates are the declared class constants, not magic numbers inline
+    assert df.loc['tail deficit', 'Gate'] == biv.TAIL_DEFICIT_GATE
+
+
+def test_bivariate_narratives_agree_with_the_frame(biv):
+    """The one-liner, the prose and the frame come off one computation."""
+    assert biv.validation_description == 'not unreasonable'
+    assert biv.validation_description in biv.info
+    txt = biv.validation_explanation
+    assert 'Tail deficit' in txt
+    for unit in biv.unit_names:
+        assert unit in txt
+
+
+def test_bivariate_validation_df_fails_a_pinned_grid():
+    """A grid pinned far below support fails the deficit gate, and says so."""
+    b = build('bivariate FCC.BivBad 25 claims '
+              'agg X dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 '
+              'agg Y dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 '
+              'copula gumbel 0.4 poisson')
+    b.update(bs=(1.0, 1.0), log2=(6, 6))
+    df = b.validation_df
+    assert not df.loc['tail deficit', 'Pass']
+    assert 'tail deficit' in b.validation_description
+    assert 'fails' in b.validation_explanation
+
+
+def test_distortion_validation_df_checks_the_identities():
+    """a172: four structural identities, two tolerance regimes."""
+    from aggregate.spectral import Distortion
+    from aggregate.spectral import VALIDATION_NOISE
+    for kind, kw in [('ph', {'a': 0.5}), ('wang', {'lam': 0.2}),
+                     ('dual', {'b': 2}), ('tvar', {'p': 0.99}),
+                     ('ccoc', {'r': 0.1}),
+                     ('bitvar', {'p0': 0.9, 'p1': 0.99, 'w1': 0.5})]:
+        d = Distortion(kind, **kw)
+        df = d.validation_df
+        assert list(df.columns) == ['Est', 'Ref', 'Err', 'Gate', 'Pass']
+        assert list(df.index) == ['E[D_g]+E[D_g_inv]', 'g(g_inv(0.5))',
+                                  'g(0)', 'g(1)']
+        assert df['Pass'].all(), f'{kind} fails its own identities'
+        # the endpoints are exact and gated at the noise floor; the two grid
+        # quantities carry a real O(h^2) term and are gated well above it
+        assert df.loc['g(0)', 'Gate'] == VALIDATION_NOISE
+        assert df.loc['E[D_g]+E[D_g_inv]', 'Gate'] > VALIDATION_NOISE
+
+
+def test_distortion_summary_df_check_rows_are_unchanged():
+    """Rule 1: a report's rows are fixed. validation_df did not move them."""
+    from aggregate.spectral import Distortion
+    df = Distortion('ph', 0.5).summary_df
+    for row in ('E[D_g]+E[D_g_inv]', 'g(g_inv(0.5))', 'g(0), g(1)'):
+        assert row in df.index
+
+
+def test_validation_description_is_the_terse_form(agg, port):
+    """a172: the short verdict is what the info row and the intro carry."""
+    for obj in (agg, port):
+        short = obj.validation_description
+        assert '\n' not in short and len(short) < 80
+        assert obj._text_info_blob().endswith(f'Validation: {short}.')
+        assert len(obj.validation_explanation) > len(short)
+
+
+def test_validation_explanation_names_what_was_checked(agg):
+    """The long form is actionable without knowing the library's vocabulary."""
+    txt = agg.validation_explanation
+    assert 'mean, CV and skewness' in txt
+    assert 'reinsurance' in txt.lower()      # the fixture cedes 50 xs 50
+
+
+def test_validation_explanation_on_an_unbuilt_object():
+    a = build('agg FCC.NoUp 5 claims sev lognorm 50 cv 1 poisson', update=False)
+    assert a.validation_description == 'n/a, not updated'
+    assert 'has not been updated' in a.validation_explanation
+
+
+def test_reins_explanation_adds_the_economics(agg):
+    """a172: the description declares the terms, the explanation prices them."""
+    short, long = agg.reins_description, agg.reins_explanation
+    assert long.startswith(short.rstrip('.'))
+    assert len(long) > len(short)
+    assert 'ceded' in long and 'net' in long
+
+
+def test_reins_explanation_is_flat_on_a_clean_book():
+    """No branching on reins_kinds first, on either class."""
+    a = build('agg FCC.CleanR 5 claims sev lognorm 50 cv 1 poisson')
+    p = build('port FCC.CleanRP '
+              'agg P1 5 claims sev lognorm 50 cv 1 poisson '
+              'agg P2 3 claims sev gamma 20 cv .5 poisson')
+    assert a.reins_explanation == 'No reinsurance.'
+    assert p.reins_explanation == 'No reinsurance.'
+
+
+def test_portfolio_reins_explanation_omits_clean_units(port):
+    """Unlike reins_description, which names every unit."""
+    long = port.reins_explanation
+    assert 'Unit A' in long                  # A cedes 500 xs 500
+    assert 'Unit B' not in long              # B is clean
+    assert 'Unit B' in port.reins_description
 
 
 def test_grid_distribution_has_info(agg):

@@ -2568,7 +2568,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             ('reinsurance', self.reins_kinds.lower()),
             ('occurrence reinsurance', self._reins_description('occ').lower()),
             ('aggregate reinsurance', self._reins_description('agg').lower()),
-            ('validation', self.validation_explanation),
+            ('validation', self.validation_description),
         ]
         s = [info_row(label, value) for label, value in rows]
         # Tail report summary (frequency / severity / aggregate -- support and
@@ -2579,12 +2579,24 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return '\n'.join(s)
 
     @property
+    def validation_description(self):
+        """
+        Short one-line validation verdict (str).
+
+        The terse phrase the ``info`` row and the one-line intro carry:
+        ``'not unreasonable'``, ``'fails agg cv'``. The verbose form is
+        :attr:`validation_explanation`. Validation is computed if needed.
+        """
+        return _validation.validation_description(self)
+
+    @property
     def validation_explanation(self):
         """
         Long-narrative explanation of the validation result (str).
 
         The consistent narrative surface, mirroring ``tail_explanation`` /
-        ``bs_explanation``. Validation is computed if needed.
+        ``bs_explanation``, and the verbose form of
+        :attr:`validation_description`. Validation is computed if needed.
         """
         return _validation.validation_explanation(self)
 
@@ -2594,7 +2606,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         The headline table (``summary_df``) carries the risk view; this blob is
         the one-glance context. The validation result is always stated inline as
-        the closing sentence (``Validation: {validation_explanation}.``) -- a
+        the closing sentence (``Validation: {validation_description}.``) -- a
         clean object reads "not unreasonable", a failing one names the offending
         moment.
         """
@@ -2608,7 +2620,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
             parts.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
-        parts.append(f'Validation: {self.validation_explanation}.')
+        parts.append(f'Validation: {self.validation_description}.')
         return (f'<h3>Aggregate object: {self._title_name}</h3>\n'
                 f'<p>{" ".join(parts)}</p>')
 
@@ -2619,7 +2631,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         and the validation result -- the one-glance context :meth:`qd` prints
         above the headline ``summary_df``. **One line**: the sentences are
         space-joined (not stacked), and the blob closes with
-        ``Validation: {validation_explanation}.`` exactly as the HTML twin
+        ``Validation: {validation_description}.`` exactly as the HTML twin
         does, so the two renderings say the same thing.
         """
         s = [f'Aggregate object: {self._title_name}.',
@@ -2633,7 +2645,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
-        s.append(f'Validation: {self.validation_explanation}.')
+        s.append(f'Validation: {self.validation_description}.')
         return ' '.join(s)
 
     def _repr_html_(self):
@@ -3722,6 +3734,61 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         private worker :meth:`_reins_description`.
         """
         return self._reins_description(kind='both', width=0)
+
+    @property
+    def reins_explanation(self):
+        """
+        Long narrative of the reinsurance: the terms, then what they do (str).
+
+        The verbose half of the pair (a172 [FCC-Contract-Gaps]).
+        :attr:`reins_description` says what the program *declares*;  this adds
+        what the cession *does*, read off :attr:`reins_summary_df`: expected loss
+        gross, ceded and net at each stage, and the share of the gross that the
+        cession carries.
+
+        Returns
+        -------
+        str
+            ``'No reinsurance.'`` on a clean book, so the caller never has to
+            branch on :attr:`reins_kinds` first.
+
+        Notes
+        -----
+        Occurrence and aggregate are reported as separate stages because they are
+        applied in sequence: the aggregate cover attaches to the *subject*, which
+        is the occurrence stage's net, not to the gross. Reading a single
+        "ceded" number across both stages is the standard way to double count.
+        """
+        if self.reins_kinds == 'None':
+            return 'No reinsurance.'
+        # reins_description is not consistently sentence-terminated (the
+        # occurrence-only form has no full stop, the aggregate form does), and
+        # the Portfolio look-through already works around that with rstrip.
+        # Terminate it here rather than changing an asserted string.
+        desc = self.reins_description.rstrip('.')
+        out = [f'{desc}.']
+        df = self.reins_summary_df
+        if df is None:
+            return ' '.join(out)
+
+        def _agg_ex(stage, view):
+            try:
+                return float(df.loc[(stage, view, 'agg'), 'Est EX'])
+            except KeyError:
+                return None
+
+        for stage, base_view, base_word in (('occ', 'gross', 'Gross'),
+                                            ('agg', 'subject', 'Subject')):
+            base = _agg_ex(stage, base_view)
+            ceded, net = _agg_ex(stage, 'ceded'), _agg_ex(stage, 'net')
+            if base is None or ceded is None or net is None:
+                continue
+            share = f'{ceded / base:.1%}' if base else 'n/a'
+            where = ('Per occurrence' if stage == 'occ' else 'In the aggregate')
+            out.append(f'{where}, {base_word.lower()} expected loss '
+                       f'{base:,.6g} splits into {ceded:,.6g} ceded ({share}) '
+                       f'and {net:,.6g} net.')
+        return ' '.join(out)
 
     def _reins_description(self, kind='both', width=0):
         """

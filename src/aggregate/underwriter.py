@@ -298,7 +298,7 @@ def _row_stats(a, summary_cols):
                    actual_sd=a.actual_sd, actual_skew=a.actual_skew,
                    emp_m=a.est_m, emp_cv=a.est_cv, emp_sd=a.est_sd,
                    emp_skew=a.est_skew,
-                   valid=a.validation_explanation)
+                   valid=a.validation_description)
     elif isinstance(a, Severity):
         # theoretical moments only; severity has no discretization. Use the
         # project's own .moms(), which returns raw moments (E[X], E[X^2], E[X^3]);
@@ -1280,9 +1280,17 @@ class Underwriter(HelpMixin):
                     f"{', '.join(pnl_units)}. Build a standalone PnL, or declare "
                     "the unit as a plain agg.")
             agg_list = [k for i, j, k in spec['spec']]
+            # The whole trailer, not just the note: a172 [FCC-Contract-Gaps].
+            # ``tags`` / ``doc`` / ``hints`` were parsed into the port spec and
+            # dropped here, so a portfolio's own trailer was write-only. The
+            # hints still *took effect* (``_resolve_hints`` reads the spec), but
+            # the object could not report how it had been asked to build.
             obj = Portfolio(name, agg_list, uw=self,
                             label=spec.get('label'),
-                            note=spec.get('note', ''))
+                            note=spec.get('note', ''),
+                            tags=spec.get('tags', ()),
+                            doc=spec.get('doc', ''),
+                            hints=spec.get('hints', ''))
             obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:

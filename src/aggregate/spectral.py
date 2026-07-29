@@ -1062,6 +1062,17 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         return self._compute_describe()
 
     @cached_property
+    def validation_df(self):
+        """QA table: the structural identities, with gates and verdicts (lazy).
+
+        a172 [FCC-Contract-Gaps]. ``summary_df`` reported the same four realized
+        values in its checks block but left the reader to decide what counted as
+        close enough; this frame states the gate and the verdict. See
+        :meth:`_compute_validation_df` for the two tolerance regimes.
+        """
+        return self._compute_validation_df()
+
+    @cached_property
     def stats_df(self):
         """Single-column DataFrame of D_g statistics with closed-form column
         and error column where analytics exist (lazy)."""
@@ -1076,8 +1087,8 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
 
     def _invalidate_cache(self):
         """Drop cached quartet values; called by ``_build``."""
-        for k in ('info', 'summary_df', 'stats_df', 'density_df',
-                  'tvar_info_df', '_grid_moments'):
+        for k in ('info', 'summary_df', 'validation_df', 'stats_df',
+                  'density_df', 'tvar_info_df', '_grid_moments'):
             self.__dict__.pop(k, None)
 
     # --- subclass hooks (defaults return empty / no overrides) -----------
@@ -1383,6 +1394,77 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         # piecewise-linear kinds require per-kind exact summation.
         return df
 
+    def _identity_checks(self):
+        """The four structural identities every distortion must satisfy.
+
+        Returns
+        -------
+        dict
+            ``{'sum_means', 'g_round', 'g0', 'g1'}``, the realized values.
+
+        Notes
+        -----
+        One computation, two readers: the checks block of
+        :attr:`summary_df` (unchanged in shape) and :attr:`validation_df`
+        (a172 [FCC-Contract-Gaps]).
+        """
+        try:
+            g_inv_half = float(self.g_inv(0.5))
+            g_round = float(self.g(g_inv_half))
+        except NotImplementedError:
+            # MixtureDistortion has no closed-form g_inv; the numerical brentq
+            # fallback normally drives this, and NotImplementedError means even
+            # that is unavailable.
+            g_round = np.nan
+        m = self._ensure_grid_moments()
+        return {'sum_means': m['mean_g'] + m['mean_g_inv'],
+                'g_round': g_round,
+                'g0': float(np.asarray(self.g(0.0)).ravel()[0]),
+                'g1': float(np.asarray(self.g(1.0)).ravel()[0])}
+
+    def _compute_validation_df(self):
+        """Is this distortion calculating correctly? One row per identity.
+
+        Notes
+        -----
+        **Two tolerance regimes, and the difference is real.** ``g(0) = 0`` and
+        ``g(1) = 1`` are the endpoint contract: they are evaluated directly, must
+        hold exactly, and are gated at the config noise floor
+        (:data:`VALIDATION_NOISE`).
+
+        The other two are **grid quantities**. ``E[D_g] + E[D_g_inv] = 1`` and
+        ``g(g_inv(0.5)) = 0.5`` come off a trapezoidal integral on
+        :data:`_DISTORTION_DENSITY_N` points, so they carry a genuine, expected
+        discretization error of order ``h**2``. Gating those at the noise floor
+        would fail every kind for being a numerical integral, so the gate is
+        ``10 * h**2``: an order of magnitude of headroom over the theoretical
+        term, tightening automatically if the grid is ever refined. Measured
+        across the canonical five plus ``bitvar``, the worst realized error is
+        ~1.9e-4 against a 1e-3 gate, and a genuine break is O(1), so the gate
+        discriminates.
+
+        The moment rows of :attr:`stats_df` are deliberately **not** here. Their
+        ``error`` column compares a grid moment against a closed form, and for an
+        atomic kind (``tvar``, ``bitvar``) that error is legitimately large: the
+        trapezoid cannot see a Dirac atom. That is a property of the grid, not a
+        defect, so it stays a reported number rather than a pass/fail.
+        """
+        c = self._identity_checks()
+        h = 1.0 / (self._density_n_points - 1)
+        grid_gate = 10.0 * h * h
+        rows = [
+            ('E[D_g]+E[D_g_inv]', c['sum_means'], 1.0, grid_gate),
+            ('g(g_inv(0.5))', c['g_round'], 0.5, grid_gate),
+            ('g(0)', c['g0'], 0.0, VALIDATION_NOISE),
+            ('g(1)', c['g1'], 1.0, VALIDATION_NOISE),
+        ]
+        df = pd.DataFrame(
+            [{'Est': est, 'Ref': ref, 'Err': est - ref, 'Gate': gate,
+              'Pass': bool(np.isfinite(est) and abs(est - ref) <= gate)}
+             for _, est, ref, gate in rows],
+            index=pd.Index([r[0] for r in rows], name='check'))
+        return df[['Est', 'Ref', 'Err', 'Gate', 'Pass']]
+
     def _compute_describe(self):
         """Pair-column ``(D_g, D_g_inv)`` table plus checks block.
 
@@ -1428,19 +1510,15 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         }, index=pd.Index(
             ['mean_mass', 'max_mass', 'interior_atoms'], name='stat'))
         # Checks block. Each row reports the realised value; the user reads
-        # them as approximate-identity tests against the target.
-        try:
-            g_inv_half = float(self.g_inv(0.5))
-            g_round = float(self.g(g_inv_half))
-        except NotImplementedError:
-            g_round = np.nan
-        sum_means = m['mean_g'] + m['mean_g_inv']
+        # them as approximate-identity tests against the target. Values come
+        # from ``_identity_checks`` so this block and ``validation_df`` (which
+        # adds the gates and the verdicts) cannot disagree.
+        c = self._identity_checks()
         checks = pd.DataFrame({
-            'D_g': [sum_means, g_round, float(np.asarray(self.g(0.0)).ravel()[0])],
-            'D_g_inv': [np.nan, np.nan, float(np.asarray(self.g(1.0)).ravel()[0])],
+            'D_g': [c['sum_means'], c['g_round'], c['g0']],
+            'D_g_inv': [np.nan, np.nan, c['g1']],
             'closed_form': [1.0, 0.5, 0.0],
-            'error': [sum_means - 1.0, g_round - 0.5,
-                      float(np.asarray(self.g(0.0)).ravel()[0])],
+            'error': [c['sum_means'] - 1.0, c['g_round'] - 0.5, c['g0']],
         }, index=pd.Index(
             ['E[D_g]+E[D_g_inv]', 'g(g_inv(0.5))', 'g(0), g(1)'], name='stat'))
         return pd.concat([moments, kusuoka_summary, checks])

@@ -300,11 +300,66 @@ def valid_portfolio(port):
     return rv
 
 
+def validation_description(obj):
+    """Short one-line validation verdict (str).
+
+    Shared by ``Aggregate`` and ``Portfolio`` (both delegate here). This is the
+    terse phrase the ``info`` row and the one-line text intro carry:
+    ``'not unreasonable'``, ``'fails agg cv'``, ``'n/a, not updated'``.
+    Validation is computed if needed via ``obj.valid``.
+
+    Notes
+    -----
+    a172 [FCC-Contract-Gaps]. This function is what ``validation_explanation``
+    used to be. The narrative surface pairs a short ``*_description`` with a long
+    ``*_explanation``, and validation carried only the name ``explanation`` on a
+    string that was actually the short form. The terse text is unchanged: it
+    moved to the name that describes it, and ``validation_explanation`` became
+    the long form it always claimed to be.
+    """
+    return explain_validation(obj.valid)
+
+
 def validation_explanation(obj):
     """Long-narrative explanation of the validation result (str).
 
     Shared by ``Aggregate`` and ``Portfolio`` (both delegate here): the
     consistent narrative surface mirroring ``tail_explanation`` /
-    ``bs_explanation``. Validation is computed if needed via ``obj.valid``.
+    ``bs_explanation``, and the verbose form of :func:`validation_description`.
+
+    Spells out what was checked and against what, so a reader who has never met
+    the word "unreasonable" in this library can act on the answer: the analytic
+    first three moments of severity and aggregate against the ones realized on
+    the FFT grid, at the object's own ``validation_eps``, plus the aliasing test
+    and the reinsurance caveat where they apply.
     """
-    return explain_validation(obj.valid)
+    rv = obj.valid
+    short = explain_validation(rv)
+    if rv & Validation.NOT_UPDATED:
+        return ('Not validated: the object has not been updated, so there is no '
+                'realized grid to compare the analytic moments against. Call '
+                'update() (or build with update=True).')
+    eps = getattr(obj, 'validation_eps', None)
+    tol = f'{eps:.3g}' if isinstance(eps, (int, float)) else 'the configured eps'
+    out = [f'Validation of the realized grid against the analytic moments: '
+           f'{short}.',
+           f'Each of mean, CV and skewness is compared for severity and for the '
+           f'aggregate, and a relative error above {tol} fails; only the '
+           f'lowest-order failure is reported, since a mean that is wrong makes '
+           f'the higher moments uninformative.']
+    if rv & Validation.ALIASING:
+        out.append('The aggregate mean error is far larger than the severity '
+                   'error, which is the signature of FFT wrap-around: mass is '
+                   'coming off the top of the grid and landing back at the '
+                   'bottom. Try a larger bs, or a larger log2 at the same bs.')
+    if rv & Validation.REINSURANCE:
+        out.append('The reported view is net or ceded, and a cession has no '
+                   'independent analytic moments, so it cannot be validated '
+                   'directly. The verdict above is for the subject (gross) '
+                   'object underneath, which is what the cession is computed '
+                   'from.')
+    if rv == Validation.NOT_UNREASONABLE:
+        out.append('Nothing failed, so the object is not unreasonable. That is '
+                   'a statement about the numerics reproducing the model, not '
+                   'about the model being right for the risk.')
+    return ' '.join(out)

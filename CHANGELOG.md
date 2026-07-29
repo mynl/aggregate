@@ -1,5 +1,75 @@
 # Changelog
 
+## 1.0.0a172
+
+**[FCC-Contract-Gaps]** The four holes the declared contract exposed at `a170`,
+closed. `FCC_CONTRACT_EXCEPTIONS` and `FCC_UNPAIRED_NARRATIVES` are now empty,
+which is what finishes the item: the contract is satisfied, not excused.
+
+### `Portfolio` keeps its own DecL trailer
+
+The parser has always merged the whole trailer into a `port` spec, and
+`_resolve_hints` has always applied it to the build. The underwriter passed only
+`label` and `note` to the constructor, so `tags`, `doc` and `hints` were dropped:
+a portfolio's own trailer was write-only. All three are wired now. Retention
+only, so nothing about how a portfolio builds changes.
+
+Worth knowing, because it is easy to get wrong: the port trailer goes **right
+after the name** (`port_out: PORT name as_label trailer agg_list`). Written after
+the last unit it binds to *that unit*, which is what it means, not a portfolio
+note in the wrong place.
+
+### `validation_df` on `BivariateAggregate` and `Distortion`
+
+Both are **check tables**, `Est | Ref | Err | Gate | Pass`, carrying only what
+can fail. That is the point: a reader who wants the verdict should not have to
+know which of twenty numbers in `summary_df` is load-bearing.
+
+The bivariate's rows are one per axis (each marginal must reproduce its
+standalone aggregate) plus the tail deficit. It is now the **one** computation
+behind the `validation` row of `info`, `validation_description` and
+`validation_explanation`, which previously each recomputed it.
+
+The distortion's rows are the four structural identities, and they need **two
+tolerance regimes**. `g(0) = 0` and `g(1) = 1` are evaluated directly, must hold
+exactly, and are gated at the config noise floor. `E[D_g] + E[D_g_inv] = 1` and
+`g(g_inv(0.5)) = 0.5` come off a trapezoidal integral on 101 points, so they
+carry a genuine `O(h²)` discretization term; gating those at the noise floor
+would fail every kind for the crime of being a numerical integral. They are gated
+at `10 h²`, which tightens automatically if the grid is refined. Measured across
+the canonical five plus `bitvar`, the worst realized error is 1.9e-4 against a
+1e-3 gate, and a real break is `O(1)`.
+
+The moment rows of `Distortion.stats_df` are deliberately **not** validated. For
+an atomic kind (`tvar`, `bitvar`) the grid-vs-closed-form error is legitimately
+large, because a trapezoid cannot see a Dirac atom. That is a property of the
+grid, so it stays a reported number rather than a pass/fail. `summary_df` keeps
+its rows exactly as they were.
+
+### The narrative pairs are complete
+
+**Breaking, in a narrow way.** `validation_explanation` was never a long form: it
+returned `'not unreasonable'` or `'fails agg cv'`. That terse text now lives on
+`validation_description`, the name that describes it, and every terse consumer
+(the `info` row, the one-line intro, the `Underwriter` `valid` column) reads it,
+so **what they print is unchanged**. Code that read `validation_explanation` for
+a short phrase gets a paragraph instead and should move to
+`validation_description`.
+
+`validation_explanation` became the long form it always claimed to be. It names
+what was checked (the analytic first three moments of severity and aggregate
+against the realized grid, at the object's own `validation_eps`), why only the
+lowest-order failure is reported, and what to do about aliasing or the
+reinsurance caveat when they apply.
+
+`reins_explanation` is new, on `Aggregate` and `Portfolio`. `reins_description`
+says what the program *declares*; this adds what the cession *does*, off
+`reins_summary_df`: expected loss gross, ceded as a share, and net. Reported per
+**stage**, because the aggregate cover attaches to the occurrence net rather than
+the gross, and one "ceded" number across both stages double counts. It answers
+`'No reinsurance.'` on a clean book, so no caller has to check `reins_kinds`
+first.
+
 ## 1.0.0a171
 
 **[FCC-Surface-Decisions]** The five open `[FCC-Surface-Sweep]` decisions,

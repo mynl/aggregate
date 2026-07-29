@@ -2399,27 +2399,80 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ]
         return '\n'.join(info_row(label, value) for label, value in rows)
 
+    #: Loose gate on the per-axis marginal mean (relative error vs the analytic
+    #: standalone). Deliberately loose: it catches gross misplacement, not the
+    #: budget-dependent bs-discretization error, which is expected.
+    MARGINAL_MEAN_GATE = 0.10
+    #: Hard gate on the joint tail deficit. A measured grid conserves mass, so
+    #: any deficit means a clipped or aliased window.
+    TAIL_DEFICIT_GATE = 1e-5
+
+    @property
+    def validation_df(self):
+        """The joint grid's QA table: is this bivariate calculating correctly?
+
+        The bivariate answer to :attr:`Aggregate.validation_df`, and the **one**
+        computation behind the ``validation`` row of :attr:`info`,
+        :attr:`validation_explanation`, and this frame (a172
+        [FCC-Contract-Gaps]; the three used to compute it three times).
+
+        One row per check, in escalating order of severity:
+
+        * **marginal mean**, one row per axis. Each marginal must reproduce its
+          standalone aggregate, which is the showpiece invariant of the 2-D FFT.
+          Measured against the analytic standalone mean at
+          :attr:`MARGINAL_MEAN_GATE`.
+        * **tail deficit**, one row. The hard correctness gate at
+          :attr:`TAIL_DEFICIT_GATE`.
+
+        Returns
+        -------
+        DataFrame
+            Rows indexed by ``check``; columns ``Est`` (realized), ``Ref``
+            (the target it is held to), ``Err`` (signed relative error, or the
+            level itself for the deficit), ``Gate`` and ``Pass``.
+
+        Notes
+        -----
+        Distinct from :attr:`summary_df`, which is the full theory-vs-realized
+        moment block over Freq / Sev / Agg. This frame carries only what can
+        *fail*, so a reader who wants the verdict does not have to know which of
+        twenty numbers is load-bearing. The unit differs by row (currency for a
+        mean, probability for the deficit) because a check table is a list of
+        checks, not one measurement repeated.
+        """
+        self._require_density()
+        rows, index = [], []
+        m0, m1 = self.marginals
+        for i, (name, dens) in enumerate(zip(self.unit_names, (m0, m1))):
+            mt = self._axis_theory(i)[0]
+            me = xsden_to_meancvskew(self.axis_xs[i], dens)[0]
+            err = (me - mt) / abs(mt) if mt else np.nan
+            rows.append({'Est': me, 'Ref': mt, 'Err': err,
+                         'Gate': self.MARGINAL_MEAN_GATE,
+                         'Pass': not (np.isfinite(err)
+                                      and abs(err) > self.MARGINAL_MEAN_GATE)})
+            index.append(f'marginal mean {name}')
+        # The deficit IS its own error: there is no reference level to hit, the
+        # target is zero, so Est and Err carry the same number and Ref is 0.
+        rows.append({'Est': self.deficit, 'Ref': 0.0, 'Err': self.deficit,
+                     'Gate': self.TAIL_DEFICIT_GATE,
+                     'Pass': not self.deficit > self.TAIL_DEFICIT_GATE})
+        index.append('tail deficit')
+        df = pd.DataFrame(rows, index=pd.Index(index, name='check'))
+        return df[['Est', 'Ref', 'Err', 'Gate', 'Pass']]
+
     def _explain_oneline(self):
         """One-unit validation summary for the ``info`` ``validation`` row.
 
-        The hard correctness gate is the joint **tail deficit** (< 1e-5): a
-        measured grid conserves mass, so a deficit means a clipped / aliased
-        window. The marginal-mean check is deliberately **loose** (rel error vs
-        the *analytic* standalone < 10%) -- it catches gross misplacement but not
-        the budget-dependent bs-discretization error, which is expected (the
-        marginal still reproduces the standalone *at the matched grid*). The
-        per-axis mean / cv errors are surfaced in the ``Agg`` rows of
-        :attr:`summary_df`.
+        Reads the verdicts off :attr:`validation_df` rather than recomputing
+        them, so the one-liner, the narrative and the frame cannot disagree.
         """
+        df = self.validation_df
         bad = []
-        m0, m1 = self.marginals
-        for i, dens in enumerate((m0, m1)):
-            mt = self._axis_theory(i)[0]
-            me = xsden_to_meancvskew(self.axis_xs[i], dens)[0]
-            if mt and abs(me - mt) / abs(mt) > 0.10:
-                bad.append('marginal mean')
-                break
-        if self.deficit > 1e-5:
+        if not df.loc[df.index.str.startswith('marginal mean'), 'Pass'].all():
+            bad.append('marginal mean')
+        if not df.loc['tail deficit', 'Pass']:
             bad.append('tail deficit')
         return 'not unreasonable' if not bad else 'check: ' + ', '.join(bad)
 
@@ -2576,36 +2629,48 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return ' '.join(out)
 
     @property
+    def validation_description(self) -> str:
+        """One-line validation verdict, naming any check that failed.
+
+        The short half of the pair (a172 [FCC-Contract-Gaps]); the verbose form
+        is :attr:`validation_explanation` and the frame behind both is
+        :attr:`validation_df`.
+        """
+        return self._explain_oneline()
+
+    @property
     def validation_explanation(self) -> str:
         """Long-narrative validation result for the joint grid.
 
         The bivariate twin of
         :attr:`~aggregate.distributions.Aggregate.validation_explanation`, and
-        the verbose form of the one-line ``validation`` row in :attr:`info`.
-        Two checks: the **tail deficit** (the hard gate -- a measured grid
-        conserves mass, so a deficit means a clipped / aliased window) and,
-        loosely, that **each marginal reproduces its standalone aggregate**
-        (the showpiece invariant). The marginal check is deliberately loose
-        (10% relative): the budget-dependent bs-discretization error is
-        expected, and the exact per-axis errors are in :attr:`summary_df`.
+        the verbose form of :attr:`validation_description` (the one-line
+        ``validation`` row in :attr:`info`). Two checks: the **tail deficit**
+        (the hard gate, since a measured grid conserves mass, so a deficit means
+        a clipped or aliased window) and, loosely, that **each marginal
+        reproduces its standalone aggregate** (the showpiece invariant). The
+        marginal check is deliberately loose: the budget-dependent
+        bs-discretization error is expected, and the exact per-axis errors are in
+        :attr:`summary_df`.
+
+        Reads :attr:`validation_df` rather than recomputing, so the frame and the
+        prose always agree.
         """
-        self._require_density()
         out = []
-        m0, m1 = self.marginals
-        for i, (name, dens) in enumerate(zip(self.unit_names, (m0, m1))):
-            mt = self._axis_theory(i)[0]
-            me = xsden_to_meancvskew(self.axis_xs[i], dens)[0]
-            if mt:
-                err = (me - mt) / abs(mt)
-                verdict = 'fails' if abs(err) > 0.10 else 'passes'
-                out.append(f'Marginal {name} mean {me:,.6g} vs standalone '
-                           f'{mt:,.6g} (rel err {err:.2e}): {verdict}.')
-        deficit = self.deficit
-        gate = 'fails' if deficit > 1e-5 else 'passes'
-        out.append(f'Tail deficit {deficit:.2e} against the 1e-5 gate: {gate}.')
-        out.append('Not unreasonable.' if self._explain_oneline() ==
-                   'not unreasonable' else
-                   f'Overall: {self._explain_oneline()}.')
+        df = self.validation_df
+        for check, r in df.iterrows():
+            verdict = 'passes' if r['Pass'] else 'fails'
+            if check == 'tail deficit':
+                out.append(f'Tail deficit {r["Est"]:.2e} against the '
+                           f'{r["Gate"]:.0e} gate: {verdict}.')
+            elif np.isfinite(r['Err']):
+                name = check[len('marginal mean '):]
+                out.append(f'Marginal {name} mean {r["Est"]:,.6g} vs standalone '
+                           f'{r["Ref"]:,.6g} (rel err {r["Err"]:.2e}): '
+                           f'{verdict}.')
+        one = self._explain_oneline()
+        out.append('Not unreasonable.' if one == 'not unreasonable'
+                   else f'Overall: {one}.')
         return ' '.join(out)
 
     def plot(self, axs=None, levels=14, log=False, **kwargs):

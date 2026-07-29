@@ -103,7 +103,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
     """
 
     def __init__(self, name, spec_list, uw=None, label=None, label_map=None,
-                 note='', tags=(), doc=''):
+                 note='', tags=(), doc='', hints=''):
         """
         Create a new :class:`Portfolio` object.
 
@@ -115,6 +115,14 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
            Stored so a ``port`` matches ``Aggregate`` / ``Severity`` /
            ``BivariateAggregate``, all of which retain theirs; the writer
            already rendered a portfolio note it could not read back.
+        :param hints: optional ``key=value;`` build settings from the DecL
+           ``hints{...}`` trailer. The same shape of gap as ``note`` before
+           a154: the parser has always merged the trailer into a ``port`` spec
+           and :func:`aggregate.underwriter._resolve_hints` has always applied
+           it to the portfolio build, but the class never retained the text, so
+           ``p.hints`` was the one first-class-citizen member a ``Portfolio``
+           was missing. Retention only: the settings still take effect through
+           the build, not from this attribute.
         :param spec_list: A list of
 
            1. dictionary: Aggregate object dictionary specifications or
@@ -287,6 +295,11 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self.program = ''
         #: Free text from the DecL ``note{...}`` trailer ('' when none).
         self.note = note
+        #: ``key=value;`` build settings from the DecL ``hints{...}`` trailer
+        #: ('' when none). Applied at build time by ``_resolve_hints``; this is
+        #: the retained text, so a portfolio can report how it was asked to
+        #: build (a172 [FCC-Contract-Gaps]).
+        self.hints = hints
         #: Tag slugs from the DecL ``tags{...}`` trailer ('()' when none).
         self.tags = tuple(tags)
         #: Long-form markdown recipe from ``doc{{{...}}}`` ('' when none).
@@ -594,7 +607,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         The portfolio twin of :meth:`Aggregate._text_info_blob`: **one line**
         of space-joined sentences, closing with
-        ``Validation: {validation_explanation}.`` exactly as
+        ``Validation: {validation_description}.`` exactly as
         :meth:`_repr_html_` does.
         """
         _n = len(self.agg_list)
@@ -604,7 +617,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         if self.bs > 0:
             bss = f'{self.bs:.6g}' if self.bs >= 1 else f'1/{int(1 / self.bs)}'
             s.append(f'Updated with bucket size {bss} and log2 = {self.log2}.')
-        s.append(f'Validation: {self.validation_explanation}.')
+        s.append(f'Validation: {self.validation_description}.')
         return ' '.join(s)
 
     def _repr_html_(self):
@@ -618,7 +631,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         if self.bs > 0:
             parts.append(
                 f'Updated with bucket size {self.bs:.6g} and log2 = {self.log2}.')
-        parts.append(f'Validation: {self.validation_explanation}.')
+        parts.append(f'Validation: {self.validation_description}.')
         s = [f'<h3>Portfolio object: {self._title_name}</h3>',
              '<p>' + ' '.join(parts) + '</p>']
         fmt = lambda x: f'{x:,.5g}'
@@ -829,6 +842,37 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             return 'No reinsurance'
         return ' '.join(f'Unit {a.name}: {d[0].lower()}{d[1:].rstrip(".")}.'
                         for a, d in zip(self.agg_list, descs))
+
+    @property
+    def reins_explanation(self) -> str:
+        """Long reinsurance narrative, unit by unit (a look-through).
+
+        The verbose half of the pair (a172 [FCC-Contract-Gaps]) and the
+        portfolio twin of
+        :attr:`~aggregate.distributions.Aggregate.reins_explanation`: each
+        ceding unit's terms followed by what they do to its expected loss, one
+        paragraph-sentence per unit.
+
+        Returns
+        -------
+        str
+            ``'No reinsurance.'`` when no unit cedes.
+
+        Notes
+        -----
+        Clean units are **omitted** here, unlike :attr:`reins_description`, which
+        names every unit so the short form covers the whole book. Once the text
+        runs to the economics per unit, listing the units with nothing to say
+        buries the ones that have something.
+        """
+        if not self.agg_list:
+            return 'No reinsurance.'
+        parts = [(a, a.reins_explanation) for a in self.agg_list]
+        ceding = [(a, e) for a, e in parts if e != 'No reinsurance.']
+        if not ceding:
+            return 'No reinsurance.'
+        return ' '.join(f'Unit {a.name}: {e[0].lower()}{e[1:]}'
+                        for a, e in ceding)
 
     @property
     def bs_window_df(self) -> 'pd.DataFrame':
@@ -2392,12 +2436,23 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return _validation.valid_portfolio(self)
 
     @property
+    def validation_description(self):
+        """
+        Short one-line validation verdict (str).
+
+        The terse phrase the ``info`` row and the one-line intro carry. The
+        verbose form is :attr:`validation_explanation`.
+        """
+        return _validation.validation_description(self)
+
+    @property
     def validation_explanation(self):
         """
         Long-narrative explanation of the validation result (str).
 
         The consistent narrative surface, mirroring ``tail_explanation`` /
-        ``bs_explanation``.
+        ``bs_explanation``, and the verbose form of
+        :attr:`validation_description`.
         """
         return _validation.validation_explanation(self)
 

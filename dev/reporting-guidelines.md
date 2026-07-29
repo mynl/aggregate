@@ -39,8 +39,11 @@ nothing to report.
 Everything else is **optional**, and a caller reaches it defensively with
 `getattr`. The `*_description` (short) / `*_explanation` (long) narrative strings
 are the main such family. Optional does not mean unconstrained: wherever one half
-of a pair is present the other must be too. `FCC_UNPAIRED_NARRATIVES` names the
-stems still short a half, and it empties with `[FCC-Contract-Gaps]`.
+of a pair is present the other must be too.
+
+Both `FCC_CONTRACT_EXCEPTIONS` and `FCC_UNPAIRED_NARRATIVES` are **empty** as of
+`1.0.0a172`, and must stay empty at `1.0.0b1`. Adding an entry is how a
+deliberate, temporary hole gets declared; it is not a way to quiet the check.
 
 ## The reports themselves
 

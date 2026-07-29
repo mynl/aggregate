@@ -130,22 +130,25 @@ FCC_REQUIRED = ('info', 'help',
                 'summary_df', 'validation_df', 'stats_df', 'density_df',
                 'plot')
 
-#: Contract members a class does not carry YET, by class. Each entry is a known
-#: hole with a plan behind it ([FCC-Contract-Gaps]), not a permanent carve-out:
-#: the audit and the test subtract these so the contract can be stated before it
-#: is satisfied. **This dict must be empty by 1.0.0b1**, and emptying it is what
-#: closes the item.
-FCC_CONTRACT_EXCEPTIONS = {
-    'Portfolio': ('hints',),
-    'BivariateAggregate': ('validation_df',),
-    'Distortion': ('validation_df',),
-}
+#: Contract members a class does not carry YET, by class. Each entry would be a
+#: known hole with a plan behind it, not a permanent carve-out: the audit and the
+#: test subtract these so the contract can be stated before it is satisfied.
+#:
+#: **EMPTY since 1.0.0a172** ([FCC-Contract-Gaps]), which closed all three:
+#: ``Portfolio.hints``, ``BivariateAggregate.validation_df`` and
+#: ``Distortion.validation_df``. It must stay empty at 1.0.0b1. Adding an entry
+#: is how a deliberate, temporary hole is declared; it is not a way to silence
+#: the check.
+FCC_CONTRACT_EXCEPTIONS = {}
 
-#: Narrative stems that carry only ONE half of the description / explanation
-#: pair today: ``validation_explanation`` has no short form, ``reins_description``
-#: no long one. Same status as ``FCC_CONTRACT_EXCEPTIONS``, and emptied by the
-#: same item.
-FCC_UNPAIRED_NARRATIVES = ('validation', 'reins')
+#: Narrative stems allowed to carry only ONE half of the description /
+#: explanation pair.
+#:
+#: **EMPTY since 1.0.0a172**, which wrote the two missing halves:
+#: ``validation_description`` (the short verdict, which is what the old
+#: ``validation_explanation`` actually was) and ``reins_explanation`` (the terms
+#: plus what the cession does to expected loss).
+FCC_UNPAIRED_NARRATIVES = ()
 
 
 class Validation(Flag):

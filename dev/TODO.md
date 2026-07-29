@@ -22,10 +22,11 @@
 > (`1.0.0a170` `[FCC-Contract]`, `a171` `[FCC-Surface-Decisions]`). Closed and
 > removed: `[ZT-ZM-Frequency-Fix]` (shipped `a152`),
 > `[Aggregate-Summary-DF-Useless]` (the gross/net smell is fixed),
-> `[FCC-Surface-Sweep]` and `[PnL-Repr-HTML]` (both shipped `a171`). Deferred to
-> post-v1.0, last: `[Joint-Padding-Window-Tradeoff]`. Closed with no change:
-> sub-item 3 of `[Display-Surface-Incidentals]`. Added: `[FCC-Contract-Gaps]`,
-> `[Bivariate-DecL-Label]`, and sub-item 5 of `[Display-Surface-Incidentals]`.
+> `[FCC-Surface-Sweep]` and `[PnL-Repr-HTML]` (both shipped `a171`), and
+> `[FCC-Contract-Gaps]` (shipped `a172`, both excuse lists now empty). Deferred
+> to post-v1.0, last: `[Joint-Padding-Window-Tradeoff]`. Closed with no change:
+> sub-item 3 of `[Display-Surface-Incidentals]`. Added:
+> `[Bivariate-DecL-Label]` and sub-item 5 of `[Display-Surface-Incidentals]`.
 > `[Plotting-Punchups]` is its own task, not part of the reporting cluster.
 >
 > **Previous rebuild, 2026-07-27.** The file before that, with the full
@@ -53,13 +54,6 @@
   `dev/regen_features.py`, asserted by `tests/test_fcc_surface.py`, and written up
   as §0 of `dev/reporting-guidelines.md`. What remains here is the other half:
   what those reports **contain**.
-- **[FCC-Contract-Gaps]** — the four holes the declared contract exposed, carried
-  in `constants.FCC_CONTRACT_EXCEPTIONS` / `FCC_UNPAIRED_NARRATIVES` so they
-  cannot be forgotten: `Portfolio.hints` (the parser produces it, the class never
-  stores it — the same shape as the `note` gap fixed at a154), `validation_df` on
-  `BivariateAggregate` and on `Distortion`, and the two unpaired narrative stems
-  (`validation_explanation` has no short form, `reins_description` no long one).
-  **Both declarations must be empty by `1.0.0b1`**; emptying them closes this item.
 - **[Bivariate-DecL-Label]** — `BivariateAggregate` became a `LabeledMixin` host
   at `1.0.0a171`, but its **object-level** label has no DecL spelling: the nine
   `bv_out` productions in `decl.lark` (copula / discrete / view-pair, each in

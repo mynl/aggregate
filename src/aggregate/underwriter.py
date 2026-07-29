@@ -3,6 +3,7 @@ from dataclasses import replace
 from datetime import datetime
 from importlib.resources import files
 import logging
+import numbers
 from pathlib import Path
 import re
 import warnings
@@ -349,12 +350,15 @@ class Underwriter(HelpMixin):
     - Bridge to the parser (`UnderwritingLexer` / `UnderwritingParser`).
     - Safe lookup of named programs from the recipe base for the parser.
 
-    Every parsed declaration has a *kind* (one of ``'sev'``, ``'agg'``, ``'port'``,
-    ``'distortion'``) and a *name*. Parsing produces a
+    Every parsed declaration has a *kind* (one of ``'sev'``, ``'agg'``,
+    ``'port'``, ``'bvagg'``, ``'pnl'``, ``'xpnl'``, ``'distortion'``, or
+    ``'expr'``) and a *name*. Parsing produces a
     :class:`~aggregate.recipe.Recipe` holding the kind, name, dict spec, source
     program, provenance, its documentation (``note`` / ``tags`` / ``hints`` /
-    ``doc``, derived from the spec), and — once :meth:`_factory` runs — the
-    constructed object.
+    ``doc``, derived from the spec), and, once :meth:`_factory` runs, the
+    constructed object. ``'expr'`` is the odd one out: a bare expression is an
+    answer rather than a declaration, so it evaluates to its value and is never
+    stored in the recipe base.
 
     The recipe base is a flat in-memory union, ``(kind, name) -> Recipe``,
     stored in ``self._recipes`` as a plain dict. It is fed by the loaded
@@ -1292,6 +1296,11 @@ class Underwriter(HelpMixin):
         elif kind == 'distortion':
             obj = Distortion.from_spec(spec)
             obj.program = program
+        elif kind == 'expr':
+            # a bare expression is its own answer: the parser has already
+            # evaluated it, so the spec is the number. There is no object to
+            # construct and nothing is stored in the recipe base.
+            obj = spec
         else:
             raise ValueError(f'Cannot build {kind} objects')
 
@@ -1310,7 +1319,10 @@ class Underwriter(HelpMixin):
         Parameters
         ----------
         kind : str
-            One of ``'sev'``, ``'agg'``, ``'port'``, ``'distortion'``, ``'bvagg'``.
+            One of ``'sev'``, ``'agg'``, ``'port'``, ``'bvagg'``, ``'pnl'``,
+            ``'xpnl'``, ``'distortion'``. Note that ``'expr'`` is deliberately
+            not stored: a bare expression is an answer, not a declaration, so
+            :meth:`_interpret_program` skips this method for it.
         name : str
             The declaration name.
         spec : dict
@@ -1638,6 +1650,14 @@ class Underwriter(HelpMixin):
                     logger.error(e)
                 raise
             else:
+                if kind == 'expr':
+                    # a bare expression evaluates to a number; it is an answer,
+                    # not a declaration, so it is never stored (nothing to look
+                    # up by name, and no spec_to_decl renderer for it).
+                    logger.info('answer out: expression %s evaluated', name)
+                    rv.append(Recipe(kind=kind, name=name, spec=spec,
+                                     program=program_line, source=source))
+                    continue
                 logger.info('answer out: %s object %s parsed successfully...adding a recipe',
                             kind, name)
                 self.add_recipe(kind, name, spec, program_line, source=source)
@@ -1704,17 +1724,40 @@ class Underwriter(HelpMixin):
 
         if update is None:
             update = self.update
+        # tested by truthiness below, so update=1 behaves like update=True
+        # rather than silently skipping the update
+        update = bool(update)
 
         # in this loop bs_ and log2_ are the values actually used for each
         # update; they do not overwrite the input default values
         from .bivariate import BivariateAggregate
 
+        # The closed set of objects _factory can produce. Severity, Distortion
+        # and a bare numeric expr have no update step; everything in
+        # ``updatable`` is finished by the dispatch at the foot of the loop.
+        # Register a new output type here, in one place, and give it a branch.
+        no_update = (Severity, Distortion, numbers.Number)
+        updatable = (Aggregate, Portfolio, BivariateAggregate)
+
         for answer in rv:
-            if answer.object is None:
+            obj = answer.object
+            if obj is None:
                 # object not created (named-mixed-severity case)
                 logger.info('Object %s of kind %s returned as a spec; no further processing.',
                             answer.name, answer.kind)
-            elif isinstance(answer.object, BivariateAggregate) and update is True:
+                continue
+            if isinstance(obj, no_update):
+                continue
+            if not isinstance(obj, updatable):
+                logger.warning('Unexpected: build produced a %s, which build_many '
+                               'does not know how to finish.', type(obj))
+                continue
+            if not update:
+                # constructed on purpose without a density; nothing to finish
+                continue
+            # BivariateAggregate is tested first. It is not an Aggregate today,
+            # but the order is load bearing if that ever changes.
+            if isinstance(obj, BivariateAggregate):
                 # per-axis auto-sizing lives in BivariateAggregate.update;
                 # pass log2/bs through (0 => auto), drop agg-only kwargs.
                 d = answer.spec
@@ -1723,8 +1766,10 @@ class Underwriter(HelpMixin):
                 log2_ = 0 if log2 == 0 else log2
                 logger.info('(%s, %s): bivariate update(log2=%s, bs=%s)',
                             answer.kind, answer.name, log2_, bs)
-                answer.object.update(log2=log2_, bs=bs, **kwargs)
-            elif isinstance(answer.object, Aggregate) and update is True:
+                obj.update(log2=log2_, bs=bs, **kwargs)
+            elif isinstance(obj, Aggregate):
+                # pnl / xpnl ride here: their deferred engine is an Aggregate
+                # until _snapshot_pnl runs below.
                 d = answer.spec
                 log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
                     d, log2, bs, bucket_sizing_p, kwargs)
@@ -1738,15 +1783,13 @@ class Underwriter(HelpMixin):
                 logger.info('(%s, %s): update(log2=%s, bs=%s) -> _bs_window',
                             answer.kind, answer.name, log2_, bs)
                 try:
-                    answer.object.update(
+                    obj.update(
                         log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
                         debug=self.debug, force_severity=True, **kwargs)
                 except (ZeroDivisionError, AttributeError) as e:
                     logger.error(e)
-            elif isinstance(answer.object, Severity):
-                # severities have no update
-                pass
-            elif isinstance(answer.object, Portfolio) and update is True:
+            else:
+                # Portfolio
                 d = answer.spec
                 log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
                     d, log2, bs, bucket_sizing_p, kwargs)
@@ -1761,19 +1804,13 @@ class Underwriter(HelpMixin):
                 # (signed coarsen-to-fit) itself, so do NOT pre-compute the
                 # bucket here -- mirrors the Aggregate branch above (plan 3.4).
                 logger.info('(%s, %s): bs=%s and log2=%s', answer.kind, answer.name, bs, log2_)
-                answer.object.update(log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
-                                     remove_fuzz=True, force_severity=True,
-                                     debug=self.debug, **kwargs)
-            elif isinstance(answer.object, Distortion):
-                pass
-            elif isinstance(answer.object, (Aggregate, Portfolio)) and update is False:
-                pass
-            else:
-                logger.warning('Unexpected: output kind is %s. (expr/number?)', type(answer.object))
+                obj.update(log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
+                           remove_fuzz=True, force_severity=True,
+                           debug=self.debug, **kwargs)
 
         # snapshot any deferred P&L: the inner Aggregate is now updated, so build
         # the eager PnL / marginal-stack / analysis value object from its recipe.
-        if update is True:
+        if update:
             for answer in rv:
                 recipe = getattr(answer.object, '_pnl_recipe', None)
                 if recipe is not None:

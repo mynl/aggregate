@@ -1,5 +1,70 @@
 # Changelog
 
+## 1.0.0a169
+
+**[Build-Output-Dispatch]** `build_many` now finishes every kind the parser can
+produce, under either setting of `update`.
+
+### A bivariate built with `update=False` warned about itself
+
+```python
+build('bivariate BV 25 claims '
+      'agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 '
+      'agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson', update=False)
+```
+logged `Unexpected: output kind is <class 'aggregate.bivariate.BivariateAggregate'>.
+(expr/number?)`. Nothing was broken: the object came back correct and
+un-updated, exactly as asked. The message was noise.
+
+`build_many` ran a post-construction `isinstance` chain in which the
+`BivariateAggregate` branch was gated on `update is True`, while the no-op
+escape hatch for `update is False` listed only `(Aggregate, Portfolio)`.
+`BivariateAggregate` is not an `Aggregate` subclass, and that escape hatch
+predates bivariates, so every bivariate entry point fell through to the
+catch-all: `bivariate` / `bv`, `netceded`, `grossceded`, `grossnet`, `clash`,
+and the `dbvsev` discrete forms. `build(<bivariate>, update=False)` had no test,
+which is how it survived. `pnl` was unaffected only by accident: a P&L is still
+its deferred inner `Aggregate` when the loop runs, and is snapshotted afterwards.
+
+The chain is now guard clauses over two tuples, `no_update` and `updatable`,
+declared at the head of the loop. A new output type is registered in one place
+instead of two. The catch-all survives as a defensive net, without its stale
+`(expr/number?)` hint, which is no longer where an expression lands.
+
+### `update` is honored by truthiness
+
+The branches tested `update is True` and `update is False` by identity, so
+`update=1` matched neither: it skipped the update *and* tripped the catch-all
+warning. `update` is now normalized with `bool()` where it is resolved.
+
+### `build('3')` evaluates to `3.0`
+
+**Behavior change.** The grammar has always had a top-level `expr` production,
+but `_factory` had no branch for it, so a bare expression raised
+`ValueError: Cannot build expr objects`. Worse, `_interpret_program` had already
+written an `('expr', '3.0')` entry into the recipe base, and that orphan then
+broke `to_agg`, whose renderer has no `expr` case and raises a `ValueError` that
+the export loop does not catch.
+
+An expression is an answer, not a declaration: it now evaluates to its value and
+is never stored. `build('3')` is `3.0`, `build('2 ** 3')` is `8.0`,
+`build('exp(1)')` is `e`. Note that the top-level production accepts a subset of
+arithmetic: `1 + 2` and a trailing `2 * 3` still do not parse there, because `*`
+is the severity scale operator. That is a separate grammar question, untouched
+here.
+
+### Also
+
+Seven docstrings carried seven different, incomplete lists of what a *kind* can
+be. The four that describe the parser's own output (`UnderwritingParser` and its
+`parse`, the `Underwriter` class docstring, `add_recipe`) now agree with
+`_factory`: `agg`, `sev`, `port`, `bvagg`, `pnl`, `xpnl`, `distortion`, `expr`.
+
+`tests/test_underwriter.py` gains a parametrized sweep over one program per
+output kind, asserting `update=False` returns the right class and logs nothing,
+plus the `expr` cases. The bivariate programs are the `MV.*` lines already in
+`decl-testers.agg`, reused verbatim.
+
 ## 1.0.0a168
 
 **[Recipe-Canonical-Lookup]** plus a documentation sweep: one lookup

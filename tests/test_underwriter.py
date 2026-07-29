@@ -6,13 +6,16 @@ refactor lands and as the contract afterwards. Anything that changes here is an
 intentional, documented behavior change.
 """
 
+import logging
 from pathlib import Path
 
 import pytest
 
 from aggregate import build as global_build
+from aggregate.bivariate import BivariateAggregate
 from aggregate.distributions import Aggregate, Severity
 from aggregate.portfolio import Portfolio
+from aggregate.spectral import Distortion
 from aggregate.underwriter import Underwriter
 
 
@@ -43,7 +46,6 @@ def test_build_portfolio_returns_portfolio():
 
 
 def test_build_distortion_returns_distortion():
-    from aggregate.spectral import Distortion
     obj = global_build('distortion PhaseZero:D ph 0.5')
     assert isinstance(obj, Distortion)
 
@@ -72,6 +74,100 @@ def test_build_many_returns_list():
     assert isinstance(rv, list)
     assert len(rv) == 2
     assert {r.name for r in rv} == {'PhaseZero:Many1', 'PhaseZero:Many2'}
+
+
+# ---------------------------------------------------------------------------
+# build_many's output dispatch: every kind must be finished quietly
+# ---------------------------------------------------------------------------
+
+#: One program per object type ``_factory`` can produce, paired with the class
+#: build must hand back. The bivariate programs are the ones in
+#: ``src/aggregate/agg/decl-testers.agg`` (``MV.Indep``, ``MV.NetCeded``,
+#: ``MV.DBVUniform``, ``MV.Clash``), reused verbatim.
+_ONE_PER_KIND = [
+    ('agg', 'agg PhaseZero:Q.Agg dfreq [1:3] dsev [1:6]', Aggregate),
+    ('sev', 'sev PhaseZero:Q.Sev lognorm 10 cv 1.2', Severity),
+    ('distortion', 'distortion PhaseZero:Q.D ph 0.5', Distortion),
+    ('port', 'port PhaseZero:Q.P agg Q.PA dfreq [1] dsev [1:6] '
+             'agg Q.PB dfreq [1] dsev [1:6]', Portfolio),
+    # a pnl is its deferred inner engine until _snapshot_pnl runs
+    ('pnl', 'pnl PhaseZero:Q.PnL 100 prem less agg PhaseZero:Q.PnL_e '
+            '10 claims sev lognorm 8 cv 1.5 poisson', Aggregate),
+    ('bvagg copula', 'bivariate MV.Indep 25 claims '
+                     'agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 '
+                     'agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson',
+     BivariateAggregate),
+    ('bvagg netceded', 'netceded agg MV.NetCeded 8 claims sev 300 * beta 2 3 '
+                       'occurrence net of 0.7 so 60 xs 40 poisson',
+     BivariateAggregate),
+    ('bvagg dbvsev', 'bivariate MV.DBVUniform 5 claims dbvsev [0 1 2] [0 5 10]',
+     BivariateAggregate),
+    ('bvagg clash', 'clash MV.Clash 8 5 2 claims sev lognorm 50 cv 1.2 '
+                    'sev lognorm 60 cv 1.5 mixed gamma 0.2',
+     BivariateAggregate),
+]
+
+
+@pytest.mark.parametrize('kind, program, expected', _ONE_PER_KIND,
+                         ids=[k for k, _p, _e in _ONE_PER_KIND])
+def test_build_update_false_is_quiet(kind, program, expected, caplog):
+    """``update=False`` constructs every kind without complaining.
+
+    ``build_many``'s dispatch used to gate the ``BivariateAggregate`` branch on
+    ``update is True`` while the no-op escape hatch listed only
+    ``(Aggregate, Portfolio)``, so a bivariate built with ``update=False`` fell
+    through to the catch-all and logged ``Unexpected: output kind is ...``. The
+    object was fine; the message was not.
+    """
+    with caplog.at_level(logging.WARNING, logger='aggregate.underwriter'):
+        obj = global_build(program, update=False)
+    assert isinstance(obj, expected)
+    assert not [r for r in caplog.records if 'Unexpected' in r.getMessage()]
+
+
+def test_build_truthy_update_updates():
+    """``update=1`` is honored, not silently dropped.
+
+    The branches used to test ``update is True`` by identity, so any truthy
+    value that was not the singleton skipped the update *and* tripped the
+    catch-all warning.
+    """
+    obj = global_build('agg PhaseZero:Q.Truthy dfreq [1:3] dsev [1:6]', update=1)
+    assert obj.density_df is not None
+    assert obj.est_m > 0
+
+
+# ---------------------------------------------------------------------------
+# expr: a bare expression is an answer, not a declaration
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('program, expected', [
+    ('3', 3.0),
+    ('-4', -4.0),
+    ('2 ** 3', 8.0),
+    ('6 / 2', 3.0),
+    ('exp(1)', 2.718281828459045),
+])
+def test_build_expr_returns_its_value(program, expected):
+    """``build('3')`` evaluates to 3.0 rather than raising.
+
+    Only the forms the top-level ``expr`` production accepts are covered.
+    ``1 + 2`` and a trailing ``2 * 3`` do not parse there, since ``*`` is the
+    severity scale operator, but that is a separate grammar question.
+    """
+    assert global_build(program) == pytest.approx(expected)
+
+
+def test_build_expr_is_not_stored():
+    """An expression leaves no recipe behind.
+
+    It used to: the entry was written before ``_factory`` raised
+    ``Cannot build expr objects``, and the orphan then broke ``to_agg``, whose
+    renderer has no ``expr`` case.
+    """
+    uw = Underwriter(databases=None)
+    uw('2 ** 5')
+    assert not [k for k in uw._recipes if k[0] == 'expr']
 
 
 # ---------------------------------------------------------------------------

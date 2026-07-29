@@ -2223,7 +2223,8 @@ class UnderwritingParser:
     """DecL parser. Accepts either a raw line of source or the iterable
     returned by ``UnderwritingLexer.tokenize`` (which carries the original
     text), returning a ``(kind, name, spec)`` tuple where ``kind`` is one of
-    ``'agg'``, ``'sev'``, ``'port'``, ``'distortion'``, or ``'expr'``."""
+    ``'agg'``, ``'sev'``, ``'port'``, ``'bvagg'``, ``'pnl'``, ``'xpnl'``,
+    ``'distortion'``, or ``'expr'``."""
 
     def __init__(self, safe_lookup_function, debug: bool = False) -> None:
         self.safe_lookup = safe_lookup_function
@@ -2241,10 +2242,11 @@ class UnderwritingParser:
         Returns
         -------
         (kind, name, spec) : tuple
-            ``kind`` is one of ``'agg'``, ``'sev'``, ``'port'``,
-            ``'distortion'``, ``'expr'``; ``name`` is the object identifier;
-            ``spec`` is the dictionary specification used downstream to
-            construct the object.
+            ``kind`` is one of ``'agg'``, ``'sev'``, ``'port'``, ``'bvagg'``,
+            ``'pnl'``, ``'xpnl'``, ``'distortion'``, ``'expr'``; ``name`` is
+            the object identifier; ``spec`` is the dictionary specification
+            used downstream to construct the object. For ``'expr'`` the
+            statement is a bare expression and ``spec`` is its numeric value.
 
         Raises
         ------

@@ -1,8 +1,8 @@
-# Task — maintain `dev/features.qmd`
+# Task — maintain `docs/new_material/features.qmd`
 
 > **What this is.** A *repeatable task*, not a one-shot plan. Invoke it by saying
 > **"execute task-features"** (or "bring features up to date"). Each run
-> reconciles `dev/features.qmd` against the current development state and adds /
+> reconciles `docs/new_material/features.qmd` against the current development state and adds /
 > updates whatever is missing, then verifies the whole notebook executes clean.
 >
 > **Resume model.** There is no "step N done" — every run starts from the
@@ -38,8 +38,9 @@
 It covers **everything added on `REFACTOR`, i.e. the entire `1.0.0a*` series since
 0.30.1** (and, going forward, the `1.0.0b*` series). It is a Quarto-markdown
 notebook the author opens in **Jupyter Lab** (jupytext pairs `.qmd` ↔ notebook;
-`jupytext` ships in the `notebook` extra). It lives in `dev/` — it is a project
-artifact, **not** part of the Sphinx/readthedocs tree *today*.
+`jupytext` ships in the `notebook` extra). It lives in `docs/new_material/`
+awaiting integration; it is a project artifact, **not** part of the
+Sphinx/readthedocs tree *today*.
 
 **Destiny and scale.** This document is expected to graduate into the Sphinx docs
 at release as a **"What changed in 1.0 vs 0.30"** chapter. Write it to that
@@ -191,9 +192,16 @@ harness (a38), config-file *plumbing* (a30 — though its user-facing surface,
 ### 3.0 Pre-flight
 
 - Confirm the worktree is on `REFACTOR`.
-- `uv sync --extra notebook` (the verification in §4 needs a Jupyter kernel;
-  `ipykernel` arrives transitively via `jupyterlab`). `UV_LINK_MODE=copy` is set
-  for the harness; in a plain shell `$env:UV_LINK_MODE = "copy"`.
+- `uv sync --all-extras` (the verification in §4 needs a Jupyter kernel;
+  `ipykernel` arrives transitively via `jupyterlab`). **Never a single
+  `--extra`**: `uv sync` is an exact sync and prunes the extras you did not
+  select, which deletes the `massive` / `viz` / `numba` packages and breaks the
+  bivariate suites. `UV_LINK_MODE=copy` is set for the harness; in a plain shell
+  `$env:UV_LINK_MODE = "copy"`.
+- Run against **`.venv`**, not `.doc-venv`. An ambient
+  `UV_PROJECT_ENVIRONMENT=.doc-venv` makes a bare `uv run` resolve to the docs
+  environment, where `jupytext` may not be installed. Be explicit:
+  `.venv/Scripts/python.exe -m jupytext …`.
 - Note the current version in `pyproject.toml` and skim recent `git log` —
   the author may have landed things ahead of the plans (standing workflow rule).
 - Check `git status` / `git diff` for **uncommitted author edits to
@@ -250,7 +258,8 @@ Every run ends by **executing the whole notebook headlessly** and requiring it t
 complete with no cell raising:
 
 ```
-uv run jupytext --to ipynb --execute dev/features.qmd --output <temp>.ipynb
+.venv/Scripts/python.exe -m jupytext --to ipynb --execute \
+    docs/new_material/features.qmd --output <temp>.ipynb
 ```
 
 (`jupytext --execute` runs each cell through the kernel; a non-zero exit means a
@@ -279,6 +288,28 @@ This task is **part of release hygiene**, not a separately versioned change:
 - No `dev/done/` move applies (this is a standing task, not a consumable plan).
 
 ---
+
+## 5a. Run history
+
+- **First run, 2026-06-11, at a57.** Covered a1 to a57; 57-row ledger; §4 gate
+  passed. Seed classification retained in §6.1 below.
+- **Catch-up run, 2026-07-29, at a168.** The task had not been run since the
+  first, so the gap was 111 releases. Ledger extended to **168 rows**. Five new
+  top-level sections were added for subsystems that did not exist at a57: P&L
+  (§14), Bivariate (§15), Reinsurance economics (§16), Renewal and ruin (§17),
+  the Recipe library (§18); Under the hood became §19. Substantial repair was
+  needed as well, because the doc had drifted badly against the API:
+  `describe` → `summary_df` (a84), `multivariate` → `bivariate` (a80),
+  `explain_validation()` → `validation_explanation` (a82/a84),
+  `BivariateAggregate.corr()` → property (a85), and the whole `pnl` cast member,
+  whose in-place affine form was removed at a103 and replaced by the
+  engine-wrapping form at a125. **One substantive error was corrected, not just
+  a rename:** old §3.3 claimed the per-claim (`ssev`) premium form carried
+  *more* variance than the book-level `pnl` form. It carries far less
+  (sd 63.6 vs 253.1), because premium booked per claim scales with N and hedges
+  the count risk. Verified against both the FFT and the closed-form
+  decomposition. §4 gate passed: 70 code cells, 0 errors.
+  Both files then moved from `dev/` to `docs/new_material/`.
 
 ## 6. First-run note (completed 2026-06-11, at a57)
 

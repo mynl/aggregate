@@ -1,5 +1,19 @@
 # doc-fix — executed-cell errors in the docs build
 
+> **Mostly addressed. The remainder is out of date.** Closed 2026-07-29.
+>
+> The mechanical groups were fixed in the doc source and G4 was resolved in
+> code at 1.0.0a33. What stayed pended (G2, G6, G7, G8, and the G11 remainder)
+> is no longer actionable as written: the catalogue was captured against
+> **1.0.0a30** and the library is now at a168, and the line references point
+> into a text build (`T:\doc-diff\agg-doc-diff\text`) of that vintage. The
+> pended entries also cross-reference TODO items **F2**, **F4** and **D7**,
+> none of which survive in `dev/TODO.md` since the descriptive-label rule
+> replaced the letter codes.
+>
+> If the docs build throws executed-cell errors again, recapture against the
+> current version rather than working from this list.
+
 > Catalogue of `*Error` failures surfaced in the rendered docs (text build at
 > `T:\doc-diff\agg-doc-diff\text`, HTML at `docs/_build/html`). Grouped by
 > **fundamental cause**, most-impactful first, with the proposed fix or

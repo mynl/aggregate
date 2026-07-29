@@ -9,9 +9,13 @@ This notebook is the user-side, topical companion to `CHANGELOG.md`: everything
 `aggregate` 1.0 can do that 0.30.1 could not, organized by subject and shown by
 worked example. The changelog is chronological and developer-facing; this
 document answers *"what's new since the last release I used, and how do I use
-it?"* It covers the entire `1.0.0a*` series. Breaking changes vs 0.30.1 are
-flagged in each section. Maintained by `dev/task-features.md`; source of record
-for what shipped is `CHANGELOG.md`.
+it?"* It covers the entire `1.0.0a*` series, a1 through a168. Breaking changes
+vs 0.30.1 are flagged in each section, and there are many: pre-1.0 was the one
+chance to make the names right, and the project took it, generally without
+deprecated aliases.
+
+Maintained by `task-features.md` alongside it; the source of record for what
+shipped is `CHANGELOG.md`.
 
 # 1. Coverage ledger
 
@@ -65,7 +69,7 @@ but not exampled.
 | SD for zero-mean signed aggregates | a40 | Reporting quartet | `signed_d` |
 | `reinsurance_*` → `reins_*` rename | a41 | Reporting quartet | `reins` |
 | fuzz-removal consolidation | a42 | Under the hood | — |
-| signed `Portfolio.describe` spread; `price_pentagon` | a43 | Reporting quartet / Pricing & the pentagon | `book` |
+| signed `Portfolio.summary_df` spread; `price_pentagon` | a43 | Reporting quartet / Pricing & the pentagon | `book` |
 | module organization, dropped deps, lazy IPython | a44 | Under the hood | — |
 | `pnl` with signed loss severity (fix) | a45 | New DecL elements | `pnl` |
 | exponential-tilting pedagogy | a46 | Pedagogy helpers | `dice` |
@@ -80,13 +84,106 @@ but not exampled.
 | `unit_density` / `unit_density_df` / `aligned_unit_density_df` | a55 | Reporting quartet | `book` |
 | `p_<unit>` columns & EPD family removed from `density_df`; signed objective columns | a56 | Reporting quartet / Under the hood | `book` |
 | one Choquet engine; `T.*`/`M.*` removed; `allocation_diagnostics`; signed books price | a57 | Pricing & the pentagon / Under the hood | `book` |
+| convention-aware aggregate output windowing | a58 | Grids & windows | `bigex` |
+| single-big-jump extent floor (heavy / signed severities) | a59 | Grids & windows | `defective` |
+| layered thick/thin tail report (`tail_df`) | a60 | Tail classification | `simple` |
+| curated `examples.agg` library + `build` default | a61 | Underwriter & persistence | `uw` |
+| narrative tail report (`tail_description` / `tail_explanation`) | a62 | Tail classification | `defective` |
+| comprehensive scipy severity tail tables (family classifier) | a63 | Tail classification | — |
+| tail report wired into grid sizing | a64 | Grids & windows | — |
+| the grid choice made legible (`bs_window_df`, `bs_description`) | a65 | Grids & windows | `simple` |
+| portfolio windowed combine 1P; single-big-jump look-through | a66 | Under the hood | — |
+| `Aggregate.approximate()` un-shadowed (bug); one fit core | a67, a68 | Under the hood | — |
+| DecL statement separation: blank line or `;`, no more `\` | a69 | New DecL elements | — |
+| `balanced_window` + `Aggregate.focus` | a70 | Grids & windows | — |
+| `.agg` library rationalization (superseded by a159) | a71 | Under the hood | — |
+| bivariate axis sizing: measure, don't guess; measured lower edge; centred axes | a72, a73, a75, a76 | Bivariate | `mv_copula` |
+| `round_bucket` ladder: no more 2.5x jumps | a74 | Grids & windows | — |
+| bivariate reporting surface | a77 | Bivariate | `mv_copula` |
+| netceded view-pairs (`grossceded`, `grossnet`) | a78 | Bivariate | `netceded` |
+| shuffle-of-Min copula + `clash` statement | a79 | Bivariate | `clash` |
+| **breaking:** `multivariate` → `bivariate` (`bv`) | a80 | New DecL elements / Bivariate | `mv_indep` |
+| **breaking:** portfolio sub-component `line` → `unit` | a81 | Reporting quartet | `book` |
+| consistent naming on the narrative surface; `validation_explanation` | a82 | Reporting quartet | `defective` |
+| config phase 2: numerics floors + stranded sizing knobs (**breaking**) | a83 | Configuration / Under the hood | — |
+| **breaking:** `describe` → `summary_df`; `explain_validation` removed | a84 | Reporting quartet | all |
+| **breaking:** accessor rationalization; bivariate reporting redesign; `dependency_df` | a85 | Reporting quartet / Bivariate | `mv_copula` |
+| discrete bivariate severity (`dbvsev`) + discrete-freq `bv` forms | a86 | Bivariate | — |
+| infinite-variance aggregates error without an explicit `bs` | a87 | Grids & windows | — |
+| DecL syntax colorer + error labels resynced with the grammar | a88 | Under the hood | — |
+| pedagogy figures renamed off the legacy PIR names | a89 | Pedagogy helpers | — |
+| `GridDistribution` value type, adopted by Aggregate/Portfolio/Bounds | a90, a91 | Under the hood | — |
+| plotting subsystem: one matplotlib boundary | a92 | Under the hood | — |
+| distortion calibration on a single distribution (Aggregate/Portfolio parity) | a93 | Pricing & the pentagon | `simple` |
+| `portfolio.py` split into a facade + three subsystems | a94 | Under the hood | — |
+| concern modules filled in; legacy bucket sizers retired; moment helpers | a95, a96 | Under the hood | — |
+| `prob_loss_assets`: free choice of capital anchor; `price_pentagon_ex` (the `pla` alias was retired at a151) | a97 | Pricing & the pentagon | `simple` |
+| `.help` with finer detail control (`lod`, `output`) | a98 | Reporting quartet | — |
+| distortion calibration on signed and payoff supports | a99 | Pricing & the pentagon | `pnl` |
+| `format_program` spread layout (default multiline) | a100 | Programs as text | `mix_both` |
+| **breaking:** `.help` render targets; `output` → `values` | a101 | Reporting quartet | — |
+| DecL `payoff` / `loss` orientation suffix on `agg` | a102 | New DecL elements / P&L | — |
+| **breaking:** first-class `PnL`; the in-place `pnl` affine removed | a103 | P&L | `pnl` |
+| signed additive `PnL.summary_df` and `PnL.plot()` | a104 | P&L | `pnl` |
+| `PnL.evaluate()`: the Cherny-Madan breakeven panel | a105 | P&L | `pnl` |
+| reinsurance-aware Gross / Ceded / Net `PnL` view | a106 | P&L | `tower` |
+| `create_frequency()`: materialize the claim-count distribution | a107 | Reporting quartet | `simple` |
+| point-mass severity no longer blocks the windowed grid | a108 | Grids & windows | — |
+| bare unary minus on a severity (`ssev -lognorm …`) | a109 | New DecL elements | — |
+| return-period x-axis for quantile (Lee) plots | a110 | Reporting quartet | `simple` |
+| `GridDistribution` knows its sign; Lee worker consumes it | a111, a112 | Under the hood | — |
+| user-facing `summary_df` + `tail_df`; QA frames renamed | a113 | Reporting quartet | `simple` |
+| P&L expenses, ceded premium / ceding commission, GCN waterfall | a114 | P&L | `book_pnl` |
+| multiple `pnl` expense terms (`and`-joined) | a115 | P&L | `book_pnl` |
+| property-cat reinstatement premiums (stochastic ceded premium) | a116, a117 | Reinsurance economics | `reinst` |
+| variable rating: terms, engine, and DecL for swing/slide/pc/corridor | a118, a119 | Reinsurance economics | `swing` |
+| variable rating: `retro` DecL surface | a120 | Reinsurance economics | — |
+| the bivariate leg kernel (domain-free P&L engine) | a121 | Under the hood | — |
+| `PnL` API: domain-agnostic value object | a122 | P&L | `pnl` |
+| `PnL` exhibits: generic and self-describing | a123 | P&L | `book_pnl` |
+| DecL display labels, quoted names, expense grouping | a124 | New DecL elements | — |
+| `pnl` wraps a complete engine; `inherit premium` | a125 | P&L | `inh` |
+| massive (disk-backed) bivariate: out-of-core update, pyramid viz | a126 | Bivariate | — |
+| parallel-by-default test suite and the fast local loop | a127 | Under the hood | — |
+| DecL labels everywhere: interior label sites, `LabeledMixin` | a128 | New DecL elements | — |
+| generic P&L: signed group ledger, builders, marginal-stack | a129, a130, a131 | P&L | `book_pnl` |
+| reins labels pooled into `label_map`; canonical `label` | a132, a133 | New DecL elements | — |
+| P&L punchups: kappa percentiles, summary card, 3-level tower stats | a134 | P&L | `book_pnl` |
+| a pure aggregate ignores economics clauses, with a warning | a135 | P&L | — |
+| consolidated `pnl` vs the `xpnl` walk | a136 | P&L | `tower` |
+| `pnl` engine-name round-trip fix | a137 | P&L | — |
+| P&L faces: two-tier occ x agg classifier, composed cells, kappa walks | a138, a139, a140, a141 | P&L | `tower` |
+| `help` everywhere; computed moments in summary; repr trim | a142 | Reporting quartet | — |
+| reinsurance premium quoted at 100% placement, scaled down | a143 | Reinsurance economics | `reinst` |
+| analysis drill-down classes decommissioned | a144 | Under the hood | — |
+| `exact_discrete` sizing must clear a reachability guard | a145 | Under the hood | — |
+| Sparre-Andersen renewal frequency: `years` / `wait` / `dwait` | a146 | Renewal & ruin | `renewal` |
+| layer terms on the wait clause (`wait y xs a`) | a147 | Renewal & ruin | — |
+| `en` plus `freq_df` frequency-surface items | a148 | Reporting quartet | `simple` |
+| first-class-class surface sweep; `HelpMixin`; alias retirement (**breaking**) | a149, a150, a151 | Under the hood | — |
+| zero-truncated / zero-modified frequency reparameterized and fixed | a152 | Renewal & ruin | — |
+| eventual-ruin probabilities: `wiener_hopf`, Poisson guard | a153 | Renewal & ruin | `renewal` |
+| DecL round-trip surface collapsed into a mixin | a154 | Under the hood | — |
+| `pedagogy.ruin_example` figure polish | a155, a156 | Pedagogy helpers | — |
+| `doc{{{}}}` / `tags{}` trailer clauses; distortion gains a trailer | a157 | Recipe library | — |
+| the recipe runtime: `Recipe`, `build.recipe()`, `build.recipes` | a158 | Recipe library | — |
+| three shipped libraries merge into `library.agg` (186 entries) | a159 | Recipe library | — |
+| the library tests itself (`tests/test_library_recipes.py`) | a160 | Recipe library | — |
+| library tags namespaced (`topic:` / `role:` / `check:`) | a161 | Recipe library | — |
+| test-impact analysis for the edit loop | a162 | Under the hood | — |
+| `<<decl>>`: a recipe never retypes its own program | a163 | Recipe library | — |
+| one `Recipe` class, one registry; `knowledge` → `recipes` (**breaking**) | a164 | Recipe library | — |
+| cookbook pages generated from `library.agg` into native Quarto cells | a165 | Recipe library | — |
+| trailer gets its own lines; `format_program` drops it by default | a166 | Recipe library | — |
+| the cookbook generator becomes `aggregate.cookbook` | a167 | Recipe library | — |
+| one canonical `recipe()` lookup; documentation sweep | a168 | Recipe library | — |
 
 # 2. The cast of examples
 
 A small set of objects built once and heavily leveraged: each is the minimal
 program that exercises a distinct piece of DecL surface, and the feature
 sections borrow these rather than minting throwaways. (Canonical definition
-lives in `dev/task-features.md` §2.4 — edit it there.)
+brief lives in `task-features.md` §2.4; the live definitions are here.)
 
 ```{python}
 from aggregate import build, qd
@@ -116,13 +213,15 @@ signed_s = build('agg SignedS 10 claim ssev 100 - lognorm 80 cv 0.025 poisson')
 # 3.c pnl — book-level premium minus loss. Contrast 3.b: SAME MEAN, DIFFERENT VARIANCE —
 #     the pnl premium is one deterministic shift; the ssev +100 is multiplied by the
 #     (random) claim count, so 3.b carries extra variance from 100*N.
-pnl = build('pnl PNL 1000 premium - 10 claim sev lognorm 80 cv 0.025 poisson')
+#     Since a125 a pnl wraps a COMPLETE named engine: `less agg <name> <program>`
+#     (the a23 in-place `premium - <severity>` affine was removed at a103).
+pnl = build('pnl PNL 1000 prem less agg PNL_e 10 claim sev lognorm 80 cv 0.025 poisson')
 
-# 4. Multivariate ────────────────────────────────────────────────────────────
+# 4. Bivariate (was `multivariate` — renamed a80) ────────────────────────────
 # 4.a mv_indep — INDEPENDENT (shared frequency only; positive baseline corr from
 #     the shared mixing / common shock). Splicing an unbounded base works since a48.
 mv_indep = build('''
-multivariate Cat 25 claims
+bivariate Cat 25 claims
     agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 0.65 splice [0 250]
     agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 0.95 splice [0 300]
     mixed gamma .2
@@ -130,7 +229,7 @@ multivariate Cat 25 claims
 
 # 4.b mv_copula — COPULA-coupled (Gumbel, upper-tail dependence)
 mv_copula = build('''
-multivariate CatC 25 claims
+bivariate CatC 25 claims
     agg Wind  dfreq [0 1] [.3 .7] sev lognorm 40 cv 0.65 splice [0 250]
     agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 0.95 splice [0 300]
     copula gumbel 0.4
@@ -188,6 +287,24 @@ big = build('agg Big 1e6 claims dsev [1 3] poisson approximate sgamma')
 #     bs=1 on a two-sided output window far from 0 (mean 2e6, sd ≈ 2,200)
 #     instead of wasting the whole grid on [0, 2e6).
 bigex = build('agg BigEx 1e6 claims dsev [1 3] poisson')
+
+# 9. Reinsurance economics (a116-a120) ───────────────────────────────────────
+# 9.a reinst — an occurrence layer with reinstatements: the ceded premium is
+#     STOCHASTIC, because reinstatement premium is driven by the recovery.
+reinst = build('agg Reinst 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 '
+               'occurrence net of 24500 xs 500 deposit 1000 reinstatements [1] '
+               'mixed gamma 0.25')
+
+# 9.b swing — variable rating: a swing-rated aggregate layer. Same idea, other
+#     direction: the ceded premium is a function of the ceded loss.
+swing = build('agg Swing 10000 premium at 75% lr 10000 xs 0 sev 10.808 * lognorm 1.75 '
+              'mixed gamma 0.25 '
+              'aggregate net of 5000 xs 10000 swing basic 0 lcm 1.1 min 300 max 1000')
+
+# 10. Renewal frequency (a146) ───────────────────────────────────────────────
+# 10.a renewal — a Sparre-Andersen renewal count: claims arrive after iid waits,
+#      not on a Poisson clock. `1 year` + `wait <dist>` replaces the freq clause.
+renewal = build('agg Renewal 1 year sev gamma 2 wait 0.25 * uniform')
 ```
 
 | Member | Drives |
@@ -197,11 +314,13 @@ bigex = build('agg BigEx 1e6 claims dsev [1 3] poisson')
 | `dice` | discrete/exact moments, `dsev_bucket` |
 | `signed_d` | signed `dsev`, signed-aware `describe` (SD vs CV) |
 | `signed_s` / `pnl` | `ssev`, `shift - dist`, per-claim vs book-level premium (`pnl`) |
-| `mv_indep` / `mv_copula` | `multivariate`, `copula` (and the no-copula baseline) |
+| `mv_indep` / `mv_copula` | `bivariate`, `copula` (and the no-copula baseline) |
 | `reins` / `netceded` | reins gross/net reporting; `netceded` occurrence bivariate |
 | `mix_sev` / `mix_exp` / `mix_both` | mixed severity, mixed exposure, and the joint |
 | `book` / `book_w_re` | combine, pentagon pricing, `price_pentagon` / `price_stand_alone`, bounds; reins in a portfolio |
 | `big` / `bigex` | `approximate sgamma` vs the exact convolution on a non-zero output window (a51) |
+| `reinst` / `swing` | stochastic ceded premium: reinstatements and variable rating |
+| `renewal` | Sparre-Andersen renewal frequency via the `wait` clause |
 
 # 3. New DecL elements
 
@@ -215,7 +334,7 @@ Signedness is recorded at parse time, so the analytic moments — and the
 automatic two-sided output window — are right before any FFT runs.
 
 ```{python}
-qd(signed_d.describe)   # SD trio instead of CV — see Reporting quartet
+qd(signed_d.summary_df)   # SD trio instead of CV — see Reporting quartet
 ```
 
 ```{python}
@@ -231,49 +350,68 @@ loss, *per claim*. It is exactly `-1 * X + 100` (reflect, then shift) and needs
 `ssev` to keep the signed support.
 
 ```{python}
-qd(signed_s.describe)
+qd(signed_s.summary_df)
 ```
 
-## 3.3 `pnl`: premium minus loss, once for the book (a23, fixed for signed losses in a45)
+## 3.3 `pnl`: premium minus loss, once for the book (a23; reshaped a103, a125)
 
-The `pnl` keyword builds an ordinary loss aggregate and applies one
-deterministic book-level shift: `PnL = premium − A`. Contrast with `signed_s`:
-**same mean, different variance**. The `ssev 100 - …` shift is multiplied by
-the random claim count N, so `signed_s` carries the extra variance of `100·N`;
-the `pnl` premium is collected once.
+The `pnl` keyword collects the premium **once for the book** and subtracts the
+loss aggregate: `PnL = premium − A`. Contrast with `signed_s`, which books
+premium **per claim**. They have the **same mean and very different variance**,
+and the direction is the interesting part:
 
 ```{python}
 import pandas as pd
-cmp = pd.concat([signed_s.describe, pnl.describe], keys=['ssev (per claim)', 'pnl (book)'])
-qd(cmp)
+print(f'per-claim  (signed_s): mean {signed_s.est_m:8.2f}   sd {signed_s.est_sd:8.2f}')
+print(f'book-level (pnl)     : mean {pnl.est_m:8.2f}   sd {pnl.est_sd:8.2f}')
 ```
 
-`pnl` objects have `value_type == 'payoff'` — the pricing layer's sign
-convention (see Reporting quartet). The premium and implied loss ratio land in
-`stats_df`'s meta rows (a54):
+Booking premium per claim is a **natural hedge on count risk**: premium and
+loss both scale with N, so the count variance largely cancels. Write
+`P = 100N − S` for the per-claim form and `P = 1000 − S` for the book form,
+with `S` the compound sum. Then
+
+- per claim: `Var = E[N]·Var(100−X) + Var(N)·E[100−X]² = 10(4) + 10(400) = 4,040`, sd ≈ 63.6
+- book: `Var = E[N]·Var(X) + Var(N)·E[X]² = 10(4) + 10(6,400) = 64,040`, sd ≈ 253.1
+
+The book-level P&L carries the full `Var(N)·E[X]²` term because its premium is
+fixed. Fixing the premium is what *creates* the count exposure, which is the
+whole reason an aggregate cover is worth buying.
+
+Since a103 a `pnl` is no longer an `Aggregate` with a shift applied in place; it
+is a **first-class `PnL` object** wrapping a complete named engine
+(`less agg <name> <program>`, a125). Its `summary_df` is a signed ledger rather
+than a moment table:
 
 ```{python}
-print(pnl.value_type)
-qd(pnl.stats_df.loc['meta'])
+qd(pnl.summary_df)
 ```
+
+The full P&L surface, including expenses, ceded premium and the reinsurance
+walk, is §14.
 
 Since a45, the *loss* severity of a `pnl` may itself be signed (a `dsev` with a
 negative atom, or an `ssev`); previously the affine path silently wrapped the
 negative atoms.
 
-## 3.4 `multivariate` and `copula`: joint laws of two perils (a24)
+## 3.4 `bivariate` and `copula`: joint laws of two perils (a24, renamed a80)
+
+**Breaking, a80:** the keyword is **`bivariate`** (short form `bv`). It shipped
+at a24 as `multivariate`, which promised a generality the 2D FFT engine does not
+have. The object is `BivariateAggregate`, and the whole surface is covered in
+§15.
 
 One event can drive two correlated perils, and you want the joint law of the
-two aggregates, not just the marginals. `multivariate` couples two component
+two aggregates, not just the marginals. `bivariate` couples two component
 severities by a copula and accumulates them with a shared outer frequency
 through a 2D FFT. The component `dfreq [0 1] [p0 p1]` is the per-event trigger
 probability. The `copula` clause is optional — omitted means independence,
 where the only dependence is the shared (here gamma-mixed) count:
 
 ```{python}
-qd(mv_indep.describe)
-print(f'corr, no copula (common shock only): {mv_indep.corr():.4f}')
-print(f'corr, Gumbel tau=0.4 on top:         {mv_copula.corr():.4f}')
+qd(mv_indep.summary_df)
+print(f'corr, no copula (common shock only): {mv_indep.corr:.4f}')
+print(f'corr, Gumbel tau=0.4 on top:         {mv_copula.corr:.4f}')
 ```
 
 The realized output correlation is reported alongside the copula parameter
@@ -300,8 +438,8 @@ aggregates and `E[Ceded] + E[Net]` is the gross mean; the joint law carries
 what the margins cannot — the reinsurer-vs-cedent dependence:
 
 ```{python}
-qd(netceded.describe)
-print(f'corr(Ceded, Net) = {netceded.corr():.4f}')
+qd(netceded.summary_df)
+print(f'corr(Ceded, Net) = {netceded.corr:.4f}')
 ```
 
 `Aggregate.occ_bivariate()` returns the same object from an already-built
@@ -362,6 +500,40 @@ print(big.info)    # the permanent `approximate` line + self-describing fit note
 See Grids & windows for the accuracy comparison against `bigex`, the exact
 convolution.
 
+## 3.11 Statement separation: a blank line or `;` (a69)
+
+**Breaking.** Multi-statement DecL used to need a trailing backslash to
+continue a line. Statements are now separated by a **blank line or a `;`**, and
+the backslash is gone. A program can therefore be indented naturally across
+lines, which is what every multi-line example in this document relies on.
+
+## 3.12 Bare unary minus on a severity (a109)
+
+`ssev -lognorm 10 cv 0.5` negates a severity directly, without the
+`-1 * ` scale factor:
+
+```{python}
+print(build('agg U 5 claims ssev -lognorm 10 cv 0.5 poisson').est_m)
+```
+
+## 3.13 `payoff` / `loss` orientation (a102)
+
+An `agg` can be declared a payoff rather than a loss by suffixing the program.
+Orientation drives the sign convention used throughout pricing, so it is
+declared rather than inferred:
+
+```{python}
+print(build('agg P 10 claims sev lognorm 100 cv 1 poisson payoff').value_type)
+```
+
+## 3.14 Labels: `as "…"` (a124, a128, a132, a133)
+
+Any named object, and since a128 any *interior* site (a layer, a severity
+component, an exposure band), can carry a human display label with
+`as "Some Label"`. Labels are presentation only: no computed value changes.
+They live in one place per object (`label`) with classless interior sites
+pooled into `label_map`, reached through the `labels` namespace.
+
 # 4. Better parse errors (a16)
 
 DecL parse failures are now structured reports with line/column, a source-line
@@ -415,7 +587,7 @@ audited against exact moments, the declare → build → validate → trust cycl
 is described in the package paper [@Mildenhall2024].
 
 ```{python}
-qd(simple.describe)
+qd(simple.summary_df)
 ```
 
 ```{python}
@@ -456,7 +628,7 @@ They are now backed by an honest discrete RV: exact step `cdf`/`sf`, exact
 and layered. A fair die has mean exactly 3.5:
 
 ```{python}
-qd(dice.describe)   # Err columns exactly 0
+qd(dice.summary_df)   # Err columns exactly 0
 print('sev ppf(0.5) =', dice.sevs[0].fz.ppf(0.5))
 ```
 
@@ -466,12 +638,12 @@ print('sev ppf(0.5) =', dice.sevs[0].fz.ppf(0.5))
 the moment table shows an SD trio instead of CV (visible in §3.1 above). The
 zero-mean case reports the correct SD — in 0.30.1-era logic it reconstructed
 `SD = mean × CV = 0 × NaN = NaN` (fixed a40, deriving variance from the second
-moment). `Portfolio.describe` makes the CV-vs-SD choice once, portfolio-wide,
+moment). `Portfolio.summary_df` makes the CV-vs-SD choice once, portfolio-wide,
 so a mixed signed/unsigned book renders one consistent frame (a43).
 
 ```{python}
 zero_mean = build('agg ZM dfreq [3] dsev [-1 1]')   # mean 0, sd sqrt(3)
-qd(zero_mean.describe)
+qd(zero_mean.summary_df)
 ```
 
 ## 6.5 The `density` property and `sev_density_df` (a39, a21)
@@ -504,7 +676,7 @@ Reinsurance reporting was rebuilt end to end. Three objects on `Aggregate`
 Change columns:
 
 ```{python}
-qd(reins.describe)
+qd(reins.summary_df)
 ```
 
 ```{python}
@@ -550,20 +722,58 @@ silently in pricing. The cast's `defective` (Pareto 1.3, infinite variance) is
 built to show this:
 
 ```{python}
-print(defective.explain_validation())
+print(defective.validation_explanation)
+```
+
+## 6.9 The frequency distribution, materialized (a107, a148)
+
+`create_frequency()` builds the claim-count distribution as an object in its own
+right, so the frequency can be inspected and plotted like any other aggregate.
+`Frequency.freq_df` is the diagnostic table: the count pmf `p` beside the
+mean-matched Poisson `po_p`.
+
+```{python}
+qd(simple.frequency.freq_df.head(8))
+```
+
+Reading the two columns side by side is the fastest way to see dispersion. A
+`mixed gamma ν` frequency has variance/mean exactly `1 + ν²n`, so `p` spreads
+visibly wider than `po_p`. A `wait expon` renewal count reproduces `po_p` to the
+kernel noise floor, which is the Poisson process recovered as a special case.
+The diagnostic is capped at mean ≤ 1000: it is a small-count eyeball tool.
+
+## 6.10 Return-period quantile plots (a110)
+
+`quantile_x='return'` puts the Lee plot on a return-period x-axis, which is how
+catastrophe results are usually read:
+
+```{python}
+simple.plot(quantile_x='return')
+```
+
+## 6.11 `help` on every first-class class (a98, a101, a142, a150)
+
+Every first-class class answers `help(regex)`, filtered by pattern, with `lod`
+controlling detail. **Breaking at a101:** the `output` argument is `values`.
+At a150 nine copy-pasted implementations collapsed into a single `HelpMixin`,
+so the surface is identical everywhere it appears.
+
+```{python}
+simple.help('tvar|var$')
 ```
 
 # 7. Grids, buckets & windows
 
 ## 7.1 The sizing decision is inspectable (a21)
 
-`update` runs up to several sizing methods — exact-discrete lattice, bounded
-small-count, the legacy three-moment rule, windowed — and records them in
-`_bs_window_df`, then picks. `log2` is a cap; pinning `bs` keeps full manual
-control.
+`update` runs up to several sizing methods (exact-discrete lattice, bounded
+small-count, the legacy three-moment rule, windowed), records them in
+`bs_window_df`, then picks. `log2` is a cap; pinning `bs` keeps full manual
+control. The frame became public at a65, and §7.4 covers the narrative forms
+built on top of it.
 
 ```{python}
-qd(bigex._bs_window_df.iloc[:, :6])
+qd(bigex.bs_window_df.iloc[:, :6])
 ```
 
 **Breaking vs 0.30.1:** the `recommend_p` knob is renamed `bucket_sizing_p`
@@ -590,7 +800,7 @@ A concentrated aggregate — CV small enough that its whole mass sits far above
 hundreds:
 
 ```{python}
-qd(pd.concat([big.describe, bigex.describe], keys=['approximate sgamma', 'exact, windowed']))
+qd(pd.concat([big.summary_df, bigex.summary_df], keys=['approximate sgamma', 'exact, windowed']))
 ```
 
 Behavioral note (intended): `q`/`F`/plots of a windowed aggregate live on
@@ -609,6 +819,29 @@ The portfolio combine grid was also fixed (a49, `best_window`): the shared
 floor — so adding units no longer *coarsens* the grid, and all-integer
 discrete books land on the lattice (`bs=1`) instead of a spurious fine
 continuous `bs`.
+
+## 7.4 The grid choice is legible (a58, a64, a65, a70)
+
+The sizing decision used to be a number you either trusted or overrode. It is
+now a reported decision. `bs_window_df` shows each candidate method, whether it
+applies, which was selected, and the resulting window:
+
+```{python}
+qd(simple.bs_window_df)
+```
+
+`bs_description` and `bs_explanation` are the short and long narrative forms of
+the same decision. The tail report (§8) feeds this: since a64 the thick/thin
+classification is an *input* to sizing rather than a report written afterwards.
+
+## 7.5 Guards: infinite variance and unreachable grids (a74, a87, a145)
+
+Three sizing corrections worth knowing. `round_bucket` lost its 2.5x jumps
+(a74), so the bucket ladder is smooth. An **infinite-variance** aggregate now
+errors unless you pass an explicit `bs` (a87): there is no honest automatic
+answer, so it asks rather than guessing. And `exact_discrete` sizing lost its
+unconditional top priority (a145), and must clear a reachability guard before
+it is chosen.
 
 # 8. Tail-thickness classification (a29)
 
@@ -630,6 +863,21 @@ print(f'dice bounded: {dice.bounded};  defective bounded: {defective.bounded}')
 
 `Portfolio.tail_class` reports the worst-of across units and names the driving
 unit(s).
+
+## 8.1 The layered tail report: `tail_df` (a60, a62, a63)
+
+`tail_class` gives the one-word answer. `tail_df` gives the layered evidence
+behind it, and `tail_description` / `tail_explanation` the narrative:
+
+```{python}
+qd(simple.tail_df.head(8))
+print(simple.tail_description)
+```
+
+a63 added comprehensive tail tables for the scipy severity families, so the
+classifier knows the analytic tail of each family rather than inferring it
+numerically. That is what makes the classification trustworthy enough to drive
+grid sizing (§7.4).
 
 # 9. Pricing & the pentagon
 
@@ -658,7 +906,7 @@ including the Kusuoka spectral-measure atoms (a16):
 ```{python}
 from aggregate import Distortion
 d = Distortion('bitvar', p0=0.9, p1=0.99, w1=0.5)
-qd(d.describe)
+qd(d.summary_df)
 ```
 
 ## 9.3 Calibration: `distortion_df` and `calibration_df` (a7, a34)
@@ -737,6 +985,28 @@ qd(book.price_pentagon(p=0.995, ROE=0.10))   # VaR capital + cost of capital
 ```{python}
 qd(simple.price_pentagon(a=12500, LR=0.70))  # works on an Aggregate too
 ```
+
+## 9.7 Free choice of capital anchor: `prob_loss_assets` (a97)
+
+Capital can be anchored three ways, and they are the same relationship read from
+different ends: pick the exceedance probability `p`, the loss level `L`, or the
+assets `a`, and get the other two. Pass exactly one:
+
+```{python}
+print(simple.prob_loss_assets(p=0.99))
+print(simple.prob_loss_assets(a=20000))
+```
+
+`price_pentagon_ex` extends the pentagon readout over a range of anchors. (The
+short alias `pla` shipped at a97 and was retired at a151 under the one-name-per-
+concept rule.)
+
+## 9.8 Calibration on signed and payoff supports (a93, a99)
+
+Distortion calibration works on a single distribution, with `Aggregate` and
+`Portfolio` reaching it identically (a93), and since a99 it handles **signed**
+and **payoff** supports. That is what lets a P&L, which lives on both sides of
+zero, be priced with the same machinery as a loss.
 
 # 10. Pricing & allocation bounds
 
@@ -910,7 +1180,277 @@ print(f'tilted convolution mass: {td_.sum():.6f} (reproduces the ordinary result
       f'tilt=None is byte-identical)')
 ```
 
-# 14. Under the hood
+# 14. P&L: profit and loss as a first-class object
+
+The single largest addition since a57. In a23 `pnl` was a keyword that shifted
+an aggregate; today it builds a **`PnL`**, an object with its own ledger,
+exhibits and reinsurance walk. The arc runs a102 to a144.
+
+## 14.1 The ledger: Consideration, Obligation, Margin (a103, a122, a123)
+
+A P&L is money in minus money out over a random state. `summary_df` is that
+statement, not a moment table: **Consideration** is what you are paid,
+**Obligation** what you owe (negative, by sign convention), **Margin** the sum.
+
+```{python}
+qd(pnl.summary_df)
+```
+
+`stats_df` breaks the same ledger out by line, and carries the **κ columns**:
+`κ01 … κ99` are conditional expectations of each line *given the total lands at
+that percentile*. They answer "when the year is bad, which line is driving
+it?", and they foot exactly, by construction, to the Total row.
+
+Since a125 a `pnl` wraps a **complete named engine**, written
+`less agg <name> <program>`. The premium can be inherited from the engine's own
+technical premium rather than restated:
+
+```{python}
+inh = build('pnl Inherit inherit premium less agg Inherit_e '
+            '8000 prem at 65% lr sev lognorm 100 cv 2 poisson')
+qd(inh.summary_df)
+```
+
+## 14.2 Expenses and loss-sensitive legs (a114, a115)
+
+Expenses are `and`-joined obligation legs. Three kinds, distinguished by what
+they scale with: `% loss expense` rides the loss (so it is stochastic),
+`% premium expense` rides the premium, and `fixed expense` is a constant.
+
+```{python}
+book_pnl = build('pnl Book 10000 premium less agg Book_e 10000 premium at 75% lr '
+                 '10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 '
+                 'less 5% loss expense as LAE 100 fixed expense '
+                 'and 10% premium expense')
+qd(book_pnl.stats_df)
+```
+
+The LAE row has the same CV and skew as the Loss row because it *is* the loss,
+scaled. The expense row has zero SD. That separation is the point: a single
+Total hides which legs carry risk and which merely carry cost.
+
+## 14.3 `pnl` and `xpnl`: the net view and the walk (a136)
+
+Two objects, two questions. **`pnl`** is the consolidated **net** view: one
+group, everything folded in, "what did the book earn?". **`xpnl`** is the
+**walk**: gross, then each reinsurance step, then the total, "where did the
+margin go?".
+
+```{python}
+tower = build('xpnl Tower 1000 prem less agg Tower_e 1000 prem at 70% lr '
+              'sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 poisson')
+qd(tower.summary_df)
+```
+
+Read it down the `Step` index: `Gross` is the book before reinsurance, `ceded
+occ` is the cover as its own signed block (you pay 100 of premium, you recover
+51 on average, so the cover costs 49 in expectation), and `All` is the net
+result. The `Impact` row is the difference the step made. Each step's rows are
+an affine function of a `reins_density_df` marginal, so the walk is exact rather
+than simulated.
+
+## 14.4 Acceptability: `evaluate()` (a105)
+
+`PnL.evaluate()` returns the Cherny-Madan breakeven panel: the level of
+distortion at which the P&L stops being acceptable. It needs a single obligation
+leg over a regular grid, so it applies to the plain forms, not to a multi-leg
+expense ledger.
+
+```{python}
+qd(pnl.evaluate())
+```
+
+# 15. Bivariate aggregates
+
+## 15.1 The rename, and what the object is (a80)
+
+**Breaking, a80: `multivariate` is `bivariate`** (short form `bv`), and the
+class is `BivariateAggregate`. The old name promised a generality the 2D FFT
+engine does not have: it is genuinely two dimensions, not n.
+
+Axis sizing was rebuilt over a70 to a76 to *measure* rather than guess: each
+axis gets an honest centred window (`balanced_window`), the lower edge comes
+from the measured support instead of an artificial pin at 0, and `round_bucket`
+lost its 2.5x jumps (a74) so the ladder is smooth.
+
+## 15.2 The reporting surface (a77, a85)
+
+Three frames, each owning one question. `summary_df` follows the
+`Portfolio.summary_df` shape: a shared `Freq` block, a `Sev` / `Agg` block per
+component, and a `total` block for the genuine `X + Y`. `stats_df` is pure
+per-component marginal moments. **`dependency_df`** (new at a85) owns
+everything joint:
+
+```{python}
+qd(mv_copula.dependency_df)
+```
+
+`tau` is the input copula's Kendall tau, a **per-claim** property. The `Sev` row
+is the joint per-claim severity and the `Agg` row the realized aggregate. They
+differ, and the gap is the whole story: compounding attenuates per-claim
+dependence while shared frequency mixing adds common-shock dependence on top.
+
+## 15.3 `clash`: two lines, one event (a79)
+
+A clash program shares events across two lines with per-line claim counts. Here
+8 events, of which 5 hit line 1 and 2 hit line 2:
+
+```{python}
+clash = build('clash Clash 8 5 2 claims sev lognorm 50 cv 1.2 '
+              'sev lognorm 60 cv 1.5 mixed gamma 0.2')
+qd(clash.dependency_df)
+```
+
+Per-claim severity dependence is zero (the severities are independent given an
+event), yet the aggregates are correlated: the shared event count and the shared
+gamma mixing do all the work. That is exactly the clash structure, and it is
+invisible if you only look at marginals.
+
+## 15.4 View pairs (a78)
+
+`netceded` (§3.5) has two siblings. `grossceded` and `grossnet` prefix the same
+reinsured program and return the corresponding joint law, so you can ask for
+whichever pair the analysis needs without rebuilding.
+
+## 15.5 Massive: disk-backed bivariates (a126)
+
+A 2D grid at useful resolution can exceed memory. `update(store_dir=...)` runs
+the update out of core, backed by `zarr` (the `massive` extra), with dict
+pushforwards and pyramid visualization for exploration. One caveat worth
+carrying: with `padding=0` the wrap hides from the deficit check, so compare
+means rather than trusting the deficit.
+
+# 16. Reinsurance economics: stochastic ceded premium
+
+Guaranteed-cost reinsurance has a premium you know at inception. These features
+share one theme: the ceded premium is **random**, because it is a function of
+the ceded loss. That is what makes them require the aggregate machinery rather
+than a spreadsheet.
+
+## 16.1 Reinstatements (a116, a117)
+
+Property-cat covers are paid for as they are used. A layer with
+`reinstatements [1]` carries a deposit premium plus a reinstatement premium
+driven by the recovery:
+
+```{python}
+qd(reinst.reins_summary_df)
+```
+
+## 16.2 Variable rating (a118, a119, a120)
+
+Five features, all now expressible in DecL: **swing** (`swing basic B lcm L min
+m max M`), **slide** (a sliding commission), **pc** (profit commission),
+**corridor** (a retained corridor inside the layer), and **retro**. Each makes
+the ceded premium, or the effective recovery, a function of the loss.
+
+```{python}
+qd(swing.reins_summary_df)
+```
+
+## 16.3 Placement scaling (a143)
+
+Reinsurance premiums in a `pnl` or `xpnl` are quoted at **100% placement** and
+scaled down by the fraction actually placed. Quoting at 100% and scaling once at
+the end is the market convention, and it keeps a partial placement from
+silently rescaling the layer terms.
+
+# 17. Renewal frequency and ruin
+
+## 17.1 Sparre-Andersen: the `wait` clause (a146, a147)
+
+Until a146 the claim count was Poisson or a mixed Poisson. It can now be a
+general **renewal process**: claims arrive after iid waiting times of any law.
+Write `1 year` in place of the count and give the waiting-time distribution:
+
+```{python}
+qd(renewal.summary_df)
+```
+
+The expected count is an **output**, not an input: it falls out of the waiting
+law and the horizon. a147 added layer terms on the wait clause
+(`wait y xs a <dist>`), so waiting times can be capped or floored.
+
+## 17.2 Zero-truncated and zero-modified frequency (a152)
+
+`zt` / `zm` were reparameterized to the textbook form and fixed; `zt` previously
+raised. The parameter is now the one the textbooks use, so a `zt` negative
+binomial matches *Loss Models* directly.
+
+## 17.3 Eventual ruin: `wiener_hopf` (a153)
+
+For a renewal aggregate, `wiener_hopf(rho)` returns the eventual-ruin function
+by a cepstral Wiener-Hopf factorization, at loading `rho`:
+
+```{python}
+wh = renewal.wiener_hopf(0.2)
+print(f'psi(0)  = {wh.ruin.iloc[0]:.4f}')
+print(f'mean claim size = {wh.mean:.4f}')
+print(f'capital for 1% ruin: u = {wh.find_u(0.01):.2f}')
+```
+
+`find_u` inverts it: the capital needed to hold eventual ruin below a target.
+The classical Pollaczek-Khinchine solver is still there and now carries a strict
+Poisson guard, so it refuses rather than silently returning the wrong answer for
+a renewal process. Defective waiting laws are refused outright.
+
+# 18. The recipe library
+
+The last arc before v1.0 (a157 to a168): the shipped `.agg` library describes,
+demonstrates and tests itself.
+
+## 18.1 `doc{{{ }}}` and `tags{ }` (a157)
+
+The DecL trailer grew from two clauses to four. `note{}` is the one-line
+description and `hints{}` the build settings, as before. New: **`tags{}}`**, a
+namespaced classification (`topic:`, `role:`, `check:`), and **`doc{{{ }}}`**, a
+fenced markdown body carrying a full Problem / Solution / Discussion / Check
+recipe. The fence survives markdown headings, blank lines and Python code
+because it is extracted and base64-encoded *before* the comment stripper runs.
+`distortion` gained a trailer at the same time, so distortions are first-class
+in describe / test / audit like everything else.
+
+## 18.2 One library (a159, a161)
+
+`examples.agg`, `cookbook.agg` and `actuarial-severity-curves.agg` merged into a
+single **`library.agg`**, names made unique across kinds, letter prefixes
+retired. It is the default database, so the out-of-the-box knowledge base grew
+from 36 entries to 186.
+
+## 18.3 `build.recipe()` and `build.recipes` (a158, a164)
+
+```{python}
+print(f'{len(build.recipes)} entries; {build.recipes.doc.sum()} carry a full recipe')
+print(build.recipes.query('doc').index.tolist())
+```
+
+`build.recipes` is the audit frame: what is documented, what is demonstrated,
+what is checked. `build.recipe(name)` returns the entry itself. At a164 the two
+objects that described one entry collapsed into one `Recipe` class, and
+`knowledge` was retired in favor of `recipes`.
+
+```{python}
+qd(build.recipes.head(8))
+```
+
+Tags are queryable, which is what replaced the old comment-banner TOC:
+
+```{python}
+print(f"hero entries: {len(build.discover(tags='role:hero'))}")
+```
+
+## 18.4 The cookbook generates itself (a165, a167)
+
+Cookbook pages are **generated** from `library.agg` into native Quarto cells by
+`aggregate.cookbook`. The same `doc{{{}}}` body is executed by
+`tests/test_library_recipes.py`, so the page you read and the test that guards
+it are the same source and cannot drift. `<<decl>>` (a163) substitutes the
+entry's own program, so a recipe never retypes the code it documents.
+
+**Trust note.** Running a recipe executes the code in the `.agg` file. Treat a
+third-party `.agg` like a third-party Python file.
+
+# 19. Under the hood
 
 Internal changes, named for the record — no new user-facing surface. Versions
 refer to `CHANGELOG.md` sections.
@@ -948,6 +1488,42 @@ refer to `CHANGELOG.md` sections.
   kappa with direct sums carrying the grid origin, and the single
   exact-discrete Choquet engine behind all distorted pricing. User-visible
   column changes are covered in the Reporting quartet and Pricing sections.
+- **a66** portfolio windowed combine: Portfolio method-of-moments plus a
+  single-big-jump look-through for the combined grid.
+- **a67–a68** `Aggregate.approximate()` was shadowed by a same-named attribute
+  and had been uncallable; the fix, then one fit core with a symmetric guard
+  and honest reflected-fit errors. The naming rule in `CLAUDE.md` about vetting
+  a new attribute against existing methods comes from this bug.
+- **a71** `.agg` library rationalization (the first pass, later superseded by
+  the a159 merge).
+- **a83** config phase 2: the last hard-coded numerics floors and stranded
+  sizing knobs moved into `aggregate.config` (**breaking**:
+  `aggregate.constants` no longer exposes `FT_NOISE_FLOOR`, `ALIASING_RATIO`,
+  `EXEQA_NOISE_FLOOR`, `DEFICIT_MATERIALITY`).
+- **a88** DecL syntax colorer and error labels resynced with the grammar.
+- **a90–a91** `GridDistribution`, the shared discrete-grid distribution value
+  type, adopted by `Aggregate`, `Portfolio` and `Bounds`. Every quantile, VaR,
+  TVaR, cdf and sf now routes through one implementation instead of
+  hand-rolled searchsorted calls.
+- **a92** plotting subsystem: a single matplotlib boundary.
+- **a94** `portfolio.py` split into a facade plus three subsystems.
+- **a95–a96** shared-concern modules filled in, legacy bucket sizers retired,
+  moment helpers rationalized.
+- **a111–a112** `GridDistribution` learned its own sign (loss vs payoff), and
+  the Lee/quantile worker consumes it.
+- **a121** the bivariate leg kernel: a domain-free engine for the P&L leg
+  model, with insurance as a View on top.
+- **a127** parallel-by-default test suite (`-n auto`) and the fast local loop.
+- **a144** the `ReinstatementAnalysis` and `VariableRatingAnalysis` drill-down
+  classes removed; the generic P&L absorbed their work.
+- **a145** the `exact_discrete` grid-sizing method lost unconditional top
+  priority and must now clear a reachability guard.
+- **a149–a151** the first-class-class surface sweep: `dev/FEATURES.csv` worked
+  class by class, one `help()` implementation replacing nine copies
+  (`HelpMixin`), then the breaking alias retirement. One name per concept.
+- **a154** the DecL round-trip surface (`program` / `pprogram` /
+  `pprogram_html`) collapsed into a third mixin.
+- **a162** test-impact analysis for the edit loop (`pytest-testmon`).
 
 ## References
 

@@ -1,6 +1,25 @@
 # [Recipe-Library] — notes-driven describe / test / audit
 
-**Status:** design, out for peer review (2026-07-28). Nothing implemented.
+> **Done (2026-07-29).** Work completed in a157 (phase 1, the `tags{}` /
+> `doc{{{}}}` trailer clauses), a158 (phase 2, the `aggregate.recipe` runtime),
+> a159 (phase 3, the merged 186-entry `library.agg`), a160 (phase 4, the
+> `tests/test_library_recipes.py` harness), and a161, a163, a164, a165 with
+> follow-ons in a166, a167, a168 (tag namespacing, `<<decl>>` substitution,
+> `[Recipe-Is-The-Entry]`, `[Cookbook-Generate]`, trailer layout,
+> `aggregate.cookbook`, canonical `recipe()` lookup), *except* for the Cookbook
+> implementation. Considered completed.
+>
+> What phase 5 leaves behind is cookbook work, and it is tracked where it
+> belongs: `dev/TODO.md` `[Recipe-Library]` for the page-by-page conversion, and
+> `docs/cookbook/plan.md` `[Cookbook-Pages]` for the page list. Four loose ends
+> named in phase 5 above are still open: the `plan.md` rename of
+> `[Cookbook-Five-Beats]`, the `_setup.py` calibration move into `library.agg`,
+> the two `.md` orphans (`_03_04_modifications`, `_10_01_PK_WH`), and the
+> missing `cookbook/` entry in `docs/conf.py` `exclude_patterns`. Phase 6 was
+> closed by rescoping, not by execution: a `note{}` is the norm and a
+> `doc{{{}}}` is for the cookbook-worthy few.
+
+**Status at design time (2026-07-28):** out for peer review. Nothing implemented.
 Two review rounds incorporated: round 1 found three blocking issues (all folded
 into §1a / §1a′ / §3.4); round 2 closed five open questions and added measured
 evidence for the grammar-ambiguity decision. See *Resolved questions* and

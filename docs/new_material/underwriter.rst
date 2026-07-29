@@ -103,8 +103,8 @@ a parse error.
 Two ways in: ``build(x)`` and ``build.recipe(x)``
 ==================================================
 
-This is the distinction worth learning first, because both take the same string
-and return different things.
+There is an important distinction between ``build(x)`` and ``build.recipe(x)``.
+Both take the same string argument but they return different things.
 
 .. list-table::
     :header-rows: 1
@@ -129,7 +129,7 @@ and return different things.
     rec = build.recipe('ThreeDice')     # looks up
     type(obj).__name__, type(rec).__name__, rec.object is None
 
-So the difference is **construct versus look up**, and it
+The difference is **construct versus look up**, and it
 is deliberate. The recipe base stores DecL specs, which are small and
 picklable, not live objects. Objects are made on demand for two reasons: a
 :class:`Portfolio` needs an :class:`Underwriter` reference that may differ
@@ -330,7 +330,7 @@ Because the page and the test read one source, they cannot drift apart.
 ``program`` versus ``pprogram``
 ================================
 
-Every DecL-created object carries both.
+Every DecL-created object carries both a ``program`` and ``pprogram`` attribute.
 
 .. ipython:: python
     :okwarning:

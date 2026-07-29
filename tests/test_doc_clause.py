@@ -130,6 +130,80 @@ def test_empty_doc_body_is_allowed():
 
 
 # ----------------------------------------------------------------------
+# note/tags/hints bodies are free text (1.0.0a177)
+# ----------------------------------------------------------------------
+# A note is prose, so it may contain the three characters DecL preprocessing
+# would otherwise claim: ``#`` and ``//`` (comment openers, step 2) and ``[``
+# / ``]`` (the vector collapse, step 3). Before 1.0.0a177 the first two
+# truncated the note into a confusing parse error and the third silently
+# padded the text, so ``E[loss]=85`` was stored as ``E [loss] =85``. Step 0b
+# lifts the body out the way step 0 lifts a doc body.
+@pytest.mark.parametrize(
+    'body',
+    [
+        'E[loss]=85, margin 15',            # brackets, unpadded
+        'Beta on [0, 100000] -- bounded',   # brackets with a space inside
+        'layer is 5# of limit',             # a hash mid-note
+        'a // b',                           # a double slash mid-note
+        'trailing hash #',                  # a hash at the very end
+        'alpha = [0 .5 1 1]; and more',     # brackets and a semicolon
+    ],
+)
+def test_note_body_is_free_text(body):
+    """The note reaches the spec byte-for-byte, whatever punctuation it holds."""
+    assert _spec(f'{BASE} note{{{body}}}')['note'] == body
+
+
+def test_hash_in_a_note_does_not_truncate_the_statement():
+    """The clause after a ``#``-bearing note still parses.
+
+    The old failure was not just a mangled note: step 2 cut the line at the
+    ``#``, so everything after it vanished and the parser reported an
+    unexpected token several clauses earlier.
+    """
+    spec = _spec(f'{BASE} note{{5# of limit}} tags{{topic:x}} hints{{log2=16}}')
+    assert spec['note'] == '5# of limit'
+    assert spec['tags'] == ('topic:x',)
+    assert spec['hints'] == 'log2=16'
+
+
+def test_trailer_bodies_are_lifted_independently():
+    """Three bodies on one statement restore to the right three clauses."""
+    spec = _spec(f'{BASE} note{{n[1]}} tags{{t}} hints{{log2=16}}')
+    assert (spec['note'], spec['tags'], spec['hints']) == ('n[1]', ('t',), 'log2=16')
+
+
+def test_a_full_line_comment_holding_a_note_still_vanishes():
+    """Lifting bodies must not resurrect a commented-out statement."""
+    program = f'# {BASE} note{{commented out}}\n{BASE} note{{live}}'
+    statements = UnderwritingLexer.preprocess(program)
+    assert len(statements) == 1
+    assert 'commented out' not in statements[0]
+    assert statements[0].endswith('note{live}')
+
+
+def test_bracketed_note_round_trips_through_format_program():
+    """Unparse and re-parse leaves the note alone, so regeneration is stable.
+
+    The padding was cumulative: each pass through the preprocessor added
+    another space, so a file regenerated from its own specs drifted a little
+    further every time.
+    """
+    program = f'{BASE} note{{E[loss]=85}}'
+    once = format_program(_spec_kind_name(program), fmt='text', trailer=True)
+    twice = format_program(_spec_kind_name(once), fmt='text', trailer=True)
+    assert once == twice
+    assert 'E[loss]=85' in once
+
+
+def _spec_kind_name(program):
+    """``(kind, name, spec)`` for one DecL program, the shape format_program takes."""
+    statements = UnderwritingLexer.preprocess(program)
+    assert len(statements) == 1
+    return PARSER.parse(statements[0])
+
+
+# ----------------------------------------------------------------------
 # Order-free, at most one of each
 # ----------------------------------------------------------------------
 @pytest.mark.parametrize(

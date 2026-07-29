@@ -97,6 +97,30 @@ def _decode_doc(payload: str) -> str:
     return base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8")
 
 
+# ----------------------------------------------------------------------
+# note{...} / tags{...} / hints{...} -- the single-line trailer clauses
+# ----------------------------------------------------------------------
+# Free text, for the same reason a doc body is: a note is prose written by a
+# human, so it may legitimately contain ``#`` (``5# of limit``), ``//``, or
+# square brackets (``E[loss] = 85``). Left in place, the preprocessing steps
+# treat all three as DecL punctuation: step 2 truncates the note at the ``#``
+# or ``//``, and step 3's bracket collapse pads ``[`` and ``]`` with spaces, so
+# ``E[loss]=85`` was silently stored as ``E [loss] =85``.
+#
+# The fix is the doc clause's, one size down. Step 0b lifts each body out and
+# substitutes an indexed placeholder whose alphabet (``A-Za-z0-9_``) is inert
+# through every later step; the bodies are put back verbatim at the end, once
+# the text has been split into statements. An **index**, not base64, because
+# the substitution is undone inside ``preprocess`` rather than by the parser:
+# a real note body could imitate a base64 payload, but nothing can imitate a
+# placeholder that is only ever written by the same call that reads it.
+#
+# The terminals (``decl.lark``: ``/note\\{[^}]*\\}/`` and friends) admit any
+# character but ``}``, newlines included. The lift deliberately does NOT match
+# across a newline: a body spelled over two lines keeps exactly the behavior it
+# had before, rather than acquiring a new one here.
+_TRAILER_BODY_RE = re.compile(r"\b(note|tags|hints)\{([^}\n]*)\}")
+
 class _InheritPremium:
     """Sentinel for ``inherit premium``: copy the engine's technical premium.
 
@@ -164,13 +188,18 @@ class UnderwritingLexer:
         stay in the same statement. The corollary is that a comment cannot
         separate two statements — use a blank line or a ``;`` for that.
 
-        The preprocessor performs seven steps:
+        The preprocessor performs eight steps:
 
         0. ``doc{{{ ... }}}`` bodies are lifted out and replaced by URL-safe
            base64, whose alphabet is inert through every later step. Done
            **first**, so a doc body may contain ``#`` headings, blank lines,
            fenced code and braces -- none of which would survive steps 1-6.
            The closing fence must be alone on its line.
+        0b. ``note{...}`` / ``tags{...}` / ``hints{...}`` bodies are lifted the
+           same way, behind an indexed placeholder, and restored in step 7.
+           They are free text too, so a ``#``, a ``//`` or a ``[`` in a note is
+           prose, not DecL. Done **after** the doc lift, so a ``note{...}``
+           written inside a doc body is already base64 and is left alone.
         1. Full-line comments (optional indent, then ``#`` / ``//``) are removed
            **entirely, including their newline**, so they leave no blank-line
            ghost and a comment inside a multi-line statement folds away. Done
@@ -185,6 +214,8 @@ class UnderwritingLexer:
         5. The text is split into paragraphs on runs of blank lines.
         6. Each paragraph is flattened: its newlines, indentation, and repeated
            spaces collapse to single spaces. Empty paragraphs are dropped.
+        7. The trailer bodies lifted in step 0b are put back verbatim, so what
+           reaches the lexer is exactly what was written.
 
         Parameters
         ----------
@@ -203,6 +234,18 @@ class UnderwritingLexer:
         # ``[A-Za-z0-9_=-]`` and passes through them byte-for-byte.
         program = _DOC_FENCE_RE.sub(
             lambda m: f"doc{{{{{{{_encode_doc(m.group(1))}}}}}}}", program)
+
+        # 0b. Lift every single-line note/tags/hints body behind an indexed
+        # placeholder. Same reasoning as step 0, smaller scope: the body is
+        # prose, so a ``#``, ``//`` or ``[`` in it must not be read as DecL
+        # punctuation by steps 2 and 3. Restored in step 7.
+        bodies = []
+
+        def _lift_trailer(m):
+            bodies.append(m.group(2))
+            return f'{m.group(1)}{{__DECL_TRAILER_{len(bodies) - 1}__}}'
+
+        program = _TRAILER_BODY_RE.sub(_lift_trailer, program)
 
         # 1. Remove full-line comments ENTIRELY (line + its newline), so a
         # comment is transparent: it never separates statements and never
@@ -260,7 +303,14 @@ class UnderwritingLexer:
         # Empty paragraphs are dropped.
         statements = (re.sub(r"\s*\n\s*", " ", p).strip()
                       for p in re.split(r"\n\s*\n", program))
-        return [s for s in statements if s]
+
+        # 7. Put the step-0b bodies back. Only placeholders this call wrote are
+        # ever matched, so the restore cannot misfire on real note text.
+        if not bodies:
+            return [s for s in statements if s]
+        placeholder = re.compile(r"__DECL_TRAILER_(\d+)__")
+        return [placeholder.sub(lambda m: bodies[int(m.group(1))], s)
+                for s in statements if s]
 
     def tokenize(self, text: str) -> _TokenizedText:
         """Tokenize a single DecL line.

@@ -52,43 +52,30 @@ import numpy as np
 
 __all__ = ['spec_to_decl', 'format_program']
 
-# Comment stripping for the text path of format_program. Mirrors
-# UnderwritingLexer.preprocess EXCEPT for the leading bracket-newline-collapse
-# step: that step unconditionally inserts a space after every ``]`` (to fold
-# multiline numpy-array vectors), which silently rewrites ``[`` inside a
-# ``note{...}`` and so is non-idempotent on bracketed notes. format_program's
-# inputs (a stored single-line program, a spec) never carry multiline vectors,
-# so omitting that step keeps re-rendering idempotent.
-_FULL_LINE_COMMENT_RE = re.compile(r"(?m)^[ \t]*(?://|#)[^\n]*\n?")
-_COMMENT_RE = re.compile(r"(//|#)[^\n]*")
-_SEMICOLON_RE = re.compile(r";[ \t]*(\r?\n|$)")
-
-
 def _split_statements(text: str) -> list[str]:
     """Split program text into logical statements under the blank-line / ``;`` rule.
 
-    Lifts ``doc{{{...}}}`` bodies out first (step 0), removes full-line comments
-    transparently (so they never separate statements), strips trailing comments,
-    turns a line-final ``;`` into a paragraph break, then splits on runs of blank
-    lines and flattens each paragraph (newlines and indentation collapse to
-    single spaces, so a tab-indented portfolio folds into one statement).
-    Mirrors :meth:`UnderwritingLexer.preprocess` minus its bracket-newline step,
-    so bracketed notes survive intact.
+    One line, delegating to :meth:`UnderwritingLexer.preprocess`, so the writer
+    and the reader agree on what a statement is by construction.
 
-    Step 0 is shared with the lexer rather than reimplemented: a doc body
-    legitimately contains ``#`` headings and blank lines, so without it the
-    renderer's own output would split into several statements and fail to
-    re-parse. That is exactly what a doc-carrying round-trip test catches.
+    Notes
+    -----
+    This was a near-copy of ``preprocess`` until 1.0.0a177, forked to omit the
+    bracket-newline step: that step pads every ``[`` and ``]`` with a space,
+    which silently rewrote the brackets inside a ``note{...}`` and made
+    re-rendering non-idempotent on a bracketed note. The fork treated the
+    symptom and left the ``#`` / ``//`` half of the same bug in place, so a note
+    holding either still truncated here. ``preprocess`` now lifts trailer bodies
+    out (step 0b), which fixes the cause, and the copy has no reason to exist.
+
+    The returned text is fed straight back to the parser, so the padding the
+    bracket step still applies *outside* a trailer body is invisible: the lexer
+    ignores whitespace, and nothing rendered by ``format_program`` comes from
+    here.
     """
-    from .parser import _DOC_FENCE_RE, _encode_doc
+    from .parser import UnderwritingLexer
 
-    text = _DOC_FENCE_RE.sub(
-        lambda m: f"doc{{{{{{{_encode_doc(m.group(1))}}}}}}}", text)
-    text = _FULL_LINE_COMMENT_RE.sub("", text)
-    text = _COMMENT_RE.sub("", text)
-    text = _SEMICOLON_RE.sub("\n\n", text)
-    statements = (re.sub(r"\s*\n\s*", " ", p).strip() for p in re.split(r"\n\s*\n", text))
-    return [s for s in statements if s]
+    return UnderwritingLexer.preprocess(text)
 
 # Direct frequency families (the FREQ terminal in decl.lark). A spec whose
 # ``freq_name`` is NOT in this set (and is not 'empirical') came from a

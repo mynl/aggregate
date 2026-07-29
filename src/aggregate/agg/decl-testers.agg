@@ -824,11 +824,12 @@ port AE.Trailer.Port note{on the portfolio} agg AE.Trailer.PortUnit 5 claims sev
 # tags{} is a comma- and/or space-separated slug list, decomposed to a tuple.
 # doc{{{...}}} is a long-form markdown recipe. Its body is lifted out by step 0
 # of the lexer preprocessor and carried as URL-safe base64, so it may contain
-# everything a note{} cannot: `#` headings (which the comment stripper would
-# eat), blank lines (which would split the statement), fenced code, braces, and
-# semicolons. The ONLY forbidden content is a line consisting solely of `}}}` --
-# the closing fence must be alone on its line, which is what makes an inline
-# `}}}` inside Python (e.g. a nested dict) harmless.
+# everything a note{} cannot: blank lines (which would split the statement),
+# fenced code, and braces. The ONLY forbidden content is a line consisting
+# solely of `}}}` -- the closing fence must be alone on its line, which is what
+# makes an inline `}}}` inside Python (e.g. a nested dict) harmless. Since
+# 1.0.0a177 a note{} body is lifted too (step 0b), so the gap between the two
+# is narrower: see section AG.
 agg AF.Tags.Spaces 5 claims sev lognorm 10 cv 1 poisson                                       tags{severity frequency aggregate}                note{space-separated tag list};
 agg AF.Tags.Commas 5 claims sev lognorm 10 cv 1 poisson                                       tags{severity, frequency, aggregate}              note{comma-separated tag list};
 agg AF.Tags.Mixed  5 claims sev lognorm 10 cv 1 poisson                                       tags{severity,frequency  aggregate, check:round-trip}  note{mixed separators and a namespaced tag};
@@ -867,3 +868,24 @@ assert abs(a.actual_m - 500) < 1e-9      # E[N] x E[X] = 10 x 50
 assert abs(a.est_m - a.actual_m) < 1e-5  # FFT estimate vs theoretic
 ```
 }}}
+
+# ============================================================
+# AG. note/tags/hints bodies are free text (1.0.0a177)
+#     (tests/test_doc_clause.py)
+# ============================================================
+# A note is prose, so it may hold the three characters DecL preprocessing used
+# to claim: `#` and `//` (the comment openers, step 2) and `[` / `]` (the
+# vector collapse, step 3). Step 0b lifts each single-line note/tags/hints body
+# behind an indexed placeholder and step 7 puts it back verbatim, so what
+# reaches the lexer is what was typed. Before that, `#` and `//` truncated the
+# statement into a parse error several clauses upstream, and brackets were
+# silently padded: `E[loss]=85` was stored as `E [loss] =85`, and the padding
+# grew by one space every time the file was regenerated from its own specs.
+# Still forbidden in a note, and still what doc{{{...}}} is for: a `}` (the
+# terminal ends at the first one) and a line break.
+agg AG.Note.Brackets  5 claims sev lognorm 10 cv 1 poisson                                     note{E[loss]=85, margin 15};
+agg AG.Note.Hash      5 claims sev lognorm 10 cv 1 poisson                                     note{layer is 5# of limit};
+agg AG.Note.Slashes   5 claims sev lognorm 10 cv 1 poisson                                     note{net // ceded, a ratio not a comment};
+agg AG.Note.Semicolon 5 claims sev lognorm 10 cv 1 poisson                                     note{alpha = [0 .5 1 1]; beta follows};
+agg AG.Note.Trailing  5 claims sev lognorm 10 cv 1 poisson                                     note{ends on a hash #};
+agg AG.Note.WithRest  5 claims sev lognorm 10 cv 1 poisson                                     note{5# of limit}  tags{topic:numerics}  hints{log2=16};

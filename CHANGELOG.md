@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.0.0a177
+
+**[Trailer-Body-Inert]** A `note{...}` is prose, but the preprocessor read it as
+DecL. Three characters were claimed that a human writing a note has every right
+to use, and all three are now free.
+
+| written | stored before | stored now |
+|---|---|---|
+| `note{E[loss]=85, margin 15}` | `E [loss] =85, margin 15` | `E[loss]=85, margin 15` |
+| `note{layer is 5# of limit}` | parse error, several clauses upstream | `layer is 5# of limit` |
+| `note{net // ceded}` | parse error, several clauses upstream | `net // ceded` |
+
+`#` and `//` are the comment openers stripped by step 2, so the statement was
+cut at the note and the parser reported an unexpected token well before it.
+`[` and `]` drive step 3's vector collapse, which pads them with spaces. The
+padding was **cumulative**: regenerating a file from its own specs added
+another space every pass.
+
+Twenty-four shipped notes were affected, 8 in `agg/library.agg` and 16 in
+`agg/decl-testers.agg`. They now read exactly as written.
+
+### The fix
+
+`UnderwritingLexer.preprocess` gains step 0b, the doc clause's treatment one
+size down. Each single-line `note{}` / `tags{}` / `hints{}` body is lifted
+behind an indexed placeholder before the comment and bracket steps and restored
+verbatim in step 7, once the text has been split into statements. An index
+rather than base64, because the substitution is undone inside `preprocess`: a
+real note body could imitate a base64 payload, but nothing can imitate a
+placeholder written by the same call that reads it. A body spelled across a
+line break is deliberately not lifted, so it keeps the behavior it had.
+
+`decl_writer._split_statements` was a near-copy of `preprocess`, forked to omit
+the bracket step for exactly this reason. It treated the symptom and left the
+`#` / `//` half in place. With the cause fixed, the copy is deleted and the
+function delegates, so writer and reader agree on what a statement is by
+construction.
+
+### What a note still cannot hold
+
+A `}` (the terminal ends at the first one) and a line break. That is what
+`doc{{{...}}}` is for.
+
+New fixtures: section AG of `agg/decl-testers.agg` and the free-text cases in
+`tests/test_doc_clause.py`, including an idempotence check that pins the
+regeneration drift.
+
 ## 1.0.0a176
 
 **[Interpret-File-Whole-Text]** `Underwriter.interpret_file` reported parse

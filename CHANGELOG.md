@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.0.0a173
+
+**[Discover-Kwarg-Guard]** `build.discover(tag='role:hero')` returned every one
+of the 186 entries in the recipe base. A filter that silently matches everything
+is the worst possible answer: it looks like a successful query, and it denies
+that the tag vocabulary exists.
+
+The tag filter was never wrong. The parameter is `tags`, plural, and `discover`
+accepts `**kwargs` so it can forward build options to `build()`. The singular
+spelling therefore bound into `kwargs`, and the lightweight directory path
+returns without ever reading them. Nothing was filtered because nothing was
+asked.
+
+The same typo did fail on the `plot` / `describe` path, where `kwargs` reaches
+`build()` and eventually `update()`, which is what made it so easy to miss: the
+call that builds blows up, the call that lists does not.
+
+### Two rules, both checked before any work
+
+A kwarg whose name is close to one of `discover`'s own parameters is a mistyped
+filter, and is rejected on either path with the house `Did you mean:` hint,
+`get_close_matches` at the same `n=3, cutoff=0.6` the DecL parser uses. That
+covers `kinds=` and `describ=` as well as the `tag=` that prompted this.
+
+Anything left over is a build option, which is forwarded only when `plot`,
+`describe`, or `return_objects` asks for a build. Passed on the directory path
+it would be dropped, so it raises instead. `discover(log2=16)` was previously a
+silent no-op returning the whole base; `discover('Dice', log2=16, describe=True)`
+still forwards exactly as before.
+
+```
+>>> build.discover(tag='role:hero')
+TypeError: discover() got an unexpected keyword argument 'tag'. Did you mean: tags?
+>>> build.discover(log2=16)
+TypeError: discover() ignores log2: build options are only forwarded when plot,
+describe, or return_objects asks for a build.
+```
+
+### An empty filter intersection no longer raises
+
+Separately, `discover('NoSuchName', tags='role:hero')` raised
+`KeyError: "['program'] not in index"`. When `regex` or `kind` had already left
+zero rows, the tag mask was an empty list, and pandas does not read one as a
+boolean mask: `is_bool_indexer` guards its list branch on `len > 0`, so `df[[]]`
+selected zero *columns*, and the `program` lookup downstream failed. The mask is
+now an explicitly bool-dtype `Series`, which indexes correctly when empty. Subset
+semantics are unchanged.
+
+Three regression tests in `tests/test_underwriter.py` pin all of it: the singular
+spelling failing identically on both paths, build options rejected when unused
+and still forwarded when used, and the empty intersection returning an empty
+frame that keeps its `program` column.
+
 ## 1.0.0a172
 
 **[FCC-Contract-Gaps]** The four holes the declared contract exposed at `a170`,

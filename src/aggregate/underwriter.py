@@ -1,6 +1,7 @@
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime
+from difflib import get_close_matches
 from importlib.resources import files
 import logging
 import numbers
@@ -2219,6 +2220,56 @@ class Underwriter(HelpMixin):
             logger.error('%d parse error(s) in %s', n_errors, filename)
         return df_out
 
+    #: :meth:`discover`'s own parameter names, the candidate set for the
+    #: near-miss check on ``**kwargs``. A kwarg close to one of these is a
+    #: mistyped filter, not a build option to forward.
+    _DISCOVER_PARAMS = ('regex', 'kind', 'tags', 'plot', 'describe',
+                        'return_objects')
+
+    @classmethod
+    def _check_discover_kwargs(cls, kwargs, do_build):
+        """Reject :meth:`discover` kwargs that cannot do what the caller meant.
+
+        Two failure modes, both silent before 1.0.0a173. ``discover`` takes
+        ``**kwargs`` so it can forward build options, which means a mistyped
+        filter name lands there instead of raising: ``discover(tag='role:hero')``
+        returned the entire recipe base, the worst possible answer to a filter,
+        because the directory path never reads ``kwargs`` at all.
+
+        Parameters
+        ----------
+        kwargs : dict
+            The keyword arguments ``discover`` did not consume itself.
+        do_build : bool
+            Whether ``plot`` / ``describe`` / ``return_objects`` asked for the
+            build loop, i.e. whether ``kwargs`` has anywhere to go.
+
+        Raises
+        ------
+        TypeError
+            If a name closely matches one of :data:`_DISCOVER_PARAMS` (a
+            mistyped filter, rejected on either path), or if anything is left
+            over when not building (a build option that would be dropped).
+
+        Notes
+        -----
+        Suggestions use :func:`difflib.get_close_matches` at the same ``n=3,
+        cutoff=0.6`` the DecL parser uses for its own "did you mean" hints
+        (``parser_errors._did_you_mean``), and follow the house message shape:
+        one line, the suggestion concatenated onto it rather than set below.
+        """
+        for name in kwargs:
+            near = get_close_matches(name, cls._DISCOVER_PARAMS, n=3, cutoff=0.6)
+            if near:
+                raise TypeError(
+                    f'discover() got an unexpected keyword argument {name!r}. '
+                    f'Did you mean: {", ".join(near)}?')
+        if not do_build:
+            names = ', '.join(sorted(kwargs))
+            raise TypeError(
+                f'discover() ignores {names}: build options are only forwarded '
+                f'when plot, describe, or return_objects asks for a build.')
+
     def discover(self, regex='', kind='', tags='', plot=False, describe=False,
                  return_objects=False, **kwargs):
         """
@@ -2259,10 +2310,24 @@ class Underwriter(HelpMixin):
         :param describe: build each match and ``qd()`` its summary table.
         :param return_objects: when building, also return the list of built
             objects alongside the DataFrame.
-        :param kwargs: passed to :meth:`build` for each match.
+        :param kwargs: build options, passed to :meth:`build` for each match.
+            Forwarded **only** when ``plot`` / ``describe`` / ``return_objects``
+            asks for a build; on the lightweight directory path they would be
+            dropped, so passing them there is an error. A name close to one of
+            this method's own parameters is always an error, whichever path is
+            taken: it is a mistyped filter, not a build option.
         :return: DataFrame of matches; ``(objects, DataFrame)`` if
             ``return_objects=True``.
+        :raises TypeError: on a mistyped filter name (``tag=`` for ``tags=``),
+            or on a build option passed without asking for a build. Both were
+            silent no-ops before 1.0.0a173.
         """
+        # asking for the built objects implies we must run the build loop
+        do_build = plot or describe or return_objects
+        # before any work: a kwarg that cannot do what the caller intended
+        if kwargs:
+            self._check_discover_kwargs(kwargs, do_build)
+
         # base frame: optionally restricted to a kind
         base = self.recipes.droplevel('kind') if not kind else self.recipes.loc[kind]
         # empty regex means "no filter" — return everything
@@ -2270,10 +2335,14 @@ class Underwriter(HelpMixin):
 
         if tags:
             wanted = {t for t in re.split(r'[,\s]+', tags) if t}
-            df = df[[wanted <= set(t or ()) for t in df['tags']]]
-
-        # asking for the built objects implies we must run the build loop
-        do_build = plot or describe or return_objects
+            # An explicitly bool-dtype Series, not a list: pandas reads an
+            # EMPTY list as a column selection (``is_bool_indexer`` guards its
+            # list branch on ``len > 0``), so a regex/kind filter that already
+            # matched nothing turned this into ``df[[]]``, a zero-column frame,
+            # and the ``df[['program']]`` below raised KeyError.
+            mask = pd.Series([wanted <= set(t or ()) for t in df['tags']],
+                             index=df.index, dtype=bool)
+            df = df[mask]
 
         if not do_build:
             # lightweight directory view; format the program column for readability

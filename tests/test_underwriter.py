@@ -459,6 +459,44 @@ def test_discover_by_tags():
     assert len(global_build.discover(tags='no-such-tag')) == 0
 
 
+def test_discover_rejects_singular_tag():
+    """``tag=`` is a mistyped ``tags=``, not a build option to swallow.
+
+    The regression this pins: ``discover`` takes ``**kwargs`` to forward build
+    options, so the singular spelling used to bind there and the directory path
+    returned the *entire* recipe base, silently. It must fail the same way on
+    both paths.
+    """
+    for kwargs in ({}, {'describe': True}):
+        with pytest.raises(TypeError, match='Did you mean: tags'):
+            global_build.discover(tag='role:hero', **kwargs)
+    # any near-miss on a filter name, not just this one
+    with pytest.raises(TypeError, match='Did you mean: kind'):
+        global_build.discover(kinds='sev')
+
+
+def test_discover_rejects_unused_build_kwargs():
+    """Build options are an error unless something asks for a build."""
+    with pytest.raises(TypeError, match='build options are only forwarded'):
+        global_build.discover(log2=16)
+    # ... and still reach build() when one does
+    objs, df = global_build.discover('^TwoLineBook$', log2=14,
+                                     return_objects=True)
+    assert df.loc['TwoLineBook', 'log2'] == 14
+
+
+def test_discover_empty_intersection():
+    """A filter pair matching nothing returns an empty frame, not a KeyError.
+
+    An empty mask list made pandas read ``df[[]]`` as selecting zero *columns*
+    (``is_bool_indexer`` is False for an empty list), so the ``program`` lookup
+    downstream raised.
+    """
+    df = global_build.discover('NoSuchNameZZZ', tags='role:hero')
+    assert len(df) == 0
+    assert 'program' in df.columns
+
+
 def test_discover_kind_is_the_type_filter():
     """``kind=`` filters by TYPE; ``tags=`` by subject. They compose.
 

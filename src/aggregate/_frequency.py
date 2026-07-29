@@ -515,6 +515,32 @@ class Frequency(HelpMixin):
         s.append(info_row('frequency tail', self.tail_description))
         return '\n'.join(s)
 
+    def __repr__(self):
+        """Unambiguous one-line form: the family, its shape parameters, and E[N].
+
+        Notes
+        -----
+        Added at a173. ``Frequency`` was the one class in ``dev/FEATURES.csv``
+        with no ``__repr__``, so it fell through to ``object.__repr__`` and
+        printed ``<aggregate._frequency.FrequencyPoisson object at 0x...>``. It
+        went unnoticed because the matrix could not see the display surface at
+        all until the introspector's ``_``-prefix filter was widened, which is
+        exactly what that widening was for.
+
+        ``en`` is stamped by the owning :class:`Aggregate`, so a standalone
+        frequency reports its family without a mean rather than inventing one.
+        """
+        parts = [self.freq_name]
+        if self.freq_a:
+            parts.append(f'a={self.freq_a:.4g}')
+        if self.freq_b:
+            parts.append(f'b={self.freq_b:.4g}')
+        if self.freq_zm:
+            parts.append(f'zm p0={self.freq_p0:.4g}')
+        if self.en is not None:
+            parts.append(f'E[N]={self.en:,.6g}')
+        return f'Frequency({", ".join(parts)})'
+
     @property
     def name(self) -> str:
         """Object name -- the frequency family (``'poisson'``, ``'negbin'``, ...).

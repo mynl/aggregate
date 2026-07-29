@@ -692,17 +692,25 @@ def test_bivariate_narratives_agree_with_the_frame(biv):
         assert unit in txt
 
 
-def test_bivariate_validation_df_fails_a_pinned_grid():
-    """A grid pinned far below support fails the deficit gate, and says so."""
-    b = build('bivariate FCC.BivBad 25 claims '
-              'agg X dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 '
-              'agg Y dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 '
-              'copula gumbel 0.4 poisson')
-    b.update(bs=(1.0, 1.0), log2=(6, 6))
-    df = b.validation_df
-    assert not df.loc['tail deficit', 'Pass']
-    assert 'tail deficit' in b.validation_description
-    assert 'fails' in b.validation_explanation
+def test_bivariate_validation_df_fails_the_deficit_gate(biv):
+    """A deficit over the gate fails the row, the one-liner and the prose.
+
+    Drives the gate by setting :attr:`deficit` on the module fixture rather than
+    by building a bivariate on a deliberately coarse grid: that a coarse grid
+    *produces* a deficit is ``test_bivariate.py``'s job (and lives in the slow
+    tier, where a 2-D grid belongs). What is under test here is the wiring, that
+    a failed check reaches all three readouts, and that is worth a millisecond
+    rather than eighty seconds.
+    """
+    good = biv.deficit
+    biv.deficit = 10 * biv.TAIL_DEFICIT_GATE
+    try:
+        assert not biv.validation_df.loc['tail deficit', 'Pass']
+        assert 'tail deficit' in biv.validation_description
+        assert 'fails' in biv.validation_explanation
+    finally:
+        biv.deficit = good
+    assert biv.validation_df['Pass'].all()      # and the fixture is left clean
 
 
 def test_distortion_validation_df_checks_the_identities():
@@ -779,6 +787,62 @@ def test_portfolio_reins_explanation_omits_clean_units(port):
     assert 'Unit A' in long                  # A cedes 500 xs 500
     assert 'Unit B' not in long              # B is clean
     assert 'Unit B' in port.reins_description
+
+
+# ---------------------------------------------------------------------------
+# the a173 [Display-Surface-Incidentals] batch
+# ---------------------------------------------------------------------------
+
+def test_tweedie_html_dunder_is_the_one_ipython_calls():
+    """a173: it was ``__repr_html__``, which nothing ever calls."""
+    from aggregate.tweedie import Tweedie
+    t = Tweedie(p=1.5, mean=10, dispersion=2)
+    assert not hasattr(t, '__repr_html__'), 'the wrong dunder survived'
+    html = t._repr_html_()
+    assert '<table' in html
+    # the mimebundle served the same HTML all along; they must not diverge
+    assert t._repr_mimebundle_()['text/html'] == html
+
+
+def test_copula_carries_both_mixins():
+    """a173: the one class with LabeledMixin but not HelpMixin."""
+    from aggregate.copula import Copula
+    from aggregate._help import HelpMixin
+    from aggregate._labeled import LabeledMixin
+    c = Copula('gumbel', 0.4)
+    assert isinstance(c, HelpMixin) and isinstance(c, LabeledMixin)
+    assert callable(c.help)
+    assert c.label                                  # the derived pretty label
+
+
+def test_every_matrix_class_has_its_own_repr(agg, port, pnl, biv):
+    """a173: ``Frequency`` fell through to ``object.__repr__``.
+
+    Invisible until the introspector's ``_``-prefix filter was widened, which
+    is what ``dev/regen_features.py``'s ``DISPLAY_MEMBERS`` allowlist is for.
+    """
+    from aggregate.spectral import Distortion
+    hosts = [agg, port, pnl, biv, agg.sevs[0], agg.frequency,
+             agg._grid_distribution(), Distortion('ph', 0.5),
+             Bounds(agg, premium=agg.actual_m * 1.1)]
+    for obj in hosts:
+        assert type(obj).__repr__ is not object.__repr__, \
+            f'{type(obj).__name__} has no __repr__ of its own'
+        # not asserting the address is absent: Aggregate and Portfolio append
+        # ``super().__repr__()`` on purpose, so two objects with one label stay
+        # distinguishable. The check is that the class says something of its own.
+        assert repr(obj).strip()
+
+
+def test_frequency_repr_reports_family_params_and_mean(agg):
+    from aggregate._frequency import Frequency
+    assert repr(agg.frequency) == 'Frequency(poisson, E[N]=100)'
+    mixed = build('agg FCC.Mix 10 claims sev lognorm 100 cv 1 mixed gamma 0.25',
+                  update=False)
+    assert repr(mixed.frequency) == 'Frequency(gamma, a=0.25, E[N]=10)'
+    # standalone: no owning Aggregate has stamped en, so no mean is invented
+    bare = Frequency('poisson', freq_a=0, freq_b=0, freq_zm=False, freq_p0=0)
+    assert repr(bare) == 'Frequency(poisson)'
 
 
 def test_grid_distribution_has_info(agg):

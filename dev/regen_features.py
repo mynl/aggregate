@@ -85,6 +85,18 @@ SHORT = {'Aggregate': 'Agg', 'Portfolio': 'Port', 'BivariateAggregate': 'Biv',
 PRESENT_TOKENS = ('Y', '~')
 COLLISION_TOKEN = '~'
 
+#: Underscore-prefixed members the introspector lets through anyway (a173).
+#:
+#: The filter below drops every ``_``-prefixed name, which made the matrix
+#: structurally blind to the *presentation* surface -- exactly the most
+#: duplicated part of the library, and the part
+#: ``[Display-Surface-Incidentals]`` is about auditing. An explicit allowlist,
+#: not a blanket widening: letting all private names through would bury the
+#: report under internals and turn UNDOCUMENTED into noise. Add a name here when
+#: it is a display entry point that ought to be consistent across classes.
+DISPLAY_MEMBERS = ('__repr__', '_repr_html_', '_repr_mimebundle_',
+                   '_text_info_blob', '_html_info_blob')
+
 
 def build_objects() -> dict:
     """One live object per class column (built + updated where relevant)."""
@@ -205,7 +217,7 @@ def introspect(objs) -> dict:
             names |= set(klass.__dict__)
         names |= set(vars(obj))
         for name in names:
-            if name.startswith('_'):
+            if name.startswith('_') and name not in DISPLAY_MEMBERS:
                 continue
             kind = member_kind(cls, name)
             if kind is None:

@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.0.0a174
+
+**[Display-Surface-Incidentals]** The grouped small defects, plus the change that
+made the group findable in the first place.
+
+### The matrix can finally see the display surface
+
+`dev/regen_features.py` dropped every `_`-prefixed name from its introspection,
+which made `dev/FEATURES.csv` **structurally blind** to `__repr__`,
+`_repr_html_`, `_text_info_blob` and `_html_info_blob`: the most duplicated part
+of the library, and the part this item is about auditing. An explicit
+`DISPLAY_MEMBERS` allowlist now lets those through. Deliberately not a blanket
+widening, which would bury the UNDOCUMENTED report under internals and make it
+useless.
+
+It paid immediately. `Frequency` had **no `__repr__`** and printed
+`<aggregate._frequency.FrequencyPoisson object at 0x...>`. It now reports its
+family, its shape parameters and `E[N]`, omitting the mean when no owning
+`Aggregate` has stamped one rather than inventing a number:
+
+```
+Frequency(poisson, E[N]=10)
+Frequency(gamma, a=0.25, E[N]=10)
+Frequency(poisson, zm p0=0.5, E[N]=2.03731)
+Frequency(poisson)
+```
+
+The four display members are now a `display` group in the matrix, with the
+remaining gaps written down rather than rediscovered: `_repr_html_` is on the
+five first-class classes only, so `Severity`, `Frequency`, `GridDistribution`
+and the three `Bounds` classes still render as plain text in a notebook; and
+`_html_info_blob` exists on `Aggregate` alone, while four other classes build
+the same intro paragraph inline. Neither is fixed here. The point of the row is
+that closing them becomes a decision rather than a discovery.
+
+### `tweedie.Tweedie._repr_html_`
+
+Was spelled `__repr_html__`, which is not a dunder IPython looks for, so the
+method was unreachable. No visible symptom, because `_repr_mimebundle_` serves
+the same HTML and takes precedence in a notebook: dead code, not a broken
+display. Both are kept and both render `to_frame()`, so they cannot disagree.
+
+### `Copula` gains `HelpMixin`
+
+It was the one class carrying `LabeledMixin` without `HelpMixin`, so `.help()`
+reached every other labeled object and not this one. Neither mixin defines an
+`__init__`, so this is a base-list change only.
+
+### Closed with no change
+
+`Underwriter.__repr__` hand-rolls its label/value layout at a hardcoded 19
+columns instead of `info_row` / `INFO_LABEL_WIDTH`. Left alone by author
+decision: `Underwriter` is not a first-class citizen, has no `info`, and is not a
+column in the matrix, so the shared layout does not apply to it.
+
 ## 1.0.0a173
 
 **[Discover-Kwarg-Guard]** `build.discover(tag='role:hero')` returned every one

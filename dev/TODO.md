@@ -23,10 +23,11 @@
 > removed: `[ZT-ZM-Frequency-Fix]` (shipped `a152`),
 > `[Aggregate-Summary-DF-Useless]` (the gross/net smell is fixed),
 > `[FCC-Surface-Sweep]` and `[PnL-Repr-HTML]` (both shipped `a171`), and
-> `[FCC-Contract-Gaps]` (shipped `a172`, both excuse lists now empty). Deferred
-> to post-v1.0, last: `[Joint-Padding-Window-Tradeoff]`. Closed with no change:
-> sub-item 3 of `[Display-Surface-Incidentals]`. Added:
-> `[Bivariate-DecL-Label]` and sub-item 5 of `[Display-Surface-Incidentals]`.
+> `[FCC-Contract-Gaps]` (shipped `a172`, both excuse lists now empty), and
+> `[Display-Surface-Incidentals]` (shipped `a174`). Deferred to post-v1.0, last:
+> `[Joint-Padding-Window-Tradeoff]`. Closed with no change:
+> `Underwriter.__repr__`. Added: `[Bivariate-DecL-Label]` and
+> `[Display-Surface-Punchups]` (what the widened matrix filter exposed).
 > `[Plotting-Punchups]` is its own task, not part of the reporting cluster.
 >
 > **Previous rebuild, 2026-07-27.** The file before that, with the full
@@ -63,35 +64,28 @@
   plus the `decl_writer` round-trip, the grammar-reference regen and the
   `test_decl_unparser` / `test_grammar_sync` corpora, so it is its own item
   rather than a rider.
-- **[Display-Surface-Incidentals]** — four unrelated small defects found while
-  surveying the duplicated presentation surface for `[Program-Mixin]`
-  (`1.0.0a154`). None is urgent; none has a visible symptom today. Grouped so
-  they are not re-discovered:
-  1. `tweedie.py:850` defines **`__repr_html__`** — the wrong dunder (IPython
-     looks for `_repr_html_`), so the method is unreachable. No symptom only
-     because `_repr_mimebundle_` (`:866`) serves the same HTML — i.e. it is
-     silently dead code, not a broken display. **Fix it.**
-  2. `Copula` (`copula.py:64`) is the only class carrying `LabeledMixin` but
-     **not `HelpMixin`** — the one asymmetric mixin host. **Add the mixin.**
-  3. `Underwriter.__repr__` (`underwriter.py:906-929`) hand-rolls the `info`
-     layout, 13 label/value rows padded to a hardcoded 19 columns instead of
-     `info_row` / `INFO_LABEL_WIDTH = 25`. **CLOSED, no change** (author,
-     2026-07-29): `Underwriter` is not a FEATURES column, has no `info`, and is
-     not a first-class citizen, so the shared layout does not apply to it.
-  4. `regen_features.py:203` skips every `_`-prefixed name, so the matrix is
-     **structurally blind to `__repr__` / `_repr_html_` / `_text_info_blob`** —
-     exactly the most-duplicated part of the presentation surface. **Widen it**
-     to an explicit display allowlist (not to all private names, which would
-     flood the report), then add the rows to `dev/FEATURES.csv`. That is the
-     prerequisite for auditing display consistency at all.
-  5. **Found at `a171`:** the P&L builders pass `label=name`, so a `PnL`'s
+- **[Display-Surface-Punchups]** — what the `1.0.0a174` widening exposed, and one
+  loose end. The original four-item `[Display-Surface-Incidentals]` list is
+  **done** (`a174`: the tweedie dunder fixed, `Copula` given `HelpMixin`, the
+  matrix's `_`-prefix filter widened to a `DISPLAY_MEMBERS` allowlist and the
+  four display rows curated, `Frequency` given the `__repr__` it never had;
+  `Underwriter.__repr__` closed with no change, since it is not a first-class
+  citizen). What the new `display` group in `dev/FEATURES.csv` now makes visible:
+  1. **`_repr_html_` is on the five first-class classes only.** `Severity`,
+     `Frequency`, `GridDistribution` and the three `Bounds` classes render as
+     plain text in a notebook. Deliberate or not, it is now a decision.
+  2. **`_html_info_blob` exists on `Aggregate` alone**, while `Portfolio`,
+     `BivariateAggregate`, `PnL` and `Distortion` each build the same intro
+     paragraph inline in `_repr_html_`. The same shape of duplication
+     `HelpMixin` / `ProgramMixin` collapsed, and the obvious fourth mixin.
+  3. **Found at `a171`:** the P&L builders pass `label=name`, so a `PnL`'s
      private `_label` is never `None` and `LabeledMixin._title_name` renders the
      name twice (`'PL (PL)'`). No symptom today only because nothing on `PnL`
-     calls `_title_name`: the new `_repr_html_` deliberately uses `label`, as
-     `__repr__` already did. Either stop defaulting `label` to `name` in
+     calls `_title_name`: `_repr_html_` deliberately uses `label`, as `__repr__`
+     already did. Either stop defaulting `label` to `name` in
      `_pnl_builders.py`, or accept that `PnL` does not use the `label (handle)`
      form and say so on the class.
-  *(A sixth suspect was checked and cleared: `Distortion.program` **does**
+  *(Checked and cleared during the original survey: `Distortion.program` **does**
   survive pickling — the class has no `__reduce__`, so default `__dict__`
   pickling carries it.)*
 - **[Plotting-Punchups]** — plotting polish; lead item: a `pnl` aggregate plots

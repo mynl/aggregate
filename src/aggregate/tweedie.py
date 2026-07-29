@@ -847,7 +847,17 @@ class Tweedie:
         else:
             raise NotImplementedError('Additive decl not yet implemented')
 
-    def __repr_html__(self):
+    def _repr_html_(self):
+        """HTML view: the parameter frame.
+
+        Notes
+        -----
+        Spelled ``__repr_html__`` until a173, which is not a dunder IPython
+        looks for, so the method was unreachable. There was no visible symptom
+        because :meth:`_repr_mimebundle_` serves the same HTML and takes
+        precedence in a notebook; it was dead code, not a broken display. Both
+        are kept and both render :meth:`to_frame`, so they cannot disagree.
+        """
         return self.to_frame().to_html()
 
     def __repr__(self):

@@ -50,6 +50,7 @@ import logging
 import numpy as np
 from scipy.stats import norm, multivariate_normal
 
+from ._help import HelpMixin
 from ._labeled import LabeledMixin
 
 logger = logging.getLogger(__name__)
@@ -61,8 +62,14 @@ logger = logging.getLogger(__name__)
 _PPF_CLIP = 1e-15
 
 
-class Copula(LabeledMixin):
+class Copula(HelpMixin, LabeledMixin):
     """Base class for bivariate copulas; registry + factory dispatch.
+
+    Carries both shared mixins (a173): it was the one class with
+    :class:`~aggregate._labeled.LabeledMixin` but not
+    :class:`~aggregate._help.HelpMixin`, so ``.help()`` reached every other
+    labeled object and not this one. Neither mixin defines an ``__init__``, so
+    this is a base-list change only.
 
     Each concrete kind is a subclass declared below (:class:`CopulaNormal`,
     :class:`CopulaGumbel`, ...). Subclasses register themselves by setting the

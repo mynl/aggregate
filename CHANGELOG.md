@@ -1,5 +1,112 @@
 # Changelog
 
+## 1.0.0a175
+
+**[DecL-Colorizer-Resync]** The Pygments colorer was a hand-written mirror of
+`decl.lark` that had not kept pace with the language. It is now re-derived from
+the grammar, and the drift guard has been widened so the next addition cannot
+slip past.
+
+### The visible symptom: red boxes in Jupyter
+
+`AggLexer` had no rule for the quoted display label that
+`[DecL-Labels-Everywhere]` introduced, so `as "My Book"` lexed both quotes as
+`Token.Error`. The `friendly` style, which `decl_writer._colorize` hard-codes
+for all three markup formats, draws `Token.Error` with a red border. Every
+labeled object's `pprogram_html` therefore showed a red box around each quote.
+
+`Token.Error` counts over the shipped corpora, before and after:
+
+| corpus | before | after |
+|---|---|---|
+| `agg/library.agg` | 170 | 0 |
+| `agg/decl-testers.agg` | 77 | 0 |
+| `agg/_test_suite.agg` | 0 | 0 |
+| `agg/_test_suite2.agg` | 0 | 0 |
+
+### What the colorer had missed
+
+Thirteen defects, each reproduced against real DecL before being fixed.
+
+- **`tags{...}`** and **`doc{{{...}}}`** had no rules at all. The trailer word
+  fell through to a bare identifier and the body was lexed as DecL, which is
+  where most of `library.agg`'s errors came from: a markdown doc body is full of
+  backticks and quotes.
+- **`//` comments** were lexed as two division operators. Only `#` was handled,
+  though `UnderwritingLexer.preprocess` has always stripped both.
+- **`@`**, the inhomogeneous-multiply operator, was an error.
+- **Underscore group separators** were not accepted: `1_000_000` came out as
+  three numbers and two errors.
+- **`port.X`, `dist.X` and `distortion.X`** were split into three tokens. Only
+  `agg.` and `sev.` were recognized as builtin references.
+- **`mixed` at the end of a line** was uncolored. The rule was the literal
+  string `'mixed '`, trailing space required, so the legal line break between
+  `mixed` and its mixing distribution broke it.
+- **`sichel.gamma` and `sichel.ig`** were not single tokens.
+- **`dfreq`** sat with the frequency *distribution* names rather than with
+  `dsev` / `dbvsev` / `dwait`, which is what it actually is. Conversely
+  **`dhistogram` and `chistogram`** sat with the declaration keywords although
+  they are severity distribution names reached through `sev dhistogram xps ...`.
+- **`Name.Type`**, used for the `note{` / `hints{` / `wts` markers, has no entry
+  in the `friendly` style, so those markers rendered as plain black text.
+
+The root cause of a whole class of these is one line: every keyword rule used
+`suffix=r'\b'`, and `\b` is not DecL's word boundary. The grammar makes `.`,
+`_`, `:`, `~` and `-` name characters, so `\b` peeled keywords off the front of
+longer names: `loss-ratio` came out as `loss`, `-`, `ratio`, and `dist.A` as
+`dist`, `.`, `A`. Every rule now uses the grammar's own lookahead,
+`(?![a-zA-Z0-9._:~\-])`.
+
+### What is now colored
+
+`tags{}` slugs read as `Name.Tag`; `hints{}` keys as `Name.Attribute` with
+their values as numbers, constants or names; `note{}` stays prose. A
+`doc{{{...}}}` body is handed to Pygments' Markdown lexer, so headings, inline
+code and fenced code blocks highlight properly. That lexer costs roughly 110 ms
+to import, so it is imported inside the fence callback rather than at module
+scope, and a test pins that `import aggregate` does not pull it in.
+
+Distortion kinds, copula kinds and approximation kinds are deliberately left as
+plain identifiers: they are ordinary `ID` to the grammar, and coloring them
+would mean a third hand-maintained vocabulary to keep in sync with
+`spectral.py` and `copula.py`.
+
+### Dead Python-lexer inheritance removed
+
+The module began life as a copy of the Python lexer, and said so. It carried
+`!=`, `==`, `<<`, `>>`, `:=`, the `in` / `is` / `or` / `not` operator words, and
+backslash line-continuation rules. DecL has none of these. The continuation
+rules were actively harmful: `\`-continuation was removed from the language, so
+a stray backslash is now a real lexer error, and those rules hid it.
+
+There is deliberately **no catch-all rule**. `Token.Error` is the drift signal,
+and swallowing it would make the corpus test below vacuous.
+
+### The guard
+
+`tests/test_grammar_sync.py` walked the 88 reserved words in the grammar's `ID`
+exclusion list. That walk structurally could not see any of the defects above:
+`note`, `tags`, `hints` and `doc` are absent from the list on purpose, since
+their terminals include the opening brace, and neither `STRING` nor the
+operator terminals carry the priority tag the test greps for. It also probed
+each word with a trailing space, which is exactly what hid the `mixed` defect.
+
+The suite now also tokenizes all four shipped corpora asserting zero
+`Token.Error`, checks the token values concatenate back to the source byte for
+byte, derives the brace-clause words and the operator literals from the grammar
+so a fifth trailer clause fails the suite, probes each reserved word against
+five different following characters, and pins both the lazy Markdown import and
+the stray backslash staying an error. 169 cases became 570.
+
+`agg.sublime-syntax`, the second hand-written mirror, had drifted further: 33
+missing reserved words and 2 stale ones (`multivariate` / `mv`, gone from the
+grammar). It is resynced, gained the `tags` / `doc` / `//` / `port.` handling,
+and is now covered by the same guard.
+
+Docs are not rebuilt here. `docs/4_dec_Language_Reference.rst` reaches the lexer
+through the `pygments.lexers` entry point, so its `literalinclude
+:language: agg` picks this up on the next build with no edit.
+
 ## 1.0.0a174
 
 **[Display-Surface-Incidentals]** The grouped small defects, plus the change that

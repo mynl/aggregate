@@ -286,6 +286,17 @@
   `[Pedagogy-Docs-Punchup]`.
 - **[Switcheroo-Sample-Regression]** (#12) — a `Port.Sample` regression case
   guarding the kappa-replacement path.
+- **[DecL-Colorizer-Resync]** — **done `1.0.0a175`**
+  (`dev/done/plan-colorizer-resync.md`). `AggLexer` re-derived from `decl.lark`
+  (quoted labels, `tags{}`, `doc{{{}}}`, `//`, `@`, `_` separators, all four
+  builtin prefixes); `agg.sublime-syntax` resynced. The guard now tokenizes all
+  four shipped corpora asserting zero `Token.Error` and derives the brace
+  clauses and operator literals from the grammar, so the reserved-word walk is
+  no longer the only check.
+- **[Colorizer-Style-Choice]** — `decl_writer._colorize` hard-codes
+  `style='friendly'` for html, ansi and latex alike. A `style=` axis on
+  `format_program`, and a dark-background default for the terminal path, is a
+  small separate item.
 
 ### Docs
 

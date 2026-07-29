@@ -1,5 +1,10 @@
 %YAML 1.2
 ---
+# Sublime Text colorer for DecL, the second hand-maintained mirror of
+# src/aggregate/decl.lark (the first is src/aggregate/decl_pygments.py).
+# tests/test_grammar_sync.py asserts that the reserved words named here are
+# exactly the grammar's, so adding a keyword to decl.lark fails the suite until
+# this file follows.
 name: DecL
 file_extensions:
   - agg
@@ -9,6 +14,8 @@ scope: source.decl
 variables:
   name_char: '[a-zA-Z0-9._:~\-]'
   name_tail: '[._:~a-zA-Z0-9\-]*'
+  # The grammar's own word boundary. NOT \b: `.` `_` `:` `~` and `-` are all
+  # name characters in DecL, so \b would peel `loss` off `loss-ratio`.
   keyword_boundary: '(?![a-zA-Z0-9._:~\-])'
 
 contexts:
@@ -16,43 +23,88 @@ contexts:
     - include: comments
 
   main:
-    - include: note_hints
+    - include: trailer
+    - include: strings
     - include: builtins
     - include: keywords
     - include: frequencies
+    - include: discrete
     - include: operators
     - include: identifiers
     - include: numbers
-    - include: strings
 
-  note_hints:
-    - match: '\b(note)\{'
+  # note{...} / tags{...} / hints{...} / doc{{{...}}}, the four trailer clauses.
+  trailer:
+    - match: '\b(note)(\{)'
       captures:
         1: keyword.other.note.decl
+        2: punctuation.section.braces.begin.decl
       push:
-        - meta_scope: comment.block.note.decl
+        - meta_content_scope: comment.block.note.decl
         - match: '\}'
+          scope: punctuation.section.braces.end.decl
           pop: true
 
-    - match: '\b(hints)\{'
+    - match: '\b(tags)(\{)'
+      captures:
+        1: keyword.other.tags.decl
+        2: punctuation.section.braces.begin.decl
+      push:
+        - match: '\}'
+          scope: punctuation.section.braces.end.decl
+          pop: true
+        - match: '[,;:]'
+          scope: punctuation.separator.decl
+        - match: '[^}:,;\s]+'
+          scope: entity.other.attribute-name.tag.decl
+
+    - match: '\b(hints)(\{)'
       captures:
         1: keyword.other.hints.decl
+        2: punctuation.section.braces.begin.decl
       push:
-        - meta_scope: meta.mapping.hints.decl
+        - match: '\}'
+          scope: punctuation.section.braces.end.decl
+          pop: true
+        # Any key, known or not. Mirroring underwriter._HINT_KEYS here would
+        # create a third copy to keep in sync for no visual gain.
         - match: '\b[a-zA-Z][._:~a-zA-Z0-9\-]*\b(?=\s*=)'
           scope: variable.parameter.hints.decl
         - match: '='
           scope: keyword.operator.assignment.decl
         - match: ';'
           scope: punctuation.separator.decl
+        - match: '\b(?:True|False|None)\b'
+          scope: constant.language.decl
         - include: numbers
         - include: identifiers
-        - match: '\}'
-          pop: true
+
+    # doc{{{...}}} in the preprocessed form: the body has been lifted out and
+    # replaced with URL-safe base64, so it is opaque and sits on one line.
+    - match: '\b(doc)(\{\{\{)([A-Za-z0-9_=\-]*)(\}\}\})'
+      captures:
+        1: keyword.other.doc.decl
+        2: punctuation.section.block.begin.decl
+        3: comment.block.documentation.decl
+        4: punctuation.section.block.end.decl
+
+    # doc{{{...}}} in source form: the opening fence ends its line, the body is
+    # markdown, and the closing fence is alone on its line.
+    - match: '\b(doc)(\{\{\{)[ \t]*$'
+      captures:
+        1: keyword.other.doc.decl
+        2: punctuation.section.block.begin.decl
+      embed: scope:text.html.markdown
+      escape: '^[ \t]*(\}\}\})'
+      escape_captures:
+        1: punctuation.section.block.end.decl
 
   builtins:
     - match: '\bagg\.[a-zA-Z][._:~a-zA-Z0-9\-]*'
       scope: support.type.builtin.aggregate.decl
+
+    - match: '\bport\.[a-zA-Z][._:~a-zA-Z0-9\-]*'
+      scope: support.type.builtin.portfolio.decl
 
     - match: '\bsev\.[a-zA-Z][._:~a-zA-Z0-9\-]*'
       scope: support.type.builtin.severity.decl
@@ -61,24 +113,19 @@ contexts:
       scope: support.type.builtin.distortion.decl
 
   keywords:
-    - match: '\b(?:occurrence|aggregate|netceded|grossceded|grossnet|clash|copula|exposure|tweedie|tower|mixed|picks|splice|ceded|dfreq|dsev|ssev|loss|pnl|port|rate|net|sev|agg|xps|wts|and|exp|at|cv|lr|xs|of|to|po|so|zm|zt){{keyword_boundary}}'
+    - match: '\b(?:aggregate|agg|and|approximate|approx|as|at|basic|bivariate|bv|cede|ceded|clash|claims|claim|copula|corridor|cv|deposit|distortion|dist|exposure|expenses|expense|exp|free|grossceded|grossnet|inherit|lcm|less|loss|lr|max|min|mixed|netceded|net|no|occurrence|of|payoff|pc|picks|pnl|xpnl|po|port|premium|prem|rate|reinstatements|reinstatement|retro|rol|sev|slide|so|splice|ssev|swing|to|tower|tweedie|after|wait|wts|xps|xs|years|year|zm|zt){{keyword_boundary}}'
       scope: keyword.control.decl
-
-    - match: '\b(?:multivariate|mv){{keyword_boundary}}'
-      scope: keyword.control.multivariate.decl
-
-    - match: '\b(?:premium|prem){{keyword_boundary}}'
-      scope: keyword.control.premium.decl
-
-    - match: '\b(?:claims|claim){{keyword_boundary}}'
-      scope: keyword.control.claims.decl
-
-    - match: '\b(?:distortion|dist){{keyword_boundary}}'
-      scope: keyword.control.distortion.decl
 
   frequencies:
     - match: '\b(?:binomial|pascal|poisson|bernoulli|geometric|fixed|neymanA|neymana|neyman|logarithmic|negbin){{keyword_boundary}}'
       scope: support.function.frequency.decl
+
+  # The discrete declaration heads. dfreq belongs with its dsev siblings, not
+  # with the frequency DISTRIBUTION names above: it declares an outcome and
+  # probability pair, it is not a named distribution.
+  discrete:
+    - match: '\b(?:dfreq|dsev|dbvsev|dwait){{keyword_boundary}}'
+      scope: storage.type.discrete.decl
 
   operators:
     - match: '\*\*|\^'
@@ -96,7 +143,10 @@ contexts:
     - match: '[\[\]()]'
       scope: punctuation.section.brackets.decl
 
-    - match: '[,|\\]'
+    # Comma and pipe are whitespace to the parser (%ignore), but they read as
+    # separators. The backslash is NOT here: line continuation was removed from
+    # the language, so a stray backslash must show as an error.
+    - match: '[,|;]'
       scope: punctuation.separator.decl
 
     - match: '!'
@@ -105,31 +155,23 @@ contexts:
   identifiers:
     # Mirrors the Lark ID token. Placing this before numbers prevents
     # names such as mydist.1 from splitting and coloring .1 as a number.
-    - match: '\b(?!agg\.|sev\.|dist\.|distortion\.)(?!(?:agg|aggregate|and|at|bernoulli|binomial|ceded|claim|claims|clash|copula|cv|dfreq|dist|distortion|dsev|exp|exposure|fixed|geometric|grossceded|grossnet|logarithmic|loss|lr|mixed|multivariate|mv|negbin|net|netceded|neyman|neymana|neymanA|occurrence|of|pascal|picks|pnl|po|poisson|port|prem|premium|rate|sev|so|splice|ssev|to|tower|tweedie|wts|xps|xs|zm|zt)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][._:~a-zA-Z0-9\-]*'
+    - match: '\b(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|so|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][._:~a-zA-Z0-9\-]*'
       scope: variable.other.identifier.decl
 
   numbers:
-    - match: '(?<![a-zA-Z0-9._:~\-])-?(?:inf|(?:\d+\.?\d*|\d*\.\d+)(?:[eE][+\-]?\d+)?%?)(?![a-zA-Z0-9._:~\-])'
+    - match: '(?<![a-zA-Z0-9._:~\-])-?(?:inf{{keyword_boundary}}|(?:\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)(?:[eE][+\-]?\d(?:_?\d)*)?%?)'
       scope: constant.numeric.decl
 
   strings:
-    - match: '"'
-      scope: punctuation.definition.string.begin.decl
-      push: inside_string
-
-  inside_string:
-    - meta_include_prototype: false
-    - meta_scope: string.quoted.double.decl
-    - match: '\\.'
-      scope: constant.character.escape.decl
-    - match: '"'
-      scope: punctuation.definition.string.end.decl
-      pop: true
+    # A quoted display label: no escapes and no embedded newline, matching the
+    # grammar's STRING terminal.
+    - match: '"[^"\n]*"'
+      scope: string.quoted.double.decl
 
   comments:
-    - match: '#'
+    - match: '(?:#|//)'
       scope: punctuation.definition.comment.decl
       push:
-        - meta_scope: comment.line.number-sign.decl
+        - meta_scope: comment.line.decl
         - match: '$\n?'
           pop: true

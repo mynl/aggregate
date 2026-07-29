@@ -1,5 +1,82 @@
 # Changelog
 
+## 1.0.0a178
+
+**[Library-Canonical-Layout]** `agg/library.agg` is rewritten in the canonical
+`spread` layout: one clause per line at a two-space indent, `;` closing each
+statement, a blank line between them. Median statement length was 153
+characters and 40 statements ran past 200; nothing but a note body is now over
+100. It is the layout `build.recipe('X').decl` prints and every generated
+cookbook page already showed, so the source and the docs finally read alike.
+
+```
+agg ExposureRating
+  [100 200 1000 50] premium at [0.9 0.85 0.9 0.8] lr
+  [250 500 1000 2000] xs 0
+  sev lognorm 120 cv 12
+  occurrence ceded to
+    750 xs 750
+  mixed gamma 0.2
+  note{Exposure rating on a small portfolio with limits profile, amounts in 000s.}
+  tags{role:hero, topic:aggregate};
+```
+
+### How
+
+`dev/reflow_library.py` renders each entry through
+`format_program(..., layout='spread')` and refuses to write unless every
+statement in the file still parses to the same `(kind, name, spec)`. Whitespace
+between tokens is insignificant to the lexer, so that check is complete: where
+the breaks fall is taste, whether the meaning moved is not. 169 entries are
+canonical; 16 are held back and hand-written in the same style, because the
+writer cannot render them back to what was written.
+
+Comments pass through verbatim, so the file header and every section divider
+are untouched.
+
+### Two defects the layout exposed
+
+**Four PIR case studies were building at the wrong resolution.** `PIRTame`,
+`PIRDiscrete`, `PIRCatNonCatGross` and `PIRCatNonCatNet` each carried
+`hints{bs=1/64; log2=16; padding=1}` after their last unit, where a `port`
+trailer does not reach: `port_out` places the trailer *before* `agg_list`, so
+the portfolio's slot has closed by the time a unit is read. The hints bound to
+the unit and were ignored. `PIRDiscrete` built at `log2=11, bs=1` against the
+`log2=8, bs=1` it asked for; `PIRTame` at `bs=1/256` against `bs=1/64`. Moved
+to the port header line, all four now build as specified. Invisible on one long
+line; obvious once the clause is indented under the unit it was attached to.
+
+**`ssev <c> - <dist>` renders as an ambiguous form.** The writer emits the
+general affine spelling `ssev -1 * <dist> + <c>`, whose leading `-1 *` parses
+two ways (`scaled(-1, X)` or `negate(scaled(1, X))`, algebraically identical).
+Three entries are held back rather than grow the shipped library's ambiguous
+set for a cosmetic gain, and the reflow script now refuses any rendering more
+ambiguous than its source.
+
+### Also
+
+- `decl_writer` renders a unit claim count as `1 claim`, not `1 claims`.
+  46 single-claim severity entries read as English again.
+- `agg/decl-testers.agg`: 17 `port` entries had a `note{}` describing the
+  *portfolio* bound to their last unit. Moved to the header line.
+  `AE.Trailer.Port` and `FCC.NoteP` keep theirs, being the fixtures for the
+  positional rule and for per-unit notes.
+- `tests/test_agg_libraries.py` gains two checks: every non-exempt entry is
+  byte-identical to what `format_program` renders (so regeneration is a no-op,
+  not a diff), and no library `port` binds a trailer to a unit.
+
+### Known unparser gaps
+
+Recorded as `[Unparser-Reference-Gaps]` in `dev/TODO.md`; the exempt list lives
+in `tests/test_agg_libraries.py`.
+
+| gap | entries | what the writer emits |
+|---|---|---|
+| named object reference | 9 | `sev.UnitSeverity` inlines to `dsev [1]`; the spec keeps no record a reference was written |
+| `tweedie` clause | 3 | expands to the equivalent compound-Poisson-gamma, and the transformer has already replaced the author's `note{}` with a conversion string |
+| distortion combinator | 1 | `minimum dist.A dist.B` raises: the child names are not retained |
+| `ssev <c> - <dist>` | 3 | the general affine form, which parses two ways |
+
 ## 1.0.0a177
 
 **[Trailer-Body-Inert]** A `note{...}` is prose, but the preprocessor read it as

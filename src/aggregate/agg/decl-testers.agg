@@ -528,7 +528,7 @@ pnl H4.Prem 1000 prem less agg H4.Prem_e 10 claims sev lognorm 80 cv 1 poisson  
 pnl H4.PremLR 1000 prem less agg H4.PremLR_e 1000 prem at 65% lr sev lognorm 80 cv 1 poisson                                               note{bare-lr pnl; exposure clause carries premium};
 agg H4.ExpPrem 100 prem at 0.65 lr sev lognorm 80 cv 1 poisson                                               note{exposure-clause premium; regression guard};
 pnl H4.Reins 1000 prem less agg H4.Reins_e 10 claims sev lognorm 80 cv 1 occurrence net of 100 xs 100 poisson                note{prem/lr meta stay GROSS under reinsurance};
-port H4.Book agg A1 5 claims sev lognorm 50 cv 1 poisson agg A2 3 claims sev gamma 20 cv .5 poisson          note{homogeneous loss book; portfolio value_type}
+port H4.Book note{homogeneous loss book; portfolio value_type} agg A1 5 claims sev lognorm 50 cv 1 poisson agg A2 3 claims sev gamma 20 cv .5 poisson
 
 
 # UD. Unit-density accessors (numerics-1)
@@ -537,8 +537,8 @@ port H4.Book agg A1 5 claims sev lognorm 50 cv 1 poisson agg A2 3 claims sev gam
 # pmf accessors and the aligned display adapter. UD.PnLpair in the tests
 # reuses the PortPnL.Pair program above (not repeated here). See
 # dev/done/plan-numerics-1-unit-density.md.
-port UD.Plain    agg P 50 claims sev lognorm 100 cv 1 poisson agg Q 30 claims sev lognorm 80 cv 1 poisson    note{zero-origin book; aligned grid=total legacy parity};
-port UD.Disjoint agg Hi 100 claims ssev 1 * norm + 100 poisson agg Lo 100 claims ssev 1 * norm - 100 poisson note{disjoint unit windows near +/-10000}
+port UD.Plain note{zero-origin book; aligned grid=total legacy parity} agg P 50 claims sev lognorm 100 cv 1 poisson agg Q 30 claims sev lognorm 80 cv 1 poisson;
+port UD.Disjoint note{disjoint unit windows near +/-10000} agg Hi 100 claims ssev 1 * norm + 100 poisson agg Lo 100 claims ssev 1 * norm - 100 poisson
 
 
 # N2. Objective spine (numerics-2)
@@ -547,11 +547,11 @@ port UD.Disjoint agg Hi 100 claims ssev 1 * norm + 100 poisson agg Lo 100 claims
 # support kappa (exeqa_*) and the direct-sum objective columns on signed /
 # zero-spectrum / legacy books, plus the Aggregate-side direct sums. See
 # dev/done/plan-numerics-2-objective.md.
-port N2.SignedD  agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed discrete; exact brute-force kappa incl negative origins};
-port N2.ZeroSpec agg S dfreq [1] dsev [-1 1] agg T dfreq [1] dsev [1 2] agg U dfreq [1 2] dsev [2 3]              note{symmetric line zeroes FFT bins; prefix/suffix ft_nots branch};
-port N2.Legacy   agg A dfreq [0 1 2] dsev [1 2 3] agg B dfreq [1] dsev [2 4] [.6 .4]                              note{zero-origin book; sum exa_i == exa_total; F/S guards};
-port N2.PosOrigin agg A dfreq [1] dsev [10 11] agg B dfreq [1] dsev [20 22] [.6 .4]                               note{base for the hand-built positive-origin add_exa frame};
-port N2.SignedLN agg A 8 claims ssev 20 * lognorm 0.4 - 25 poisson agg L 4 claims sev lognorm 30 cv 0.4 poisson   note{signed continuous; exeqa vs Monte Carlo incl a<0};
+port N2.SignedD note{signed discrete; exact brute-force kappa incl negative origins} agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3];
+port N2.ZeroSpec note{symmetric line zeroes FFT bins; prefix/suffix ft_nots branch} agg S dfreq [1] dsev [-1 1] agg T dfreq [1] dsev [1 2] agg U dfreq [1 2] dsev [2 3];
+port N2.Legacy note{zero-origin book; sum exa_i == exa_total; F/S guards} agg A dfreq [0 1 2] dsev [1 2 3] agg B dfreq [1] dsev [2 4] [.6 .4];
+port N2.PosOrigin note{base for the hand-built positive-origin add_exa frame} agg A dfreq [1] dsev [10 11] agg B dfreq [1] dsev [20 22] [.6 .4];
+port N2.SignedLN note{signed continuous; exeqa vs Monte Carlo incl a<0} agg A 8 claims ssev 20 * lognorm 0.4 - 25 poisson agg L 4 claims sev lognorm 30 cv 0.4 poisson;
 agg N2.Dice dfreq [1] dsev [1:6]                                                                                  note{hand checks: lev(3)=2.5 exlea(3)=2 exgta(3)=5};
 pnl N2.PnL 10 prem less agg N2.PnL_e dfreq [1] dsev [2 5] [.5 .5]                                                               note{signed Aggregate direct sums carry the origin}
 
@@ -563,11 +563,11 @@ pnl N2.PnL 10 prem less agg N2.PnL_e dfreq [1] dsev [2 5] [.5 .5]               
 # lifted builder, builder-level mass guard, signed total pricing, and the
 # on-demand per-line capital. See dev/done/plan-numerics-3-distortion.md.
 agg N3.Dice dfreq [1:6] dsev [1:6]                                                                                note{six-surface consistency target; choquet hand checks};
-port N3.OneDice agg D dfreq [1:6] dsev [1:6]                                                                      note{one-line port: line == total};
-port N3.Bodoff agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed note{bounded discrete; linear vs lifted; mass distortion exact};
-port N3.SignedD agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3] note{signed totals price via dot(kappa, gp); shares NaN};
-port N3.PayPair agg P1 dfreq [1] dsev [5 8] [.5 .5] payoff agg P2 dfreq [1] dsev [5 7] [.5 .5] payoff           note{homogeneous payoff book (orientation suffix) prices through the dual};
-port N3.Unb agg U 5 claims sev lognorm 10 cv 1 poisson                                                            note{mass-on-unbounded refused in the lifted builder (G6)}
+port N3.OneDice note{one-line port: line == total} agg D dfreq [1:6] dsev [1:6];
+port N3.Bodoff note{bounded discrete; linear vs lifted; mass distortion exact} agg wind  1 claim sev dhistogram xps [0,  99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed;
+port N3.SignedD note{signed totals price via dot(kappa, gp); shares NaN} agg A dfreq [1 2] dsev [-3 -1 2] [.5 .3 .2] agg B dfreq [1] dsev [-2 1 4] agg C dfreq [2] dsev [1 3];
+port N3.PayPair note{homogeneous payoff book (orientation suffix) prices through the dual} agg P1 dfreq [1] dsev [5 8] [.5 .5] payoff agg P2 dfreq [1] dsev [5 7] [.5 .5] payoff;
+port N3.Unb note{mass-on-unbounded refused in the lifted builder (G6)} agg U 5 claims sev lognorm 10 cv 1 poisson
 
 # ============================================================
 # 1P. Portfolio windowed combine (1.0.0a66)
@@ -576,10 +576,10 @@ port N3.Unb agg U 5 claims sev lognorm 10 cv 1 poisson                          
 # reconciled to Portfolio MM (bulk span from the total moments, not a width
 # sum) + single-big-jump look-through (max_k, not sum) + windowed non-signed
 # origin (Plan B). See dev/done/plan-bucket-window-2.md Round 3.
-port BW.DivIID agg U1 200 claims sev gamma 100 cv 1.2 poisson agg U2 200 claims sev gamma 100 cv 1.2 poisson agg U3 200 claims sev gamma 100 cv 1.2 poisson agg U4 200 claims sev gamma 100 cv 1.2 poisson note{diversified iid: MM sits ~sqrt(k) tighter than the legacy linear sum};
-port BW.Heavy agg HU 100 claims sev lognorm 100 cv 2 poisson agg LU 50 claims sev gamma 50 cv 1 poisson         note{heavy unit drives the SBJ look-through extent floor};
-port BW.Windowed agg H1 5000 claims sev lognorm 10 cv 0.5 poisson agg H2 4000 claims sev gamma 10 cv 0.5 poisson note{concentrated total clears 0: windowed Plan B origin x_min>0};
-port BW.Mixed agg M1 dfreq [4] dsev [3] agg M2 dfreq [3] dsev [-1 1]                                            note{signed combine; resolution floor keeps bs=1, no wrap}
+port BW.DivIID note{diversified iid: MM sits ~sqrt(k) tighter than the legacy linear sum} agg U1 200 claims sev gamma 100 cv 1.2 poisson agg U2 200 claims sev gamma 100 cv 1.2 poisson agg U3 200 claims sev gamma 100 cv 1.2 poisson agg U4 200 claims sev gamma 100 cv 1.2 poisson;
+port BW.Heavy note{heavy unit drives the SBJ look-through extent floor} agg HU 100 claims sev lognorm 100 cv 2 poisson agg LU 50 claims sev gamma 50 cv 1 poisson;
+port BW.Windowed note{concentrated total clears 0: windowed Plan B origin x_min>0} agg H1 5000 claims sev lognorm 10 cv 0.5 poisson agg H2 4000 claims sev gamma 10 cv 0.5 poisson;
+port BW.Mixed note{signed combine; resolution floor keeps bs=1, no wrap} agg M1 dfreq [4] dsev [3] agg M2 dfreq [3] dsev [-1 1]
 
 # ============================================================
 # SC. Signed / payoff distortion calibration (1.0.0a99)

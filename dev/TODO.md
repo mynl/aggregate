@@ -117,6 +117,31 @@
   distribution.
 ### Tests & example libraries
 
+- **[Unparser-Reference-Gaps]** (surfaced by `[Library-Canonical-Layout]`, a178)
+  — `decl_writer` cannot render four constructs back to what was written, so 16
+  `library.agg` entries are exempt from the canonical layout and hand-written.
+  The list is `UNPARSER_EXEMPT` in `tests/test_agg_libraries.py`; shrinking it
+  is progress.
+  1. **Named object reference** (9 entries) — `sev.UnitSeverity` is resolved and
+     inlined at parse time, and nothing on the spec records that a reference was
+     written, so it renders as `dsev [1]`. Fixing it means carrying the
+     reference on the spec (a `sev_ref` key, say) and rendering from that. This
+     is the one worth doing: named-severity reuse is a documented feature that
+     would otherwise appear nowhere in the shipped library.
+  2. **`tweedie` clause** (3) — expands to the equivalent compound-Poisson-gamma
+     with 16-significant-digit parameters. Carries a **live second bug**: the
+     transformer overwrites the author's `note{}` with a machine conversion
+     string (`Tw(p=1.005, mu=1.0, ...)`), so `discover()` and any generated page
+     show the machine text, not what was written. Fix the note clobber first; it
+     is independent and visible today.
+  3. **Distortion combinator** (1) — `minimum` / `mixture` drop their child
+     distortion names, so `format_program` raises rather than rendering.
+  4. **`ssev <c> - <dist>`** (3) — renders in the general affine form
+     `-1 * <dist> + <c>`, whose leading `-1 *` parses two ways
+     (`tests/test_grammar_ambiguity.py`, `KNOWN_AMBIGUOUS`). Either teach the
+     writer the compact spelling when the scale is exactly `-1`, or resolve the
+     grammar ambiguity. `dev/reflow_library.py` refuses any rendering more
+     ambiguous than its source, so this cannot regress silently.
 - **[Agg-Library-Build-Check]** (from `plan-for-v1.md` §1 — *"the one change that
   makes step 1.2 real"*) — `tests/test_agg_libraries.py` today only checks each
   example **parses**. Extend it to check the example **builds**, that the result

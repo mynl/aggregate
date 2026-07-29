@@ -413,6 +413,11 @@ def _render_exposure(spec: dict) -> str:
     (``exp_premium``, ``exp_lr``, ``exp_el``), so both canonicalize to the
     ``premium at lr`` form. The ``loss`` form sets only ``exp_el``; the premium
     form is detected first by the presence of ``exp_premium``.
+
+    A claim count of exactly one renders ``1 claim``, the spelling the grammar
+    also accepts and the one a reader expects. It is cosmetic to the parser
+    (``CLAIMS`` covers both) and matters to the shipped library, where 46
+    single-claim severity entries would otherwise read ``1 claims``.
     """
     if spec.get('freq_name') == 'empirical':
         return _render_dfreq(spec)
@@ -433,7 +438,8 @@ def _render_exposure(spec: dict) -> str:
     if 'exp_el' in spec:
         return f'{_fmt_seq(spec["exp_el"])} loss{label}'
     if 'exp_en' in spec:
-        return f'{_fmt_seq(spec["exp_en"])} claims{label}'
+        count = _fmt_seq(spec['exp_en'])
+        return f'{count} {"claim" if count == "1" else "claims"}{label}'
     return ''
 
 

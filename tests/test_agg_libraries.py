@@ -133,6 +133,88 @@ def test_library_is_the_default_recipe_base():
     assert 'role:hero' in a.tags
 
 
+# ----------------------------------------------------------------------
+# Layout and trailer placement (1.0.0a178)
+# ----------------------------------------------------------------------
+#: Entries `decl_writer` cannot render back to what was written, so they are
+#: hand-written and exempt from the canonical-layout check. Four causes, all
+#: recorded as `[Unparser-Reference-Gaps]` in `dev/TODO.md`: a named object
+#: reference (`sev.UnitSeverity`) is resolved and inlined at parse time with
+#: nothing on the spec recording that a reference was written; the `tweedie`
+#: clause expands to its compound-Poisson-gamma equivalent; the `minimum`
+#: combinator drops its child distortion names; and the compact `ssev <c> -
+#: <dist>` spelling renders in the general affine form `-1 * <dist> + <c>`,
+#: whose leading `-1 *` parses two ways (see `tests/test_grammar_ambiguity.py`).
+#: Shrinking this set is progress; growing it needs a reason.
+UNPARSER_EXEMPT = {
+    # named object reference
+    'BernoulliFrequency', 'BinomialSimple', 'FixedFrequency',
+    'GeometricFrequency', 'NegativeBinomialFrequency', 'NegativeBinomialMixed',
+    'PoissonSimple', 'BasicMixedSev', 'InverseGaussianMixed',
+    # tweedie clause
+    'TweedieCompound', 'TweedieDispersion', 'TweedieSimple',
+    # distortion combinator
+    'MinimumDistortion',
+    # canonical form would be ambiguous
+    'PremiumMinusLoss', 'SignedPremiumMinusLoss', 'PnLSignedSsev',
+}
+
+
+def test_library_is_written_in_the_canonical_layout():
+    """Every non-exempt entry is byte-identical to what ``format_program`` renders.
+
+    The shipped library is formatted by ``dev/reflow_library.py``, which is just
+    ``format_program(..., layout='spread')`` over the file. Pinning that here
+    makes the layout mechanical rather than a matter of taste, and makes a
+    regeneration a no-op instead of a diff.
+    """
+    from aggregate.decl_writer import format_program
+    from aggregate.parser import UnderwritingLexer
+
+    uw = Underwriter(databases='library')
+    uw.load()
+    path = next(p for p in uw.databases if p.name == 'library.agg')
+    offenders = []
+    for statement in UnderwritingLexer.preprocess(path.read_text(encoding='utf-8')):
+        kind, name, spec = uw.parser.parse(uw.lexer.tokenize(statement))
+        if name in UNPARSER_EXEMPT:
+            continue
+        canonical = format_program((kind, name, spec), fmt='text',
+                                   layout='spread', trailer=True)
+        # Compare flattened: the file carries the layout, the check carries the
+        # content, and preprocess is what turns one into the other.
+        if UnderwritingLexer.preprocess(canonical)[0] != statement:
+            offenders.append(name)
+    assert not offenders, (
+        f'{offenders} are not in canonical form -- run '
+        f'`python dev/reflow_library.py`, or add a name to UNPARSER_EXEMPT '
+        f'with a reason')
+
+
+def test_no_library_port_binds_its_trailer_to_a_unit(library):
+    """A ``port``'s ``note{}`` must sit on the port, not on its last unit.
+
+    ``port_out`` places the trailer BEFORE ``agg_list``, so the portfolio's slot
+    has closed by the time a unit is read: a note written after the last unit
+    silently annotates that unit instead. The rule is deliberate and pinned by
+    ``tests/test_trailer_attachment.py``; this asserts the shipped library is on
+    the right side of it, since the mistake is invisible in the source.
+    """
+    offenders = {}
+    for (kind, name), recipe in library._recipes.items():
+        if kind != 'port':
+            continue
+        for unit in recipe.spec.get('spec', ()):
+            # units are (kind, name, spec) triples
+            unit_spec = unit[2] if isinstance(unit, tuple) and len(unit) == 3 else {}
+            stray = [k for k in ('note', 'tags', 'hints') if unit_spec.get(k)]
+            if stray:
+                offenders[f'{name}.{unit_spec.get("name", "?")}'] = stray
+    assert not offenders, (
+        f'trailer bound to a portfolio unit instead of the portfolio: '
+        f'{offenders}; move it to the port header line, after the name')
+
+
 def test_duplicate_names_in_a_library_are_rejected(tmp_path):
     """The uniqueness rule is enforced at load, not just asserted here.
 

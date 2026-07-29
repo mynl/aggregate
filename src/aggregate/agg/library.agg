@@ -254,9 +254,9 @@ agg NegativeBinomialMixed 10 claims sev.UnitSeverity mixed gamma 0.65 note{negat
 agg PoissonFrequency 100 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson note{Poisson frequency -- the no-contagion baseline.} tags{topic:frequency, role:intro};
 agg PoissonSimple 10 claims sev.UnitSeverity poisson note{Poisson claim count} tags{topic:frequency};
 agg ZMPoissonFrequency 4 claims dsev [1] poisson zm 0.5 note{Zero-modified Poisson -- inflate the no-claim probability to 0.5. The 4 is the UN-MODIFIED base mean; reweighting leaves E[N] = 2.0373. Append ! to pin E[N] = 4 instead.} tags{topic:frequency};
-agg ZMPoissonSimple 4 claims dsev [1] poisson zt note{zero truncated Poisson with mean 4} tags{topic:frequency};
+agg ZMPoissonSimple 4 claims dsev [1] poisson zm .5 note{zero modified Poisson} tags{topic:frequency};
 agg ZTPoissonFrequency 4 claims dsev [1] poisson zt note{Zero-truncated Poisson -- at least one claim, so E[N] = 4/(1-exp(-4)) = 4.0746.} tags{topic:frequency};
-agg ZTPoissonSimple 4 claims dsev [1] poisson zm .5 note{zero modified Poisson} tags{topic:frequency};
+agg ZTPoissonSimple 4 claims dsev [1] poisson zt note{zero truncated Poisson with mean 4} tags{topic:frequency};
 
 # ----------------------------------------------------------------------
 # Severity

@@ -24,6 +24,12 @@ internal attribute -- so only three kinds of drift are treated as **failures**
   or a typo).
 * **KIND** (fail) -- the ``kind`` column disagrees with the live descriptor
   (``property`` / ``method`` / ``attribute``).
+* **FCC CONTRACT** (fail) -- a class in ``constants.FIRST_CLASS_CLASSES`` is
+  missing a member of ``constants.FCC_REQUIRED``, or is still excused for one it
+  now has. Unlike the three above this does not read the CSV at all: the CSV
+  documents what *is*, the contract states what must *be*. Paired with the
+  narrative check, which requires ``*_description`` and ``*_explanation`` to
+  appear together. See :func:`fcc_contract`.
 * **COLLISION** (info only) -- cells marked ``~``: the name exists on that class
   but is *not* the documented capability (see the cell vocabulary below). Listed
   so the deliberate collisions stay visible rather than hiding behind a ``Y``.
@@ -271,12 +277,77 @@ def is_present(cell: str) -> bool:
     return cell.startswith('Y') or cell.startswith(COLLISION_TOKEN)
 
 
+def fcc_contract(inv) -> int:
+    """Check the declared FCC contract against the live classes; return failures.
+
+    Notes
+    -----
+    Two checks, both driven by the contract declared in
+    :mod:`aggregate.constants` (``FIRST_CLASS_CLASSES`` / ``FCC_REQUIRED``), so
+    this script and ``tests/test_fcc_surface.py`` cannot drift apart:
+
+    **REQUIRED** every member of ``FCC_REQUIRED`` resolves on every class in
+    ``FIRST_CLASS_CLASSES``, less the declared ``FCC_CONTRACT_EXCEPTIONS``. A
+    *stale* exception (the member is now there, but the class is still excused)
+    fails too: that is what stops the excuse list outliving the hole.
+
+    **PAIRS** the optional narrative surface comes in halves. Where a class
+    carries ``<stem>_description`` it must carry ``<stem>_explanation``, and the
+    other way round, less the stems in ``FCC_UNPAIRED_NARRATIVES``.
+    """
+    from aggregate.constants import (FIRST_CLASS_CLASSES, FCC_REQUIRED,
+                                     FCC_CONTRACT_EXCEPTIONS,
+                                     FCC_UNPAIRED_NARRATIVES)
+    failures = 0
+
+    print('## FCC CONTRACT (constants.FCC_REQUIRED vs live class) -- FAILS')
+    n = 0
+    for cname in FIRST_CLASS_CLASSES:
+        excused = set(FCC_CONTRACT_EXCEPTIONS.get(cname, ()))
+        for member in FCC_REQUIRED:
+            present = cname in inv.get(member, {}).get('classes', set())
+            if not present and member not in excused:
+                print(f'  {cname:<20} MISSING {member}')
+                n += 1
+            elif present and member in excused:
+                print(f'  {cname:<20} {member} is present -- drop it from '
+                      f'FCC_CONTRACT_EXCEPTIONS')
+                n += 1
+    excused_total = sum(len(v) for v in FCC_CONTRACT_EXCEPTIONS.values())
+    print(f'  ({n} contract failures; {excused_total} declared exception(s) '
+          f'outstanding, must be 0 by 1.0.0b1)\n')
+    failures += n
+
+    # PAIRS: the optional narrative surface, checked for symmetry rather than
+    # presence. ``sorted`` so the report is stable run to run.
+    print('## NARRATIVE PAIRS (*_description <-> *_explanation) -- FAILS')
+    n = 0
+    for name in sorted(inv):
+        for suffix, partner_suffix in (('_description', '_explanation'),
+                                       ('_explanation', '_description')):
+            if not name.endswith(suffix):
+                continue
+            stem = name[:-len(suffix)]
+            if stem in FCC_UNPAIRED_NARRATIVES:
+                continue
+            partner = f'{stem}{partner_suffix}'
+            missing = inv[name]['classes'] - inv.get(partner, {}).get('classes', set())
+            for cname in sorted(missing):
+                print(f'  {cname:<20} has {name} but not {partner}')
+                n += 1
+    print(f'  ({n} unpaired; {len(FCC_UNPAIRED_NARRATIVES)} stem(s) excused: '
+          f'{", ".join(FCC_UNPAIRED_NARRATIVES)})\n')
+    failures += n
+    return failures
+
+
 def audit(inv, rows, include_all) -> int:
     """Print drift report; return the number of **failures**.
 
-    Failures are MISMATCH + STALE + KIND. Collisions and undocumented members are
-    reported but do not count: the CSV is a curated subset, so a new internal
-    attribute is not a defect, and a ``~`` cell is a deliberate annotation.
+    Failures are MISMATCH + STALE + KIND + the FCC contract checks. Collisions
+    and undocumented members are reported but do not count: the CSV is a curated
+    subset, so a new internal attribute is not a defect, and a ``~`` cell is a
+    deliberate annotation.
     """
     csv_names = {r['name'] for r in rows}
     skip = set() if include_all else scipy_inherited()
@@ -333,6 +404,11 @@ def audit(inv, rows, include_all) -> int:
         n += 1
     print(f'  ({n} kind mismatches)\n')
     failures += n
+
+    # FCC CONTRACT (fail): the declared surface, checked against the live
+    # classes. Independent of the CSV -- the CSV documents what IS, the contract
+    # states what MUST BE.
+    failures += fcc_contract(inv)
 
     # COLLISION (info): ``~`` cells -- the name is there but is not the capability
     print('## COLLISION (~ cells: name present, NOT this capability) -- info only')

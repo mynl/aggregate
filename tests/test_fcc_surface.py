@@ -4,6 +4,10 @@
 first-class classes; this module is its executable half. It checks the
 *shared* surfaces actually exist and agree across classes:
 
+* the **FCC contract** declared in :mod:`aggregate.constants`
+  (``FIRST_CLASS_CLASSES`` x ``FCC_REQUIRED``) holds on live objects, and the
+  declared ``FCC_CONTRACT_EXCEPTIONS`` are exactly the outstanding holes
+  (a170 [FCC-Contract]);
 * every FCC class answers to ``info`` (terse, fixed-layout, ``info_row``-shaped);
 * every DecL-creatable class answers to ``pprogram`` / ``pprogram_html``;
 * the moment families are ``actual_*`` (theory) and ``est_*`` (realised grid),
@@ -20,7 +24,10 @@ import pytest
 
 from aggregate import build
 from aggregate.bounds import Bounds
-from aggregate.constants import INFO_LABEL_WIDTH
+from aggregate.constants import (INFO_LABEL_WIDTH, FIRST_CLASS_CLASSES,
+                                 NEAR_FIRST_CLASS, FCC_REQUIRED,
+                                 FCC_CONTRACT_EXCEPTIONS,
+                                 FCC_UNPAIRED_NARRATIVES)
 
 
 # ---------------------------------------------------------------------------
@@ -53,6 +60,93 @@ def biv():
                  'agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 '
                  'agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 '
                  'copula gumbel 0.4 poisson')
+
+
+# ---------------------------------------------------------------------------
+# the FCC contract (a170 [FCC-Contract])
+#
+# ``dev/regen_features.py`` runs the same two checks off a live introspection;
+# this is the pytest half, so the contract cannot be broken without a red test
+# even when nobody runs the dev script.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope='module')
+def fcc_objects(agg, port, pnl, biv):
+    """One live object per class in ``FIRST_CLASS_CLASSES``, in that order."""
+    from aggregate.spectral import Distortion
+    return {'Aggregate': agg, 'Portfolio': port, 'BivariateAggregate': biv,
+            'PnL': pnl, 'Distortion': Distortion('ph', 0.5)}
+
+
+def _surface(obj):
+    """Public member names on an object, WITHOUT evaluating any property.
+
+    ``dir`` walks the class MRO and the instance dict, so an attribute set in
+    ``__init__`` (``note``, ``hints``, ...) counts, and a property that would
+    raise is still *present*. ``hasattr`` cannot be used here: it swallows the
+    exception and would report a raising property as a missing member.
+    """
+    return {n for n in dir(obj) if not n.startswith('_')}
+
+
+def test_fcc_fixtures_cover_the_declared_class_list(fcc_objects):
+    """The fixture dict is the contract's class list, not a parallel copy."""
+    assert tuple(fcc_objects) == FIRST_CLASS_CLASSES
+    assert set(FCC_CONTRACT_EXCEPTIONS) <= set(FIRST_CLASS_CLASSES)
+
+
+@pytest.mark.parametrize('cname', FIRST_CLASS_CLASSES)
+def test_fcc_required_surface(cname, fcc_objects):
+    """Every ``FCC_REQUIRED`` member, on every first-class class.
+
+    An excused member is asserted **absent**, so closing a gap without deleting
+    its ``FCC_CONTRACT_EXCEPTIONS`` entry fails here rather than leaving a stale
+    excuse behind.
+    """
+    surface = _surface(fcc_objects[cname])
+    excused = set(FCC_CONTRACT_EXCEPTIONS.get(cname, ()))
+    for member in FCC_REQUIRED:
+        if member in excused:
+            assert member not in surface, (
+                f'{cname}.{member} exists: drop it from '
+                f'FCC_CONTRACT_EXCEPTIONS (constants.py)')
+        else:
+            assert member in surface, f'{cname} is missing FCC member {member}'
+
+
+def test_near_first_class_severity_has_everything_but_the_frames(agg):
+    """``Severity`` is DecL-creatable but a scipy look-through, not a compute
+    result, so the DataFrame quartet is the declared exemption and nothing else.
+    """
+    assert NEAR_FIRST_CLASS == ('Severity',)
+    surface = _surface(agg.sevs[0])
+    frames = {'summary_df', 'validation_df', 'stats_df', 'density_df'}
+    for member in FCC_REQUIRED:
+        if member in frames:
+            continue
+        assert member in surface, f'Severity is missing {member}'
+
+
+@pytest.mark.parametrize('cname', FIRST_CLASS_CLASSES)
+def test_narrative_pairs_are_symmetric(cname, fcc_objects):
+    """``<stem>_description`` and ``<stem>_explanation`` travel together.
+
+    The narratives are *optional* (callers reach them with ``getattr``), so this
+    checks symmetry rather than presence: whichever half a class carries, it
+    carries both. ``FCC_UNPAIRED_NARRATIVES`` names the stems still short one
+    half; that tuple empties with [FCC-Contract-Gaps].
+    """
+    surface = _surface(fcc_objects[cname])
+    for name in sorted(surface):
+        for suffix, partner_suffix in (('_description', '_explanation'),
+                                       ('_explanation', '_description')):
+            if not name.endswith(suffix):
+                continue
+            stem = name[:-len(suffix)]
+            if stem in FCC_UNPAIRED_NARRATIVES:
+                continue
+            partner = f'{stem}{partner_suffix}'
+            assert partner in surface, f'{cname} has {name} but not {partner}'
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,80 @@
 # Changelog
 
+## 1.0.0a170
+
+**[FCC-Contract]** "First-class citizen" stops being a phrase in a plan and
+becomes a declaration the build checks.
+
+### The contract
+
+`aggregate.constants` gains four names. They are names only, no class imports,
+because that module is the import-graph leaf and both the dev audit and the test
+suite have to read the one copy:
+
+```python
+FIRST_CLASS_CLASSES = ('Aggregate', 'Portfolio', 'BivariateAggregate',
+                       'PnL', 'Distortion')
+NEAR_FIRST_CLASS    = ('Severity',)
+FCC_REQUIRED = ('info', 'help', 'note', 'hints', 'tags', 'doc',
+                'program', 'pprogram',
+                'summary_df', 'validation_df', 'stats_df', 'density_df',
+                'plot')
+```
+
+Two criteria put a class on the list, and both must hold: it **can be created in
+DecL** (which is why `Bounds`, `Frequency` and `GridDistribution` are out: they
+are reached from an object, never declared), and it **flows through to the
+`aggregate_api` SPA**, which calls exactly those members on whatever it is
+handed. `Severity` is DecL-creatable and near-first-class, but it is a
+look-through onto a frozen scipy random variable rather than a compute result, so
+it is exempt from the DataFrame quartet and listed separately rather than
+silently omitted.
+
+Everything outside `FCC_REQUIRED` is optional and callers reach it with
+`getattr`. The `*_description` (short) / `*_explanation` (long) narratives are the
+main such family, and optional does not mean unconstrained: wherever one half is
+present, the other must be too.
+
+### Two checks, one source
+
+`dev/regen_features.py` grows an `## FCC CONTRACT` section and a
+`## NARRATIVE PAIRS` section, both counting toward its exit status.
+`tests/test_fcc_surface.py` runs the same two checks on live objects, so the
+contract cannot break without a red test even when nobody runs the dev script.
+Membership is read from `dir`, never `hasattr`: `hasattr` swallows exceptions and
+would report a raising property as a missing member.
+
+### What the check found
+
+Four holes nobody was tracking, now carried in the declaration itself:
+
+| Class | Missing |
+|---|---|
+| `Portfolio` | `hints` (the parser produces it, the class never stores it, the same shape as the `note` gap fixed at `a154`) |
+| `BivariateAggregate` | `validation_df` (its validation lives inside `summary_df`) |
+| `Distortion` | `validation_df` |
+
+plus two unpaired narrative stems: `validation_explanation` has no short form and
+`reins_description` no long one. They are declared as
+`FCC_CONTRACT_EXCEPTIONS` and `FCC_UNPAIRED_NARRATIVES`, and both **must be empty
+by `1.0.0b1`**. An excused member that is later added fails the check too, so an
+excuse cannot outlive its hole.
+
+### Also
+
+`ZMPoissonSimple` and `ZTPoissonSimple` in `library.agg` had their programs
+crossed: the entry named `ZM` declared `poisson zt` and the entry named `ZT`
+declared `poisson zm .5`. The notes matched the programs, so only the two names
+were wrong. Swapped.
+
+The first-class-citizen definition is written up as §0 of
+`dev/reporting-guidelines.md`. `dev/TODO.md` is reconciled against the author's
+review: `[ZT-ZM-Frequency-Fix]` (shipped `a152`) and
+`[Aggregate-Summary-DF-Useless]` are closed and removed,
+`[Joint-Padding-Window-Tradeoff]` is deferred past v1.0, the five
+`[FCC-Surface-Sweep]` decisions and `[PnL-Repr-HTML]` are settled, and
+`[FCC-Contract-Gaps]` is added.
+
 ## 1.0.0a169
 
 **[Build-Output-Dispatch]** `build_many` now finishes every kind the parser can

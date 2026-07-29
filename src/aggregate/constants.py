@@ -12,6 +12,10 @@ The reinsurance labels are *structural* MultiIndex column / axis keys
 (referenced by literal in ``bivariate`` and asserted across the reins
 tests), so they are constants here, not user-tunable settings.
 
+The first-class-citizen (FCC) contract lives here for the same reason: it is a
+tuple of *names*, so stating it costs no imports, and both
+``dev/regen_features.py`` and ``tests/test_fcc_surface.py`` read the one copy.
+
 All tunable defaults (grid sizing, databases, discretization schemes,
 validation tolerances — including the former numerics noise floors) and the
 path names now live in :mod:`aggregate.config`. The plotting figure constants
@@ -30,7 +34,9 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'CoarseJointGridWarning',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
-           'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row']
+           'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row',
+           'FIRST_CLASS_CLASSES', 'NEAR_FIRST_CLASS', 'FCC_REQUIRED',
+           'FCC_CONTRACT_EXCEPTIONS', 'FCC_UNPAIRED_NARRATIVES']
 
 # --- plotting figure defaults (permanently here, not config) ---------------
 # These are used as module-level constants in default argument expressions
@@ -85,6 +91,61 @@ def info_row(label, value):
     str
     """
     return f'{label:<{INFO_LABEL_WIDTH}}{value}'
+
+
+# --- the first-class-citizen (FCC) contract ---------------------------------
+# What "first class" MEANS, as names rather than as a phrase. Two criteria put a
+# class on the list, and both must hold:
+#
+#   1. it can be created in DecL (which is why ``Bounds``, ``Frequency`` and
+#      ``GridDistribution`` are out: they are reached from an object, never
+#      declared), and
+#   2. it flows through to the ``aggregate_api`` (aLL) SPA, which calls exactly
+#      the members below on whatever it is handed.
+#
+# ``Severity`` is DecL-creatable and near-first-class, but it is a look-through
+# onto a frozen scipy rv rather than a compute result, so it is exempt from the
+# DataFrame quartet; it is listed separately rather than silently omitted.
+#
+# Everything OUTSIDE ``FCC_REQUIRED`` is optional and callers reach it
+# defensively with ``getattr``. The narrative ``*_description`` (short) /
+# ``*_explanation`` (long) strings are the main such family: not required, but
+# where one half is present the other must be too (the pairs rule, checked by
+# ``dev/regen_features.py`` and ``tests/test_fcc_surface.py``).
+#
+# Names only, no class imports: this module is the import-graph leaf, and both
+# the dev audit script and the test suite read the contract from here.
+FIRST_CLASS_CLASSES = ('Aggregate', 'Portfolio', 'BivariateAggregate',
+                       'PnL', 'Distortion')
+
+#: DecL-creatable, exempt from the DataFrame quartet. See the note above.
+NEAR_FIRST_CLASS = ('Severity',)
+
+#: Every member a first-class class must carry. Grouped: the discovery front
+#: door and the fixed-layout text card; the four DecL trailer values; the
+#: declaration round-trip; the DataFrame quartet; the plot.
+FCC_REQUIRED = ('info', 'help',
+                'note', 'hints', 'tags', 'doc',
+                'program', 'pprogram',
+                'summary_df', 'validation_df', 'stats_df', 'density_df',
+                'plot')
+
+#: Contract members a class does not carry YET, by class. Each entry is a known
+#: hole with a plan behind it ([FCC-Contract-Gaps]), not a permanent carve-out:
+#: the audit and the test subtract these so the contract can be stated before it
+#: is satisfied. **This dict must be empty by 1.0.0b1**, and emptying it is what
+#: closes the item.
+FCC_CONTRACT_EXCEPTIONS = {
+    'Portfolio': ('hints',),
+    'BivariateAggregate': ('validation_df',),
+    'Distortion': ('validation_df',),
+}
+
+#: Narrative stems that carry only ONE half of the description / explanation
+#: pair today: ``validation_explanation`` has no short form, ``reins_description``
+#: no long one. Same status as ``FCC_CONTRACT_EXCEPTIONS``, and emptied by the
+#: same item.
+FCC_UNPAIRED_NARRATIVES = ('validation', 'reins')
 
 
 class Validation(Flag):

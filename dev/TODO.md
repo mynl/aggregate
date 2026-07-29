@@ -18,12 +18,19 @@
 > **Where plans live.** `dev/` = live · `dev/deferred/` = parked past the beta,
 > not closed · `dev/done/` = closed (shipped, `-REJECTED`, or `-SUPERSEDED`).
 >
-> **Last updated: 2026-07-27** — rebuilt from scratch. The previous file, with the
-> full `1.0.0a122`–`a151` done-history, is archived at
-> `dev/done/TODO-2026-07-27.md`. Struck: `[Display-Mode]` (rejected — see
-> `dev/done/plans-considered-and-rejected.md`). Added the seven beta-gate items
-> that `plan-for-v1.md` §1 named but this file never carried, plus
-> `[PnL-Repr-HTML]` from the superseded first-class-PnL plan.
+> **Last updated: 2026-07-29** — the author's review annotations worked through
+> (`1.0.0a170` `[FCC-Contract]`). Closed and removed: `[ZT-ZM-Frequency-Fix]`
+> (shipped `a152`) and `[Aggregate-Summary-DF-Useless]` (the gross/net smell is
+> fixed). Deferred to post-v1.0, last: `[Joint-Padding-Window-Tradeoff]`. Settled:
+> the five `[FCC-Surface-Sweep]` decisions, `[PnL-Repr-HTML]`, and sub-item 3 of
+> `[Display-Surface-Incidentals]` (closed, no change). Added:
+> `[FCC-Contract-Gaps]`. `[Plotting-Punchups]` is its own task, not part of the
+> reporting cluster.
+>
+> **Previous rebuild, 2026-07-27.** The file before that, with the full
+> `1.0.0a122`–`a151` done-history, is archived at `dev/done/TODO-2026-07-27.md`.
+> Struck then: `[Display-Mode]` (rejected — see
+> `dev/done/plans-considered-and-rejected.md`).
 
 ---
 
@@ -37,27 +44,41 @@
   and ratios never mixed), headings are **presentation-ready**, and the `summary`
   (what *is* this?) vs `validation` (is it calculating right?) vs `reins_<flavor>`
   (only when reinsurance present) split is settled. Plan:
-  `dev/reporting-guidelines.md`. Gates `[Aggregate-Summary-DF-Useless]` and
-  `[Accounting-Summary-DF]` — scope the three together before redesigning any of
-  them.
+  `dev/reporting-guidelines.md`. Gates `[Accounting-Summary-DF]` — scope the two
+  together before redesigning either.
+  **The "what is a first-class citizen" half is DONE** (`1.0.0a170`
+  `[FCC-Contract]`): the membership rule and the required surface are declared in
+  `constants.FIRST_CLASS_CLASSES` / `FCC_REQUIRED`, audited by
+  `dev/regen_features.py`, asserted by `tests/test_fcc_surface.py`, and written up
+  as §0 of `dev/reporting-guidelines.md`. What remains here is the other half:
+  what those reports **contain**.
+- **[FCC-Contract-Gaps]** — the four holes the declared contract exposed, carried
+  in `constants.FCC_CONTRACT_EXCEPTIONS` / `FCC_UNPAIRED_NARRATIVES` so they
+  cannot be forgotten: `Portfolio.hints` (the parser produces it, the class never
+  stores it — the same shape as the `note` gap fixed at a154), `validation_df` on
+  `BivariateAggregate` and on `Distortion`, and the two unpaired narrative stems
+  (`validation_explanation` has no short form, `reins_description` no long one).
+  **Both declarations must be empty by `1.0.0b1`**; emptying them closes this item.
 - **[FCC-Surface-Sweep]** — passes 1 and 2 shipped (`1.0.0a149`–`a151`;
   `dev/FEATURES.csv` now reports **zero** undocumented capabilities, and the
-  executable half is `tests/test_fcc_surface.py`). **What is left is five author
-  decisions**, all flagged in the matrix:
-  1. the `BivariateAggregate.tail_df` name collision — a per-axis support frame
-     under the name `a149` made a return-period property elsewhere
-     (`bivariate.py:2483` vs `_portfolio.py:1347`); suggested `axis_support_df`;
-  2. `BivariateAggregate` as a `LabeledMixin` host;
-  3. `info` on `GridDistribution`;
-  4. the `PnL.gd` / `PnL.result` alias (`_pnl.py:1172`, `:1177`) — one canonical
-     name;
-  5. whether `var_dict` follows the VaR-is-`q` rule and becomes `q_dict`
-     (`_portfolio.py:3025`).
+  executable half is `tests/test_fcc_surface.py`). The five author decisions are
+  **settled** (2026-07-29) and execute as `[FCC-Surface-Decisions]`:
+  1. `BivariateAggregate.tail_df` (a per-axis support frame wearing the name of
+     the return-period property elsewhere) becomes **`axis_support_df`**;
+  2. `BivariateAggregate` **becomes a `LabeledMixin` host**;
+  3. `GridDistribution` **gains `info`** (useful, not contractual: GD is not
+     DecL-creatable, so it is not an FCC);
+  4. the `PnL.gd` / `PnL.result` alias resolves to **`result`**, the documented
+     public name; `gd` stays the internal vocabulary on ledger rows;
+  5. `var_dict` **stays `var_dict`**: `q_dict` is too cryptic, so the VaR-is-`q`
+     rule stops at the scalar accessors.
 - **[PnL-Repr-HTML]** — `PnL` is the **only** first-class citizen with no
   `_repr_html_`, so it does not render in Jupyter (`Aggregate`, `Portfolio` and
   the three bivariate classes all define one). The residue of
-  `dev/done/plan-pnl-first-class-SUPERSEDED.md`; land it with
-  `[Reporting-Guidelines]` so the card it renders is the settled one.
+  `dev/done/plan-pnl-first-class-SUPERSEDED.md`. **Settled:** model it on the
+  bivariate one (repr line plus the summary card). It does **not** wait on
+  `[Reporting-Guidelines]`: the card it renders is the fixed one `a134` already
+  settled. Lands with `[FCC-Surface-Decisions]`.
 - **[Display-Surface-Incidentals]** — four unrelated small defects found while
   surveying the duplicated presentation surface for `[Program-Mixin]`
   (`1.0.0a154`). None is urgent; none has a visible symptom today. Grouped so
@@ -65,18 +86,20 @@
   1. `tweedie.py:850` defines **`__repr_html__`** — the wrong dunder (IPython
      looks for `_repr_html_`), so the method is unreachable. No symptom only
      because `_repr_mimebundle_` (`:866`) serves the same HTML — i.e. it is
-     silently dead code, not a broken display.
+     silently dead code, not a broken display. **Fix it.**
   2. `Copula` (`copula.py:64`) is the only class carrying `LabeledMixin` but
-     **not `HelpMixin`** — the one asymmetric mixin host.
-  3. `Underwriter.__repr__` (`underwriter.py:906-929`) **hand-rolls the `info`
-     layout** — 13 label/value rows padded to a hardcoded 19 columns instead of
-     `info_row` / `INFO_LABEL_WIDTH = 25`. Invisible to both the matrix and
-     `test_fcc_surface.py` because `Underwriter` is not a FEATURES column and
-     has no `info`.
-  4. `regen_features.py:200` skips every `_`-prefixed name, so the matrix is
+     **not `HelpMixin`** — the one asymmetric mixin host. **Add the mixin.**
+  3. `Underwriter.__repr__` (`underwriter.py:906-929`) hand-rolls the `info`
+     layout, 13 label/value rows padded to a hardcoded 19 columns instead of
+     `info_row` / `INFO_LABEL_WIDTH = 25`. **CLOSED, no change** (author,
+     2026-07-29): `Underwriter` is not a FEATURES column, has no `info`, and is
+     not a first-class citizen, so the shared layout does not apply to it.
+  4. `regen_features.py:203` skips every `_`-prefixed name, so the matrix is
      **structurally blind to `__repr__` / `_repr_html_` / `_text_info_blob`** —
-     exactly the most-duplicated part of the presentation surface. Widening
-     that filter is the prerequisite for auditing display consistency at all.
+     exactly the most-duplicated part of the presentation surface. **Widen it**
+     to an explicit display allowlist (not to all private names, which would
+     flood the report), then add the rows to `dev/FEATURES.csv`. That is the
+     prerequisite for auditing display consistency at all.
   *(A fifth suspect was checked and cleared: `Distortion.program` **does**
   survive pickling — the class has no `__reduce__`, so default `__dict__`
   pickling carries it.)*
@@ -84,11 +107,9 @@
   the aggregate **only** (no loss-convention severity overlaid on a payoff —
   a wrong-sign distraction for the UW/finance audience). Gate on
   `_agg_affine_active()` / `_signed()` in `plots/_aggregate.py`, both the
-  discrete and continuous branches. Plan: `dev/plan-plotting-punchups.md`.
-- **[Aggregate-Summary-DF-Useless]** (author verdict 2026-07-05, the CatBook
-  example) — `Aggregate.summary_df` on a decorated engine judged "USELESS and
-  needs improving". Scope with `[Reporting-Guidelines]` /
-  `[Accounting-Summary-DF]`.
+  discrete and continuous branches. **Its own task** (author, 2026-07-29): it is
+  independent of the reporting cluster above, so do not scope it with them.
+  Plan: `dev/plan-plotting-punchups.md`.
 
 ### Correctness & bugs
 
@@ -109,37 +130,6 @@
   `lb` not consistent with attachment equals zero; flag **fixed** frequency with
   a non-integer expected value; flag **mixing** with an inconsistent frequency
   distribution.
-- **[ZT-ZM-Frequency-Fix]** — zero-truncated / zero-modified frequency is broken
-  (`poisson zt` → NaN solver for every parameterization; `zm` builds but the
-  semantics are wrong — it inverts a post-modification mean). Redesign: the user
-  inputs the **un-truncated/un-modified base mean** and we apply the shift
-  **forward** (no solver); ship documented shift helpers (both directions). Two
-  examples are commented out in `examples.agg` until then. Named in
-  `plan-for-v1.md` §1; pairs with `[Doc-Gaps]`.
-- **[Joint-Padding-Window-Tradeoff]** (logged 2026-07-07) — the in-core
-  occurrence joint already *computes* a padded transform 4× the retained grid
-  (`padding = 1` doubles each axis; `build_netceded_joint` inherits the engine's
-  padding, `bivariate.py:868`). Flipping to `padding = 0` spends the same flops
-  on **retained** cells: half the `bs`, or twice the window, per axis — the
-  massive path's settled design. The catch: with `padding = 0`, clipped tail mass
-  **wraps onto the body and is invisible to the deficit** (the a126 caution), so
-  the flip requires (a) the massive window discipline on the in-core netceded
-  sizing (the `balanced_window` measurement already exists — raise its nines
-  target), and (b) the decisive cheap guard: compare the joint's marginal means
-  against the engine's exact 1-D marginal means at build time (wrap hides from
-  the deficit, never from the means). Tail-thickness caveat: thin/moderate tails
-  win cleanly; a `pareto 1.2` cat book needs an astronomical window to the nines,
-  where `padding = 1`'s honest clip stays competitive — so keep it a knob, not a
-  silent default flip. Plumbing: `occ_bivariate` does not expose `padding=` (add
-  a pass-through).
-  **Phase 2, its own investigation — NOT a rider:** mixed-radix axis lengths
-  `3 * 2**k` (scipy FFT handles radix 3 within ~10–20% of a power of two) give a
-  1.5× window at unchanged binary `bs` — the "√2 step" — but `log2` is stored as
-  an *exponent* throughout the library (`1 << log2` arithmetic, window sizing,
-  the massive chunker, `bs_window_df` audits), so the blast radius is large;
-  author flagged this explicitly (2026-07-07). Scope it standalone before
-  touching anything.
-
 ### Tests & example libraries
 
 - **[Agg-Library-Build-Check]** (from `plan-for-v1.md` §1 — *"the one change that
@@ -158,7 +148,7 @@
   works. **Still open:** tune the `hero` entries themselves (they were marked
   draft), and rewrite `aggregate_api/examples.py` against the new library —
   it re-lexed the old `FORMAT` header and the entry names have all changed.
-- **[Recipe-Library]** (`dev/plan-meta-data.md`; `dev/done/plan-recipes.md`) —
+- **[Recipe-Library]** (`dev/done/plan-meta-data.md`; `dev/done/plan-recipes.md`) —
   notes-driven describe / test / audit. Phase 1 (the `tags{}` / `doc{{{}}}`
   trailer clauses, distortion trailer, ambiguity guards) landed in **a157**;
   phase 2 (the `aggregate.recipe` runtime, `Underwriter.recipe()` / `.recipes`)
@@ -338,7 +328,7 @@
   recipe. Deliberately *not* done for v1.0: running a recipe from a `.agg` file
   executes the code in it, and the shipped answer is a documented warning —
   treat a third-party `.agg` like a third-party Python file. See
-  `dev/plan-meta-data.md` *Resolved questions* 2.
+  `dev/done/plan-meta-data.md` *Resolved questions* 2.
 - **[Multi-Resolution-Portfolio-Combine]** (#20) — compute each unit on its own
   `bs`, decimate onto the shared grid before the Fourier product (the real fix
   for the coarse shared-`bs` deficit). Deficit accepted / surfaced for now.
@@ -366,6 +356,30 @@
   papers' severity curves are already harvested into
   `actuarial-severity-curves.agg` §F, and all citation keys are confirmed present
   in `uber-library.bib`.
+- **[Joint-Padding-Window-Tradeoff]** (logged 2026-07-07; **deferred past v1.0**
+  by the author 2026-07-29, and deliberately last) — the in-core occurrence joint
+  already *computes* a padded transform 4× the retained grid (`padding = 1`
+  doubles each axis; `build_netceded_joint` inherits the engine's padding,
+  `bivariate.py:868`). Flipping to `padding = 0` spends the same flops on
+  **retained** cells: half the `bs`, or twice the window, per axis — the massive
+  path's settled design. The catch: with `padding = 0`, clipped tail mass **wraps
+  onto the body and is invisible to the deficit** (the a126 caution), so the flip
+  requires (a) the massive window discipline on the in-core netceded sizing (the
+  `balanced_window` measurement already exists — raise its nines target), and (b)
+  the decisive cheap guard: compare the joint's marginal means against the
+  engine's exact 1-D marginal means at build time (wrap hides from the deficit,
+  never from the means). Tail-thickness caveat: thin/moderate tails win cleanly; a
+  `pareto 1.2` cat book needs an astronomical window to the nines, where
+  `padding = 1`'s honest clip stays competitive — so keep it a knob, not a silent
+  default flip. Plumbing: `occ_bivariate` does not expose `padding=` (add a
+  pass-through).
+  **Phase 2, its own investigation — NOT a rider:** mixed-radix axis lengths
+  `3 * 2**k` (scipy FFT handles radix 3 within ~10–20% of a power of two) give a
+  1.5× window at unchanged binary `bs` — the "√2 step" — but `log2` is stored as
+  an *exponent* throughout the library (`1 << log2` arithmetic, window sizing,
+  the massive chunker, `bs_window_df` audits), so the blast radius is large;
+  author flagged this explicitly (2026-07-07). Scope it standalone before
+  touching anything.
 
 > *Rejected, so it is not re-proposed cold:* DecL colorization (aesthetic-only,
 > structurally weak) and the `dev`/`user` **display mode** `ReprMixin` (not worth

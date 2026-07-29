@@ -139,7 +139,14 @@ autosummary_generate = False
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
-exclude_patterns = ['_build', '**.ipynb_checkpoints', 'Thumbs.db', '.DS_Store']
+exclude_patterns = [
+    '_build', '**.ipynb_checkpoints', 'Thumbs.db', '.DS_Store',
+    # Generated grammar listing. It is pulled into 4_dec_Language_Reference.rst
+    # with ``.. include::``, so Sphinx must not also build it as a standalone
+    # page (which made it an orphan, warned about, and shipped a stray
+    # 4_agg_language_reference/ref_include.html).
+    '4_agg_language_reference/ref_include.rst',
+]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.

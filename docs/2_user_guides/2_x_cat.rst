@@ -16,11 +16,11 @@ Catastrophe Modeling
 
 **Contents:**
 
-#. :ref:`Helpful References`
+#. :ref:`2_user_guides/2_x_cat:Helpful References`
 #. :ref:`cat jewsons pml estimates`
 #. :ref:`cat jewsons climate estimates`
-#. :ref:`ILW Pricing`
-#. :ref:`Secondary Uncertainty`
+#. :ref:`2_user_guides/2_x_cat:ILW Pricing`
+#. :ref:`2_user_guides/2_x_cat:Secondary Uncertainty`
 #. :ref:`cat summary`
 
 

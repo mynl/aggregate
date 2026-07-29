@@ -119,7 +119,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
            1. dictionary: Aggregate object dictionary specifications or
            2. Aggregate: An actual aggregate objects or
-           3. tuple (type, dict) as returned by uw['name'] or
+           3. tuple (type, dict) of a kind and its spec or
            4. string: Names referencing objects in the optionally passed underwriter
            5. a single DataFrame: empirical samples (the total column, if present, is ignored);
               a p_total column is used for probabilities if present
@@ -1358,7 +1358,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         """Return-period / exceedance table on the default ladder (a property).
 
         The first-class-citizen form of :meth:`tail_periods_df`: no arguments,
-        the standard :data:`~aggregate.distributions.DEFAULT_RETURN_PERIODS`
+        the standard :data:`~aggregate._aggregate.DEFAULT_RETURN_PERIODS`
         ladder. Pass your own ladder with ``tail_periods_df(periods=...)``.
 
         Returns

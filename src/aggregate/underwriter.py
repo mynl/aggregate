@@ -773,63 +773,45 @@ class Underwriter(HelpMixin):
 
     def __getitem__(self, item):
         """
-        Look up one entry in the recipe base.
+        Subscript form of :meth:`recipe`, the canonical lookup.
 
-        Pure lookup: returns the stored :class:`~aggregate.recipe.Recipe`.
-        **The ``object`` field is always ``None`` on the returned
-        Recipe** — :meth:`__getitem__` does not construct the
-        object. Use :meth:`__call__` / :meth:`build` /
-        :meth:`build_many` (which run :meth:`_factory` after the lookup)
-        when you want a live Aggregate / Severity / Portfolio /
-        Distortion instance.
+        ``uw[name]`` is ``uw.recipe(name)``; ``uw[kind, name]`` is
+        ``uw.recipe(name, kind)``. Same result, same errors. Reach for the
+        subscript when the code around it already reads like a store; reach for
+        :meth:`recipe` in prose, when you want ``kind=`` named, or when you want
+        the method to be discoverable through :meth:`help` and tab completion.
 
         Parameters
         ----------
         item : str or tuple
-            ``'name'`` looks up by name across all kinds (must be unique
-            across kinds, else ``KeyError``). ``(kind, name)`` is the
-            unambiguous form.
+            ``'name'``, or the unambiguous ``(kind, name)`` pair.
 
         Returns
         -------
         aggregate.recipe.Recipe
-            With ``kind`` / ``name`` / ``spec`` / ``program`` populated
-            from the recipe base and ``object=None``.
+            See :meth:`recipe`. ``object`` is ``None``: this is a lookup, not
+            a build.
 
         Raises
         ------
         KeyError
-            If the lookup matches zero or more than one entry.
+            No such entry, or the name is ambiguous across kinds.
 
         See Also
         --------
-        recipe : the same lookup by name, spelled as a verb.
+        recipe : the canonical form of this lookup.
         __call__ : the user-facing entry that also constructs the object.
         """
-        if not isinstance(item, (str, tuple)):
-            raise ValueError(
-                f'item must be a str (name of object) or tuple (kind, name), not {type(item)}.')
-
-        if not self._loaded:
-            self.load()
-
+        if isinstance(item, str):
+            return self.recipe(item)
         if isinstance(item, tuple):
-            try:
-                entry = self._recipes[item]
-            except KeyError:
-                raise KeyError(f'Item {item} not found.')
-            # Hand back a copy so the caller's factory cannot mutate the stored
-            # recipe (object stays None in the recipe base).
-            return replace(entry)
-
-        # str: match by name across all kinds (must be unique).
-        matches = [r for (kind, name), r in self._recipes.items() if name == item]
-        if len(matches) == 1:
-            return replace(matches[0])
-        if not matches:
-            raise KeyError(f'Item {item} not found.')
-        raise KeyError(
-            f'Error: no unique object found matching {item}. Found {len(matches)} objects.')
+            if len(item) != 2:
+                raise ValueError(
+                    f'a tuple subscript must be (kind, name), not {len(item)} items.')
+            kind, name = item
+            return self.recipe(name, kind)
+        raise ValueError(
+            f'item must be a str (name of object) or tuple (kind, name), not {type(item)}.')
 
     @staticmethod
     def _format_dir(path: Path) -> str:
@@ -1448,8 +1430,15 @@ class Underwriter(HelpMixin):
         base), that is an error rather than a silent pick -- pass ``kind=`` to
         disambiguate.
 
-        ``uw[name]`` is the same lookup spelled as a subscript, and takes a
-        ``(kind, name)`` tuple as well.
+        This is the canonical lookup, and the one place the lookup is
+        implemented: ``uw[name]`` and ``uw[kind, name]`` are subscript spellings
+        that delegate here, so all three raise the same errors.
+
+        Pure lookup. **The returned Recipe's ``object`` is always ``None``**,
+        because this does not construct anything. Use :meth:`__call__` /
+        :meth:`build` / :meth:`build_many`, which run :meth:`_factory` after the
+        lookup, when you want a live Aggregate / Severity / Portfolio /
+        Distortion.
 
         Parameters
         ----------
@@ -1476,22 +1465,28 @@ class Underwriter(HelpMixin):
         See Also
         --------
         recipes : the frame over every entry.
+        __getitem__ : the same lookup, spelled as a subscript.
         """
         if not self._loaded:
             self.load()
-        hits = [(k, n) for (k, n) in self._recipes
-                if n == name and (not kind or k == kind)]
+        # A copy is returned throughout: the caller must not be able to mutate
+        # the stored entry (and a fresh copy re-derives its doc / decl caches).
+        if kind:
+            # The store is keyed (kind, name), so a supplied kind is a direct
+            # hit. This is the parser's path via _safe_lookup, so keep it O(1).
+            try:
+                return replace(self._recipes[(kind, name)])
+            except KeyError:
+                raise KeyError(f'no recipe named {name!r} of kind {kind!r}') from None
+        hits = [k for (k, n) in self._recipes if n == name]
         if not hits:
-            raise KeyError(f'no recipe named {name!r}'
-                           + (f' of kind {kind!r}' if kind else ''))
+            raise KeyError(f'no recipe named {name!r}')
         if len(hits) > 1:
-            kinds = ', '.join(sorted(k for k, _ in hits))
+            kinds = ', '.join(sorted(hits))
             raise KeyError(
                 f'{name!r} is ambiguous across kinds ({kinds}); pass kind= to '
                 f'choose. Shipped library names are unique across kinds.')
-        # A copy, like __getitem__: the caller must not be able to mutate the
-        # stored entry (and a fresh copy re-derives its doc / decl caches).
-        return replace(self._recipes[hits[0]])
+        return replace(self._recipes[(hits[0], name)])
 
     @property
     def version(self):
@@ -2053,10 +2048,10 @@ class Underwriter(HelpMixin):
                 assert cc1 is not None                # the Distortion
 
         2. **Recipe lookup, no construction** — returns the recipe
-           only; ``object`` is ``None`` because :meth:`__getitem__`
+           only; ``object`` is ``None`` because :meth:`recipe`
            does not run the factory::
 
-                entry = build['cc1m']                 # a Recipe
+                entry = build.recipe('cc1m')          # a Recipe
                 assert entry.object is None           # *by design*
                 assert entry.spec == {'name': 'ccoc', 'r': 0.25}
 

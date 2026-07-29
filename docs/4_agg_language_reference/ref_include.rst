@@ -1,4 +1,4 @@
-.. code-block:: lark
+.. code-block:: text
 
     // Grammar for the DecL (Declarative Language) DSL used by aggregate/parser.py.
     //
@@ -120,9 +120,10 @@
     // is a separate *sizing* input. ``less`` is a dedicated keyword (not ``-``) so
     // the split never collides with severity arithmetic (``ssev 20 - lognorm``); a
     // **second** ``less`` is the hard anchor introducing the (optional) expense
-    // clause -- the embedded engine's tail cannot cross a ``less``. ``xpnl`` is the
-    // exploded sibling: same syntax, returns the Gross/net-occ/net-agg
-    // :class:`PnLTower`. See dev/plan-pnl-engine-source.md,
+    // clause -- the embedded engine's tail cannot cross a ``less``. Both return a
+    // :class:`~aggregate._pnl.PnL`; ``pnl`` is the consolidated single-group net
+    // view, ``xpnl`` the exploded sibling, same syntax, a multi-group walk with one
+    // group per step. See dev/done/plan-pnl-engine-source.md,
     // dev/done/plan-pnl-premium.md, dev/done/plan-pnl-expenses-ceded-premium.md.
     // ======================================================================
     

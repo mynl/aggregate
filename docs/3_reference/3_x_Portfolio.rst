@@ -44,3 +44,11 @@ Module functions
 
 .. automodule:: aggregate.portfolio
    :exclude-members: Portfolio
+
+Pricing result types
+--------------------
+
+The typed return values of the ``Portfolio`` pricing methods, so a caller reads
+fields by name instead of unpacking a tuple.
+
+.. automodule:: aggregate.results

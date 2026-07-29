@@ -17,10 +17,10 @@ Student
 **Contents:**
 
 #. :ref:`st what is`
-#. :ref:`Formal Construction`
-#. :ref:`Simple Example`
-#. :ref:`Exercise - Test Your Understanding`
-#. :ref:`Dice Rolls`
+#. :ref:`2_user_guides/2_x_student:Formal Construction`
+#. :ref:`2_user_guides/2_x_student:Simple Example`
+#. :ref:`2_user_guides/2_x_student:Exercise - Test Your Understanding`
+#. :ref:`2_user_guides/2_x_student:Dice Rolls`
 #. :ref:`student summary`
 
 
@@ -104,7 +104,7 @@ The DecL program has three parts:
 -  ``dfreq`` is a keyword to specify the frequency distribution. The next two blocks of numbers are the outcomes ``[1 2 3]`` and their probabilities ``[1/2 1/4 1/4]``. Commas are optional in the lists and only division arithmetic is supported.
 -  ``dsev`` is a keyword to specify the a discrete severity distribution. It has the same outcomes-probabilities form as ``dfreq``.
 
-The program string is only one line long because Python automatically concatenates strings within parenthesis; it is split up for clarity. It is recommended that DecL programs be split in this way. Note the spaces at the end of each line, see :ref:`10 mins formatting`.
+The program string is only one line long because Python automatically concatenates strings within parenthesis; it is split up for clarity. It is recommended that DecL programs be split in this way. Note the spaces at the end of each line, see :ref:`10 min formatting`.
 
 Use ``qd`` to print a dataframe of statistics that answer the first three questions: the mean and CV for the frequency (``Freq``), severity (``Sev``) and aggregate (``Agg``) distributions.
 

@@ -21,7 +21,7 @@ Bodoff’s Percentile Layer Capital Method
 * :ref:`bodoff te1`
 * :ref:`bodoff ex123`
 * :ref:`bodoff ex4`
-* :ref:`bodoff summary`
+* :ref:`5_technical_guides/5_x_bodoff:Bodoff Summary`
 * :ref:`bodoff cas`
 
 
@@ -213,7 +213,7 @@ Bodoff introduces four thought experiments:
 3. Wind and quake, wind 0 or 5, quake 0 or
    100, same probabilities.
 
-4. Bernoulli / exponential compound distribution (see :ref:`Bodoff Example 4`.)
+4. Bernoulli / exponential compound distribution (see :ref:`5_technical_guides/5_x_bodoff:Bodoff Example 4`.)
 
 The units are independent. The next block of code sets up and validates :class:`Portfolio`
 objects for each. The Bodoff portfolios are part of the base library and can be extracted with

@@ -17,7 +17,7 @@ Capital Modeling and Risk Management
 
 **Contents:**
 
-#. :ref:`Helpful References`
+#. :ref:`2_user_guides/2_x_capital:Helpful References`
 #. :ref:`cap kappa`
 
 Helpful References

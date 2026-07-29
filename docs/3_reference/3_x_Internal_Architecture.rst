@@ -76,6 +76,33 @@ and ``dev/done/plan-pnl-faces-punchlist.md``.
 
 .. automodule:: aggregate._pnl_builders
 
+Shared mixins
+-------------
+
+Three surfaces are shared by classes with no common base
+(:class:`~aggregate.Aggregate`, :class:`~aggregate.Portfolio`,
+:class:`~aggregate.Severity`, :class:`~aggregate.Distortion`, ``PnL``,
+``Copula``), so they are mixins rather than base classes. Following the house
+convention they take the ``<Role>Mixin`` suffix, and none defines ``__init__``
+— each stays transparent to the host's ``super()`` chain, and a
+:class:`~aggregate._labeled.LabeledMixin` host calls ``self._init_labels(...)``
+explicitly when it is ready.
+
+DecL round trip
+~~~~~~~~~~~~~~~
+
+.. automodule:: aggregate._program
+
+Labels
+~~~~~~
+
+.. automodule:: aggregate._labeled
+
+Help and discovery
+~~~~~~~~~~~~~~~~~~
+
+.. automodule:: aggregate._help
+
 Compute leaves
 --------------
 
@@ -86,6 +113,24 @@ Aggregate compute kernel
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: aggregate._aggregate_compute
+
+Out-of-core bivariate compute
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The disk-backed sibling of the compute kernel, used by the ``massive``
+bivariate path (the ``massive`` extra; ``zarr`` on disk rather than the grid in
+memory).
+
+.. automodule:: aggregate._aggregate_compute_massive
+
+Renewal counts
+~~~~~~~~~~~~~~
+
+The Sparre-Andersen renewal count distribution behind the DecL
+``years`` / ``wait`` / ``dwait`` frequency clauses, and the cepstral
+Wiener-Hopf factorization behind ``Aggregate.wiener_hopf``.
+
+.. automodule:: aggregate._renewal
 
 Grid distribution value type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

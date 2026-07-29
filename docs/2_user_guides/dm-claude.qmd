@@ -1271,9 +1271,11 @@ to keep only what changes the build. The object property `pprogram` is this
 function at its defaults.
 
 Because it renders from the spec rather than from the text, the result is
-*canonical*: `[1:6]` comes back as `[1 2 3 4 5 6]`, `50% so` on a $10 line as
-`5 so`, a `sev.X` reference resolved inline. Comparing the two is a quick way
-to see what the parser actually understood.
+*canonical*: range sugar expands, so `[1:6]` comes back as `[1 2 3 4 5 6]`; a
+bare `.3` comes back as `0.3`; a proportion is restated as a share, so `50 po`
+becomes `500% so`; an arithmetic expression such as `exp(.5)` is evaluated; and
+a `sev.X` reference is resolved inline. Comparing the two is a quick way to see
+what the parser actually understood.
 
 ```{python}
 from aggregate import format_program

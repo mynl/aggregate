@@ -16,7 +16,7 @@ Reserving
 
 **Contents:**
 
-#. :ref:`Helpful References`
+#. :ref:`2_user_guides/2_x_reserving:Helpful References`
 #. :ref:`res modeling`
 #. :ref:`res resolution`
 

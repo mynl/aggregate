@@ -16,7 +16,7 @@ Strategy and Portfolio Management
 
 **Contents:**
 
-#. :ref:`Helpful References`
+#. :ref:`2_user_guides/2_x_strategy:Helpful References`
 #. :ref:`strat margin alloc`
 
 Helpful References

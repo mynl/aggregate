@@ -14,10 +14,10 @@ Multivariate Methods
 
 **Contents:**
 
-* :ref:`Helpful References`
-* :ref:`Two Shortcomings`
+* :ref:`5_technical_guides/5_x_multivariate:Helpful References`
+* :ref:`5_technical_guides/5_x_multivariate:Two Shortcomings`
 * :ref:`mv neg multi`
-* :ref:`Correlated Aggregate Distributions`
+* :ref:`5_technical_guides/5_x_multivariate:Correlated Aggregate Distributions`
 
 Helpful References
 --------------------

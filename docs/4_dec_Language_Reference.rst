@@ -57,7 +57,7 @@ Aggregate names must not include underscore. Portfolio names may include undersc
 Lexing is performed by Lark's dynamic, context-sensitive lexer directly from the
 terminal definitions in the grammar (``aggregate/decl.lark``). Each terminal —
 its regular expression, priority, and any keyword negative-lookahead — is part of
-the grammar listing in :ref:`Dec Language Grammar Specification` below, so there
+the grammar listing in :ref:`4_dec_Language_Reference:Dec Language Grammar Specification` below, so there
 is no separate, hand-maintained token table. Keyword/ID disambiguation is handled
 by terminal priorities (keywords priority 2, ``ID`` priority 1, builtin dotted
 names priority 3), which is what makes the lexing contextual.
@@ -77,7 +77,7 @@ Here is the full DecL Grammar and a `grammar railroad diagram <_static/diagram.x
 
 .. The grammar below is regenerated from decl.lark by ``python -m aggregate.parser``.
 
-.. literalinclude:: 4_agg_language_reference/ref_include.rst
+.. include:: 4_agg_language_reference/ref_include.rst
 
 .. _test suite programs:
 
@@ -92,7 +92,7 @@ check + SLY-snapshot shape check). Run::
 
 The full ``.agg`` source:
 
-.. literalinclude:: ../aggregate/agg/_test_suite.agg
+.. literalinclude:: ../src/aggregate/agg/_test_suite.agg
    :language: agg
 
 To only parse the file from Python::
@@ -196,4 +196,4 @@ traceback without any opt-in.
 Parser Implementation
 =======================
 
-The parser is built using `Lark <https://lark-parser.readthedocs.io/>`_ with an Earley backend and a dynamic, context-sensitive lexer. The grammar lives in ``aggregate/decl.lark`` and is the single source of truth — the listing in :ref:`Dec Language Grammar Specification` is regenerated from it. Earley dissolves the shift/reduce conflicts the previous SLY (LALR) implementation needed to hand-tune; the dynamic lexer plus tightened ``ID`` rule keep the grammar unambiguous.
+The parser is built using `Lark <https://lark-parser.readthedocs.io/>`_ with an Earley backend and a dynamic, context-sensitive lexer. The grammar lives in ``aggregate/decl.lark`` and is the single source of truth — the listing in :ref:`4_dec_Language_Reference:Dec Language Grammar Specification` is regenerated from it. Earley dissolves the shift/reduce conflicts the previous SLY (LALR) implementation needed to hand-tune; the dynamic lexer plus tightened ``ID`` rule keep the grammar unambiguous.

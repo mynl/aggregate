@@ -17,6 +17,17 @@ analysis.
 
 .. automodule:: aggregate.bivariate
 
+Copulas
+-------
+
+:mod:`aggregate.copula` supplies the dependence structures
+:mod:`aggregate.bivariate` couples per-claim severities with. The taxonomy
+follows the house ``Base<Kind>`` convention (:class:`~aggregate.copula.Copula`
+and its ``CopulaClayton`` / ``CopulaFGM`` / ``CopulaGumbel`` /
+``CopulaIndependent`` / ``CopulaNormal`` / ``CopulaShuffle`` subclasses).
+
+.. automodule:: aggregate.copula
+
 Tail classification
 -------------------
 

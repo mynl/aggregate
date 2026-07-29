@@ -2291,8 +2291,10 @@ def grammar(add_to_doc: bool = False, save_to_fn: str | Path = "") -> str:
     ----------
     add_to_doc : bool
         If True, write the grammar to ``docs/4_agg_language_reference/
-        ref_include.rst`` wrapped in a Sphinx ``code-block:: lark`` directive
-        so it can be ``include``-d by the language reference.
+        ref_include.rst`` wrapped in a Sphinx ``code-block:: text`` directive
+        so it can be ``include``-d by the language reference. The language is
+        ``text`` because Pygments ships no ``lark`` lexer, and an unknown name
+        is a build warning.
     save_to_fn : str or Path
         Optional additional output path. If empty, defaults to
         ``~/aggregate/parser/grammar.lark``.
@@ -2315,7 +2317,7 @@ def grammar(add_to_doc: bool = False, save_to_fn: str | Path = "") -> str:
         )
         body = "\n".join("    " + ln for ln in text.splitlines())
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(f".. code-block:: lark\n\n{body}\n", encoding="utf-8")
+        out.write_text(f".. code-block:: text\n\n{body}\n", encoding="utf-8")
 
     target = Path(save_to_fn) if save_to_fn else Path.home() / "aggregate/parser/grammar.lark"
     target.parent.mkdir(parents=True, exist_ok=True)

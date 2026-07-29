@@ -100,15 +100,15 @@ a parse error.
 
 .. _uw three patterns:
 
-Three ways in: ``build(x)``, ``build[x]``, ``build.recipe(x)``
-===============================================================
+Two ways in: ``build(x)`` and ``build.recipe(x)``
+==================================================
 
-This is the distinction worth learning first, because all three take the same
-string and return different things.
+This is the distinction worth learning first, because both take the same string
+and return different things.
 
 .. list-table::
     :header-rows: 1
-    :widths: 22 26 52
+    :widths: 24 24 52
 
     * - Call
       - Returns
@@ -117,22 +117,19 @@ string and return different things.
       - the live object
       - Parses ``x`` as DecL, **or** looks it up by name, then **constructs**
         and updates it. This is the one you want most of the time.
-    * - ``build[x]``
-      - a :class:`Recipe`
-      - **Looks up only.** Never constructs, never parses. ``.object`` is
-        always ``None``.
     * - ``build.recipe(x)``
       - a :class:`Recipe`
-      - The same lookup, spelled as a verb.
+      - **Looks up only.** Never constructs, never parses. ``.object`` is
+        always ``None``. Also spelled ``build[x]``, the subscript form.
 
 .. ipython:: python
     :okwarning:
 
     obj = build('ThreeDice')            # constructs
-    rec = build['ThreeDice']            # looks up
+    rec = build.recipe('ThreeDice')     # looks up
     type(obj).__name__, type(rec).__name__, rec.object is None
 
-So the ``()`` versus ``[]`` difference is **construct versus look up**, and it
+So the difference is **construct versus look up**, and it
 is deliberate. The recipe base stores DecL specs, which are small and
 picklable, not live objects. Objects are made on demand for two reasons: a
 :class:`Portfolio` needs an :class:`Underwriter` reference that may differ
@@ -144,20 +141,17 @@ caller's ``update()`` cannot bleed into another's.
 
     build('ThreeDice') is build('ThreeDice')     # a fresh object every time
 
-``build[x]`` takes either a bare name or an unambiguous ``(kind, name)`` pair;
-``build.recipe(x)`` takes a name and an optional ``kind=``. Both raise
-:class:`KeyError` on a name that matches zero or more than one entry.
+``build.recipe(x)`` takes a name and an optional ``kind=``, needed only when a
+name is not unique across kinds. The subscript takes the same two forms,
+``build[name]`` and ``build[kind, name]``, and delegates to ``recipe``, so it
+raises the identical :class:`KeyError` on a name that matches zero or more than
+one entry.
 
 .. ipython:: python
     :okwarning:
 
-    build['agg', 'ThreeDice'].kind
     build.recipe('ThreeDice', kind='agg').name
-
-.. note::
-
-    Since 1.0.0a164 these two return the **same class**, so they are two
-    spellings of one lookup. Keep whichever reads better to you.
+    build['agg', 'ThreeDice'].kind
 
 For a program with more than one top-level output, ``build`` raises and points
 you at :meth:`build_many`, which always returns the full ``list[Recipe]`` with
@@ -354,7 +348,7 @@ comments stripped, kept a few double spaces from the bracket step, and had any
 .. ipython:: python
     :okwarning:
 
-    build['ThreeDice'].program[-34:]      # the tail of a documented entry
+    build.recipe('ThreeDice').program[-34:]      # the tail of a documented entry
 
 The encoding is deliberate rather than corruption. It happens first, which is
 what lets a doc body carry ``#`` headings, blank lines and fenced code through
@@ -459,7 +453,7 @@ forms. A :class:`Recipe` carries all of them:
 .. ipython:: python
     :okwarning:
 
-    r = build['LimitProfile']
+    r = build.recipe('LimitProfile')
     r.kind, r.name, sorted(r.spec)[:6], r.object is None
 
 Names in the shipped ``library.agg`` are **globally unique across kinds**,
@@ -498,7 +492,7 @@ One-page summary
       - Parse, register, construct, update. The live object.
     * - ``build('X')``
       - Look up by name, construct. A fresh object each call.
-    * - ``build['X']`` / ``build.recipe('X')``
+    * - ``build.recipe('X')``
       - The :class:`Recipe`. No construction.
     * - ``build.build_many(prog)``
       - ``list[Recipe]``, ``.object`` populated on each.

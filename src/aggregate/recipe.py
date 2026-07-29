@@ -4,7 +4,7 @@ A **recipe** is a DecL entry: its identity (``kind``, ``name``), its parsed
 ``spec``, the source ``program`` it came from, its provenance, and -- once
 the factory has run -- the constructed ``object``. :class:`Recipe` is what the
 underwriter's *recipe base* stores, what
-:meth:`aggregate.Underwriter.__getitem__` hands back, and what
+:meth:`aggregate.Underwriter.recipe` hands back, and what
 :meth:`aggregate.Underwriter.build_many` returns one of per top-level output.
 
 Most entries carry only a one-line ``note{...}`` abstract. The cookbook-worthy
@@ -152,9 +152,9 @@ class Recipe:
     """One DecL declaration: identity, spec, source, docs, built object.
 
     The single entry record. Stored in the underwriter's recipe base under
-    ``(kind, name)``, returned by :meth:`aggregate.Underwriter.__getitem__` and
-    :meth:`aggregate.Underwriter.recipe`, and produced one per top-level output
-    by :meth:`aggregate.Underwriter.build_many`.
+    ``(kind, name)``, returned by :meth:`aggregate.Underwriter.recipe` (or its
+    subscript spelling ``uw[name]``), and produced one per top-level output by
+    :meth:`aggregate.Underwriter.build_many`.
 
     Attributes
     ----------

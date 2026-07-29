@@ -11,7 +11,7 @@ Working With Samples
 
 **Contents:**
 
-* :ref:`Helpful References`
+* :ref:`5_technical_guides/5_x_working_with_samples:Helpful References`
 * :ref:`samp using and switch`
 * :ref:`samp ic method`
 * :ref:`samp ra algo`

@@ -15,7 +15,7 @@ Working With Samples
 
 **Contents:**
 
-#. :ref:`Helpful References`
+#. :ref:`2_user_guides/2_x_samples:Helpful References`
 #. :ref:`samp samp`
 #. :ref:`samp ic`
 #. :ref:`samp ra`
@@ -177,7 +177,7 @@ class object. Both cases work by applying ``pandas.DataFrame.sample`` to the obj
 Applying the Iman-Conover Algorithm
 ---------------------------------------
 
-The method :meth:`sample` automatically applies the Iman-Conover algorithm (described in :doc:`../5_technical_guides/5_x_iman_conover`). It is also easy to apply Iman-Conover to a dataframe using the method :meth:`aggregate.utilities.iman_conover`. It reorders the input dataframe to have the same rank correlation as a multivariate normal reference sample with the desired linear correlation. Optionally, a multivariate t-distribution can be used as the reference.
+The method :meth:`sample` automatically applies the Iman-Conover algorithm (described in :doc:`../5_technical_guides/5_x_iman_conover`). It is also easy to apply Iman-Conover to a dataframe using the function :func:`aggregate.iman_conover.iman_conover`. It reorders the input dataframe to have the same rank correlation as a multivariate normal reference sample with the desired linear correlation. Optionally, a multivariate t-distribution can be used as the reference.
 
 **Examples.**
 
@@ -216,7 +216,7 @@ See WP REF for ways to apply Iman-Conover with different reference distributions
 Applying the Re-Arrangement Algorithm
 ---------------------------------------
 
-The method :meth:`rearrangement_algorithm_max_VaR` implements the re-arrangement algorithm described in :ref:`../5_technical_guides/5_x_rearrangement_algorithm`. It returns only the tail of the re-arrangement, since values below the requested percentile are irrelevant.
+The method :meth:`rearrangement_algorithm_max_VaR` implements the re-arrangement algorithm described in :doc:`../5_technical_guides/5_x_rearrangement_algorithm`. It returns only the tail of the re-arrangement, since values below the requested percentile are irrelevant.
 
 Apply to ``df`` and request 0.999-VaR. The marginals are the 10 largest values. The algorithm permutes them to balance large and small observations.
 

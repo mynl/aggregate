@@ -31,7 +31,7 @@ A DecL program takes care of many of these details. The DecL program correspondi
 It specifies the loss ratio and distributions selected in steps 1, 2 and 5; these require actuarial judgment and cannot be automated. Based on this input, the ``aggregate`` package computes the rest of steps 1, 3, 4, and 6. The details of the program are explained in the rest of this chapter.
 
 .. note::
-    All DecL programs are one-line long. The program above uses a Python ``\`` line break so that the code above can be cut and pasted as an argument to ``build`` using a triple quoted string. See :ref:`10 mins formatting`.
+    All DecL programs are one-line long. The program above uses a Python ``\`` line break so that the code above can be cut and pasted as an argument to ``build`` using a triple quoted string. See :ref:`10 min formatting`.
 
 Specifying a Realistic Aggregate Distribution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -16,9 +16,9 @@ Actuarial Student
 
 **Contents:**
 
-#. :ref:`Realistic Insurance Example`
-#. :ref:`College and Exam Questions`
-#. :ref:`Advantages of Modeling with Aggregate Distributions`
+#. :ref:`2_user_guides/2_x_actuary_student:Realistic Insurance Example`
+#. :ref:`2_user_guides/2_x_actuary_student:College and Exam Questions`
+#. :ref:`2_user_guides/2_x_actuary_student:Advantages of Modeling with Aggregate Distributions`
 #. :ref:`actuary summary`
 
 Realistic Insurance Example
@@ -84,7 +84,7 @@ The survival function ``a01.sf`` answers 3 and 4. ``qd`` is used to print with r
 College and Exam Questions
 ---------------------------
 
-College courses and the early actuarial exams often ask purely technical questions. Using assumptions from the :ref:`Realistic Insurance Example` answer the following.
+College courses and the early actuarial exams often ask purely technical questions. Using assumptions from the :ref:`2_user_guides/2_x_actuary_student:Realistic Insurance Example` answer the following.
 
 1. Compute the severity lognormal parameters mu and sigma.
 2. Compute the expected insured severity and expected claim count.

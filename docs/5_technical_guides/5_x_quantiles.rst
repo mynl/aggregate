@@ -16,8 +16,8 @@ Quantiles and Related Risk Measures
 **Contents:**
 
 * :ref:`q hr`
-* :ref:`quantiles`
-* :ref:`Value at Risk`
+* :ref:`5_technical_guides/5_x_quantiles:Quantiles`
+* :ref:`5_technical_guides/5_x_quantiles:Value at Risk`
 * :ref:`q not sa`
 * :ref:`q tvar`
 

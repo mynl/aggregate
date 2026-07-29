@@ -1,5 +1,90 @@
 # Changelog
 
+## 1.0.0a168
+
+**[Recipe-Canonical-Lookup]** plus a documentation sweep: one lookup
+implementation instead of two, and the reference chapters realigned with the
+package as it actually is.
+
+### `recipe()` is the canonical lookup
+
+Since a164, `build[x]` and `build.recipe(x)` returned the same class and did the
+same work, arrived at by two independent code paths. That is a synonym, which
+the house rule forbids, and the two paths had drifted: the subscript raised
+`Item Nope not found.` and, on an ambiguous name, `Error: no unique object found
+matching Nope. Found 2 objects.`, neither of which tells you the remedy.
+`recipe()` raised `no recipe named 'Nope'` and named the kinds plus the `kind=`
+fix.
+
+`Underwriter.recipe` is now the single implementation. `__getitem__` is a
+four-line delegator: `uw[name]` is `uw.recipe(name)`, `uw[kind, name]` is
+`uw.recipe(name, kind)`. Consequences:
+
+* Both spellings raise the **better** message, because there is only one that
+  can be raised.
+* A tuple subscript of the wrong length now raises a clear `ValueError` instead
+  of a confusing `KeyError`.
+* `recipe(name, kind)` takes the direct `(kind, name)` dict hit when `kind` is
+  supplied, so the parser's `sev.X` resolution path stays O(1) rather than
+  scanning the store.
+
+No deprecation and no behavior change for correct code: the subscript keeps
+working and keeps taking both forms. The docs demote it from a peer to a
+parenthetical, so the guide teaches **two** ideas (construct, or look up)
+instead of three.
+
+### Reference chapters realigned
+
+The grammar listing was rendered wrong. `grammar(add_to_doc=True)` wraps
+`decl.lark` in a `code-block` directive precisely so the page can `include` it,
+but chapter 4 used `literalinclude`, so the directive itself appeared as
+literal text and the whole grammar shipped as an unhighlighted block indented
+four extra spaces. Fixed to `include`. The emitted language changed from `lark`
+to `text` because Pygments has no `lark` lexer and an unknown name is a build
+warning; `ref_include.rst` is now excluded from the toctree, since it is
+included rather than built (it was shipping a stray orphan page).
+
+Also in chapter 4: the test-suite `literalinclude` pointed at
+`../aggregate/agg/_test_suite.agg`, which has not existed since the `src/`
+layout.
+
+Modules that had no reference page at all now have one: `decl_writer` (the
+unparser, whose `format_program` and `spec_to_decl` are re-exported at the top
+level) and `parser_errors` join the Parser page; `copula` joins `bivariate` on
+Auxiliary; `results` joins Portfolio; and the mixins (`_program`, `_labeled`,
+`_help`) plus `_renewal` and `_aggregate_compute_massive` join the internal
+architecture map. Three modules are deliberately still unlisted pending a call
+on where they belong: `contract_terms`, `decl_pygments`, `style`.
+
+### Cross-references
+
+`autosectionlabel_prefix_document = True` means a section's implicit label is
+`<docname>:<Title>`, so a bare `` :ref:`Title` `` never resolves. Every
+"Contents" list at the head of the user and technical guides was written bare,
+so those lists rendered as dead plain text. 26 refs across 13 files now carry
+the document prefix, and 10 more had simply the wrong target: `10 mins
+formatting` for `10 min formatting`, `10mins create from knowledge` for `10 min
+create from knowledge`, `For Portfolio Objects` for `10 min port bucket`,
+`Aggregate Class` / `Portfolio Class` for the reference-chapter sections, and a
+`:ref:` that should have been a `:doc:`. Six broken refs remain whose target
+does not exist anywhere; they are listed in the run notes rather than guessed
+at.
+
+`aggregate.utilities.iman_conover` and
+`aggregate.distributions.DEFAULT_RETURN_PERIODS` both moved long ago; their
+cross-references now point at `aggregate.iman_conover.iman_conover` and
+`aggregate._aggregate.DEFAULT_RETURN_PERIODS`.
+
+### Corrections
+
+The claim that `pprogram` canonicalizes `50% so` to `5 so` was wrong: it
+round-trips unchanged. Replaced in both `2_x_10mins.rst` and `dm-claude.qmd`
+with five verified examples (`[1:6]` expands, `.3` becomes `0.3`, `50 po`
+becomes `500% so`, `exp(.5)` evaluates, `sev.X` resolves inline).
+
+`decl.lark`'s `pnl` comment still described `xpnl` as returning a `PnLTower`,
+retired at a129; both `pnl` and `xpnl` return a `PnL`.
+
 ## 1.0.0a167
 
 **[Cookbook-Promote]** — the cookbook generator becomes package code, and

@@ -192,15 +192,15 @@ It is indexed by object kind (severity, aggregate, portfolio) and name, and acce
 
     qd(build.recipes.iloc[:5, :9], justify="left", max_colwidth=60)
 
-A single entry is fetched by name, either as a subscript or via :meth:`Underwriter.recipe`. This example models the roll of three single dice.
+A single entry is fetched by name with :meth:`Underwriter.recipe` (``build[x]`` is the same lookup written as a subscript). This example models the roll of three single dice.
 
 .. ipython:: python
     :okwarning:
 
-    print(build['ThreeDice'])
+    print(build.recipe('ThreeDice'))
     print(build.recipe('ThreeDice').note)
 
-Both return a :class:`~aggregate.recipe.Recipe`: the entry's kind, name, spec, program and provenance, plus its note, tags and (for the cookbook-worthy few) its parsed doc sections. ``object`` is ``None`` — a lookup does not build.
+The result is a :class:`~aggregate.recipe.Recipe`: the entry's kind, name, spec, program and provenance, plus its note, tags and (for the cookbook-worthy few) its parsed doc sections. ``object`` is ``None`` — a lookup does not build.
 
 .. _10 min create from knowledge:
 
@@ -298,7 +298,7 @@ A :class:`Severity` can be created using DecL using any of the following five fo
 
 #. ``sev NAME sev.BUILDIN_ID`` is a recipe-base lookup for ``BUILTIN_ID``
 
-#. ``sev NAME DISTNAME SHAPE1 <SHAPE2>`` where ``DISTAME`` is the name of any ``scipy.stats`` continuous random variable with zero, one, or two shape parameters, see the :ref:`DecL/list of distributions`.
+#. ``sev NAME DISTNAME SHAPE1 <SHAPE2>`` where ``DISTAME`` is the name of any ``scipy.stats`` continuous random variable with zero, one, or two shape parameters, see the :ref:`list of distributions`.
 
 #. ``sev NAME SCALE * DISTNAME SHAPE1 <SHAPE2> + LOC``
 
@@ -431,9 +431,9 @@ Creating an Aggregate Distribution
 
 #.  Generally, they are created using DecL by :meth:`Underwriter.build`, as shown in :ref:`10 min create from decl`.
 
-#. Recipes can be :ref:`created by name<10mins create from knowledge>`.
+#. Recipes can be :ref:`created by name<10 min create from knowledge>`.
 
-#. Advanced users and programmers can create :class:`Aggregate` objects directly using ``kwargs``, see :ref:`Aggregate Class`.
+#. Advanced users and programmers can create :class:`Aggregate` objects directly using ``kwargs``, see :ref:`3_reference/3_x_Distribution:Aggregate class`.
 
 
 **Example.**
@@ -811,7 +811,7 @@ The portfolio units are called A, B and Cat. Printing using ``qd`` shows ``p07.s
 * Unit B is similar.
 * The Cat unit is has expected frequency of 2 claims from the indicated limit, with severity given by a Pareto distribution with shape parameter 1.8, scale 500, shifted left by 500. This corresponds to the usual Pareto with survival function :math:`S(x) = (500 / (500 + x))^{1.8} = (1 + x / 500)^{-1.8}` for :math:`x \ge 0`.
 
-The portfolio total (i.e., the sum of the units) is computed using FFTs to convolve (add) the unit's aggregate distributions. All computations use the same discretization bucket size; here the bucket-size ``bs=2``. See :ref:`For Portfolio Objects`.
+The portfolio total (i.e., the sum of the units) is computed using FFTs to convolve (add) the unit's aggregate distributions. All computations use the same discretization bucket size; here the bucket-size ``bs=2``. See :ref:`10 min port bucket`.
 
 A :class:`Portfolio` object acts like a discrete probability distribution, the same as an :class:`Aggregate`. There are properties for the mean, standard deviation, coefficient of variation, and skewness, both computed exactly and numerically estimated.
 
@@ -951,7 +951,7 @@ Methods and Properties Common To :class:`Aggregate` and :class:`Portfolio` Class
 ------------------------------------------------------------------------------------
 
 
-:class:`Aggregate` and :class:`Portfolio` both have the following methods and properties. See :ref:`Aggregate Class` and :ref:`Portfolio Class` for full lists.
+:class:`Aggregate` and :class:`Portfolio` both have the following methods and properties. See :ref:`3_reference/3_x_Distribution:Aggregate class` and :ref:`3_reference/3_x_Portfolio:Portfolio class` for full lists.
 
 - ``info`` and  ``summary_df`` are dataframes with statistics and other information; they are printed with the object.
 
@@ -1119,7 +1119,7 @@ The ``program`` property returns the DecL statement **as the parser received it*
 
 The helper function :func:`format_program` renders that statement back from the parsed spec: each clause on its own indented line, and by default without the ``note{...}`` / ``tags{...}`` / ``hints{...}`` / ``doc{{{...}}}`` trailer, so what you see is the math and the insurance. Pass ``trailer=True`` to include the metadata, or an iterable such as ``trailer=('hints',)`` to keep only the clauses that change how the object builds. The object property :attr:`pprogram` is this function at its defaults.
 
-Because it renders from the spec rather than from the text, the result is *canonical*: ``[1:6]`` comes back as ``[1 2 3 4 5 6]``, ``50% so`` on a $10 line as ``5 so``, a ``sev.X`` reference resolved inline. Comparing the two is a quick way to see what the parser actually understood.
+Because it renders from the spec rather than from the text, the result is *canonical*: range sugar expands, so ``[1:6]`` comes back as ``[1 2 3 4 5 6]``; a bare ``.3`` comes back as ``0.3``; a proportion is restated as a share, so ``50 po`` becomes ``500% so``; an arithmetic expression such as ``exp(.5)`` is evaluated; and a ``sev.X`` reference is resolved inline. Comparing the two is a quick way to see what the parser actually understood.
 
 .. ipython:: python
     :okwarning:

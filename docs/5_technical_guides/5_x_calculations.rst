@@ -13,7 +13,7 @@ Calculations For Each ``aggregate`` Class
 
 **Contents:**
 
-* :ref:`Helpful References`
+* :ref:`5_technical_guides/5_x_calculations:Helpful References`
 * :doc:`5_x_aggregate_calculations`
 * :doc:`5_x_portfolio_calculations`
 * :doc:`5_x_distortions`

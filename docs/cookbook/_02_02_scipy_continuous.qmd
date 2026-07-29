@@ -24,7 +24,7 @@ pp(decl)   # HOUSE_SEV lives in _setup (source of truth)
 
 <!-- TODO(author): contrast lognorm vs gamma vs pareto on a common mean; show the
      Severity object, moments, density + survival plots. Pull 2-3 real severities
-     from src/aggregate/agg/test_suite.agg (categories B/severities) so the
+     from src/aggregate/agg/_test_suite.agg (categories B/severities) so the
      numbers are audited actuarial examples, not toy figures. -->
 
 ```{python}

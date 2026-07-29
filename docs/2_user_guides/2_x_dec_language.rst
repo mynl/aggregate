@@ -14,7 +14,7 @@ The Dec Language
 **See also:** :doc:`2_x_re_pricing`, and :doc:`../4_dec_Language_Reference`.
 
 **Notation:** ``<item>`` denotes an optional term.
-See the note :ref:`10 mins formatting` for important information about how DecL programs are formatted and laid out in the help.
+See the note :ref:`10 min formatting` for important information about how DecL programs are formatted and laid out in the help.
 
 **Contents:**
 

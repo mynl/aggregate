@@ -647,7 +647,7 @@ The variance of a sum of independent random variables equals the sum of the vari
 
 Using conditional expectations and conditioning on the value of :math:`N` shows this  is the correct answer!
 
-**Exercise.** Confirm the formulas for an aggregate mean and variance hold for the :ref:`Simple Example`.
+**Exercise.** Confirm the formulas for an aggregate mean and variance hold for the :ref:`2_user_guides/2_x_student:Simple Example`.
 
 Aggregate Moment Generating Function
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -136,11 +136,12 @@ distortion V.DiscPlotDist  ph 0.3
 # Both prefixes resolve through the knowledge base.
 #
 # Leaf distortions are live and validated by interpret_file. The four combo
-# lines below are commented out because interpret_file() parses each line
-# with a fresh, empty knowledge base — combo lookups need the children
-# already registered, which only happens through a sequential file load
-# (Underwriter.load). They are listed verbatim for reference; uncomment when
-# loading via Underwriter.load.
+# lines below are commented out because interpret_file() parses without
+# registering what it parses, so a reference to an entry declared earlier in
+# the same file does not resolve. Combo lookups need the children already in
+# the recipe base, which only a sequential file load (Underwriter.load) gives
+# them. They are listed verbatim for reference; uncomment when loading via
+# Underwriter.load.
 dist W.tcc       ccoc .25;
 dist W.tdu       dual 2.5;
 dist W.tph       ph   0.7;

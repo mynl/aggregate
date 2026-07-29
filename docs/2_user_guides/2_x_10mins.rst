@@ -247,7 +247,7 @@ The primary user-facing entry points are :meth:`Underwriter.build` and :meth:`Un
 * :meth:`Underwriter.build` parses a DecL program producing exactly one top-level output (or looks up an existing entry by name in the recipe base), constructs the corresponding object, smart-updates its discrete distribution (detecting discrete severities to pick ``bs=1``, otherwise sizing from the analytic moment window), and returns the constructed object. If the program produces zero or more than one output, it raises :class:`ValueError` and points the user at :meth:`build_many`.
 * :meth:`Underwriter.build_many` is the explicit-batch counterpart: it parses a (possibly multi-output) DecL program and returns the full ``list[Recipe]`` regardless of count. Use ``update=False`` to skip the smart-update step (useful when you intend to call :meth:`update` yourself with chosen bucket parameters).
 
-For interactive parser debugging, :meth:`Underwriter.interpret_file` runs every DecL program in a ``.agg`` or ``.csv`` file through the parser without creating output, returning a DataFrame with per-line parse-error info. Call it with no arguments to run the bundled test suite (at :attr:`Underwriter.test_suite_file`).
+For interactive parser debugging, :meth:`Underwriter.interpret_file` runs every DecL program in a ``.agg`` or ``.csv`` file through the parser without creating output, returning a DataFrame with per-statement parse-error info. A ``.agg`` file is split into statements exactly as :meth:`Underwriter.load` splits it, so a multi-line statement or a ``doc{{{...}}}`` body is one row, not one row per line. Call it with no arguments to run the bundled test suite (at :attr:`Underwriter.test_suite_file`).
 
 .. _10 min how:
 

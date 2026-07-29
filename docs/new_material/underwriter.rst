@@ -463,8 +463,9 @@ same entry and no ``kind=`` is ever needed. The store itself allows
 on purpose.
 
 For parser debugging, :meth:`interpret_file` runs every statement in a ``.agg``
-file through the parser without constructing anything, returning per-line error
-information.
+file through the parser without constructing anything, returning per-statement
+error information. It splits the file the way :meth:`load` does, so a statement
+laid out over several lines, or carrying a ``doc{{{...}}}`` body, is one row.
 
 Configuration
 --------------

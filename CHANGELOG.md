@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.0a176
+
+**[Interpret-File-Whole-Text]** `Underwriter.interpret_file` reported parse
+errors that were not there: 67 on `agg/library.agg`, 13 on `agg/decl-testers.agg`.
+Both counts are now zero, and neither file had anything wrong with it.
+
+### The bug
+
+`interpret_file` split the raw file text on newlines and parsed each **physical
+line**. That model predates multi-line statements and the `doc{{{...}}}`
+trailer. A doc body is markdown, so every one of its lines became a bogus
+"statement" and every one of those failed to parse. The production path
+(`Underwriter.load` to `UnderwritingLexer.preprocess`) has always split on
+statements instead, which is why the same files load without complaint.
+
+The `.agg` branch now calls `self.lexer.preprocess(txt)` on the whole file, the
+identical split `_read_file` uses: statements separated by a blank line or a
+line-final `;`, comments transparent, doc bodies lifted out first.
+
+### Surface changes
+
+- The `preprocessed program` and `program` columns collapse into one `program`
+  column holding the statement. The old pair compared a preprocessed line
+  against its raw source, a distinction that no longer exists when the unit of
+  work is the statement.
+- Rows are collected positionally rather than in a dict keyed on the entry name,
+  so two entries sharing a name (`decl-testers.agg` reuses names across kinds)
+  no longer silently overwrite each other.
+- `.csv` files are unchanged: a cell is free-form, so it is still preprocessed
+  in place and may still report `multiline` or `blank`.
+
+Docs are pending a rebuild: the per-line wording in
+`docs/new_material/underwriter.rst`, `docs/2_user_guides/2_x_10mins.rst` and
+`docs/2_user_guides/dm-claude.qmd` was updated in place.
+
 ## 1.0.0a175
 
 **[DecL-Colorizer-Resync]** The Pygments colorer was a hand-written mirror of

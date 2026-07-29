@@ -2138,22 +2138,33 @@ class Underwriter(HelpMixin):
         Parse every DecL program in a ``.agg`` or ``.csv`` file and return per-line error info.
 
         Useful for validating a new ``.agg`` file before installing it into
-        :attr:`user_dir`. Unlike :meth:`read_database` (which aborts on the first
-        parse error), this method collects errors for every line and returns a
-        DataFrame with columns ``kind, error, name, output, preprocessed program,
-        program``.
+        :attr:`user_dir`. Unlike :meth:`load` (which aborts on the first parse
+        error), this method collects errors for every statement and returns a
+        DataFrame with columns ``kind, error, name, output, program``.
 
         The bundled test suite lives at :attr:`test_suite_file` — call
         ``interpret_file()`` with no arguments to run it.
 
-        For ``.csv`` files, the first column is used as index. For ``.agg`` files,
-        the text is preprocessed (``\\n\\tagg`` folded back into one line, comments
-        stripped) and then split on newlines.
+        For ``.csv`` files the first column is used as index, and each cell is
+        preprocessed in place (a cell may still hold several statements). For
+        ``.agg`` files the **whole file** goes through
+        :meth:`UnderwritingLexer.preprocess`, which is the same split
+        :meth:`_read_file` uses: statements are separated by a blank line or a
+        line-final ``;``, comments are transparent, and a ``doc{{{...}}}`` body
+        is lifted out before any of that happens.
+
+        Notes
+        -----
+        The unit of work is the **statement**, not the physical line. Splitting
+        the raw text on newlines (what this did before 1.0.0a176) predates
+        multi-line statements and the ``doc{{{...}}}`` trailer: it shredded every
+        doc body into one bogus statement per line of markdown and reported each
+        as a parse error. ``library.agg`` alone showed 67 such phantoms.
 
         :param filename: a string or :class:`Path`. When ``None`` (default),
             uses :attr:`test_suite_file`.
         :param where: regex filter on the DataFrame index; ``''`` means all rows.
-        :return: DataFrame with one row per line of the input file.
+        :return: DataFrame with one row per statement in the input file.
         """
         if filename is None:
             filename = self.test_suite_file
@@ -2163,8 +2174,9 @@ class Underwriter(HelpMixin):
             df = pd.read_csv(filename, index_col=0)
         elif filename.suffix == '.agg':
             txt = filename.read_text(encoding='utf-8')
-            stxt = re.sub('\n\tagg', ' agg', txt, flags=re.MULTILINE)
-            stxt = [i for i in stxt.split('\n') if len(i) and i[0] != '#']
+            # Whole-file preprocess, exactly as _read_file does it: statements,
+            # not lines. Anything less shreds a multi-line statement.
+            stxt = self.lexer.preprocess(txt)
             # Use the program name (second token of '<kind> <name> ...') as the
             # DataFrame index so a `where` regex can filter by name.
             names = [(line.split() + ['?'])[1] for line in stxt]
@@ -2176,44 +2188,49 @@ class Underwriter(HelpMixin):
         # ensure the canonical One severity is present for any sev.One references
         self.build_many('sev One dsev [1]', update=False)
 
-        ans = {}
-        # detect a non-trivial change between preprocessed and input program
-        def _changed(preprocessed, original):
-            return 'same' if preprocessed.replace(' ', '') == original.replace(' ', '').replace('\t', '') else original
+        # Rows are collected as a list rather than a dict keyed on the name:
+        # two entries may legitimately share a name (``decl-testers.agg`` reuses
+        # names across kinds), and a dict would silently drop one of them.
+        rows, index = [], []
 
         # df has exactly one column (program text). Iterate index + first-column-by-position;
         # `program[0]` on a labeled pandas Series raises in modern pandas.
         for test_name, program_in in zip(df.index, df.iloc[:, 0]):
-            preprocessed = self.lexer.preprocess(program_in)
-            err = 0
-            if len(preprocessed) == 1:
-                line = preprocessed[0]
-                try:
-                    kind, name, spec = self.parser.parse(self.lexer.tokenize(line))
-                except (ValueError, TypeError) as e:
-                    err = 1
-                    kind = line.split()[0]
-                    report = getattr(e, 'report', None)
-                    if report is not None:
-                        # report.column is 1-indexed; insert >>> at the offending position.
-                        i = max(0, report.column - 1)
-                        spec = line[0:i] + '>>>' + line[i:]
-                        name = 'parse error'
-                    else:
-                        # Non-parse error (e.g. transformer-level ValueError).
-                        spec = str(e)
-                        name = 'other error'
-                ans[test_name] = [kind, err, name, spec, line, _changed(line, program_in)]
-            elif len(preprocessed) > 1:
-                logger.info('%s preprocesses to %d lines; not processing.',
-                            program_in, len(preprocessed))
-                ans[test_name] = ['multiline', err, None, None, preprocessed, program_in]
-            else:
+            # .agg rows arrive already split, one statement each. A .csv cell is
+            # free-form, so it may still hold several statements or none.
+            statements = ([program_in] if filename.suffix == '.agg'
+                          else self.lexer.preprocess(program_in))
+            index.append(test_name)
+            if len(statements) > 1:
+                logger.info('%s preprocesses to %d statements; not processing.',
+                            program_in, len(statements))
+                rows.append(['multiline', 0, None, None, program_in])
+                continue
+            if not statements:
                 logger.info('%s preprocesses to a blank line; ignoring.', program_in)
-                ans[test_name] = ['blank', err, None, None, preprocessed, program_in]
+                rows.append(['blank', 0, None, None, program_in])
+                continue
+            line = statements[0]
+            err = 0
+            try:
+                kind, name, spec = self.parser.parse(self.lexer.tokenize(line))
+            except (ValueError, TypeError) as e:
+                err = 1
+                kind = line.split()[0]
+                report = getattr(e, 'report', None)
+                if report is not None:
+                    # report.column is 1-indexed; insert >>> at the offending position.
+                    i = max(0, report.column - 1)
+                    spec = line[0:i] + '>>>' + line[i:]
+                    name = 'parse error'
+                else:
+                    # Non-parse error (e.g. transformer-level ValueError).
+                    spec = str(e)
+                    name = 'other error'
+            rows.append([kind, err, name, spec, line])
 
-        df_out = pd.DataFrame(ans, index=['kind', 'error', 'name', 'output',
-                                          'preprocessed program', 'program']).T
+        df_out = pd.DataFrame(rows, index=index,
+                              columns=['kind', 'error', 'name', 'output', 'program'])
         df_out.index.name = 'index'
         n_errors = df_out.error.sum()
         if n_errors:

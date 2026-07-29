@@ -313,8 +313,11 @@ The primary user-facing entry points are `Underwriter.build` and
 
 For interactive parser debugging, `Underwriter.interpret_file` runs every DecL
 program in a `.agg` or `.csv` file through the parser without creating output,
-returning a DataFrame with per-line parse-error info. Call it with no arguments
-to run the bundled test suite (at `Underwriter.test_suite_file`).
+returning a DataFrame with per-statement parse-error info. A `.agg` file is
+split into statements exactly as `Underwriter.load` splits it, so a multi-line
+statement or a `doc{{{...}}}` body is one row, not one row per line. Call it
+with no arguments to run the bundled test suite (at
+`Underwriter.test_suite_file`).
 
 # How `aggregate` Represents Distributions {#sec-how-represents}
 

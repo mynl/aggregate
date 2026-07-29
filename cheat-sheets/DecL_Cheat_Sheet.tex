@@ -4,14 +4,19 @@
 % Created by Stephen J Mildenhall
 % (c) 2023
 %
-% Updated 2026 for aggregate v1.0.0a66 (REFACTOR branch):
-%   * grammar source of truth is aggregate/decl.lark (Lark Earley)
-%   * split into 3 pages:
-%       p1  agg + pnl  (the compound-distribution language)
-%       p2  port + bivariate (bv) + netceded
-%       p3  distortion
-%   * new clauses: approximate, pnl, bivariate/copula, netceded;
-%     severity gains ssev, xps, picks
+% Updated 2026 for aggregate v1.0.0a169 (REFACTOR branch):
+%   * grammar source of truth is aggregate/decl.lark (Lark Earley);
+%     every form on this card was parse-checked against the live parser
+%   * grown 3 -> 4 pages:
+%       p1  agg   (the compound-distribution language, incl. renewal wait)
+%       p2  reinsurance economics + pnl / xpnl
+%       p3  port + the bivariate family (copula, dbvsev, view pairs, clash)
+%       p4  distortion
+%   * corrections to the a66 card: xps goes with (d|c)histogram, not a
+%     parametric severity; a reflected severity needs ssev, not sev;
+%     wtdtvar has NO DecL number-list form; variable rating is
+%     aggregate-reinsurance only in this release; `*` is severity scaling,
+%     not general arithmetic
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -27,13 +32,13 @@
 \begin{document}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PAGE 1 : agg + pnl
+% PAGE 1 : agg
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-{\huge{\bf DecL Cheat Sheet \textnormal{(1/3)}: \texttt{agg} and \texttt{pnl}}}
+{\huge{\bf DecL Cheat Sheet \textnormal{(1/4)}: \texttt{agg}}}
 
 \raggedright An \texttt{Aggregate} compound distribution has the clause structure: \\
-\texttt{agg <NAME> <EXPOSURE> <LAYERS*> <SEVERITY> <OCC\_RE*> <FREQUENCY> <AGG\_RE*> <APPROX*> <TRAILER*>} \\
+\texttt{agg <NAME> <LABEL*> <EXPOSURE> <LAYERS*> <SEVERITY> <OCC\_RE*> <FREQUENCY> <AGG\_RE*> <APPROX*> <ORIENTATION*> <TRAILER*>} \\
 Key: \texttt{<INPUT>} user input; \texttt{lower\_case} a DecL keyword; \texttt{CLAUSE} a sub-clause; options \texttt{a|b|c}; \texttt{inf} infinity; \texttt{*} optional. Build with \texttt{build('agg ...')}.
 
 \begin{multicols*}{3}
@@ -42,12 +47,14 @@ Key: \texttt{<INPUT>} user input; \texttt{lower\_case} a DecL keyword; \texttt{C
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
 \texttt{agg <NAME> ...} \\
-\texttt{sev <NAME> <SEVERITY>} {\it standalone severity}
+\texttt{sev <NAME> <SEVERITY>} {\it standalone severity} \\
+\texttt{... as <LABEL>}, \texttt{... as "<LABEL>"} {\it display label}
 
-\medskip\it Names match \rm\texttt{[a-zA-Z][.\_:\textasciitilde a-zA-Z0-9-]*}.
-Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{dist.<NAME>}; clone with \texttt{agg <NEW> agg.<OLD>}.
+\medskip\it Names match \rm\texttt{[a-zA-Z][.\_:\textasciitilde a-zA-Z0-9-]*}\it{} and are the identity handle; \texttt{as} adds presentation text. A label may also attach to the exposure, a layer, a severity, a reinsurance layer, and an expense group.
+
+\medskip\it Reference: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{port.<NAME>}, \texttt{dist.<NAME>}. \it Clone / transform: \rm\texttt{agg <NEW> agg.<OLD>}, \texttt{2 * agg.X} {\it (homog.)}, \texttt{2 @ agg.X} {\it (inhomog.)}, \texttt{agg.X + 100}.
 \end{minipage}};
-\node[fancytitle] at (box.north west) {1. Name \& references};
+\node[fancytitle] at (box.north west) {1. Name, labels \& references};
 \end{tikzpicture}
 
 %--- Exposure ---
@@ -57,9 +64,10 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 \texttt{<PREMIUM> premium at <LR> lr} \\
 \texttt{<EXPOSURE> exposure at <RATE> rate} \\
 \texttt{<CLAIMS> claims} \\
-\texttt{dfreq <OUTCOMES> <PROBS*>} {\it fixed empirical freq}
+\texttt{dfreq <OUTCOMES> <PROBS*>} {\it fixed empirical freq} \\
+\texttt{<T> years <at <RATE> rate>*} {\it renewal horizon}
 
-\medskip\it Outcomes \texttt{[1 2 3 4]} or \texttt{[2:10:2]}; probs \texttt{[.5 .25 .25]} or omitted = equally likely.
+\medskip\it Outcomes \texttt{[1 2 3 4]} or \texttt{[2:10:2]}; probs \texttt{[.5 .25 .25]} or omitted $=$ equally likely. \texttt{years} pairs only with \texttt{wait} (box 7); its \texttt{rate} is informational and never sizes the count.
 \end{minipage}};
 \node[fancytitle] at (box.north west) {2. Exposure};
 \end{tikzpicture}
@@ -67,13 +75,15 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 %--- Limit ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{<LIMIT> xs <ATTACHMENT>} \\
+\texttt{<LIMIT> xs <ATTACHMENT> <LABEL*>} \\
 \texttt{tower [<BREAKS>]}
 
-\medskip\it Occurrence limits on ground-up severity, unlimited reinstatements, losses conditional on attaching by default.
+\medskip\it Occurrence limits on ground-up severity, unlimited reinstatements, conditional on attaching by default.
 \end{minipage}};
 \node[fancytitle] at (box.north west) {3. Limit / layers (optional)};
 \end{tikzpicture}
+
+\columnbreak
 
 %--- Severity continuous ---
 \begin{tikzpicture}
@@ -83,24 +93,23 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 \texttt{sev sev.<NAME>} {\it built-in}
 
 \medskip\texttt{<SCALE> * SEV + <LOC>} {\it scale \& shift} \\
-\texttt{SEV wts [<W>]} {\it mixture} \\
+\texttt{ssev <NUM> - SEV} {\it reflect (needs} \texttt{ssev}) \\
+\texttt{SEV wts [<W>]}, \texttt{SEV wts=<N>} {\it mixture} \\
 \texttt{SEV splice [<LB> <UB>]} {\it conditional in layer} \\
 \texttt{SEV !} {\it unconditional (when} \texttt{ATTACH}>0) \\
-\texttt{ssev ...} {\it spliced severity}
+\texttt{ssev ...} {\it spliced / signed severity}
 \end{minipage}};
 \node[fancytitle] at (box.north west) {4. Severity (continuous)};
 \end{tikzpicture}
 
-\columnbreak
-
 %--- Severity discrete ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{dsev <OUTCOMES> <PROBS*>} {\it discrete} \\
-\texttt{<DIST> xps [<X>] [<P>]} {\it empirical points} \\
+\texttt{dsev <OUTCOMES> <PROBS*>}, \texttt{dsev ... !} \\
+\texttt{sev (d|c)histogram xps [<X>] [<P>]} \\
 \texttt{picks [<X>] [<P>]} {\it match layer picks}
 
-\medskip\it \texttt{dsev [1:6]} is a fair die; \texttt{xps} attaches outcomes/probabilities to a parametric severity.
+\medskip\it \texttt{dsev [1:6]} is a fair die; \texttt{xps} gives outcomes and probabilities directly, and attaches only to a histogram.
 \end{minipage}};
 \node[fancytitle] at (box.north west) {5. Severity (discrete)};
 \end{tikzpicture}
@@ -108,82 +117,75 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 %--- Frequency ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{poisson}, \texttt{bernoulli}, \texttt{fixed}, \texttt{geometric}, \texttt{logarithmic}, \\
-\texttt{binomial <P>}, \texttt{negbin <VAR\_MULT>}, \texttt{neymana <CLAIMS/OCC>}, \texttt{pascal <CV> <CLAIMS/OCC>}
+\texttt{poisson}, \texttt{bernoulli}, \texttt{fixed}, \texttt{geometric}, \texttt{logarithmic}, \texttt{binomial <P>}, \texttt{negbin <VAR\_MULT>}, \texttt{neymana <CLAIMS/OCC>}, \texttt{pascal <CV> <CLAIMS/OCC>}
 
 \medskip\texttt{mixed <MIX> <SHAPE1> <SHAPE2*>} \\
 \texttt{MIX = gamma|delaporte|ig|sig|sichel|beta}
 
-\medskip\texttt{FREQ zt} {\it zero-truncated} \\
-\texttt{FREQ zm <P0>} {\it zero-modified,} $\Pr(N{=}0){=}p_0$
+\medskip\texttt{FREQ zt} {\it zero-truncated};
+\texttt{FREQ zm <P0>} {\it zero-modified,} $\Pr(N{=}0){=}p_0$;
+{\it trailing} \texttt{!} {\it pins the realized mean to the exposure clause instead of the base mean}
 \end{minipage}};
 \node[fancytitle] at (box.north west) {6. Frequency};
 \end{tikzpicture}
 
-%--- Occ reins ---
+%--- Renewal / wait ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{occurrence net of LAYERS} \\
-\texttt{occurrence ceded to LAYERS}
+\texttt{wait <SEVERITY> <LABEL*>} \\
+\texttt{wait <Y> xs <A> <SEVERITY> <LABEL*>} \\
+\texttt{dwait <OUTCOMES> <PROBS*>}, \texttt{dwait ... !}
 
-\medskip\texttt{LAYER = <LIMIT> xs <ATTACH>} \\
-\hspace*{1em}\texttt{| <SHARE> so <LIMIT> xs <ATTACH>} \\
-\hspace*{1em}\texttt{| <PCT> po <LIMIT> xs <ATTACH>} \\
-\texttt{LAYERS = LAYER and LAYER ...} {\it or} \texttt{tower [...]}
+\medskip\it The Sparre-Andersen alternative to a frequency clause: the count comes from the waiting-time law over the \texttt{years} horizon. \texttt{wait} takes the full severity mini-language on the time axis. The layered form is conditional by default; \texttt{!} collapses $\Pr(W \le a)$ into a zero-wait cluster atom.
 
-\medskip\it \texttt{so} = share of, \texttt{po} = part of; $0\le\mathrm{share}\le1$.
+\medskip\rm\texttt{agg R 10 years sev lognorm 50 cv 2 wait expon 1}
 \end{minipage}};
-\node[fancytitle] at (box.north west) {7. Occurrence reinsurance};
-\end{tikzpicture}
-
-%--- Agg reins ---
-\begin{tikzpicture}
-\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{aggregate net of LAYERS} \\
-\texttt{aggregate ceded to LAYERS} \\
-\texttt{aggregate (net of|ceded to) tower [<BREAKS>]}
-
-\medskip\it Same \texttt{LAYER} syntax as occurrence, applied to the aggregate loss.
-\end{minipage}};
-\node[fancytitle] at (box.north west) {8. Aggregate reinsurance};
+\node[fancytitle] at (box.north west) {7. Renewal waiting time};
 \end{tikzpicture}
 
 \columnbreak
 
-%--- Approximate ---
+%--- Reinsurance ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{approximate exact} {\it (default)} \\
-\texttt{approximate sgamma} {\it shifted gamma} \\
-\texttt{approximate slognorm} {\it shifted lognormal}
+\texttt{occurrence (net of|ceded to) LAYERS} \\
+\texttt{aggregate (net of|ceded to) LAYERS}
 
-\medskip\it Alias \texttt{approx}. Replaces freq\,$\times$\,sev convolution with a single severity matched to the first three aggregate moments.
+\medskip\texttt{LAYER = <LIMIT> xs <ATTACH>} \\
+\hspace*{1em}\texttt{| <SHARE> so <LIMIT> xs <ATTACH>} \\
+\hspace*{1em}\texttt{| <PCT> po <LIMIT> xs <ATTACH>} \\
+\hspace*{1em}\texttt{| <FRAC> of <LIMIT> xs <ATTACH>} \\
+\texttt{LAYERS = LAYER and LAYER ...} {\it or} \texttt{tower [...]}
+
+\medskip\it \texttt{so} $=$ share of, \texttt{po} $=$ part of, \texttt{of} $=$ fraction of; $0\le\mathrm{share}\le1$. Occurrence applies per claim, aggregate to the annual total. Layers may also carry economics and a label; see page 2.
 \end{minipage}};
-\node[fancytitle] at (box.north west) {9. Approximate (optional)};
+\node[fancytitle] at (box.north west) {8. Reinsurance};
 \end{tikzpicture}
 
-%--- PnL ---
+%--- Approximate + orientation ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{pnl <NAME> <PREMIUM> prem - <AGG-BODY>}
+\texttt{approximate exact} {\it (default)}, \texttt{approximate sgamma} {\it shifted gamma}, \texttt{approximate slognorm} {\it shifted lognormal}
 
-\medskip\it Profit-and-loss = premium minus loss. The premium is one deterministic amount subtracted \rm once\it{} for the book (aggregate-level shift), unlike a constant in \texttt{sev} (per claim). The body after \texttt{prem -} is an ordinary aggregate; a bare \texttt{lr} binds to the stated premium.
+\medskip\it Alias \texttt{approx}. Replaces the freq\,$\times$\,sev convolution with one severity matched to the first three aggregate moments.
 
-\medskip\rm\texttt{pnl P 1000 prem - 700 loss sev lognorm 50 cv 2 poisson}
+\medskip\texttt{loss} {\it (default), } \texttt{payoff}. {\it The orientation suffix, last before the trailer: \texttt{payoff} marks an asset-return primitive (more is better) and flips pricing to the dual distortion.}
+
+\medskip\texttt{tweedie <MEAN> <P> <DISP>} {\it a declaration on its own}
 \end{minipage}};
-\node[fancytitle] at (box.north west) {10. PnL (premium $-$ loss)};
+\node[fancytitle] at (box.north west) {9. Approximate \& orientation};
 \end{tikzpicture}
 
 %--- Trailer + vectorization + math ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-{\bf Trailer} \texttt{note\{free text\}}, \texttt{hints\{bs=100; log2=17\}} {\it (build settings; both optional, order-free)}
+{\bf Trailer} \texttt{note\{free text\}}, \texttt{tags\{cat, property\}}, \texttt{hints\{bs=100; log2=17\}}, \texttt{doc\{\{\{markdown\}\}\}}. {\it Order-free, at most one of each; only \texttt{doc} may carry blank lines and fenced code.}
 
-\medskip{\bf Vectorize} \rm\texttt{[1 2 3] claims}; \texttt{[100 200] premium at [.8 .7] lr}; \texttt{[250 250 500] xs [0 250 500]} {\it zip}; \texttt{[1 3] * lognorm [.7 1.5] wts [.6 .4]}. {\it Vectors broadcast; layers / exposure zip.}
+\medskip{\bf Vectorize} \rm\texttt{[1 2 3] claims}; \texttt{[250 250 500] xs [0 250 500]}; \texttt{lognorm [1 3] cv [.7 1.5] wts [.6 .4]}. {\it Vectors broadcast; layers / exposure zip.}
 
-\medskip{\bf Math} \rm\texttt{1/2}, \texttt{3**4}, \texttt{exp(2)}, \texttt{12.4\%}. {\it Warning: minus binds to the number,} $-4^2=16$ {\it (no unary minus).}
+\medskip{\bf Math} \rm\texttt{1/2}, \texttt{3**4}, \texttt{3\textasciicircum4}, \texttt{exp(2)}, \texttt{12.4\%}, \texttt{10\_000}. {\it Minus binds to the number, so} $-4^2=16$; \texttt{*} {\it is severity scaling, not general arithmetic.} {\bf Comments} \rm\texttt{\#} {\it to end of line; statements separate on a blank line or} \texttt{;}.
 \end{minipage}};
-\node[fancytitle] at (box.north west) {11. Trailer, vectors, math};
+\node[fancytitle] at (box.north west) {10. Trailer, vectors, math};
 \end{tikzpicture}
 
 \makefooter
@@ -192,24 +194,177 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 \clearpage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PAGE 2 : port + bivariate + netceded
+% PAGE 2 : reinsurance economics + pnl / xpnl
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-{\huge{\bf DecL Cheat Sheet \textnormal{(2/3)}: \texttt{port}, \texttt{bv}, \texttt{netceded}}}
+{\huge{\bf DecL Cheat Sheet \textnormal{(2/4)}: reinsurance economics, \texttt{pnl} and \texttt{xpnl}}}
 
-\raggedright These declarations build collections and couplings of aggregates. Each component is an ordinary \texttt{agg} (or \texttt{pnl}) declaration.
+\raggedright Page 1 declared the reinsurance \emph{loss} structure. Everything here is \emph{money}: ceded premium, commission, reinstatements, variable rating, and the profit-and-loss statement that books them. \\
+A priced layer is \texttt{LAYER <PREMIUM*> <CEDE*> <REINSTATEMENTS*> <VARIABLE*> <LABEL*>}, in that order.
+
+\begin{multicols*}{3}
+
+%--- Ceded premium ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{LAYER deposit <AMOUNT>} \\
+\texttt{LAYER rol <RATE>} {\it rate on line} $\times$ share $\times$ limit \\
+\texttt{LAYER rate <FRACTION>} {\it of gross premium}
+
+\medskip\texttt{... cede <FRACTION>} {\it ceding commission}
+
+\medskip\it The three premium forms are mutually exclusive. \texttt{cede} is valid only with a premium; the premium is entered \rm gross\it{} of commission.
+
+\medskip\rm\texttt{occurrence net of 250 xs 250 deposit 60 cede 20\%}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {1. Ceded premium \& commission};
+\end{tikzpicture}
+
+%--- Reinstatements ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{reinstatements [0 .5 1 1]} {\it explicit multipliers} \\
+\texttt{reinstatements 1 free and 2 at 100\%} \\
+\texttt{no reinstatements} {\it one annual limit}
+
+\medskip\it Multipliers $\alpha_j$ are relative to the base rate on line $r$, so a base premium clause is required. \texttt{free} $=$ \texttt{at 0\%}. Counts may be digits or the words \texttt{one}\dots\texttt{five}. $m$ reinstatements $=$ $m+1$ annual limits, so \texttt{no reinstatements} is one limit --- distinct from \rm omitting\it{} the clause, which keeps free and unlimited.
+
+\medskip\it One occurrence layer, one clause. This is the stochastic-ceded property-cat feature.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {2. Reinstatements};
+\end{tikzpicture}
+
+%--- Variable rating ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{swing basic <B> lcm <M> <min <LO>>* <max <HI>>*} \\
+\texttt{slide <C1> at <LR1> and <C2> at <LR2> ...} \\
+\texttt{pc <SHARE> after <ALLOWANCE>} \\
+\texttt{corridor <SHARE> po <WIDTH> xs <ATTACH>}
+
+\medskip\it \texttt{swing} \rm replaces\it{} the deposit / rol / rate premium with the collared affine $\mathrm{clip}(b + m \cdot L_{\text{ceded}}, lo, hi)$; \texttt{slide} \rm replaces\it{} \texttt{cede} with a commission sliding on the ceded loss ratio; \texttt{pc} is a profit commission on the ceded premium; \texttt{corridor} is a loss-ratio band the cedant retains.
+
+\medskip\it At most \rm one\it{} variable feature per program (no stacking), and \rm aggregate reinsurance only\it{} in this release.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {3. Variable rating};
+\end{tikzpicture}
+
+\columnbreak
+
+%--- pnl declaration ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{pnl <NAME> <LABEL*> <PREMIUM> less <ENGINE> <less <EXPENSES>>* <TRAILER*>} \\
+\texttt{xpnl <NAME> ...} {\it same syntax}
+
+\medskip\it Profit and loss $=$ premium minus what comes out of the sausage maker. \texttt{less} is a dedicated keyword, never \texttt{-}, so the split cannot collide with severity arithmetic (\texttt{ssev 20 - lognorm}); a \rm second\it{} \texttt{less} is the hard anchor introducing expenses.
+
+\medskip\rm\texttt{pnl P 1000 premium less agg E 700 loss sev lognorm 50 cv 2 poisson}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {4. \texttt{pnl} / \texttt{xpnl} declaration};
+\end{tikzpicture}
+
+%--- Premium head ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{<AMOUNT> premium <LABEL*>} \\
+\texttt{inherit premium <LABEL*>} \\
+\texttt{retro <COLLAR> premium <LABEL*>}
+
+\medskip\it The premium is the \rm consideration\it{} (what you book); the engine's own \texttt{premium at lr} is a separate \rm sizing\it{} input. \texttt{inherit} copies the engine's technical premium (a build error if it has none). \texttt{retro} is the account-level retrospective-rating clause, taking the same \texttt{basic ... lcm ... min ... max} collar as \texttt{swing}.
+
+\medskip\rm\texttt{pnl P inherit premium as "gross written" less agg.Book}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {5. The premium head};
+\end{tikzpicture}
+
+%--- Engine source ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{agg <NAME> <AGG-BODY>} {\it inline} \\
+\texttt{agg.<NAME>} {\it stored aggregate} \\
+\texttt{port.<NAME>} {\it stored portfolio (net-net total)}
+
+\medskip\it A P\&L wraps a \rm complete\it{} stochastic engine, never an anonymous half-body: the inline form reuses the identical \texttt{agg} body from page 1, minus the trailer, which the wrapping \texttt{pnl} owns. So every clause on page 1 is available inside a \texttt{pnl}.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {6. The engine source};
+\end{tikzpicture}
+
+\columnbreak
+
+%--- Expenses ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{less <TERM> and <TERM> ... <LABEL*>} {\it one group} \\
+\texttt{less <GROUP> <GROUP> ...} {\it several groups}
+
+\medskip\texttt{TERM = <F> premium expense} \\
+\hspace*{1em}\texttt{| <F> loss expense} \\
+\hspace*{1em}\texttt{| <AMOUNT> fixed expense}
+
+\medskip\it \texttt{expense} and \texttt{expenses} are both accepted. Terms joined by \texttt{and} \rm combine\it{} into one reported obligation leg; juxtaposed groups stay \rm separate\it{} items. Each group may carry its own \texttt{as} label; the default name is the basis.
+
+\medskip\rm\texttt{less 25\% premium expense as acquisition 1000 fixed expense as overhead}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {7. Expenses};
+\end{tikzpicture}
+
+%--- pnl vs xpnl ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{pnl} {\it the \rm consolidated\it{} single-group net view: one \texttt{Consideration} / \texttt{Obligation} / \texttt{Margin} card.}
+
+\medskip\texttt{xpnl} {\it the \rm exploded\it{} sibling, same syntax: a multi-group walk with one group per step, so you see gross, then each cession, then expenses, as separate blocks that foot to the same margin.}
+
+\medskip\it Both return a \texttt{PnL}. Reach for \texttt{xpnl} to see \rm where\it{} the margin went, for \texttt{pnl} to see \rm what it is\it. Both may be portfolio units.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {8. \texttt{pnl} vs.\ \texttt{xpnl}};
+\end{tikzpicture}
+
+%--- Worked example ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\rm\texttt{xpnl Book 10000 premium} \\
+\hspace*{1em}\texttt{less agg Book\_e 10000 premium at 75\% lr} \\
+\hspace*{2em}\texttt{10000 xs 0} \\
+\hspace*{2em}\texttt{sev 10.808 * lognorm 1.75} \\
+\hspace*{2em}\texttt{mixed gamma 0.25} \\
+\hspace*{2em}\texttt{aggregate net of 5000 xs 10000} \\
+\hspace*{3em}\texttt{deposit 1500 pc 50\% after 10\%} \\
+\hspace*{1em}\texttt{less 20\% premium expense} \\
+\hspace*{1em}\texttt{note\{profit commission on the agg cover\}}
+
+\medskip\it Premium head, engine with an aggregate cession carrying a deposit and a profit commission, then expenses.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {9. Worked example};
+\end{tikzpicture}
+
+\makefooter
+\end{multicols*}
+
+\clearpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PAGE 3 : port + the bivariate family
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+{\huge{\bf DecL Cheat Sheet \textnormal{(3/4)}: \texttt{port} and the bivariate family}}
+
+\raggedright These declarations build collections and couplings of aggregates. Each component is an ordinary \texttt{agg} (or \texttt{pnl}) declaration, so everything on pages 1 and 2 is available inside them.
 
 \begin{multicols*}{3}
 
 %--- Portfolio ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{port <NAME> <TRAILER*>} \\
+\texttt{port <NAME> <LABEL*> <TRAILER*>} \\
 \hspace*{1em}\texttt{agg <UNIT1> ...} \\
 \hspace*{1em}\texttt{agg <UNIT2> ...} \\
 \hspace*{1em}\dots
 
-\medskip\it A \texttt{Portfolio} is a list of independent units sharing a discretization grid. Units may be \texttt{agg} or \texttt{pnl} lines, or references \texttt{agg.<NAME>}.
+\medskip\it A \texttt{Portfolio} is a list of \rm independent\it{} units sharing a discretization grid; the total is their convolution. Units may be \texttt{agg} or \texttt{pnl} lines, or references \texttt{agg.<NAME>}. Per-unit reinsurance is set on each unit line.
+
+\medskip\it The portfolio trailer sits \rm before\it{} the unit list, so a trailing trailer always binds to the last unit.
 \end{minipage}};
 \node[fancytitle] at (box.north west) {1. Portfolio (\texttt{port})};
 \end{tikzpicture}
@@ -217,16 +372,14 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 %--- Portfolio example ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\rm\texttt{port MyBook} \\
+\rm\texttt{port MyBook note\{two lines\}} \\
 \hspace*{1em}\texttt{agg A 100 claims sev lognorm 50 cv 2 poisson} \\
 \hspace*{1em}\texttt{agg B 200 claims sev gamma 30 cv 1 poisson}
 
-\medskip\it Units are added independently; the portfolio total is their convolution. Per-unit reinsurance is set on each \texttt{agg} line.
+\medskip\it Access units by name (\texttt{p.A}); \texttt{unit\_names\_ex} adds \texttt{total}.
 \end{minipage}};
 \node[fancytitle] at (box.north west) {2. \texttt{port} example};
 \end{tikzpicture}
-
-\columnbreak
 
 %--- Bivariate ---
 \begin{tikzpicture}
@@ -237,37 +390,74 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 \hspace*{1em}\texttt{copula <KIND> <P*>} \\
 \hspace*{1em}\texttt{<FREQUENCY*>}
 
-\medskip\it Abbreviation \texttt{bv}. Couples \rm exactly two\it{} component severities by a copula and accumulates them with a \rm shared\it{} outer frequency via a 2D FFT. Frequency optional (default poisson).
+\medskip\it Abbreviation \texttt{bv}. Couples \rm exactly two\it{} component severities by a copula and accumulates them with a \rm shared\it{} outer frequency via a 2D FFT. The shared exposure may be \texttt{<N> claims} or \texttt{dfreq [...]}; the trailing frequency is optional (default poisson). Per-event triggers come from the inner \texttt{dfreq [0 1] [p0 p1]} Bernoulli forms.
 \end{minipage}};
 \node[fancytitle] at (box.north west) {3. Bivariate (\texttt{bv})};
 \end{tikzpicture}
+
+\columnbreak
 
 %--- Copula clause ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
 \texttt{copula <KIND> <P>} {\it one-parameter} \\
 \texttt{copula <KIND>} {\it parameter-free} \\
-{\it omitted} = \texttt{copula independent}
+{\it omitted} $=$ \texttt{copula independent}
 
-\medskip\texttt{KIND = normal|gumbel|clayton|fgm|independent}
+\medskip\texttt{normal <rho>} $\rho \in (-1, 1)$ \\
+\texttt{gumbel <tau>} $\tau \in [0, 1)$ {\it upper tail dependence} \\
+\texttt{clayton <tau>} $\tau \in [0, 1)$ {\it lower tail dependence} \\
+\texttt{fgm <rho\_s>} $\rho_s \in [-1/3, 1/3]$ \\
+\texttt{independent}
 
-\medskip\rm\texttt{bivariate M 100 claims agg A ... agg B ... copula gumbel 0.4}
+\medskip\rm\texttt{bv M 100 claims agg A ... agg B ... copula gumbel 0.4}
 \end{minipage}};
 \node[fancytitle] at (box.north west) {4. Copula clause};
 \end{tikzpicture}
 
-\columnbreak
-
-%--- Netceded ---
+%--- dbvsev ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{netceded <AGG>}
+\texttt{dbvsev [<XS>] [<YS>] [[<ROW>] [<ROW>] ...]} \\
+\texttt{dbvsev [<XS>] [<YS>]} {\it uniform on the lattice} \\
+\texttt{dbvsev [[<X> <Y> <P>] ...]} {\it sparse triples}
 
-\medskip\it Build the bivariate (net, ceded) joint outcome of one reinsured aggregate --- the two coupled marginals are the \rm net\it{} and \rm ceded\it{} positions of the same loss, so their dependence is exact (comonotone within the layer). Lets you see net and ceded \rm jointly\it, not just their marginals.
+\medskip\it The 2-D analogue of \texttt{dsev}: the joint per-claim probability matrix given directly, \texttt{matrix[i][j]} $= \Pr(X{=}x_i, Y{=}y_j)$. Replaces the two \texttt{agg} bodies \rm and\it{} the copula clause. The three surface forms are auto-detected.
+
+\medskip\rm\texttt{bv D 10 claims dbvsev [1 2] [3 4] [[.25 .25] [.25 .25]]}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {5. Discrete bivariate (\texttt{dbvsev})};
+\end{tikzpicture}
+
+\columnbreak
+
+%--- View pairs ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{netceded <AGG>} \\
+\texttt{grossceded <AGG>} \\
+\texttt{grossnet <AGG>}
+
+\medskip\it One ordinary \texttt{agg} carrying occurrence reinsurance; the keyword names the pair \rm x-then-y\it{} out of \{gross, ceded, net\} (gross leads when present). The two coupled marginals are positions of the \rm same\it{} loss, so their dependence is exact, comonotone within the layer. Lets you see the pair \rm jointly\it, not just their marginals.
 
 \medskip\rm\texttt{netceded agg G 100 claims sev lognorm 50 cv 2 occurrence net of 500 xs 500 poisson}
 \end{minipage}};
-\node[fancytitle] at (box.north west) {5. \texttt{netceded}};
+\node[fancytitle] at (box.north west) {6. View pairs};
+\end{tikzpicture}
+
+%--- Clash ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{clash <NAME> <NA> <NB> <NC> claims} \\
+\hspace*{1em}\texttt{<LAYERS*> <SEVERITY>} {\it component A} \\
+\hspace*{1em}\texttt{<LAYERS*> <SEVERITY>} {\it component B} \\
+\hspace*{1em}\texttt{<FREQUENCY*>}
+
+\medskip\it Dependence from interpretable claim counts rather than a copula parameter: $n_a$ claims hit A, $n_b$ hit B, and $n_c$ hit \rm both\it{} (the clash). The solver derives the shared event count $n_0$ and the two per-event Bernoulli triggers $p_a$, $p_b$.
+
+\medskip\rm\texttt{clash C 10 8 2 claims 100 xs 0 sev lognorm 50 cv 2 100 xs 0 sev gamma 40 cv 1 poisson}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {7. Clash};
 \end{tikzpicture}
 
 \makefooter
@@ -276,24 +466,24 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 \clearpage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% PAGE 3 : distortion
+% PAGE 4 : distortion
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-{\huge{\bf DecL Cheat Sheet \textnormal{(3/3)}: \texttt{distortion}}}
+{\huge{\bf DecL Cheat Sheet \textnormal{(4/4)}: \texttt{distortion}}}
 
-\raggedright A distortion $g$ defines a coherent risk measure / pricing functional. Declare one by kind and its natural parameters; the kind\,$\to$\,parameter mapping lives on each \texttt{Distortion} subclass.
+\raggedright A distortion $g$ defines a coherent risk measure / pricing functional. Declare one by kind and its natural parameters; the kind\,$\to$\,parameter mapping lives on each \texttt{Distortion} subclass (\texttt{decl\_params}), so the grammar holds no per-kind knowledge.
 
 \begin{multicols*}{3}
 
 %--- Distortion decl ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{distortion <NAME> <KIND> <PARAMS>}
+\texttt{distortion <NAME> <KIND> <PARAMS> <TRAILER*>}
 
-\medskip\it Alias \texttt{dist}. \texttt{<PARAMS>} is a flat list of the kind's natural parameters (see table). Reference a stored distortion as \texttt{dist.<NAME>}.
+\medskip\it Alias \texttt{dist}. \texttt{<PARAMS>} is a flat list of the kind's natural parameters, in the order of the table. Reference a stored distortion as \texttt{dist.<NAME>}. A \texttt{dist} line carries the same trailer as every other statement, so it can be described, tagged, and documented.
 
 \medskip\rm\texttt{distortion D1 ph 0.9} \\
-\texttt{dist D2 wang 0.25} \\
+\texttt{dist D2 wang 0.25 note\{market standard\}} \\
 \texttt{dist D3 power 0 100 2}
 \end{minipage}};
 \node[fancytitle] at (box.north west) {1. Declaration};
@@ -302,13 +492,20 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 %--- Kinds ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+{\it One shape parameter:} \\
 \texttt{ph <a>} {\it proportional hazard} \\
 \texttt{wang <lam>} {\it Wang / normal shift} \\
 \texttt{dual <b>} {\it dual moment} \\
 \texttt{tvar <p>} {\it tail VaR at} $p$ \\
 \texttt{ccoc <r>} {\it constant cost of capital} \\
-\texttt{bitvar <p0> <p1> <w1>} {\it two-point} \\
-\texttt{beta <a> <b>} \\
+\texttt{cll <b>} {\it capped log-linear} \\
+\texttt{clin <slope>} {\it capped linear} \\
+\texttt{lep <r>} {\it leverage-equivalent pricing} \\
+\texttt{ly <r>} {\it linear yield}
+
+\medskip{\it Several parameters:} \\
+\texttt{bitvar <p0> <p1> <w1>} {\it weight} $w_1$ {\it on} $p_1$ \\
+\texttt{beta <a> <b>} {\it \rm a\it{} in} $(0, 1]$ \\
 \texttt{power <x0> <x1> <alpha>}
 \end{minipage}};
 \node[fancytitle] at (box.north west) {2. Kinds \& parameters};
@@ -316,29 +513,28 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 
 \columnbreak
 
-%--- More kinds ---
-\begin{tikzpicture}
-\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
-\texttt{wtdtvar ...} {\it weighted TVaR (knots)} \\
-\texttt{cll <b>} {\it capped log-linear} \\
-\texttt{clin <slope>} {\it capped linear} \\
-\texttt{lep <r>} {\it leverage-equivalent pricing} \\
-\texttt{ly <r>} {\it linear yield}
-
-\medskip\it List available kinds with \rm\texttt{Distortion.available\_distortions()}.
-\end{minipage}};
-\node[fancytitle] at (box.north west) {3. More kinds};
-\end{tikzpicture}
-
 %--- Combinators ---
 \begin{tikzpicture}
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
 \texttt{distortion <NAME> minimum dist.<A> dist.<B> ...} \\
 \texttt{distortion <NAME> mixture dist.<A> dist.<B> ... wts [<W>]}
 
-\medskip\it \texttt{minimum} = pointwise min of the referenced distortions; \texttt{mixture} = weighted average (weights via \texttt{wts}).
+\medskip\it \texttt{minimum} $=$ pointwise min of the referenced distortions (min of concaves is concave, so the result is a distortion); \texttt{mixture} $=$ weighted average, weights via \texttt{wts}. Both take distortion \rm references\it, not numbers.
 \end{minipage}};
-\node[fancytitle] at (box.north west) {4. Combinators};
+\node[fancytitle] at (box.north west) {3. Combinators};
+\end{tikzpicture}
+
+%--- No DecL form ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\texttt{wtdtvar} {\it (weighted TVaR) has \rm no\it{} DecL number-list form}: it takes parameter \rm vectors\it{} of knots and weights. Build it in Python, or reach it through the combinators.
+
+\medskip\rm\texttt{Distortion.random\_distortion(n\_knots=5)} \\
+\texttt{Distortion.mixture([d1, d2], [.6, .4])}
+
+\medskip\it List the registered kinds with \rm\texttt{Distortion.available\_distortions()}.
+\end{minipage}};
+\node[fancytitle] at (box.north west) {4. Not declarable};
 \end{tikzpicture}
 
 \columnbreak
@@ -350,11 +546,26 @@ Reference stored objects: \rm\texttt{agg.<NAME>}, \texttt{sev.<NAME>}, \texttt{d
 
 \medskip\rm\texttt{a = build('agg A 100 claims sev lognorm 50 cv 2 poisson')} \\
 \texttt{d = build('distortion D ph 0.9')} \\
-\texttt{a.price(0.99, d)}
+\texttt{a.price(0.99, d)} \\
+\texttt{p.price(0.99, d)} {\it total \rm and\it{} allocation by unit}
 
-\medskip\it or reference it inside pricing calls by \texttt{dist.<NAME>}. A distortion satisfies $g(0)=0$, $g(1)=1$, increasing and concave.
+\medskip\it Calibrate to a target instead of guessing a shape: \rm\texttt{p.calibrate\_distortions(coc=0.1, p=0.99)}.
+
+\medskip\it A distortion satisfies $g(0)=0$, $g(1)=1$, increasing and concave; the dual is $g^*(x) = 1 - g(1-x)$; the distorted price is $\int_0^\infty g(S(x))\,dx$.
 \end{minipage}};
 \node[fancytitle] at (box.north west) {5. Usage};
+\end{tikzpicture}
+
+%--- Bounds ---
+\begin{tikzpicture}
+\node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
+\it The reverse question --- \rm which\it{} distortions are consistent with an observed price --- is not a declaration but an analysis. See the \texttt{*Bounds} card: its answers come back as \texttt{bitvar} distortions, which \rm are\it{} declarable.
+
+\medskip\rm\texttt{ab = p.allocation\_bounds(p=0.99)} \\
+\texttt{ab.bitvars(1200)} \\
+\texttt{dist D bitvar 0.5 0.99 0.3}
+\end{minipage}};
+\node[fancytitle] at (box.north west) {6. And back again};
 \end{tikzpicture}
 
 \makefooter

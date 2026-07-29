@@ -7,15 +7,20 @@ $ErrorActionPreference = 'Stop'
 Set-Location -Path $PSScriptRoot
 
 # Order in the combined document: the DecL language first, then the classes
-# roughly in dependency order (Underwriter -> Severity -> Aggregate -> Portfolio
-# -> Distortion).
+# roughly in dependency order (Underwriter -> Severity -> Aggregate ->
+# BivariateAggregate -> Portfolio -> PnL -> Distortion -> Bounds). Each class
+# follows the one it is built out of, so the reader never meets a name before
+# its card.
 $order = @(
     'DecL_Cheat_Sheet.pdf',
     'Underwriter_Cheat_Sheet.pdf',
     'Severity_Cheat_Sheet.pdf',
     'Aggregate_Cheat_Sheet.pdf',
+    'BivariateAggregate_Cheat_Sheet.pdf',
     'Portfolio_Cheat_Sheet.pdf',
-    'Distortion_Cheat_Sheet.pdf'
+    'PnL_Cheat_Sheet.pdf',
+    'Distortion_Cheat_Sheet.pdf',
+    'Bounds_Cheat_Sheet.pdf'
 )
 
 $missing = $order | Where-Object { -not (Test-Path $_) }

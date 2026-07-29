@@ -1,0 +1,209 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% *Bounds Cheat Sheet  (Bounds, AllocationBounds, PricingBounds)
+%
+% Created by Stephen J Mildenhall
+% (c) 2026
+%
+% New at aggregate v1.0.0a170 (REFACTOR branch):
+%   * content regenerated from introspect() on all three classes
+%   * ONE card, three columns, one per class: the surfaces are small and
+%     the interest is in reading them against each other. The eleven
+%     standard categories appear as headings down each column; the four
+%     that are empty for all three are disposed of in the preamble.
+%   * These classes are not DecL-creatable. The analog: their INPUTS are
+%     DecL objects, and their OUTPUTS are biTVaR distortions, which are
+%     DecL-writable as `dist D bitvar p0 p1 w1`. The round trip is the
+%     creation story.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\input{cheat_sheet_macros.tex}
+\title{Bounds Cheat Sheet}
+
+% color scheme defeined here - just change the suffixes
+\colorlet{highlightcolor}{highlightcolorh}
+\colorlet{washedcolor}{washedcolorh}
+\colorlet{textcolor}{texth}
+
+
+\begin{document}
+
+{\huge{\textbf{\texttt{*Bounds} Classes Cheat Sheet}}} \hfill {\large\it pricing and allocation bounds}
+
+\raggedright
+\smallskip
+Three classes in \texttt{aggregate.bounds}, two papers, one question: {\it given that a risk is priced to $P$, what else is pinned down?} All three parameterise the extreme consistent distortions as biTVaRs $(1-w_1)\,\mathrm{TVaR}_{p_0} + w_1\,\mathrm{TVaR}_{p_1}$ with $p_0 \le p_\ast \le p_1$.
+
+\smallskip
+{\bf Not DecL-creatable} --- but DecL is at both ends. Every {\it input} is a DecL object (\texttt{build('port ...')}, \texttt{build('agg ...')}), and every {\it output} is a biTVaR distortion, which is DecL-writable: \texttt{ab.distortion(P, 'A', 'upper')} returns a \texttt{Distortion} you can spell \texttt{dist D bitvar <p0> <p1> <w1>} and hand to \texttt{port.price}. That round trip is the creation story; the constructors below are the only entry points.
+
+\smallskip
+{\bf How they differ.} \texttt{Bounds} studies the distortion family itself (the envelopes of $g$), on a $p$-knot grid with a root find: approximate. The two hull classes study the {\it image} of that family, on exact CDF-breakpoint vertices with monotone convex hulls: exact, and $P$ enters only as a cheap slice.
+
+\smallskip
+{\bf The geometry.} Represent a distortion by its Kusuoka measure $\mu$, so $\rho_\mu(X) = \int \mathrm{TVaR}_p(X)\,\mu(dp)$. Pricing $X$ to $P$ is {\it one affine constraint} on probability measures, so the extreme consistent measures are two-point mixtures, biTVaRs. Write $T(p) = \mathrm{TVaR}_p(X)$ and plot the score $y_j(p)$ against $T(p)$ as $p$ sweeps $[0,1]$: the vertical slice at $T = P$ through the convex hull of that curve is $[\min, \max]$, and the hull edge crossing $T = P$ names the achieving biTVaR. On the FFT grid both coordinates are affine in $u = 1/(1-p)$ within an atom, so the curve is exactly piecewise linear and the hull of the curve equals the hull of its breakpoint vertices: no $p$-grid, no interpolation error. Here $p_\ast$ solves $T(p_\ast) = P$, exeqa is $\mathsf{E}[X_i \mid X = x]$, and NA is the natural allocation. {\bf The Gini lens} is the case $X = U[0,1]$, where $T(p) = (1+p)/2$ is affine in $p$, the constraint collapses to the mean Kusuoka level $\mathsf{E}_\mu[p] = 2P - 1$, and the bounds read off the envelope gap of $Y$'s own TVaR curve: an $X$-free reading of why distortions pricing $Y$ disagree.
+
+\smallskip
+The columns show all \texttt{\m methods}, and fields or properties (used interchangeably), under the eleven standard category headings. Categories {\bf 2} (update), {\bf 3} (moments), {\bf 7} (reinsurance), and {\bf 10} (approximations) are empty for all three and are omitted: a bounds object is built once from an already-updated risk and is then pure geometry, with nothing to re-discretize, no moments of its own, no cessions, no fitted approximation.
+
+
+\begin{multicols*}{3}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% COLUMN 1 : Bounds
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m Bounds(obj, premium, $*$, a=inf, unit='total', n\_p=256, n\_s=513)}
+
+\smallskip
+{\bf 1. Specification \& creation.}
+\texttt{obj} is a \texttt{Portfolio}, \texttt{Aggregate}, or pmf \texttt{Series} / \texttt{DataFrame}; the premium is {\it baked in at construction} ($\mathsf{E}[X] < $ \texttt{premium} $\le a$).
+\texttt{name}, \texttt{unit}, \texttt{premium}, \texttt{a} (asset cap), \texttt{Fb} ($F(a)$), \texttt{n\_p}, \texttt{n\_s} (grid sizes).
+
+\smallskip
+{\bf 4. Statistical functions.}
+\texttt{p\_star} (the $p$ with $\mathrm{TVaR}_p(\min(X,a)) = $ premium; a cached property, found by root search),
+\texttt{p\_knots} (the $p$ axis), \texttt{s\_grid} (the $s$ axis),
+\texttt{tvar\_x\_p}, \texttt{tvar\_hinges} ($\min(1, s/(1-p))$),
+\texttt{\m distortion(pl, pu)} (the biTVaR with those knots and the matching weight).
+
+\smallskip
+{\bf 5. Validation.} {\it None:} the p-knot grid plus \texttt{brentq} is approximate by construction. Refine with \texttt{n\_p} / \texttt{n\_s}.
+
+\smallskip
+{\bf 6. Output dataframes.}
+\texttt{info},
+\texttt{tvar\_df} ($p$ vs.\ TVaR),
+\texttt{weight\_df} (one row per bracketing $(p_0, p_1)$ pair),
+\texttt{cloud\_df} (shape $(n_s, K)$, one column per bracket).
+
+\smallskip
+{\bf 8. Visualization.}
+\texttt{\m plot\_envelope} (the three-panel cloud figure from the paper),
+\texttt{\m plot\_weights}.
+
+\smallskip
+{\bf 9. Risk and pricing.}
+\texttt{min\_envelope} (pointwise minimum of the cloud; min of concaves is concave, so this {\it is} a \texttt{Distortion}),
+\texttt{max\_envelope} (pointwise maximum, an interpolating {\it callable only}: max of concaves need not be concave),
+\texttt{min\_envelope\_hinges}.
+
+\smallskip
+{\bf 11. Meta.} \texttt{\m help}.
+
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {\texttt{Bounds} --- the distortion family (IME 2022)};
+\end{tikzpicture}
+
+
+\columnbreak
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% COLUMN 2 : AllocationBounds
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m AllocationBounds(port, $*$, a=inf, units=None, s\_floor=1e-14)} \\
+\texttt{\m Portfolio.allocation\_bounds($*$, a=0, p=0, units, s\_floor)}
+
+\smallskip
+{\bf 1. Specification \& creation.}
+Portfolio only (it reads the \texttt{exeqa\_*} columns, so the portfolio must be updated). Given the total is priced to $P$, what is the range of {\it natural allocation} premium to each unit?
+\texttt{port}, \texttt{units}, \texttt{a}, \texttt{s\_floor}.
+{\it The premium is a call-time argument, not baked in.}
+
+\smallskip
+{\bf 4. Statistical functions.}
+\texttt{\m p\_star(P)} (exact per-atom inversion of $T(p) = P$),
+\texttt{\m bounds(P)} (the answer: \texttt{lower} / \texttt{upper} / \texttt{width} by unit),
+\texttt{\m bitvars(P)} (the achieving $(p_0, p_1, w_1)$ per unit and side),
+\texttt{\m na\_grid(p\_grid)}.
+
+\smallskip
+{\bf 5. Validation.}
+\texttt{\m check(P)} (audit: reprice with the achieving biTVaRs),
+\texttt{additivity\_error} ($\max_p |\sum_i a_i(p) - T(p)|$, inherited \texttt{density\_df} FFT noise; $\sim 10^{-6}$ relative).
+
+\smallskip
+{\bf 6. Output dataframes.}
+\texttt{info},
+\texttt{curve\_df} (vertex table indexed by $p$: \texttt{exeqa\_total} $= T(p)$, one \texttt{exeqa\_<unit>} column each),
+\texttt{premium\_range} ($= [\mathsf{E}[X], T_{\max}]$).
+
+\smallskip
+{\bf 8. Visualization.} \texttt{\m plot(items, P)} (curves, envelopes, the $P$-slice).
+\quad {\bf 9. Risk and pricing.} \texttt{\m distortion(P, item, bound)}.
+\quad {\bf 11. Meta.} \texttt{\m help}.
+
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {\texttt{AllocationBounds} --- by unit};
+\end{tikzpicture}
+
+
+\columnbreak
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% COLUMN 3 : PricingBounds + notes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{tikzpicture}
+\node [mybox] (box){%
+    \begin{minipage}{0.3\textwidth}\raggedright
+
+\texttt{\m PricingBounds(x\_source, y\_sources, $*$, a=inf, s\_floor=1e-14, n\_grid=1024)} \\
+\texttt{\m Portfolio.pricing\_bounds(y\_sources, $*$, a=0, p=0, s\_floor, n\_grid)}
+
+\smallskip
+{\bf 1. Specification \& creation.}
+The same question for {\it any} second risk: given $X$ is priced to $P$, what is the range of the price of $Y$? A source is an \texttt{Aggregate}, \texttt{Portfolio}, pmf \texttt{Series}, or \texttt{'uniform'}; \texttt{y\_sources} takes one, a list, or a naming dict.
+\texttt{a}, \texttt{s\_floor}, \texttt{n\_grid}.
+
+\smallskip
+{\bf 4. Statistical functions.}
+\texttt{\m p\_star(P)}, \texttt{\m bounds(P)}, \texttt{\m bitvars(P)} {\it (as for} \texttt{AllocationBounds}),
+\texttt{\m mean\_kusuoka\_level(P)} ($= 2P - 1$), \texttt{gini\_level}.
+
+\smallskip
+{\bf 5. Validation.} \texttt{\m check(P)}. {\it Bounded ($a$ finite) reprices to $\sim 10^{-12}$. Unbounded with a heavy-tailed $Y$ the upper bound is genuinely tail-driven and grid-sensitive: cap the risks or raise \texttt{s\_floor}.}
+
+\smallskip
+{\bf 6. Output dataframes.}
+\texttt{info},
+\texttt{curve\_df} (vertex table: \texttt{tvar\_<X>} plus one \texttt{price\_<Y>} column per $Y$),
+\texttt{premium\_range}.
+
+\smallskip
+{\bf 8. Visualization.} \texttt{\m plot(items, P)}.
+\quad {\bf 9. Risk and pricing.} \texttt{\m distortion(P, item, bound)}.
+\quad {\bf 11. Meta.} \texttt{\m help}.
+
+
+    \end{minipage}
+};
+\node[fancytitle] at (box.north west) {\texttt{PricingBounds} --- any second risk};
+\end{tikzpicture}
+
+
+% \vskip .25truein
+% FOOTER
+\makefooter
+
+
+
+\end{multicols*}
+
+\end{document}

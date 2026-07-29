@@ -4,12 +4,15 @@
 % Created by Stephen J Mildenhall
 % (c) 2023
 %
-% Updated 2026 for aggregate v1.0.0a66 (REFACTOR branch):
+% Updated 2026 for aggregate v1.0.0a169 (REFACTOR branch):
 %   * content regenerated from introspect(Distortion('ph', 0.5))
-%   * Distortion is now a factory base class; concrete kinds are subclasses
+%   * Distortion is a factory base class; concrete kinds are subclasses
 %     (PHDistortion, TVaRDistortion, ...) auto-registered by __init_subclass__
-%   * named-constructor static methods (ph, wang, tvar, ...) marked \s
-%   * info / describe / stats_df / density_df / plot mirror Aggregate/Portfolio
+%   * display_name -> label (the resolved property; label= kwarg)
+%   * new: summary_df, from_spec, calibrate_set, a, has_mass_default and the
+%     full DecL trailer (note / tags / hints / doc, program / pprogram)
+%   * info / summary_df / stats_df / density_df / plot mirror Aggregate and
+%     Portfolio
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -28,9 +31,9 @@
 
 \raggedright
 
-\texttt{\m Distortion(name, shape=None, $*$, display\_name='', $**$natural)} \\
+\texttt{\m Distortion(name, shape=None, $*$, label=None, $**$natural)} \\
 
-\texttt{Distortion} is a factory base class: the call \texttt{Distortion('ph', 0.9)} dispatches on \texttt{name} to a registered subclass (\texttt{PHDistortion}, \texttt{TVaRDistortion}, \dots) and returns an instance. A distortion is an increasing, concave $g:[0,1]\to[0,1]$ with $g(0)=0$, $g(1)=1$, used to define a coherent risk measure / pricing functional. Create one by family with a named constructor (\texttt{\s Distortion.ph(0.9)}), or via DecL \texttt{distortion <NAME> <KIND> <SHAPE>}.
+\texttt{Distortion} is a factory base class: the call \texttt{Distortion('ph', 0.9)} dispatches on \texttt{name} to a registered subclass (\texttt{PHDistortion}, \texttt{TVaRDistortion}, \dots) and returns an instance. A distortion is an increasing, concave $g:[0,1]\to[0,1]$ with $g(0)=0$, $g(1)=1$, used to define a coherent risk measure / pricing functional. Create one by family with a named constructor (\texttt{\s Distortion.ph(0.9)}), or via DecL \texttt{distortion <NAME> <KIND> <PARAMS>}.
 The following tables show all \texttt{\m methods}, \texttt{\s static / class methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
 
 
@@ -42,16 +45,16 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{name} {\it the kind string, e.g.\ \texttt{'ph'}} \\
-\texttt{shape} {\it the (single) shape parameter} \\
+\texttt{name} {\it the identity handle: the kind, or a given name} \\
 \texttt{kind} {\it registry key for the subclass} \\
-\texttt{display\_name} {\it optional label override} \\
+\texttt{shape} {\it the (single) shape parameter} \\
+\texttt{label} {\it resolved display label} \\
 \smallskip
 {\it Named constructors, by family} (each \texttt{\s} static):
 \texttt{\s ph} (proportional hazard),
 \texttt{\s wang} (Wang / normal shift),
 \texttt{\s dual} (dual moment),
-\texttt{\s power} (power on $[x_0, x_1]$),
+\texttt{\s power} ($\alpha$ on $[x_0, x_1]$),
 \texttt{\s beta},
 \texttt{\s tvar} (TVaR at level $p$),
 \texttt{\s bitvar} ($p_0 < p_1$, weight $w$ on $p_1$),
@@ -65,7 +68,8 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
 \texttt{\s random\_distortion}, \texttt{\s random\_distortion\_ex} (random wtdTVaR),
 \texttt{\s distortions\_from\_params} (dict from a calibration table),
 \texttt{\s available\_distortions} (list registered kinds),
-\texttt{\s decl\_spec} (spec dict from a DecL number list)
+\texttt{\s decl\_spec} (spec dict from a DecL number list),
+\texttt{\s from\_spec} (construct from that spec)
 
 
     \end{minipage}
@@ -79,7 +83,7 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-{\it None }
+{\it None} --- a \texttt{Distortion} is a closed-form function, not a discretized object. Everything is computed on demand.
 
     \end{minipage}
 };
@@ -92,7 +96,7 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-{\it None }
+{\it None} --- the moments of $g$ itself ($D_g$ statistics, and the closed forms where they exist) are tabulated in \texttt{stats\_df} / \texttt{summary\_df}; see Output.
 
     \end{minipage}
 };
@@ -112,7 +116,7 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
 \texttt{\m g\_inv} (inverse $g^{-1}$),
 \texttt{\m g\_dual} (dual $1-g(1-x)$),
 \texttt{\m g\_prime} (derivative $g'$, central-difference default),
-\texttt{\m effective\_g} (resolve ask / bid view to the effective $g$),
+\texttt{\m effective\_g} (resolve the ask / bid view and the loss / payoff role to the effective $g$),
 \texttt{\m make\_q} (vector of risk-adjusted probabilities $q$ for pricing),
 \texttt{\s tvar\_terms} (TVaR knot function $\min(s/(1-p),\,1)$)
 
@@ -130,7 +134,7 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
 
 \texttt{pricing\_ok} (the distortion yields well-defined prices),
 \texttt{strict\_pricing} (enforce strict concavity / validity),
-\texttt{error} (numerical $g$ vs.\ closed-form residual; see \texttt{describe})
+\texttt{error} (numerical $g$ vs.\ closed-form residual; see \texttt{summary\_df})
 
 
     \end{minipage}
@@ -145,12 +149,11 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{info} (text summary)${}^{[1]}$,
-\texttt{describe}${}^{[1]}$ (moments of $g$, $g^{-1}$ vs.\ closed form),
-\texttt{stats\_df}${}^{[1]}$,
-\texttt{density\_df}${}^{[1]}$,
-\texttt{\m tvar\_info\_df} (affine pieces of a weighted-TVaR),
-\texttt{decl\_params},
-\texttt{renamer}
+\texttt{summary\_df}${}^{[1]}$ (paired $D_g$, $D_{g^{-1}}$ columns plus checks),
+\texttt{stats\_df}${}^{[1]}$ ($D_g$ statistics with closed form and error where analytics exist),
+\texttt{density\_df}${}^{[1]}$ ($x$, $g$, $g^{-1}$, $g^*$, $g'$, kusuoka),
+\texttt{tvar\_info\_df} (affine pieces of a weighted-TVaR: knots, slopes, intercepts),
+\texttt{decl\_params}, \texttt{param\_name}
 
 
     \end{minipage}
@@ -197,9 +200,10 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
 
 \texttt{\m price} (distorted ask / bid prices of a distribution),
 \texttt{\m calibrate} (solve \texttt{shape} so the distorted price hits a \texttt{premium\_target}),
+\texttt{\s calibrate\_set} (calibrate a whole family to one target),
 \texttt{premium\_target},
-\texttt{assets} (capital / $a$),
-\texttt{mass}, \texttt{has\_mass} (point mass $g(0^+) > 0$),
+\texttt{assets}, \texttt{a} (capital level),
+\texttt{mass}, \texttt{has\_mass}, \texttt{has\_mass\_default} (point mass $g(0^+) > 0$),
 \texttt{gini\_p} (Gini coefficient)
 
 
@@ -228,11 +232,14 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{\m id} (short structural ID string),
-\texttt{med\_name}, \texttt{long\_name}, \texttt{param\_name} (display labels),
+\texttt{med\_name}, \texttt{long\_name} (display labels),
 \texttt{documented} (listed by \texttt{available\_distortions}),
+\texttt{\m help},
+\texttt{\m format\_program}, \texttt{program}, \texttt{pprogram}, \texttt{pprogram\_html},
+\texttt{note}, \texttt{tags}, \texttt{doc}, \texttt{hints} (the DecL trailer)${}^{[2]}$,
+\texttt{label\_map}, \texttt{labels}, \texttt{renamer}, \texttt{use\_labels},
 \texttt{\m min\_index},
-\texttt{\m quick\_gS},
-\texttt{\m quick\_ra} (internal numerical helpers)
+\texttt{\m quick\_gS}, \texttt{\m quick\_ra} (numba-backed numerical helpers)
 
 
     \end{minipage}
@@ -243,9 +250,11 @@ The following tables show all \texttt{\m methods}, \texttt{\s static / class met
 \bigskip \raggedright
 {\bf Notes:}
 
-[1]: \texttt{info}, \texttt{describe}, \texttt{stats\_df}, \texttt{density\_df}, and \texttt{plot} mirror the common reporting interface shared with \texttt{Aggregate} and \texttt{Portfolio} --- the same names do the analogous job on each class.
+[1]: \texttt{info}, \texttt{summary\_df}, \texttt{stats\_df}, \texttt{density\_df}, and \texttt{plot} mirror the common reporting interface shared with \texttt{Aggregate} and \texttt{Portfolio}: the same names do the analogous job on each class.
 
-A distortion satisfies $g(0)=0$, $g(1)=1$, increasing and concave; the dual is $g^*(x) = 1 - g(1-x)$. Distorted price $= \int_0^\infty g(S(x))\,dx$.
+[2]: a \texttt{dist} line carries the same trailer as every other DecL statement, so a distortion can be described, tagged, and documented like an aggregate.
+
+$g(0)=0$, $g(1)=1$, increasing and concave; dual $g^*(x) = 1 - g(1-x)$; price $= \int_0^\infty g(S(x))\,dx$.
 
 
 % \vskip .25truein

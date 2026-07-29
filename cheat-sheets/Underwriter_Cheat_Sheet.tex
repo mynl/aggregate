@@ -4,14 +4,12 @@
 % Created by Stephen J Mildenhall
 % (c) 2023
 %
-% Updated 2026 for aggregate v1.0.0a66 (REFACTOR branch):
+% Updated 2026 for aggregate v1.0.0a169 (REFACTOR branch):
 %   * content regenerated from introspect(Underwriter())
-%   * Lark parser; keyword-only constructor; config-driven update/log2
-%   * interpreter_line/list/program + run_test_suite collapsed to interpret_file
-%     (the test suite now runs under pytest, not the Underwriter)
-%   * read_database(s)/write/write_from_file/safe_lookup -> load/add_entry/to_agg
-%   * qlist/qshow/show/dir -> discover; logger_level removed
-%   * new config surface: show_settings, reload_settings, write_default_config
+%   * knowledge -> recipes; add_entry -> add_recipe; new recipe(name, kind)
+%     is the one canonical lookup (uw[name] / uw[kind, name] delegate to it)
+%   * discover gained a tags filter; to_agg is now a pandas-style export
+%     (path, pattern, kind, source, mode)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -30,7 +28,7 @@
 \raggedright
 \texttt{\m Underwriter($*$, name='Rory', databases=None, update=cfg, log2=cfg, debug=False)}${}^{[1]}$ \\
 
-The \texttt{Underwriter} manages the creation of \texttt{Aggregate}, \texttt{Severity}, \texttt{Portfolio}, and \texttt{Distortion} objects, maintains a \texttt{knowledge} base of named DecL declarations keyed by \texttt{(kind, name)}, and provides the interface to the Lark-based DecL parser. The convenience method \texttt{\m build}${}^{[2]}$ is the primary entry point; \texttt{uw(program)} delegates to it.
+The \texttt{Underwriter} manages the creation of \texttt{Aggregate}, \texttt{Severity}, \texttt{Portfolio}, \texttt{BivariateAggregate}, \texttt{PnL}, and \texttt{Distortion} objects, maintains a base of named DecL declarations (\texttt{Recipe} records keyed by \texttt{(kind, name)}), and provides the interface to the Lark-based DecL parser. The convenience method \texttt{\m build}${}^{[2]}$ is the primary entry point; \texttt{uw(program)} delegates to it.
 The following tables show all \texttt{\m methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
 
 
@@ -61,11 +59,12 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{\m build}${}^{[2]}$ (primary entry point: parse a single-output DecL program and return the constructed object),
-\texttt{\m build\_many} (parse a multi-output program, construct each, smart-update; returns \texttt{list[ParsedProgram]}),
-\texttt{knowledge} (the knowledge base as a \texttt{(kind, name)}-indexed \texttt{DataFrame}, lazy-loaded),
-\texttt{\m load} (resolve a request and read matching \texttt{.agg} files into the knowledge),
-\texttt{\m add\_entry} (add or overwrite one parsed declaration in the knowledge),
-\texttt{\m to\_agg} (export selected knowledge entries to a \texttt{.agg} file; re-loads cleanly),
+\texttt{\m build\_many} (parse a multi-output program, construct each, smart-update; returns \texttt{list[Recipe]}),
+\texttt{recipes} (the recipe base as a \texttt{(kind, name)}-indexed \texttt{DataFrame}, lazy-loaded),
+\texttt{\m recipe} (the one canonical lookup: one \texttt{Recipe} by name; \texttt{uw[name]} and \texttt{uw[kind, name]} delegate to it)${}^{[3]}$,
+\texttt{\m load} (resolve a request and read matching \texttt{.agg} files into the recipe base),
+\texttt{\m add\_recipe} (add or overwrite one parsed declaration),
+\texttt{\m to\_agg} (export a selection of recipes to a \texttt{.agg} file; re-loads cleanly),
 \texttt{\m reload} (reset to as-created state and re-read the configured request),
 \texttt{lexer},
 \texttt{parser} (the DecL lexer / parser objects)
@@ -114,7 +113,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{\m interpret\_file} (parse every DecL program in a \texttt{.agg} / \texttt{.csv} file and return per-line error info; collects \emph{all} errors rather than aborting --- validate a file before installing it),
-\texttt{test\_suite\_file} (path to the bundled test suite \texttt{.agg}, or \texttt{None})${}^{[3]}$
+\texttt{test\_suite\_file} (path to the bundled test suite \texttt{.agg}, or \texttt{None})${}^{[4]}$
 
 
     \end{minipage}
@@ -128,7 +127,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-{\it None }
+\texttt{recipes} {\it (the only frame: one row per stored declaration; see Update)}
 
     \end{minipage}
 };
@@ -154,7 +153,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-{\it None }
+{\it None} (though \texttt{\m discover(plot=True)} plots every match)
 
 
     \end{minipage}
@@ -197,7 +196,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{\m discover} (search the knowledge base by \texttt{regex} and optional \texttt{kind}; optionally describe, plot, or return the objects --- the directory view, replacing \texttt{qlist/qshow/show/dir}),
+\texttt{\m discover} (search the recipe base by \texttt{regex}, \texttt{tags}, and optional \texttt{kind}; optionally describe, plot, or return the objects --- the directory view),
 \texttt{\m help} (help on methods and properties matching \texttt{regex}),
 \texttt{\m available\_databases} (list \texttt{.agg} files on the search path: cwd / user / default),
 \texttt{\m resolve\_databases} (dry run: preview the files a request \emph{would} load),
@@ -221,9 +220,11 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
 [2]: Also exported as \texttt{from aggregate import build}. The module-level \texttt{build} pre-loads \texttt{build.databases} (\texttt{test\_suite}) whereas a bare \texttt{Underwriter()} starts empty. \texttt{build} returns one object, \texttt{build\_many} a list.
 
-[3]: \texttt{aggregate/agg/test\_suite.agg} (categories A--O) is now exercised by \texttt{uv run pytest}, not by an \texttt{Underwriter} method.
+[3]: A \texttt{Recipe} is one declaration record: \texttt{kind}, \texttt{name}, \texttt{spec}, \texttt{program}, \texttt{source}, the trailer (\texttt{note}, \texttt{tags}, \texttt{hints}, \texttt{doc}), the canonical \texttt{decl} re-rendering, and the cookbook sections (\texttt{problem}, \texttt{solution}, \texttt{discussion}, \texttt{check}). Lookup is pure: \texttt{Recipe.object} is \texttt{None} until \texttt{build} runs.
 
-\texttt{kind} $\in$ \{\texttt{sev}, \texttt{agg}, \texttt{port}, \texttt{distortion}\}; database search path cwd $\to$ \texttt{user\_dir} $\to$ \texttt{default\_dir}.
+[4]: \texttt{aggregate/agg/test\_suite.agg} (categories A--O) is exercised by \texttt{uv run pytest}, not by an \texttt{Underwriter} method.
+
+\texttt{kind} $\in$ \{\texttt{sev}, \texttt{agg}, \texttt{port}, \texttt{distortion}, \texttt{bvagg}, \texttt{pnl}, \texttt{xpnl}, \texttt{expr}\}; database search path cwd $\to$ \texttt{user\_dir} $\to$ \texttt{default\_dir}.
 
 
 % \vskip .25truein

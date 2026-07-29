@@ -4,10 +4,18 @@
 % Created by Stephen J Mildenhall
 % (c) 2023
 %
-% Updated 2026 for aggregate v1.0.0a66 (REFACTOR branch):
-%   * regenerated from introspect(build('agg ... poisson')); terse lists
-%   * new: value_type, agg_premium/shift/reflect (pnl), approximate, tail_*,
-%     bs_window_df, reins_* (renamed from reinsurance_*), price_pentagon
+% Updated 2026 for aggregate v1.0.0a169 (REFACTOR branch):
+%   * regenerated from introspect(build('agg ... poisson'))
+%   * agg_* moments renamed actual_*; describe -> validation_df;
+%     explain_validation -> validation_explanation
+%   * gone: recommend_bucket, ppf, cramer_lundberg (use
+%     pollaczeck_khinchine / wiener_hopf), reins_describe
+%   * new: summary_df, tail_periods_df, focus, make_pnl, create_frequency,
+%     price_ccoc, price_pentagon_ex, prob_loss_assets, wiener_hopf,
+%     base_mean, prob_eq_0, reins_summary_df, renewal (years / wait) fields,
+%     the label surface (label / labels / label_map / renamer / use_labels)
+%     and the tags{} / doc{} trailer
+%   * approximate is a METHOD (fit); the stored kind is approximation
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -25,11 +33,12 @@
 {\huge{\bf \textbf{\texttt{Aggregate} Class Cheat Sheet}}}
 
 \raggedright
-\texttt{\m Aggregate(name, exp\_el=0, exp\_premium=0, exp\_lr=0, exp\_en=0, exp\_attachment=None, exp\_limit=inf, sev\_name='',} \\
-\texttt{\phantom{\m}sev\_a, sev\_b, sev\_mean, sev\_cv, sev\_loc, sev\_scale, sev\_xs, sev\_ps, sev\_wt, sev\_lb, sev\_ub, sev\_conditional, } \\
-\texttt{\phantom{\m}occ\_reins, occ\_kind, freq\_name, freq\_a, freq\_b, freq\_zm, freq\_p0, agg\_reins, agg\_kind, approximate, note, hints)}${}^{[0]}$
+\texttt{\m Aggregate(name, exp\_el, exp\_premium, exp\_lr, exp\_en, exp\_attachment, exp\_limit, exp\_years, exp\_rate, sev\_name, sev\_a, sev\_b,} \\
+\texttt{\phantom{\m}sev\_mean, sev\_cv, sev\_loc, sev\_scale, sev\_xs, sev\_ps, sev\_wt, sev\_lb, sev\_ub, sev\_conditional, sev\_signed, sev\_reflect,} \\
+\texttt{\phantom{\m}sev\_pick\_attachments, sev\_pick\_losses, occ\_reins, occ\_kind, freq\_name, freq\_a, freq\_b, freq\_zm, freq\_p0, freq\_pin\_mean,} \\
+\texttt{\phantom{\m}wait\_*${}^{[0]}$, agg\_reins, agg\_kind, reins\_bucket, dsev\_bucket, value\_type, approximate, label, label\_map, note, hints, tags, doc)}
 
-The constructor follows the DecL clauses (exposure, severity, occurrence reinsurance, frequency, aggregate reinsurance). Usually built via \texttt{build('agg ...')}.
+The constructor follows the DecL clauses (exposure, severity, occurrence reinsurance, frequency, aggregate reinsurance, approximate). Usually built via \texttt{build('agg ...')}.
 The following tables show all \texttt{\m methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
 
 
@@ -41,23 +50,24 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{name},
+\texttt{name} (identity), \texttt{label} (display),
 \texttt{limit},
 \texttt{attachment},
 \texttt{frequency},
 \texttt{sevs} (list of \texttt{Severity}),
-\texttt{en},
+\texttt{en} (expected claims),
 \texttt{n} (frequency),
-\texttt{value\_type} (loss / premium for \texttt{pnl}),
-\texttt{sev\_pick\_attachments},
-\texttt{sev\_pick\_losses},
-\texttt{note},
-\texttt{hints},
-\texttt{program},
-\texttt{pprogram} (pretty),
-\texttt{pprogram\_html},
-\texttt{spec},
-\texttt{spec\_ex}
+\texttt{base\_mean} (un-modified $\mathsf{E}[N]$, before \texttt{zt}/\texttt{zm}),
+\texttt{value\_type} (loss / payoff),
+\texttt{exp\_premium}, \texttt{exp\_lr}, \texttt{exp\_rate}, \texttt{exp\_years},
+\texttt{sev\_pick\_attachments}, \texttt{sev\_pick\_losses},
+\texttt{program}, \texttt{pprogram} (canonical DecL),
+\texttt{spec}, \texttt{spec\_ex}
+
+\smallskip
+{\it Derived objects:}
+\texttt{\m make\_pnl} (wrap as the risky leg of a \texttt{PnL}),
+\texttt{\m create\_frequency} (claim count as its own \texttt{Aggregate})
 
 
     \end{minipage}
@@ -77,16 +87,13 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \texttt{discretization\_calc} (distribution / survival / both),
 \texttt{normalize},
 \texttt{padding},
-\texttt{approximate} (exact / sgamma / slognorm),
-\texttt{fzapprox},
-\texttt{dsev\_bucket}, \texttt{reins\_bucket},
-\texttt{x\_min}, \texttt{x\_max}, \texttt{i0},
+\texttt{dsev\_bucket}, \texttt{reins\_bucket} (atom placement schemes),
+\texttt{x\_min}, \texttt{x\_max}, \texttt{i0} (window),
 \texttt{\m update}, \texttt{\m update\_work},
 \texttt{\m discretize},
-\texttt{\m recommend\_bucket},
-\texttt{\m picks},
+\texttt{\m picks} (hit layer loss picks),
 \texttt{\m rescale} (homog.\ sev / inhomog.\ freq),
-\texttt{\m snap}, \texttt{\m unwrap}
+\texttt{\m snap}, \texttt{\m unwrap} (undo FFT wrapping)
 
 
     \end{minipage}
@@ -100,8 +107,8 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-{\it \texttt{est} prefix = estimated from FFT} \\
-\texttt{agg\_m}, \texttt{agg\_cv}, \texttt{agg\_sd}, \texttt{agg\_var}, \texttt{agg\_skew},
+{\it \texttt{actual} $=$ analytic, \texttt{est} $=$ estimated from the FFT grid} \\
+\texttt{actual\_m}, \texttt{actual\_cv}, \texttt{actual\_sd}, \texttt{actual\_var}, \texttt{actual\_skew},
 \texttt{est\_m}, \texttt{est\_cv}, \texttt{est\_sd}, \texttt{est\_var}, \texttt{est\_skew},
 \texttt{sev\_m}, \texttt{sev\_cv}, \texttt{sev\_sd}, \texttt{sev\_var}, \texttt{sev\_skew},
 \texttt{est\_sev\_m}, \texttt{est\_sev\_cv}, \texttt{est\_sev\_sd}, \texttt{est\_sev\_var}, \texttt{est\_sev\_skew},
@@ -120,10 +127,11 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{\m cdf}, \texttt{\m sf}, \texttt{\m pdf}, \texttt{\m pmf},
-\texttt{\m q} (lower quantile = VaR), \texttt{\m ppf},
+\texttt{\m q} (lower quantile $=$ VaR),
 \texttt{\m tvar},
-\texttt{\m sev} (exact severity cdf/sf/pdf), \texttt{\m q\_sev}, \texttt{\m tvar\_sev},
+\texttt{sev} (exact severity cdf / sf / pdf), \texttt{\m q\_sev}, \texttt{\m tvar\_sev},
 \texttt{\m var\_dict}${}^{[1]}$,
+\texttt{prob\_eq\_0} ($\Pr(X{=}0)$),
 \texttt{\m sample}
 
 
@@ -143,12 +151,14 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
 \texttt{valid},
 \texttt{validation\_eps},
-\texttt{describe} (validation stats),
-\texttt{\m explain\_validation},
+\texttt{validation\_df} (moment vs.\ estimate, the QA view),
+\texttt{validation\_explanation},
 \texttt{\m aggregate\_error\_analysis} (agg error over \texttt{bs}),
 \texttt{\m severity\_error\_analysis} (trunc.\ / discr.\ by component),
 \texttt{bs\_window\_df}, \texttt{bs\_description}, \texttt{bs\_explanation},
-\texttt{tail\_class}, \texttt{tail\_df}, \texttt{tail\_description}, \texttt{tail\_explanation}
+\texttt{tail\_class} ((freq, sev, agg) triple), \texttt{tail\_behavior\_df},
+\texttt{tail\_description}, \texttt{tail\_explanation},
+\texttt{bounded}
 
 
     \end{minipage}
@@ -163,13 +173,17 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{density\_df}${}^{[1]}$ (main output),
+\texttt{density} (live rows only),
+\texttt{summary\_df} (at a glance: moments $+$ percentiles),
 \texttt{stats\_df},
 \texttt{info},
-\texttt{density}, \texttt{agg\_density},
+\texttt{tail\_df}, \texttt{\m tail\_periods\_df} (return periods),
+\texttt{\m focus} (central window holding $1-p$ of the mass),
+\texttt{agg\_density},
 \texttt{sev\_density}, \texttt{sev\_density\_df},
 \texttt{ftagg\_density} (FT),
 \texttt{xs}, \texttt{xs\_sev},
-\texttt{figure}, \texttt{bounded}
+\texttt{figure}
 {\it see also Reinsurance}
 
 
@@ -190,8 +204,10 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \texttt{sev\_density\_gross/ceded/net},
 \texttt{occ\_ceder}, \texttt{occ\_netter}, \texttt{agg\_ceder}, \texttt{agg\_netter},
 \texttt{\m apply\_occ\_reins}, \texttt{\m apply\_agg\_reins},
-\texttt{\m reins\_description}, \texttt{reins\_kinds},
-\texttt{reins\_density\_df}, \texttt{reins\_describe}, \texttt{reins\_stats\_df}
+\texttt{reins\_kinds}, \texttt{reins\_description},
+\texttt{reins\_summary\_df} (per stage, the daily driver),
+\texttt{reins\_density\_df}, \texttt{reins\_stats\_df},
+\texttt{\m occ\_bivariate} (joint law of two of gcn; see the \texttt{BivariateAggregate} card)
 
 
     \end{minipage}
@@ -211,7 +227,6 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
 \texttt{\m plot},
 \texttt{\m reins\_occ\_plot},
-\texttt{\m occ\_bivariate},
 \texttt{figure}
 
 
@@ -226,10 +241,13 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{\m price},
-\texttt{\m price\_pentagon},
+\texttt{\m price}, \texttt{\m price\_ccoc},
+\texttt{\m price\_pentagon}, \texttt{\m price\_pentagon\_ex} (complete the pricing octet),
+\texttt{\m prob\_loss\_assets} (consistent $(p, L, a)$ triple),
 \texttt{\m apply\_distortion},
-\texttt{\m cramer\_lundberg} (aka \texttt{\m pollaczeck\_khinchine}; prob.\ of eventual ruin)
+\texttt{\m calibrate\_distortions} (standard set to a CoC target),
+\texttt{\m pollaczeck\_khinchine} (probability of eventual ruin, Poisson),
+\texttt{\m wiener\_hopf} (ruin for a renewal / Sparre-Andersen model)
 
 
     \end{minipage}
@@ -243,7 +261,8 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{approximate} (exact / sgamma / slognorm),
+\texttt{approximation} (the stored kind: exact / sgamma / slognorm),
+\texttt{\m approximate} (fit by moment matching)${}^{[2]}$,
 \texttt{\m entropy\_fit},
 \texttt{fzapprox}
 
@@ -261,8 +280,9 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
 \texttt{\m help},
 \texttt{\m json} (persist),
-\texttt{value\_type},
-\texttt{spec}, \texttt{spec\_ex}
+\texttt{\m format\_program}, \texttt{pprogram\_html},
+\texttt{note}, \texttt{tags}, \texttt{doc}, \texttt{hints} (the DecL trailer),
+\texttt{label\_map}, \texttt{labels}, \texttt{renamer}, \texttt{use\_labels} (the label surface)
 
 
     \end{minipage}
@@ -273,11 +293,11 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \bigskip \raggedright
 {\bf Notes:}
 
-[0]: Full signature also has \texttt{sev\_signed/reflect}, \texttt{agg\_premium/shift/reflect} (the \texttt{pnl} affine wrapper), \texttt{reins\_bucket}, \texttt{dsev\_bucket}; see help.
+[0]: \texttt{wait\_*} is the renewal (Sparre-Andersen) waiting-time family: \texttt{wait\_name}, \texttt{\_a}, \texttt{\_b}, \texttt{\_mean}, \texttt{\_cv}, \texttt{\_loc}, \texttt{\_scale}, \texttt{\_xs}, \texttt{\_ps}, \texttt{\_wt}, \texttt{\_lb}, \texttt{\_ub}, \texttt{\_conditional}, \texttt{\_attachment}, \texttt{\_limit}. It pairs with \texttt{exp\_years}, never with a frequency clause.
 
-[1]: matches \texttt{Portfolio}.
+[1]: matches \texttt{Portfolio}. \quad [2]: \texttt{approximate} is the \emph{action}; \texttt{approximation} is the \emph{stored kind} set by the DecL clause.
 
-Abbreviations: gcn = gross (subject), ceded, net; m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk; est=FFT estimate.
+Abbreviations: gcn $=$ gross (subject), ceded, net; actual $=$ analytic, est $=$ FFT estimate.
 
 
 % \vskip .25truein

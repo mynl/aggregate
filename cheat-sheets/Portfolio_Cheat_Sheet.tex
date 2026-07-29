@@ -4,10 +4,18 @@
 % Created by Stephen J Mildenhall
 % (c) 2023
 %
-% Updated 2026 for aggregate v1.0.0a66 (REFACTOR branch):
-%   * regenerated from introspect(build('port ...')); terse lists
-%   * pricing / allocation engine: price_*, *_distortion(s), allocation_*,
-%     pentagon_at, bodoff, exa; reins_* replace reinsurance_*
+% Updated 2026 for aggregate v1.0.0a169 (REFACTOR branch):
+%   * regenerated from introspect(build('port ...'))
+%   * agg_* moments renamed actual_*; describe -> validation_df;
+%     explain_validation -> validation_explanation; trim_df ->
+%     trim_density_df; reins_describe -> reins_summary_df
+%   * line_names / line_names_ex / line_name_pipe / line_renamer collapsed
+%     onto unit_names / unit_names_ex / unit_name_pipe / renamer
+%   * gone: nice_program (-> format_program), recommend_bucket, best_bucket,
+%     percentiles, var
+%   * new: summary_df, tail_periods_df, prob_loss_assets, price_pentagon_ex,
+%     create_frequency, allocation_bounds / pricing_bounds (see the Bounds
+%     card), the label surface and the tags{} / doc{} trailer
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -25,7 +33,7 @@
 {\huge{\textbf{\texttt{Portfolio} Class Cheat Sheet}}}
 
 \raggedright
-\texttt{\m Portfolio(name, spec\_list, uw=None)} \\
+\texttt{\m Portfolio(name, spec\_list, uw=None, label=None, label\_map=None, note='', tags=(), doc='')} \\
 
 A \texttt{Portfolio} is a collection of \texttt{Aggregate} units sharing a discretization grid; it adds diversification, capital allocation, and distortion pricing. \texttt{spec\_list} is a list of \texttt{agg} specs / programs; usually built via \texttt{build('port ...')}.
 The following tables show all \texttt{\m methods}, and fields or properties (used interchangeably). Comments elucidate the meaning of more obscure entries.
@@ -39,18 +47,18 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{name},
+\texttt{name} (identity), \texttt{label} (display),
 \texttt{agg\_list} (the units),
 \texttt{n\_units},
-\texttt{unit\_names}, \texttt{unit\_names\_ex},
-\texttt{line\_names}, \texttt{line\_names\_ex}, \texttt{line\_name\_pipe}, \texttt{line\_renamer},
+\texttt{unit\_names}, \texttt{unit\_names\_ex} (with \texttt{total}), \texttt{unit\_name\_pipe},
 \texttt{<unit>} (each unit by name, e.g.\ \texttt{A}),
 \texttt{value\_type},
-\texttt{program}, \texttt{pprogram}, \texttt{pprogram\_html},
+\texttt{exp\_premium},
+\texttt{program}, \texttt{pprogram},
 \texttt{spec}, \texttt{spec\_ex},
-\texttt{\m nice\_program},
-\texttt{\m as\_severity},
-\texttt{\m create\_from\_sample}
+\texttt{\m as\_severity} (collapse the total to a \texttt{Severity}),
+\texttt{\m create\_from\_sample},
+\texttt{\m create\_frequency}
 
 
     \end{minipage}
@@ -69,9 +77,9 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \texttt{normalize}, \texttt{padding},
 \texttt{last\_update}, \texttt{hash\_rep\_at\_last\_update},
 \texttt{\m update},
-\texttt{\m recommend\_bucket}, \texttt{\m best\_bucket}, \texttt{\m best\_window},
+\texttt{\m best\_window} (choose the shared combine grid),
 \texttt{\m snap}, \texttt{\m remove\_fuzz},
-\texttt{\m trim\_df}, \texttt{\m swap\_density\_df}
+\texttt{\m trim\_density\_df}, \texttt{\m swap\_density\_df}
 
 
     \end{minipage}
@@ -85,8 +93,8 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-{\it \texttt{est} prefix = estimated from FFT} \\
-\texttt{agg\_m}, \texttt{agg\_cv}, \texttt{agg\_sd}, \texttt{agg\_var}, \texttt{agg\_skew},
+{\it \texttt{actual} $=$ analytic, \texttt{est} $=$ estimated from the FFT grid} \\
+\texttt{actual\_m}, \texttt{actual\_cv}, \texttt{actual\_sd}, \texttt{actual\_var}, \texttt{actual\_skew},
 \texttt{est\_m}, \texttt{est\_cv}, \texttt{est\_sd}, \texttt{est\_var}, \texttt{est\_skew},
 \texttt{ex} ($\mathsf{E}[X]$)
 
@@ -104,8 +112,8 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
 \texttt{\m cdf}, \texttt{\m sf}, \texttt{\m pdf}, \texttt{\m pmf},
 \texttt{\m q} (VaR), \texttt{\m tvar}, \texttt{\m tvar\_threshold},
-\texttt{\m var}, \texttt{\m var\_dict}${}^{[1]}$,
-\texttt{\m percentiles},
+\texttt{\m var\_dict}${}^{[1]}$,
+\texttt{prob\_eq\_0} ($\Pr(X{=}0)$),
 \texttt{\m sample}, \texttt{sample\_df},
 \texttt{\m sample\_compare}, \texttt{\m sample\_density\_compare}
 
@@ -126,10 +134,11 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
 \texttt{valid},
 \texttt{validation\_eps},
-\texttt{describe},
-\texttt{\m explain\_validation},
+\texttt{validation\_df}, \texttt{validation\_explanation},
 \texttt{bs\_window\_df}, \texttt{bs\_description}, \texttt{bs\_explanation},
-\texttt{tail\_class}, \texttt{tail\_df}, \texttt{tail\_description}, \texttt{tail\_explanation}
+\texttt{tail\_class} (worst of the units), \texttt{tail\_behavior\_df},
+\texttt{tail\_description}, \texttt{tail\_explanation},
+\texttt{bounded}
 
 
     \end{minipage}
@@ -144,11 +153,13 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{density\_df}${}^{[1]}$, \texttt{density},
+\texttt{summary\_df} (per unit $+$ total, at a glance),
 \texttt{stats\_df}, \texttt{info},
-\texttt{independent\_density\_df}, \texttt{independent\_stats\_df},
+\texttt{tail\_df}, \texttt{\m tail\_periods\_df},
+\texttt{independent\_density\_df}, \texttt{independent\_stats\_df} (the no-diversification comparison),
 \texttt{\m unit\_density}, \texttt{\m unit\_density\_df}, \texttt{\m aligned\_unit\_density\_df},
-\texttt{\m augmented\_df}, \texttt{augmented\_dfs},
-\texttt{figure}, \texttt{bounded}
+\texttt{\m augmented\_df}, \texttt{augmented\_dfs} (per-distortion cache),
+\texttt{figure}
 
 
     \end{minipage}
@@ -162,8 +173,9 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
+\texttt{reins\_kinds}, \texttt{reins\_description} (look-through, unit by unit),
+\texttt{reins\_summary\_df},
 \texttt{reins\_density\_df},
-\texttt{reins\_describe},
 \texttt{reins\_stats\_df}
 {\it (per-unit reinsurance is set on each \texttt{Aggregate})}
 
@@ -197,13 +209,17 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 \node [mybox] (box){%
     \begin{minipage}{0.3\textwidth}\raggedright
 
-\texttt{\m price}, \texttt{\m price\_ccoc}, \texttt{\m price\_stand\_alone}, \texttt{\m price\_pentagon},
-\texttt{\m pricing\_at}, \texttt{\m pentagon\_at}, \texttt{\m pricing\_bounds},
+\texttt{\m price}, \texttt{\m price\_ccoc}, \texttt{\m price\_stand\_alone},
+\texttt{\m price\_pentagon}, \texttt{\m price\_pentagon\_ex},
+\texttt{\m pricing\_at}, \texttt{\m pentagon\_at},
+\texttt{\m prob\_loss\_assets},
 \texttt{\m apply\_distortion},
 \texttt{distortion}, \texttt{distortions}, \texttt{distortion\_df}, \texttt{calibration\_df},
-\texttt{\m calibrate\_distortion}, \texttt{\m calibrate\_distortions},
+\texttt{\m calibrate\_distortions},
 \texttt{\m analyze\_distortion}, \texttt{\m analyze\_distortions},
-\texttt{allocation\_method}, \texttt{\m allocation\_bounds}, \texttt{\m allocation\_diagnostics},
+\texttt{allocation\_method} (linear / lifted),
+\texttt{\m allocation\_diagnostics},
+\texttt{\m allocation\_bounds}, \texttt{\m pricing\_bounds}${}^{[2]}$,
 \texttt{\m bodoff},
 \texttt{\m add\_exa}, \texttt{\m add\_exa\_sample},
 \texttt{\m make\_comonotonic\_allocations}
@@ -235,8 +251,10 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
     \begin{minipage}{0.3\textwidth}\raggedright
 
 \texttt{\m help},
-\texttt{\m json},
-\texttt{\m save}
+\texttt{\m json}, \texttt{\m save},
+\texttt{\m format\_program}, \texttt{pprogram\_html},
+\texttt{note}, \texttt{tags}, \texttt{doc} (the DecL trailer),
+\texttt{label\_map}, \texttt{labels}, \texttt{renamer}, \texttt{use\_labels}
 
 
     \end{minipage}
@@ -249,7 +267,9 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
 [1]: matches \texttt{Aggregate}.
 
-Abbreviations: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk; est=FFT estimate; exa $= \mathsf{E}[X_i \mid X]$ (conditional expected allocation).
+[2]: both return objects from \texttt{aggregate.bounds}; see the \texttt{Bounds} card. \texttt{allocation\_bounds} ranges the natural allocation by unit; \texttt{pricing\_bounds} ranges the price of any other risk.
+
+Abbreviations: m=mean, cv=coefficient of variation, sd=standard deviation, var=variance, skew(ness); VaR=value-at-risk; actual=analytic, est=FFT estimate; exa $= \mathsf{E}[X_i \mid X]$ (conditional expected allocation); CoC=cost of capital.
 
 
 % \vskip .25truein

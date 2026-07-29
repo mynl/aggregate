@@ -15,15 +15,22 @@ $sheets = @(
     'Underwriter_Cheat_Sheet',
     'Severity_Cheat_Sheet',
     'Aggregate_Cheat_Sheet',
+    'BivariateAggregate_Cheat_Sheet',
     'Portfolio_Cheat_Sheet',
+    'PnL_Cheat_Sheet',
     'Distortion_Cheat_Sheet',
+    'Bounds_Cheat_Sheet',
     'DecL_Cheat_Sheet'
 )
 
 # Optional filter: keep only sheets matching any argument (substring, case-insensitive).
+# $patterns copies $args deliberately: inside a Where-Object scriptblock $args is
+# the *scriptblock's* own (empty) argument list, so referring to $args there
+# silently matched nothing and the filter never selected a sheet.
 if ($args.Count -gt 0) {
-    $sheets = $sheets | Where-Object { $s = $_; ($args | Where-Object { $s -like "*$_*" }).Count -gt 0 }
-    if ($sheets.Count -eq 0) { throw "No cheat sheet matched: $($args -join ', ')" }
+    $patterns = @($args)
+    $sheets = @($sheets | Where-Object { $s = $_; @($patterns | Where-Object { $s -like "*$_*" }).Count -gt 0 })
+    if ($sheets.Count -eq 0) { throw "No cheat sheet matched: $($patterns -join ', ')" }
 }
 
 if (-not (Get-Command tectonic -ErrorAction SilentlyContinue)) {

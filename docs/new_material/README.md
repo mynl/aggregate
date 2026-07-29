@@ -25,6 +25,7 @@ them as part of the site.
 | File | Subject | Likely home |
 |---|---|---|
 | `reinstatements.md` | Property catastrophe reinsurance with reinstatements, the math | `docs/5_technical_guides/`, or cookbook §5 |
+| `kappa.md` | The scenario (κ) ladder in `PnL` objects: definition, where it is built, why the 2-D source is trustable | `docs/5_technical_guides/`, beside `reinstatements.md` |
 | `distribution-types.md` | Laws, types, and the `scipy.stats` shape / loc / scale paradigm | `docs/2_user_guides/`, or cookbook §2 |
 | `task-features.md` | **Not a page.** The maintenance spec for `features.qmd` | stays with `features.qmd`; do not publish |
 
@@ -33,6 +34,14 @@ with `features.qmd` because it defines the coverage-ledger contract, the cast
 design brief and the execution gate that keep that notebook honest. If
 `features.qmd` graduates into the docs, this file goes back to `dev/`, or is
 deleted once the notebook stops being maintained.
+
+`kappa.md` arrived by a different route: it was written at the repository root
+during the `[PLAN-A-PnL-Faces]` work (1.0.0a141, 2026-07-05) and swept into the
+a142 commit as a stray, so the 2026-07-29 sweep of `dev/` missed it. Its closing
+paragraph was corrected on arrival here, since it still described the
+`pnl.analysis.validation_df` audit frame that `[Decommission-Analysis-Classes]`
+deleted at a144. The line numbers in its "Where it happens" map have drifted with
+the source and need re-checking before publication.
 
 `distribution-types.md` carries Quarto YAML front matter (`bibliography:`,
 `csl:`), so it is really a Quarto page with a `.md` extension. Both use `$…$`
@@ -70,7 +79,7 @@ API.
 
 `docs/conf.py` does **not** exclude `new_material/`, and both `.rst` and `.md`
 are live source suffixes there (`myst_parser` is enabled). A Sphinx build will
-therefore pick up the seven `.rst` files, the two `.md` pages and this README as
+therefore pick up the seven `.rst` files, the three `.md` pages and this README as
 orphan documents and warn about each one. The `.qmd` files are not affected,
 since `.qmd` is not a Sphinx source suffix. Either add `'new_material'` to
 `exclude_patterns` in

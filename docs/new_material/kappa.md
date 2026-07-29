@@ -60,10 +60,20 @@ Three layers — runtime guards, one-line cross-checks, and one-time adjudicatio
 1. **Mass/deficit bookkeeping** — `build_netceded_joint` computes `deficit = 1 − Σ density` (`bivariate.py:875`) and carries it in the joint's `meta`, same convention as the 1-D engine's clipped-tail reporting. `padding=1` means no FFT wrap-around.
 2. **Structural correctness of the dependence** — mass *cannot* appear off the feasible region: each claim's atom sits exactly on the cession curve, and the one frequency PGF wraps the 2-D severity transform, so the shared claim count *and* shared mixing are exact by construction, not approximated.
 3. **`CoarseJointGridWarning`** (`reinstatement.py`, `check_joint_grid_adequacy`) — fires when a treaty kink region spans <20 joint buckets, the one error mode the internal bookkeeping can't see (Jensen-type O(bs) bias on kinked maps).
-4. **Theory-vs-realised audit on demand** — the returned holder is a `BivariateAggregate`; its `summary_df` (`bivariate.py:2069`) is the Portfolio-shape validation frame (exact moments from `_netceded_theory` at :1730 vs realised, with noise-aware `Err` columns).
+4. **Theory-vs-realized audit on demand** — the returned holder is a `BivariateAggregate`; its `summary_df` (`bivariate.py:2069`) is the Portfolio-shape validation frame (exact moments from `_netceded_theory` at :1730 vs realized, with noise-aware `Err` columns).
 
 **One line away, any time:** the `pnl` face reads the *exact* 1-D marginals, so `pnl.mean` vs the walk's `('All','Margin','Total')` EX bounds the joint-grid error for your actual program; any single walk row vs its `reins_density_df` marginal mean does the same per row. The tests do exactly this (rel ~1e-3 linear rows, ~1e-2 kinked agg tiers).
 
 **One-time adjudication (2026-07-05, now pinned in tests):** joint mass 1 − 3e-11; *zero* off-support mass; joint marginal means = engine means to ~1e-5 rel; internal accounting identities to 1e-15 (`ReinstatementAnalysis.validation_df`); and a 1.6M-simulation Monte Carlo of the true process matching every leg within 2 SE, with the kinked-layer grid bias isolated and quantified (~0.25% at 25 buckets/layer — the origin of the 20-bucket warning floor). Tests: `test_pnl_consolidated_walk.py`, `test_composition_matrix.py`, `test_reinstatement_decl.py`.
 
-**One honest gap to note:** the reinstatement route ships its audit on the object (`pnl.analysis.validation_df`); a GC walk currently has no attached equivalent — its runtime guards are the deficit bookkeeping and the adequacy warning, and the exact-vs-realised comparison lives in the tests and the `biv.summary_df` you'd have to call yourself (the walk doesn't retain the holder; only `pnl._source` = the joint and `pnl.engine` = the Aggregate). If you want a `validation_df` on joint-sourced walks — each row's realised EX against the engine's exact marginal mean, the per-program version of what the tests assert — that's a small, well-defined addition. Say the word and it goes on the list.
+**One honest gap to note:** no route ships an attached audit frame. The
+reinstatement route once carried one on `pnl.analysis.validation_df`, but the
+analysis classes were decommissioned at 1.0.0a144, so a reinstatement walk and a
+GC walk now stand on the same footing. Their runtime guards are the deficit
+bookkeeping and the adequacy warning, and the exact-vs-realized comparison lives
+in the tests and in the `biv.summary_df` you would have to call yourself: the
+walk does not retain the holder, keeping only `pnl.source` (the joint) and
+`pnl.engine` (the `Aggregate`). A `validation_df` on joint-sourced walks, each
+row's realized EX against the engine's exact marginal mean, would be the
+per-program version of what the tests already assert. It remains a small,
+well-defined addition.

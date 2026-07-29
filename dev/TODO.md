@@ -19,13 +19,14 @@
 > not closed · `dev/done/` = closed (shipped, `-REJECTED`, or `-SUPERSEDED`).
 >
 > **Last updated: 2026-07-29** — the author's review annotations worked through
-> (`1.0.0a170` `[FCC-Contract]`). Closed and removed: `[ZT-ZM-Frequency-Fix]`
-> (shipped `a152`) and `[Aggregate-Summary-DF-Useless]` (the gross/net smell is
-> fixed). Deferred to post-v1.0, last: `[Joint-Padding-Window-Tradeoff]`. Settled:
-> the five `[FCC-Surface-Sweep]` decisions, `[PnL-Repr-HTML]`, and sub-item 3 of
-> `[Display-Surface-Incidentals]` (closed, no change). Added:
-> `[FCC-Contract-Gaps]`. `[Plotting-Punchups]` is its own task, not part of the
-> reporting cluster.
+> (`1.0.0a170` `[FCC-Contract]`, `a171` `[FCC-Surface-Decisions]`). Closed and
+> removed: `[ZT-ZM-Frequency-Fix]` (shipped `a152`),
+> `[Aggregate-Summary-DF-Useless]` (the gross/net smell is fixed),
+> `[FCC-Surface-Sweep]` and `[PnL-Repr-HTML]` (both shipped `a171`). Deferred to
+> post-v1.0, last: `[Joint-Padding-Window-Tradeoff]`. Closed with no change:
+> sub-item 3 of `[Display-Surface-Incidentals]`. Added: `[FCC-Contract-Gaps]`,
+> `[Bivariate-DecL-Label]`, and sub-item 5 of `[Display-Surface-Incidentals]`.
+> `[Plotting-Punchups]` is its own task, not part of the reporting cluster.
 >
 > **Previous rebuild, 2026-07-27.** The file before that, with the full
 > `1.0.0a122`–`a151` done-history, is archived at `dev/done/TODO-2026-07-27.md`.
@@ -59,26 +60,15 @@
   `BivariateAggregate` and on `Distortion`, and the two unpaired narrative stems
   (`validation_explanation` has no short form, `reins_description` no long one).
   **Both declarations must be empty by `1.0.0b1`**; emptying them closes this item.
-- **[FCC-Surface-Sweep]** — passes 1 and 2 shipped (`1.0.0a149`–`a151`;
-  `dev/FEATURES.csv` now reports **zero** undocumented capabilities, and the
-  executable half is `tests/test_fcc_surface.py`). The five author decisions are
-  **settled** (2026-07-29) and execute as `[FCC-Surface-Decisions]`:
-  1. `BivariateAggregate.tail_df` (a per-axis support frame wearing the name of
-     the return-period property elsewhere) becomes **`axis_support_df`**;
-  2. `BivariateAggregate` **becomes a `LabeledMixin` host**;
-  3. `GridDistribution` **gains `info`** (useful, not contractual: GD is not
-     DecL-creatable, so it is not an FCC);
-  4. the `PnL.gd` / `PnL.result` alias resolves to **`result`**, the documented
-     public name; `gd` stays the internal vocabulary on ledger rows;
-  5. `var_dict` **stays `var_dict`**: `q_dict` is too cryptic, so the VaR-is-`q`
-     rule stops at the scalar accessors.
-- **[PnL-Repr-HTML]** — `PnL` is the **only** first-class citizen with no
-  `_repr_html_`, so it does not render in Jupyter (`Aggregate`, `Portfolio` and
-  the three bivariate classes all define one). The residue of
-  `dev/done/plan-pnl-first-class-SUPERSEDED.md`. **Settled:** model it on the
-  bivariate one (repr line plus the summary card). It does **not** wait on
-  `[Reporting-Guidelines]`: the card it renders is the fixed one `a134` already
-  settled. Lands with `[FCC-Surface-Decisions]`.
+- **[Bivariate-DecL-Label]** — `BivariateAggregate` became a `LabeledMixin` host
+  at `1.0.0a171`, but its **object-level** label has no DecL spelling: the nine
+  `bv_out` productions in `decl.lark` (copula / discrete / view-pair, each in
+  three frequency flavors) carry no `as_label`, so `bivariate Cat as "..."` does
+  not parse and the label is set with `label=`. The *component* labels already
+  work, because each unit is an ordinary `agg`. Closing this is a grammar change
+  plus the `decl_writer` round-trip, the grammar-reference regen and the
+  `test_decl_unparser` / `test_grammar_sync` corpora, so it is its own item
+  rather than a rider.
 - **[Display-Surface-Incidentals]** — four unrelated small defects found while
   surveying the duplicated presentation surface for `[Program-Mixin]`
   (`1.0.0a154`). None is urgent; none has a visible symptom today. Grouped so
@@ -100,7 +90,14 @@
      to an explicit display allowlist (not to all private names, which would
      flood the report), then add the rows to `dev/FEATURES.csv`. That is the
      prerequisite for auditing display consistency at all.
-  *(A fifth suspect was checked and cleared: `Distortion.program` **does**
+  5. **Found at `a171`:** the P&L builders pass `label=name`, so a `PnL`'s
+     private `_label` is never `None` and `LabeledMixin._title_name` renders the
+     name twice (`'PL (PL)'`). No symptom today only because nothing on `PnL`
+     calls `_title_name`: the new `_repr_html_` deliberately uses `label`, as
+     `__repr__` already did. Either stop defaulting `label` to `name` in
+     `_pnl_builders.py`, or accept that `PnL` does not use the `label (handle)`
+     form and say so on the class.
+  *(A sixth suspect was checked and cleared: `Distortion.program` **does**
   survive pickling — the class has no `__reduce__`, so default `__dict__`
   pickling carries it.)*
 - **[Plotting-Punchups]** — plotting polish; lead item: a `pnl` aggregate plots

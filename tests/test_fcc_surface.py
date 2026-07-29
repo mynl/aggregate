@@ -15,7 +15,8 @@ first-class classes; this module is its executable half. It checks the
 * ``prob_eq_0`` is the sign-neutral break-even atom on Aggregate / Portfolio /
   PnL;
 * ``tail_df`` is a **property** everywhere, with ``tail_periods_df(periods=)``
-  the parametrized worker on Aggregate / Portfolio;
+  the parametrized worker on Aggregate / Portfolio (the bivariate per-axis frame
+  is ``axis_support_df``, a171, and is a different report);
 * the ``*_description`` / ``*_explanation`` narrative pairs are complete.
 """
 import numpy as np
@@ -428,11 +429,26 @@ def test_pnl_prob_eq_0_is_the_break_even_atom():
 # tail_df is a property; tail_periods_df is the worker
 # ---------------------------------------------------------------------------
 
-def test_tail_df_is_a_property_on_every_class_that_has_it(agg, port, biv):
-    for obj in (agg, port, biv):
+def test_tail_df_is_a_property_on_every_class_that_has_it(agg, port):
+    for obj in (agg, port):
         assert isinstance(type(obj).tail_df, property), \
             f'{type(obj).__name__}.tail_df is not a property'
         assert isinstance(obj.tail_df, pd.DataFrame)
+
+
+def test_bivariate_axis_support_df_no_longer_collides_with_tail_df(biv):
+    """a171: the per-axis support frame is not a return-period table.
+
+    ``Aggregate.tail_df`` / ``Portfolio.tail_df`` are return-period ladders; the
+    bivariate frame reports where the realized mass sits, per axis. Sharing the
+    name made them look like the same report.
+    """
+    assert not hasattr(biv, 'tail_df'), 'the colliding name survived'
+    df = biv.axis_support_df
+    assert isinstance(df, pd.DataFrame)
+    assert df.index.name == 'axis'
+    assert list(df.index) == list(biv.unit_names)
+    assert {'support_min', 'support_max', 'right_heavy'} <= set(df.columns)
 
 
 def test_tail_periods_df_takes_a_custom_ladder(agg, port):
@@ -571,6 +587,71 @@ def test_pnl_tvar_delegates_to_the_result_grid(pnl):
     """a150: PnL delegated q/var/cdf/sf but not tvar -- the gap is closed."""
     for p in (0.5, 0.9, 0.99):
         assert pnl.tvar(p) == pnl.result.tvar(p)
+
+
+# ---------------------------------------------------------------------------
+# the a171 [FCC-Surface-Decisions] batch
+# ---------------------------------------------------------------------------
+
+def test_pnl_result_is_the_one_name_for_its_distribution(pnl):
+    """a171: the ``gd`` alias is retired; ``gd`` stays internal to ledger rows."""
+    from aggregate._grid_distribution import GridDistribution
+    assert isinstance(pnl.result, GridDistribution)
+    assert not hasattr(pnl, 'gd'), 'the PnL.gd alias survived'
+    # the ledger rows keep the internal name -- that is the point of the split
+    assert isinstance(pnl._grand_result.gd, GridDistribution)
+
+
+def test_pnl_renders_html(pnl):
+    """a171 [PnL-Repr-HTML]: the last first-class class without one."""
+    html = pnl._repr_html_()
+    assert isinstance(html, str) and html
+    assert pnl.label in html
+    assert '<table' in html                      # the summary card is inlined
+    assert 'do not foot' in html                 # the marginal-percentile caveat
+
+
+def test_every_first_class_class_renders_html(fcc_objects):
+    for cname, obj in fcc_objects.items():
+        html = obj._repr_html_()
+        assert isinstance(html, str) and html, f'{cname} renders no HTML'
+
+
+def test_bivariate_is_a_labeled_mixin_host(biv):
+    """a171: the one class carrying neither half of the label surface."""
+    from aggregate._labeled import LabeledMixin
+    assert isinstance(biv, LabeledMixin)
+    assert biv.label == biv.name                 # no explicit label -> the handle
+    assert biv.use_labels is True
+    assert isinstance(biv.label_map, dict)
+    assert biv.labels.exposure is None           # missing site, never raises
+
+
+def test_bivariate_component_labels_reach_the_exhibits():
+    """A unit's DecL ``as`` clause renames the axis in the per-axis frames."""
+    b = build('bivariate FCC.BivL 25 claims '
+              'agg Wind as "Windstorm" dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 '
+              'agg Flood as "Flooding" dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 '
+              'copula gumbel 0.4 poisson')
+    assert b.renamer == {'Wind': 'Windstorm', 'Flood': 'Flooding'}
+    assert list(b.axis_support_df.index) == ['Windstorm', 'Flooding']
+    assert list(b.bs_window_df.index) == ['Windstorm', 'Flooding']
+    # the switch turns it off, and the canonical handles come back
+    b.use_labels = False
+    assert list(b.axis_support_df.index) == ['Wind', 'Flood']
+
+
+def test_grid_distribution_has_info(agg):
+    """a171: ``info`` on GD. Not contractual (GD is not DecL-creatable), but the
+    grid a quantile came off is what you want when a number looks wrong."""
+    gd = agg._grid_distribution()
+    info = gd.info
+    assert isinstance(info, str) and info
+    labels = _labels(info)
+    assert labels[0] == 'grid object name'
+    assert all(line for line in info.split('\n'))     # no blank lines
+    assert ':' not in ''.join(labels)                 # no colons, like the rest
+    assert 'buckets' in labels and 'total mass' in labels
 
 
 # ---------------------------------------------------------------------------

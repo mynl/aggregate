@@ -7,6 +7,30 @@ Append new entries at the top.
 
 ---
 
+## `Portfolio.var_dict` renamed to `q_dict` (rejected 2026-07-29)
+
+**Origin.** Decision 5 of 5 in `[FCC-Surface-Sweep]`, executed as
+`[FCC-Surface-Decisions]` at `1.0.0a171`.
+
+**What was proposed.** `a151` established the one-name-per-concept rule that
+`var` always means **variance** and VaR is always **`q`**, and retired the
+VaR-flavored `var()` from `Portfolio` / `PnL` / `GridDistribution`.
+`Portfolio.var_dict` (`_portfolio.py`) returns `{unit: VaR}` at a given `p` and
+was the one surviving `var`-means-VaR name, so the rule read as requiring
+`q_dict`.
+
+**Why rejected.** `q_dict` is too cryptic. A one-letter stem carries the rule
+fine on a *method* whose argument makes the reading obvious (`port.q(0.99)`), and
+badly on a *noun* that has to stand alone in a call site, a column heading or a
+docstring: `var_dict` says what is in the dict, `q_dict` says nothing. Being
+consistent about a rule is worth less than being readable at the point of use.
+
+**What we do instead.** `var_dict` keeps its name. The VaR-is-`q` rule applies to
+the scalar accessors, where it earns its keep, and stops there. The row's `notes`
+in `dev/FEATURES.csv` records the carve-out so the matrix does not read as drift.
+
+---
+
 ## `dev` / `user` display mode via a `ReprMixin` (rejected 2026-07-27)
 
 **Origin.** `dev/plan-display-mode.md` (drafted, gated behind

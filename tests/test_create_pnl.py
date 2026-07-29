@@ -418,7 +418,7 @@ def _assert_columns_foot(pnl):
         cell = float(s.loc[result_key, c])
         assert leg_sum == pytest.approx(cell, abs=1e-9), c
         # the grand-result cell is its own marginal quantile, automatically
-        assert cell == pytest.approx(float(pnl.gd.q(q)), abs=TOL), c
+        assert cell == pytest.approx(float(pnl.result.q(q)), abs=TOL), c
 
 
 def test_scenario_columns_foot_1d_both_roles():
@@ -460,7 +460,7 @@ def test_scenario_monotone_1d_cells_evaluate_at_state():
     p = _simple('sell')                      # result = 15 - x, monotone
     s = p.stats_df
     for c, q in zip(_KCOLS, (.01, .05, .10, .25, .50, .75, .90, .95, .99)):
-        x_q = float(p.gd.q(q))
+        x_q = float(p.result.q(q))
         x_atom = 15.0 - x_q                  # invert the state
         assert s.loc[('Obligation', 'obligation'), c] == \
             pytest.approx(-x_atom, abs=TOL), c
@@ -475,7 +475,7 @@ def test_scenario_switcheroo_level_set_means():
     s = p.stats_df
     # result = 0 pools atoms {0, 30} (prob .4/.1): E[x|slice] = 6, loss cell -15
     # result = 10 pools atoms {10, 20} (prob .3/.2): loss cell -5
-    lo = float(p.gd.q(0.01))            # 0, the bad-side level set
+    lo = float(p.result.q(0.01))            # 0, the bad-side level set
     assert lo == pytest.approx(0.0, abs=TOL)
     assert s.loc[('Obligation', 'obligation'), 'κ01'] == \
         pytest.approx(-15.0, abs=TOL)
@@ -527,8 +527,8 @@ def test_card_single_group_fixed_three_rows():
     assert df.loc['Obligation', 'EX'] == pytest.approx(-13.0)
     assert df.loc['Margin', 'EX'] == pytest.approx(2.0)
     # marginal percentiles: the Margin row is the result's own quantile
-    assert df.loc['Margin', 'P01'] == pytest.approx(float(p.gd.q(0.01)))
-    assert df.loc['Margin', 'Median'] == pytest.approx(float(p.gd.q(0.5)))
+    assert df.loc['Margin', 'P01'] == pytest.approx(float(p.result.q(0.01)))
+    assert df.loc['Margin', 'Median'] == pytest.approx(float(p.result.q(0.5)))
 
 
 def test_card_tower_blocks():

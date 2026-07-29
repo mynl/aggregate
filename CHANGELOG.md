@@ -1,5 +1,90 @@
 # Changelog
 
+## 1.0.0a171
+
+**[FCC-Surface-Decisions]** The five open `[FCC-Surface-Sweep]` decisions,
+executed, plus `[PnL-Repr-HTML]`.
+
+### `BivariateAggregate.tail_df` is `axis_support_df`
+
+**Breaking.** It was a collision, not an analogy. `Aggregate.tail_df` and
+`Portfolio.tail_df` are return-period ladders (p, VaR, TVaR, xsVaR by exceedance
+probability). The bivariate frame under the same name reported something else
+entirely: where the realized mass sits on each axis. Two different reports
+answering to one name is how a reader gets the wrong one.
+
+`tail_description` and `tail_explanation` keep their names, because what they
+describe really is the tail.
+
+### `BivariateAggregate` joins the label surface
+
+**Breaking only in the sense that a class gained members.** It was the last class
+carrying neither half of the label surface, so `label`, `label_map`, `labels`,
+`renamer` and `use_labels` now work on a bivariate, and the renamer resolves each
+axis to its component `Aggregate`'s label:
+
+```python
+b = build('bivariate Cat 25 claims '
+          'agg Wind as "Windstorm" dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 '
+          'agg Flood as "Flooding" dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 '
+          'copula gumbel 0.4 poisson')
+b.axis_support_df.index          # ['Windstorm', 'Flooding']
+b.use_labels = False
+b.axis_support_df.index          # ['Wind', 'Flood']
+```
+
+Applied at serve time in `axis_support_df`, `bs_window_df` and `stats_df`, which
+are the frames keyed by axis. The component labels come through DecL because each
+unit is an ordinary `agg`; an **object-level** label has no DecL spelling yet
+(the `bv_out` productions carry no `as_label`), so it is set with `label=`. That
+grammar gap is logged as `[Bivariate-DecL-Label]`.
+
+### `GridDistribution.info`
+
+Not contractual: a `GridDistribution` cannot be declared in DecL, so it is not a
+first-class citizen. It is here because the grid a quantile came off is exactly
+what you want to see when a number looks wrong, and the rows are the grid rather
+than the risk:
+
+```
+grid object name         Simple
+value type               loss
+buckets                  65,536
+support                  0 to 131,070
+bs                       2
+total mass               1
+E[X]                     10,000
+```
+
+Realized total mass is the row that earns its place. It is `1` for a complete
+distribution and less when the holder handed over a clipped or conditional slice,
+and every accessor works off the realized cumulative either way.
+
+### `PnL.result` is the one name
+
+**Breaking.** `PnL.gd` is retired. `result` was already the documented name and
+what the tests used. `gd` stays the *internal* vocabulary on ledger rows, where a
+leg's or a group's `.gd` reads correctly; a first-class object's own distribution
+reads as its `result`.
+
+### `var_dict` stays `var_dict`
+
+No code. `q_dict` was considered under the VaR-is-`q` rule and **rejected**: too
+cryptic. The rule stops at the scalar accessors, and this is recorded so it is not
+re-proposed cold.
+
+### `PnL` and `Distortion` render in Jupyter
+
+`PnL` was thought to be the only first-class class without a `_repr_html_`.
+Making the check executable rather than eyeballing it found a second, `Distortion`,
+which had `__repr__` only. Both now render the same two pieces as everywhere else,
+an intro paragraph and the headline frame.
+
+The P&L intro says out loud that its percentile columns are marginal and do not
+foot, with `stats_df` named as the footing sheet. That was already true of the
+fixed card settled at `a134`; leaving the reader to discover it from a column that
+does not add up was the wrong place to learn it.
+
 ## 1.0.0a170
 
 **[FCC-Contract]** "First-class citizen" stops being a phrase in a plan and

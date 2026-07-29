@@ -38,6 +38,7 @@ import pandas as pd
 from scipy.optimize import bisect
 
 from ._help import HelpMixin
+from .constants import INFO_NA, info_row
 
 __all__ = ['GridDistribution', 'make_var_tvar', 'ProbLossAssets',
            'return_period_map']
@@ -298,6 +299,42 @@ class GridDistribution(HelpMixin):
         bs = '' if self.bs is None else f', bs={self.bs:g}'
         role = 'loss' if self._is_loss_value else 'payoff'
         return f'GridDistribution{nm} (n={len(self._x)}{bs}, {role})'
+
+    @property
+    def info(self):
+        """Fixed-layout multi-line summary string (terse).
+
+        Every row is always present, in the same order, for every
+        ``GridDistribution``; an inapplicable value renders as ``n/a``. Shares
+        the label/value convention (:func:`aggregate.constants.info_row`) with
+        ``Aggregate`` / ``Portfolio`` / ``Frequency`` / ``Severity``.
+
+        Notes
+        -----
+        Added at ``a171``. A ``GridDistribution`` is **not** a first-class
+        citizen (it cannot be declared in DecL, only reached from an object), so
+        this is not contractual: it is here because the grid a quantile came off
+        is exactly what you want to see when a number looks wrong. The rows are
+        the grid, not the risk: extent, spacing, realized mass, and the
+        orientation flag that decides which tail is the bad one.
+
+        The realized total mass matters most. It is ``1`` for a complete
+        distribution and less when the holder handed over a clipped or
+        conditional slice, and the accessors work off the realized cumulative
+        either way, so a surprising quantile usually shows up here first.
+        """
+        n = len(self._x)
+        span = (f'{self._x[0]:,.6g} to {self._x[-1]:,.6g}' if n else INFO_NA)
+        rows = [
+            ('grid object name', self.name or INFO_NA),
+            ('value type', 'loss' if self._is_loss_value else 'payoff'),
+            ('buckets', f'{n:,d}'),
+            ('support', span),
+            ('bs', INFO_NA if self.bs is None else f'{self.bs:,.6g}'),
+            ('total mass', f'{self._p.sum():.6g}' if n else INFO_NA),
+            ('E[X]', f'{self.mean():,.6g}' if n else INFO_NA),
+        ]
+        return '\n'.join(info_row(label, value) for label, value in rows)
 
     @property
     def x(self):

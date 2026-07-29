@@ -193,8 +193,10 @@ Value enumerations:
 The companion frames mirror the 1-D surfaces as **per-axis summaries** (the bv
 *measures* its grid rather than running the 1-D method ladder): :attr:`explain`
 (per-axis marginal-vs-standalone mean / cv error), :attr:`bs_window_df` /
-:attr:`bs_description` (the realized per-axis grid), and :attr:`tail_df` /
-:attr:`tail_description` (per-axis realized support + moments). ``describe`` and
+:attr:`bs_description` (the realized per-axis grid), and :attr:`axis_support_df` /
+:attr:`tail_description` (per-axis realized support + moments; the frame was
+called ``tail_df`` until a171, which collided with the 1-D return-period table).
+``describe`` and
 ``stats_df`` carry the per-component moment block (theoretical vs empirical) and
 the joint dependence footer (correlation, copula tau).
 

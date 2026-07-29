@@ -1179,13 +1179,16 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     # ------------------------------------------------------------------
     @property
     def result(self):
-        """The grand result as a :class:`GridDistribution`."""
-        return self._grand_result.gd
+        """The grand result as a :class:`GridDistribution`.
 
-    @property
-    def gd(self):
-        """Alias for :attr:`result` -- the grand result is the P&L's
-        distribution."""
+        Notes
+        -----
+        The one public name for the P&L's distribution. A ``PnL.gd`` alias
+        existed until ``a171``, when it was retired under the one-name-per-concept
+        rule: ``gd`` stays the *internal* vocabulary on ledger rows (a leg's or a
+        group's ``.gd``), and a first-class object's own distribution reads as its
+        ``result``.
+        """
         return self._grand_result.gd
 
     # The four moments carry the ``est_`` prefix, not ``actual_``: a P&L is
@@ -1897,6 +1900,43 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                     f'-> {self.result_name!r})')
         return (f'PnL({self.label!r}: {ng} groups, {nl} legs '
                 f'-> {self.result_name!r})')
+
+    def _repr_html_(self):
+        """HTML view: identity, ledger shape, headline moments, summary card.
+
+        Notes
+        -----
+        Added at ``a171`` [PnL-Repr-HTML], which closed the last hole in the
+        display surface: ``PnL`` was the only first-class class without one, so a
+        bare ``pnl`` in a Jupyter cell fell back to ``__repr__``. Built on the
+        same two pieces as :meth:`Portfolio._repr_html_`, an intro paragraph and
+        ``summary_df``, so a P&L renders like everything else.
+
+        The card is the fixed one settled at ``a134``: its percentiles are
+        **marginal** and deliberately do not foot, because the footing sheet is
+        ``stats_df``. That is said in the intro rather than left for the reader
+        to discover from a column that does not add up.
+        """
+        ng = len(self._egroups)
+        nl = sum(len(g.cons) + len(g.obl) for g in self._egroups)
+        _gs = '' if ng == 1 else 's'
+        _ls = '' if nl == 1 else 's'
+        parts = [f'{ng} group{_gs}, {nl} leg{_ls}, resolving to '
+                 f'<code>{self.result_name}</code>.',
+                 f'E[result] {self.est_m:,.6g}, SD {self.est_sd:,.6g}, '
+                 f'P(result = 0) {self.prob_eq_0:.4g}.',
+                 'Percentile columns are marginal and do not foot; '
+                 '<code>stats_df</code> is the footing sheet.']
+        fmt = lambda x: f'{x:,.5g}'
+        return '\n'.join([
+            # ``label``, not ``_title_name``: the builders pass ``label=name``,
+            # so ``_label`` is never None on a P&L and the ``label (handle)``
+            # form would print the name twice. Matches __repr__ above.
+            f'<h3>PnL object: {self.label}</h3>',
+            '<p>' + ' '.join(parts) + '</p>',
+            '<h4>Summary</h4>',
+            self.summary_df.to_html(float_format=fmt, na_rep=''),
+        ])
 
 
 class _LossFrameShim:

@@ -302,13 +302,17 @@ def test_mv_explain_flags_clipped_book():
     assert 'tail deficit' in mv._explain_oneline()
 
 
-def test_mv_bs_window_df_and_tail_df_per_axis():
-    """Both companion frames carry one row per axis with the right columns."""
+def test_mv_bs_window_df_and_axis_support_df_per_axis():
+    """Both companion frames carry one row per axis with the right columns.
+
+    ``axis_support_df`` was ``tail_df`` until a171, when it was renamed off the
+    collision with the Aggregate / Portfolio return-period table.
+    """
     mv = _mv()
     bw = mv.bs_window_df
     assert list(bw.index) == ['A', 'B']
     assert {'kind', 'bs', 'log2', 'x_min', 'x_max', 'clipped'}.issubset(bw.columns)
-    td = mv.tail_df
+    td = mv.axis_support_df
     assert list(td.index) == ['A', 'B']
     assert {'support_min', 'support_max', 'mean', 'sd', 'skew',
             'right_heavy'}.issubset(td.columns)

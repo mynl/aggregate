@@ -996,6 +996,29 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     def __repr__(self):
         return self.label
 
+    def _repr_html_(self):
+        """HTML view: the distortion's identity, its DecL declaration where it
+        has one, and the ``summary_df`` pair-column card.
+
+        Notes
+        -----
+        Added at ``a171`` alongside [PnL-Repr-HTML]. ``PnL`` was believed to be
+        the only first-class class that did not render in Jupyter; ``Distortion``
+        was the second, found when the check was made executable rather than
+        eyeballed. Same two pieces as everywhere else, an intro paragraph and the
+        headline frame.
+        """
+        parts = [f'Distortion of kind <code>{self.name}</code>.']
+        if self.program:
+            parts.append(f'Declared as <code>{self.program}</code>.')
+        fmt = lambda x: f'{x:,.5g}'
+        return '\n'.join([
+            f'<h3>Distortion object: {self.label}</h3>',
+            '<p>' + ' '.join(parts) + '</p>',
+            '<h4>Summary</h4>',
+            self.summary_df.to_html(float_format=fmt, na_rep=''),
+        ])
+
     @property
     def name(self):
         """The identity handle -- the distortion kind (or a given name).

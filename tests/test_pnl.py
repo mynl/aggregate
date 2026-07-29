@@ -162,12 +162,12 @@ def test_q_cdf_tvar_delegate_to_grid_distribution():
 
     The hand-rolled scalar searchsorted (pre-fix) crashed on array input and
     duplicated the canonical kernel; ``q`` / ``cdf`` / ``sf`` / ``var`` must all
-    delegate to ``pnl.gd`` (a GridDistribution) so they vectorize and agree with
-    the kernel every other class uses. Guards against re-rolling.
+    delegate to ``pnl.result`` (a GridDistribution) so they vectorize and agree
+    with the kernel every other class uses. Guards against re-rolling.
     """
     a = build('pnl X 1000 prem less agg X_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     from aggregate._grid_distribution import GridDistribution
-    assert isinstance(a.gd, GridDistribution)
+    assert isinstance(a.result, GridDistribution)
     # vectorized quantiles -- the array path that used to raise TypeError
     qs = a.q([0.01, 0.5, 0.99])
     assert np.shape(qs) == (3,)
@@ -182,8 +182,8 @@ def test_q_cdf_tvar_delegate_to_grid_distribution():
     assert not hasattr(a, 'var')
     # the GridDistribution is the canonical object; a150 added the PnL
     # delegation, which must agree with it
-    assert a.gd.tvar(0.9) >= a.gd.q(0.9)
-    assert a.tvar(0.9) == a.gd.tvar(0.9)
+    assert a.result.tvar(0.9) >= a.result.q(0.9)
+    assert a.tvar(0.9) == a.result.tvar(0.9)
 
 
 # ----------------------------------------------------------------------
@@ -425,7 +425,7 @@ def test_consolidated_net_position_drives_moments():
     assert list(df.index) == ['Consideration', 'Obligation', 'Margin']
     assert df.loc['Consideration', 'EX'] == pytest.approx(3700.0)
     # q delegates to the grand result GridDistribution
-    assert p.q(0.5) == pytest.approx(p.gd.q(0.5))
+    assert p.q(0.5) == pytest.approx(p.result.q(0.5))
 
 
 def test_xpnl_walk_rows_and_means_add():

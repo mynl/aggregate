@@ -57,6 +57,7 @@ import scipy.fft as sfft
 import scipy.sparse as ssp
 
 from ._help import HelpMixin
+from ._labeled import LabeledMixin
 from ._program import ProgramMixin
 from .constants import DefectiveDistributionWarning, info_row, INFO_NA
 from .config import get_settings
@@ -1016,7 +1017,7 @@ def _dense_1d(v):
     return np.asarray(v, dtype=float).ravel()
 
 
-class BivariateAggregate(HelpMixin, ProgramMixin):
+class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
     """Joint (bivariate) aggregate of two copula-coupled component aggregates.
 
     Declared in DecL with the ``bivariate`` keyword::
@@ -1079,7 +1080,7 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
     """
 
     def __init__(self, name, units=None, copula=None, note='', hints='',
-                 tags=(), doc='', mode='copula',
+                 tags=(), doc='', label=None, label_map=None, mode='copula',
                  nc_agg=None, nc_kwargs=None, nc_views=None, clash=None,
                  dbv_xs=None, dbv_ys=None, dbv_S=None,
                  exp_en=None, exp_el=None, exp_premium=None, exp_lr=None,
@@ -1091,6 +1092,8 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
 
         self.mode = mode
         self.name = name
+        # Before the mode branches below, two of which return early.
+        self._init_labels(label=label, label_map=label_map)
         self.note = note
         self.hints = hints
         #: Tag slugs from the DecL ``tags{...}`` trailer ('()' when none).
@@ -1970,6 +1973,32 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
                                      self.axis_xs[1], self.bs[0], self.bs[1],
                                      meta)
 
+    # ------------------------------------------------------------------
+    # Label surface (LabeledMixin hooks) -- a171. The exhibit axis is the two
+    # component units, and each one's label is its component Aggregate's
+    # resolved ``label``, exactly as Portfolio resolves its member units.
+    #
+    # A ``bivariate`` statement has no ``as`` clause in the grammar yet, so an
+    # object-level label is set programmatically (``label=``) rather than in
+    # DecL; see the [Bivariate-DecL-Label] item in dev/TODO.md. The component
+    # labels DO come through DecL, because each unit is an ordinary ``agg``.
+    # ------------------------------------------------------------------
+    def _label_handles(self):
+        """The exhibit axis: the two component unit handles."""
+        return list(self.unit_names)
+
+    def _resolve_handle_label(self, handle):
+        """A unit handle -> its component ``Aggregate``'s resolved label.
+
+        Falls back to the handle itself, which covers both an unlabeled
+        component and the view-pair modes (``netceded`` / ``grossnet`` /
+        ``grossceded``), whose axes are view names rather than units.
+        """
+        for a in getattr(self, 'units', None) or []:
+            if getattr(a, 'name', None) == handle:
+                return a.label
+        return handle
+
     @property
     def marginals(self):
         """Return the two marginal densities ``(density.sum(1), density.sum(0))``.
@@ -2158,7 +2187,7 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
         # snap display dust in the value columns (Err columns keep their dust)
         for c in ('EX', 'Est EX', spread, f'Est {spread}', 'Sk', 'Est Sk'):
             df[c] = _snap_noise(df[c])
-        return df
+        return self._relabel(df)
 
     @property
     def dependency_df(self):
@@ -2418,7 +2447,7 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
             }
         df = pd.DataFrame(rows).T
         df.index.name = 'axis'
-        return df
+        return self._relabel(df)
 
     @property
     def bs_description(self) -> str:
@@ -2469,14 +2498,21 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
         return ' '.join(out)
 
     @property
-    def tail_df(self):
-        """Per-axis tail / support summary of the realized marginals.
+    def axis_support_df(self):
+        """Per-axis support summary of the realized marginals.
 
-        The bivariate analogue of :attr:`Aggregate.tail_df`: one row per axis
-        with the realized ``support_min`` / ``support_max`` (where the marginal
-        has mass), the theoretical ``mean`` / ``sd`` / ``skew``, and a
-        ``right_heavy`` flag (``skew > 1``). The full 1-D tail-class ladder lives
-        on each axis's standalone marginal aggregate.
+        One row per axis with the realized ``support_min`` / ``support_max``
+        (where the marginal has mass), the theoretical ``mean`` / ``sd`` /
+        ``skew``, and a ``right_heavy`` flag (``skew > 1``). The full 1-D
+        tail-class ladder lives on each axis's standalone marginal aggregate.
+
+        Notes
+        -----
+        Named ``tail_df`` until ``a171``, which was a collision rather than an
+        analogy: :attr:`Aggregate.tail_df` and :attr:`Portfolio.tail_df` are
+        **return-period** tables (p, VaR, TVaR, xsVaR by exceedance probability),
+        and this frame is not one. It reports where the realized mass sits, per
+        axis, which is what the name now says.
         """
         self._require_density()
         m0, m1 = self.marginals
@@ -2493,7 +2529,7 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
             }
         df = pd.DataFrame(rows).T
         df.index.name = 'axis'
-        return df
+        return self._relabel(df)
 
     @property
     def tail_description(self) -> str:
@@ -2501,7 +2537,7 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
 
         The verbose form is :attr:`tail_explanation`.
         """
-        df = self.tail_df
+        df = self.axis_support_df
         parts = [f'{name} [{r.support_min:.4g}, {r.support_max:.4g}]'
                  for name, r in df.iterrows()]
         return 'per-axis support: ' + '; '.join(parts)
@@ -2517,7 +2553,7 @@ class BivariateAggregate(HelpMixin, ProgramMixin):
         correlation and (in copula mode) the copula's Kendall tau, which is
         what decides whether the two tails can blow out together.
         """
-        df = self.tail_df
+        df = self.axis_support_df
         out = []
         for name, r in df.iterrows():
             heavy = ('right-heavy (skew > 1)' if r.right_heavy

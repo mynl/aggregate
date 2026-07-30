@@ -139,15 +139,15 @@ def test_xpnl_returns_walk_pnl_over_gcn_engine(uw):
            'sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 '
            'poisson')
     assert isinstance(t, PnL)
-    assert [g.label for g in t.groups] == ['Gross', 'ceded occ']
+    assert [g.label for g in t.groups] == ['Gross', 'occ 500 xs 500']
     s = t.stats_df
     assert list(s.index.names) == ['Step', 'View', 'Line']
     # means add down the walk exactly (per-atom partial sums)
     assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
         s.loc[('Gross', 'Margin', 'Total'), 'EX']
-        + s.loc[('ceded occ', 'Margin', 'Total'), 'EX'], abs=1e-6)
+        + s.loc[('occ 500 xs 500', 'Margin', 'Total'), 'EX'], abs=1e-6)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
-        s.loc[('ceded occ', 'Margin', 'Total'), 'EX'], abs=1e-6)
+        s.loc[('occ 500 xs 500', 'Margin', 'Total'), 'EX'], abs=1e-6)
     # one shared joint -> the scenario (κ) ladder; every column foots
     assert 'κ01' in s.columns and 'P01' not in s.columns
     # the card is the exploded (Step, View) blocks + closing All block

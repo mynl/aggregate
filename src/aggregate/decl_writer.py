@@ -652,6 +652,16 @@ def _render_approx(spec: dict) -> str:
     return '' if kind == 'exact' else f'approximate {kind}'
 
 
+def _render_peel(spec: dict) -> str:
+    """Render the ``peel <direction>`` clause, or ``''`` for the tier default.
+
+    The absent clause is the tier walk, so a P&L that does not peel renders
+    unchanged ([Layer-Peeling-Shorthand]).
+    """
+    direction = spec.get('peel')
+    return '' if not direction else f'peel {direction}'
+
+
 def _render_label(label) -> str:
     """Render an ``as <label>`` clause (``''`` when ``label`` is ``None``).
 
@@ -887,6 +897,7 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
     return _Block(f'{keyword} {name}{obj_label} {premium_head} less', [
         engine,
         f'less {expense}' if expense else '',
+        _render_peel(spec),
         *_render_trailer(spec, trailer),
     ])
 

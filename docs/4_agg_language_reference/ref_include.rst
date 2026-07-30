@@ -123,12 +123,29 @@
     // clause -- the embedded engine's tail cannot cross a ``less``. Both return a
     // :class:`~aggregate._pnl.PnL`; ``pnl`` is the consolidated single-group net
     // view, ``xpnl`` the exploded sibling, same syntax, a multi-group walk with one
-    // group per step. See dev/done/plan-pnl-engine-source.md,
-    // dev/done/plan-pnl-premium.md, dev/done/plan-pnl-expenses-ceded-premium.md.
+    // group per step. By default a step is a reinsurance **tier** (gross, the whole
+    // occurrence program, the whole aggregate program); the optional ``peel`` clause
+    // makes it a single **layer** instead. See dev/done/plan-pnl-engine-source.md,
+    // dev/done/plan-pnl-premium.md, dev/done/plan-pnl-expenses-ceded-premium.md,
+    // dev/done/plan-layer-peeling.md.
     // ======================================================================
     
-    pnl_out:  PNL  name as_label pnl_premium LESS agg_source expense_less trailer  -> pnl_out_engine
-    xpnl_out: XPNL name as_label pnl_premium LESS agg_source expense_less trailer  -> xpnl_out_engine
+    pnl_out:  PNL  name as_label pnl_premium LESS agg_source expense_less peel_clause trailer  -> pnl_out_engine
+    xpnl_out: XPNL name as_label pnl_premium LESS agg_source expense_less peel_clause trailer  -> xpnl_out_engine
+    
+    // The optional layer-peeling clause ([Layer-Peeling-Shorthand]). Omitted, an
+    // ``xpnl`` walks tiers: one group for the whole occurrence program, one for the
+    // whole aggregate program. ``peel top-down`` / ``peel bottom-up`` walks
+    // *layers*, one group each, introduced highest-attaching first or
+    // lowest-attaching first, so every layer shows its own ceded premium,
+    // commission and marginal impact. The occurrence tier is peeled before the
+    // aggregate tier either way, preserving the tier walk's step order. Zero-share
+    // gap fillers are structural and get no step. Accepted by the grammar on ``pnl``
+    // too, so asking a consolidated P&L to peel is a clear semantic error rather
+    // than a parse error. Validated in the transformer; the direction is an
+    // ordinary ID, as ``approximate sgamma`` leaves ``sgamma`` unreserved.
+    peel_clause: PEEL ID   -> peel_set
+               |           -> peel_none
     
     // The wrapped engine: a complete aggregate. ``agg NAME <body>`` reuses the
     // shared ``agg_body`` (identical to a standalone ``agg``, minus the trailer,
@@ -680,6 +697,7 @@
     PAYOFF.2:     /payoff(?![a-zA-Z0-9._:~\-])/
     PNL.2:        /pnl(?![a-zA-Z0-9._:~\-])/
     XPNL.2:       /xpnl(?![a-zA-Z0-9._:~\-])/
+    PEEL.2:       /peel(?![a-zA-Z0-9._:~\-])/
     INHERIT.2:    /inherit(?![a-zA-Z0-9._:~\-])/
     PORT.2:       /port(?![a-zA-Z0-9._:~\-])/
     RATE.2:       /rate(?![a-zA-Z0-9._:~\-])/
@@ -757,7 +775,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|so|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|so|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

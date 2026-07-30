@@ -185,7 +185,7 @@ def test_reins_label_names_cession_rows():
 def test_reins_no_label_keeps_structural_rows():
     p = build('xpnl RP 1000 premium less agg RP_e 850 loss sev lognorm 100 cv 1 '
               'occurrence net of 100 xs 200 deposit 50 poisson')
-    assert 'ceded occ premium' in _lines(p)
+    assert 'occ 100 xs 200 premium' in _lines(p)
 
 
 # ----------------------------------------------------------------------

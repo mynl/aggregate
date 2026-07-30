@@ -1,5 +1,98 @@
 # Changelog
 
+## 1.0.0a183
+
+**[Layer-Peeling-Shorthand]** New DecL clause `peel`: `xpnl ... peel top-down`
+or `peel bottom-up` books one group per reinsurance **layer** instead of one per
+tier, so every layer reports its own ceded premium, ceding commission and
+marginal impact, and `net through <layer>` builds the program up a layer at a
+time. Plan: `dev/done/plan-layer-peeling.md`; the placeholder was in
+`dev/done/plan-yapnl.md`.
+
+```
+xpnl Book 1000 premium less
+  agg Book_e 1000 premium at 70% lr
+    sev lognorm 100 cv 2
+    occurrence net of 100 xs 100 deposit 60 and 300 xs 200 deposit 40
+    poisson
+  peel top-down
+```
+
+walks `Gross`, `occ 300 xs 200`, `occ 100 xs 100`, `All`, where the tier walk
+had a single lumped `ceded occ` step. Occurrence layers are peeled before
+aggregate ones, preserving the tier walk's step order; within a tier `top-down`
+introduces the highest-attaching layer first and `bottom-up` the lowest.
+Zero-share gap fillers are structural, not cessions, and get no step. The clause
+is a modifier on an existing statement rather than a new object kind, because
+peeling is a way of building, not a new type ([Decision-XPnL-Is-A-Recipe]).
+
+The two tiers are not symmetric, and that picks the route. **Aggregate layers**
+are disjoint intervals on the one aggregate subject, so single-layer ceders sum
+to the cumulative ceder identically and each layer is simply another per-atom
+leg on the shared source: the scenario `κ` ladder survives and every column
+foots. **Occurrence layers** are not, because the ceded-occurrence aggregate is
+not a function of the gross aggregate (the random claim count decouples them),
+which is why the tier walk reaches for the 2-D `occ_bivariate` in the first
+place. Peeling `m` occurrence layers per-atom would need an `(m+1)`-axis joint,
+which [One-2D-Source] forbids, and the total ceded axis cannot be split after
+the fact because the sum of per-claim cessions does not determine the per-layer
+allocation.
+
+Two or more peeled occurrence layers therefore route through the kernel's
+`stitched_rows` seam, kept at `a141` as the designated no-joint assembly seam
+and now with a second consumer. The caveat is softer than it sounds: every row
+of an occurrence peel is the compound of a **deterministic per-claim severity
+transform**, so each row's marginal is exactly one FFT of a transformed
+severity, the aggregate tier rides the net-of-occurrence aggregate as a plain
+pushforward, and the `EX` column **foots exactly** by linearity. Only the
+dispersion columns are marginal, so the ladder carries plain `P01…P99` headers
+rather than `κ`, `evaluate` and `+` are unavailable, and loss-basis LAE degrades
+to the deterministic `rate * E[gross loss]` (the same trade the consolidated
+face makes, [Consolidated-LAE-Off-Source]). Cost is `2m` one-dimensional FFTs on
+the existing grid, against the two `reins_density_df` already pays.
+
+The route is selected by how many occurrence layers are actually peeled, so a
+program with one layer per tier reproduces the tier walk byte for byte in either
+direction. On the two-layer example above the peeled recoveries sum to the
+engine's own `E[ceded occ]` to 1.25e-10, and the closing margin matches the
+consolidated `pnl` to the digit; the lumped tier walk is the figure that differs
+slightly, because it rides the coarser 2-D joint.
+
+`Underwriter._resolve_reins_economics` now reports `pc_occ_by_layer` /
+`c_occ_by_layer` and the `agg` pair beside the unchanged per-side totals: the
+loop already computed them layer by layer and only the aggregation was lossy.
+`peel` is rejected with a message naming the reason on a consolidated `pnl`
+(no steps to peel), a `port.NAME` engine (no layer structure), and every
+non-guaranteed-cost recipe: a plain engine has no reinsurance, a reinstated
+program is a single occurrence layer, a variable-rating feature decorates a
+single aggregate layer.
+
+**[Walk-Step-Default-Labels]** landed with it, closing the item from
+`dev/done/plan-pnl-faces-punchlist.md`. **Breaking** for anyone indexing walk
+`stats_df` by step name. An undeclared cover step whose tier holds exactly
+**one** layer is now named by that layer's DecL descriptor, so
+`occurrence net of 500 xs 500` gives a step `'occ 500 xs 500'` where it used to
+give `'ceded occ'`, and a partial share reads `'agg 85% so 1500 xs 7000'`. A
+multi-layer tier keeps the generic `'ceded occ'` / `'ceded agg'`, because it has
+no single descriptor and `peel` is how you see those layers separately. The
+descriptor comes from the writer's own cession renderer, so it is exactly the
+DecL the layer round-trips to, and descriptors cannot collide because the layer
+validator rejects overlapping cessions.
+
+Peeling forced the pick rather than merely benefiting from it: `_ledger_plan`
+raises on duplicate ledger row labels, so one group per layer could not share
+one generic name. A layer's declared `as` label still wins, read from the
+`{layer_index: label}` map pooled into `label_map` since `a132`. Test churn from
+the rename landed in the same sweep across `test_decl_labels`, `test_pnl`,
+`test_pnl_ceded_premium`, `test_pnl_engine_source` and
+`test_reinstatement_decl`.
+
+New `tests/test_pnl_peel.py` (40 cases) pins the degenerate anchor, both routes,
+column footing, agreement with the engine's exact marginals, the label rules,
+gap-filler skipping, every rejection and the writer round-trip; seven programs
+mirror into `decl-testers.agg` section AI. `src/aggregate/_pnl.py` needed no
+structural change, `_ledger_plan` having been m-group generic already.
+
 ## 1.0.0a182
 
 **[Ceder-Gap-Knot]** Bug fix. `make_ceder_netter` mis-ceded on any reinsurance

@@ -914,3 +914,29 @@ agg AH.Negbin  2 claims sev lognorm 1000 cv 2 negbin 2                          
 agg AH.Fixed   2 claims sev lognorm 1000 cv 2 fixed                                            note{Refused: fixed count};
 agg AH.Mixed   2 claims sev lognorm 1000 cv 2 mixed gamma 0.3                                  note{Refused: gamma-mixed Poisson is not Poisson};
 agg AH.ZM      2 claims sev lognorm 1000 cv 2 poisson zm 0.5                                   note{Refused: zero modification breaks P(N=0) = exp(-lam)};
+
+# ============================================================
+# AI. Layer peeling ([Layer-Peeling-Shorthand], 1.0.0a183)
+#     (tests/test_pnl_peel.py)
+# ============================================================
+# `xpnl ... peel top-down|bottom-up` books one group per reinsurance LAYER
+# instead of one per tier, so every layer reports its own ceded premium,
+# ceding commission and marginal impact. Occurrence layers are peeled before
+# aggregate ones, preserving the tier walk's step order; zero-share gap fillers
+# are structural and get no step. See dev/done/plan-layer-peeling.md.
+#
+# Two routes. AI.Agg peels aggregate layers only: those are disjoint intervals
+# on the one aggregate subject, so single-layer ceders sum to the cumulative
+# ceder identically, every leg stays per-atom and the scenario (kappa) ladder
+# holds. AI.Occ peels two occurrence layers, which no shared source can carry
+# (the random claim count decouples the ceded-occurrence aggregate from the
+# gross one), so its rows are supplied as exact marginals: EX foots exactly by
+# linearity, the dispersion columns are marginal. AI.One has one layer per tier
+# and so reproduces the plain tier walk in either direction.
+xpnl AI.Occ    1000 premium less agg AI.Occ_e 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 60 and 300 xs 200 deposit 40 poisson peel top-down                            note{two occurrence layers, highest first: marginal route, EX foots};
+xpnl AI.OccUp  1000 premium less agg AI.OccUp_e 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 60 and 300 xs 200 deposit 40 poisson peel bottom-up                          note{the same tower lowest first: same total, reversed steps};
+xpnl AI.Agg    1000 premium less agg AI.Agg_e 1000 premium at 70% lr sev lognorm 100 cv 2 poisson aggregate net of 200 xs 600 deposit 50 and 400 xs 800 deposit 30 peel top-down                              note{aggregate layers only: per-atom, kappa ladder, every column foots};
+xpnl AI.Mix    1000 premium less agg AI.Mix_e 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 60 cede 0.2 and 300 xs 200 deposit 40 poisson aggregate net of 150 xs 300 deposit 25 peel top-down   note{both tiers plus a per-layer ceding commission leg};
+xpnl AI.One    1000 premium less agg AI.One_e 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 500 xs 500 deposit 100 poisson aggregate net of 200 xs 400 deposit 40 peel top-down               note{one layer per tier: degenerates to the tier walk, per-atom};
+xpnl AI.Label  1000 premium less agg AI.Label_e 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 60 as "Working layer" and 300 xs 200 deposit 40 poisson peel bottom-up       note{a declared layer label names its step; undeclared falls back to the DecL descriptor};
+xpnl AI.Share  1000 premium less agg AI.Share_e 1000 premium at 70% lr sev lognorm 100 cv 2 poisson aggregate net of 50% so 200 xs 600 deposit 20 and 400 xs 800 deposit 15 peel top-down                    note{partial-share descriptor: the step reads "agg 50% so 200 xs 600"}

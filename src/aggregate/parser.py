@@ -697,7 +697,7 @@ class UnderwritingTransformer(Transformer):
         return ("port", portname, portspec)
 
     def _pnl_spec(self, kind, name, as_label, premium, source, expense,
-                  trailer):
+                  peel, trailer):
         """Assemble the ``(kind, name, spec)`` tuple shared by ``pnl``/``xpnl``.
 
         For an inline / ``agg.NAME`` engine the loss structure is merged into the
@@ -707,7 +707,7 @@ class UnderwritingTransformer(Transformer):
         under ``_engine_port`` for a dedicated factory path.
         """
         ekind, ename, espec = source
-        spec = {"name": name, **as_label, **expense, **trailer}
+        spec = {"name": name, **as_label, **expense, **peel, **trailer}
         if ekind == "port":
             spec["_engine_port"] = ename
         else:
@@ -732,14 +732,40 @@ class UnderwritingTransformer(Transformer):
         return (kind, name, spec)
 
     def pnl_out_engine(self, c):
-        (_pnl, name, as_label, premium, _less, source, expense, trailer) = c
+        (_pnl, name, as_label, premium, _less, source, expense, peel,
+         trailer) = c
         return self._pnl_spec("pnl", name, as_label, premium, source,
-                              expense, trailer)
+                              expense, peel, trailer)
 
     def xpnl_out_engine(self, c):
-        (_xpnl, name, as_label, premium, _less, source, expense, trailer) = c
+        (_xpnl, name, as_label, premium, _less, source, expense, peel,
+         trailer) = c
         return self._pnl_spec("xpnl", name, as_label, premium, source,
-                              expense, trailer)
+                              expense, peel, trailer)
+
+    # ----- the layer-peeling clause ----------------------------------
+    #: Accepted ``peel`` directions ([Layer-Peeling-Shorthand]). ``top-down``
+    #: introduces the highest-attaching layer first, ``bottom-up`` the lowest.
+    _PEEL_DIRECTIONS = ("top-down", "bottom-up")
+
+    def peel_set(self, c):
+        """``peel DIRECTION`` -> ``{'peel': DIRECTION}`` (direction validated)."""
+        _peel, direction = c
+        direction = str(direction)
+        if direction not in self._PEEL_DIRECTIONS:
+            raise ValueError(
+                f"DecL: peel '{direction}' is not recognised; "
+                f"use one of {', '.join(self._PEEL_DIRECTIONS)}")
+        return {"peel": direction}
+
+    def peel_none(self, _c):
+        """No ``peel`` clause: add no key, so the tier walk is the default.
+
+        Returning an empty dict (rather than an explicit default) keeps every
+        program that does not peel byte-identical through the writer and leaves
+        the frozen spec snapshots untouched.
+        """
+        return {}
 
     # ----- gross-premium head: fixed amount or retro rating clause ---
     def pnl_premium_fixed(self, c):

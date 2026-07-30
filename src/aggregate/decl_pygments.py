@@ -263,7 +263,8 @@ class AggLexer(RegexLexer):
             # rules claim it, as the grammar does.
             (words(
                 ('occurrence', 'aggregate', 'distortion', 'exposure', 'tweedie',
-                 'premium', 'tower', 'picks', 'prem', 'pnl', 'xpnl', 'inherit',
+                 'premium', 'tower', 'picks', 'prem', 'pnl', 'xpnl', 'peel',
+                 'inherit',
                  'bivariate', 'bv', 'clash', 'copula',
                  'netceded', 'grossceded', 'grossnet',
                  'approximate', 'approx', 'ssev', 'splice',

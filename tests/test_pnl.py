@@ -380,10 +380,10 @@ _WALK_ROWS = [
     ('Gross', 'Consideration', 'premium'),
     ('Gross', 'Obligation', 'Loss'),
     ('Gross', 'Margin', 'Total'),
-    ('ceded agg', 'Consideration', 'ceded agg premium'),
-    ('ceded agg', 'Obligation', 'ceded agg recovery'),
-    ('ceded agg', 'Margin', 'Total'),
-    ('ceded agg', 'Margin', 'Net'),
+    ('agg 2000 xs 3000', 'Consideration', 'agg 2000 xs 3000 premium'),
+    ('agg 2000 xs 3000', 'Obligation', 'agg 2000 xs 3000 recovery'),
+    ('agg 2000 xs 3000', 'Margin', 'Total'),
+    ('agg 2000 xs 3000', 'Margin', 'Net'),
     ('All', 'Consideration', 'Total'),
     ('All', 'Obligation', 'Total'),
     ('All', 'Margin', 'Total'),
@@ -441,14 +441,14 @@ def test_xpnl_walk_rows_and_means_add():
     assert list(s.index) == _WALK_ROWS
     assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
         s.loc[('Gross', 'Margin', 'Total'), 'EX']
-        + s.loc[('ceded agg', 'Margin', 'Total'), 'EX'], abs=1e-6)
+        + s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'], abs=1e-6)
     # total impact = the cession's step delta (result vs the gross result)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
-        s.loc[('ceded agg', 'Margin', 'Total'), 'EX'], abs=1e-6)
+        s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'], abs=1e-6)
     # the cession books contra: -premium, +recovery
-    assert s.loc[('ceded agg', 'Consideration', 'ceded agg premium'), 'EX'] \
+    assert s.loc[('agg 2000 xs 3000', 'Consideration', 'agg 2000 xs 3000 premium'), 'EX'] \
         == pytest.approx(-1800.0)
-    assert s.loc[('ceded agg', 'Obligation', 'ceded agg recovery'), 'EX'] > 0
+    assert s.loc[('agg 2000 xs 3000', 'Obligation', 'agg 2000 xs 3000 recovery'), 'EX'] > 0
     assert 'κ01' in s.columns and 'P01' not in s.columns
     # SDs do not add: the cession trims the tail
     assert s.loc[('All', 'Margin', 'Total'), 'SD'] < \

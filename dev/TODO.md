@@ -243,6 +243,24 @@
 
 ### Reporting
 
+- ~~**[Layer-Peeling-Shorthand]**~~ **DONE `1.0.0a183`**
+  (`dev/done/plan-layer-peeling.md`; the placeholder was
+  `dev/done/plan-yapnl.md`) — `xpnl ... peel top-down|bottom-up` books one group
+  per reinsurance **layer** instead of one per tier. Aggregate layers peel
+  per-atom (disjoint intervals on one subject, so single-layer ceders sum to the
+  cumulative ceder identically) and keep the κ ladder; two or more occurrence
+  layers route through the kernel's `stitched_rows` seam, where EX foots exactly
+  by linearity but the dispersion columns are marginal.
+- **[Peel-Aggregate-Tier-Only]** (logged 2026-07-30, from
+  `[Layer-Peeling-Shorthand]`) — the stitched route is all-or-nothing for a
+  `PnL`, so peeling the occurrence layers of a program that *also* carries
+  aggregate layers pulls the aggregate steps onto the marginal ladder too, even
+  though they would foot per-atom on their own. A way to peel **one tier** and
+  leave the other lumped would keep the κ ladder for the common
+  "several occurrence layers, one aggregate cover" shape. The deferred explicit
+  peel-order form (a permutation of layer indices rather than a direction) is
+  the natural surface for it; note that form is also the only one that
+  manufactures layer gaps, so it needs `[Ceder-Gap-Knot]` (fixed in `a182`).
 - **[Accounting-Summary-DF]** (pended 2026-07-04) — the gross/ceded-**split**
   consolidated-P&L card, `accounting_summary_df`: Consideration gross premium /
   ceded premium / total; Obligation gross loss / ceded loss / total; Margin
@@ -250,14 +268,15 @@
   supports GAAP / STAT / IFRS reporting shapes. The plain `summary_df` stays the
   simple net card ("summary" means summary); this is the detail view between it
   and the full `xpnl` walk. Unblocked since `1.0.0a136`.
-- **[Walk-Step-Default-Labels]** (from `dev/done/plan-pnl-faces-punchlist.md`,
-  2026-07-05) — undeclared cover steps in the walks default to `'ceded occ'` /
-  `'ceded agg'` (`_pnl_builders.py:573`, `:904`, `:1147`); the author asked for
-  better. Proposal: the DecL layer descriptor when the side has exactly one layer
-  (`'occ 4750 xs 250'`, `'agg 95% po 100 xs 100'`), the generic name otherwise.
-  **Needs the author's format pick** — it renames Step index keys and the derived
-  plan rows (`'<label> result'`, `'net through <label>'`) in every undeclared
-  program, so it should land deliberately, with the test churn in one sweep.
+- ~~**[Walk-Step-Default-Labels]**~~ **DONE `1.0.0a183`** (with
+  `[Layer-Peeling-Shorthand]`, `dev/done/plan-layer-peeling.md`) — an undeclared
+  cover step whose tier holds exactly **one** layer is now named by that layer's
+  DecL descriptor (`'occ 4750 xs 250'`, `'agg 85% so 1500 xs 7000'`) via
+  `_tier_label`; a multi-layer tier keeps the generic `'ceded occ'` / `'ceded
+  agg'`, because it has no single descriptor and `peel` is how you see those
+  layers separately. Peeling forced the pick: `_ledger_plan` raises on duplicate
+  row labels, so one group per layer cannot share one generic name. Test churn
+  landed in the same sweep (six modules).
 - **[Doc-Fix]** — clear the executed-cell `*Error`s in the docs build. **Last —
   after the code has settled** (it churns with every API change). Plan:
   `dev/doc-fix.md`.

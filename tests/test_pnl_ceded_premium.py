@@ -77,7 +77,7 @@ def test_cede_books_commission_into_the_net_premium():
     # ...and stays a visible leg on the xpnl walk
     x = build(_BASE.replace('pnl T', 'xpnl TX', 1)
               + 'poisson aggregate net of 2000 xs 3000 rol 8% cede 25%')
-    assert _leg(x, 'ceded agg commission')['EX'] == pytest.approx(40.0)
+    assert _leg(x, 'agg 2000 xs 3000 commission')['EX'] == pytest.approx(40.0)
 
 
 def test_any_reinsurance_yields_consolidated_pnl():
@@ -116,9 +116,9 @@ def test_zero_premium_cession_walks():
                   + 'poisson aggregate net of 2000 xs 3000')
     s = x.stats_df
     steps = list(dict.fromkeys(s.index.get_level_values('Step')))
-    assert steps == ['Gross', 'ceded agg', 'All']
-    assert _leg(x, 'ceded agg premium')['EX'] == 0.0
-    assert _leg(x, 'ceded agg recovery')['EX'] > 0
+    assert steps == ['Gross', 'agg 2000 xs 3000', 'All']
+    assert _leg(x, 'agg 2000 xs 3000 premium')['EX'] == 0.0
+    assert _leg(x, 'agg 2000 xs 3000 recovery')['EX'] > 0
 
 
 def test_occurrence_only_consolidates_over_net_occ():
@@ -148,13 +148,13 @@ def test_both_sides_split_and_walk_ledger():
               + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     lines = _lines(x)
-    for row in ('premium', 'Loss', 'ceded occ premium', 'ceded occ recovery',
-                'ceded agg premium', 'ceded agg recovery',
-                'ceded agg commission'):
+    for row in ('premium', 'Loss', 'occ 100 xs 200 premium', 'occ 100 xs 200 recovery',
+                'agg 2000 xs 3000 premium', 'agg 2000 xs 3000 recovery',
+                'agg 2000 xs 3000 commission'):
         assert row in lines, row
     steps = list(x.stats_df.index.get_level_values('Step'))
-    assert 'Gross' in steps and 'ceded occ' in steps \
-        and 'ceded agg' in steps and 'All' in steps
+    assert 'Gross' in steps and 'occ 100 xs 200' in steps \
+        and 'agg 2000 xs 3000' in steps and 'All' in steps
 
 
 def test_walk_means_add_down_the_sheet():
@@ -165,17 +165,17 @@ def test_walk_means_add_down_the_sheet():
     # step results foot to their signed legs (means add by linearity)
     assert s.loc[('Gross', 'Margin', 'Total'), 'EX'] == pytest.approx(
         _leg(x, 'premium')['EX'] + _leg(x, 'Loss')['EX'], abs=1e-9)
-    assert s.loc[('ceded agg', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        _leg(x, 'ceded agg premium')['EX']
-        + _leg(x, 'ceded agg recovery')['EX']
-        + _leg(x, 'ceded agg commission')['EX'], abs=1e-9)
+    assert s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'] == pytest.approx(
+        _leg(x, 'agg 2000 xs 3000 premium')['EX']
+        + _leg(x, 'agg 2000 xs 3000 recovery')['EX']
+        + _leg(x, 'agg 2000 xs 3000 commission')['EX'], abs=1e-9)
     # the grand result sums the step results exactly
     assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
         s.loc[('Gross', 'Margin', 'Total'), 'EX']
-        + s.loc[('ceded occ', 'Margin', 'Total'), 'EX']
-        + s.loc[('ceded agg', 'Margin', 'Total'), 'EX'], abs=1e-9)
+        + s.loc[('occ 100 xs 200', 'Margin', 'Total'), 'EX']
+        + s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'], abs=1e-9)
     # running nets read the engine's own net marginals
-    assert s.loc[('ceded agg', 'Margin', 'Net'), 'EX'] == pytest.approx(
+    assert s.loc[('agg 2000 xs 3000', 'Margin', 'Net'), 'EX'] == pytest.approx(
         s.loc[('All', 'Margin', 'Total'), 'EX'], abs=1e-9)
     # the consolidated pnl's margin equals the walk's grand result -- to
     # joint-grid accuracy: the walk rides the occurrence (gross, ceded)

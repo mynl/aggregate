@@ -132,6 +132,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "PAYOFF": "'payoff'",
     "PNL": "'pnl'",
     "XPNL": "'xpnl' (exploded P&L tower)",
+    "PEEL": "'peel' (walk reinsurance layers, not tiers)",
     "INHERIT": "'inherit' (copy the engine's premium)",
     "PORT": "'port'",
     "RATE": "'rate'",

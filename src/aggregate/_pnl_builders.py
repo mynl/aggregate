@@ -55,7 +55,7 @@ import numpy as np
 from ._pnl import Leg, Group, PnL
 
 __all__ = ['build_plain_pnl', 'build_consolidated_pnl', 'build_xpnl_walk',
-           'build_variable_pnl', 'build_reinstatement_pnl',
+           'build_xpnl_peel', 'build_variable_pnl', 'build_reinstatement_pnl',
            'build_reinstatement_source', 'resolve_expense']
 
 
@@ -297,6 +297,55 @@ def _first_reins_label(agg, site):
     d = getattr(agg, 'label_map', None) or {}
     d = d.get(site) or {}
     return d[min(d)] if d else None
+
+
+#: Cession-basis prefix used in a default step label, keyed by ``label_map`` site.
+_SITE_PREFIX = {'occ_reins': 'occ', 'agg_reins': 'agg'}
+
+
+def _layer_descriptor(site, clause):
+    """One layer as its DecL descriptor, e.g. ``'occ 300 xs 200'``.
+
+    Reuses the writer's cession renderer, so the descriptor is exactly the DecL
+    the layer round-trips to (a bare share renders ``limit xs attach``, a
+    partial share ``share% so limit xs attach``).
+    """
+    from .decl_writer import _render_reins_clause
+    return f'{_SITE_PREFIX[site]} {_render_reins_clause(clause)}'
+
+
+def _reins_layer_label(agg, site, index, clause):
+    """The step label for one reinsurance layer ([Walk-Step-Default-Labels]).
+
+    The layer's declared ``as`` label wins, read from the sparse
+    ``{layer_index: label}`` dict pooled into the engine's ``label_map``
+    (``agg.labels.occ_reins`` / ``.agg_reins``); an undeclared layer falls back
+    to its DecL descriptor, which is distinct per layer because the validator
+    rejects overlapping cessions. ``site`` is ``'occ_reins'`` or
+    ``'agg_reins'``.
+    """
+    d = (getattr(agg, 'label_map', None) or {}).get(site) or {}
+    if index in d and d[index]:
+        return str(d[index])
+    return _layer_descriptor(site, clause)
+
+
+def _tier_label(agg, site, generic):
+    """The step label for a whole cession **tier** ([Walk-Step-Default-Labels]).
+
+    A tier consolidates its layers into one group, so the first declared label
+    names it. Undeclared, a **single-layer** tier is named by that layer's DecL
+    descriptor (``'occ 4750 xs 250'``), which says what the step actually is; a
+    multi-layer tier has no one descriptor and keeps the generic name (``peel``
+    is how you see those layers separately).
+    """
+    declared = _first_reins_label(agg, site)
+    if declared:
+        return declared
+    layers = getattr(agg, site, None) or []
+    if len(layers) == 1:
+        return _layer_descriptor(site, layers[0])
+    return generic
 
 
 def _ledger_economics(agg, gross, ceded, econ):
@@ -552,7 +601,9 @@ def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
     on-source -- an improvement over the retired marginal stitch, which was
     all-marginal). Step labels: the base step is the engine's declared label
     (fallback ``'Gross'``); cover steps are the reins ``as`` labels
-    (fallback ``'ceded occ'`` / ``'ceded agg'``); the closing grand step's
+    (a single-layer tier falls back to that layer's DecL descriptor, e.g.
+    ``'occ 4750 xs 250'``; a multi-layer tier to ``'ceded occ'`` /
+    ``'ceded agg'`` -- see ``peel`` to walk those layers); the closing grand step's
     index key is ``'All'`` (a140 rename).
 
     Returns
@@ -571,8 +622,8 @@ def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
     has_agg = agg.agg_reins is not None
     p_gross, pc_occ, pc_agg, c_occ, c_agg = _ledger_economics(
         agg, gross, ceded, gcn_economics)
-    occ_base = _first_reins_label(agg, 'occ_reins') or 'ceded occ'
-    agg_base = _first_reins_label(agg, 'agg_reins') or 'ceded agg'
+    occ_base = _tier_label(agg, 'occ_reins', 'ceded occ')
+    agg_base = _tier_label(agg, 'agg_reins', 'ceded agg')
     base_step = loss_label or 'Gross'
     prem_key = consideration_label or 'premium'
     loss_key = loss_label or 'Loss'
@@ -657,6 +708,471 @@ def _walk_explanation(agg, pnl, has_occ, src_desc):
         '',
         pnl._replay_block(),
     ]
+    return '\n'.join(lines)
+
+
+# ----------------------------------------------------------------------
+# Layer peeling ([Layer-Peeling-Shorthand], dev/done/plan-layer-peeling.md)
+#
+# ``xpnl ... peel top-down|bottom-up`` books one group per reinsurance LAYER
+# instead of one per tier, so every layer shows its own ceded premium,
+# commission and marginal impact, and the running net builds the program up
+# one layer at a time.
+#
+# The two tiers are not symmetric, which picks the route:
+#
+# * **aggregate layers** are disjoint intervals on the ONE aggregate subject
+#   axis, so single-layer ceders sum identically to the cumulative ceder
+#   (``ceder([L1..Lk])(x) == sum_i ceder([Li])(x)``). Each layer is therefore
+#   just another per-atom ``Leg`` on the shared source: the scenario (kappa)
+#   ladder survives and every column foots.
+# * **occurrence layers** are not. The ceded-occurrence aggregate is not a
+#   function of the gross aggregate (the random claim count decouples them),
+#   which is why the tier walk reaches for the 2-D ``occ_bivariate``; splitting
+#   m layers per-atom would need an (m+1)-axis joint, and the total ceded axis
+#   cannot be decomposed after the fact because ``sum_i ceder(X_i)`` does not
+#   determine the per-layer allocation. So two or more peeled occurrence layers
+#   route through the kernel's stitched seam, where every row is supplied as
+#   its own exact marginal. Each such row is the aggregate of a deterministic
+#   per-claim severity transform, so the marginals ARE exact and the EX column
+#   foots exactly by linearity; only the dispersion columns are marginal
+#   (plain ``P`` headers, not kappa).
+# ----------------------------------------------------------------------
+def _peel_steps(agg, direction):
+    """The peel order as ``(site, index, clause, label)`` per layer.
+
+    Occurrence layers precede aggregate ones, preserving the tier walk's step
+    order. Within a tier ``bottom-up`` introduces layers in stored (ascending
+    attachment) order and ``top-down`` in reverse. Zero-share layers are gap
+    fillers, structural rather than cessions, and get no step.
+    """
+    steps = []
+    for site in ('occ_reins', 'agg_reins'):
+        layers = getattr(agg, site, None) or []
+        idx = [i for i, (share, _y, _a) in enumerate(layers)
+               if float(share) != 0.0]
+        if direction == 'top-down':
+            idx = list(reversed(idx))
+        for i in idx:
+            steps.append((site, i, layers[i],
+                          _reins_layer_label(agg, site, i, layers[i])))
+    return steps
+
+
+def _peel_side_economics(econ, which, n_layers, total_pc, total_comm):
+    """Per-layer ceded premium / commission for one cession basis.
+
+    ``Underwriter._resolve_reins_economics`` supplies the per-layer lists that
+    produced the side totals. A scalar-API or zero-fallback economics dict
+    carries only the totals; book those on the lowest-indexed layer so the
+    ledger still foots against the consolidated face.
+    """
+    out = []
+    for key, total in ((f'pc_{which}_by_layer', total_pc),
+                       (f'c_{which}_by_layer', total_comm)):
+        vals = list((econ or {}).get(key) or [])
+        if len(vals) != n_layers:
+            vals = [0.0] * n_layers
+            if n_layers and total:
+                vals[0] = float(total)
+        out.append([float(v) for v in vals])
+    return out[0], out[1]
+
+
+def _affine_row(x, p, *, sign=1.0, shift=0.0, label=''):
+    """One stitched ledger row: the marginal of ``sign * X + shift``.
+
+    Returns the ``(gd, exact_mean, exact_sd)`` triple
+    :meth:`PnL._init_stitched` expects. The mean carries the sign and shift;
+    the standard deviation is invariant to both. ``GridDistribution`` requires
+    an increasing index, so a negative sign reverses the pair.
+    """
+    from ._grid_distribution import GridDistribution
+    x = np.asarray(x, dtype=float)
+    p = np.asarray(p, dtype=float)
+    tot = float(p.sum())
+    if tot > 0:
+        m1 = float((x * p).sum()) / tot
+        m2 = float((x * x * p).sum()) / tot
+    else:                                             # pragma: no cover
+        m1 = m2 = 0.0
+    sd = float(np.sqrt(max(m2 - m1 * m1, 0.0)))
+    v = sign * x + shift
+    if sign < 0:
+        v, p = v[::-1], p[::-1]
+    return (GridDistribution(v, p, bs=None, name=label, is_loss_value=False),
+            sign * m1 + shift, sd)
+
+
+def _const_row(value, label=''):
+    """A stitched ledger row that is a known constant (premium, commission)."""
+    from ._grid_distribution import GridDistribution
+    value = float(value)
+    return (GridDistribution(np.array([value]), np.array([1.0]), bs=None,
+                             name=label, is_loss_value=False), value, 0.0)
+
+
+def _sev_transform_marginal(agg, f):
+    """The exact aggregate marginal of ``sum_j f(X_j)`` over the claim count.
+
+    ``f`` is a non-negative per-claim transform of the gross severity, so the
+    compound is one FFT of the transformed severity discretized back onto the
+    model grid. This is how a peeled occurrence layer's recovery, and every
+    running net through a set of occurrence layers, are computed exactly: both
+    are per-claim deterministic functions, even though neither is a function of
+    the gross *aggregate*.
+    """
+    xs = agg.xs
+    sev = agg.sev_density_gross if agg.sev_density_gross is not None \
+        else agg.sev_density
+    moved = agg._rebucket_to_grid(np.asarray(f(xs), dtype=float),
+                                  np.asarray(sev, dtype=float))
+    p_agg, _ft = agg._fft_aggregate(moved, agg.padding)
+    return xs, np.asarray(p_agg, dtype=float)
+
+
+def _agg_transform_marginal(agg, f, subject_p):
+    """The exact marginal of ``f(S)`` for a deterministic map of aggregate ``S``.
+
+    An aggregate cover acts on the one aggregate subject, so its layers are
+    plain pushforwards: rebucket ``f(xs)`` carrying the subject's mass. No FFT.
+    """
+    xs = agg.xs
+    return xs, np.asarray(
+        agg._rebucket_to_grid(np.asarray(f(xs), dtype=float),
+                              np.asarray(subject_p, dtype=float)), dtype=float)
+
+
+def build_xpnl_peel(agg, *, direction, gross, ceded, gcn_economics=None,
+                    expense_spec=None, consideration_label=None,
+                    loss_label=None, name=None, label=None):
+    """The layer-peeled ``xpnl``: one group per reinsurance **layer**.
+
+    ``xpnl ... peel top-down`` / ``peel bottom-up`` replaces the tier walk's
+    single lumped occurrence and aggregate groups with one group per layer, so
+    each layer reports its own ceded premium, ceding commission and marginal
+    impact, and ``net through <layer>`` builds the program up a layer at a time
+    ([Layer-Peeling-Shorthand]). Occurrence layers are peeled before aggregate
+    ones, preserving the tier walk's step order; within a tier ``top-down``
+    introduces the highest-attaching layer first and ``bottom-up`` the lowest.
+    Zero-share gap fillers get no step.
+
+    Two routes, chosen by how many occurrence layers are actually peeled:
+
+    * **per-atom** (at most one occurrence step). Aggregate layers are disjoint
+      intervals on the one aggregate subject, so ``ceder([L1..Lk])`` equals
+      ``sum_i ceder([Li])`` identically and each layer is simply another
+      per-atom :class:`~aggregate._pnl.Leg` on the shared source. The scenario
+      (kappa) ladder holds and every column foots exactly, as in the tier walk.
+    * **stitched** (two or more occurrence steps). The ceded-occurrence
+      aggregate is not a function of the gross aggregate, and the total ceded
+      axis of the 2-D joint cannot be split after the fact, so no shared source
+      can carry a per-layer occurrence walk. Every ledger row is supplied
+      instead as its own exact marginal: each is the compound of a
+      deterministic per-claim severity transform (one FFT), or a pushforward of
+      the aggregate subject for the aggregate tier. The **EX column still foots
+      exactly** by linearity (the default ``'linear'`` rebucketing preserves
+      first moments), but the dispersion columns are marginal, so the ladder
+      carries plain ``P`` headers rather than kappa, ``evaluate`` is
+      unavailable and loss-basis LAE degrades to the deterministic
+      ``rate * E[gross loss]`` (the shared-source loss it would scale with does
+      not exist here; the same trade the consolidated face makes).
+
+    Returns
+    -------
+    PnL
+        A plain multi-group :class:`~aggregate._pnl.PnL` -- peeling is a way of
+        building, not a new type ([Decision-XPnL-Is-A-Recipe]).
+    """
+    rd = agg.reins_density_df
+    if rd is None:
+        raise ValueError(
+            "'xpnl ... peel' requires reinsurance on the wrapped engine; the "
+            'aggregate carries no occurrence / aggregate treaty.')
+    steps = _peel_steps(agg, direction)
+    if not steps:
+        raise ValueError(
+            f'{agg.name}: nothing to peel -- every reinsurance layer on this '
+            'engine has zero share (gap fillers are structural, not '
+            "cessions). Drop the 'peel' clause.")
+    occ_steps = [s for s in steps if s[0] == 'occ_reins']
+    agg_steps = [s for s in steps if s[0] == 'agg_reins']
+    p_gross, pc_occ, pc_agg, c_occ, c_agg = _ledger_economics(
+        agg, gross, ceded, gcn_economics)
+    pc_occ_by, c_occ_by = _peel_side_economics(
+        gcn_economics, 'occ', len(agg.occ_reins or []), pc_occ, c_occ)
+    pc_agg_by, c_agg_by = _peel_side_economics(
+        gcn_economics, 'agg', len(agg.agg_reins or []), pc_agg, c_agg)
+    econ_by = {'occ_reins': (pc_occ_by, c_occ_by),
+               'agg_reins': (pc_agg_by, c_agg_by)}
+    common = dict(base_step=loss_label or 'Gross',
+                  prem_key=consideration_label or 'premium',
+                  loss_key=loss_label or 'Loss',
+                  expense_spec=expense_spec, econ_by=econ_by,
+                  p_gross=p_gross, name=name, label=label)
+    if len(occ_steps) >= 2:
+        pnl, route = _peel_stitched(agg, occ_steps, agg_steps, **common)
+    else:
+        pnl, route = _peel_per_atom(agg, occ_steps, agg_steps, **common)
+    pnl.economics = dict(gcn_economics) if gcn_economics is not None \
+        else {'gross': float(gross), 'ceded': float(ceded)}
+    order = ' -> '.join(s[3] for s in steps)
+    pnl._construction_description = (
+        f'xpnl peel ({direction}): {len(steps)}-layer '
+        f'{"per-atom" if route == "per-atom" else "marginal"} tower '
+        f'(Gross -> {order} -> All); '
+        + ('scenario (κ) ladder -- every column foots.'
+           if route == 'per-atom' else
+           'EX foots exactly by linearity, dispersion columns are marginal.'))
+    pnl._construction_explanation = _peel_explanation(
+        agg, pnl, direction, steps, route)
+    return pnl
+
+
+def _peel_per_atom(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
+                   expense_spec, econ_by, p_gross, name, label):
+    """Peel over ONE shared source: the kappa ladder survives and columns foot.
+
+    Reached when at most one occurrence layer is peeled, so the joint's ceded
+    axis already *is* that layer's cession and nothing has to be split. Each
+    aggregate layer books its own ceder as a per-atom leg, exact because
+    aggregate layers are disjoint intervals on the same subject.
+    """
+    from . import _reinsurance
+    gross_obl = [Leg(loss_key, lambda l: l)]         # reads axis 0 on a joint
+    gross_obl += _expense_legs(agg, expense_spec, p_gross,
+                               on_source_loss=True,
+                               taken={prem_key, loss_key})
+    groups = [Group(base_step, 'sell', [Leg(prem_key, p_gross)], gross_obl)]
+
+    def cover(lbl, pc, comm, recovery, is2d):
+        obl = [Leg(f'{lbl} recovery', recovery, is2d=is2d)]
+        if comm:
+            obl.append(Leg(f'{lbl} commission', comm))
+        return Group(lbl, 'buy', [Leg(f'{lbl} premium', pc)], obl)
+
+    if occ_steps:
+        site, i, _clause, lbl = occ_steps[0]
+        biv = agg.occ_bivariate(views=('gross', 'ceded'))
+        check_joint_grid_adequacy(biv.bivariate.bs_ceded,
+                                  biv.bivariate.bs_net, None, agg.agg_reins)
+        source = biv.bivariate
+        pc_by, c_by = econ_by[site]
+        groups.append(cover(lbl, pc_by[i], c_by[i],
+                            lambda l, c: c, True))
+        for site_j, j, clause, lbl_j in agg_steps:
+            ceder_j, _n = _reinsurance.make_ceder_netter([clause])
+            pc_by, c_by = econ_by[site_j]
+
+            def rec(l, c, g=ceder_j):
+                # the aggregate cover's subject is the net-of-occurrence
+                # aggregate; clip at 0 for off-support joint cells (c > l),
+                # which carry ~no mass but still evaluate.
+                return g(np.maximum(l - c, 0.0))
+
+            groups.append(cover(lbl_j, pc_by[j], c_by[j], rec, True))
+    else:
+        # aggregate layers only: everything is a function of the gross atoms
+        source = _marginal_gd(agg, 'gross')
+        for site_j, j, clause, lbl_j in agg_steps:
+            ceder_j, _n = _reinsurance.make_ceder_netter([clause])
+            pc_by, c_by = econ_by[site_j]
+            groups.append(cover(lbl_j, pc_by[j], c_by[j], ceder_j, False))
+    pnl = PnL(name=name or agg.name, source=source, groups=groups,
+              result_name='margin', label=label)
+    return pnl, 'per-atom'
+
+
+def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
+                   expense_spec, econ_by, p_gross, name, label):
+    """Peel two or more occurrence layers: exact marginals, no shared source.
+
+    Every ledger row is supplied to :meth:`PnL._init_stitched` as its own exact
+    marginal. Occurrence rows are compounds of deterministic per-claim severity
+    transforms (one FFT each); aggregate rows are pushforwards of the
+    net-of-occurrence aggregate. The chain is computed end to end from the
+    engine's gross severity rather than read off ``reins_density_df``, so the
+    rows are internally consistent and the EX column foots exactly.
+    """
+    from . import _reinsurance
+    from ._pnl import _ledger_plan
+    xs = agg.xs
+
+    # ----- gross book -------------------------------------------------
+    expense_legs = _expense_legs(agg, expense_spec, p_gross,
+                                 on_source_loss=False,
+                                 taken={prem_key, loss_key})
+    # every expense leg is a constant on this route (no shared source to
+    # scale a loss-basis term against), so its magnitude is its value at 0
+    expense_vals = [float(leg.func(0.0)) if callable(leg.func)
+                    else float(leg.func) for leg in expense_legs]
+    expense_total = float(sum(expense_vals))
+    gross_obl = [Leg(loss_key, lambda l: l)] + expense_legs
+    groups = [Group(base_step, 'sell', [Leg(prem_key, p_gross)], gross_obl)]
+
+    # ----- the peel chain: cumulative cessions, tier by tier ----------
+    _xs, p_gross_agg = _sev_transform_marginal(agg, lambda x: x)
+    occ_rows = []          # per occurrence step: (label, pc, comm, R, N_cum)
+    taken = []
+    for site, i, clause, lbl in occ_steps:
+        taken.append(i)
+        cum = _reinsurance.make_ceder_netter(
+            [agg.occ_reins[k] for k in sorted(taken)])[0]
+        one = _reinsurance.make_ceder_netter([clause])[0]
+        _x, recovery = _sev_transform_marginal(agg, one)
+        _x, net_cum = _sev_transform_marginal(agg, lambda x, g=cum: x - g(x))
+        pc_by, c_by = econ_by[site]
+        occ_rows.append((lbl, pc_by[i], c_by[i], recovery, net_cum))
+    subject = occ_rows[-1][4]        # the net-of-occurrence aggregate
+
+    agg_rows = []          # per aggregate step: (label, pc, comm, R, N_cum)
+    taken = []
+    for site, j, clause, lbl in agg_steps:
+        taken.append(j)
+        cum = _reinsurance.make_ceder_netter(
+            [agg.agg_reins[k] for k in sorted(taken)])[0]
+        one = _reinsurance.make_ceder_netter([clause])[0]
+        _x, recovery = _agg_transform_marginal(agg, one, subject)
+        _x, net_cum = _agg_transform_marginal(
+            agg, lambda s, g=cum: s - g(s), subject)
+        pc_by, c_by = econ_by[site]
+        agg_rows.append((lbl, pc_by[j], c_by[j], recovery, net_cum))
+
+    # the final net after every cover, and the closing running totals
+    final_net = agg_rows[-1][4] if agg_rows else subject
+    covers = occ_rows + agg_rows
+    total_pc = float(sum(c[1] for c in covers))
+    total_comm = float(sum(c[2] for c in covers))
+
+    # ----- groups, one per peeled layer -------------------------------
+    # The legs carry only their labels and the ledger shape here: the stitched
+    # route supplies each row's distribution directly, so no leg function is
+    # ever evaluated (the recovery's placeholder is never called).
+    for lbl, pc, comm, _r, _n in covers:
+        obl = [Leg(f'{lbl} recovery', 0.0)]
+        if comm:
+            obl.append(Leg(f'{lbl} commission', comm))
+        groups.append(Group(lbl, 'buy', [Leg(f'{lbl} premium', pc)], obl))
+
+    # ----- one entry per plan row -------------------------------------
+    entries = {}
+    plan = _ledger_plan(groups, 'margin')
+    # running consideration / commission net through each cover step
+    running = []
+    acc = 0.0
+    for _lbl, pc, comm, _r, _n in covers:
+        acc += comm - pc
+        running.append(acc)
+    for row_label, kind, payload in plan:
+        if kind == 'leg':
+            gi, side, li = payload
+            if gi == 0:
+                if side == 'cons':
+                    entries[row_label] = _const_row(p_gross, row_label)
+                elif li == 0:
+                    entries[row_label] = _affine_row(
+                        xs, p_gross_agg, sign=-1.0, label=row_label)
+                else:
+                    entries[row_label] = _const_row(
+                        -expense_vals[li - 1], row_label)
+                continue
+            lbl, pc, comm, recovery, _n = covers[gi - 1]
+            if side == 'cons':
+                entries[row_label] = _const_row(-pc, row_label)
+            elif li == 0:
+                entries[row_label] = _affine_row(xs, recovery, label=row_label)
+            else:
+                entries[row_label] = _const_row(comm, row_label)
+        elif kind == 'group_total':
+            gi, side = payload
+            if gi == 0:
+                entries[row_label] = _affine_row(
+                    xs, p_gross_agg, sign=-1.0, shift=-expense_total,
+                    label=row_label)
+            else:
+                _lbl, _pc, comm, recovery, _n = covers[gi - 1]
+                entries[row_label] = _affine_row(
+                    xs, recovery, shift=comm, label=row_label)
+        elif kind == 'group_result':
+            gi = payload
+            if gi == 0:
+                entries[row_label] = _affine_row(
+                    xs, p_gross_agg, sign=-1.0,
+                    shift=p_gross - expense_total, label=row_label)
+            else:
+                _lbl, pc, comm, recovery, _n = covers[gi - 1]
+                entries[row_label] = _affine_row(
+                    xs, recovery, shift=comm - pc, label=row_label)
+        elif kind == 'running_net':
+            gi = payload
+            _lbl, _pc, _comm, _r, net_cum = covers[gi - 1]
+            entries[row_label] = _affine_row(
+                xs, net_cum, sign=-1.0,
+                shift=p_gross - expense_total + running[gi - 1],
+                label=row_label)
+        elif kind == 'grand_total':
+            if payload == 'cons':
+                entries[row_label] = _const_row(p_gross - total_pc, row_label)
+            else:
+                entries[row_label] = _affine_row(
+                    xs, final_net, sign=-1.0,
+                    shift=total_comm - expense_total, label=row_label)
+        elif kind == 'grand_result':
+            entries[row_label] = _affine_row(
+                xs, final_net, sign=-1.0,
+                shift=p_gross - total_pc + total_comm - expense_total,
+                label=row_label)
+        elif kind == 'total_impact':
+            entries[row_label] = ('delta', 'margin', f'{base_step} result')
+    pnl = PnL(name=name or agg.name, source=None, groups=groups,
+              result_name='margin', label=label, stitched_rows=entries)
+    return pnl, 'stitched'
+
+
+def _peel_explanation(agg, pnl, direction, steps, route):
+    """The full [Construction-Introspection] story for a layer-peeled walk."""
+    per_atom = route == 'per-atom'
+    lines = [
+        f'xpnl peel {pnl.label!r} ([Layer-Peeling-Shorthand], {route}).',
+        f'Engine: {agg.name!r}'
+        + (f' -- occurrence reinsurance {agg.occ_reins}'
+           if agg.occ_reins is not None else '')
+        + (f' -- aggregate reinsurance {agg.agg_reins}'
+           if agg.agg_reins is not None else '') + '.',
+        f'Economics resolution: {pnl.economics!r}.',
+        f'Peel order ({direction}): '
+        + ' -> '.join(f'{s[3]}' for s in steps)
+        + '. Occurrence layers precede aggregate ones, preserving the tier '
+          'walk step order; zero-share gap fillers get no step.',
+    ]
+    if per_atom:
+        lines += [
+            'Source: one shared source -- at most one occurrence layer is '
+            'peeled, so the joint ceded axis already is that layer, and each '
+            'aggregate layer rides the same atoms as its own ceder (aggregate '
+            'layers are disjoint intervals on one subject, so single-layer '
+            'ceders sum to the cumulative ceder identically).',
+            'Ladder: scenario (κ) -- every column foots exactly '
+            '([Decision-Kappa-Shared-Source-Rule]).',
+        ]
+    else:
+        lines += [
+            'Source: none -- the ceded-occurrence aggregate is not a function '
+            'of the gross aggregate (the random claim count decouples them), '
+            'and the total ceded axis of the 2-D joint cannot be split after '
+            'the fact, so peeling two or more occurrence layers per-atom '
+            'would need an (m+1)-axis joint ([One-2D-Source] forbids it).',
+            'Rows: each supplied as its own exact marginal. An occurrence row '
+            'is the compound of a deterministic per-claim severity transform '
+            '(one FFT); an aggregate row is a pushforward of the '
+            'net-of-occurrence aggregate.',
+            'Ladder: marginal (plain P headers). The EX column foots exactly '
+            'by linearity, the dispersion columns are deltas of row '
+            'statistics rather than statistics of the delta, evaluate is '
+            'unavailable, and loss-basis LAE books the deterministic '
+            'rate * E[gross loss].',
+        ]
+    lines += ['', pnl._replay_block()]
     return '\n'.join(lines)
 
 
@@ -861,7 +1377,7 @@ def _build_variable_walk(agg, terms, P_G, P_C, C, layer, tl, expense_spec,
                          taken={leg.label for leg in cons + obl})
     groups = [Group('Gross', 'sell', cons, obl)]
     g_ceder, _netter = _reinsurance.make_ceder_netter([layer])
-    base = _first_reins_label(agg, 'agg_reins') or 'ceded agg'
+    base = _tier_label(agg, 'agg_reins', 'ceded agg')
     if tl == 'ceded_premium':            # swing: stochastic ceded premium
         c_cons = [Leg(f'{base} premium',
                       lambda x: terms.phi(g_ceder(x)))]
@@ -903,8 +1419,8 @@ def _build_variable_walk_occ(agg, terms, P_G, P_C, C, layer, tl,
     from . import _reinsurance
     g_ceder, _netter = _reinsurance.make_ceder_netter([layer])
     prem_f, rec_f, comm_f = _feature_maps(terms, tl, g_ceder, P_C, C)
-    occ_base = _first_reins_label(agg, 'occ_reins') or 'ceded occ'
-    agg_base = _first_reins_label(agg, 'agg_reins') or 'ceded agg'
+    occ_base = _tier_label(agg, 'occ_reins', 'ceded occ')
+    agg_base = _tier_label(agg, 'agg_reins', 'ceded agg')
     biv = agg.occ_bivariate(views=('gross', 'ceded'))
     check_joint_grid_adequacy(biv.bivariate.bs_ceded, biv.bivariate.bs_net,
                               None, [layer])
@@ -1145,10 +1661,8 @@ def build_reinstatement_pnl(agg, *, source, terms, gross_premium,
     t = terms
     P_G, D = gross_premium, t.deposit
     A, h = t.recovery, t.reinstatement_premium
-    occ_base = _first_reins_label(agg, 'occ_reins') \
-        or 'ceded occ'
-    agg_base = _first_reins_label(agg, 'agg_reins') \
-        or 'ceded agg'
+    occ_base = _tier_label(agg, 'occ_reins', 'ceded occ')
+    agg_base = _tier_label(agg, 'agg_reins', 'ceded agg')
     prem_key = consideration_label or 'premium'
     loss_key = loss_label or 'Loss'
     cons = [Leg(prem_key, P_G)]

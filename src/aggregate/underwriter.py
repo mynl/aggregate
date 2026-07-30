@@ -951,6 +951,13 @@ class Underwriter(HelpMixin):
         ``{'gross', 'ceded', 'pc_occ', 'pc_agg', 'c_occ', 'c_agg'}`` for the GCN
         view, or ``None`` when no ceded-premium clause is present.
 
+        The per-side totals are accompanied by the per-layer figures that
+        produced them, ``pc_occ_by_layer`` / ``c_occ_by_layer`` and the
+        ``agg`` pair, each a list aligned with the layer list and ``0.0`` where
+        a layer carries no clause. A layer-peeled ``xpnl`` books one group per
+        layer and needs them ([Layer-Peeling-Shorthand]); the totals are
+        unchanged, so the consolidated and tier-walk paths are unaffected.
+
         Parameters
         ----------
         spec : dict
@@ -969,8 +976,10 @@ class Underwriter(HelpMixin):
             prem = spec.pop(f'{which}_reins_premium', None)
             cede = spec.pop(f'{which}_reins_cede', None)
             pc = comm = 0.0
+            pc_layers = [0.0] * len(layers)
+            comm_layers = [0.0] * len(layers)
             if prem is None:
-                return 0.0, 0.0
+                return 0.0, 0.0, pc_layers, comm_layers
             for i, p in enumerate(prem):
                 if p is None:
                     continue
@@ -989,14 +998,18 @@ class Underwriter(HelpMixin):
                 else:                                   # pragma: no cover
                     raise ValueError(f'unknown ceded-premium basis {basis!r}')
                 pc += layer_pc
+                pc_layers[i] = layer_pc
                 if cede is not None and cede[i] is not None:
                     comm += cede[i] * layer_pc
-            return pc, comm
+                    comm_layers[i] = cede[i] * layer_pc
+            return pc, comm, pc_layers, comm_layers
 
-        pc_occ, c_occ = side('occ')
-        pc_agg, c_agg = side('agg')
+        pc_occ, c_occ, pc_occ_layers, c_occ_layers = side('occ')
+        pc_agg, c_agg, pc_agg_layers, c_agg_layers = side('agg')
         return {'gross': pg, 'ceded': pc_occ + pc_agg,
-                'pc_occ': pc_occ, 'pc_agg': pc_agg, 'c_occ': c_occ, 'c_agg': c_agg}
+                'pc_occ': pc_occ, 'pc_agg': pc_agg, 'c_occ': c_occ, 'c_agg': c_agg,
+                'pc_occ_by_layer': pc_occ_layers, 'c_occ_by_layer': c_occ_layers,
+                'pc_agg_by_layer': pc_agg_layers, 'c_agg_by_layer': c_agg_layers}
 
     @staticmethod
     def _make_feature_terms(var_feat, var_params, share=1.0):
@@ -1093,7 +1106,26 @@ class Underwriter(HelpMixin):
             # Optional consideration display label (the ``as`` clause on the
             # premium head) -> the consideration leg's dict key in the plain P&L.
             consideration_label = spec.pop('consideration_label', None)
+            # Optional ``peel <direction>``: walk reinsurance *layers* rather
+            # than tiers ([Layer-Peeling-Shorthand]). Pop before the inner
+            # Aggregate is built (it is not loss structure). An onion is
+            # inherently multi-group, so a consolidated ``pnl`` cannot honour
+            # it -- the grammar accepts the clause on both kinds precisely so
+            # this reads as a semantic error rather than a parse error.
+            peel = spec.pop('peel', None)
+            if peel is not None and kind == 'pnl':
+                raise ValueError(
+                    f"{name}: 'peel' is an 'xpnl' clause. A 'pnl' is the "
+                    'consolidated single-group net view, so it has no steps to '
+                    f"peel; write 'xpnl {name} ... peel {peel}' for the "
+                    'layer-by-layer walk.')
             if port_engine is not None:
+                if peel is not None:
+                    raise ValueError(
+                        f"{name}: 'peel' needs the reinsurance layers of a "
+                        'single aggregate engine; a port.NAME engine reads the '
+                        'net-net portfolio total, which has no layer structure '
+                        'to peel.')
                 obj = self._build_pnl_from_port(
                     name, port_engine, consideration, expense_spec,
                     consideration_label, loss_label, is_tower, program,
@@ -1256,6 +1288,27 @@ class Underwriter(HelpMixin):
             # :meth:`_snapshot_pnl` selects that face after the inner engine is
             # updated.
             inner._pnl_recipe['is_tower'] = is_tower
+            # Peeling is a guaranteed-cost recipe only. ``plain`` has no layers;
+            # ``reins`` restricts to a single occurrence layer by construction;
+            # ``var`` carries one decorated feature layer. Each already owns its
+            # own step tower, so there is nothing to peel and a silent no-op
+            # would be worse than an error.
+            if peel is not None:
+                recipe_kind = inner._pnl_recipe['kind']
+                if recipe_kind != 'gcn':
+                    _why = {
+                        'plain': 'the engine carries no reinsurance',
+                        'reins': 'a reinstated program is a single occurrence '
+                                 'layer',
+                        'var': 'a variable-rating feature decorates a single '
+                               'aggregate layer',
+                    }.get(recipe_kind, f'the {recipe_kind} recipe has no layer '
+                                       'tower')
+                    raise ValueError(
+                        f"{name}: 'peel' needs a guaranteed-cost program with "
+                        f'reinsurance layers to walk, but {_why}. Drop the '
+                        "'peel' clause.")
+                inner._pnl_recipe['peel'] = peel
             # The pnl statement's own trailer. It is also splatted onto the
             # inner Aggregate (the parser merges the specs), but the PnL face
             # reads it from here so the port-engine path -- where the engine
@@ -1900,8 +1953,11 @@ class Underwriter(HelpMixin):
           joint -- [2D-Deferred] closed).
         * ``xpnl`` -- the **walk**, a multi-group :class:`PnL`:
           :func:`~aggregate._pnl_builders.build_xpnl_walk` (guaranteed-cost,
-          marginal-stitched), the walk face of ``build_variable_pnl`` (the
-          per-atom two-group ledger, or the stitched three-step walk when a
+          per-atom, one group per reinsurance **tier**),
+          :func:`~aggregate._pnl_builders.build_xpnl_peel` when the statement
+          carries a ``peel`` clause (one group per **layer**;
+          [Layer-Peeling-Shorthand]), the walk face of ``build_variable_pnl``
+          (the per-atom two-group ledger, or the three-step walk when a
           GC occurrence program inures), or the reinstatement 2-D tower
           re-homed. A plain engine gets the same one-group ledger presented
           as a **one-step walk** ([Decision-XPnL-Plain-Is-One-Step-Walk]);
@@ -1910,7 +1966,8 @@ class Underwriter(HelpMixin):
         The wrapped engine rides on ``pnl.engine`` for drill-down.
         """
         from ._pnl_builders import (build_plain_pnl, build_consolidated_pnl,
-                                    build_xpnl_walk, build_variable_pnl,
+                                    build_xpnl_walk, build_xpnl_peel,
+                                    build_variable_pnl,
                                     build_reinstatement_pnl,
                                     build_reinstatement_source)
         kind = recipe['kind']
@@ -1987,9 +2044,21 @@ class Underwriter(HelpMixin):
             return face
         if kind == 'gcn':
             econ = recipe['econ']
-            if is_tower:
-                # ``xpnl`` -> the marginal-stitched step walk (a plain
-                # multi-group PnL).
+            peel = recipe.get('peel')
+            if is_tower and peel is not None:
+                # ``xpnl ... peel <direction>`` -> one group per reinsurance
+                # LAYER rather than per tier ([Layer-Peeling-Shorthand]).
+                face = build_xpnl_peel(
+                    inner, direction=peel,
+                    gross=econ['gross'], ceded=econ['ceded'],
+                    gcn_economics=econ,
+                    expense_spec=recipe['expense_spec'],
+                    consideration_label=recipe.get('consideration_label'),
+                    loss_label=recipe.get('loss_label'), name=inner.name,
+                    label=inner.label)
+            elif is_tower:
+                # ``xpnl`` -> the per-atom step walk, one group per tier (a
+                # plain multi-group PnL).
                 face = build_xpnl_walk(
                     inner, gross=econ['gross'], ceded=econ['ceded'],
                     gcn_economics=econ,

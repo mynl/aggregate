@@ -96,8 +96,10 @@ def make_ceder_netter(reins_list, debug=False):
 
     It is easiest to make the ceder function. Ceded loss at subject loss at x equals
     the sum of the limits below x plus the cession to the layer in which x lies. The
-    variable ``base`` keeps track of the layer, ``h`` of the sum (height) of lower layers.
-    ``xs`` tracks the knot points, ``ys`` the values.
+    variable ``base`` tracks the running top of the program (where a contiguous next
+    layer would attach), ``h`` the sum (height) of lower layers. ``xs`` tracks the
+    knot points, ``ys`` the values. A layer attaching above ``base`` sits over a gap,
+    so it needs an explicit left-hand knot to hold the ceder flat across the gap.
 
     ::
 
@@ -155,8 +157,11 @@ def make_ceder_netter(reins_list, debug=False):
         # write out right-hand knot points
         xs.append(a + y)
         ys.append(h)
-        # update left-hand end
-        base += (a + y)
+        # the running top of the program, i.e. where a contiguous next layer
+        # would attach. Assign, do not accumulate: an accumulating ``base``
+        # runs ahead of the true top, so the ``a > base`` test above silently
+        # skips a needed left-hand knot once a program has two or more gaps.
+        base = a + y
     # if not at infinity, stay flat from base to end
     if base < INF:
         xs.append(np.inf)

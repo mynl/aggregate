@@ -112,3 +112,56 @@ def test_overlap_raises():
 def test_inf_top_layer_no_false_overlap():
     # an unlimited top layer must not be treated as overlapping a gap above it
     _validate_reins_layers([(1, 10, 0), (1, np.inf, 10)])
+
+
+# ----------------------------------------------------------------------------
+# ceder knot placement across gaps
+#
+# ``make_ceder_netter`` emits a layer's left-hand knot only when the layer
+# attaches strictly above the running top of the program. Tracking that top by
+# accumulation rather than assignment let it run ahead of the truth, so from the
+# second gap onward the test silently failed and the ceder interpolated straight
+# across the gap instead of holding flat.
+# ----------------------------------------------------------------------------
+
+def _ceded_closed_form(reins_list, x):
+    """Reference cession: the sum of each layer's own signed-share payout."""
+    return sum(share * np.clip(x - attach, 0.0, limit)
+               for share, limit, attach in reins_list)
+
+
+def test_two_gaps_hold_flat_across_each_gap():
+    # 100 xs 0, gap, 100 xs 200, gap, 100 xs 400: the ceder must be flat at 100
+    # over (100, 200) and flat at 200 over (300, 400).
+    layers = [(1, 100, 0), (1, 100, 200), (1, 100, 400)]
+    ceder, _netter, xs, ys = make_ceder_netter(layers, debug=True)
+    # a knot at every attachment and every layer top
+    assert xs == [0, 100, 200, 300, 400, 500, np.inf]
+    assert ys == [0, 100, 100, 200, 200, 300, 300]
+    assert ceder(350.0) == 200.0        # inside the upper gap
+    assert ceder(400.0) == 200.0        # the third layer's attachment
+    assert ceder(150.0) == 100.0        # inside the lower gap
+
+
+@pytest.mark.parametrize('layers', [
+    [(1, 100, 0), (1, 100, 200), (1, 100, 400)],            # two gaps
+    [(1, 100, 0), (1, 100, 200)],                           # one gap
+    [(1, 100, 0), (1, 100, 100), (1, 100, 200)],            # contiguous
+    [(0.5, 100, 50), (0.25, 200, 300), (1, 100, 700)],      # shares and gaps
+    [(1, 10, 0), (0, 5, 10), (1, 10, 15)],                  # zero-share filler
+])
+def test_ceder_matches_closed_form(layers):
+    """The interpolated ceder equals the sum of the layers' own payouts."""
+    ceder, netter = make_ceder_netter(layers)
+    x = np.linspace(0, 1000, 2001)
+    assert np.allclose(ceder(x), _ceded_closed_form(layers, x),
+                       atol=VALIDATION_NOISE)
+    # netter is the complement by construction
+    assert np.allclose(netter(x), x - ceder(x), atol=VALIDATION_NOISE)
+
+
+def test_docstring_example_knots():
+    """The knot table in the ``make_ceder_netter`` docstring stays true."""
+    _c, _n, xs, ys = make_ceder_netter([(1, 10, 0), (0.5, 30, 20)], debug=True)
+    assert xs == [0, 10, 20, 50, np.inf]
+    assert ys == [0, 10, 10, 25, 25]

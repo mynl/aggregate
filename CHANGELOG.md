@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.0.0a182
+
+**[Ceder-Gap-Knot]** Bug fix. `make_ceder_netter` mis-ceded on any reinsurance
+program with three or more layers and two or more genuine gaps, returning a
+cession part way up the gap instead of holding flat across it.
+
+The ceder is built by walking the layers and emitting knot points. A layer that
+attaches above the running top of the program sits over a gap, so it needs an
+explicit left-hand knot to hold the ceded amount flat from the previous layer's
+top up to its own attachment. The running top was tracked by accumulation
+(`base += (a + y)`) rather than assignment, so it ran ahead of the truth and the
+`a > base` test that emits that knot silently failed from the second gap onward.
+The ceder then interpolated straight across the gap. On
+`[(1, 100, 0), (1, 100, 200), (1, 100, 400)]` a subject loss of 400 ceded 250
+where the correct answer is 200, and the missing knot at `(400, 200)` is visible
+in the `debug=True` knot list.
+
+Only programs with two or more gaps were affected. A gap written the documented
+way, as a zero-share filler layer `0 po L xs A`, keeps the attachments
+contiguous and so never triggered it, which is why this survived. Contiguous
+towers, single gaps, unlimited top layers and the docstring's own worked example
+are all unchanged, and the accumulating value's second use, the
+`base < INF` test that decides whether to close the ceder flat at infinity, is
+if anything more correct now that `base` really is the top of the last layer.
+
+`tests/test_reins_buckets.py` gains a ceder-knot section: the two-gap
+regression, a parametrized check of the interpolated ceder against the
+closed-form sum of each layer's own payout across five layer shapes, and a pin
+on the docstring's knot table.
+
 ## 1.0.0a181
 
 **[OEP-Curve]** New utility `aggregate.oep(agg, p, *, freq=0)`, the occurrence

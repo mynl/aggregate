@@ -323,16 +323,16 @@ def test_ratio_df_cession_ratios_read_positive():
 
 
 def test_ratio_df_mean_of_ratio_equals_ratio_of_means_when_premium_is_fixed():
-    """``EX_LR`` and ``LR`` coincide exactly for a deterministic premium."""
+    """``E_LR`` and ``LR`` coincide exactly for a deterministic premium."""
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
             consideration=[Leg('premium', 20.0, kind='premium')],
             obligation=[Leg('loss', lambda x: x, kind='loss')])
     row = p.ratio_df.loc['p']
-    assert row['EX_LR'] == pytest.approx(row['LR'], abs=TOL)
+    assert row['E_LR'] == pytest.approx(row['LR'], abs=TOL)
 
 
-def test_ratio_df_mean_of_ratio_is_nan_without_shared_atoms():
-    """No joint of loss and premium, so no mean-of-ratio to report."""
+def _stitched(premium_sd):
+    """A one-group gd-backed ledger whose premium sd the caller chooses."""
     from aggregate._grid_distribution import GridDistribution
 
     def gd(vals, probs):
@@ -342,15 +342,37 @@ def test_ratio_df_mean_of_ratio_is_nan_without_shared_atoms():
 
     groups = [Group('base', 'sell', [Leg('premium', 15.0, kind='premium')],
                     [Leg('loss', lambda x: x, kind='loss')])]
-    entries = {'premium': (gd([15.0], [1.0]), 15.0, 0.0),
+    prem = (gd([10.0, 20.0], [0.5, 0.5]) if premium_sd
+            else gd([15.0], [1.0]))
+    entries = {'premium': (prem, 15.0, premium_sd),
                'loss': (gd([-10.0, 0.0], [0.5, 0.5]), -5.0, 5.0),
                'result': (gd([5.0, 15.0], [0.5, 0.5]), 10.0, 5.0)}
-    p = PnL(name='s', source=None, groups=groups, result_name='result',
-            stitched_rows=entries)
-    row = p.ratio_df.loc['base']
+    return PnL(name='s', source=None, groups=groups, result_name='result',
+               stitched_rows=entries)
+
+
+def test_mean_of_ratio_survives_a_missing_joint_when_premium_is_fixed():
+    """A constant denominator factors out, so no joint is needed.
+
+    The gate is whether the **denominator** is random, not whether a joint
+    happens to exist: ``E[L / P] == E[L] / P`` exactly for constant ``P``.
+    """
+    row = _stitched(premium_sd=0.0).ratio_df.loc['base']
     assert row['LR'] == pytest.approx(5.0 / 15.0, abs=TOL)
-    assert np.isnan(row['EX_LR'])
-    assert np.isnan(row['EX_ER']) and np.isnan(row['EX_CR'])
+    assert row['E_LR'] == row['LR']            # exactly, not approximately
+    assert row['E_ER'] == row['ER'] and row['E_CR'] == row['CR']
+
+
+def test_mean_of_ratio_is_nan_when_premium_is_random_and_the_joint_is_gone():
+    """Random denominator and no atoms to average over: genuinely unknowable.
+
+    Never a silent fallback to the ratio of the means, which is a different
+    number precisely when the denominator is random.
+    """
+    row = _stitched(premium_sd=5.0).ratio_df.loc['base']
+    assert row['LR'] == pytest.approx(5.0 / 15.0, abs=TOL)
+    assert np.isnan(row['E_LR'])
+    assert np.isnan(row['E_ER']) and np.isnan(row['E_CR'])
 
 
 def test_legs_df_itemizes_declared_legs_only():

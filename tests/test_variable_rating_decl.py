@@ -172,7 +172,7 @@ def test_retro_build():
 # not be conflated under one "loss ratio" heading
 # ----------------------------------------------------------------------
 def test_retro_premium_separates_the_two_loss_ratios():
-    """``LR`` and ``EX_LR`` differ, and in the direction the retro implies.
+    """``LR`` and ``E_LR`` differ, and in the direction the retro implies.
 
     A retro premium rises with loss, so the high-loss atoms carry the high
     premiums and the per-atom ratio is damped: ``E[L/P] < E[L]/E[P]``.
@@ -181,11 +181,11 @@ def test_retro_premium_separates_the_two_loss_ratios():
               'less agg R_e 1000 loss sev lognorm 100 cv 2 poisson')
     assert _leg(p, 'premium')['SD'] > 0            # premium really is random
     row = p.ratio_df.iloc[0]
-    assert row['LR'] > 0 and row['EX_LR'] > 0
-    assert abs(row['EX_LR'] - row['LR']) > 1e-3, \
+    assert row['LR'] > 0 and row['E_LR'] > 0
+    assert abs(row['E_LR'] - row['LR']) > 1e-3, \
         'a correlated premium must move the mean of the ratio off the ratio ' \
         'of the means'
-    assert row['EX_LR'] < row['LR']
+    assert row['E_LR'] < row['LR']
 
 
 def test_fixed_premium_makes_the_two_loss_ratios_agree():
@@ -193,7 +193,7 @@ def test_fixed_premium_makes_the_two_loss_ratios_agree():
     p = build('pnl F 5000 premium less agg F_e 1000 loss '
               'sev lognorm 100 cv 2 poisson')
     row = p.ratio_df.iloc[0]
-    assert row['EX_LR'] == pytest.approx(row['LR'], rel=1e-12)
+    assert row['E_LR'] == pytest.approx(row['LR'], rel=1e-12)
 
 
 # ----------------------------------------------------------------------

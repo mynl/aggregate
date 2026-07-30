@@ -280,7 +280,7 @@
   validated `kind` (`LEG_KINDS`), which is what makes an expense ratio possible;
   `stats_df` unchanged. Amounts are signed in the gross direction so they add
   across blocks, `M == P - L - E - C` holds identically, and a cession's LR
-  reads positive. `LR` (ratio of means) and `EX_LR` (mean of ratio) are reported
+  reads positive. `LR` (ratio of means) and `E_LR` (mean of ratio) are reported
   separately because a correlated premium makes them different numbers.
 - **[Ratio-Distribution]** (logged 2026-07-30, from `[PnL-Ratio-Frame]`) — a
   per-atom P&L holds the joint of loss and premium, so the loss **ratio** is
@@ -289,9 +289,9 @@
   *realized* loss ratio to a commission, so the commission is `E[phi(LR)]`,
   which no moment of `LR` determines. Shape: a `ratio_distribution(ratio='LR',
   step=...)` accessor returning the GD, refusing on the stitched / massive
-  routes where there are no shared atoms (exactly where `EX_LR` is already
-  `nan`). Care needed at atoms with vanishing premium, where the ratio is
-  undefined.
+  routes where there are no shared atoms AND premium is random (exactly where
+  `E_LR` is `nan` after the `a186` regate). Care needed at atoms with vanishing
+  premium, where the ratio is undefined.
 - **[Accounting-Summary-DF]** (pended 2026-07-04) — the gross/ceded-**split**
   consolidated-P&L card, `accounting_summary_df`: Consideration gross premium /
   ceded premium / total; Obligation gross loss / ceded loss / total; Margin

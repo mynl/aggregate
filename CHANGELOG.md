@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.0.0a186
+
+**[PnL-Ratio-Frame]** Two corrections to the ratio frame shipped in `a185`.
+
+**Renamed** `EX_LR` / `EX_ER` / `EX_CR` to `E_LR` / `E_ER` / `E_CR`. `EX_LR`
+read as "the `EX` column, of `LR`", which is not what it is; `E_LR` reads as
+`E[LR]`, which is.
+
+**The availability gate was wrong.** It asked whether a joint existed when the
+question is whether the **denominator is random**. A constant premium factors
+straight out of `E[X / P]`, so the mean of the ratio is exact on any route and
+simply repeats the plain ratio. Reporting `nan` there withheld a number that was
+never in doubt.
+
+It bit hardest exactly where it was least warranted. A layer-peeled `xpnl` with
+two or more occurrence layers takes the stitched route, and peeling is
+guaranteed-cost by construction: `peel` is refused on the variable-rating and
+reinstatement recipes, and every consideration row is a resolved
+`deposit` / `rol` / `rate`. So a peeled ledger's premium is *always* constant,
+and its `E_` columns were always blank when they were always exactly computable.
+
+The gate is now three-way, on the denominator:
+
+- constant premium: `E_x` is the plain ratio, exact, on every route;
+- random premium with atoms: average over them, as before;
+- random premium without atoms: `nan`, genuinely unknowable, never a silent
+  fallback to the ratio of the means.
+
+`nan` also still stands where an atom carrying probability has a vanishing
+premium, the ratio being undefined there. The third case needs a route with no
+shared atoms *and* a variable feature, which no current builder produces; it
+would arise if `[Peel-Aggregate-Tier-Only]` let a variable-rated cession into a
+peeled ledger. `_block_amounts` reports the constant-denominator test off the
+per-row exact standard deviations, which every route carries, rather than off
+atoms that may not exist.
+
+The retro case is unchanged and still the reason both columns exist:
+`LR = 0.2427` against `E_LR = 0.2256`.
+
 ## 1.0.0a185
 
 **[PnL-Ratio-Frame]** **Breaking.** The `Scaled` column is gone, and with it

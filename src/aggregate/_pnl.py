@@ -739,7 +739,7 @@ _RATIO_BUCKET = {'premium': 'P', 'loss': 'L', 'recovery': 'L',
 #: concatenates and diffs against a pricing frame; ``E`` / ``C`` / ``ER`` / ``CR``
 #: extend it, and ``Q`` / ``a`` / ``PQ`` / ``ROE`` have no meaning on a ledger.
 _RATIO_COLS = ('P', 'L', 'E', 'C', 'M', 'LR', 'ER', 'CR',
-               'EX_LR', 'EX_ER', 'EX_CR', 'P_share', 'M_share')
+               'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
 
 
 #: Default ``View`` level names for the :attr:`PnL.stats_df` row MultiIndex,
@@ -1705,14 +1705,19 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         amounts add across blocks, and ``M == P - L - E - C`` holds identically
         (it *is* the signed row sum).
 
-        Returns ``(amounts, vectors, m)``. ``vectors`` is ``None`` when the
-        ledger has no shared atoms (the stitched and massive routes), which is
-        exactly when a mean-of-ratio cannot be formed.
+        Returns ``(amounts, vectors, m, fixed_p)``. ``vectors`` is ``None`` when
+        the ledger has no shared atoms (the stitched and massive routes).
+        ``fixed_p`` reports whether every leg feeding ``P`` is deterministic,
+        which is what decides whether a mean-of-ratio can be formed without a
+        joint: a constant denominator factors straight out of ``E[X / P]``.
+        Every route carries an exact per-row standard deviation, so the test
+        works off the rows rather than off the atoms.
         """
         n = 0 if self._probs is None else len(self._probs)
         amounts = {k: 0.0 for k in _RATIO_AMOUNTS}
         vectors = {k: np.zeros(n) for k in _RATIO_AMOUNTS} if n else None
         m = 0.0
+        fixed_p = True
         for gi in gis:
             spec, g = self._group_specs[gi], self._egroups[gi]
             for legs, rows, side in ((spec.consideration, g.cons, 'cons'),
@@ -1724,8 +1729,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                     amounts[bucket] += factor * r.mean
                     if vectors is not None:
                         vectors[bucket] += factor * r.values
+                    if bucket == 'P' and r.moments[1] > VALIDATION_NOISE:
+                        fixed_p = False
                     m += r.mean
-        return amounts, vectors, m
+        return amounts, vectors, m, fixed_p
 
     @staticmethod
     def _mean_of_ratio(num, den, probs):
@@ -1772,15 +1779,22 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 means**, the convention of ``pricing_df`` and of a rate filing.
                 Re-derived from this row's amounts, never averaged from the
                 blocks below it. ``CR`` satisfies ``1 - CR == M / P``.
-            ``EX_LR``, ``EX_ER``, ``EX_CR``
+            ``E_LR``, ``E_ER``, ``E_CR``
                 The same three as **means of ratios**, ``E[L / P]`` and so on.
-                These differ from the plain ratios exactly when premium is
-                random and correlated with loss, which is what a retro-rated
-                account or a swing / slide / profit-commission cession is; with
-                a deterministic premium the pairs agree. ``nan`` when they
-                cannot be formed: on a route with no shared atoms (no joint of
-                loss and premium to average over) or when some atom carrying
-                probability has a vanishing premium.
+                These part company with the plain ratios exactly when premium
+                is random and correlated with loss, which is what a retro-rated
+                account or a swing / slide / profit-commission cession is; a
+                deterministic premium makes the pairs agree identically.
+
+                Availability turns on whether the **denominator** is random,
+                not on whether a joint happens to exist. A constant premium
+                factors out of ``E[X / P]``, so these are exact on every route
+                and simply repeat the plain ratios. A random premium needs the
+                atoms to average over, so it is ``nan`` on a route that has
+                none (the stitched peel, the massive sweep), and ``nan`` where
+                some atom carrying probability has a vanishing premium, the
+                ratio being undefined there. Never a silent fallback to the
+                ratio of the means.
             ``P_share``, ``M_share``
                 Premium and margin over the **first** block's, that block being
                 the gross book in every builder. Ratios of means.
@@ -1793,8 +1807,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         probs = self._probs
         recs, index = [], []
         first = None
+        pairs = (('LR', 'E_LR'), ('ER', 'E_ER'), ('CR', 'E_CR'))
         for label, gis in self._blocks():
-            a, v, m = self._block_amounts(gis)
+            a, v, m, fixed_p = self._block_amounts(gis)
             p, ell, e, c = a['P'], a['L'], a['E'], a['C']
             if first is None:
                 first = (p, m)
@@ -1804,12 +1819,22 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 # ``or 0.0`` normalizes the signed zero a zero numerator over a
                 # negative (cession) premium would otherwise leave on the sheet
                 row[name] = (num / p or 0.0) if live else float('nan')
-            if v is None:
-                for name in ('EX_LR', 'EX_ER', 'EX_CR'):
+            # Three-way, on whether the DENOMINATOR is random -- not on whether
+            # a joint happens to exist. A constant premium factors out of
+            # E[X / P] exactly, so the mean of the ratio is available on every
+            # route; only a random premium needs the atoms to average over.
+            if not live:
+                for _r, name in pairs:
+                    row[name] = float('nan')
+            elif fixed_p:
+                for plain, name in pairs:
+                    row[name] = row[plain]
+            elif v is None:
+                for _r, name in pairs:
                     row[name] = float('nan')
             else:
-                for name, num in (('EX_LR', v['L']), ('EX_ER', v['E']),
-                                  ('EX_CR', v['L'] + v['E'] + v['C'])):
+                for name, num in (('E_LR', v['L']), ('E_ER', v['E']),
+                                  ('E_CR', v['L'] + v['E'] + v['C'])):
                     row[name] = self._mean_of_ratio(num, v['P'], probs)
             row['P_share'] = (p / first[0]
                               if abs(first[0]) > VALIDATION_NOISE

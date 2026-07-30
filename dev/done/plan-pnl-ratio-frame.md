@@ -67,7 +67,7 @@ ledger that declares no expense legs reports `E = 0` rather than guessing.
 ### `ratio_df`
 
 Indexed by `Step`, one row per block: each group, each tier subtotal, `All`.
-Columns `P L E C M LR ER CR EX_LR EX_ER EX_CR P_share M_share`.
+Columns `P L E C M LR ER CR E_LR E_ER E_CR P_share M_share`.
 
 **The sign convention is the design's keystone.** The amounts are signed *in the
 gross direction*: consideration as booked, obligations negated. So a cession's
@@ -93,12 +93,20 @@ meaning on a ledger.
 The author's caution drove this and it was right: when premium is random and
 correlated with loss, `E[L/P] != E[L]/E[P]`, so neither can be labelled "the"
 loss ratio. Both are reported, `LR` for the ratio of means (the `pricing_df` and
-rate-filing convention) and `EX_LR` for the mean of the ratio.
+rate-filing convention) and `E_LR` for the mean of the ratio.
 
-`EX_*` needs the joint of loss and premium, so it exists **only on a per-atom
-route**. It is `nan` on a route with no shared atoms (the stitched peel, the
-massive sweep) and `nan` when some atom carrying probability has a vanishing
-premium, rather than silently falling back on the ratio of the means.
+Availability turns on whether the **denominator** is random, not on whether a
+joint exists. A constant premium factors out of `E[X / P]`, so `E_*` is exact on
+every route and repeats the plain ratio; a random premium needs atoms to average
+over, so it is `nan` on a route with none, and `nan` where some atom carrying
+probability has a vanishing premium. Never a silent fallback to the ratio of the
+means.
+
+> **Corrected in `a186`.** As shipped at `a185` this gated on the joint rather
+> than the denominator, and the columns were named `EX_*`. That blanked the
+> whole frame on a stitched peel, where premium is in fact always constant
+> (peeling is guaranteed-cost by construction), so the numbers were always
+> exactly computable. See the `a186` CHANGELOG entry.
 
 ### `legs_df`
 
@@ -121,10 +129,12 @@ orientation, matching the documented `pricing_df.T` convention.
   row's amounts equal the column-wise sums of the blocks.
 - `All` `LR` equals `sum(L) / sum(P)` and is **not** the average of the block
   loss ratios.
-- Retro-rated premium: `LR = 0.2426` against `EX_LR = 0.2256`, a 7% relative
-  gap, `EX_LR < LR` as the retro implies (premium rises with loss, damping the
+- Retro-rated premium: `LR = 0.2426` against `E_LR = 0.2256`, a 7% relative
+  gap, `E_LR < LR` as the retro implies (premium rises with loss, damping the
   per-atom ratio). Deterministic premium: the two agree to `rel=1e-12`.
-- Stitched peel: every `EX_*` cell `nan`, every `LR` / `CR` cell live.
+- Stitched peel: every `LR` / `CR` cell live. (At `a185` the `E_*` cells were
+  `nan` here; `a186` makes them live and exactly equal to the plain ratios, the
+  peel premium being constant.)
 - A cession block reads `P < 0`, `L < 0`, `LR > 0`.
 - `P_share == M_share == 1` on the gross block.
 - Every library-built leg is classified; `LAE` reads `'expense'` and the gross

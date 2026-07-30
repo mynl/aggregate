@@ -669,23 +669,30 @@ def test_ratio_df_gross_shares_are_one_and_cessions_are_negative():
     assert r.loc['All occurrence', 'LR'] > 0           # ...but the LR reads +
 
 
-def test_ratio_df_ex_columns_are_nan_on_the_stitched_peel():
-    """Two peeled occurrence layers means no shared atoms, so no joint."""
+def test_ratio_df_e_columns_survive_the_stitched_peel():
+    """No joint, but every peel premium is a constant, so the ratio is exact.
+
+    A peeled ledger is guaranteed-cost by construction (``peel`` is refused on
+    the variable-rating and reinstatement recipes) and every consideration row
+    is a resolved ``deposit`` / ``rol`` / ``rate``, so the denominator never
+    varies and ``E[L / P] == E[L] / P`` identically.
+    """
     p = build(f'{OCC2} peel top-down')
     assert p._stitched
     r = p.ratio_df
-    assert r[['EX_LR', 'EX_ER', 'EX_CR']].isna().all().all()
-    assert r[['LR', 'CR']].notna().all().all()
+    assert r[['E_LR', 'E_ER', 'E_CR']].notna().all().all()
+    for plain, mean_of in (('LR', 'E_LR'), ('ER', 'E_ER'), ('CR', 'E_CR')):
+        assert (r[plain] == r[mean_of]).all(), plain
 
 
 def test_ratio_df_ex_columns_are_live_on_the_per_atom_peel():
     p = build(f'{AGG2} peel top-down')
     assert not p._stitched
     r = p.ratio_df
-    assert r[['EX_LR', 'EX_CR']].notna().all().all()
+    assert r[['E_LR', 'E_CR']].notna().all().all()
     # every premium here is deterministic, so the two readings coincide
     for step in r.index:
-        assert r.loc[step, 'EX_LR'] == pytest.approx(
+        assert r.loc[step, 'E_LR'] == pytest.approx(
             r.loc[step, 'LR'], abs=1e-9)
 
 

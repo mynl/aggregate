@@ -251,6 +251,16 @@
   cumulative ceder identically) and keep the κ ladder; two or more occurrence
   layers route through the kernel's `stitched_rows` seam, where EX foots exactly
   by linearity but the dispersion columns are marginal.
+- ~~**[Tier-Subtotal-Rows]**~~ **DONE `1.0.0a184`**
+  (`dev/done/plan-tier-subtotals.md`) — a layer-peeled `xpnl` shows the whole
+  occurrence and whole aggregate program again: a tier peeling into two or more
+  steps gains an `'All occurrence'` / `'All aggregate'` block after its last
+  step. `_ledger_plan` gained `tier_spans` plus the `'tier_total'` /
+  `'tier_result'` kinds; per-atom it is a partial sum over a group span (κ ladder
+  intact), stitched it costs one FFT for the occurrence tier and none for the
+  aggregate. Also fixed three bare `else` row-kind fallthroughs that silently
+  booked an unknown kind as the impact row, and `PnL.__add__` dropping new
+  constructor arguments on composition.
 - **[Peel-Aggregate-Tier-Only]** (logged 2026-07-30, from
   `[Layer-Peeling-Shorthand]`) — the stitched route is all-or-nothing for a
   `PnL`, so peeling the occurrence layers of a program that *also* carries

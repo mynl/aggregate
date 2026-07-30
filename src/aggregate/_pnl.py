@@ -566,30 +566,58 @@ class _EvaluatedGroup:
         self.result_values = cons_vals + obl_vals
 
 
-def _ledger_plan(groups, result_name):
+def _ledger_plan(groups, result_name, tier_spans=()):
     """The ledger row template as ``(label, kind, payload)`` triples.
 
-    The **single source of truth** for the row set both evaluation routes
-    materialize (in-memory atoms and the massive one-sweep pushforward), so
-    the two ledgers cannot drift. Per group: consideration legs, the group
-    total consideration (only if more than one), obligation legs, the group
-    total obligation (ditto), the group result (= its step delta); in a
-    multi-group ledger a running-net row (``net through <group>``) follows
-    each group after the first, the per-group total / result rows are
-    qualified by the group label, and the sheet closes with the grand rows:
-    ``total consideration`` / ``total obligation`` / the grand result /
-    ``total impact`` (grand result vs the first group's result).
+    The **single source of truth** for the row set every evaluation route
+    materializes (in-memory atoms, the massive one-sweep pushforward, and the
+    gd-backed stitch), so the ledgers cannot drift. Per group: consideration
+    legs, the group total consideration (only if more than one), obligation
+    legs, the group total obligation (ditto), the group result (= its step
+    delta); in a multi-group ledger a running-net row (``net through
+    <group>``) follows each group after the first, the per-group total /
+    result rows are qualified by the group label, and the sheet closes with
+    the grand rows: ``total consideration`` / ``total obligation`` / the
+    grand result / ``total impact`` (grand result vs the first group's
+    result).
 
     Kinds and payloads: ``'leg'`` ``(gi, side, li)``; ``'group_total'``
     ``(gi, side)``; ``'group_result'`` / ``'running_net'`` ``gi``;
+    ``'tier_total'`` ``(lo, hi, side)``; ``'tier_result'`` ``(lo, hi)``;
     ``'grand_total'`` ``side``; ``'grand_result'`` / ``'total_impact'``
-    ``None``. Duplicate labels raise here, once, for both routes. (A forced
+    ``None``. Duplicate labels raise here, once, for every route. (A forced
     single-group tower -- the one-step walk -- keeps this single-group
     template: the tower shape is presentation only, no grand rows.)
+
+    Parameters
+    ----------
+    groups : list of Group
+        The declared groups, in ledger order.
+    result_name : str
+        Name of the single-group result row (the grand result on a tower).
+    tier_spans : tuple, optional
+        ``(label, lo, hi)`` triples naming contiguous **spans** of groups that
+        earn their own subtotal block, emitted after group ``hi - 1`` with
+        ``hi`` exclusive ([Tier-Subtotal-Rows]). A layer-peeled walk passes one
+        span per reinsurance tier, so a peeled tower still shows the whole
+        occurrence and whole aggregate program. A span of fewer than two groups
+        emits nothing, mirroring the group totals: with one group the group's
+        own rows already *are* the subtotal, which is why the plain tier walk
+        is untouched.
+
+    Notes
+    -----
+    Payloads must be hashable: they are half of the ``(kind, payload)`` key
+    into ``PnL._by_kind``, hence tuples for the span kinds.
     """
     multi = len(groups) > 1
     plan = []
     seen = set()
+    # spans that earn a block, keyed by the group they follow
+    spans_after = {}
+    for label, lo, hi in tier_spans:
+        if hi - lo >= 2:
+            spans_after.setdefault(hi - 1, []).append((label, lo, hi))
 
     def add(label, kind, payload):
         if label in seen:
@@ -612,6 +640,10 @@ def _ledger_plan(groups, result_name):
         add(f'{g.label} result' if multi else result_name, 'group_result', gi)
         if multi and gi > 0:
             add(f'net through {g.label}', 'running_net', gi)
+        for label, lo, hi in spans_after.get(gi, ()):
+            add(f'{label} total consideration', 'tier_total', (lo, hi, 'cons'))
+            add(f'{label} total obligation', 'tier_total', (lo, hi, 'obl'))
+            add(f'{label} result', 'tier_result', (lo, hi))
     if multi:
         add('total consideration', 'grand_total', 'cons')
         add('total obligation', 'grand_total', 'obl')
@@ -721,6 +753,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         Label for the grand result row -- the flat ledger key only
         (:attr:`density_df`, the sweep result keys). The card and stats
         sheets display ``Margin`` / ``'Total'`` regardless.
+    tier_spans : tuple, optional
+        ``(label, lo, hi)`` triples naming contiguous spans of groups that earn
+        their own subtotal block, ``hi`` exclusive ([Tier-Subtotal-Rows]). See
+        :func:`_ledger_plan`; a span of fewer than two groups emits nothing.
     label : str, optional
         Optional human display label (the DecL ``as`` clause); presentation
         only, preferred over ``name`` in repr / titles.
@@ -738,8 +774,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
     def __init__(self, *, name, source, groups=None, role=None,
                  consideration=None, obligation=None, scale=None,
-                 result_name='result', label=None, label_map=None,
-                 stitched_rows=None, force_tower=False):
+                 result_name='result', tier_spans=(), label=None,
+                 label_map=None, stitched_rows=None, force_tower=False):
         if groups is None:
             if role is None:
                 raise ValueError(
@@ -806,8 +842,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         #: presents the one-group ledger as its single (Step, View) block /
         #: (Step, View, Line) sheet; no grand rows, no impact).
         self._tower = len(groups) > 1 or bool(force_tower)
+        #: contiguous group spans carrying their own subtotal block
+        #: ([Tier-Subtotal-Rows]); ``{(lo, hi): label}`` for the presentation
+        #: lookup, spans of fewer than two groups dropped as the plan drops them.
+        self._tier_spans = tuple(tier_spans)
+        self._span_labels = {(lo, hi): lbl for lbl, lo, hi in self._tier_spans
+                             if hi - lo >= 2}
         #: the shared row template -- one source of truth for all routes
-        self._plan = _ledger_plan(groups, self.result_name)
+        self._plan = _ledger_plan(groups, self.result_name, self._tier_spans)
         if stitched_rows is not None:
             self._init_stitched(groups, stitched_rows)
         elif _is_massive(source):
@@ -886,6 +928,17 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 self._group_result_rows.append(row)
             elif kind == 'running_net':
                 row = _EvaluatedLeg(label, net_after[payload].copy(), probs)
+            elif kind == 'tier_total':
+                # a span subtotal is the grand total restricted to egs[lo:hi]
+                lo, hi, side = payload
+                vals = sum((g.cons_total_values if side == 'cons'
+                            else g.obl_total_values for g in egs[lo:hi]),
+                           np.zeros(n))
+                row = _EvaluatedLeg(label, vals, probs)
+            elif kind == 'tier_result':
+                lo, hi = payload
+                vals = sum((g.result_values for g in egs[lo:hi]), np.zeros(n))
+                row = _EvaluatedLeg(label, vals, probs)
             elif kind == 'grand_total':
                 vals = sum((g.cons_total_values if payload == 'cons'
                             else g.obl_total_values for g in egs),
@@ -894,10 +947,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 grand_total_rows[payload] = row
             elif kind == 'grand_result':
                 row = _EvaluatedLeg(label, net_after[-1], probs)
-            else:                                     # 'total_impact'
+            elif kind == 'total_impact':
                 row = _EvaluatedLeg(label,
                                     net_after[-1] - egs[0].result_values,
                                     probs)
+            else:
+                raise ValueError(
+                    f'unknown ledger row kind {kind!r} for row {label!r}; '
+                    '_assemble_rows must handle every kind _ledger_plan emits.')
             rows[label] = row
             self._by_kind[(kind, payload)] = row
         self._rows = rows
@@ -973,14 +1030,27 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             elif kind == 'running_net':
                 entries = [e for gi in range(payload + 1)
                            for e in group_entries[gi]]
+            elif kind == 'tier_total':
+                lo, hi, side = payload
+                entries = [(fn, bs) for (gi, sd, li), (fn, bs)
+                           in leg_entries.items()
+                           if sd == side and lo <= gi < hi]
+            elif kind == 'tier_result':
+                lo, hi = payload
+                entries = [e for gi in range(lo, hi)
+                           for e in group_entries[gi]]
             elif kind == 'grand_total':
                 entries = [(fn, bs) for (gi, side, li), (fn, bs)
                            in leg_entries.items() if side == payload]
             elif kind == 'grand_result':
                 entries = [e for fns in group_entries.values() for e in fns]
-            else:                                     # 'total_impact'
+            elif kind == 'total_impact':
                 entries = [e for gi in range(1, len(groups))
                            for e in group_entries[gi]]
+            else:
+                raise ValueError(
+                    f'unknown ledger row kind {kind!r} for row {label!r}; '
+                    '_init_massive must handle every kind _ledger_plan emits.')
             funcs[label] = _sum_sweep_fns([fn for fn, _bs in entries])
             bs_list.append(max(bs for _fn, bs in entries))
         # the sweep computes its own total over ALL entries -- meaningless
@@ -1139,9 +1209,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             raise ValueError(
                 'pnl_a + pnl_b requires the same source (identical atoms); '
                 f'{self.name!r} and {other.name!r} differ.')
+        # ``other``'s groups shift right by our count, so its spans shift too
+        offset = len(self._group_specs)
+        spans = self._tier_spans + tuple(
+            (lbl, lo + offset, hi + offset) for lbl, lo, hi in other._tier_spans)
         return PnL(name=f'{self.name} + {other.name}', source=self._source,
                    groups=self._group_specs + other._group_specs,
-                   scale=self._scale_arg, result_name=self.result_name)
+                   scale=self._scale_arg, result_name=self.result_name,
+                   tier_spans=spans)
 
     # ------------------------------------------------------------------
     # structure access
@@ -1352,6 +1427,16 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         contract. The card always displays ``Margin`` regardless of
         :attr:`result_name` (which names the flat ledger key only).
 
+        A layer-peeled walk adds a three-row block per reinsurance tier that
+        spans two or more steps, after the last step it spans
+        ([Tier-Subtotal-Rows])::
+
+            ('All occurrence', 'Consideration' | 'Obligation' | 'Margin')
+
+        so a peeled tower still shows the whole occurrence and whole aggregate
+        program. There is no ``Net`` row on a tier block: the running net
+        through the tier is already the last layer's ``Net``.
+
         Columns ``EX`` / ``Scaled`` (``EX`` over the committed :attr:`scale`)
         / ``SD`` / ``CV`` / ``Skew`` / ``P01`` / ``Median`` / ``P99``. The
         percentiles are **marginal quantiles of each card row's own
@@ -1397,6 +1482,17 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 index.append((g.label, 'Net'))
                 recs.append(self._card_stat_row(
                     self._by_kind[('running_net', gi)]))
+            # a tier's own block, after the last group it spans
+            # ([Tier-Subtotal-Rows]); the grand block below is the template
+            for (lo, hi), lbl in self._span_labels.items():
+                if hi - 1 != gi:
+                    continue
+                for view, key in (
+                        ('Consideration', ('tier_total', (lo, hi, 'cons'))),
+                        ('Obligation', ('tier_total', (lo, hi, 'obl'))),
+                        ('Margin', ('tier_result', (lo, hi)))):
+                    index.append((lbl, view))
+                    recs.append(self._card_stat_row(self._by_kind[key]))
         if len(self._group_specs) > 1:
             # the closing grand block ('All' since a140 -- too many things
             # were already called Total); a forced single-group tower (the
@@ -1433,6 +1529,12 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         single-group tower (the one-step walk) is just its one block -- no
         grand rows, no impact.
 
+        A tier subtotal ([Tier-Subtotal-Rows]) takes its span's own ``Step``
+        (``'All occurrence'`` / ``'All aggregate'`` on a layer-peeled walk) and
+        reads ``Line == 'Total'``, like the group and grand totals it sits
+        between, so exhibits that filter ``Line`` on ``'Total'`` already treat
+        it as the summary row it is.
+
         Presentation only -- the flat plan labels stay the canonical row keys
         everywhere else (:attr:`density_df`, :attr:`validation_df`, the sweep
         result keys).
@@ -1452,12 +1554,21 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 t = (groups[payload].label, v['margin'], 'Total')
             elif kind == 'running_net':
                 t = (groups[payload].label, v['margin'], 'Net')
+            elif kind == 'tier_total':
+                lo, hi, side = payload
+                t = (self._span_labels[(lo, hi)], v[side], 'Total')
+            elif kind == 'tier_result':
+                t = (self._span_labels[payload], v['margin'], 'Total')
             elif kind == 'grand_total':
                 t = ('All', v[payload], 'Total')
             elif kind == 'grand_result':
                 t = ('All', v['margin'], 'Total')
-            else:                                     # 'total_impact'
+            elif kind == 'total_impact':
                 t = ('All', v['margin'], 'Impact')
+            else:
+                raise ValueError(
+                    f'unknown ledger row kind {kind!r} for row {label!r}; '
+                    '_view_index must handle every kind _ledger_plan emits.')
             tuples.append(t)
         if not multi:
             return pd.MultiIndex.from_tuples(
@@ -1590,7 +1701,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     @property
     def density_df(self):
         """An ordered ``{row label: GridDistribution}`` -- the declared legs,
-        the group results (multi-group), and the grand result.
+        the group results (multi-group), any tier subtotal results, and the
+        grand result.
 
         **Not** a single stapled frame: each row keeps its own (irregular,
         exact) grid, so there is no lossy rebucketing onto a shared axis. The
@@ -1602,6 +1714,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             out[r.label] = r.gd
         if self._tower:
             for r in self._group_result_rows:
+                out[r.label] = r.gd
+            for span in self._span_labels:
+                r = self._by_kind[('tier_result', span)]
                 out[r.label] = r.gd
         out[self._grand_result.label] = self._grand_result.gd
         return out

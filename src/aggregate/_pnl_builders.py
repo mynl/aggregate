@@ -905,11 +905,20 @@ def build_xpnl_peel(agg, *, direction, gross, ceded, gcn_economics=None,
         gcn_economics, 'agg', len(agg.agg_reins or []), pc_agg, c_agg)
     econ_by = {'occ_reins': (pc_occ_by, c_occ_by),
                'agg_reins': (pc_agg_by, c_agg_by)}
+    # One subtotal block per tier that peels into two or more steps
+    # ([Tier-Subtotal-Rows]). Groups run [gross] + occ covers + agg covers, so
+    # the spans are the cover ranges offset by the one gross group. A tier that
+    # peels into a single step already *is* its own subtotal, and
+    # ``_ledger_plan`` drops such a span, so this needs no length test here.
+    tier_spans = (('All occurrence', 1, 1 + len(occ_steps)),
+                  ('All aggregate', 1 + len(occ_steps),
+                   1 + len(occ_steps) + len(agg_steps)))
     common = dict(base_step=loss_label or 'Gross',
                   prem_key=consideration_label or 'premium',
                   loss_key=loss_label or 'Loss',
                   expense_spec=expense_spec, econ_by=econ_by,
-                  p_gross=p_gross, name=name, label=label)
+                  p_gross=p_gross, tier_spans=tier_spans,
+                  name=name, label=label)
     if len(occ_steps) >= 2:
         pnl, route = _peel_stitched(agg, occ_steps, agg_steps, **common)
     else:
@@ -930,13 +939,16 @@ def build_xpnl_peel(agg, *, direction, gross, ceded, gcn_economics=None,
 
 
 def _peel_per_atom(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
-                   expense_spec, econ_by, p_gross, name, label):
+                   expense_spec, econ_by, p_gross, tier_spans, name, label):
     """Peel over ONE shared source: the kappa ladder survives and columns foot.
 
     Reached when at most one occurrence layer is peeled, so the joint's ceded
     axis already *is* that layer's cession and nothing has to be split. Each
     aggregate layer books its own ceder as a per-atom leg, exact because
     aggregate layers are disjoint intervals on the same subject.
+
+    Tier subtotals need nothing extra here: they are per-atom partial sums over
+    a group span, assembled by the kernel ([Tier-Subtotal-Rows]).
     """
     from . import _reinsurance
     gross_obl = [Leg(loss_key, lambda l: l)]         # reads axis 0 on a joint
@@ -979,12 +991,12 @@ def _peel_per_atom(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
             pc_by, c_by = econ_by[site_j]
             groups.append(cover(lbl_j, pc_by[j], c_by[j], ceder_j, False))
     pnl = PnL(name=name or agg.name, source=source, groups=groups,
-              result_name='margin', label=label)
+              result_name='margin', tier_spans=tier_spans, label=label)
     return pnl, 'per-atom'
 
 
 def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
-                   expense_spec, econ_by, p_gross, name, label):
+                   expense_spec, econ_by, p_gross, tier_spans, name, label):
     """Peel two or more occurrence layers: exact marginals, no shared source.
 
     Every ledger row is supplied to :meth:`PnL._init_stitched` as its own exact
@@ -993,6 +1005,13 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
     net-of-occurrence aggregate. The chain is computed end to end from the
     engine's gross severity rather than read off ``reins_density_df``, so the
     rows are internally consistent and the EX column foots exactly.
+
+    A tier subtotal ([Tier-Subtotal-Rows]) needs the tier's **whole** cession as
+    its own marginal: summing the per-layer recovery vectors would add densities
+    rather than variables, and the tier recovery is not an affine of any
+    cumulative net already in hand. That costs one further FFT for the
+    occurrence tier (the cumulative ceder from its last step) and no FFT at all
+    for the aggregate tier, which is a pushforward.
     """
     from . import _reinsurance
     from ._pnl import _ledger_plan
@@ -1014,27 +1033,30 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
     _xs, p_gross_agg = _sev_transform_marginal(agg, lambda x: x)
     occ_rows = []          # per occurrence step: (label, pc, comm, R, N_cum)
     taken = []
+    occ_cum = None
     for site, i, clause, lbl in occ_steps:
         taken.append(i)
-        cum = _reinsurance.make_ceder_netter(
+        occ_cum = _reinsurance.make_ceder_netter(
             [agg.occ_reins[k] for k in sorted(taken)])[0]
         one = _reinsurance.make_ceder_netter([clause])[0]
         _x, recovery = _sev_transform_marginal(agg, one)
-        _x, net_cum = _sev_transform_marginal(agg, lambda x, g=cum: x - g(x))
+        _x, net_cum = _sev_transform_marginal(
+            agg, lambda x, g=occ_cum: x - g(x))
         pc_by, c_by = econ_by[site]
         occ_rows.append((lbl, pc_by[i], c_by[i], recovery, net_cum))
     subject = occ_rows[-1][4]        # the net-of-occurrence aggregate
 
     agg_rows = []          # per aggregate step: (label, pc, comm, R, N_cum)
     taken = []
+    agg_cum = None
     for site, j, clause, lbl in agg_steps:
         taken.append(j)
-        cum = _reinsurance.make_ceder_netter(
+        agg_cum = _reinsurance.make_ceder_netter(
             [agg.agg_reins[k] for k in sorted(taken)])[0]
         one = _reinsurance.make_ceder_netter([clause])[0]
         _x, recovery = _agg_transform_marginal(agg, one, subject)
         _x, net_cum = _agg_transform_marginal(
-            agg, lambda s, g=cum: s - g(s), subject)
+            agg, lambda s, g=agg_cum: s - g(s), subject)
         pc_by, c_by = econ_by[site]
         agg_rows.append((lbl, pc_by[j], c_by[j], recovery, net_cum))
 
@@ -1043,6 +1065,24 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
     covers = occ_rows + agg_rows
     total_pc = float(sum(c[1] for c in covers))
     total_comm = float(sum(c[2] for c in covers))
+
+    # ----- the whole-tier cession, for the subtotal blocks -------------
+    # Keyed by group span; only computed for a tier that actually peels into
+    # two or more steps, since ``_ledger_plan`` drops the others.
+    n_occ = len(occ_rows)
+    tier_recovery = {}
+    if n_occ >= 2:
+        tier_recovery[(1, 1 + n_occ)] = _sev_transform_marginal(
+            agg, occ_cum)[1]
+    if len(agg_rows) >= 2:
+        tier_recovery[(1 + n_occ, 1 + n_occ + len(agg_rows))] = \
+            _agg_transform_marginal(agg, agg_cum, subject)[1]
+
+    def span_economics(lo, hi):
+        """``(ceded premium, commission)`` summed over a span's covers."""
+        block = covers[lo - 1:hi - 1]        # group 0 is Gross
+        return (float(sum(c[1] for c in block)),
+                float(sum(c[2] for c in block)))
 
     # ----- groups, one per peeled layer -------------------------------
     # The legs carry only their labels and the ledger shape here: the stitched
@@ -1055,8 +1095,11 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
         groups.append(Group(lbl, 'buy', [Leg(f'{lbl} premium', pc)], obl))
 
     # ----- one entry per plan row -------------------------------------
+    # The plan is re-derived here and must match the one ``PnL`` builds below,
+    # so the same ``tier_spans`` goes to both; a mismatch surfaces as the
+    # "no entry supplied for ledger row" error.
     entries = {}
-    plan = _ledger_plan(groups, 'margin')
+    plan = _ledger_plan(groups, 'margin', tier_spans)
     # running consideration / commission net through each cover step
     running = []
     acc = 0.0
@@ -1110,6 +1153,21 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
                 xs, net_cum, sign=-1.0,
                 shift=p_gross - expense_total + running[gi - 1],
                 label=row_label)
+        elif kind == 'tier_total':
+            lo, hi, side = payload
+            pc_span, comm_span = span_economics(lo, hi)
+            if side == 'cons':
+                entries[row_label] = _const_row(-pc_span, row_label)
+            else:
+                entries[row_label] = _affine_row(
+                    xs, tier_recovery[(lo, hi)], shift=comm_span,
+                    label=row_label)
+        elif kind == 'tier_result':
+            lo, hi = payload
+            pc_span, comm_span = span_economics(lo, hi)
+            entries[row_label] = _affine_row(
+                xs, tier_recovery[(lo, hi)], shift=comm_span - pc_span,
+                label=row_label)
         elif kind == 'grand_total':
             if payload == 'cons':
                 entries[row_label] = _const_row(p_gross - total_pc, row_label)
@@ -1124,8 +1182,13 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
                 label=row_label)
         elif kind == 'total_impact':
             entries[row_label] = ('delta', 'margin', f'{base_step} result')
+        else:                                        # pragma: no cover
+            raise ValueError(
+                f'unknown ledger row kind {kind!r} for row {row_label!r}; '
+                '_peel_stitched must supply an entry for every plan row.')
     pnl = PnL(name=name or agg.name, source=None, groups=groups,
-              result_name='margin', label=label, stitched_rows=entries)
+              result_name='margin', tier_spans=tier_spans, label=label,
+              stitched_rows=entries)
     return pnl, 'stitched'
 
 

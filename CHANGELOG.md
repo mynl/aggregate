@@ -1,5 +1,66 @@
 # Changelog
 
+## 1.0.0a184
+
+**[Tier-Subtotal-Rows]** A layer-peeled `xpnl` now also shows the whole
+occurrence and whole aggregate program. Peeling gave the per-layer detail but
+lost the tier lines the plain walk carried, so a five-layer tower had no row for
+the program as a whole. Plan: `dev/done/plan-tier-subtotals.md`.
+
+A tier that peels into **two or more** steps gains its own three-row block after
+the last step it spans:
+
+```
+Gross            Consideration | Obligation | Margin
+occ 300 xs 200   ...
+occ 100 xs 100   ...
+All occurrence   Consideration | Obligation | Margin   <- subtotal
+agg 150 xs 300   ...
+All              Consideration | Obligation | Margin | Impact
+```
+
+A tier that peels into one step already *is* its own subtotal and gets nothing,
+which is why the plain tier walk and a one-layer-per-tier peel are byte
+identical to `a183`. There is no `Net` row on a tier block: the running net
+through the tier is already the last layer's `Net`.
+
+`_ledger_plan` takes a `tier_spans` argument, `(label, lo, hi)` triples naming
+contiguous group spans with `hi` exclusive, and emits two new row kinds,
+`'tier_total'` `(lo, hi, side)` and `'tier_result'` `(lo, hi)`. `Line` reads
+`'Total'`, like the group and grand totals the block sits between, so exhibits
+that filter `Line` on `'Total'` already treat it as the summary row it is.
+
+The three evaluation routes cost little. On the **per-atom** route a subtotal is
+the grand total restricted to a group span, so it is a partial sum over the same
+atoms: the scenario `κ` ladder survives and every column still foots exactly. On
+the **massive** route it is one extra sweep key, not a second sweep. On the
+**stitched** route the kernel needs nothing, since that route is keyed by row
+label, but the builder needs the tier's *whole* cession as its own marginal:
+summing the per-layer recovery vectors would add densities rather than
+variables, and the tier recovery is not an affine of any cumulative net already
+in hand. That costs one further FFT for the occurrence tier (the cumulative
+ceder from its last step) and no FFT at all for the aggregate tier, which is a
+pushforward of the net-of-occurrence aggregate.
+
+The subtotal is the cross-check the peel had been missing: on a two-layer
+occurrence tower the peel's `All occurrence` block reaches the tier total by
+summing its own per-layer rows, while the plain walk reaches it as one lumped
+group off the occurrence joint. Two independent code paths, and they agree to
+1.6e-7 (the walk is the looser, riding the coarser 2-D joint).
+
+Three latent kernel problems fixed while in there. `_assemble_rows`,
+`_init_massive` and `_view_index` each closed their row-kind dispatch with a
+bare `else` that *meant* `'total_impact'`, so an unhandled kind was silently
+booked as the impact row; all three now name `'total_impact'` explicitly and
+raise on anything unknown. `PnL.__add__` reconstructed from `_group_specs` /
+`_scale_arg` / `result_name` only, so any new constructor argument silently
+dropped on composition; it now carries `tier_spans`, shifting the right-hand
+operand's spans by the left-hand group count, since `+` renumbers the groups.
+
+`summary_df` gains the matching tier blocks and `density_df` the tier result
+rows. `tests/test_pnl_peel.py` grows to 53 cases; `decl-testers.agg` section AI
+gains `AI.Both`, two layers in each tier.
+
 ## 1.0.0a183
 
 **[Layer-Peeling-Shorthand]** New DecL clause `peel`: `xpnl ... peel top-down`

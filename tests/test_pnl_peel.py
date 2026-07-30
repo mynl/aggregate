@@ -33,10 +33,17 @@ from aggregate.underwriter import Underwriter
 
 VALIDATION_NOISE = get_settings().validation.noise
 
-#: Footing tolerance. The ledger rows are partial sums of the same exact
-#: marginals, so a column that foots does so to numerical noise, not to a
-#: modelling tolerance.
+#: Footing tolerance *within* a step. Those rows are affine shifts of one
+#: marginal, so the column foots to numerical noise, not to a modelling
+#: tolerance.
 FOOTS = 1e-9
+
+#: Footing tolerance *across* steps on the stitched route. Each step rides its
+#: own independently computed marginal, so a cross-step sum is exact only up to
+#: the rebucketing's first-moment accumulation. Relative, because the absolute
+#: drift scales with the amounts: measured ~1.7e-10 relative on the two-tier
+#: program below.
+FOOTS_ACROSS = 1e-9
 
 #: One occurrence tower, two priced layers. The peel target.
 OCC2 = (
@@ -60,6 +67,15 @@ ONE_EACH = (
     'sev lognorm 100 cv 2 '
     'occurrence net of 500 xs 500 deposit 100 poisson '
     'aggregate net of 200 xs 400 deposit 40'
+)
+
+#: Two layers in each tier, so both tiers earn a subtotal block.
+TWO_EACH = (
+    'xpnl PeelBoth 1000 premium less agg PeelBoth_e 1000 premium at 70% lr '
+    'sev lognorm 100 cv 2 '
+    'occurrence net of 100 xs 100 deposit 60 cede 0.2 and '
+    '300 xs 200 deposit 40 poisson '
+    'aggregate net of 100 xs 300 deposit 25 and 200 xs 400 deposit 15'
 )
 
 
@@ -122,12 +138,14 @@ def test_one_layer_per_tier_keeps_the_kappa_ladder():
 # ----------------------------------------------------------------------
 def test_top_down_introduces_the_highest_layer_first():
     p = build(f'{OCC2} peel top-down')
-    assert _steps(p) == ['Gross', 'occ 300 xs 200', 'occ 100 xs 100', 'All']
+    assert _steps(p) == ['Gross', 'occ 300 xs 200', 'occ 100 xs 100',
+                         'All occurrence', 'All']
 
 
 def test_bottom_up_introduces_the_lowest_layer_first():
     p = build(f'{OCC2} peel bottom-up')
-    assert _steps(p) == ['Gross', 'occ 100 xs 100', 'occ 300 xs 200', 'All']
+    assert _steps(p) == ['Gross', 'occ 100 xs 100', 'occ 300 xs 200',
+                         'All occurrence', 'All']
 
 
 def test_occurrence_tier_precedes_the_aggregate_tier():
@@ -138,8 +156,11 @@ def test_occurrence_tier_precedes_the_aggregate_tier():
         'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 deposit 40 '
         'poisson aggregate net of 150 xs 300 deposit 25 peel top-down'
     )
+    # the occurrence tier peels into two steps so it earns a subtotal; the
+    # single-layer aggregate tier is already its own subtotal
     assert _steps(build(prog)) == [
-        'Gross', 'occ 300 xs 200', 'occ 100 xs 100', 'agg 150 xs 300', 'All']
+        'Gross', 'occ 300 xs 200', 'occ 100 xs 100', 'All occurrence',
+        'agg 150 xs 300', 'All']
 
 
 # ----------------------------------------------------------------------
@@ -148,7 +169,8 @@ def test_occurrence_tier_precedes_the_aggregate_tier():
 def test_aggregate_only_peel_is_per_atom():
     p = build(f'{AGG2} peel top-down')
     assert not p._stitched
-    assert _steps(p) == ['Gross', 'agg 400 xs 800', 'agg 200 xs 600', 'All']
+    assert _steps(p) == ['Gross', 'agg 400 xs 800', 'agg 200 xs 600',
+                         'All aggregate', 'All']
     assert _kappa_columns(p)
 
 
@@ -310,7 +332,7 @@ def test_declared_layer_label_names_its_step():
         '300 xs 200 deposit 40 poisson peel bottom-up'
     )
     assert _steps(build(prog)) == [
-        'Gross', 'Working layer', 'occ 300 xs 200', 'All']
+        'Gross', 'Working layer', 'occ 300 xs 200', 'All occurrence', 'All']
 
 
 def test_partial_share_layer_descriptor():
@@ -322,7 +344,8 @@ def test_partial_share_layer_descriptor():
         '400 xs 800 deposit 15 peel top-down'
     )
     assert _steps(build(prog)) == [
-        'Gross', 'agg 400 xs 800', 'agg 50% so 200 xs 600', 'All']
+        'Gross', 'agg 400 xs 800', 'agg 50% so 200 xs 600',
+        'All aggregate', 'All']
 
 
 def test_single_layer_tier_walk_step_takes_the_descriptor():
@@ -352,7 +375,8 @@ def test_zero_share_filler_gets_no_step():
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         p = build(prog)
-    assert _steps(p) == ['Gross', 'occ 100 xs 0', 'occ 200 xs 200', 'All']
+    assert _steps(p) == ['Gross', 'occ 100 xs 0', 'occ 200 xs 200',
+                         'All occurrence', 'All']
     _assert_column_foots(p, 'EX')
 
 
@@ -453,6 +477,156 @@ def test_absent_peel_adds_no_spec_key():
     _kind, _name, spec = uw.parser.parse(OCC2)
     assert 'peel' not in spec
     assert 'peel' not in spec_to_decl(spec, 'xpnl', 'PeelOcc')
+
+
+# ----------------------------------------------------------------------
+# Tier subtotals ([Tier-Subtotal-Rows])
+#
+# A tier that peels into two or more steps earns its own three-row block after
+# the last step it spans, so a peeled tower still shows the whole occurrence
+# and whole aggregate program. A tier that peels into one step already *is* its
+# own subtotal, so it gets none.
+# ----------------------------------------------------------------------
+def _side(frame, step, view, column='EX'):
+    return _side_total(frame, step, view, column)
+
+
+def test_two_layer_tier_earns_a_subtotal_block():
+    p = build(f'{OCC2} peel top-down')
+    s = p.stats_df
+    assert 'All occurrence' in _steps(p)
+    for view in ('Consideration', 'Obligation', 'Margin'):
+        assert ('All occurrence', view, 'Total') in s.index
+
+
+def test_single_layer_tier_earns_no_subtotal():
+    """One layer in a tier: its own group rows already are the subtotal."""
+    assert 'All occurrence' not in _steps(build(f'{ONE_EACH} peel top-down'))
+    assert 'All aggregate' not in _steps(build(f'{ONE_EACH} peel top-down'))
+
+
+def test_both_tiers_get_their_own_subtotal():
+    p = build(f'{TWO_EACH} peel top-down')
+    assert _steps(p) == [
+        'Gross', 'occ 300 xs 200', 'occ 100 xs 100', 'All occurrence',
+        'agg 200 xs 400', 'agg 100 xs 300', 'All aggregate', 'All']
+
+
+@pytest.mark.parametrize('direction', ['top-down', 'bottom-up'])
+def test_tier_subtotal_matches_the_lumped_tier_walk(direction):
+    """The cross-path anchor: the subtotal IS the tier walk's step.
+
+    The peel reaches the tier total by summing its own per-layer rows; the tier
+    walk reaches it as one lumped group off the occurrence joint. Two
+    independent code paths, one answer. The walk rides the coarser 2-D joint,
+    so it is the looser of the two.
+    """
+    walk = build(OCC2).stats_df
+    peeled = build(f'{OCC2} peel {direction}').stats_df
+    for view in ('Consideration', 'Obligation', 'Margin'):
+        assert _side(peeled, 'All occurrence', view) == pytest.approx(
+            _side(walk, 'ceded occ', view), abs=1e-6)
+
+
+def test_tier_subtotal_sums_its_own_layers():
+    """Consideration and obligation add over exactly the tier's own steps."""
+    p = build(f'{TWO_EACH} peel top-down')
+    s = p.stats_df
+    for tier, prefix in (('All occurrence', 'occ '), ('All aggregate', 'agg ')):
+        layers = [st for st in _steps(p) if st.startswith(prefix)]
+        assert len(layers) == 2
+        for view in ('Consideration', 'Obligation', 'Margin'):
+            assert _side(s, tier, view) == pytest.approx(
+                sum(_side(s, st, view) for st in layers), abs=FOOTS)
+
+
+def test_tier_subtotals_chain_into_the_running_net():
+    """Gross margin plus the tier subtotals equals the closing margin.
+
+    A cross-step sum on the stitched route, so the tolerance is relative: the
+    four rows ride four independently computed marginals and linearity holds to
+    the rebucketing's first-moment accuracy.
+    """
+    p = build(f'{TWO_EACH} peel top-down')
+    s = p.stats_df
+    total = (s.loc[('Gross', 'Margin', 'Total'), 'EX']
+             + s.loc[('All occurrence', 'Margin', 'Total'), 'EX']
+             + s.loc[('All aggregate', 'Margin', 'Total'), 'EX'])
+    assert total == pytest.approx(
+        s.loc[('All', 'Margin', 'Total'), 'EX'], rel=FOOTS_ACROSS)
+
+
+def test_tier_subtotal_foots_in_every_column_per_atom():
+    """On the per-atom route the subtotal keeps the kappa ladder and foots."""
+    p = build(f'{AGG2} peel top-down')
+    assert 'All aggregate' in _steps(p)
+    for column in ['EX'] + _kappa_columns(p):
+        _assert_column_foots(p, column)
+
+
+def test_tier_subtotal_ex_foots_on_the_stitched_route():
+    p = build(f'{TWO_EACH} peel bottom-up')
+    assert p._stitched
+    _assert_column_foots(p, 'EX')
+
+
+def test_summary_df_gains_the_tier_block():
+    card = build(f'{TWO_EACH} peel top-down').summary_df
+    for tier in ('All occurrence', 'All aggregate'):
+        for view in ('Consideration', 'Obligation', 'Margin'):
+            assert (tier, view) in card.index
+        # a tier block carries no Net row: the running net through the tier is
+        # already the last layer's Net
+        assert (tier, 'Net') not in card.index
+
+
+def test_density_df_carries_the_tier_results():
+    dd = build(f'{TWO_EACH} peel top-down').density_df
+    assert 'All occurrence result' in dd
+    assert 'All aggregate result' in dd
+    assert np.isfinite(dd['All occurrence result'].x).all()
+
+
+def test_tier_spans_shift_on_composition():
+    """``+`` renumbers groups, so the right-hand spans must shift with them."""
+    from aggregate._grid_distribution import GridDistribution
+    from aggregate._pnl import Group, Leg, PnL
+
+    src = GridDistribution(np.array([0.0, 10.0]), np.array([0.5, 0.5]),
+                           bs=None, is_loss_value=False)
+
+    def two_group(tag):
+        groups = [Group(f'{tag}a', 'sell', [Leg(f'{tag} p1', 4.0)],
+                        [Leg(f'{tag} o1', lambda x: x)]),
+                  Group(f'{tag}b', 'sell', [Leg(f'{tag} p2', 6.0)],
+                        [Leg(f'{tag} o2', lambda x: x)])]
+        return PnL(name=tag, source=src, groups=groups, result_name='margin',
+                   tier_spans=((f'All {tag}', 0, 2),))
+
+    left, right = two_group('L'), two_group('R')
+    both = left + right
+    assert both._tier_spans == (('All L', 0, 2), ('All R', 2, 4))
+    s = both.stats_df
+    # each span still totals its OWN two groups, not the other pair's
+    for tag, steps in (('L', ['La', 'Lb']), ('R', ['Ra', 'Rb'])):
+        assert _side(s, f'All {tag}', 'Margin') == pytest.approx(
+            sum(s.loc[(st, 'Margin', 'Total'), 'EX'] for st in steps),
+            abs=FOOTS)
+
+
+def test_unknown_row_kind_raises(monkeypatch):
+    """The kernel no longer books an unhandled kind as the total impact."""
+    from aggregate import _pnl as pnl_mod
+
+    real = pnl_mod._ledger_plan
+
+    def bogus(groups, result_name, tier_spans=()):
+        return real(groups, result_name, tier_spans) + [
+            ('mystery row', 'no_such_kind', None)]
+
+    monkeypatch.setattr(pnl_mod, '_ledger_plan', bogus)
+    with pytest.raises(ValueError, match='unknown ledger row kind'):
+        build(f'{AGG2} peel top-down')
 
 
 def test_every_peeled_row_carries_a_distribution():

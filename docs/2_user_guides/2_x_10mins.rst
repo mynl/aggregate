@@ -669,6 +669,23 @@ cdf, and sf of the underlying :class:`Severity` objects.
 
     a03.sev.pdf(20), a03.sev.cdf(20), a03.sev.sf(20)
 
+Since 1.0.0a180 it also carries the two inverses, ``ppf`` (indexed by
+non-exceedance probability) and ``isf`` (by exceedance probability). These are
+the *exact* severity quantiles, computed from the input distributions. Contrast
+:meth:`Aggregate.q_sev`, which reads the discretized severity and so can only
+return a point on the ``bs`` lattice. Use ``q_sev`` when the question is about
+the computed aggregate, and ``sev.ppf`` when it is about the input severity, as
+it is for occurrence PML and exceedance curves. See
+:func:`aggregate.utilities.oep`.
+
+.. ipython:: python
+    :okwarning:
+
+    a03.sev.ppf(0.99), a03.sev.isf(0.01), a03.q_sev(0.99)
+
+For a mixture the inverse has no closed form, so it is found by bracketing the
+root with the component quantiles and calling ``scipy.optimize.brentq``.
+
 The component weights are proportional to ``a03.en`` and ``a03.sev.cdf`` is computed as
 
 .. ipython:: python

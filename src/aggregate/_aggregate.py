@@ -19,7 +19,7 @@ import scipy.fft as sfft
 from scipy.integrate import quad
 import scipy.stats as ss
 from scipy import interpolate
-from scipy.optimize import NoConvergence  # noqa
+from scipy.optimize import brentq, NoConvergence  # noqa
 from textwrap import fill
 from ._help import HelpMixin
 from .constants import (DefectiveDistributionWarning,
@@ -432,6 +432,87 @@ _STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
 #: ``dfi`` for Pollaczeck-Khinchine, the pmf of the all-time maximum for
 #: Wiener-Hopf.
 RuinFunction = namedtuple('RuinFunction', ['ruin', 'find_u', 'mean', 'density'])
+
+
+#: Return type of :meth:`Aggregate.sev`, the *exact* continuous severity: the
+#: en-weighted mixture of the component :class:`~aggregate.Severity` objects,
+#: evaluated from the input distributions rather than from the discretized
+#: ``bs``-grid in ``sev_density_df``. ``cdf`` / ``sf`` / ``pdf`` are the forward
+#: functions; ``ppf`` / ``isf`` are their inverses, added in 1.0.0a180. Contrast
+#: :meth:`Aggregate.q_sev`, which snaps to the grid.
+SevFunctions = namedtuple('SevFunctions', ['cdf', 'sf', 'pdf', 'ppf', 'isf'])
+
+
+def _mixture_inverse(q, mixture_fn, component_invs, increasing):
+    """Invert a monotone weighted-mixture cdf or sf by bracketed root finding.
+
+    A weighted mixture has no closed-form inverse, but it is bracketed for free
+    by the inverses of its own components, so no search for a starting interval
+    is needed.
+
+    Parameters
+    ----------
+    q : float or array_like
+        Probability level(s) to invert. ``0 < q < 1`` for a useful answer;
+        values outside are passed through to the component inverses, which
+        return the support endpoints or ``nan`` as scipy does.
+    mixture_fn : callable
+        The weighted mixture function being inverted, ``cdf`` or ``sf``.
+    component_invs : list of callable
+        The matching per-component inverses, ``ppf`` for a cdf, ``isf`` for an
+        sf. Must be the components of ``mixture_fn``.
+    increasing : bool
+        ``True`` when ``mixture_fn`` is a cdf (nondecreasing), ``False`` for an
+        sf (nonincreasing). Sets the sign of the bracket test.
+
+    Returns
+    -------
+    numpy scalar or ndarray
+        The inverse, matching the shape of ``q``. A 0-d input gives a numpy
+        scalar, following the :meth:`Severity._unwrap` convention.
+
+    Notes
+    -----
+    **Why the component inverses bracket the mixture inverse.** Write the
+    mixture as :math:`G(x) = \\sum_i w_i G_i(x)` with :math:`w_i > 0`,
+    :math:`\\sum_i w_i = 1`, each :math:`G_i` monotone in the same direction.
+    Take the cdf case. Let :math:`lo = \\min_i G_i^{-1}(q)`, attained by
+    component :math:`j`. Then :math:`G_j(lo) \\ge q`, and every other component
+    has :math:`G_k^{-1}(q) \\ge lo`, hence :math:`G_k(lo) \\ge q` as well, so
+    :math:`G(lo) \\ge q`. Symmetrically :math:`G(hi) \\le q` at
+    :math:`hi = \\max_i G_i^{-1}(q)`. The root therefore lies in ``[lo, hi]``
+    and :func:`scipy.optimize.brentq` converges on it. The sf case is the same
+    argument with the inequalities reversed.
+
+    A severity whose survival function *jumps* past ``q`` (a limit, a
+    discrete component) has no exact root. brentq still converges to the jump
+    location, which is the correct lower-quantile answer; the same-sign guard
+    below covers the degenerate case where the bracket collapses onto it.
+    """
+    q = np.asarray(q, dtype=float)
+
+    def _one(qi):
+        candidates = np.array([inv(qi) for inv in component_invs], dtype=float)
+        lo, hi = float(np.min(candidates)), float(np.max(candidates))
+        # all components agree, or the bracket is degenerate / unbounded: no
+        # root to find, and brentq would reject the interval
+        if not (np.isfinite(lo) and np.isfinite(hi)) or lo >= hi:
+            return lo
+        f_lo = mixture_fn(lo) - qi
+        f_hi = mixture_fn(hi) - qi
+        if f_lo == 0.0:
+            return lo
+        if f_hi == 0.0:
+            return hi
+        if np.sign(f_lo) == np.sign(f_hi):
+            # the mixture stepped clean over qi; the crossing is the endpoint
+            # the function has already passed, which is hi for an increasing
+            # mixture and lo for a decreasing one
+            return hi if increasing else lo
+        return float(brentq(lambda x: mixture_fn(x) - qi, lo, hi))
+
+    out = np.array([_one(float(qi)) for qi in q.ravel()], dtype=float).reshape(q.shape)
+    return out[()] if out.ndim == 0 else out
 
 
 def _ruin_find_u(ruin, kind):
@@ -5396,7 +5477,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         intrinsic loss role: the severity curve shares the aggregate's Lee panel
         and must spread the same tail, so a payoff aggregate draws its severity
         with the payoff convention too. The objective accessors that read this GD
-        (:meth:`sev_q`, :meth:`sev_tvar`) are sign-agnostic, so the role only
+        (:meth:`q_sev`, :meth:`tvar_sev`) are sign-agnostic, so the role only
         affects :meth:`GridDistribution.return_period`.
         """
         if self._sev_dist is None:
@@ -5522,14 +5603,67 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
     @property
     def sev(self):
-        """
-        Make exact sf, cdf and pdfs and store in namedtuple for use as sev.cdf etc.
+        """The *exact* continuous severity distribution, as a set of functions.
+
+        The look-through past the discretization: the weighted mixture of the
+        component :class:`~aggregate.Severity` objects evaluated from the input
+        distributions, not from the ``bs``-grid PMF in ``sev_density_df``. Use
+        it whenever the answer should not be quantized to a bucket.
+
+        Returns
+        -------
+        SevFunctions
+            A namedtuple of five callables, each accepting a scalar or an
+            array:
+
+            ``cdf(x)``, ``sf(x)``, ``pdf(x)``
+                The forward functions.
+            ``ppf(p)``, ``isf(s)``
+                Their inverses. ``ppf`` is the quantile function indexed by
+                non-exceedance probability, ``isf`` by exceedance probability.
+                Added in 1.0.0a180.
+
+        See Also
+        --------
+        Aggregate.q_sev : the same quantile snapped to the ``bs`` grid.
+
+        Notes
+        -----
+        **Exact versus grid.** :meth:`q_sev` reads the discretized severity PMF
+        through a :class:`~aggregate._grid_distribution.GridDistribution`, so it
+        can only ever return a lattice point. ``sev.ppf`` calls the underlying
+        continuous distribution, so it returns the true quantile. On
+        ``agg T1 2 claims sev lognorm 1000 cv 1.31 poisson`` at ``bs = 8``,
+        ``sev.ppf(0.99) = 6207.853`` against ``q_sev(0.99) = 6208``. The grid
+        answer is the right one when the question is about the computed
+        aggregate; the exact one is right when the question is about the input
+        severity, as it is for occurrence PML and exceedance curves. See
+        :func:`~aggregate.utilities.oep`.
+
+        **Single component.** The five functions are the component
+        :class:`~aggregate.Severity` methods directly. ``Severity`` subclasses
+        :class:`scipy.stats.rv_continuous` and routes ``ppf`` / ``isf`` through
+        its layered overrides, so limits, attachments and splices are all
+        respected.
+
+        **Mixture.** The forward functions are the ``wts``-weighted sums of the
+        component functions. The inverses have no closed form and are solved by
+        :func:`_mixture_inverse`, which brackets the root with the component
+        inverses and calls :func:`scipy.optimize.brentq`. All five close over
+        the *same* ``wts`` vector, so the inverses invert exactly the mixture
+        the forward functions evaluate.
+
+        **Weights.** ``sev_wt`` carries the mixture weights directly. Under
+        broadcasting (exposure crossed with severity) the per-component
+        ``sev_wt`` are all 1, so their sum is the component count; that case is
+        detected and the weights are taken from the per-component expected
+        claim counts instead.
         """
         if self._sev is None:
-            SevFunctions = namedtuple('SevFunctions', ['cdf', 'sf', 'pdf'])
             if len(self.sevs) == 1:
                 self._sev = SevFunctions(cdf=self.sevs[0].cdf, sf=self.sevs[0].sf,
-                                         pdf=self.sevs[0].pdf)
+                                         pdf=self.sevs[0].pdf, ppf=self.sevs[0].ppf,
+                                         isf=self.sevs[0].isf)
             else:
                 # multiple severites, needs more work
                 wts = np.array([i.sev_wt for i in self.sevs])
@@ -5548,7 +5682,17 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 def _sev_pdf(x):
                     return np.sum([wts[i] * self.sevs[i].pdf(x) for i in range(len(self.sevs))], axis=0)
 
-                self._sev = SevFunctions(cdf=_sev_cdf, sf=_sev_sf, pdf=_sev_pdf)
+                # inverses: bracket with the component inverses, then brentq
+                def _sev_ppf(p):
+                    return _mixture_inverse(p, _sev_cdf, [s.ppf for s in self.sevs],
+                                            increasing=True)
+
+                def _sev_isf(s):
+                    return _mixture_inverse(s, _sev_sf, [sv.isf for sv in self.sevs],
+                                            increasing=False)
+
+                self._sev = SevFunctions(cdf=_sev_cdf, sf=_sev_sf, pdf=_sev_pdf,
+                                         ppf=_sev_ppf, isf=_sev_isf)
         return self._sev
 
     def cdf(self, x, kind='previous'):

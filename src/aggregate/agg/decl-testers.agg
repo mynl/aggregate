@@ -889,3 +889,28 @@ agg AG.Note.Slashes   5 claims sev lognorm 10 cv 1 poisson                      
 agg AG.Note.Semicolon 5 claims sev lognorm 10 cv 1 poisson                                     note{alpha = [0 .5 1 1]; beta follows};
 agg AG.Note.Trailing  5 claims sev lognorm 10 cv 1 poisson                                     note{ends on a hash #};
 agg AG.Note.WithRest  5 claims sev lognorm 10 cv 1 poisson                                     note{5# of limit}  tags{topic:numerics}  hints{log2=16};
+
+# ============================================================
+# AH. OEP curve fixtures ([OEP-Curve], 1.0.0a180)
+#     (tests/test_oep.py)
+# ============================================================
+# `oep(agg, p)` inverts OEP(x) = 1 - exp(-lam Pr(L > x)): given an annual
+# probability it returns the loss one or more occurrences exceed with that
+# probability. It reads the EXACT severity through `agg.sev.isf`, never the
+# bucketed `q_sev`, so these fixtures are about severity shape and frequency
+# kind, not about the FFT grid; most are built with update=False.
+#
+# AH.Blog is `ss.lognorm(1, scale=1000)` written in DecL's (mean, cv) form,
+# full precision on purpose: the published losses are quoted to three decimals
+# and a truncated cv misses them. AH.Mix forces the mixture branch, where the
+# inverse has no closed form and is solved by bracketed brentq. AH.Limit has an
+# atom at the limit, where the achieved oep falls below the requested p. The
+# rest are the frequencies `oep` must refuse.
+agg AH.Blog    2 claims sev lognorm 1648.7212707001281 cv 1.3108324944320862 poisson           note{Return Period Confusions Clarified, Table 8: p=.001 -> 26853.227};
+agg AH.Mix     [1 2] claims sev lognorm [1000 5000] cv [1 2] wts [.6 .4] poisson               note{Four-component mixture; sev.isf(.01) = 26880.5485 against q_sev 26880};
+agg AH.Snap    2 claims sev lognorm 1000 cv 1.31 poisson                                       note{sev.ppf(.99) = 6207.853 against the snapped q_sev(.99) = 6208 at bs=8};
+agg AH.Limit   2 claims 5000 xs 0 sev lognorm 1000 cv 2 poisson                                note{Atom at the limit: S_sev = 0, oep = 0, both return periods infinite};
+agg AH.Negbin  2 claims sev lognorm 1000 cv 2 negbin 2                                         note{Refused: Poisson thinning is what makes 1 - exp(-lam S) hold};
+agg AH.Fixed   2 claims sev lognorm 1000 cv 2 fixed                                            note{Refused: fixed count};
+agg AH.Mixed   2 claims sev lognorm 1000 cv 2 mixed gamma 0.3                                  note{Refused: gamma-mixed Poisson is not Poisson};
+agg AH.ZM      2 claims sev lognorm 1000 cv 2 poisson zm 0.5                                   note{Refused: zero modification breaks P(N=0) = exp(-lam)};

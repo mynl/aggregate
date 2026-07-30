@@ -27,6 +27,7 @@ __all__ = [
     'round_bucket',
     'nice_multiple',
     'qd', 'mv',
+    'oep',
     'kaplan_meier', 'kaplan_meier_np',
     'agg_help', 'explain_validation', 'introspect',
     'silence_warnings',
@@ -454,6 +455,181 @@ def balanced_window(ser, p, bs=None):
         lo = np.floor(lo / bs) * bs
         hi = np.ceil(hi / bs) * bs
     return lo, hi
+
+
+def oep(agg, p, *, freq=0):
+    """Occurrence exceeding probability curve of a Poisson aggregate.
+
+    Given an annual probability ``p``, return the loss ``x`` such that there is
+    a probability ``p`` that one or more occurrences in a year exceed ``x``, or
+    equivalently that the year's largest occurrence exceeds ``x``. OEP points
+    are also called occurrence PML points.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        The aggregate supplying the severity and, unless ``freq`` overrides it,
+        the expected claim count. Its frequency must be Poisson, and not zero
+        modified. Need not have been updated: only the input severity and the
+        claim count are read, never ``density_df``.
+    p : float or array_like of float
+        Annual probability level(s), each in ``(0, 1)`` and strictly below the
+        ceiling ``1 - exp(-lam)``. Typically small, 0.01 or less. Order is
+        preserved, not sorted.
+    freq : float, default 0
+        Expected annual claim count to use in place of ``agg.n``. The default
+        ``0`` means use ``agg.n``; any positive value overrides it. Negative
+        and non-finite values raise. Supplying ``freq`` rescales the curve but
+        does not waive the Poisson requirement.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Indexed by ``p``, with columns
+
+        ``loss``
+            The occurrence PML ``x``, exact, not snapped to the ``bs`` grid.
+        ``S_sev``, ``F_sev``
+            ``Pr(L > x)`` and the severity percentile ``Pr(L <= x)`` of that
+            loss, read back from ``loss``. ``F_sev`` is the level you would
+            hand to :meth:`Aggregate.q_sev`; ``S_sev`` is the usable handle far
+            out in the tail, where ``F_sev`` rounds to 1.
+        ``oep``
+            The achieved annual probability. Equals the index ``p`` to machine
+            precision for a continuous severity.
+        ``occurrence_return_period``
+            ``1 / (lam * S_sev)``, the average gap between occurrences
+            exceeding ``x``. Can be shorter than a year.
+        ``annual_return_period``
+            ``1 / oep``, the average gap between years containing such an
+            occurrence. Always at least 1.
+
+    Raises
+    ------
+    TypeError
+        If ``agg`` is not an :class:`Aggregate`.
+    ValueError
+        If the frequency is not Poisson or is zero modified, if ``freq`` is
+        negative or non-finite, or if any ``p`` falls outside ``(0, 1)`` or
+        above the ceiling.
+
+    See Also
+    --------
+    Aggregate.sev : the exact severity functions this is built on.
+    Aggregate.q_sev : the grid-snapped severity quantile.
+
+    Notes
+    -----
+    **Derivation.** Fix a threshold :math:`x` and keep only the occurrences
+    exceeding it. Thinning a Poisson stream leaves a Poisson stream, so those
+    occurrences are Poisson with rate :math:`\\lambda\\,P(L>x)`. The chance a
+    year contains at least one is one minus the chance it contains none,
+
+    .. math:: \\mathrm{OEP}(x) = 1 - e^{-\\lambda P(L>x)}.
+
+    Inverting for :math:`x` given :math:`p` gives what the reference below
+    calls the exceedance quantile :math:`\\mathrm{EQ}`,
+
+    .. math:: x = S_L^{-1}\\left(\\frac{-\\ln(1-p)}{\\lambda}\\right)
+              = q_L\\left(1 + \\frac{\\ln(1-p)}{\\lambda}\\right),
+
+    which is the formula in the catastrophe modeling user guide. This function
+    is named for the forward map because that is the standing industry usage:
+    an "OEP point" is a loss.
+
+    **The two forms are not numerically equal.** ``1 + ln(1-p)/lam`` cancels
+    toward 1 as ``lam`` grows, losing digits before the quantile is even
+    evaluated. At ``lam = 100`` and ``p = 1e-4`` the two routes already differ
+    by 6e-12 relative. This function computes ``s = -log1p(-p) / lam`` and
+    calls ``isf(s)``, which is accurate throughout.
+
+    **The ceiling.** Solving requires ``-ln(1-p)/lam <= 1``, that is
+    ``p <= 1 - exp(-lam)``, the probability of one or more occurrences. Above
+    it no solution exists: a year with no occurrence has no largest loss, so no
+    threshold is exceeded. At ``lam = 2`` the ceiling is 0.8646647. The ceiling
+    itself is excluded as well, since there the only answer is the infimum of
+    the severity support, which every threshold is exceeded above.
+
+    **Two return periods, one threshold.** They are not the same number and the
+    difference is the usual source of confusion. The occurrence return period
+    counts occurrences and can dip below a year; the annual return period
+    counts the years that contain one and is at least 1. They agree when ``x``
+    is large and diverge as ``x`` falls.
+
+    **Exact, not bucketed.** The loss comes from :meth:`Aggregate.sev`, the
+    continuous input severity, rather than :meth:`Aggregate.q_sev`, which snaps
+    to the ``bs`` lattice. Where the severity has an atom or a gap in support,
+    for instance a limited severity whose quantile lands on the limit for a
+    whole range of ``s``, the achieved ``oep`` column falls below the requested
+    ``p``. That is reported rather than hidden.
+
+    References
+    ----------
+    Mildenhall, S. J., *Return Period Confusions Clarified*, 2026.
+    https://blog.mynl.com/posts/notes/2026-07-16-Return-Period-Confusions-Clarified/
+
+    Examples
+    --------
+    ::
+
+        from aggregate import build, qd, oep
+        a = build('agg Cat 2 claims sev lognorm 1648.7212707 cv 1.3108324 poisson')
+        qd(oep(a, [0.001, 0.01, 0.05, 0.5]))
+
+    gives losses 26853.227, 13119.408, 7021.788 and 1483.772.
+    """
+    from ._aggregate import Aggregate
+
+    if not isinstance(agg, Aggregate):
+        raise TypeError(f'oep requires an Aggregate; got {type(agg).__name__}.')
+
+    fname = getattr(agg.frequency, 'freq_name', '')
+    if fname != 'poisson':
+        raise ValueError(f'oep requires Poisson frequency; {agg.name} has '
+                         f'freq_name={fname!r}.')
+    if getattr(agg.frequency, 'freq_zm', False):
+        raise ValueError(f'oep requires plain Poisson frequency; {agg.name} is zero '
+                         'modified, which breaks the 1 - exp(-lam S) derivation.')
+
+    freq = float(freq)
+    if freq < 0 or not np.isfinite(freq):
+        raise ValueError(f'freq must be a non-negative finite float, 0 to use agg.n; '
+                         f'got {freq}.')
+    lam = freq if freq > 0 else float(agg.n)
+    if lam <= 0:
+        raise ValueError(f'oep needs a positive expected claim count; {agg.name} has '
+                         f'n={agg.n}. Pass freq= to supply one.')
+
+    p = np.atleast_1d(np.asarray(p, dtype=float))
+    bad = p[~((p > 0.0) & (p < 1.0))]
+    if bad.size:
+        raise ValueError(f'p must be in (0, 1) exclusive; got {bad.tolist()}.')
+    # S(x) < 1 caps the attainable annual probability below Pr(N >= 1)
+    ceiling = -np.expm1(-lam)
+    bad = p[p >= ceiling]
+    if bad.size:
+        raise ValueError(f'p must be below the ceiling 1 - exp(-lam) = {ceiling:.7g} '
+                         f'for lam = {lam:g}; got {bad.tolist()}. A year with no '
+                         'occurrence has no largest loss, so nothing is exceeded.')
+
+    # severity exceedance probability implied by p; log1p keeps small p exact
+    s = -np.log1p(-p) / lam
+    loss = np.asarray(agg.sev.isf(s), dtype=float)
+    # read S back from the loss rather than reusing s, so an atom or a gap in
+    # the severity support shows up as an achieved oep below the requested p
+    s_sev = np.asarray(agg.sev.sf(loss), dtype=float)
+    achieved = -np.expm1(-lam * s_sev)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        occ_rp = 1.0 / (lam * s_sev)
+        ann_rp = 1.0 / achieved
+    return pd.DataFrame({
+        'loss': loss,
+        'S_sev': s_sev,
+        'F_sev': 1.0 - s_sev,
+        'oep': achieved,
+        'occurrence_return_period': occ_rp,
+        'annual_return_period': ann_rp,
+    }, index=pd.Index(p, name='p'))
 
 
 def kaplan_meier(df, loss='loss', closed='closed'):

@@ -61,6 +61,16 @@ occurrence PML and severity VaR:
    \mathsf{PML}_{n, \lambda} = q_X\left( 1 +\frac{\log(p)}{\lambda} \right)
    =\mathsf{VaR}_{1+\log(p)/\lambda}(X)
 
+:func:`aggregate.utilities.oep` implements this inversion. Given an annual
+probability :math:`p` it returns the loss
+:math:`q_X(1+\log(1-p)/\lambda)`, computed as
+:math:`S_X^{-1}(-\log(1-p)/\lambda)` because the first form loses precision as
+:math:`\lambda` grows. It reads the exact continuous severity through
+:meth:`Aggregate.sev`, so the answer is not quantized to the bucket size, and
+it reports both return periods discussed below. Note the ceiling
+:math:`p < 1-e^{-\lambda}`: a year with no event has no largest loss, so above
+that probability no threshold is exceeded.
+
 Catastrophe models output a sample of :math:`N` loss events, each with
 an associated annual frequency :math:`\lambda_i` and an expected loss
 :math:`x_i`, :math:`i=1,\dots,N`. Each event is assumed to have a

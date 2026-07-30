@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.0.0a181
+
+**[OEP-Curve]** New utility `aggregate.oep(agg, p, *, freq=0)`, the occurrence
+exceeding probability curve, and the exact severity inverse it needed.
+
+`Aggregate.sev` gains `ppf` and `isf`. It already carried the exact continuous
+`cdf` / `sf` / `pdf` of the weighted severity mixture, the documented look
+through past the discretization, but it had no inverse, so there was no way to
+get an exact severity quantile out of an `Aggregate` at all. `q_sev` reads the
+bucketed `sev_density_df` and can only return a lattice point: on
+`agg T1 2 claims sev lognorm 1000 cv 1.31 poisson` at `bs = 8`,
+`sev.ppf(0.99) = 6207.853` against `q_sev(0.99) = 6208`. A single component
+delegates to the `Severity` `rv_continuous` methods, which respect limits,
+attachments and splices. A mixture has no closed-form inverse and is solved by
+`_mixture_inverse`, which brackets the root with the component quantiles, a
+bracket the monotonicity of the components guarantees, then calls
+`scipy.optimize.brentq`. The `SevFunctions` namedtuple is now defined at module
+level alongside `RuinFunction` instead of being rebuilt inside the property.
+
+`oep(agg, p)` answers "there is a probability `p` that one or more occurrences
+in a year exceed `x`, what is `x`?" It inverts
+`p = 1 - exp(-lam * Pr(L > x))`, returning a DataFrame indexed by `p` with the
+loss, the severity probabilities `S_sev` / `F_sev` of that loss, the achieved
+`oep`, and both return periods: the occurrence one `1 / (lam * S_sev)`, which
+can be shorter than a year, and the annual one `1 / oep`, which cannot. It
+reproduces Table 8 of *Return Period Confusions Clarified* and the
+`q(1 + log(1 - 1/n) / lam)` formula in the catastrophe modeling user guide, and
+it agrees bit for bit with `scipy.stats.lognorm(1, scale=1000).isf(...)` on the
+post's example.
+
+Three points worth knowing:
+
+* The loss is computed as `isf(-log1p(-p) / lam)`, not `ppf(1 + log1p(-p) /
+  lam)`. The second form cancels toward 1 as `lam` grows and the two already
+  differ by 6e-12 relative at `lam = 100`, `p = 1e-4`.
+* There is a ceiling, `p < 1 - exp(-lam)`, which is 0.8646647 at `lam = 2`. A
+  year with no occurrence has no largest loss, so above it nothing is exceeded.
+  Raises rather than returning `nan`.
+* Poisson frequency is required, and zero-modified Poisson is refused: the
+  thinning argument is what makes `1 - exp(-lam S)` hold. Passing `freq` only
+  rescales `lam`, it does not waive the requirement.
+
+`S_sev` is read back from the loss rather than reused from the target, so where
+the severity has an atom the achieved `oep` visibly falls below the requested
+`p` instead of the table silently repeating the same loss. On a limited
+severity the quantile pins to the limit, `S_sev` is 0, and both return periods
+are infinite.
+
+Also in this release: the stale `:meth:`sev_q`` / `:meth:`sev_tvar``
+cross-reference in `_sev_grid_distribution` corrected to `q_sev` / `tvar_sev`,
+and `balanced_window` added to the utilities autosummary, which had never
+listed it. Docs are edited but **not rebuilt**; a rebuild is pending.
+
 ## 1.0.0a180
 
 **[Help-Default-Regex]** `regex` now defaults to `'.*'` on `HelpMixin.help` and

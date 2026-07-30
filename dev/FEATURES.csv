@@ -150,7 +150,7 @@ dist-fn,cdf,method,scalar,Cumulative distribution function,Y,Y,,Y,Y,,Y,,,,,
 dist-fn,sf,method,scalar,Survival function,Y,Y,,Y,Y,,Y,,,,,
 dist-fn,pdf,method,scalar,Probability density (continuous approximation),Y,Y,,,Y,,Y,,,,,
 dist-fn,pmf,method,scalar,Probability mass (discrete view),Y,Y,,,,,Y,,,,,
-dist-fn,q_sev,method,scalar,Severity quantile,Y,,,,,,,,,,,
+dist-fn,q_sev,method,scalar,Severity quantile,Y,,,,,,,,,,,"WRINKLE: grid-snapped. Reads the discretized sev_density_df through a GridDistribution, so it can only return a point on the bs lattice. a180: sev.ppf / sev.isf are the EXACT inverses -- use those when the question is about the input severity (occurrence PML, exceedance curves) and q_sev when it is about the computed aggregate."
 dist-fn,tvar_sev,method,scalar,Severity TVaR,Y,,,,,,,,,,,
 dist-fn,snap,method,scalar,Snap a value to the density_df grid (multiple of bs),Y,Y,,,,,Y,,,,,
 dist-fn,var_dict,method,dict,Dictionary of VaRs for the aggregate / units,Y,Y,,,,,,,,,,"CARVE-OUT, not drift: a171 [FCC-Surface-Decisions] considered q_dict under the a151 VaR-is-q rule and REJECTED it (author decision 5 of 5) -- q_dict is too cryptic. The rule applies to the scalar accessors, where the argument makes the reading obvious (port.q(0.99)), and stops there; on a noun that stands alone in a call site or a heading, var_dict says what is in the dict and q_dict says nothing. See dev/done/plans-considered-and-rejected.md."
@@ -257,7 +257,7 @@ severity-api,fz,attribute,object,Underlying frozen scipy.stats distribution,,,,,
 severity-api,moms,method,tuple,First three moments of the layered severity X(a d),,,,,Y,,,,,,,
 frequency-api,freq_pgf,method,callable,Probability generating function,,,,,,Y,,,,,,"Freq core; never materializes a count dist (see create_frequency). a146 [Empirical-PGF-Horner-Dispatch]: empirical evaluates via Horner / sorted-gap square-and-multiply (evaluate_pgf_polynomial), legacy matrix path only for fractional outcomes."
 build-io,discretize,method,ndarray,Discretize the severity distributions and weight them,Y,,,,,,,,,,,The step-1 kernel behind update; exposed for error analysis.
-build-io,sev,property,namedtuple,Exact sf / cdf / pdf callables for the (mixed) severity,Y,,,,,,,,,,,"SevFunctions namedtuple -- the analytic severity, distinct from the discretized sev_density."
+build-io,sev,property,namedtuple,Exact cdf / sf / pdf / ppf / isf callables for the (mixed) severity,Y,,,,,,,,,,,"SevFunctions namedtuple -- the analytic severity, distinct from the discretized sev_density. a180: gained the inverses ppf / isf, hoisted to a module-level namedtuple. Single component delegates to the Severity rv_continuous methods; a mixture has no closed-form inverse and is solved by bracketing the root with the component quantiles then brentq."
 build-io,moments,method,scalar,Mixed raw moments E[A0^i A1^j] of the joint,,,Y,,,,,,,,,Bivariate-only; delegates to the bivariate distribution.
 build-io,best_window,method,tuple,Decide the combine grid by Portfolio MM + SBJ look-through,,Y,,,,,,,,,,The portfolio grid sizer; populates bs_window_df.
 build-io,n_units,property,scalar,Number of units in the portfolio,,Y,,,,,,,,,,"a150: gained a docstring; counts unit_names, so it excludes the total row."

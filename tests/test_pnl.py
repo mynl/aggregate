@@ -270,7 +270,7 @@ def test_bivariate_with_pnl_component_rejected():
 # ----------------------------------------------------------------------
 # summary_df: the fixed card (Consideration / Obligation / Margin)
 # ----------------------------------------------------------------------
-_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
+_CARD_COLS = ['EX', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
 
 
 def test_summary_df_fixed_card_and_additive_result():
@@ -286,8 +286,8 @@ def test_summary_df_fixed_card_and_additive_result():
     # the defining identity: the EX column adds down the card
     assert df.loc['Margin', 'EX'] == pytest.approx(
         df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX'], abs=1e-6)
-    # Scaled divides by the committed E[total consideration]: -(loss ratio)
-    assert df.loc['Obligation', 'Scaled'] == pytest.approx(-0.70, rel=TOL)
+    # the loss ratio reads off ratio_df, the card being currency only
+    assert a.ratio_df.loc['B', 'LR'] == pytest.approx(0.70, rel=TOL)
     # the margin SD is the loss SD (constant consideration adds no spread)
     assert df.loc['Margin', 'SD'] == pytest.approx(df.loc['Obligation', 'SD'])
 

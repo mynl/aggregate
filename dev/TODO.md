@@ -271,6 +271,27 @@
   peel-order form (a permutation of layer indices rather than a direction) is
   the natural surface for it; note that form is also the only one that
   manufactures layer gaps, so it needs `[Ceder-Gap-Knot]` (fixed in `a182`).
+- ~~**[PnL-Ratio-Frame]**~~ **DONE `1.0.0a185`**
+  (`dev/done/plan-pnl-ratio-frame.md`) — **breaking**: the `Scaled` column,
+  `scaled_stats_df`, the `scale` property and the `scale=` kwarg are gone;
+  ratios live in `PnL.ratio_df`, with `PnL.legs_df` as the itemized companion.
+  `Scaled` divided every cell by one number (net premium on a walk), so it read
+  1.43 for gross premium and -0.571 for a 0.40 gross loss ratio. `Leg` gained a
+  validated `kind` (`LEG_KINDS`), which is what makes an expense ratio possible;
+  `stats_df` unchanged. Amounts are signed in the gross direction so they add
+  across blocks, `M == P - L - E - C` holds identically, and a cession's LR
+  reads positive. `LR` (ratio of means) and `EX_LR` (mean of ratio) are reported
+  separately because a correlated premium makes them different numbers.
+- **[Ratio-Distribution]** (logged 2026-07-30, from `[PnL-Ratio-Frame]`) — a
+  per-atom P&L holds the joint of loss and premium, so the loss **ratio** is
+  available as a `GridDistribution`, not just its two scalar means. That is what
+  a sliding commission actually needs: `contract_terms.SlideTerms.phi` maps a
+  *realized* loss ratio to a commission, so the commission is `E[phi(LR)]`,
+  which no moment of `LR` determines. Shape: a `ratio_distribution(ratio='LR',
+  step=...)` accessor returning the GD, refusing on the stitched / massive
+  routes where there are no shared atoms (exactly where `EX_LR` is already
+  `nan`). Care needed at atoms with vanishing premium, where the ratio is
+  undefined.
 - **[Accounting-Summary-DF]** (pended 2026-07-04) — the gross/ceded-**split**
   consolidated-P&L card, `accounting_summary_df`: Consideration gross premium /
   ceded premium / total; Obligation gross loss / ceded loss / total; Margin

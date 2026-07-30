@@ -107,11 +107,20 @@ from .moments import VALIDATION_NOISE, _snap_noise
 from ._labeled import LabeledMixin
 from ._program import ProgramMixin
 
-__all__ = ['Leg', 'Group', 'PnL', 'stack_marginal_pnls']
+__all__ = ['Leg', 'Group', 'PnL', 'stack_marginal_pnls', 'LEG_KINDS']
 
 
-#: The detailed percentile ladder used by :attr:`PnL.stats_df` /
-#: :attr:`PnL.scaled_stats_df` and :func:`stack_marginal_pnls`. On the stats
+#: What a declared :class:`Leg` *is*, economically. Accounting metadata the
+#: ledger itself never reads: :attr:`PnL.ratio_df` uses it to split a group's
+#: obligation into loss and expense (there is no other way to tell ``'Loss'``
+#: from ``'LAE'`` but the label text), and :attr:`PnL.legs_df` reports it.
+#: ``'premium'`` and ``'commission'`` are consideration-side flows on a ``sell``
+#: and ``buy`` group respectively; ``'recovery'`` is what a cession pays back.
+LEG_KINDS = ('premium', 'loss', 'expense', 'recovery', 'commission')
+
+
+#: The detailed percentile ladder used by :attr:`PnL.stats_df` and
+#: :func:`stack_marginal_pnls`. On the stats
 #: sheets the ladder columns are **scenario states** (conditional means given
 #: the grand result lands at its ``q``-quantile -- [Kappa-Scenario-Percentiles])
 #: and carry ``κ`` headers; in :func:`stack_marginal_pnls` they stay marginal
@@ -152,22 +161,38 @@ class Leg:
     is2d : bool, default False
         ``func`` reads both axes of the shared 2-D joint. An ``is2d`` leg over
         a 1-D source is an error ([One-2D-Source]).
+    kind : str, optional
+        What the flow *is*, one of :data:`LEG_KINDS`. Accounting metadata, not
+        behavior: nothing in the ledger reads it, but :attr:`PnL.ratio_df` needs
+        it to separate loss from expense inside a group's obligation, and
+        :attr:`PnL.legs_df` reports it. ``None`` (the default) leaves the leg
+        unclassified, and ``ratio_df`` folds an unclassified obligation into
+        ``L``, so a ledger that declares no expense legs correctly reports
+        ``E = 0``. Distinct from the ledger **row** kinds of
+        :func:`_ledger_plan`, which describe a row's role in the sheet rather
+        than a declared flow's economic nature.
     """
 
-    def __init__(self, label, func, bs=0, is2d=False):
+    def __init__(self, label, func, bs=0, is2d=False, kind=None):
         if not isinstance(label, str) or not label:
             raise ValueError(
                 f'Leg label must be a non-empty string, got {label!r}.')
         if bs < 0:
             raise ValueError(f'Leg bs must be >= 0, got {bs!r} ({label!r}).')
+        if kind is not None and kind not in LEG_KINDS:
+            raise ValueError(
+                f'Leg kind must be one of {", ".join(LEG_KINDS)}, not '
+                f'{kind!r} ({label!r}).')
         self.label = label
         self.func = func
         self.bs = float(bs)
         self.is2d = bool(is2d)
+        self.kind = kind
 
     def __repr__(self):
         extra = (f', bs={self.bs:g}' if self.bs else '') + \
-            (', is2d=True' if self.is2d else '')
+            (', is2d=True' if self.is2d else '') + \
+            (f', kind={self.kind!r}' if self.kind else '')
         return f'Leg({self.label!r}{extra})'
 
 
@@ -696,7 +721,25 @@ def _stat_names(scenario=False):
 #: Fixed column set of the :attr:`PnL.summary_df` card (headline moments +
 #: the three marginal range percentiles; ``P01`` zero-pads to pair with
 #: ``P99`` -- [Decision-Ladder-Column-Names]).
-_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
+_CARD_COLS = ['EX', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
+
+
+#: The four signed amounts :attr:`PnL.ratio_df` accumulates per block, and which
+#: :data:`LEG_KINDS` feeds each. An unclassified leg falls back on its side:
+#: consideration to ``P``, obligation to ``L`` (the residual), so a ledger that
+#: declares no expense legs reports ``E = 0`` rather than guessing.
+_RATIO_AMOUNTS = ('P', 'L', 'E', 'C')
+_RATIO_BUCKET = {'premium': 'P', 'loss': 'L', 'recovery': 'L',
+                 'expense': 'E', 'commission': 'C'}
+
+#: Fixed column order of :attr:`PnL.ratio_df`: the amounts, the block's signed
+#: result, the three ratios of means, their three mean-of-ratio twins, then the
+#: two shares of the gross block. ``L``, ``M``, ``P`` and ``LR`` keep the
+#: :data:`aggregate.pentagon.PENTAGON_STATS` spelling so a P&L ratio frame
+#: concatenates and diffs against a pricing frame; ``E`` / ``C`` / ``ER`` / ``CR``
+#: extend it, and ``Q`` / ``a`` / ``PQ`` / ``ROE`` have no meaning on a ledger.
+_RATIO_COLS = ('P', 'L', 'E', 'C', 'M', 'LR', 'ER', 'CR',
+               'EX_LR', 'EX_ER', 'EX_CR', 'P_share', 'M_share')
 
 
 #: Default ``View`` level names for the :attr:`PnL.stats_df` row MultiIndex,
@@ -706,11 +749,6 @@ _CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
 _VIEW_DEFAULTS = {'cons': 'Consideration', 'obl': 'Obligation',
                   'margin': 'Margin'}
 
-
-#: ``stats_df`` / ``scaled_stats_df`` columns that are scale-invariant: a ratio
-#: (``CV``) and a shape (``Skew``) pass through ``X / scale`` unchanged; every
-#: other column divides by the committed scale.
-_SCALE_INVARIANT_STATS = frozenset({'CV', 'Skew'})
 
 
 # ----------------------------------------------------------------------
@@ -745,10 +783,6 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         The ordered ledger. Mutually exclusive with the single-group form.
     role, consideration, obligation : optional
         The single-group sugar (see :class:`Group`).
-    scale : float or str, optional
-        The committed unitizer for :attr:`summary_df` / :attr:`scaled_stats_df`.
-        ``None`` (default) uses the expected signed grand total consideration;
-        a number is an explicit scale; a string names a consideration leg.
     result_name : str, default 'result'
         Label for the grand result row -- the flat ledger key only
         (:attr:`density_df`, the sweep result keys). The card and stats
@@ -773,7 +807,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     """
 
     def __init__(self, *, name, source, groups=None, role=None,
-                 consideration=None, obligation=None, scale=None,
+                 consideration=None, obligation=None,
                  result_name='result', tier_spans=(), label=None,
                  label_map=None, stitched_rows=None, force_tower=False):
         if groups is None:
@@ -888,8 +922,6 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                     _EvaluatedGroup(g.label, g.role, cons_rows, obl_rows,
                                     self._probs))
             self._assemble_rows()
-        self._scale_arg = scale
-        self._scale_value, self._scale_label = self._resolve_scale(scale)
 
     # ------------------------------------------------------------------
     # ledger assembly (in-memory atoms route)
@@ -1167,25 +1199,6 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         self._grand_obl = grand_total_rows.get('obl') \
             or self._card_side_row(0, 'obl')
 
-    def _resolve_scale(self, scale):
-        """Commit the exhibit scale at construction.
-
-        Returns ``(value, label)``. ``scale`` is ``None`` (the default -- the
-        expected signed grand total consideration, the natural unitizer), a
-        bare number (an explicit scale, e.g. the reinstatement-program
-        ``gross - deposit``), or a consideration leg label.
-        """
-        if scale is None:
-            return self._grand_cons.mean, 'consideration'
-        if isinstance(scale, str):
-            for g in self._egroups:
-                for r in g.cons:
-                    if r.label == scale:
-                        return r.mean, scale
-            raise ValueError(
-                f'scale {scale!r} names no consideration leg; legs are '
-                f'{[r.label for g in self._egroups for r in g.cons]}.')
-        return float(scale), 'scale'
 
     # ------------------------------------------------------------------
     # composition: same source, concatenated ledgers
@@ -1215,8 +1228,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             (lbl, lo + offset, hi + offset) for lbl, lo, hi in other._tier_spans)
         return PnL(name=f'{self.name} + {other.name}', source=self._source,
                    groups=self._group_specs + other._group_specs,
-                   scale=self._scale_arg, result_name=self.result_name,
-                   tier_spans=spans)
+                   result_name=self.result_name, tier_spans=spans)
 
     # ------------------------------------------------------------------
     # structure access
@@ -1349,15 +1361,6 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         scale."""
         return self._grand_cons.mean
 
-    @property
-    def scale(self):
-        """The committed ``(value, label)`` scale for the scaled exhibits.
-
-        Fixed at construction (default: the expected signed grand total
-        consideration). Every scaled cell divides by this one number, so the
-        reports never re-derive it per call.
-        """
-        return self._scale_value, self._scale_label
 
     # ------------------------------------------------------------------
     # the row ledger, three views
@@ -1392,14 +1395,11 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return side_rows[0] if side_rows else self._zero_row()
 
     def _card_stat_row(self, row):
-        """One :attr:`summary_df` card row: ``EX / Scaled / SD / CV / Skew``
-        + **marginal** ``P1 / Median / P99`` of the row's own distribution."""
-        denom = self._scale_value
-        scalable = denom and abs(denom) > VALIDATION_NOISE
+        """One :attr:`summary_df` card row: ``EX / SD / CV / Skew`` +
+        **marginal** ``P1 / Median / P99`` of the row's own distribution."""
         m, sd, cv, skew = row.moments
         gd = row.gd
-        return [m, (m / denom if scalable else float('nan')),
-                _snap_noise(sd), cv, _snap_noise(skew),
+        return [m, _snap_noise(sd), cv, _snap_noise(skew),
                 float(gd.q(0.01)), float(gd.q(0.50)), float(gd.q(0.99))]
 
     @property
@@ -1437,16 +1437,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         program. There is no ``Net`` row on a tier block: the running net
         through the tier is already the last layer's ``Net``.
 
-        Columns ``EX`` / ``Scaled`` (``EX`` over the committed :attr:`scale`)
-        / ``SD`` / ``CV`` / ``Skew`` / ``P01`` / ``Median`` / ``P99``. The
-        percentiles are **marginal quantiles of each card row's own
-        distribution** -- the card answers "how big is each total" (range),
+        Columns ``EX`` / ``SD`` / ``CV`` / ``Skew`` / ``P01`` / ``Median`` /
+        ``P99``. The percentiles are **marginal quantiles of each card row's
+        own distribution** -- the card answers "how big is each total" (range),
         so its percentile cells do **not** add down the card (marginal
         quantiles never add). The footing sheet is :attr:`stats_df`, whose
-        scenario columns condition on the grand result and foot exactly.
-        With scale = premium the ``Scaled`` column reads as a combined-ratio
-        decomposition: ``1.00`` / ``-(loss & expense ratio)`` /
-        ``margin ratio``.
+        scenario columns condition on the grand result and foot exactly. The
+        card is currency only: ratios live in :attr:`ratio_df`, their own
+        table, per the reporting rule that a column carries one unit.
 
         Returns
         -------
@@ -1509,8 +1507,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             index=pd.MultiIndex.from_tuples(index, names=['Step', 'View']))
 
     def _view_index(self):
-        """The row MultiIndex for :attr:`stats_df` / :attr:`scaled_stats_df`,
-        aligned with the ledger plan order.
+        """The row MultiIndex for :attr:`stats_df`, aligned with the ledger
+        plan order.
 
         Single-group: two-level ``(View, Line)``. ``View`` buckets every
         ledger row: legs and totals under their side (:data:`_VIEW_DEFAULTS`
@@ -1677,26 +1675,184 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             cols = _stat_names(scenario=True)
         return pd.DataFrame(data, index=self._view_index(), columns=cols)
 
-    @property
-    def scaled_stats_df(self):
-        """The statistics of ``X / scale`` -- :attr:`stats_df` unitized.
+    # ------------------------------------------------------------------
+    # raw materials for ratio exhibits ([PnL-Ratio-Frame])
+    # ------------------------------------------------------------------
+    def _blocks(self):
+        """The ``(step label, group indices)`` pairs :attr:`ratio_df` reports.
 
-        ``EX`` / ``SD`` and every percentile divide by the committed
-        :attr:`scale` (conditional means scale linearly, so the scenario
-        columns divide through like everything else); ``CV`` and ``Skew``
-        are scale-invariant and pass through unchanged. Every cell defined
-        (a break-even scale yields ``nan`` in the divided columns -- there
-        is no unit to measure in). Carries the same row MultiIndex as
-        :attr:`stats_df`.
+        Every group, then each tier span, then the whole ledger under ``'All'``
+        (only where the grand rows exist, i.e. a genuinely multi-group ledger).
+        Spans sit after the last group they cover, matching the sheet.
         """
-        df = self.stats_df
-        denom = self._scale_value
-        scalable = denom and abs(denom) > VALIDATION_NOISE
-        for col in df.columns:
-            if col in _SCALE_INVARIANT_STATS:
+        out = []
+        for gi, g in enumerate(self._group_specs):
+            out.append((g.label, (gi,)))
+            for (lo, hi), lbl in self._span_labels.items():
+                if hi - 1 == gi:
+                    out.append((lbl, tuple(range(lo, hi))))
+        if len(self._group_specs) > 1:
+            out.append(('All', tuple(range(len(self._group_specs)))))
+        return out
+
+    def _block_amounts(self, gis):
+        """Signed ``P / L / E / C`` and the per-atom vectors, over a group span.
+
+        The four amounts carry the sign of their contribution **in the gross
+        direction**: consideration enters as booked, obligations negated. A
+        cession's ceded premium and recovery are therefore both negative, so
+        every ratio built from them comes out with its conventional sign, the
+        amounts add across blocks, and ``M == P - L - E - C`` holds identically
+        (it *is* the signed row sum).
+
+        Returns ``(amounts, vectors, m)``. ``vectors`` is ``None`` when the
+        ledger has no shared atoms (the stitched and massive routes), which is
+        exactly when a mean-of-ratio cannot be formed.
+        """
+        n = 0 if self._probs is None else len(self._probs)
+        amounts = {k: 0.0 for k in _RATIO_AMOUNTS}
+        vectors = {k: np.zeros(n) for k in _RATIO_AMOUNTS} if n else None
+        m = 0.0
+        for gi in gis:
+            spec, g = self._group_specs[gi], self._egroups[gi]
+            for legs, rows, side in ((spec.consideration, g.cons, 'cons'),
+                                     (spec.obligation, g.obl, 'obl')):
+                factor = 1.0 if side == 'cons' else -1.0
+                for leg, r in zip(legs, rows):
+                    bucket = _RATIO_BUCKET.get(
+                        leg.kind, 'P' if side == 'cons' else 'L')
+                    amounts[bucket] += factor * r.mean
+                    if vectors is not None:
+                        vectors[bucket] += factor * r.values
+                    m += r.mean
+        return amounts, vectors, m
+
+    @staticmethod
+    def _mean_of_ratio(num, den, probs):
+        """``E[num / den]`` per atom, or ``nan`` where the ratio is undefined.
+
+        The mean of the ratio, as distinct from the ratio of the means. They
+        differ exactly when the denominator is random and correlated with the
+        numerator, which is what a variable-rated premium is. Undefined, hence
+        ``nan``, if any atom carrying probability has a vanishing denominator.
+        """
+        if den is None:
+            return float('nan')
+        live = probs > 0
+        if np.any(np.abs(den[live]) <= VALIDATION_NOISE):
+            return float('nan')
+        return float(np.sum(probs[live] * num[live] / den[live]))
+
+    @property
+    def ratio_df(self):
+        """Amounts and ratios per ledger block -- **raw materials**, not a card.
+
+        One row per block: each group, each tier subtotal, and ``'All'`` on a
+        multi-group ledger. Deliberately unformatted and absent from ``qd`` /
+        the notebook repr, which render :attr:`summary_df`: this is the frame to
+        slice, unstack and build presentation tables from, in the spirit of
+        ``Portfolio.analyze_distortions``' ``pricing_df``. Transpose for the
+        stat-down-the-side orientation.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by ``'Step'``, with columns
+
+            ``P``, ``L``, ``E``, ``C``
+                Premium, loss, expense and commission, signed in the **gross
+                direction** (see :meth:`_block_amounts`), so they add across
+                blocks and ``M == P - L - E - C`` identically. ``L`` absorbs
+                cession recoveries and any unclassified obligation leg; ``E``
+                and ``C`` need :attr:`Leg.kind`.
+            ``M``
+                The block's signed result.
+            ``LR``, ``ER``, ``CR``
+                ``L / P``, ``E / P`` and ``(L + E + C) / P``: **ratios of
+                means**, the convention of ``pricing_df`` and of a rate filing.
+                Re-derived from this row's amounts, never averaged from the
+                blocks below it. ``CR`` satisfies ``1 - CR == M / P``.
+            ``EX_LR``, ``EX_ER``, ``EX_CR``
+                The same three as **means of ratios**, ``E[L / P]`` and so on.
+                These differ from the plain ratios exactly when premium is
+                random and correlated with loss, which is what a retro-rated
+                account or a swing / slide / profit-commission cession is; with
+                a deterministic premium the pairs agree. ``nan`` when they
+                cannot be formed: on a route with no shared atoms (no joint of
+                loss and premium to average over) or when some atom carrying
+                probability has a vanishing premium.
+            ``P_share``, ``M_share``
+                Premium and margin over the **first** block's, that block being
+                the gross book in every builder. Ratios of means.
+
+        See Also
+        --------
+        legs_df : the itemized companion, one row per declared leg.
+        summary_df : the presentation-ready card.
+        """
+        probs = self._probs
+        recs, index = [], []
+        first = None
+        for label, gis in self._blocks():
+            a, v, m = self._block_amounts(gis)
+            p, ell, e, c = a['P'], a['L'], a['E'], a['C']
+            if first is None:
+                first = (p, m)
+            live = abs(p) > VALIDATION_NOISE
+            row = {'P': p, 'L': ell, 'E': e, 'C': c, 'M': m}
+            for name, num in (('LR', ell), ('ER', e), ('CR', ell + e + c)):
+                # ``or 0.0`` normalizes the signed zero a zero numerator over a
+                # negative (cession) premium would otherwise leave on the sheet
+                row[name] = (num / p or 0.0) if live else float('nan')
+            if v is None:
+                for name in ('EX_LR', 'EX_ER', 'EX_CR'):
+                    row[name] = float('nan')
+            else:
+                for name, num in (('EX_LR', v['L']), ('EX_ER', v['E']),
+                                  ('EX_CR', v['L'] + v['E'] + v['C'])):
+                    row[name] = self._mean_of_ratio(num, v['P'], probs)
+            row['P_share'] = (p / first[0]
+                              if abs(first[0]) > VALIDATION_NOISE
+                              else float('nan'))
+            row['M_share'] = (m / first[1]
+                              if abs(first[1]) > VALIDATION_NOISE
+                              else float('nan'))
+            recs.append([row[c_] for c_ in _RATIO_COLS])
+            index.append(label)
+        return pd.DataFrame(recs, columns=list(_RATIO_COLS),
+                            index=pd.Index(index, name='Step'))
+
+    @property
+    def legs_df(self):
+        """One row per **declared** leg: where it sits, what it is, what it costs.
+
+        The itemized companion to :attr:`ratio_df`, and the only place
+        :attr:`Leg.kind` surfaces. Raw materials, like ``ratio_df``: the frame
+        to group and pivot when the ratio you want is not one ``ratio_df``
+        carries. Derived rows (totals, results, running nets) are absent by
+        design -- they are sums of these.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Columns ``Step`` / ``View`` / ``Line`` / ``kind`` / ``EX`` / ``SD``,
+            in ledger order. ``EX`` is the **signed booked** mean, as on
+            :attr:`stats_df`; ``kind`` is ``None`` for an unclassified leg.
+        """
+        recs = []
+        for label, kind, payload in self._plan:
+            if kind != 'leg':
                 continue
-            df[col] = df[col] / denom if scalable else float('nan')
-        return df
+            gi, side, li = payload
+            spec = self._group_specs[gi]
+            legs = spec.consideration if side == 'cons' else spec.obligation
+            row = self._by_kind[(kind, payload)]
+            sd = row.stat_vector()[1] if self._probs is None \
+                else row.moments[1]
+            recs.append([spec.label, _VIEW_DEFAULTS[side], label,
+                         legs[li].kind, row.mean, _snap_noise(sd)])
+        return pd.DataFrame(
+            recs, columns=['Step', 'View', 'Line', 'kind', 'EX', 'SD'])
 
     @property
     def density_df(self):
@@ -1883,7 +2039,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             return '[' + ', '.join(
                 f'Leg({leg.label!r}, {fn_repr(leg.func)}'
                 + (f', bs={leg.bs:g}' if leg.bs else '')
-                + (', is2d=True' if leg.is2d else '') + ')'
+                + (', is2d=True' if leg.is2d else '')
+                + (f', kind={leg.kind!r}' if leg.kind else '') + ')'
                 for leg in legs) + ']'
 
         groups = ',\n        '.join(
@@ -1935,7 +2092,6 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         ``dev/info-strings.rst``; the narrative twin is
         :attr:`construction_description`.
         """
-        scale_value, scale_label = self.scale
         engine = self.engine
         rows = [
             ('pnl object name', self.name),
@@ -1944,7 +2100,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             ('legs', sum(len(g.cons) + len(g.obl) for g in self._egroups)),
             ('role', self.role or 'multi-group'),
             ('result name', self.result_name),
-            ('scale', f'{scale_value:,.6g} ({scale_label})'),
+            ('E[consideration]', f'{self.E_consideration:,.6g}'),
             ('E[result]', f'{self.est_m:,.6g}'),
             ('SD(result)', f'{self.est_sd:,.6g}'),
             ('CV(result)', f'{self.est_cv:,.6g}'),

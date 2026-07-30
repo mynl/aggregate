@@ -262,12 +262,12 @@ def _expense_legs(agg, expense_spec, gross_premium, *, on_source_loss=True,
             n += 1
         used.add(key)
         if loss_rate and on_source_loss:
-            legs.append(Leg(key, lambda x, r=loss_rate, s=scalar_exp: r * x + s))
+            legs.append(Leg(key, lambda x, r=loss_rate, s=scalar_exp: r * x + s, kind='expense'))
         elif loss_rate:
             legs.append(Leg(key, loss_rate * _expected_gross_loss(agg)
-                            + scalar_exp))
+                            + scalar_exp, kind='expense'))
         elif scalar_exp:
-            legs.append(Leg(key, scalar_exp))
+            legs.append(Leg(key, scalar_exp, kind='expense'))
     return legs
 
 
@@ -438,18 +438,18 @@ def build_plain_pnl(engine, *, consideration, consideration_label=None,
             bs=getattr(engine, 'bs', None) or None,
             name=getattr(engine, 'name', None))
     loss_key = loss_label or 'Loss'
-    obligation = [Leg(loss_key, lambda x: x)]
+    obligation = [Leg(loss_key, lambda x: x, kind='loss')]
     obligation += _expense_legs(engine, expense_spec, gp,
                                 on_source_loss=True, taken={loss_key})
     prem_key = consideration_label or 'premium'
     if walk:
         pnl = PnL(name=name, source=source,
-                  groups=[Group('Gross', 'sell', [Leg(prem_key, cons)],
+                  groups=[Group('Gross', 'sell', [Leg(prem_key, cons, kind='premium')],
                                 obligation)],
                   result_name='margin', label=label, force_tower=True)
     else:
         pnl = PnL(name=name, role='sell', source=source,
-                  consideration=[Leg(prem_key, cons)],
+                  consideration=[Leg(prem_key, cons, kind='premium')],
                   obligation=obligation, result_name='margin',
                   label=label)
     face = 'one-step walk (xpnl)' if walk else 'consolidated'
@@ -515,8 +515,8 @@ def build_consolidated_pnl(agg, *, gross, ceded, gcn_economics=None,
     loss_key = f'{loss_label or "Loss"} (net)'
     persp = 'net_agg' if has_agg else 'net_occ'
     source = _marginal_gd(agg, persp)
-    cons = [Leg(prem_key, net_premium)]
-    obl = [Leg(loss_key, lambda x: x)]
+    cons = [Leg(prem_key, net_premium, kind='premium')]
+    obl = [Leg(loss_key, lambda x: x, kind='loss')]
     obl += _expense_legs(agg, expense_spec, p_gross, on_source_loss=False,
                          taken={prem_key, loss_key})
     pnl = PnL(name=name or agg.name, role='sell', source=source,
@@ -628,22 +628,22 @@ def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
     prem_key = consideration_label or 'premium'
     loss_key = loss_label or 'Loss'
 
-    gross_obl = [Leg(loss_key, lambda l: l)]     # reads axis 0 on a joint
+    gross_obl = [Leg(loss_key, lambda l: l, kind='loss')]     # reads axis 0 on a joint
     gross_obl += _expense_legs(agg, expense_spec, p_gross,
                                on_source_loss=True,
                                taken={prem_key, loss_key})
-    groups = [Group(base_step, 'sell', [Leg(prem_key, p_gross)], gross_obl)]
+    groups = [Group(base_step, 'sell', [Leg(prem_key, p_gross, kind='premium')], gross_obl)]
     if has_occ:
         # the occurrence (gross, ceded) joint -- built per walk
         biv = agg.occ_bivariate(views=('gross', 'ceded'))
         check_joint_grid_adequacy(biv.bivariate.bs_ceded,
                                   biv.bivariate.bs_net, None, agg.agg_reins)
         source = biv.bivariate
-        occ_obl = [Leg(f'{occ_base} recovery', lambda l, c: c, is2d=True)]
+        occ_obl = [Leg(f'{occ_base} recovery', lambda l, c: c, is2d=True, kind='recovery')]
         if c_occ:
-            occ_obl.append(Leg(f'{occ_base} commission', c_occ))
+            occ_obl.append(Leg(f'{occ_base} commission', c_occ, kind='commission'))
         groups.append(Group(occ_base, 'buy',
-                            [Leg(f'{occ_base} premium', pc_occ)], occ_obl))
+                            [Leg(f'{occ_base} premium', pc_occ, kind='premium')], occ_obl))
         if has_agg:
             g_agg, _netter = _reinsurance.make_ceder_netter(agg.agg_reins)
 
@@ -652,20 +652,20 @@ def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
                 # but still evaluate.
                 return g_agg(np.maximum(l - c, 0.0))
 
-            a_obl = [Leg(f'{agg_base} recovery', agg_rec, is2d=True)]
+            a_obl = [Leg(f'{agg_base} recovery', agg_rec, is2d=True, kind='recovery')]
             if c_agg:
-                a_obl.append(Leg(f'{agg_base} commission', c_agg))
+                a_obl.append(Leg(f'{agg_base} commission', c_agg, kind='commission'))
             groups.append(Group(agg_base, 'buy',
-                                [Leg(f'{agg_base} premium', pc_agg)], a_obl))
+                                [Leg(f'{agg_base} premium', pc_agg, kind='premium')], a_obl))
     else:
         # aggregate cover only: everything is a function of the gross atoms
         source = _marginal_gd(agg, 'gross')
         g_agg, _netter = _reinsurance.make_ceder_netter(agg.agg_reins)
-        a_obl = [Leg(f'{agg_base} recovery', g_agg)]
+        a_obl = [Leg(f'{agg_base} recovery', g_agg, kind='recovery')]
         if c_agg:
-            a_obl.append(Leg(f'{agg_base} commission', c_agg))
+            a_obl.append(Leg(f'{agg_base} commission', c_agg, kind='commission'))
         groups.append(Group(agg_base, 'buy',
-                            [Leg(f'{agg_base} premium', pc_agg)], a_obl))
+                            [Leg(f'{agg_base} premium', pc_agg, kind='premium')], a_obl))
     pnl = PnL(name=name or agg.name, source=source, groups=groups,
               result_name='margin', label=label)
     pnl.economics = dict(gcn_economics) if gcn_economics is not None \
@@ -951,17 +951,17 @@ def _peel_per_atom(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
     a group span, assembled by the kernel ([Tier-Subtotal-Rows]).
     """
     from . import _reinsurance
-    gross_obl = [Leg(loss_key, lambda l: l)]         # reads axis 0 on a joint
+    gross_obl = [Leg(loss_key, lambda l: l, kind='loss')]         # reads axis 0 on a joint
     gross_obl += _expense_legs(agg, expense_spec, p_gross,
                                on_source_loss=True,
                                taken={prem_key, loss_key})
-    groups = [Group(base_step, 'sell', [Leg(prem_key, p_gross)], gross_obl)]
+    groups = [Group(base_step, 'sell', [Leg(prem_key, p_gross, kind='premium')], gross_obl)]
 
     def cover(lbl, pc, comm, recovery, is2d):
-        obl = [Leg(f'{lbl} recovery', recovery, is2d=is2d)]
+        obl = [Leg(f'{lbl} recovery', recovery, is2d=is2d, kind='recovery')]
         if comm:
-            obl.append(Leg(f'{lbl} commission', comm))
-        return Group(lbl, 'buy', [Leg(f'{lbl} premium', pc)], obl)
+            obl.append(Leg(f'{lbl} commission', comm, kind='commission'))
+        return Group(lbl, 'buy', [Leg(f'{lbl} premium', pc, kind='premium')], obl)
 
     if occ_steps:
         site, i, _clause, lbl = occ_steps[0]
@@ -1026,8 +1026,8 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
     expense_vals = [float(leg.func(0.0)) if callable(leg.func)
                     else float(leg.func) for leg in expense_legs]
     expense_total = float(sum(expense_vals))
-    gross_obl = [Leg(loss_key, lambda l: l)] + expense_legs
-    groups = [Group(base_step, 'sell', [Leg(prem_key, p_gross)], gross_obl)]
+    gross_obl = [Leg(loss_key, lambda l: l, kind='loss')] + expense_legs
+    groups = [Group(base_step, 'sell', [Leg(prem_key, p_gross, kind='premium')], gross_obl)]
 
     # ----- the peel chain: cumulative cessions, tier by tier ----------
     _xs, p_gross_agg = _sev_transform_marginal(agg, lambda x: x)
@@ -1089,10 +1089,10 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key,
     # route supplies each row's distribution directly, so no leg function is
     # ever evaluated (the recovery's placeholder is never called).
     for lbl, pc, comm, _r, _n in covers:
-        obl = [Leg(f'{lbl} recovery', 0.0)]
+        obl = [Leg(f'{lbl} recovery', 0.0, kind='recovery')]
         if comm:
-            obl.append(Leg(f'{lbl} commission', comm))
-        groups.append(Group(lbl, 'buy', [Leg(f'{lbl} premium', pc)], obl))
+            obl.append(Leg(f'{lbl} commission', comm, kind='commission'))
+        groups.append(Group(lbl, 'buy', [Leg(f'{lbl} premium', pc, kind='premium')], obl))
 
     # ----- one entry per plan row -------------------------------------
     # The plan is re-derived here and must match the one ``PnL`` builds below,
@@ -1396,8 +1396,8 @@ def _build_variable_consolidated(agg, terms, P_G, P_C, C, layer, tl,
         # retro: nothing is ceded, so the ledger is the plain shape with the
         # stochastic phi premium; labels stay untouched
         # ([Flag-Net-Premium-Leg-Label]).
-        cons = [Leg(prem_key, terms.phi if tl == 'gross_premium' else P_G)]
-        obl = [Leg(loss_key, lambda x: x)]
+        cons = [Leg(prem_key, terms.phi if tl == 'gross_premium' else P_G, kind='premium')]
+        obl = [Leg(loss_key, lambda x: x, kind='loss')]
         obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
                              taken={leg.label for leg in cons + obl})
         return PnL(name=name or agg.name, role='sell', source=agg,
@@ -1419,8 +1419,8 @@ def _build_variable_consolidated(agg, terms, P_G, P_C, C, layer, tl,
         net_loss = lambda x: x - terms.phi(g_ceder(x) / P_C) * P_C
     else:
         net_loss = lambda x: x - g_ceder(x)
-    cons = [Leg(net_prem_key, net_prem)]
-    obl = [Leg(net_loss_key, net_loss)]
+    cons = [Leg(net_prem_key, net_prem, kind='premium')]
+    obl = [Leg(net_loss_key, net_loss, kind='loss')]
     obl += _expense_legs(agg, expense_spec, P_G,
                          on_source_loss=not has_occ,
                          taken={net_prem_key, net_loss_key})
@@ -1434,8 +1434,8 @@ def _build_variable_walk(agg, terms, P_G, P_C, C, layer, tl, expense_spec,
     """The walk (xpnl) face of a variable-rating program: gross ``sell``
     group + the cession ``buy`` group over the shared gross atoms."""
     from . import _reinsurance
-    cons = [Leg(prem_key, P_G)]
-    obl = [Leg(loss_key, lambda x: x)]
+    cons = [Leg(prem_key, P_G, kind='premium')]
+    obl = [Leg(loss_key, lambda x: x, kind='loss')]
     obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
                          taken={leg.label for leg in cons + obl})
     groups = [Group('Gross', 'sell', cons, obl)]
@@ -1443,22 +1443,22 @@ def _build_variable_walk(agg, terms, P_G, P_C, C, layer, tl, expense_spec,
     base = _tier_label(agg, 'agg_reins', 'ceded agg')
     if tl == 'ceded_premium':            # swing: stochastic ceded premium
         c_cons = [Leg(f'{base} premium',
-                      lambda x: terms.phi(g_ceder(x)))]
+                      lambda x: terms.phi(g_ceder(x)), kind='premium')]
     else:
-        c_cons = [Leg(f'{base} premium', P_C)]
+        c_cons = [Leg(f'{base} premium', P_C, kind='premium')]
     if tl == 'ceded_loss':               # corridor: adjusted recovery
         c_obl = [Leg(f'{base} recovery',
-                     lambda x: terms.phi(g_ceder(x) / P_C) * P_C)]
+                     lambda x: terms.phi(g_ceder(x) / P_C) * P_C, kind='recovery')]
     else:
-        c_obl = [Leg(f'{base} recovery', g_ceder)]
+        c_obl = [Leg(f'{base} recovery', g_ceder, kind='recovery')]
     if tl == 'expense':                  # slide / profit commission
         comm_key = ('sliding commission'
                     if type(terms).__name__ == 'SlideTerms'
                     else 'profit commission')
         c_obl.append(Leg(comm_key,
-                         lambda x: terms.phi(g_ceder(x) / P_C) * P_C))
+                         lambda x: terms.phi(g_ceder(x) / P_C) * P_C, kind='commission'))
     elif C:
-        c_obl.append(Leg(f'{base} commission', C))
+        c_obl.append(Leg(f'{base} commission', C, kind='commission'))
     groups.append(Group(base, 'buy', c_cons, c_obl))
     return PnL(name=name or agg.name, source=agg, groups=groups,
                result_name='margin', label=label)
@@ -1493,30 +1493,30 @@ def _build_variable_walk_occ(agg, terms, P_G, P_C, C, layer, tl,
         # off-support joint cells c > l, which carry ~no mass)
         return np.maximum(l - c, 0.0)
 
-    gross_obl = [Leg(loss_key, lambda l: l)]
+    gross_obl = [Leg(loss_key, lambda l: l, kind='loss')]
     gross_obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
                                taken={prem_key, loss_key})
-    groups = [Group('Gross', 'sell', [Leg(prem_key, P_G)], gross_obl)]
-    occ_obl = [Leg(f'{occ_base} recovery', lambda l, c: c, is2d=True)]
+    groups = [Group('Gross', 'sell', [Leg(prem_key, P_G, kind='premium')], gross_obl)]
+    occ_obl = [Leg(f'{occ_base} recovery', lambda l, c: c, is2d=True, kind='recovery')]
     if c_occ:
-        occ_obl.append(Leg(f'{occ_base} commission', c_occ))
+        occ_obl.append(Leg(f'{occ_base} commission', c_occ, kind='commission'))
     groups.append(Group(occ_base, 'buy',
-                        [Leg(f'{occ_base} premium', pc_occ)], occ_obl))
+                        [Leg(f'{occ_base} premium', pc_occ, kind='premium')], occ_obl))
     feat_obl = [Leg(f'{agg_base} recovery',
-                    lambda l, c: rec_f(n(l, c)), is2d=True)]
+                    lambda l, c: rec_f(n(l, c)), is2d=True, kind='recovery')]
     if tl == 'expense':
         comm_key = ('sliding commission'
                     if type(terms).__name__ == 'SlideTerms'
                     else 'profit commission')
         feat_obl.append(Leg(comm_key, lambda l, c: comm_f(n(l, c)),
-                            is2d=True))
+                            is2d=True, kind='commission'))
     elif C:
-        feat_obl.append(Leg(f'{agg_base} commission', C))
+        feat_obl.append(Leg(f'{agg_base} commission', C, kind='commission'))
     if tl == 'ceded_premium':                     # swing
         feat_cons = [Leg(f'{agg_base} premium',
-                         lambda l, c: prem_f(n(l, c)), is2d=True)]
+                         lambda l, c: prem_f(n(l, c)), is2d=True, kind='premium')]
     else:
-        feat_cons = [Leg(f'{agg_base} premium', P_C)]
+        feat_cons = [Leg(f'{agg_base} premium', P_C, kind='premium')]
     groups.append(Group(agg_base, 'buy', feat_cons, feat_obl))
     return PnL(name=name or agg.name, source=biv.bivariate, groups=groups,
                result_name='margin', label=label)
@@ -1681,8 +1681,6 @@ def build_reinstatement_pnl(agg, *, source, terms, gross_premium,
       same joint -- so the two faces agree on the net position **exactly**
       (no engine drift; one joint).
 
-    The committed ``Scaled`` denominator is the deterministic
-    ``gross - deposit - pc_agg`` on both faces.
 
     Parameters
     ----------
@@ -1728,17 +1726,17 @@ def build_reinstatement_pnl(agg, *, source, terms, gross_premium,
     agg_base = _tier_label(agg, 'agg_reins', 'ceded agg')
     prem_key = consideration_label or 'premium'
     loss_key = loss_label or 'Loss'
-    cons = [Leg(prem_key, P_G)]
-    obl = [Leg(loss_key, lambda l: l)]       # 1-D: reads axis 0 = gross loss
+    cons = [Leg(prem_key, P_G, kind='premium')]
+    obl = [Leg(loss_key, lambda l: l, kind='loss')]       # 1-D: reads axis 0 = gross loss
     obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
                          taken={leg.label for leg in cons + obl})
     groups = [Group('Gross', 'sell', cons, obl)]
-    occ_obl = [Leg(f'{occ_base} recovery', lambda l, r: A(r), is2d=True)]
+    occ_obl = [Leg(f'{occ_base} recovery', lambda l, r: A(r), is2d=True, kind='recovery')]
     if occ_commission:
-        occ_obl.append(Leg(f'{occ_base} commission', occ_commission))
+        occ_obl.append(Leg(f'{occ_base} commission', occ_commission, kind='commission'))
     groups.append(Group(
         occ_base, 'buy',
-        [Leg(f'{occ_base} premium', lambda l, r: D + h(r), is2d=True)],
+        [Leg(f'{occ_base} premium', lambda l, r: D + h(r), is2d=True, kind='premium')],
         occ_obl))
     pc = 0.0
     if agg_recovery is not None:
@@ -1749,22 +1747,21 @@ def build_reinstatement_pnl(agg, *, source, terms, gross_premium,
         rec, prem, comm = agg_tier_maps(terms, agg_recovery, agg_ceded_premium,
                                         agg_feature_terms)
         ft = agg_feature_terms
-        a_obl = [Leg(f'{agg_base} recovery', rec, is2d=True)]
+        a_obl = [Leg(f'{agg_base} recovery', rec, is2d=True, kind='recovery')]
         if comm is not None:
             comm_key = ('sliding commission'
                         if type(ft).__name__ == 'SlideTerms'
                         else 'profit commission')
-            a_obl.append(Leg(comm_key, comm, is2d=True))
+            a_obl.append(Leg(comm_key, comm, is2d=True, kind='commission'))
         elif agg_commission:
-            a_obl.append(Leg(f'{agg_base} commission', agg_commission))
+            a_obl.append(Leg(f'{agg_base} commission', agg_commission, kind='commission'))
         if getattr(ft, 'target_leg', None) == 'ceded_premium':   # swing
-            a_cons = [Leg(f'{agg_base} premium', prem, is2d=True)]
+            a_cons = [Leg(f'{agg_base} premium', prem, is2d=True, kind='premium')]
         else:
-            a_cons = [Leg(f'{agg_base} premium', pc)]
+            a_cons = [Leg(f'{agg_base} premium', pc, kind='premium')]
         groups.append(Group(agg_base, 'buy', a_cons, a_obl))
     pnl = PnL(name=name or agg.name, source=source, groups=groups,
-              result_name='margin', scale=float(P_G - D - pc),
-              label=label)
+              result_name='margin', label=label)
     if gcn_economics is not None:
         pnl.economics = dict(gcn_economics)
     feat = type(agg_feature_terms).__name__ \
@@ -1838,13 +1835,13 @@ def _build_reinstatement_consolidated(agg, *, source, terms, gross_premium,
         pc = 0.0
         net_prem = lambda l, r: P_G - D - h(r) + c_occ
         net_loss = lambda l, r: l - A(r)
-    cons = [Leg(prem_key, net_prem, is2d=True)]
-    obl = [Leg(loss_key, net_loss, is2d=True)]
+    cons = [Leg(prem_key, net_prem, is2d=True, kind='premium')]
+    obl = [Leg(loss_key, net_loss, is2d=True, kind='loss')]
     obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
                          taken={prem_key, loss_key})
     pnl = PnL(name=name or agg.name, role='sell', source=source,
               consideration=cons, obligation=obl, result_name='margin',
-              scale=float(P_G - D - pc), label=label)
+              label=label)
     if gcn_economics is not None:
         pnl.economics = dict(gcn_economics)
     feat = type(agg_feature_terms).__name__ \

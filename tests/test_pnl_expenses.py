@@ -109,10 +109,12 @@ def test_expense_reduces_margin_and_drives_combined_ratio():
     assert (s.loc[('Margin', 'Total'), 'EX']
             == pytest.approx(s.loc[('Consideration', 'premium'), 'EX']
                              + s.loc[('Obligation', 'Total'), 'EX'], abs=1e-6))
-    # the card tells the same story: combined ratio off the Scaled column
-    card = p.summary_df
-    assert -card.loc['Obligation', 'Scaled'] == \
-        pytest.approx((400 + 200) / 1000, rel=TOL)
+    # ratio_df tells the same story, and now splits loss from expense: the
+    # combined ratio is (400 + 200) / 1000, its two parts 0.40 and 0.20
+    r = p.ratio_df.iloc[0]
+    assert r['LR'] == pytest.approx(400 / 1000, rel=TOL)
+    assert r['ER'] == pytest.approx(200 / 1000, rel=TOL)
+    assert r['CR'] == pytest.approx((400 + 200) / 1000, rel=TOL)
 
 
 def test_expense_in_gcn_ledger():

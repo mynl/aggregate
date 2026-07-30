@@ -629,6 +629,93 @@ def test_unknown_row_kind_raises(monkeypatch):
         build(f'{AGG2} peel top-down')
 
 
+# ----------------------------------------------------------------------
+# ratio_df / legs_df over a peeled ledger ([PnL-Ratio-Frame])
+# ----------------------------------------------------------------------
+def test_ratio_df_has_a_row_per_block_including_the_tier_subtotals():
+    p = build(f'{TWO_EACH} peel top-down')
+    assert list(p.ratio_df.index) == _steps(p)
+
+
+def test_ratio_df_amounts_add_across_the_peeled_blocks():
+    """Layers add into their tier, tiers into ``All``; ratios re-derived."""
+    p = build(f'{TWO_EACH} peel top-down')
+    r = p.ratio_df
+    for tier, prefix in (('All occurrence', 'occ '), ('All aggregate', 'agg ')):
+        layers = [s for s in r.index if s.startswith(prefix)]
+        for col in ('P', 'L', 'E', 'C', 'M'):
+            assert r.loc[tier, col] == pytest.approx(
+                sum(r.loc[s, col] for s in layers), abs=FOOTS)
+        # the tier LR comes off the tier's own amounts
+        assert r.loc[tier, 'LR'] == pytest.approx(
+            r.loc[tier, 'L'] / r.loc[tier, 'P'], abs=FOOTS)
+
+
+def test_ratio_df_margin_identity_holds_on_every_peeled_block():
+    p = build(f'{TWO_EACH} peel top-down')
+    r = p.ratio_df
+    for step in r.index:
+        row = r.loc[step]
+        assert row['M'] == pytest.approx(
+            row['P'] - row['L'] - row['E'] - row['C'], rel=FOOTS_ACROSS,
+            abs=FOOTS)
+
+
+def test_ratio_df_gross_shares_are_one_and_cessions_are_negative():
+    r = build(f'{TWO_EACH} peel top-down').ratio_df
+    assert r.loc['Gross', 'P_share'] == pytest.approx(1.0)
+    assert r.loc['Gross', 'M_share'] == pytest.approx(1.0)
+    assert r.loc['All occurrence', 'P_share'] < 0     # premium paid away
+    assert r.loc['All occurrence', 'LR'] > 0           # ...but the LR reads +
+
+
+def test_ratio_df_ex_columns_are_nan_on_the_stitched_peel():
+    """Two peeled occurrence layers means no shared atoms, so no joint."""
+    p = build(f'{OCC2} peel top-down')
+    assert p._stitched
+    r = p.ratio_df
+    assert r[['EX_LR', 'EX_ER', 'EX_CR']].isna().all().all()
+    assert r[['LR', 'CR']].notna().all().all()
+
+
+def test_ratio_df_ex_columns_are_live_on_the_per_atom_peel():
+    p = build(f'{AGG2} peel top-down')
+    assert not p._stitched
+    r = p.ratio_df
+    assert r[['EX_LR', 'EX_CR']].notna().all().all()
+    # every premium here is deterministic, so the two readings coincide
+    for step in r.index:
+        assert r.loc[step, 'EX_LR'] == pytest.approx(
+            r.loc[step, 'LR'], abs=1e-9)
+
+
+def test_legs_df_classifies_every_peeled_leg():
+    """Every library-built leg carries a kind; none is left unclassified."""
+    p = build(f'{TWO_EACH} peel top-down')
+    df = p.legs_df
+    assert df['kind'].notna().all()
+    assert set(df['kind']) == {'premium', 'loss', 'recovery', 'commission'}
+    # itemized, so derived rows are absent: one row per declared leg
+    assert len(df) == sum(len(g.consideration) + len(g.obligation)
+                          for g in p.groups)
+
+
+def test_expense_legs_are_classified_as_expense():
+    prog = (
+        'xpnl PeelExp 1000 premium less agg PeelExp_e 1000 premium at 70% lr '
+        'sev lognorm 100 cv 2 '
+        'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 deposit 40 '
+        'poisson less 5% loss expense as LAE peel top-down'
+    )
+    p = build(prog)
+    df = p.legs_df
+    assert df.loc[df['Line'] == 'LAE', 'kind'].iloc[0] == 'expense'
+    # ...so the ratio frame can split the gross block's LR from its ER
+    gross = p.ratio_df.loc['Gross']
+    assert gross['E'] > 0
+    assert gross['CR'] == pytest.approx(gross['LR'] + gross['ER'], abs=FOOTS)
+
+
 def test_every_peeled_row_carries_a_distribution():
     """The stitched route must supply a gd for every ledger row it declares."""
     p = build(f'{OCC2} peel top-down')

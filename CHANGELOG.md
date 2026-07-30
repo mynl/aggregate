@@ -1,5 +1,82 @@
 # Changelog
 
+## 1.0.0a185
+
+**[PnL-Ratio-Frame]** **Breaking.** The `Scaled` column is gone, and with it
+`scaled_stats_df`, the `scale` property and the `scale=` constructor argument.
+Ratios now live in `ratio_df`, their own table, joined by an itemized `legs_df`.
+Plan: `dev/done/plan-pnl-ratio-frame.md`.
+
+`Scaled` divided every cell by one committed number, `E[grand total
+consideration]`, which on a walk is gross premium *minus every cession*. On a
+two-group tower (premium 100, loss 40, ceded premium 30, recovery 8) the gross
+premium cell read **1.43** and the gross "loss ratio" read **-0.571** against a
+true 0.40. The combined-ratio reading was an accident of the single-group case,
+where the divisor happens to be that block's own premium; the original design
+called the column *"just a unitless, comparable number"*, explicitly not an
+accounting ratio. `[Reporting-Guidelines]` settles the direction: rule 1 permits
+column changes, and rule 2 says ratios live in their own columns or tables.
+`E_consideration` survives the cull, being the `P` denominator `ratio_df` needs
+and the premium target `evaluate` calibrates to; the `info` block's `scale` row
+becomes `E[consideration]`.
+
+`Leg` gains an optional `kind`, one of the new `LEG_KINDS` (`'premium'`,
+`'loss'`, `'expense'`, `'recovery'`, `'commission'`). Every builder now sets it,
+so `_resolve_expense_split` no longer discards the one fact that separates
+`'LAE'` from `'Loss'`. This is what makes an expense ratio possible at all:
+nothing in `stats_df` distinguishes a loss leg from an expense leg but the label
+text. `stats_df` gains no index level, so no existing exhibit changes shape. A
+leg left unclassified (the dict shorthand, a hand-built ledger) folds into `L` as
+the residual, so a ledger that declares no expense legs reports `E = 0` rather
+than guessing.
+
+`PnL.ratio_df` is indexed by `Step`, one row per block: each group, each tier
+subtotal, and `All`. Columns are the amounts `P` / `L` / `E` / `C`, the block's
+signed `M`, then `LR` / `ER` / `CR` and `EX_LR` / `EX_ER` / `EX_CR`, then
+`P_share` / `M_share` against the gross block. `L`, `M`, `P` and `LR` keep the
+`PENTAGON_STATS` spelling so a P&L ratio frame concatenates and diffs against a
+pricing frame.
+
+The amounts are signed **in the gross direction**: consideration as booked,
+obligations negated. A cession's ceded premium and recovery are therefore both
+negative, which buys three things at once. The amounts add across blocks, so
+layers sum into their tier and tiers into `All`. `M == P - L - E - C` holds
+identically, being the signed row sum, with `1 - CR == M / P` as its other
+reading. And every ratio comes out with its conventional sign, because numerator
+and denominator flip together: a cover that paid back three times its premium
+reads `LR = 3.10`, not `-3.10`. Ratios are re-derived from each row's own
+amounts, never averaged from the blocks below, following `pricing_df`.
+
+**`LR` and `EX_LR` are the ratio of the means and the mean of the ratio, and
+they are reported separately because they are different numbers.** When premium
+is random and correlated with loss (a retro-rated account, a swing / slide /
+profit-commission cession, reinstatement ceded premium `D + h(R)`),
+`E[L/P] != E[L]/E[P]`. Measured on `pnl R retro basic 3000 lcm 1.1 min 3500 max
+8000 premium less agg R_e 1000 loss sev lognorm 100 cv 2 poisson`: `LR = 0.2426`
+against `EX_LR = 0.2256`, a 7% relative gap, and in the direction the retro
+implies, since premium rises with loss and damps the per-atom ratio. With a
+deterministic premium the two agree to the last bit.
+
+`EX_*` needs the joint of loss and premium, so it exists only on a per-atom
+route. It is `nan` on a route with no shared atoms (the stitched peel, the
+massive sweep) and `nan` when some atom carrying probability has a vanishing
+premium, rather than silently falling back on the ratio of the means.
+
+`PnL.legs_df` is the itemized companion: one row per **declared** leg with its
+`Step` / `View` / `Line` / `kind` / `EX` / `SD`. Derived rows are absent by
+design, being sums of these. It is the only place `Leg.kind` surfaces, and the
+frame to pivot when the ratio you want is not one `ratio_df` carries.
+
+Both frames are **raw materials**, in the author's sense: unformatted, and
+deliberately absent from `qd` and the notebook repr, which keep rendering
+`summary_df`, the presentation-ready layer. Transpose for the stat-down-the-side
+orientation, matching the documented `pricing_df.T` convention.
+
+Follow-on logged as `[Ratio-Distribution]`: a per-atom route holds the joint, so
+the loss ratio is available as a `GridDistribution`, which is what `E[phi(LR)]`
+needs for a sliding commission. That is strictly more than either scalar column
+gives.
+
 ## 1.0.0a184
 
 **[Tier-Subtotal-Rows]** A layer-peeled `xpnl` now also shows the whole

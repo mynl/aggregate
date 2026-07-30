@@ -6,7 +6,7 @@ everything else derived. These tests exercise the cross-domain core -- a raw
 ``(values, probs)`` slot, a :class:`GridDistribution` slot, and a coupled
 bivariate joint -- plus the ledger algebra, role orientation, the
 [One-2D-Source] rule, per-leg ``bs`` rebucketing with its ``validation_df``
-audit, ``scaled_stats_df``, ``+`` composition, and
+audit, ``ratio_df`` / ``legs_df``, ``+`` composition, and
 :func:`stack_marginal_pnls`. The insurance builders are covered by their own
 suites.
 """
@@ -202,7 +202,6 @@ def test_stats_df_view_line_multiindex():
         ('Obligation', 'loss'), ('Obligation', 'expense'),
         ('Obligation', 'Total'),
         ('Margin', 'Total')]
-    assert p.scaled_stats_df.index.equals(s.index)
     # canonical flat keys untouched on the non-presentation exhibits
     assert list(p.density_df) == ['premium', 'loss', 'expense', 'result']
 
@@ -232,44 +231,145 @@ def test_stats_df_multiindex_multigroup():
         ('cover', 'Margin', 'Total'), ('cover', 'Margin', 'Net'),
         ('All', 'Consideration', 'Total'), ('All', 'Obligation', 'Total'),
         ('All', 'Margin', 'Total'), ('All', 'Margin', 'Impact')]
-    # single-group frames stay two-level; scaled index always matches
+    # single-group frames stay two-level
     assert list(_simple().stats_df.index.names) == ['View', 'Line']
-    assert t.scaled_stats_df.index.equals(s.index)
 
 
 # ----------------------------------------------------------------------
-# scale / scaled_stats_df
+# ratio_df / legs_df ([PnL-Ratio-Frame]) -- the retired scale / Scaled /
+# scaled_stats_df surface is replaced by these two raw-materials frames
 # ----------------------------------------------------------------------
-def test_scaled_stats_df_is_stats_of_x_over_scale():
-    """scaled_stats_df = the stats of ``X / scale`` exactly: EX / SD /
-    percentiles divide by the committed scale; CV / Skew pass through."""
+def _classified_two_group():
+    """A sell book with one cession, every leg carrying its ``kind``."""
+    return PnL(name='m', source=(_VALS, _PROBS), groups=[
+        Group('base', 'sell', [Leg('premium', 40.0, kind='premium')],
+              [Leg('loss', lambda x: x, kind='loss'),
+               Leg('LAE', 1.0, kind='expense')]),
+        Group('cover', 'buy', [Leg('ceded premium', 6.0, kind='premium')],
+              [Leg('recovery', lambda x: np.maximum(x - 20, 0),
+                   kind='recovery')]),
+    ])
+
+
+def test_the_retired_scale_surface_is_gone():
+    p = _simple()
+    for name in ('scale', 'scaled_stats_df', '_resolve_scale'):
+        assert not hasattr(p, name), name
+    assert 'Scaled' not in p.summary_df.columns
+    # the accessor that happened to be the default scale stays: ratio_df needs
+    # it as the P denominator and evaluate() as its premium target
+    assert p.E_consideration == pytest.approx(15.0)
+
+
+def test_ratio_df_amounts_foot_to_the_margin():
+    """``M == P - L - E - C`` holds by construction, on every block."""
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
-            consideration={'premium': 20.0}, obligation={'loss': lambda x: x},
-            scale=10.0)
-    assert p.scale == (10.0, 'scale')
-    s, sc = p.stats_df, p.scaled_stats_df
-    for row in s.index:
-        for col in s.columns:
-            if col in ('CV', 'Skew'):
-                np.testing.assert_equal(sc.loc[row, col], s.loc[row, col])
-            else:
-                assert sc.loc[row, col] == pytest.approx(
-                    s.loc[row, col] / 10.0, abs=TOL, nan_ok=True)
+            consideration=[Leg('premium', 20.0, kind='premium')],
+            obligation=[Leg('loss', lambda x: x, kind='loss'),
+                        Leg('expense', 2.0, kind='expense')])
+    r = p.ratio_df
+    assert list(r.index) == ['p']
+    row = r.loc['p']
+    assert row['P'] == pytest.approx(20.0)
+    assert row['E'] == pytest.approx(2.0)
+    assert row['M'] == pytest.approx(
+        row['P'] - row['L'] - row['E'] - row['C'], abs=TOL)
+    # 1 - CR == M / P, the other reading of the same identity
+    assert 1.0 - row['CR'] == pytest.approx(row['M'] / row['P'], abs=TOL)
 
 
-def test_default_scale_is_expected_total_consideration():
+def test_ratio_df_unclassified_obligation_folds_into_loss():
+    """No ``kind`` declared: the residual rule puts obligation in ``L``.
+
+    A ledger that declares no expense legs reports ``E == 0`` rather than
+    guessing which of its legs was meant to be an expense.
+    """
+    # the dict shorthand declares no kinds, so both legs are unclassified
+    p = PnL(name='u', source=(_VALS, _PROBS), role='sell',
+            consideration={'premium': 20.0},
+            obligation={'loss': lambda x: x, 'expense': 2.0})
+    row = p.ratio_df.loc['u']
+    assert row['E'] == 0.0 and row['C'] == 0.0
+    obl = -p.stats_df.loc[('Obligation', 'Total'), 'EX']
+    assert row['L'] == pytest.approx(obl, abs=TOL)   # loss AND expense
+    assert row['M'] == pytest.approx(row['P'] - row['L'], abs=TOL)
+
+
+def test_ratio_df_ratios_are_re_derived_not_averaged():
+    """The pricing_df rule: amounts add, ratios come off the summed amounts."""
+    r = _classified_two_group().ratio_df
+    assert list(r.index) == ['base', 'cover', 'All']
+    for col in ('P', 'L', 'E', 'C', 'M'):
+        assert r.loc['All', col] == pytest.approx(
+            r.loc['base', col] + r.loc['cover', col], abs=TOL)
+    assert r.loc['All', 'LR'] == pytest.approx(
+        r.loc['All', 'L'] / r.loc['All', 'P'], abs=TOL)
+    # ...and is NOT the average of the block loss ratios
+    assert r.loc['All', 'LR'] != pytest.approx(
+        (r.loc['base', 'LR'] + r.loc['cover', 'LR']) / 2, abs=1e-6)
+
+
+def test_ratio_df_cession_ratios_read_positive():
+    """Signing amounts in the gross direction keeps a ceded LR conventional.
+
+    A cession's premium and recovery are both negative contributions, so their
+    ratio comes out positive: "this cover paid back a multiple of its premium".
+    """
+    r = _classified_two_group().ratio_df
+    assert r.loc['cover', 'P'] < 0 and r.loc['cover', 'L'] < 0
+    assert r.loc['cover', 'LR'] > 0
+    assert r.loc['base', 'P_share'] == pytest.approx(1.0)
+    assert r.loc['base', 'M_share'] == pytest.approx(1.0)
+
+
+def test_ratio_df_mean_of_ratio_equals_ratio_of_means_when_premium_is_fixed():
+    """``EX_LR`` and ``LR`` coincide exactly for a deterministic premium."""
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
-            consideration={'premium': 20.0}, obligation={'loss': lambda x: x})
-    assert p.scale == (20.0, 'consideration')
-    # card Scaled column divides EX by the committed scale
-    assert p.summary_df.loc['Consideration', 'Scaled'] == pytest.approx(1.0)
+            consideration=[Leg('premium', 20.0, kind='premium')],
+            obligation=[Leg('loss', lambda x: x, kind='loss')])
+    row = p.ratio_df.loc['p']
+    assert row['EX_LR'] == pytest.approx(row['LR'], abs=TOL)
 
 
-def test_scale_by_consideration_leg_name():
-    p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
-            consideration={'premium': 20.0, 'fee': 5.0},
-            obligation={'loss': lambda x: x}, scale='fee')
-    assert p.scale == (5.0, 'fee')
+def test_ratio_df_mean_of_ratio_is_nan_without_shared_atoms():
+    """No joint of loss and premium, so no mean-of-ratio to report."""
+    from aggregate._grid_distribution import GridDistribution
+
+    def gd(vals, probs):
+        return GridDistribution(np.asarray(vals, dtype=float),
+                                np.asarray(probs, dtype=float), bs=None,
+                                is_loss_value=False)
+
+    groups = [Group('base', 'sell', [Leg('premium', 15.0, kind='premium')],
+                    [Leg('loss', lambda x: x, kind='loss')])]
+    entries = {'premium': (gd([15.0], [1.0]), 15.0, 0.0),
+               'loss': (gd([-10.0, 0.0], [0.5, 0.5]), -5.0, 5.0),
+               'result': (gd([5.0, 15.0], [0.5, 0.5]), 10.0, 5.0)}
+    p = PnL(name='s', source=None, groups=groups, result_name='result',
+            stitched_rows=entries)
+    row = p.ratio_df.loc['base']
+    assert row['LR'] == pytest.approx(5.0 / 15.0, abs=TOL)
+    assert np.isnan(row['EX_LR'])
+    assert np.isnan(row['EX_ER']) and np.isnan(row['EX_CR'])
+
+
+def test_legs_df_itemizes_declared_legs_only():
+    df = _classified_two_group().legs_df
+    assert list(df.columns) == ['Step', 'View', 'Line', 'kind', 'EX', 'SD']
+    assert len(df) == 5                    # declared legs only, no derived rows
+    assert list(df['kind']) == ['premium', 'loss', 'expense', 'premium',
+                                'recovery']
+    assert list(df['Step']) == ['base'] * 3 + ['cover'] * 2
+    # EX is the signed booked mean, matching stats_df
+    assert df.loc[0, 'EX'] == pytest.approx(40.0)
+    assert df.loc[3, 'EX'] == pytest.approx(-6.0)
+
+
+def test_leg_kind_validates_its_value_set():
+    with pytest.raises(ValueError, match='Leg kind must be one of'):
+        Leg('x', 1.0, kind='banana')
+    assert Leg('x', 1.0).kind is None
+    assert "kind='loss'" in repr(Leg('x', 1.0, kind='loss'))
 
 
 # ----------------------------------------------------------------------
@@ -510,7 +610,7 @@ def test_scenario_moment_columns_stay_marginal():
 # ----------------------------------------------------------------------
 # [Summary-Fixed-Card]: summary_df is the fixed headline card
 # ----------------------------------------------------------------------
-_CARD_COLS = ['EX', 'Scaled', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
+_CARD_COLS = ['EX', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
 
 
 def test_card_single_group_fixed_three_rows():
@@ -555,15 +655,21 @@ def test_card_tower_blocks():
         abs=1e-9)
 
 
-def test_card_scaled_reads_as_combined_ratio():
-    """With scale = premium the Scaled column is a combined-ratio
-    decomposition: 1.00 / -(loss ratio) / margin ratio."""
+def test_ratio_df_reads_as_a_combined_ratio_decomposition():
+    """The combined ratio now lives in ``ratio_df``, its own table.
+
+    The card is currency only ([Reporting-Guidelines] rule 2: one unit per
+    column), so the decomposition the retired ``Scaled`` column carried is read
+    off the ratio frame instead.
+    """
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
-            consideration={'premium': 20.0}, obligation={'loss': lambda x: x})
-    df = p.summary_df
-    assert df.loc['Consideration', 'Scaled'] == pytest.approx(1.0)
-    assert df.loc['Obligation', 'Scaled'] == pytest.approx(-0.5)   # LR 50%
-    assert df.loc['Margin', 'Scaled'] == pytest.approx(0.5)
+            consideration=[Leg('premium', 20.0, kind='premium')],
+            obligation=[Leg('loss', lambda x: x, kind='loss')])
+    row = p.ratio_df.loc['p']
+    assert row['LR'] == pytest.approx(0.5)         # E[loss] 10 / premium 20
+    assert row['CR'] == pytest.approx(0.5)         # no expense declared
+    assert row['M'] / row['P'] == pytest.approx(0.5)
+    assert 'Scaled' not in p.summary_df.columns
 
 
 def test_card_marginal_vs_stats_scenario_differ_on_dependent_legs():

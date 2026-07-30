@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0a180
+
+**[Help-Default-Regex]** `regex` now defaults to `'.*'` on `HelpMixin.help` and
+on `utilities.agg_help`, so a bare `a.help()` lists the whole surface instead of
+raising `TypeError`. Two filters decide what appears, and only two: `regex`, and
+the leading-underscore skip governed by `private` (default `False`). Inherited
+names are not filtered, so `Severity.help()` reports the
+`scipy.stats.rv_continuous` methods alongside its own; that is documented in the
+`agg_help` Notes.
+
 ## 1.0.0a179
 
 **[TVaR-Endpoint-Noise]** `Bounds(port, premium).weight_df` emitted

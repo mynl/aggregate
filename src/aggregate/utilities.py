@@ -547,7 +547,7 @@ def _help_target(fmt):
     return 'ansi' if _in_jupyter() else 'text'
 
 
-def agg_help(self, regex, lod='terse', values='none', private=False, fmt='auto'):
+def agg_help(self, regex='.*', lod='terse', values='none', private=False, fmt='auto'):
     """
     Investigate ``self`` for public names matching ``regex`` and display each
     one's documentation and (optionally) its value or no-argument call result.
@@ -562,8 +562,9 @@ def agg_help(self, regex, lod='terse', values='none', private=False, fmt='auto')
     ----------
     self : object
         The instance to introspect.
-    regex : str
+    regex : str, default '.*'
         Regular expression; names matching it (via :func:`re.search`) are shown.
+        The default matches every name, so a bare call lists the whole surface.
     lod : {'terse', 'short', 'all'}, default 'terse'
         Level of *documentation* detail per match:
 
@@ -600,6 +601,13 @@ def agg_help(self, regex, lod='terse', values='none', private=False, fmt='auto')
     ``fmt`` the render target. The default ``lod='terse', values='none'`` is a
     bare public-name listing (``private=False``). Documentation is shown for
     methods and properties only (a plain field carries no useful docstring).
+
+    Two filters, and only two, decide which names appear: ``regex`` (default
+    ``'.*'``, i.e. everything) and the leading-underscore skip governed by
+    ``private``. Nothing else is excluded, so the listing spans inherited names
+    too: on :class:`Severity`, whose base is ``scipy.stats.rv_continuous``, a
+    bare call reports the inherited ``cdf`` / ``ppf`` / ``rvs`` family alongside
+    the ``aggregate`` surface.
     """
     if lod not in ('terse', 'short', 'all'):
         raise ValueError(f"lod must be 'terse', 'short', or 'all'; got {lod!r}")
@@ -775,8 +783,10 @@ def introspect(ob):
         columns=['name', 'kind', 'value', 'type', 'signature', 'help', 'length'])
     df = df.sort_values(['kind', 'length', 'name']).reset_index(drop=True)
     return df
+
+
 # explain_validation relocated to _validation.py (Phase 1b); re-exported
 # here for back-compat (mirrors make_var_tvar in _grid_distribution).
 from ._validation import explain_validation  # noqa: F401
 
-
+    

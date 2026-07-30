@@ -72,3 +72,27 @@ def test_help_bad_fmt_raises(a):
 def test_help_html_runs(a):
     pytest.importorskip('IPython')
     a.help('actual_m', fmt='html')   # rich display path executes without error
+
+
+def test_help_no_argument_lists_everything(a, capsys):
+    # regex defaults to '.*', so a bare call is the whole public surface
+    a.help(fmt='text')
+    bare = capsys.readouterr().out
+    assert 'actual_m' in bare        # a narrow match is still there ...
+    assert 'density_df' in bare      # ... alongside names it would have excluded
+    assert 'plot' in bare
+
+    a.help('.*', fmt='text')         # explicit '.*' is the same listing
+    assert capsys.readouterr().out == bare
+
+
+def test_help_default_hides_private(a, capsys):
+    # the leading-underscore skip is the only member filter besides regex
+    a.help(fmt='text')
+    public = capsys.readouterr().out
+    assert '_apply_reins' not in public
+
+    a.help(private=True, fmt='text')
+    everything = capsys.readouterr().out
+    assert '_apply_reins' in everything
+    assert len(everything) > len(public)

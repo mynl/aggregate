@@ -127,7 +127,7 @@ print(GT(bit))
 Look at just the margin progression.
 
 ```{python}
-bit2 = bit.xs('Margin', axis=0, level='View')
+bit2 = bit.xs('Margin', axis=0, level='Side')
 print(GT(bit2, caption='Margin by Step'))
 ```
 

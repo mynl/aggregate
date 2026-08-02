@@ -94,11 +94,11 @@ def test_as_is_reserved(uw):
 def _lines(pnl):
     """The declared-leg Line labels of the stats sheet (leg-level labels
     live there; summary_df is the fixed card)."""
-    return list(pnl.stats_df.index.get_level_values('Line'))
+    return list(pnl.stats_df.index.get_level_values('Label'))
 
 
 def _leg(pnl, label):
-    return pnl.stats_df.xs(label, level='Line').iloc[0]
+    return pnl.stats_df.xs(label, level='Label').iloc[0]
 
 
 def test_premium_label_names_consideration_leg():

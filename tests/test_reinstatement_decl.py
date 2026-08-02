@@ -42,7 +42,7 @@ def _joint_mean(pnl, fn):
 
 def _leg(pnl, label):
     """One ledger leg's stats_df row, by ``Line`` label."""
-    return pnl.stats_df.xs(label, level='Line').iloc[0]
+    return pnl.stats_df.xs(label, level='Label').iloc[0]
 
 
 _HUMAN = ('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
@@ -219,16 +219,16 @@ def test_ledger_rows_and_means_add():
     s = p.stats_df
     for row in (('Gross', 'Consideration', 'premium'),
                 ('Gross', 'Obligation', 'Loss'),
-                ('Gross', 'Margin', 'Total'),
+                ('Gross', 'Margin', 'Direct'),
                 ('occ 95% so 100 xs 100', 'Consideration', 'occ 95% so 100 xs 100 premium'),
                 ('occ 95% so 100 xs 100', 'Obligation', 'occ 95% so 100 xs 100 recovery'),
                 ('occ 95% so 100 xs 100', 'Margin', 'Total'),
                 ('occ 95% so 100 xs 100', 'Margin', 'Net'),
-                ('All', 'Margin', 'Total'),
+                ('All', 'Margin', 'Net'),
                 ('All', 'Margin', 'Impact')):
         assert row in s.index, row
-    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Total'), 'EX']
+    assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
+        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
         + s.loc[('occ 95% so 100 xs 100', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
@@ -285,21 +285,21 @@ def test_subsequent_aggregate_cover_builds():
                      'EX']) > 0
     # decision 3: the ledger extends to the inuring both-tiers form -- a third
     # buy group over the SAME joint (no new dimension).
-    for row in (('Gross', 'Margin', 'Total'),
+    for row in (('Gross', 'Margin', 'Direct'),
                 ('occ 100 xs 100', 'Margin', 'Total'),
                 ('occ 100 xs 100', 'Margin', 'Net'),
                 ('agg 85% so 1500 xs 7000', 'Consideration', 'agg 85% so 1500 xs 7000 premium'),
                 ('agg 85% so 1500 xs 7000', 'Obligation', 'agg 85% so 1500 xs 7000 recovery'),
                 ('agg 85% so 1500 xs 7000', 'Margin', 'Total'),
                 ('agg 85% so 1500 xs 7000', 'Margin', 'Net'),
-                ('All', 'Margin', 'Total')):
+                ('All', 'Margin', 'Net')):
         assert row in s.index, row
     # means add tier by tier down the sheet
     assert s.loc[('occ 100 xs 100', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Total'), 'EX']
+        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
         + s.loc[('occ 100 xs 100', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
-    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
+    assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
         s.loc[('occ 100 xs 100', 'Margin', 'Net'), 'EX']
         + s.loc[('agg 85% so 1500 xs 7000', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
@@ -322,7 +322,7 @@ def test_expense_and_cede_book_as_ledger_legs():
     # (premium + loss legs)
     pure_gross = (s.loc[('Gross', 'Consideration', 'premium'), 'EX']
                   + s.loc[('Gross', 'Obligation', 'Loss'), 'EX'])
-    assert s.loc[('Gross', 'Margin', 'Total'), 'EX'] == pytest.approx(
+    assert s.loc[('Gross', 'Margin', 'Direct'), 'EX'] == pytest.approx(
         pure_gross - 1500.0, rel=1e-6, abs=1e-6)
     # and the cession result credits its commission vs the pure ceded UW
     # (ceded premium + recovery legs)
@@ -345,7 +345,7 @@ def test_no_expense_leaves_ledger_pure():
     # the gross group result is the pure gross underwriting mean (premium + loss)
     pure_gross = (s.loc[('Gross', 'Consideration', 'premium'), 'EX']
                   + s.loc[('Gross', 'Obligation', 'Loss'), 'EX'])
-    assert s.loc[('Gross', 'Margin', 'Total'), 'EX'] == \
+    assert s.loc[('Gross', 'Margin', 'Direct'), 'EX'] == \
         pytest.approx(pure_gross, rel=1e-6, abs=1e-6)
 
 
@@ -356,19 +356,19 @@ def test_no_expense_leaves_ledger_pure():
 def test_consolidated_face_shape_and_exact_means():
     p = build(_HUMAN)
     s = p.stats_df
-    assert list(s.index.names) == ['View', 'Line']
+    assert list(s.index.names) == ['Side', 'Label']
     assert list(p.summary_df.index) == ['Consideration', 'Obligation',
                                         'Margin']
     t = p.engine.reinstatement_terms
     P_G = p.engine.reinstatement_gross_premium
     # net premium = P_G - D - E[h(R)] (no cede here); stochastic (h(R))
     e_h = _joint_mean(p, lambda l, r: t.reinstatement_premium(r))
-    row = s.xs('net premium', level='Line').iloc[0]
+    row = s.xs('net premium', level='Label').iloc[0]
     assert row['EX'] == pytest.approx(P_G - t.deposit - e_h, rel=1e-9)
     assert row['SD'] > 0
     # loss (net) = -E[L - A(R)]
     e_net_loss = _joint_mean(p, lambda l, r: l - t.recovery(r))
-    assert s.xs('Loss (net)', level='Line').iloc[0]['EX'] == pytest.approx(
+    assert s.xs('Loss (net)', level='Label').iloc[0]['EX'] == pytest.approx(
         -e_net_loss, rel=1e-9)
     # one shared joint -> scenario ladder
     assert 'κ01' in s.columns
@@ -382,4 +382,4 @@ def test_consolidated_agrees_with_walk_exactly():
     p = build(_HUMAN)
     x = build(_HUMANX)
     assert p.est_m == pytest.approx(
-        x.stats_df.loc[('All', 'Margin', 'Total'), 'EX'], abs=1e-12)
+        x.stats_df.loc[('All', 'Margin', 'Net'), 'EX'], abs=1e-12)

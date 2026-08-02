@@ -145,22 +145,22 @@ def test_group_results_are_step_deltas_and_grand_result_sums():
     of the group results; means add but SDs do not (covariance per atom)."""
     t = _two_group()
     s = t.stats_df
-    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('base', 'Margin', 'Total'), 'EX']
+    assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
+        s.loc[('base', 'Margin', 'Direct'), 'EX']
         + s.loc[('cover', 'Margin', 'Total'), 'EX'], abs=1e-9)
     assert s.loc[('cover', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('All', 'Margin', 'Total'), 'EX'], abs=TOL)
+        s.loc[('All', 'Margin', 'Net'), 'EX'], abs=TOL)
     # SDs do not add (the cover trims the tail, so net SD < base SD)
-    assert s.loc[('All', 'Margin', 'Total'), 'SD'] < \
-        s.loc[('base', 'Margin', 'Total'), 'SD']
+    assert s.loc[('All', 'Margin', 'Net'), 'SD'] < \
+        s.loc[('base', 'Margin', 'Direct'), 'SD']
     # total impact = grand result - first group's result
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
-        s.loc[('All', 'Margin', 'Total'), 'EX']
-        - s.loc[('base', 'Margin', 'Total'), 'EX'], abs=TOL)
+        s.loc[('All', 'Margin', 'Net'), 'EX']
+        - s.loc[('base', 'Margin', 'Direct'), 'EX'], abs=TOL)
     # grand totals foot to the result
-    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('All', 'Consideration', 'Total'), 'EX']
-        + s.loc[('All', 'Obligation', 'Total'), 'EX'], abs=1e-9)
+    assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
+        s.loc[('All', 'Consideration', 'Net'), 'EX']
+        + s.loc[('All', 'Obligation', 'Net'), 'EX'], abs=1e-9)
 
 
 def test_plus_composition_concatenates_ledgers():
@@ -186,17 +186,17 @@ def test_plus_requires_same_source():
 
 
 # ----------------------------------------------------------------------
-# stats_df MultiIndex: (View, Line) single-group, (Step, View, Line) tower
+# stats_df MultiIndex: (Side, Label) single-group, (Step, Side, Label) tower
 # ----------------------------------------------------------------------
-def test_stats_df_view_line_multiindex():
-    """stats_df rows carry a (View, Line) MultiIndex: legs under their side,
-    total rows -> (View, 'Total'), the result -> ('Margin', 'Total'). The
+def test_stats_df_side_label_multiindex():
+    """stats_df rows carry a (Side, Label) MultiIndex: legs under their side,
+    total rows -> (Side, 'Total'), the result -> ('Margin', 'Total'). The
     flat ledger labels stay the canonical keys on the other exhibits."""
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
             consideration={'premium': 15.0},
             obligation={'loss': lambda x: x, 'expense': 3.0})
     s = p.stats_df
-    assert list(s.index.names) == ['View', 'Line']
+    assert list(s.index.names) == ['Side', 'Label']
     assert list(s.index) == [
         ('Consideration', 'premium'),
         ('Obligation', 'loss'), ('Obligation', 'expense'),
@@ -207,10 +207,13 @@ def test_stats_df_view_line_multiindex():
 
 
 def test_stats_df_multiindex_multigroup():
-    """Multi-group sheet: three-level (Step, View, Line) -- the step level is
-    the group label, in ledger order; per-step totals / results / running
-    nets read ('Total') / ('Total') / ('Net') under their step; the grand
-    rows close under step 'Total' with the impact at
+    """Multi-group sheet: three-level (Step, Side, Label) -- the step level is
+    the group label, in ledger order.
+
+    Because this ledger buys something, the three margins that would all read
+    ``Total`` are told apart ([Ledger-Side-Label-Levels]): the ``sell`` group's
+    own result is ``Direct``, the cession's stays ``Total``, and the grand
+    block reads ``Net`` on all three of its rows. The impact closes at
     ('All', 'Margin', 'Impact')."""
     t = PnL(name='m', source=(_VALS, _PROBS), groups=[
         Group('base', 'sell', {'premium': 15.0, 'fee': 1.0},
@@ -219,20 +222,47 @@ def test_stats_df_multiindex_multigroup():
               {'recovery': lambda x: np.maximum(x - 20, 0)}),
     ])
     s = t.stats_df
-    assert list(s.index.names) == ['Step', 'View', 'Line']
+    assert list(s.index.names) == ['Step', 'Side', 'Label']
     assert list(s.index) == [
         ('base', 'Consideration', 'premium'),
         ('base', 'Consideration', 'fee'),
         ('base', 'Consideration', 'Total'),
         ('base', 'Obligation', 'loss'),
-        ('base', 'Margin', 'Total'),
+        ('base', 'Margin', 'Direct'),
         ('cover', 'Consideration', 'ceded premium'),
         ('cover', 'Obligation', 'recovery'),
         ('cover', 'Margin', 'Total'), ('cover', 'Margin', 'Net'),
-        ('All', 'Consideration', 'Total'), ('All', 'Obligation', 'Total'),
-        ('All', 'Margin', 'Total'), ('All', 'Margin', 'Impact')]
+        ('All', 'Consideration', 'Net'), ('All', 'Obligation', 'Net'),
+        ('All', 'Margin', 'Net'), ('All', 'Margin', 'Impact')]
     # single-group frames stay two-level
-    assert list(_simple().stats_df.index.names) == ['View', 'Line']
+    assert list(_simple().stats_df.index.names) == ['Side', 'Label']
+    assert ('All', 'Margin', 'Total') not in s.index
+
+
+def test_direct_and_net_need_something_bought():
+    """The Direct / Net pair appears only when the ledger contains a buy group.
+
+    Two sold books merged into one ledger have nothing to be direct *of*, so
+    every group result and the grand block keep the neutral ``Total``. Same for
+    a plain single-group ``pnl``, whose one ``sell`` group holds legs that are
+    already net: naming that margin ``Direct`` would be a plain lie.
+
+    The per-step ``net through <g>`` row is a different thing and keeps its
+    ``Net`` label either way: it is a running total, not half of the
+    direct-versus-net contrast.
+    """
+    both_sold = PnL(name='s', source=(_VALS, _PROBS), groups=[
+        Group('book A', 'sell', {'A premium': 15.0}, {'A loss': lambda x: x}),
+        Group('book B', 'sell', {'B premium': 4.0},
+              {'B loss': lambda x: 0.2 * x}),
+    ])
+    s = both_sold.stats_df
+    assert 'Direct' not in set(s.index.get_level_values('Label'))
+    for side in ('Consideration', 'Obligation', 'Margin'):
+        assert ('All', side, 'Total') in s.index
+    assert ('book B', 'Margin', 'Net') in s.index      # still a running net
+    # ... and the single-group case
+    assert ('Margin', 'Total') in _simple().stats_df.index
 
 
 # ----------------------------------------------------------------------
@@ -379,7 +409,7 @@ def test_mean_of_ratio_is_nan_when_premium_is_random_and_the_joint_is_gone():
 
 def test_legs_df_itemizes_declared_legs_only():
     df = _classified_two_group().legs_df
-    assert list(df.columns) == ['Step', 'View', 'Line', 'kind', 'EX', 'SD']
+    assert list(df.columns) == ['Step', 'Side', 'Label', 'kind', 'EX', 'SD']
     assert len(df) == 5                    # declared legs only, no derived rows
     assert list(df['kind']) == ['premium', 'loss', 'expense', 'premium',
                                 'recovery']
@@ -534,10 +564,10 @@ def _assert_columns_foot(pnl):
     legs = [lbl for g in pnl.groups
             for leg in (g.consideration + g.obligation)
             for lbl in [leg.label]]
-    result_key = (('All', 'Margin', 'Total') if multi
+    result_key = (('All', 'Margin', 'Net') if multi
                   else ('Margin', 'Total'))
     for c, q in zip(_KCOLS, (.01, .05, .10, .25, .50, .75, .90, .95, .99)):
-        leg_sum = sum(float(s.xs(lbl, level='Line')[c].iloc[0])
+        leg_sum = sum(float(s.xs(lbl, level='Label')[c].iloc[0])
                       for lbl in legs)
         cell = float(s.loc[result_key, c])
         assert leg_sum == pytest.approx(cell, abs=1e-9), c
@@ -645,7 +675,7 @@ def test_card_single_group_fixed_three_rows():
             obligation={'loss': lambda x: x, 'expense': 3.0})
     df = p.summary_df
     assert list(df.index) == ['Consideration', 'Obligation', 'Margin']
-    assert df.index.name == 'View'
+    assert df.index.name == 'Side'
     assert list(df.columns) == _CARD_COLS
     assert df.loc['Consideration', 'EX'] == pytest.approx(15.0)
     assert df.loc['Obligation', 'EX'] == pytest.approx(-13.0)
@@ -666,11 +696,11 @@ def test_card_tower_blocks():
         ('cover', 'Margin'), ('cover', 'Net'),
         ('All', 'Consideration'), ('All', 'Obligation'),
         ('All', 'Margin'), ('All', 'Impact')]
-    assert list(df.index.names) == ['Step', 'View']
+    assert list(df.index.names) == ['Step', 'Side']
     # per-step Margin = the step delta; Total block foots on EX
     s = t.stats_df
     assert df.loc[('base', 'Margin'), 'EX'] == pytest.approx(
-        s.loc[('base', 'Margin', 'Total'), 'EX'])
+        s.loc[('base', 'Margin', 'Direct'), 'EX'])
     assert df.loc[('All', 'Margin'), 'EX'] == pytest.approx(
         df.loc[('All', 'Consideration'), 'EX']
         + df.loc[('All', 'Obligation'), 'EX'], abs=1e-9)
@@ -789,7 +819,7 @@ def test_stitched_rows_kernel_mode_direct():
     # marginal ladder (plain P headers) -- no shared atoms, no kappa
     assert 'P01' in s.columns and '\u03ba01' not in s.columns
     # supplied exact means surface on EX; the impact row is a per-stat delta
-    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(2.0)
+    assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(2.0)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
         2.0 - 2.5)
     # no shared atoms: + composition refuses

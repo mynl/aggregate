@@ -52,8 +52,8 @@ The DecL builders serve two objects for two questions
   its net.
 * **``xpnl`` -- "how did I get there?"** The walk: gross -> each cover ->
   Total, a plain multi-group :class:`PnL` (a way of building, not a new
-  type) carrying the exploded ``(Step, View)`` card and
-  ``(Step, View, Line)`` stats sheet.
+  type) carrying the exploded ``(Step, Side)`` card and
+  ``(Step, Side, Label)`` stats sheet.
 
 **Kappa shared-source rule** ([Decision-Kappa-Shared-Source-Rule]): scenario
 (``κ``) ladder columns exist exactly when the ledger shares one source --
@@ -89,10 +89,10 @@ Two exhibits, deliberately different in kind:
 
 Where the result is non-monotone in the source (slides, swings, humps -- the
 "switcheroo") a scenario cell is the exact mean over the level set of that
-result value; well-defined, but read with care. The default ``View`` labels
+result value; well-defined, but read with care. The default ``Side`` labels
 (``Consideration`` / ``Obligation`` / ``Margin``) rename at serve time::
 
-    pnl.stats_df.rename({'Obligation': 'Loss & LAE'}, level='View')
+    pnl.stats_df.rename({'Obligation': 'Loss & LAE'}, level='Side')
 """
 from __future__ import annotations
 
@@ -738,11 +738,11 @@ _RATIO_COLS = ('P', 'L', 'E', 'C', 'M', 'LR', 'ER', 'CR',
                'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
 
 
-#: Default ``View`` level names for the :attr:`PnL.stats_df` row MultiIndex,
+#: Default ``Side`` level names for the :attr:`PnL.stats_df` row MultiIndex,
 #: keyed by the internal side codes (``margin`` covers every result-flavored
 #: row: group results, running nets, the grand result, total impact).
 #: Capitalized, presentation-ready.
-_VIEW_DEFAULTS = {'cons': 'Consideration', 'obl': 'Obligation',
+_SIDE_DEFAULTS = {'cons': 'Consideration', 'obl': 'Obligation',
                   'margin': 'Margin'}
 
 
@@ -782,7 +782,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     result_name : str, default 'result'
         Label for the grand result row -- the flat ledger key only
         (:attr:`density_df`, the sweep result keys). The card and stats
-        sheets display ``Margin`` / ``'Total'`` regardless.
+        sheets display ``Margin`` regardless, over ``'Net'`` on a ledger that
+        buys something and ``'Total'`` on one that does not.
     tier_spans : tuple, optional
         ``(label, lo, hi)`` triples naming contiguous spans of groups that earn
         their own subtotal block, ``hi`` exclusive ([Tier-Subtotal-Rows]). See
@@ -869,8 +870,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         self._stitched = stitched_rows is not None
         #: tower presentation: multi-group, or a forced single-group walk
         #: ([Decision-XPnL-Plain-Is-One-Step-Walk] -- ``force_tower=True``
-        #: presents the one-group ledger as its single (Step, View) block /
-        #: (Step, View, Line) sheet; no grand rows, no impact).
+        #: presents the one-group ledger as its single (Step, Side) block /
+        #: (Step, Side, Label) sheet; no grand rows, no impact).
         self._tower = len(groups) > 1 or bool(force_tower)
         #: contiguous group spans carrying their own subtotal block
         #: ([Tier-Subtotal-Rows]); ``{(lo, hi): label}`` for the presentation
@@ -1398,7 +1399,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         Single-group: a flat three-row card ``Consideration`` /
         ``Obligation`` / ``Margin`` read from the grand references -- the
         exact structural mirror of the flat :attr:`Aggregate.summary_df`.
-        Multi-group (a tower): one ``(Step, View)`` block per step plus a
+        Multi-group (a tower): one ``(Step, Side)`` block per step plus a
         closing ``'All'`` block (the a140 author rename -- too many things
         were already called Total), mirroring the per-unit blocks of
         :attr:`Portfolio.summary_df`::
@@ -1438,8 +1439,12 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         Returns
         -------
         pandas.DataFrame
-            Flat index named ``'View'`` (single group) or a ``(Step, View)``
-            MultiIndex (tower); columns as above.
+            Flat index named ``'Side'`` (single group) or a ``(Step, Side)``
+            MultiIndex (tower); columns as above. The card's ``Side`` level
+            merges the two :attr:`stats_df` levels: ``Net`` and ``Impact`` are
+            ``Label`` values there, but on a fixed-shape card they are rows of
+            their own, so both frames name the level the same way rather than
+            inventing a second word for it.
 
         See Also
         --------
@@ -1453,7 +1458,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             df = pd.DataFrame.from_dict(
                 {k: self._card_stat_row(r) for k, r in rows.items()},
                 orient='index', columns=_CARD_COLS)
-            df.index.name = 'View'
+            df.index.name = 'Side'
             return df
         recs = []
         index = []
@@ -1493,34 +1498,42 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 recs.append(self._card_stat_row(row))
         return pd.DataFrame(
             recs, columns=_CARD_COLS,
-            index=pd.MultiIndex.from_tuples(index, names=['Step', 'View']))
+            index=pd.MultiIndex.from_tuples(index, names=['Step', 'Side']))
 
-    def _view_index(self):
+    def _side_index(self):
         """The row MultiIndex for :attr:`stats_df`, aligned with the ledger
         plan order.
 
-        Single-group: two-level ``(View, Line)``. ``View`` buckets every
-        ledger row: legs and totals under their side (:data:`_VIEW_DEFAULTS`
+        Single-group: two-level ``(Side, Label)``. ``Side`` buckets every
+        ledger row: legs and totals under their side (:data:`_SIDE_DEFAULTS`
         -- ``Consideration`` / ``Obligation``), the result under ``Margin``.
-        ``Line`` is the presentation label: leg labels as declared; total
+        ``Label`` is the presentation label: leg labels as declared; total
         rows and the result read ``Total``.
 
-        Multi-group (a tower): three-level ``(Step, View, Line)``. ``Step``
+        Multi-group (a tower): three-level ``(Step, Side, Label)``. ``Step``
         is the group label, in ledger order; the grand rows close the sheet
         under step ``'All'`` (the a140 author rename -- too many things were
-        already called Total). Group results sit at
-        ``(step, 'Margin', 'Total')``, running nets at
-        ``(step, 'Margin', 'Net')``, the total impact at
-        ``('All', 'Margin', 'Impact')`` -- the a132 qualified-string lines
-        (``'<group> total'``, ``'Net through <g>'``) became levels. A forced
-        single-group tower (the one-step walk) is just its one block -- no
-        grand rows, no impact.
+        already called Total). Running nets sit at ``(step, 'Margin', 'Net')``
+        and the total impact at ``('All', 'Margin', 'Impact')`` -- the a132
+        qualified-string lines (``'<group> total'``, ``'Net through <g>'``)
+        became levels. A forced single-group tower (the one-step walk) is just
+        its one block -- no grand rows, no impact.
+
+        **Direct and Net** ([Ledger-Side-Label-Levels], a189). A ledger that
+        buys something distinguishes three margins that all used to read
+        ``Total``: a ``sell`` group's own result is ``Direct``, the grand
+        result and the grand totals are ``Net``, and a cession's own result
+        stays ``Total``. The pair is gated on the ledger actually containing a
+        ``buy`` group, because only then is there something to be direct *of*:
+        a plain single-group ``pnl`` is one ``sell`` group whose legs are
+        already net, and a ledger merging two sold books has no net to take, so
+        both keep ``Total`` throughout.
 
         A tier subtotal ([Tier-Subtotal-Rows]) takes its span's own ``Step``
         (``'All occurrence'`` / ``'All aggregate'`` on a layer-peeled walk) and
-        reads ``Line == 'Total'``, like the group and grand totals it sits
-        between, so exhibits that filter ``Line`` on ``'Total'`` already treat
-        it as the summary row it is.
+        reads ``Label == 'Total'``, like the group totals it sits between, so
+        exhibits that filter ``Label`` on ``'Total'`` still treat it as the
+        summary row it is.
 
         Presentation only -- the flat plan labels stay the canonical row keys
         everywhere else (:attr:`density_df`, :attr:`validation_df`, the sweep
@@ -1528,7 +1541,11 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         """
         groups = self._group_specs
         multi = self._tower
-        v = _VIEW_DEFAULTS
+        v = _SIDE_DEFAULTS
+        # only a ledger with a purchase in it has a Direct and a Net to name
+        has_buy = any(g.role == 'buy' for g in groups)
+        direct = 'Direct' if has_buy else 'Total'
+        net = 'Net' if has_buy else 'Total'
         tuples = []
         for label, kind, payload in self._plan:
             if kind == 'leg':
@@ -1538,7 +1555,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 gi, side = payload
                 t = (groups[gi].label, v[side], 'Total')
             elif kind == 'group_result':
-                t = (groups[payload].label, v['margin'], 'Total')
+                g = groups[payload]
+                t = (g.label, v['margin'],
+                     direct if g.role == 'sell' else 'Total')
             elif kind == 'running_net':
                 t = (groups[payload].label, v['margin'], 'Net')
             elif kind == 'tier_total':
@@ -1547,21 +1566,21 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             elif kind == 'tier_result':
                 t = (self._span_labels[payload], v['margin'], 'Total')
             elif kind == 'grand_total':
-                t = ('All', v[payload], 'Total')
+                t = ('All', v[payload], net)
             elif kind == 'grand_result':
-                t = ('All', v['margin'], 'Total')
+                t = ('All', v['margin'], net)
             elif kind == 'total_impact':
                 t = ('All', v['margin'], 'Impact')
             else:
                 raise ValueError(
                     f'unknown ledger row kind {kind!r} for row {label!r}; '
-                    '_view_index must handle every kind _ledger_plan emits.')
+                    '_side_index must handle every kind _ledger_plan emits.')
             tuples.append(t)
         if not multi:
             return pd.MultiIndex.from_tuples(
-                [t[1:] for t in tuples], names=['View', 'Line'])
+                [t[1:] for t in tuples], names=['Side', 'Label'])
         return pd.MultiIndex.from_tuples(
-            tuples, names=['Step', 'View', 'Line'])
+            tuples, names=['Step', 'Side', 'Label'])
 
     def _scenario_ladder(self):
         """The [Kappa-Scenario-Percentiles] pass: ``{label: [cell per q]}``.
@@ -1601,8 +1620,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         alignment/footing exhibit.
 
         Rows = the whole ledger (legs, totals, results, running nets, grand
-        rows), in ledger order, indexed by :meth:`_view_index`: two-level
-        ``(View, Line)`` single-group, three-level ``(Step, View, Line)`` on
+        rows), in ledger order, indexed by :meth:`_side_index`: two-level
+        ``(Side, Label)`` single-group, three-level ``(Step, Side, Label)`` on
         a tower. Columns are ``EX`` / ``SD`` / ``CV`` / ``Skew`` and the full
         :data:`PERCENTILE_LADDER`.
 
@@ -1662,7 +1681,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                      list(row.moments) + ladder[label]]
                     for label, row in self._rows.items()]
             cols = _stat_names(scenario=True)
-        return pd.DataFrame(data, index=self._view_index(), columns=cols)
+        return pd.DataFrame(data, index=self._side_index(), columns=cols)
 
     # ------------------------------------------------------------------
     # raw materials for ratio exhibits ([PnL-Ratio-Frame])
@@ -1849,9 +1868,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         Returns
         -------
         pandas.DataFrame
-            Columns ``Step`` / ``View`` / ``Line`` / ``kind`` / ``EX`` / ``SD``,
-            in ledger order. ``EX`` is the **signed booked** mean, as on
-            :attr:`stats_df`; ``kind`` is ``None`` for an unclassified leg.
+            Columns ``Step`` / ``Side`` / ``Label`` / ``kind`` / ``EX`` /
+            ``SD``, in ledger order, matching the :attr:`stats_df` level names.
+            ``EX`` is the **signed booked** mean, as on :attr:`stats_df`;
+            ``kind`` is ``None`` for an unclassified leg.
         """
         recs = []
         for label, kind, payload in self._plan:
@@ -1863,10 +1883,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             row = self._by_kind[(kind, payload)]
             sd = row.stat_vector()[1] if self._probs is None \
                 else row.moments[1]
-            recs.append([spec.label, _VIEW_DEFAULTS[side], label,
+            recs.append([spec.label, _SIDE_DEFAULTS[side], label,
                          legs[li].kind, row.mean, _snap_noise(sd)])
         return pd.DataFrame(
-            recs, columns=['Step', 'View', 'Line', 'kind', 'EX', 'SD'])
+            recs, columns=['Step', 'Side', 'Label', 'kind', 'EX', 'SD'])
 
     @property
     def density_df(self):
@@ -1927,7 +1947,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     #: Ledger row kinds whose row *is* a margin, and so can be evaluated: each
     #: group's own result, the running net after each group, a tier subtotal
     #: result, the grand result, and the program's total impact. Exactly the
-    #: rows ``_VIEW_DEFAULTS`` files under ``'margin'``.
+    #: rows ``_SIDE_DEFAULTS`` files under ``'margin'``.
     _MARGIN_KINDS = ('group_result', 'running_net', 'tier_result',
                      'grand_result', 'total_impact')
 

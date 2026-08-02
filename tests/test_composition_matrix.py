@@ -78,11 +78,11 @@ def test_gc_feat_consolidated_books_occ_constants(uw):
     pn = rd['p_agg_net_occ'].to_numpy()
     pn = pn / pn.sum()
     hand_np = _P_G - _PC_OCC + c_occ - float((_phi(_g(xs)) * pn).sum())
-    booked = p.stats_df.xs('net premium', level='Line').iloc[0]
+    booked = p.stats_df.xs('net premium', level='Label').iloc[0]
     assert booked['EX'] == pytest.approx(hand_np, abs=1e-6)
     assert booked['SD'] > 0                    # the swing premium is live
     hand_nl = -float(((xs - _g(xs)) * pn).sum())
-    assert p.stats_df.xs('Gross Loss (net)', level='Line').iloc[0]['EX'] \
+    assert p.stats_df.xs('Gross Loss (net)', level='Label').iloc[0]['EX'] \
         == pytest.approx(hand_nl, abs=1e-6)
     assert p.economics['pc_occ'] == pytest.approx(_PC_OCC)
     assert p.economics['c_occ'] == pytest.approx(c_occ)
@@ -122,14 +122,14 @@ def test_gc_feat_walk_has_occ_step_and_true_gross(uw):
     assert s.loc[('Swing Program', 'Obligation', 'Swing Program recovery'),
                  'EX'] == pytest.approx(m('p_agg_net_occ', _g), rel=2e-2)
     # the EX column foots exactly (per-atom partial sums)...
-    legs = [i for i in s.index if i[2] not in ('Total', 'Net', 'Impact')]
+    legs = [i for i in s.index if i[2] not in ('Total', 'Direct', 'Net', 'Impact')]
     assert s['EX'].loc[legs].sum() == pytest.approx(
-        s.loc[('All', 'Margin', 'Total'), 'EX'], abs=1e-9)
+        s.loc[('All', 'Margin', 'Net'), 'EX'], abs=1e-9)
     # ...and the consolidated pnl (exact net-occ marginal) agrees with the
     # joint-riding walk to joint-grid accuracy
     p = _build(uw, 'pnl', 'CBGF')
     assert p.est_m == pytest.approx(
-        s.loc[('All', 'Margin', 'Total'), 'EX'], rel=5e-3)
+        s.loc[('All', 'Margin', 'Net'), 'EX'], rel=5e-3)
     # one shared joint -> the scenario ladder
     assert 'κ01' in s.columns and 'P01' not in s.columns
 
@@ -172,11 +172,11 @@ def test_reinst_feat_routes_through_joint_and_keeps_cap(uw):
     # pnl face = the consolidated net view over the SAME joint
     # ([Decision-PnL-Is-Consolidated]); agrees with the walk exactly
     pb = _build(uw, 'pnl', 'CBRF')
-    assert list(pb.stats_df.index.names) == ['View', 'Line']
+    assert list(pb.stats_df.index.names) == ['Side', 'Label']
     assert pb.est_m == pytest.approx(
-        sb.loc[('All', 'Margin', 'Total'), 'EX'], abs=1e-12)
+        sb.loc[('All', 'Margin', 'Net'), 'EX'], abs=1e-12)
     # the swing premium rides the net-premium leg (stochastic)
-    assert pb.stats_df.xs('net premium', level='Line').iloc[0]['SD'] > 0
+    assert pb.stats_df.xs('net premium', level='Label').iloc[0]['SD'] > 0
 
 
 def test_reinst_feat_consolidated_foots(uw):
@@ -245,12 +245,12 @@ def test_matrix_routing(uw):
     expect = {
         # (occ, agg, face) -> stats_df index names (no analysis object exists
         # post-[Decommission-Analysis-Classes])
-        ('none', 'none', 'pnl'): ['View', 'Line'],
-        ('none', 'none', 'xpnl'): ['Step', 'View', 'Line'],
-        ('gc', 'feat', 'pnl'): ['View', 'Line'],
-        ('gc', 'feat', 'xpnl'): ['Step', 'View', 'Line'],
-        ('reinst', 'feat', 'pnl'): ['View', 'Line'],
-        ('reinst', 'feat', 'xpnl'): ['Step', 'View', 'Line'],
+        ('none', 'none', 'pnl'): ['Side', 'Label'],
+        ('none', 'none', 'xpnl'): ['Step', 'Side', 'Label'],
+        ('gc', 'feat', 'pnl'): ['Side', 'Label'],
+        ('gc', 'feat', 'xpnl'): ['Step', 'Side', 'Label'],
+        ('reinst', 'feat', 'pnl'): ['Side', 'Label'],
+        ('reinst', 'feat', 'xpnl'): ['Step', 'Side', 'Label'],
     }
     for (o, ag, face), names in expect.items():
         prog = (f'{face} M{o}{ag}{face} 5000 premium less agg E{o}{ag}{face} '

@@ -20,11 +20,11 @@ _BASE = 'pnl A 1000 prem less agg A_e 8 claims sev lognorm 50 cv 1 poisson'  # E
 def _leg(pnl, label):
     """The stats_df row of one declared leg, looked up by its Line label
     (leg-level detail lives on the stats sheet; summary_df is the fixed card)."""
-    return pnl.stats_df.xs(label, level='Line').iloc[0]
+    return pnl.stats_df.xs(label, level='Label').iloc[0]
 
 
 def _lines(pnl):
-    return list(pnl.stats_df.index.get_level_values('Line'))
+    return list(pnl.stats_df.index.get_level_values('Label'))
 
 
 def test_expense_absent_defaults_to_zero():

@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.0.0a189
+
+**[Ledger-Side-Label-Levels]** The `PnL` sheets rename their index levels and
+stop overloading `Total`. **Breaking for anything that names a level or a
+margin row key.**
+
+### The levels
+
+`View` becomes **`Side`** and `Line` becomes **`Label`**, on `stats_df`
+(`(Side, Label)` single-group, `(Step, Side, Label)` on a tower), on
+`summary_df` (`Side` / `(Step, Side)`), and as `legs_df` columns
+(`Step` / `Side` / `Label` / `kind` / `EX` / `SD`).
+
+`Line` assumed a line of business, which the ledger does not otherwise assume,
+and the level holds presentation labels: declared leg names, or `Total` on a
+derived row. `Side` was already the internal word (`_pnl.py` passes
+`side='cons'|'obl'`); this promotes it and widens it to cover `Margin`.
+
+`Side` was chosen over `Leg` deliberately. `Leg` is the public class for an
+individual declared cash flow, and those now sit under `Label`, so a level
+named `Leg` would be the one level with no leg names in it.
+
+### Direct and Net
+
+`Total` was doing three jobs: a within-step subtotal, the direct result, and
+the grand result. On a ledger that **buys** something they separate:
+
+| row | before | after |
+|---|---|---|
+| a `sell` group's own result | `Total` | **`Direct`** |
+| a cession's own result | `Total` | `Total` |
+| the grand consideration / obligation / result | `Total` | **`Net`** |
+| a running net, the impact, every subtotal | unchanged | unchanged |
+
+The pair is gated on the ledger actually containing a `buy` group, because only
+then is there something to be direct *of*. A plain single-group `pnl` is one
+`sell` group whose legs are already net, and a ledger merging two sold books
+has no net to take: both keep `Total` throughout, so calling either `Direct`
+would be a lie. The per-step `net through <g>` row keeps its `Net` label
+either way, being a running total rather than half of this contrast.
+
+### Migration
+
+* `df.rename(..., level='View')` becomes `level='Side'`; `xs(..., level='Line')`
+  becomes `level='Label'`.
+* `('All', 'Margin', 'Total')` becomes `('All', 'Margin', 'Net')`, and likewise
+  for the grand consideration and obligation rows.
+* `('Gross', 'Margin', 'Total')` becomes `('Gross', 'Margin', 'Direct')` for
+  whatever the first, sold step is called.
+* Code that filtered legs out with `Label not in ('Total', 'Net', 'Impact')`
+  needs `'Direct'` in that set.
+* A step's own result, whatever its label, is the first `Margin` row of its
+  block in plan order.
+
+`PnL._view_index` is now `PnL._side_index` and `_VIEW_DEFAULTS` is
+`_SIDE_DEFAULTS`; both are private.
+
 ## 1.0.0a188
 
 **[Counterparty-Margin-Evaluate]** `evaluate` reads a **bought** position from

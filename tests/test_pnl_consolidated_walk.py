@@ -113,19 +113,19 @@ def test_walk_running_nets_and_footing(cat):
     s = x.stats_df
     ex = s['EX']
     # the EX column foots exactly (means add by linearity)
-    legs = [i for i in s.index if i[2] not in ('Total', 'Net', 'Impact')]
+    legs = [i for i in s.index if i[2] not in ('Total', 'Direct', 'Net', 'Impact')]
     assert ex.loc[legs].sum() == pytest.approx(
-        ex.loc[('All', 'Margin', 'Total')], abs=1e-9)
+        ex.loc[('All', 'Margin', 'Net')], abs=1e-9)
     # running nets are cumulative step results
     assert ex.loc[('Occ Cover', 'Margin', 'Net')] == pytest.approx(
-        ex.loc[('Gross Book1', 'Margin', 'Total')]
+        ex.loc[('Gross Book1', 'Margin', 'Direct')]
         + ex.loc[('Occ Cover', 'Margin', 'Total')], abs=1e-9)
     assert ex.loc[('Agg Cover', 'Margin', 'Net')] == pytest.approx(
-        ex.loc[('All', 'Margin', 'Total')], abs=1e-9)
+        ex.loc[('All', 'Margin', 'Net')], abs=1e-9)
     # ...and every κ column foots too (per-atom conditional means)
     k = [c for c in s.columns if c.startswith('κ')][0]
     assert s[k].loc[legs].sum() == pytest.approx(
-        s.loc[('All', 'Margin', 'Total'), k], abs=1e-6)
+        s.loc[('All', 'Margin', 'Net'), k], abs=1e-6)
 
 
 def test_walk_ladder_scenario_and_flagged(cat):
@@ -145,8 +145,8 @@ def test_walk_impact_row_is_per_atom_delta(cat):
     # (its SD / percentiles are of the difference distribution, not deltas
     # of statistics -- richer than the retired stitched per-stat delta)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
-        s.loc[('All', 'Margin', 'Total'), 'EX']
-        - s.loc[('Gross Book1', 'Margin', 'Total'), 'EX'], abs=1e-9)
+        s.loc[('All', 'Margin', 'Net'), 'EX']
+        - s.loc[('Gross Book1', 'Margin', 'Direct'), 'EX'], abs=1e-9)
     assert s.loc[('All', 'Margin', 'Impact'), 'SD'] >= 0
 
 

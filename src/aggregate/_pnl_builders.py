@@ -408,8 +408,8 @@ def build_plain_pnl(engine, *, consideration, consideration_label=None,
         The P&L handle and its optional human label.
     walk : bool, default False
         ``True`` presents the same one-group ledger as a **one-step walk**
-        ([Decision-XPnL-Plain-Is-One-Step-Walk]): the (Step, View) card and
-        (Step, View, Line) sheet with the single gross step and closing
+        ([Decision-XPnL-Plain-Is-One-Step-Walk]): the (Step, Side) card and
+        (Step, Side, Label) sheet with the single gross step and closing
         grand rows (which duplicate it; the impact is identically zero).
         The ``xpnl`` face of a plain engine -- boring but uniform.
 

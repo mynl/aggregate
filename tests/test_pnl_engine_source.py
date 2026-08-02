@@ -141,17 +141,17 @@ def test_xpnl_returns_walk_pnl_over_gcn_engine(uw):
     assert isinstance(t, PnL)
     assert [g.label for g in t.groups] == ['Gross', 'occ 500 xs 500']
     s = t.stats_df
-    assert list(s.index.names) == ['Step', 'View', 'Line']
+    assert list(s.index.names) == ['Step', 'Side', 'Label']
     # means add down the walk exactly (per-atom partial sums)
-    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Total'), 'EX']
+    assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
+        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
         + s.loc[('occ 500 xs 500', 'Margin', 'Total'), 'EX'], abs=1e-6)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
         s.loc[('occ 500 xs 500', 'Margin', 'Total'), 'EX'], abs=1e-6)
     # one shared joint -> the scenario (κ) ladder; every column foots
     assert 'κ01' in s.columns and 'P01' not in s.columns
     # the card is the exploded (Step, View) blocks + closing All block
-    assert list(t.summary_df.index.names) == ['Step', 'View']
+    assert list(t.summary_df.index.names) == ['Step', 'Side']
 
 
 def test_xpnl_over_plain_engine_one_step_walk(uw):
@@ -162,10 +162,10 @@ def test_xpnl_over_plain_engine_one_step_walk(uw):
            'poisson')
     assert isinstance(t, PnL)
     s = t.stats_df
-    assert list(s.index.names) == ['Step', 'View', 'Line']
+    assert list(s.index.names) == ['Step', 'Side', 'Label']
     steps = list(dict.fromkeys(s.index.get_level_values('Step')))
     assert steps == ['Gross']
-    assert ('All', 'Margin', 'Total') not in s.index
+    assert ('All', 'Margin', 'Net') not in s.index
     assert list(t.summary_df.index) == [
         ('Gross', 'Consideration'), ('Gross', 'Obligation'),
         ('Gross', 'Margin')]

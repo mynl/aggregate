@@ -19,7 +19,7 @@ pp(pnl(house('Book', occ=OCC_LAYER), walk=True))
 
 **Beats 2 & 3 — build, validate, the walk.**
 
-<!-- TODO(author): build; show the multi-level stats_df (Step, View, Line) and
+<!-- TODO(author): build; show the multi-level stats_df (Step, Side, Label) and
      that means add down the sheet. -->
 
 **Beat 4 — the check.** [Check-Reconciliation] + [Check-Round-Trip]

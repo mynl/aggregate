@@ -40,7 +40,7 @@ def _means_add(pnl):
 
 def _leg(pnl, label):
     """One declared leg's stats_df row, by Line label."""
-    return pnl.stats_df.xs(label, level='Line').iloc[0]
+    return pnl.stats_df.xs(label, level='Label').iloc[0]
 
 
 # ----------------------------------------------------------------------

@@ -569,14 +569,14 @@ _REINS = 'agg R 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 x
 _WALK_ROWS = [
     ('Gross', 'Consideration', 'premium'),
     ('Gross', 'Obligation', 'Loss'),
-    ('Gross', 'Margin', 'Total'),
+    ('Gross', 'Margin', 'Direct'),
     ('agg 2000 xs 3000', 'Consideration', 'agg 2000 xs 3000 premium'),
     ('agg 2000 xs 3000', 'Obligation', 'agg 2000 xs 3000 recovery'),
     ('agg 2000 xs 3000', 'Margin', 'Total'),
     ('agg 2000 xs 3000', 'Margin', 'Net'),
-    ('All', 'Consideration', 'Total'),
-    ('All', 'Obligation', 'Total'),
-    ('All', 'Margin', 'Total'),
+    ('All', 'Consideration', 'Net'),
+    ('All', 'Obligation', 'Net'),
+    ('All', 'Margin', 'Net'),
     ('All', 'Margin', 'Impact')]
 
 
@@ -629,8 +629,8 @@ def test_xpnl_walk_rows_and_means_add():
     assert isinstance(x, PnL)
     s = x.stats_df
     assert list(s.index) == _WALK_ROWS
-    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Total'), 'EX']
+    assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
+        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
         + s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'], abs=1e-6)
     # total impact = the cession's step delta (result vs the gross result)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
@@ -641,11 +641,11 @@ def test_xpnl_walk_rows_and_means_add():
     assert s.loc[('agg 2000 xs 3000', 'Obligation', 'agg 2000 xs 3000 recovery'), 'EX'] > 0
     assert 'κ01' in s.columns and 'P01' not in s.columns
     # SDs do not add: the cession trims the tail
-    assert s.loc[('All', 'Margin', 'Total'), 'SD'] < \
-        s.loc[('Gross', 'Margin', 'Total'), 'SD']
+    assert s.loc[('All', 'Margin', 'Net'), 'SD'] < \
+        s.loc[('Gross', 'Margin', 'Direct'), 'SD']
     # the walk's grand result mean = the consolidated pnl's margin
     p = agg.make_pnl(gross=5500, ceded=1800)
-    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == \
+    assert s.loc[('All', 'Margin', 'Net'), 'EX'] == \
         pytest.approx(p.est_m, abs=1e-9)
 
 

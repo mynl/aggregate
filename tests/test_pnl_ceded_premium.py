@@ -24,11 +24,11 @@ _BASE = 'pnl T 5000 prem less agg T_e 100 claims sev lognorm 50 cv 1.5 '
 
 def _leg(pnl, label):
     """One declared leg's stats_df row, by Line label."""
-    return pnl.stats_df.xs(label, level='Line').iloc[0]
+    return pnl.stats_df.xs(label, level='Label').iloc[0]
 
 
 def _lines(pnl):
-    return list(pnl.stats_df.index.get_level_values('Line'))
+    return list(pnl.stats_df.index.get_level_values('Label'))
 
 
 def test_deposit_rol_rate_resolution():
@@ -89,14 +89,14 @@ def test_any_reinsurance_yields_consolidated_pnl():
         plain = build(_BASE + 'poisson aggregate net of 2000 xs 3000')
     assert isinstance(plain, PnL)
     assert plain.economics['pc_agg'] == 0.0
-    assert list(plain.stats_df.index.names) == ['View', 'Line']
+    assert list(plain.stats_df.index.names) == ['Side', 'Label']
     # zero ceded premium: net premium = the full gross premium
     assert _leg(plain, 'net premium')['EX'] == pytest.approx(5000.0)
     assert 'Loss (net)' in _lines(plain)
     # a premium clause -> the same consolidated face, priced
     p = build(_BASE + 'poisson aggregate net of 2000 xs 3000 deposit 1500')
     assert isinstance(p, PnL)
-    assert list(p.stats_df.index.names) == ['View', 'Line']
+    assert list(p.stats_df.index.names) == ['Side', 'Label']
     assert list(p.summary_df.index) == ['Consideration', 'Obligation',
                                         'Margin']
     # consideration = net premium: 5000 - 1500
@@ -130,7 +130,7 @@ def test_occurrence_only_consolidates_over_net_occ():
     assert 'Loss (net)' in _lines(p)
     assert p.economics['pc_occ'] == pytest.approx(0.10 * 100)
     assert p.economics['pc_agg'] == 0.0
-    assert list(p.stats_df.index.names) == ['View', 'Line']
+    assert list(p.stats_df.index.names) == ['Side', 'Label']
 
 
 def test_both_sides_split_and_walk_ledger():
@@ -163,20 +163,20 @@ def test_walk_means_add_down_the_sheet():
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     s = x.stats_df
     # step results foot to their signed legs (means add by linearity)
-    assert s.loc[('Gross', 'Margin', 'Total'), 'EX'] == pytest.approx(
+    assert s.loc[('Gross', 'Margin', 'Direct'), 'EX'] == pytest.approx(
         _leg(x, 'premium')['EX'] + _leg(x, 'Loss')['EX'], abs=1e-9)
     assert s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'] == pytest.approx(
         _leg(x, 'agg 2000 xs 3000 premium')['EX']
         + _leg(x, 'agg 2000 xs 3000 recovery')['EX']
         + _leg(x, 'agg 2000 xs 3000 commission')['EX'], abs=1e-9)
     # the grand result sums the step results exactly
-    assert s.loc[('All', 'Margin', 'Total'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Total'), 'EX']
+    assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
+        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
         + s.loc[('occ 100 xs 200', 'Margin', 'Total'), 'EX']
         + s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'], abs=1e-9)
     # running nets read the engine's own net marginals
     assert s.loc[('agg 2000 xs 3000', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('All', 'Margin', 'Total'), 'EX'], abs=1e-9)
+        s.loc[('All', 'Margin', 'Net'), 'EX'], abs=1e-9)
     # the consolidated pnl's margin equals the walk's grand result -- to
     # joint-grid accuracy: the walk rides the occurrence (gross, ceded)
     # joint (budget-sized common bs), the consolidated margin reads the
@@ -184,7 +184,7 @@ def test_walk_means_add_down_the_sheet():
     p = build(_BASE + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     assert p.est_m == pytest.approx(
-        s.loc[('All', 'Margin', 'Total'), 'EX'], rel=5e-3)
+        s.loc[('All', 'Margin', 'Net'), 'EX'], rel=5e-3)
 
 
 def test_cede_without_premium_errors():

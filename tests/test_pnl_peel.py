@@ -89,21 +89,35 @@ def _kappa_columns(pnl):
     return [c for c in pnl.stats_df.columns if c.startswith('κ')]
 
 
-def _side_total(frame, step, view, column):
+def _side_total(frame, step, side, column):
     """One side's total for a step: its ``Total`` line, else its single leg.
 
     A side gains an explicit ``Total`` line only when it carries more than one
-    leg, so summing the block blindly would double count it.
+    leg, so summing the block blindly would double count it. The ``All`` block
+    reads ``Net`` rather than ``Total`` and carries one row per side, so the
+    sum branch covers it ([Ledger-Side-Label-Levels]).
     """
-    block = frame.loc[(step, view), column]
+    block = frame.loc[(step, side), column]
     return block['Total'] if 'Total' in block.index else block.sum()
+
+
+def _step_result(frame, step, column):
+    """A step's **own** result cell, whatever its ``Label`` reads.
+
+    The label varies with ledger position ([Ledger-Side-Label-Levels]): the
+    direct step reads ``Direct``, a cession ``Total``, the grand block ``Net``.
+    In every case the step's own result is the first ``Margin`` row of the
+    block, in plan order, ahead of the running net or the impact that may
+    follow it.
+    """
+    return frame.loc[(step, 'Margin'), column].iloc[0]
 
 
 def _assert_column_foots(pnl, column):
     """``margin == consideration + obligation`` at every step and at ``All``."""
     s = pnl.stats_df
     for step in _steps(pnl):
-        margin = s.loc[(step, 'Margin', 'Total'), column]
+        margin = _step_result(s, step, column)
         parts = (_side_total(s, step, 'Consideration', column)
                  + _side_total(s, step, 'Obligation', column))
         assert margin == pytest.approx(parts, abs=FOOTS), \
@@ -238,7 +252,7 @@ def test_peel_total_agrees_with_the_consolidated_pnl():
     """
     peeled = build(f'{OCC2} peel top-down')
     consolidated = build(OCC2.replace('xpnl', 'pnl', 1))
-    assert peeled.stats_df.loc[('All', 'Margin', 'Total'), 'EX'] == \
+    assert peeled.stats_df.loc[('All', 'Margin', 'Net'), 'EX'] == \
         pytest.approx(consolidated.est_m, abs=1e-8)
 
 
@@ -246,11 +260,11 @@ def test_peel_total_agrees_with_the_consolidated_pnl():
 def test_peel_order_does_not_change_the_total(direction):
     """The order layers are introduced in cannot move the closing margin."""
     total = build(f'{OCC2} peel {direction}').stats_df.loc[
-        ('All', 'Margin', 'Total'), 'EX']
+        ('All', 'Margin', 'Net'), 'EX']
     other = 'bottom-up' if direction == 'top-down' else 'top-down'
     assert total == pytest.approx(
         build(f'{OCC2} peel {other}').stats_df.loc[
-            ('All', 'Margin', 'Total'), 'EX'], abs=FOOTS)
+            ('All', 'Margin', 'Net'), 'EX'], abs=FOOTS)
 
 
 def test_aggregate_tier_rides_the_occurrence_net_subject():
@@ -315,7 +329,7 @@ def test_each_layer_books_its_own_ceded_premium():
     assert s.loc[('occ 300 xs 200', 'Consideration',
                   'occ 300 xs 200 premium'), 'EX'] == pytest.approx(-40.0)
     # and the grand consideration is the gross premium less both cessions
-    assert s.loc[('All', 'Consideration', 'Total'), 'EX'] == \
+    assert s.loc[('All', 'Consideration', 'Net'), 'EX'] == \
         pytest.approx(1000.0 - 60.0 - 40.0, abs=FOOTS)
 
 
@@ -574,11 +588,11 @@ def test_tier_subtotals_chain_into_the_running_net():
     """
     p = build(f'{TWO_EACH} peel top-down')
     s = p.stats_df
-    total = (s.loc[('Gross', 'Margin', 'Total'), 'EX']
+    total = (s.loc[('Gross', 'Margin', 'Direct'), 'EX']
              + s.loc[('All occurrence', 'Margin', 'Total'), 'EX']
              + s.loc[('All aggregate', 'Margin', 'Total'), 'EX'])
     assert total == pytest.approx(
-        s.loc[('All', 'Margin', 'Total'), 'EX'], rel=FOOTS_ACROSS)
+        s.loc[('All', 'Margin', 'Net'), 'EX'], rel=FOOTS_ACROSS)
 
 
 def test_tier_subtotal_foots_in_every_column_per_atom():
@@ -741,7 +755,7 @@ def test_expense_legs_are_classified_as_expense():
     )
     p = build(prog)
     df = p.legs_df
-    assert df.loc[df['Line'] == 'LAE', 'kind'].iloc[0] == 'expense'
+    assert df.loc[df['Label'] == 'LAE', 'kind'].iloc[0] == 'expense'
     # ...so the ratio frame can split the gross block's LR from its ER
     gross = p.ratio_df.loc['Gross']
     assert gross['E'] > 0

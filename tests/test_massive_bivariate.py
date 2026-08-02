@@ -638,13 +638,13 @@ def test_massive_pnl_one_sweep_ledger(tmp_path):
             pi.stats_df.loc[row, 'EX'], abs=1e-12), row
     # mean(result) == sum of signed leg means -- the derived row is pushed as
     # its own signed-sum function, never a sum of bucketed legs
-    leg_means = sum(pm.stats_df.xs(r, level='Line')['EX'].iloc[0]
+    leg_means = sum(pm.stats_df.xs(r, level='Label')['EX'].iloc[0]
                     for r in ('premium', 'loss', 'ceded premium', 'recovery'))
     assert abs(pm.est_m - leg_means) < 10 * VALIDATION_NOISE
     # [Massive-Kappa-Second-Sweep]: the massive ladder stays MARGINAL (each
     # cell the row's own quantile), unlike the in-core scenario columns
     loss_gd = pm.density_df['loss']
-    assert pm.stats_df.xs('loss', level='Line')['P50'].iloc[0] == \
+    assert pm.stats_df.xs('loss', level='Label')['P50'].iloc[0] == \
         pytest.approx(float(loss_gd.q(0.5)))
     # the massive card carries full marginal percentiles (grand rows reused
     # from the sweep's own ledger rows -- no NaN holes)

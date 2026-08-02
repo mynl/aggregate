@@ -271,20 +271,30 @@ def test_aggregate_tier_rides_the_occurrence_net_subject():
     _assert_column_foots(p, 'EX')
 
 
-def test_stitched_peel_evaluates_every_layer_but_not_the_impact_row():
+def test_stitched_peel_evaluates_its_nets_and_flags_underpriced_layers():
     """A stitched peel evaluates: each row's own gd is all ``evaluate`` needs.
 
-    The exception is ``total impact``, a delta of two statistics whose sides
-    ride different marginals: it has no law without a joint, so it reports NaN
-    with that reason. Composition still needs shared atoms and refuses.
+    Two kinds of row correctly report no breakeven. The layers here are
+    deliberate bargains, deposit 60 against an expected recovery of 123.76 and
+    deposit 40 against 123.89, so read from the seller's side they carry
+    ``E[M] <= 0``: a position priced below its own expected loss survives no
+    stress at all. ``total impact`` is a delta of two statistics whose sides
+    ride different marginals, so it has no law without a joint. Composition
+    still needs shared atoms and refuses.
     """
     p = build(f'{OCC2} peel top-down')
     with pytest.warns(DegenerateEvaluationWarning, match='no joint'):
         ev = p.evaluate()
     layers = ['occ 100 xs 100 result', 'occ 300 xs 200 result']
-    assert (ev.loc[layers, 'status'] == 'ok').all()
+    assert (ev.loc[layers, 'role'] == 'buy').all()
+    assert ev.loc[layers, 'status'].str.startswith('E[M]').all()
     assert ev.loc['total impact', 'param'].isna().all()
-    # buying cover improves the deal: gini_p rises down the running nets
+    # the nets are the holder's own position, read exactly as booked
+    nets = ['Gross result', 'net through occ 300 xs 200',
+            'net through occ 100 xs 100', 'margin']
+    assert (ev.loc[nets, 'role'] == 'sell').all()
+    assert (ev.loc[nets, 'status'] == 'ok').all()
+    # buying cover this cheap improves the deal: gini_p rises down the nets
     gini = ev.unstack('distortion')['gini_p']
     for fam in ('ph', 'wang', 'dual', 'tvar'):
         assert (gini.loc['Gross result', fam]

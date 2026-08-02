@@ -2845,7 +2845,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         pandas.DataFrame
             Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)``, one
-            ``Step`` per evaluated unit.
+            ``Step`` per evaluated unit, and columns ``role`` / ``param_name`` /
+            ``param`` / ``gini_p`` / ``error`` / ``status``. ``role`` is always
+            ``'sell'``: every unit is an obligation written.
 
         Warns
         -----

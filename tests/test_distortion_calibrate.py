@@ -262,6 +262,8 @@ def test_aggregate_evaluate_defaults_to_exp_premium_and_raises_without():
     ev = a.evaluate()
     assert list(ev.index.get_level_values('Step').unique()) == ['AEv']
     assert (ev.status == 'ok').all()
+    # an aggregate is an obligation written, so it is read as booked
+    assert (ev.role == 'sell').all()
     # the explicit premium reproduces the default
     assert ev.param.to_numpy() == pytest.approx(
         a.evaluate(1000.0).param.to_numpy())
@@ -288,6 +290,7 @@ def test_portfolio_evaluate_total_and_unit_profile():
     profile = port.evaluate(unit=['PU1', 'PU2'])
     assert list(profile.index.get_level_values('Step').unique()) == \
         ['PU1', 'PU2']
+    assert (profile.role == 'sell').all()      # every unit is written, not bought
     for fam in ('ph', 'wang', 'dual', 'tvar'):
         assert (total.loc[fam, 'gini_p']
                 > profile.loc[('PU1', fam), 'gini_p']

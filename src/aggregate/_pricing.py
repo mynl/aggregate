@@ -629,11 +629,33 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
 #: supply.
 EVAL_FAMILIES = ('ph', 'wang', 'dual', 'tvar')
 
+#: Sign applied to a position's margin before the solve, by the role it is held
+#: at. A ``buy`` position's margin is negative by construction (you pay for
+#: cover), so it has no breakeven of its own; the acceptability question about a
+#: purchased layer is the **seller's**, and the panel answers it by reading the
+#: margin negated.
+EVAL_SIGN = {'sell': 1.0, 'buy': -1.0}
+
 #: Fixed column order of the acceptability panel. Tidy (long) form, one row per
 #: ``(step, family)``: ``param`` holds each family's own natural parameter, so
-#: it is a pure column only at this grain. ``area = (gini_p + 1) / 2`` is not
-#: carried, being a restatement of ``gini_p``.
-EVAL_COLS = ['param_name', 'param', 'gini_p', 'error', 'status']
+#: it is a pure column only at this grain. ``role`` leads because it qualifies
+#: the whole row, naming whose position the parameters describe.
+#: ``area = (gini_p + 1) / 2`` is not carried, being a restatement of ``gini_p``.
+EVAL_COLS = ['role', 'param_name', 'param', 'gini_p', 'error', 'status']
+
+
+def _eval_sign(role):
+    """Validate a position's role and return the sign its margin is read at.
+
+    See :data:`EVAL_SIGN`. Raises rather than defaulting, so a typo surfaces at
+    the call site instead of silently evaluating the wrong side of the trade.
+    """
+    try:
+        return EVAL_SIGN[role]
+    except (KeyError, TypeError):
+        raise ValueError(
+            f'role must be one of {", ".join(EVAL_SIGN)}, got {role!r}.'
+        ) from None
 
 
 def _eval_panel(rows, names):
@@ -644,20 +666,23 @@ def _eval_panel(rows, names):
                                   name='distortion'))
 
 
-def no_distribution_panel(status, *, names=None):
+def no_distribution_panel(status, *, role='sell', names=None):
     """One step's block for a row that carries **no distribution** to distort.
 
     A ledger row can be a well-defined number without being a random variable:
     a stitched impact row is the difference of two statistics whose sides ride
     different marginals, so it has no law absent a joint. Such a row keeps its
-    place in the panel and says why it is ``NaN``, rather than vanishing.
+    place in the panel and says why it is ``NaN``, rather than vanishing. It
+    still carries its ``role``, so the sheet reports whose position it was even
+    where there is nothing to solve.
     """
+    _eval_sign(role)
     names = list(EVAL_FAMILIES if names is None else names)
     return _eval_panel(
-        [[None, np.nan, np.nan, np.nan, status] for _ in names], names)
+        [[role, None, np.nan, np.nan, np.nan, status] for _ in names], names)
 
 
-def evaluate_margin(gd, *, names=None):
+def evaluate_margin(gd, *, role='sell', names=None):
     """The Cherny and Madan breakeven acceptability panel for one margin.
 
     Solves, per distortion family, for the shape at which the risk-adjusted
@@ -667,9 +692,12 @@ def evaluate_margin(gd, *, names=None):
     Parameters
     ----------
     gd : GridDistribution
-        The **margin** distribution in payoff orientation (more is better).
-        Its grid may be a regular lattice or exact and irregular; the
-        quadrature adapts (:func:`_calibration_datum`).
+        The **margin** distribution in payoff orientation (more is better),
+        as the position is booked. Its grid may be a regular lattice or exact
+        and irregular; the quadrature adapts (:func:`_calibration_datum`).
+    role : {'sell', 'buy'}, default 'sell'
+        How the position is held. A ``buy`` margin is negated before the solve
+        and the panel answers for the seller (:data:`EVAL_SIGN`).
     names : sequence of str, optional
         Distortion families. Defaults to :data:`EVAL_FAMILIES`.
 
@@ -705,6 +733,14 @@ def evaluate_margin(gd, *, names=None):
     is negative with positive probability (so ``ess_sup(Z) > c``), which is
     what the two guards below check. The target is then strictly interior and
     the Newton iteration has a root to find.
+
+    Those same guards are why ``role`` exists. A purchased layer fails the
+    ``E[M] > 0`` test by construction, since its margin to the buyer is the
+    premium paid less the recoveries received. There is no breakeven to find on
+    that side and never was; the question worth asking about a layer is what
+    stress the **seller's** position survives, which is the buyer's margin
+    negated. Reading a ``buy`` row at ``role='buy'`` answers that, so a ceded
+    layer prices instead of reporting ``NaN``.
     """
     if gd.is_loss_value:
         raise ValueError(
@@ -713,10 +749,10 @@ def evaluate_margin(gd, *, names=None):
             'evaluate_constant_premium for a premium against a loss.')
     return _evaluate_margin_arrays(
         np.asarray(gd.x, dtype=float), np.asarray(gd.p, dtype=float),
-        gd.bs, names=names)
+        gd.bs, role=role, names=names)
 
 
-def evaluate_constant_premium(x, p, bs, premium, *, names=None):
+def evaluate_constant_premium(x, p, bs, premium, *, role='sell', names=None):
     """Acceptability panel for the margin ``premium - X``: the ordinary case.
 
     A constant consideration against a loss distribution ``X``, which is the
@@ -734,6 +770,10 @@ def evaluate_constant_premium(x, p, bs, premium, *, names=None):
         Bucket size, or ``None`` for an irregular grid.
     premium : float
         The constant consideration held against ``X``.
+    role : {'sell', 'buy'}, default 'sell'
+        How the position is held; see :func:`evaluate_margin`. Writing the
+        obligation as a loss already fixes the holder as the one who owes it,
+        so ``sell`` is almost always right here.
     names : sequence of str, optional
         Distortion families; defaults to :data:`EVAL_FAMILIES`.
 
@@ -746,15 +786,19 @@ def evaluate_constant_premium(x, p, bs, premium, *, names=None):
     p = np.asarray(p, dtype=float)
     # M = premium - X, re-sorted ascending (negating reverses the order).
     return _evaluate_margin_arrays((premium - x)[::-1], p[::-1], bs,
-                                   names=names)
+                                   role=role, names=names)
 
 
-def _evaluate_margin_arrays(x, p, bs, *, names=None):
+def _evaluate_margin_arrays(x, p, bs, *, role='sell', names=None):
     """The solve itself, on a margin's ``(x, p)`` arrays in payoff orientation.
     See :func:`evaluate_margin` for the math and the return contract."""
     if names is None:
         names = EVAL_FAMILIES
     names = list(names)
+    # A 'buy' margin is read from the seller's side: negate, then re-sort
+    # ascending, since negating reverses the order (:data:`EVAL_SIGN`).
+    if _eval_sign(role) < 0:
+        x, p = (-x)[::-1], p[::-1]
     mean = float(np.sum(x * p))
 
     # --- degeneracy: no stress level to solve for ---------------------------
@@ -767,7 +811,8 @@ def _evaluate_margin_arrays(x, p, bs, *, names=None):
         status = f'E[M] = {mean:,.6g} <= 0'
     if status is not None:
         return _eval_panel(
-            [[None, np.nan, np.nan, np.nan, status] for _ in names], names)
+            [[role, None, np.nan, np.nan, np.nan, status] for _ in names],
+            names)
 
     # --- the solve ----------------------------------------------------------
     z, pz, c, _reverse = _canonical_grid(x, p, bs, is_loss_value=False)
@@ -781,7 +826,7 @@ def _evaluate_margin_arrays(x, p, bs, *, names=None):
     rows = []
     for nm in names:
         d = dists[nm]
-        rows.append([getattr(d, 'param_name', None) or 'param',
+        rows.append([role, getattr(d, 'param_name', None) or 'param',
                      d.shape, d.gini_p, d.error, 'ok'])
     return _eval_panel(rows, names)
 

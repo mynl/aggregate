@@ -1931,6 +1931,48 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     _MARGIN_KINDS = ('group_result', 'running_net', 'tier_result',
                      'grand_result', 'total_impact')
 
+    def _row_role(self, kind, payload):
+        """The role a margin row is evaluated under: ``'buy'`` when the row
+        **is** a cession, so its margin is read from the seller's side.
+
+        A purchased layer's margin to the buyer is negative by construction
+        (premium paid less recoveries received), so it has no breakeven of its
+        own. The question worth asking about a layer is what stress the seller's
+        position survives, and :data:`~aggregate._pricing.EVAL_SIGN` answers it
+        by negating a ``buy`` margin.
+
+        Row by row: a group result takes its own group's role. A tier subtotal
+        and the total impact read ``'buy'`` only when **every** group they cover
+        is a ``buy``, so a mixed span stays as booked rather than being flipped
+        on a majority. A running net and the grand result are the holder's own
+        net position and are always ``'sell'``.
+
+        Parameters
+        ----------
+        kind, payload : str, object
+            A ledger row's kind and payload, as :func:`_ledger_plan` emits them.
+            Only the :data:`_MARGIN_KINDS` are meaningful here.
+
+        Returns
+        -------
+        str
+            ``'sell'`` or ``'buy'``.
+        """
+        groups = self._group_specs
+        if kind == 'group_result':
+            return groups[payload].role
+        if kind == 'tier_result':
+            lo, hi = payload
+            span = range(lo, hi)
+        elif kind == 'total_impact':
+            # the impact is the grand result less the first group's, hence
+            # everything bought after it
+            span = range(1, len(groups))
+        else:
+            return 'sell'
+        return 'buy' if span and all(
+            groups[i].role == 'buy' for i in span) else 'sell'
+
     def evaluate(self, names=None):
         """Evaluate the position: the Cherny--Madan breakeven acceptability panel.
 
@@ -1943,7 +1985,15 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         result, so a tower reads as a story: the gross deal, each reinsurance
         layer as a position in its own right, and the running net after each
         purchase. Reading a ``gini_p`` column down the ``net through ...`` rows
-        is watching the deal improve as cover is bought.
+        is watching what buying cover does to the deal.
+
+        A ceded layer is evaluated **from the seller's side** (:meth:`_row_role`
+        and :data:`~aggregate._pricing.EVAL_SIGN`), because the buyer's margin
+        on it is negative by construction and has no breakeven. The ``role``
+        column says which rows those are. That is what makes the panel a buy
+        decision: a layer whose ``gini_p`` sits **above** the running net
+        immediately over it is priced above the holder's own acceptability, so
+        buying it lowers the net, and one below it raises the net.
 
         Parameters
         ----------
@@ -1956,16 +2006,17 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         pandas.DataFrame
             Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)`` and
-            columns ``param_name`` / ``param`` / ``gini_p`` / ``error`` /
-            ``status``. ``.unstack('distortion')`` gives the wide comparison
-            view.
+            columns ``role`` / ``param_name`` / ``param`` / ``gini_p`` /
+            ``error`` / ``status``. ``.unstack('distortion')`` gives the wide
+            comparison view.
 
         Warns
         -----
         DegenerateEvaluationWarning
-            Once per call, naming every step with no breakeven level. A
-            reinsurance program booked as its own step reads ``E[M] <= 0``
-            correctly, since you pay for cover.
+            Once per call, naming every step with no breakeven level. Since a
+            cession is read from the seller's side this is now rare: it fires
+            on a layer priced below its own expected recovery, which is a real
+            finding rather than the routine consequence of paying for cover.
 
         See Also
         --------
@@ -1984,19 +2035,20 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         from ._pricing import evaluate_margin, no_distribution_panel, \
             warn_degenerate
         blocks, steps = [], []
-        for label, kind, _payload in self._plan:
+        for label, kind, payload in self._plan:
             if kind not in self._MARGIN_KINDS:
                 continue
             row = self._rows[label]
+            role = self._row_role(kind, payload)
             if isinstance(row, _DeltaRow):
                 # a stitched impact row is a delta of two statistics, not a
                 # random variable: its two sides ride different marginals and
                 # their difference has no law without a joint.
                 blocks.append(no_distribution_panel(
                     'stitched impact row: no joint, so no distribution to '
-                    'distort', names=names))
+                    'distort', role=role, names=names))
             else:
-                blocks.append(evaluate_margin(row.gd, names=names))
+                blocks.append(evaluate_margin(row.gd, role=role, names=names))
             steps.append(label)
         panel = pd.concat(blocks, keys=steps, names=['Step'])
         warn_degenerate(panel, self.label)

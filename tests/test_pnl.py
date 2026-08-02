@@ -347,8 +347,10 @@ def test_evaluate_panel_shape_and_breakeven():
     assert ev.index.names == ['Step', 'distortion']
     assert list(ev.index.get_level_values('Step').unique()) == ['margin']
     assert list(ev.index.get_level_values('distortion')) == _FAMS
-    assert list(ev.columns) == ['param_name', 'param', 'gini_p', 'error',
-                                'status']
+    assert list(ev.columns) == ['role', 'param_name', 'param', 'gini_p',
+                                'error', 'status']
+    # a plain sold position is read as booked
+    assert (ev.role == 'sell').all()
     # gini_p is the family-agnostic acceptability index in [0, 1]
     assert (ev.gini_p >= 0).all() and (ev.gini_p <= 1).all()
     # every family hit its breakeven target (calibration residual ~ 0)
@@ -443,6 +445,119 @@ def test_evaluate_arbitrage_and_no_downside_report_nan():
     with pytest.warns(DegenerateEvaluationWarning, match='arbitrage'):
         ev = pnl.evaluate()
     assert ev.param.isna().all()
+
+
+# ----------------------------------------------------------------------
+# evaluate(): a cession is read from the seller's side
+# ----------------------------------------------------------------------
+#: a realistically priced two-tier program: two occurrence layers and two
+#: aggregate layers, each with a rate that leaves the reinsurer a margin.
+_CEDED_TOWER = '''
+xpnl CedeTower 33333.33333333321 premium as GWP less
+  agg CedeTower_e as Subject
+    2 claims
+    sev 20000 * uniform
+    occurrence net of
+      50% so 5000 xs 10000 rate 0.3 cede 0.3 as "Occ1"
+      and
+      50% so 5000 xs 15000 rate 0.2 cede 0.3 as "Occ2"
+    fixed
+    aggregate net of
+      2500 xs 23500 rol 0.25 as "Agg1"
+      and
+      2000 xs 26000 rol 0.15 as "Agg2"
+    less
+        5% loss expense as LAE
+        500 fixed expense as "Fixed Exp"
+        20% premium expense as "Acq Exp"
+    peel top-down
+'''
+
+#: the ledger rows of ``_CEDED_TOWER`` that are cessions, so are evaluated
+#: from the seller's side, and those that are the holder's own net position
+_CEDED_STEPS = ['Occ2 result', 'Occ1 result', 'All occurrence result',
+                'Agg2 result', 'Agg1 result', 'All aggregate result']
+_HELD_STEPS = ['Subject result', 'net through Occ2', 'net through Occ1',
+               'net through Agg2', 'net through Agg1', 'margin']
+
+
+def test_evaluate_prices_every_ceded_layer():
+    """The change this section exists for: a bought layer prices, not NaNs.
+
+    A cession's margin to the buyer is negative by construction, so read as
+    booked every layer row reports ``E[M] <= 0`` and the tower says nothing
+    about the cover. Read from the seller's side each layer is an ordinary
+    profitable position with a breakeven of its own.
+    """
+    p = build(_CEDED_TOWER)
+    ev = p.evaluate()
+    assert (ev.loc[_CEDED_STEPS, 'role'] == 'buy').all()
+    assert (ev.loc[_CEDED_STEPS, 'status'] == 'ok').all()
+    assert (ev.loc[_CEDED_STEPS, 'gini_p'] > 0).all()
+    assert (ev.loc[_HELD_STEPS, 'role'] == 'sell').all()
+    assert (ev.loc[_HELD_STEPS, 'status'] == 'ok').all()
+    # a stitched peel still has no law for the impact row, whatever its role
+    assert ev.loc['total impact', 'role'].eq('buy').all()
+    assert ev.loc['total impact', 'param'].isna().all()
+
+
+def test_evaluate_ceded_layer_equals_the_negated_margin_solve():
+    """The flip is exactly a negation, checked against the raw arrays.
+
+    Nothing subtler than ``M -> -M`` happens to a ``buy`` row, so solving the
+    layer's own reversed, negated grid must reproduce the panel cell for cell.
+    """
+    from aggregate._pricing import _evaluate_margin_arrays
+    p = build(_CEDED_TOWER)
+    ev = p.evaluate()
+    gd = p._rows['Occ2 result'].gd
+    x, pr = np.asarray(gd.x, float), np.asarray(gd.p, float)
+    direct = _evaluate_margin_arrays((-x)[::-1], pr[::-1], gd.bs)
+    got = ev.loc['Occ2 result']
+    for fam in _FAMS:
+        assert got.loc[fam, 'param'] == direct.loc[fam, 'param']
+        assert got.loc[fam, 'gini_p'] == direct.loc[fam, 'gini_p']
+
+
+def test_evaluate_compares_a_layer_against_the_net_above_it():
+    """The buy decision: a layer dearer than your own book lowers the net.
+
+    Both occurrence layers here price above the direct book, so each purchase
+    drops the running net; the reader sees the cost of the cover rather than
+    just its risk relief.
+    """
+    p = build(_CEDED_TOWER)
+    gini = p.evaluate().unstack('distortion')['gini_p']
+    for fam in _FAMS:
+        assert gini.loc['Occ2 result', fam] > gini.loc['Subject result', fam]
+        assert (gini.loc['net through Occ2', fam]
+                < gini.loc['Subject result', fam])
+        assert (gini.loc['net through Occ1', fam]
+                < gini.loc['net through Occ2', fam])
+
+
+def test_evaluate_flips_the_impact_row_on_an_unpeeled_walk():
+    """Without a peel the impact row carries a law, so the whole program prices.
+
+    ``total impact`` is the grand result less the first group's, hence every
+    cession combined. It is a ``buy`` and evaluates as one.
+    """
+    p = build('xpnl Imp 1000 premium less '
+              'agg Imp_e 1000 premium at 70% lr sev lognorm 100 cv 2 poisson '
+              'aggregate net of 500 xs 800 rate 0.35')
+    ev = p.evaluate()
+    assert ev.loc['total impact', 'role'].eq('buy').all()
+    assert (ev.loc['total impact', 'status'] == 'ok').all()
+    assert ev.loc['margin', 'role'].eq('sell').all()
+
+
+def test_evaluate_rejects_an_unknown_role():
+    """A typo evaluates the wrong side of the trade, so it raises."""
+    from aggregate._pricing import evaluate_margin
+    p = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr '
+              'sev gamma 100 cv 0.5 poisson')
+    with pytest.raises(ValueError, match='role must be one of'):
+        evaluate_margin(p.result, role='cede')
 
 
 # ----------------------------------------------------------------------

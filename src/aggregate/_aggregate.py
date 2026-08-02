@@ -6084,10 +6084,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         pandas.DataFrame
             Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)`` with
-            ``Step`` this aggregate's name, and columns ``param_name`` /
-            ``param`` / ``gini_p`` / ``error`` / ``status``. The same shape
-            :meth:`PnL.evaluate` and :meth:`Portfolio.evaluate` return, so
-            panels concatenate.
+            ``Step`` this aggregate's name, and columns ``role`` /
+            ``param_name`` / ``param`` / ``gini_p`` / ``error`` / ``status``.
+            ``role`` is always ``'sell'`` here: an aggregate is an obligation
+            written, so the position is held the way it is booked. The same
+            shape :meth:`PnL.evaluate` and :meth:`Portfolio.evaluate` return,
+            so panels concatenate.
 
         Warns
         -----

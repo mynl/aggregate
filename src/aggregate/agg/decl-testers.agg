@@ -609,7 +609,8 @@ agg EV.NoPrem 100 claims sev gamma 10 cv 1 poisson                              
 pnl EV.Pnl   1000 prem less agg EV.Pnl_e 1000 prem at 0.7 lr sev gamma 100 cv 0.5 poisson                         note{constant premium: agrees with the Aggregate face};
 pnl EV.Arb   1000 prem less agg EV.Arb_e dfreq [1] dsev [1 2]                                                     note{M >= 0 a.s.: acceptable at every stress, reports NaN};
 port EV.Port agg EV.U1 1000 premium at 0.65 lr sev gamma 100 cv 0.5 poisson agg EV.U2 500 premium at 0.75 lr sev gamma 50 cv 1.2 poisson   note{unit profile: the book beats both units};
-xpnl EV.Peel 1000 premium less agg EV.Peel_e 1000 premium at 0.7 lr sev lognorm 100 cv 2 poisson aggregate net of 200 xs 600 deposit 50 and 400 xs 800 deposit 30 peel top-down  note{tower: gini_p rises down the running nets as cover is bought}
+xpnl EV.Peel 1000 premium less agg EV.Peel_e 1000 premium at 0.7 lr sev lognorm 100 cv 2 poisson aggregate net of 200 xs 600 deposit 50 and 400 xs 800 deposit 30 peel top-down  note{tower: gini_p rises down the running nets as cover is bought};
+xpnl EV.CedeTower 33333.33333333321 premium as GWP less agg EV.CedeTower_e as Subject 2 claims sev 20000 * uniform occurrence net of 50% so 5000 xs 10000 rate 0.3 cede 0.3 as "Occ1" and 50% so 5000 xs 15000 rate 0.2 cede 0.3 as "Occ2" fixed aggregate net of 2500 xs 23500 rol 0.25 as "Agg1" and 2000 xs 26000 rol 0.15 as "Agg2" less 5% loss expense as LAE 500 fixed expense as "Fixed Exp" 20% premium expense as "Acq Exp" peel top-down  note{two tiers priced to leave the reinsurer a margin: every ceded layer evaluates from the seller's side}
 
 # ============================================================
 # UM. DecL unary minus on a severity (1.0.0a109)

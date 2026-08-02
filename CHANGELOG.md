@@ -1,5 +1,68 @@
 # Changelog
 
+## 1.0.0a188
+
+**[Counterparty-Margin-Evaluate]** `evaluate` reads a **bought** position from
+the seller's side, so every ceded layer in a tower now prices instead of
+reporting `NaN`. This completes `a187`: evaluating every margin row is only
+useful if the reinsurance rows produce an answer.
+
+### The problem
+
+A cession's margin to the buyer is negative by construction, because you pay
+for cover. The `E[M] > 0` guard therefore fired on every reinsurance row of
+every tower. On a two-tier program (two occurrence layers, two aggregate
+layers, peeled) six of the thirteen margin rows came back `NaN` reading
+`E[M] <= 0`. Arithmetically right, analytically useless: the panel said nothing
+at all about the cover.
+
+The question worth asking about a purchased layer is what stress the
+**seller's** position survives, and that is the buyer's margin negated.
+
+### What changed
+
+`PnL._row_role` classifies each margin row and `evaluate` passes the result
+through to the solve:
+
+* a **group result** takes its own group's `role`, so a cession is a `buy`;
+* a **tier subtotal** and the **total impact** read `buy` only when *every*
+  group they cover is a `buy`, so a mixed span stays as booked;
+* a **running net** and the **grand result** are the holder's own net position
+  and are always `sell`.
+
+The flip is keyed off `Group.role`, not off a row label. On a builder-produced
+ledger the two rules agree exactly; they diverge only on a hand-built ledger
+with two `sell` groups, where a label rule would wrongly flip the second book.
+
+The panel gains a **`role`** column (`sell` / `buy`), first in `EVAL_COLS`,
+naming whose position the parameters describe. `Aggregate.evaluate` and
+`Portfolio.evaluate` always report `sell`: an aggregate is an obligation
+written. `aggregate._pricing.EVAL_SIGN` is the one-line map, and
+`evaluate_margin` / `evaluate_constant_premium` / `no_distribution_panel` all
+take `role=`, raising on anything else rather than defaulting.
+
+### What this buys you
+
+The panel becomes a **buy decision**. A layer whose `gini_p` sits above the
+running net immediately over it is priced above the holder's own acceptability,
+so buying it lowers the net; one below it raises the net. On the two-tier
+program above (`ph`), the direct book reads 0.329, the two occurrence layers
+0.586 and 0.535, and the running net falls 0.329 to 0.255 to 0.172 as they are
+bought. The cover is dear and the sheet says so.
+
+`DegenerateEvaluationWarning` becomes rare and meaningful: it now fires on a
+layer priced below its own expected recovery, a real finding, rather than on
+the routine fact that cover costs money.
+
+### Breaking
+
+* `evaluate` gains a leading `role` column. Code selecting columns positionally
+  or asserting the exact column list needs updating; `EVAL_COLS` is the
+  canonical order.
+* A ceded-layer row that returned `NaN` on `a187` now returns solved
+  parameters. Constant-premium and running-net answers are **unchanged**, which
+  is the regression anchor.
+
 ## 1.0.0a187
 
 **[Margin-Acceptability-Evaluate]** `evaluate` now solves `rho_g(margin) = 0`

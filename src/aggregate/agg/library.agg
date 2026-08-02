@@ -210,15 +210,32 @@ sev UnitSeverity dsev [1]
 # ----------------------------------------------------------------------
 # Showcase -- realistic books
 # ----------------------------------------------------------------------
-agg CatXOLTower
+agg GrossCatXOL as "Gross US Hurricane"
+  1.74 claims
+  sev lognorm 8.501 cv 14.624
+  poisson
+  note{ILW model on US Cat, amounts in billions.}
+  tags{topic:severity}
+  hints{bs=2;log2=16;normalize=False;};
+
+agg USXOLTower as "US Hurricane Reinsurance"
   1.74 claims
   sev lognorm 8.501 cv 14.624
   occurrence net of
-    90% so 200 xs 200 and
-    95% so 400 xs 400
+      90% po 100 xs 100 deposit 4 and
+      95% po 200 xs 200 deposit 3.75 as "Occ re"
   poisson
-  note{ILW model on US Cat, amounts in billions.}
+  aggregate net of
+      50% po 20 xs 100 deposit 3 as "Agg re"
   tags{role:hero, topic:reinsurance}
+  note{ILW model of US Cat. Amounts in billions. From St John's RMI3388 course. Industry estimates, as of 2019: 100 year PML USD132.5B and 250 year USD300.3B.}
+  hints{bs=2;log2=16;normalize=False;};
+
+xpnl USHurr as "US Hurricane"
+  20 premium as "Gross Premium"
+  less agg.USXOLTower
+  tags{role:hero, topic:reinsurance}
+  note{ILW model of US Cat. Amounts in billions.}
   hints{bs=2;log2=16;normalize=False;};
 
 bivariate CopulaWindFlood
@@ -245,7 +262,7 @@ agg ExposureRating
   tags{role:hero, topic:aggregate};
 
 agg LimitProfile
-  [1000 2000 500] premium at [0.8 0.7 0.5] lr
+  [10000 20000 5000] premium at [0.8 0.7 0.5] lr
   [1000 2000 5000] xs 0
   sev lognorm 50 cv 1.5
   poisson
@@ -268,8 +285,8 @@ qd(a.summary_df)
 
 ## Discussion
 
-The three vectors line up positionally: 1000 of premium at an 80% loss ratio
-written at a 1000 limit, 2000 at 70% at a 2000 limit, 500 at 50% at a 5000
+The three vectors line up positionally: 10000 of premium at an 80% loss ratio
+written at a 1000 limit, 20000 at 70% at a 2000 limit, 5000 at 50% at a 5000
 limit. One severity curve is written across all three bands, and the *limit* is
 what differs -- so the severity is the same lognormal capped at three different
 points.

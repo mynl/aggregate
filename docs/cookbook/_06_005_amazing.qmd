@@ -1,0 +1,234 @@
+---
+wd-python: T:/worktrees/aggregate_REFACTOR/.venv/Scripts/python.exe
+---
+<!-- _06_00_pnl.qmd — PnL (section landing) -->
+
+# PnL {#sec-pnl}
+
+This is how you would work. Use a very  simple agg so you can see the answer is correct.
+
+<!-- hidden prefobnication -->
+```{python}
+#| echo: false
+from aggregate import build, __version__ as v, format_program
+from greater_tables import GT, Fabricator, __version__ as vgt
+print(v, vgt)
+import aggregate.style
+aggregate.style.use()
+from aggregate.plots import make_grid
+%config InlineBackend.figure_format = 'svg'
+from aggregate.utilities import silence_warnings
+silence_warnings()
+from textwrap import fill
+def pf(*argv):
+    for txt in argv:
+        print(fill(txt, 80), end='\n\n')
+from functools import partial
+_gt = partial(GT, ratio_cols='LR|ER|CR|CV')
+def qd(df, **kwargs):
+    print(_gt(df, **kwargs))
+```
+
+## Gross Book
+
+```{python}
+gross = build('''
+    agg Gross as "Subject"
+        2 claims
+        sev 20000 * uniform
+        fixed
+''')
+pf(gross.tail_explanation, gross.validation_explanation, gross.validation_description)
+qd(gross.summary_df, caption='Gross summary.')
+```
+
+### Gross Pricing
+Top down. What will the market bear?  Internal objectives?
+
+E.g., price to 20% ROE at 100% capital (no default) pure (net of expenses) margin. What functions are available? Try `gross.help('price')`.
+
+```{python}
+gross_pricing = gross.price_ccoc(0.2, p=1)
+qd(gross_pricing, caption='Gross pricing to 20% cost of capital.')
+```
+
+Gross PNL adding 30% G&A expenses.
+
+```{python}
+gross_er = 0.3
+P = gross_pricing.loc['total', 'P']
+GP = P / (1 - gross_er)
+pnl1 = build(f'''
+xpnl pnlGross
+    {GP} premium as "GWP"
+    less
+    agg.Gross
+    less
+    {gross_er} premium expense as "G&A"
+''')
+qd(pnl1.summary_df, caption='Gross profit and loss summary.')
+```
+
+For more detail, look at the stats.
+
+```{python}
+stats_cols = ['EX', 'SD', 'CV', 'κ01', 'κ99']
+qd(pnl1.stats_df[stats_cols], caption='Gross pricing: details.')
+```
+
+
+## Craft an Occurrence Program
+
+Pull in the same gross stochastic engine and apply reinsurance. Iterate to add pricing: shown here in two steps, going-forward will combine to one. Easy to see a 10K xs 10K layer has EL of $0.5 \times 10K \times 0.5=2.5K$ times frequency of two times placed percentage gives the indicated loss.
+
+```{python}
+pct_placed = 0.5
+net_occ = build(f'''
+    agg NetOcc as "Net Occ"
+        agg.Gross
+        occurrence net of
+            {pct_placed:.2%} po 10000 xs 10000
+''')
+qd(net_occ.reins_summary_df, capition='Occurrence program summary.')
+```
+
+Pricing on occ program, say re priced to 90% CR with 30% cede.
+
+```{python}
+re_cede = 0.3
+re_margin = 0.1
+re_occ_el = net_occ.reins_summary_df.loc[('occ', 'ceded','agg'), 'Est EX']
+# at 100%
+re_prem = (re_occ_el / pct_placed) /  (1 - re_cede - re_margin)
+re_rate = re_prem / GP
+
+# create net agg with premiums --> would really go back to top
+net_occ_prem = build(f'''
+    agg NetOcc2 as "Net Occ w Re Prem"
+        agg.Gross
+        occurrence net of
+            {pct_placed:.2%} po 10000 xs 10000
+            rate {re_rate}
+            cede {re_cede}
+            as "Occ 10x10"
+''')
+```
+
+Wrap it in a PNL.
+
+```{python}
+net_occ_pnl = build(f'''
+xpnl NETOCC
+    {GP} premium as "GWP"
+    less
+    # inject from recipies
+    agg.NetOcc2
+    less
+    {gross_er} premium expense as "G&A"
+''')
+qd(net_occ_pnl.stats_df[stats_cols], caption='Occurrence PNL stats details.')
+```
+
+## Craft and Apply an Aggregate Program
+
+Look at percentiles of net loss.
+
+```{python}
+import numpy as np
+import pandas as pd
+ps = np.linspace(.8, .99, 20)
+df = pd.DataFrame({'p': ps, 'Quantile': net_occ_prem.q(ps)})
+qd(df, float_format=2)
+```
+
+Select 18 percentage points excess 80th percentile cover. Run twice to estimate premium if needed.,
+
+```{python}
+agg_attach = net_occ.q(0.8)
+agg_rol = 0.2
+agg_limit =  net_occ.q(0.98) - agg_attach
+caption = f'Aggregate results {agg_limit:,.0f} xs {agg_attach:,.0f}'
+
+net_net = build(f'''
+    agg NetNet as "Net Occ&Agg"
+        agg.NetOcc2
+        aggregate net of
+            {agg_limit} xs {agg_attach}
+            rol 20%
+            as "AggXOL"
+''')
+qd(net_net.reins_summary_df, caption=caption)
+```
+
+Plot the loss distributions. **How do we plot the MARGINS?**
+
+```{python}
+ax = None
+for a in [gross, net_occ, net_net]:
+    bit = a.density[['loss', 'F']]
+    bit = bit.set_index('F')
+    bit = bit.rename({'loss': a.name}, axis=1)
+    ax = bit.plot(ax=ax)
+ax.legend();
+```
+
+## Impact of Total Program
+
+Start by describing the reinsurance in place.
+
+```{python}
+#| echo: false
+pf(net_net.reins_description, net_net.reins_explanation)
+```
+
+Build PNL for entire program.
+
+```{python}
+pnl2 = build(f'''
+xpnl pnlRe
+    {GP} premium as "GWP"
+    less
+    agg.NetNet
+    less
+    {gross_er} premium expense as "G&A"
+''')
+qd(pnl2.stats_df[stats_cols], caption='Whole program stats.')
+```
+
+## DecL program reference
+
+
+Print the DecL program to date for reference.
+
+```{python}
+print(format_program(pnl2.program))
+```
+
+## Recap from DecL Program
+
+```{python}
+pnl3 = build('''
+xpnl pnlRe2 33333.33333333321 premium as GWP less
+  agg NetNet as Subject
+    2 claims
+    sev 20000 * uniform
+    occurrence net of
+      50% so 5000 xs 10000 rate 0.3 cede 0.3
+      and
+      50% so 5000 xs 15000 rate 0.2 cede 0.3
+    fixed
+    aggregate net of
+      2500 xs 23500 rol 0.25 and
+      2000 xs 26000 rol 0.15
+  less 0.3 premium expenses as "G&A"
+  peel top-down
+''')
+qd(pnl3.stats_df, caption='Whole program stats.')
+```
+
+```{python}
+pnl3.stats_df
+```
+
+
+

@@ -1149,8 +1149,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
         Consequences of having no atoms: the stats ladder is **marginal**
         (plain ``P`` headers -- the on-sheet signature of
-        [Decision-Kappa-Shared-Source-Rule]), ``+`` composition is
-        unavailable, and :meth:`evaluate` is not supported.
+        [Decision-Kappa-Shared-Source-Rule]) and ``+`` composition is
+        unavailable. :meth:`evaluate` works (a187): it reads each row's own
+        marginal, and the one row that has no law, the ``_DeltaRow`` impact, is
+        not an evaluated position anyway (a190).
         """
         self._coords = None
         self._shape = None
@@ -1944,12 +1946,19 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     # ------------------------------------------------------------------
     # Evaluation: the Cherny--Madan breakeven acceptability panel
     # ------------------------------------------------------------------
-    #: Ledger row kinds whose row *is* a margin, and so can be evaluated: each
-    #: group's own result, the running net after each group, a tier subtotal
-    #: result, the grand result, and the program's total impact. Exactly the
-    #: rows ``_SIDE_DEFAULTS`` files under ``'margin'``.
+    #: Ledger row kinds whose row is an evaluable **position**: each group's own
+    #: result, the running net after each group, a tier subtotal result, and the
+    #: grand result.
+    #:
+    #: ``total_impact`` is deliberately absent. It is a margin, but it is not a
+    #: position: it is the difference between two of them, what the ledger's
+    #: purchases did to the bottom line. Nobody holds it, so the stress it
+    #: survives is not a question with an answer. (On a stitched peel it does
+    #: not even have a law, being a delta of two statistics whose sides ride
+    #: different marginals.) The ceded program *as a position* is already in the
+    #: sheet, under the tier subtotal rows.
     _MARGIN_KINDS = ('group_result', 'running_net', 'tier_result',
-                     'grand_result', 'total_impact')
+                     'grand_result')
 
     def _row_role(self, kind, payload):
         """The role a margin row is evaluated under: ``'buy'`` when the row
@@ -1962,10 +1971,12 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         by negating a ``buy`` margin.
 
         Row by row: a group result takes its own group's role. A tier subtotal
-        and the total impact read ``'buy'`` only when **every** group they cover
-        is a ``buy``, so a mixed span stays as booked rather than being flipped
-        on a majority. A running net and the grand result are the holder's own
-        net position and are always ``'sell'``.
+        reads ``'buy'`` when every group it spans is a ``buy`` and ``'sell'``
+        when every one is a ``sell``; a mixed span nets the two, so it reads
+        ``'net'`` like the rows below. A running net and the grand result **are**
+        a netting of buying against selling, which is neither of the two sides,
+        so they read ``'net'``: already in payoff orientation, evaluated as
+        booked.
 
         Parameters
         ----------
@@ -1976,22 +1987,17 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         Returns
         -------
         str
-            ``'sell'`` or ``'buy'``.
+            A key of :data:`~aggregate._pricing.EVAL_SIGN`: ``'sell'``,
+            ``'buy'`` or ``'net'``.
         """
         groups = self._group_specs
         if kind == 'group_result':
             return groups[payload].role
-        if kind == 'tier_result':
-            lo, hi = payload
-            span = range(lo, hi)
-        elif kind == 'total_impact':
-            # the impact is the grand result less the first group's, hence
-            # everything bought after it
-            span = range(1, len(groups))
-        else:
-            return 'sell'
-        return 'buy' if span and all(
-            groups[i].role == 'buy' for i in span) else 'sell'
+        if kind != 'tier_result':                 # running_net, grand_result
+            return 'net'
+        lo, hi = payload
+        roles = {groups[i].role for i in range(lo, hi)}
+        return roles.pop() if len(roles) == 1 else 'net'
 
     def evaluate(self, names=None):
         """Evaluate the position: the Cherny--Madan breakeven acceptability panel.
@@ -2010,10 +2016,18 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         A ceded layer is evaluated **from the seller's side** (:meth:`_row_role`
         and :data:`~aggregate._pricing.EVAL_SIGN`), because the buyer's margin
         on it is negative by construction and has no breakeven. The ``role``
-        column says which rows those are. That is what makes the panel a buy
-        decision: a layer whose ``gini_p`` sits **above** the running net
-        immediately over it is priced above the holder's own acceptability, so
-        buying it lowers the net, and one below it raises the net.
+        column says which rows those are: ``buy`` for a cession, ``sell`` for a
+        book written, ``net`` for a running net or the grand result, which net
+        the two against each other. That is what makes the panel a buy decision:
+        a layer whose ``gini_p`` sits **above** the ``net`` row immediately over
+        it is priced above the holder's own acceptability, so buying it lowers
+        the net, and one below it raises the net.
+
+        Only **positions** appear. The ``total impact`` row does not: it is the
+        difference between two positions, what the purchases did to the bottom
+        line, and nobody holds it, so the stress it survives is not a question
+        with an answer. The ceded program as a position is already here, under
+        the tier subtotal rows.
 
         Parameters
         ----------
@@ -2052,23 +2066,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         however many legs feed it, so an expense ledger evaluates like any
         other.
         """
-        from ._pricing import evaluate_margin, no_distribution_panel, \
-            warn_degenerate
+        from ._pricing import evaluate_margin, warn_degenerate
         blocks, steps = [], []
         for label, kind, payload in self._plan:
             if kind not in self._MARGIN_KINDS:
                 continue
-            row = self._rows[label]
-            role = self._row_role(kind, payload)
-            if isinstance(row, _DeltaRow):
-                # a stitched impact row is a delta of two statistics, not a
-                # random variable: its two sides ride different marginals and
-                # their difference has no law without a joint.
-                blocks.append(no_distribution_panel(
-                    'stitched impact row: no joint, so no distribution to '
-                    'distort', role=role, names=names))
-            else:
-                blocks.append(evaluate_margin(row.gd, role=role, names=names))
+            blocks.append(evaluate_margin(
+                self._rows[label].gd,
+                role=self._row_role(kind, payload), names=names))
             steps.append(label)
         panel = pd.concat(blocks, keys=steps, names=['Step'])
         warn_degenerate(panel, self.label)

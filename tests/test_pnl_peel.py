@@ -288,26 +288,26 @@ def test_aggregate_tier_rides_the_occurrence_net_subject():
 def test_stitched_peel_evaluates_its_nets_and_flags_underpriced_layers():
     """A stitched peel evaluates: each row's own gd is all ``evaluate`` needs.
 
-    Two kinds of row correctly report no breakeven. The layers here are
-    deliberate bargains, deposit 60 against an expected recovery of 123.76 and
-    deposit 40 against 123.89, so read from the seller's side they carry
-    ``E[M] <= 0``: a position priced below its own expected loss survives no
-    stress at all. ``total impact`` is a delta of two statistics whose sides
-    ride different marginals, so it has no law without a joint. Composition
-    still needs shared atoms and refuses.
+    The layers here are deliberate bargains, deposit 60 against an expected
+    recovery of 123.76 and deposit 40 against 123.89, so read from the seller's
+    side they carry ``E[M] <= 0``: a position priced below its own expected loss
+    survives no stress at all. ``total impact`` is not evaluated at all, being a
+    difference between positions rather than one. Composition still needs shared
+    atoms and refuses.
     """
     p = build(f'{OCC2} peel top-down')
-    with pytest.warns(DegenerateEvaluationWarning, match='no joint'):
-        ev = p.evaluate()
     layers = ['occ 100 xs 100 result', 'occ 300 xs 200 result']
+    with pytest.warns(DegenerateEvaluationWarning, match=r'E\[M\]'):
+        ev = p.evaluate()
     assert (ev.loc[layers, 'role'] == 'buy').all()
     assert ev.loc[layers, 'status'].str.startswith('E[M]').all()
-    assert ev.loc['total impact', 'param'].isna().all()
-    # the nets are the holder's own position, read exactly as booked
-    nets = ['Gross result', 'net through occ 300 xs 200',
-            'net through occ 100 xs 100', 'margin']
-    assert (ev.loc[nets, 'role'] == 'sell').all()
-    assert (ev.loc[nets, 'status'] == 'ok').all()
+    assert 'total impact' not in ev.index.get_level_values('Step')
+    # the book written, then the rows that net the cover against it
+    assert (ev.loc['Gross result', 'role'] == 'sell').all()
+    nets = ['net through occ 300 xs 200', 'net through occ 100 xs 100',
+            'margin']
+    assert (ev.loc[nets, 'role'] == 'net').all()
+    assert (ev.loc[nets + ['Gross result'], 'status'] == 'ok').all()
     # buying cover this cheap improves the deal: gini_p rises down the nets
     gini = ev.unstack('distortion')['gini_p']
     for fam in ('ph', 'wang', 'dual', 'tvar'):

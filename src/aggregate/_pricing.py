@@ -633,8 +633,10 @@ EVAL_FAMILIES = ('ph', 'wang', 'dual', 'tvar')
 #: at. A ``buy`` position's margin is negative by construction (you pay for
 #: cover), so it has no breakeven of its own; the acceptability question about a
 #: purchased layer is the **seller's**, and the panel answers it by reading the
-#: margin negated.
-EVAL_SIGN = {'sell': 1.0, 'buy': -1.0}
+#: margin negated. ``net`` is a position that nets buying against selling (a
+#: running net, a ledger's grand result): already in payoff orientation, so it
+#: reads as booked, and named apart from ``sell`` because it is not one.
+EVAL_SIGN = {'sell': 1.0, 'buy': -1.0, 'net': 1.0}
 
 #: Fixed column order of the acceptability panel. Tidy (long) form, one row per
 #: ``(step, family)``: ``param`` holds each family's own natural parameter, so
@@ -664,22 +666,6 @@ def _eval_panel(rows, names):
         rows, columns=EVAL_COLS,
         index=pd.CategoricalIndex(list(names), dtype=DISTORTION_DTYPE,
                                   name='distortion'))
-
-
-def no_distribution_panel(status, *, role='sell', names=None):
-    """One step's block for a row that carries **no distribution** to distort.
-
-    A ledger row can be a well-defined number without being a random variable:
-    a stitched impact row is the difference of two statistics whose sides ride
-    different marginals, so it has no law absent a joint. Such a row keeps its
-    place in the panel and says why it is ``NaN``, rather than vanishing. It
-    still carries its ``role``, so the sheet reports whose position it was even
-    where there is nothing to solve.
-    """
-    _eval_sign(role)
-    names = list(EVAL_FAMILIES if names is None else names)
-    return _eval_panel(
-        [[role, None, np.nan, np.nan, np.nan, status] for _ in names], names)
 
 
 def evaluate_margin(gd, *, role='sell', names=None):

@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.0.0a190
+
+**[Evaluate-Positions-Only]** Two corrections to the `a188` acceptability
+panel, both about what a row *is*.
+
+### `total impact` is no longer evaluated
+
+The impact row is the grand result less the first group's, so it measures what
+the ledger's purchases did to the bottom line. That makes it a **difference
+between two positions, not a position**: nobody holds it, so the breakeven
+stress it survives is not a question with an answer. It is now excluded from
+`evaluate` outright, whether or not it happens to carry a law (it does on an
+unpeeled walk; on a stitched peel it is a delta of two statistics whose sides
+ride different marginals and has none).
+
+The ceded program **as a position** is unaffected and still reported, under the
+tier subtotal rows (`All occurrence result`, `All aggregate result`).
+
+`_MARGIN_KINDS` drops `'total_impact'`. That made the panel's
+no-distribution branch unreachable, since the impact row was the only ledger
+row ever built as a `_DeltaRow`, so `aggregate._pricing.no_distribution_panel`
+is **deleted**. `total impact` remains an ordinary ledger row on `stats_df`,
+`summary_df` and `density_df`; only `evaluate` skips it.
+
+### A netted row reads `role == 'net'`
+
+A running net and the grand result net buying against selling. That is neither
+side, so calling them `sell` was wrong. `EVAL_SIGN` gains `'net': 1.0`: they
+are already in payoff orientation and read as booked, exactly as before, but
+the panel now names them for what they are.
+
+| row | `role` |
+|---|---|
+| a `sell` group's own result | `sell` |
+| a cession's own result | `buy` |
+| a tier subtotal | its span's shared role, or `net` if the span mixes |
+| a running net, the grand result | `net` |
+
+Numbers are unchanged: `net` and `sell` carry the same sign.
+
+### Breaking
+
+* `evaluate` no longer returns a `total impact` block. Code indexing that step
+  raises `KeyError`.
+* Rows that reported `role == 'sell'` for a running net or the grand result now
+  report `'net'`. `Aggregate.evaluate` and `Portfolio.evaluate` still report
+  `'sell'`, being obligations written rather than netted ledgers.
+* `aggregate._pricing.no_distribution_panel` is gone.
+
 ## 1.0.0a189
 
 **[Ledger-Side-Label-Levels]** The `PnL` sheets rename their index levels and

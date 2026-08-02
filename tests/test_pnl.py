@@ -473,12 +473,13 @@ xpnl CedeTower 33333.33333333321 premium as GWP less
     peel top-down
 '''
 
-#: the ledger rows of ``_CEDED_TOWER`` that are cessions, so are evaluated
-#: from the seller's side, and those that are the holder's own net position
+#: the ledger rows of ``_CEDED_TOWER`` that are cessions, so are evaluated from
+#: the seller's side; the one book written; and the rows that net the two
 _CEDED_STEPS = ['Occ2 result', 'Occ1 result', 'All occurrence result',
                 'Agg2 result', 'Agg1 result', 'All aggregate result']
-_HELD_STEPS = ['Subject result', 'net through Occ2', 'net through Occ1',
-               'net through Agg2', 'net through Agg1', 'margin']
+_SOLD_STEPS = ['Subject result']
+_NET_STEPS = ['net through Occ2', 'net through Occ1', 'net through Agg2',
+              'net through Agg1', 'margin']
 
 
 def test_evaluate_prices_every_ceded_layer():
@@ -494,11 +495,11 @@ def test_evaluate_prices_every_ceded_layer():
     assert (ev.loc[_CEDED_STEPS, 'role'] == 'buy').all()
     assert (ev.loc[_CEDED_STEPS, 'status'] == 'ok').all()
     assert (ev.loc[_CEDED_STEPS, 'gini_p'] > 0).all()
-    assert (ev.loc[_HELD_STEPS, 'role'] == 'sell').all()
-    assert (ev.loc[_HELD_STEPS, 'status'] == 'ok').all()
-    # a stitched peel still has no law for the impact row, whatever its role
-    assert ev.loc['total impact', 'role'].eq('buy').all()
-    assert ev.loc['total impact', 'param'].isna().all()
+    assert (ev.loc[_SOLD_STEPS, 'role'] == 'sell').all()
+    # a running net and the grand result net buying against selling, which is
+    # neither side, so they are their own role
+    assert (ev.loc[_NET_STEPS, 'role'] == 'net').all()
+    assert (ev.loc[_SOLD_STEPS + _NET_STEPS, 'status'] == 'ok').all()
 
 
 def test_evaluate_ceded_layer_equals_the_negated_margin_solve():
@@ -536,19 +537,26 @@ def test_evaluate_compares_a_layer_against_the_net_above_it():
                 < gini.loc['net through Occ2', fam])
 
 
-def test_evaluate_flips_the_impact_row_on_an_unpeeled_walk():
-    """Without a peel the impact row carries a law, so the whole program prices.
+def test_evaluate_reports_positions_only_never_the_impact():
+    """``total impact`` is excluded: it is a difference, not a position.
 
-    ``total impact`` is the grand result less the first group's, hence every
-    cession combined. It is a ``buy`` and evaluates as one.
+    The impact is the grand result less the first group's, so it measures what
+    the purchases did to the bottom line. Nobody holds it, so the stress it
+    survives is not a question with an answer, and it is left out whether or
+    not it happens to carry a law (it does on an unpeeled walk, and does not on
+    a stitched peel). The ceded program **as a position** is still reported,
+    under the tier subtotal rows.
     """
-    p = build('xpnl Imp 1000 premium less '
-              'agg Imp_e 1000 premium at 70% lr sev lognorm 100 cv 2 poisson '
-              'aggregate net of 500 xs 800 rate 0.35')
-    ev = p.evaluate()
-    assert ev.loc['total impact', 'role'].eq('buy').all()
-    assert (ev.loc['total impact', 'status'] == 'ok').all()
-    assert ev.loc['margin', 'role'].eq('sell').all()
+    for prog in (_CEDED_TOWER,
+                 'xpnl Imp 1000 premium less agg Imp_e 1000 premium at 70% lr '
+                 'sev lognorm 100 cv 2 poisson '
+                 'aggregate net of 500 xs 800 rate 0.35'):
+        p = build(prog)
+        steps = list(p.evaluate().index.get_level_values('Step').unique())
+        assert 'total impact' not in steps
+        # the impact row is still a ledger row, just not an evaluated one
+        assert 'total impact' in p._rows
+        assert steps[-1] == 'margin'
 
 
 def test_evaluate_rejects_an_unknown_role():

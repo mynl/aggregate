@@ -31,7 +31,9 @@ import numpy as np
 import pytest
 
 from aggregate import build, PnL
-from aggregate.constants import DefectiveDistributionWarning
+from aggregate.constants import (DefectiveDistributionWarning,
+                                 DegenerateEvaluationWarning)
+from aggregate.spectral import Distortion
 
 # severities chosen light enough that the 12-nines window is well-resolved, so
 # the empirical moments match the analytic ones tightly.
@@ -335,39 +337,112 @@ def test_plot_discrete_runs():
 # ----------------------------------------------------------------------
 # evaluate(): the Cherny-Madan breakeven acceptability panel
 # ----------------------------------------------------------------------
+_FAMS = ['ph', 'wang', 'dual', 'tvar']
+
+
 def test_evaluate_panel_shape_and_breakeven():
-    """The panel has the default families minus ccoc; breakeven is solved."""
+    """Tidy (Step, distortion) panel, default families minus ccoc, solved."""
     a = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     ev = a.evaluate()
-    assert list(ev.index) == ['ph', 'wang', 'dual', 'tvar']    # ccoc excluded
-    assert list(ev.columns) == ['param_name', 'param', 'error', 'gini_p', 'area']
+    assert ev.index.names == ['Step', 'distortion']
+    assert list(ev.index.get_level_values('Step').unique()) == ['margin']
+    assert list(ev.index.get_level_values('distortion')) == _FAMS
+    assert list(ev.columns) == ['param_name', 'param', 'gini_p', 'error',
+                                'status']
     # gini_p is the family-agnostic acceptability index in [0, 1]
     assert (ev.gini_p >= 0).all() and (ev.gini_p <= 1).all()
-    # area = (gini_p + 1) / 2 = integral g
-    assert np.allclose(ev.area, (ev.gini_p + 1) / 2)
     # every family hit its breakeven target (calibration residual ~ 0)
     assert (ev.error.abs() < 1e-2).all()
+    assert (ev.status == 'ok').all()
+
+
+def test_evaluate_matches_the_constant_premium_price_form():
+    """With a constant premium, rho_g(margin) = 0 IS rho_g(loss) = P.
+
+    Translation equivariance makes the two statements identical, so the margin
+    solve must reproduce the classic price-the-obligation calibration. These
+    are the a105 values, and they are the regression anchor for the whole
+    margin route.
+    """
+    a = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
+    ev = a.evaluate().droplevel('Step')
+    for fam, param, gini_p in [('ph', 0.425679, 0.402840),
+                               ('wang', 0.945893, 0.496407),
+                               ('dual', 3.696140, 0.574118),
+                               ('tvar', 0.616007, 0.616007)]:
+        assert ev.loc[fam, 'param'] == pytest.approx(param, rel=1e-5)
+        assert ev.loc[fam, 'gini_p'] == pytest.approx(gini_p, rel=1e-5)
 
 
 def test_evaluate_gini_p_monotone_in_profit():
     """A more profitable position survives a larger stress -> larger gini_p."""
     lo = build('pnl L 800 prem less agg L_e 800 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     hi = build('pnl H 1200 prem less agg H_e 1200 prem at 70% lr sev gamma 100 cv 0.5 poisson')
-    for fam in ('ph', 'wang', 'dual', 'tvar'):
-        assert lo.evaluate().loc[fam, 'gini_p'] < hi.evaluate().loc[fam, 'gini_p']
+    evl, evh = lo.evaluate().droplevel('Step'), hi.evaluate().droplevel('Step')
+    for fam in _FAMS:
+        assert evl.loc[fam, 'gini_p'] < evh.loc[fam, 'gini_p']
 
 
-def test_evaluate_function_consideration_runs():
-    """Function-valued (loss-sensitive) evaluation now runs over the obligation.
+def test_evaluate_solves_rho_of_the_margin_to_zero():
+    """The defining property, checked off the margin's own arrays.
 
-    The single-obligation, regular-grid requirement is met, so ``evaluate``
-    produces the standard family panel (the old ``constant consideration``
-    deferral was removed).
+    Independent of the calibration code path: reflect the margin to
+    ``Z = c - M``, integrate ``g(S_Z)`` with the node widths, and confirm the
+    result is ``c``, i.e. ``rho_g(M) = 0``.
+
+    Scaled against ``E[M]``, deliberately. This reference integrates the raw
+    grid where the library trims mass below ``VALIDATION_NOISE``, and a
+    tail-loading family like ``ph`` reads that dust at the 1e-4 level. The
+    assertion that matters is that the risk-adjusted margin is zero next to the
+    raw margin, which a wrong solve would miss by two orders of magnitude.
+    """
+    p = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
+    ev = p.evaluate().droplevel('Step')
+    x, pr = np.asarray(p.result.x), np.asarray(p.result.p)
+    c = float(x.max())
+    z, q = (c - x)[::-1], pr[::-1]
+    S = 1.0 - np.cumsum(q)
+    k = min(int(np.flatnonzero(S > 0).max()), len(z) - 2)
+    for fam in _FAMS:
+        g = Distortion(fam, ev.loc[fam, 'param']).g
+        rho_margin = c - float(np.sum(g(S[:k + 1]) * np.diff(z)[:k + 1]))
+        assert abs(rho_margin) < 1e-3 * abs(p.est_m)
+
+
+def test_evaluate_variable_premium_is_not_the_obligation_price():
+    """A loss-sensitive premium is where the two formulations part company.
+
+    ``rho_g`` is comonotone-additive but not additive, so once ``P`` is random
+    ``rho_g(P) - rho_g(L)`` is not ``rho_g(P - L)``. Pricing the obligation
+    against ``E[P]`` would target a premium *below* the expected loss here and
+    still return numbers; evaluating the margin correctly reports that the
+    position is acceptable at no stress at all.
     """
     pnl = build('agg L 5 claims sev gamma 100 cv 0.5 poisson').make_pnl(
         lambda x: 100.0 + 0.5 * x)
-    ev = pnl.evaluate()
-    assert list(ev.index) == ['ph', 'wang', 'dual', 'tvar']
+    assert pnl.est_m < 0                       # E[M] = 100 + 0.5*500 - 500
+    with pytest.warns(DegenerateEvaluationWarning, match=r'E\[M\]'):
+        ev = pnl.evaluate()
+    assert ev.param.isna().all()
+    assert ev.status.str.startswith('E[M]').all()
+
+
+def test_evaluate_profitable_variable_premium_solves():
+    """The same loss-sensitive shape, priced to make money, does solve."""
+    pnl = build('agg L 5 claims sev gamma 100 cv 0.5 poisson').make_pnl(
+        lambda x: 700.0 + 0.2 * x)
+    ev = pnl.evaluate().droplevel('Step')
+    assert (ev.status == 'ok').all()
+    assert (ev.gini_p > 0).all()
+
+
+def test_evaluate_arbitrage_and_no_downside_report_nan():
+    """A position that cannot lose is acceptable at every stress: NaN, not inf."""
+    pnl = build('pnl A 1000 prem less agg A_e dfreq [1] dsev [1 2]')
+    assert float(np.asarray(pnl.result.x).min()) > 0        # M > 0 always
+    with pytest.warns(DegenerateEvaluationWarning, match='arbitrage'):
+        ev = pnl.evaluate()
+    assert ev.param.isna().all()
 
 
 # ----------------------------------------------------------------------

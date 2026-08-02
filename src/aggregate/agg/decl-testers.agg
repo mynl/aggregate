@@ -596,6 +596,22 @@ pnl SC.Pnl    10 prem less agg SC.Pnl_e dfreq [1] dsev [2 5 12] [.4 .4 .2]      
 agg SC.Classic 50 claims sev lognorm 40 cv 1.5 poisson                                                            note{classic non-negative loss: transform branch never entered}
 
 # ============================================================
+# EV. Margin acceptability: evaluate solves rho_g(margin) = 0
+# ============================================================
+# Programs behind tests/test_distortion_calibrate.py and tests/test_pnl.py.
+# `evaluate` calibrates each family to the canonical shift constant, so the
+# breakeven `gini_p` is the Cherny and Madan acceptability index. Constant
+# premium is the case where it collapses back to the classic rho_g(L) = P;
+# a loss-sensitive premium is where the two part company. See
+# dev/done/plan-margin-acceptability-evaluate.md.
+agg EV.Agg   1000 premium at 0.7 lr sev gamma 100 cv 0.5 poisson                                                  note{Aggregate.evaluate default P = exp_premium};
+agg EV.NoPrem 100 claims sev gamma 10 cv 1 poisson                                                                note{no premium declared: evaluate raises rather than guessing};
+pnl EV.Pnl   1000 prem less agg EV.Pnl_e 1000 prem at 0.7 lr sev gamma 100 cv 0.5 poisson                         note{constant premium: agrees with the Aggregate face};
+pnl EV.Arb   1000 prem less agg EV.Arb_e dfreq [1] dsev [1 2]                                                     note{M >= 0 a.s.: acceptable at every stress, reports NaN};
+port EV.Port agg EV.U1 1000 premium at 0.65 lr sev gamma 100 cv 0.5 poisson agg EV.U2 500 premium at 0.75 lr sev gamma 50 cv 1.2 poisson   note{unit profile: the book beats both units};
+xpnl EV.Peel 1000 premium less agg EV.Peel_e 1000 premium at 0.7 lr sev lognorm 100 cv 2 poisson aggregate net of 200 xs 600 deposit 50 and 400 xs 800 deposit 30 peel top-down  note{tower: gini_p rises down the running nets as cover is bought}
+
+# ============================================================
 # UM. DecL unary minus on a severity (1.0.0a109)
 # ============================================================
 # Bare unary minus `ssev -X` reflects the severity, sugar for the working

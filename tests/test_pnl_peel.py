@@ -28,6 +28,7 @@ import pytest
 
 from aggregate import build
 from aggregate.config import get_settings
+from aggregate.constants import DegenerateEvaluationWarning
 from aggregate.decl_writer import spec_to_decl
 from aggregate.underwriter import Underwriter
 
@@ -270,11 +271,25 @@ def test_aggregate_tier_rides_the_occurrence_net_subject():
     _assert_column_foots(p, 'EX')
 
 
-def test_stitched_peel_refuses_evaluate_and_composition():
-    """No shared atoms: the two atom-only operations must say so."""
+def test_stitched_peel_evaluates_every_layer_but_not_the_impact_row():
+    """A stitched peel evaluates: each row's own gd is all ``evaluate`` needs.
+
+    The exception is ``total impact``, a delta of two statistics whose sides
+    ride different marginals: it has no law without a joint, so it reports NaN
+    with that reason. Composition still needs shared atoms and refuses.
+    """
     p = build(f'{OCC2} peel top-down')
-    with pytest.raises(NotImplementedError):
-        p.evaluate(['margin'])
+    with pytest.warns(DegenerateEvaluationWarning, match='no joint'):
+        ev = p.evaluate()
+    layers = ['occ 100 xs 100 result', 'occ 300 xs 200 result']
+    assert (ev.loc[layers, 'status'] == 'ok').all()
+    assert ev.loc['total impact', 'param'].isna().all()
+    # buying cover improves the deal: gini_p rises down the running nets
+    gini = ev.unstack('distortion')['gini_p']
+    for fam in ('ph', 'wang', 'dual', 'tvar'):
+        assert (gini.loc['Gross result', fam]
+                < gini.loc['net through occ 300 xs 200', fam]
+                < gini.loc['net through occ 100 xs 100', fam])
     with pytest.raises(ValueError, match='stitched'):
         p + p
 

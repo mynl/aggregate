@@ -2816,6 +2816,92 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind,
                                               names=names)
 
+    def evaluate(self, P=None, *, unit='total', names=None):
+        """Evaluate the position ``P - X``: the breakeven acceptability panel.
+
+        The ``Portfolio`` counterpart of :meth:`Aggregate.evaluate`, on the
+        total or on any unit. Passing a list of units gives the book's
+        **acceptability profile**: one ``Step`` row block per unit, each
+        measured against its own premium, so the units rank by how much stress
+        they survive rather than by how much premium they carry.
+
+        Parameters
+        ----------
+        P : float or sequence, optional
+            The premium held. Defaults to each evaluated distribution's own
+            ``exp_premium`` and raises when that is unset. A scalar is allowed
+            only for a single ``unit``; for several, pass a matching sequence
+            or leave it ``None``.
+        unit : str or sequence of str, optional
+            ``'total'`` (the default) for the book, a unit name, or a list of
+            either. Units are independent by construction, so a unit's
+            marginal in the book is its stand-alone distribution and the
+            evaluation delegates to that :class:`Aggregate`.
+        names : sequence of str, optional
+            Distortion families. Defaults to
+            :data:`~aggregate._pricing.EVAL_FAMILIES`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)``, one
+            ``Step`` per evaluated unit.
+
+        Warns
+        -----
+        DegenerateEvaluationWarning
+            Once per call, naming every unit with no breakeven level.
+
+        See Also
+        --------
+        aggregate._pricing.evaluate_margin : the solve and its math.
+        """
+        units = [unit] if isinstance(unit, str) else list(unit)
+        if P is None:
+            prems = [None] * len(units)
+        elif np.isscalar(P):
+            if len(units) > 1:
+                raise ValueError(
+                    f'a scalar P is ambiguous across {len(units)} units; pass '
+                    'one premium per unit, or P=None to use each unit\'s own.')
+            prems = [P]
+        else:
+            prems = list(P)
+            if len(prems) != len(units):
+                raise ValueError(
+                    f'{len(prems)} premiums for {len(units)} units.')
+        blocks, steps = [], []
+        for name, prem in zip(units, prems):
+            if name == 'total':
+                prem = self._resolve_evaluation_premium(prem)
+                s = self.density_df['p_total']
+                block = _pricing.evaluate_constant_premium(
+                    s.index.to_numpy(dtype=float), s.to_numpy(dtype=float),
+                    self.bs, prem, names=names)
+                steps.append(self.name)
+            else:
+                # a unit's marginal is its stand-alone law (units independent)
+                block = self[name].evaluate(prem, names=names) \
+                    .droplevel('Step')
+                steps.append(name)
+            blocks.append(block)
+        panel = pd.concat(blocks, keys=steps, names=['Step'])
+        _pricing.warn_degenerate(panel, self.name)
+        return panel
+
+    def _resolve_evaluation_premium(self, P):
+        """The consideration :meth:`evaluate` measures the total against: the
+        argument, else the accumulated :attr:`exp_premium`. Raises rather than
+        guessing, since a premium of 0 would silently make the book
+        unacceptable."""
+        if P is None:
+            P = float(getattr(self, 'exp_premium', 0.0) or 0.0)
+            if P == 0:
+                raise ValueError(
+                    f'{self.name} has no premium to evaluate against: pass '
+                    'P=, or declare premium on its units.')
+        return float(P)
+
     def apply_distortion(self, distortion, *, view='ask', S_calculation='forwards',
                          allocation='lifted', allow_deficit=False):
         """

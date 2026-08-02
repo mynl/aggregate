@@ -6059,3 +6059,67 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind,
                                               names=names)
+
+    def evaluate(self, P=None, *, names=None):
+        """Evaluate the position ``P - X``: the breakeven acceptability panel.
+
+        Pricing asks what the obligation is worth; evaluation asks how much
+        stress the position you hold survives. Solves, per distortion family,
+        for the shape at which the risk-adjusted margin reaches 0. The
+        breakeven ``gini_p`` is the family-agnostic acceptability index of
+        Cherny and Madan.
+
+        Parameters
+        ----------
+        P : float, optional
+            The premium held against this aggregate. Defaults to
+            :attr:`exp_premium`, and raises when that is unset: a position has
+            to have a consideration before it can be evaluated.
+        names : sequence of str, optional
+            Distortion families. Defaults to
+            :data:`~aggregate._pricing.EVAL_FAMILIES` (``ph`` / ``wang`` /
+            ``dual`` / ``tvar``).
+
+        Returns
+        -------
+        pandas.DataFrame
+            Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)`` with
+            ``Step`` this aggregate's name, and columns ``param_name`` /
+            ``param`` / ``gini_p`` / ``error`` / ``status``. The same shape
+            :meth:`PnL.evaluate` and :meth:`Portfolio.evaluate` return, so
+            panels concatenate.
+
+        Warns
+        -----
+        DegenerateEvaluationWarning
+            When no breakeven level exists: ``P <= E[X]`` (unacceptable at any
+            stress) or the position cannot lose (acceptable at every stress).
+            Both report ``NaN``.
+
+        See Also
+        --------
+        aggregate._pricing.evaluate_margin : the solve and its math.
+        calibrate_distortions : the pricing counterpart, given a CoC target.
+        """
+        P = self._resolve_evaluation_premium(P)
+        s = self.density_df['p_total']
+        panel = _pricing.evaluate_constant_premium(
+            s.index.to_numpy(dtype=float), s.to_numpy(dtype=float), self.bs, P,
+            names=names)
+        panel = pd.concat([panel], keys=[self.name], names=['Step'])
+        _pricing.warn_degenerate(panel, self.name)
+        return panel
+
+    def _resolve_evaluation_premium(self, P):
+        """The consideration :meth:`evaluate` measures against: the argument,
+        else :attr:`exp_premium`. Raises rather than guessing, since a premium
+        of 0 would silently make every position unacceptable."""
+        if P is None:
+            P = float(np.sum(np.asarray(
+                getattr(self, 'exp_premium', 0.0), dtype=float)))
+            if P == 0:
+                raise ValueError(
+                    f'{self.name} has no premium to evaluate against: pass '
+                    'P=, or declare one in DecL (e.g. "1000 premium at 0.7 '
+                    'lr").')
+        return float(P)

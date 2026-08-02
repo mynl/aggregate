@@ -131,10 +131,6 @@ LEG_KINDS = ('premium', 'loss', 'expense', 'recovery', 'commission')
 #: standardized in ``[Reporting-Guidelines]``.
 PERCENTILE_LADDER = (0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99)
 
-#: Distortion families evaluated by :meth:`PnL.evaluate` (the standard set minus
-#: ``ccoc``, which needs an asset level a P&L does not carry).
-_EVAL_FAMILIES = ('ph', 'wang', 'dual', 'tvar')
-
 
 # ----------------------------------------------------------------------
 # The leg / group spec objects
@@ -1355,13 +1351,6 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         """``P(result > x)``."""
         return self._grand_result.gd.sf(x)
 
-    @property
-    def E_consideration(self):
-        """``E[total consideration]`` (signed, across groups) -- the default
-        scale."""
-        return self._grand_cons.mean
-
-
     # ------------------------------------------------------------------
     # the row ledger, three views
     # ------------------------------------------------------------------
@@ -1935,80 +1924,83 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     # ------------------------------------------------------------------
     # Evaluation: the Cherny--Madan breakeven acceptability panel
     # ------------------------------------------------------------------
+    #: Ledger row kinds whose row *is* a margin, and so can be evaluated: each
+    #: group's own result, the running net after each group, a tier subtotal
+    #: result, the grand result, and the program's total impact. Exactly the
+    #: rows ``_VIEW_DEFAULTS`` files under ``'margin'``.
+    _MARGIN_KINDS = ('group_result', 'running_net', 'tier_result',
+                     'grand_result', 'total_impact')
+
     def evaluate(self, names=None):
         """Evaluate the position: the Cherny--Madan breakeven acceptability panel.
 
-        A P&L is **evaluated, not priced**: you price the **obligation** and
-        ask which distortion drives the risk-adjusted net to zero -- the
-        breakeven stress the position survives. That is the
-        ``rho_g(obligation) = consideration`` calibration
-        :meth:`Distortion.calibrate_set` solves over the full support, with
-        the expected total consideration the held magnitude. The breakeven
-        ``gini_p`` is the single family-agnostic acceptability index (Cherny &
-        Madan).
+        A P&L is **evaluated, not priced**: you ask which distortion drives the
+        risk-adjusted margin to zero, the breakeven stress the position
+        survives. The breakeven ``gini_p`` is the single family-agnostic
+        acceptability index (Cherny & Madan).
+
+        Every **margin row of the ledger** is evaluated, not just the grand
+        result, so a tower reads as a story: the gross deal, each reinsurance
+        layer as a position in its own right, and the running net after each
+        purchase. Reading a ``gini_p`` column down the ``net through ...`` rows
+        is watching the deal improve as cover is bought.
 
         Parameters
         ----------
         names : sequence of str, optional
-            Distortion families. Defaults to :data:`_EVAL_FAMILIES` (``ph`` /
-            ``wang`` / ``dual`` / ``tvar``; ``ccoc`` is excluded).
+            Distortion families. Defaults to
+            :data:`~aggregate._pricing.EVAL_FAMILIES` (``ph`` / ``wang`` /
+            ``dual`` / ``tvar``; ``ccoc`` is excluded).
 
         Returns
         -------
         pandas.DataFrame
-            One row per family: ``param_name`` / ``param`` / ``error`` /
-            ``gini_p`` / ``area``.
+            Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)`` and
+            columns ``param_name`` / ``param`` / ``gini_p`` / ``error`` /
+            ``status``. ``.unstack('distortion')`` gives the wide comparison
+            view.
+
+        Warns
+        -----
+        DegenerateEvaluationWarning
+            Once per call, naming every step with no breakeven level. A
+            reinsurance program booked as its own step reads ``E[M] <= 0``
+            correctly, since you pay for cover.
+
+        See Also
+        --------
+        aggregate._pricing.evaluate_margin : the per-row solve and its math.
 
         Notes
         -----
-        Requires a **single** obligation leg over a regular (``bs``-lattice)
-        source -- the ordinary insurance case. Unchanged constraint; revisit
-        post-beta if needed.
+        Each row's :attr:`~aggregate.GridDistribution` is already the signed
+        margin in payoff orientation, exact and irregular for a ``bs = 0`` leg
+        and a regular rebucket otherwise, so the quadrature adapts per row and
+        no ledger shape is excluded. In particular there is no
+        single-obligation-leg restriction: a margin is one random variable
+        however many legs feed it, so an expense ledger evaluates like any
+        other.
         """
-        obl_legs = [r for g in self._egroups for r in g.obl]
-        if self._source_bs is None or len(obl_legs) != 1:
-            raise NotImplementedError(
-                'evaluate requires a single obligation leg over a regular-grid '
-                'source (an Aggregate / GridDistribution with bs); not '
-                'available for this P&L.')
-        from .spectral import Distortion
-        from ._grid_distribution import GridDistribution
-        from ._pricing import (_canonical_loss_frame, _calibration_survival,
-                               _limited_ev)
-        if names is None:
-            names = _EVAL_FAMILIES
-        # price the obligation *magnitude* (the caller's loss orientation):
-        # the ledger row is signed, so divide the booking sign back out.
-        leg = obl_legs[0]
-        mag = leg.values * leg.sign
-        ser = (pd.Series(self._probs, index=mag)
-               .groupby(level=0).sum().sort_index())
-        obl_gd = GridDistribution(ser.index.to_numpy(dtype=float),
-                                  ser.to_numpy(dtype=float), bs=None,
-                                  name=leg.label, is_loss_value=True)
-        dz_index = obl_gd.x
-        frame = pd.DataFrame({'loss': dz_index, 'p_total': obl_gd.p},
-                             index=pd.Index(dz_index, name='loss'))
-        shim = _LossFrameShim(frame, self._source_bs)
-        dz, c, _reverse = _canonical_loss_frame(shim)
-        bs = self._source_bs
-        a_full = float(dz.index[-1])
-        S, ess_sup = _calibration_survival(dz, bs, a_full)
-        el = _limited_ev(dz, bs, a_full + bs)
-        P = self.E_consideration
-        target = P + c
-        dists = Distortion.calibrate_set(
-            S=S, bs=bs, premium_target=target, ess_sup=ess_sup,
-            assets=ess_sup or a_full, el=el, names=names)
-        rows = []
-        for nm in names:
-            d = dists[nm]
-            param_name = getattr(d, 'param_name', None) or 'param'
-            rows.append([param_name, d.shape, d.error, d.gini_p,
-                         (d.gini_p + 1) / 2])
-        return pd.DataFrame(
-            rows, columns=['param_name', 'param', 'error', 'gini_p', 'area'],
-            index=pd.Index(list(names), name='distortion'))
+        from ._pricing import evaluate_margin, no_distribution_panel, \
+            warn_degenerate
+        blocks, steps = [], []
+        for label, kind, _payload in self._plan:
+            if kind not in self._MARGIN_KINDS:
+                continue
+            row = self._rows[label]
+            if isinstance(row, _DeltaRow):
+                # a stitched impact row is a delta of two statistics, not a
+                # random variable: its two sides ride different marginals and
+                # their difference has no law without a joint.
+                blocks.append(no_distribution_panel(
+                    'stitched impact row: no joint, so no distribution to '
+                    'distort', names=names))
+            else:
+                blocks.append(evaluate_margin(row.gd, names=names))
+            steps.append(label)
+        panel = pd.concat(blocks, keys=steps, names=['Step'])
+        warn_degenerate(panel, self.label)
+        return panel
 
     # ------------------------------------------------------------------
     # Plot: the net result density + distribution
@@ -2125,7 +2117,6 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             ('legs', sum(len(g.cons) + len(g.obl) for g in self._egroups)),
             ('role', self.role or 'multi-group'),
             ('result name', self.result_name),
-            ('E[consideration]', f'{self.E_consideration:,.6g}'),
             ('E[result]', f'{self.est_m:,.6g}'),
             ('SD(result)', f'{self.est_sd:,.6g}'),
             ('CV(result)', f'{self.est_cv:,.6g}'),
@@ -2233,17 +2224,6 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             '<h4>Summary</h4>',
             self.summary_df.to_html(float_format=fmt, na_rep=''),
         ])
-
-
-class _LossFrameShim:
-    """A minimal stand-in carrying ``density_df`` / ``bs`` / ``_is_loss_value``
-    for :func:`_canonical_loss_frame` -- so :meth:`PnL.evaluate` reuses the
-    pricing helpers without retaining an :class:`Aggregate`."""
-
-    def __init__(self, density_df, bs):
-        self.density_df = density_df
-        self.bs = bs
-        self._is_loss_value = True
 
 
 # ----------------------------------------------------------------------

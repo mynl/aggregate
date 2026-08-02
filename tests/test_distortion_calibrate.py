@@ -49,7 +49,7 @@ def test_calibrate_no_r0(synthetic_S, kind):
         d = Distortion(name=kind, r0=0.0, b=init)
     else:
         d = Distortion(name=kind, **{subclass.param_name: init})
-    d.calibrate(S=S, bs=bs, premium_target=prem)
+    d.calibrate(S=S, dx=bs, premium_target=prem)
 
     assert abs(d.error) < 1e-4, \
         f'{kind} residual {d.error} exceeds tolerance'
@@ -75,7 +75,7 @@ def test_calibrate_with_r0(synthetic_S, kind, r0):
     init = subclass._calibration_init_shape
     pn = {'ly': 'r', 'clin': 'slope', 'lep': 'r'}[kind]
     d = Distortion(name=kind, r0=r0, **{pn: init})
-    d.calibrate(S=S, bs=bs, premium_target=prem, ess_sup=ess_sup)
+    d.calibrate(S=S, dx=bs, premium_target=prem, ess_sup=ess_sup)
 
     assert abs(d.error) < 1e-4
     assert d.premium_target == prem
@@ -92,7 +92,7 @@ def test_calibrate_ccoc(synthetic_S):
     prem = el * 1.20
 
     d = Distortion(name='ccoc', r=0.25)
-    d.calibrate(S=S, bs=bs, premium_target=prem, assets=assets, el=el)
+    d.calibrate(S=S, dx=bs, premium_target=prem, assets=assets, el=el)
 
     expected = (prem - el) / (assets - prem)
     assert d.shape == pytest.approx(expected)
@@ -118,7 +118,7 @@ def test_base_calibrate_raises():
     sub_d2 = Distortion.wang(0.3)
     d = Distortion.minimum([sub_d1, sub_d2])
     with pytest.raises(NotImplementedError):
-        d.calibrate(S=np.array([0.5]), bs=1.0, premium_target=1.0)
+        d.calibrate(S=np.array([0.5]), dx=1.0, premium_target=1.0)
 
 
 def test_calibration_init_shape_present_for_pricing_kinds():
@@ -141,7 +141,7 @@ def test_calibrate_set_matches_individual(synthetic_S):
     assets = synthetic_S['assets']
     prem = el * 1.20
 
-    dset = Distortion.calibrate_set(S=S, bs=bs, premium_target=prem,
+    dset = Distortion.calibrate_set(S=S, dx=bs, premium_target=prem,
                                     assets=assets, el=el)
     assert list(dset) == ['ccoc', 'ph', 'wang', 'dual', 'tvar']
     for name, d in dset.items():
@@ -151,14 +151,14 @@ def test_calibrate_set_matches_individual(synthetic_S):
     # set member equals the stand-alone calibrate for a representative kind
     sub = Distortion._registry['ph']
     d_ph = Distortion(name='ph', **{sub.param_name: sub._calibration_init_shape})
-    d_ph.calibrate(S=S, bs=bs, premium_target=prem, assets=assets, el=el)
+    d_ph.calibrate(S=S, dx=bs, premium_target=prem, assets=assets, el=el)
     assert dset['ph'].shape == pytest.approx(d_ph.shape)
 
 
 def test_calibrate_set_unknown_kind_raises(synthetic_S):
     """A non-calibratable kind in ``names`` raises ValueError."""
     with pytest.raises(ValueError, match='calibrate_set not implemented'):
-        Distortion.calibrate_set(S=synthetic_S['S'], bs=synthetic_S['bs'],
+        Distortion.calibrate_set(S=synthetic_S['S'], dx=synthetic_S['bs'],
                                  premium_target=1.0, names=('minimum',))
 
 
@@ -192,3 +192,115 @@ def test_aggregate_price_ccoc_matches_pentagon():
     import pandas.testing as pdt
     pdt.assert_frame_equal(agg.price_ccoc(0.1, p=0.99),
                            agg.price_pentagon(p=0.99, ROE=0.1))
+
+
+# ---------------------------------------------------------------------------
+# Evaluation: the grid-agnostic quadrature and the two new public faces
+# [Margin-Acceptability-Evaluate]
+# ---------------------------------------------------------------------------
+
+def test_quad_scalar_branch_keeps_the_legacy_summation_order():
+    """A scalar ``dx`` must stay bit-for-bit ``np.sum(v) * dx``.
+
+    The whole point of the scalar branch: the classic lattice pricing path is
+    unchanged, so ``calibrate_distortions`` keeps its byte-for-byte guarantee.
+    ``np.sum(v * dx)`` is mathematically the same and numerically is not.
+    """
+    v = np.linspace(0.999, 0.001, 5000)
+    assert Distortion._quad(v, 0.1) == np.sum(v) * 0.1
+    dx = np.full(len(v), 0.1)
+    assert Distortion._quad(v, dx) == np.sum(v * dx)
+
+
+def test_quad_vector_branch_is_exact_on_an_irregular_grid():
+    """``sum g(S_i) (z_{i+1} - z_i)`` is the layer integral, not an estimate.
+
+    A three-atom law has a closed-form distorted mean, and the width vector
+    reproduces it to machine precision. Rebucketing onto a lattice would match
+    the mean and miss this.
+    """
+    # Z in {0, 1.7, 11.9}, masses .5 / .3 / .2, so S = (.5, .2) on the first
+    # two nodes and rho_g(Z) = g(.5) * 1.7 + g(.2) * 10.2.
+    z = np.array([0.0, 1.7, 11.9])
+    S = np.array([0.5, 0.2])
+    d = Distortion('ph', 0.6)
+    exact = d.g(0.5) * 1.7 + d.g(0.2) * 10.2
+    assert Distortion._quad(d.g(S), np.diff(z)) == pytest.approx(exact,
+                                                                 rel=1e-15)
+
+
+def test_evaluate_on_an_irregular_margin_is_exact():
+    """A margin off any lattice still solves rho_g(M) = 0.
+
+    The atoms are deliberately incommensurable, so the margin's support is
+    genuinely irregular and the width-vector quadrature is the only exact
+    route. The bound is ``_newton_iterate``'s own ``tol`` of 1e-5, which is
+    what the solve promises; exactness of the *quadrature* is pinned
+    bit-for-bit by ``test_quad_vector_branch_is_exact_on_an_irregular_grid``.
+    A rebucketed implementation would miss by orders more on this support.
+    """
+    from aggregate import PnL
+    vals = np.array([0.0, 1.7, 4.3, 11.9])
+    probs = np.array([0.45, 0.25, 0.2, 0.1])
+    p = PnL(name='irr', source=(vals, probs), role='sell',
+            consideration=3.0, obligation=lambda x: x)
+    assert p.result.bs is None                    # exact irregular grid
+    ev = p.evaluate().droplevel('Step')
+    x, q = np.asarray(p.result.x), np.asarray(p.result.p)
+    c = float(x.max())
+    z, qz = (c - x)[::-1], q[::-1]
+    S = 1.0 - np.cumsum(qz)
+    k = min(int(np.flatnonzero(S > 0).max()), len(z) - 2)
+    for fam in ('ph', 'wang', 'dual', 'tvar'):
+        g = Distortion(fam, ev.loc[fam, 'param']).g
+        rho = c - float(np.sum(g(S[:k + 1]) * np.diff(z)[:k + 1]))
+        assert rho == pytest.approx(0.0, abs=1e-5)
+
+
+def test_aggregate_evaluate_defaults_to_exp_premium_and_raises_without():
+    a = build('agg AEv 1000 premium at 0.7 lr sev gamma 100 cv 0.5 poisson')
+    ev = a.evaluate()
+    assert list(ev.index.get_level_values('Step').unique()) == ['AEv']
+    assert (ev.status == 'ok').all()
+    # the explicit premium reproduces the default
+    assert ev.param.to_numpy() == pytest.approx(
+        a.evaluate(1000.0).param.to_numpy())
+    bare = build('agg ANoP 100 claims sev gamma 10 cv 1 poisson')
+    with pytest.raises(ValueError, match='no premium to evaluate against'):
+        bare.evaluate()
+
+
+def test_aggregate_and_pnl_evaluate_agree():
+    """The two faces are one solve: a constant premium is just a margin."""
+    a = build('agg AX 1000 premium at 0.7 lr sev gamma 100 cv 0.5 poisson')
+    p = build('pnl PX 1000 prem less agg PX_e 1000 prem at 0.7 lr '
+              'sev gamma 100 cv 0.5 poisson')
+    assert a.evaluate().param.to_numpy() == pytest.approx(
+        p.evaluate().param.to_numpy(), rel=1e-6)
+
+
+def test_portfolio_evaluate_total_and_unit_profile():
+    """The book survives more stress than either unit: diversification."""
+    port = build('port PEv '
+                 'agg PU1 1000 premium at 0.65 lr sev gamma 100 cv 0.5 poisson '
+                 'agg PU2 500 premium at 0.75 lr sev gamma 50 cv 1.2 poisson')
+    total = port.evaluate().droplevel('Step')
+    profile = port.evaluate(unit=['PU1', 'PU2'])
+    assert list(profile.index.get_level_values('Step').unique()) == \
+        ['PU1', 'PU2']
+    for fam in ('ph', 'wang', 'dual', 'tvar'):
+        assert (total.loc[fam, 'gini_p']
+                > profile.loc[('PU1', fam), 'gini_p']
+                > profile.loc[('PU2', fam), 'gini_p'])
+    with pytest.raises(ValueError, match='scalar P is ambiguous'):
+        port.evaluate(900.0, unit=['PU1', 'PU2'])
+
+
+def test_evaluate_margin_rejects_a_loss_oriented_gd():
+    """Orientation is not guessed: a loss-valued GD is a caller error."""
+    from aggregate._grid_distribution import GridDistribution
+    from aggregate._pricing import evaluate_margin
+    gd = GridDistribution(np.array([0.0, 1.0]), np.array([0.5, 0.5]),
+                          is_loss_value=True)
+    with pytest.raises(ValueError, match='payoff orientation'):
+        evaluate_margin(gd)

@@ -267,7 +267,6 @@ groups                       number of ledger groups
 legs                         total declared legs across groups
 role                         the single group's role, else ``multi-group``
 result name                  ``result_name`` (the grand result row label)
-E[consideration]             ``E_consideration`` — signed grand total
 E[result]                    ``est_m``
 SD(result)                   ``est_sd``
 CV(result)                   ``est_cv``

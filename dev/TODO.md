@@ -421,7 +421,16 @@
   case for v1.0.
 - **[Named-Cherny-Madan-Families]** (#23) — add the MINMAXVAR / MAXVAR / MAXMINVAR
   distortion kinds so `PnL.evaluate` can surface the *named* indices (`dual`
-  already *is* MINVAR). `@Cherny2009a`.
+  already *is* MINVAR). `@Cherny2009a`. Independent of
+  `[Margin-Acceptability-Evaluate]` (`1.0.0a187`), which fixed *what* is solved;
+  this adds families to solve it over.
+- **[PnL-Density-DF-Running-Nets]** — `PnL.density_df` yields a GD for the legs,
+  group results, tier results and the grand result, but **not** the
+  `running_net` rows, which `PnL.evaluate` does report (`1.0.0a187`). Two views
+  disagreeing about what a ledger row is. `evaluate` reads `_by_kind` directly
+  so nothing depends on the gap; closing it means deciding whether `density_df`
+  is "rows with a law" (add them) or "declared plus subtotal rows" (leave it and
+  say so in the docstring).
 - **[Rate-Based-Reins-Clauses]** — extend reinsurance clauses to accept e.g.
   `net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros` (rate on subject
   = quota share).

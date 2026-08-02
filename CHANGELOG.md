@@ -1,5 +1,98 @@
 # Changelog
 
+## 1.0.0a187
+
+**[Margin-Acceptability-Evaluate]** `evaluate` now solves `rho_g(margin) = 0`
+rather than `rho_g(obligation) = E[consideration]`, applies to **every margin
+row of a ledger**, and gains `Aggregate` and `Portfolio` faces. This is a
+**correction, not an enhancement**: a variable-premium position evaluated on
+`a186` returned a number that answered the wrong question.
+
+### Why the old form was wrong
+
+Distortion risk measures are translation-equivariant, so with a **constant**
+premium `P` the statements `rho_g(P - L) = 0` and `rho_g(L) = P` are the same,
+and pricing the obligation against the premium was legitimate. Once the
+consideration is random (swing rating, slide, profit commission, reinstatement
+premium, corridor) that equivalence fails: `rho_g` is comonotone-additive but
+not additive, and the margin `M = P - L` is generally not monotone in `L`, so
+`rho_g(P) - rho_g(L)` is not `rho_g(P - L)`. Only the margin's own pushforward
+answers the question.
+
+The symptom was visible: a loss-sensitive P&L with `E[P] < E[L]` used to
+calibrate happily to a "premium" below its own expected loss. It now reports,
+correctly, that the position is acceptable at no stress at all.
+
+**Constant-premium answers are unchanged.** With `M = P - L` the canonical
+shift is `c = P - min(L)` and `Z = L - min(L)`, so the target is `P - min(L)`
+and the solve is `rho_g(L) = P`, exactly the classic form. This is the
+regression anchor, pinned by
+`test_evaluate_matches_the_constant_premium_price_form`.
+
+### Every margin row, not just the grand result
+
+`PnL.evaluate` evaluates each `group_result` / `running_net` / `tier_result` /
+`grand_result` / `total_impact` row: the gross deal, each reinsurance layer as
+a position in its own right, and the running net after each purchase. Reading
+a `gini_p` column down the `net through ...` rows is watching the deal improve
+as cover is bought. The **single-obligation-leg restriction is gone** (a margin
+is one random variable however many legs feed it, so expense ledgers evaluate),
+and so is the regular-grid restriction. A **stitched peel** now evaluates too;
+its `total impact` row is the one exception, being a delta of two statistics
+whose sides ride different marginals, and it reports `NaN` with that reason.
+
+### Grid-agnostic quadrature
+
+A margin pushforward generally lands on an **irregular** support, so
+`Distortion.calibrate` / `calibrate_set` take `dx` where they took `bs`: a
+scalar bucket size, or a per-node width vector. One new helper,
+`Distortion._quad(v, dx)`, carries the split. The scalar branch keeps the exact
+`np.sum(v) * dx` summation order, so the classic lattice pricing path
+(`calibrate_distortions`) is **bit-for-bit unchanged**; the vector branch is
+*exact* rather than an approximation, since the survival function of an atomic
+law is a step function and the layer integral is a finite sum of rectangles.
+Rebucketing a margin onto a lattice was rejected as the alternative: it is
+mean-preserving, so it looks right while misreading the tail the index reads.
+
+### The new faces
+
+- `Aggregate.evaluate(P=None, names=None)` and
+  `Portfolio.evaluate(P=None, unit='total', names=None)`. `P` defaults to
+  `exp_premium` and **raises** when unset, since a premium of 0 would silently
+  make every position unacceptable. `Portfolio` accepts a list of units, giving
+  the book's acceptability profile in one frame.
+- All three faces return the same tidy frame, so panels concatenate.
+
+### The panel
+
+Tidy (long) form: `MultiIndex` rows `(Step, distortion)`, columns
+`param_name` / `param` / `gini_p` / `error` / `status`. `dev/reporting-guidelines.md`
+rule 2 decides the orientation: a wide frame would put a PH exponent, a Wang
+`lam`, a Dual `b` and a TVaR `p` under one `param` heading, four units in one
+column. The wide comparison view is `.unstack('distortion')`. `area` is
+dropped, being exactly `(gini_p + 1) / 2`.
+
+A degenerate position reports `NaN`, never `0` or `inf`, with a new
+`DegenerateEvaluationWarning` raised **once per call** naming the affected
+steps. Two cases: `E[M] <= 0` (acceptable at no stress) and `M >= 0` almost
+surely (an arbitrage, acceptable at every stress). The limiting parameter
+differs by family and says nothing about the position, so a number there would
+invite meaningless comparisons; the `status` column names which case fired. A
+reinsurance program booked as its own step reads `E[M] <= 0` correctly, since
+you pay for cover.
+
+### `E_consideration` retired
+
+Property and `info` row both. It was the same idea as the `Scaled` column
+retired in `a185`: one committed ledger-wide premium number. Its only two
+consumers in `src` were `evaluate` (which no longer targets a premium) and one
+`info` row. The `a185` CHANGELOG and `dev/done/plan-pnl-ratio-frame.md` claim
+it is "the `P` denominator `ratio_df` needs"; that was **wrong even then**.
+`ratio_df` accumulates `P` per block from the `LEG_KINDS` buckets, and reading
+`ratio_df['P']` is the replacement.
+
+Plan: `dev/done/plan-margin-acceptability-evaluate.md`.
+
 ## 1.0.0a186
 
 **[PnL-Ratio-Frame]** Two corrections to the ratio frame shipped in `a185`.

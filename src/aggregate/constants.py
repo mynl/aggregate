@@ -31,7 +31,7 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'Validation', 'DefectiveDistributionWarning',
            'DefectiveDistributionError', 'InfiniteVarianceError',
            'IgnoredDecLClauseWarning', 'ZeroPremiumCessionWarning',
-           'CoarseJointGridWarning',
+           'CoarseJointGridWarning', 'DegenerateEvaluationWarning',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
            'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row',
@@ -277,6 +277,29 @@ class CoarseJointGridWarning(UserWarning):
     ``dev/done/plan-pnl-faces-punchlist.md``); the remedy is the
     joint grid knobs (``bs`` / ``log2_x`` / ``log2_y``, forwarded to
     :meth:`~aggregate.Aggregate.occ_bivariate`).
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
+
+
+class DegenerateEvaluationWarning(UserWarning):
+    """Emitted when a position has no breakeven acceptability level.
+
+    ``evaluate`` solves for the distortion at which the risk-adjusted margin
+    reaches 0. That level exists only when the margin is favorable on average
+    and unfavorable somewhere, so the distorted mean can cross 0. Two positions
+    have nothing to solve:
+
+    * ``E[M] <= 0``: unacceptable under the identity distortion already, so
+      unacceptable at every stress. Cherny and Madan set the index to 0.
+    * ``M >= 0`` a.s.: an arbitrage, acceptable at every stress, so the index
+      is unbounded.
+
+    Both report ``NaN`` rather than 0 or infinity. The limiting parameter
+    differs by family and carries no information about the position, so a
+    number there would invite comparisons that mean nothing; the panel's
+    ``status`` column names which case fired.
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).

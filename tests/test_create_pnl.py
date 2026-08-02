@@ -253,12 +253,14 @@ def _classified_two_group():
 
 def test_the_retired_scale_surface_is_gone():
     p = _simple()
-    for name in ('scale', 'scaled_stats_df', '_resolve_scale'):
+    for name in ('scale', 'scaled_stats_df', '_resolve_scale',
+                 'E_consideration'):
         assert not hasattr(p, name), name
     assert 'Scaled' not in p.summary_df.columns
-    # the accessor that happened to be the default scale stays: ratio_df needs
-    # it as the P denominator and evaluate() as its premium target
-    assert p.E_consideration == pytest.approx(15.0)
+    # E_consideration went with it: one committed ledger-wide premium number
+    # was the same idea as Scaled. ratio_df reads P per block from the leg
+    # kinds, and evaluate() targets the canonical shift, not a premium.
+    assert p.ratio_df['P'].iloc[-1] == pytest.approx(15.0)
 
 
 def test_ratio_df_amounts_foot_to_the_margin():

@@ -1973,7 +1973,29 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     # is not calibratable through the Portfolio dispatch.
     _calibration_init_shape = None
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    @staticmethod
+    def _quad(v, dx):
+        """Layer-integral quadrature: ``∫ v dx`` over the calibration grid.
+
+        Parameters
+        ----------
+        v : ndarray
+            Integrand sampled at the grid nodes.
+        dx : float or ndarray
+            Scalar bucket size (a regular lattice) or the per-node width
+            vector ``x[i+1] - x[i]`` (an irregular grid).
+
+        Notes
+        -----
+        The scalar branch keeps the exact ``np.sum(v) * dx`` summation order
+        of the original lattice code, so the regular-grid calibration stays
+        bit-for-bit what it was. The vector branch is not an approximation of
+        it: on a purely atomic support the survival function is a step
+        function, so ``Σ v_i (x_{i+1} - x_i)`` *is* the layer integral.
+        """
+        return np.sum(v) * dx if np.isscalar(dx) else np.sum(v * dx)
+
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """
         Calibrate the shape parameter so the distorted integral matches
@@ -1989,10 +2011,12 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         Parameters
         ----------
         S : ndarray
-            Survival function evaluated on the bs-grid up to the asset
-            limit; must be strictly positive and weakly decreasing.
-        bs : float
-            Bucket size of the discretisation; the integration step.
+            Survival function evaluated on the calibration grid up to the
+            asset limit; must be strictly positive and weakly decreasing.
+        dx : float or ndarray
+            The integration step: a scalar bucket size on a regular lattice,
+            or the per-node width vector ``x[i+1] - x[i]`` on an irregular
+            grid (a margin pushforward, say). See :meth:`_quad`.
         premium_target : float
             Premium that the distorted integral ``∫ g(S) dx`` must hit.
         ess_sup : float, optional
@@ -2051,7 +2075,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         self._build()
 
     @classmethod
-    def calibrate_set(cls, S, bs, premium_target, *, ess_sup=0.0, assets=0.0,
+    def calibrate_set(cls, S, dx, premium_target, *, ess_sup=0.0, assets=0.0,
                       el=None, r0=0.05,
                       names=('ccoc', 'ph', 'wang', 'dual', 'tvar')):
         """Calibrate a set of pricing distortions to one premium target on one S.
@@ -2060,7 +2084,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         ``names`` it constructs the uncalibrated distortion from the subclass's
         :attr:`_calibration_init_shape` and runs that subclass's
         :meth:`calibrate` Newton iteration against the shared
-        ``(S, bs, premium_target, ess_sup, assets, el)`` datum, returning
+        ``(S, dx, premium_target, ess_sup, assets, el)`` datum, returning
         ``{name: calibrated Distortion}``.
 
         This is pure ``Distortion`` knowledge -- the family registry, each
@@ -2074,10 +2098,11 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         Parameters
         ----------
         S : ndarray
-            Survival vector on the bs-grid up to the asset limit; strictly
-            positive and weakly decreasing. See :meth:`calibrate`.
-        bs : float
-            Bucket size (integration step).
+            Survival vector on the calibration grid up to the asset limit;
+            strictly positive and weakly decreasing. See :meth:`calibrate`.
+        dx : float or ndarray
+            The integration step: a scalar bucket size on a regular lattice,
+            or the per-node width vector on an irregular grid.
         premium_target : float
             Premium the distorted integral ``∫ g(S) dx`` must hit.
         ess_sup : float, optional
@@ -2124,7 +2149,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
             else:
                 pn = subclass.param_name
                 dist = cls(name=lookup, **{pn: init_shape})
-            dist.calibrate(S=S, bs=bs, premium_target=premium_target,
+            dist.calibrate(S=S, dx=dx, premium_target=premium_target,
                            ess_sup=ess_sup, assets=assets, el=el)
             out[name] = dist
         return out
@@ -2223,7 +2248,7 @@ class CCoCDistortion(Distortion):
     def g_prime(self, x):
         return self.v
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """
         Closed-form calibration: ``r = (premium - el) / (assets - premium)``.
@@ -2313,15 +2338,15 @@ class PHDistortion(Distortion):
         rho = self.shape
         return np.where(x > 0, rho * x ** (rho - 1.0), np.inf)
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """Newton on ``∫ S^ρ dx = premium_target``."""
         lS = np.log(S)
 
         def f(rho):
             trho = S ** rho
-            ex = np.sum(trho) * bs
-            ex_prime = np.sum(trho * lS) * bs
+            ex = self._quad(trho, dx)
+            ex_prime = self._quad(trho * lS, dx)
             return ex - premium_target, ex_prime
 
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
@@ -2408,7 +2433,7 @@ class WangDistortion(Distortion):
         n = self._norm
         return n.pdf(n.ppf(x) + self.shape) / n.pdf(n.ppf(x))
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """Newton on ``∫ Φ(Φ⁻¹(S) + λ) dx = premium_target``."""
         n = ss.norm()
@@ -2416,8 +2441,8 @@ class WangDistortion(Distortion):
         def f(lam):
             temp = n.ppf(S) + lam
             tlam = n.cdf(temp)
-            ex = np.sum(tlam) * bs
-            ex_prime = np.sum(n.pdf(temp)) * bs
+            ex = self._quad(tlam, dx)
+            ex_prime = self._quad(n.pdf(temp), dx)
             return ex - premium_target, ex_prime
 
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
@@ -2484,7 +2509,7 @@ class DualDistortion(Distortion):
         p = self.shape
         return p * (1 - x) ** (p - 1)
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """Newton on ``∫ (1 - (1-S)^ρ) dx = premium_target``.
 
@@ -2501,8 +2526,8 @@ class DualDistortion(Distortion):
         def f(rho):
             temp = (1 - S) ** rho
             trho = 1 - temp
-            ex = np.sum(trho) * bs
-            ex_prime = np.sum(temp * lS) * bs
+            ex = self._quad(trho, dx)
+            ex_prime = self._quad(temp * lS, dx)
             return ex - premium_target, ex_prime
 
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
@@ -2609,7 +2634,7 @@ class TVaRDistortion(Distortion):
         assert x is not None
         return tvar_ra(den, x, p)
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """
         Newton on ``∫ min(S/(1-ρ), 1) dx = premium_target``.
@@ -2621,8 +2646,8 @@ class TVaRDistortion(Distortion):
         def f(rho):
             temp = np.where(S <= 1 - rho, S / (1 - rho), 1)
             temp2 = np.where(S <= 1 - rho, S / (1 - rho) ** 2, 1)
-            ex = np.sum(temp) * bs
-            ex_prime = np.sum(temp2) * bs
+            ex = self._quad(temp, dx)
+            ex_prime = self._quad(temp2, dx)
             return ex - premium_target, ex_prime
 
         shape, fx = self._newton_iterate(
@@ -3621,7 +3646,7 @@ class CLLDistortion(Distortion):
         ea = self._ea
         return np.where(x < 1, np.minimum(1, (x / ea) ** (1 / b)), 1)
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """Newton on ``∫ min(1, e^{r0} S^b) dx = premium_target``.
 
@@ -3635,8 +3660,8 @@ class CLLDistortion(Distortion):
 
         def f(b):
             uncapped = ea * S ** b
-            ex = np.sum(np.minimum(1, uncapped)) * bs
-            ex_prime = np.sum(np.where(uncapped < 1, uncapped * lS, 0)) * bs
+            ex = self._quad(np.minimum(1, uncapped), dx)
+            ex_prime = self._quad(np.where(uncapped < 1, uncapped * lS, 0), dx)
             return ex - premium_target, ex_prime
 
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
@@ -3738,7 +3763,7 @@ class CLinDistortion(Distortion):
         sl = self.shape
         return np.where(x <= self.r0, 0, (x - self.r0) / sl)
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """Newton on ``∫ min(1, r0 + r·S) dx + ess_sup·r0 = premium_target``.
 
@@ -3749,8 +3774,8 @@ class CLinDistortion(Distortion):
 
         def f(r):
             r0_rS = self.r0 + r * S
-            ex = np.sum(np.minimum(1, r0_rS)) * bs + mass
-            ex_prime = np.sum(np.where(r0_rS < 1, S, 0)) * bs
+            ex = self._quad(np.minimum(1, r0_rS), dx) + mass
+            ex_prime = self._quad(np.where(r0_rS < 1, S, 0), dx)
             return ex - premium_target, ex_prime
 
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
@@ -3867,7 +3892,7 @@ class LEPDistortion(Distortion):
         u = (mb - rad) / (2 * a)
         return np.where(y < d, 0, np.maximum(0, u))
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """Newton on the layer-equivalent-pricing distortion.
 
@@ -3881,9 +3906,9 @@ class LEPDistortion(Distortion):
         def f(r):
             spread = r / (1 + r) - d
             temp = d + (1 - d) * S + spread * rSF
-            ex = np.sum(np.minimum(1, temp)) * bs + mass
+            ex = self._quad(np.minimum(1, temp), dx) + mass
             ex_prime = (1 + r) ** -2 * \
-                np.sum(np.where(temp < 1, rSF, 0)) * bs
+                self._quad(np.where(temp < 1, rSF, 0), dx)
             return ex - premium_target, ex_prime
 
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
@@ -3991,7 +4016,7 @@ class LYDistortion(Distortion):
         return np.maximum(0,
                           (x * (1 + self.r0) - self.r0) / (1 + rk * (1 - x)))
 
-    def calibrate(self, S, bs, premium_target, *, ess_sup=0.0,
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
         """Newton on the linear-yield distortion.
 
@@ -4004,8 +4029,8 @@ class LYDistortion(Distortion):
             num = self.r0 + S * (1 + rk)
             den = 1 + self.r0 + rk * S
             tlam = num / den
-            ex = np.sum(tlam) * bs + mass
-            ex_prime = np.sum(S * (den ** -1 - num / (den ** 2))) * bs
+            ex = self._quad(tlam, dx) + mass
+            ex_prime = self._quad(S * (den ** -1 - num / (den ** 2)), dx)
             return ex - premium_target, ex_prime
 
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)

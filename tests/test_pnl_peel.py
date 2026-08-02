@@ -104,10 +104,11 @@ def _side_total(frame, step, side, column):
 def _step_result(frame, step, column):
     """A step's **own** result cell, whatever its ``Label`` reads.
 
-    The label varies with ledger position ([Ledger-Side-Label-Levels]): the
-    direct step reads ``Direct``, a cession ``Total``, the grand block ``Net``.
-    In every case the step's own result is the first ``Margin`` row of the
-    block, in plan order, ahead of the running net or the impact that may
+    The label varies with ledger position ([Ledger-Side-Label-Levels],
+    [First-Step-Label]): the direct step is named for the subject business
+    (``'Gross'`` unlabelled), a cession reads ``Total``, the grand block
+    ``Net``. In every case the step's own result is the first ``Margin`` row of
+    the block, in plan order, ahead of the running net or the impact that may
     follow it.
     """
     return frame.loc[(step, 'Margin'), column].iloc[0]
@@ -588,7 +589,7 @@ def test_tier_subtotals_chain_into_the_running_net():
     """
     p = build(f'{TWO_EACH} peel top-down')
     s = p.stats_df
-    total = (s.loc[('Gross', 'Margin', 'Direct'), 'EX']
+    total = (s.loc[('Gross', 'Margin', 'Gross'), 'EX']
              + s.loc[('All occurrence', 'Margin', 'Total'), 'EX']
              + s.loc[('All aggregate', 'Margin', 'Total'), 'EX'])
     assert total == pytest.approx(
@@ -767,7 +768,7 @@ def test_every_peeled_row_carries_a_distribution():
     p = build(f'{OCC2} peel top-down')
     dd = p.density_df
     # one entry per declared leg plus the derived rows the exhibits read
-    assert {'premium', 'Loss', 'margin'} <= set(dd)
+    assert {'Premium', 'Loss', 'margin'} <= set(dd)
     for step in _steps(p):
         if step.startswith('occ '):
             assert f'{step} premium' in dd and f'{step} recovery' in dd

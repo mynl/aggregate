@@ -217,9 +217,9 @@ def test_ledger_rows_and_means_add():
     the sheet and the total impact is the cession's step delta."""
     p = build(_HUMANX)
     s = p.stats_df
-    for row in (('Gross', 'Consideration', 'premium'),
+    for row in (('Gross', 'Consideration', 'Premium'),
                 ('Gross', 'Obligation', 'Loss'),
-                ('Gross', 'Margin', 'Direct'),
+                ('Gross', 'Margin', 'Gross'),
                 ('occ 95% so 100 xs 100', 'Consideration', 'occ 95% so 100 xs 100 premium'),
                 ('occ 95% so 100 xs 100', 'Obligation', 'occ 95% so 100 xs 100 recovery'),
                 ('occ 95% so 100 xs 100', 'Margin', 'Total'),
@@ -228,7 +228,7 @@ def test_ledger_rows_and_means_add():
                 ('All', 'Margin', 'Impact')):
         assert row in s.index, row
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
+        s.loc[('Gross', 'Margin', 'Gross'), 'EX']
         + s.loc[('occ 95% so 100 xs 100', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
@@ -242,7 +242,7 @@ def test_ceded_premium_is_stochastic_in_exhibit():
     # nonzero SD on its ledger row, while the gross premium is fixed...
     assert s.loc[('occ 95% so 100 xs 100', 'Consideration', 'occ 95% so 100 xs 100 premium'), 'SD'] \
         > 0.0
-    assert s.loc[('Gross', 'Consideration', 'premium'), 'SD'] == 0.0
+    assert s.loc[('Gross', 'Consideration', 'Premium'), 'SD'] == 0.0
 
 
 def test_ledger_mean_check_ceded_premium():
@@ -285,7 +285,7 @@ def test_subsequent_aggregate_cover_builds():
                      'EX']) > 0
     # decision 3: the ledger extends to the inuring both-tiers form -- a third
     # buy group over the SAME joint (no new dimension).
-    for row in (('Gross', 'Margin', 'Direct'),
+    for row in (('Gross', 'Margin', 'Gross'),
                 ('occ 100 xs 100', 'Margin', 'Total'),
                 ('occ 100 xs 100', 'Margin', 'Net'),
                 ('agg 85% so 1500 xs 7000', 'Consideration', 'agg 85% so 1500 xs 7000 premium'),
@@ -296,7 +296,7 @@ def test_subsequent_aggregate_cover_builds():
         assert row in s.index, row
     # means add tier by tier down the sheet
     assert s.loc[('occ 100 xs 100', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
+        s.loc[('Gross', 'Margin', 'Gross'), 'EX']
         + s.loc[('occ 100 xs 100', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
@@ -320,9 +320,9 @@ def test_expense_and_cede_book_as_ledger_legs():
                  'EX'] == pytest.approx(3.6)
     # the gross group result books the whole expense vs the pure gross UW
     # (premium + loss legs)
-    pure_gross = (s.loc[('Gross', 'Consideration', 'premium'), 'EX']
+    pure_gross = (s.loc[('Gross', 'Consideration', 'Premium'), 'EX']
                   + s.loc[('Gross', 'Obligation', 'Loss'), 'EX'])
-    assert s.loc[('Gross', 'Margin', 'Direct'), 'EX'] == pytest.approx(
+    assert s.loc[('Gross', 'Margin', 'Gross'), 'EX'] == pytest.approx(
         pure_gross - 1500.0, rel=1e-6, abs=1e-6)
     # and the cession result credits its commission vs the pure ceded UW
     # (ceded premium + recovery legs)
@@ -343,9 +343,9 @@ def test_no_expense_leaves_ledger_pure():
     assert ('Gross', 'Obligation', 'expense') not in s.index
     assert p.economics.get('c_occ', 0.0) == pytest.approx(0.0)
     # the gross group result is the pure gross underwriting mean (premium + loss)
-    pure_gross = (s.loc[('Gross', 'Consideration', 'premium'), 'EX']
+    pure_gross = (s.loc[('Gross', 'Consideration', 'Premium'), 'EX']
                   + s.loc[('Gross', 'Obligation', 'Loss'), 'EX'])
-    assert s.loc[('Gross', 'Margin', 'Direct'), 'EX'] == \
+    assert s.loc[('Gross', 'Margin', 'Gross'), 'EX'] == \
         pytest.approx(pure_gross, rel=1e-6, abs=1e-6)
 
 

@@ -107,7 +107,7 @@ def test_expense_reduces_margin_and_drives_combined_ratio():
             == pytest.approx(s.loc[('Obligation', 'Total'), 'EX'], abs=1e-6))
     # the EX column foots: margin = consideration + total obligation
     assert (s.loc[('Margin', 'Total'), 'EX']
-            == pytest.approx(s.loc[('Consideration', 'premium'), 'EX']
+            == pytest.approx(s.loc[('Consideration', 'Premium'), 'EX']
                              + s.loc[('Obligation', 'Total'), 'EX'], abs=1e-6))
     # ratio_df tells the same story, and now splits loss from expense: the
     # combined ratio is (400 + 200) / 1000, its two parts 0.40 and 0.20

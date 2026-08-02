@@ -104,15 +104,15 @@ def _leg(pnl, label):
 def test_premium_label_names_consideration_leg():
     p = build(_PNL_BASE.replace('1000 premium', '1000 premium as "GWP"'))
     assert 'GWP' in _lines(p)
-    assert 'premium' not in _lines(p)
+    assert 'Premium' not in _lines(p)
     assert _leg(p, 'GWP')['EX'] == pytest.approx(1000.0)
 
 
 def test_premium_no_label_keeps_default_leg():
-    # one canonical default across faces: 'premium' (the walk's gross step
+    # one canonical default across faces: 'Premium' (the walk's gross step
     # uses the same name; 'consideration' retired as the DecL default)
     p = build(_PNL_BASE)
-    assert 'premium' in _lines(p)
+    assert 'Premium' in _lines(p)
 
 
 # ----------------------------------------------------------------------

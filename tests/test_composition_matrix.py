@@ -100,7 +100,8 @@ def test_gc_feat_walk_has_occ_step_and_true_gross(uw):
     x = _build(uw, 'xpnl', 'CBGF')
     s = x.stats_df
     steps = list(dict.fromkeys(s.index.get_level_values('Step')))
-    assert steps == ['Gross', 'Cat Program', 'Swing Program', 'All']
+    # the first step takes the P&L's own ``as`` label ([First-Step-Label])
+    assert steps == ['W', 'Cat Program', 'Swing Program', 'All']
     # the source is the occurrence joint; the engine ref carries the exact
     # 1-D marginals ([Engine-Reference-On-PnL])
     rd = x.engine.reins_density_df
@@ -110,7 +111,7 @@ def test_gc_feat_walk_has_occ_step_and_true_gross(uw):
         p_ = rd[col].to_numpy()
         return float((f(xs) * (p_ / p_.sum())).sum())
 
-    assert s.loc[('Gross', 'Obligation', 'Gross Loss'), 'EX'] \
+    assert s.loc[('W', 'Obligation', 'Gross Loss'), 'EX'] \
         == pytest.approx(-m('p_agg_gross'), rel=1e-3)
     assert s.loc[('Cat Program', 'Obligation', 'Cat Program recovery'),
                  'EX'] == pytest.approx(m('p_agg_ceded_occ'), rel=1e-3)
@@ -122,7 +123,8 @@ def test_gc_feat_walk_has_occ_step_and_true_gross(uw):
     assert s.loc[('Swing Program', 'Obligation', 'Swing Program recovery'),
                  'EX'] == pytest.approx(m('p_agg_net_occ', _g), rel=2e-2)
     # the EX column foots exactly (per-atom partial sums)...
-    legs = [i for i in s.index if i[2] not in ('Total', 'Direct', 'Net', 'Impact')]
+    legs = [i for i in s.index
+            if i[1] != 'Margin' and i[2] not in ('Total', 'Net')]
     assert s['EX'].loc[legs].sum() == pytest.approx(
         s.loc[('All', 'Margin', 'Net'), 'EX'], abs=1e-9)
     # ...and the consolidated pnl (exact net-occ marginal) agrees with the

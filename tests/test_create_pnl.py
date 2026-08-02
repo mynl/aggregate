@@ -146,17 +146,17 @@ def test_group_results_are_step_deltas_and_grand_result_sums():
     t = _two_group()
     s = t.stats_df
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('base', 'Margin', 'Direct'), 'EX']
+        s.loc[('base', 'Margin', 'Gross'), 'EX']
         + s.loc[('cover', 'Margin', 'Total'), 'EX'], abs=1e-9)
     assert s.loc[('cover', 'Margin', 'Net'), 'EX'] == pytest.approx(
         s.loc[('All', 'Margin', 'Net'), 'EX'], abs=TOL)
     # SDs do not add (the cover trims the tail, so net SD < base SD)
     assert s.loc[('All', 'Margin', 'Net'), 'SD'] < \
-        s.loc[('base', 'Margin', 'Direct'), 'SD']
+        s.loc[('base', 'Margin', 'Gross'), 'SD']
     # total impact = grand result - first group's result
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
         s.loc[('All', 'Margin', 'Net'), 'EX']
-        - s.loc[('base', 'Margin', 'Direct'), 'EX'], abs=TOL)
+        - s.loc[('base', 'Margin', 'Gross'), 'EX'], abs=TOL)
     # grand totals foot to the result
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
         s.loc[('All', 'Consideration', 'Net'), 'EX']
@@ -228,7 +228,7 @@ def test_stats_df_multiindex_multigroup():
         ('base', 'Consideration', 'fee'),
         ('base', 'Consideration', 'Total'),
         ('base', 'Obligation', 'loss'),
-        ('base', 'Margin', 'Direct'),
+        ('base', 'Margin', 'Gross'),
         ('cover', 'Consideration', 'ceded premium'),
         ('cover', 'Obligation', 'recovery'),
         ('cover', 'Margin', 'Total'), ('cover', 'Margin', 'Net'),
@@ -239,30 +239,50 @@ def test_stats_df_multiindex_multigroup():
     assert ('All', 'Margin', 'Total') not in s.index
 
 
-def test_direct_and_net_need_something_bought():
-    """The Direct / Net pair appears only when the ledger contains a buy group.
+def test_direct_block_and_net_need_something_bought():
+    """The named direct block and ``Net`` appear only if a buy group is present.
 
     Two sold books merged into one ledger have nothing to be direct *of*, so
     every group result and the grand block keep the neutral ``Total``. Same for
     a plain single-group ``pnl``, whose one ``sell`` group holds legs that are
-    already net: naming that margin ``Direct`` would be a plain lie.
+    already net: naming that margin for the subject business would be a lie,
+    since it is the net.
 
     The per-step ``net through <g>`` row is a different thing and keeps its
     ``Net`` label either way: it is a running total, not half of the
     direct-versus-net contrast.
     """
     both_sold = PnL(name='s', source=(_VALS, _PROBS), groups=[
-        Group('book A', 'sell', {'A premium': 15.0}, {'A loss': lambda x: x}),
+        Group('book A', 'sell', {'A premium': 15.0}, {'A loss': lambda x: x},
+              margin_label='Book A'),
         Group('book B', 'sell', {'B premium': 4.0},
               {'B loss': lambda x: 0.2 * x}),
     ])
     s = both_sold.stats_df
-    assert 'Direct' not in set(s.index.get_level_values('Label'))
+    # margin_label is declared and still ignored: no purchase, no direct block
+    assert set(s.xs('Margin', level='Side').index.get_level_values('Label')) \
+        == {'Total', 'Net', 'Impact'}
     for side in ('Consideration', 'Obligation', 'Margin'):
         assert ('All', side, 'Total') in s.index
     assert ('book B', 'Margin', 'Net') in s.index      # still a running net
     # ... and the single-group case
     assert ('Margin', 'Total') in _simple().stats_df.index
+
+
+def test_margin_label_names_the_direct_block():
+    """With a purchase in the ledger, the sold group's margin takes its name.
+
+    The subject business names its own margin row the way it already names its
+    loss leg ([First-Step-Label]); ``None`` falls back to ``'Gross'``.
+    """
+    named = PnL(name='n', source=(_VALS, _PROBS), groups=[
+        Group('base', 'sell', {'premium': 15.0}, {'loss': lambda x: x},
+              margin_label='Motor'),
+        Group('cover', 'buy', {'ceded premium': 2.0},
+              {'recovery': lambda x: np.maximum(x - 20, 0)}),
+    ])
+    assert ('base', 'Margin', 'Motor') in named.stats_df.index
+    assert ('base', 'Margin', 'Gross') in _two_group().stats_df.index
 
 
 # ----------------------------------------------------------------------
@@ -700,7 +720,7 @@ def test_card_tower_blocks():
     # per-step Margin = the step delta; Total block foots on EX
     s = t.stats_df
     assert df.loc[('base', 'Margin'), 'EX'] == pytest.approx(
-        s.loc[('base', 'Margin', 'Direct'), 'EX'])
+        s.loc[('base', 'Margin', 'Gross'), 'EX'])
     assert df.loc[('All', 'Margin'), 'EX'] == pytest.approx(
         df.loc[('All', 'Consideration'), 'EX']
         + df.loc[('All', 'Obligation'), 'EX'], abs=1e-9)

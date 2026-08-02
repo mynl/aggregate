@@ -477,7 +477,7 @@ xpnl CedeTower 33333.33333333321 premium as GWP less
 #: the seller's side; the one book written; and the rows that net the two
 _CEDED_STEPS = ['Occ2 result', 'Occ1 result', 'All occurrence result',
                 'Agg2 result', 'Agg1 result', 'All aggregate result']
-_SOLD_STEPS = ['Subject result']
+_SOLD_STEPS = ['Gross result']
 _NET_STEPS = ['net through Occ2', 'net through Occ1', 'net through Agg2',
               'net through Agg1', 'margin']
 
@@ -530,9 +530,9 @@ def test_evaluate_compares_a_layer_against_the_net_above_it():
     p = build(_CEDED_TOWER)
     gini = p.evaluate().unstack('distortion')['gini_p']
     for fam in _FAMS:
-        assert gini.loc['Occ2 result', fam] > gini.loc['Subject result', fam]
+        assert gini.loc['Occ2 result', fam] > gini.loc['Gross result', fam]
         assert (gini.loc['net through Occ2', fam]
-                < gini.loc['Subject result', fam])
+                < gini.loc['Gross result', fam])
         assert (gini.loc['net through Occ1', fam]
                 < gini.loc['net through Occ2', fam])
 
@@ -575,9 +575,9 @@ _REINS = 'agg R 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 x
 
 #: the agg-only walk stats template (gross sell + agg cession buy)
 _WALK_ROWS = [
-    ('Gross', 'Consideration', 'premium'),
+    ('Gross', 'Consideration', 'Premium'),
     ('Gross', 'Obligation', 'Loss'),
-    ('Gross', 'Margin', 'Direct'),
+    ('Gross', 'Margin', 'Gross'),
     ('agg 2000 xs 3000', 'Consideration', 'agg 2000 xs 3000 premium'),
     ('agg 2000 xs 3000', 'Obligation', 'agg 2000 xs 3000 recovery'),
     ('agg 2000 xs 3000', 'Margin', 'Total'),
@@ -638,7 +638,7 @@ def test_xpnl_walk_rows_and_means_add():
     s = x.stats_df
     assert list(s.index) == _WALK_ROWS
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
+        s.loc[('Gross', 'Margin', 'Gross'), 'EX']
         + s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'], abs=1e-6)
     # total impact = the cession's step delta (result vs the gross result)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
@@ -650,7 +650,7 @@ def test_xpnl_walk_rows_and_means_add():
     assert 'κ01' in s.columns and 'P01' not in s.columns
     # SDs do not add: the cession trims the tail
     assert s.loc[('All', 'Margin', 'Net'), 'SD'] < \
-        s.loc[('Gross', 'Margin', 'Direct'), 'SD']
+        s.loc[('Gross', 'Margin', 'Gross'), 'SD']
     # the walk's grand result mean = the consolidated pnl's margin
     p = agg.make_pnl(gross=5500, ceded=1800)
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == \
@@ -665,9 +665,9 @@ def test_net_only_on_reins_agg():
     e_net = float((agg.xs * agg.agg_density_net).sum())
     assert p.est_m == pytest.approx(3700.0 - e_net, rel=1e-3)
     # single-group: a flat card and a two-level stats sheet; the premium leg
-    # default is 'premium' (one canonical name across faces)
+    # default is 'Premium' (one canonical name across faces)
     assert list(p.summary_df.index) == ['Consideration', 'Obligation', 'Margin']
-    assert list(p.density_df) == ['premium', 'Loss', 'margin']
+    assert list(p.density_df) == ['Premium', 'Loss', 'margin']
     # the wrapped engine stays reachable ([Engine-Reference-On-PnL])
     assert p.engine is agg
 

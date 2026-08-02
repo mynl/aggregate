@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.0.0a191
+
+**[First-Step-Label]** The direct block of a walk now reads the labels you
+declared. **Breaking for any exhibit that names the first step or the default
+premium leg.**
+
+Given
+
+```
+xpnl Deal as "ABC" 33333.33 premium as "XYZ" less
+  agg Deal_e as "LLL" ...
+```
+
+the first block of `stats_df` reads
+
+| Step | Side | Label |
+|---|---|---|
+| `ABC` | `Consideration` | `XYZ` |
+| | `Obligation` | `LLL` |
+| | `Margin` | `LLL` |
+
+### What changed
+
+* **The first `Step` is the P&L's own `as` label**, defaulting to `Gross`. It
+  used to be the *engine's* `as` label, which put the subject business's name
+  in the step column and left the deal's own name nowhere. `xpnl` and every
+  variant (guaranteed cost, peel, variable rating, reinstatements) agree.
+* **The direct block's margin row takes the engine's `as` label too**,
+  defaulting to `Gross`. The subject business names its own margin the way it
+  already names its loss leg. This replaces `Direct`, introduced two versions
+  ago in `a189`, which never survived contact with a labelled sheet.
+* **The default consideration leg label is `Premium`**, capitalized, matching
+  `Loss`. It was `premium`.
+
+The `sell` group's margin label is carried by the new **`Group.margin_label`**,
+so a hand-built ledger can name it directly. It is read only on the direct
+block of a ledger that buys something, which is the `a189` gate unchanged:
+a plain single-group `pnl` and a ledger merging two sold books keep `Total`
+throughout, since neither has anything to be direct *of*.
+
+### Migration
+
+* First-step keys move: `('Gross', ...)` becomes `('<your as label>', ...)`,
+  and stays `('Gross', ...)` only when the P&L carries no `as` clause.
+* `('Gross', 'Margin', 'Direct')` becomes `('Gross', 'Margin', 'Gross')`, or
+  your engine's `as` label.
+* `('Consideration', 'premium')` becomes `('Consideration', 'Premium')`, and
+  likewise the `density_df` key. `Leg.kind` values and expense-basis strings
+  are unchanged and stay lowercase: only the default *label* moved.
+* A step's own result is still the first `Margin` row of its block in plan
+  order, whatever the label reads.
+
 ## 1.0.0a190
 
 **[Evaluate-Positions-Only]** Two corrections to the `a188` acceptability

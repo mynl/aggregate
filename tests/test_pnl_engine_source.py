@@ -144,7 +144,7 @@ def test_xpnl_returns_walk_pnl_over_gcn_engine(uw):
     assert list(s.index.names) == ['Step', 'Side', 'Label']
     # means add down the walk exactly (per-atom partial sums)
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
+        s.loc[('Gross', 'Margin', 'Gross'), 'EX']
         + s.loc[('occ 500 xs 500', 'Margin', 'Total'), 'EX'], abs=1e-6)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
         s.loc[('occ 500 xs 500', 'Margin', 'Total'), 'EX'], abs=1e-6)

@@ -159,7 +159,7 @@ def test_retro_build():
     assert (terms.basic, terms.lcm, terms.minimum, terms.maximum) == \
         (3000.0, 1.1, 3500.0, 8000.0)
     # gross premium is the stochastic leg; collared between min and max
-    prem = _leg(p, 'premium')
+    prem = _leg(p, 'Premium')
     assert prem['SD'] > 0
     assert 3500.0 <= prem['EX'] <= 8000.0
     assert _means_add(p)
@@ -179,7 +179,7 @@ def test_retro_premium_separates_the_two_loss_ratios():
     """
     p = build('pnl R retro basic 3000 lcm 1.1 min 3500 max 8000 premium '
               'less agg R_e 1000 loss sev lognorm 100 cv 2 poisson')
-    assert _leg(p, 'premium')['SD'] > 0            # premium really is random
+    assert _leg(p, 'Premium')['SD'] > 0            # premium really is random
     row = p.ratio_df.iloc[0]
     assert row['LR'] > 0 and row['E_LR'] > 0
     assert abs(row['E_LR'] - row['LR']) > 1e-3, \

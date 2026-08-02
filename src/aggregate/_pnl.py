@@ -234,9 +234,17 @@ class Group:
     consideration, obligation : list of Leg, dict, Leg, or scalar/callable
         The group's cash flows; see :func:`_as_legs` for the accepted
         shorthands. At least one leg between the two.
+    margin_label : str, optional
+        What this group's **own result** row is called under ``Margin`` on
+        :attr:`PnL.stats_df`. Only the direct (``sell``) block of a ledger that
+        buys something reads it, and only then does it appear
+        ([First-Step-Label]): the subject business names its own margin, the way
+        it already names its loss leg. ``None`` falls back to ``'Gross'``
+        there, and everywhere else the label is structural (``'Total'``).
     """
 
-    def __init__(self, label, role, consideration=None, obligation=None):
+    def __init__(self, label, role, consideration=None, obligation=None,
+                 margin_label=None):
         if role not in ('sell', 'buy'):
             raise ValueError(f"role must be 'sell' or 'buy', got {role!r}.")
         if not isinstance(label, str) or not label:
@@ -244,6 +252,7 @@ class Group:
                 f'Group label must be a non-empty string, got {label!r}.')
         self.label = label
         self.role = role
+        self.margin_label = margin_label
         self.consideration = _as_legs(consideration, 'consideration')
         self.obligation = _as_legs(obligation, 'obligation')
         if not self.consideration and not self.obligation:
@@ -1521,15 +1530,18 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         became levels. A forced single-group tower (the one-step walk) is just
         its one block -- no grand rows, no impact.
 
-        **Direct and Net** ([Ledger-Side-Label-Levels], a189). A ledger that
-        buys something distinguishes three margins that all used to read
-        ``Total``: a ``sell`` group's own result is ``Direct``, the grand
-        result and the grand totals are ``Net``, and a cession's own result
-        stays ``Total``. The pair is gated on the ledger actually containing a
-        ``buy`` group, because only then is there something to be direct *of*:
-        a plain single-group ``pnl`` is one ``sell`` group whose legs are
-        already net, and a ledger merging two sold books has no net to take, so
-        both keep ``Total`` throughout.
+        **The direct block and Net** ([Ledger-Side-Label-Levels], a189;
+        [First-Step-Label], a191). A ledger that buys something distinguishes
+        three margins that all used to read ``Total``: the grand result and the
+        grand totals are ``Net``, a cession's own result stays ``Total``, and
+        the ``sell`` group's own result takes :attr:`Group.margin_label` (the
+        subject business's own name, defaulting to ``'Gross'``) so the direct
+        block names its margin the way it already names its loss leg. Both are
+        gated on the ledger actually containing a ``buy`` group, because only
+        then is there anything to be direct or net *of*: a plain single-group
+        ``pnl`` is one ``sell`` group whose legs are already net, and a ledger
+        merging two sold books has no net to take, so both keep ``Total``
+        throughout.
 
         A tier subtotal ([Tier-Subtotal-Rows]) takes its span's own ``Step``
         (``'All occurrence'`` / ``'All aggregate'`` on a layer-peeled walk) and
@@ -1544,9 +1556,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         groups = self._group_specs
         multi = self._tower
         v = _SIDE_DEFAULTS
-        # only a ledger with a purchase in it has a Direct and a Net to name
+        # only a ledger with a purchase in it has a direct block and a net
         has_buy = any(g.role == 'buy' for g in groups)
-        direct = 'Direct' if has_buy else 'Total'
         net = 'Net' if has_buy else 'Total'
         tuples = []
         for label, kind, payload in self._plan:
@@ -1558,8 +1569,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 t = (groups[gi].label, v[side], 'Total')
             elif kind == 'group_result':
                 g = groups[payload]
-                t = (g.label, v['margin'],
-                     direct if g.role == 'sell' else 'Total')
+                lbl = ((g.margin_label or 'Gross')
+                       if (has_buy and g.role == 'sell') else 'Total')
+                t = (g.label, v['margin'], lbl)
             elif kind == 'running_net':
                 t = (groups[payload].label, v['margin'], 'Net')
             elif kind == 'tier_total':

@@ -148,7 +148,7 @@ def test_both_sides_split_and_walk_ledger():
               + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     lines = _lines(x)
-    for row in ('premium', 'Loss', 'occ 100 xs 200 premium', 'occ 100 xs 200 recovery',
+    for row in ('Premium', 'Loss', 'occ 100 xs 200 premium', 'occ 100 xs 200 recovery',
                 'agg 2000 xs 3000 premium', 'agg 2000 xs 3000 recovery',
                 'agg 2000 xs 3000 commission'):
         assert row in lines, row
@@ -163,15 +163,15 @@ def test_walk_means_add_down_the_sheet():
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     s = x.stats_df
     # step results foot to their signed legs (means add by linearity)
-    assert s.loc[('Gross', 'Margin', 'Direct'), 'EX'] == pytest.approx(
-        _leg(x, 'premium')['EX'] + _leg(x, 'Loss')['EX'], abs=1e-9)
+    assert s.loc[('Gross', 'Margin', 'Gross'), 'EX'] == pytest.approx(
+        _leg(x, 'Premium')['EX'] + _leg(x, 'Loss')['EX'], abs=1e-9)
     assert s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'] == pytest.approx(
         _leg(x, 'agg 2000 xs 3000 premium')['EX']
         + _leg(x, 'agg 2000 xs 3000 recovery')['EX']
         + _leg(x, 'agg 2000 xs 3000 commission')['EX'], abs=1e-9)
     # the grand result sums the step results exactly
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
-        s.loc[('Gross', 'Margin', 'Direct'), 'EX']
+        s.loc[('Gross', 'Margin', 'Gross'), 'EX']
         + s.loc[('occ 100 xs 200', 'Margin', 'Total'), 'EX']
         + s.loc[('agg 2000 xs 3000', 'Margin', 'Total'), 'EX'], abs=1e-9)
     # running nets read the engine's own net marginals

@@ -2004,14 +2004,20 @@ class Underwriter(HelpMixin):
                     f"{inner.name}: 'xpnl' over a retro program is not "
                     'supported -- retro has no cession to walk through. '
                     "Use 'pnl'.")
-            # the LEDGER books the expense legs via the split resolver
+            # ``label=inner._label`` is the RAW ``as`` clause, ``None`` when
+            # absent, not the resolved ``inner.label`` (which falls back to the
+            # name). The builders need to tell "no label given" from "labelled",
+            # because the walk's first step defaults to ``'Gross'`` rather than
+            # to the P&L's name ([First-Step-Label]). The resolved display label
+            # is unaffected: ``PnL`` resolves ``None`` back to its own name.
+            # The LEDGER books the expense legs via the split resolver
             # (expense_spec); the builder is the real engine.
             face = build_variable_pnl(
                 inner, walk=is_tower, econ=recipe.get('econ'),
                 expense_spec=recipe['expense_spec'],
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
-                label=inner.label)
+                label=inner._label)
             face._adopt_engine(inner, recipe)
             return face
         if kind == 'reins':
@@ -2039,7 +2045,7 @@ class Underwriter(HelpMixin):
                 expense_spec=recipe['expense_spec'], gcn_economics=econ,
                 consideration_label=recipe.get('consideration_label'),
                 loss_label=recipe.get('loss_label'), name=inner.name,
-                label=inner.label)
+                label=inner._label)
             face._adopt_engine(inner, recipe)
             return face
         if kind == 'gcn':
@@ -2055,7 +2061,7 @@ class Underwriter(HelpMixin):
                     expense_spec=recipe['expense_spec'],
                     consideration_label=recipe.get('consideration_label'),
                     loss_label=recipe.get('loss_label'), name=inner.name,
-                    label=inner.label)
+                    label=inner._label)
             elif is_tower:
                 # ``xpnl`` -> the per-atom step walk, one group per tier (a
                 # plain multi-group PnL).
@@ -2065,7 +2071,7 @@ class Underwriter(HelpMixin):
                     expense_spec=recipe['expense_spec'],
                     consideration_label=recipe.get('consideration_label'),
                     loss_label=recipe.get('loss_label'), name=inner.name,
-                    label=inner.label)
+                    label=inner._label)
             else:
                 # ``pnl`` -> the consolidated single-group net view.
                 face = build_consolidated_pnl(
@@ -2073,7 +2079,7 @@ class Underwriter(HelpMixin):
                     gcn_economics=econ, expense_spec=recipe['expense_spec'],
                     consideration_label=recipe.get('consideration_label'),
                     loss_label=recipe.get('loss_label'), name=inner.name,
-                    label=inner.label)
+                    label=inner._label)
             face._adopt_engine(inner, recipe)
             return face
         # kind == 'plain': the consolidated one-group ledger; ``xpnl`` gets
@@ -2084,7 +2090,7 @@ class Underwriter(HelpMixin):
             consideration_label=recipe.get('consideration_label'),
             loss_label=recipe.get('loss_label'),
             expense_spec=recipe['expense_spec'], name=inner.name,
-            label=inner.label, walk=is_tower)
+            label=inner._label, walk=is_tower)
         face._adopt_engine(inner, recipe)
         return face
 

@@ -239,3 +239,48 @@ The name is wrong for what it does and it blocks the good name. Rename to
   `sharpen()`.
 - the description / explanation pair is non-empty in all three outcomes (not
   run, moved, no easy win).
+
+---
+
+## Follow-up punch-ups, shipped 1.0.0a193
+
+Author review of the shipped `a192` probe raised five, all executed:
+
+1. **`validation_score` as a property.** The score is a handy statistic on its
+   own, so it is exposed on `Aggregate` and `Portfolio` at `power=2`. That made
+   `_bucket_window.sharpen_score` a second name for one concept, so the score
+   **moved to `_validation.py`** with the rest of the validation family:
+   `SCORE_TERMS`, `validation_score_terms(obj)` (power-free per-term detail),
+   `combine_score_terms(terms, power)` and `validation_score(obj, power=2)`.
+   `_bucket_window` imports them.
+2. **A wider bucket reach, and then a better idea.** The author first asked for a
+   fixed `bs/4 .. 4*bs` row, then proposed expanding outward until the score
+   worsens. The second is strictly better and subsumes the first. Shipped as a
+   **line search per `log2` row**: double until the score stops improving, halve
+   likewise, capped by `bs_limit` (default 16, must be a power of two).
+
+   Chosen over the two cheaper variants (search at the current `log2` only, then
+   check the neighbours; or search once and probe only near the winner) because
+   keeping all three rows complete preserves the constant-extent anti-diagonal
+   reading that makes the frame interpretable, and costs nothing on a grid near
+   its optimum: the search stops at the first cell that fails to improve, so the
+   common case is still eight evaluations. Worst case is 26.
+
+   Stopping at the first worse cell assumes the score is single-troughed in `bs`
+   at fixed `log2`, which holds because a larger bucket trades resolution for
+   extent. The exception is a discrete severity whose atoms land on grid points
+   at some buckets and not others, which could dip again past the turn;
+   `bs_window` sizes those by its exact-discrete method, so they rarely reach a
+   probe. Documented in the `sharpen` Notes rather than guarded against, since a
+   patience parameter would be a seventh knob for a case the estimator already
+   handles.
+3. **`(d_bs, d_log2)` is the index**, not two columns, so
+   `sharpen_df.score.unstack('d_log2')` is the picture. The line search makes the
+   rows ragged; unvisited cells come back `NaN`.
+4. **Sub-unit `bs` renders as a binary fraction** (`1/8`, not `0.125`) in both
+   narrative halves, via `_fmt_bs`. Anything that is not a unit fraction falls
+   back to plain formatting.
+5. **`sharpen_description` opens capitalized.** Found alongside it: a
+   bucket-only move reported `log2 16 to 16`, which reads as a bug rather than
+   as "unchanged", so `_move_phrase` now names only what actually changed.
+

@@ -13,7 +13,7 @@ import scipy.stats as ss
 from scipy.optimize import NoConvergence  # noqa
 from .config import get_settings
 from .constants import InfiniteVarianceError, DefectiveDistributionWarning
-from ._validation import VALIDATION_NOISE
+from . import _validation
 from .utilities import round_bucket, value_type_role
 from . import tail as _tail
 from ._fits import gamma_fit, lognorm_fit, sgamma_fit, sln_fit
@@ -1333,9 +1333,9 @@ def port_bs_window(port, log2, bs_in, bucket_sizing_p=BUCKET_SIZING_P):
 #
 # ``bs_window`` / ``port_best_window`` above CHOOSE a grid from the analytic
 # moments, before any FFT runs. ``sharpen`` below AUDITS that choice after the
-# fact: it re-updates the object on the eight neighbouring (bs, log2) cells,
-# scores each against the analytic moments, and moves only when the win is
-# large. See ``dev/done/plan-sharpen.md``.
+# fact: it re-updates the object on neighbouring (bs, log2) cells, scores each
+# with ``_validation.validation_score``, and moves only when the win is large.
+# See ``dev/done/plan-sharpen.md``.
 # ====================================================================
 
 #: Lowest ``log2`` the probe will drop to. Below this the grid is too coarse for
@@ -1350,113 +1350,15 @@ SHARPEN_LOG2_FLOOR = 8
 SHARPEN_FALLBACK_SLACK = 1.25
 
 
-#: The six scored terms as ``((component, measure), tolerance_multiple)``. The
-#: multiples are exactly the ones ``_validation.valid_aggregate`` /
-#: ``valid_portfolio`` apply (mean at ``eps``, cv at ``10 eps``, skew at
-#: ``100 eps``, skewness being the harder moment to estimate). Dividing each
-#: relative error by its own tolerance puts every term on one scale, in units of
-#: "fraction of the tolerance used up", so a combined score of 1 is exactly the
-#: validation pass boundary and the score does not move when ``validation_eps``
-#: is changed.
-_SHARPEN_TERMS = (
-    (('sev', 'mean'), 1.0),
-    (('sev', 'cv'), 10.0),
-    (('sev', 'skew'), 100.0),
-    (('agg', 'mean'), 1.0),
-    (('agg', 'cv'), 10.0),
-    (('agg', 'skew'), 100.0),
-)
+#: Default cap on how far the bucket line search walks: the largest factor by
+#: which the probe will multiply or divide ``bs``. 16 allows four doublings each
+#: way, so a grid wrong by two orders of magnitude is reachable in one call.
+SHARPEN_BS_LIMIT = 16
 
 
 def _sharpen_is_port(ob):
     """Whether ``ob`` is a Portfolio (duck test, keeps this module a leaf)."""
     return hasattr(ob, 'agg_list')
-
-
-def _sharpen_theory(ob):
-    """The theoretical-moment column of ``ob.stats_df``.
-
-    ``'mixed'`` for an :class:`~aggregate._aggregate.Aggregate` (the mixed
-    frequency/severity analytic moments), ``'total'`` for a
-    :class:`~aggregate._portfolio.Portfolio`. Detected by presence rather than
-    by class so this module keeps its leaf status.
-    """
-    sdf = ob.stats_df
-    return sdf['mixed'] if 'mixed' in sdf.columns else sdf['total']
-
-
-def sharpen_score(ob, power=2):
-    """Score how well the realized grid reproduces the analytic moments.
-
-    Small is good: **the score is in units of the validation tolerance**, so
-    ``score <= 1`` means the object passes validation at its own
-    ``validation_eps`` and ``score = 1`` sits exactly on the pass boundary.
-
-    Parameters
-    ----------
-    ob : Aggregate or Portfolio
-        An updated object. Reads ``stats_df`` and ``validation_eps`` only.
-    power : float, default 2
-        Exponent of the combining norm. ``1`` averages the terms, ``2`` is the
-        Euclidean default, ``numpy.inf`` reports the worst single term. The
-        ``1/power`` root keeps all three on the same scale.
-
-    Returns
-    -------
-    (score, terms) : (float, dict)
-        The combined score, and the per-term normalized errors keyed by
-        ``'u_sev_mean'``-style names (``nan`` for a term that does not apply).
-
-    Notes
-    -----
-    The six terms are severity and aggregate mean, CV and skewness. Each is read
-    from ``stats_df['error']``, the canonical noise-aware relative error written
-    at the end of every update, which degrades to an absolute error when the
-    reference is at or below the noise floor. Each is divided by its own
-    tolerance from :data:`_SHARPEN_TERMS`::
-
-        u_i   = |error_i| / tol_i
-        score = (mean_i u_i ** power) ** (1 / power)
-
-    Averaging rather than summing keeps cells with different numbers of live
-    terms comparable. A term is live only when its *theoretical* value is finite
-    and above the noise floor, the same test ``valid_aggregate`` applies: a
-    theoretically-zero skewness (symmetric severity) or CV (deterministic
-    severity) cannot be validated against the FFT's grid-dependent estimate of
-    it. The theoretical moments do not depend on ``bs``, so the live set is
-    identical across every cell of a probe. A non-finite *empirical* value is a
-    genuine failure and scores infinite rather than dropping out.
-
-    Under reinsurance ``error`` compares the SUBJECT (gross) moments, which is
-    the right basis here: the score audits the grid, and the gross grid is what
-    the grid choice controls.
-    """
-    err = ob.stats_df['error'].abs()
-    theo = _sharpen_theory(ob)
-    eps = float(ob.validation_eps)
-    terms = {}
-    live = []
-    for key, mult in _SHARPEN_TERMS:
-        name = f'u_{key[0]}_{key[1]}'
-        t = float(theo.get(key, np.nan))
-        # Live only where the theoretical is finite and meaningfully non-zero;
-        # mirrors the guard in _validation.valid_aggregate.
-        if not (np.isfinite(t) and abs(t) > VALIDATION_NOISE):
-            terms[name] = np.nan
-            continue
-        e = float(err.get(key, np.nan))
-        # A non-finite empirical error is a real failure, not an absent term.
-        u = np.inf if not np.isfinite(e) else e / (mult * eps)
-        terms[name] = u
-        live.append(u)
-    if not live:
-        return np.nan, terms
-    arr = np.array(live, dtype=float)
-    if np.isinf(arr).any():
-        return np.inf, terms
-    if np.isinf(power):
-        return float(arr.max()), terms
-    return float(np.mean(arr ** power) ** (1.0 / power)), terms
 
 
 def _sharpen_aliasing(ob):
@@ -1483,8 +1385,8 @@ def _sharpen_locked(ob):
     ``'survival'`` / ``True`` / ``1``. So a bare ``update(log2=..., bs=...)``
     restores the grid but silently *resets* those four. Harvesting them once up
     front and passing them to every cell is both the fidelity fix, the object
-    comes back as it was, and the comparability fix: the nine cells differ in
-    ``bs`` and ``log2``, and in nothing else.
+    comes back as it was, and the comparability fix: the cells differ in ``bs``
+    and ``log2``, and in nothing else.
 
     Returns
     -------
@@ -1523,15 +1425,23 @@ def _sharpen_update(ob, bs, log2, locked, *, final):
     ob.update(log2=log2, bs=bs, sharpen=False, **kwargs)
 
 
-def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
-            min_gain=2.0, execute=True):
+def _bs_steps(bs_limit):
+    """Largest number of doublings the bucket line search may take each way."""
+    k = int(round(np.log2(float(bs_limit))))
+    if k < 1 or not np.isclose(2.0 ** k, float(bs_limit)):
+        raise ValueError(f'bs_limit must be a power of two >= 2, got {bs_limit}')
+    return k
+
+
+def sharpen(ob, bs=None, log2=None, *, log2_cap=24, bs_limit=SHARPEN_BS_LIMIT,
+            power=2, good_enough=0.5, min_gain=2.0, execute=True):
     """Probe the grid neighbourhood and move to a better ``(bs, log2)``.
 
     ``bs_window`` and ``port_best_window`` *choose* a grid from the analytic
     moments before any FFT runs. This *audits* that choice after the fact: it
-    re-updates ``ob`` on the eight neighbouring cells ``bs * 2**i`` by
-    ``log2 + j``, scores each with :func:`sharpen_score`, and moves only when
-    the improvement is large. Results land on ``ob._sharpen_df``.
+    re-updates ``ob`` on neighbouring cells, scores each with
+    :func:`~aggregate._validation.validation_score`, and moves only when the
+    improvement is large. Results land on ``ob._sharpen_df``.
 
     Parameters
     ----------
@@ -1541,10 +1451,13 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
     bs, log2 : float, int, optional
         Centre of the probe. Default the object's current grid.
     log2_cap : int, default 24
-        The ``log2 + 1`` column is dropped when ``log2 >= log2_cap``. The
-        ``log2 - 1`` column is dropped below :data:`SHARPEN_LOG2_FLOOR`.
+        The ``log2 + 1`` row is dropped when ``log2 >= log2_cap``. The
+        ``log2 - 1`` row is dropped below :data:`SHARPEN_LOG2_FLOOR`.
+    bs_limit : float, default 16
+        Largest factor by which the line search may multiply or divide ``bs``.
+        Must be a power of two, so 16 permits four doublings each way.
     power : float, default 2
-        Norm exponent passed to :func:`sharpen_score`.
+        Norm exponent passed to the score.
     good_enough : float, default 0.5
         Target score, in tolerance units. Two gates run off this one number.
         **Probe gate**: if the centre already scores at or below it, nothing is
@@ -1553,9 +1466,8 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
         never negative; that is why there is no separate ``force`` argument.
     min_gain : float, default 2.0
         When no cell meets the target, move to the best cell only if it beats the
-        centre by this factor. The point of the probe is a win that helps a lot,
-        not one that helps a little. The bar is modest rather than severe because
-        the probe gate means this branch is only ever reached by a grid that has
+        centre by this factor. The bar is modest rather than severe because the
+        probe gate means this branch is only ever reached by a grid that has
         already failed the target: refusing to move would leave a known-bad grid
         in place and freeze the descent, since a re-run would refuse identically.
     execute : bool, default True
@@ -1569,17 +1481,33 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
 
     Notes
     -----
-    **Geometry.** With extent ``W = bs * 2**(log2 + i + j)``, rows of the probe
-    are constant *resolution* and anti-diagonals are constant *extent*. That is
-    why the bucket steps are a strict factor of two rather than rungs of the
-    ``round_bucket`` ladder: the three same-extent cells isolate the pure
-    resolution effect, so the frame says whether the grid is extent-limited,
-    widen it, or resolution-limited, refine it. Ladder rungs would be factors of
-    1.25 and 1.6, too fine to move the error, and would break the alignment with
-    ``log2`` plus or minus one.
+    **Shape.** Three rows, ``log2 - 1`` / ``log2`` / ``log2 + 1``, and within
+    each row a **line search out from the centre bucket**: ``bs`` is doubled
+    until the score stops improving, then halved until the score stops
+    improving, capped at ``bs_limit`` each way. The rows are therefore ragged,
+    which is why the frame is tidy rather than a matrix.
 
-    **Cost.** The centre cell is free, being the object's current state, so a
-    full probe costs eight updates plus one final update, never ten.
+    The line search is well posed because the score is single-troughed in ``bs``
+    at fixed ``log2``: with extent ``W = bs * 2**log2``, a larger bucket buys
+    extent and loses resolution, so the two error families trade off and there is
+    one turning point. Stopping at the first worse cell assumes exactly that.
+    A severity whose atoms land on grid points at some buckets and not others can
+    in principle dip again past the turn, and such a dip would be missed;
+    ``bs_window`` sizes those objects by its exact-discrete method, so they
+    rarely reach a probe at all.
+
+    **Geometry.** Rows are constant *resolution* and anti-diagonals are constant
+    *extent*, which is what makes the frame readable: cells sharing an extent
+    differ only in resolution, so comparing them says whether the grid is extent
+    limited, widen it, or resolution limited, refine it. That is also why the
+    bucket steps are a strict factor of two rather than rungs of the
+    ``round_bucket`` ladder, which would be factors of 1.25 and 1.6, too fine to
+    move the error and out of step with ``log2`` plus or minus one.
+
+    **Cost.** The centre cell is free, being the object's current state. A grid
+    already near its optimum stops after one step each way, so the probe costs
+    eight evaluations; a badly wrong grid walks further, which is exactly when
+    the walking is worth paying for.
 
     **Parsimony.** Among cells that meet the target the winner is the one with
     the smallest ``log2``, then the best score. More grid almost always helps a
@@ -1592,6 +1520,7 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
     """
     if log2_cap is None:
         log2_cap = 24
+    k_max = _bs_steps(bs_limit)
     # Establish the centre. An object that has never been updated has no
     # empirical moments to score, so update it once at the auto-sized grid.
     if not getattr(ob, 'bs', 0):
@@ -1608,13 +1537,13 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
     rows = []
 
     def _record(d_bs, d_log2, seconds, note='', n_warn=0):
-        score, terms = sharpen_score(ob, power)
+        terms = _validation.validation_score_terms(ob)
         xs = getattr(ob, 'xs', None)
         row = {'d_bs': d_bs, 'd_log2': d_log2, 'bs': float(ob.bs),
                'log2': int(ob.log2),
                'extent': float(ob.bs) * (1 << int(ob.log2)),
                'x_min': float(xs[0]) if xs is not None else np.nan,
-               'score': score}
+               'score': _validation.combine_score_terms(terms, power)}
         row.update(terms)
         row['aliasing'] = _sharpen_aliasing(ob)
         row['validation'] = ob.validation_description
@@ -1623,18 +1552,35 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
         row['selected'] = False
         row['note'] = note
         rows.append(row)
+        return row['score']
 
     def _failed(d_bs, d_log2, bs_c, log2_c, seconds, note):
         row = {'d_bs': d_bs, 'd_log2': d_log2, 'bs': bs_c, 'log2': log2_c,
                'extent': bs_c * (1 << log2_c), 'x_min': np.nan, 'score': np.nan}
-        row.update({f'u_{k[0]}_{k[1]}': np.nan for k, _ in _SHARPEN_TERMS})
+        row.update({f'u_{k[0]}_{k[1]}': np.nan
+                    for k, _ in _validation.SCORE_TERMS})
         row.update({'aliasing': np.nan, 'validation': '', 'warnings': 0,
                     'seconds': seconds, 'selected': False, 'note': note})
         rows.append(row)
+        return np.nan
+
+    def _cell(k, j):
+        """Evaluate one cell and return its score (``nan`` if it blew up)."""
+        bs_c, log2_c = bs0 * (2.0 ** k), log20 + j
+        t0 = time.perf_counter()
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter('always')
+                _sharpen_update(ob, bs_c, log2_c, locked, final=False)
+            return _record(k, j, time.perf_counter() - t0, n_warn=len(caught))
+        except Exception as e:          # noqa: BLE001 a cell may legitimately blow up
+            logger.info('sharpen: cell (bs x %s, log2 %s) failed: %s',
+                        2.0 ** k, log2_c, e)
+            return _failed(k, j, bs_c, log2_c, time.perf_counter() - t0,
+                           f'{type(e).__name__}: {e}')
 
     # The centre is already computed: score it in place, for free.
-    _record(0, 0, 0.0, note='centre (current grid)')
-    centre_score = rows[0]['score']
+    centre_score = _record(0, 0, 0.0, note='centre (current grid)')
 
     # Probe gate. A grid that already clears the target is left alone and nothing
     # is run. good_enough=0 never clears, which is how a probe is forced.
@@ -1642,7 +1588,7 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
         rows[0]['selected'] = True
         rows[0]['note'] = ('centre (current grid); at or under target, '
                            'probe not run')
-        ob._sharpen_df = pd.DataFrame(rows)
+        ob._sharpen_df = _sharpen_frame(rows)
         ob._sharpen_state = {'ran': False, 'moved': False, 'power': power,
                              'good_enough': good_enough, 'min_gain': min_gain,
                              'execute': execute, 'centre_score': centre_score,
@@ -1651,28 +1597,25 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
 
     js = [j for j in (-1, 0, 1)
           if SHARPEN_LOG2_FLOOR <= log20 + j and (j <= 0 or log20 < log2_cap)]
-    cells = [(i, j) for i in (-1, 0, 1) for j in js if not (i == 0 and j == 0)]
-
-    for i, j in cells:
-        bs_c = bs0 * (2.0 ** i)
-        log2_c = log20 + j
-        t0 = time.perf_counter()
-        try:
-            with warnings.catch_warnings(record=True) as caught:
-                warnings.simplefilter('always')
-                _sharpen_update(ob, bs_c, log2_c, locked, final=False)
-            _record(i, j, time.perf_counter() - t0, n_warn=len(caught))
-        except Exception as e:            # noqa: BLE001 a cell may legitimately blow up
-            logger.info('sharpen: cell (bs x %s, log2 %s) failed: %s',
-                        2.0 ** i, log2_c, e)
-            _failed(i, j, bs_c, log2_c, time.perf_counter() - t0,
-                    f'{type(e).__name__}: {e}')
+    for j in js:
+        # One bucket line search per log2 row, out from the centre bucket in
+        # both directions, stopping as soon as a step fails to improve.
+        anchor = centre_score if j == 0 else _cell(0, j)
+        for step in (1, -1):
+            prev, k = anchor, step
+            while abs(k) <= k_max:
+                score = _cell(k, j)
+                # `not (score < prev)` also stops on a nan, which is what a
+                # failed cell should do: it is not evidence to keep walking.
+                if not (score < prev):
+                    break
+                prev, k = score, k + step
 
     df = pd.DataFrame(rows)
 
     # Move gate. Prefer the cheapest cell that meets the target: smallest log2
-    # first, then best score. Only when nothing meets it does a large-factor win
-    # over the centre justify moving at all.
+    # first, then best score. Only when nothing meets it does a real win over the
+    # centre justify moving at all.
     ok = df[df['score'] <= good_enough]
     if len(ok):
         pick = ok.sort_values(['log2', 'score']).index[0]
@@ -1718,13 +1661,57 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, power=2, good_enough=0.5,
             kwargs['x_min'] = x_min0
         ob.update(log2=log20, bs=bs0, sharpen=False, **kwargs)
 
-    ob._sharpen_df = df
+    ob._sharpen_df = _sharpen_frame(df)
     ob._sharpen_state = {'ran': True, 'moved': moved and execute,
                          'power': power, 'good_enough': good_enough,
                          'min_gain': min_gain, 'execute': execute,
                          'centre_score': centre_score, 'bs0': bs0,
-                         'log20': log20, 'pick': int(pick), 'reason': reason}
+                         'log20': log20, 'reason': reason}
     return ob
+
+
+def _sharpen_frame(rows):
+    """Index the probe rows by their offsets, so the picture is one unstack.
+
+    ``sharpen_df.score.unstack('d_log2')`` is the bucket-by-grid-size table; the
+    line search makes the rows ragged, so absent cells come back ``nan``.
+    """
+    df = rows if isinstance(rows, pd.DataFrame) else pd.DataFrame(rows)
+    return df.set_index(['d_bs', 'd_log2']).sort_index()
+
+
+def _fmt_bs(bs):
+    """Format a bucket size, sub-unit values as the binary fractions they are.
+
+    A ``bs`` below 1 is a negative power of two (``round_bucket`` keeps it binary
+    exact, and the probe only halves and doubles), and ``1/8`` reads at a glance
+    where ``0.125`` does not. Anything that is not a unit fraction falls back to
+    plain formatting.
+    """
+    bs = float(bs)
+    if bs >= 1 or bs <= 0:
+        return f'{bs:.6g}'
+    inv = 1.0 / bs
+    if abs(inv - round(inv)) < 1e-9 and round(inv) > 1:
+        return f'1/{round(inv)}'
+    return f'{bs:.6g}'
+
+
+def _move_phrase(st, win):
+    """Describe a move naming only what actually changed.
+
+    A line search often moves the bucket at the same grid size, and "log2 16 to
+    16" reads as a bug rather than as "unchanged".
+    """
+    bs_moved = float(win['bs']) != float(st['bs0'])
+    log2_moved = int(win['log2']) != int(st['log20'])
+    bs_txt = f'bs {_fmt_bs(st["bs0"])} to {_fmt_bs(win["bs"])}'
+    log2_txt = f'log2 {st["log20"]} to {int(win["log2"])}'
+    if bs_moved and log2_moved:
+        return f'{bs_txt}, {log2_txt}'
+    if bs_moved:
+        return f'{bs_txt}, at log2 {st["log20"]}'
+    return f'{log2_txt}, at bs {_fmt_bs(st["bs0"])}'
 
 
 def _sharpen_fmt(x):
@@ -1746,22 +1733,21 @@ def sharpen_describe(ob) -> str:
     df = getattr(ob, '_sharpen_df', None)
     st = getattr(ob, '_sharpen_state', None)
     if df is None or st is None:
-        return 'sharpen: not run.'
+        return 'Sharpen: not run.'
     target = st['good_enough']
     if not st['ran']:
-        return (f'sharpen: not run, the grid already scores '
+        return (f'Sharpen: not run, the grid already scores '
                 f'{_sharpen_fmt(st["centre_score"])} against a target of '
                 f'{target:g}.')
     win = df[df['selected']].iloc[0]
     secs = float(df['seconds'].sum())
-    head = (f'sharpen: {len(df)} cells in {secs:.2f}s, best score '
+    head = (f'Sharpen: {len(df)} cells in {secs:.2f}s, best score '
             f'{_sharpen_fmt(win["score"])} vs '
             f'{_sharpen_fmt(st["centre_score"])} at the centre, target '
             f'{target:g}.')
-    if not (win['d_bs'] or win['d_log2']):
-        return f'{head} Kept bs {st["bs0"]:.6g}, log2 {st["log20"]}.'
-    move = (f'bs {st["bs0"]:.6g} to {win["bs"]:.6g}, log2 {st["log20"]} to '
-            f'{int(win["log2"])}')
+    if win['bs'] == st['bs0'] and int(win['log2']) == st['log20']:
+        return f'{head} Kept bs {_fmt_bs(st["bs0"])}, log2 {st["log20"]}.'
+    move = _move_phrase(st, win)
     if st['execute']:
         return f'{head} Moved: {move}.'
     return f'{head} Recommends {move}; not executed, grid restored.'
@@ -1776,7 +1762,7 @@ def sharpen_explain(ob) -> str:
     st = getattr(ob, '_sharpen_state', None)
     if df is None or st is None:
         return ('The grid has not been sharpened. Call sharpen() to probe the '
-                'eight neighbouring (bs, log2) cells and score each one.')
+                'neighbouring (bs, log2) cells and score each one.')
     out = [
         'The sharpen score measures how well the realized grid reproduces the '
         'analytic moments: severity and aggregate mean, CV and skewness, each '
@@ -1792,14 +1778,18 @@ def sharpen_explain(ob) -> str:
         return ' '.join(out)
     win = df[df['selected']].iloc[0]
     out.append(
-        f'{len(df)} cells were scored: the current grid, and its neighbours at '
-        'half and double the bucket size, by one step down and up in log2. '
-        'Extent is bs times 2**log2, so cells on an anti-diagonal of that grid '
-        'share an extent and differ only in resolution. Reading them together '
-        'says whether the grid is extent-limited, where the aggregate mean '
-        'error runs far above the severity error and the fix is a wider grid, '
-        'or resolution-limited, where the severity moments themselves are '
-        'poorly reproduced and the fix is a finer bucket.')
+        f'{len(df)} cells were scored, in three rows at log2 '
+        f'{st["log20"] - 1}, {st["log20"]} and {st["log20"] + 1}, each row a '
+        'line search out from the current bucket: bs is doubled until the score '
+        'stops improving, then halved likewise. That works because the score has '
+        'a single trough in bs, a larger bucket buying extent and losing '
+        'resolution, so the rows are ragged and the frame is tidy rather than a '
+        'matrix. Extent is bs times 2**log2, so cells on an anti-diagonal share '
+        'an extent and differ only in resolution. Reading them together says '
+        'whether the grid is extent-limited, where the aggregate mean error runs '
+        'far above the severity error and the fix is a wider grid, or '
+        'resolution-limited, where the severity moments themselves are poorly '
+        'reproduced and the fix is a finer bucket.')
     out.append(f'Selection: {st["reason"]}.')
     out.append(
         'Among cells that meet the target the smallest log2 wins, then the best '
@@ -1807,11 +1797,11 @@ def sharpen_explain(ob) -> str:
         'minimum would grow log2 on nearly every object and double the runtime '
         'for a negligible gain. log2 grows only when nothing cheaper reaches the '
         'target.')
-    if win['d_bs'] or win['d_log2']:
+    if win['bs'] != st['bs0'] or int(win['log2']) != st['log20']:
         verb = 'The grid moved' if st['execute'] else 'The recommendation is'
         out.append(
-            f'{verb} to bs {win["bs"]:.6g} at log2 {int(win["log2"])}, scoring '
-            f'{_sharpen_fmt(win["score"])} against '
+            f'{verb} to bs {_fmt_bs(win["bs"])} at log2 {int(win["log2"])}, '
+            f'scoring {_sharpen_fmt(win["score"])} against '
             f'{_sharpen_fmt(st["centre_score"])} before.')
         if st['execute']:
             out.append('Re-running sharpen re-centres the probe on the new grid '
@@ -1829,4 +1819,3 @@ def sharpen_explain(ob) -> str:
             'that is not, and that will not show here. Check the units '
             'individually with their own valid property.')
     return ' '.join(out)
-

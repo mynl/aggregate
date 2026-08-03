@@ -300,6 +300,136 @@ def valid_portfolio(port):
     return rv
 
 
+#: The six scored terms of :func:`validation_score`, as
+#: ``((component, measure), tolerance_multiple)``. The multiples are exactly the
+#: ones :func:`valid_aggregate` / :func:`valid_portfolio` apply: mean at ``eps``,
+#: cv at ``10 eps``, skew at ``100 eps``, skewness being the harder moment to
+#: estimate. Dividing each relative error by its own tolerance puts every term on
+#: one scale, in units of "fraction of the tolerance used up", so a combined
+#: score of 1 is exactly the pass boundary and the score does not move when
+#: ``validation_eps`` is changed.
+SCORE_TERMS = (
+    (('sev', 'mean'), 1.0),
+    (('sev', 'cv'), 10.0),
+    (('sev', 'skew'), 100.0),
+    (('agg', 'mean'), 1.0),
+    (('agg', 'cv'), 10.0),
+    (('agg', 'skew'), 100.0),
+)
+
+
+def _theory_column(obj):
+    """The theoretical-moment column of ``obj.stats_df``.
+
+    ``'mixed'`` for an ``Aggregate`` (the mixed frequency/severity analytic
+    moments), ``'total'`` for a ``Portfolio``. Detected by presence rather than
+    by class, so this module stays a leaf.
+    """
+    sdf = obj.stats_df
+    return sdf['mixed'] if 'mixed' in sdf.columns else sdf['total']
+
+
+def validation_score_terms(obj):
+    """The six normalized validation errors, keyed ``'u_sev_mean'``-style.
+
+    The per-term detail behind :func:`validation_score`, and **independent of
+    the combining power**, so a caller comparing several powers computes these
+    once.
+
+    Parameters
+    ----------
+    obj : Aggregate or Portfolio
+        An updated object. Reads ``stats_df`` and ``validation_eps`` only.
+
+    Returns
+    -------
+    dict
+        ``{'u_sev_mean': float, ...}``; ``nan`` for a term that does not apply,
+        ``inf`` for one whose empirical value is not finite.
+
+    Notes
+    -----
+    Each term is read from ``stats_df['error']``, the canonical noise-aware
+    relative error written at the end of every update, which degrades to an
+    absolute error when the reference is at or below the noise floor, and is
+    divided by its own tolerance from :data:`SCORE_TERMS`::
+
+        u_i = |error_i| / tol_i
+
+    A term is live only when its *theoretical* value is finite and above the
+    noise floor, the same test :func:`valid_aggregate` applies: a theoretically
+    zero skewness (symmetric severity) or CV (deterministic severity) cannot be
+    validated against the FFT's grid-dependent estimate of it. The theoretical
+    moments do not depend on the grid, so the live set is stable as ``bs`` and
+    ``log2`` vary, which is what makes scores comparable across a
+    :meth:`Aggregate.sharpen` probe. A non-finite *empirical* value is a genuine
+    failure and scores infinite rather than dropping out.
+
+    Under reinsurance ``error`` compares the SUBJECT (gross) moments: the after
+    reinsurance object has no independent theoretical, so the gross comparison is
+    the only apples-to-apples check available.
+    """
+    err = obj.stats_df['error'].abs()
+    theo = _theory_column(obj)
+    eps = float(obj.validation_eps)
+    terms = {}
+    for key, mult in SCORE_TERMS:
+        name = f'u_{key[0]}_{key[1]}'
+        t = float(theo.get(key, np.nan))
+        if not (np.isfinite(t) and abs(t) > VALIDATION_NOISE):
+            terms[name] = np.nan
+            continue
+        e = float(err.get(key, np.nan))
+        terms[name] = np.inf if not np.isfinite(e) else e / (mult * eps)
+    return terms
+
+
+def combine_score_terms(terms, power=2):
+    """Combine normalized terms into one score by a power mean.
+
+    ``(mean_i u_i ** power) ** (1 / power)``, or ``max_i u_i`` for infinite
+    power. Averaging rather than summing keeps objects with different numbers of
+    live terms comparable; the ``1/power`` root puts every ``power`` on the same
+    scale. ``nan`` when no term applies, ``inf`` when any term is infinite.
+    """
+    live = [u for u in terms.values() if not (u is None or np.isnan(u))]
+    if not live:
+        return np.nan
+    arr = np.array(live, dtype=float)
+    if np.isinf(arr).any():
+        return np.inf
+    if np.isinf(power):
+        return float(arr.max())
+    return float(np.mean(arr ** power) ** (1.0 / power))
+
+
+def validation_score(obj, power=2):
+    """How well the realized grid reproduces the analytic moments. Small is good.
+
+    **The score is in units of the validation tolerance**, so ``score <= 1``
+    means the object passes validation at its own ``validation_eps`` and
+    ``score = 1`` sits exactly on the pass boundary. That makes it the
+    continuous refinement of the pass/fail :attr:`Aggregate.valid` verdict: a
+    number to watch and to compare across grids, where the flag only says
+    whether a line was crossed.
+
+    Parameters
+    ----------
+    obj : Aggregate or Portfolio
+        An updated object.
+    power : float, default 2
+        Exponent of the combining power mean. ``1`` averages the terms, ``2`` is
+        the Euclidean default, ``numpy.inf`` reports the worst single term.
+
+    Returns
+    -------
+    float
+        The combined score over severity and aggregate mean, CV and skewness.
+        See :func:`validation_score_terms` for the per-term detail.
+    """
+    return combine_score_terms(validation_score_terms(obj), power)
+
+
 def validation_description(obj):
     """Short one-line validation verdict (str).
 

@@ -2,8 +2,9 @@
 
 ``bs_window`` / ``port_best_window`` *choose* a grid from the analytic moments
 before any FFT runs. ``sharpen`` *audits* that choice afterwards. These cover
-the score, the two gates, the parsimony rule, state restoration and the class
-surface. Programs mirrored in ``src/aggregate/agg/decl-testers.agg`` (SH block).
+the score, the two gates, the bucket line search, the parsimony rule, state
+restoration and the class surface. Programs mirrored in
+``src/aggregate/agg/decl-testers.agg`` (SH block).
 """
 
 import warnings
@@ -12,8 +13,9 @@ import numpy as np
 import pytest
 
 from aggregate import build
-from aggregate._bucket_window import (SHARPEN_LOG2_FLOOR, _SHARPEN_TERMS,
-                                      sharpen_score)
+from aggregate._bucket_window import SHARPEN_LOG2_FLOOR, _fmt_bs
+from aggregate._validation import (SCORE_TERMS, validation_score,
+                                   validation_score_terms)
 
 
 # A well-behaved book whose auto-sized grid comfortably clears the target.
@@ -22,6 +24,8 @@ GOOD = 'agg SH.Good 100 claims sev lognorm 100 cv 2 poisson'
 STARVED_BS, STARVED_LOG2 = 0.125, 14
 PORT = ('port SH.Port agg SH.A 50 claims sev lognorm 100 cv 2 poisson '
         'agg SH.B 20 claims sev lognorm 200 cv 1 poisson')
+
+TERM_NAMES = {f'u_{c}_{m}' for (c, m), _ in SCORE_TERMS}
 
 
 @pytest.fixture(autouse=True)
@@ -32,33 +36,45 @@ def _quiet():
         yield
 
 
+def _levels(df, name):
+    """Sorted unique values of an index level of ``sharpen_df``."""
+    return sorted(set(df.index.get_level_values(name)))
+
+
 # ---------------------------------------------------------------- the score
 
 def test_score_is_in_tolerance_units():
     """A passing object scores at or under 1: the score IS the validation boundary."""
     a = build(GOOD)
-    score, terms = sharpen_score(a)
     assert a.valid.passes
-    assert 0 < score <= 1
-    # all six terms present, keyed as documented
-    assert set(terms) == {f'u_{c}_{m}' for (c, m), _ in _SHARPEN_TERMS}
+    assert 0 < a.validation_score <= 1
+
+
+def test_score_property_matches_the_worker():
+    """The property is the power-2 score, no more and no less."""
+    a = build(GOOD)
+    assert a.validation_score == pytest.approx(validation_score(a, power=2))
+
+
+def test_score_terms_are_all_present():
+    a = build(GOOD)
+    assert set(validation_score_terms(a)) == TERM_NAMES
 
 
 def test_score_degrades_on_a_starved_grid():
     """Halving the extent the grid can hold makes the score far worse."""
     a = build(GOOD)
-    good, _ = sharpen_score(a)
+    good = a.validation_score
     a.update(log2=STARVED_LOG2, bs=STARVED_BS)
-    bad, _ = sharpen_score(a)
-    assert bad > 100 * good
+    assert a.validation_score > 100 * good
 
 
 def test_score_power_orders_as_a_norm():
     """power=1 <= power=2 <= power=inf, the standard p-norm ordering."""
     a = build(GOOD)
-    s1, _ = sharpen_score(a, power=1)
-    s2, _ = sharpen_score(a, power=2)
-    si, _ = sharpen_score(a, power=np.inf)
+    s1 = validation_score(a, power=1)
+    s2 = validation_score(a, power=2)
+    si = validation_score(a, power=np.inf)
     assert s1 <= s2 + 1e-12 <= si + 1e-12
 
 
@@ -70,8 +86,12 @@ def test_zero_skew_term_drops_out():
     ``valid_aggregate`` drops it.
     """
     a = build('agg SH.Sym 1 claim dsev [-1 0 1] fixed')
-    _, terms = sharpen_score(a)
-    assert np.isnan(terms['u_sev_skew'])
+    assert np.isnan(validation_score_terms(a)['u_sev_skew'])
+
+
+def test_portfolio_carries_the_score_too():
+    p = build(PORT)
+    assert np.isfinite(p.validation_score)
 
 
 # ----------------------------------------------------------- the probe gate
@@ -91,7 +111,7 @@ def test_good_enough_zero_forces_the_probe():
     """``good_enough=0`` never clears, which is how a probe is forced."""
     a = build(GOOD)
     a.sharpen(good_enough=0, execute=False)
-    assert len(a.sharpen_df) == 9
+    assert len(a.sharpen_df) > 1
 
 
 def test_probe_returns_self_for_chaining():
@@ -99,35 +119,81 @@ def test_probe_returns_self_for_chaining():
     assert a.sharpen() is a
 
 
-# ---------------------------------------------------------- geometry / cells
+# ---------------------------------------------------------- the line search
 
-def test_probe_geometry_is_the_full_three_by_three():
-    """Nine cells: half / same / double bs by one step down / same / up in log2."""
+def test_three_log2_rows_each_search_the_bucket_line():
+    """Three rows, each holding the centre bucket plus a contiguous walk out."""
     a = build(GOOD)
     a.sharpen(good_enough=0, execute=False)
     df = a.sharpen_df
-    assert sorted(df.d_bs.unique()) == [-1, 0, 1]
-    assert sorted(df.d_log2.unique()) == [-1, 0, 1]
-    # extent is bs * 2**log2, so anti-diagonals share an extent
-    same = df[df.d_bs + df.d_log2 == 0]
-    assert len(same) == 3
-    assert np.allclose(same.extent, same.extent.iloc[0])
+    assert _levels(df, 'd_log2') == [-1, 0, 1]
+    for j in (-1, 0, 1):
+        ks = sorted(df.xs(j, level='d_log2').index)
+        assert 0 in ks and max(ks) >= 1 and min(ks) <= -1
+        # contiguous: the search walks outward, it never skips a bucket
+        assert ks == list(range(min(ks), max(ks) + 1))
 
 
-def test_log2_cap_drops_the_upper_column():
-    """No ``log2 + 1`` column once the cap is reached."""
+def test_search_stops_at_the_first_cell_that_does_not_improve():
+    """Walking out from the centre, every step but the last strictly improved."""
+    a = build(GOOD)
+    a.sharpen(good_enough=0, execute=False)
+    df = a.sharpen_df
+    for j in _levels(df, 'd_log2'):
+        row = df.xs(j, level='d_log2').sort_index()
+        for step in (1, -1):
+            walk = [row.score.loc[k] for k in
+                    range(0, (max(row.index) if step > 0 else min(row.index))
+                          + step, step)]
+            for before, after in zip(walk, walk[1:-1]):
+                assert after < before, f'row {j} step {step}: {walk}'
+
+
+def test_bs_limit_bounds_the_search():
+    """The line search never walks past ``bs_limit`` in either direction."""
+    a = build(GOOD)
+    a.update(log2=STARVED_LOG2, bs=STARVED_BS)
+    a.sharpen(good_enough=0, bs_limit=4, execute=False)
+    assert max(abs(k) for k in _levels(a.sharpen_df, 'd_bs')) <= 2
+
+
+def test_bs_limit_must_be_a_power_of_two():
+    a = build(GOOD)
+    with pytest.raises(ValueError):
+        a.sharpen(good_enough=0, bs_limit=10)
+
+
+def test_expansion_reaches_further_than_one_step():
+    """A badly starved grid walks several buckets in a single call."""
+    a = build(GOOD)
+    a.update(log2=STARVED_LOG2, bs=STARVED_BS)
+    a.sharpen(good_enough=0, execute=False)
+    assert max(_levels(a.sharpen_df, 'd_bs')) >= 2
+
+
+def test_log2_cap_drops_the_upper_row():
+    """No ``log2 + 1`` row once the cap is reached."""
     a = build(GOOD)
     a.sharpen(good_enough=0, log2_cap=a.log2, execute=False)
-    assert sorted(a.sharpen_df.d_log2.unique()) == [-1, 0]
-    assert len(a.sharpen_df) == 6
+    assert _levels(a.sharpen_df, 'd_log2') == [-1, 0]
 
 
-def test_log2_floor_drops_the_lower_column():
-    """No ``log2 - 1`` column at the floor."""
+def test_log2_floor_drops_the_lower_row():
+    """No ``log2 - 1`` row at the floor."""
     a = build(GOOD)
     a.update(log2=SHARPEN_LOG2_FLOOR, bs=64)
     a.sharpen(good_enough=0, execute=False)
-    assert sorted(a.sharpen_df.d_log2.unique()) == [0, 1]
+    assert _levels(a.sharpen_df, 'd_log2') == [0, 1]
+
+
+def test_anti_diagonals_share_an_extent():
+    """Extent is bs * 2**log2, so d_bs + d_log2 constant means extent constant."""
+    a = build(GOOD)
+    a.sharpen(good_enough=0, execute=False)
+    df = a.sharpen_df.reset_index()
+    same = df[df.d_bs + df.d_log2 == 0]
+    assert len(same) >= 2
+    assert np.allclose(same.extent, same.extent.iloc[0])
 
 
 # ------------------------------------------------------------ the move gate
@@ -136,22 +202,14 @@ def test_starved_grid_moves_and_improves():
     """A failing grid moves to a better cell and the score falls."""
     a = build(GOOD)
     a.update(log2=STARVED_LOG2, bs=STARVED_BS)
-    before, _ = sharpen_score(a)
+    before = a.validation_score
     a.sharpen()
-    after, _ = sharpen_score(a)
     assert (a.bs, a.log2) != (STARVED_BS, STARVED_LOG2)
-    assert after < before
-    win = a.sharpen_df[a.sharpen_df.selected].iloc[0]
-    assert (win.d_bs, win.d_log2) != (0, 0)
+    assert a.validation_score < before
 
 
 def test_repeated_sharpen_walks_to_a_valid_grid_and_converges():
-    """Re-running re-centres the probe, so the descent continues, then stops.
-
-    This is the whole reason the fallback bar is modest: a single probe cannot
-    fix a grid that is orders of magnitude wrong, but re-running must be able to
-    start the descent at all.
-    """
+    """Re-running re-centres the probe, so the descent continues, then stops."""
     a = build(GOOD)
     a.update(log2=STARVED_LOG2, bs=STARVED_BS)
     assert not a.valid.passes
@@ -160,7 +218,6 @@ def test_repeated_sharpen_walks_to_a_valid_grid_and_converges():
         if not a._sharpen_state['moved']:
             break
     assert a.valid.passes
-    # converged: the last round found nothing worth taking
     assert not a._sharpen_state['moved']
 
 
@@ -174,8 +231,7 @@ def test_parsimony_prefers_the_smallest_qualifying_log2():
     a.update(log2=STARVED_LOG2, bs=STARVED_BS)
     a.sharpen(good_enough=1e9)   # every cell qualifies
     df = a.sharpen_df
-    win = df[df.selected].iloc[0]
-    assert win.log2 == df.log2.min()
+    assert df[df.selected].log2.iloc[0] == df.log2.min()
 
 
 # ------------------------------------------------------ state / restoration
@@ -213,9 +269,9 @@ def test_explicit_centre_is_honoured():
     """Passing ``bs`` / ``log2`` probes around that cell, not the current one."""
     a = build(GOOD)
     a.sharpen(bs=STARVED_BS, log2=STARVED_LOG2, good_enough=0, execute=False)
-    centre = a.sharpen_df[(a.sharpen_df.d_bs == 0) & (a.sharpen_df.d_log2 == 0)]
-    assert centre.bs.iloc[0] == pytest.approx(STARVED_BS)
-    assert int(centre.log2.iloc[0]) == STARVED_LOG2
+    centre = a.sharpen_df.loc[(0, 0)]
+    assert centre.bs == pytest.approx(STARVED_BS)
+    assert int(centre.log2) == STARVED_LOG2
 
 
 # --------------------------------------------------------------- robustness
@@ -235,13 +291,23 @@ def test_a_failing_cell_does_not_abort_the_sweep(monkeypatch):
     monkeypatch.setattr(type(a), 'update_work', flaky)
     a.sharpen(good_enough=0, execute=False)
     df = a.sharpen_df
-    assert len(df) == 9
     bad = df[df.score.isna()]
     assert len(bad) == 1
     assert 'synthetic cell failure' in bad.note.iloc[0]
+    # the sweep carried on past it
+    assert len(df) > len(bad) + 1
 
 
 # ------------------------------------------------------------ class surface
+
+def test_frame_is_indexed_by_the_offsets():
+    """``(d_bs, d_log2)`` is the index, so the picture is one unstack away."""
+    a = build(GOOD)
+    a.sharpen(good_enough=0, execute=False)
+    assert list(a.sharpen_df.index.names) == ['d_bs', 'd_log2']
+    picture = a.sharpen_df.score.unstack('d_log2')
+    assert picture.loc[0, 0] == pytest.approx(a.validation_score)
+
 
 def test_frame_and_narrative_surface():
     """The frame carries the documented columns and both narrative halves fire."""
@@ -251,21 +317,48 @@ def test_frame_and_narrative_surface():
     assert 'not been sharpened' in a.sharpen_explanation
     a.sharpen(good_enough=0, execute=False)
     cols = set(a.sharpen_df.columns)
-    for c in ('d_bs', 'd_log2', 'bs', 'log2', 'extent', 'x_min', 'score',
-              'aliasing', 'validation', 'warnings', 'seconds', 'selected',
-              'note'):
+    for c in ('bs', 'log2', 'extent', 'x_min', 'score', 'aliasing',
+              'validation', 'warnings', 'seconds', 'selected', 'note'):
         assert c in cols
-    for (comp, meas), _ in _SHARPEN_TERMS:
-        assert f'u_{comp}_{meas}' in cols
+    assert TERM_NAMES <= cols
     assert len(a.sharpen_description) > 20
     assert len(a.sharpen_explanation) > 200
+
+
+def test_description_starts_capitalized():
+    a = build(GOOD)
+    assert a.sharpen_description.startswith('Sharpen')
+    a.sharpen()
+    assert a.sharpen_description.startswith('Sharpen')
+
+
+def test_sub_unit_bs_reads_as_a_binary_fraction():
+    """0.125 is 1/8, and reads that way in the narrative."""
+    assert _fmt_bs(0.125) == '1/8'
+    assert _fmt_bs(1 / 32) == '1/32'
+    assert _fmt_bs(2.0) == '2'
+    assert _fmt_bs(0.3) == '0.3'          # not a unit fraction, plain format
+    a = build(GOOD)
+    a.update(log2=STARVED_LOG2, bs=STARVED_BS)
+    a.sharpen()
+    assert '1/8' in a.sharpen_description
+    assert '0.125' not in a.sharpen_description
+
+
+def test_move_phrase_names_only_what_changed():
+    """A bucket-only move must not report 'log2 16 to 16'."""
+    a = build(GOOD)
+    a.sharpen(good_enough=0)
+    st, win = a._sharpen_state, a.sharpen_df[a.sharpen_df.selected].iloc[0]
+    if int(win.log2) == st['log20'] and win.bs != st['bs0']:
+        assert f'log2 {st["log20"]} to {st["log20"]}' not in a.sharpen_description
 
 
 def test_sharpen_df_is_a_copy():
     a = build(GOOD)
     a.sharpen(good_enough=0, execute=False)
-    a.sharpen_df.loc[0, 'score'] = -999
-    assert a.sharpen_df.loc[0, 'score'] != -999
+    a.sharpen_df.loc[(0, 0), 'score'] = -999
+    assert a.sharpen_df.loc[(0, 0), 'score'] != -999
 
 
 def test_update_sharpen_kwarg_matches_an_explicit_call():
@@ -292,7 +385,7 @@ def test_portfolio_sharpen_runs_end_to_end():
     """The portfolio probe scores the total and keeps add_exa on the final grid."""
     p = build(PORT)
     p.sharpen(good_enough=0, execute=False)
-    assert len(p.sharpen_df) == 9
+    assert _levels(p.sharpen_df, 'd_log2') == [-1, 0, 1]
     # probe cells run add_exa=False for speed; the final update restores it
     assert any(c.startswith('exa_') for c in p.density_df.columns)
 
@@ -300,11 +393,10 @@ def test_portfolio_sharpen_runs_end_to_end():
 def test_portfolio_starved_grid_moves():
     p = build(PORT)
     p.update(log2=12, bs=1)
-    before, _ = sharpen_score(p)
+    before = p.validation_score
     p.sharpen()
-    after, _ = sharpen_score(p)
     assert (p.bs, p.log2) != (1, 12)
-    assert after < before
+    assert p.validation_score < before
 
 
 def test_portfolio_explanation_states_the_total_only_limitation():

@@ -992,7 +992,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                 f'suggests increasing log2 to {int(clip["need_log2"])}.')
         return ' '.join(parts)
 
-    def sharpen(self, bs=None, log2=None, *, log2_cap=24, power=2,
+    def sharpen(self, bs=None, log2=None, *, log2_cap=24,
+                bs_limit=_bucket_window.SHARPEN_BS_LIMIT, power=2,
                 good_enough=0.5, min_gain=2.0, execute=True):
         """Probe the grid neighbourhood and move to a better ``(bs, log2)``.
 
@@ -1001,9 +1002,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         aggregate twin is :meth:`Aggregate.sharpen`.
 
         :meth:`update` *chooses* the combine grid before any FFT runs; this
-        *audits* that choice afterwards, re-updating the portfolio on the eight
-        neighbouring cells and moving only on a large win, preferring the
-        smallest ``log2`` that reaches the target. Probe cells run with
+        *audits* that choice afterwards, re-updating the portfolio on
+        neighbouring cells (three ``log2`` rows, each a line search out from the
+        current bucket) and moving only on a large win, preferring the smallest
+        ``log2`` that reaches the target. Probe cells run with
         ``add_exa=False``, which is the dominant cost of a portfolio update and
         contributes nothing to the moments; the chosen cell is then updated in
         full.
@@ -1017,7 +1019,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         :attr:`sharpen_explanation`. Returns ``self``, so the call chains.
         """
         return _bucket_window.sharpen(
-            self, bs, log2, log2_cap=log2_cap, power=power,
+            self, bs, log2, log2_cap=log2_cap, bs_limit=bs_limit, power=power,
             good_enough=good_enough, min_gain=min_gain, execute=execute)
 
     @property
@@ -1029,8 +1031,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         its six normalized terms (``u_sev_mean`` through ``u_agg_skew``), the
         ``aliasing`` ratio, the ``validation`` verdict, a ``warnings`` count,
         ``seconds``, the ``selected`` winner, and a ``note`` carrying the
-        exception text for any cell that failed. ``None`` before :meth:`sharpen`
-        runs.
+        exception text for any cell that failed. Indexed by ``(d_bs, d_log2)``,
+        so ``sharpen_df.score.unstack('d_log2')`` is the picture. ``None`` before
+        :meth:`sharpen` runs.
         """
         if self._sharpen_df is None:
             return None
@@ -2509,6 +2512,24 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         """
         return _validation.valid_portfolio(self)
+
+    @property
+    def validation_score(self):
+        """Continuous validation score: how well the grid reproduces theory (float).
+
+        **In units of the validation tolerance**, so ``score <= 1`` means the
+        object passes at its own ``validation_eps`` and ``1`` is exactly the pass
+        boundary. Where :attr:`valid` says whether a line was crossed, this says
+        by how far, which is what makes it comparable across grids and the
+        quantity :meth:`sharpen` minimizes.
+
+        Six terms: severity and aggregate mean, CV and skewness, each relative
+        error divided by its own tolerance, combined as a power mean with
+        ``power=2``. See :func:`~aggregate._validation.validation_score` for the
+        other powers and :func:`~aggregate._validation.validation_score_terms`
+        for the per-term detail.
+        """
+        return _validation.validation_score(self)
 
     @property
     def validation_description(self):

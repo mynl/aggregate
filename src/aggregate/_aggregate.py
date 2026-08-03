@@ -762,7 +762,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return bs_explain(self)
 
-    def sharpen(self, bs=None, log2=None, *, log2_cap=24, power=2,
+    def sharpen(self, bs=None, log2=None, *, log2_cap=24,
+                bs_limit=_bucket_window.SHARPEN_BS_LIMIT, power=2,
                 good_enough=0.5, min_gain=2.0, execute=True):
         """Probe the grid neighbourhood and move to a better ``(bs, log2)``.
 
@@ -770,11 +771,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         the probe geometry and the selection rule are documented in full.
 
         :meth:`update` *chooses* a grid from the analytic moments before any FFT
-        runs; this *audits* that choice afterwards. It re-updates the aggregate
-        on the eight neighbouring cells (half / same / double ``bs`` by one step
-        down / same / up in ``log2``), scores each against the analytic moments
-        in units of the validation tolerance, and moves only on a large win,
-        preferring the smallest ``log2`` that reaches the target.
+        runs; this *audits* that choice afterwards. Three rows, ``log2 - 1`` /
+        ``log2`` / ``log2 + 1``, and within each a line search out from the
+        current bucket: ``bs`` is doubled until :attr:`validation_score` stops
+        improving, then halved likewise, capped at ``bs_limit`` each way. It
+        moves only on a large win, preferring the smallest ``log2`` that reaches
+        the target.
 
         Populates :attr:`sharpen_df`, :attr:`sharpen_description` and
         :attr:`sharpen_explanation`. Returns ``self``, so the call chains.
@@ -788,7 +790,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             print(a.sharpen_description)
         """
         return _bucket_window.sharpen(
-            self, bs, log2, log2_cap=log2_cap, power=power,
+            self, bs, log2, log2_cap=log2_cap, bs_limit=bs_limit, power=power,
             good_enough=good_enough, min_gain=min_gain, execute=execute)
 
     @property
@@ -802,8 +804,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ``seconds``, the ``selected`` winner, and a ``note`` carrying the
         exception text for any cell that failed.
 
-        ``d_bs`` and ``d_log2`` make the three-by-three picture one ``pivot``
-        away. ``None`` before :meth:`sharpen` runs.
+        Indexed by ``(d_bs, d_log2)``, so the picture is one unstack away::
+
+            a.sharpen_df.score.unstack('d_log2')
+
+        The line search makes the rows ragged, so cells never visited come back
+        ``nan``. ``None`` before :meth:`sharpen` runs.
         """
         if self._sharpen_df is None:
             return None
@@ -2726,6 +2732,24 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         s.append(info_row('bounded', self.bounded))
         s.append(info_row('id', self._spec_hash()))
         return '\n'.join(s)
+
+    @property
+    def validation_score(self):
+        """Continuous validation score: how well the grid reproduces theory (float).
+
+        **In units of the validation tolerance**, so ``score <= 1`` means the
+        object passes at its own ``validation_eps`` and ``1`` is exactly the pass
+        boundary. Where :attr:`valid` says whether a line was crossed, this says
+        by how far, which is what makes it comparable across grids and the
+        quantity :meth:`sharpen` minimizes.
+
+        Six terms: severity and aggregate mean, CV and skewness, each relative
+        error divided by its own tolerance, combined as a power mean with
+        ``power=2``. See :func:`~aggregate._validation.validation_score` for the
+        other powers and :func:`~aggregate._validation.validation_score_terms`
+        for the per-term detail.
+        """
+        return _validation.validation_score(self)
 
     @property
     def validation_description(self):

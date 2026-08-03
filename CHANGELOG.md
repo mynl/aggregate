@@ -1,5 +1,83 @@
 # Changelog
 
+## 1.0.0a193
+
+**[Sharpen-Grid-Probe]** Punch-ups to `a192`. The score is now a first-class
+statistic in its own right, and the probe walks instead of taking one step.
+
+### `validation_score`, a property
+
+```python
+a = build('agg X 100 claims sev lognorm 100 cv 2 poisson')
+a.validation_score      # 0.391
+```
+
+The quantity `sharpen` minimizes, exposed on `Aggregate` and `Portfolio` because
+it is worth watching on its own. **In units of the validation tolerance**, so
+`<= 1` means the object passes at its own `validation_eps` and `1` is exactly
+the pass boundary. Where `valid` says whether a line was crossed, this says by
+how far, which is what makes it comparable across grids.
+
+It lives in `_validation.py` with the rest of the validation family, not in the
+grid code: `validation_score(obj, power=2)` for the other powers,
+`validation_score_terms(obj)` for the per-term detail, `SCORE_TERMS` for the
+tolerance multiples. The `_bucket_window.sharpen_score` of `a192` is gone; it
+was a second name for this.
+
+### The probe walks
+
+Still three rows at `log2 - 1` / `log2` / `log2 + 1`, but each row is now a
+**line search out from the current bucket**: `bs` is doubled until the score
+stops improving, then halved likewise, capped by the new `bs_limit` (default
+`16`, four doublings each way, must be a power of two).
+
+This is a large practical difference on a badly sized grid. Forcing the book
+above onto `bs=1/8, log2=14`:
+
+```
+a192:  3494 -> 908 -> 5.49 -> 0.391       four calls
+a193:  3494 -> 1.61 -> 0.463              two calls, and it validates
+```
+
+The line search is well posed because the score has a single trough in `bs` at
+fixed `log2`: a larger bucket buys extent and loses resolution, so the two error
+families trade off. A severity whose atoms land on grid points at some buckets
+and not others could in principle dip again past the turn and be missed;
+`bs_window` sizes those by its exact-discrete method, so they rarely reach a
+probe. Cost is unchanged on a grid near its optimum, eight evaluations, because
+the search stops at the first cell that fails to improve.
+
+### `sharpen_df` is indexed by the offsets
+
+```python
+a.sharpen_df.score.unstack('d_log2')
+
+d_log2        -1         0         1
+d_bs
+-1      5.486182  1.605396  0.390593
+ 0      1.605666  0.391127  0.074544
+ 1      0.395764  0.091433  0.107531
+ 2      0.251204  0.239852       NaN
+ 3      5.213805       NaN       NaN
+```
+
+`(d_bs, d_log2)` moved from columns to the index, so the picture is one unstack
+away. The rows are ragged, since each searched to its own turning point, and
+cells never visited come back `NaN`. Reading down a column is constant grid
+size; reading an anti-diagonal is constant extent.
+
+That table also shows the parsimony rule earning its place: the outright best
+cell is `0.0745` at `log2 17`, and `sharpen` picks `0.0914` at `log2 16`, half
+the memory for a score 23% worse and still far inside the target.
+
+### Narrative
+
+* A sub-unit `bs` reads as **the binary fraction it is**: `bs 1/8 to 2`, not
+  `bs 0.125 to 2`.
+* A move names **only what changed**. A bucket-only move said `log2 16 to 16`,
+  which reads as a bug rather than as "unchanged".
+* `sharpen_description` opens with `Sharpen`, capitalized.
+
 ## 1.0.0a192
 
 **[Sharpen-Grid-Probe]** A new `sharpen()` audits the FFT grid the bucket

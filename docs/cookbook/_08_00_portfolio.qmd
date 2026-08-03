@@ -2,12 +2,8 @@
 
 # Portfolio {#sec-portfolio}
 
-*This section covers* multi-unit books — several aggregates combined, priced, and
-allocated. Three recipes:
+*This section covers* multi-unit books — several aggregates combined, priced, and allocated. Three recipes:
 
-- **@sec-portfolio-construction** — build a portfolio from units; the
-  independent-sum FFT and the diversification it delivers.
-- **@sec-portfolio-pricing** — price with a distortion and allocate the premium
-  back to units (natural allocation).
-- **@sec-portfolio-samples** — dependence via the sample path (the *switcheroo*):
-  couple units with a copula and read the result back as a sample.
+- **@sec-portfolio-construction** — build a portfolio from units; the independent-sum FFT and the diversification it delivers.
+- **@sec-portfolio-pricing** — price with a distortion and allocate the premium back to units (natural allocation).
+- **@sec-portfolio-samples** — dependence via the sample path (the *switcheroo*): couple units with a copula and read the result back as a sample.

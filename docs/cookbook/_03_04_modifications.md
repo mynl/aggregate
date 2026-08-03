@@ -10,8 +10,6 @@ from _setup import *
 from textwrap import fill
 ```
 
-**Beat 1 — the DecL.**
-
 ```{python}
 #| echo: false
 egs = """4 claims dsev[1] poisson zm 0.5      note{base 4      → E[N] = 2.0373}
@@ -21,8 +19,6 @@ egs = """4 claims dsev[1] poisson zm 0.5      note{base 4      → E[N] = 2.0373
 for eg in egs:
     print(eg)
 ```
-
-**Beats 2 & 3 — build, validate, exhibits.**
 
 ```{python}
 #| echo: false
@@ -42,6 +38,9 @@ for i, eg in enumerate(egs):
 
 <!-- TODO(author): show the count pmf and the resulting aggregate for each. -->
 
-**Beat 4 — the check.** [Check-Independent-Oracle]
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Independent-Oracle] -->
 
 <!-- TODO(author): each count's mean/variance matches its closed form. -->
+
+:::

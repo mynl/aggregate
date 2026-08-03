@@ -4,12 +4,8 @@
 
 *This section covers* the claim count. Three pages:
 
-- **@sec-frequency-discrete** — deterministic and simple discrete counts
-  (`fixed`, `dfreq`, Bernoulli).
-- **@sec-frequency-mixed-poisson** — the workhorses: `poisson` and the mixed
-  (gamma-mixed = negative binomial) Poisson, where the mixing CV (contagion)
-  controls over-dispersion.
+- **@sec-frequency-discrete** — deterministic and simple discrete counts (`fixed`, `dfreq`, Bernoulli).
+- **@sec-frequency-mixed-poisson** — the workhorses: `poisson` and the mixed (gamma-mixed = negative binomial) Poisson, where the mixing CV (contagion) controls over-dispersion.
 - **@sec-frequency-other** — the rest of the menu (binomial, geometric, …).
 
-The theme throughout: the frequency's dispersion flows straight through to the
-aggregate CV, so the count assumption is never innocent.
+The theme throughout: the frequency's dispersion flows straight through to the aggregate CV, so the count assumption is never innocent.

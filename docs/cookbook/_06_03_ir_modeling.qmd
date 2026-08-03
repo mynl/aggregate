@@ -2,24 +2,14 @@
 
 ## Individual-risk modeling {#sec-pnl-ir}
 
-*This is a recipe for* the **individual risk (IR) model** — a *fixed* block of
-policies, each an independent loss — and the lesson it teaches about
-*parameterization*. The usual **collective risk** model has a random claim
-count; the IR model fixes the count (`dfreq[n]`, `n` policies) and puts a
-Bernoulli-style severity on each. Life and other short-duration guarantees are
-the canonical case, and they expose a trap: folding the deterministic premium
-into a *signed profit severity* reproduces the mean but not the standard
-deviation. The `pnl` — premium **less** losses — is the fix, and it is exact.
+*This is a recipe for* the **individual risk (IR) model** — a *fixed* block of policies, each an independent loss — and the lesson it teaches about *parameterization*. The usual **collective risk** model has a random claim count; the IR model fixes the count (`dfreq[n]`, `n` policies) and puts a Bernoulli-style severity on each. Life and other short-duration guarantees are the canonical case, and they expose a trap: folding the deterministic premium into a *signed profit severity* reproduces the mean but not the standard deviation. The `pnl` — premium **less** losses — is the fix, and it is exact.
 
 ```{python}
 from _setup import *
 import numpy as np
 ```
 
-The whole page reads off one block of parameters — an `n`-life one-year term
-book, each life paying face `F` on death (probability `q`) against premium `P`.
-Units are reduced by `gcd(P, F)` (true `P=20, F=1000`) so the arithmetic is
-tidy:
+The whole page reads off one block of parameters — an `n`-life one-year term book, each life paying face `F` on death (probability `q`) against premium `P`. Units are reduced by `gcd(P, F)` (true `P=20, F=1000`) so the arithmetic is tidy:
 
 ```{python}
 n = 1_000_000     # policies (fixed count -> individual risk model)
@@ -28,18 +18,14 @@ P = 1             # premium per life   (gcd-reduced; true 20)
 F = 50            # face amount        (gcd-reduced; true 1000)
 ```
 
-**Beat 1 — the DecL (the tempting, wrong parameterization).** Per-life profit is
-`+P` if the life survives and `P − F` if it dies, so the "obvious" model is a
-signed severity with atoms `{P−F, P} = {-49, +1}`:
+Per-life profit is `+P` if the life survives and `P − F` if it dies, so the "obvious" model is a signed severity with atoms `{P−F, P} = {-49, +1}`:
 
 ```{python}
 naive = f'agg Life dfreq[{n}] dsev[{P-F} {P}] [{q} {1-q}]'
 pp(naive)
 ```
 
-**Beats 2 & 3 — build, validate.** The mean is reproduced exactly; the standard
-deviation is not — validation flags `AGG_CV` / `AGG_SKEW` (and the severity
-twins):
+The mean is reproduced exactly; the standard deviation is not — validation flags `AGG_CV` / `AGG_SKEW` (and the severity twins):
 
 ```{python}
 a = build(naive)
@@ -47,11 +33,7 @@ print(f'{a.name}: valid = {a.valid}')
 qd(a.validation_df)
 ```
 
-**Why the mean survives but the sd does not — the exact linear fit.** The atoms
-`-49` and `+1` are *odd*, so placing them exactly needs `bs = 1`. But (see below)
-the aggregate really lives on the spacing-`F = 50` lattice, so the grid sizer
-coarsens toward it. On a `bs = 50` grid `{…, -50, 0, 50, …}` neither atom lands,
-and mass-preserving (linear) bucketing splits each onto its two neighbors:
+**Why the mean survives but the sd does not — the exact linear fit.** The atoms `-49` and `+1` are *odd*, so placing them exactly needs `bs = 1`. But (see below) the aggregate really lives on the spacing-`F = 50` lattice, so the grid sizer coarsens toward it. On a `bs = 50` grid `{…, -50, 0, 50, …}` neither atom lands, and mass-preserving (linear) bucketing splits each onto its two neighbors:
 
 ```{python}
 # atom +1 (prob 1-q) sits 1 above 0, 49 below 50; atom -49 (prob q) sits 1 above
@@ -72,26 +54,11 @@ print(f'E[X^2] : spread={m2_s:.4f}  true={m2_t:.4f}   inflated by {m2_s-m2_t:.0f
 print(f'sd     : spread={np.sqrt(m2_s-m1_s**2):.4f}  true={np.sqrt(m2_t-m1_t**2):.4f}')
 ```
 
-Linear bucketing is *mean-preserving by construction*, so the first moment is
-untouched. But splitting a point mass across a width-`b` bucket at distances
-`d₁, d₂` (with `d₁ + d₂ = b`) adds variance exactly `d₁·d₂` — here `1·49 = 49` on
-top of `E[X²]`. That single unit of inflation carries all the way through the
-`n`-fold convolution, so the aggregate sd is off by the same ratio: the mean
-matches to machine precision while the sd is 43% too large.
+Linear bucketing is *mean-preserving by construction*, so the first moment is untouched. But splitting a point mass across a width-`b` bucket at distances `d₁, d₂` (with `d₁ + d₂ = b`) adds variance exactly `d₁·d₂` — here `1·49 = 49` on top of `E[X²]`. That single unit of inflation carries all the way through the `n`-fold convolution, so the aggregate sd is off by the same ratio: the mean matches to machine precision while the sd is 43% too large.
 
-**The observation: "wasted" space.** The aggregate is
-`profit = nP − F·(deaths) = n − 50·(deaths)`, so it is supported *only* on
-multiples of 50. At `bs = 1` that means **49 of every 50 buckets are
-structurally empty** — a 50× oversampled grid, and exactly where the amplified
-round-off "grass" shows up (see `docs/error-analysis.md`). The severity wants a
-fine bucket; the aggregate wants a coarse one; and no single grid and origin
-serves both, because the deterministic `+P` per life *accumulates* `n` times
-under convolution and a one-origin grid cannot carry that shift.
+**The observation: "wasted" space.** The aggregate is `profit = nP − F·(deaths) = n − 50·(deaths)`, so it is supported *only* on multiples of 50. At `bs = 1` that means **49 of every 50 buckets are structurally empty** — a 50× oversampled grid, and exactly where the amplified round-off "grass" shows up (see `docs/error-analysis.md`). The severity wants a fine bucket; the aggregate wants a coarse one; and no single grid and origin serves both, because the deterministic `+P` per life *accumulates* `n` times under convolution and a one-origin grid cannot carry that shift.
 
-**The fix — reparameterize as a P&L.** Pull the deterministic premium out of the
-stochastic severity. Model *losses* with the benefit severity on its natural
-`{0, F}` lattice, and let the total premium `nP` enter as an affine shift — which
-is precisely what `pnl … premium less agg …` does:
+**The fix — reparameterize as a P&L.** Pull the deterministic premium out of the stochastic severity. Model *losses* with the benefit severity on its natural `{0, F}` lattice, and let the total premium `nP` enter as an affine shift — which is precisely what `pnl … premium less agg …` does:
 
 ```{python}
 loss = f'agg Loss dfreq[{n}] dsev[0 {F}] [{1-q} {q}]'
@@ -104,10 +71,7 @@ b = build(book)
 show(b)
 ```
 
-Now `{0, 50}` is phase-0 and buckets **exactly** at `bs = 50`; the loss
-aggregate stays on `50ℤ` (phase-0 is closed under convolution) — no wasted cells,
-no grass; and the premium `nP` is an exact affine shift. The margin standard
-deviation matches the analytic value to machine precision:
+Now `{0, 50}` is phase-0 and buckets **exactly** at `bs = 50`; the loss aggregate stays on `50ℤ` (phase-0 is closed under convolution) — no wasted cells, no grass; and the premium `nP` is an exact affine shift. The margin standard deviation matches the analytic value to machine precision:
 
 ```{python}
 analytic_sd = np.sqrt(n * (F**2*q - (F*q)**2))    # Var(profit) = Var(loss)
@@ -115,10 +79,9 @@ margin_sd = float(b.summary_df.loc['Margin', 'SD'])
 print(f'margin sd: pnl={margin_sd:.6f}  analytic={analytic_sd:.6f}')
 ```
 
-**Beat 4 — the check.** [Check-Reparameterization]
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Reparameterization] -->
 
-The lesson generalizes beyond life: an individual-risk book is a *fixed-count*
-aggregate of losses, and the numerically clean model keeps the benefit severity
-on its own lattice (`{0, F}`) rather than a signed profit severity (`{P−F, P}`).
-Deterministic quantities — premium, expenses — belong in the affine `pnl` layer,
-not smuggled into the severity. Reproduce the mean **and** the sd; waste no grid.
+The lesson generalizes beyond life: an individual-risk book is a *fixed-count* aggregate of losses, and the numerically clean model keeps the benefit severity on its own lattice (`{0, F}`) rather than a signed profit severity (`{P−F, P}`). Deterministic quantities — premium, expenses — belong in the affine `pnl` layer, not smuggled into the severity. Reproduce the mean **and** the sd; waste no grid.
+
+:::

@@ -2,43 +2,31 @@
 
 ## Continuous severity {#sec-severity-continuous}
 
-*This is a recipe for* the continuous severities that carry real books: named
-`scipy` distributions (`lognorm`, `gamma`, `pareto`, …), the mean/CV
-parameterization, scaling (`100 * pareto ...`) and shifting (`- 100`), layers and
-limits, and spliced tails. We draw calibrated actuarial examples from the bundled
-`.agg` library rather than inventing numbers.
+*This is a recipe for* the continuous severities that carry real books: named `scipy` distributions (`lognorm`, `gamma`, `pareto`, …), the mean/CV parameterization, scaling (`100 * pareto ...`) and shifting (`- 100`), layers and limits, and spliced tails. We draw calibrated actuarial examples from the bundled `.agg` library rather than inventing numbers.
 
 ```{python}
 from _setup import *
 ```
 
-**Beat 1 — the DecL.** The house severity is a shifted, scaled single-parameter
-Pareto — thick-tailed, unlimited:
+The house severity is a shifted, scaled single-parameter Pareto — thick-tailed, unlimited:
 
 ```{python}
 decl = house('SevDemo')
 pp(decl)   # HOUSE_SEV lives in _setup (source of truth)
 ```
 
-**Beats 2 & 3 — build, validate, exhibits.**
-
-<!-- TODO(author): contrast lognorm vs gamma vs pareto on a common mean; show the
-     Severity object, moments, density + survival plots. Pull 2-3 real severities
-     from src/aggregate/agg/_test_suite.agg (categories B/severities) so the
-     numbers are audited actuarial examples, not toy figures. -->
+<!-- TODO(author): contrast lognorm vs gamma vs pareto on a common mean; show the Severity object, moments, density + survival plots. Pull 2-3 real severities from src/aggregate/agg/_test_suite.agg (categories B/severities) so the numbers are audited actuarial examples, not toy figures. -->
 
 ```{python}
 a = build(decl, padding=0) 
 qd(a.summary_df)
 ```
 
-
 ```{python}
 a.plot()
 ```
 
 Check probability of no claims and 1 limit claim.
-
 
 ```{python}
 import numpy as np
@@ -57,8 +45,9 @@ print(f'Prob no claims adj. = {p0a} vs {a.density_df.loc[0,"p_total"]}')
 
 Hummmm. Not really intro level stuff! 
 
-**Beat 4 — the check.** [Check-Independent-Oracle]
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Independent-Oracle] -->
 
-<!-- TODO(author): est_sev_m / est_sev_sd / est_sev_skew (the discretized FFT-grid
-     moments) vs the theoretic scipy moments — agree to grid accuracy; the tail
-     rule (slognorm vs sgamma) shows in how cleanly each matches. -->
+<!-- TODO(author): est_sev_m / est_sev_sd / est_sev_skew (the discretized FFT-grid moments) vs the theoretic scipy moments — agree to grid accuracy; the tail rule (slognorm vs sgamma) shows in how cleanly each matches. -->
+
+:::

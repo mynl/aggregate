@@ -2,31 +2,25 @@
 
 # Bivariate {#sec-bivariate}
 
-*This section covers* the joint distribution of two views — most often the
-occurrence gross/ceded/net view-pairs (`netceded`, `grossceded`, `grossnet` DecL
-prefixes, and `occ_bivariate(views=...)`), or two coupled aggregates. Produces a
-`BivariateAggregate`. **@sec-massive-bivariate** takes the same idea out-of-core.
+*This section covers* the joint distribution of two views — most often the occurrence gross/ceded/net view-pairs (`netceded`, `grossceded`, `grossnet` DecL prefixes, and `occ_bivariate(views=...)`), or two coupled aggregates. Produces a `BivariateAggregate`. **@sec-massive-bivariate** takes the same idea out-of-core.
 
 ::: {.callout-warning}
-This section is **not executed on render** — the joint FFT is expensive. Every
-code cell carries `#| eval: false`; run it by hand in JupyterLab.
+This section is **not executed on render** — the joint FFT is expensive. Every code cell carries `#| eval: false`; run it by hand in JupyterLab.
 :::
-
-**Beat 1 — the DecL.**
 
 ```{python}
 #| eval: false
 pp('netceded ...')   # TODO(author): a calibrated occ view-pair program
 ```
 
-**Beats 2 & 3 — build, exhibits.**
-
 ```{python}
 #| eval: false
 # TODO(author): build; scatter / pyramid of the joint; the two marginals.
 ```
 
-**Beat 4 — the check.** [Check-Cross-Object]
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Cross-Object] -->
 
-<!-- TODO(author): the bivariate marginals recover the univariate gross / ceded /
-     net aggregates (compare MEANS, not the wrap-hidden deficit). -->
+<!-- TODO(author): the bivariate marginals recover the univariate gross / ceded / net aggregates (compare MEANS, not the wrap-hidden deficit). -->
+
+:::

@@ -2,26 +2,20 @@
 
 ## Pricing & allocation {#sec-portfolio-pricing}
 
-*This is a recipe for* pricing a portfolio with a distortion and **allocating**
-the distorted premium back to the units (natural allocation, @Mildenhall2022a).
-The allocation is the coherent capital/margin each unit is responsible for.
+*This is a recipe for* pricing a portfolio with a distortion and **allocating** the distorted premium back to the units (natural allocation, @Mildenhall2022a). The allocation is the coherent capital/margin each unit is responsible for.
 
 ```{python}
 from _setup import *
 from aggregate import Distortion
 ```
 
-**Beats 1 & 2 — build and price.**
-
-<!-- TODO(author): build the two-unit portfolio, pick a distortion, price and
-     allocate. -->
-
-**Beat 3 — exhibits.**
+<!-- TODO(author): build the two-unit portfolio, pick a distortion, price and allocate. -->
 
 <!-- TODO(author): the allocation table — premium, loss, margin by unit and total. -->
 
-**Beat 4 — the check.** [Check-Reconciliation] + [Check-Cross-Object]
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Reconciliation] + [Check-Cross-Object] -->
 
-<!-- TODO(author): unit allocations sum to the total distorted premium; a unit
-     priced standalone differs from its in-portfolio allocation by exactly the
-     diversification benefit. -->
+<!-- TODO(author): unit allocations sum to the total distorted premium; a unit priced standalone differs from its in-portfolio allocation by exactly the diversification benefit. -->
+
+:::

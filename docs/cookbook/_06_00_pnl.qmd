@@ -5,16 +5,12 @@ wd-python: T:/worktrees/aggregate_REFACTOR/.venv/Scripts/python.exe
 
 # PnL {#sec-pnl}
 
-*This section covers* the bottom line — wrapping a complete engine in a profit
-model. Two views of the same economics:
+*This section covers* the bottom line — wrapping a complete engine in a profit model. Two views of the same economics:
 
-- **@sec-pnl-consolidated** — the `pnl`: one consolidated net group
-  (consideration / obligation / margin), the summary card.
-- **@sec-pnl-walk** — the `xpnl`: the step-by-step walk gross → each cession →
-  Total, showing how the consolidated view is built.
+- **@sec-pnl-consolidated** — the `pnl`: one consolidated net group (consideration / obligation / margin), the summary card.
+- **@sec-pnl-walk** — the `xpnl`: the step-by-step walk gross → each cession → Total, showing how the consolidated view is built.
 
-Both inherit premium from the wrapped book and read scenario (κ) columns beside
-the marginal (P) percentiles.
+Both inherit premium from the wrapped book and read scenario (κ) columns beside the marginal (P) percentiles.
 
 
 ```{python}
@@ -131,8 +127,7 @@ bit2 = bit.xs('Margin', axis=0, level='Side')
 print(GT(bit2, caption='Margin by Step'))
 ```
 
-Try a quota share instead of the aggregate program. Swing rated with cede. Start without
-the occ program. Look gross first
+Try a quota share instead of the aggregate program. Swing rated with cede. Start without the occ program. Look gross first
 
 ```{python}
 df = pd.DataFrame({'p': ps, 'Quantile': g.q(ps)})
@@ -230,6 +225,11 @@ xpnl NO as "Re3 Analysis"
 cols = ['EX', 'SD', 'CV', 'κ01', 'κ50', 'κ99']
 bit = n2.stats_df[cols]
 print(GT(bit, caption=f"Net QS, limit {limit:,.0f}"))
+```
+
+
+```{python}
+10 * 12
 ```
 
 

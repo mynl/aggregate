@@ -2,26 +2,22 @@
 
 ## Construction {#sec-portfolio-construction}
 
-*This is a recipe for* building a multi-unit `Portfolio` — several `agg` units
-summed under independence via FFT. Meet `density_df`, the per-unit and total
-columns, and the diversification the sum delivers.
+*This is a recipe for* building a multi-unit `Portfolio` — several `agg` units summed under independence via FFT. Meet `density_df`, the per-unit and total columns, and the diversification the sum delivers.
 
 ```{python}
 from _setup import *
 ```
-
-**Beat 1 — the DecL.**
 
 ```{python}
 pp('port Book agg A 100 claims sev lognorm 50 cv 1.5 poisson '
    'agg B 50 claims sev gamma 80 cv 1.0 poisson')
 ```
 
-**Beats 2 & 3 — build, validate, exhibits.**
-
 <!-- TODO(author): build; show summary_df for units + total; a stacked density. -->
 
-**Beat 4 — the check.** [Check-Reconciliation]
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Reconciliation] -->
 
-<!-- TODO(author): unit means sum to the total mean; total SD <= sum of unit SDs
-     (diversification). -->
+<!-- TODO(author): unit means sum to the total mean; total SD <= sum of unit SDs (diversification). -->
+
+:::

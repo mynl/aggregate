@@ -8,35 +8,22 @@ from _setup import *
 
 ## Limit profile {#sec-recipe-aggregate-limit-profile}
 
-You have the shape every pricing actuary already has: a table of premium by
-limit band, each band with its own expected loss ratio. You want one aggregate
-distribution for the whole book, with the bands correctly weighted -- not three
-separate models you then have to add up by hand.
+You have the shape every pricing actuary already has: a table of premium by limit band, each band with its own expected loss ratio. You want one aggregate distribution for the whole book, with the bands correctly weighted -- not three separate models you then have to add up by hand.
 
 ```{python}
 a = build('''agg LimitProfile
-  [1000 2000 500] premium at [0.8 0.7 0.5] lr
+  [10000 20000 5000] premium at [0.8 0.7 0.5] lr
   [1000 2000 5000] xs 0
   sev lognorm 50 cv 1.5
   poisson''')
 qd(a.summary_df)
 ```
 
-The three vectors line up positionally: 1000 of premium at an 80% loss ratio
-written at a 1000 limit, 2000 at 70% at a 2000 limit, 500 at 50% at a 5000
-limit. One severity curve is written across all three bands, and the *limit* is
-what differs -- so the severity is the same lognormal capped at three different
-points.
+The three vectors line up positionally: 10000 of premium at an 80% loss ratio written at a 1000 limit, 20000 at 70% at a 2000 limit, 5000 at 50% at a 5000 limit. One severity curve is written across all three bands, and the *limit* is what differs -- so the severity is the same lognormal capped at three different points.
 
-The claim count is an **output**, not an input. `aggregate` knows the expected
-loss in each band (premium x loss ratio) and the expected severity in that band
-(the lognormal limited at that band's limit), so it derives the implied count
-per band and adds them. That is the whole point of the exposure clause: you
-give it what you actually have -- premium and a loss ratio -- and it solves for
-the count rather than making you do it.
+The claim count is an **output**, not an input. `aggregate` knows the expected loss in each band (premium x loss ratio) and the expected severity in that band (the lognormal limited at that band's limit), so it derives the implied count per band and adds them. That is the whole point of the exposure clause: you give it what you actually have -- premium and a loss ratio -- and it solves for the count rather than making you do it.
 
-Read `a.n` back to see the implied total count, and `a.sev_m` for the
-exposure-weighted average severity across the bands.
+Read `a.n` back to see the implied total count, and `a.sev_m` for the exposure-weighted average severity across the bands.
 
 ::: {.callout-note collapse="true" title="The check"}
 
@@ -54,8 +41,7 @@ assert abs(a.n * a.sev_m - a.actual_m) < 1e-6
 
 ## Three dice: an exact discrete aggregate {#sec-recipe-aggregate-three-dice}
 
-You want to see what `aggregate` computes on something you can check in your
-head. Three dice: a fixed frequency of 3, a severity uniform on 1..6.
+You want to see what `aggregate` computes on something you can check in your head. Three dice: a fixed frequency of 3, a severity uniform on 1..6.
 
 ```{python}
 a = build('''agg ThreeDice
@@ -64,15 +50,9 @@ a = build('''agg ThreeDice
 qd(a.summary_df)
 ```
 
-Everything here is discrete and lands exactly on the grid, so this is the one
-case where the FFT is not an approximation at all -- the aggregate PMF is the
-exact three-fold convolution of the die. That is why it is the first recipe: it
-separates "is the method right" from "is the discretization fine", which every
-later recipe has to hold apart.
+Everything here is discrete and lands exactly on the grid, so this is the one case where the FFT is not an approximation at all -- the aggregate PMF is the exact three-fold convolution of the die. That is why it is the first recipe: it separates "is the method right" from "is the discretization fine", which every later recipe has to hold apart.
 
-`dfreq [3]` is an explicit outcome list with a single outcome, so N = 3 with
-probability one. `dsev [1:6]` is the inclusive range 1, 2, ..., 6 with equal
-weights.
+`dfreq [3]` is an explicit outcome list with a single outcome, so N = 3 with probability one. `dsev [1:6]` is the inclusive range 1, 2, ..., 6 with equal weights.
 
 ::: {.callout-note collapse="true" title="The check"}
 

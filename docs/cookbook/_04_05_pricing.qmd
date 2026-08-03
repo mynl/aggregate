@@ -2,28 +2,22 @@
 
 ## Basic pricing {#sec-aggregate-pricing}
 
-*This is a recipe for* putting a price on a single aggregate: take a distortion
-from @sec-distortions and apply it to the aggregate's survival function to get a
-risk-loaded premium. The bridge from a distribution to a number.
+*This is a recipe for* putting a price on a single aggregate: take a distortion from @sec-distortions and apply it to the aggregate's survival function to get a risk-loaded premium. The bridge from a distribution to a number.
 
 ```{python}
 from _setup import *
 from aggregate import Distortion
 ```
 
-**Beat 1 — the DecL.**
-
 ```{python}
 pp(house('PricedBook'))
 ```
 
-**Beats 2 & 3 — build and price.**
+<!-- TODO(author): build the book, pick a distortion, apply the pricing path (Distortion.price on the aggregate's survival, or the aggregate's own pricing helper); show premium, loss, margin. -->
 
-<!-- TODO(author): build the book, pick a distortion, apply the pricing path
-     (Distortion.price on the aggregate's survival, or the aggregate's own
-     pricing helper); show premium, loss, margin. -->
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Limiting-Case] -->
 
-**Beat 4 — the check.** [Check-Limiting-Case]
+<!-- TODO(author): distorted premium >= expected loss, and increases with the distortion parameter (more risk load -> more premium). -->
 
-<!-- TODO(author): distorted premium >= expected loss, and increases with the
-     distortion parameter (more risk load -> more premium). -->
+:::

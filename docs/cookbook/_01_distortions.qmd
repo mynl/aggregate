@@ -2,13 +2,7 @@
 
 # Distortions {#sec-distortions}
 
-*This is a recipe for* pricing risk with a **distortion** — a function
-$g:[0,1]\to[0,1]$ with $g(0)=0$, $g(1)=1$, increasing and concave, that re-weights
-the survival function to load for risk [@Mildenhall2022a]. Distortions are the
-simplest first-class citizen and they turn up everywhere downstream (aggregate
-pricing @sec-aggregate-pricing, bounds @sec-bounds, portfolio allocation
-@sec-portfolio-pricing), so we meet them first — and use them to introduce the
-surface every citizen shares.
+*This is a recipe for* pricing risk with a **distortion** — a function $g:[0,1]\to[0,1]$ with $g(0)=0$, $g(1)=1$, increasing and concave, that re-weights the survival function to load for risk [@Mildenhall2022a]. Distortions are the simplest first-class citizen and they turn up everywhere downstream (aggregate pricing @sec-aggregate-pricing, bounds @sec-bounds, portfolio allocation @sec-portfolio-pricing), so we meet them first — and use them to introduce the surface every citizen shares.
 
 ```{python}
 from _setup import *
@@ -16,9 +10,7 @@ from aggregate import Distortion
 import numpy as np
 ```
 
-**Beat 1 — the menu.** Distortions are usually built directly, by name and
-parameter. (You *can* also express one in DecL — you just rarely need to; direct
-construction reads better here.) The registry lists what is available:
+Distortions are usually built directly, by name and parameter. (You *can* also express one in DecL — you just rarely need to; direct construction reads better here.) The registry lists what is available:
 
 ```{python}
 Distortion.available_distortions()
@@ -32,9 +24,7 @@ tvar = Distortion('tvar', 0.1)
 ph, wang, tvar
 ```
 
-**Beats 2 & 3 — validate, then the shared exhibits.** Every first-class citizen
-answers the same questions — `valid`, a `*_explanation`, a `plot`. For a
-distortion the natural exhibit is the curve itself:
+Every first-class citizen answers the same questions — `valid`, a `*_explanation`, a `plot`. For a distortion the natural exhibit is the curve itself:
 
 ```{python}
 ph.plot()
@@ -46,9 +36,10 @@ tvar.plot()
 print(ph)   # short repr / description — the *_explanation surface in miniature
 ```
 
-**Beat 4 — the check: it really is a distortion.** [Check-Limiting-Case] +
-[Check-Round-Trip]. A coherent distortion must satisfy $g(0)=0$, $g(1)=1$, be
-increasing, and be concave ($g'$ decreasing). We *watch* all four hold:
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Limiting-Case] + [Check-Round-Trip] -->
+
+A coherent distortion must satisfy $g(0)=0$, $g(1)=1$, be increasing, and be concave ($g'$ decreasing). We *watch* all four hold:
 
 ```{python}
 x = np.linspace(0, 1, 11)
@@ -60,6 +51,6 @@ for d in (ph, wang, tvar):
           f'concave={bool(np.all(np.diff(gp) <= 1e-9))}')
 ```
 
-<!-- TODO(author): calibrate a canonical trio to the house book's loss ratio;
-     add a .price() demo once we reach @sec-aggregate-pricing so the reader sees
-     premium >= expected loss (the [Check-Limiting-Case] there). -->
+<!-- TODO(author): calibrate a canonical trio to the house book's loss ratio; add a .price() demo once we reach @sec-aggregate-pricing so the reader sees premium >= expected loss (the [Check-Limiting-Case] there). -->
+
+:::

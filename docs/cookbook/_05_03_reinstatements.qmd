@@ -2,28 +2,21 @@
 
 ## Reinstatements {#sec-reinstatements}
 
-*This is a recipe for* reinstatement premium on an occurrence layer:
-`reinstatements [1 1 1]` (paid), `no reinstatements`, and free reinstatements.
-The reinstated premium is stochastic — it depends on how much of the layer burns
-— and the terms live on `p.engine.reinstatement_terms`.
+*This is a recipe for* reinstatement premium on an occurrence layer: `reinstatements [1 1 1]` (paid), `no reinstatements`, and free reinstatements. The reinstated premium is stochastic — it depends on how much of the layer burns — and the terms live on `p.engine.reinstatement_terms`.
 
 ```{python}
 from _setup import *
 ```
 
-**Beat 1 — the DecL.**
-
 ```{python}
 pp(house('Reinst', occ=f'{OCC_LAYER} {REINST}'))
 ```
 
-**Beats 2 & 3 — build, validate, exhibits.**
+<!-- TODO(author): build; show the stochastic ceded-premium leg on p.stats_df (walk face) and p.engine.reinstatement_terms; contrast paid vs free vs no reinstatements. -->
 
-<!-- TODO(author): build; show the stochastic ceded-premium leg on p.stats_df
-     (walk face) and p.engine.reinstatement_terms; contrast paid vs free vs no
-     reinstatements. -->
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Reconciliation] -->
 
-**Beat 4 — the check.** [Check-Reconciliation]
+<!-- TODO(author): expected reinstated premium reconciles with expected layer burn × rate; consolidated reinstatement pnl == xpnl exactly. -->
 
-<!-- TODO(author): expected reinstated premium reconciles with expected layer
-     burn × rate; consolidated reinstatement pnl == xpnl exactly. -->
+:::

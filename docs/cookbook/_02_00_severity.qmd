@@ -2,14 +2,9 @@
 
 # Severity {#sec-severity}
 
-*This section covers* the size of a single loss — the `sev` clause. Two flavors,
-one page each:
+*This section covers* the size of a single loss — the `sev` clause. Two flavors, one page each:
 
-- **@sec-severity-discrete** — discrete / empirical severities (`dsev`), the
-  outcome-and-probability form.
-- **@sec-severity-continuous** — named `scipy` continuous distributions, the
-  mean/CV parameterization, scaling and shifting, layers and limits, and spliced
-  forms — drawing real actuarial examples from the bundled `.agg` library.
+- **@sec-severity-discrete** — discrete / empirical severities (`dsev`), the outcome-and-probability form.
+- **@sec-severity-continuous** — named `scipy` continuous distributions, the mean/CV parameterization, scaling and shifting, layers and limits, and spliced forms — drawing real actuarial examples from the bundled `.agg` library.
 
-Rule of thumb for picking a continuous form: thick unlimited tail → `slognorm`;
-bounded/thin → `sgamma`; if in doubt, `slognorm`.
+Rule of thumb for picking a continuous form: thick unlimited tail → `slognorm`; bounded/thin → `sgamma`; if in doubt, `slognorm`.

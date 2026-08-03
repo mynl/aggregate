@@ -2,9 +2,7 @@
 
 ## Limit profile {#sec-aggregate-limit-profile}
 
-*This is a recipe for* an **exposure/limit profile** — the same severity written
-across several limits (and attachments) with premium or count weights, the
-bread-and-butter of commercial rating. One `agg` carries the whole profile.
+*This is a recipe for* an **exposure/limit profile** — the same severity written across several limits (and attachments) with premium or count weights, the bread-and-butter of commercial rating. One `agg` carries the whole profile.
 
 ```{python}
 from _setup import *
@@ -13,10 +11,7 @@ from textwrap import fill
 from aggregate import qd
 ```
 
-**Beat 1 — the DecL.**
-
-<!-- TODO(author): a multi-limit profile, e.g. limits [1000 5000 10000] with
-     exposure weights, one severity curve; calibrated. -->
+<!-- TODO(author): a multi-limit profile, e.g. limits [1000 5000 10000] with exposure weights, one severity curve; calibrated. -->
 
 ```{python}
 #| echo: false
@@ -29,13 +24,11 @@ print()
 qd(a.stats_df.iloc[:, :5].filter(regex='meta|mean|cv|skew', axis=0))
 ```
 
+<!-- TODO(author): show the per-limit breakdown and the blended aggregate; the increased-limits behavior. -->
 
-**Beats 2 & 3 — build, validate, exhibits.**
+::: {.callout-note collapse="true" title="The check"}
+<!-- [Check-Reconciliation] -->
 
-<!-- TODO(author): show the per-limit breakdown and the blended aggregate; the
-     increased-limits behavior. -->
+<!-- TODO(author): the profile's expected loss equals the exposure-weighted sum of the per-limit expected losses. -->
 
-**Beat 4 — the check.** [Check-Reconciliation]
-
-<!-- TODO(author): the profile's expected loss equals the exposure-weighted sum of
-     the per-limit expected losses. -->
+:::

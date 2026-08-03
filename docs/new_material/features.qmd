@@ -95,7 +95,7 @@ but not exampled.
 | portfolio windowed combine 1P; single-big-jump look-through | a66 | Under the hood | — |
 | `Aggregate.approximate()` un-shadowed (bug); one fit core | a67, a68 | Under the hood | — |
 | DecL statement separation: blank line or `;`, no more `\` | a69 | New DecL elements | — |
-| `balanced_window` + `Aggregate.focus` | a70 | Grids & windows | — |
+| `balanced_window` + `Aggregate.center_window` | a70 | Grids & windows | — |
 | `.agg` library rationalization (superseded by a159) | a71 | Under the hood | — |
 | bivariate axis sizing: measure, don't guess; measured lower edge; centred axes | a72, a73, a75, a76 | Bivariate | `mv_copula` |
 | `round_bucket` ladder: no more 2.5x jumps | a74 | Grids & windows | — |

@@ -1,13 +1,14 @@
-"""Stage MV-1 regressions: ``balanced_window`` + ``Aggregate.focus``.
+"""Stage MV-1 regressions: ``balanced_window`` + ``Aggregate.center_window``.
 
 ``balanced_window(ser, p)`` is the *measure-don't-guess* primitive the bivariate
 axis sizing is built on (``dev/plan-mv.md`` §5.1): given a realized pmf and a
 discarded tail mass ``p``, it returns the equal-tail window ``[q(p/2),
-q(1 - p/2)]`` snapped to ``bs``. ``Aggregate.focus`` is the thin public
-re-slicer over a computed ``density_df`` (§5.4). These pin the contract both
-must deliver: the window keeps ``1 - p`` of the mass, trims equal *probability*
-off each tail (so a signed/skewed margin stays centred on its mass), snaps to
-the grid, and ``focus`` round-trips the mass without recompute.
+q(1 - p/2)]`` snapped to ``bs``. ``Aggregate.center_window`` is the thin public
+re-slicer over a computed ``density_df`` (§5.4), named ``focus`` until 1.0.0a192.
+These pin the contract both must deliver: the window keeps ``1 - p`` of the mass,
+trims equal *probability* off each tail (so a signed/skewed margin stays centred
+on its mass), snaps to the grid, and ``center_window`` round-trips the mass
+without recompute.
 """
 
 from __future__ import annotations
@@ -78,27 +79,27 @@ def test_p_out_of_range_raises():
             balanced_window(ser, bad)
 
 
-def test_focus_round_trips_mass():
-    """``focus(p)`` returns a slice holding ``>= 1 - p`` of the total mass, no recompute."""
+def test_center_window_round_trips_mass():
+    """``center_window(p)`` returns a slice holding ``>= 1 - p`` of the total mass, no recompute."""
     a = build('agg FocusN 100 claims sev lognorm 100 cv 0.8 poisson')
     before = a.density_df.copy()
     p = 1e-4
-    win = a.focus(p)
+    win = a.center_window(p)
     assert float(win['p_total'].sum()) >= 1.0 - p - 1e-9
-    # focus does not mutate the aggregate's density_df
+    # center_window does not mutate the aggregate's density_df
     pd.testing.assert_frame_equal(a.density_df, before)
     # window is a contiguous central slice of the full grid
     assert win.index.min() >= a.density_df.index.min()
     assert win.index.max() <= a.density_df.index.max()
 
 
-def test_focus_matches_balanced_window():
-    """``focus`` is exactly ``balanced_window`` on ``p_total`` re-sliced on the grid."""
+def test_center_window_matches_balanced_window():
+    """``center_window`` is exactly ``balanced_window`` on ``p_total`` re-sliced on the grid."""
     a = build('agg FocusN2 50 claims sev lognorm 100 cv 1.2 poisson')
     p = 1e-5
     ser = a.density_df.query('p_total > 0').p_total
     lo, hi = balanced_window(ser, p, bs=a.bs)
-    win = a.focus(p)
+    win = a.center_window(p)
     assert win.index.min() == pytest.approx(lo)
     assert win.index.max() == pytest.approx(hi)
 

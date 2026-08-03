@@ -762,6 +762,72 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return bs_explain(self)
 
+    def sharpen(self, bs=None, log2=None, *, log2_cap=24, power=2,
+                good_enough=0.5, min_gain=2.0, execute=True):
+        """Probe the grid neighbourhood and move to a better ``(bs, log2)``.
+
+        Delegated to :func:`~aggregate._bucket_window.sharpen`, where the score,
+        the probe geometry and the selection rule are documented in full.
+
+        :meth:`update` *chooses* a grid from the analytic moments before any FFT
+        runs; this *audits* that choice afterwards. It re-updates the aggregate
+        on the eight neighbouring cells (half / same / double ``bs`` by one step
+        down / same / up in ``log2``), scores each against the analytic moments
+        in units of the validation tolerance, and moves only on a large win,
+        preferring the smallest ``log2`` that reaches the target.
+
+        Populates :attr:`sharpen_df`, :attr:`sharpen_description` and
+        :attr:`sharpen_explanation`. Returns ``self``, so the call chains.
+
+        Examples
+        --------
+        ::
+
+            a = build('agg X 100 claims sev lognorm 100 cv 2 poisson')
+            a.sharpen()
+            print(a.sharpen_description)
+        """
+        return _bucket_window.sharpen(
+            self, bs, log2, log2_cap=log2_cap, power=power,
+            good_enough=good_enough, min_gain=min_gain, execute=execute)
+
+    @property
+    def sharpen_df(self) -> 'pd.DataFrame':
+        """The last :meth:`sharpen` probe, one tidy row per grid cell.
+
+        Columns: the integer offsets ``d_bs`` / ``d_log2`` from the probe centre,
+        the realized ``bs`` / ``log2`` / ``extent`` / ``x_min``, the ``score`` and
+        its six normalized terms (``u_sev_mean`` through ``u_agg_skew``), the
+        ``aliasing`` ratio, the ``validation`` verdict, a ``warnings`` count,
+        ``seconds``, the ``selected`` winner, and a ``note`` carrying the
+        exception text for any cell that failed.
+
+        ``d_bs`` and ``d_log2`` make the three-by-three picture one ``pivot``
+        away. ``None`` before :meth:`sharpen` runs.
+        """
+        if self._sharpen_df is None:
+            return None
+        return self._sharpen_df.copy()
+
+    @property
+    def sharpen_description(self) -> str:
+        """One-line summary of the last :meth:`sharpen` probe.
+
+        What was scored, what won, and whether the grid moved. The verbose form
+        is :attr:`sharpen_explanation`.
+        """
+        return _bucket_window.sharpen_describe(self)
+
+    @property
+    def sharpen_explanation(self) -> str:
+        """Verbose prose explaining the last :meth:`sharpen` probe.
+
+        What the score means, how to read the probe as extent-limited versus
+        resolution-limited, why ``log2`` was or was not grown, and what changed.
+        The short form is :attr:`sharpen_description`.
+        """
+        return _bucket_window.sharpen_explain(self)
+
     def _sev_label(self) -> str:
         """Short severity family label for tail text (the family, or ``'N components'``)."""
         if self.sevs is None or len(self.sevs) == 0:
@@ -1867,6 +1933,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self.i0 = 0           # index of physical 0 in the severity array
         self.xs_sev = None    # severity discretisation grid (may differ from xs)
         self._bs_window_df = None   # inspectable bucket/window estimator summary
+        self._sharpen_df = None     # last sharpen() probe, one row per cell
+        self._sharpen_state = None  # last sharpen() decision, for the narrative
         self._bs_clip = None        # structured far-tail clip report (item 6) or None
         self._bs_raw = None         # pre-dyadic-round bs (unset for the multi-method agg sizer)
         # F1 opt-in: when True the severity keeps its negative support (the
@@ -3067,7 +3135,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return face
 
     def update(self, log2=16, bs=0, bucket_sizing_p=BUCKET_SIZING_P, debug=False,
-               x_min='auto', x_max=None, window_convention=None, **kwargs):
+               x_min='auto', x_max=None, window_convention=None, sharpen=False,
+               **kwargs):
         """
         Convenience function, delegates to update_work. Avoids having to pass xs. Also
         aliased as easy_update for backward compatibility.
@@ -3089,6 +3158,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
           convention orienting the automatic windowed placement (per-edge
           coverage and padding skew). ``None`` (default) derives it from
           ``value_type``. See ``dev/plan-bucket-window-2.md`` §1A.
+        :param sharpen: opt in to auto-sharpening. ``False`` (default) leaves the
+          grid exactly as the estimator chose it. ``True`` runs :meth:`sharpen`
+          once the update completes, which probes the eight neighbouring
+          ``(bs, log2)`` cells and moves to a better one on a large win. Off by
+          default, and *not* turned on by ``build``, because a probe costs eight
+          extra updates.
         :param kwargs:  passed through to update
         :return:
 
@@ -3112,8 +3187,13 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # (``ssev`` / negative-``dsev``), so the loss convolves on its genuine
         # signed grid.
         xs = x_min + np.arange(0, N, dtype=float) * bs
-        return self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
-                                **kwargs)
+        rv = self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
+                              **kwargs)
+        if sharpen:
+            # Opt-in only. ``sharpen``'s own probe updates pass sharpen=False,
+            # so there is no recursion.
+            self.sharpen()
+        return rv
 
     def update_work(self, xs, padding=1, sev_calc='discrete',
                     discretization_calc='survival', normalize=True, force_severity=False,
@@ -5487,7 +5567,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 is_loss_value=self._is_loss_value)
         return self._sev_dist
 
-    def focus(self, p=1e-6):
+    def center_window(self, p=1e-6):
         """Return the central window of ``density_df`` holding ``1 - p`` of the mass.
 
         A thin, no-recompute re-slicer over the finished aggregate: it runs
@@ -5517,7 +5597,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         the grid. Does not mutate the aggregate -- ``density_df`` is unchanged.
         """
         if self.density_df is None:
-            raise ValueError('Must update before calling focus.')
+            raise ValueError('Must update before calling center_window.')
         ser = self.density_df.query('p_total > 0').p_total
         lo, hi = balanced_window(ser, p, bs=self.bs)
         return self.density_df.loc[lo:hi]

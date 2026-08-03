@@ -1825,6 +1825,9 @@ class Underwriter(HelpMixin):
                 d = answer.spec
                 log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
                     d, log2, bs, bucket_sizing_p, kwargs)
+                # BivariateAggregate has no sharpen (the probe is quadratic in
+                # the joint grid), so drop the kwarg rather than raise on it.
+                kwargs.pop('sharpen', None)
                 log2_ = 0 if log2 == 0 else log2
                 logger.info('(%s, %s): bivariate update(log2=%s, bs=%s)',
                             answer.kind, answer.name, log2_, bs)

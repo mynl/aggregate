@@ -401,7 +401,7 @@ def balanced_window(ser, p, bs=None):
     where that places a window from method-of-moments fits *before* the FFT (a
     guess), this measures the window directly from an already-computed marginal
     pmf. A privileged consumer -- a bivariate aggregate, which runs its inner
-    marginals first, or :meth:`Aggregate.focus` on a finished aggregate -- can
+    marginals first, or :meth:`Aggregate.center_window` on a finished aggregate -- can
     therefore *measure* the support that matters rather than guess it.
 
     The window trims ``p / 2`` of the probability mass off **each** tail and

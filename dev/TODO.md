@@ -355,7 +355,10 @@
   want reshaping. **Reconcile with `dev/done/plan-consistent-naming.md` §3** (the
   deferred rename of the verb workers that shadow the noun properties by one
   letter, e.g. → `_format_bs_grid`). Do the two together. *Standing reminder —
-  surface periodically until scoped.*
+  surface periodically until scoped.* **Now three pairs, not one:** `1.0.0a192`
+  added `sharpen_describe` / `sharpen_explain` to `_bucket_window.py` on the
+  same shape (deliberately, to match the neighbours rather than invent a fourth
+  convention), so whatever the rename lands on applies to them too.
 - **[Pedagogy-Migrations]** (#19) — move figure generators out of `ft.py` /
   `tweedie.py` into `pedagogy.py` so those stay API-focused. Feeds
   `[Pedagogy-Docs-Punchup]`.

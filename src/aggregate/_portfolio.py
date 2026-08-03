@@ -310,6 +310,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self.figure = None
         # bucket/window reporting (set by best_window / update)
         self._bs_window_df = None
+        self._sharpen_df = None     # last sharpen() probe, one row per cell
+        self._sharpen_state = None  # last sharpen() decision, for the narrative
         self._bs_clip = None            # portfolio far-tail clip record or None
         self._bs_raw = None             # pre-dyadic-round bs (auto-size only) or None
         self._combine_x_min = None      # windowed combine origin (Plan B) or None
@@ -989,6 +991,69 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                 f'clipped, a reported deficit not normalized); the analysis '
                 f'suggests increasing log2 to {int(clip["need_log2"])}.')
         return ' '.join(parts)
+
+    def sharpen(self, bs=None, log2=None, *, log2_cap=24, power=2,
+                good_enough=0.5, min_gain=2.0, execute=True):
+        """Probe the grid neighbourhood and move to a better ``(bs, log2)``.
+
+        Delegated to :func:`~aggregate._bucket_window.sharpen`, where the score,
+        the probe geometry and the selection rule are documented in full. The
+        aggregate twin is :meth:`Aggregate.sharpen`.
+
+        :meth:`update` *chooses* the combine grid before any FFT runs; this
+        *audits* that choice afterwards, re-updating the portfolio on the eight
+        neighbouring cells and moving only on a large win, preferring the
+        smallest ``log2`` that reaches the target. Probe cells run with
+        ``add_exa=False``, which is the dominant cost of a portfolio update and
+        contributes nothing to the moments; the chosen cell is then updated in
+        full.
+
+        The score reads the portfolio **total** only, so a book whose total is
+        well resolved can still hold one poorly resolved unit. See
+        :attr:`sharpen_explanation`, which says so, and check the units with
+        their own ``valid``.
+
+        Populates :attr:`sharpen_df`, :attr:`sharpen_description` and
+        :attr:`sharpen_explanation`. Returns ``self``, so the call chains.
+        """
+        return _bucket_window.sharpen(
+            self, bs, log2, log2_cap=log2_cap, power=power,
+            good_enough=good_enough, min_gain=min_gain, execute=execute)
+
+    @property
+    def sharpen_df(self) -> 'pd.DataFrame':
+        """The last :meth:`sharpen` probe, one tidy row per grid cell.
+
+        Columns: the integer offsets ``d_bs`` / ``d_log2`` from the probe centre,
+        the realized ``bs`` / ``log2`` / ``extent`` / ``x_min``, the ``score`` and
+        its six normalized terms (``u_sev_mean`` through ``u_agg_skew``), the
+        ``aliasing`` ratio, the ``validation`` verdict, a ``warnings`` count,
+        ``seconds``, the ``selected`` winner, and a ``note`` carrying the
+        exception text for any cell that failed. ``None`` before :meth:`sharpen`
+        runs.
+        """
+        if self._sharpen_df is None:
+            return None
+        return self._sharpen_df.copy()
+
+    @property
+    def sharpen_description(self) -> str:
+        """One-line summary of the last :meth:`sharpen` probe.
+
+        The verbose form is :attr:`sharpen_explanation`.
+        """
+        return _bucket_window.sharpen_describe(self)
+
+    @property
+    def sharpen_explanation(self) -> str:
+        """Verbose prose explaining the last :meth:`sharpen` probe.
+
+        What the score means, how to read the probe as extent-limited versus
+        resolution-limited, why ``log2`` was or was not grown, what changed, and
+        the total-only limitation of the portfolio score. The short form is
+        :attr:`sharpen_description`.
+        """
+        return _bucket_window.sharpen_explain(self)
 
     @property
     def tail_behavior_df(self) -> 'pd.DataFrame':
@@ -2029,7 +2094,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
     def update(self, log2, bs, remove_fuzz=False,
                sev_calc='discrete', discretization_calc='survival', normalize=True, padding=1,
                trim_density_df=False, add_exa=True, force_severity=True, bucket_sizing_p=BUCKET_SIZING_P,
-               debug=False):
+               debug=False, sharpen=False):
         """
 
         TODO: currently debug doesn't do anything...
@@ -2058,6 +2123,12 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         :param force_severity: force computation of severities for aggregate components even when approximating
         :param bucket_sizing_p: percentile to use for bucket recommendation.
         :param debug: if True, print debug information
+        :param sharpen: opt in to auto-sharpening. ``False`` (default) leaves the
+          combine grid exactly as the estimator chose it. ``True`` runs
+          :meth:`sharpen` once the update completes, which probes the eight
+          neighbouring ``(bs, log2)`` cells and moves to a better one on a large
+          win. Off by default, and *not* turned on by ``build``, because a probe
+          costs eight extra updates.
         :return:
         """
         self._valid = None # reset valid flag
@@ -2266,6 +2337,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         # invalidate stored functions
         self._dist = None
         self._cdf = None
+        if sharpen:
+            # Opt-in only. ``sharpen``'s own probe updates pass sharpen=False,
+            # so there is no recursion.
+            self.sharpen()
 
     def _build_stats_df(self, ma, max_limit):
         """Construct ``stats_df`` from the ``MomentAggregator`` after init.

@@ -1,5 +1,91 @@
 # Changelog
 
+## 1.0.0a192
+
+**[Sharpen-Grid-Probe]** A new `sharpen()` audits the FFT grid the bucket
+estimator chose, and moves to a better one when the win is large.
+
+```python
+a = build('agg X 100 claims sev lognorm 100 cv 2 poisson')
+a.update(log2=14, bs=1/8)     # a grid far too small to hold the book
+a.sharpen()
+print(a.sharpen_description)
+# sharpen: 9 cells in 0.22s, best score 908 vs 3.49e+03 at the centre,
+# target 0.5. Moved: bs 0.125 to 0.25, log2 14 to 15.
+```
+
+`update` *chooses* a grid from the analytic moments before any FFT runs.
+`sharpen` *audits* that choice afterwards: it re-updates the object on the eight
+neighbouring cells (half, same, double `bs` by one step down, same, up in
+`log2`), scores each against the analytic moments, and moves only on a large
+win. Available on `Aggregate` and `Portfolio`.
+
+### The score
+
+Six terms, severity and aggregate mean, CV and skewness, read from the canonical
+`stats_df['error']` and each divided by **its own** validation tolerance (`eps`
+for a mean, `10 eps` for a CV, `100 eps` for a skewness). Those are the
+multipliers `valid_aggregate` already applies, so the units are tolerance:
+**`score <= 1` means the object passes validation**, and `1` is exactly the pass
+boundary. The score does not move when `validation_eps` changes.
+
+Combined as a power mean, `(mean_i u_i ** power) ** (1 / power)`; `power=1`,
+`2` (default) and `numpy.inf` all land on the same scale. A term whose
+theoretical value is zero or infinite drops out, as it does in validation; a
+non-finite empirical value scores infinite.
+
+### Reading the frame
+
+`sharpen_df` is tidy, one row per cell, carrying the offsets `d_bs` / `d_log2`,
+the realized grid, the score and its six terms, the aliasing ratio, the
+validation verdict, timings and a `note`. Extent is `bs * 2**log2`, so cells on
+an anti-diagonal share an extent and differ only in resolution. Reading them
+together says whether a grid is **extent-limited**, widen it, or
+**resolution-limited**, refine it. `sharpen_description` and
+`sharpen_explanation` say it in prose.
+
+### Two gates, one number
+
+`good_enough` (default `0.5`) sets both. If the current grid already scores at
+or under it, **nothing is run at all**; `good_enough=0` never clears, which is
+how a probe is forced. Among cells that meet it, the winner is the one with the
+**smallest `log2`**, then the best score: more grid almost always helps a
+little, and a plain argmin would grow `log2` on nearly every object and double
+everyone's runtime for a negligible gain.
+
+When no cell reaches the target the best available step is taken anyway, if it
+beats the centre by `min_gain` (default `2`). Re-running `sharpen` re-centres
+the probe and continues, so a badly starved grid walks back to a valid one over
+a few calls.
+
+`execute=False` makes the probe pure diagnosis: the original grid is restored,
+along with the `sev_calc` / `discretization_calc` / `normalize` / `padding`
+settings that a bare re-update would silently reset to their defaults. Those
+same settings are locked across every cell, so the nine differ in `bs` and
+`log2` and in nothing else.
+
+### Also
+
+* **`update(..., sharpen=True)`** opts a single update into auto-sharpening.
+  Off by default and **not** turned on by `build`, because a probe costs eight
+  extra updates. `BivariateAggregate` has no sharpen: the probe is quadratic in
+  the joint grid.
+* A `pnl` gets it through its engine. `build_many` updates the deferred engine
+  and only then snapshots the P&L, so `build(prog, sharpen=True)` reaches it
+  pre-construction. There is deliberately no `PnL.sharpen`, which would leave a
+  built ledger on a stale grid.
+* Portfolio probe cells run `add_exa=False`, the dominant cost of a portfolio
+  update and irrelevant to the moments; the chosen cell is then updated in full.
+  The portfolio score reads the **total only**, so a well resolved total can
+  still hide a poorly resolved unit. `sharpen_explanation` says so.
+
+### Breaking
+
+* **`Aggregate.focus` is now `Aggregate.center_window`.** The name was wrong for
+  what it does, a no-recompute re-slicer returning the central window of
+  `density_df` holding `1 - p` of the mass, and it blocked the good name. No
+  deprecation shim.
+
 ## 1.0.0a191
 
 **[First-Step-Label]** The direct block of a walk now reads the labels you

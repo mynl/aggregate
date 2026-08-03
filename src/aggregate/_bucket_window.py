@@ -1433,15 +1433,74 @@ def _bs_steps(bs_limit):
     return k
 
 
-def sharpen(ob, bs=None, log2=None, *, log2_cap=24, bs_limit=SHARPEN_BS_LIMIT,
-            power=2, good_enough=0.5, min_gain=2.0, execute=True):
+def _sharpen_lattice(ob):
+    """The integer lattice step of a wholly discrete severity, else ``None``.
+
+    Delegates to :meth:`Aggregate._severity_lattice`, the gcd of the integer
+    severity atoms, taking the gcd across units for a Portfolio. ``None`` as soon
+    as any component is continuous or off the integer lattice.
+    """
+    if _sharpen_is_port(ob):
+        lats = [a._severity_lattice() for a in getattr(ob, 'agg_list', [])]
+        if not lats or any(v is None for v in lats):
+            return None
+        return float(np.gcd.reduce([int(round(v)) for v in lats]))
+    fn = getattr(ob, '_severity_lattice', None)
+    return None if fn is None else fn()
+
+
+def _bucket_is_exact(ob, bs):
+    """Whether ``bs`` discretizes a discrete severity exactly.
+
+    ``(exact, lattice)``. Exact when every atom is a whole number of buckets,
+    i.e. the lattice gcd is an integer multiple of ``bs``. A *finer* bucket is
+    still exact but wastes grid; a coarser one that does not divide the lattice
+    scatters the atoms off their own values.
+    """
+    lattice = _sharpen_lattice(ob)
+    if lattice is None or not bs:
+        return False, lattice
+    ratio = lattice / float(bs)
+    return bool(abs(ratio - round(ratio)) < 1e-9), lattice
+
+
+def _note(row, text):
+    """Append to a cell's ``note``, never overwrite it.
+
+    A walk terminates on a cell that failed as readily as on one that merely
+    stopped improving, and the exception text is the more valuable of the two
+    facts, so the stop reason is added after it rather than in place of it.
+    """
+    row['note'] = f'{row["note"]}; {text}' if row['note'] else text
+
+
+def _pick_cell(df):
+    """Index of the best cell, thriftily: cheapest grid among the near-best.
+
+    Cells within :data:`SHARPEN_FALLBACK_SLACK` of the best score count as tied,
+    and ties break on ``log2`` first, so a free memory saving is taken when the
+    score is genuinely a wash, then on ``|d_bs|``, so a competitive centre wins
+    over an equally good move and the grid is not churned for nothing.
+    ``None`` when every cell failed.
+    """
+    finite = df[np.isfinite(df['score'])]
+    if not len(finite):
+        return None
+    near = finite[finite['score'] <= finite['score'].min() * SHARPEN_FALLBACK_SLACK]
+    near = near.assign(_move=near['d_bs'].abs())
+    return near.sort_values(['log2', '_move', 'score']).index[0]
+
+
+def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
+            power=2, good_enough=0.5, execute=True):
     """Probe the grid neighbourhood and move to a better ``(bs, log2)``.
 
     ``bs_window`` and ``port_best_window`` *choose* a grid from the analytic
     moments before any FFT runs. This *audits* that choice after the fact: it
     re-updates ``ob`` on neighbouring cells, scores each with
-    :func:`~aggregate._validation.validation_score`, and moves only when the
-    improvement is large. Results land on ``ob._sharpen_df``.
+    :func:`~aggregate._validation.validation_score`, and takes the best grid that
+    does not cost more than the one you already have. Results land on
+    ``ob._sharpen_df``.
 
     Parameters
     ----------
@@ -1450,26 +1509,20 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, bs_limit=SHARPEN_BS_LIMIT,
         is updated once first, to establish the centre cell.
     bs, log2 : float, int, optional
         Centre of the probe. Default the object's current grid.
-    log2_cap : int, default 24
-        The ``log2 + 1`` row is dropped when ``log2 >= log2_cap``. The
-        ``log2 - 1`` row is dropped below :data:`SHARPEN_LOG2_FLOOR`.
+    log2_cap : int, default 20
+        ``log2`` is never grown to more than this.
     bs_limit : float, default 16
         Largest factor by which the line search may multiply or divide ``bs``.
         Must be a power of two, so 16 permits four doublings each way.
     power : float, default 2
         Norm exponent passed to the score.
     good_enough : float, default 0.5
-        Target score, in tolerance units. Two gates run off this one number.
-        **Probe gate**: if the centre already scores at or below it, nothing is
-        run at all. **Move gate**: the winner is the cheapest cell that meets it.
-        ``good_enough=0`` therefore forces the probe to run, since a score is
-        never negative; that is why there is no separate ``force`` argument.
-    min_gain : float, default 2.0
-        When no cell meets the target, move to the best cell only if it beats the
-        centre by this factor. The bar is modest rather than severe because the
-        probe gate means this branch is only ever reached by a grid that has
-        already failed the target: refusing to move would leave a known-bad grid
-        in place and freeze the descent, since a re-run would refuse identically.
+        Target score, in tolerance units, and the only judgment knob. It does two
+        things. **Probe gate**: if the current grid already scores at or below
+        it, nothing is run at all. **Growth trigger**: ``log2`` is grown only
+        when no cell at the current size or smaller reaches it. ``good_enough=0``
+        therefore means "probe everything, never grow", since a score is never
+        negative; that is why there is no separate ``force`` argument.
     execute : bool, default True
         ``True`` leaves ``ob`` on the chosen cell. ``False`` restores the
         original grid, so the probe is pure diagnosis.
@@ -1477,24 +1530,41 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, bs_limit=SHARPEN_BS_LIMIT,
     Returns
     -------
     Aggregate or Portfolio
-        ``ob``, so the call chains.
+        ``ob``, so the call chains. The object is updated in place either way;
+        the return is a convenience, not a copy.
 
     Notes
     -----
-    **Shape.** Three rows, ``log2 - 1`` / ``log2`` / ``log2 + 1``, and within
-    each row a **line search out from the centre bucket**: ``bs`` is doubled
-    until the score stops improving, then halved until the score stops
-    improving, capped at ``bs_limit`` each way. The rows are therefore ragged,
-    which is why the frame is tidy rather than a matrix.
+    **Shape.** A row per ``log2``, and within each row a **line search out from
+    the current bucket**: ``bs`` is doubled until the score stops improving, then
+    halved until it stops improving, capped at ``bs_limit`` each way. The rows
+    are ragged, which is why the frame is tidy rather than a matrix. ``log2``
+    and ``log2 - 1`` are searched up front; ``log2 + 1`` is searched **only if
+    neither reaches the target**, because it costs twice as much per cell and
+    under the selection rule below it is usually not consulted.
 
     The line search is well posed because the score is single-troughed in ``bs``
     at fixed ``log2``: with extent ``W = bs * 2**log2``, a larger bucket buys
     extent and loses resolution, so the two error families trade off and there is
-    one turning point. Stopping at the first worse cell assumes exactly that.
-    A severity whose atoms land on grid points at some buckets and not others can
-    in principle dip again past the turn, and such a dip would be missed;
-    ``bs_window`` sizes those objects by its exact-discrete method, so they
-    rarely reach a probe at all.
+    one turning point. Stopping at the first worse cell assumes exactly that. A
+    walk that runs out of ``bs_limit`` while still improving says so in its
+    ``note``, which is a different fact from turning, and means a re-run will
+    keep going.
+
+    **Selection.** Take the best score among cells that **do not grow**
+    ``log2``. That is the principle: never make the caller pay more than they
+    already are. Reducing ``log2`` is a bonus rather than a goal, so it is picked
+    up by the tie rule in :func:`_pick_cell` rather than chased. ``log2`` grows
+    only when nothing at the current size or smaller reaches ``good_enough`` and
+    something at ``log2 + 1`` does. If nothing anywhere reaches the target, the
+    best cell overall is taken, still thrift-ordered, so the descent starts and a
+    re-run continues it.
+
+    **Discrete severity.** When every severity atom is a whole number of buckets
+    the discretization is already exact, and no bucket change can help: coarser
+    scatters the atoms off their own values, finer only wastes grid. The bucket
+    is pinned and only ``log2`` is probed, which is what a failing discrete
+    object actually needs, its problem being extent.
 
     **Geometry.** Rows are constant *resolution* and anti-diagonals are constant
     *extent*, which is what makes the frame readable: cells sharing an extent
@@ -1504,22 +1574,11 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, bs_limit=SHARPEN_BS_LIMIT,
     ``round_bucket`` ladder, which would be factors of 1.25 and 1.6, too fine to
     move the error and out of step with ``log2`` plus or minus one.
 
-    **Cost.** The centre cell is free, being the object's current state. A grid
-    already near its optimum stops after one step each way, so the probe costs
-    eight evaluations; a badly wrong grid walks further, which is exactly when
-    the walking is worth paying for.
-
-    **Parsimony.** Among cells that meet the target the winner is the one with
-    the smallest ``log2``, then the best score. More grid almost always helps a
-    little, so a plain argmin would drift to ``log2 + 1`` on nearly every object
-    and silently double everyone's runtime. ``log2`` grows only when nothing
-    cheaper reaches the target.
-
     Every cell runs inside its own guard: one that raises is recorded as ``nan``
     with the exception text in its ``note``, and the sweep completes.
     """
     if log2_cap is None:
-        log2_cap = 24
+        log2_cap = 20
     k_max = _bs_steps(bs_limit)
     # Establish the centre. An object that has never been updated has no
     # empirical moments to score, so update it once at the auto-sized grid.
@@ -1533,6 +1592,7 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, bs_limit=SHARPEN_BS_LIMIT,
         ob.update(log2=log20, bs=bs0, sharpen=False)
     locked = _sharpen_locked(ob)
     x_min0 = float(ob.xs[0]) if getattr(ob, 'xs', None) is not None else 0.0
+    bs_exact, lattice = _bucket_is_exact(ob, bs0)
 
     rows = []
 
@@ -1579,6 +1639,35 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, bs_limit=SHARPEN_BS_LIMIT,
             return _failed(k, j, bs_c, log2_c, time.perf_counter() - t0,
                            f'{type(e).__name__}: {e}')
 
+    def _search_row(j, anchor):
+        """Line search along the bucket axis of one ``log2`` row.
+
+        The anchor cell is already recorded; this walks out from it in both
+        directions and stops each walk at the first cell that fails to improve,
+        recording on the terminal cell WHY it stopped. Running out of
+        ``bs_limit`` while still improving is a different fact from turning, and
+        the caller wants to know which happened.
+        """
+        if bs_exact:
+            return                      # the bucket is pinned, nothing to search
+        for step in (1, -1):
+            prev, k, last = anchor, step, None
+            while abs(k) <= k_max:
+                score = _cell(k, j)
+                last = len(rows) - 1
+                # `not (score < prev)` also stops on a nan, which is what a
+                # failed cell should do: it is not evidence to keep walking.
+                if not (score < prev):
+                    _note(rows[last],
+                          'stopped: this cell failed' if np.isnan(score)
+                          else 'stopped: no better than the previous bucket')
+                    break
+                prev, k = score, k + step
+            else:
+                if last is not None:
+                    _note(rows[last],
+                          'stopped: bs_limit reached, still improving')
+
     # The centre is already computed: score it in place, for free.
     centre_score = _record(0, 0, 0.0, note='centre (current grid)')
 
@@ -1590,60 +1679,57 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, bs_limit=SHARPEN_BS_LIMIT,
                            'probe not run')
         ob._sharpen_df = _sharpen_frame(rows)
         ob._sharpen_state = {'ran': False, 'moved': False, 'power': power,
-                             'good_enough': good_enough, 'min_gain': min_gain,
-                             'execute': execute, 'centre_score': centre_score,
-                             'bs0': bs0, 'log20': log20}
+                             'good_enough': good_enough, 'execute': execute,
+                             'centre_score': centre_score, 'bs0': bs0,
+                             'log20': log20, 'bs_exact': bs_exact,
+                             'lattice': lattice, 'grew': False}
         return ob
 
-    js = [j for j in (-1, 0, 1)
-          if SHARPEN_LOG2_FLOOR <= log20 + j and (j <= 0 or log20 < log2_cap)]
-    for j in js:
-        # One bucket line search per log2 row, out from the centre bucket in
-        # both directions, stopping as soon as a step fails to improve.
-        anchor = centre_score if j == 0 else _cell(0, j)
-        for step in (1, -1):
-            prev, k = anchor, step
-            while abs(k) <= k_max:
-                score = _cell(k, j)
-                # `not (score < prev)` also stops on a nan, which is what a
-                # failed cell should do: it is not evidence to keep walking.
-                if not (score < prev):
-                    break
-                prev, k = score, k + step
+    # Thrifty rows first: the current grid size and, when there is room below,
+    # the smaller one. Neither costs more than the caller is already paying.
+    _search_row(0, centre_score)
+    if log20 - 1 >= SHARPEN_LOG2_FLOOR:
+        _search_row(-1, _cell(0, -1))
 
     df = pd.DataFrame(rows)
-
-    # Move gate. Prefer the cheapest cell that meets the target: smallest log2
-    # first, then best score. Only when nothing meets it does a real win over the
-    # centre justify moving at all.
-    ok = df[df['score'] <= good_enough]
-    if len(ok):
-        pick = ok.sort_values(['log2', 'score']).index[0]
-        reason = 'meets the target at the smallest log2 that does'
+    thrifty = _pick_cell(df)
+    grew = False
+    if thrifty is None:
+        pick = 0
+        reason = 'every probed cell failed, so the grid was left alone'
+    elif df.loc[thrifty, 'score'] <= good_enough:
+        # The rule: best score among cells that do not grow log2. Reached the
+        # target without growing, so the expensive row is never even run.
+        pick = thrifty
+        reason = ('best score at the current grid size or smaller, and it meets '
+                  'the target, so log2 was not grown')
+    elif log20 >= log2_cap:
+        pick = thrifty
+        reason = (f'nothing at the current grid size or smaller meets the '
+                  f'target, and log2 is already at the cap of {log2_cap}')
     else:
-        # Nothing reaches the target. Take the best available step anyway,
-        # provided it is a real improvement: the probe gate means we only get
-        # here when the grid has already failed, so refusing to move leaves a
-        # known-bad grid in place AND freezes the descent (re-running sharpen
-        # would face the same refusal). Parsimony still applies: among cells
-        # within SHARPEN_FALLBACK_SLACK of the best score, prefer the smallest
-        # log2, so a marginal gain never buys a doubled grid.
-        finite = df[np.isfinite(df['score'])]
-        if len(finite):
-            floor = finite['score'].min()
-            near = finite[finite['score'] <= floor * SHARPEN_FALLBACK_SLACK]
-            best = near.sort_values(['log2', 'score']).index[0]
+        # Only now is growing worth pricing: nothing affordable reaches the
+        # target, so pay for the log2 + 1 row and see whether it does.
+        _search_row(1, _cell(0, 1))
+        df = pd.DataFrame(rows)
+        growth = df[df['d_log2'] == 1]
+        ok_growth = growth[growth['score'] <= good_enough]
+        if len(ok_growth):
+            pick = _pick_cell(ok_growth)
+            grew = True
+            reason = ('nothing at the current grid size or smaller meets the '
+                      'target, so log2 grew by one to reach it')
         else:
-            best = 0
-        if (np.isfinite(centre_score) and np.isfinite(df.loc[best, 'score'])
-                and df.loc[best, 'score'] * min_gain <= centre_score):
-            pick = best
-            reason = ('no cell meets the target, so the best available step was '
-                      f'taken; it beats the centre by over {min_gain:g}x')
-        else:
-            pick = 0
-            reason = ('no cell meets the target, and none beats the centre by '
-                      'enough to be worth the move')
+            # Nothing anywhere reaches the target. Take the best cell overall,
+            # still thrift-ordered so growth must be meaningfully better to win.
+            # Refusing to move here would leave a known-bad grid in place AND
+            # freeze the descent, since a re-run would refuse identically.
+            pick = _pick_cell(df)
+            if pick is None:
+                pick = 0
+            grew = bool(df.loc[pick, 'd_log2'] == 1)
+            reason = ('no cell anywhere meets the target, so the best available '
+                      'step was taken; re-run to continue')
     df.loc[pick, 'selected'] = True
     moved = bool(df.loc[pick, 'd_bs'] or df.loc[pick, 'd_log2'])
 
@@ -1664,9 +1750,9 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=24, bs_limit=SHARPEN_BS_LIMIT,
     ob._sharpen_df = _sharpen_frame(df)
     ob._sharpen_state = {'ran': True, 'moved': moved and execute,
                          'power': power, 'good_enough': good_enough,
-                         'min_gain': min_gain, 'execute': execute,
-                         'centre_score': centre_score, 'bs0': bs0,
-                         'log20': log20, 'reason': reason}
+                         'execute': execute, 'centre_score': centre_score,
+                         'bs0': bs0, 'log20': log20, 'reason': reason,
+                         'bs_exact': bs_exact, 'lattice': lattice, 'grew': grew}
     return ob
 
 
@@ -1741,10 +1827,13 @@ def sharpen_describe(ob) -> str:
                 f'{target:g}.')
     win = df[df['selected']].iloc[0]
     secs = float(df['seconds'].sum())
-    head = (f'Sharpen: {len(df)} cells in {secs:.2f}s, best score '
+    pinned = ' (discrete: bucket pinned, grid size only)' if st['bs_exact'] else ''
+    head = (f'Sharpen: {len(df)} cells in {secs:.2f}s{pinned}, best score '
             f'{_sharpen_fmt(win["score"])} vs '
             f'{_sharpen_fmt(st["centre_score"])} at the centre, target '
             f'{target:g}.')
+    if 'bs_limit' in str(win['note']):
+        head += ' The winner sits on the bs_limit and was still improving.'
     if win['bs'] == st['bs0'] and int(win['log2']) == st['log20']:
         return f'{head} Kept bs {_fmt_bs(st["bs0"])}, log2 {st["log20"]}.'
     move = _move_phrase(st, win)
@@ -1777,30 +1866,47 @@ def sharpen_explain(ob) -> str:
             'Pass good_enough=0 to force the probe regardless.')
         return ' '.join(out)
     win = df[df['selected']].iloc[0]
-    out.append(
-        f'{len(df)} cells were scored, in three rows at log2 '
-        f'{st["log20"] - 1}, {st["log20"]} and {st["log20"] + 1}, each row a '
-        'line search out from the current bucket: bs is doubled until the score '
-        'stops improving, then halved likewise. That works because the score has '
-        'a single trough in bs, a larger bucket buying extent and losing '
-        'resolution, so the rows are ragged and the frame is tidy rather than a '
-        'matrix. Extent is bs times 2**log2, so cells on an anti-diagonal share '
-        'an extent and differ only in resolution. Reading them together says '
-        'whether the grid is extent-limited, where the aggregate mean error runs '
-        'far above the severity error and the fix is a wider grid, or '
-        'resolution-limited, where the severity moments themselves are poorly '
-        'reproduced and the fix is a finer bucket.')
-    out.append(f'Selection: {st["reason"]}.')
-    out.append(
-        'Among cells that meet the target the smallest log2 wins, then the best '
-        'score. More grid almost always helps a little, so choosing the outright '
-        'minimum would grow log2 on nearly every object and double the runtime '
-        'for a negligible gain. log2 grows only when nothing cheaper reaches the '
-        'target.')
-    if win['bs'] != st['bs0'] or int(win['log2']) != st['log20']:
-        verb = 'The grid moved' if st['execute'] else 'The recommendation is'
+    if st['bs_exact']:
         out.append(
-            f'{verb} to bs {_fmt_bs(win["bs"])} at log2 {int(win["log2"])}, '
+            'The severity is discrete and bs divides every atom, so the bucket '
+            'is already exact and only the grid size was probed. No bucket '
+            'change can help: a coarser one scatters the atoms off their own '
+            'values, a finer one only wastes grid. What a discrete object fails '
+            'on is extent, which is what log2 controls.')
+        if st['lattice'] and st['lattice'] > st['bs0']:
+            out.append(
+                f'Note that bs {_fmt_bs(st["bs0"])} is finer than it needs to '
+                f'be: the atoms sit on a lattice of {st["lattice"]:g}, which is '
+                'the coarsest exact bucket and would hold the same book on a '
+                'shorter grid.')
+    else:
+        out.append(
+            f'{len(df)} cells were scored, a row per log2 and within each a line '
+            'search out from the current bucket: bs is doubled until the score '
+            'stops improving, then halved likewise. That works because the score '
+            'has a single trough in bs, a larger bucket buying extent and losing '
+            'resolution, so the rows are ragged and the frame is tidy rather '
+            'than a matrix. A walk that runs out of bs_limit while still '
+            'improving says so in its note, which is a different fact from '
+            'turning. Extent is bs times 2**log2, so cells on an anti-diagonal '
+            'share an extent and differ only in resolution. Reading them '
+            'together says whether the grid is extent-limited, where the '
+            'aggregate mean error runs far above the severity error and the fix '
+            'is a wider grid, or resolution-limited, where the severity moments '
+            'themselves are poorly reproduced and the fix is a finer bucket.')
+    out.append(
+        'Selection takes the best score among the cells that do not grow log2, '
+        'the principle being that a probe should never make you pay more than '
+        'you already are. A smaller log2 is a bonus rather than a goal, so it '
+        'wins only when the score is a wash. log2 grows by one only when nothing '
+        'at the current size or smaller reaches the target and something at the '
+        'larger size does, which is why the more expensive row is not even '
+        f'computed unless it is needed. Here: {st["reason"]}.')
+    if win['bs'] != st['bs0'] or int(win['log2']) != st['log20']:
+        verb = ('The grid moved to' if st['execute']
+                else 'The recommendation is')
+        out.append(
+            f'{verb} bs {_fmt_bs(win["bs"])} at log2 {int(win["log2"])}, '
             f'scoring {_sharpen_fmt(win["score"])} against '
             f'{_sharpen_fmt(st["centre_score"])} before.')
         if st['execute']:

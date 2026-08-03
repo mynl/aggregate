@@ -1,5 +1,78 @@
 # Changelog
 
+## 1.0.0a194
+
+**[Sharpen-Grid-Probe]** The selection rule changes, `min_gain` is retired, and
+a discrete severity no longer has its exact bucket searched.
+
+### The rule: never pay more than you already are
+
+`sharpen` now takes **the best score among the cells that do not grow `log2`**.
+It grows by one only when nothing at the current grid size or smaller reaches
+`good_enough`, and something at the larger size does.
+
+The old rule, "the smallest `log2` that meets the target", was written for a
+fixed 3x3 where each row held one arbitrary sample of the bucket axis. Once
+`a193` made every row search to its own trough, that rule started taking a much
+worse score in exchange for a grid saving nobody asked for:
+
+```
+d_log2 │    -4       -3       -2       -1      0      1
+   -1  │     —  2.06428  0.17708  0.64241  2.122  6.386
+    0  │ 2.043  0.04443  0.17671  0.64241  2.122  6.386
+    1  │ 0.010  0.04405  0.17671  0.64241  2.122  6.386
+```
+
+`a193` picked `0.177` at `log2 - 1`, the cheapest cell clearing the bar.
+`a194` picks `0.0444` at the current `log2`. Reducing `log2` is a bonus, not a
+goal: it is now picked up by the tie rule (cells within 25% of the best score
+count as tied, and ties break on `log2`, then on how far the bucket moved, so a
+competitive centre wins and the grid is not churned for nothing).
+
+**`min_gain` is gone.** Its job was "is the best cell enough better than the
+centre to bother", which the rule above answers directly. `good_enough` is now
+the only judgment knob, with two uses: the probe gate, and the growth trigger.
+`good_enough=0` means "probe everything, never grow".
+
+### The `log2 + 1` row is computed lazily
+
+It costs twice as much per cell as the current row and, under the rule above, is
+only ever consulted when nothing affordable reaches the target. So it is no
+longer searched up front. On the table above it was pure waste: rows `0` and `+1`
+agree at every bucket except one, because that book is resolution-limited, not
+extent-limited.
+
+### Discrete severity: the bucket is already exact
+
+When every severity atom is a whole number of buckets there is nothing to search
+on the bucket axis. A coarser bucket scatters the atoms off their own values; a
+finer one only wastes grid. So the bucket is **pinned** and only `log2` is
+probed, which is what a failing discrete object actually needs, its problem being
+extent.
+
+```
+d = build('agg Dice dfreq [3] dsev [1:6]')
+d.sharpen(good_enough=0)
+# Sharpen: 2 cells in 0.02s (discrete: bucket pinned, grid size only), ...
+```
+
+Detection reuses `Aggregate._severity_lattice`, the gcd of the integer atoms,
+taking the gcd across units for a `Portfolio`. A bucket that is exact but finer
+than it needs to be gets a note naming the coarsest exact one: *"bs 1 is finer
+than it needs to be: the atoms sit on a lattice of 5."*
+
+### Also
+
+* **`log2_cap` defaults to 20**, was 24.
+* A walk that runs out of `bs_limit` **while still improving** says so in its
+  `note`, which is a different fact from turning, and `sharpen_description`
+  surfaces it when the winner sits there. The stop reason is appended to a
+  cell's note rather than overwriting it, so a failed cell keeps its exception
+  text.
+* The current-`log2` row is always searched. It used to be dropped along with
+  the row below it when `log2` sat under `SHARPEN_LOG2_FLOOR`, which left a
+  small-grid object with nothing probed at all.
+
 ## 1.0.0a193
 
 **[Sharpen-Grid-Probe]** Punch-ups to `a192`. The score is now a first-class

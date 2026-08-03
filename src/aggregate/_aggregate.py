@@ -762,21 +762,23 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return bs_explain(self)
 
-    def sharpen(self, bs=None, log2=None, *, log2_cap=24,
+    def sharpen(self, bs=None, log2=None, *, log2_cap=20,
                 bs_limit=_bucket_window.SHARPEN_BS_LIMIT, power=2,
-                good_enough=0.5, min_gain=2.0, execute=True):
+                good_enough=0.5, execute=True):
         """Probe the grid neighbourhood and move to a better ``(bs, log2)``.
 
         Delegated to :func:`~aggregate._bucket_window.sharpen`, where the score,
         the probe geometry and the selection rule are documented in full.
 
         :meth:`update` *chooses* a grid from the analytic moments before any FFT
-        runs; this *audits* that choice afterwards. Three rows, ``log2 - 1`` /
-        ``log2`` / ``log2 + 1``, and within each a line search out from the
-        current bucket: ``bs`` is doubled until :attr:`validation_score` stops
-        improving, then halved likewise, capped at ``bs_limit`` each way. It
-        moves only on a large win, preferring the smallest ``log2`` that reaches
-        the target.
+        runs; this *audits* that choice afterwards. A row per ``log2``, and
+        within each a line search out from the current bucket: ``bs`` is doubled
+        until :attr:`validation_score` stops improving, then halved likewise,
+        capped at ``bs_limit`` each way. It then takes **the best score among the
+        cells that do not grow** ``log2``, growing by one only when nothing at
+        the current size or smaller reaches ``good_enough``. A discrete severity
+        whose atoms are a whole number of buckets is already exact, so the bucket
+        is pinned and only ``log2`` is probed.
 
         Populates :attr:`sharpen_df`, :attr:`sharpen_description` and
         :attr:`sharpen_explanation`. Returns ``self``, so the call chains.
@@ -791,7 +793,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _bucket_window.sharpen(
             self, bs, log2, log2_cap=log2_cap, bs_limit=bs_limit, power=power,
-            good_enough=good_enough, min_gain=min_gain, execute=execute)
+            good_enough=good_enough, execute=execute)
 
     @property
     def sharpen_df(self) -> 'pd.DataFrame':

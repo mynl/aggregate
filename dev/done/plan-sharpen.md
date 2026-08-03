@@ -284,3 +284,62 @@ Author review of the shipped `a192` probe raised five, all executed:
    bucket-only move reported `log2 16 to 16`, which reads as a bug rather than
    as "unchanged", so `_move_phrase` now names only what actually changed.
 
+## Second round of punch-ups, shipped 1.0.0a194
+
+Author review of `a193` found the selection rule fighting the new search. Five
+changes, all agreed before execution.
+
+**The rule.** `sharpen` now takes **the best score among cells that do not grow
+`log2`**, growing by one only when nothing at the current size or smaller reaches
+`good_enough`. The old "smallest `log2` that meets the target" was written for a
+fixed 3x3, where each row held one arbitrary sample of the bucket axis and
+cheapest-that-clears was about all the data supported. Once every row searched to
+its own trough it started trading a 4x worse score for a grid saving nobody asked
+for: on the author's table it took `0.177` at `log2 - 1` over `0.0444` at the
+current `log2`. The principle is *never make the caller pay more than they
+already are*; reducing `log2` is a bonus, handled by the tie rule in
+`_pick_cell` (within `SHARPEN_FALLBACK_SLACK` of the best, order by `log2`, then
+`|d_bs|`, so a competitive centre wins and the grid is not churned).
+
+**`min_gain` retired.** Its job was "is the best cell enough better than the
+centre to bother", which the rule above answers structurally. `good_enough` is
+now the only judgment knob and gains a second, crisp use as the growth trigger.
+The stuck case is covered: when nothing anywhere reaches the target the best cell
+overall is taken, still thrift-ordered, so the descent starts and a re-run
+continues it.
+
+**Lazy growth row.** `log2 + 1` costs 2x per cell and under the new rule is only
+consulted when the thrifty rows fail, so it is not searched up front. The
+author's table was the argument: rows `0` and `+1` agreed at every bucket but
+one, every cell of it wasted.
+
+**Discrete guard.** Reuses the existing `Aggregate._severity_lattice` (gcd of
+the integer atoms, `_aggregate.py:4958`), gcd across units for a Portfolio. When
+`bs` divides the lattice the bucket is pinned and only `log2` is probed.
+
+Chosen over the author's first framing (refuse outright and say so) because the
+probe gate already handles the innocent case: an exact-discrete object with
+adequate `log2` scores near zero and is never probed. The guard therefore only
+fires on a *failing* discrete object, which is failing on extent, which is
+exactly what the `log2` axis fixes. Refusing would leave someone holding a real,
+fixable problem and a scolding. An exact-but-wasteful bucket (`bs=1` on a
+5-lattice) gets a note naming the coarsest exact bucket instead of a search.
+
+**`log2_cap` default 20**, name kept (the author's `log2_limit` was withdrawn:
+`bs_limit` is a relative factor and `log2_cap` an absolute value, so alike names
+would mislead).
+
+Two bugs found while executing, both fixed:
+
+- The stop-reason note **overwrote** a failed cell's exception text. Notes now
+  append. A walk that runs out of `bs_limit` while still improving is recorded
+  distinctly from one that turned, and the description surfaces it when the
+  winner sits there, since that means a re-run will keep going.
+- The `SHARPEN_LOG2_FLOOR` filter was applied to the **current** row as well as
+  the row below, so an object with `log2 < 8` had nothing probed at all. The
+  current row now always runs; only `log2 - 1` is gated.
+
+`sharpen` returns `ob` for chaining and mutates in place; an in-place-only
+variant was considered and dropped (author: "I never use pandas inplace, let's
+stick with `a = a.sharpen()`").
+

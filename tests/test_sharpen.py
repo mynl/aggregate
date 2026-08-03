@@ -13,7 +13,8 @@ import numpy as np
 import pytest
 
 from aggregate import build
-from aggregate._bucket_window import SHARPEN_LOG2_FLOOR, _fmt_bs
+from aggregate._bucket_window import (SHARPEN_LOG2_FLOOR, _bucket_is_exact,
+                                      _fmt_bs)
 from aggregate._validation import (SCORE_TERMS, validation_score,
                                    validation_score_terms)
 
@@ -121,13 +122,12 @@ def test_probe_returns_self_for_chaining():
 
 # ---------------------------------------------------------- the line search
 
-def test_three_log2_rows_each_search_the_bucket_line():
-    """Three rows, each holding the centre bucket plus a contiguous walk out."""
+def test_each_log2_row_searches_the_bucket_line():
+    """Each row holds the centre bucket plus a contiguous walk out from it."""
     a = build(GOOD)
     a.sharpen(good_enough=0, execute=False)
     df = a.sharpen_df
-    assert _levels(df, 'd_log2') == [-1, 0, 1]
-    for j in (-1, 0, 1):
+    for j in _levels(df, 'd_log2'):
         ks = sorted(df.xs(j, level='d_log2').index)
         assert 0 in ks and max(ks) >= 1 and min(ks) <= -1
         # contiguous: the search walks outward, it never skips a bucket
@@ -171,19 +171,42 @@ def test_expansion_reaches_further_than_one_step():
     assert max(_levels(a.sharpen_df, 'd_bs')) >= 2
 
 
-def test_log2_cap_drops_the_upper_row():
-    """No ``log2 + 1`` row once the cap is reached."""
+def test_growth_row_is_lazy():
+    """``log2 + 1`` is not paid for when a thrifty cell already meets the target.
+
+    It costs twice as much per cell as the current row, and under the selection
+    rule it is only ever consulted when nothing affordable reaches the target.
+    """
     a = build(GOOD)
-    a.sharpen(good_enough=0, log2_cap=a.log2, execute=False)
+    a.update(log2=16, bs=16)          # fails, but a finer bucket fixes it
+    a.sharpen(execute=False)
     assert _levels(a.sharpen_df, 'd_log2') == [-1, 0]
+    assert not a._sharpen_state['grew']
+
+
+def test_growth_row_runs_when_nothing_affordable_reaches_the_target():
+    a = build(GOOD)
+    a.update(log2=13, bs=1 / 2)       # only a bigger grid can reach 0.5
+    a.sharpen(execute=False)
+    assert 1 in _levels(a.sharpen_df, 'd_log2')
+    assert a._sharpen_state['grew']
+
+
+def test_log2_cap_forbids_growing():
+    """No ``log2 + 1`` row once the cap is reached, even when nothing qualifies."""
+    a = build(GOOD)
+    a.update(log2=16, bs=1 / 8)
+    a.sharpen(log2_cap=16, execute=False)
+    assert max(_levels(a.sharpen_df, 'd_log2')) == 0
+    assert not a._sharpen_state['grew']
 
 
 def test_log2_floor_drops_the_lower_row():
-    """No ``log2 - 1`` row at the floor."""
+    """No ``log2 - 1`` row at the floor; the current row always runs."""
     a = build(GOOD)
     a.update(log2=SHARPEN_LOG2_FLOOR, bs=64)
     a.sharpen(good_enough=0, execute=False)
-    assert _levels(a.sharpen_df, 'd_log2') == [0, 1]
+    assert min(_levels(a.sharpen_df, 'd_log2')) == 0
 
 
 def test_anti_diagonals_share_an_extent():
@@ -194,6 +217,74 @@ def test_anti_diagonals_share_an_extent():
     same = df[df.d_bs + df.d_log2 == 0]
     assert len(same) >= 2
     assert np.allclose(same.extent, same.extent.iloc[0])
+
+
+def test_a_limit_stop_is_recorded_differently_from_a_turn():
+    """Running out of ``bs_limit`` while improving is not the same as turning."""
+    a = build(GOOD)
+    a.update(log2=13, bs=1 / 2)
+    a.sharpen(good_enough=0, bs_limit=2, execute=False)
+    notes = ' '.join(a.sharpen_df.note.astype(str))
+    assert 'bs_limit reached, still improving' in notes
+
+
+def test_limit_stop_is_surfaced_when_the_winner_sits_on_it():
+    a = build(GOOD)
+    a.update(log2=13, bs=1 / 2)
+    a.sharpen(execute=False)
+    win = a.sharpen_df[a.sharpen_df.selected].iloc[0]
+    if 'bs_limit' in str(win.note):
+        assert 'still improving' in a.sharpen_description
+
+
+# ----------------------------------------------------- the discrete guard
+
+def test_exact_bucket_is_detected():
+    """``bs`` divides every atom, so the discretization is already exact."""
+    d = build('agg SH.Dice dfreq [3] dsev [1:6]')
+    exact, lattice = _bucket_is_exact(d, d.bs)
+    assert exact and lattice == 1.0
+    # a bucket that does not divide the lattice is not exact
+    assert not _bucket_is_exact(d, 4.0)[0]
+
+
+def test_continuous_severity_has_no_lattice():
+    a = build(GOOD)
+    assert _bucket_is_exact(a, a.bs) == (False, None)
+
+
+def test_discrete_pins_the_bucket_and_probes_log2_only():
+    """No bucket change can help an exact grid, so only the grid size is probed."""
+    d = build('agg SH.Dice dfreq [3] dsev [1:6]')
+    d.sharpen(good_enough=0, execute=False)
+    assert _levels(d.sharpen_df, 'd_bs') == [0]
+    assert d._sharpen_state['bs_exact']
+    assert 'bucket pinned' in d.sharpen_description
+    assert 'bs divides every atom' in d.sharpen_explanation
+
+
+def test_discrete_still_probes_the_grid_size():
+    """A failing discrete object fails on extent, which is exactly what log2 fixes."""
+    d = build('agg SH.Dice dfreq [3] dsev [1:6]')
+    d.sharpen(good_enough=0, execute=False)
+    assert len(_levels(d.sharpen_df, 'd_log2')) > 1
+
+
+def test_finer_than_needed_bucket_is_called_out():
+    """Exact but wasteful: atoms on a 5-lattice discretized at bs=1."""
+    e = build('agg SH.Five 10 claims dsev [0 5 10 15] poisson')
+    e.update(log2=12, bs=1)
+    assert _bucket_is_exact(e, 1.0) == (True, 5.0)
+    e.sharpen(good_enough=0, execute=False)
+    assert 'finer than it needs to be' in e.sharpen_explanation
+    assert 'lattice of 5' in e.sharpen_explanation
+
+
+def test_portfolio_of_discrete_units_takes_the_gcd():
+    p = build('port SH.PDisc agg SH.D1 dfreq [2] dsev [2 4 6] '
+              'agg SH.D2 dfreq [2] dsev [4 8]')
+    exact, lattice = _bucket_is_exact(p, 2.0)
+    assert exact and lattice == 2.0
 
 
 # ------------------------------------------------------------ the move gate
@@ -221,17 +312,33 @@ def test_repeated_sharpen_walks_to_a_valid_grid_and_converges():
     assert not a._sharpen_state['moved']
 
 
-def test_parsimony_prefers_the_smallest_qualifying_log2():
-    """Among cells meeting the target the smallest log2 wins, not the best score.
+def test_winner_is_the_best_score_that_does_not_grow_log2():
+    """The rule: never make the caller pay more than they already are.
 
-    More grid almost always helps a little; growing log2 for that is how a probe
-    silently doubles everyone's runtime.
+    Not "the smallest log2 that clears the bar", which would take a much worse
+    score for a grid saving nobody asked for, and not the outright argmin, which
+    would grow the grid for a marginal gain.
     """
     a = build(GOOD)
-    a.update(log2=STARVED_LOG2, bs=STARVED_BS)
-    a.sharpen(good_enough=1e9)   # every cell qualifies
-    df = a.sharpen_df
-    assert df[df.selected].log2.iloc[0] == df.log2.min()
+    a.update(log2=16, bs=16)
+    a.sharpen(execute=False)
+    df = a.sharpen_df.reset_index()
+    win = df[df.selected].iloc[0]
+    free = df[(df.d_log2 <= 0) & np.isfinite(df.score)]
+    assert win.d_log2 <= 0
+    assert win.score == pytest.approx(free.score.min())
+
+
+def test_a_free_grid_saving_is_taken_when_the_score_is_a_wash():
+    """A smaller log2 wins on a tie, so the bonus is not left on the table."""
+    a = build(GOOD)
+    a.update(log2=16, bs=16)
+    a.sharpen(execute=False)
+    df = a.sharpen_df.reset_index()
+    win = df[df.selected].iloc[0]
+    tied = df[np.isfinite(df.score) & (df.d_log2 <= 0)
+              & (df.score <= win.score * 1.25)]
+    assert win.log2 == tied.log2.min()
 
 
 # ------------------------------------------------------ state / restoration

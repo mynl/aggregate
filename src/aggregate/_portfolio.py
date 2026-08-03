@@ -992,9 +992,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                 f'suggests increasing log2 to {int(clip["need_log2"])}.')
         return ' '.join(parts)
 
-    def sharpen(self, bs=None, log2=None, *, log2_cap=24,
+    def sharpen(self, bs=None, log2=None, *, log2_cap=20,
                 bs_limit=_bucket_window.SHARPEN_BS_LIMIT, power=2,
-                good_enough=0.5, min_gain=2.0, execute=True):
+                good_enough=0.5, execute=True):
         """Probe the grid neighbourhood and move to a better ``(bs, log2)``.
 
         Delegated to :func:`~aggregate._bucket_window.sharpen`, where the score,
@@ -1003,9 +1003,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         :meth:`update` *chooses* the combine grid before any FFT runs; this
         *audits* that choice afterwards, re-updating the portfolio on
-        neighbouring cells (three ``log2`` rows, each a line search out from the
-        current bucket) and moving only on a large win, preferring the smallest
-        ``log2`` that reaches the target. Probe cells run with
+        neighbouring cells (a row per ``log2``, each a line search out from the
+        current bucket) and taking the best score among the cells that do not
+        grow ``log2``. Probe cells run with
         ``add_exa=False``, which is the dominant cost of a portfolio update and
         contributes nothing to the moments; the chosen cell is then updated in
         full.
@@ -1020,7 +1020,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _bucket_window.sharpen(
             self, bs, log2, log2_cap=log2_cap, bs_limit=bs_limit, power=power,
-            good_enough=good_enough, min_gain=min_gain, execute=execute)
+            good_enough=good_enough, execute=execute)
 
     @property
     def sharpen_df(self) -> 'pd.DataFrame':

@@ -52,6 +52,11 @@ htmlcov/
 docs/_build/
 docs/savefig/
 
+# Symlink to the standalone monograph project (C:/s/AI/aggregate-monograph),
+# which holds the Quarto ports of the technical and user guides. Convenience
+# only; the monograph is its own repository.
+docs/AGGREGATE-MONOGRAPH
+
 # LaTeX build artifacts (cheat-sheets/)
 cheat-sheets/*.aux
 cheat-sheets/*.log
@@ -69,3 +74,10 @@ cheat-sheets/preamble.fmt
 # Local scratch (ad-hoc throwaway files)
 scratch_*
 hacks
+
+# docs related
+docs/**/*.aux
+docs/**/*.log
+docs/**/*.pdf
+docs/**/*.tex
+docs/cookbook/*.quarto_ipynb

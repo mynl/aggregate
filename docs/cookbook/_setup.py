@@ -57,7 +57,7 @@ import warnings
 
 __all__ = [
     # the recipe namespace -- keep in step with Recipe.namespace()
-    'aggregate', 'build', 'qd', 'np', 'pd',
+    'aggregate', 'build', 'qd', 'np', 'pd', 'fill',
     # cookbook extras
     'format_program', 'version', 'IgnoredDecLClauseWarning',
     'warnings', 'display', 'Markdown',

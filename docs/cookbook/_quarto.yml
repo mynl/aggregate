@@ -26,6 +26,21 @@ format:
     code-fold: false
     df-print: paged
 
+  pdf:
+    documentclass: scrreprt
+    pdf-engine: tectonic
+    number-sections: true
+    toc: false
+    colorlinks: true
+    # article-style flow: chapters set like sections, no page break
+    include-in-header:
+      text: |
+        \RedeclareSectionCommand[style=section]{chapter}
+    # keep-tex conflicts with the tectonic stdin pipeline; use
+    # `quarto render docs --to latex` when the .tex is needed
+    geometry:
+      - margin=2cm
+
 # House standing order: every authored Quarto page references the master bib.
 bibliography: C:/s/TELOS/Biblio/uber-library.bib
 csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl

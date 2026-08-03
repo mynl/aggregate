@@ -8,7 +8,7 @@ from _setup import *
 
 ## Proportional-hazard distortion {#sec-recipe-distortions-ph-distortion}
 
-You want to load expected loss into a price in a way that charges more for the tail than for the body, and you want the loading to be a *property of the measure* rather than a judgement applied case by case.
+You want to load expected loss into a price in a way that charges more for the tail than for the body, and you want the loading to be a *property of the measure* rather than a judgment applied case by case.
 
 ```{python}
 import numpy as np

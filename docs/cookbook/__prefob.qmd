@@ -4,6 +4,13 @@ wd-python:  T:/worktrees/aggregate_REFACTOR/.venv/Scripts/python.exe
 
 <!-- this file provides setup so that the cookbook previews in writedown -->
 
+Pin the quarto Python!
+
+```bash
+$env:QUARTO_PYTHON = "T:\worktrees\aggregate_REFACTOR\.venv\Scripts\python.exe"
+```
+
+
 ```{python}
 import sys
 sys.path.append('T:\\worktrees\\aggregate_REFACTOR\\docs\\cookbook')

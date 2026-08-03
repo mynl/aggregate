@@ -24,7 +24,7 @@ from aggregate.plots import make_grid
 
 ## A book with interesting kappas
 
-Bounds are only interesting when the units behave differently in the tail, so this page builds its own two unit book rather than using the house aggregate. It is the Cat/Non-Cat pair from *Pricing Insurance Risk* [@Mildenhall2022a]: a large, thin, well behaved line and a small, volatile one.
+Bounds are most interesting when the units behave differently in the tail, so this page builds its own two unit book rather than using the house aggregate. It is the Cat/Non-Cat pair from *Pricing Insurance Risk* [@Mildenhall2022a]: a large, thin, well behaved line and a small, volatile one.
 
 ```{python}
 port = build('''
@@ -52,48 +52,50 @@ Cat's kappa rises without limit: big totals are cat totals. Non-Cat's kappa is *
 
 ```{python}
 k = port.density_df['exeqa_NonCat'].loc[60:600]
-print(f'kappa_NonCat peaks at x = {k.idxmax():.1f}, value {k.max():.2f}; '
-      f'falls to {k.iloc[-1]:.2f} by x = 600 (E[NonCat] = {port.NonCat.est_m:.1f})')
+print(fill(f'kappa_NonCat peaks at x = {k.idxmax():.1f}, value {k.max():.2f}; '
+      f'falls to {k.iloc[-1]:.2f} by x = 600 (E[NonCat] = {port.NonCat.est_m:.1f})', 65))
 ```
 
-That hump is the whole story of this page. It makes the allocation curve non-concave, which is precisely when the convex hull sits strictly above the curve and the bounds get wide.
+Beyond the hump Non-Cat acts in part as a capital provider. It makes the allocation curve non-concave, which is precisely when the convex hull sits strictly above the curve and the bounds get wide.
 
 Fix an asset level and a premium. Assets at the 99th percentile, total premium 110 against an expected loss of 100 within those assets.
 
 ```{python}
+#| echo: false
 #| warning: false
 a = port.q(0.99)
 P = 110.0
 L = port.density_df.loc[a, 'exa_total']
 coc = (P - L) / (a - P)
-print(f'a = q(0.99) = {a:,.2f}   E[X ^ a] = {L:,.4f}   P = {P}   '
-      f'Q = {a - P:,.2f}   coc = {coc:.4f}')
+print(fill(f'a = q(0.99) = {a:,.2f}   E[X ^ a] = {L:,.4f}   P = {P}   '
+      f'Q = {a - P:,.2f}   coc = {coc:.1%}', 65))
 
 # calibrate the standard distortion set to that same premium; the sections
 # below use it to see where the named families sit inside the feasible set
 port.calibrate_distortions(coc, p=0.99)
+print()
 qd(port.distortion_df)
 ```
 
-Every one of those five prices the total to 110, so all five are members of $\mathcal{G}_P$. Hold that thought: the checks at the end ask where they sit relative to the bounds.
+Each of the distortion in the table prices the total to 110, so all five are members of $\mathcal{G}_P$.
 
 Capping matters. Unbounded, the upper price bound of a heavy tailed risk is genuinely tail driven, a vanishing weight on the essential supremum times a diverging essential supremum, and on an FFT grid the deep tail vertices are discretization noise rather than mathematics. Bounded is the well conditioned regime, and every class here takes an asset cap.
 
-## `Bounds`: the set itself
+## `Bounds`: the set $\mathcal{G}_P$
 
-`Bounds` is built in one shot from the risk and the target premium. It works in $g$ space, on the unit square.
+`Bounds` is built in one call from the risk and the target premium.
 
 ```{python}
 bd = Bounds(port, P, a=a)
 print(bd.info)
 ```
 
-`p_star` is the level with $\mathrm{TVaR}_{p^*}(X \wedge a) = P$, so $\mathrm{TVaR}_{p^*}$ is the single TVaR that hits the premium on the nose. Every consistent biTVaR straddles it: one knot at or below $p^*$, one above.
+`p_star` is the level with $\mathrm{TVaR}_{p^*}(X \wedge a) = P$, so $\mathrm{TVaR}_{p^*}$ is the single TVaR that achieves the premium. Every consistent biTVaR straddles it and has one knot at or below $p^*$, one above.
 
 The **cloud** is that set of biTVaRs, and its pointwise minimum and maximum are the envelope of everything calibration allows.
 
 ```{python}
-bd.plot_envelope(distortions='ordered', n_resamples=200,
+_ = bd.plot_envelope(distortions='ordered', n_resamples=200,
                  title='Consistent distortions, and where the named ones sit');
 ```
 
@@ -110,16 +112,16 @@ qd(env)
 
 At $s = 0.1$, that is on the 1 in 10 tail, the consistent distortions disagree by roughly a factor of two on how heavily to weight it. One calibration point does not buy much.
 
-The asymmetry between the two envelopes is real and worth knowing. A minimum of concave functions is concave, so `min_envelope` is a genuine `Distortion`. A maximum of concave functions need not be, so `max_envelope` is only a callable.
+There is an asymmetry between the two envelopes. The pointwise minimum of concave functions is concave, so `min_envelope` is a distortion function and returns a `Distortion`. On the other hand, the pointwise maximum of concave functions need not be, and so `max_envelope` is generally not a distortion function, and just returns a callable.
 
 ```{python}
 print(type(bd.min_envelope).__name__, '/', type(bd.max_envelope).__name__)
 ```
 
-`min_envelope_hinges` names the biTVaR binding at each $s$, so the envelope is not a black box. Every point on it is a specific, nameable pricing measure.
+`min_envelope_hinges` returns the biTVaR binding at each $s$, so the envelope is not a black box. Every point on it is a specific pricing measure.
 
 ```{python}
-qd(bd.min_envelope_hinges.iloc[::64])
+qd(bd.min_envelope_hinges.iloc[::32].set_index('s'))
 ```
 
 Read the lower rows: from $s$ around $0.375$ upward the binding bracket settles on $p_{lo} = 0$ and $p_{hi}$ at the top of the range, with a weight equal to `ccoc`'s `gini_p` above. That bracket *is* the constant cost of capital distortion, $g(s) = d + (1-d)s$ with $d = r/(1+r)$, which is exactly the biTVaR putting weight $d$ on the default state and the rest on the mean. Keep an eye on it: it comes back as an endpoint below.

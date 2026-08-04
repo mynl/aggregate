@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.0.0a198
+
+**[Chart-IR] pass two, [Chart-Schema].** Chart IR schema v1: new
+`aggregate/charts/` package. `charts/ir.py` holds the frozen dataclasses
+(`ChartDoc`, `Panel`, `ChartAxis`, `ChartSeries`, `Mark`, `SurfaceData`),
+`CHART_IR_VERSION = 1`, and hand-rolled `canonical_dict` / `canonical_json` /
+`doc_hash` / `stamp` mirroring greater_tables' determinism contract exactly:
+deterministic field presence (structural fields always, optional fields only
+when they differ from their defaults), NFC-normalized strings, sorted-key
+compact UTF-8 JSON with NaN forbidden, sha256 truncated to 12 hex, and `hash`
+/ `generator` excluded from the hashed form so stamping does not perturb the
+digest. No pydantic; aggregate's dependency set is unchanged. Documents
+validate on construction (reference integrity across panel / axis / series
+ids, payload-kind agreement, xy length agreement) and are immutable all the
+way down.
+
+Vocabularies (panel kinds, axis units, series roles, mark roles) are
+documented strings, not enums. Two fields flagged in the inventory's judgment
+calls are drafted in and are one-line removals if vetoed:
+`ChartAxis.reciprocal_of` (the return-period twin as a semantic pairing) and
+`ChartSeries.y2` (band series); `Panel.aspect` carries the semantic
+equal-aspect cases (unit square, complex plane). There is deliberately no
+`extra_mpl_kwargs` and no renderer passthrough of any kind.
+
+`charts/__init__.py` is the public surface (`from aggregate import charts`;
+nothing star exported): the IR names plus the `CHARTS` registry,
+`register_chart`, and `available_charts(obj)` derived from singledispatch
+registries plus per-chart predicates, mirroring the exhibits capability
+mechanics. No emitters yet; the registry fills from the pilot onward.
+
+Representability, checked on paper against the twelve `plot_twelve` panels
+per the plan: the density / log density pair and the kappa, alpha, beta
+families are multi-series xy panels off `density_df` `exeqa_*` and
+`allocation_diagnostics` columns with roles carrying the objective vs
+distorted distinction; the per-unit S / gS families are xy with a backdrop
+role; the margin panels and the Lee-orientation stand-alone / natural M
+panels use `read_axis='y'` plus `y2` band series; the bivariate density panel
+is a `SurfaceData` grid (its sparse-scatter branch is a renderer realization,
+not IR). Nothing in the twelve panels, the bounds plots, or the ft
+illustrations demands a fourth panel kind.
+
+Tests: `tests/test_charts_ir.py` (structure, validation, determinism,
+capability, and the boundary check that `import aggregate.charts` does not
+load matplotlib). The plan puts that assertion in `test_plots_boundary.py`;
+it lives in the charts test module for now because `test_plots_boundary.py`
+was mid-edit in the parallel `[Exhibits-Module]` workstream, and migrating it
+later is a two-line move.
+
+The schema sign-off gate stands: the author reviews the field list before
+emitters multiply beyond the pilot.
+
 ## 1.0.0a197
 
 **[Chart-IR] pass one, [Chart-Inventory].** `dev/chart-inventory.md`: one row

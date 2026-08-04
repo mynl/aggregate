@@ -14,9 +14,9 @@ Python testing.
    :depth: 2
 
 
-********************************
-1. What is automated testing?
-********************************
+**************************
+What is automated testing?
+**************************
 
 An *automated test* is a small piece of code that checks one fact about the
 library and either passes (the fact holds) or fails (it doesn't). For example:
@@ -39,9 +39,9 @@ Each test is just a Python function whose name starts with ``test_``, living in
 a file whose name starts with ``test_`` in the ``tests/`` folder.
 
 
-********************************
-2. What is pytest?
-********************************
+***************
+What is pytest?
+***************
 
 `pytest <https://docs.pytest.org/>`_ is the program that **finds and runs** all
 those ``test_*`` functions and reports which passed and which failed. You never
@@ -69,9 +69,9 @@ The project's pytest settings live in ``pyproject.toml`` under
 You don't need to understand those flags to use the tests.
 
 
-********************************
-3. Running the tests
-********************************
+*****************
+Running the tests
+*****************
 
 Everything runs through ``uv`` (the environment manager). From the project root:
 
@@ -107,15 +107,15 @@ run the whole suite before declaring a change finished.
    sets this automatically.
 
 
-********************************
-4. The kinds of test we have
-********************************
+*************************
+The kinds of test we have
+*************************
 
 The suite mixes several *styles* of test. Knowing which is which makes failures
 much easier to interpret.
 
-4.1 Unit tests — "does this one thing work?"
-============================================
+Unit tests — "does this one thing work?"
+========================================
 
 The bread and butter: build a small object, assert a known property. They are
 fast and pinpoint exactly what broke.
@@ -137,8 +137,8 @@ Example (the spirit of many of these)::
 
 ``pytest.raises`` is how you assert that something *should* raise an error.
 
-4.2 Parametrized tests — "do this for every case"
-=================================================
+Parametrized tests — "do this for every case"
+=============================================
 
 Often you want the *same* check run over many inputs. ``@pytest.mark.parametrize``
 turns one function into many test cases — pytest reports each separately.
@@ -156,8 +156,8 @@ That single function becomes two named cases:
 ``test_default_path_identity[agg Id.A ...]`` and ``[agg Id.B ...]``. The big
 example is the **DecL grammar suite** (below).
 
-4.3 The DecL grammar suite — every line of ``test_suite.agg``
-=============================================================
+The DecL grammar suite — every line of ``test_suite.agg``
+=========================================================
 
 ``src/aggregate/agg/test_suite.agg`` is a long file of example DecL programs,
 organised into categories A–O (frequencies, severities, reinsurance,
@@ -173,8 +173,8 @@ line** into its own pair of parametrized tests:
 
 So adding a line to ``test_suite.agg`` automatically adds test coverage for it.
 
-4.4 Snapshot / "golden master" tests — "does the answer still match the file?"
-==============================================================================
+Snapshot / "golden master" tests — "does the answer still match the file?"
+==========================================================================
 
 A *snapshot* (or *golden master*) test compares today's computed output against
 a previously-saved "known good" copy on disk. These guard the *numbers*, not
@@ -195,10 +195,11 @@ just "does it run".
   smaller golden-master checks for distortions and layered-severity moments.
 
 The reference data is produced by *capture scripts* (``tests/baseline/capture.py``
-and the ``tests/capture_*.py`` files). See section 7.
+and the ``tests/capture_*.py`` files). See
+:ref:`Regenerating reference data <tests regenerating>`.
 
-4.5 Feature suites — "this whole capability behaves correctly"
-==============================================================
+Feature suites — "this whole capability behaves correctly"
+==========================================================
 
 Larger files that exercise one feature end-to-end, usually mixing closed-form
 checks, identities, and regressions:
@@ -215,16 +216,16 @@ checks, identities, and regressions:
 * ``tests/test_bounds.py``, ``test_splice_suite.py``, ``test_underwriter.py`` —
   pricing bounds, spliced severities, and the ``build()`` entry point.
 
-4.6 Error / robustness tests — "does it fail *gracefully*?"
-===========================================================
+Error / robustness tests — "does it fail *gracefully*?"
+=======================================================
 
 * ``tests/test_parser_errors.py`` and ``test_parser_errors_integration.py`` —
   feed deliberately broken DecL and assert that the error message is clear and
   points at the right spot. Good error messages are a feature, so they are
   tested too.
 
-4.7 Validation tests — "is the FFT answer trustworthy?"
-=======================================================
+Validation tests — "is the FFT answer trustworthy?"
+===================================================
 
 * ``tests/test_validation.py`` — the library's own self-check (``valid`` /
   ``explain_validation``) flags when the discretisation grid is too coarse
@@ -232,9 +233,9 @@ checks, identities, and regressions:
   fires when it should and stays quiet when the model is fine.
 
 
-********************************
-5. Fixtures and ``conftest.py``
-********************************
+****************************
+Fixtures and ``conftest.py``
+****************************
 
 A *fixture* is reusable setup shared by many tests, so each test doesn't repeat
 it. Fixtures live in ``tests/conftest.py`` (a special file pytest loads
@@ -254,9 +255,9 @@ automatically) and are "requested" by naming them as a function argument:
 Both are ``scope="session"``: built once and reused across the whole run (fast).
 
 
-***************************************
-6. Keeping ``decl-testers.agg`` in sync
-***************************************
+************************************
+Keeping ``decl-testers.agg`` in sync
+************************************
 
 When a hand-written test (e.g. ``test_negative_x.py``) uses DecL programs, the
 *same* programs are mirrored into ``src/aggregate/agg/decl-testers.agg`` under a
@@ -266,9 +267,11 @@ examples discoverable and in one place. Add to it whenever you add DecL-driven
 tests.
 
 
-********************************
-7. Regenerating reference data
-********************************
+.. _tests regenerating:
+
+***************************
+Regenerating reference data
+***************************
 
 Snapshot/golden tests compare against saved files. When you make a change that is
 *supposed* to move the numbers (or move a column), you regenerate the reference —
@@ -295,9 +298,9 @@ regenerate.
    check).
 
 
-********************************
-8. Reading a failure
-********************************
+*****************
+Reading a failure
+*****************
 
 A typical failure looks like::
 
@@ -316,9 +319,9 @@ numeric tests compare with a small tolerance (``abs(x - y) < 1e-12``,
 ``np.allclose``, or the project's noise-aware helpers) rather than ``==``.
 
 
-********************************
-9. Quick reference
-********************************
+***************
+Quick reference
+***************
 
 ============================  ====================================================
 Command                       Does

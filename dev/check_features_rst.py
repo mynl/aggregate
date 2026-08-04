@@ -31,13 +31,19 @@ DEFAULT = Path(__file__).resolve().parent.parent / 'docs' / '2_aggregate_overvie
 
 RE_DIRECTIVE = re.compile(r'^\s*\.\. ipython:: python\s*$')
 
+#: A directive *option* line, e.g. ``:okwarning:`` or ``:okexcept:``. These sit
+#: at the same indent as the code, so the block reader picks them up, and a bare
+#: ``:name:`` is never valid Python. Dropped along with ``@savefig``.
+RE_OPTION = re.compile(r'^:[A-Za-z][A-Za-z0-9_-]*:\s*$')
+
 
 def blocks(text: str) -> list[tuple[int, str]]:
     """Return ``(first_source_line, source)`` for each ipython block.
 
     A block runs from the directive line to the first non-blank line indented
     less than its own body. ``@savefig`` lines are directives to the Sphinx
-    extension, not Python, so they are dropped.
+    extension, not Python, and neither are option lines such as
+    ``:okwarning:``, so both are dropped.
     """
     out: list[tuple[int, str]] = []
     lines = text.split('\n')
@@ -62,7 +68,9 @@ def blocks(text: str) -> list[tuple[int, str]]:
                 break
             body.append(lines[i][indent:])
             i += 1
-        body = [b for b in body if not b.lstrip().startswith('@savefig')]
+        body = [b for b in body
+                if not b.lstrip().startswith('@savefig')
+                and not RE_OPTION.match(b.strip())]
         out.append((start + 1, '\n'.join(body).rstrip() + '\n'))
     return out
 

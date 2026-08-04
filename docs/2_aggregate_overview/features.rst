@@ -19,8 +19,8 @@ Maintained by ``dev/task-features.md``; the source of record for what shipped is
    :local:
    :depth: 2
 
-1. Coverage ledger
---------------------
+Coverage ledger
+---------------
 
 The maintenance contract: every major point in ``CHANGELOG.md`` is accounted for
 by a row. "Under the hood" plus an em-dash means an internal change named in the
@@ -211,8 +211,8 @@ appendix but not exampled.
    "sharpen takes the best affordable grid; ``min_gain`` retired; ``log2_cap`` 20", "a194", "Grids & windows", "``dice``"
    "a grid that loses mass is disqualified; ``deficit`` / ``defective`` / ``warns``", "a195", "Grids & windows", "``simple``"
 
-2. The cast of examples
--------------------------
+The cast of examples
+--------------------
 
 A small set of objects built once and heavily leveraged: each is the minimal
 program that exercises a distinct piece of DecL surface, and the feature
@@ -375,11 +375,13 @@ here.)
    * - ``renewal``
      - Sparre-Andersen renewal frequency via the ``wait`` clause
 
-3. New DecL elements
-----------------------
+New DecL elements
+-----------------
 
-3.1 Signed severity: ``ssev`` and negative ``dsev`` atoms (a21)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _feat signed severity:
+
+Signed severity: ``ssev`` and negative ``dsev`` atoms (a21)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A profit is a negative loss, so an aggregate can live on a signed grid. The
 severity family is now: ``sev``, continuous, clamps its sub-zero tail at 0
@@ -398,8 +400,8 @@ automatic two-sided output window, are right before any FFT runs.
     @savefig features_signed_d.png scale=20
     signed_d.plot()
 
-3.2 ``shift - dist``: premium minus loss per claim (a22)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``shift - dist``: premium minus loss per claim (a22)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A constant minus a distribution parses as the natural P&L reading. The cast's
 ``signed_s`` is ``ssev 100 - lognorm 80 cv 0.025``, premium 100 minus a lognormal
@@ -410,8 +412,8 @@ loss, *per claim*. It is exactly ``-1 * X + 100`` (reflect, then shift) and need
 
     qd(signed_s.summary_df)
 
-3.3 ``pnl``: premium minus loss, once for the book (a23; reshaped a103, a125)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``pnl``: premium minus loss, once for the book (a23; reshaped a103, a125)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``pnl`` keyword collects the premium **once for the book** and subtracts the
 loss aggregate: :math:`\mathrm{PnL} = \mathrm{premium} - A`. Contrast with
@@ -446,19 +448,19 @@ rather than a moment table:
     qd(pnl.summary_df)
 
 The full P&L surface, including expenses, ceded premium and the reinsurance walk,
-is section 14.
+is :ref:`P&L: profit and loss as a first-class object <feat pnl>`.
 
 Since a45, the *loss* severity of a ``pnl`` may itself be signed (a ``dsev`` with
 a negative atom, or an ``ssev``); previously the affine path silently wrapped the
 negative atoms.
 
-3.4 ``bivariate`` and ``copula``: joint laws of two perils (a24, renamed a80)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``bivariate`` and ``copula``: joint laws of two perils (a24, renamed a80)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking, a80:** the keyword is **``bivariate``** (short form ``bv``). It
 shipped at a24 as ``multivariate``, which promised a generality the 2D FFT engine
 does not have. The object is :class:`BivariateAggregate`, and the whole surface
-is covered in section 15.
+is covered in :ref:`Bivariate aggregates <feat bivariate>`.
 
 One event can drive two correlated perils, and you want the joint law of the two
 aggregates, not just the marginals. ``bivariate`` couples two component
@@ -488,8 +490,10 @@ taking its natural dependence parameter.
 The splice on the lognormal base (``splice [0 250]``) caps an unbounded family;
 this crashed window sizing until the a48 fix.
 
-3.5 ``netceded``: the joint (ceded, net) law of a reinsured aggregate (a20, a24)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _feat netceded:
+
+``netceded``: the joint (ceded, net) law of a reinsured aggregate (a20, a24)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Prefix any occurrence-reinsured ``agg`` program with ``netceded`` and the result
 is the *joint* per-occurrence (Ceded, Net) law as a bivariate: the same 2D FFT
@@ -506,8 +510,8 @@ the margins cannot, the reinsurer-versus-cedent dependence:
 ``Aggregate.occ_bivariate()`` returns the same object from an already-built
 reinsured aggregate (for example ``reins.occ_bivariate()``).
 
-3.6 ``hints{}``: build settings out of ``note{}`` (a25)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``hints{}``: build settings out of ``note{}`` (a25)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``note{...}`` used to double as a ``key=value`` side-channel for build settings,
 so any ``=`` in note prose crashed the build. Notes are now pure annotation; a
@@ -515,8 +519,8 @@ dedicated ``hints{key=value; ...}`` clause carries settings (``log2``, ``bs``,
 ``bucket_sizing_p``, and the rest). Explicit ``build(...)`` keyword arguments
 always override hints. The cast's ``defective`` uses ``hints{bs=0.25; log2=16;}``.
 
-3.7 Distortions in DecL: flat number list (a27)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Distortions in DecL: flat number list (a27)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking vs 0.30.1.** The distortion form is uniformly
 ``distortion NAME kind n1 n2 ...``, the kind's parameters in declaration order,
@@ -531,8 +535,8 @@ order, so the parser no longer hard-codes kinds. Note ``ccoc`` takes the *return
     print(d1)
     print(d2)
 
-3.8 Reinsurance share syntax: the number sets the meaning (a17, a52)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reinsurance share syntax: the number sets the meaning (a17, a52)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``so`` (share-of), ``po`` (part-of), and, since a52, plain ``of`` are synonyms;
 the **number** decides. A literal percentage (``50% po 300 xs 200``) is the share
@@ -541,13 +545,13 @@ share is ``amount / limit``. In 0.30.1 ``50% po`` silently divided the percentag
 by the limit. Layer validation (a18) also hard-errors on out-of-order or
 overlapping layers; express a gap with a zero-share layer.
 
-3.9 Number literals: ``_`` digit separators (a52)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Number literals: ``_`` digit separators (a52)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``agg BIG 10_000_000 claims …`` parses exactly as Python reads ``10_000_000``.
 
-3.10 ``approximate``: method-of-moments aggregates (a47)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``approximate``: method-of-moments aggregates (a47)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For very-high-frequency books the exact convolution is overkill. The
 ``approximate sgamma | slognorm | exact`` directive (placed **after** the
@@ -566,16 +570,16 @@ error); aggregate reinsurance rides along.
 See Grids & windows for the accuracy comparison against ``bigex``, the exact
 convolution.
 
-3.11 Statement separation: a blank line or ``;`` (a69)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Statement separation: a blank line or ``;`` (a69)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking.** Multi-statement DecL used to need a trailing backslash to continue
 a line. Statements are now separated by a **blank line or a** ``;``, and the
 backslash is gone. A program can therefore be indented naturally across lines,
 which is what every multi-line example in this document relies on.
 
-3.12 Bare unary minus on a severity (a109)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Bare unary minus on a severity (a109)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``ssev -lognorm 10 cv 0.5`` negates a severity directly, without the ``-1 *``
 scale factor:
@@ -584,8 +588,8 @@ scale factor:
 
     print(build('agg U 5 claims ssev -lognorm 10 cv 0.5 poisson').est_m)
 
-3.13 ``payoff`` / ``loss`` orientation (a102)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``payoff`` / ``loss`` orientation (a102)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 An ``agg`` can be declared a payoff rather than a loss by suffixing the program.
 Orientation drives the sign convention used throughout pricing, so it is declared
@@ -595,8 +599,8 @@ rather than inferred:
 
     print(build('agg P 10 claims sev lognorm 100 cv 1 poisson payoff').value_type)
 
-3.14 Labels: ``as "…"`` (a124, a128, a132, a133)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Labels: ``as "…"`` (a124, a128, a132, a133)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Any named object, and since a128 any *interior* site (a layer, a severity
 component, an exposure band), can carry a human display label with
@@ -604,8 +608,8 @@ component, an exposure band), can carry a human display label with
 They live in one place per object (``label``) with classless interior sites
 pooled into ``label_map``, reached through the ``labels`` namespace.
 
-4. Better parse errors (a16)
-------------------------------
+Better parse errors (a16)
+-------------------------
 
 DecL parse failures are now structured reports with line and column, a
 source-line echo, a caret marker, and "did you mean" suggestions, instead of
@@ -624,8 +628,8 @@ Keyword terminals also require word boundaries, so a typo like ``aggx Re …``
 reports ``Unexpected 'aggx'. Did you mean: agg?`` at column 1 instead of a
 misleading downstream error.
 
-5. Programs as text: ``decl_writer`` (a53)
---------------------------------------------
+Programs as text: ``decl_writer`` (a53)
+---------------------------------------
 
 ``aggregate.decl_writer`` is the structural inverse of the parser: it renders a
 parsed spec back to canonical DecL instead of pretty-printing by regex.
@@ -644,8 +648,8 @@ canonical DecL, so saved ``.agg`` files round-trip cleanly.
 **Breaking vs 0.30.1:** ``utilities.decl_pprint`` is removed; use
 ``format_program``.
 
-5.1 A trailer body is prose (a177)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A trailer body is prose (a177)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``note{}``, ``tags{}`` and ``hints{}`` bodies used to be read as DecL before they
 were read as text, which claimed four characters a human writing a note has every
@@ -666,8 +670,8 @@ steps and restored verbatim afterward. What a note still cannot hold is a ``}``
 (the terminal ends at the first one) and a line break. That is what
 ``doc{{{ }}}`` is for.
 
-5.2 The colorizer is derived from the grammar (a175)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The colorizer is derived from the grammar (a175)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Pygments lexer behind ``pprogram_html`` was a hand-written mirror of
 ``decl.lark`` that had fallen behind the language, and the visible symptom was
@@ -695,8 +699,8 @@ keywords off the front of longer names and ``loss-ratio`` came out as three
 tokens. There is deliberately no catch-all rule, because ``Token.Error`` is the
 drift signal and swallowing it would make the corpus test above vacuous.
 
-5.3 The shipped library reads like its own documentation (a178)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The shipped library reads like its own documentation (a178)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``agg/library.agg`` is written in the canonical ``spread`` layout: one clause per
 line at a two-space indent, ``;`` closing each statement. Median statement length
@@ -720,11 +724,11 @@ hand-written for reasons like this, tracked as ``[Unparser-Reference-Gaps]``.
 A single-claim severity also reads as English again: ``1 claim``, not
 ``1 claims``.
 
-6. The reporting quartet: ``info`` / ``describe`` / ``stats_df`` / ``density_df``
-----------------------------------------------------------------------------------
+The reporting quartet: ``info`` / ``describe`` / ``stats_df`` / ``density_df``
+------------------------------------------------------------------------------
 
-6.1 One stats surface everywhere (a3, a8, a15)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One stats surface everywhere (a3, a8, a15)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking vs 0.30.1.** The overlapping moment frames (``report_df``,
 ``report_ser``, ``statistics``, ``statistics_df``, ``audit_df`` on both classes)
@@ -746,8 +750,8 @@ package paper :cite:p:`Mildenhall2024`.
 
     qd(simple.stats_df)
 
-6.2 Fixed-layout ``info`` and ``value_type`` (a54)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Fixed-layout ``info`` and ``value_type`` (a54)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``info`` now has a fixed row layout, every row always present, same order, for
 every instance, ``n/a`` where unavailable, shared across all three classes. New
@@ -772,8 +776,8 @@ loss/payoff book at construction** (no coherent sign convention):
     except ValueError as e:
         print(e)
 
-6.3 Exact discrete moments (a26)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Exact discrete moments (a26)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Discrete severities (``dsev``, ``fixed``) used to be faked through a continuous
 ``rv_histogram`` with sliver-width atoms, producing ``ppf(0.5) = 149.9999999992``
@@ -787,11 +791,12 @@ and layered. A fair die has mean exactly 3.5:
     qd(dice.summary_df)   # Err columns exactly 0
     print('sev ppf(0.5) =', dice.sevs[0].fz.ppf(0.5))
 
-6.4 Signed-aware ``describe``: SD instead of CV (a23, a40, a43)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Signed-aware ``describe``: SD instead of CV (a23, a40, a43)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``CV = sd/mean`` is meaningless as the mean crosses 0, so for any signed object
-the moment table shows an SD trio instead of CV (visible in section 3.1 above).
+the moment table shows an SD trio instead of CV (visible under
+:ref:`signed severity <feat signed severity>` above).
 The zero-mean case reports the correct SD; in 0.30.1-era logic it reconstructed
 ``SD = mean × CV = 0 × NaN = NaN`` (fixed a40, deriving variance from the second
 moment). ``Portfolio.summary_df`` makes the CV-versus-SD choice once,
@@ -803,8 +808,8 @@ portfolio-wide, so a mixed signed/unsigned book renders one consistent frame
     zero_mean = build('agg ZM dfreq [3] dsev [-1 1]')   # mean 0, sd sqrt(3)
     qd(zero_mean.summary_df)
 
-6.5 The ``density`` property and ``sev_density_df`` (a39, a21)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ``density`` property and ``sev_density_df`` (a39, a21)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``density`` is ``density_df.query('p_total > 0')``, the live support with the
 grid's leading and trailing zero buckets dropped, which is usually what you want
@@ -816,8 +821,8 @@ its severity.
 
     qd(signed_d.density)
 
-6.6 Reinsurance reporting (a18, a19, a41)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reinsurance reporting (a18, a19, a41)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reinsurance reporting was rebuilt end to end. Three objects on :class:`Aggregate`
 *and* (new) :class:`Portfolio`:
@@ -856,8 +861,8 @@ spelled-out method names are renamed: ``reinsurance_kinds`` to ``reins_kinds``,
 ``reinsurance_description`` to ``reins_description``, ``reinsurance_occ_plot`` to
 ``reins_occ_plot`` (a41; ``reins`` is the canonical short form).
 
-6.7 Unit densities on a Portfolio (a55, a56)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unit densities on a Portfolio (a55, a56)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking vs 0.30.1.** ``Portfolio.density_df`` no longer carries ``p_<unit>``
 columns, and the EPD columns are gone (stand-alone EPD is the one-liner
@@ -872,8 +877,8 @@ their native grids, read through explicit accessors:
 is the display adapter that scatters unit pmfs onto a common grid (and warns when
 a windowed book's view would be clipped).
 
-6.8 Validation: noise-aware, with honest deficit warnings (a17)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Validation: noise-aware, with honest deficit warnings (a17)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Validation moments are tested against a definite noise floor (1e-12), so a fair
 die no longer "fails skew" on floating-point dust, and ``describe`` snaps dust to
@@ -886,8 +891,8 @@ show this:
 
     print(defective.validation_explanation)
 
-6.9 The frequency distribution, materialized (a107, a148)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The frequency distribution, materialized (a107, a148)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``create_frequency()`` builds the claim-count distribution as an object in its
 own right, so the frequency can be inspected and plotted like any other
@@ -905,8 +910,8 @@ reproduces ``po_p`` to the kernel noise floor, which is the Poisson process
 recovered as a special case. The diagnostic is capped at mean 1000 or less: it is
 a small-count eyeball tool.
 
-6.10 Return-period quantile plots (a110)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Return-period quantile plots (a110)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``quantile_x='return'`` puts the Lee plot on a return-period x-axis, which is how
 catastrophe results are usually read:
@@ -916,8 +921,8 @@ catastrophe results are usually read:
     @savefig features_return_period.png scale=20
     simple.plot(quantile_x='return')
 
-6.11 ``help`` on every first-class class (a98, a101, a142, a150, a180)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``help`` on every first-class class (a98, a101, a142, a150, a180)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Every first-class class answers ``help(regex)``, filtered by pattern, with
 ``lod`` controlling detail. **Breaking at a101:** the ``output`` argument is
@@ -934,8 +939,8 @@ appears, ``regex`` and the leading-underscore skip governed by ``private``.
 Inherited names are not filtered, so ``Severity.help()`` reports the
 ``scipy.stats.rv_continuous`` methods alongside its own.
 
-6.12 The first-class-citizen contract (a170, a172)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The first-class-citizen contract (a170, a172)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 "First-class citizen" stopped being a phrase in a plan and became a declaration
 the build checks. Two criteria put a class on the list, and both must hold: it
@@ -964,8 +969,8 @@ cannot break without a red test. It found four holes nobody was tracking, and
 a172 closed all of them: both exception lists print empty above, which is what
 finishes the item. The contract is satisfied, not excused.
 
-6.13 ``validation_df``, and the narrative pairs (a172)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``validation_df``, and the narrative pairs (a172)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``validation_df`` is a **check table**, ``Est | Ref | Err | Gate | Pass``,
 carrying only what can fail. The point is that a reader who wants the verdict
@@ -1015,8 +1020,8 @@ on a clean book, so no caller has to check ``reins_kinds`` first:
     print(reins.reins_explanation)
     print(simple.reins_explanation)
 
-6.14 Every object says what it is (a171, a174)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every object says what it is (a171, a174)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :class:`Frequency` had no ``__repr__`` at all and printed
 ``<aggregate._frequency.FrequencyPoisson object at 0x...>``. It now reports its
@@ -1044,8 +1049,8 @@ first-class class now renders the same two pieces in Jupyter, an intro paragraph
 and the headline frame. The P&L intro says out loud that its percentile columns
 are marginal and do not foot, with ``stats_df`` named as the footing sheet.
 
-6.15 Exact severity quantiles, and the OEP curve (a181)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Exact severity quantiles, and the OEP curve (a181)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``Aggregate.sev`` already carried the exact continuous ``cdf``, ``sf`` and
 ``pdf`` of the weighted severity mixture, the documented look through past the
@@ -1083,17 +1088,18 @@ occurrence has no largest loss, and it raises rather than returning ``nan``. And
 Poisson frequency is required, with zero-modified Poisson refused: the thinning
 argument is what makes :math:`1 - e^{-\lambda S}` hold.
 
-7. Grids, buckets and windows
--------------------------------
+Grids, buckets and windows
+--------------------------
 
-7.1 The sizing decision is inspectable (a21)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The sizing decision is inspectable (a21)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``update`` runs up to several sizing methods (exact-discrete lattice, bounded
 small-count, the legacy three-moment rule, windowed), records them in
 ``bs_window_df``, then picks. ``log2`` is a cap; pinning ``bs`` keeps full manual
-control. The frame became public at a65, and section 7.4 covers the narrative
-forms built on top of it.
+control. The frame became public at a65, and
+:ref:`the grid choice is legible <feat grid legible>` covers the narrative forms
+built on top of it.
 
 .. ipython:: python
 
@@ -1103,8 +1109,8 @@ forms built on top of it.
 everywhere (a30), as a ``build``/``update`` keyword and as a ``hints{}`` key. No
 alias.
 
-7.2 Mean-preserving discrete bucketing: ``dsev_bucket`` (a28)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Mean-preserving discrete bucketing: ``dsev_bucket`` (a28)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Off-grid discrete atoms (an empirical sample with a non-integer ``bs``) are now
 split across their two bracketing buckets so the discretized mean is exact
@@ -1117,8 +1123,8 @@ unchanged.
     off = build('agg Off dfreq [1] dsev [0.3 1.7 2.4] [.5 .3 .2]', bs=0.5)
     print(f'discretized mean {off.est_m:.6f} == exact {0.3*.5 + 1.7*.3 + 2.4*.2:.6f}')
 
-7.3 Non-zero output windows (a51)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Non-zero output windows (a51)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A concentrated aggregate, CV small enough that its whole mass sits far above 0,
 now computes on a two-sided window around the mass instead of the wasteful
@@ -1148,8 +1154,10 @@ no-wrap floor, so adding units no longer *coarsens* the grid, and all-integer
 discrete books land on the lattice (``bs=1``) instead of a spurious fine
 continuous ``bs``.
 
-7.4 The grid choice is legible (a58, a64, a65, a70)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _feat grid legible:
+
+The grid choice is legible (a58, a64, a65, a70)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The sizing decision used to be a number you either trusted or overrode. It is now
 a reported decision. ``bs_window_df`` shows each candidate method, whether it
@@ -1160,12 +1168,12 @@ applies, which was selected, and the resulting window:
     qd(simple.bs_window_df)
 
 ``bs_description`` and ``bs_explanation`` are the short and long narrative forms
-of the same decision. The tail report (section 8) feeds this: since a64 the
+of the same decision. The :ref:`tail report <feat tail class>` feeds this: since a64 the
 thick/thin classification is an *input* to sizing rather than a report written
 afterwards.
 
-7.5 Guards: infinite variance and unreachable grids (a74, a87, a145)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Guards: infinite variance and unreachable grids (a74, a87, a145)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Three sizing corrections worth knowing. ``round_bucket`` lost its 2.5x jumps
 (a74), so the bucket ladder is smooth. An **infinite-variance** aggregate now
@@ -1174,14 +1182,17 @@ answer, so it asks rather than guessing. And ``exact_discrete`` sizing lost its
 unconditional top priority (a145), and must clear a reachability guard before it
 is chosen.
 
-7.6 ``sharpen``: auditing the grid, not just trusting it (a192 to a195)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``sharpen``: auditing the grid, not just trusting it (a192 to a195)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``update`` **chooses** a grid from the analytic moments before any FFT runs.
 ``sharpen`` **audits** that choice afterwards: it re-updates the object on
 neighbouring ``(bs, log2)`` cells, scores each against the analytic moments, and
 moves when the win is worth having. It is on :class:`Aggregate` and
-:class:`Portfolio`.
+:class:`Portfolio`. The mechanism, the selection rule, the controls and the frame
+layout are documented on the grid page,
+:ref:`Auditing the choice afterwards: sharpen <bs sharpen>`; what follows is what
+changed and how it looks in use.
 
 The score came first, and it is worth having on its own. ``validation_score`` is
 six terms, severity and aggregate mean, CV and skewness, read from the canonical
@@ -1210,25 +1221,15 @@ the picture is one unstack away:
 
     qd(sharp.sharpen_df.score.unstack('d_log2'))
 
-Read it two ways. Down a column is constant grid size, so it is the resolution
-question; along an anti-diagonal is constant extent, since extent is
-``bs * 2**log2``. Together they say whether a grid is **extent-limited**, widen
-it, or **resolution-limited**, refine it, and ``sharpen_explanation`` says which
-in prose. The rows are ragged because each one is a **line search** (a193):
-``bs`` is doubled until the score stops improving, then halved likewise, capped
-by ``bs_limit``. Cells never visited come back ``NaN``.
-
-The selection rule (a194) is *never pay more than you already are*: take the best
-score among the cells that **do not grow** ``log2``, and grow by one only when
-nothing at the current size or smaller reaches ``good_enough``. Reducing ``log2``
-is a bonus rather than a goal, picked up by the tie rule. ``min_gain`` is
-retired, ``good_enough`` (default ``0.5``) is the only judgment knob, and
-``good_enough=0`` means probe everything and never grow.
+Down a column is constant grid size, the resolution question; along an
+anti-diagonal is constant extent. The rows are ragged because each one is a
+**line search** (a193) out from the current bucket, and the selection rule (a194)
+is *never pay more than you already are*. ``min_gain`` is retired and
+``good_enough`` (default ``0.5``) is the only judgment knob left.
 
 A discrete severity is a special case, and a satisfying one. When every atom is a
-whole number of buckets there is nothing to search on the bucket axis: a coarser
-bucket scatters the atoms off their own values, a finer one only wastes grid. So
-the bucket is **pinned** and only ``log2`` is probed, which is what a failing
+whole number of buckets there is nothing to search on the bucket axis, so the
+bucket is **pinned** and only ``log2`` is probed, which is what a failing
 discrete object actually needs, its problem being extent.
 
 .. ipython:: python
@@ -1240,16 +1241,10 @@ discrete object actually needs, its problem being extent.
 Finally (a195), **a grid that loses mass off its top end is disqualified, however
 well it scores**. A moment score cannot see lost mass and never will: on a cat
 tower the winning cell sat 13 times *inside* mean tolerance while shedding
-2.1e-08 of its mass out at the far tail. That is not cosmetic, because forwards
-``S = 1 - cumsum`` and backwards ``S`` then differ by exactly the missing mass,
-so two correct-looking pricing routes disagree in the tail. It is a **gate, not a
-penalty**: a deficit has no tolerance of its own to divide by, and the cost is
-qualitative rather than a matter of degree. The threshold is the level at which
-``DefectiveDistributionWarning`` already fires, so a cell rejected here is
-exactly one that would warn when you used it. Three frame columns carry it,
-``deficit``, ``defective`` and ``warns``, and because soundness sits outside the
-thrift ordering it composes: a deficit becomes a reason to **grow** ``log2``,
-which is its cure.
+2.1e-08 of its mass out at the far tail. It is a **gate, not a penalty**, and the
+threshold is the level at which ``DefectiveDistributionWarning`` already fires,
+so a cell rejected here is exactly one that would warn when you used it. Three
+frame columns carry it:
 
 .. ipython:: python
 
@@ -1257,20 +1252,19 @@ which is its cure.
 
 Two notes on reach. ``update(..., sharpen=True)`` opts a single update into
 auto-sharpening; it is off by default and **not** turned on by ``build``, because
-a probe costs eight or more extra updates. There is no
-``BivariateAggregate.sharpen`` (the probe is quadratic in the joint grid) and
-deliberately no ``PnL.sharpen``, which would leave a built ledger on a stale
-grid; a P&L gets it through its engine instead. A :class:`Portfolio` scores the
-**total only**, so a well resolved total can still hide a poorly resolved unit,
-and ``sharpen_explanation`` says so.
+a probe costs eight or more extra updates. And there is no
+``BivariateAggregate.sharpen`` or ``PnL.sharpen``, for reasons the grid page
+gives.
 
 **Breaking at a192:** ``Aggregate.focus`` is now ``Aggregate.center_window``. The
 old name was wrong for what it does, a no-recompute re-slicer returning the
 central window of ``density_df`` holding :math:`1 - p` of the mass, and it
 blocked the good name. No deprecation shim.
 
-8. Tail-thickness classification (a29)
-----------------------------------------
+.. _feat tail class:
+
+Tail-thickness classification (a29)
+-----------------------------------
 
 Every :class:`Aggregate` and :class:`Portfolio` reports an ordered tail class on
 a five-rung scale, ``bounded < super-exponential < exponential < subexponential <
@@ -1291,8 +1285,8 @@ classifier, with the certify setter ``obj.bounded = True`` as escape hatch.
 ``Portfolio.tail_class`` reports the worst-of across units and names the driving
 units.
 
-8.1 The layered tail report: ``tail_df`` (a60, a62, a63)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The layered tail report: ``tail_df`` (a60, a62, a63)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``tail_class`` gives the one-word answer. ``tail_df`` gives the layered evidence
 behind it, and ``tail_description`` / ``tail_explanation`` the narrative:
@@ -1305,13 +1299,13 @@ behind it, and ``tail_description`` / ``tail_explanation`` the narrative:
 a63 added comprehensive tail tables for the scipy severity families, so the
 classifier knows the analytic tail of each family rather than inferring it
 numerically. That is what makes the classification trustworthy enough to drive
-grid sizing (section 7.4).
+grid sizing (:ref:`the grid choice is legible <feat grid legible>`).
 
-9. Pricing and the pentagon
------------------------------
+Pricing and the pentagon
+------------------------
 
-9.1 One canonical readout: the octet (a31)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One canonical readout: the octet (a31)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Every pricing method emits the same eight accounting quantities in the same
 order: amounts ``L`` (loss), ``M`` (margin), ``P = L + M`` (premium), ``Q``
@@ -1321,8 +1315,8 @@ each method built these independently and disagreed on naming and order. The
 framework is that of *Pricing Insurance Risk* :cite:p:`Mildenhall2022a` and its
 capital-modeling companion :cite:p:`Major2026`.
 
-9.2 Distortions: natural parameters (a13) and the quartet
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Distortions: natural parameters (a13) and the quartet
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking vs 0.30.1.** :class:`Distortion` constructors take kind-specific names
 instead of the generic ``(name, shape, r0, df, …)`` slots: ``Distortion('ph',
@@ -1340,8 +1334,8 @@ including the Kusuoka spectral-measure atoms (a16):
     d = Distortion('bitvar', p0=0.9, p1=0.99, w1=0.5)
     qd(d.summary_df)
 
-9.3 Calibration: ``distortion_df`` and ``calibration_df`` (a7, a34)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Calibration: ``distortion_df`` and ``calibration_df`` (a7, a34)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``calibrate_distortions(coc=, p=)`` (one point; the old list-based batch API is
 gone, a7) calibrates the canonical five (``ccoc``, ``ph``, ``wang``, ``dual``,
@@ -1362,8 +1356,8 @@ target:
 methods take explicit ``p=`` *or* ``a=`` (the implicit "p greater than 1 means an
 asset level" convention is gone).
 
-9.4 Pricing a book (a7, a17, a57)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Pricing a book (a7, a17, a57)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``apply_distortion`` is a cached build of the risk-adjusted frame;
 ``pricing_at(distortion, p=|a=)`` reads the octet at a capital level; ``price``
@@ -1393,8 +1387,8 @@ keyed on ``(name, view, role, S_calculation, allocation)`` so variant frames
 coexist. Signed (P&L) books now price (total premium via the Choquet dot
 product; equal-priority per-line columns are NaN on a signed grid).
 
-9.5 Stand-alone vs diversified (a33)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Stand-alone vs diversified (a33)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``price_stand_alone(dist, p)`` prices every unit backed by its own VaR(p) capital
 and contrasts the ``sum`` with the diversified ``total``, the classic
@@ -1404,8 +1398,8 @@ diversification-benefit exhibit:
 
     qd(book.price_stand_alone(wang, 0.995))
 
-9.6 The ``Pentagon`` and ``price_pentagon`` (a31, a43)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ``Pentagon`` and ``price_pentagon`` (a31, a43)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``pentagon_at(distortion, p=)`` returns a ``Pentagon``, an eight-vector with
 named attributes that completes any soluble partial input. ``price_pentagon``
@@ -1421,8 +1415,8 @@ completes the octet by pure accounting:
 
     qd(simple.price_pentagon(a=12500, LR=0.70))  # works on an Aggregate too
 
-9.7 Free choice of capital anchor: ``prob_loss_assets`` (a97)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Free choice of capital anchor: ``prob_loss_assets`` (a97)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Capital can be anchored three ways, and they are the same relationship read from
 different ends: pick the exceedance probability ``p``, the loss level ``L``, or
@@ -1437,24 +1431,24 @@ the assets ``a``, and get the other two. Pass exactly one:
 short alias ``pla`` shipped at a97 and was retired at a151 under the
 one-name-per-concept rule.)
 
-9.8 Calibration on signed and payoff supports (a93, a99)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Calibration on signed and payoff supports (a93, a99)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Distortion calibration works on a single distribution, with :class:`Aggregate`
 and :class:`Portfolio` reaching it identically (a93), and since a99 it handles
 **signed** and **payoff** supports. That is what lets a P&L, which lives on both
 sides of zero, be priced with the same machinery as a loss.
 
-10. Pricing and allocation bounds
------------------------------------
+Pricing and allocation bounds
+-----------------------------
 
 Three classes in ``aggregate.bounds``, sharing one exact piecewise-linear hull
 engine on the FFT grid (no resampling: TVaR curves are affine in
 :math:`1/(1-p)` within an atom, so hulls built at CDF breakpoints are exact and
 :math:`O(n)`).
 
-10.1 ``Bounds``: distortion envelopes for the total (a11, redesigned)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``Bounds``: distortion envelopes for the total (a11, redesigned)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The class implementing the similar-risks bounds of :cite:t:`Mildenhall2022` is
 now one-shot: construct with the object and premium, and read ``p_star``,
@@ -1469,8 +1463,8 @@ now one-shot: construct with the object and premium, and read ``p_star``,
     b = Bounds(book, P, a=float(book.q(0.995)))
     print(f'p* = {b.p_star:.4f}; min envelope: {b.min_envelope}')
 
-10.2 ``AllocationBounds``: natural-allocation ranges (a36)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``AllocationBounds``: natural-allocation ranges (a36)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Given that the total is priced to P, the range of natural-allocation premiums to
 each unit over *all* consistent distortions :math:`\{g : \rho_g(X) = P\}`, the
@@ -1486,8 +1480,8 @@ premium):
 ``ab.bitvars(P)`` gives the achieving distortions, ``ab.distortion(P, unit,
 bound)`` reconstructs one, and ``ab.check(P)`` reprices from first principles.
 
-10.3 ``PricingBounds`` and the Gini lens (a37)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``PricingBounds`` and the Gini lens (a37)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Same machinery, different question: if a reference risk X is priced to P by
 *some* distortion, what is the price range of another risk Y? Any
@@ -1502,11 +1496,11 @@ With the uniform reference (``uniform_source()``) as X, the constraint collapses
 to a mean-Kusuoka-level condition, the **Gini lens**, reading the envelope gap of
 Y's own TVaR curve.
 
-11. Configuration
--------------------
+Configuration
+-------------
 
-11.1 ``config.toml`` (a30)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``config.toml`` (a30)
+~~~~~~~~~~~~~~~~~~~~~
 
 The hard-coded "secret bits", default ``log2``, default database, bucketing
 schemes, sizing percentile, validation tolerances, are now read from an optional,
@@ -1531,8 +1525,8 @@ The ``[labels]`` section (a54) renames the printed ``value_type`` words
 (``loss``/``payoff`` to, say, ``claim``/``P&L``) without moving any object's
 role: code branches on the underlying boolean, never the label text.
 
-11.2 Plot styling: ``aggregate.style`` (a14)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Plot styling: ``aggregate.style`` (a14)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The library no longer touches your matplotlib settings at import (the 0.30.1
 ``knobble_fonts`` machinery is gone). Opt in to the house style globally with
@@ -1545,18 +1539,18 @@ The library no longer touches your matplotlib settings at import (the 0.30.1
     with aggregate.style.context():
         simple.plot()
 
-11.3 Warnings are yours (a16)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Warnings are yours (a16)
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 The package no longer runs ``warnings.simplefilter('ignore')`` at import. Muting
 is an explicit opt-in: ``from aggregate import silence_warnings;
 silence_warnings()``, now with optional ``category=`` and ``message=`` scoping.
 
-12. Underwriter and persistence
----------------------------------
+Underwriter and persistence
+---------------------------
 
-12.1 Construction: keyword-only, empty by default (a35, a39)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Construction: keyword-only, empty by default (a35, a39)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A bare ``Underwriter()`` starts **empty**, with no silent loading of the bundled
 ``test_suite`` (the module-level ``build`` still loads its configured databases).
@@ -1570,8 +1564,8 @@ silently *name* the underwriter after the database you meant to load, is now a
     uw = Underwriter(name='demo')
     print(uw)
 
-12.2 Legible loading (a32)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Legible loading (a32)
+~~~~~~~~~~~~~~~~~~~~~
 
 One explicit pipeline: ``databases=`` is the *request*; the public ``databases``
 attribute reports the file ``Path`` objects actually loaded; ``load(request)``,
@@ -1591,8 +1585,8 @@ directory, then ``~/.aggregate``, then bundled. Every knowledge entry carries a
 ``CannotBuild``, a ``ValueError``, rather than returning ``None``-ish objects,
 a2). ``.more()`` is renamed ``.help()`` everywhere (a2).
 
-12.3 Saving work: ``to_agg`` (a32, a35, a53)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Saving work: ``to_agg`` (a32, a35, a53)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``to_agg(path)`` writes selected knowledge entries back to a re-loadable ``.agg``
 file: by default everything built this session, in dependency order (severities
@@ -1609,8 +1603,8 @@ refuses to clobber), ``'w'``, ``'a'``:
         uw.to_agg(path, mode='w')
         print(open(path).read())
 
-12.4 ``discover`` refuses what it cannot honor (a173)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``discover`` refuses what it cannot honor (a173)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``build.discover(tag='role:hero')`` used to return every entry in the recipe
 base. A filter that silently matches everything is the worst possible answer: it
@@ -1642,8 +1636,8 @@ lookup downstream failed:
 
     print(build.discover('NoSuchName', tags='role:hero').shape)
 
-12.5 ``interpret_file`` reads statements, not lines (a176)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``interpret_file`` reads statements, not lines (a176)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``interpret_file`` reported 67 parse errors on ``agg/library.agg`` and 13 on
 ``agg/decl-testers.agg``. Both counts are now zero, and neither file ever had
@@ -1668,8 +1662,8 @@ line against its raw source, a distinction that does not exist when the unit of
 work is the statement. Rows are also collected positionally rather than keyed on
 the entry name, so two entries sharing a name no longer overwrite each other.
 
-12.6 ``build`` finishes every kind (a169)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``build`` finishes every kind (a169)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Two loose ends in ``build_many``'s output dispatch. A
 :class:`BivariateAggregate` built with ``update=False`` came back correct and
@@ -1693,8 +1687,8 @@ Note that the top-level production accepts a subset of arithmetic: ``1 + 2`` and
 a trailing ``2 * 3`` still do not parse there, because ``*`` is the severity
 scale operator.
 
-13. Pedagogy helpers
-----------------------
+Pedagogy helpers
+----------------
 
 The deleted ``extensions/`` package's doc-cited figure machinery lives on in
 ``aggregate.pedagogy`` (a12): ``bodoff_exhibit``, ``plot_twelve``,
@@ -1717,15 +1711,17 @@ Poisson comparison table:
     print(f'tilted convolution mass: {td_.sum():.6f} (reproduces the ordinary result; '
           f'tilt=None is byte-identical)')
 
-14. P&L: profit and loss as a first-class object
---------------------------------------------------
+.. _feat pnl:
+
+P&L: profit and loss as a first-class object
+--------------------------------------------
 
 The single largest addition since a57. In a23 ``pnl`` was a keyword that shifted
 an aggregate; today it builds a :class:`PnL`, an object with its own ledger,
 exhibits and reinsurance walk. The arc runs a102 to a191.
 
-14.1 The ledger: Consideration, Obligation, Margin (a103, a122, a123)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ledger: Consideration, Obligation, Margin (a103, a122, a123)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A P&L is money in minus money out over a random state. ``summary_df`` is that
 statement, not a moment table: **Consideration** is what you are paid,
@@ -1750,8 +1746,8 @@ technical premium rather than restated:
                 '8000 prem at 65% lr sev lognorm 100 cv 2 poisson')
     qd(inh.summary_df)
 
-14.2 Expenses and loss-sensitive legs (a114, a115)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Expenses and loss-sensitive legs (a114, a115)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Expenses are ``and``-joined obligation legs. Three kinds, distinguished by what
 they scale with: ``% loss expense`` rides the loss (so it is stochastic),
@@ -1769,8 +1765,8 @@ The LAE row has the same CV and skew as the Loss row because it *is* the loss,
 scaled. The expense row has zero SD. That separation is the point: a single Total
 hides which legs carry risk and which merely carry cost.
 
-14.3 ``pnl`` and ``xpnl``: the net view and the walk (a136)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``pnl`` and ``xpnl``: the net view and the walk (a136)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Two objects, two questions. **``pnl``** is the consolidated **net** view: one
 group, everything folded in, "what did the book earn?". **``xpnl``** is the
@@ -1798,8 +1794,8 @@ and the step name says what it covers. A multi-layer tier keeps the generic
 14.5 is how you see those layers separately. A layer's declared ``as`` label
 still wins.
 
-14.4 Acceptability: ``evaluate()`` (a105, corrected a187, a188, a190)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Acceptability: ``evaluate()`` (a105, corrected a187, a188, a190)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``evaluate`` returns the breakeven panel: the level of distortion at which a
 position stops being acceptable. **a187 is a correction, not an enhancement.**
@@ -1880,8 +1876,8 @@ indexing a ``total impact`` block raises ``KeyError``; and
 ``evaluate`` no longer targets a premium and ``ratio_df['P']`` is the
 replacement.
 
-14.5 Peeling a tower, layer by layer (a183, a184)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Peeling a tower, layer by layer (a183, a184)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The tier walk books one group per reinsurance *tier*, so a five-layer program had
 one lumped ``ceded occ`` step. The DecL clause ``peel`` books one group per
@@ -1921,8 +1917,8 @@ by linearity, but the dispersion columns are marginal, so the ladder carries
 plain ``P01…P99`` headers rather than κ, and ``evaluate`` and ``+`` are
 unavailable.
 
-14.6 The ledger's index: ``Side`` and ``Label`` (a189, a191)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ledger's index: ``Side`` and ``Label`` (a189, a191)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking.** The :class:`PnL` sheets renamed their index levels. ``View`` became
 **``Side``** and ``Line`` became **``Label``**, on ``stats_df``, on
@@ -1967,8 +1963,8 @@ code that filtered legs out with ``Label not in ('Total', 'Net', 'Impact')``
 needs the direct label in that set. A step's own result is still the first
 ``Margin`` row of its block in plan order, whatever the label reads.
 
-14.7 Ratios in their own frame: ``ratio_df`` and ``legs_df`` (a185, a186)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ratios in their own frame: ``ratio_df`` and ``legs_df`` (a185, a186)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking.** The ``Scaled`` column is gone, and with it ``scaled_stats_df``, the
 ``scale`` property and the ``scale=`` constructor argument. ``Scaled`` divided
@@ -2026,11 +2022,13 @@ Both frames are **raw materials**: unformatted, and deliberately absent from
 ``qd`` and the notebook repr, which keep rendering ``summary_df``, the
 presentation-ready layer.
 
-15. Bivariate aggregates
---------------------------
+.. _feat bivariate:
 
-15.1 The rename, and what the object is (a80)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Bivariate aggregates
+--------------------
+
+The rename, and what the object is (a80)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking, a80: ``multivariate`` is ``bivariate``** (short form ``bv``), and the
 class is :class:`BivariateAggregate`. The old name promised a generality the 2D
@@ -2041,8 +2039,8 @@ gets an honest centred window (``balanced_window``), the lower edge comes from
 the measured support instead of an artificial pin at 0, and ``round_bucket`` lost
 its 2.5x jumps (a74) so the ladder is smooth.
 
-15.2 The reporting surface (a77, a85)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The reporting surface (a77, a85)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Three frames, each owning one question. ``summary_df`` follows the
 ``Portfolio.summary_df`` shape: a shared ``Freq`` block, a ``Sev`` / ``Agg``
@@ -2059,8 +2057,8 @@ row is the joint per-claim severity and the ``Agg`` row the realized aggregate.
 They differ, and the gap is the whole story: compounding attenuates per-claim
 dependence while shared frequency mixing adds common-shock dependence on top.
 
-15.3 ``clash``: two lines, one event (a79)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``clash``: two lines, one event (a79)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A clash program shares events across two lines with per-line claim counts. Here 8
 events, of which 5 hit line 1 and 2 hit line 2:
@@ -2076,15 +2074,15 @@ event), yet the aggregates are correlated: the shared event count and the shared
 gamma mixing do all the work. That is exactly the clash structure, and it is
 invisible if you only look at marginals.
 
-15.4 View pairs (a78)
-~~~~~~~~~~~~~~~~~~~~~~~
+View pairs (a78)
+~~~~~~~~~~~~~~~~
 
-``netceded`` (section 3.5) has two siblings. ``grossceded`` and ``grossnet``
+:ref:`netceded <feat netceded>` has two siblings. ``grossceded`` and ``grossnet``
 prefix the same reinsured program and return the corresponding joint law, so you
 can ask for whichever pair the analysis needs without rebuilding.
 
-15.5 Massive: disk-backed bivariates (a126)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Massive: disk-backed bivariates (a126)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A 2D grid at useful resolution can exceed memory. ``update(store_dir=...)`` runs
 the update out of core, backed by ``zarr`` (the ``massive`` extra), with dict
@@ -2092,8 +2090,8 @@ pushforwards and pyramid visualization for exploration. One caveat worth
 carrying: with ``padding=0`` the wrap hides from the deficit check, so compare
 means rather than trusting the deficit.
 
-15.6 ``axis_support_df``, and labels on a bivariate (a171)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``axis_support_df``, and labels on a bivariate (a171)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking: ``BivariateAggregate.tail_df`` is ``axis_support_df``.** It was a
 collision, not an analogy. ``Aggregate.tail_df`` and ``Portfolio.tail_df`` are
@@ -2124,16 +2122,16 @@ because each unit is an ordinary ``agg``; an **object-level** label has no DecL
 spelling yet, so it is set with ``label=``, a grammar gap logged as
 ``[Bivariate-DecL-Label]``.
 
-16. Reinsurance economics: stochastic ceded premium
------------------------------------------------------
+Reinsurance economics: stochastic ceded premium
+-----------------------------------------------
 
 Guaranteed-cost reinsurance has a premium you know at inception. These features
 share one theme: the ceded premium is **random**, because it is a function of the
 ceded loss. That is what makes them require the aggregate machinery rather than a
 spreadsheet.
 
-16.1 Reinstatements (a116, a117)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reinstatements (a116, a117)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Property-cat covers are paid for as they are used. A layer with
 ``reinstatements [1]`` carries a deposit premium plus a reinstatement premium
@@ -2143,8 +2141,8 @@ driven by the recovery:
 
     qd(reinst.reins_summary_df)
 
-16.2 Variable rating (a118, a119, a120)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Variable rating (a118, a119, a120)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Five features, all now expressible in DecL: **swing** (``swing basic B lcm L min
 m max M``), **slide** (a sliding commission), **pc** (profit commission),
@@ -2155,19 +2153,19 @@ the ceded premium, or the effective recovery, a function of the loss.
 
     qd(swing.reins_summary_df)
 
-16.3 Placement scaling (a143)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Placement scaling (a143)
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reinsurance premiums in a ``pnl`` or ``xpnl`` are quoted at **100% placement**
 and scaled down by the fraction actually placed. Quoting at 100% and scaling once
 at the end is the market convention, and it keeps a partial placement from
 silently rescaling the layer terms.
 
-17. Renewal frequency and ruin
---------------------------------
+Renewal frequency and ruin
+--------------------------
 
-17.1 Sparre-Andersen: the ``wait`` clause (a146, a147)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sparre-Andersen: the ``wait`` clause (a146, a147)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Until a146 the claim count was Poisson or a mixed Poisson. It can now be a
 general **renewal process**: claims arrive after iid waiting times of any law.
@@ -2181,15 +2179,15 @@ The expected count is an **output**, not an input: it falls out of the waiting l
 and the horizon. a147 added layer terms on the wait clause
 (``wait y xs a <dist>``), so waiting times can be capped or floored.
 
-17.2 Zero-truncated and zero-modified frequency (a152)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Zero-truncated and zero-modified frequency (a152)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``zt`` and ``zm`` were reparameterized to the textbook form and fixed; ``zt``
 previously raised. The parameter is now the one the textbooks use, so a ``zt``
 negative binomial matches *Loss Models* directly.
 
-17.3 Eventual ruin: ``wiener_hopf`` (a153)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Eventual ruin: ``wiener_hopf`` (a153)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For a renewal aggregate, ``wiener_hopf(rho)`` returns the eventual-ruin function
 by a cepstral Wiener-Hopf factorization, at loading ``rho``:
@@ -2206,14 +2204,14 @@ The classical Pollaczek-Khinchine solver is still there and now carries a strict
 Poisson guard, so it refuses rather than silently returning the wrong answer for
 a renewal process. Defective waiting laws are refused outright.
 
-18. The recipe library
-------------------------
+The recipe library
+------------------
 
 The last arc before v1.0 (a157 to a168): the shipped ``.agg`` library describes,
 demonstrates and tests itself.
 
-18.1 ``doc{{{ }}}`` and ``tags{ }`` (a157)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``doc{{{ }}}`` and ``tags{ }`` (a157)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The DecL trailer grew from two clauses to four. ``note{}`` is the one-line
 description and ``hints{}`` the build settings, as before. New: **``tags{}``**, a
@@ -2224,16 +2222,16 @@ Python code because it is extracted and base64-encoded *before* the comment
 stripper runs. ``distortion`` gained a trailer at the same time, so distortions
 are first-class in describe, test and audit like everything else.
 
-18.2 One library (a159, a161)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One library (a159, a161)
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``examples.agg``, ``cookbook.agg`` and ``actuarial-severity-curves.agg`` merged
 into a single **``library.agg``**, names made unique across kinds, letter
 prefixes retired. It is the default database, so the out-of-the-box knowledge
 base grew from 36 entries to 186.
 
-18.3 ``build.recipe()`` and ``build.recipes`` (a158, a164)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``build.recipe()`` and ``build.recipes`` (a158, a164)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ipython:: python
 
@@ -2256,8 +2254,8 @@ contents:
 
     print(f"hero entries: {len(build.discover(tags='role:hero'))}")
 
-18.4 The cookbook generates itself (a165, a167)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The cookbook generates itself (a165, a167)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Cookbook pages are **generated** from ``library.agg`` into native Quarto cells by
 ``aggregate.cookbook``. The same ``doc{{{ }}}`` body is executed by
@@ -2270,8 +2268,8 @@ entry's own program, so a recipe never retypes the code it documents.
     Running a recipe executes the code in the ``.agg`` file. Treat a third-party
     ``.agg`` like a third-party Python file.
 
-19. Under the hood
---------------------
+Under the hood
+--------------
 
 Internal changes, named for the record, with no new user-facing surface. Versions
 refer to ``CHANGELOG.md`` sections.

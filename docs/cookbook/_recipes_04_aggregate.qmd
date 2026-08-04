@@ -29,8 +29,8 @@ Read `a.n` back to see the implied total count, and `a.sev_m` for the exposure-w
 
 ```{python}
 # the aggregate mean IS the premium-weighted expected loss, exactly:
-# 1000x0.8 + 2000x0.7 + 500x0.5 = 2450
-assert abs(a.actual_m - 2450.0) < 1e-9
+# 10000x0.8 + 20000x0.7 + 5000x0.5 = 24500
+assert abs(a.actual_m - 24500.0) < 1e-9
 # and the FFT estimate agrees to grid accuracy
 assert abs(a.est_m / a.actual_m - 1) < 1e-6
 # E[A] = E[N] x E[X] still holds across the blended profile

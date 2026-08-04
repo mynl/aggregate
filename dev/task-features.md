@@ -60,8 +60,17 @@ density, not total length; there is a lot of material and it should all be here.
 ### 2.1 Format and conventions
 
 - **reStructuredText** (`.rst`) in the Sphinx tree, with a `.. _2_x_features:`
-  anchor, an `=`-underlined title, `-` for the numbered sections and `~` for
+  anchor, an `=`-underlined title, `-` for the top-level sections and `~` for
   their subsections, and a `.. contents:: :local: :depth: 2` block.
+- **Never write a section number into a heading.** Sphinx numbers headings
+  itself, from `:numbered: 3` on the master toctree in `docs/index.rst`, so a
+  hand-written number renders twice: `2.8.3.12. 3.12 Bare unary minus`. Write
+  `Bare unary minus on a severity (a109)` and let the build supply the number.
+  The numbers in the §2.2 layout list below are an ordering aid for this spec,
+  not text to copy into the page. Numbering stops at three levels, so a `~`
+  subsection is deliberately unnumbered; cross-reference one by adding an
+  explicit `.. _feat some name:` anchor above it and linking with
+  `` :ref:`its title <feat some name>` ``, never by writing "see section 7.4".
 - Code is `.. ipython:: python` blocks, indented four spaces. They **execute at
   build time**, which is what makes the page self-auditing; `IPython.sphinxext.
   ipython_directive` and `ipython_execlines` are already configured in

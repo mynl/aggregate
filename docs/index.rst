@@ -5,18 +5,6 @@
 aggregate Documentation
 #######################
 
-.. toctree::
-   :maxdepth: 3
-   :hidden:
-   :numbered:
-
-   1_Getting_Started
-   2_Aggregate_Overview
-   3_Reference
-   4_dec_Language_Reference
-   7_bibliography
-
-
 ****************
 Introduction
 ****************
@@ -35,3 +23,17 @@ This help document is in four parts plus a bibliography.
 #. :doc:`Reference <3_Reference>`: documentation for every class and function, for developers and more advanced users.
 
 #. :doc:`Dec Language Reference <4_dec_Language_Reference>`: the Dec Language (DecL) for specifying aggregate distributions.
+
+
+
+.. toctree::
+   :maxdepth: 3
+   :hidden:
+   :numbered: 3
+
+   1_Getting_Started
+   2_Aggregate_Overview
+   3_Reference
+   4_dec_Language_Reference
+   7_bibliography
+

@@ -5,6 +5,7 @@
 # containing dir.
 #
 
+import re
 import sys
 import os
 
@@ -29,6 +30,66 @@ ipython_execlines = [
     # other notebook prelude you might want, e.g.
     # 'import aggregate.style; aggregate.style.use()',
 ]
+
+
+# ---------------------------------------------------------------------------
+# Bug fix: IPython's ``.. ipython:: python`` continuation prompt, statement 10
+# ---------------------------------------------------------------------------
+# ``IPython.sphinxext.ipython_directive`` renders a pure-python block as a fake
+# console session, then re-parses its own rendering. The two halves disagree
+# about the width of the ``...:`` continuation prompt.
+#
+# ``process_pure_python`` writes the prompt for statement ``n`` as ``In [n]:``,
+# increments its counter, and only *then* builds the continuation string from
+# the counter, so the continuation lines of statement ``n`` are padded for
+# ``n + 1``. ``block_parser`` reads the number back out of ``In [n]:`` and pads
+# for ``n``. For a single-digit ``n`` both come to three dots and nothing is
+# wrong. At ``n = 9`` the writer pads for ``10`` and emits four dots while the
+# reader still expects three, so the continuation lines stop being recognized
+# as input: they are filed as echoed stdout instead, and the shell is handed
+# the first line of a multi-line statement on its own. That is *incomplete*
+# rather than invalid, so it is buffered, never executed, and never raises.
+#
+# The symptom is silent and remote from its cause: the assignment vanishes, and
+# the build fails hundreds of lines later with a bare ``NameError`` on a name
+# whose definition is plainly there in the source. It bites the 10th statement
+# of any pure-python block, and only when that statement spans lines. In this
+# tree it hit the cast of examples in ``2_aggregate_overview/features.rst``,
+# whose 10th statement is ``reins = build(...)`` wrapped over three lines.
+#
+# Fixed here rather than worked around in the prose (reordering the cast, or
+# forcing the statement onto one long line) because a rule like "never let a
+# multi-line statement land tenth" is invisible and unenforceable. The patch
+# post-processes the writer's output, renumbering every continuation prompt to
+# match the ``In [n]:`` above it. That output contains only blank lines,
+# comments, pseudo-decorators and prompted input, so nothing else can match.
+try:
+    from IPython.sphinxext.ipython_directive import EmbeddedSphinxShell
+
+    _RE_PROMPT_IN = re.compile(r'^In \[(\d+)\]:')
+    _RE_PROMPT_CONTINUATION = re.compile(r'^   (\.+):')
+    _orig_process_pure_python = EmbeddedSphinxShell.process_pure_python
+
+    def _process_pure_python(self, content):
+        lines = _orig_process_pure_python(self, content)
+        out, number = [], None
+        for line in lines:
+            m = _RE_PROMPT_IN.match(line)
+            if m:
+                number = int(m.group(1))
+                out.append(line)
+                continue
+            m = _RE_PROMPT_CONTINUATION.match(line)
+            if m is not None and number is not None:
+                prompt = '   %s:' % ('.' * (len(str(number)) + 2))
+                out.append(prompt + line[m.end():])
+                continue
+            out.append(line)
+        return out
+
+    EmbeddedSphinxShell.process_pure_python = _process_pure_python
+except ImportError:
+    pass
 
 
 # -- Project information -----------------------------------------------------
@@ -256,6 +317,34 @@ latex_elements = {
     # The font size ('10pt', '11pt' or '12pt').
     'pointsize': '10pt',
     'extrapackages': '\\usepackage{mathrsfs}',
+    # Wrap over-long code lines instead of letting them run off the page. The
+    # docs contain ipython output lines over 2,000 characters; unwrapped they
+    # produce badly overfull boxes and, where one lands on a page break, the
+    # PDF build dies with "This can't happen (ext3)" / "(ext4)".
+    'sphinxsetup': 'verbatimforcewraps=true',
+    # Section numbering stops at three levels (chapter.section.subsection, e.g.
+    # 2.8.1), matching ``:numbered: 3`` on the master toctree in ``index.rst``.
+    # LaTeX's own counter is what numbers the PDF, and Sphinx derives it from the
+    # toctree ``:maxdepth:``, not from ``:numbered:``, so the two have to be set
+    # separately or the PDF numbers a level deeper than the HTML. The counter is
+    # set here rather than via the ``secnumdepth`` element because the writer
+    # overwrites that element whenever it computes a larger minimum; ``preamble``
+    # is emitted after it in the template, so this wins.
+    # LaTeX caps list nesting at 6 levels (4 for itemize) and errors with
+    # "Too deeply nested". Autodoc stacks deeply: a page section, a class, a
+    # method, its parameter list, and any list inside a docstring. Raise the
+    # cap rather than flatten docstrings one at a time. HTML has no such limit,
+    # which is why this only ever bites the PDF build.
+    'preamble': r'''
+\setcounter{secnumdepth}{2}
+\usepackage{enumitem}
+\setlistdepth{12}
+\renewlist{itemize}{itemize}{12}
+\renewlist{enumerate}{enumerate}{12}
+\renewlist{description}{description}{12}
+\setlist[itemize]{label=\textbullet}
+\setlist[enumerate]{label=\arabic*.}
+''',
     # 'preamble': '\\renewenvironment{DUlineblock}{}{}',
     # 'preamble': '\\renewenvironment{DUlineblock}{\\begin{comment}}{\\end{comment}}'
 }

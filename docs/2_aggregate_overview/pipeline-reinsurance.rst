@@ -1,8 +1,8 @@
 .. _pipeline reinsurance:
 
-#######################################
+#################################
 The Reinsurance Reporting Surface
-#######################################
+#################################
 
 *Developer documentation for the reinsurance reporting surface as it stands at
 1.0.0a19 (after the* ``reins-buckets`` *and* ``reins-reporting`` *cycles).
@@ -146,12 +146,12 @@ The two callers:
   ``ftagg_density``.
 
 
-**********************
+*********************
 The reporting objects
-**********************
+*********************
 
-1. ``reins_density_df`` (≈ 1828)
-================================
+``reins_density_df`` (≈ 1828)
+=============================
 
 The reinsurance analogue of ``density_df``: one row per grid bucket,
 **consistent columns regardless of which programs are present** (a missing stage
@@ -186,8 +186,8 @@ densities-of-record (rebucketed) frame the other objects are computed from.
 :meth:`reinsurance_occ_plot` reads from here.
 
 
-2. ``_reins_view_stats`` (private; ≈ 2001) — the EX-vs-Est frame
-================================================================
+``_reins_view_stats`` (private; ≈ 2001): the EX-vs-Est frame
+============================================================
 
 The per-stage/view/**basis** moment frame, shaped like ``stats_df`` but indexed
 by stage/view/basis instead of components. Lazily built, cached in
@@ -219,8 +219,8 @@ biases it by at most ``bs/2``). The rebucketing regression tests read this frame
 directly.
 
 
-3. ``reins_stats_df`` (≈ 2146) — the per-layer layering view
-============================================================
+``reins_stats_df`` (≈ 2146): the per-layer layering view
+========================================================
 
 The actuarial "how is the loss layered" exhibit. **Per-layer**, empirical
 (model-grid), one column per reinsurance layer plus the gross book and the
@@ -274,8 +274,8 @@ dynamic). This object supersedes the removed ``reinsurance_audit_df`` /
 rebuilt against ``a.reins_stats_df['occ']`` directly.
 
 
-4. ``reins_summary_df`` (≈ 2461): the per-stage economic view
-=============================================================
+``reins_summary_df`` (≈ 2461): the per-stage economic view
+==========================================================
 
 The daily driver. One block per applicable stage, sharing the **same eight
 columns as** :meth:`describe`, and mirroring its **economic view**::
@@ -338,9 +338,9 @@ net of the *portfolio* aggregate); the per-stage breakdown stays in each unit's
   the convolved portfolio marginals).
 
 
-**********************************
+*********************************
 ``stats_df`` staged-reins columns
-**********************************
+*********************************
 
 Not a separate object, but the reinsurance progression baked into the canonical
 ``stats_df`` during ``update_work``. Beyond ``mixed`` / ``empirical`` the staged

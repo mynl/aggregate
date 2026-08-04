@@ -15,23 +15,12 @@ collective risk model.
 **Prerequisites:** Python and pandas basics; frequency/severity ideas. No FFT
 knowledge needed.
 
-**Contents:**
+.. contents:: Contents
+   :local:
+   :depth: 1
 
-#. Who this is for
-#. The collective risk model, and how ``aggregate`` computes it
-#. Anatomy of a DecL program
-#. Severity: a vocabulary, not a menu
-#. Frequency: Poisson is an opinion
-#. Trust, but verify
-#. Limits, attachments, and increased limits
-#. Reinsurance, gross to net
-#. The head-to-head: FFT vs Monte Carlo
-#. Portfolios, capital, and a first price
-#. Everything is pandas
-#. Install and next steps
-
-1. Who this is for
---------------------
+Who this is for
+---------------
 
 - **Pricing actuaries:** the distribution behind every increased-limits factor
   and aggregate feature.
@@ -47,8 +36,8 @@ knowledge needed.
 - **Students and researchers:** the collective risk model of the textbooks and
   the ASTIN literature, runnable and checkable.
 
-2. The collective risk model, and how ``aggregate`` computes it
------------------------------------------------------------------
+The collective risk model, and how ``aggregate`` computes it
+------------------------------------------------------------
 
 Total losses are :math:`S = X_1 + \cdots + X_N`: a random count :math:`N` of
 claims, each of random size :math:`X`, the collective risk model of the
@@ -72,10 +61,11 @@ when the answer cannot be represented well.
     qd(a)
 
 The result is the *entire* distribution: every quantile, every tail measure,
-deterministically, in milliseconds. Hold that build time for section 9.
+deterministically, in milliseconds. Hold that build time for
+:ref:`the head-to-head <intro20 head to head>` below.
 
-3. Anatomy of a DecL program
-------------------------------
+Anatomy of a DecL program
+-------------------------
 
 Models are written in DecL, a small declarative language. The organizing idea is
 that **exposure is a pair: (volume, coverage)**, how *much* risk, and on what
@@ -121,9 +111,11 @@ real syntax:
   (omit it for ground-up, unlimited);
 - **severity:** any ``scipy.stats`` family, parameterized the way actuaries
   think, by mean and CV;
-- **frequency:** ``poisson``, or a mixed/contagion family (section 5);
+- **frequency:** ``poisson``, or a mixed/contagion family
+  (:ref:`Frequency: Poisson is an opinion <intro20 frequency>`);
 - **reinsurance:** occurrence (per claim, stated before the frequency) and
-  aggregate (per year, after it), both optional, section 8.
+  aggregate (per year, after it), both optional
+  (:ref:`Reinsurance, gross to net <intro20 reinsurance>`).
 
 The (volume, coverage) pair is not just pedagogy. It is the constructor's own
 vocabulary: ``Aggregate`` takes ``exp_en`` / ``exp_el`` / ``exp_premium`` /
@@ -133,8 +125,8 @@ Why a language? Because a model you can read is a model you can review, version,
 email, and store. The program is data: ``a.program`` returns it, and an
 :class:`Underwriter` object persists whole libraries of named risks.
 
-4. Severity: a vocabulary, not a menu
----------------------------------------
+Severity: a vocabulary, not a menu
+----------------------------------
 
 Any continuous ``scipy.stats`` family by mean and CV, plus shifting and scaling,
 mixtures, and empirical (discrete) data. Tail shape is a modeling *choice*, and
@@ -177,8 +169,10 @@ thousands, say):
     emp = build('agg FromData 25 claims dsev [2 5 12 18 45] [.30 .30 .20 .15 .05] poisson')
     qd(emp)
 
-5. Frequency: Poisson is an opinion
--------------------------------------
+.. _intro20 frequency:
+
+Frequency: Poisson is an opinion
+--------------------------------
 
 Claim counts are usually *over*-dispersed: years differ for reasons shared
 across claims (weather, inflation, the legal environment). ``mixed gamma 0.4``
@@ -198,8 +192,8 @@ The mixing carries through everything downstream: layers, reinsurance, portfolio
 dependence (units sharing a mixed frequency are correlated, the common-shock
 effect cat modelers expect).
 
-6. Trust, but verify
-----------------------
+Trust, but verify
+-----------------
 
 The working cycle is **declare, build, validate, trust**. Validation is a
 designed-in stage, not an afterthought :cite:p:`Mildenhall2024`. Every object
@@ -227,8 +221,8 @@ validator says so plainly instead of handing you a silently wrong number:
                   'hints{bs=0.25; log2=16;}')
     print(heavy.validation_explanation)
 
-7. Limits, attachments, and increased limits
-----------------------------------------------
+Limits, attachments, and increased limits
+-----------------------------------------
 
 Policy terms are language, not post-processing. Expected losses by limit,
 increased limits factors, in a loop:
@@ -243,8 +237,10 @@ increased limits factors, in a loop:
 
 Note the layer caps each *occurrence*; aggregate-level features are next.
 
-8. Reinsurance, gross to net
-------------------------------
+.. _intro20 reinsurance:
+
+Reinsurance, gross to net
+-------------------------
 
 Occurrence programs (per-claim) and aggregate programs (whole-year) are both one
 clause. Shares read naturally: ``50% po 300 xs 200`` is half of the 300 excess
@@ -271,8 +267,10 @@ An aggregate stop loss is the same idea at the year level:
                  'aggregate net of 5000 xs 30000')
     qd(stop.summary_df)
 
-9. The head-to-head: FFT vs Monte Carlo
------------------------------------------
+.. _intro20 head to head:
+
+The head-to-head: FFT vs Monte Carlo
+------------------------------------
 
 The honest comparison. Simulate the section-2 book, Poisson(250), lognormal mean
 100 CV 1.5 capped at 1,000, and estimate the 99.9th percentile five times with
@@ -316,8 +314,8 @@ costs the same milliseconds. Simulation still earns its keep for path-dependence
 and exotic dependence; for the workhorse compound distribution, convolution
 dominates.
 
-10. Portfolios, capital, and a first price
---------------------------------------------
+Portfolios, capital, and a first price
+--------------------------------------
 
 A ``port`` convolves independent units onto one grid (frequencies can share a
 mixing variable for common shock). Diversification is then arithmetic, and
@@ -346,8 +344,8 @@ measures, calibrated pricing, and capital allocation across units. The pointers
 are :meth:`Portfolio.price`, the published documentation, and *Pricing Insurance
 Risk* :cite:p:`Mildenhall2022a`, whose framework the pricing surface implements.
 
-11. Everything is pandas
---------------------------
+Everything is pandas
+--------------------
 
 No export step: the distribution is a DataFrame, the reports are DataFrames, and
 plots are matplotlib:
@@ -361,8 +359,8 @@ plots are matplotlib:
     @savefig intro20_port.png scale=20
     port.plot()
 
-12. Install and next steps
-----------------------------
+Install and next steps
+----------------------
 
 .. code-block:: bash
 

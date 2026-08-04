@@ -50,13 +50,30 @@
 #   .\doc-test-uv.ps1 -Clean -Lenient          # typical first-pass after a big
 #                                              # refactor — shows everything
 #   .\doc-test-uv.ps1 -Clean -PythonVersion 3.14
-#   .\doc-test-uv.ps1 -Text                    # plain-text build, output to
+#   .\doc-test-uv.ps1 -Format pdf              # PDF via LaTeX + tectonic, to
+#                                              # docs\_build\latex\aggregate.pdf
+#   .\doc-test-uv.ps1 -Format html,pdf         # both, one sync, one pass each
+#   .\doc-test-uv.ps1 -Format text             # plain-text build, output to
 #                                              # docs\_build\text (handy for
 #                                              # cross-branch numerical diffs)
 #   .\doc-test-uv.ps1 -Text -Lenient `
 #       -OutputDir T:\doc-diff\agg-doc-diff\text
 #                                              # text build into a custom dir,
 #                                              # warnings non-fatal
+#
+# PDF OUTPUT
+# ----------
+# `-Format pdf` runs Sphinx's `latex` builder and then compiles the generated
+# `aggregate.tex` with **tectonic**, not latexmk. latexmk is a Perl script and
+# there is no Perl on this machine, so both `sphinx-build -M latexpdf` and the
+# generated `make.bat` fail with "MiKTeX could not find the script engine
+# 'perl'". tectonic is a single self-contained binary that runs the rerun loop
+# itself and fetches whatever packages it needs, so it needs no MiKTeX package
+# juggling either.
+#
+# Two conf.py settings are load-bearing for the PDF and must not be dropped:
+# `verbatimforcewraps=true` (long ipython output lines) and the `enumitem`
+# preamble raising the list-depth cap. Both are commented at their definitions.
 #
 # When the build finishes, the script prints the command to serve the result
 # locally — just copy-paste.
@@ -69,8 +86,15 @@ param(
     # pyproject.toml says requires-python = ">=3.10".
     [string]$PythonVersion = "3.13",
 
-    # Where to write the built HTML. Default mirrors the `make html` layout
-    # so you can also use `cd docs && make html` if you prefer.
+    # Which outputs to build. Accepts more than one: `-Format html,pdf` runs a
+    # single dependency sync and then one Sphinx pass per format. Each format
+    # gets its own output dir and its own doctrees cache, so they never tread
+    # on each other.
+    [ValidateSet('html', 'pdf', 'text')]
+    [string[]]$Format = @('html'),
+
+    # Where to write the build. Only meaningful for a single -Format; with
+    # several, each uses its own default (docs\_build\{html,latex,text}).
     [string]$OutputDir = "docs\_build\html",
 
     # Skip the `uv sync` step. Use when iterating on .rst edits and you know
@@ -90,12 +114,8 @@ param(
     # expect lots of broken cross-references and stale examples.
     [switch]$Lenient,
 
-    # Build the plain-text builder (``sphinx-build -b text``) instead of
-    # HTML. Useful for diffing the rendered docs across branches: text
-    # output is one .txt per page, no styling/IDs, so cross-version diffs
-    # surface real numerical / content changes without HTML noise. If
-    # -OutputDir isn't passed explicitly, defaults to ``docs\_build\text``
-    # (parallel to the HTML default).
+    # Back-compat alias for `-Format text`, kept so existing muscle memory and
+    # any saved command lines keep working. Prefer -Format for new use.
     [switch]$Text,
 
     # Port to suggest when printing the local-serve command at the end.
@@ -105,20 +125,34 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # ---- Builder selection ------------------------------------------------------
-# Pick the Sphinx builder and the build-output / doctrees-cache directories.
-# When -Text is passed and the caller did NOT also pass -OutputDir, switch
-# the default output dir to ``docs\_build\text`` so a text build doesn't
-# overwrite the HTML build's directory. Doctrees caches are kept separate
-# per builder for the same reason (no cross-builder contamination).
-if ($Text) {
-    $builder = 'text'
-    if (-not $PSBoundParameters.ContainsKey('OutputDir')) {
-        $OutputDir = "docs\_build\text"
+# `-Text` is the old spelling of `-Format text`; honour it unless the caller
+# also passed -Format explicitly.
+if ($Text -and -not $PSBoundParameters.ContainsKey('Format')) { $Format = @('text') }
+$Format = $Format | Select-Object -Unique
+
+# Per-format Sphinx builder, output dir and doctrees cache. The caches are kept
+# separate so a text or latex pass never invalidates the HTML one. -OutputDir
+# overrides the default only when a single format was asked for; with several
+# there is no single directory it could sensibly mean.
+$plan = @{
+    html = @{ Builder = 'html';  Out = 'docs\_build\html';  Doctrees = 'docs\_build\doctrees' }
+    pdf  = @{ Builder = 'latex'; Out = 'docs\_build\latex'; Doctrees = 'docs\_build\doctrees-latex' }
+    text = @{ Builder = 'text';  Out = 'docs\_build\text';  Doctrees = 'docs\_build\doctrees-text' }
+}
+if ($PSBoundParameters.ContainsKey('OutputDir')) {
+    if ($Format.Count -eq 1) {
+        $plan[$Format[0]].Out = $OutputDir
+    } else {
+        Write-Warning "-OutputDir ignored: it cannot apply to $($Format.Count) formats at once. Using the defaults."
     }
-    $doctreesDir = "docs\_build\doctrees-text"
-} else {
-    $builder = 'html'
-    $doctreesDir = "docs\_build\doctrees"
+}
+
+# tectonic compiles the PDF (see the header note on why not latexmk). Fail here
+# with something readable rather than deep inside a LaTeX run.
+if ($Format -contains 'pdf' -and -not (Get-Command tectonic -ErrorAction SilentlyContinue)) {
+    Write-Error ("PDF output needs 'tectonic' on PATH and it was not found. " +
+                 "Install from https://tectonic-typesetting.github.io/, or drop 'pdf' from -Format.")
+    exit 1
 }
 
 # ---- uv environment knobs ---------------------------------------------------
@@ -133,12 +167,24 @@ $env:UV_LINK_MODE = "copy"
 $env:UV_PROJECT_ENVIRONMENT = ".doc-venv"
 
 # ---- Optional clean --------------------------------------------------------
+# Only the requested formats are cleaned, so `-Format pdf -Clean` does not
+# throw away an HTML build you still wanted.
 if ($Clean) {
     Write-Host "Cleaning build artifacts..." -ForegroundColor Cyan
-    foreach ($p in @($OutputDir, $doctreesDir)) {
-        if (Test-Path $p) {
-            Remove-Item -Path $p -Recurse -Force
-            Write-Host "  removed $p"
+    foreach ($f in $Format) {
+        foreach ($p in @($plan[$f].Out, $plan[$f].Doctrees)) {
+            if (-not (Test-Path $p)) { continue }
+            # Empty the directory rather than delete it. Something holding a
+            # handle on the folder itself (an editor, a file watcher, a stray
+            # http.server, the indexer) makes a recursive delete of the folder
+            # fail, and that should not abort the build: emptying it achieves
+            # the same thing, and a leftover file is not fatal either.
+            try {
+                Remove-Item -Path (Join-Path $p '*') -Recurse -Force -ErrorAction Stop
+                Write-Host "  emptied $p"
+            } catch {
+                Write-Warning "could not fully clean $p ($($_.Exception.Message.Split([Environment]::NewLine)[0])); continuing"
+            }
         }
     }
 }
@@ -189,35 +235,77 @@ if (-not $NoSync) {
 # the directive has no global ``okexcept`` config knob. jupyter-sphinx
 # already renders cell errors inline by default, so nothing extra needed
 # there.
-$sphinxArgs = @('-T', '-b', $builder,
-                '-d', $doctreesDir,
-                '-D', 'language=en',
-                'docs', $OutputDir)
-if ($Lenient) {
-    $sphinxArgs = @('--keep-going', '-D', 'nbsphinx_allow_errors=1') + $sphinxArgs
-    $env:AGG_DOCS_LENIENT = "1"
-}
+if ($Lenient) { $env:AGG_DOCS_LENIENT = "1" }
 
-$builderLabel = if ($Text) { "text" } else { "HTML" }
-Write-Host "Building $builderLabel documentation..." -ForegroundColor Cyan
-uv run sphinx-build @sphinxArgs
-$sphinxExit = $LASTEXITCODE
+$results = @()
+foreach ($f in $Format) {
+    $builder     = $plan[$f].Builder
+    $outDir      = $plan[$f].Out
+    $doctreesDir = $plan[$f].Doctrees
 
-if ($sphinxExit -ne 0) {
+    $sphinxArgs = @('-T', '-b', $builder,
+                    '-d', $doctreesDir,
+                    '-D', 'language=en',
+                    'docs', $outDir)
     if ($Lenient) {
-        Write-Warning "Sphinx reported warnings/errors (exit $sphinxExit); continuing because -Lenient is set."
-    } else {
-        Write-Error "$builderLabel build failed."
-        exit $sphinxExit
+        $sphinxArgs = @('--keep-going', '-D', 'nbsphinx_allow_errors=1') + $sphinxArgs
     }
+
+    Write-Host "`nBuilding $f documentation (sphinx -b $builder)..." -ForegroundColor Cyan
+    uv run sphinx-build @sphinxArgs
+    $sphinxExit = $LASTEXITCODE
+
+    if ($sphinxExit -ne 0) {
+        if ($Lenient) {
+            Write-Warning "Sphinx reported warnings/errors for $f (exit $sphinxExit); continuing because -Lenient is set."
+        } else {
+            Write-Error "$f build failed."
+            exit $sphinxExit
+        }
+    }
+
+    # PDF is a two-stage build: Sphinx writes aggregate.tex above, tectonic
+    # turns it into the PDF here. tectonic runs its own rerun loop, so one
+    # invocation resolves the TOC and cross-references.
+    if ($f -eq 'pdf') {
+        $tex = Join-Path $outDir 'aggregate.tex'
+        if (-not (Test-Path $tex)) {
+            Write-Error "Expected $tex but the latex builder did not write it."
+            exit 1
+        }
+        Write-Host "Compiling PDF with tectonic..." -ForegroundColor Cyan
+        Push-Location $outDir
+        try {
+            $tectonicArgs = @('aggregate.tex')
+            # -Lenient lets a recoverable LaTeX error through so a PDF still
+            # lands; without it a LaTeX error stops the run, like Sphinx's.
+            if ($Lenient) { $tectonicArgs = @('-Z', 'continue-on-errors') + $tectonicArgs }
+            tectonic @tectonicArgs
+            $tectonicExit = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+        if ($tectonicExit -ne 0) {
+            Write-Error "tectonic failed (exit $tectonicExit). See $outDir\aggregate.log."
+            exit $tectonicExit
+        }
+        $results += [pscustomobject]@{ Format = $f; Path = (Join-Path $outDir 'aggregate.pdf') }
+        continue
+    }
+
+    $results += [pscustomobject]@{ Format = $f; Path = $outDir }
 }
 
 # ---- Done -------------------------------------------------------------------
-Write-Host "`n$builderLabel documentation built successfully in: $OutputDir" -ForegroundColor Green
-if (-not $Text) {
+Write-Host ""
+foreach ($r in $results) {
+    Write-Host "$($r.Format) documentation built successfully in: $($r.Path)" -ForegroundColor Green
+}
+if ($Format -contains 'html') {
+    $htmlOut = $plan['html'].Out
     Write-Host ""
     Write-Host "To serve locally and open in a browser:" -ForegroundColor Cyan
-    Write-Host "  uv run python -m http.server $Port --directory $OutputDir"
+    Write-Host "  uv run python -m http.server $Port --directory $htmlOut"
     Write-Host "  Start-Process http://localhost:$Port"
     Write-Host ""
     Write-Host "(Ctrl-C in the serving terminal to stop the server.)"

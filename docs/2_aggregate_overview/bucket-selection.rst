@@ -6,17 +6,19 @@ Automatic Grid Selection (``bs``, ``log2``, ``x_min``)
 
 .. note::
 
-   Draft. It documents the automatic grid sizer
-   :meth:`aggregate.distributions.Aggregate._bs_window` as built at
-   ``1.0.0a59``. Severity discretization (how a single distribution is laid on
-   a lattice) is covered separately;
-   this page covers the *grid* the aggregate is computed on. This document is
-   kept current by **``dev/done/plan-univariate-bucket.md``** (the "1A-bucket" plan),
-   which owns the tail-intelligence and reporting work flagged under
-   :ref:`bs open planned` below. The inspection frame is currently
-   ``Aggregate._bs_window_df``; the plan adds a curated public
-   ``Aggregate.bs_window_df`` (and ``Portfolio.bs_window_df``) and narrative
-   ``bs_description`` / ``bs_explanation``.
+   This page documents the automatic grid sizer, ``Aggregate._bs_window``, and
+   the after-the-fact probe,
+   :meth:`~aggregate.distributions.Aggregate.sharpen`. Severity discretization
+   (how a single distribution is laid on a lattice) is covered separately; this
+   page covers the *grid* the aggregate is computed on. The sizer is as built at
+   ``1.0.0a59`` with the tail-aware work of a64 and a65 on top, and ``sharpen``
+   as built at a192 to a195. Both frames are available: the curated public
+   ``bs_window_df`` (also on ``Portfolio``) and the complete private
+   ``_bs_window_df``, with the narrative ``bs_description`` /
+   ``bs_explanation``. The plan of record is
+   **``dev/done/plan-univariate-bucket.md``** (the "1A-bucket" plan), whose
+   tail-intelligence and reporting work is summarized under
+   :ref:`bs open planned` below.
 
 The problem
 -----------
@@ -431,3 +433,261 @@ functions ``bs_describe`` / ``bs_explain`` -- the same narrative technique
 destined for the validation report. ``Portfolio`` carries ``bs_window_df`` and
 ``bs_description`` already; its full windowed combine (1P,
 ``plan-bucket-window-2.md``) inherits the rest when it lands.
+
+.. _bs sharpen:
+
+Auditing the choice afterwards: ``sharpen``
+-------------------------------------------
+
+Everything above **chooses** a grid, and it does so from the analytic moments,
+before any FFT has run. :meth:`~aggregate.distributions.Aggregate.sharpen`
+**audits** that choice after the fact: it re-updates the object on neighbouring
+``(bs, log2)`` cells, scores each against the analytic moments, and moves when
+the win is worth having. It is on :class:`~aggregate.distributions.Aggregate`
+and :class:`~aggregate.portfolio.Portfolio`, and landed over a192 to a195.
+
+The two halves answer different questions. The sizer asks *"given only what I
+can compute in closed form, where should the grid go?"*, with no realized
+density to look at. ``sharpen`` asks *"now that it has run, was that right?"*,
+with the estimated moments, the realized mass and every warning the update
+raised in hand.
+
+The score
+~~~~~~~~~
+
+``validation_score`` is six terms, severity and aggregate mean, CV and
+skewness, each read from the canonical ``stats_df['error']`` and divided by
+**its own** validation tolerance: ``eps`` for a mean, ``10 eps`` for a CV,
+``100 eps`` for a skewness, exactly the multiples ``valid_aggregate`` applies.
+They combine in a power mean, Euclidean (``power=2``) by default; ``power=1``
+averages, ``power=inf`` reports the worst single term.
+
+Dividing by the tolerance is what makes the number useful. **The units are
+tolerance**, so ``score <= 1`` means the object passes validation and ``1`` sits
+exactly on the pass boundary. Where ``valid`` says whether a line was crossed,
+this says by how far, which is what makes two grids comparable. A consequence
+worth knowing: the score does not move when ``validation_eps`` is changed.
+
+A term is live only when its *theoretical* value is finite and above the noise
+floor, the same test validation itself applies: a symmetric severity has no
+skewness to validate against, a deterministic one no CV. The theoretical moments
+do not depend on the grid, so the live set is stable as ``bs`` and ``log2`` vary,
+which is precisely what makes scores comparable across a probe. Averaging rather
+than summing then keeps objects with different numbers of live terms on one
+scale.
+
+The probe
+~~~~~~~~~
+
+One row per ``log2``, and within each row a **line search** out from the current
+bucket: ``bs`` is doubled until the score stops improving, then halved likewise,
+capped each way by ``bs_limit``. The rows come out ragged, which is why
+``sharpen_df`` is a tidy frame rather than a matrix; cells never visited read
+``NaN``.
+
+The line search is well posed because the score is single-troughed in ``bs`` at
+fixed ``log2``. With extent ``W = bs * 2**log2``, a coarser bucket buys extent
+and loses resolution, so the two error families trade off and there is one
+turning point. Stopping at the first cell that fails to improve assumes exactly
+that. A walk that instead runs out of ``bs_limit`` while still improving records
+so in its ``note``, a different fact from turning: a re-run will keep going.
+
+``log2`` and ``log2 - 1`` are searched up front. ``log2 + 1`` is searched **only
+if neither reaches the target**, since it costs twice as much per cell and under
+the selection rule below it is usually not consulted.
+
+The geometry is the point. A row is constant *resolution*; an anti-diagonal is
+constant *extent*. Cells sharing an extent differ only in resolution, so reading
+the two directions together says whether the grid is **extent-limited**, widen
+it, or **resolution-limited**, refine it. That is also why the bucket steps are a
+strict factor of two rather than rungs of the ``round_bucket`` ladder, whose
+1.25 and 1.6 factors are too fine to move the error and out of step with ``log2``
+plus or minus one.
+
+Every cell runs inside its own guard: one that raises is recorded as ``NaN`` with
+the exception text in its ``note``, and the sweep completes.
+
+Selection: thrift, gated on soundness
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The rule is *never make the caller pay more than they already are*: take the best
+score among the cells that **do not grow** ``log2``. Reducing ``log2`` is a bonus
+rather than a goal, so it is picked up by the tie rule rather than chased. Cells
+within ``SHARPEN_FALLBACK_SLACK`` (``1.25``) of the best count as tied; ties
+break on ``log2`` first, so a free memory saving is taken when the score is
+genuinely a wash, then on ``|d_bs|``, so a competitive centre wins over an
+equally good move and the grid is not churned for nothing. ``log2`` grows by one
+**only** when nothing at the current size or smaller reaches ``good_enough`` and
+something at ``log2 + 1`` does. If nothing anywhere reaches the target, the best
+cell overall is taken, still thrift-ordered, so the descent starts and a re-run
+continues it.
+
+``good_enough`` (default ``0.5``) is the only judgment knob, and it does two
+things. As a **probe gate**: a grid already at or under it, and sound, is left
+alone and nothing is run at all. As a **growth trigger**: it is the target that
+``log2 + 1`` has to reach. A score is never negative, so ``good_enough=0`` reads
+as "probe everything, never grow", which is why there is no separate ``force``
+argument.
+
+**A grid that loses mass off its top end is disqualified, however well it
+scores** (a195). This is a *gate*, not a term in the score, for two reasons. A
+moment score cannot see lost mass and never will: far-tail mass is negligible for
+the first three moments and decisive for tail pricing, so the two measures are
+orthogonal and the gate is the only thing that catches it. And it could not be a
+penalty even if you wanted one, because every term in the score divides by its
+own tolerance and a deficit has no tolerance to divide by; its cost is
+qualitative rather than a matter of degree. Mass that runs off the top is
+**dropped, not wrapped**, so the realized law sums to less than one and forwards
+``S = 1 - cumsum`` differs from backwards ``S`` by exactly the missing amount:
+two correct-looking pricing routes disagree in the tail. The threshold is the
+library's own ``VALIDATION_NOISE``, the level at which
+:class:`~aggregate.constants.DefectiveDistributionWarning` already fires, so a
+cell rejected here is exactly one that would warn when you used it. Because
+soundness sits outside the thrift ordering, it composes: a deficit becomes a
+reason to **grow** ``log2``, which is its cure. Three columns carry it,
+``deficit``, ``defective`` and ``warns``, and the narrative reports how many
+better-scoring cells the gate threw out.
+
+Discrete severity: the bucket is pinned
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When every severity atom is a whole number of buckets the discretization is
+already exact and no bucket change can help: a coarser bucket scatters the atoms
+off their own values, a finer one only wastes grid. The bucket is therefore
+**pinned** and only ``log2`` is probed, which is what a failing discrete object
+actually needs, its problem being extent. The test is the gcd of the integer
+severity atoms (``Aggregate._severity_lattice``, taken across units for a
+``Portfolio``); it declines as soon as any component is continuous or off the
+lattice.
+
+Probe controls
+~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 14 64
+
+   * - Argument
+     - Default
+     - Role
+   * - ``bs``, ``log2``
+     - current grid
+     - centre of the probe. An explicit centre that is not where the object sits
+       moves it there first, so the centre row describes a real state.
+   * - ``good_enough``
+     - ``0.5``
+     - target score, in tolerance units. Probe gate and growth trigger, as above.
+       ``0`` means probe everything and never grow.
+   * - ``log2_cap``
+     - ``20``
+     - ``log2`` is never grown past this.
+   * - ``bs_limit``
+     - ``16``
+     - largest factor by which the line search may multiply or divide ``bs``.
+       A power of two, so ``16`` permits four doublings each way and a grid wrong
+       by two orders of magnitude is reachable in one call.
+   * - ``power``
+     - ``2``
+     - norm exponent used to combine the six terms.
+   * - ``execute``
+     - ``True``
+     - ``True`` leaves the object on the chosen cell; ``False`` restores the
+       original grid, so the probe is pure diagnosis.
+
+Module constants: ``SHARPEN_LOG2_FLOOR = 8`` is the lowest ``log2`` the probe
+will drop to (below it the comparison stops meaning anything),
+``SHARPEN_FALLBACK_SLACK = 1.25`` is the tie band, and ``SHARPEN_BS_LIMIT = 16``
+is the default ``bs_limit``. The tie band is deliberately tight: a genuine
+improvement here is orders of magnitude, not percent.
+
+Comparability is enforced by harvesting the settings that must not drift.
+``update`` stamps ``sev_calc`` / ``discretization_calc`` / ``normalize`` /
+``padding`` from *its arguments*, so a bare ``update(log2=..., bs=...)`` would
+silently reset all four. They are read off the object once, up front, and passed
+to every cell: the object comes back as it was, and the cells differ in ``bs``
+and ``log2`` and in nothing else.
+
+Inspecting a probe
+~~~~~~~~~~~~~~~~~~
+
+``sharpen_df`` is one row per cell, indexed by the offsets ``(d_bs, d_log2)``, so
+the picture is one unstack away. Take a book auto-sized to ``bs = 2``,
+``log2 = 16``, force it onto a grid far too small to hold it, and probe:
+
+.. code-block:: text
+
+    >>> a = build('agg Sharp 100 claims sev lognorm 100 cv 2 poisson')
+    >>> a.validation_score
+    0.3911267630053992
+    >>> a.update(log2=14, bs=1/8)          # far too small
+    >>> a.validation_score
+    3493.9786647146843
+    >>> a.sharpen()
+    >>> a.sharpen_df.score.unstack('d_log2').round(3)
+    d_log2        -1         0         1
+    d_bs
+    -1      4064.189  3816.641  3493.969
+     0      3816.654  3493.979  3097.981
+     1      3493.998  3098.005   907.703
+     2      3098.052   907.704    28.736
+     3       907.705    28.736     5.486
+     4        28.734     5.486     1.606
+
+Down a column is constant grid size, so it is the resolution question; along an
+anti-diagonal is constant extent. Here the improvement runs up the ``d_bs`` axis
+and does not turn, so the book is resolution-starved in the wrong direction: the
+bucket was far too fine for the extent it had to cover. The winner is the
+top-right corner, and it sits on the ``bs_limit`` still improving, which
+``sharpen_description`` says out loud:
+
+.. code-block:: text
+
+    >>> print(a.sharpen_description)
+    Sharpen: 18 cells in 0.35s, best score 1.61 vs 3.49e+03 at the centre, target 0.5. The winner sits on the bs_limit and was still improving. Moved: bs 1/8 to 2, log2 14 to 15.
+
+Re-running re-centres the probe on the new grid and continues from there. The
+soundness gate is visible in the same frame, alongside the score:
+
+.. code-block:: text
+
+    >>> a.sharpen_df[['bs', 'log2', 'score', 'deficit', 'defective', 'selected']].tail(4)
+                  bs  log2      score       deficit  defective  selected
+    d_bs d_log2
+    3     1      1.0    15   5.486182  4.077595e-05       True     False
+    4    -1      2.0    13  28.733585  1.101324e-02       True     False
+          0      2.0    14   5.485980  4.078025e-05       True     False
+          1      2.0    15   1.605666  5.448738e-07       True      True
+
+Full column list: ``bs``, ``log2``, ``extent``, ``x_min``, ``score``, the six
+per-term ``u_sev_mean`` .. ``u_agg_skew``, ``aliasing`` (the agg-mean over
+sev-mean error ratio, recorded alongside the score but deliberately not part of
+it, being the specific signature of ``bs`` too small), ``deficit``,
+``defective``, ``validation`` (the one-line verdict), ``warnings`` / ``warns``,
+``seconds``, ``selected`` and ``note``. ``sharpen_description`` and
+``sharpen_explanation`` are the short and long narrative forms, in the same style
+as ``bs_description`` / ``bs_explanation`` above.
+
+The discrete case shows the pinned bucket. ``good_enough=0`` forces a probe on an
+object that is already exact:
+
+.. code-block:: text
+
+    >>> d = build('agg D6 dfreq [3] dsev [1:6]')
+    >>> d.sharpen(good_enough=0)
+    >>> print(d.sharpen_description)
+    Sharpen: 2 cells in 0.02s (discrete: bucket pinned, grid size only), best score 1.92e-12 vs 1.92e-12 at the centre, target 0. Kept bs 1, log2 5.
+
+Reach, and what it does not cover
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``update(..., sharpen=True)`` opts a single update into auto-sharpening. It is
+**off by default and not turned on by** ``build``, because a probe costs eight or
+more extra updates.
+
+There is no ``BivariateAggregate.sharpen``: the probe is quadratic in the joint
+grid. There is deliberately no ``PnL.sharpen`` either, since it would leave a
+built ledger sitting on a stale grid; a P&L sharpens through its engine instead.
+
+A :class:`~aggregate.portfolio.Portfolio` scores the **total only**, so a well
+resolved total can still hide a poorly resolved unit. ``sharpen_explanation``
+says so rather than leaving it to be discovered.

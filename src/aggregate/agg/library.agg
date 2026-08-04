@@ -155,7 +155,7 @@ distortion PHDistortion ph 0.7
   doc{{{
 ## Problem
 
-You want to load expected loss into a price in a way that charges more for the tail than for the body, and you want the loading to be a *property of the measure* rather than a judgement applied case by case.
+You want to load expected loss into a price in a way that charges more for the tail than for the body, and you want the loading to be a *property of the measure* rather than a judgment applied case by case.
 
 ## Solution
 
@@ -283,8 +283,8 @@ Read `a.n` back to see the implied total count, and `a.sev_m` for the exposure-w
 
 ```python
 # the aggregate mean IS the premium-weighted expected loss, exactly:
-# 1000x0.8 + 2000x0.7 + 500x0.5 = 2450
-assert abs(a.actual_m - 2450.0) < 1e-9
+# 10000x0.8 + 20000x0.7 + 5000x0.5 = 24500
+assert abs(a.actual_m - 24500.0) < 1e-9
 # and the FFT estimate agrees to grid accuracy
 assert abs(a.est_m / a.actual_m - 1) < 1e-6
 # E[A] = E[N] x E[X] still holds across the blended profile
@@ -860,7 +860,7 @@ agg OccurrenceXOL
   doc{{{
 ## Problem
 
-You have a two-layer per-occurrence excess programme with partial placements, and you want the *net* aggregate -- with gross and ceded still visible, so you can see where the cession went instead of taking the net on faith.
+You have a two-layer per-occurrence excess program with partial placements, and you want the *net* aggregate -- with gross and ceded still visible, so you can see where the cession went instead of taking the net on faith.
 
 ## Solution
 
@@ -871,11 +871,11 @@ qd(a.reins_summary_df)
 
 ## Discussion
 
-`occurrence net of ...` applies the programme claim by claim, before the frequency convolution -- which is what "per occurrence" means and why it cannot be done by adjusting the aggregate afterwards.
+`occurrence net of ...` applies the program claim by claim, before the frequency convolution -- which is what "per occurrence" means and why it cannot be done by adjusting the aggregate afterwards.
 
-`50% so 2500 xs 2500` cedes half of the 2500-excess-2500 layer, `90% so 5000 xs 5000` nine tenths of the layer above it; `and` chains them into one programme.
+`50% so 2500 xs 2500` cedes half of the 2500-excess-2500 layer, `90% so 5000 xs 5000` nine tenths of the layer above it; `and` chains them into one program.
 
-Note the program above is the **canonical** form. Partial placements can be written `so` (*share of*) or `po` (*part of*) and with a percentage or an absolute amount; all of them normalise to the `<pct>% so <limit> xs <attach>` spelling you see here, which is why what you wrote and what the library shows back can differ without anything having changed.
+Note the program above is the **canonical** form. Partial placements can be written `so` (*share of*) or `po` (*part of*) and with a percentage or an absolute amount; all of them normalize to the `<pct>% so <limit> xs <attach>` spelling you see here, which is why what you wrote and what the library shows back can differ without anything having changed.
 
 `reins_summary_df` is the exhibit that matters here: three stages (gross, ceded, net) x three components (freq, sev, agg), with theoretic `EX` next to the FFT `Est EX`. The frequency row is identical across the three views -- occurrence cover changes what each claim costs, never how many there are.
 

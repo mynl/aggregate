@@ -1,5 +1,19 @@
 # Running docs - reminder
 
+Latest on running docs
+
+```bash
+.\doc-test-uv.ps1 -Format pdf              # PDF only
+.\doc-test-uv.ps1 -Format html,pdf         # both, one sync, one Sphinx pass each
+.\doc-test-uv.ps1 -Format text             # text (=" -Text", which still works)
+```
+
+Also
+
+    -clean
+    -Text
+    -Lenient
+
 ```bash
 # html doc from REFACTOR
 $log = "T:\tmp\build-log-$(Get-Date -Format yyyyMMdd-HHmmss).log"

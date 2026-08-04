@@ -5,10 +5,6 @@
 aggregate Documentation
 #######################
 
-****************
-Introduction
-****************
-
 :mod:`aggregate` builds approximations to compound (aggregate) probability distributions quickly and accurately.
 It can be used to solve insurance, risk management, and actuarial problems using realistic models that reflect underlying frequency and severity.
 It delivers the speed and accuracy of parametric distributions to situations that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution as the lognormal.
@@ -24,7 +20,12 @@ This help document is in four parts plus a bibliography.
 
 #. :doc:`Dec Language Reference <4_dec_Language_Reference>`: the Dec Language (DecL) for specifying aggregate distributions.
 
-
+.. The toctree sits last on purpose. For LaTeX, Sphinx splices each entry into
+   the master document at the position of this directive, even when it is
+   ``:hidden:`` (hidden only suppresses the in-page list in HTML), so a toctree
+   written above the text puts the whole book ahead of the introduction. The
+   text above carries no section heading of its own, which keeps it out of the
+   chapter numbering: Getting Started is chapter 1 in both formats.
 
 .. toctree::
    :maxdepth: 3

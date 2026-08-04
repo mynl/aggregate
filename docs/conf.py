@@ -335,6 +335,21 @@ latex_elements = {
     # method, its parameter list, and any list inside a docstring. Raise the
     # cap rather than flatten docstrings one at a time. HTML has no such limit,
     # which is why this only ever bites the PDF build.
+    #
+    # The third block gives the PDF one "Bibliography" heading instead of two.
+    # ``docs/7_bibliography.rst`` is titled Bibliography, which becomes a
+    # numbered ``\chapter``. Sphinx then wraps the entries in
+    # ``sphinxthebibliography``, which ``sphinxmanual.cls`` defines as a page
+    # break plus ``report.cls``'s ``thebibliography`` plus an explicit
+    # ``\addcontentsline``. That inner environment opens with its own
+    # *unnumbered* ``\chapter*{\bibname}``, so the heading and the contents
+    # line each landed twice. HTML emits no such automatic heading, which is
+    # why the duplicate was PDF-only. The environment is redefined to drop the
+    # page break and the contents line, which the page's own title already
+    # supplies, and ``\chapter`` is shadowed just long enough to swallow the
+    # automatic heading. Shadowing beats copying ``report.cls``'s list body
+    # here: it survives a change of document class, and it leaves ``\@mkboth``
+    # to set the running head as before.
     'preamble': r'''
 \setcounter{secnumdepth}{2}
 \usepackage{enumitem}
@@ -344,6 +359,14 @@ latex_elements = {
 \renewlist{description}{description}{12}
 \setlist[itemize]{label=\textbullet}
 \setlist[enumerate]{label=\arabic*.}
+\makeatletter
+\renewenvironment{sphinxthebibliography}[1]
+  {\let\sphinxorigchapter\chapter
+   \def\chapter{\@ifstar\@gobble\sphinxorigchapter}%
+   \begin{thebibliography}{#1}%
+   \let\chapter\sphinxorigchapter}
+  {\end{thebibliography}}
+\makeatother
 ''',
     # 'preamble': '\\renewenvironment{DUlineblock}{}{}',
     # 'preamble': '\\renewenvironment{DUlineblock}{\\begin{comment}}{\\end{comment}}'

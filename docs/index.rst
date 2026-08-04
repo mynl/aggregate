@@ -11,13 +11,11 @@ aggregate Documentation
    :numbered:
 
    1_Getting_Started
-   2_User_Guides
+   2_Aggregate_Overview
    3_Reference
    4_dec_Language_Reference
-   5_Technical_Guides
    6_Development
    7_bibliography
-
 
 
 ****************
@@ -33,12 +31,10 @@ This help document is in six parts plus a bibliography.
 
 #. :doc:`Getting Started <1_Getting_Started>`: get up and running: installation, :mod:`aggregate` "hello world", and a glimpse into the functionality.
 
-#. :doc:`User Guides <2_User_Guides>`: how to solve real-world actuarial problems using :mod:`aggregate`.
+#. :doc:`Aggregate Overview <2_Aggregate_Overview>`: various technical aspects of the :mod:`aggregate` library.
 
 #. :doc:`Reference <3_Reference>`: documentation for every class and function, for developers and more advanced users.
 
 #. :doc:`Dec Language Reference <4_dec_Language_Reference>`: the Dec Language (DecL) for specifying aggregate distributions.
 
 #. :doc:`Technical Guides <5_Technical_Guides>`: probability theory background and the numerical implementation methods employed by :mod:`aggregate`.
-
-#. :doc:`Development <6_Development>`: design philosophy, competing products, future development ideas, and historical perspective.

@@ -1,0 +1,9534 @@
+{
+ "dependency/insurer/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Sev",
+      "2.000",
+      "0.50000",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Agg",
+      "7.640",
+      "0.73102",
+      "\u2014"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "cov"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "corr"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "tau"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level"
+     },
+     {
+      "text": "cov"
+     },
+     {
+      "text": "corr"
+     },
+     {
+      "text": "tau"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "X",
+      "10.0",
+      "40.0",
+      "19.499999999999996",
+      "8.930285549745882",
+      "0.7297909280734887",
+      "False"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Y",
+      "1.0",
+      "6.0",
+      "2.0799999999999996",
+      "1.1702991070662239",
+      "0.9675216470639391",
+      "False"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "axis"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "support_min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "support_max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "mean"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "sd"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "skew"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "right_heavy"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "axis"
+     },
+     {
+      "text": "support_min"
+     },
+     {
+      "text": "support_max"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "sd"
+     },
+     {
+      "text": "skew"
+     },
+     {
+      "text": "right_heavy"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "dependency/raw/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Sev",
+      "2.000",
+      "0.50000",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Agg",
+      "7.640",
+      "0.73102",
+      "\u2014"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "cov"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "corr"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "tau"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level"
+     },
+     {
+      "text": "cov"
+     },
+     {
+      "text": "corr"
+     },
+     {
+      "text": "tau"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "X",
+      "10.0",
+      "40.0",
+      "19.499999999999996",
+      "8.930285549745882",
+      "0.7297909280734887",
+      "False"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Y",
+      "1.0",
+      "6.0",
+      "2.0799999999999996",
+      "1.1702991070662239",
+      "0.9675216470639391",
+      "False"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "axis"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "support_min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "support_max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "mean"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "sd"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "skew"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "right_heavy"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "axis"
+     },
+     {
+      "text": "support_min"
+     },
+     {
+      "text": "support_max"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "sd"
+     },
+     {
+      "text": "skew"
+     },
+     {
+      "text": "right_heavy"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "stats/insurer/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "\u2014",
+      "0.000",
+      "0.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "10.500",
+      "10.500",
+      "10.500",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "0.000",
+      "0.000",
+      "0.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "0.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "0.000",
+      "0.000",
+      "0.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.000",
+      "1.000",
+      "1.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "freq"
+      },
+      "mean",
+      "3.000",
+      "3.000",
+      "3.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.000",
+      "0.000",
+      "0.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "sev"
+      },
+      "mean",
+      "3.500",
+      "3.500",
+      "3.500",
+      "\u2014",
+      "3.500\u00a0",
+      "\u2014",
+      "\u2014",
+      "3.500\u00a0",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.488",
+      "0.488",
+      "0.488",
+      "\u2014",
+      "487.950m",
+      "\u2014",
+      "\u2014",
+      "487.950m",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-333.067a"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.000",
+      "0.000",
+      "0.000",
+      "\u2014",
+      "5.706f",
+      "\u2014",
+      "\u2014",
+      "5.706f",
+      "5.706f"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "agg"
+      },
+      "mean",
+      "10.500",
+      "10.500",
+      "10.500",
+      "\u2014",
+      "10.500\u00a0",
+      "\u2014",
+      "\u2014",
+      "10.500\u00a0",
+      "222.045a"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.282",
+      "0.282",
+      "0.282",
+      "\u2014",
+      "281.718m",
+      "\u2014",
+      "\u2014",
+      "281.718m",
+      "3.109f"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.000",
+      "0.000",
+      "0.000",
+      "\u2014",
+      "52.708f",
+      "\u2014",
+      "\u2014",
+      "52.708f",
+      "52.708f"
+     ]
+    }
+   ],
+   "caption": "Canonical moment store by component and measure across the computation views. Raw noncentral moments (ex1, ex2, ex3) are dropped from this view; the raw perspective keeps the full store.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "e0.m0"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "mixed"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c10",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "e0.m0"
+     },
+     {
+      "text": "mixed"
+     },
+     {
+      "text": "independent"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "stats/insurer/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "theoretical"
+      },
+      "mean",
+      "19.500",
+      "2.080"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sd",
+      "8.930",
+      "1.170"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.458",
+      "0.563"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.730",
+      "0.968"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "empirical"
+      },
+      "mean",
+      "19.500",
+      "2.080"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sd",
+      "8.930",
+      "1.170"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.458",
+      "0.563"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.730",
+      "0.968"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "basis"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "stat"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "X"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "Y"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "basis"
+     },
+     {
+      "text": "stat"
+     },
+     {
+      "text": "X"
+     },
+     {
+      "text": "Y"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "stats/insurer/Distortion": [
+  {
+   "body": [
+    {
+     "cells": [
+      "mean",
+      "0.33354",
+      "0.33333",
+      "203.720\u00b5"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "var",
+      "0.08873",
+      "0.08889",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-160.345\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "std",
+      "0.29787",
+      "0.29814",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-269.028\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "cv",
+      "0.89307",
+      "0.89443",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.353m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "skew",
+      "0.64158",
+      "0.63888",
+      "2.704m"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "gini",
+      "0.33293",
+      "0.33333",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-407.439\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "p_equiv",
+      "0.33293",
+      "0.33333",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-407.439\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "loading",
+      "0.16646",
+      "0.16667",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-203.720\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mu_0.000",
+      "0.50000",
+      "0.00000",
+      "\u2014"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stat"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "D_g"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "closed_form"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stat"
+     },
+     {
+      "text": "D_g"
+     },
+     {
+      "text": "closed_form"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "stats/insurer/PnL": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Consideration",
+      "Premium",
+      "1,000.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Obligation",
+      "Loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-850.00"
+      },
+      "412.31",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.485"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.97011"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,080.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,607.25"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,393.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,080.75"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-791.25"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-553.50"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-378.75"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-290.50"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-155.75"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Margin",
+      "Total",
+      "150.00",
+      "412.31",
+      "2.749",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.97011"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,080.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-607.25"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-393.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-80.75"
+      },
+      "208.75",
+      "446.50",
+      "621.25",
+      "709.50",
+      "844.25"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Label"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "\u03ba01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "\u03ba05"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "\u03ba10"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "\u03ba25"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "\u03ba50"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "\u03ba75"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c12",
+     "name": [
+      "\u03ba90"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c13",
+     "name": [
+      "\u03ba95"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c14",
+     "name": [
+      "\u03ba99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "\u03ba01"
+     },
+     {
+      "text": "\u03ba05"
+     },
+     {
+      "text": "\u03ba10"
+     },
+     {
+      "text": "\u03ba25"
+     },
+     {
+      "text": "\u03ba50"
+     },
+     {
+      "text": "\u03ba75"
+     },
+     {
+      "text": "\u03ba90"
+     },
+     {
+      "text": "\u03ba95"
+     },
+     {
+      "text": "\u03ba99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "stats/insurer/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "0.000\u00a0",
+      "0.000",
+      "0.000\u00a0",
+      "\u2014",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "2.000\u00a0",
+      "6.000",
+      "8.000\u00a0",
+      "\u2014",
+      "8.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "0.000\u00a0",
+      "0.000",
+      "0.000\u00a0",
+      "\u2014",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "0.000\u00a0",
+      "0.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "0.000\u00a0",
+      "0.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.000\u00a0",
+      "1.000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "freq"
+      },
+      "mean",
+      "1.000\u00a0",
+      "2.000",
+      "3.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.000\u00a0",
+      "0.000",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "sev"
+      },
+      "mean",
+      "2.000\u00a0",
+      "3.000",
+      "2.667\u00a0",
+      "\u2014",
+      "2.667\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "408.248m",
+      "0.333",
+      "395.285m",
+      "\u2014",
+      "395.285m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "6.527f",
+      "0.000",
+      "126.491m",
+      "\u2014",
+      "126.491m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "agg"
+      },
+      "mean",
+      "2.000\u00a0",
+      "6.000",
+      "8.000\u00a0",
+      "\u2014",
+      "8.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "888.178a"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "408.248m",
+      "0.236",
+      "204.124m",
+      "\u2014",
+      "204.124m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "20.428f"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "6.527f",
+      "0.000",
+      "52.214f",
+      "\u2014",
+      "757.103f",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "704.889f"
+     ]
+    }
+   ],
+   "caption": "Canonical moment store by component and measure across the computation views. Raw noncentral moments (ex1, ex2, ex3) are dropped from this view; the raw perspective keeps the full store.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c2",
+     "name": [
+      "Unit Alpha"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX.UnitB"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "total"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c10",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "Unit Alpha"
+     },
+     {
+      "text": "EX.UnitB"
+     },
+     {
+      "text": "total"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "stats/raw/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "\u2014",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "10.50",
+      "10.50",
+      "10.50",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "0.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "0.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.00",
+      "1.00",
+      "1.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      "3.00",
+      "3.00",
+      "3.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "9.00",
+      "9.00",
+      "9.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "27.00",
+      "27.00",
+      "27.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "3.00",
+      "3.00",
+      "3.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      "3.50",
+      "3.50",
+      "3.50",
+      "\u2014",
+      "3.500\u00a0",
+      "\u2014",
+      "\u2014",
+      "3.500\u00a0",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "15.17",
+      "15.17",
+      "15.17",
+      "\u2014",
+      "15.167\u00a0",
+      "\u2014",
+      "\u2014",
+      "15.167\u00a0",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-111.022a"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "73.50",
+      "73.50",
+      "73.50",
+      "\u2014",
+      "73.500\u00a0",
+      "\u2014",
+      "\u2014",
+      "73.500\u00a0",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "3.50",
+      "3.50",
+      "3.50",
+      "\u2014",
+      "3.500\u00a0",
+      "\u2014",
+      "\u2014",
+      "3.500\u00a0",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.49",
+      "0.49",
+      "0.49",
+      "\u2014",
+      "487.950m",
+      "\u2014",
+      "\u2014",
+      "487.950m",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-333.067a"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "5.706f",
+      "\u2014",
+      "\u2014",
+      "5.706f",
+      "5.706f"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      "10.50",
+      "10.50",
+      "10.50",
+      "\u2014",
+      "10.500\u00a0",
+      "\u2014",
+      "\u2014",
+      "10.500\u00a0",
+      "222.045a"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "119.00",
+      "119.00",
+      "119.00",
+      "\u2014",
+      "119.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "119.000\u00a0",
+      "888.178a"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "1,433.25",
+      "1,433.25",
+      "1,433.25",
+      "\u2014",
+      "1.433k",
+      "\u2014",
+      "\u2014",
+      "1.433k",
+      "2.442f"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "10.50",
+      "10.50",
+      "10.50",
+      "\u2014",
+      "10.500\u00a0",
+      "\u2014",
+      "\u2014",
+      "10.500\u00a0",
+      "222.045a"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.28",
+      "0.28",
+      "0.28",
+      "\u2014",
+      "281.718m",
+      "\u2014",
+      "\u2014",
+      "281.718m",
+      "3.109f"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "52.708f",
+      "\u2014",
+      "\u2014",
+      "52.708f",
+      "52.708f"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "e0.m0"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "mixed"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c10",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "e0.m0"
+     },
+     {
+      "text": "mixed"
+     },
+     {
+      "text": "independent"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "stats/raw/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "theoretical"
+      },
+      "mean",
+      "19.500",
+      "2.080"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sd",
+      "8.930",
+      "1.170"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.458",
+      "0.563"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.730",
+      "0.968"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "empirical"
+      },
+      "mean",
+      "19.500",
+      "2.080"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sd",
+      "8.930",
+      "1.170"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.458",
+      "0.563"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.730",
+      "0.968"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "basis"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "stat"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "X"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "Y"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "basis"
+     },
+     {
+      "text": "stat"
+     },
+     {
+      "text": "X"
+     },
+     {
+      "text": "Y"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "stats/raw/Distortion": [
+  {
+   "body": [
+    {
+     "cells": [
+      "mean",
+      "0.33354",
+      "0.33333",
+      "203.720\u00b5"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "var",
+      "0.08873",
+      "0.08889",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-160.345\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "std",
+      "0.29787",
+      "0.29814",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-269.028\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "cv",
+      "0.89307",
+      "0.89443",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.353m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "skew",
+      "0.64158",
+      "0.63888",
+      "2.704m"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "gini",
+      "0.33293",
+      "0.33333",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-407.439\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "p_equiv",
+      "0.33293",
+      "0.33333",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-407.439\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "loading",
+      "0.16646",
+      "0.16667",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-203.720\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mu_0.000",
+      "0.50000",
+      "0.00000",
+      "\u2014"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stat"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "D_g"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "closed_form"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stat"
+     },
+     {
+      "text": "D_g"
+     },
+     {
+      "text": "closed_form"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "stats/raw/PnL": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Consideration",
+      "Premium",
+      "1,000.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Obligation",
+      "Loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-850.00"
+      },
+      "412.31",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.485"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.97011"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,080.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,607.25"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,393.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,080.75"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-791.25"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-553.50"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-378.75"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-290.50"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-155.75"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Margin",
+      "Total",
+      "150.00",
+      "412.31",
+      "2.749",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.97011"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,080.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-607.25"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-393.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-80.75"
+      },
+      "208.75",
+      "446.50",
+      "621.25",
+      "709.50",
+      "844.25"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Label"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "\u03ba01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "\u03ba05"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "\u03ba10"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "\u03ba25"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "\u03ba50"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "\u03ba75"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c12",
+     "name": [
+      "\u03ba90"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c13",
+     "name": [
+      "\u03ba95"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c14",
+     "name": [
+      "\u03ba99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "\u03ba01"
+     },
+     {
+      "text": "\u03ba05"
+     },
+     {
+      "text": "\u03ba10"
+     },
+     {
+      "text": "\u03ba25"
+     },
+     {
+      "text": "\u03ba50"
+     },
+     {
+      "text": "\u03ba75"
+     },
+     {
+      "text": "\u03ba90"
+     },
+     {
+      "text": "\u03ba95"
+     },
+     {
+      "text": "\u03ba99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "stats/raw/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "0.000\u00a0",
+      "0.00",
+      "0.000\u00a0",
+      "\u2014",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "2.000\u00a0",
+      "6.00",
+      "8.000\u00a0",
+      "\u2014",
+      "8.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "0.000\u00a0",
+      "0.00",
+      "0.000\u00a0",
+      "\u2014",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "0.000\u00a0",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "0.000\u00a0",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.000\u00a0",
+      "1.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      "1.000\u00a0",
+      "2.00",
+      "3.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "1.000\u00a0",
+      "4.00",
+      "9.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "1.000\u00a0",
+      "8.00",
+      "27.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "1.000\u00a0",
+      "2.00",
+      "3.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.000\u00a0",
+      "0.00",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      "2.000\u00a0",
+      "3.00",
+      "2.667\u00a0",
+      "\u2014",
+      "2.667\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "4.667\u00a0",
+      "10.00",
+      "8.222\u00a0",
+      "\u2014",
+      "8.222\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "12.000\u00a0",
+      "36.00",
+      "28.000\u00a0",
+      "\u2014",
+      "28.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "2.000\u00a0",
+      "3.00",
+      "2.667\u00a0",
+      "\u2014",
+      "2.667\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "408.248m",
+      "0.33",
+      "395.285m",
+      "\u2014",
+      "395.285m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "6.527f",
+      "0.00",
+      "126.491m",
+      "\u2014",
+      "126.491m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      "2.000\u00a0",
+      "6.00",
+      "8.000\u00a0",
+      "\u2014",
+      "8.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "888.178a"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "4.667\u00a0",
+      "38.00",
+      "66.667\u00a0",
+      "\u2014",
+      "66.667\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "3.331f"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "12.000\u00a0",
+      "252.00",
+      "576.000\u00a0",
+      "\u2014",
+      "576.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "12.434f"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "2.000\u00a0",
+      "6.00",
+      "8.000\u00a0",
+      "\u2014",
+      "8.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "888.178a"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "408.248m",
+      "0.24",
+      "204.124m",
+      "\u2014",
+      "204.124m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "20.428f"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "6.527f",
+      "0.00",
+      "52.214f",
+      "\u2014",
+      "757.103f",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "704.889f"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c2",
+     "name": [
+      "Unit Alpha"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX.UnitB"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "total"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c10",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "Unit Alpha"
+     },
+     {
+      "text": "EX.UnitB"
+     },
+     {
+      "text": "total"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "summary/insurer/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Freq",
+      "3.000",
+      "0.000",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Sev",
+      "3.500",
+      "1.708",
+      "0.48795",
+      "0.00000",
+      "1.000",
+      "3.000",
+      "6.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Agg",
+      "10.500",
+      "2.958",
+      "0.28172",
+      "0.00000",
+      "4.000",
+      "10.000",
+      "17.00"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "Moments and key percentiles by component (Freq, Sev, Agg). Percentiles are exact grid values. Frequency percentiles are blank by design: frequency enters through its PGF and no count distribution is materialized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Mean"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "X"
+     },
+     {
+      "text": "Mean"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "summary/insurer/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "shared",
+      "Freq",
+      "1.30",
+      "\u2014",
+      "\u2014",
+      "0.35251",
+      "\u2014",
+      "\u2014",
+      "0.87287",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "X"
+      },
+      "Sev",
+      "15.00",
+      "\u2014",
+      "\u2014",
+      "0.33333",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "19.50",
+      "19.50",
+      "222.045a",
+      "0.45796",
+      "0.45796",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-999.201a"
+      },
+      "0.72979",
+      "0.72979"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Y"
+      },
+      "Sev",
+      "1.60",
+      "\u2014",
+      "\u2014",
+      "0.50000",
+      "\u2014",
+      "\u2014",
+      "0.84375",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "2.08",
+      "2.08",
+      "222.045a",
+      "0.56264",
+      "0.56264",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-777.156a"
+      },
+      "0.96752",
+      "0.96752"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "total"
+      },
+      "Sev",
+      "16.60",
+      "\u2014",
+      "\u2014",
+      "0.32797",
+      "\u2014",
+      "\u2014",
+      "0.03242",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "21.58",
+      "21.58",
+      "222.045a",
+      "\u2014",
+      "0.45497",
+      "\u2014",
+      "\u2014",
+      "0.74066"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "part"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "Est EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "Err EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Est CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c7",
+     "name": [
+      "Err CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "Sk"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "Est Sk"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "part"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Err EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Err CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "summary/insurer/Distortion": [
+  {
+   "body": [
+    {
+     "cells": [
+      "mean",
+      "0.3335370528968524",
+      "0.66665",
+      "0.33333",
+      "203.720\u00b5"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "std",
+      "0.2978733691327634",
+      "0.23564",
+      "0.29814",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-269.028\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "cv",
+      "0.893074297280194",
+      "0.35347",
+      "0.89443",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.353m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "skew",
+      "0.6415802963608989",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.56377"
+      },
+      "0.63888",
+      "2.704m"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "gini",
+      "0.33292589420629515",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.33293"
+      },
+      "0.33333",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-407.439\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mean_mass",
+      "0.5",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "max_mass",
+      "0.0",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "interior_atoms",
+      "False",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "E[D_g]+E[D_g_inv]",
+      "1.0001870528968524",
+      "\u2014",
+      "1.00000",
+      "187.053\u00b5"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(g_inv(0.5))",
+      "0.5",
+      "\u2014",
+      "0.50000",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(0), g(1)",
+      "0.0",
+      "1.00000",
+      "0.00000",
+      "0.000\u00a0"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stat"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "D_g"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "D_g_inv"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "closed_form"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stat"
+     },
+     {
+      "text": "D_g"
+     },
+     {
+      "text": "D_g_inv"
+     },
+     {
+      "text": "closed_form"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "summary/insurer/PnL": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Consideration",
+      "1,000.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-850.00"
+      },
+      "412.31",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.485"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.97011"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,080.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-791.25"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-155.75"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Margin",
+      "150.00",
+      "412.31",
+      "2.749",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.97011"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,080.00"
+      },
+      "208.75",
+      "844.25"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Side"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "summary/insurer/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Unit Alpha"
+      },
+      "Freq",
+      "1.000",
+      "0.00000",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "2.000",
+      "0.81650",
+      "0.40825",
+      "0.00000",
+      "1.000",
+      "2.000",
+      "3.000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "2.000",
+      "0.81650",
+      "0.40825",
+      "0.00000",
+      "1.000",
+      "2.000",
+      "3.000"
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "EX.UnitB"
+      },
+      "Freq",
+      "2.000",
+      "0.00000",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "3.000",
+      "1.00000",
+      "0.33333",
+      "0.00000",
+      "2.000",
+      "2.000",
+      "4.000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "6.000",
+      "1.41421",
+      "0.23570",
+      "0.00000",
+      "4.000",
+      "6.000",
+      "8.000"
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "total",
+      "Agg",
+      "8.000",
+      "1.63299",
+      "0.20412",
+      "0.00000",
+      "5.000",
+      "8.000",
+      "11.000"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "Moments and key percentiles per unit plus the portfolio total; the total block carries the Agg row only (a portfolio has no single Freq or Sev). Frequency percentiles are blank by design: frequency enters through its PGF and no count distribution is materialized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Mean"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "X"
+     },
+     {
+      "text": "Mean"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "summary/raw/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Freq",
+      "3.000",
+      "0.000",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Sev",
+      "3.500",
+      "1.708",
+      "0.48795",
+      "0.00000",
+      "1.000",
+      "3.000",
+      "6.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Agg",
+      "10.500",
+      "2.958",
+      "0.28172",
+      "0.00000",
+      "4.000",
+      "10.000",
+      "17.00"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Mean"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "X"
+     },
+     {
+      "text": "Mean"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "summary/raw/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "shared",
+      "Freq",
+      "1.30",
+      "\u2014",
+      "\u2014",
+      "0.35251",
+      "\u2014",
+      "\u2014",
+      "0.87287",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "X"
+      },
+      "Sev",
+      "15.00",
+      "\u2014",
+      "\u2014",
+      "0.33333",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "19.50",
+      "19.50",
+      "222.045a",
+      "0.45796",
+      "0.45796",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-999.201a"
+      },
+      "0.72979",
+      "0.72979"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Y"
+      },
+      "Sev",
+      "1.60",
+      "\u2014",
+      "\u2014",
+      "0.50000",
+      "\u2014",
+      "\u2014",
+      "0.84375",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "2.08",
+      "2.08",
+      "222.045a",
+      "0.56264",
+      "0.56264",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-777.156a"
+      },
+      "0.96752",
+      "0.96752"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "total"
+      },
+      "Sev",
+      "16.60",
+      "\u2014",
+      "\u2014",
+      "0.32797",
+      "\u2014",
+      "\u2014",
+      "0.03242",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "21.58",
+      "21.58",
+      "222.045a",
+      "\u2014",
+      "0.45497",
+      "\u2014",
+      "\u2014",
+      "0.74066"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "part"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "Est EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "Err EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Est CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c7",
+     "name": [
+      "Err CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "Sk"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "Est Sk"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "part"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Err EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Err CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "summary/raw/Distortion": [
+  {
+   "body": [
+    {
+     "cells": [
+      "mean",
+      "0.3335370528968524",
+      "0.66665",
+      "0.33333",
+      "203.720\u00b5"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "std",
+      "0.2978733691327634",
+      "0.23564",
+      "0.29814",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-269.028\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "cv",
+      "0.893074297280194",
+      "0.35347",
+      "0.89443",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.353m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "skew",
+      "0.6415802963608989",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.56377"
+      },
+      "0.63888",
+      "2.704m"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "gini",
+      "0.33292589420629515",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.33293"
+      },
+      "0.33333",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-407.439\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mean_mass",
+      "0.5",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "max_mass",
+      "0.0",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "interior_atoms",
+      "False",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "E[D_g]+E[D_g_inv]",
+      "1.0001870528968524",
+      "\u2014",
+      "1.00000",
+      "187.053\u00b5"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(g_inv(0.5))",
+      "0.5",
+      "\u2014",
+      "0.50000",
+      "0.000\u00a0"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(0), g(1)",
+      "0.0",
+      "1.00000",
+      "0.00000",
+      "0.000\u00a0"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stat"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "D_g"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "D_g_inv"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "closed_form"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stat"
+     },
+     {
+      "text": "D_g"
+     },
+     {
+      "text": "D_g_inv"
+     },
+     {
+      "text": "closed_form"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "summary/raw/PnL": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Consideration",
+      "1,000.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-850.00"
+      },
+      "412.31",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.485"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.97011"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,080.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-791.25"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-155.75"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Margin",
+      "150.00",
+      "412.31",
+      "2.749",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.97011"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,080.00"
+      },
+      "208.75",
+      "844.25"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Side"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "summary/raw/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Unit Alpha"
+      },
+      "Freq",
+      "1.000",
+      "0.00000",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "2.000",
+      "0.81650",
+      "0.40825",
+      "0.00000",
+      "1.000",
+      "2.000",
+      "3.000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "2.000",
+      "0.81650",
+      "0.40825",
+      "0.00000",
+      "1.000",
+      "2.000",
+      "3.000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "EX.UnitB"
+      },
+      "Freq",
+      "2.000",
+      "0.00000",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "3.000",
+      "1.00000",
+      "0.33333",
+      "0.00000",
+      "2.000",
+      "2.000",
+      "4.000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "6.000",
+      "1.41421",
+      "0.23570",
+      "0.00000",
+      "4.000",
+      "6.000",
+      "8.000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "total",
+      "Agg",
+      "8.000",
+      "1.63299",
+      "0.20412",
+      "0.00000",
+      "5.000",
+      "8.000",
+      "11.000"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Mean"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "X"
+     },
+     {
+      "text": "Mean"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "tail/insurer/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "2",
+      "0.50000",
+      "10.00",
+      "12.92",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.500"
+      },
+      "0.952"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "5",
+      "0.80000",
+      "13.00",
+      "14.62",
+      "2.500",
+      "1.238"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "10",
+      "0.90000",
+      "14.00",
+      "15.62",
+      "3.500",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "25",
+      "0.96000",
+      "16.00",
+      "16.58",
+      "5.500",
+      "1.524"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "50",
+      "0.98000",
+      "16.00",
+      "17.16",
+      "5.500",
+      "1.524"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "100",
+      "0.99000",
+      "17.00",
+      "17.46",
+      "6.500",
+      "1.619"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "200",
+      "0.99500",
+      "17.00",
+      "17.93",
+      "6.500",
+      "1.619"
+     ],
+     "flags": [
+      "emphasis"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "250",
+      "0.99600",
+      "18.00",
+      "18.00",
+      "7.500",
+      "1.714"
+     ],
+     "flags": [
+      "emphasis"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "500",
+      "0.99800",
+      "18.00",
+      "18.00",
+      "7.500",
+      "1.714"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "1,000",
+      "0.99900",
+      "18.00",
+      "18.00",
+      "7.500",
+      "1.714"
+     ]
+    }
+   ],
+   "caption": "Return period ladder: VaR (the quoted number), TVaR (the priced number), excess VaR over the mean (capital), and VaR to mean leverage, exact from the FFT grid. The 1 in 200 (99.5%, Solvency II) and 1 in 250 (99.6%, US capital adequacy) anchors are emphasized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "T"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "p"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "VaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "TVaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "xsVaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "VaR/Mean"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "T"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "VaR"
+     },
+     {
+      "text": "TVaR"
+     },
+     {
+      "text": "xsVaR"
+     },
+     {
+      "text": "VaR/Mean"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail/insurer/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 10,
+       "text": "Unit Alpha"
+      },
+      "2",
+      "0.50000",
+      "2.000",
+      "2.667",
+      "222.045a",
+      "1.000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "5",
+      "0.80000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "10",
+      "0.90000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "25",
+      "0.96000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "50",
+      "0.98000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "100",
+      "0.99000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "200",
+      "0.99500",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ],
+     "flags": [
+      "emphasis"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "250",
+      "0.99600",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ],
+     "flags": [
+      "emphasis"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "500",
+      "0.99800",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "1,000",
+      "0.99900",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 10,
+       "text": "EX.UnitB"
+      },
+      "2",
+      "0.50000",
+      "6.000",
+      "7.000",
+      "0.000\u00a0",
+      "1.000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "5",
+      "0.80000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "10",
+      "0.90000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "25",
+      "0.96000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "50",
+      "0.98000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "100",
+      "0.99000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "200",
+      "0.99500",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ],
+     "flags": [
+      "emphasis"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "250",
+      "0.99600",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ],
+     "flags": [
+      "emphasis"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "500",
+      "0.99800",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "1,000",
+      "0.99900",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 10,
+       "text": "total"
+      },
+      "2",
+      "0.50000",
+      "8.000",
+      "9.333",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-7.105f"
+      },
+      "1.000"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "5",
+      "0.80000",
+      "9.000",
+      "10.250",
+      "1000.000m",
+      "1.125"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "10",
+      "0.90000",
+      "10.000",
+      "10.833",
+      "2.000\u00a0",
+      "1.250"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "25",
+      "0.96000",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "50",
+      "0.98000",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "100",
+      "0.99000",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "200",
+      "0.99500",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ],
+     "flags": [
+      "total",
+      "emphasis"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "250",
+      "0.99600",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ],
+     "flags": [
+      "total",
+      "emphasis"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "500",
+      "0.99800",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "1,000",
+      "0.99900",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "Return period ladder per unit plus the portfolio total: VaR, TVaR, excess VaR over the mean (capital), and VaR to mean leverage, exact from the FFT grid. The 1 in 200 (99.5%, Solvency II) and 1 in 250 (99.6%, US capital adequacy) anchors are emphasized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "T"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "VaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "TVaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "xsVaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "VaR/Mean"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "T"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "VaR"
+     },
+     {
+      "text": "TVaR"
+     },
+     {
+      "text": "xsVaR"
+     },
+     {
+      "text": "VaR/Mean"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "tail/raw/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "2",
+      "0.50000",
+      "10.00",
+      "12.92",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.500"
+      },
+      "0.952"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "5",
+      "0.80000",
+      "13.00",
+      "14.62",
+      "2.500",
+      "1.238"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "10",
+      "0.90000",
+      "14.00",
+      "15.62",
+      "3.500",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "25",
+      "0.96000",
+      "16.00",
+      "16.58",
+      "5.500",
+      "1.524"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "50",
+      "0.98000",
+      "16.00",
+      "17.16",
+      "5.500",
+      "1.524"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "100",
+      "0.99000",
+      "17.00",
+      "17.46",
+      "6.500",
+      "1.619"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "200",
+      "0.99500",
+      "17.00",
+      "17.93",
+      "6.500",
+      "1.619"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "250",
+      "0.99600",
+      "18.00",
+      "18.00",
+      "7.500",
+      "1.714"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "500",
+      "0.99800",
+      "18.00",
+      "18.00",
+      "7.500",
+      "1.714"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "1,000",
+      "0.99900",
+      "18.00",
+      "18.00",
+      "7.500",
+      "1.714"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "T"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "p"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "VaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "TVaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "xsVaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "VaR/Mean"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "T"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "VaR"
+     },
+     {
+      "text": "TVaR"
+     },
+     {
+      "text": "xsVaR"
+     },
+     {
+      "text": "VaR/Mean"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail/raw/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 10,
+       "text": "Unit Alpha"
+      },
+      "2",
+      "0.50000",
+      "2.000",
+      "2.667",
+      "222.045a",
+      "1.000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "5",
+      "0.80000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "10",
+      "0.90000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "25",
+      "0.96000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "50",
+      "0.98000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "100",
+      "0.99000",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "200",
+      "0.99500",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "250",
+      "0.99600",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "500",
+      "0.99800",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "1,000",
+      "0.99900",
+      "3.000",
+      "3.000",
+      "1.000\u00a0",
+      "1.500"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 10,
+       "text": "EX.UnitB"
+      },
+      "2",
+      "0.50000",
+      "6.000",
+      "7.000",
+      "0.000\u00a0",
+      "1.000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "5",
+      "0.80000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "10",
+      "0.90000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "25",
+      "0.96000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "50",
+      "0.98000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "100",
+      "0.99000",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "200",
+      "0.99500",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "250",
+      "0.99600",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "500",
+      "0.99800",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "1,000",
+      "0.99900",
+      "8.000",
+      "8.000",
+      "2.000\u00a0",
+      "1.333"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 10,
+       "text": "total"
+      },
+      "2",
+      "0.50000",
+      "8.000",
+      "9.333",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-7.105f"
+      },
+      "1.000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "5",
+      "0.80000",
+      "9.000",
+      "10.250",
+      "1000.000m",
+      "1.125"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "10",
+      "0.90000",
+      "10.000",
+      "10.833",
+      "2.000\u00a0",
+      "1.250"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "25",
+      "0.96000",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "50",
+      "0.98000",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "100",
+      "0.99000",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "200",
+      "0.99500",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "250",
+      "0.99600",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "500",
+      "0.99800",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "1,000",
+      "0.99900",
+      "11.000",
+      "11.000",
+      "3.000\u00a0",
+      "1.375"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "T"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "VaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "TVaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "xsVaR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "VaR/Mean"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "T"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "VaR"
+     },
+     {
+      "text": "TVaR"
+     },
+     {
+      "text": "xsVaR"
+     },
+     {
+      "text": "VaR/Mean"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "validation/insurer/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Freq",
+      "3.000",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Sev",
+      "3.500",
+      "3.500",
+      "0.000\u00a0",
+      "0.48795",
+      "0.48795",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-333.067a"
+      },
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Agg",
+      "10.500",
+      "10.500",
+      "222.045a",
+      "0.28172",
+      "0.28172",
+      "3.109f",
+      "0.00000",
+      "0.00000"
+     ]
+    }
+   ],
+   "caption": "Moment QA: reference vs realized FFT estimate with noise aware relative errors (the economic Gross / Net / Ceded view when reinsurance is present). Rows failing validation at the object's validation_eps gate are emphasized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Est EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "Err EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Est CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "Err CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Sk"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "Est Sk"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "X"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Err EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Err CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/insurer/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "marginal mean X",
+      "19.500",
+      "19.500",
+      "182.190a",
+      "0.10000",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "marginal mean Y",
+      "2.080",
+      "2.080",
+      "213.504a",
+      "0.10000",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tail deficit",
+      "0.000",
+      "0.000",
+      "0.000\u00a0",
+      "0.00001",
+      "True"
+     ]
+    }
+   ],
+   "caption": "Joint grid checks (per axis marginal means and the tail deficit) with gates and verdicts; failing checks are emphasized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "check"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Est"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Ref"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "Err"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Gate"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c5",
+     "name": [
+      "Pass"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "check"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "Ref"
+     },
+     {
+      "text": "Err"
+     },
+     {
+      "text": "Gate"
+     },
+     {
+      "text": "Pass"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/insurer/Distortion": [
+  {
+   "body": [
+    {
+     "cells": [
+      "E[D_g]+E[D_g_inv]",
+      "1.00019",
+      "1.00000",
+      "187.053\u00b5",
+      "1.000m",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(g_inv(0.5))",
+      "0.50000",
+      "0.50000",
+      "0.000\u00a0",
+      "1.000m",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(0)",
+      "0.00000",
+      "0.00000",
+      "0.000\u00a0",
+      "1.000p",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(1)",
+      "1.00000",
+      "1.00000",
+      "0.000\u00a0",
+      "1.000p",
+      "True"
+     ]
+    }
+   ],
+   "caption": "Structural identity checks with gates and verdicts; failing checks are emphasized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "check"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Est"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Ref"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "Err"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "Gate"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c5",
+     "name": [
+      "Pass"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "check"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "Ref"
+     },
+     {
+      "text": "Err"
+     },
+     {
+      "text": "Gate"
+     },
+     {
+      "text": "Pass"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/insurer/PnL": [
+  {
+   "body": [],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "EX"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Est"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "abs_err"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "rel_err"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "leg"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "abs_err"
+     },
+     {
+      "text": "rel_err"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/insurer/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Unit Alpha"
+      },
+      "Freq",
+      "1.000",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "2.000",
+      "2.000",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-111.022a"
+      },
+      "0.40825",
+      "0.40825",
+      "888.178a",
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "2.000",
+      "2.000",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-111.022a"
+      },
+      "0.40825",
+      "0.40825",
+      "888.178a",
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "EX.UnitB"
+      },
+      "Freq",
+      "2.000",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "3.000",
+      "3.000",
+      "0.000\u00a0",
+      "0.33333",
+      "0.33333",
+      "0.000\u00a0",
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "6.000",
+      "6.000",
+      "0.000\u00a0",
+      "0.23570",
+      "0.23570",
+      "0.000\u00a0",
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "total"
+      },
+      "Freq",
+      "3.000",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "2.667",
+      "2.667",
+      "0.000\u00a0",
+      "0.39528",
+      "0.39528",
+      "0.000\u00a0",
+      "0.12649",
+      "0.12649"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "8.000",
+      "8.000",
+      "888.178a",
+      "0.20412",
+      "0.20412",
+      "20.428f",
+      "0.00000",
+      "0.00000"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "Moment QA per unit plus the portfolio total: reference vs realized FFT estimate with noise aware relative errors (the economic view when any unit cedes). Rows failing validation at each object's validation_eps gate are emphasized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "Est EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "Err EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Est CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c7",
+     "name": [
+      "Err CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "Sk"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "Est Sk"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "X"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Err EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Err CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "validation/raw/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Freq",
+      "3.000",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Sev",
+      "3.500",
+      "3.500",
+      "0.000\u00a0",
+      "0.48795",
+      "0.48795",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-333.067a"
+      },
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Agg",
+      "10.500",
+      "10.500",
+      "222.045a",
+      "0.28172",
+      "0.28172",
+      "3.109f",
+      "0.00000",
+      "0.00000"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Est EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "Err EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Est CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "Err CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Sk"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "Est Sk"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "X"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Err EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Err CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/raw/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "marginal mean X",
+      "19.500",
+      "19.500",
+      "182.190a",
+      "0.10000",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "marginal mean Y",
+      "2.080",
+      "2.080",
+      "213.504a",
+      "0.10000",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tail deficit",
+      "0.000",
+      "0.000",
+      "0.000\u00a0",
+      "0.00001",
+      "True"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "check"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Est"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Ref"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "Err"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Gate"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c5",
+     "name": [
+      "Pass"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "check"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "Ref"
+     },
+     {
+      "text": "Err"
+     },
+     {
+      "text": "Gate"
+     },
+     {
+      "text": "Pass"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/raw/Distortion": [
+  {
+   "body": [
+    {
+     "cells": [
+      "E[D_g]+E[D_g_inv]",
+      "1.00019",
+      "1.00000",
+      "187.053\u00b5",
+      "1.000m",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(g_inv(0.5))",
+      "0.50000",
+      "0.50000",
+      "0.000\u00a0",
+      "1.000m",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(0)",
+      "0.00000",
+      "0.00000",
+      "0.000\u00a0",
+      "1.000p",
+      "True"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "g(1)",
+      "1.00000",
+      "1.00000",
+      "0.000\u00a0",
+      "1.000p",
+      "True"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "check"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Est"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Ref"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "Err"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "Gate"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c5",
+     "name": [
+      "Pass"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "check"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "Ref"
+     },
+     {
+      "text": "Err"
+     },
+     {
+      "text": "Gate"
+     },
+     {
+      "text": "Pass"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/raw/PnL": [
+  {
+   "body": [],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "EX"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Est"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "abs_err"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "rel_err"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "leg"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "abs_err"
+     },
+     {
+      "text": "rel_err"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/raw/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Unit Alpha"
+      },
+      "Freq",
+      "1.000",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "2.000",
+      "2.000",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-111.022a"
+      },
+      "0.40825",
+      "0.40825",
+      "888.178a",
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "2.000",
+      "2.000",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-111.022a"
+      },
+      "0.40825",
+      "0.40825",
+      "888.178a",
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "EX.UnitB"
+      },
+      "Freq",
+      "2.000",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "3.000",
+      "3.000",
+      "0.000\u00a0",
+      "0.33333",
+      "0.33333",
+      "0.000\u00a0",
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "6.000",
+      "6.000",
+      "0.000\u00a0",
+      "0.23570",
+      "0.23570",
+      "0.000\u00a0",
+      "0.00000",
+      "0.00000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "total"
+      },
+      "Freq",
+      "3.000",
+      "\u2014",
+      "\u2014",
+      "0.00000",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Sev",
+      "2.667",
+      "2.667",
+      "0.000\u00a0",
+      "0.39528",
+      "0.39528",
+      "0.000\u00a0",
+      "0.12649",
+      "0.12649"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Agg",
+      "8.000",
+      "8.000",
+      "888.178a",
+      "0.20412",
+      "0.20412",
+      "20.428f",
+      "0.00000",
+      "0.00000"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "Est EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "Err EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Est CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c7",
+     "name": [
+      "Err CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "Sk"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "Est Sk"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "X"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Err EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Err CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ]
+}

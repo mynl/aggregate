@@ -6,9 +6,10 @@ just re-exports those via ``from .module import *``. To change what's
 public at the top level, edit ``__all__`` in the source module -- not
 this file.
 
-``Tweedie``, ``FourierTools``, ``Pentagon``, and anything in
-``pedagogy`` are intentionally NOT re-exported here -- reach them via
-submodule import (``from aggregate.tweedie import Tweedie``, etc.).
+``Tweedie``, ``FourierTools``, ``Pentagon``, anything in ``pedagogy``,
+and the ``exhibits`` module are intentionally NOT re-exported here --
+reach them via submodule import (``from aggregate.tweedie import
+Tweedie``, ``from aggregate import exhibits``, etc.).
 """
 
 # Pandas Copy-on-Write: enabled unconditionally for the library. On

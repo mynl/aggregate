@@ -986,3 +986,14 @@ agg SH.Five 10 claims dsev [0 5 10 15] poisson                                  
 port SH.PDisc agg SH.D1 dfreq [2] dsev [2 4 6] agg SH.D2 dfreq [2] dsev [4 8];
 agg SH.Tower as "US Hurricane Reinsurance" 1.74 claims sev lognorm 8.501 cv 14.624 splice [0 500] poisson    note{cat XOL tower: bs=1/64 scores best but loses 2e-8 of its mass off the grid, so the soundness gate takes bs=1/32};
 agg SH.Clean 100 claims sev gamma 100 cv 1 poisson                                                                note{thin enough that the auto-sized grid holds every bit of mass: the probe gate skips it}
+
+
+# EX. Exhibits module fixtures (1.0.0a200)
+# ========================================
+# Programs behind tests/test_exhibits.py and the canonical_dict snapshots
+# captured by tests/capture_exhibit_snapshots.py ([Exhibits-Module] scaffold).
+# Small exact discrete objects keep the committed IR snapshots cheap and
+# deterministic; the labeled unit exercises the LabeledMixin relabel step in
+# exhibit_frames (unit handle EX.UnitA serves as "Unit Alpha").
+agg EX.Dice dfreq [3] dsev [1:6]                                                                                  note{summary/tail exhibit fixture; exact discrete lattice};
+port EX.Port agg EX.UnitA as "Unit Alpha" 1 claim dsev [1 2 3] fixed agg EX.UnitB 2 claims dsev [2 4] fixed

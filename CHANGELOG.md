@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.0.0a200
+
+**[Exhibits-Module] phases one and two, [Exhibits-Scaffold] plus
+[Exhibits-Stats-Validation].** New `aggregate/exhibits.py`
+(`dev/plan-exhibits.md`, approved 2026-08-04): business exhibits translating
+the first class frames to greater_tables table-document IR. The library owns
+meaning, the app owns arrangement; the app's row flag, caption and raw moment
+drop knowledge starts migrating in here. Purely additive: the core never
+imports it, it is not star exported (`from aggregate import exhibits`), and
+`import aggregate.exhibits` imports neither matplotlib nor greater_tables
+(two new guards in `tests/test_plots_boundary.py`).
+
+The surface: `Perspective` enum (raw / insured / insurer / reinsurer; 1.0
+implements raw and insurer, the other two are stable vocabulary), frozen
+`Exhibit` dataclass (`ir_blocks`, sha256 `hash` over the block doc hashes for
+ETags, `to_payload()` canonical dict envelope), eight generic singledispatch
+exhibit functions (`summary`, `tail`, `stats`, `validation`, `reins`,
+`pnl_ledger`, `pnl_ratios`, `dependency`) with open registration, the
+`EXHIBITS` registry with per object availability predicates,
+`available_exhibits(obj)` derived from the registries so it cannot go stale,
+`exhibit_frames` (the pure pandas stage, fully testable without GT), and
+`build_exhibit` (the only lazy greater_tables import, naming the extra when
+missing). INSURER equals RAW unless a per (exhibit, type) override hook is
+registered; every override is an explicit reviewable delta on the raw frame.
+All served frames pass through `LabeledMixin._relabel`; titles use
+`_title_name`.
+
+Registered at this version: `summary` for all five first class classes with
+insurer captions and total / subtotal row flags on Aggregate and Portfolio
+(frequency percentiles blank by design noted in the caption); `tail` for
+Aggregate and Portfolio with the 1 in 200 / 1 in 250 capital anchors
+emphasized and the portfolio total block flagged; `stats` for all five, the
+insurer view dropping the raw noncentral moment rows (ex1/ex2/ex3, 26 rows
+to 17) on Aggregate and Portfolio; `validation` for all five, the insurer
+view emphasizing failing rows (moment failures via the object's `Validation`
+flags on Aggregate and Portfolio, `Pass == False` check rows on Distortion
+and BivariateAggregate; the PnL audit has no gate and passes through); and
+`dependency` for BivariateAggregate (`dependency_df` plus `axis_support_df`,
+no override, none needed today).
+
+Tests: `tests/test_exhibits.py` (65 cases: availability by kind, frame stage
+structure, relabeling honored, error paths, and committed
+`canonical_dict` snapshots per (exhibit, perspective, kind) via
+`tests/capture_exhibit_snapshots.py`, 36 snapshots guarding both the
+business translation and IR drift; the snapshot file drives the case list).
+Fixture programs added to `decl-testers.agg` section EX; the exhibits
+surface documented as a comment row in `dev/FEATURES.csv`.
+
+**The `exhibits` extra is documented but commented in `pyproject.toml`:**
+greater_tables 6 is not yet on PyPI (latest published is 5.3.0), and an
+active unresolvable extra would break `uv sync --all-extras`. It activates
+verbatim when GT 6 publishes; until then the sibling checkout is path
+installed, as `aggregate_api` already does.
+
+Open with the author: per measure formats for the stats insurer view
+(greater_tables formats are per column, the canonical store mixes measures
+down a column), and whether the PnL validation audit gets a failure gate.
+
 ## 1.0.0a199
 
 **[Chart-IR] pass three opens, [Chart-Surface-Pilot], library side.** The

@@ -18,7 +18,15 @@
 > **Where plans live.** `dev/` = live · `dev/deferred/` = parked past the beta,
 > not closed · `dev/done/` = closed (shipped, `-REJECTED`, or `-SUPERSEDED`).
 >
-> **Last updated: 2026-07-29** — the author's review annotations worked through
+> **Last updated: 2026-08-05.** Added `[Exhibits-Module]` and `[Chart-IR]`: the
+> aggregate to aLL interface work from the author's design notes (business
+> exhibits over greater_tables IR with raw/insured/insurer/reinsurer
+> perspectives, 1.0 implementing raw and insurer, and a chart intermediate
+> representation with a 3-D surface
+> pilot, the twelve plot inventoried per panel). Both approved, plans in
+> `dev/plan-exhibits.md` and `dev/plan-chart-ir.md`.
+>
+> **Previous update, 2026-07-29** — the author's review annotations worked through
 > (`1.0.0a170` `[FCC-Contract]`, `a171` `[FCC-Surface-Decisions]`). Closed and
 > removed: `[ZT-ZM-Frequency-Fix]` (shipped `a152`),
 > `[Aggregate-Summary-DF-Useless]` (the gross/net smell is fixed),
@@ -95,6 +103,61 @@
   discrete and continuous branches. **Its own task** (author, 2026-07-29): it is
   independent of the reporting cluster above, so do not scope it with them.
   Plan: `dev/plan-plotting-punchups.md`.
+- **[Exhibits-Module]**: new `aggregate/exhibits.py` translating the raw FCC
+  stats frames into greater_tables IR envelopes. `Perspective` enum
+  (raw/insured/insurer/reinsurer), singledispatch generics (summary, tail, stats,
+  validation, reins, pnl_ledger, pnl_ratios, dependency), a registry derived
+  `available_exhibits(obj)` capability query, a new `exhibits` optional extra
+  (lazy GT import), and one generic aLL endpoint pair (capability plus
+  envelope with ETag). Migrates the app's ROW_FLAGS/FORMATS/caption knowledge
+  into the library. Purely additive, provisional at 1.0. Six phases; author
+  gate on the PnL business framing. 1.0 implements RAW and INSURER only,
+  with INSURER = RAW unless a per (exhibit, type) override is registered;
+  overrides are custom per exhibit (identity, thin renames, or an extensive
+  reshape for the xpnl tower ledger), settled case by case with the author
+  once the infrastructure lands. INSURED and REINSURER are
+  enum vocabulary, implementations deferred with the reinsurer semantics
+  review as that work's opening gate. Approved 2026-08-04; perspectives
+  renamed and scoped 2026-08-05 (buyer/seller were relative and confusing,
+  the insurer both sells and buys). Plan: `dev/plan-exhibits.md`.
+  **Progress:** `[Exhibits-Scaffold]` and `[Exhibits-Stats-Validation]`
+  landed together at `a200` (module, registry, summary and tail for
+  Aggregate/Portfolio; stats and validation across the five FCCs with the
+  raw moment drop and failing row emphasis; dependency for bvagg; snapshot
+  tests, lazy GT boundary; the `exhibits` extra is documented but commented
+  in `pyproject.toml` until greater_tables 6 publishes to PyPI, since an
+  active unresolvable extra would break `uv sync --all-extras`). Next:
+  `[Exhibits-Reins-Insurer]`, then `[Exhibits-PnL-Translation]` behind its
+  author gate. Open with the author: per measure formats for the stats
+  insurer view (greater_tables formats are per column, the store mixes
+  measures down a column, so the app's measure formats have no TableSpec
+  home yet) and whether the PnL validation audit ever gets a failure gate.
+- **[Chart-IR]**: a minimal versioned chart IR in a new `aggregate/charts/`
+  package (frozen dataclasses, no pydantic; ChartDoc/ChartSeries/ChartAxis/
+  Panel/Mark), with the one generic mpl renderer at `plots/_chartdoc.py` and
+  matplotlib-renders-the-IR as the committed post 1.0 convergence. Three
+  independently landing passes: inventory (`dev/chart-inventory.md`, review
+  gate), schema (sign off gate), conversion (one chart per commit, image diff
+  and fixture diff acceptance). Pilot: the bvagg 3-D surface (emitter block
+  sums the joint; ECharts true 3-D; mpl renders the 2-D projection or raises
+  under `strict=True`). 1.0 scope is the 8 app facing charts plus schema
+  representability (not conversion) of the `plot_twelve` panels, inventoried
+  per panel: the kappa and two unit independence panels are expected future
+  aLL charts, deliberately not developed before the IR, then born as
+  emitters. Emitters read the numerics-2 accessors (`unit_density_df`,
+  `allocation_diagnostics`), never legacy `density_df` `p_<unit>` columns.
+  Approved 2026-08-04, panel scope added 2026-08-05.
+  Plan: `dev/plan-chart-ir.md`. **Progress:** inventory landed a197
+  (`dev/chart-inventory.md`, six judgment calls awaiting author picks);
+  schema v1 landed a198 (`charts/ir.py` plus `tests/test_charts_ir.py`,
+  field list awaiting sign off; the charts boundary assertion lives in
+  `test_charts_ir.py` for now because `test_plots_boundary.py` was
+  mid-edit in the parallel exhibits workstream); pilot library side landed
+  a199 (`chart_joint_surface` emitter with the migrated surfaceGrid
+  reduction, `plots/_chartdoc.py` renderer with the capability pattern).
+  Next: the pilot's aggregate_api commit (route, chartdoc-to-echarts
+  adapter, surfaceGrid deletion), then conversions in plan order
+  (distortion g(s) first).
 
 ### Correctness & bugs
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a199"
+version = "1.0.0a200"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -97,6 +97,16 @@ viz = [
     "holoviews",
     "bokeh",
 ]
+# Business exhibits to greater_tables table-document IR (dev/plan-exhibits.md,
+# [Exhibits-Module]). greater_tables 6 is NOT yet on PyPI (latest published is
+# 5.3.0), so the extra stays commented until it publishes: an active extra
+# would make `uv sync --all-extras` unresolvable. Until then install the
+# sibling checkout ad hoc, as aggregate_api does:
+#   UV_PROJECT_ENVIRONMENT=.venv uv pip install -e C:/S/AI/greatest-tables
+# Activate when GT 6 publishes:
+# exhibits = [
+#     "greater_tables>=6.0.0a8",
+# ]
 
 [tool.setuptools]
 include-package-data = true

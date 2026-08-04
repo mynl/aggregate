@@ -10,6 +10,11 @@ matplotlib use under :mod:`aggregate.plots`. Two invariants protect that:
    at top level -- with a single documented exemption: ``pedagogy.py``, the
    non-core paper/blog figure-generator module, which is never imported on the
    ``import aggregate`` path and is a sanctioned figures module.
+
+The exhibits module ([Exhibits-Module]) adds a second lazy boundary:
+``import aggregate`` must not import greater_tables, and
+``import aggregate.exhibits`` must import neither matplotlib nor
+greater_tables (the IR conversion step imports greater_tables lazily).
 """
 
 import ast
@@ -48,6 +53,32 @@ def test_import_aggregate_does_not_load_matplotlib():
         "import sys, aggregate; "
         "assert 'matplotlib' not in sys.modules, "
         "'import aggregate pulled in matplotlib'"
+    )
+    result = subprocess.run([sys.executable, '-c', code],
+                            capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_import_aggregate_does_not_load_greater_tables():
+    """A fresh ``import aggregate`` must leave greater_tables unloaded."""
+    code = (
+        "import sys, aggregate; "
+        "assert 'greater_tables' not in sys.modules, "
+        "'import aggregate pulled in greater_tables'"
+    )
+    result = subprocess.run([sys.executable, '-c', code],
+                            capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_import_exhibits_stays_lazy():
+    """``import aggregate.exhibits`` loads neither matplotlib nor greater_tables."""
+    code = (
+        "import sys, aggregate.exhibits; "
+        "assert 'matplotlib' not in sys.modules, "
+        "'aggregate.exhibits pulled in matplotlib'; "
+        "assert 'greater_tables' not in sys.modules, "
+        "'aggregate.exhibits pulled in greater_tables'"
     )
     result = subprocess.run([sys.executable, '-c', code],
                             capture_output=True, text=True)

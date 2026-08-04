@@ -41,6 +41,10 @@ from ._bivariate_massive import (plot_bivariate_massive,
 from ._fourier import (plot_fourier, plot_fourier_wraps, plot_fourier_simpson,
                        plot_fourier1d)
 
+# The generic ChartDoc renderer (chart IR realization; dev/plan-chart-ir.md).
+# plots may import charts, never the reverse.
+from ._chartdoc import plot_chartdoc
+
 __all__ = [
     # Layer 0
     'use', 'context', 'rc_params', 'make_mosaic', 'make_grid',
@@ -56,4 +60,6 @@ __all__ = [
     'plot_bivariate_massive', 'plot_bivariate_massive_slice',
     'plot_fourier', 'plot_fourier_wraps', 'plot_fourier_simpson',
     'plot_fourier1d',
+    # ChartDoc renderer
+    'plot_chartdoc',
 ]

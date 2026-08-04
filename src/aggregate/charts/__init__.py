@@ -101,3 +101,10 @@ def _emitter_base(name):
             f'{type(obj).__name__}')
     emit.__name__ = f'chart_{name}'
     return emit
+
+
+# Emitter modules populate the registry at import (each guards its own
+# imports; none may touch matplotlib).
+from ._emit_bivariate import chart_joint_surface  # noqa: E402
+
+__all__.append('chart_joint_surface')

@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.0.0a199
+
+**[Chart-IR] pass three opens, [Chart-Surface-Pilot], library side.** The
+first emitter and the generic renderer, end to end on the chart that forces
+the IR to be designed from semantics rather than matplotlib's vocabulary.
+
+`charts/_emit_bivariate.py`: `chart_joint_surface(bv, display_log2=None)`
+pulls the joint matrix off a `BivariateAggregate`, block-sums it to the
+display grid inside the emitter (the app's `surfaceGrid` mass-preserving
+reduction, migrated: fixed prefix blocks, short final block, non-finite as
+zero, clamped right-edge labels per inventory judgment call J3; verified in
+tests against a transliteration of the surface.js loop), labels the axes
+from the resolved component labels (ending the app's `axisNames` stats_df
+hack), and returns one 'surface' panel with z linear and
+`meta['z_log_ok'] = True` declaring the log-height toggle meaningful.
+Registered in the `CHARTS` registry with an in-memory-density predicate, so
+`available_charts(bv)` now answers `['joint_surface']` (the massive
+disk-backed pyramid stays bespoke). Values are display-cell masses; the sum
+of the emitted grid equals the joint's mass to 1e-10 in the end-to-end test.
+
+`plots/_chartdoc.py`: `plot_chartdoc(doc, ax=None, strict=False,
+log_z=False)`, the one generic mpl renderer, inside the mpl boundary,
+establishing the capability-declaration pattern: matplotlib has no faithful
+3-D surface, so a 'surface' panel renders as its honest 2-D reading (a
+`pcolormesh` projection with a contour overlay) and the title is stamped
+"(projection)"; `strict=True` raises `ChartCapabilityError` instead;
+'heatmap' renders natively; unrealized kinds refuse loudly. Renderer-side
+choices only (the sequential white-to-house-primary ramp, the colorbar the
+massive heatmap never had, figure sizing); `log_z` is honored only when the
+document declares `z_log_ok`, with the app's floor-not-holes rule (one
+decade under the smallest mass present). Exported as
+`aggregate.plots.plot_chartdoc`.
+
+Tests: `tests/test_chart_surface_pilot.py` (reduction equivalence to the
+app algorithm on an awkward grid with a NaN cell, mass conservation,
+passthrough, document shape and orientation, byte determinism, registry
+dispatch, projection stamp, strict refusal). The app side of the pilot (the
+`/chart/joint_surface` route, the generic `chartdoc-to-echarts.js` adapter,
+and the surface.js reduction deletion) follows as one aggregate_api commit.
+
 ## 1.0.0a198
 
 **[Chart-IR] pass two, [Chart-Schema].** Chart IR schema v1: new

@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.0a197
+
+**[Chart-IR] pass one, [Chart-Inventory].** `dev/chart-inventory.md`: one row
+per drawing across the 8 app charts, all 20 `plots/` layer-2 compositors,
+`pedagogy.py` (with `plot_twelve` broken out per panel, twelve rows), and the
+`ft.py` illustrations, each split into semantic columns (data inputs, panels
+and shared axes, scales, reference marks, window logic, series naming) and the
+incidental column that stays renderer-side. Compiled from the app's
+`twoPanelData` / `surfaceGrid` / serializer sources and the compositor bodies,
+with anchors throughout. Six judgment calls are collected for author review
+with a recommendation each: the twin return-period axis (recommend IR, as an
+axis-level reciprocal pairing), reference-line toggles (marks in IR,
+visibility renderer-side), the surface display-grid label convention
+(right-edge, matching the app; the center-vs-edge divergence from the server's
+`bin_density` recorded for later reconciliation), the surface default camera
+(renderer override dict, angle preserved), one log floor (1e-15), and band
+series (a `y2` field). The plan's review gate stands: the semantic vs
+incidental split awaits author sign off; anything vetoed is a doc edit plus,
+where drafted into the schema, a field removal before emitters multiply.
+
+**Housekeeping.** `dev/plan-chart-ir.md` (approved 2026-08-04) is committed
+alongside its first executed pass.
+
 ## 1.0.0a196
 
 **[Reference-Chapter-Audit]** The API reference chapter audited against the live

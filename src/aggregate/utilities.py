@@ -28,6 +28,7 @@ __all__ = [
     'nice_multiple',
     'qd', 'mv',
     'oep',
+    'balanced_window',
     'kaplan_meier', 'kaplan_meier_np',
     'agg_help', 'explain_validation', 'introspect',
     'silence_warnings',
@@ -397,7 +398,7 @@ def mv(x, y=None):
 def balanced_window(ser, p, bs=None):
     """Equal-tail window ``[q(p/2), q(1 - p/2)]`` of a realized pmf.
 
-    The *post-calc* analogue of :func:`aggregate.distributions.estimate_agg_window`:
+    The *post-calc* analogue of :func:`aggregate._bucket_window.estimate_agg_window`:
     where that places a window from method-of-moments fits *before* the FFT (a
     guess), this measures the window directly from an already-computed marginal
     pmf. A privileged consumer -- a bivariate aggregate, which runs its inner

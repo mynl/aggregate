@@ -25,13 +25,13 @@ spliced forms. :class:`Aggregate` combines a :class:`Frequency` and one or more
 Where the code lives
 --------------------
 
-Since 1.0.0a90–a95 the former monolith is split behind the façade:
+Since 1.0.0a90 to a95 the former monolith is split behind the façade:
 
 - :mod:`aggregate._frequency`, :mod:`aggregate._severity`, :mod:`aggregate._aggregate`
-  — the ``Frequency`` / ``Severity`` / ``Aggregate`` classes (kind subclasses use
-  the ``Base<Kind>`` registry dispatch);
-- :mod:`aggregate._fits` — the method-of-moments severity fits (``lognorm_fit``,
-  ``sln_fit``, ``sgamma_fit``, …) re-exported here;
+  hold the ``Frequency`` / ``Severity`` / ``Aggregate`` classes (kind subclasses
+  use the ``Base<Kind>`` registry dispatch);
+- :mod:`aggregate._fits` holds the method-of-moments severity fits
+  (``lognorm_fit``, ``sln_fit``, ``sgamma_fit``, …) re-exported here;
 - the **concern modules** hold the orchestration that used to sit on
   ``Aggregate``: reinsurance (:mod:`aggregate._reinsurance`), bucket/window
   sizing (:mod:`aggregate._bucket_window`), validation
@@ -39,6 +39,9 @@ Since 1.0.0a90–a95 the former monolith is split behind the façade:
   (:mod:`aggregate._pricing`), and the FFT convolution kernel
   (:mod:`aggregate._aggregate_compute`). The ``Aggregate`` methods are thin
   delegators to these. See :doc:`3_x_Internal_Architecture`.
+
+:class:`~aggregate.PnL` is re-exported through this façade for historical
+reasons; it is documented on its own :doc:`Profit and Loss <3_x_PnL>` page.
 
 .. currentmodule:: aggregate.distributions
 
@@ -77,4 +80,4 @@ Severity fits and approximations
 --------------------------------
 
 .. automodule:: aggregate.distributions
-   :exclude-members: Frequency, Severity, Aggregate
+   :exclude-members: Frequency, Severity, Aggregate, PnL

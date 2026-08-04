@@ -215,7 +215,12 @@
   splice examples.
 - **[API-Docstring-Coverage]** — every public function/class carries a NumPy-style
   docstring that renders in the API reference. The doc side of
-  `[Docstring-Sweep-NumPy]`.
+  `[Docstring-Sweep-NumPy]`. **Page coverage is done** as of a196
+  (`[Reference-Chapter-Audit]`): every public module now has a home in
+  `docs/3_Reference.rst`, every autodoc target and cross-reference resolves, and
+  the `autosummary` lists match each module's `__all__`. What remains here is
+  docstring *quality*, not missing pages. Re-run the three checks after any
+  public surface change.
 - **[Docstring-Sweep-NumPy]** (#18) — Sphinx `:param:` → NumPy style in
   `iman_conover.py` / `moments.py` (and pockets elsewhere); public surface first.
 

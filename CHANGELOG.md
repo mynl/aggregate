@@ -1,5 +1,74 @@
 # Changelog
 
+## 1.0.0a196
+
+**[Reference-Chapter-Audit]** The API reference chapter audited against the live
+package. Three checks were run over `docs/3_Reference.rst` and its leaf pages: every
+autodoc target resolved, every narrative cross-reference resolved, and the
+`autosummary` lists were reconciled against each module's `__all__`. Autodoc
+targets went from 128 to 153.
+
+### `aggregate.balanced_window` is now exported
+
+`balanced_window` was defined in `utilities.py` but missing from its `__all__`.
+Autodoc honours `__all__`, so the function was never documented, and the seven
+places that cite it as `` :func:`~aggregate.utilities.balanced_window` `` (in
+`_aggregate.py`, `bivariate.py`, `config.py`, and the reference chapter itself)
+were all dead links. It is now in `__all__`, so `aggregate.balanced_window`
+joins the top-level surface and those references resolve.
+
+The same docstring pointed at `aggregate.distributions.estimate_agg_window`,
+which has lived in `aggregate._bucket_window` since the a90 to a95 split. Path
+corrected.
+
+### `PnL` gets a public page
+
+`PnL` is one of the five `FIRST_CLASS_CLASSES` and is re-exported at the top
+level, but its only autodoc lived on the Internal Architecture page, which the
+chapter introduces as documenting things that are *not* part of the supported
+API. It was also being rendered a second time under the Distribution page's
+"Severity fits and approximations" heading, because `distributions.__all__`
+re-exports it.
+
+New page `3_reference/3_x_PnL.rst`, sitting after Portfolio: the `pnl` / `xpnl`
+faces, how to read the card and the sheet (marginal percentiles versus the `κ`
+scenario ladder), and the `PnL` / `Leg` / `Group` / `stack_marginal_pnls`
+surface. `aggregate._pnl` is documented there instead of on Internal
+Architecture, which keeps `_pnl_builders` as the internal half. The Distribution
+page excludes `PnL` and points at the new page.
+
+### Newly documented
+
+- **`aggregate.contract_terms`**, previously absent from the chapter entirely:
+  the `ContractTerms` taxonomy and its six single-leg features (retro, swing,
+  slide, profit commission, corridor, and the two-map `ReinstatementTerms`).
+  Documented on the new P&L page, since a contract term fills one P&L leg.
+- **`aggregate.decl_pygments.AggLexer`**, reached at the top level through the
+  star import but undocumented. Now a "Syntax highlighting" section on the
+  Parser page.
+- **`aggregate.parser.INHERIT_PREMIUM`**, the `inherit premium` sentinel: in
+  `parser.__all__`, but the Parser page has no `automodule`, so nothing rendered
+  it. Now an explicit `autodata`.
+- **`aggregate.utilities.explain_validation`**, which the Internal Architecture
+  page promises is "documented on the Utilities page". It was, by `automodule`,
+  but was missing from the curated list a reader scans after following that
+  pointer.
+- **`aggregate.tail`**: the `autosummary` listed 12 of 20 exported names. The
+  eight missing (`TailClasses`, `TailInfo`, `TailRow`, `tail_class_label`,
+  `thickness_label`, `occ_net_severity_row`, `describe_rows`,
+  `CONCENTRATION_CV`) are added. The two underscore-private bounded-support
+  tables are exported and cited by `Aggregate.bounded` / `Severity.bounded`, but
+  autodoc skips private names even when listed in `__all__`, so the page now
+  names them under `:private-members:`.
+
+### Housekeeping
+
+`BivariateAggregate`'s first-class status is stated on the Auxiliary page, along
+with the reason it stays a submodule import. `aggregate.style` remains
+undocumented on purpose: it is a backward-compatibility shim over
+`aggregate.plots`. Dash-as-punctuation cleared from all nine leaf pages and the
+chapter index.
+
 ## 1.0.0a195
 
 **[Sharpen-Grid-Probe]** A grid that loses mass off its top end is disqualified,

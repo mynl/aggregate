@@ -13,11 +13,11 @@ Where the code lives
 The joint-distribution machinery is split by **how the joint law is built**
 (Plan P4); the ``Portfolio`` methods are thin delegators:
 
-- :mod:`aggregate._portfolio_density` — the density-based (independence) path:
+- :mod:`aggregate._portfolio_density`, the density-based (independence) path:
   the ``add_exa`` / ``exeqa`` independent-sum kernel;
-- :mod:`aggregate._portfolio_sample` — the sample-based (dependence) path:
+- :mod:`aggregate._portfolio_sample`, the sample-based (dependence) path:
   ``sample`` / ``add_exa_sample`` and the comonotonic / copula machinery;
-- :mod:`aggregate._portfolio_common` — the FFT-vs-sample-agnostic exeqa
+- :mod:`aggregate._portfolio_common`, the FFT-vs-sample-agnostic exeqa
   numerics shared by both (capital allocation, Bodoff, convex-hull helpers).
 
 Bucket/window sizing, validation, and pricing are shared with ``Aggregate``

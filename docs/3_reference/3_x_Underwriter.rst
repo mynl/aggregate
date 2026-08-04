@@ -9,7 +9,7 @@ corresponding :class:`~aggregate.Aggregate` or :class:`~aggregate.Portfolio`
 objects.
 
 A **recipe** is one entry, whole: its kind and name, its parsed spec, the DecL
-source it came from, where it was read from, and — once it has been built — the
+source it came from, where it was read from, and, once it has been built, the
 object. It also carries the entry's own documentation, taken from its DecL
 trailer: a one-line ``note{...}``, ``tags{...}`` for grouping, and, for the
 cookbook-worthy few, a ``doc{{{...}}}`` holding a Problem / Solution /

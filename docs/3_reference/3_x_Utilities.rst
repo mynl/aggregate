@@ -34,11 +34,11 @@ Utilities
 ---------
 
 :mod:`aggregate.utilities` holds the FFT helpers (``ft`` / ``ift``), the
-bucket-rounding rule (``round_bucket``), the noise / display helpers
+bucket-rounding rule (``round_bucket``), the noise and display helpers
 (``remove_fuzz``, ``qd``, ``mv``), the occurrence exceeding probability curve
-(``oep``), Kaplan–Meier estimators, and small shared helpers such as
-``value_type_role`` (the loss/payoff role resolver, relocated here in 1.0.0a95
-so the core and the bucket sizer can share it).
+(``oep``), the equal-tail window measured off a realized pmf
+(``balanced_window``), the shared validation formatter (``explain_validation``),
+and Kaplan-Meier estimators.
 
 .. currentmodule:: aggregate.utilities
 
@@ -57,6 +57,7 @@ so the core and the bucket sizer can share it).
    kaplan_meier
    kaplan_meier_np
    agg_help
+   explain_validation
    introspect
    silence_warnings
 

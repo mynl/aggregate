@@ -4,9 +4,9 @@ Distortion
 :class:`~aggregate.Distortion` (in :mod:`aggregate.spectral`) is the risk-measure
 engine: a distortion :math:`g` is an increasing concave function on
 :math:`[0, 1]` that re-weights the survival function to produce a coherent
-(spectral) risk measure. The standard families — TVaR, Wang, proportional
+(spectral) risk measure. The standard families (TVaR, Wang, proportional
 hazard (PH), dual, bi-TVaR, and the constant cost-of-capital (CCoC) "bent"
-distortion — are all constructed from one :class:`Distortion` class.
+distortion) are all constructed from one :class:`Distortion` class.
 
 The module also exposes the calibration and Choquet-pricing helpers that the
 :class:`~aggregate.Aggregate` / :class:`~aggregate.Portfolio` pricing methods

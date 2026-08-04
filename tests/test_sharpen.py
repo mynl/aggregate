@@ -14,7 +14,7 @@ import pytest
 
 from aggregate import build
 from aggregate._bucket_window import (SHARPEN_LOG2_FLOOR, _bucket_is_exact,
-                                      _fmt_bs)
+                                      _fmt_bs, _sharpen_deficit)
 from aggregate._validation import (SCORE_TERMS, validation_score,
                                    validation_score_terms)
 
@@ -25,6 +25,15 @@ GOOD = 'agg SH.Good 100 claims sev lognorm 100 cv 2 poisson'
 STARVED_BS, STARVED_LOG2 = 0.125, 14
 PORT = ('port SH.Port agg SH.A 50 claims sev lognorm 100 cv 2 poisson '
         'agg SH.B 20 claims sev lognorm 200 cv 1 poisson')
+# A cat XOL tower: a fine bucket scores best but loses mass off the top of the
+# grid, which is the failure a moment score cannot see. bs=1/64 at log2=16
+# scores 0.044 with a 2.1e-8 deficit; bs=1/32 scores 0.177 and is sound.
+TOWER = ('agg SH.Tower as "US Hurricane Reinsurance" 1.74 claims '
+         'sev lognorm 8.501 cv 14.624 splice [0 500] poisson')
+
+# GOOD's auto-sized grid clips ~8e-9 of its tail, so the soundness gate makes
+# it probe. CLEAN is thin enough that its grid holds everything.
+CLEAN = 'agg SH.Clean 100 claims sev gamma 100 cv 1 poisson'
 
 TERM_NAMES = {f'u_{c}_{m}' for (c, m), _ in SCORE_TERMS}
 
@@ -98,8 +107,9 @@ def test_portfolio_carries_the_score_too():
 # ----------------------------------------------------------- the probe gate
 
 def test_probe_gate_skips_a_good_grid():
-    """A grid already at or under the target is left alone and nothing is run."""
-    a = build(GOOD)
+    """A grid at or under the target AND holding all its mass is left alone."""
+    a = build(CLEAN)
+    assert _sharpen_deficit(a) < 1e-12
     bs0, log20 = a.bs, a.log2
     a.sharpen()
     assert len(a.sharpen_df) == 1
@@ -237,6 +247,81 @@ def test_limit_stop_is_surfaced_when_the_winner_sits_on_it():
         assert 'still improving' in a.sharpen_description
 
 
+# ---------------------------------------------------- the soundness gate
+
+def test_deficit_is_recorded_for_every_cell():
+    """The mass the grid failed to hold, alongside the gate and the warnings."""
+    a = build(TOWER)
+    a.sharpen(execute=False)
+    df = a.sharpen_df
+    for c in ('deficit', 'defective', 'warnings', 'warns'):
+        assert c in df.columns
+    assert df.deficit.notna().all()
+    # the gate agrees with the warning the library would raise
+    fired = df.warns.astype(str).str.contains('DefectiveDistribution')
+    assert (df.defective[fired]).all()
+
+
+def test_a_better_scoring_defective_cell_is_rejected():
+    """The tower case: 0.044 with lost mass loses to 0.177 that holds it all.
+
+    A moment score cannot see a far-tail deficit, so soundness has to be asked
+    about separately or the probe hands back a grid that warns at you and on
+    which forwards and backwards survival functions disagree.
+    """
+    a = build(TOWER)
+    a.sharpen()
+    df = a.sharpen_df
+    win = df[df.selected].iloc[0]
+    assert not win.defective
+    # something did score better, and was thrown out for being defective
+    better = df[(df.score < win.score) & np.isfinite(df.score)]
+    assert len(better) and better.defective.all()
+    assert a.bs == pytest.approx(1 / 32)
+    assert 1.0 - float(a.density_df.p_total.sum()) < 1e-12
+
+
+def test_rejection_is_surfaced_not_silent():
+    """Otherwise the frame reads as though the picker ignored its own minimum."""
+    a = build(TOWER)
+    a.sharpen()
+    assert a._sharpen_state['passed_over'] >= 1
+    assert 'rejected as defective' in a.sharpen_description
+    assert 'gate rather than a term in the score' in a.sharpen_explanation
+
+
+def test_probe_gate_does_not_wave_through_a_defective_grid():
+    """At target but losing mass is not a grid to leave alone."""
+    a = build(TOWER)
+    a.update(log2=16, bs=1 / 64)
+    assert a.validation_score <= 0.5          # the score is happy
+    assert 1.0 - float(a.density_df.p_total.sum()) > 1e-12   # the grid is not
+    a.sharpen()
+    assert a._sharpen_state['ran']
+    assert a._sharpen_state['centre_defective']
+    assert 1.0 - float(a.density_df.p_total.sum()) < 1e-12
+    assert 'loses mass off its top end' in a.sharpen_explanation
+
+
+def test_growing_log2_cures_a_deficit():
+    """Extent is the cure for lost mass, so a deficit can be a reason to grow."""
+    a = build(TOWER)
+    a.sharpen(good_enough=0.1)
+    assert a._sharpen_state['grew']
+    assert a.bs == pytest.approx(1 / 64)      # the fine bucket, now affordable
+    assert 1.0 - float(a.density_df.p_total.sum()) < 1e-12
+
+
+def test_deficit_helper_matches_the_realized_mass():
+    a = build(TOWER)
+    a.update(log2=16, bs=1 / 64)
+    assert _sharpen_deficit(a) == pytest.approx(
+        1.0 - float(a.density_df.p_total.sum()), abs=1e-15)
+    p = build(PORT)
+    assert _sharpen_deficit(p) == pytest.approx(
+        1.0 - float(p.density_df.p_total.sum()), abs=1e-15)
+
+
 # ----------------------------------------------------- the discrete guard
 
 def test_exact_bucket_is_detected():
@@ -324,7 +409,7 @@ def test_winner_is_the_best_score_that_does_not_grow_log2():
     a.sharpen(execute=False)
     df = a.sharpen_df.reset_index()
     win = df[df.selected].iloc[0]
-    free = df[(df.d_log2 <= 0) & np.isfinite(df.score)]
+    free = df[(df.d_log2 <= 0) & np.isfinite(df.score) & ~df.defective]
     assert win.d_log2 <= 0
     assert win.score == pytest.approx(free.score.min())
 
@@ -336,7 +421,7 @@ def test_a_free_grid_saving_is_taken_when_the_score_is_a_wash():
     a.sharpen(execute=False)
     df = a.sharpen_df.reset_index()
     win = df[df.selected].iloc[0]
-    tied = df[np.isfinite(df.score) & (df.d_log2 <= 0)
+    tied = df[np.isfinite(df.score) & (df.d_log2 <= 0) & ~df.defective
               & (df.score <= win.score * 1.25)]
     assert win.log2 == tied.log2.min()
 
@@ -424,8 +509,9 @@ def test_frame_and_narrative_surface():
     assert 'not been sharpened' in a.sharpen_explanation
     a.sharpen(good_enough=0, execute=False)
     cols = set(a.sharpen_df.columns)
-    for c in ('bs', 'log2', 'extent', 'x_min', 'score', 'aliasing',
-              'validation', 'warnings', 'seconds', 'selected', 'note'):
+    for c in ('bs', 'log2', 'extent', 'x_min', 'score', 'aliasing', 'deficit',
+              'defective', 'validation', 'warnings', 'warns', 'seconds',
+              'selected', 'note'):
         assert c in cols
     assert TERM_NAMES <= cols
     assert len(a.sharpen_description) > 20

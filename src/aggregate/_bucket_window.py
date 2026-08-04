@@ -1474,19 +1474,59 @@ def _note(row, text):
     row['note'] = f'{row["note"]}; {text}' if row['note'] else text
 
 
-def _pick_cell(df):
-    """Index of the best cell, thriftily: cheapest grid among the near-best.
+def _sharpen_deficit(ob):
+    """Probability mass the grid failed to hold, ``1 - sum(p)``.
 
-    Cells within :data:`SHARPEN_FALLBACK_SLACK` of the best score count as tied,
-    and ties break on ``log2`` first, so a free memory saving is taken when the
-    score is genuinely a wash, then on ``|d_bs|``, so a competitive centre wins
-    over an equally good move and the grid is not churned for nothing.
-    ``None`` when every cell failed.
+    The same quantity ``update_work`` measures before raising
+    :class:`~aggregate.constants.DefectiveDistributionWarning`
+    (``_aggregate.py``, ``_portfolio.py``): mass that runs off the top of the
+    grid is dropped rather than wrapped, so the realized law sums to less than
+    one and forwards ``S = 1 - cumsum`` and backwards ``S`` differ by exactly
+    this amount.
+    """
+    if _sharpen_is_port(ob):
+        df = getattr(ob, 'density_df', None)
+        if df is None or 'p_total' not in df:
+            return np.nan
+        return 1.0 - float(np.sum(df['p_total']))
+    dens = getattr(ob, 'agg_density', None)
+    if dens is None:
+        return np.nan
+    return 1.0 - float(np.sum(dens))
+
+
+def _pick_cell(df):
+    """Index of the best cell: sound first, then thrifty, then best score.
+
+    Three preferences, outermost first.
+
+    **Sound.** A cell carrying a genuine deficit is disqualified outright while
+    any clean cell survives. This is a gate rather than a term in the score
+    because a deficit is a different kind of failure from a moment error: the
+    score's terms each divide by their own validation tolerance, a deficit has
+    no such tolerance to divide by, and its cost is qualitative, two correct
+    looking pricing routes disagreeing by exactly the lost mass. A moment score
+    cannot see it either, far tail mass being negligible for the first three
+    moments and decisive for tail pricing, so the two measures are orthogonal
+    and the gate is the only thing that catches it. The threshold is the
+    library's own: ``VALIDATION_NOISE``, the level at which
+    ``DefectiveDistributionWarning`` fires, so "rejected here" and "warns when
+    you use it" are the same set by construction.
+
+    **Thrifty.** Cells within :data:`SHARPEN_FALLBACK_SLACK` of the best score
+    count as tied, and ties break on ``log2`` first, so a free memory saving is
+    taken when the score is genuinely a wash, then on ``|d_bs|``, so a
+    competitive centre wins over an equally good move and the grid is not
+    churned for nothing.
+
+    Returns ``None`` when every cell failed.
     """
     finite = df[np.isfinite(df['score'])]
     if not len(finite):
         return None
-    near = finite[finite['score'] <= finite['score'].min() * SHARPEN_FALLBACK_SLACK]
+    clean = finite[~finite['defective'].astype(bool)]
+    pool = clean if len(clean) else finite
+    near = pool[pool['score'] <= pool['score'].min() * SHARPEN_FALLBACK_SLACK]
     near = near.assign(_move=near['d_bs'].abs())
     return near.sort_values(['log2', '_move', 'score']).index[0]
 
@@ -1596,9 +1636,10 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
 
     rows = []
 
-    def _record(d_bs, d_log2, seconds, note='', n_warn=0):
+    def _record(d_bs, d_log2, seconds, note='', caught=()):
         terms = _validation.validation_score_terms(ob)
         xs = getattr(ob, 'xs', None)
+        deficit = _sharpen_deficit(ob)
         row = {'d_bs': d_bs, 'd_log2': d_log2, 'bs': float(ob.bs),
                'log2': int(ob.log2),
                'extent': float(ob.bs) * (1 << int(ob.log2)),
@@ -1606,8 +1647,15 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
                'score': _validation.combine_score_terms(terms, power)}
         row.update(terms)
         row['aliasing'] = _sharpen_aliasing(ob)
+        row['deficit'] = deficit
+        # The gate: the library's own threshold, so a cell rejected here is
+        # exactly one that would warn when you used it.
+        row['defective'] = bool(np.isfinite(deficit)
+                                and deficit > _validation.VALIDATION_NOISE)
         row['validation'] = ob.validation_description
-        row['warnings'] = n_warn
+        row['warnings'] = len(caught)
+        row['warns'] = ','.join(sorted({type(w.message).__name__
+                                        for w in caught}))
         row['seconds'] = seconds
         row['selected'] = False
         row['note'] = note
@@ -1619,7 +1667,8 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
                'extent': bs_c * (1 << log2_c), 'x_min': np.nan, 'score': np.nan}
         row.update({f'u_{k[0]}_{k[1]}': np.nan
                     for k, _ in _validation.SCORE_TERMS})
-        row.update({'aliasing': np.nan, 'validation': '', 'warnings': 0,
+        row.update({'aliasing': np.nan, 'deficit': np.nan, 'defective': False,
+                    'validation': '', 'warnings': 0, 'warns': '',
                     'seconds': seconds, 'selected': False, 'note': note})
         rows.append(row)
         return np.nan
@@ -1632,7 +1681,7 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always')
                 _sharpen_update(ob, bs_c, log2_c, locked, final=False)
-            return _record(k, j, time.perf_counter() - t0, n_warn=len(caught))
+            return _record(k, j, time.perf_counter() - t0, caught=caught)
         except Exception as e:          # noqa: BLE001 a cell may legitimately blow up
             logger.info('sharpen: cell (bs x %s, log2 %s) failed: %s',
                         2.0 ** k, log2_c, e)
@@ -1673,16 +1722,22 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
 
     # Probe gate. A grid that already clears the target is left alone and nothing
     # is run. good_enough=0 never clears, which is how a probe is forced.
-    if np.isfinite(centre_score) and centre_score <= good_enough:
+    # Soundness is part of the gate: a grid whose moments are fine but whose mass
+    # runs off the end is not a grid to wave through, and no moment score will
+    # ever say so, so the deficit has to be asked about separately.
+    centre_defective = bool(rows[0]['defective'])
+    if (np.isfinite(centre_score) and centre_score <= good_enough
+            and not centre_defective):
         rows[0]['selected'] = True
-        rows[0]['note'] = ('centre (current grid); at or under target, '
-                           'probe not run')
+        rows[0]['note'] = ('centre (current grid); at or under target and '
+                           'sound, probe not run')
         ob._sharpen_df = _sharpen_frame(rows)
         ob._sharpen_state = {'ran': False, 'moved': False, 'power': power,
                              'good_enough': good_enough, 'execute': execute,
                              'centre_score': centre_score, 'bs0': bs0,
                              'log20': log20, 'bs_exact': bs_exact,
-                             'lattice': lattice, 'grew': False}
+                             'lattice': lattice, 'grew': False,
+                             'centre_defective': False, 'passed_over': 0}
         return ob
 
     # Thrifty rows first: the current grid size and, when there is room below,
@@ -1698,11 +1753,11 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
         pick = 0
         reason = 'every probed cell failed, so the grid was left alone'
     elif df.loc[thrifty, 'score'] <= good_enough:
-        # The rule: best score among cells that do not grow log2. Reached the
-        # target without growing, so the expensive row is never even run.
+        # The rule: best sound score among cells that do not grow log2. Reached
+        # the target without growing, so the expensive row is never even run.
         pick = thrifty
-        reason = ('best score at the current grid size or smaller, and it meets '
-                  'the target, so log2 was not grown')
+        reason = ('best sound score at the current grid size or smaller, and it '
+                  'meets the target, so log2 was not grown')
     elif log20 >= log2_cap:
         pick = thrifty
         reason = (f'nothing at the current grid size or smaller meets the '
@@ -1714,11 +1769,12 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
         df = pd.DataFrame(rows)
         growth = df[df['d_log2'] == 1]
         ok_growth = growth[growth['score'] <= good_enough]
+        ok_growth = ok_growth[~ok_growth['defective'].astype(bool)]
         if len(ok_growth):
             pick = _pick_cell(ok_growth)
             grew = True
-            reason = ('nothing at the current grid size or smaller meets the '
-                      'target, so log2 grew by one to reach it')
+            reason = ('nothing sound at the current grid size or smaller meets '
+                      'the target, so log2 grew by one to reach it')
         else:
             # Nothing anywhere reaches the target. Take the best cell overall,
             # still thrift-ordered so growth must be meaningfully better to win.
@@ -1732,6 +1788,10 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
                       'step was taken; re-run to continue')
     df.loc[pick, 'selected'] = True
     moved = bool(df.loc[pick, 'd_bs'] or df.loc[pick, 'd_log2'])
+    # Better-scoring cells the soundness gate threw out. Without this the frame
+    # reads as though the picker ignored its own minimum.
+    passed_over = int(((df['score'] < df.loc[pick, 'score'])
+                       & df['defective'].astype(bool)).sum())
 
     # Final update: the winner when executing, otherwise back to the centre.
     # x_min is pinned on the restore so a signed grid returns on its own origin.
@@ -1752,7 +1812,9 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
                          'power': power, 'good_enough': good_enough,
                          'execute': execute, 'centre_score': centre_score,
                          'bs0': bs0, 'log20': log20, 'reason': reason,
-                         'bs_exact': bs_exact, 'lattice': lattice, 'grew': grew}
+                         'bs_exact': bs_exact, 'lattice': lattice, 'grew': grew,
+                         'centre_defective': centre_defective,
+                         'passed_over': passed_over}
     return ob
 
 
@@ -1832,6 +1894,10 @@ def sharpen_describe(ob) -> str:
             f'{_sharpen_fmt(win["score"])} vs '
             f'{_sharpen_fmt(st["centre_score"])} at the centre, target '
             f'{target:g}.')
+    if st.get('passed_over'):
+        n = st['passed_over']
+        head += (f' {n} better-scoring cell{"s" if n > 1 else ""} rejected as '
+                 f'defective (mass off the end of the grid).')
     if 'bs_limit' in str(win['note']):
         head += ' The winner sits on the bs_limit and was still improving.'
     if win['bs'] == st['bs0'] and int(win['log2']) == st['log20']:
@@ -1862,8 +1928,9 @@ def sharpen_explain(ob) -> str:
     if not st['ran']:
         out.append(
             f'The current grid scores {_sharpen_fmt(st["centre_score"])}, at or '
-            'under the target, so no probe was run and nothing was changed. '
-            'Pass good_enough=0 to force the probe regardless.')
+            'under the target, and holds all of its mass, so no probe was run '
+            'and nothing was changed. Pass good_enough=0 to force the probe '
+            'regardless.')
         return ' '.join(out)
     win = df[df['selected']].iloc[0]
     if st['bs_exact']:
@@ -1894,8 +1961,32 @@ def sharpen_explain(ob) -> str:
             'aggregate mean error runs far above the severity error and the fix '
             'is a wider grid, or resolution-limited, where the severity moments '
             'themselves are poorly reproduced and the fix is a finer bucket.')
+    if st.get('centre_defective'):
+        out.append(
+            'The probe ran even though the score was at or under the target, '
+            'because the current grid loses mass off its top end: '
+            f'{_sharpen_fmt(df.loc[(0, 0), "deficit"])} of the distribution is '
+            'missing. That is not something the score can report, since far '
+            'tail mass barely moves the first three moments, and it is not '
+            'cosmetic either: forwards and backwards survival functions differ '
+            'by exactly the lost mass, so two correct-looking pricing routes '
+            'disagree.')
+    if st.get('passed_over'):
+        out.append(
+            f'{st["passed_over"]} cell(s) scored better than the winner and were '
+            'rejected anyway, for carrying a genuine deficit. Soundness is a '
+            'gate rather than a term in the score: every score term divides by '
+            'its own validation tolerance and a deficit has none to divide by, '
+            'and the cost of one is qualitative rather than a matter of degree. '
+            'The threshold is the one the library already uses, the level at '
+            'which a defective-distribution warning fires, so a cell rejected '
+            'here is '
+            'exactly one that would warn when you used it. The cure for a '
+            'deficit is extent, which is why it can also be a reason to grow '
+            'log2.')
     out.append(
-        'Selection takes the best score among the cells that do not grow log2, '
+        'Selection takes the best sound score among the cells that do not grow '
+        'log2, '
         'the principle being that a probe should never make you pay more than '
         'you already are. A smaller log2 is a bonus rather than a goal, so it '
         'wins only when the score is a wash. log2 grows by one only when nothing '

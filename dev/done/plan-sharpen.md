@@ -343,3 +343,54 @@ Two bugs found while executing, both fixed:
 variant was considered and dropped (author: "I never use pandas inplace, let's
 stick with `a = a.sharpen()`").
 
+## Third round: the soundness gate, shipped 1.0.0a195
+
+The author brought a cat XOL tower that `a194` sharpened to `bs = 1/64`, a grid
+that scores 0.044 and loses 2.1e-08 of its mass off the top. `bs = 1/32` scores
+0.177 and holds all of it.
+
+**The moment score is structurally blind to this.** At the winning cell every
+term is well inside tolerance (`u_agg_mean` 0.077, 13x inside), because the lost
+mass sits at ~1024 and shifts a mean of 10.75 by ~2e-06 relative. The same
+deficit is 2.1e04 times the noise floor. Far-tail mass is negligible for the
+first three moments and decisive for tail pricing, so the two measures are
+orthogonal, not correlated.
+
+This corrects the original plan (section 2), which recorded the deficit as
+redundant on the grounds that "mass off the end either wraps or is dropped, so
+the agg mean error already carries it". True in direction, wrong in magnitude,
+and the magnitude is the whole question. The author then dropped the column as
+hard to interpret; both calls were wrong and the tower settles it.
+
+**Gate, not penalty.** The author asked for a penalty; a disqualifier shipped
+instead, agreed before execution. Three reasons: every score term divides by its
+own validation tolerance and a deficit has none to divide by; the only defensible
+divisor (`VALIDATION_NOISE`) yields 2.1e04, which swamps the norm, so a penalty
+degenerates into a gate carrying a meaningless number; and the cost is
+qualitative, forwards and backwards `S` differing by exactly the lost mass, so
+two correct-looking pricing routes disagree.
+
+The threshold is the library's existing one, the level at which
+`DefectiveDistributionWarning` fires, so a cell rejected by the gate is exactly
+one that would warn in use. No new constant.
+
+**Placement.** Outermost preference inside `_pick_cell`: prefer clean, fall back
+to all only when nothing is clean. This composes with everything already there,
+and gives a property worth having: since the affordability test now runs over
+clean cells, a deficit becomes a reason to grow `log2`, which is precisely its
+cure. On the tower at `good_enough=0.1` that yields `bs = 1/64` at `log2 17`,
+clean.
+
+**Bug this exposed.** The probe gate skipped the probe whenever the centre scored
+at or under target, so a good-moments/lost-mass grid was waved through untouched.
+Now "at target **and** sound". This fires more often than expected: an ordinary
+`100 claims sev lognorm 100 cv 2 poisson` clips ~8e-09 on its auto-sized grid, so
+heavy-tailed books are now probed by default rather than skipped. That is the
+intended behaviour, not a regression, and it changed a test premise rather than a
+test result.
+
+**Frame.** `deficit`, `defective` and `warns` added; the `warnings` count kept at
+the author's request. `sharpen_description` reports how many better-scoring cells
+the gate rejected and `sharpen_explanation` says why, since a frame whose winner
+is not its minimum otherwise reads as a bug.
+

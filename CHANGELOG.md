@@ -1,5 +1,88 @@
 # Changelog
 
+## 1.0.0a195
+
+**[Sharpen-Grid-Probe]** A grid that loses mass off its top end is disqualified,
+however well it scores. `sharpen_df` records the deficit for every cell.
+
+### The problem
+
+```
+agg CatXOLTower as "US Hurricane Reinsurance"
+    1.74 claims
+    sev lognorm 8.501 cv 14.624 splice [0 500]
+    poisson
+```
+
+`a194` sharpened this to `bs = 1/64`, which scored `0.044` and **lost 2.1e-08 of
+its mass off the top of the grid**. `bs = 1/32` scored `0.177` and held all of
+it. The probe took the better score.
+
+A moment score cannot see this and never will. At `bs = 1/64` the six terms are
+
+```
+u_sev_mean 0.0759   u_sev_cv 0.0081   u_sev_skew 0.0001
+u_agg_mean 0.0773   u_agg_cv 0.0063   u_agg_skew 0.0014     score 0.0444
+```
+
+`u_agg_mean` sits 13x *inside* tolerance: the lost mass is out at ~1024 and moves
+a mean of 10.75 by about 2e-06 in relative terms. Meanwhile the deficit is 2.1e04
+times the noise floor, and it is not cosmetic. Forwards `S = 1 - cumsum` and
+backwards `S` differ by exactly the missing mass, so two correct-looking pricing
+routes disagree, on a cat tower, in the tail, which is the whole point of the
+object.
+
+### The fix: a gate, not a penalty
+
+A cell carrying a genuine deficit is **disqualified while any clean cell
+survives**. Not a term in the score, for three reasons: every score term divides
+by its own validation tolerance and a deficit has none to divide by; the only
+defensible divisor gives `2.1e04`, which would swamp the norm and so is a gate
+wearing a number that means nothing; and the cost is qualitative rather than a
+matter of degree.
+
+The threshold is the one the library already uses, the level at which
+`DefectiveDistributionWarning` fires, so **a cell rejected here is exactly one
+that would warn when you used it**. No new constant.
+
+```
+Sharpen: 11 cells in 0.30s, best score 0.177 vs 2.12 at the centre, target 0.5.
+1 better-scoring cell rejected as defective (mass off the end of the grid).
+Moved: bs 1/8 to 1/32, at log2 16.
+```
+
+Soundness sits outside the existing thrift ordering, so it composes: because the
+"does an affordable cell meet the target?" test now runs over *clean* cells, **a
+deficit becomes a reason to grow `log2`**, which is exactly its cure. Tighten the
+target on the tower and you get the fine bucket on a grid wide enough to hold it:
+
+```python
+a.sharpen(good_enough=0.1)      # bs 1/64 at log2 17, deficit 9e-13
+```
+
+### The probe gate was waving defective grids through
+
+`sharpen` skipped the probe entirely whenever the current grid scored at or under
+target. A grid with good moments and lost mass, which is exactly the `bs = 1/64`
+cell above, was therefore left alone. The gate is now **at target *and* sound**.
+
+This bites more often than it sounds. An ordinary `100 claims sev lognorm 100
+cv 2 poisson` clips ~8e-09 of its tail on the auto-sized grid, so it is no longer
+waved through; `sharpen` probes it and finds a grid that holds everything.
+
+### Frame columns
+
+Three new, none removed:
+
+* **`deficit`** — `1 - sum(p)`, the mass the grid failed to hold.
+* **`defective`** — the gate the picker applied, so its decision is visible
+  rather than re-derived from a threshold.
+* **`warns`** — the warning class names that fired, comma-joined.
+
+`warnings` (the count) stays. `sharpen_description` reports how many
+better-scoring cells the gate threw out, and `sharpen_explanation` says why,
+since otherwise the frame reads as though the picker ignored its own minimum.
+
 ## 1.0.0a194
 
 **[Sharpen-Grid-Probe]** The selection rule changes, `min_gain` is retired, and

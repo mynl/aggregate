@@ -1207,7 +1207,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         Columns
         -------
-        loss : grid (also the index).
+        loss : float
+            The model grid (also the index).
         p_sev_gross, p_sev_ceded, p_sev_net : occurrence-level severity
             views. With no occurrence cover ``p_sev_ceded`` is a point mass
             at 0 and ``p_sev_net == p_sev_gross``.
@@ -2957,7 +2958,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         Discretize the severity distributions and weight.
 
-        ``sev_calc`` describes how the severity is discretize, see `Discretizing the Severity Distribution`_. The
+        ``sev_calc`` describes how the severity is discretized. The
         options are discrete=round, forward, backward or moment.
 
         ``sev_calc='continuous'`` (same as forward, kept for backwards compatibility) is used when

@@ -1596,16 +1596,19 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
 
     def plot(self, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='AB\nCD',
              **kwargs):
-        """
+        r"""
         Quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
         replaced with log density plot.
+
+        The docstring is raw so the ``'AB\nCD'`` default below stays literal
+        text; unescaped it becomes a real newline and breaks the field list.
 
         :param n: number of points to plot.
         :param axd: axis dictionary, if None, create new figure. Must have keys 'A', 'B', 'C', 'D'.
         :param figsize: (width, height) in inches.
         :param layout: the subplot_mosaic layout of the figure. Default is 'AB\nCD'.
-        :param kwargs: Lee-panel options forwarded to the quantile worker --
-               notably ``quantile_x='return'`` and ``max_return_period``.
+        :param kwargs: Lee-panel options forwarded to the quantile worker,
+                       notably ``quantile_x='return'`` and ``max_return_period``.
         :return:
         """
         from .plots import plot_severity

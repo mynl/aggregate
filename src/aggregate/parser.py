@@ -190,32 +190,41 @@ class UnderwritingLexer:
 
         The preprocessor performs eight steps:
 
-        0. ``doc{{{ ... }}}`` bodies are lifted out and replaced by URL-safe
-           base64, whose alphabet is inert through every later step. Done
-           **first**, so a doc body may contain ``#`` headings, blank lines,
-           fenced code and braces -- none of which would survive steps 1-6.
-           The closing fence must be alone on its line.
-        0b. ``note{...}`` / ``tags{...}` / ``hints{...}`` bodies are lifted the
-           same way, behind an indexed placeholder, and restored in step 7.
-           They are free text too, so a ``#``, a ``//`` or a ``[`` in a note is
-           prose, not DecL. Done **after** the doc lift, so a ``note{...}``
-           written inside a doc body is already base64 and is left alone.
-        1. Full-line comments (optional indent, then ``#`` / ``//``) are removed
-           **entirely, including their newline**, so they leave no blank-line
-           ghost and a comment inside a multi-line statement folds away. Done
-           first so a stray bracket in a comment can never unbalance step 3.
-        2. Trailing (inline) comments are stripped to end of line, keeping the
-           line's own newline.
-        3. Newlines inside ``[ ]`` (e.g., from formatted numpy arrays) are
-           collapsed to spaces, so a vector never reads as a paragraph break.
-        4. A ``;`` at end of line is turned into a blank-line break. Only a
-           line-final ``;`` fires, so the ``;`` inside ``hints{key=value;}`` /
-           ``note{...}`` (which always end a line with ``}``) is untouched.
-        5. The text is split into paragraphs on runs of blank lines.
-        6. Each paragraph is flattened: its newlines, indentation, and repeated
-           spaces collapse to single spaces. Empty paragraphs are dropped.
-        7. The trailer bodies lifted in step 0b are put back verbatim, so what
-           reaches the lexer is exactly what was written.
+        **Step 0**
+            ``doc{{{ ... }}}`` bodies are lifted out and replaced by URL-safe
+            base64, whose alphabet is inert through every later step. Done
+            **first**, so a doc body may contain ``#`` headings, blank lines,
+            fenced code and braces, none of which would survive steps 1 to 6.
+            The closing fence must be alone on its line.
+        **Step 0b**
+            ``note{...}`` / ``tags{...}`` / ``hints{...}`` bodies are lifted the
+            same way, behind an indexed placeholder, and restored in step 7.
+            They are free text too, so a ``#``, a ``//`` or a ``[`` in a note is
+            prose, not DecL. Done **after** the doc lift, so a ``note{...}``
+            written inside a doc body is already base64 and is left alone.
+        **Step 1**
+            Full-line comments (optional indent, then ``#`` / ``//``) are removed
+            **entirely, including their newline**, so they leave no blank-line
+            ghost and a comment inside a multi-line statement folds away. Done
+            first so a stray bracket in a comment can never unbalance step 3.
+        **Step 2**
+            Trailing (inline) comments are stripped to end of line, keeping the
+            line's own newline.
+        **Step 3**
+            Newlines inside ``[ ]`` (e.g., from formatted numpy arrays) are
+            collapsed to spaces, so a vector never reads as a paragraph break.
+        **Step 4**
+            A ``;`` at end of line is turned into a blank-line break. Only a
+            line-final ``;`` fires, so the ``;`` inside ``hints{key=value;}`` /
+            ``note{...}`` (which always end a line with ``}``) is untouched.
+        **Step 5**
+            The text is split into paragraphs on runs of blank lines.
+        **Step 6**
+            Each paragraph is flattened: its newlines, indentation, and repeated
+            spaces collapse to single spaces. Empty paragraphs are dropped.
+        **Step 7**
+            The trailer bodies lifted in step 0b are put back verbatim, so what
+            reaches the lexer is exactly what was written.
 
         Parameters
         ----------

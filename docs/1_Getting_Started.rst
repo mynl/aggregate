@@ -47,7 +47,7 @@ Help Structure
 This help is structured around **access**, **application**, **theory**, and **implementation**. There are six parts.
 
 #. Getting Started (this document).
-#. :doc:`2_Aggregate_101`, explaining how to get started with ``aggregate``.
+#. :doc:`2_Aggregate_Overview`, explaining how ``aggregate`` computes and how to steer it.
 #. :doc:`3_Reference`: all functions, classes, methods, and properties.
 #. :doc:`4_dec_Language_Reference`: syntax and grammar.
 
@@ -110,7 +110,7 @@ The only object you need to import to get started is ``build``. The quick displa
 ``build`` is a :class:`Underwriter` object. It  allows you to create all other
 objects and  includes a library of examples, called the recipe base.
 
-Using ``build`` you can create an :class:`Aggregate` object using an :doc:`DecL program <2_user_guides/2_x_dec_language>`. For example, the program::
+Using ``build`` you can create an :class:`Aggregate` object using a :doc:`DecL program <4_dec_Language_Reference>`. For example, the program::
 
     agg Eg1 dfreq [1:5] dsev [1:3]
 
@@ -157,4 +157,4 @@ Creating an object automatically stores its specification as a **recipe**, with 
     qd(build.recipes.iloc[:5, :9], line_width=73, max_colwidth=50, justify='left')
     qd(build.recipes.query('name == "Eg1"').iloc[:, :9], line_width=73, max_colwidth=50, justify='left')
 
-The :doc:`2_User_Guides` contain more details and examples.
+The :doc:`2_Aggregate_Overview` contains more details and examples.

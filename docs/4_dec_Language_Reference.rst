@@ -12,7 +12,7 @@
 
 This section describes how a DecL program is pre-processed, lexed, and parsed according to the grammar specification. It reports the results of interpreting the builtin test suite of programs.
 
-The DecL :ref:`introduction <design and purpose>` describes its design and purpose.
+The :doc:`Aggregate Overview <2_Aggregate_Overview>` describes DecL's design and purpose.
 
 Pre-Processing
 ==============

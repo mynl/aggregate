@@ -6,11 +6,10 @@ Automatic Grid Selection (``bs``, ``log2``, ``x_min``)
 
 .. note::
 
-   Draft for the technical guides (destined for
-   ``docs/5_technical_guides/``). It documents the automatic grid sizer
+   Draft. It documents the automatic grid sizer
    :meth:`aggregate.distributions.Aggregate._bs_window` as built at
-   ``1.0.0a59``. The companion page :ref:`num how agg reps a dist` covers the
-   *severity* discretization (how a single distribution is laid on a lattice);
+   ``1.0.0a59``. Severity discretization (how a single distribution is laid on
+   a lattice) is covered separately;
    this page covers the *grid* the aggregate is computed on. This document is
    kept current by **``dev/done/plan-univariate-bucket.md``** (the "1A-bucket" plan),
    which owns the tail-intelligence and reporting work flagged under

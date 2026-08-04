@@ -38,8 +38,8 @@ error, and ``freeze`` caches at cell granularity.
 One source, two consumers
 --------------------------
 The transform is deliberately thin. Prose passes through verbatim and each
-fenced python block has its fence rewritten from ```` ```python ```` to
-```` ```{python} ````. Nothing else. Because the code itself is untouched, the
+fenced python block has its info string rewritten from ``python`` to
+``{python}``. Nothing else. Because the code itself is untouched, the
 page Quarto executes and the script
 :meth:`~aggregate.recipe.Recipe.run` compiles are byte-identical, which is what
 makes "the cookbook and the test suite run the same program" true by

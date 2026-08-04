@@ -1956,8 +1956,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
 
         :param p:
-        :param kind: No longer neeed as the new method is exact (equals the old
-        tail) and about 1000x faster.
+        :param kind: No longer needed as the new method is exact (equals the old
+                     tail) and about 1000x faster.
         :return:
         """
 

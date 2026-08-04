@@ -50,17 +50,17 @@ mass-preserving scatter :meth:`Aggregate._rebucket_to_grid`
 The reporting surface is **three public objects** (plus one private helper),
 defined on ``Aggregate`` and mirrored end-to-end on ``Portfolio``:
 
-============================  =========  ====================================================
-Object                        Shape      One-line role
-============================  =========  ====================================================
-``reins_density_df``          DataFrame  all gcn densities, severity **and** aggregate, on the grid
-``reins_stats_df``            DataFrame  **per-layer** layering view (Gross / layer.k / Ceded / Net)
-``reins_summary_df``            DataFrame  per-stage **economic view** — the daily driver
-``_reins_view_stats``         DataFrame  *(private)* per-stage/view/basis EX-vs-Est moments → feeds ``reins_summary_df``
-``reinsurance_kinds()``       str        "None / Occurrence only / Aggregate only / both"
-``reinsurance_description()`` str        human sentence ("Net of 88% share of 4,000 xs 1,000…")
-``reinsurance_occ_plot()``    figure     occ log-density + aggregate quantile plot
-============================  =========  ====================================================
+=============================  =========  ====================================================
+Object                         Shape      One-line role
+=============================  =========  ====================================================
+``reins_density_df``           DataFrame  all gcn densities, severity **and** aggregate, on the grid
+``reins_stats_df``             DataFrame  **per-layer** layering view (Gross / layer.k / Ceded / Net)
+``reins_summary_df``           DataFrame  per-stage **economic view**, the daily driver
+``_reins_view_stats``          DataFrame  *(private)* per-stage/view/basis EX-vs-Est moments → feeds ``reins_summary_df``
+``reinsurance_kinds()``        str        "None / Occurrence only / Aggregate only / both"
+``reinsurance_description()``  str        human sentence ("Net of 88% share of 4,000 xs 1,000…")
+``reinsurance_occ_plot()``     figure     occ log-density + aggregate quantile plot
+=============================  =========  ====================================================
 
 Vocabulary used throughout:
 
@@ -107,16 +107,16 @@ Every reinsurance density in the library comes out of here. Given a layer list
 Returned transient frame (one row per grid bucket), columns in order:
 ``loss``, ``p_subject``, ``loss_net``, ``loss_ceded``, ``p_net``, ``p_ceded``.
 
-============  ====================================================================
-column        meaning
-============  ====================================================================
-``loss``      bucket loss ``xs[k]`` (also the index)
-``p_subject`` subject density (input to this stage)
-``loss_net``  ``netter(xs[k])`` — exact real value this bucket's loss is retained to
-``loss_ceded````ceder(xs[k])``  — exact real value this bucket's loss is ceded to
-``p_net``     net density (subject mass re-gridded through ``netter``)
-``p_ceded``   ceded density (subject mass re-gridded through ``ceder``)
-============  ====================================================================
+==============  ====================================================================
+column          meaning
+==============  ====================================================================
+``loss``        bucket loss ``xs[k]`` (also the index)
+``p_subject``   subject density (input to this stage)
+``loss_net``    ``netter(xs[k])``, exact real value this bucket's loss is retained to
+``loss_ceded``  ``ceder(xs[k])``, exact real value this bucket's loss is ceded to
+``p_net``       net density (subject mass re-gridded through ``netter``)
+``p_ceded``     ceded density (subject mass re-gridded through ``ceder``)
+==============  ====================================================================
 
 **Key identity (mass split, not per-bucket split).** ``p_net + p_ceded`` is
 **not** ``p_subject`` bucket-by-bucket — a subject loss at ``x`` sends its mass
@@ -346,15 +346,15 @@ Not a separate object, but the reinsurance progression baked into the canonical
 ``stats_df`` during ``update_work``. Beyond ``mixed`` / ``empirical`` the staged
 block writes (de-fuzzed sev/agg moments):
 
-================  ==================================================================
-column            plain meaning
-================  ==================================================================
-``gross_empirical`` subject (gross) empirical moments — what validation checks
-``after_occ``       empirical moments after the occurrence stage (pre-agg)
-``occ_impact``      ``after_occ / mixed``     (ratio: what occ did)
-``agg_impact``      ``empirical / after_occ`` (ratio: what agg did)
-``empirical``       the final, after-both-stages object
-================  ==================================================================
+===================  ==================================================================
+column               plain meaning
+===================  ==================================================================
+``gross_empirical``  subject (gross) empirical moments, what validation checks
+``after_occ``        empirical moments after the occurrence stage (pre-agg)
+``occ_impact``       ``after_occ / mixed``     (ratio: what occ did)
+``agg_impact``       ``empirical / after_occ`` (ratio: what agg did)
+``empirical``        the final, after-both-stages object
+===================  ==================================================================
 
 The subject → after-occ → after-agg progression is already computed here;
 ``error`` validates ``gross_empirical`` vs ``mixed`` (the apples-to-apples check

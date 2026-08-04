@@ -18,7 +18,7 @@
 #
 # With `uv` it isn't needed:
 #   • the project's pyproject.toml already declares Sphinx and friends under
-#     the `[dev]` extra, so `uv sync --extra dev` brings them in;
+#     the `[dev]` extra, so `uv sync --all-extras` brings them in;
 #   • `uv run sphinx-build` invokes Sphinx from that venv with zero activation
 #     ceremony;
 #   • the build runs in place against your current working tree — no clone
@@ -143,18 +143,25 @@ if ($Clean) {
     }
 }
 
-# ---- Sync dev dependencies into the doc venv -------------------------------
-# `uv sync --extra dev` installs everything in the `[project.optional-
-# dependencies] dev` block of pyproject.toml — Sphinx, myst-parser, nbsphinx,
-# sphinx-design, sphinx-rtd-theme, etc. — plus the project itself in editable
-# mode.
+# ---- Sync dependencies into the doc venv -----------------------------------
+# `uv sync --all-extras` installs every `[project.optional-dependencies]` block
+# of pyproject.toml, plus the project itself in editable mode. The doc build
+# needs `dev` (Sphinx, myst-parser, nbsphinx, sphinx-design, sphinx-rtd-theme),
+# but it must be `--all-extras`, not `--extra dev`.
+#
+# `uv sync` is an EXACT sync: naming a subset of extras makes uv PRUNE the
+# packages belonging to the unselected ones. The optional deps here are split
+# five ways (`dev` / `notebook` / `numba` / `massive` / `viz`), so `--extra dev`
+# deletes `zarr`, `holoviews`, `datashader` and `numba`. Any page that imports
+# them then fails to build, and the pruning churns the venv on every run.
+# `--all-extras` selects them all, so nothing gets pruned. See CLAUDE.md.
 #
 # `--python 3.X` pins the venv's interpreter. If the doc venv already uses
 # that version this is essentially a no-op (uv just verifies the lockfile);
 # if not, uv recreates `.doc-venv\` with the requested Python.
 if (-not $NoSync) {
-    Write-Host "Syncing dev dependencies under Python $PythonVersion (into .doc-venv\)..." -ForegroundColor Cyan
-    uv sync --extra dev --python $PythonVersion
+    Write-Host "Syncing dependencies (--all-extras) under Python $PythonVersion (into .doc-venv\)..." -ForegroundColor Cyan
+    uv sync --all-extras --python $PythonVersion
     if ($LASTEXITCODE -ne 0) {
         Write-Error "uv sync failed."
         exit $LASTEXITCODE

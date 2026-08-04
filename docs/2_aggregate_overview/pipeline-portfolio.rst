@@ -524,7 +524,7 @@ Design
 
 #. **Storage.** Parquet/feather for the frames (preserves float64 exactly),
    plus a small JSON manifest (program text, grid, versions, column list, and a
-   content hash). Exclude volatile fields (``last_update``, object ``repr``s).
+   content hash). Exclude volatile fields (``last_update``, object ``repr``).
 
 #. **Comparison — initial goal: VERY VERY close.** A pytest that loads the
    baseline and, per (case, frame, column), asserts ``np.allclose`` at a **tight**

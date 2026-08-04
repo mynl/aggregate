@@ -821,12 +821,12 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         independently toggles ``g ↔ g_dual``, composing by XOR -- the
         dual applies iff ``(view == 'bid') XOR (payoff role)``:
 
-        ====== ======== ==========
-        view    loss     payoff
-        ====== ======== ==========
-        ask     ``g``    ``g_dual``
-        bid     ``g_dual`` ``g``
-        ====== ======== ==========
+        ======  ==========  ==========
+        view    loss        payoff
+        ======  ==========  ==========
+        ask     ``g``       ``g_dual``
+        bid     ``g_dual``  ``g``
+        ======  ==========  ==========
 
         Ask-of-loss puts the heaviest distortion weight on the large-loss
         tail; ask-of-payoff sorts ascending so the largest *good* outcome

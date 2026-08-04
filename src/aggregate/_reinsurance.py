@@ -352,7 +352,8 @@ def reins_density_df(agg):
 
     Columns
     -------
-    loss : grid (also the index).
+    loss : float
+        The model grid (also the index).
     p_sev_gross, p_sev_ceded, p_sev_net : occurrence-level severity
         views. With no occurrence cover ``p_sev_ceded`` is a point mass
         at 0 and ``p_sev_net == p_sev_gross``.

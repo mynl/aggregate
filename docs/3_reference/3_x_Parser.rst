@@ -43,13 +43,13 @@ drives them, but they are public for tooling and introspection.
 
 .. currentmodule:: aggregate.parser
 
-Lexer
------
+Lexer class
+-----------
 
 .. autoclass:: aggregate.parser.UnderwritingLexer
 
-Parser
-------
+Parser class
+------------
 
 .. autoclass:: aggregate.parser.UnderwritingParser
 

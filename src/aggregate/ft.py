@@ -174,12 +174,12 @@ def recentering_convolution_example(sev_clause, en, log2, agg_log2=0, bs=1,
     **Method**
 
     #. Compute aggregate with enough space for the supported part of the
-      distribution (say, where density > 1e-15 or so)
+       distribution (say, where density > 1e-15 or so)
     #. Subtract the mean by rolling left (negative shift) by mean / bs buckets (mod n)
     #. fft shift = roll (in either direction) by n / 2 buckets, because
-      the distribution is centered at zero and has positive and negative parts.
+       the distribution is centered at zero and has positive and negative parts.
     #. Set appropriate x values to align with the density. Density is from
-      mean - n/2 to mean + n/2 - 1 (times bs).
+       mean - n/2 to mean + n/2 - 1 (times bs).
 
     Reasonable defaults::
 
@@ -271,12 +271,12 @@ def recentering_convolution(sev_clause, freq_clause, en, log2, bs, remove_fuzz):
     **Method**
 
     #. Compute aggregate with enough space for the supported part of the
-      distribution (say, where density > 1e-15 or so)
+       distribution (say, where density > 1e-15 or so)
     #. Subtract the mean by rolling left (negative shift) by mean / bs buckets (mod n)
     #. fft shift = roll (in either direction) by n / 2 buckets, because
-      the distribution is centered at zero and has positive and negative parts.
+       the distribution is centered at zero and has positive and negative parts.
     #. Set appropriate x values to align with the density. Density is from
-      mean - n/2 to mean + n/2 - 1 (times bs).
+       mean - n/2 to mean + n/2 - 1 (times bs).
 
     """
 

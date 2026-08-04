@@ -78,7 +78,7 @@ Configuration
 
 :mod:`aggregate.config` defines the user-editable settings (discretization,
 validation thresholds, labels, …) and the load / reload cascade. See the
-configuration discussion in the :doc:`user guides <../2_User_Guides>` for the
-file locations and override order.
+:doc:`Aggregate Overview <../2_Aggregate_Overview>` for the file locations and
+override order.
 
 .. automodule:: aggregate.config

@@ -19,7 +19,7 @@ Cookbook* (Beazley & Jones) rhythm, plus a check:
 ``## Discussion``
     Why it works, what to watch for.
 ``## Check``
-    Pure ``assert``s -- the invariant, made visible. Runs in the same namespace
+    Pure ``assert`` statements: the invariant, made visible. Runs in the same namespace
     the Solution left behind, so it can reach the objects that code built.
 
 Those sections are parsed **lazily**, on first access: only a handful of the

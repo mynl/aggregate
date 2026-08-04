@@ -16,7 +16,7 @@ What the Underwriter is
 :class:`Underwriter` is the interface to everything ``aggregate`` computes. It
 does three things:
 
-#. **Creates objects** from DecL programs (:doc:`2_x_dec_language`).
+#. **Creates objects** from DecL programs (:doc:`../4_dec_Language_Reference`).
 #. **Keeps a library** of named DecL declarations, the *recipe base*. Anything
    you build is added to it automatically.
 #. **Describes, tests and audits** that library, because a declaration carries

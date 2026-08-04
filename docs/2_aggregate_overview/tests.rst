@@ -254,7 +254,7 @@ automatically) and are "requested" by naming them as a function argument:
 Both are ``scope="session"``: built once and reused across the whole run (fast).
 
 
-********************************
+***************************************
 6. Keeping ``decl-testers.agg`` in sync
 ***************************************
 

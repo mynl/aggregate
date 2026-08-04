@@ -129,6 +129,15 @@ napoleon_google_docstring = False
 napoleon_use_param = True
 napoleon_use_rtype = False
 napoleon_preprocess_types = True
+# Render an ``Attributes`` section as ``:ivar:`` fields inside the class
+# description rather than as standalone ``.. attribute::`` directives. Without
+# this, a dataclass / NamedTuple that documents its fields in an ``Attributes``
+# section gets each one registered twice: once by napoleon from the docstring
+# and once by autodoc from the annotated field. That is a "duplicate object
+# description" warning per attribute, and it was 51 of this build's warnings
+# (results, bounds, parser_errors, tail, recipe, contract_terms, and the
+# massive compute leaf).
+napoleon_use_ivar = True
 
 # autosummary is used for the per-page *overview tables* only (``.. autosummary::``
 # without ``:toctree:``): they link to the full ``automodule`` / ``autoclass``
@@ -146,6 +155,19 @@ exclude_patterns = [
     # page (which made it an orphan, warned about, and shipped a stray
     # 4_agg_language_reference/ref_include.html).
     '4_agg_language_reference/ref_include.rst',
+    # ``docs/AGGREGATE-MONOGRAPH`` is a symlink to the Quarto monograph repo,
+    # kept here for convenience. Its pages are Quarto sources rendered by
+    # Quarto, not Sphinx sources: nothing in this tree links to them, so Sphinx
+    # built ~57 orphan pages, copied their figures, and emitted the bulk of the
+    # build's warnings. Worse, a Quarto render running in that repo deletes and
+    # recreates files mid-build, which crashed sphinx-build outright with
+    # FileNotFoundError on a path it had just globbed. Excluded here; delete
+    # this line to pull the monograph back into the Sphinx build.
+    'AGGREGATE-MONOGRAPH/**',
+    # Developer notes that live under docs/ but are not documentation pages.
+    # Sphinx picked them up as sources, then warned that nothing links to them.
+    'README.md',
+    'cookbook/plan.md',
 ]
 
 # List of patterns, relative to source directory, that match files and
@@ -198,7 +220,9 @@ html_theme = 'sphinx_rtd_theme'
 
 html_theme_options = {
     'logo_only': False,
-    'display_version': True,
+    # 'display_version' was removed in sphinx_rtd_theme 3.0; the version is
+    # shown via the flyout menu / html_context instead. Leaving it set only
+    # earned an "unsupported theme option given" warning.
     'prev_next_buttons_location': 'both',
     'style_external_links': False,
     'collapse_navigation': True,

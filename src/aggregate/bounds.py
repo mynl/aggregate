@@ -61,17 +61,17 @@ Both parameterize the extreme consistent distortions as biTVaRs
 Naming convention used throughout
 ---------------------------------
 
-============  =============  ============================================
-Name          Shape          Meaning
-============  =============  ============================================
-``p_knots``   ``(n_p,)``     TVaR threshold values — the p axis
-``s_grid``    ``(n_s,)``     distortion evaluation points — the s axis
-``tvar_x_p``  ``(n_p,)``     ``tvar_x_p[i] = TVaR_{p_knots[i]}(min(X, a))``
-``tvar_hinges`` ``(n_p, n_s)`` ``min(1, s_grid[j] / (1 - p_knots[i]))``
-``cloud_df``  ``(n_s, K)``   each column is a convex combination of two
-                              rows of ``tvar_hinges``; ``K`` = number of
-                              ``(p_lo, p_hi)`` pairs straddling ``p_star``
-============  =============  ============================================
+===============  ==============  ============================================
+Name             Shape           Meaning
+===============  ==============  ============================================
+``p_knots``      ``(n_p,)``      TVaR threshold values, the p axis
+``s_grid``       ``(n_s,)``      distortion evaluation points, the s axis
+``tvar_x_p``     ``(n_p,)``      ``tvar_x_p[i] = TVaR_{p_knots[i]}(min(X, a))``
+``tvar_hinges``  ``(n_p, n_s)``  ``min(1, s_grid[j] / (1 - p_knots[i]))``
+``cloud_df``     ``(n_s, K)``    each column is a convex combination of two
+                                 rows of ``tvar_hinges``; ``K`` = number of
+                                 ``(p_lo, p_hi)`` pairs straddling ``p_star``
+===============  ==============  ============================================
 
 The "hinge family" is the set of TVaR distortions parameterised by p:
 ``TVaR_p(s) = min(1, s / (1 - p))``. p indexes the family; s is the
@@ -407,10 +407,10 @@ class Bounds(HelpMixin):
         bracket that is, plus its weight.
 
         Each row fully specifies the BiTVaR realising the envelope at that
-        ``s``:
+        ``s``::
 
-            ``g_s(u) = (1 - w) * min(1, u / (1 - p_lo))
-                          + w * min(1, u / (1 - p_hi))``
+            g_s(u) = (1 - w) * min(1, u / (1 - p_lo))
+                        + w * min(1, u / (1 - p_hi))
 
         evaluated at ``u = s``, where ``w`` is the bracket weight
         (chosen so that the BiTVaR prices ``min(X, a)`` to ``premium``).

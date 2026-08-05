@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0a203
+
+**[Exhibits-Module] phase four opens, [Exhibits-PnL-Translation], raw stage.**
+`pnl_ledger` (source `PnL.stats_df`: the full ledger by (Side, Label), or
+(Step, Side, Label) on a tower, with the kappa scenario ladder) and
+`pnl_ratios` (two blocks: `ratio_df`, the per block amounts and LR / ER / CR
+ratios, and `legs_df`, the itemized declared legs) registered for PnL as RAW
+passthroughs. No insurer override is registered: INSURER equals RAW by the
+default rule, deliberately. The flagship INSURER business framing (captions,
+footing rules, Side sign presentation, the xpnl tower ledger reshape) is the
+plan's author gate and lands only after that review; a written draft with
+proposed captions, flag rules and the ratio card reshape is appended to
+`dev/plan-exhibits.md` for it (left uncommitted for the author). Snapshot
+corpus grows to 60; PnL now serves five exhibits.
+
 ## 1.0.0a202
 
 **[Chart-IR] pass three continues, [Chart-Conversions]: distortion g(s),

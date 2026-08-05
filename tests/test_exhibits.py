@@ -64,7 +64,7 @@ EXPECTED_EXHIBITS = {
     'Aggregate': ['summary', 'tail', 'stats', 'validation'],
     'Portfolio': ['summary', 'tail', 'stats', 'validation'],
     'BivariateAggregate': ['summary', 'stats', 'validation', 'dependency'],
-    'PnL': ['summary', 'stats', 'validation'],
+    'PnL': ['summary', 'stats', 'validation', 'pnl_ledger', 'pnl_ratios'],
     'Distortion': ['summary', 'stats', 'validation'],
     'ReinsAggregate': ['summary', 'tail', 'stats', 'validation', 'reins'],
     'ReinsPortfolio': ['summary', 'tail', 'stats', 'validation', 'reins'],
@@ -275,6 +275,34 @@ def test_reins_unavailable_without_cession(dice):
     assert 'reins' not in [n for n, _ in available_exhibits(dice)]
     with pytest.raises(ValueError, match='not available'):
         exhibit_frames(dice, 'reins')
+
+
+# --- pnl ([Exhibits-PnL-Translation], raw stage) ----------------------------
+
+def test_pnl_ledger_raw(objects):
+    pn = objects['PnL']
+    blocks = exhibit_frames(pn, 'pnl_ledger')
+    assert [name for name, _, _ in blocks] == ['stats_df']
+    _, df, kw = blocks[0]
+    assert kw == {}
+    assert list(df.index.names) in (['Side', 'Label'],
+                                    ['Step', 'Side', 'Label'])
+    # the insurer framing is author gated: INSURER equals RAW for now
+    _, ins_df, ins_kw = exhibit_frames(pn, 'pnl_ledger', 'insurer')[0]
+    pd.testing.assert_frame_equal(df, ins_df)
+    assert ins_kw == {}
+
+
+def test_pnl_ratios_raw(objects):
+    pn = objects['PnL']
+    blocks = exhibit_frames(pn, 'pnl_ratios')
+    assert [name for name, _, _ in blocks] == ['ratio_df', 'legs_df']
+    ratio_frame = blocks[0][1]
+    assert ratio_frame.index.name == 'Step'
+    assert {'P', 'L', 'M', 'LR', 'ER', 'CR'} <= set(ratio_frame.columns)
+    legs_frame = blocks[1][1]
+    assert {'Step', 'Side', 'Label', 'kind', 'EX', 'SD'} \
+        <= set(legs_frame.columns)
 
 
 # --- errors -----------------------------------------------------------------

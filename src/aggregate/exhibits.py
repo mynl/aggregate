@@ -517,7 +517,12 @@ pnl_ledger = _make_exhibit_function(
     'pnl_ledger', 'P&L ledger',
     """P&L ledger exhibit. Source frame ``PnL.stats_df``.
 
-    Registrations land in the [Exhibits-PnL-Translation] phase.
+    The full ledger by (Side, Label), or (Step, Side, Label) on a tower, in
+    currency units with the kappa scenario ladder. RAW passes the frame
+    through; the flagship INSURER business translation (captions, footing
+    rules, Side sign presentation, the tower reshape) is behind the
+    [Exhibits-PnL-Translation] author gate, so INSURER currently equals RAW
+    per the default rule.
 
     Parameters
     ----------
@@ -532,9 +537,13 @@ pnl_ledger = _make_exhibit_function(
 
 pnl_ratios = _make_exhibit_function(
     'pnl_ratios', 'P&L ratios',
-    """P&L ratio card exhibit. Source frames ``PnL.ratio_df`` and ``legs_df``.
+    """P&L ratio exhibit. Source frames ``PnL.ratio_df`` and ``legs_df``.
 
-    Registrations land in the [Exhibits-PnL-Translation] phase.
+    Two blocks of raw materials: the per block amounts and LR / ER / CR
+    ratios, and the itemized declared legs. RAW passes both frames through;
+    the INSURER arrangement into the ratio card is behind the
+    [Exhibits-PnL-Translation] author gate, so INSURER currently equals RAW
+    per the default rule.
 
     Parameters
     ----------
@@ -855,6 +864,22 @@ def _validation_insurer_bivariate(obj, blocks):
 def _dependency_frames_bivariate(obj):
     return [('dependency_df', obj.dependency_df, {}),
             ('axis_support_df', obj.axis_support_df, {})]
+
+
+# --- pnl registrations ([Exhibits-PnL-Translation], raw stage) --------------
+# Raw registrations only: the INSURER business framing (captions, footing
+# rules, Side sign presentation, the tower ledger reshape) is gated on author
+# review and lands separately. Until then INSURER equals RAW by default.
+
+@pnl_ledger.register(PnL)
+def _pnl_ledger_frames(obj):
+    return [('stats_df', obj.stats_df, {})]
+
+
+@pnl_ratios.register(PnL)
+def _pnl_ratios_frames(obj):
+    return [('ratio_df', obj.ratio_df, {}),
+            ('legs_df', obj.legs_df, {})]
 
 
 # --- reins registrations ([Exhibits-Reins-Insurer]) -------------------------

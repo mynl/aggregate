@@ -128,8 +128,11 @@
   in `pyproject.toml` until greater_tables 6 publishes to PyPI, since an
   active unresolvable extra would break `uv sync --all-extras`).
   `[Exhibits-Reins-Insurer]` landed `a201` (reins exhibit, two blocks,
-  cession gated, insurer moment drop plus captions and total flags). Next:
-  `[Exhibits-PnL-Translation]` behind its author gate. Open with the author: per measure formats for the stats
+  cession gated, insurer moment drop plus captions and total flags).
+  `[Exhibits-PnL-Translation]` raw stage landed `a203` (pnl_ledger and
+  pnl_ratios as RAW passthroughs); the INSURER framing draft awaits the
+  author gate (captions, footing rules, Side sign presentation, the tower
+  reshape; see the draft section appended to `dev/plan-exhibits.md`). Open with the author: per measure formats for the stats
   insurer view (greater_tables formats are per column, the store mixes
   measures down a column, so the app's measure formats have no TableSpec
   home yet) and whether the PnL validation audit ever gets a failure gate.

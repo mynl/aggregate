@@ -66,6 +66,23 @@ CAPITAL_ANCHOR_PERIODS = (200.0, 250.0)
 #: raw perspective keeps every row of the canonical 26 row store).
 RAW_MOMENT_MEASURES = ('ex1', 'ex2', 'ex3')
 
+#: Per measure formats for the INSURER views, as greater_tables format sugar
+#: (author, 2026-08-05). Applies wherever a measure **is a column**: the
+#: summary card and the P&L ledger. It cannot apply to the canonical moment
+#: store, where measures run *down* a column, and that asymmetry is the open
+#: question recorded in ``dev/plan-exhibits.md``.
+#:
+#: ``Skew`` is asked for as ``.3g``, three significant figures, which
+#: greater_tables sugar does not express: its kinds are ``f`` / ``d`` / ``%``
+#: / ``e`` / ``s``, with no ``g``. ``.3f`` is the nearest available and reads
+#: the same for the skews actually seen (it differs only in trailing zeros on
+#: large values). Switch the constant the day greater_tables grows a ``g``
+#: kind; nothing else needs to change.
+MEASURE_FORMATS = {
+    'CV': '.1%',
+    'Skew': '.3f',
+}
+
 #: Validation failure flags that emphasize the ``Sev`` row of a
 #: Freq / Sev / Agg validation frame, and those that emphasize ``Agg``
 #: (aliasing is an aggregate level symptom). ``Freq`` is PGF exact and

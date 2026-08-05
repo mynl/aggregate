@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.0.0a206
+
+**[Exhibits-Economic-Insurer]: the P&L accounting exhibits get their business
+reading.**
+
+`economic` (the ledger) keeps its shape under INSURER and gains the three
+things a reader needs in order not to misread it. A caption that says the
+ladder semantics **aloud**: the kappa columns are scenario states, not per row
+quantiles, so they foot down the sheet, and `κ01` is the adverse state under
+the payoff convention, which is why a loss sensitive premium correctly reads
+high there. The caption is regime aware: a ledger with no shared atoms (the
+one sweep and stitched routes) falls back to plain `P` headers where no
+conditioning happened and the ladder does **not** foot, and the caption says
+that instead. Row flags read off the ledger plan: the grand result is the
+bottom line (`total`), each group's and each tier's own result and the grand
+side totals are `subtotal`, and a running net is `muted`, being a cumulative
+reading aid rather than a booked line. Legs are never flagged. A single group
+ledger has no grand result, so its one group result is promoted from subtotal
+to total rather than leaving a sheet of subtotals with no bottom line.
+
+`economic_ratios` splits into three blocks under INSURER, per the reporting
+rule that a column carries one unit: `amounts` (P, L, E, C, M, currency,
+signed in the gross direction so the margin identity holds exactly), `ratios`
+(LR, ER, CR, the three `E_` means of ratios, and the two share columns,
+declared as `ratio_cols` so they render as percentages), and `legs`. The
+captions carry the two facts that are easy to get wrong: ratios are re-derived
+from each block's own amounts and never averaged from the blocks below, and
+the plain and `E_` pairs agree identically for a deterministic premium and
+part company exactly when premium is random and correlated with loss, which is
+what a retro, a swing, a slide or a profit commission is.
+
+**Per measure formats, where a measure is a column.** `MEASURE_FORMATS`
+applies `CV` as `.1%` and a fixed format to `Skew`, on the summary card and on
+the ledger, both of which carry measures across the columns. It cannot apply
+to the canonical moment store, where measures run *down* a column; that
+asymmetry stays the open question in the plan. One deviation to flag: `Skew`
+was asked for as `.3g`, three significant figures, which greater_tables sugar
+does not express (its kinds are `f`, `d`, `%`, `e` and `s`, with no `g`).
+`.3f` is the nearest available and reads the same for the skews actually seen,
+differing only in trailing zeros on large values. Switch the constant the day
+greater_tables grows a `g` kind; nothing else needs to change.
+
+Snapshot corpus stays at 78 entries with new content. `EX.Tower`, a two step
+walk carrying group, running net and grand rows plus a kappa ladder, joins
+`decl-testers.agg` section EX and round-trips through both corpus suites.
+
 ## 1.0.0a205
 
 **[Exhibits-Package-Split]: `exhibits.py` becomes `exhibits/`, and passthrough

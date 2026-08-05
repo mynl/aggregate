@@ -307,10 +307,11 @@ def test_economic_raw(objects):
     assert kw == {}
     assert list(df.index.names) in (['Side', 'Label'],
                                     ['Step', 'Side', 'Label'])
-    # the insurer framing is author gated: INSURER equals RAW for now
+    # RAW stays the untouched passthrough; INSURER translates the same frame
+    # rather than reshaping it ([Exhibits-Economic-Insurer]).
     _, ins_df, ins_kw = exhibit_frames(pn, 'economic', 'insurer')[0]
     pd.testing.assert_frame_equal(df, ins_df)
-    assert ins_kw == {}
+    assert set(ins_kw) == {'caption', 'row_flags', 'formatters'}
 
 
 def test_economic_ratios_raw(objects):
@@ -323,6 +324,76 @@ def test_economic_ratios_raw(objects):
     legs_frame = blocks[1][1]
     assert {'Step', 'Side', 'Label', 'kind', 'EX', 'SD'} \
         <= set(legs_frame.columns)
+
+
+# --- economic insurer ([Exhibits-Economic-Insurer]) -------------------------
+
+_TOWER = ('xpnl EX.Tower 1000 prem less agg EX.TowerE 1000 prem at 70% lr '
+          'sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 '
+          'poisson')
+
+
+@pytest.fixture(scope='module')
+def tower():
+    return build(_TOWER)
+
+
+def test_economic_insurer_ledger_flags(tower):
+    """Flags follow the ledger plan: one total, results subtotal, nets muted."""
+    _, df, kw = exhibit_frames(tower, 'economic', 'insurer')[0]
+    flags = kw['row_flags']
+    kinds = dict(enumerate(k for _, k, _ in tower._plan))
+    totals = [i for i, f in flags.items() if 'total' in f]
+    assert len(totals) == 1, 'exactly one bottom line'
+    assert kinds[totals[0]] == 'grand_result'
+    for i, f in flags.items():
+        if 'subtotal' in f:
+            assert kinds[i] in ('group_result', 'tier_result', 'grand_total')
+        if 'muted' in f:
+            assert kinds[i] == 'running_net'
+    # legs are never flagged
+    assert all(kinds[i] != 'leg' for i in flags)
+
+
+def test_economic_single_group_has_a_total(objects):
+    """A single group ledger's one result IS the bottom line, not a subtotal."""
+    _, df, kw = exhibit_frames(objects['PnL'], 'economic', 'insurer')[0]
+    assert any('total' in f for f in kw['row_flags'].values())
+
+
+def test_economic_insurer_caption_states_the_ladder_regime(tower):
+    _, df, kw = exhibit_frames(tower, 'economic', 'insurer')[0]
+    scenario = any(str(c).startswith('κ') for c in df.columns)
+    caption = kw['caption']
+    assert scenario, 'this fixture shares atoms, so it should carry kappa'
+    assert 'scenario states' in caption and 'foots exactly' in caption
+    assert 'adverse state' in caption
+
+
+def test_measure_formats_where_measures_are_columns(dice, tower):
+    """CV and Skew take their declared formats on the card and the ledger."""
+    from aggregate.exhibits._core import MEASURE_FORMATS
+    assert MEASURE_FORMATS['CV'] == '.1%'
+    for obj, name in ((dice, 'summary'), (tower, 'economic')):
+        _, df, kw = exhibit_frames(obj, name, 'insurer')[0]
+        assert kw['formatters'] == MEASURE_FORMATS
+        assert {'CV', 'Skew'} <= set(df.columns)
+
+
+def test_economic_ratios_insurer_splits_units(tower):
+    """One unit per column: amounts, ratios, legs, per the reporting rule."""
+    blocks = exhibit_frames(tower, 'economic_ratios', 'insurer')
+    assert [b for b, _, _ in blocks] == ['amounts', 'ratios', 'legs']
+    (_, amounts, amounts_kw), (_, ratios, ratios_kw), _ = blocks
+    assert set(amounts.columns) == {'P', 'L', 'E', 'C', 'M'}
+    assert set(ratios.columns).isdisjoint(amounts.columns)
+    # the ratio block declares its columns as ratios so they render as percents
+    assert ratios_kw['ratio_cols'] == list(ratios.columns)
+    # M == P - L - E - C, the identity the caption claims
+    import numpy as np
+    np.testing.assert_allclose(
+        amounts['M'],
+        amounts['P'] - amounts['L'] - amounts['E'] - amounts['C'], atol=1e-9)
 
 
 # --- register_simple_exhibit ([Exhibits-Package-Split]) ---------------------

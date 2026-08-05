@@ -2484,7 +2484,7 @@
       "Premium",
       "1,000.00",
       "0.00",
-      "0.000",
+      "0.0%",
       "\u2014",
       "1,000.00",
       "1,000.00",
@@ -2513,13 +2513,13 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.485"
+       "text": "-48.5%"
       },
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
+       "text": "-0.970"
       },
       {
        "flags": [
@@ -2584,12 +2584,12 @@
       "Total",
       "150.00",
       "412.31",
-      "2.749",
+      "274.9%",
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
+       "text": "-0.970"
       },
       {
        "flags": [
@@ -2620,9 +2620,13 @@
       "621.25",
       "709.50",
       "844.25"
+     ],
+     "flags": [
+      "total"
      ]
     }
    ],
+   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. The kappa columns are scenario states, not per row quantiles: column kappa-q is the state in which the grand result lands at its q quantile, and each cell is the conditional mean of that row in that state, so every kappa column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there.",
    "columns": [
     {
      "align": "l",
@@ -2676,9 +2680,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
@@ -2689,8 +2692,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c5",
@@ -3275,18 +3277,11 @@
       "850.00",
       "0.00000",
       "0.00000",
-      "150.00",
-      "0.85000",
-      "0.00000",
-      "0.85000",
-      "0.85000",
-      "0.00000",
-      "0.85000",
-      "1.000",
-      "1.000"
+      "150.00"
      ]
     }
    ],
+   "caption": "Premium, loss, expense and commission per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E - C holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg.",
    "columns": [
     {
      "align": "l",
@@ -3363,110 +3358,6 @@
      "name": [
       "M"
      ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "LR"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c7",
-     "name": [
-      "ER"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c8",
-     "name": [
-      "CR"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c9",
-     "name": [
-      "E_LR"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c10",
-     "name": [
-      "E_ER"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c11",
-     "name": [
-      "E_CR"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 3,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c12",
-     "name": [
-      "P_share"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 3,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c13",
-     "name": [
-      "M_share"
-     ]
     }
    ],
    "head": [
@@ -3488,6 +3379,151 @@
      },
      {
       "text": "M"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "EX.B",
+      "85.0%",
+      "0.0%",
+      "85.0%",
+      "85.0%",
+      "0.0%",
+      "85.0%",
+      "100.0%",
+      "100.0%"
+     ]
+    }
+   ],
+   "caption": "LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below. The E_ columns are the same three as means of ratios. The pairs agree identically when premium is deterministic and part company exactly when it is random and correlated with loss, which is what a retro, a swing, a slide or a profit commission is. Share columns are against the first (gross) block.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "LR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "ER"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "E_LR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c5",
+     "name": [
+      "E_ER"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "E_CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "P_share"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c8",
+     "name": [
+      "M_share"
+     ],
+     "tag": "ratio"
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
      },
      {
       "text": "LR"
@@ -3547,6 +3583,7 @@
      ]
     }
    ],
+   "caption": "One row per declared leg, the itemized companion. Derived rows (totals, results, running nets) are absent by design: they are sums of these.",
    "columns": [
     {
      "align": "l",
@@ -12951,7 +12988,7 @@
       "Freq",
       "3.000",
       "0.000",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "\u2014",
       "\u2014",
@@ -12964,8 +13001,8 @@
       "Sev",
       "3.500",
       "1.708",
-      "0.48795",
-      "0.00000",
+      "48.8%",
+      "0.000",
       "1.000",
       "3.000",
       "6.00"
@@ -12977,8 +13014,8 @@
       "Agg",
       "10.500",
       "2.958",
-      "0.28172",
-      "0.00000",
+      "28.2%",
+      "0.000",
       "4.000",
       "10.000",
       "17.00"
@@ -13031,9 +13068,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c3",
      "name": [
@@ -13044,8 +13080,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
@@ -13868,7 +13903,7 @@
       "Freq",
       "1.000",
       "0.00000",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "\u2014",
       "\u2014",
@@ -13881,8 +13916,8 @@
       "Sev",
       "2.000",
       "0.81650",
-      "0.40825",
-      "0.00000",
+      "40.8%",
+      "0.000",
       "1.000",
       "2.000",
       "3.000"
@@ -13894,8 +13929,8 @@
       "Agg",
       "2.000",
       "0.81650",
-      "0.40825",
-      "0.00000",
+      "40.8%",
+      "0.000",
       "1.000",
       "2.000",
       "3.000"
@@ -13914,7 +13949,7 @@
       "Freq",
       "2.000",
       "0.00000",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "\u2014",
       "\u2014",
@@ -13927,8 +13962,8 @@
       "Sev",
       "3.000",
       "1.00000",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "2.000",
       "2.000",
       "4.000"
@@ -13940,8 +13975,8 @@
       "Agg",
       "6.000",
       "1.41421",
-      "0.23570",
-      "0.00000",
+      "23.6%",
+      "0.000",
       "4.000",
       "6.000",
       "8.000"
@@ -13957,8 +13992,8 @@
       "Agg",
       "8.000",
       "1.63299",
-      "0.20412",
-      "0.00000",
+      "20.4%",
+      "0.000",
       "5.000",
       "8.000",
       "11.000"
@@ -14022,9 +14057,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
@@ -14035,8 +14069,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c5",
@@ -14128,8 +14161,8 @@
       "Freq",
       "1.50",
       "0.500",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "\u2014",
       "\u2014",
       "\u2014"
@@ -14141,8 +14174,8 @@
       "Sev",
       "13.33",
       "4.714",
-      "0.35355",
-      "0.70711",
+      "35.4%",
+      "0.707",
       "10.00",
       "10.00",
       "20.00"
@@ -14154,8 +14187,8 @@
       "Agg",
       "20.00",
       "8.819",
-      "0.44096",
-      "0.48595",
+      "44.1%",
+      "0.486",
       "10.00",
       "20.00",
       "40.00"
@@ -14208,9 +14241,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c3",
      "name": [
@@ -14221,8 +14253,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
@@ -14315,8 +14346,8 @@
       "Freq",
       "1.50",
       "0.500",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "\u2014",
       "\u2014",
       "\u2014"
@@ -14328,8 +14359,8 @@
       "Sev",
       "13.33",
       "4.714",
-      "0.35355",
-      "0.70711",
+      "35.4%",
+      "0.707",
       "10.000",
       "10.00",
       "20.00"
@@ -14341,8 +14372,8 @@
       "Agg",
       "20.00",
       "8.819",
-      "0.44096",
-      "0.48595",
+      "44.1%",
+      "0.486",
       "10.000",
       "20.00",
       "40.00"
@@ -14361,7 +14392,7 @@
       "Freq",
       "1.00",
       "0.000",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "\u2014",
       "\u2014",
@@ -14374,8 +14405,8 @@
       "Sev",
       "7.50",
       "2.500",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "5.000",
       "5.00",
       "10.00"
@@ -14387,8 +14418,8 @@
       "Agg",
       "7.50",
       "2.500",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "5.000",
       "5.00",
       "10.00"
@@ -14404,8 +14435,8 @@
       "Agg",
       "27.50",
       "9.167",
-      "0.33333",
-      "0.43276",
+      "33.3%",
+      "0.433",
       "15.000",
       "25.00",
       "50.00"
@@ -14469,9 +14500,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
@@ -14482,8 +14512,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c5",

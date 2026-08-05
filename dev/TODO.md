@@ -134,7 +134,10 @@
   to the engine so the name means one thing across the contract).
   `[Exhibits-Package-Split]` landed `a205` (`exhibits/` package mirroring
   `plots/`, `register_simple_exhibit`, `bs_window` and `tail_behavior`,
-  `economic` / `economic_ratios` renames).
+  `economic` / `economic_ratios` renames). `[Exhibits-Economic-Insurer]`
+  landed `a206` (ledger captions stating the kappa regime, ledger row flags,
+  the ratio frame split into pure-unit blocks, `MEASURE_FORMATS`). Next:
+  `[Exhibits-Waterfall]`, then the app consolidation.
   `[Exhibits-PnL-Translation]` raw stage landed `a203` (pnl_ledger and
   pnl_ratios as RAW passthroughs); the INSURER framing draft awaits the
   author gate (captions, footing rules, Side sign presentation, the tower

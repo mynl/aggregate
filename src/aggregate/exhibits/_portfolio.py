@@ -8,6 +8,7 @@ only in what the frames look like, not in how they are declared.
 from .._portfolio import Portfolio
 from ._core import (
     reins, stats, summary, tail, validation,
+    MEASURE_FORMATS,
     _drop_raw_moment_rows, _moment_validation_emphasis, _reins_frames,
     _reins_summary_flags, _stats_insurer_moment_store, _summary_flags,
     _tail_flags,
@@ -26,7 +27,8 @@ def _summary_insurer_portfolio(obj, blocks):
                'by design: frequency enters through its PGF and no count '
                'distribution is materialized.')
     return [(block_name, df,
-             dict(kw, caption=caption, row_flags=_summary_flags(df)))]
+             dict(kw, caption=caption, row_flags=_summary_flags(df),
+                  formatters=MEASURE_FORMATS))]
 
 
 @tail.insurer.register(Portfolio)

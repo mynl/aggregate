@@ -19,7 +19,7 @@ meaningfulness flag) comes off the document.
 import numpy as np
 
 from ..charts.ir import ChartCapabilityError
-from ._style import plt, mpl, FIG_W, make_grid
+from ._style import plt, mpl, FIG_H, FIG_W, make_grid
 
 __all__ = ['plot_chartdoc']
 
@@ -31,7 +31,7 @@ _LOG_FLOOR = 1e-15
 # Panel kinds this renderer realizes natively today. 'surface' is the
 # declared degradation (projection); anything else raises until its
 # conversion lands.
-_NATIVE = {'heatmap'}
+_NATIVE = {'heatmap', 'xy'}
 _DEGRADED = {'surface'}
 
 
@@ -75,6 +75,51 @@ def _render_grid_panel(ax, doc, panel, series, log_z):
     ax.set(xlabel=axes[panel.x_axis].label, ylabel=axes[panel.y_axis].label)
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
+
+
+def _apply_axis(ax, which, axis):
+    """Realize one ChartAxis on a matplotlib axis ('x' or 'y')."""
+    if axis.scale == 'log':
+        getattr(ax, f'set_{which}scale')('log')
+    if axis.suggested_range is not None:
+        lo, hi = axis.suggested_range
+        # The unit interval draws with pinned round ticks: the reference
+        # gridlines of a probability square are part of how it is read.
+        if (lo, hi) == (0.0, 1.0) and axis.scale == 'linear':
+            getattr(ax, f'set_{which}ticks')(np.linspace(0, 1, 6))
+
+
+def _render_xy_panel(ax, doc, panel, series_list):
+    """Render one 'xy' panel: role-styled curves, gaps broken, marks drawn."""
+    axes = {a.id: a for a in doc.axes}
+    labeled = False
+    for s in series_list:
+        x = np.array([np.nan if v is None else v for v in s.x], dtype=float)
+        y = np.array([np.nan if v is None else v for v in s.y], dtype=float)
+        if s.role == 'identity':
+            # The reference diagonal: neutral, thin, never in the legend.
+            ax.plot(x, y, color='k', lw=0.5, alpha=0.5)
+            continue
+        if s.y2 is not None:
+            y2 = np.array([np.nan if v is None else v for v in s.y2],
+                          dtype=float)
+            ax.fill_between(x, y, y2, alpha=0.15, label=s.name)
+            labeled = True
+            continue
+        ax.plot(x, y, label=s.name)
+        labeled = True
+    for m in doc.marks:
+        if m.panel_id != panel.id:
+            continue
+        line = ax.axvline if m.orient == 'v' else ax.axhline
+        line(m.at, lw=0.75 if not m.faint else 0.5, color='C7', ls='--',
+             alpha=0.45 if m.faint else 1.0)
+    _apply_axis(ax, 'x', axes[panel.x_axis])
+    _apply_axis(ax, 'y', axes[panel.y_axis])
+    if panel.aspect == 'equal':
+        ax.set_aspect('equal')
+    if labeled and sum(s.role != 'identity' for s in series_list) > 1:
+        ax.legend(loc='upper left', fontsize='x-small')
 
 
 def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
@@ -128,15 +173,25 @@ def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
 
     panel = doc.panels[0]
     if ax is None:
-        # Near-square: the z grid reads as a map, and the colorbar takes
-        # the balance of the width.
-        _, ax = make_grid(1, 1, figsize=(1.25 * FIG_W, FIG_W), squeeze=True)
+        if panel.kind == 'xy':
+            # An equal-aspect single panel is a square figure (the unit
+            # square reads at the small preset, as the compositor draws it).
+            size = ((FIG_H, FIG_H) if panel.aspect == 'equal'
+                    else (FIG_W, FIG_H))
+        else:
+            # Near-square: the z grid reads as a map, and the colorbar
+            # takes the balance of the width.
+            size = (1.25 * FIG_W, FIG_W)
+        _, ax = make_grid(1, 1, figsize=size, squeeze=True)
     fig = ax.figure
     series = [s for s in doc.series if s.panel_id == panel.id]
-    log_z = bool(log_z) and bool(doc.meta.get('z_log_ok'))
-    _render_grid_panel(ax, doc, panel, series[0], log_z)
     title = doc.title or doc.name
-    if panel.kind == 'surface':
-        title = f'{title} (projection)'
-    ax.set_title(title)
+    if panel.kind == 'xy':
+        _render_xy_panel(ax, doc, panel, series)
+    else:
+        log_z = bool(log_z) and bool(doc.meta.get('z_log_ok'))
+        _render_grid_panel(ax, doc, panel, series[0], log_z)
+        if panel.kind == 'surface':
+            title = f'{title} (projection)'
+    ax.set_title(panel.title or title)
     return fig

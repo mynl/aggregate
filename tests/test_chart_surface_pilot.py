@@ -160,14 +160,19 @@ def test_renderer_strict_raises(bv):
         plot_chartdoc(doc, strict=True)
 
 
-def test_renderer_refuses_unrealized_kinds():
+def test_renderer_refuses_multi_panel_documents():
+    # Every panel kind now has a realization (xy landed with the distortion
+    # conversion), so the remaining declared capability edge is layout:
+    # multi-panel documents wait for the two-panel conversions.
     from aggregate.charts import ChartAxis, ChartDoc, ChartSeries, Panel
     from aggregate.plots import plot_chartdoc
+    axes = (ChartAxis(id='a', label='a'), ChartAxis(id='b', label='b'))
     doc = ChartDoc(
         name='t',
-        axes=(ChartAxis(id='a', label='a'), ChartAxis(id='b', label='b')),
-        panels=(Panel(id='p', kind='xy', x_axis='a', y_axis='b'),),
+        axes=axes,
+        panels=(Panel(id='p', kind='xy', x_axis='a', y_axis='b'),
+                Panel(id='q', kind='xy', x_axis='a', y_axis='b')),
         series=(ChartSeries(name='s', role='density', panel_id='p',
                             x=(0.0, 1.0), y=(1.0, 0.0)),))
-    with pytest.raises(ChartCapabilityError, match='not yet realized'):
+    with pytest.raises(ChartCapabilityError, match='multi-panel'):
         plot_chartdoc(doc)

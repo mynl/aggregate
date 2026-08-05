@@ -20,16 +20,16 @@ plus the predicates, so it cannot go stale.
 from functools import singledispatch
 
 from .ir import (
-    CHART_IR_VERSION, ChartAxis, ChartCapabilityError, ChartDoc,
-    ChartSeries, Mark, Panel, SurfaceData,
+    CHART_IR_VERSION, SUPPORT_KINDS, ChartAxis, ChartCapabilityError,
+    ChartDoc, ChartSeries, Mark, Panel, SurfaceData,
     canonical_dict, canonical_json, doc_hash, stamp,
 )
 
 __all__ = [
-    'CHART_IR_VERSION', 'CHARTS', 'ChartAxis', 'ChartCapabilityError',
-    'ChartDoc', 'ChartSeries', 'Mark', 'Panel', 'SurfaceData',
-    'available_charts', 'canonical_dict', 'canonical_json', 'doc_hash',
-    'register_chart', 'stamp',
+    'CHART_IR_VERSION', 'CHARTS', 'SUPPORT_KINDS', 'ChartAxis',
+    'ChartCapabilityError', 'ChartDoc', 'ChartSeries', 'Mark', 'Panel',
+    'SurfaceData', 'available_charts', 'canonical_dict', 'canonical_json',
+    'doc_hash', 'register_chart', 'stamp',
 ]
 
 #: The chart registry: ``name -> (emitter, predicate)``. The emitter is a

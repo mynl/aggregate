@@ -104,6 +104,12 @@ def _severity(sev, n=GRID_POINTS):
     mass_reading = not np.any(pdf > 0)
     ordinate = np.diff(cdf, prepend=0.0) if mass_reading else pdf
     y_label = 'Probability mass' if mass_reading else 'pdf'
+    # A severity is the one place this library holds a genuinely continuous
+    # law: build one and it is a frozen scipy variable, with no ``xs`` and
+    # no discrete density, because discretization happens in Aggregate and
+    # not here. So a continuous severity says so, and only a discrete one
+    # is atomic.
+    support = 'atomic' if mass_reading else 'continuous'
     xs = tuple(float(v) for v in loss)
     survival = gapped(sf)
     name = str(sev.label)
@@ -133,9 +139,10 @@ def _severity(sev, n=GRID_POINTS):
         ),
         series=(
             ChartSeries(name=name, role='density', panel_id='density',
-                        x=xs, y=tuple(float(v) for v in ordinate)),
+                        x=xs, y=tuple(float(v) for v in ordinate),
+                        support=support),
             ChartSeries(name=name, role='survival', panel_id='tail',
-                        x=xs, y=survival),
+                        x=xs, y=survival, support=support),
         ),
         meta={'ordinate': 'mass' if mass_reading else 'pdf'},
     )

@@ -182,6 +182,26 @@ def test_grid_panel_accepts_xy_overlays():
     assert json.loads(canonical_json(over))['series'][1]['role'] == 'iso_total'
 
 
+def test_support_defaults_to_atomic_and_costs_no_hash():
+    """The default writes the library's own worldview into the schema: a
+    discretized distribution IS the distribution, so 'continuous' is the
+    exception a series has to claim."""
+    plain = small_xy_doc()
+    assert {s.support for s in plain.series} == {'atomic'}
+    assert 'support' not in canonical_dict(plain)['series'][0]
+    cts = dataclasses.replace(
+        plain, series=tuple(dataclasses.replace(s, support='continuous')
+                            for s in plain.series))
+    assert canonical_dict(cts)['series'][0]['support'] == 'continuous'
+    assert doc_hash(cts) != doc_hash(plain)
+
+
+def test_support_vocabulary_is_closed():
+    with pytest.raises(ValueError, match='unknown support'):
+        ChartSeries(name='s', role='density', panel_id='p',
+                    x=(0.0,), y=(1.0,), support='lattice')
+
+
 def test_tex_map_is_optional_and_costs_no_hash():
     """A document with nothing to typeset serializes exactly as before."""
     plain = small_xy_doc()

@@ -31,6 +31,79 @@ _NATIVE = {'heatmap', 'xy'}
 _DEGRADED = {'surface'}
 
 
+# The ladder for an atomic series, in atoms and in pixels. Both are
+# renderer constants: how much room an atom gets is a property of the
+# figure, never of the document.
+#: At or under this many atoms in view, each one is drawn: a stem to its
+#: value with a marker on the end. Mirrors the ``mx <= 60`` rule the
+#: aggregate compositor has always used, counted in visible atoms rather
+#: than in loss units so a cropped window is judged on what it shows.
+LOLLIPOP_ATOMS = 40
+
+#: Down to this many pixels per atom the steps are visible and are drawn.
+#: Under it, steps and a line are the same picture and steps cost three
+#: times the vertices.
+STEP_PIXELS = 3.0
+
+
+def _axes_width_px(ax):
+    """Approximate drawing width of ``ax`` in pixels.
+
+    Read off the figure rather than from a rendered bounding box, so the
+    choice does not depend on a draw having happened. Constrained layout
+    shifts this a little; a threshold does not care.
+    """
+    fig = ax.figure
+    return ax.get_position().width * fig.get_size_inches()[0] * fig.dpi
+
+
+def _atom_room(ax, window, x):
+    """``(atoms in view, pixels per atom)`` for an atomic series."""
+    lo, hi = window
+    seen = int(np.count_nonzero((x >= lo) & (x <= hi)))
+    return seen, (_axes_width_px(ax) / seen if seen else float('inf'))
+
+
+def _draw_atomic(ax, x, y, label, y_axis, window):
+    """Draw an atomic series at the honest density for the room available.
+
+    Three drawings of one truth, chosen by how much room each atom gets,
+    never by what the series is called.
+
+    A **mass** lives *at* its atom, so where the atoms are far enough
+    apart each is drawn as a stem with a marker: the lollipop the
+    aggregate compositor has always used for a small book. Closer
+    together the steps carry it, read as a bar at each bucket, and the
+    point of them is the sharp vertical jump where a line would draw a
+    slope the law does not have. Sub-pixel, steps and a line are the same
+    picture, so no lie is told by taking the cheaper one.
+
+    A **cumulative** function is different in kind and skips the lollipop
+    rung entirely: F and S take a value at every x, not only at the
+    atoms, so the honest drawing is a right-continuous step that jumps at
+    the atom, however few atoms there are.
+
+    Which of the two it is comes off the **axis**, not the series role: a
+    reinsurance series is called gross or ceded in both panels, and only
+    the axis knows that one of them carries mass and the other carries
+    accumulated probability.
+    """
+    seen, pixels = _atom_room(ax, window, x)
+    unit = getattr(y_axis, 'unit', None)
+    if unit == 'probability':
+        ax.plot(x, y, label=label,
+                drawstyle='steps-post' if pixels >= STEP_PIXELS else 'default')
+        return
+    if unit == 'density' and seen <= LOLLIPOP_ATOMS:
+        # Markers first so the series takes the next prop-cycle color, then
+        # the stems in that same color.
+        marker, = ax.plot(x, y, ls='none', marker='o', ms=2.5, label=label)
+        ax.vlines(x, 0.0, y, color=marker.get_color(), lw=0.8)
+        return
+    ax.plot(x, y, label=label,
+            drawstyle='steps-mid' if pixels >= STEP_PIXELS else 'default')
+
+
 def _typeset(doc, text):
     """The typeset form of ``text`` if the document carries one.
 
@@ -132,9 +205,24 @@ def _apply_axis(ax, which, axis):
             getattr(ax, f'set_{which}ticks')(np.linspace(0, 1, 6))
 
 
+def _panel_window(panel, axes, series_list):
+    """The x range the panel will show, before anything is drawn.
+
+    The emitter's suggestion where there is one, else the data's own
+    extent. Computed off the document rather than off the axes so the
+    atom count does not depend on the order things are plotted in.
+    """
+    window = axes[panel.x_axis].suggested_range
+    if window is not None:
+        return window
+    xs = [v for s in series_list if s.x for v in s.x if v is not None]
+    return (min(xs), max(xs)) if xs else (0.0, 1.0)
+
+
 def _render_xy_panel(ax, doc, panel, series_list):
     """Render one 'xy' panel: role-styled curves, gaps broken, marks drawn."""
     axes = {a.id: a for a in doc.axes}
+    window = _panel_window(panel, axes, series_list)
     labeled = False
     for s in series_list:
         x = np.array([np.nan if v is None else v for v in s.x], dtype=float)
@@ -149,7 +237,13 @@ def _render_xy_panel(ax, doc, panel, series_list):
             ax.fill_between(x, y, y2, alpha=0.15, label=_typeset(doc, s.name))
             labeled = True
             continue
-        ax.plot(x, y, label=_typeset(doc, s.name))
+        label = _typeset(doc, s.name)
+        if s.support == 'continuous':
+            # Samples of a function that exists between them: a line is the
+            # truthful drawing and no ladder applies.
+            ax.plot(x, y, label=label)
+        else:
+            _draw_atomic(ax, x, y, label, axes[panel.y_axis], window)
         labeled = True
     for m in doc.marks:
         if m.panel_id != panel.id:

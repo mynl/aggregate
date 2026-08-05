@@ -204,10 +204,19 @@
   absorbing the app's log-spaced sf inversion, and reading probability
   mass where a law has no density instead of drawing a flat zero;
   `charts/_two_panel.py` now holds the window and survival-floor
-  semantics the five two-panel charts share). Next: agg, pnl, port, bvagg
-  heatmap in plan order, plus the paired app commits (distortion, reins
-  and sev all need the adapter's xy realization), which wait on the
-  app-side workstream.
+  semantics the five two-panel charts share). `[Chart-Atomic-Support]`
+  landed a214, the one deliberate reopening of the frozen schema (author
+  decision, 2026-08-05): `ChartSeries.support` is `'atomic'` or
+  `'continuous'` and defaults to atomic, because a discretized
+  distribution **is** the distribution here; the renderer owns the ladder
+  from that flag plus the room each atom gets (stems, then steps read as
+  bars, then a plain line once a bucket is sub-pixel), counted in visible
+  atoms so a cropped window is judged on what it shows, and cumulative
+  functions step right-continuously off the *axis* rather than the series
+  role. Next: agg, pnl, port, bvagg heatmap in plan order, plus the paired
+  app commits (distortion, reins and sev all need the adapter's xy
+  realization, and the adapter now also owns the same ladder), which wait
+  on the app-side workstream.
 - **[Derived-Programs]** — **DONE** at `1.0.0a213`, plan in
   `dev/done/plan-derived-programs.md`. Three members answering the same
   question about a different derivation, namely what is the program that

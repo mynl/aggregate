@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.0.0a214
+
+**[Chart-Atomic-Support] the discretization is the distribution, and the
+renderer decides how much of it you can see.** Author decision, taken
+against the schema freeze rather than around it: `ChartSeries.support`,
+one of `'atomic'` or `'continuous'`, defaulting to **atomic**. The default
+is the point. This library computes with gridded discrete laws and treats
+them as the distribution rather than as an approximation to some
+continuous ideal, so `'continuous'` is the exception a series has to
+claim. Today that is a distortion (g is a function of s, defined
+everywhere, sampled on the knot-spliced grid) and a frozen severity (build
+one and it is a scipy variable with no `xs` and no discrete density,
+because discretization happens in `Aggregate` and not there). A discrete
+severity is atomic, and every aggregate grid is.
+
+The document says only what the law **is**. How densely to draw it is a
+property of the figure, which no document can know, so the renderer owns
+the ladder:
+
+| room per atom | drawing |
+|---|---|
+| at most `LOLLIPOP_ATOMS` (40) in view | stems with markers, each atom drawn |
+| at least `STEP_PIXELS` (3) per atom | steps, read as a bar at each bucket |
+| below that | a plain line, indistinguishable from steps anyway |
+
+This is not new house style, it is the rule `plots/_aggregate.py` has
+always followed (`stem` under `mx <= 60`, `steps-mid` above it,
+`steps-post` for F) lifted into the renderer so every chart gets it.
+Counted in **visible** atoms rather than in `log2` or loss units, because
+charts crop: a 65,536-point grid showing 80 buckets should draw its steps,
+and the same grid showing 18,000 should not.
+
+Cumulative functions skip the stem rung and step **right-continuously**:
+F and S take a value at every x, not only at the atoms. Which of the two a
+series is comes off the **axis**, not the series role, and that is
+load-bearing rather than stylistic: a reinsurance series is called `gross`
+in both panels, and only the axis knows that one carries mass and the
+other accumulated probability. The first cut read the role and stepped the
+reins survival panel as though it were a density.
+
+No image moves: the distortion is continuous and drew as a line before and
+after.
+
 ## 1.0.0a213
 
 **[Derived-Programs] the program that reproduces an object you arrived at.**

@@ -43,9 +43,12 @@ def _distortion(dist, dual=True):
     """
     df = dist.density_df
     xs = tuple(float(v) for v in df.index.to_numpy())
+    # Continuous, and one of the few things here that is: g is a function
+    # of s defined at every s, sampled on the knot-spliced grid. Nothing
+    # about a distortion is discretized.
     series = [
         ChartSeries(name=str(dist.label), role='distortion',
-                    panel_id='square', x=xs,
+                    panel_id='square', x=xs, support='continuous',
                     y=tuple(float(v) for v in df['g'].to_numpy())),
     ]
     if dual:
@@ -54,11 +57,11 @@ def _distortion(dist, dual=True):
         # document's `tex` map for renderers that can use it.
         series.append(
             ChartSeries(name=DISTORTION_DUAL_LABEL, role='distortion',
-                        panel_id='square', x=xs,
+                        panel_id='square', x=xs, support='continuous',
                         y=tuple(float(v) for v in df['g_dual'].to_numpy())))
     series.append(
         ChartSeries(name='identity', role='identity', panel_id='square',
-                    x=(0.0, 1.0), y=(0.0, 1.0)))
+                    x=(0.0, 1.0), y=(0.0, 1.0), support='continuous'))
     return ChartDoc(
         name='distortion',
         title=str(dist.label),

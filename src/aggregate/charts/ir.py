@@ -46,8 +46,8 @@ import unicodedata
 from dataclasses import dataclass, field
 
 __all__ = [
-    'CHART_IR_VERSION', 'ChartAxis', 'ChartCapabilityError', 'ChartDoc',
-    'ChartSeries', 'Mark', 'Panel', 'SurfaceData',
+    'CHART_IR_VERSION', 'SUPPORT_KINDS', 'ChartAxis', 'ChartCapabilityError',
+    'ChartDoc', 'ChartSeries', 'Mark', 'Panel', 'SurfaceData',
     'canonical_dict', 'canonical_json', 'doc_hash', 'stamp',
 ]
 
@@ -84,6 +84,22 @@ SERIES_ROLES = ('density', 'survival', 'cdf', 'identity', 'distortion',
 #: Mark roles: 'mean', 'break_even' (the zero of a signed outcome axis),
 #: 'capital_anchor' (a return-period quantile such as 1-in-200).
 MARK_ROLES = ('mean', 'break_even', 'capital_anchor')
+
+#: What a series' x values *are*, which is a fact about the law and not
+#: about the drawing. 'atomic': the points carry the whole distribution and
+#: there is nothing between them, which in this library is the normal case,
+#: because a discretized aggregate **is** the distribution rather than an
+#: approximation to some continuous ideal. 'continuous': the points are
+#: samples of a function that exists everywhere between them (a distortion
+#: g(s), TVaR as a function of p, a frozen severity's pdf, none of which
+#: are discretized at all).
+#:
+#: The default is 'atomic' because that is what this library computes with.
+#: A renderer chooses the drawing from this plus the room it has: stems
+#: where the atoms are far enough apart to see, steps where they are not
+#: (sharp jumps, never a slope the law does not have), and a plain line
+#: once a bucket is sub-pixel and the two are indistinguishable anyway.
+SUPPORT_KINDS = ('atomic', 'continuous')
 
 
 class ChartCapabilityError(RuntimeError):
@@ -281,6 +297,11 @@ class ChartSeries:
         ``y2`` over ``x``. Same length as ``y``; only with an x/y payload.
     surface : SurfaceData, optional
         The z grid for 'heatmap' and 'surface' panels, instead of x/y.
+    support : str
+        One of :data:`SUPPORT_KINDS`, default 'atomic'. Whether the points
+        are the whole law or samples of a function that lives between
+        them. How that is *drawn* is the renderer's, and depends on how
+        much room each atom gets.
 
     Notes
     -----
@@ -297,8 +318,12 @@ class ChartSeries:
     y: tuple = None
     y2: tuple = None
     surface: SurfaceData = None
+    support: str = 'atomic'
 
     def __post_init__(self):
+        if self.support not in SUPPORT_KINDS:
+            raise ValueError(f'unknown support {self.support!r}; '
+                             f'expected one of {SUPPORT_KINDS}')
         if (self.surface is None) == (self.x is None and self.y is None):
             raise ValueError(
                 f'series {self.name!r} must carry either x/y or surface')

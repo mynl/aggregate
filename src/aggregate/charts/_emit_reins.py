@@ -32,13 +32,12 @@ where a reader expects tail.
 Pure numpy and pandas; no matplotlib.
 """
 
-import numpy as np
-
 from .._aggregate import Aggregate
 from .._grid_distribution import GridDistribution
-from ..constants import (LOG_FLOOR, REINS_LABEL_CEDED, REINS_LABEL_GROSS,
+from ..constants import (REINS_LABEL_CEDED, REINS_LABEL_GROSS,
                          REINS_LABEL_NET, REINS_LABEL_SUBJECT)
 from . import register_chart, _emitter_base
+from ._two_panel import gapped, pad_window, survival_window
 from .ir import ChartAxis, ChartDoc, ChartSeries, Panel
 
 __all__ = ['chart_reins']
@@ -57,14 +56,6 @@ BASES = {
             ('subject', 'ceded', 'net'),
             (REINS_LABEL_SUBJECT, REINS_LABEL_CEDED, REINS_LABEL_NET)),
 }
-
-#: The deepest survival the panel will show, one over the longest return
-#: period worth drawing. Past it the curve is a line of float dust.
-SURVIVAL_FLOOR = 1e-9
-
-#: Fraction of the window added either side, so the curve is not drawn
-#: hard against the frame.
-WINDOW_PAD = 0.02
 
 chart_reins = _emitter_base('reins')
 
@@ -94,23 +85,7 @@ def _loss_window(gd):
     signed grid has no such anchor and takes ``q(0.001)``.
     """
     lo = float(gd.q(0.001)) if float(gd.x[0]) < 0 else min(0.0, float(gd.x[0]))
-    hi = float(gd.q(0.999))
-    if not hi > lo:
-        return None
-    pad = WINDOW_PAD * (hi - lo)
-    return (lo - pad, hi + pad)
-
-
-def _survival_window(survivals):
-    """``[decade under the deepest survival drawn, 1]``.
-
-    Fixing the axis at ``[SURVIVAL_FLOOR, 1]`` would be simpler and wastes
-    the panel: a book whose deepest survival is 1e-3 would draw six empty
-    decades. Rounding down to a decade keeps the gridlines on round numbers.
-    """
-    seen = [v for s in survivals for v in s if v is not None and v > LOG_FLOOR]
-    lo = max(SURVIVAL_FLOOR, min(seen)) if seen else SURVIVAL_FLOOR
-    return (float(10.0 ** np.floor(np.log10(lo))), 1.0)
+    return pad_window(lo, float(gd.q(0.999)))
 
 
 @chart_reins.register(Aggregate)
@@ -159,11 +134,7 @@ def _reins(agg, basis=None):
     grids = [GridDistribution(x, df[c].to_numpy(dtype=float), bs=agg.bs,
                               name=n)
              for c, n in zip(columns, names)]
-    # A gap, not a zero: a log axis cannot place these, and drawing them at
-    # the floor would read as a tail that is not there.
-    survivals = [tuple(float(v) if v > LOG_FLOOR else None
-                       for v in gd.sf(x))
-                 for gd in grids]
+    survivals = [gapped(gd.sf(x)) for gd in grids]
 
     series = []
     for gd, role, name in zip(grids, roles, names):
@@ -183,7 +154,7 @@ def _reins(agg, basis=None):
             ChartAxis(id='density', label='Density', unit='density'),
             ChartAxis(id='survival', label='Survival', unit='probability',
                       scale='log',
-                      suggested_range=_survival_window(survivals)),
+                      suggested_range=survival_window(survivals)),
         ),
         panels=(
             Panel(id='density', kind='xy', x_axis='loss', y_axis='density',

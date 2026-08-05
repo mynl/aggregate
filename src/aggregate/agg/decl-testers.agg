@@ -1004,3 +1004,17 @@ agg EX.Re dfreq [1 2] dsev [10 20 30] occurrence net of 10 xs 10                
 port EX.RePort agg EX.ReA dfreq [1 2] dsev [10 20 30] occurrence net of 10 xs 10 agg EX.ReB 1 claim dsev [5 10] fixed;
 xpnl EX.Tower 1000 prem less agg EX.TowerE 1000 prem at 70% lr sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 poisson                                        note{economic exhibit fixture: a two-step walk, so the ledger carries group/running-net/grand rows and a kappa ladder};
 xpnl EX.Peel 1000 premium less agg EX.PeelE 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 60 and 300 xs 200 deposit 40 poisson peel top-down                     note{waterfall fixture: a stitched two-layer peel, so the ladder is marginal and the diversified column blanks}
+
+
+# CH. Chart IR emitter fixtures (1.0.0a212)
+# ========================================
+# Programs behind tests/test_chart_severity.py ([Chart-Conversions]). One
+# severity per branch the emitter has to get right: a heavy unbounded law
+# where quantile spacing earns its keep, a bounded one whose quantiles repeat
+# at the ceiling, and a discrete one with no density at all, which the
+# emitter reads as probability mass rather than drawing a flat zero line.
+# The reinsurance chart tests reuse the RR.* programs above rather than
+# adding near-duplicates here.
+sev CH.SevLN lognorm 100 cv 2                                                                                     note{chart fixture: unbounded heavy tail; quantile-spaced grid};
+sev CH.SevB 500 * beta 2 3                                                                                        note{chart fixture: bounded; repeated quantiles at the ceiling};
+sev CH.SevD dhistogram xps [1 10 40] [.5 .3 .2]                                                                   note{chart fixture: discrete; pdf is identically zero, so the panel reads mass}

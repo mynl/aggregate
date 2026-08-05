@@ -1,0 +1,144 @@
+"""Severity chart emitter: the density and its tail, on a quantile grid.
+
+A :class:`~aggregate.distributions.Severity` is a look-through onto a
+frozen scipy variable rather than a compute result, so it carries no
+``density_df`` and there is no grid to read: the emitter synthesizes one,
+absorbing the algorithm the app's server had been carrying.
+
+The grid inverts the survival function over log-spaced exceedance
+probabilities rather than walking loss linearly. A severity is routinely
+heavy tailed and its support often unbounded, so a linear grid either
+truncates the tail or spends nearly every point on it; quantile spacing
+puts the points where the probability is. That choice is meaning, which is
+why it belongs in an emitter and not in a renderer.
+
+The ordinate is a **pdf**, not a mass. An aggregate's ``p_total`` is
+probability per bucket and sums to one; this does not, and must never be
+summed. The axis says ``pdf`` for that reason.
+
+A discrete severity is the exception, and it has to be: it has no density
+at all, so its pdf is identically zero and a pdf panel would draw a flat
+line along the axis and call it a distribution. Where that happens the
+emitter draws the probability mass instead, says so on the axis, and
+records which reading it gave in ``meta['ordinate']``. The two are never
+mixed in one document.
+
+Pure numpy and pandas; no matplotlib.
+"""
+
+import numpy as np
+
+from .._severity import Severity
+from . import register_chart, _emitter_base
+from ._two_panel import gapped, pad_window, survival_window
+from .ir import ChartAxis, ChartDoc, ChartSeries, Panel
+
+__all__ = ['chart_severity']
+
+#: Grid points. Smooth at any plot width and trivial to serialize.
+GRID_POINTS = 512
+
+#: The grid runs between these exceedance probabilities, dense near the
+#: median and still resolving the 1-in-100,000 tail without a huge grid.
+GRID_P_EDGE = 1e-5
+
+chart_severity = _emitter_base('severity')
+
+
+def _quantile_grid(sev, n):
+    """Loss points from inverting the survival at log-spaced probabilities.
+
+    Two half runs meeting at the median, so both halves of the
+    distribution are resolved: a single run from 1 to 1e-5 would crowd
+    every point into the tail and leave the body a straight line.
+    """
+    ps = np.concatenate([
+        np.logspace(np.log10(1 - GRID_P_EDGE), np.log10(0.5),
+                    n // 2, endpoint=False),
+        np.logspace(np.log10(0.5), np.log10(GRID_P_EDGE), n - n // 2),
+    ])
+    loss = np.asarray(sev.isf(ps), dtype=float)
+    # A bounded or discrete severity repeats and can invert; unique() keeps
+    # the grid monotone and drops the duplicates a flat stretch produces,
+    # so no consumer has to defend against a bad axis.
+    return np.unique(loss[np.isfinite(loss)])
+
+
+@chart_severity.register(Severity)
+def _severity(sev, n=GRID_POINTS):
+    """Emit the two-panel density and tail chart for a severity.
+
+    Parameters
+    ----------
+    sev : Severity
+    n : int, default 512
+        Grid points. The grid is quantile spaced, so this buys resolution
+        in probability rather than in loss.
+
+    Returns
+    -------
+    ChartDoc
+        Two 'xy' panels sharing one loss axis: 'density' (the pdf
+        ordinate, or the probability mass for a law that has no density,
+        per ``meta['ordinate']``) and 'tail' (log survival,
+        ``read_axis='y'``).
+
+    Notes
+    -----
+    No marks: a severity chart carries no mean line and no capital
+    anchors, because neither is a severity question (the app draws none
+    either, and the inventory records the omission as deliberate).
+    """
+    loss = _quantile_grid(sev, n)
+    if loss.size == 0:
+        raise ValueError(f'severity {sev.label!r} produced no finite '
+                         'quantiles to draw')
+    with np.errstate(divide='ignore', invalid='ignore'):
+        pdf = np.asarray(sev.pdf(loss), dtype=float)
+        cdf = np.asarray(sev.cdf(loss), dtype=float)
+        sf = np.asarray(sev.sf(loss), dtype=float)
+    # No density anywhere on the grid means the law has none: read the
+    # jumps of the step cdf, which are exactly the atoms. Tested on the
+    # symptom rather than on the severity's kind, so a wrapper around a
+    # discrete law is caught as surely as the discrete law itself.
+    mass_reading = not np.any(pdf > 0)
+    ordinate = np.diff(cdf, prepend=0.0) if mass_reading else pdf
+    y_label = 'Probability mass' if mass_reading else 'pdf'
+    xs = tuple(float(v) for v in loss)
+    survival = gapped(sf)
+    name = str(sev.label)
+
+    # An unsigned severity is read from zero: starting the axis at the
+    # 0.1% quantile would hide the mass at and near zero that a layered or
+    # spliced severity routinely has.
+    lo = min(0.0, float(loss[0]))
+    hi = float(sev.isf(0.001))
+
+    return ChartDoc(
+        name='severity',
+        title=name,
+        axes=(
+            ChartAxis(id='loss', label='Loss', unit='currency',
+                      suggested_range=pad_window(lo, hi)),
+            ChartAxis(id='pdf', label=y_label, unit='density'),
+            ChartAxis(id='survival', label='Survival', unit='probability',
+                      scale='log',
+                      suggested_range=survival_window([survival])),
+        ),
+        panels=(
+            Panel(id='density', kind='xy', x_axis='loss', y_axis='pdf',
+                  title='Severity density'),
+            Panel(id='tail', kind='xy', x_axis='loss', y_axis='survival',
+                  read_axis='y', title='Survival'),
+        ),
+        series=(
+            ChartSeries(name=name, role='density', panel_id='density',
+                        x=xs, y=tuple(float(v) for v in ordinate)),
+            ChartSeries(name=name, role='survival', panel_id='tail',
+                        x=xs, y=survival),
+        ),
+        meta={'ordinate': 'mass' if mass_reading else 'pdf'},
+    )
+
+
+register_chart('severity', chart_severity)

@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.0.0a212
+
+**[Chart-IR] pass three, [Chart-Conversions]: severity, the third
+conversion.** `charts/_emit_severity.py`: `chart_severity(sev, n=512)`
+synthesizes the grid a `Severity` does not have (it is a look-through onto
+a frozen scipy variable, not a compute result) by absorbing the algorithm
+the app's server had been carrying: invert the survival over log-spaced
+exceedance probabilities in two half runs meeting at the median, then
+`unique` for monotonicity. A severity is routinely heavy tailed and often
+unbounded, so a linear grid either truncates the tail or spends nearly
+every point on it. Quantile spacing puts the points where the probability
+is, and that is meaning, which is why it belongs in an emitter.
+
+The ordinate is a **pdf**, not a mass, and the axis says so: an aggregate's
+`p_total` is probability per bucket and sums to one, this does not and must
+never be summed.
+
+*A defect inherited with the algorithm.* A discrete severity has no
+density, so its pdf is identically zero and the panel drew a flat line
+along the axis and called it a distribution. Where the pdf is zero
+everywhere on the grid the emitter now reads the jumps of the step cdf
+instead, which are exactly the atoms, labels the axis `Probability mass`,
+and records which reading it gave in `meta['ordinate']`. The test is the
+symptom rather than the severity's kind, so a wrapper around a discrete
+law is caught as surely as the discrete law itself. The two readings are
+never mixed in one document.
+
+*Shared two-panel semantics.* `charts/_two_panel.py` holds the parts five
+charts (reins, sev, agg, port, pnl) have in common and that are meaning
+rather than styling: the window pad, the survival floor and its round
+decade, and the rule that float dust becomes a gap. Lifted out now, with
+the third of the five, rather than after four copies had drifted. The
+reins emitter moves onto it; `SURVIVAL_FLOOR` and `WINDOW_PAD` now live
+there.
+
+No image gate for this chart either: `plot_severity` exists but draws a
+different chart (four panels including a Lee diagram), so there is nothing
+to compare pixel for pixel. Corpus entries added as `CH.Sev*` in
+`decl-testers.agg`, one per branch the emitter has to get right.
+
 ## 1.0.0a211
 
 **[Chart-Conversions] the suggested range is the range of the data, not of

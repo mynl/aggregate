@@ -22,7 +22,7 @@ from aggregate import build  # noqa: E402
 from aggregate.charts import (  # noqa: E402
     available_charts, canonical_json, chart_reins, doc_hash,
 )
-from aggregate.charts._emit_reins import SURVIVAL_FLOOR  # noqa: E402
+from aggregate.charts._two_panel import SURVIVAL_FLOOR  # noqa: E402
 from aggregate.constants import LOG_FLOOR  # noqa: E402
 
 _OCC = ('agg RR.Occ 10 claims sev lognorm 100 cv 2 '

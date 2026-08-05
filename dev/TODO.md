@@ -197,10 +197,17 @@
   option and the cession predicate, survival through `GridDistribution.sf`
   exactly matching the app's accumulation; the renderer grew multi-panel
   layout with shared x axes, and now honors `suggested_range`, which it had
-  never applied, `plot_distortion` pinning the unit square with it). Next:
-  sev, agg, pnl, port, bvagg heatmap in plan order, plus the paired app
-  commits (distortion and reins both need the adapter's xy realization),
-  which wait on the app-side workstream.
+  never applied; corrected at a211, where the suggested range became the
+  extent of the *data*, inset by the renderer's own margin, since a
+  distortion legitimately sits at 0 or 1 and must not be drawn along the
+  frame). Third conversion, severity, landed a212 (`chart_severity`
+  absorbing the app's log-spaced sf inversion, and reading probability
+  mass where a law has no density instead of drawing a flat zero;
+  `charts/_two_panel.py` now holds the window and survival-floor
+  semantics the five two-panel charts share). Next: agg, pnl, port, bvagg
+  heatmap in plan order, plus the paired app commits (distortion, reins
+  and sev all need the adapter's xy realization), which wait on the
+  app-side workstream.
 
 ### Correctness & bugs
 

@@ -192,9 +192,15 @@
   gaining the labels it never had, and the baseline regenerated: the
   conversion residual is now 0, pixel for pixel). Chart IR version 1 is
   **signed off and closed to additions**: a chart the schema cannot express
-  changes it by a fresh author decision or stays bespoke. Next: the
-  distortion's paired app commit (adapter xy realization), then reins
-  triple, sev, agg, pnl, port, bvagg heatmap in plan order.
+  changes it by a fresh author decision or stays bespoke. Second conversion,
+  the reins triple, landed a210 (`chart_reins` with the basis semantic
+  option and the cession predicate, survival through `GridDistribution.sf`
+  exactly matching the app's accumulation; the renderer grew multi-panel
+  layout with shared x axes, and now honors `suggested_range`, which it had
+  never applied, `plot_distortion` pinning the unit square with it). Next:
+  sev, agg, pnl, port, bvagg heatmap in plan order, plus the paired app
+  commits (distortion and reins both need the adapter's xy realization),
+  which wait on the app-side workstream.
 
 ### Correctness & bugs
 

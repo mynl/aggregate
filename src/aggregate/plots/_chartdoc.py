@@ -101,11 +101,19 @@ def _render_grid_panel(ax, doc, panel, series_list, log_z):
 
 
 def _apply_axis(ax, which, axis):
-    """Realize one ChartAxis on a matplotlib axis ('x' or 'y')."""
+    """Realize one ChartAxis on a matplotlib axis ('x' or 'y').
+
+    The suggested range is the emitter's answer to which slice of the grid
+    is worth looking at, and a heavy tail makes that the difference between
+    a readable chart and every visible mass in a sliver at the origin. So
+    the initial view honors it, exactly as :class:`ChartAxis` documents;
+    panning and zooming afterwards is the reader's business.
+    """
     if axis.scale == 'log':
         getattr(ax, f'set_{which}scale')('log')
     if axis.suggested_range is not None:
         lo, hi = axis.suggested_range
+        getattr(ax, f'set_{which}lim')(lo, hi)
         # The unit interval draws with pinned round ticks: the reference
         # gridlines of a probability square are part of how it is read.
         if (lo, hi) == (0.0, 1.0) and axis.scale == 'linear':
@@ -155,12 +163,12 @@ def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
     Parameters
     ----------
     doc : ChartDoc
-        The document to realize. Currently single-panel documents with a
-        z-grid kind ('surface', 'heatmap'); further kinds arrive with
-        their conversions.
+        The document to realize. Panels are laid out in one row, in
+        document order; panels naming the same x axis share it.
     ax : matplotlib Axes, optional
         Draw into an existing axes; default makes a figure via the house
-        canvas helpers.
+        canvas helpers. Single-panel documents only, since a shared axis
+        is a property of the figure and not of one axes.
     strict : bool
         Raise :class:`ChartCapabilityError` for any panel kind this
         renderer cannot realize faithfully ('surface'), instead of the
@@ -193,32 +201,50 @@ def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
         raise ChartCapabilityError(
             f'panel {panel.id!r} kind {panel.kind!r} is not yet realized '
             'by the matplotlib renderer')
-    if len(doc.panels) != 1:
+    if not doc.panels:
+        raise ChartCapabilityError(f'document {doc.name!r} has no panels')
+    if ax is not None and len(doc.panels) > 1:
         raise ChartCapabilityError(
-            'multi-panel documents are not yet realized by the matplotlib '
-            'renderer')
+            f'document {doc.name!r} has {len(doc.panels)} panels and cannot '
+            'be drawn into one supplied axes; leave ax=None')
 
-    panel = doc.panels[0]
-    if ax is None:
-        if panel.kind == 'xy':
-            # An equal-aspect single panel is a square figure (the unit
-            # square reads at the small preset, as the compositor draws it).
-            size = ((FIG_H, FIG_H) if panel.aspect == 'equal'
-                    else (FIG_W, FIG_H))
-        else:
-            # Near-square: the z grid reads as a map, and the colorbar
-            # takes the balance of the width.
-            size = (1.25 * FIG_W, FIG_W)
-        _, ax = make_grid(1, 1, figsize=size, squeeze=True)
-    fig = ax.figure
-    series = [s for s in doc.series if s.panel_id == panel.id]
     title = doc.title or doc.name
-    if panel.kind == 'xy':
-        _render_xy_panel(ax, doc, panel, series)
+    if len(doc.panels) == 1:
+        panel = doc.panels[0]
+        if ax is None:
+            if panel.kind == 'xy':
+                # An equal-aspect single panel is a square figure (the unit
+                # square reads at the small preset, as the compositor does).
+                size = ((FIG_H, FIG_H) if panel.aspect == 'equal'
+                        else (FIG_W, FIG_H))
+            else:
+                # Near-square: the z grid reads as a map, and the colorbar
+                # takes the balance of the width.
+                size = (1.25 * FIG_W, FIG_W)
+            _, ax = make_grid(1, 1, figsize=size, squeeze=True)
+        axs = [ax]
     else:
-        log_z = bool(log_z) and bool(doc.meta.get('z_log_ok'))
-        _render_grid_panel(ax, doc, panel, series, log_z)
-        if panel.kind == 'surface':
-            title = f'{title} (projection)'
-    ax.set_title(_typeset(doc, panel.title or title))
+        # Panels naming the same x axis share it: that is what makes a
+        # density and its tail one reading rather than two pictures, and
+        # zooming one must move the other.
+        shared = len({p.x_axis for p in doc.panels}) == 1
+        _, grid = make_grid(1, len(doc.panels), squeeze=False, sharex=shared)
+        axs = list(grid[0])
+
+    for panel, panel_ax in zip(doc.panels, axs):
+        series = [s for s in doc.series if s.panel_id == panel.id]
+        panel_title = panel.title or title
+        if panel.kind == 'xy':
+            _render_xy_panel(panel_ax, doc, panel, series)
+        else:
+            _render_grid_panel(panel_ax, doc, panel, series,
+                               bool(log_z) and bool(doc.meta.get('z_log_ok')))
+            if panel.kind == 'surface':
+                panel_title = f'{panel_title} (projection)'
+        panel_ax.set_title(_typeset(doc, panel_title))
+    fig = axs[0].figure
+    if len(doc.panels) > 1 and doc.title:
+        # Each panel already says what it is, so the document's title is the
+        # heading over them rather than a repeat inside each one.
+        fig.suptitle(_typeset(doc, doc.title))
     return fig

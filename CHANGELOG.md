@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.0.0a210
+
+**[Chart-IR] pass three, [Chart-Conversions]: the reinsurance triple, and
+the renderer learns to lay out panels.** `charts/_emit_reins.py`:
+`chart_reins(agg, basis=None)` reads `reins_density_df` and emits the
+two-panel exhibit, a density panel and a log-survival panel over one shared
+loss window, three series each. Registered behind a cession predicate, so
+`available_charts` answers `['reins']` exactly when some stage of the
+program cedes something.
+
+Which of the frame's three triples is drawn is a **semantic option** to the
+emitter and not renderer view state: `'sev'` is the occurrence program seen
+per claim, `'occ'` the aggregate before, ceded by and after that program,
+`'agg'` the aggregate cover's subject, cession and net. They answer
+different questions of different contracts. The default is `'occ'` where
+the occurrence program cedes and `'agg'` otherwise, so it is always a
+triple that carries something; naming a basis whose stage cedes nothing is
+a `ValueError` listing what is available. On the `'agg'` triple the first
+series is **subject**, never relabeled gross, since it equals true gross
+only with no occurrence program underneath it.
+
+Survival is accumulated in the emitter through `GridDistribution.sf`
+rather than client side, and agrees with the app's `1 - cumsum` **exactly**
+(asserted, not assumed: each column is a pmf on one grid). Values at or
+under `LOG_FLOOR` emit as gaps, because a log axis cannot place float dust
+and drawing it at the floor reads as tail that is not there. Series names
+reuse the existing `REINS_LABEL_*` constants, so the triple is called the
+same thing here as everywhere else in the library.
+
+*Renderer.* Panels now lay out in one row, one axes per panel, and panels
+naming the same x axis **share** it, which is what makes a density and its
+tail one reading rather than two pictures. The single-panel path is
+untouched. A multi-panel document refuses a caller-supplied `ax`, since a
+shared axis is a property of the figure.
+
+*A defect the conversion exposed.* `ChartAxis.suggested_range` documents
+that the initial view honors it, and the renderer read the field only to
+detect the unit interval for tick pinning: it never set the limits. Benign
+on the distortion, whose data spans its whole range, and badly wrong on a
+heavy tail, where the whole point of the window is that the visible mass
+would otherwise be a sliver at the origin. The renderer now honors it.
+`plot_distortion` pins `[0, 1]` on both axes with it, so the two sides of
+the seam stay on one baseline image, and because a unit square should draw
+as the unit square rather than with autoscale's 5% of white where no
+distortion can go. The baseline regenerates; the conversion residual stays
+**0**.
+
+No image gate for this chart: there is no `plots/` compositor for it, so
+the before side is the app's client-side builder and that comparison
+belongs to the paired app commit.
+
 ## 1.0.0a209
 
 **[Chart-IR] pass two closes its sign-off gate, part two:

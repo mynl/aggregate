@@ -179,9 +179,17 @@
   fixtures and node smoke updated); first conversion, distortion g(s),
   landed a202 (emitter, xy renderer growth, and the image gate:
   compositor-generated baseline, measured conversion residual RMS 0.05,
-  PROVISIONAL pins mpl 3.10.9 / tolerance 2.0 awaiting author
-  confirmation). Next: the distortion's paired app commit (adapter xy
-  realization), then reins triple, sev, agg, pnl, port, bvagg heatmap in
+  pins mpl 3.10.9 / tolerance 2.0). **Sign-off gate closed 2026-08-05**:
+  all six judgment calls agreed, the gate pins confirmed, and the schema
+  changes they imply executed from `dev/plan-chart-schema-signoff.md`.
+  `[Chart-Grid-Overlays]` landed a208 (grid panels carry one surface plus
+  any number of x/y overlays, the `iso_total` role, the twelve-plot
+  bivariate panel representability test, and `LOG_FLOOR = 1e-15` in
+  `constants.py` settling J5). Chart IR version 1 is now **closed to
+  additions**: a chart the schema cannot express changes it by a fresh
+  author decision or stays bespoke. Next: `[Chart-Plain-Text-Names]` with
+  `[Chart-Axis-Labels]`, then the distortion's paired app commit (adapter
+  xy realization), then reins triple, sev, agg, pnl, port, bvagg heatmap in
   plan order.
 
 ### Correctness & bugs

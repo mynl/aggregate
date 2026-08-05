@@ -142,12 +142,44 @@ def test_duplicate_axis_ids():
                                  ChartAxis(id='a', label='b')))
 
 
-def test_series_data_must_match_panel_kind():
+def test_xy_panel_refuses_a_surface():
     surf = SurfaceData(x=(1.0,), y=(1.0,), z=((1.0,),))
-    with pytest.raises(ValueError, match='does not match panel kind'):
+    with pytest.raises(ValueError, match='carries a surface'):
         small_xy_doc(series=(
             ChartSeries(name='s', role='joint', panel_id='density',
                         surface=surf),))
+
+
+def test_grid_panel_needs_exactly_one_surface():
+    doc = small_surface_doc()
+    surf = doc.series[0].surface
+    with pytest.raises(ValueError, match='0 surface series'):
+        dataclasses.replace(doc, series=())
+    with pytest.raises(ValueError, match='2 surface series'):
+        dataclasses.replace(doc, series=doc.series + (
+            ChartSeries(name='again', role='joint', panel_id='joint',
+                        surface=surf),))
+
+
+def test_grid_panel_accepts_xy_overlays():
+    """The twelve-plot bivariate panel: iso-total diagonals over a density.
+
+    Representability only (``dev/plan-chart-ir.md`` scope): the panel is
+    ``pedagogy.plot_twelve``'s (1,3), a contoured joint density with the
+    ``x + y = c`` lines drawn over it. No emitter is scheduled; this test
+    exists so the schema cannot silently lose the ability to express it.
+    """
+    doc = small_surface_doc()
+    top = max(doc.series[0].surface.x)
+    lines = tuple(
+        ChartSeries(name=f'Sum = {c:,.0f}', role='iso_total',
+                    panel_id='joint', x=(0.0, c), y=(c, 0.0))
+        for c in (top / 2, top, 1.5 * top))
+    over = dataclasses.replace(doc, series=doc.series + lines)
+    assert [s.role for s in over.series] == ['joint'] + ['iso_total'] * 3
+    # Overlays are ordinary content: they hash, and they move the hash.
+    assert doc_hash(over) != doc_hash(doc)
+    assert json.loads(canonical_json(over))['series'][1]['role'] == 'iso_total'
 
 
 def test_xy_lengths_must_agree():

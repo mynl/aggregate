@@ -27,7 +27,7 @@ from enum import Flag, auto
 
 
 __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
-           'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
+           'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR', 'LOG_FLOOR',
            'Validation', 'DefectiveDistributionWarning',
            'DefectiveDistributionError', 'InfiniteVarianceError',
            'IgnoredDecLClauseWarning', 'ZeroPremiumCessionWarning',
@@ -50,6 +50,15 @@ LEGEND_FONT = 'x-small'
 # see https://matplotlib.org/stable/gallery/color/named_colors.html
 PLOT_FACE_COLOR = 'lightsteelblue'
 FIGURE_BG_COLOR = 'aliceblue'
+# The one float-dust floor for anything drawn on a log scale: below this a
+# value is arithmetic noise, not tail, and on a log axis it draws as a
+# fringe that reads as signal. Chart emitters use it as the gap floor, the
+# ChartDoc renderer as the log color-scale floor, and the plots/
+# compositors converge onto it chart by chart as their conversions land
+# (dev/chart-inventory.md, judgment call J5, settled 2026-08-05; matches
+# the app's LOG_FLOOR in theme.js). Lives here rather than in charts/ so
+# the compositors, which are not chart-IR code, share the one definition.
+LOG_FLOOR = 1e-15
 
 # Column / view labels for reinsurance reporting (``validation_df``,
 # ``reins_summary_df``, ``reins_stats_df``). Centralised so the wording is

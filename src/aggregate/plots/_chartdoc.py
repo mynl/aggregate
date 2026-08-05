@@ -19,14 +19,10 @@ meaningfulness flag) comes off the document.
 import numpy as np
 
 from ..charts.ir import ChartCapabilityError
+from ..constants import LOG_FLOOR
 from ._style import plt, mpl, FIG_H, FIG_W, make_grid
 
 __all__ = ['plot_chartdoc']
-
-# The float-dust floor for log color scales, matching the app's LOG_FLOOR
-# (theme.js:63) and the inventory's judgment call J5: below it a value is
-# arithmetic noise, not signal.
-_LOG_FLOOR = 1e-15
 
 # Panel kinds this renderer realizes natively today. 'surface' is the
 # declared degradation (projection); anything else raises until its
@@ -47,9 +43,15 @@ def _house_ramp():
         'aggregate_seq', ['#ffffff', c0])
 
 
-def _render_grid_panel(ax, doc, panel, series, log_z):
-    """Render one z-grid panel (surface projection or heatmap)."""
-    surf = series.surface
+def _render_grid_panel(ax, doc, panel, series_list, log_z):
+    """Render one z-grid panel (surface projection or heatmap).
+
+    The panel's one surface series draws as the mesh; any x/y series on the
+    same panel are overlays, drawn over it in document order (the iso-total
+    diagonals of a joint density). Overlays are neutral and thin: the mesh
+    is the subject, and a heavy line over a color field hides it.
+    """
+    surf = next(s for s in series_list if s.surface is not None).surface
     x = np.asarray(surf.x, dtype=float)
     y = np.asarray(surf.y, dtype=float)
     z = np.asarray(surf.z, dtype=float)
@@ -58,9 +60,9 @@ def _render_grid_panel(ax, doc, panel, series, log_z):
         # One decade under the smallest mass actually present (ignoring
         # float dust), the app's floor-not-holes rule: a zero cell sits on
         # the floor rather than punching a hole in the field.
-        pos = z[z > _LOG_FLOOR]
+        pos = z[z > LOG_FLOOR]
         floor = (10.0 ** np.floor(np.log10(pos.min()))
-                 if pos.size else _LOG_FLOOR)
+                 if pos.size else LOG_FLOOR)
         norm = mpl.colors.LogNorm(vmin=floor, vmax=max(z.max(), floor * 10),
                                   clip=True)
     else:
@@ -72,7 +74,17 @@ def _render_grid_panel(ax, doc, panel, series, log_z):
     zlabel = axes[panel.z_axis].label
     ax.figure.colorbar(mesh, ax=ax, shrink=0.85,
                        label=f'log {zlabel}' if log_z else zlabel)
-    ax.set(xlabel=axes[panel.x_axis].label, ylabel=axes[panel.y_axis].label)
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    for s in series_list:
+        if s.surface is not None:
+            continue
+        xs = np.array([np.nan if v is None else v for v in s.x], dtype=float)
+        ys = np.array([np.nan if v is None else v for v in s.y], dtype=float)
+        ax.plot(xs, ys, color='k', lw=0.35, alpha=0.5)
+    # An overlay states a relationship, not an extent: a family of iso-total
+    # diagonals reaching past the mesh must not widen the window the grid set.
+    ax.set(xlim=xlim, ylim=ylim,
+           xlabel=axes[panel.x_axis].label, ylabel=axes[panel.y_axis].label)
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
 
@@ -190,7 +202,7 @@ def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
         _render_xy_panel(ax, doc, panel, series)
     else:
         log_z = bool(log_z) and bool(doc.meta.get('z_log_ok'))
-        _render_grid_panel(ax, doc, panel, series[0], log_z)
+        _render_grid_panel(ax, doc, panel, series, log_z)
         if panel.kind == 'surface':
             title = f'{title} (projection)'
     ax.set_title(panel.title or title)

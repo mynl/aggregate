@@ -65,9 +65,12 @@ AXIS_UNITS = ('currency', 'probability', 'density', 'return_period',
 #: 'density', 'survival', 'cdf', 'identity' (the diagonal), 'distortion'
 #: (a g(s) curve), 'gross', 'ceded', 'net', 'subject' (the aggregate
 #: cover's subject when an occurrence program sits underneath), 'total',
-#: 'unit' (one member of a portfolio family), 'joint' (a z grid).
+#: 'unit' (one member of a portfolio family), 'joint' (a z grid),
+#: 'iso_total' (a level set of x + y over a joint grid: every point on it
+#: is one total loss, so it is the line the portfolio reader traces).
 SERIES_ROLES = ('density', 'survival', 'cdf', 'identity', 'distortion',
-                'gross', 'ceded', 'net', 'subject', 'total', 'unit', 'joint')
+                'gross', 'ceded', 'net', 'subject', 'total', 'unit', 'joint',
+                'iso_total')
 
 #: Mark roles: 'mean', 'break_even' (the zero of a signed outcome axis),
 #: 'capital_anchor' (a return-period quantile such as 1-in-200).
@@ -269,6 +272,13 @@ class ChartSeries:
         ``y2`` over ``x``. Same length as ``y``; only with an x/y payload.
     surface : SurfaceData, optional
         The z grid for 'heatmap' and 'surface' panels, instead of x/y.
+
+    Notes
+    -----
+    An x/y series draws on **any** panel kind. On a grid panel it is an
+    overlay, drawn over the mesh in document order: the iso-total diagonals
+    of a joint density, a contour trace, a reference curve. The grid panel
+    itself carries exactly one surface series; an 'xy' panel carries none.
     """
 
     name: str
@@ -404,16 +414,28 @@ class ChartDoc:
                     f'axis {a.id!r} reciprocal_of unknown axis '
                     f'{a.reciprocal_of!r}')
         kinds = {p.id: p.kind for p in self.panels}
+        # A grid panel carries exactly one surface, plus any number of x/y
+        # overlays drawn over it (the iso-total diagonals of a joint
+        # density). An 'xy' panel carries no surface at all.
+        grid_kinds = ('heatmap', 'surface')
+        surfaces = {p.id: 0 for p in self.panels if p.kind in grid_kinds}
         for s in self.series:
             if s.panel_id not in kinds:
                 raise ValueError(
                     f'series {s.name!r} references unknown panel '
                     f'{s.panel_id!r}')
-            grid_panel = kinds[s.panel_id] in ('heatmap', 'surface')
-            if grid_panel != (s.surface is not None):
+            if s.surface is None:
+                continue
+            if kinds[s.panel_id] not in grid_kinds:
                 raise ValueError(
-                    f'series {s.name!r} data does not match panel kind '
-                    f'{kinds[s.panel_id]!r}')
+                    f'series {s.name!r} carries a surface but panel '
+                    f'{s.panel_id!r} is kind {kinds[s.panel_id]!r}')
+            surfaces[s.panel_id] += 1
+        for pid, count in surfaces.items():
+            if count != 1:
+                raise ValueError(
+                    f'panel {pid!r} carries {count} surface series, '
+                    'expected exactly one')
         for m in self.marks:
             if m.panel_id not in kinds:
                 raise ValueError(

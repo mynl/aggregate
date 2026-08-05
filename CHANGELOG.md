@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.0.0a208
+
+**[Chart-IR] pass two closes its sign-off gate, part one:
+[Chart-Grid-Overlays].** The author's picks on the six inventory judgment
+calls are in (`dev/chart-inventory.md` section E, all six agreed) and the
+schema changes they imply land here. Plan: `dev/plan-chart-schema-signoff.md`.
+
+The representability check the plan promised found a real gap: the twelve-plot
+bivariate panel (`pedagogy.plot_twelve` panel (1,3), a contoured joint density
+with the `x + y = c` iso-total lines drawn over it) could not be expressed,
+because a grid panel refused to carry anything but its surface. `ChartDoc`
+now validates the honest rule: a 'heatmap' or 'surface' panel carries
+**exactly one** surface series **plus any number of x/y overlays**, drawn over
+the mesh in document order; an 'xy' panel still refuses a surface. The
+diagonals ride as ordinary two-point line series with the new `iso_total`
+role, so no new geometry concept and no new `Mark` orientation enter the
+schema. The matplotlib renderer draws overlays neutral and thin over the
+mesh, and pins the window the grid set so a diagonal reaching past the data
+cannot widen it. `tests/test_charts_ir.py` builds the panel and asserts it
+validates: representability only, per the 1.0 scope, with no emitter
+scheduled.
+
+Judgment call J5 settled with it, and it is a constant rather than a look
+change: `LOG_FLOOR = 1e-15` joins `constants.py`, the one float-dust floor for
+anything drawn on a log scale, and the renderer's private `_LOG_FLOOR`
+collapses onto it. It lives in `constants.py` rather than in `charts/` because
+the `plots/` compositors need the same value and are not chart-IR code, so the
+one definition is shared without touching the charts-plots dependency
+direction. Emitters adopt it as their gap floor as each conversion lands and
+the compositors converge chart by chart under the image gate, so nothing
+outside the charts lane changes appearance here.
+
+With this and the naming pass that follows, chart IR version 1 is **signed off
+and closed to additions**: a chart the schema cannot express either changes the
+schema through a fresh author decision or stays bespoke and is listed as
+bespoke.
+
 ## 1.0.0a207
 
 **[Exhibits-Waterfall]: `economic_waterfall`, the flagship business exhibit.**

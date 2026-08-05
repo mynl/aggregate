@@ -182,6 +182,17 @@ def test_grid_panel_accepts_xy_overlays():
     assert json.loads(canonical_json(over))['series'][1]['role'] == 'iso_total'
 
 
+def test_tex_map_is_optional_and_costs_no_hash():
+    """A document with nothing to typeset serializes exactly as before."""
+    plain = small_xy_doc()
+    assert plain.tex == {}
+    assert 'tex' not in canonical_dict(plain)
+    typeset = dataclasses.replace(plain, tex={'total': r'$T$'})
+    assert canonical_dict(typeset)['tex'] == {'total': '$T$'}
+    # it is content, so it hashes; absent, it cannot perturb an existing hash
+    assert doc_hash(typeset) != doc_hash(plain)
+
+
 def test_xy_lengths_must_agree():
     with pytest.raises(ValueError, match='len'):
         ChartSeries(name='s', role='density', panel_id='p',

@@ -11,6 +11,7 @@ single-consumer case).
 
 import numpy as np
 
+from ..constants import DISTORTION_DUAL_TEX
 from ._style import plt, mpl, FIG_W, FIG_H
 
 
@@ -83,17 +84,20 @@ def plot_distortion(dist, xs=None, n=101, both=True, ax=None, plot_points=True,
     if scale == 'linear':
         ax.plot(xs, y1, c=c, label=dist.label, **kwargs)
         if both:
-            ax.plot(xs, y2, c=c_dual, label='$g\\check$', **kwargs)
+            ax.plot(xs, y2, c=c_dual, label=DISTORTION_DUAL_TEX, **kwargs)
         ax.plot(xs, xs, color='k', lw=0.5, alpha=0.5)
     elif scale == 'return':
         ax.plot(xs, y1, c=c, label=dist.label, **kwargs)
         if both:
-            ax.plot(xs, y2, c=c_dual, label=f'Dual {dist.label}', **kwargs)
+            ax.plot(xs, y2, c=c_dual, label=DISTORTION_DUAL_TEX, **kwargs)
         ax.set(xscale='log', yscale='log',
                xlim=[1 / 5_000, 1], ylim=[1 / 5_000, 1])
         ax.plot(xs, xs, color='k', lw=0.5, alpha=0.5)
 
-    ax.set(title=dist.label, aspect='equal')
+    # Axis labels: this was the one compositor in plots/ that drew none, and
+    # it draws them now so it reads like the rest of the package and matches
+    # what the ChartDoc renderer draws from the same axis labels.
+    ax.set(title=dist.label, aspect='equal', xlabel='s', ylabel='g(s)')
     if scale == 'linear':
         ax.set(xticks=np.linspace(0, 1, 6),
                yticks=np.linspace(0, 1, 6))

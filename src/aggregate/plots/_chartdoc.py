@@ -31,6 +31,16 @@ _NATIVE = {'heatmap', 'xy'}
 _DEGRADED = {'surface'}
 
 
+def _typeset(doc, text):
+    """The typeset form of ``text`` if the document carries one.
+
+    matplotlib can render mathtext, so it consults ``ChartDoc.tex``; a
+    renderer that cannot typeset skips this and draws the plain string,
+    which is why the plain form is the one the schema requires.
+    """
+    return doc.tex.get(text, text) if text else text
+
+
 def _house_ramp():
     """Sequential colormap, white to the first prop-cycle color.
 
@@ -71,7 +81,7 @@ def _render_grid_panel(ax, doc, panel, series_list, log_z):
                          norm=norm)
     if np.count_nonzero(z > 0) > 1 and z.max() > z.min():
         ax.contour(x, y, z, colors='w', linewidths=0.5, alpha=0.6)
-    zlabel = axes[panel.z_axis].label
+    zlabel = _typeset(doc, axes[panel.z_axis].label)
     ax.figure.colorbar(mesh, ax=ax, shrink=0.85,
                        label=f'log {zlabel}' if log_z else zlabel)
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
@@ -84,7 +94,8 @@ def _render_grid_panel(ax, doc, panel, series_list, log_z):
     # An overlay states a relationship, not an extent: a family of iso-total
     # diagonals reaching past the mesh must not widen the window the grid set.
     ax.set(xlim=xlim, ylim=ylim,
-           xlabel=axes[panel.x_axis].label, ylabel=axes[panel.y_axis].label)
+           xlabel=_typeset(doc, axes[panel.x_axis].label),
+           ylabel=_typeset(doc, axes[panel.y_axis].label))
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
 
@@ -115,10 +126,10 @@ def _render_xy_panel(ax, doc, panel, series_list):
         if s.y2 is not None:
             y2 = np.array([np.nan if v is None else v for v in s.y2],
                           dtype=float)
-            ax.fill_between(x, y, y2, alpha=0.15, label=s.name)
+            ax.fill_between(x, y, y2, alpha=0.15, label=_typeset(doc, s.name))
             labeled = True
             continue
-        ax.plot(x, y, label=s.name)
+        ax.plot(x, y, label=_typeset(doc, s.name))
         labeled = True
     for m in doc.marks:
         if m.panel_id != panel.id:
@@ -128,6 +139,10 @@ def _render_xy_panel(ax, doc, panel, series_list):
              alpha=0.45 if m.faint else 1.0)
     _apply_axis(ax, 'x', axes[panel.x_axis])
     _apply_axis(ax, 'y', axes[panel.y_axis])
+    # The document labels its axes and the renderer draws what it is given,
+    # as the grid panels already do.
+    ax.set(xlabel=_typeset(doc, axes[panel.x_axis].label),
+           ylabel=_typeset(doc, axes[panel.y_axis].label))
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
     if labeled and sum(s.role != 'identity' for s in series_list) > 1:
@@ -205,5 +220,5 @@ def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
         _render_grid_panel(ax, doc, panel, series, log_z)
         if panel.kind == 'surface':
             title = f'{title} (projection)'
-    ax.set_title(panel.title or title)
+    ax.set_title(_typeset(doc, panel.title or title))
     return fig

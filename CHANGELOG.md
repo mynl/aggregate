@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.0.0a209
+
+**[Chart-IR] pass two closes its sign-off gate, part two:
+[Chart-Plain-Text-Names] with [Chart-Axis-Labels].** Plan:
+`dev/plan-chart-schema-signoff.md`. Both halves land together because both
+move the same pinned baseline image, and one regeneration is honest where
+two would be noise.
+
+*Names.* A schema rule, not a label fix: **every human-facing string in a
+chart document is plain text**, never markup in any renderer's language.
+ECharts has no TeX, so the dual distortion's `$g\check$` legend string was
+already broken on one of the two renderers that exist (and malformed as
+mathtext besides: `\check` takes an argument). `ChartDoc.tex` is the new
+optional plain-to-TeX lookup a renderer consults only if it can typeset;
+one that cannot ignores it and is still correct. It is keyed by string
+value rather than by field, so one entry covers a name, an axis label and a
+title that read alike, and it defaults empty and is omitted from the
+canonical form, so **no existing document hash moves**. The dual is now
+`ǧ(s)` everywhere, in `constants.py` as `DISTORTION_DUAL_LABEL` beside its
+`DISTORTION_DUAL_TEX` form; the compositor had been calling the same curve
+two different things (`$g\check$` on the linear branch, `Dual {label}` on
+the return branch) and now calls it one.
+
+*Axis labels.* The renderer draws the axis labels the document already
+carries, on 'xy' panels as the grid panels always did. `plot_distortion`
+gains `s` and `g(s)` with it: it was the one compositor in `plots/` that
+drew no axis labels at all, so this brings it into line with the rest of
+the package and keeps both sides of the seam pinned to a single baseline.
+A visible change to `Distortion.plot`.
+
+The baseline regenerates for both changes, and the measured conversion
+residual is now **0**: the rendered ChartDoc reproduces the compositor
+pixel for pixel, where it was RMS 0.05 at a202. The gate pins are confirmed
+by the author and no longer provisional (matplotlib 3.10.9, RMS tolerance
+2.0). The image-gate modules now force the Agg backend, which `--regen`
+always did: without it they inherited whatever interactive backend was
+active and failed intermittently on an unrelated Tk toolkit error.
+
+Chart IR version 1 is now signed off and **closed to additions**.
+
 ## 1.0.0a208
 
 **[Chart-IR] pass two closes its sign-off gate, part one:

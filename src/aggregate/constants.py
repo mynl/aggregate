@@ -28,6 +28,7 @@ from enum import Flag, auto
 
 __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR', 'LOG_FLOOR',
+           'DISTORTION_DUAL_LABEL', 'DISTORTION_DUAL_TEX',
            'Validation', 'DefectiveDistributionWarning',
            'DefectiveDistributionError', 'InfiniteVarianceError',
            'IgnoredDecLClauseWarning', 'ZeroPremiumCessionWarning',
@@ -59,6 +60,14 @@ FIGURE_BG_COLOR = 'aliceblue'
 # the app's LOG_FLOOR in theme.js). Lives here rather than in charts/ so
 # the compositors, which are not chart-IR code, share the one definition.
 LOG_FLOOR = 1e-15
+# The dual distortion's one name, shared by the chart emitter and the
+# compositor so g-check is called the same thing everywhere it is drawn.
+# The plain form is what the chart IR carries (ECharts has no TeX, and
+# U+01E7 is in DejaVu Sans); the TeX form is what a renderer that can
+# typeset uses, and drawing the same typeset string on both sides is what
+# lets the conversion and its compositor pin to one baseline image.
+DISTORTION_DUAL_LABEL = 'ǧ(s)'
+DISTORTION_DUAL_TEX = r'$\check g(s)$'
 
 # Column / view labels for reinsurance reporting (``validation_df``,
 # ``reins_summary_df``, ``reins_stats_df``). Centralised so the wording is

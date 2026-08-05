@@ -7,12 +7,12 @@ renderer realizing the emitted ChartDoc lands pixel near identical on it.
 A second test per chart keeps the compositor itself pinned to the baseline,
 so drift on either side of the seam is caught, not just on the new one.
 
-PROVISIONAL PINS, per the plan's gate-setup step the author confirms both:
-``_PINNED_MPL`` is the version the baselines were rendered with (tests skip
-elsewhere rather than fail on font or hinting differences), and
-``_RMS_TOL`` is generous against the measured conversion residual (RMS
-0.05 on the distortion at setup, sub-perceptual antialiasing only).
-Regenerate baselines by running this file with ``--regen``:
+Pins confirmed by the author 2026-08-05: ``_PINNED_MPL`` is the version the
+baselines were rendered with (tests skip elsewhere rather than fail on font
+or hinting differences), and ``_RMS_TOL`` is generous against the measured
+conversion residual, which since the axis-label and dual-name pass is 0:
+the renderer reproduces the compositor exactly. Regenerate baselines by
+running this file with ``--regen``:
 
     .venv/Scripts/python.exe tests/test_chartdoc_render.py --regen
 """
@@ -22,6 +22,12 @@ from pathlib import Path
 
 import matplotlib
 import pytest
+
+# Image tests draw to a file and never to a screen. Without this they
+# inherit whatever interactive backend is active, which fails
+# intermittently (a Tk toolkit error mid-run) for reasons that have nothing
+# to do with what is being compared. ``_regen`` sets it too.
+matplotlib.use('Agg')
 
 _PINNED_MPL = '3.10.9'
 _RMS_TOL = 2.0

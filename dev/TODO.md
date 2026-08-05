@@ -185,12 +185,16 @@
   `[Chart-Grid-Overlays]` landed a208 (grid panels carry one surface plus
   any number of x/y overlays, the `iso_total` role, the twelve-plot
   bivariate panel representability test, and `LOG_FLOOR = 1e-15` in
-  `constants.py` settling J5). Chart IR version 1 is now **closed to
-  additions**: a chart the schema cannot express changes it by a fresh
-  author decision or stays bespoke. Next: `[Chart-Plain-Text-Names]` with
-  `[Chart-Axis-Labels]`, then the distortion's paired app commit (adapter
-  xy realization), then reins triple, sev, agg, pnl, port, bvagg heatmap in
-  plan order.
+  `constants.py` settling J5). `[Chart-Plain-Text-Names]` with
+  `[Chart-Axis-Labels]` landed a209 (the plain-text naming rule and the
+  `ChartDoc.tex` lookup, the dual settled on `ǧ(s)` in `constants.py`, the
+  renderer drawing the axis labels the document carries, `plot_distortion`
+  gaining the labels it never had, and the baseline regenerated: the
+  conversion residual is now 0, pixel for pixel). Chart IR version 1 is
+  **signed off and closed to additions**: a chart the schema cannot express
+  changes it by a fresh author decision or stays bespoke. Next: the
+  distortion's paired app commit (adapter xy realization), then reins
+  triple, sev, agg, pnl, port, bvagg heatmap in plan order.
 
 ### Correctness & bugs
 

@@ -26,6 +26,15 @@ Vocabularies (panel kinds, axis units, series roles, mark roles) are
 documented strings, not enums, so version 1 can grow without schema churn.
 A reader must ignore roles it does not know; a writer must not invent a
 synonym for a role that already exists.
+
+**Every human-facing string in a document is plain text**, never markup in
+any renderer's language. ECharts has no TeX, so a mathtext series name
+would already be broken on one of the two renderers that exist. Where a
+string has a typeset form, the document carries it in
+:attr:`ChartDoc.tex`, a plain-to-TeX lookup a renderer consults only if it
+can typeset; one that cannot ignores the field entirely and is still
+correct. Plain text is also the legend identity renderers link series
+toggles by, so it is the form that must stay stable.
 """
 
 from __future__ import annotations
@@ -367,6 +376,15 @@ class ChartDoc:
         Chart-level semantic facts that are not drawable objects
         (``z_log_ok``: the z grid spans enough orders of magnitude that a
         log height reading is meaningful). JSON-representable values only.
+    tex : dict
+        Plain string to its typeset form, for the strings in this document
+        that have one: ``{'ǧ(s)': r'$\check g(s)$'}``. A renderer that can
+        typeset looks a string up and falls back to the string itself; one
+        that cannot ignores the field. Values are stored exactly as
+        matplotlib consumes them, delimiters included, so a renderer never
+        guesses where the math starts and an emitter can mix text and math
+        in one string. Keyed by string value rather than by field, so one
+        entry covers a name, an axis label and a title that read alike.
     ir_version : int
         Always :data:`CHART_IR_VERSION` for documents this build writes.
     generator : str, optional
@@ -383,6 +401,7 @@ class ChartDoc:
     series: tuple = ()
     marks: tuple = ()
     meta: dict = field(default_factory=dict)
+    tex: dict = field(default_factory=dict)
     ir_version: int = CHART_IR_VERSION
     generator: str = None
     hash: str = None
@@ -397,6 +416,7 @@ class ChartDoc:
         _freeze_seq(self, 'series')
         _freeze_seq(self, 'marks')
         object.__setattr__(self, 'meta', dict(self.meta))
+        object.__setattr__(self, 'tex', dict(self.tex))
         panel_ids = [p.id for p in self.panels]
         axis_ids = [a.id for a in self.axes]
         for label, ids in (('panel', panel_ids), ('axis', axis_ids)):

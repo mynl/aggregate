@@ -11,6 +11,7 @@ from aggregate import Distortion
 from aggregate.charts import (
     available_charts, canonical_json, chart_distortion,
 )
+from aggregate.constants import DISTORTION_DUAL_LABEL, DISTORTION_DUAL_TEX
 
 
 @pytest.fixture(scope='module')
@@ -40,6 +41,23 @@ def test_dual_optional(dist):
     doc = chart_distortion(dist, dual=False)
     roles = [s.role for s in doc.series]
     assert roles == ['distortion', 'identity']
+    # nothing left to typeset once the dual is gone
+    assert doc.tex == {}
+
+
+def test_dual_name_is_plain_text_with_a_tex_companion(dist):
+    """The schema's naming rule, on the one series that needs it.
+
+    ECharts has no TeX, so the name itself must read anywhere; the typeset
+    form travels separately for renderers that can use it.
+    """
+    doc = chart_distortion(dist)
+    dual = doc.series[1]
+    assert dual.name == DISTORTION_DUAL_LABEL == 'ǧ(s)'
+    assert '$' not in dual.name and '\\' not in dual.name
+    assert doc.tex[dual.name] == DISTORTION_DUAL_TEX
+    # the plain name is what a TeX-less consumer sees in the wire form
+    assert 'ǧ(s)' in canonical_json(doc).decode('utf-8')
 
 
 def test_deterministic(dist):

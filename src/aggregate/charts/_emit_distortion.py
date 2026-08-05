@@ -10,6 +10,7 @@ diagonal is the load).
 Pure numpy and pandas; no matplotlib.
 """
 
+from ..constants import DISTORTION_DUAL_LABEL, DISTORTION_DUAL_TEX
 from ..spectral import Distortion
 from . import register_chart, _emitter_base
 from .ir import ChartAxis, ChartDoc, ChartSeries, Panel
@@ -48,11 +49,11 @@ def _distortion(dist, dual=True):
                     y=tuple(float(v) for v in df['g'].to_numpy())),
     ]
     if dual:
-        # The compositor's linear-branch legend string, kept verbatim for
-        # the conversion gate; the naming inconsistency with the return
-        # branch ('Dual {label}') is recorded in dev/chart-inventory.md.
+        # Plain text, per the schema rule: ECharts has no TeX, so the name
+        # itself must read anywhere, and the typeset form travels in the
+        # document's `tex` map for renderers that can use it.
         series.append(
-            ChartSeries(name='$g\\check$', role='distortion',
+            ChartSeries(name=DISTORTION_DUAL_LABEL, role='distortion',
                         panel_id='square', x=xs,
                         y=tuple(float(v) for v in df['g_dual'].to_numpy())))
     series.append(
@@ -72,6 +73,7 @@ def _distortion(dist, dual=True):
                   aspect='equal'),
         ),
         series=tuple(series),
+        tex=({DISTORTION_DUAL_LABEL: DISTORTION_DUAL_TEX} if dual else {}),
     )
 
 

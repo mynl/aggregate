@@ -9,15 +9,22 @@ stamp; ``ChartCapabilityError`` under ``strict``).
 
 import math
 
+import matplotlib
 import numpy as np
 import pytest
 
-from aggregate import build
-from aggregate.charts import (
+# The renderer cases draw to memory, never to a screen; without this they
+# inherit whatever interactive backend is active and fail intermittently on
+# a Tk toolkit error unrelated to the assertion.
+matplotlib.use('Agg')
+
+from aggregate import build  # noqa: E402
+from aggregate.charts import (  # noqa: E402
     ChartCapabilityError, available_charts, canonical_json, doc_hash,
     chart_joint_surface,
 )
-from aggregate.charts._emit_bivariate import DISPLAY_CELLS, _reduce_grid
+from aggregate.charts._emit_bivariate import (  # noqa: E402
+    DISPLAY_CELLS, _reduce_grid)
 
 
 @pytest.fixture(scope='module')

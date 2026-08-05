@@ -45,6 +45,17 @@ PROGRAMS = {
                        'agg EX.ReA dfreq [1 2] dsev [10 20 30] '
                        'occurrence net of 10 xs 10 '
                        'agg EX.ReB 1 claim dsev [5 10] fixed'),
+    # walks, for the economic exhibits ([Exhibits-Economic-Insurer],
+    # [Exhibits-Waterfall]). Tower shares atoms and carries a kappa ladder;
+    # Peel is stitched, so its ladder is marginal and the waterfall's
+    # diversified column blanks.
+    'Tower': ('xpnl EX.Tower 1000 prem less agg EX.TowerE 1000 prem at 70% lr '
+              'sev lognorm 100 cv 2 '
+              'occurrence ceded to 500 xs 500 deposit 100 poisson'),
+    'Peel': ('xpnl EX.Peel 1000 premium less agg EX.PeelE 1000 premium at '
+             '70% lr sev lognorm 100 cv 2 '
+             'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
+             'deposit 40 poisson peel top-down'),
 }
 
 

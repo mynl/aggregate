@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.0.0a207
+
+**[Exhibits-Waterfall]: `economic_waterfall`, the flagship business exhibit.**
+
+The margin walk, gross through what each layer cedes to net, with the margin
+evaluated at every stop. Available only on a P&L with a tower, since a single
+group ledger has one margin row and no walk to draw. RAW and INSURER serve the
+same table: here the exhibit **is** the translation, so there is no underlying
+frame to pass through.
+
+Two blocks, keeping one unit per column. **walk** carries currency: the margin
+at each step and its 1-in-100 outcome on each basis. **evaluation** carries the
+dimensionless readings: premium and margin spent against the gross block, the
+combined ratio, margin over its own standard deviation, and margin over
+required capital on each basis.
+
+The point of the exhibit is the pair of 1-in-100 columns, and the arithmetic
+bears it out on the shipped fixture. The **diversified** basis is each step's
+margin conditional on the whole book landing at its own 1-in-100, read
+straight off the ledger's kappa column, so it **foots**: `-1802.99 + 422.99 =
+-1380.00`. The **standalone** basis is each step's own 1-in-100 from its own
+grid distribution, and tail measures do not add, so it does not:
+`-1840 + -100 = -1940`, against a closing `-1380`. The gap between the columns
+is the diversification benefit, per layer, made visible. Both are asserted in
+the tests rather than left as prose.
+
+Capital is `M / -M_100`: the 1-in-100 outcome is negative, so its negation is
+the injection required and the ratio reads as a return on it. On the fixture
+the story lands in one number: buying the layer spends 10% of gross premium
+and 16.3% of gross margin, and lifts return on capital from `0.166` to
+`0.182`. The cell is **blank** where a step calls for no capital, which is what
+a purchased layer does in the adverse state, where it releases capital rather
+than consuming it; the caption says so and points at the diversified column as
+the meaningful one there.
+
+The return period is a module constant, `WATERFALL_RETURN_PERIOD = 100`, not a
+kwarg: which capital level to evaluate at is a business choice, and the exhibit
+is the place to change it rather than a configuration surface to build.
+
+When a ledger shares no atoms (the stitched and one sweep routes) no
+conditioning was possible, so the diversified column blanks and the caption
+says why. Step discovery reads the ledger plan rather than pattern matching the
+index, because a step's own result and the running net after it both sit under
+`Margin` and only the plan tells them apart; that also picks up tier subtotals
+on a multi layer peel for free.
+
+Fixtures `EX.Tower` (shares atoms, kappa ladder) and `EX.Peel` (stitched,
+marginal ladder) drive both the tests and the snapshot corpus, now 102 entries.
+Both join `decl-testers.agg` section EX. A latent defect from `a206` is fixed
+in passing: the `EX.Tower` corpus line carried no `;` terminator, harmless
+while it was the last line in the file and a parse error the moment one
+followed it.
+
 ## 1.0.0a206
 
 **[Exhibits-Economic-Insurer]: the P&L accounting exhibits get their business

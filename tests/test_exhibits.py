@@ -55,7 +55,20 @@ PROGRAMS = {
                        'agg EX.ReA dfreq [1 2] dsev [10 20 30] '
                        'occurrence net of 10 xs 10 '
                        'agg EX.ReB 1 claim dsev [5 10] fixed'),
+    # walks, for the economic exhibits ([Exhibits-Economic-Insurer],
+    # [Exhibits-Waterfall]). Tower shares atoms and carries a kappa ladder;
+    # Peel is stitched, so its ladder is marginal and the waterfall's
+    # diversified column blanks.
+    'Tower': ('xpnl EX.Tower 1000 prem less agg EX.TowerE 1000 prem at 70% lr '
+              'sev lognorm 100 cv 2 '
+              'occurrence ceded to 500 xs 500 deposit 100 poisson'),
+    'Peel': ('xpnl EX.Peel 1000 premium less agg EX.PeelE 1000 premium at '
+             '70% lr sev lognorm 100 cv 2 '
+             'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
+             'deposit 40 poisson peel top-down'),
 }
+_WALK_EXHIBITS = ['summary', 'stats', 'validation', 'economic',
+                  'economic_ratios', 'economic_waterfall']
 AGG_PROGRAM = PROGRAMS['Aggregate']
 PORT_PROGRAM = PROGRAMS['Portfolio']
 
@@ -72,6 +85,8 @@ EXPECTED_EXHIBITS = {
                        *_DIAG],
     'ReinsPortfolio': ['summary', 'tail', 'stats', 'validation', 'reins',
                        *_DIAG],
+    'Tower': _WALK_EXHIBITS,
+    'Peel': _WALK_EXHIBITS,
 }
 
 
@@ -328,14 +343,10 @@ def test_economic_ratios_raw(objects):
 
 # --- economic insurer ([Exhibits-Economic-Insurer]) -------------------------
 
-_TOWER = ('xpnl EX.Tower 1000 prem less agg EX.TowerE 1000 prem at 70% lr '
-          'sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 '
-          'poisson')
-
-
 @pytest.fixture(scope='module')
-def tower():
-    return build(_TOWER)
+def tower(objects):
+    """A walk whose rows share atoms, so the ladder is a kappa ladder."""
+    return objects['Tower']
 
 
 def test_economic_insurer_ledger_flags(tower):
@@ -394,6 +405,86 @@ def test_economic_ratios_insurer_splits_units(tower):
     np.testing.assert_allclose(
         amounts['M'],
         amounts['P'] - amounts['L'] - amounts['E'] - amounts['C'], atol=1e-9)
+
+
+# --- economic_waterfall ([Exhibits-Waterfall]) ------------------------------
+
+@pytest.fixture(scope='module')
+def peel(objects):
+    """A stitched walk: no shared atoms, so no kappa ladder."""
+    return objects['Peel']
+
+
+def test_waterfall_needs_a_tower(objects, tower):
+    """A single group P&L has one margin row and no walk to draw."""
+    single = objects['PnL']
+    assert not single._tower
+    assert 'economic_waterfall' not in [n for n, _ in available_exhibits(single)]
+    with pytest.raises(ValueError, match='not available'):
+        exhibit_frames(single, 'economic_waterfall')
+    assert 'economic_waterfall' in [n for n, _ in available_exhibits(tower)]
+
+
+def test_waterfall_two_blocks_pure_units(tower):
+    blocks = exhibit_frames(tower, 'economic_waterfall')
+    assert [b for b, _, _ in blocks] == ['walk', 'evaluation']
+    walk, evaluation = blocks[0][1], blocks[1][1]
+    assert walk.index.name == 'Step' and evaluation.index.name == 'Step'
+    assert list(walk.index) == list(evaluation.index)
+    # walk is currency, evaluation is dimensionless: no column in both
+    assert set(walk.columns).isdisjoint(evaluation.columns)
+
+
+def test_waterfall_diversified_foots_and_standalone_does_not(tower):
+    """The thesis of the exhibit, stated as an assertion.
+
+    Conditioning on the whole book's 1-in-100 makes the column a set of
+    conditional means, which add; each step's own 1-in-100 is a quantile,
+    and quantiles do not add. Showing both side by side is the point.
+    """
+    _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
+    div = walk['M @ 1-in-100 diversified']
+    sa = walk['M @ 1-in-100 standalone']
+    # the steps before the closing row sum to the closing row, exactly
+    assert div.iloc[:-1].sum() == pytest.approx(div.iloc[-1], rel=1e-9)
+    assert sa.iloc[:-1].sum() != pytest.approx(sa.iloc[-1], rel=1e-6)
+    # the expected margin foots too, by linearity
+    assert walk['M'].iloc[:-1].sum() == pytest.approx(walk['M'].iloc[-1],
+                                                      rel=1e-9)
+
+
+def test_waterfall_capital_ratio_definition(tower):
+    """``M / -M_100``: margin over the capital that outcome would call for."""
+    _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
+    _, ev, _ = exhibit_frames(tower, 'economic_waterfall')[1]
+    for basis in ('standalone', 'diversified'):
+        m100 = walk[f'M @ 1-in-100 {basis}']
+        got = ev[f'M / capital {basis}']
+        for step in walk.index:
+            capital = -m100[step]
+            if capital > 0:
+                assert got[step] == pytest.approx(walk['M'][step] / capital)
+            else:
+                # a purchased layer releases capital in the adverse state, so
+                # there is no capital to return on and the cell is blank
+                assert pd.isna(got[step])
+
+
+def test_waterfall_blanks_diversified_without_shared_atoms(peel):
+    """No shared atoms means no conditioning happened; say so, do not guess."""
+    _, walk, kw = exhibit_frames(peel, 'economic_waterfall')[0]
+    assert walk['M @ 1-in-100 diversified'].isna().all()
+    assert walk['M @ 1-in-100 standalone'].notna().any()
+    assert 'blank here' in kw['caption']
+
+
+def test_waterfall_includes_tier_subtotals(peel):
+    """A two layer peel carries a tier subtotal step, and it is picked up."""
+    _, walk, _ = exhibit_frames(peel, 'economic_waterfall')[0]
+    kinds = {k for _, k, _ in peel._plan}
+    assert 'tier_result' in kinds
+    assert len(walk) > 3
+    assert walk.index[-1] == 'All'
 
 
 # --- register_simple_exhibit ([Exhibits-Package-Split]) ---------------------

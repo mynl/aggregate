@@ -53,7 +53,7 @@ __all__ = [
     'Perspective', 'Exhibit', 'EXHIBITS',
     'available_exhibits', 'exhibit_frames', 'build_exhibit',
     'summary', 'tail', 'stats', 'validation', 'reins',
-    'economic', 'economic_ratios', 'dependency',
+    'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
     'register_simple_exhibit',
 ]
 
@@ -290,6 +290,17 @@ def _perspectives_reins(obj):
     """Perspectives for the reins exhibit: cession present and grid realized."""
     return list(_IMPLEMENTED_PERSPECTIVES) \
         if _has_reinsurance(obj) and _updated(obj) else []
+
+
+def _perspectives_tower(obj):
+    """Perspectives for an exhibit that needs a multi-step P&L walk.
+
+    A single group P&L has one margin row and no walk to draw, so the
+    exhibit reports itself unavailable and the app grays the chip out
+    rather than rendering a one row table.
+    """
+    return list(_IMPLEMENTED_PERSPECTIVES) if getattr(obj, '_tower', False) \
+        else []
 
 
 def available_exhibits(obj):
@@ -567,6 +578,39 @@ economic_ratios = _make_exhibit_function(
     Exhibit
     """)
 
+economic_waterfall = _make_exhibit_function(
+    'economic_waterfall', 'Economic waterfall',
+    """The margin walk: gross, through what each layer cedes, to net.
+
+    Two blocks. **walk** carries the currency amounts, the margin at each
+    step and its 1-in-100 outcome on both bases. **evaluation** carries the
+    dimensionless readings: how much of the gross premium and gross margin
+    each step spends, the combined ratio, margin over its own standard
+    deviation, and margin over required capital on each basis.
+
+    The point of the exhibit is the pair of 1-in-100 columns. The
+    **diversified** basis is the margin conditional on the whole book landing
+    at its own 1-in-100, so it **foots down the walk exactly**; the
+    **standalone** basis is each step's own 1-in-100, and tail measures do not
+    add, so it does not. The gap between them is the diversification benefit,
+    per layer, made visible.
+
+    Available only on a P&L with a tower: a single group ledger has one
+    margin row and no walk to draw. RAW and INSURER serve the same table,
+    because here the exhibit *is* the translation; there is no underlying
+    frame to pass through.
+
+    Parameters
+    ----------
+    obj : object
+        A ``PnL`` carrying a multi step walk.
+    perspective : Perspective or str, default Perspective.RAW
+
+    Returns
+    -------
+    Exhibit
+    """)
+
 dependency = _make_exhibit_function(
     'dependency', 'Dependency',
     """Bivariate dependency exhibit: ``dependency_df`` and ``axis_support_df``.
@@ -599,19 +643,9 @@ EXHIBITS = {
     'reins': (reins, _perspectives_reins),
     'economic': (economic, _perspectives_always),
     'economic_ratios': (economic_ratios, _perspectives_always),
+    'economic_waterfall': (economic_waterfall, _perspectives_tower),
     'dependency': (dependency, _perspectives_updated),
 }
-
-
-def _perspectives_tower(obj):
-    """Perspectives for an exhibit that needs a multi-step P&L walk.
-
-    A single group P&L has one margin row and no walk to draw, so the
-    exhibit reports itself unavailable and the app grays the chip out
-    rather than rendering a one row table.
-    """
-    return list(_IMPLEMENTED_PERSPECTIVES) if getattr(obj, '_tower', False) \
-        else []
 
 
 def register_simple_exhibit(name, title, frame_attr, classes, *,

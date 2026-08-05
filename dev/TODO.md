@@ -136,8 +136,13 @@
   `plots/`, `register_simple_exhibit`, `bs_window` and `tail_behavior`,
   `economic` / `economic_ratios` renames). `[Exhibits-Economic-Insurer]`
   landed `a206` (ledger captions stating the kappa regime, ledger row flags,
-  the ratio frame split into pure-unit blocks, `MEASURE_FORMATS`). Next:
-  `[Exhibits-Waterfall]`, then the app consolidation.
+  the ratio frame split into pure-unit blocks, `MEASURE_FORMATS`).
+  `[Exhibits-Waterfall]` landed `a207` (`economic_waterfall`: the margin walk
+  in two blocks, tower gated, capital as `M / -M_100`, the diversified column
+  footing where the standalone one cannot). **Its author gate is still open**,
+  along with the CV-on-the-ledger question; both are in the plan's open list.
+  Next: the app consolidation (`[Exhibits-App-Consolidation]`), which is the
+  SPA reading envelopes and the migrated app knowledge finally being deleted.
   `[Exhibits-PnL-Translation]` raw stage landed `a203` (pnl_ledger and
   pnl_ratios as RAW passthroughs); the INSURER framing draft awaits the
   author gate (captions, footing rules, Side sign presentation, the tower

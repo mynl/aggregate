@@ -45,8 +45,8 @@ from ._core import (
     CAPITAL_ANCHOR_PERIODS, EXHIBITS, Exhibit, Perspective,
     RAW_MOMENT_MEASURES,
     available_exhibits, build_exhibit, exhibit_frames, register_simple_exhibit,
-    dependency, economic, economic_ratios, reins, stats, summary, tail,
-    validation,
+    dependency, economic, economic_ratios, economic_waterfall, reins, stats,
+    summary, tail, validation,
     _perspectives_updated,
 )
 
@@ -60,7 +60,7 @@ __all__ = [
     'register_simple_exhibit',
     'CAPITAL_ANCHOR_PERIODS', 'RAW_MOMENT_MEASURES',
     'summary', 'tail', 'stats', 'validation', 'reins',
-    'economic', 'economic_ratios', 'dependency',
+    'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
     'bs_window', 'tail_behavior',
 ]
 

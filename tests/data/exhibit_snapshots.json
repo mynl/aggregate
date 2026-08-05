@@ -2475,6 +2475,1122 @@
    "n_stub_levels": 1
   }
  ],
+ "economic/insurer/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Gross"
+      },
+      "Consideration",
+      "Premium",
+      "1,000.00",
+      "0.00",
+      "0.0%",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "591.61",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-84.5%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.221"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,820.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,732.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,352.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-896.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-556.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-328.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-188.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-124.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "Gross",
+      "299.99",
+      "591.61",
+      "197.2%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.221"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,820.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-732.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-352.00"
+      },
+      "104.00",
+      "444.00",
+      "672.00",
+      "812.00",
+      "876.00",
+      "952.00"
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 300 xs 200"
+      },
+      "Consideration",
+      "occ 300 xs 200 premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      "0.00",
+      "0.0%",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "occ 300 xs 200 recovery",
+      "123.89",
+      "168.80",
+      "136.3%",
+      "1.561",
+      "0.00",
+      "0.00",
+      "0.00",
+      "0.00",
+      "28.00",
+      "240.00",
+      "336.00",
+      "460.00",
+      "660.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Total",
+      "83.89",
+      "168.80",
+      "201.2%",
+      "1.561",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-12.00"
+      },
+      "200.00",
+      "296.00",
+      "420.00",
+      "620.00"
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Net",
+      "383.89",
+      "470.55",
+      "122.6%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-6.430"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,336.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-332.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      },
+      "248.00",
+      "476.00",
+      "648.00",
+      "772.00",
+      "836.00",
+      "912.00"
+     ],
+     "flags": [
+      "muted"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 100 xs 100"
+      },
+      "Consideration",
+      "occ 100 xs 100 premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "0.00",
+      "0.0%",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "occ 100 xs 100 recovery",
+      "123.76",
+      "103.69",
+      "83.8%",
+      "0.900",
+      "0.00",
+      "0.00",
+      "0.00",
+      "36.00",
+      "100.00",
+      "200.00",
+      "268.00",
+      "312.00",
+      "420.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Total",
+      "63.76",
+      "103.69",
+      "162.6%",
+      "0.900",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-24.00"
+      },
+      "40.00",
+      "140.00",
+      "208.00",
+      "252.00",
+      "360.00"
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Net",
+      "447.65",
+      "411.18",
+      "91.9%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-116.00"
+      },
+      "148.00",
+      "372.00",
+      "528.00",
+      "648.00",
+      "736.00",
+      "780.00",
+      "852.00"
+     ],
+     "flags": [
+      "muted"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "All occurrence"
+      },
+      "Consideration",
+      "Total",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00",
+      "0.0%",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Total",
+      "247.65",
+      "253.03",
+      "102.2%",
+      "1.282",
+      "0.00",
+      "0.00",
+      "0.00",
+      "36.00",
+      "172.00",
+      "400.00",
+      "592.00",
+      "752.00",
+      "1,040.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "Total",
+      "147.65",
+      "253.03",
+      "171.4%",
+      "1.282",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-64.00"
+      },
+      "72.00",
+      "300.00",
+      "492.00",
+      "652.00",
+      "940.00"
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "All"
+      },
+      "Consideration",
+      "Net",
+      "900.00",
+      "0.00",
+      "0.0%",
+      "\u2014",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00"
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Net",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-452.35"
+      },
+      "411.18",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-90.9%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,036.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,016.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-752.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-528.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-372.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-252.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-164.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-120.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      }
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Net",
+      "447.65",
+      "411.18",
+      "91.9%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-116.00"
+      },
+      "148.00",
+      "372.00",
+      "528.00",
+      "648.00",
+      "736.00",
+      "780.00",
+      "852.00"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Impact",
+      "147.65",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-180.43"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-105.4%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.659"
+      },
+      "684.00",
+      "616.00",
+      "500.00",
+      "268.00",
+      "84.00",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-24.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-76.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-96.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    }
+   ],
+   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. This ledger shares no atoms across its rows (a one sweep or stitched route), so the ladder is marginal under plain P headers: each cell is that row's own quantile, no conditioning happened, and the ladder columns do not foot.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "Label"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c5",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "P05"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "P10"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "P25"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "P50"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c12",
+     "name": [
+      "P75"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c13",
+     "name": [
+      "P90"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c14",
+     "name": [
+      "P95"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c15",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "P05"
+     },
+     {
+      "text": "P10"
+     },
+     {
+      "text": "P25"
+     },
+     {
+      "text": "P50"
+     },
+     {
+      "text": "P75"
+     },
+     {
+      "text": "P90"
+     },
+     {
+      "text": "P95"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
+  }
+ ],
  "economic/insurer/PnL": [
   {
    "body": [
@@ -2872,6 +3988,1923 @@
    "n_stub_levels": 2
   }
  ],
+ "economic/insurer/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Gross"
+      },
+      "Consideration",
+      "Premium",
+      "1,000.00",
+      "0.00",
+      "0.0%",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "593.21",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-84.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.178"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,802.99"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,665.62"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,346.84"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-900.42"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-571.40"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-320.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-200.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-120.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "Gross",
+      "299.99",
+      "593.21",
+      "197.7%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.178"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,802.99"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-665.62"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-346.84"
+      },
+      "99.58",
+      "428.60",
+      "680.00",
+      "800.00",
+      "880.00",
+      "960.00"
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 500 xs 500"
+      },
+      "Consideration",
+      "occ 500 xs 500 premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00",
+      "0.0%",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "occ 500 xs 500 recovery",
+      "51.11",
+      "140.83",
+      "275.5%",
+      "3.137",
+      "522.99",
+      "225.62",
+      "146.84",
+      "60.42",
+      "11.40",
+      "0.00",
+      "0.00",
+      "0.00",
+      "0.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Total",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      "140.83",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-288.1%"
+      },
+      "3.137",
+      "422.99",
+      "125.62",
+      "46.84",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-39.58"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-88.60"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Net",
+      "251.11",
+      "497.96",
+      "198.3%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-540.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-300.00"
+      },
+      "60.00",
+      "340.00",
+      "580.00",
+      "700.00",
+      "780.00",
+      "860.00"
+     ],
+     "flags": [
+      "muted"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "All"
+      },
+      "Consideration",
+      "Net",
+      "900.00",
+      "0.00",
+      "0.0%",
+      "\u2014",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00"
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Net",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-648.89"
+      },
+      "497.96",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-76.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,280.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,440.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,200.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-840.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-560.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-320.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-200.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-120.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ],
+     "flags": [
+      "subtotal"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Net",
+      "251.11",
+      "497.96",
+      "198.3%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-540.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-300.00"
+      },
+      "60.00",
+      "340.00",
+      "580.00",
+      "700.00",
+      "780.00",
+      "860.00"
+     ],
+     "flags": [
+      "total"
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Impact",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      "140.83",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-288.1%"
+      },
+      "3.137",
+      "422.99",
+      "125.62",
+      "46.84",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-39.58"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-88.60"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    }
+   ],
+   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. The kappa columns are scenario states, not per row quantiles: column kappa-q is the state in which the grand result lands at its q quantile, and each cell is the conditional mean of that row in that state, so every kappa column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "Label"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c5",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "\u03ba01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "\u03ba05"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "\u03ba10"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "\u03ba25"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "\u03ba50"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c12",
+     "name": [
+      "\u03ba75"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c13",
+     "name": [
+      "\u03ba90"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c14",
+     "name": [
+      "\u03ba95"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c15",
+     "name": [
+      "\u03ba99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "\u03ba01"
+     },
+     {
+      "text": "\u03ba05"
+     },
+     {
+      "text": "\u03ba10"
+     },
+     {
+      "text": "\u03ba25"
+     },
+     {
+      "text": "\u03ba50"
+     },
+     {
+      "text": "\u03ba75"
+     },
+     {
+      "text": "\u03ba90"
+     },
+     {
+      "text": "\u03ba95"
+     },
+     {
+      "text": "\u03ba99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
+  }
+ ],
+ "economic/raw/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Gross"
+      },
+      "Consideration",
+      "Premium",
+      "1,000.00",
+      "0.00",
+      "0.00000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "591.61",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.84515"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.221"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,820.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,732.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,352.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-896.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-556.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-328.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-188.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-124.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "Gross",
+      "299.99",
+      "591.61",
+      "1.97209",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.221"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,820.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-732.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-352.00"
+      },
+      "104.00",
+      "444.00",
+      "672.00",
+      "812.00",
+      "876.00",
+      "952.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 300 xs 200"
+      },
+      "Consideration",
+      "occ 300 xs 200 premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      "0.00",
+      "0.00000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "occ 300 xs 200 recovery",
+      "123.89",
+      "168.80",
+      "1.36250",
+      "1.561",
+      "0.00",
+      "0.00",
+      "0.00",
+      "0.00",
+      "28.00",
+      "240.00",
+      "336.00",
+      "460.00",
+      "660.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Total",
+      "83.89",
+      "168.80",
+      "2.01214",
+      "1.561",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-12.00"
+      },
+      "200.00",
+      "296.00",
+      "420.00",
+      "620.00"
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Net",
+      "383.89",
+      "470.55",
+      "1.22576",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-6.430"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,336.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-332.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      },
+      "248.00",
+      "476.00",
+      "648.00",
+      "772.00",
+      "836.00",
+      "912.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 100 xs 100"
+      },
+      "Consideration",
+      "occ 100 xs 100 premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "0.00",
+      "0.00000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "occ 100 xs 100 recovery",
+      "123.76",
+      "103.69",
+      "0.83781",
+      "0.900",
+      "0.00",
+      "0.00",
+      "0.00",
+      "36.00",
+      "100.00",
+      "200.00",
+      "268.00",
+      "312.00",
+      "420.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Total",
+      "63.76",
+      "103.69",
+      "1.62622",
+      "0.900",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-24.00"
+      },
+      "40.00",
+      "140.00",
+      "208.00",
+      "252.00",
+      "360.00"
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Net",
+      "447.65",
+      "411.18",
+      "0.91855",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-116.00"
+      },
+      "148.00",
+      "372.00",
+      "528.00",
+      "648.00",
+      "736.00",
+      "780.00",
+      "852.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "All occurrence"
+      },
+      "Consideration",
+      "Total",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00",
+      "0.00000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Total",
+      "247.65",
+      "253.03",
+      "1.02171",
+      "1.282",
+      "0.00",
+      "0.00",
+      "0.00",
+      "36.00",
+      "172.00",
+      "400.00",
+      "592.00",
+      "752.00",
+      "1,040.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "Total",
+      "147.65",
+      "253.03",
+      "1.71368",
+      "1.282",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-64.00"
+      },
+      "72.00",
+      "300.00",
+      "492.00",
+      "652.00",
+      "940.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "All"
+      },
+      "Consideration",
+      "Net",
+      "900.00",
+      "0.00",
+      "0.00000",
+      "\u2014",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Net",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-452.35"
+      },
+      "411.18",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.90899"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,036.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,016.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-752.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-528.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-372.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-252.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-164.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-120.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Net",
+      "447.65",
+      "411.18",
+      "0.91855",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-116.00"
+      },
+      "148.00",
+      "372.00",
+      "528.00",
+      "648.00",
+      "736.00",
+      "780.00",
+      "852.00"
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Impact",
+      "147.65",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-180.43"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.05354"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.659"
+      },
+      "684.00",
+      "616.00",
+      "500.00",
+      "268.00",
+      "84.00",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-24.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-76.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-96.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "Label"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "P05"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "P10"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "P25"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "P50"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c12",
+     "name": [
+      "P75"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c13",
+     "name": [
+      "P90"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c14",
+     "name": [
+      "P95"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c15",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "P05"
+     },
+     {
+      "text": "P10"
+     },
+     {
+      "text": "P25"
+     },
+     {
+      "text": "P50"
+     },
+     {
+      "text": "P75"
+     },
+     {
+      "text": "P90"
+     },
+     {
+      "text": "P95"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
+  }
+ ],
  "economic/raw/PnL": [
   {
    "body": [
@@ -3267,6 +6300,1425 @@
    "n_stub_levels": 2
   }
  ],
+ "economic/raw/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Gross"
+      },
+      "Consideration",
+      "Premium",
+      "1,000.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "593.21",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.847"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.178"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,802.99"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,665.62"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,346.84"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-900.42"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-571.40"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-320.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-200.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-120.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "Gross",
+      "299.99",
+      "593.21",
+      "1.977",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.178"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,802.99"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-665.62"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-346.84"
+      },
+      "99.58",
+      "428.60",
+      "680.00",
+      "800.00",
+      "880.00",
+      "960.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 500 xs 500"
+      },
+      "Consideration",
+      "occ 500 xs 500 premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00",
+      "0.000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "occ 500 xs 500 recovery",
+      "51.11",
+      "140.83",
+      "2.755",
+      "3.137",
+      "522.99",
+      "225.62",
+      "146.84",
+      "60.42",
+      "11.40",
+      "0.00",
+      "0.00",
+      "0.00",
+      "0.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Total",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      "140.83",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2.881"
+      },
+      "3.137",
+      "422.99",
+      "125.62",
+      "46.84",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-39.58"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-88.60"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Net",
+      "251.11",
+      "497.96",
+      "1.983",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-540.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-300.00"
+      },
+      "60.00",
+      "340.00",
+      "580.00",
+      "700.00",
+      "780.00",
+      "860.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "All"
+      },
+      "Consideration",
+      "Net",
+      "900.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00",
+      "900.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "Net",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-648.89"
+      },
+      "497.96",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.767"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,280.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,440.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,200.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-840.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-560.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-320.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-200.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-120.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 2,
+       "text": "Margin"
+      },
+      "Net",
+      "251.11",
+      "497.96",
+      "1.983",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-540.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-300.00"
+      },
+      "60.00",
+      "340.00",
+      "580.00",
+      "700.00",
+      "780.00",
+      "860.00"
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "Impact",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      "140.83",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2.881"
+      },
+      "3.137",
+      "422.99",
+      "125.62",
+      "46.84",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-39.58"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-88.60"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "Label"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "\u03ba01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "\u03ba05"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "\u03ba10"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "\u03ba25"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "\u03ba50"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c12",
+     "name": [
+      "\u03ba75"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c13",
+     "name": [
+      "\u03ba90"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c14",
+     "name": [
+      "\u03ba95"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c15",
+     "name": [
+      "\u03ba99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "\u03ba01"
+     },
+     {
+      "text": "\u03ba05"
+     },
+     {
+      "text": "\u03ba10"
+     },
+     {
+      "text": "\u03ba25"
+     },
+     {
+      "text": "\u03ba50"
+     },
+     {
+      "text": "\u03ba75"
+     },
+     {
+      "text": "\u03ba90"
+     },
+     {
+      "text": "\u03ba95"
+     },
+     {
+      "text": "\u03ba99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
+  }
+ ],
+ "economic_ratios/insurer/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "1,000.00",
+      "700.01",
+      "0.00000",
+      "0.00000",
+      "299.99"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 300 xs 200",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-123.89"
+      },
+      "0.00000",
+      "0.00000",
+      "83.89"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 100 xs 100",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-123.76"
+      },
+      "0.00000",
+      "0.00000",
+      "63.76"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All occurrence",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-247.65"
+      },
+      "0.00000",
+      "0.00000",
+      "147.65"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "900.00",
+      "452.35",
+      "0.00000",
+      "0.00000",
+      "447.65"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "Premium, loss, expense and commission per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E - C holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "P"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "E"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "C"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "E"
+     },
+     {
+      "text": "C"
+     },
+     {
+      "text": "M"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "70.0%",
+      "0.0%",
+      "70.0%",
+      "70.0%",
+      "0.0%",
+      "70.0%",
+      "100.0%",
+      "100.0%"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 300 xs 200",
+      "309.7%",
+      "0.0%",
+      "309.7%",
+      "309.7%",
+      "0.0%",
+      "309.7%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.0%"
+      },
+      "28.0%"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 100 xs 100",
+      "206.3%",
+      "0.0%",
+      "206.3%",
+      "206.3%",
+      "0.0%",
+      "206.3%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-6.0%"
+      },
+      "21.3%"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All occurrence",
+      "247.7%",
+      "0.0%",
+      "247.7%",
+      "247.7%",
+      "0.0%",
+      "247.7%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-10.0%"
+      },
+      "49.2%"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "50.3%",
+      "0.0%",
+      "50.3%",
+      "50.3%",
+      "0.0%",
+      "50.3%",
+      "90.0%",
+      "149.2%"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below. The E_ columns are the same three as means of ratios. The pairs agree identically when premium is deterministic and part company exactly when it is random and correlated with loss, which is what a retro, a swing, a slide or a profit commission is. Share columns are against the first (gross) block.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "LR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "ER"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "E_LR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c5",
+     "name": [
+      "E_ER"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "E_CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "P_share"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c8",
+     "name": [
+      "M_share"
+     ],
+     "tag": "ratio"
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "ER"
+     },
+     {
+      "text": "CR"
+     },
+     {
+      "text": "E_LR"
+     },
+     {
+      "text": "E_ER"
+     },
+     {
+      "text": "E_CR"
+     },
+     {
+      "text": "P_share"
+     },
+     {
+      "text": "M_share"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "Consideration",
+      "Premium",
+      "premium",
+      "1,000.00",
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "Gross",
+      "Obligation",
+      "Loss",
+      "loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "591.61"
+     ]
+    },
+    {
+     "cells": [
+      "occ 300 xs 200",
+      "Consideration",
+      "occ 300 xs 200 premium",
+      "premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "occ 300 xs 200",
+      "Obligation",
+      "occ 300 xs 200 recovery",
+      "recovery",
+      "123.89",
+      "168.80"
+     ]
+    },
+    {
+     "cells": [
+      "occ 100 xs 100",
+      "Consideration",
+      "occ 100 xs 100 premium",
+      "premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "occ 100 xs 100",
+      "Obligation",
+      "occ 100 xs 100 recovery",
+      "recovery",
+      "123.76",
+      "103.69"
+     ]
+    }
+   ],
+   "caption": "One row per declared leg, the itemized companion. Derived rows (totals, results, running nets) are absent by design: they are sums of these.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "name": [
+      "Step"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "Side"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Label"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "kind"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "kind"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 0
+  }
+ ],
  "economic_ratios/insurer/PnL": [
   {
    "body": [
@@ -3584,6 +8036,1064 @@
     }
    ],
    "caption": "One row per declared leg, the itemized companion. Derived rows (totals, results, running nets) are absent by design: they are sums of these.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "name": [
+      "Step"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "Side"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Label"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "kind"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "kind"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 0
+  }
+ ],
+ "economic_ratios/insurer/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "1,000.00",
+      "700.01",
+      "0.00000",
+      "0.00000",
+      "299.99"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 500 xs 500",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-51.11"
+      },
+      "0.00000",
+      "0.00000",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "900.00",
+      "648.89",
+      "0.00000",
+      "0.00000",
+      "251.11"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "Premium, loss, expense and commission per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E - C holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "P"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "E"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "C"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "E"
+     },
+     {
+      "text": "C"
+     },
+     {
+      "text": "M"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "70.0%",
+      "0.0%",
+      "70.0%",
+      "70.0%",
+      "0.0%",
+      "70.0%",
+      "100.0%",
+      "100.0%"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 500 xs 500",
+      "51.1%",
+      "0.0%",
+      "51.1%",
+      "51.1%",
+      "0.0%",
+      "51.1%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-10.0%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-16.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "72.1%",
+      "0.0%",
+      "72.1%",
+      "72.1%",
+      "0.0%",
+      "72.1%",
+      "90.0%",
+      "83.7%"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below. The E_ columns are the same three as means of ratios. The pairs agree identically when premium is deterministic and part company exactly when it is random and correlated with loss, which is what a retro, a swing, a slide or a profit commission is. Share columns are against the first (gross) block.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "LR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "ER"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "E_LR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c5",
+     "name": [
+      "E_ER"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "E_CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "P_share"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c8",
+     "name": [
+      "M_share"
+     ],
+     "tag": "ratio"
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "ER"
+     },
+     {
+      "text": "CR"
+     },
+     {
+      "text": "E_LR"
+     },
+     {
+      "text": "E_ER"
+     },
+     {
+      "text": "E_CR"
+     },
+     {
+      "text": "P_share"
+     },
+     {
+      "text": "M_share"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "Consideration",
+      "Premium",
+      "premium",
+      "1,000.00",
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "Gross",
+      "Obligation",
+      "Loss",
+      "loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "593.21"
+     ]
+    },
+    {
+     "cells": [
+      "occ 500 xs 500",
+      "Consideration",
+      "occ 500 xs 500 premium",
+      "premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "occ 500 xs 500",
+      "Obligation",
+      "occ 500 xs 500 recovery",
+      "recovery",
+      "51.11",
+      "140.83"
+     ]
+    }
+   ],
+   "caption": "One row per declared leg, the itemized companion. Derived rows (totals, results, running nets) are absent by design: they are sums of these.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "name": [
+      "Step"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "Side"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Label"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "kind"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "kind"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 0
+  }
+ ],
+ "economic_ratios/raw/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "1,000.00",
+      "700.01",
+      "0.00000",
+      "0.00000",
+      "299.99",
+      "0.700",
+      "0.00000",
+      "0.700",
+      "0.700",
+      "0.00000",
+      "0.700",
+      "1.00000",
+      "1.00000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 300 xs 200",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-123.89"
+      },
+      "0.00000",
+      "0.00000",
+      "83.89",
+      "3.097",
+      "0.00000",
+      "3.097",
+      "3.097",
+      "0.00000",
+      "3.097",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.04000"
+      },
+      "0.27965"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 100 xs 100",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-123.76"
+      },
+      "0.00000",
+      "0.00000",
+      "63.76",
+      "2.063",
+      "0.00000",
+      "2.063",
+      "2.063",
+      "0.00000",
+      "2.063",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.06000"
+      },
+      "0.21254"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All occurrence",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-247.65"
+      },
+      "0.00000",
+      "0.00000",
+      "147.65",
+      "2.477",
+      "0.00000",
+      "2.477",
+      "2.477",
+      "0.00000",
+      "2.477",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.10000"
+      },
+      "0.49219"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "900.00",
+      "452.35",
+      "0.00000",
+      "0.00000",
+      "447.65",
+      "0.503",
+      "0.00000",
+      "0.503",
+      "0.503",
+      "0.00000",
+      "0.503",
+      "0.90000",
+      "1.49219"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "P"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "E"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "C"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "LR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "ER"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "CR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "E_LR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "E_ER"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "E_CR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c12",
+     "name": [
+      "P_share"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c13",
+     "name": [
+      "M_share"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "E"
+     },
+     {
+      "text": "C"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "ER"
+     },
+     {
+      "text": "CR"
+     },
+     {
+      "text": "E_LR"
+     },
+     {
+      "text": "E_ER"
+     },
+     {
+      "text": "E_CR"
+     },
+     {
+      "text": "P_share"
+     },
+     {
+      "text": "M_share"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "Consideration",
+      "Premium",
+      "premium",
+      "1,000.00",
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "Gross",
+      "Obligation",
+      "Loss",
+      "loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "591.61"
+     ]
+    },
+    {
+     "cells": [
+      "occ 300 xs 200",
+      "Consideration",
+      "occ 300 xs 200 premium",
+      "premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "occ 300 xs 200",
+      "Obligation",
+      "occ 300 xs 200 recovery",
+      "recovery",
+      "123.89",
+      "168.80"
+     ]
+    },
+    {
+     "cells": [
+      "occ 100 xs 100",
+      "Consideration",
+      "occ 100 xs 100 premium",
+      "premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "occ 100 xs 100",
+      "Obligation",
+      "occ 100 xs 100 recovery",
+      "recovery",
+      "123.76",
+      "103.69"
+     ]
+    }
+   ],
    "columns": [
     {
      "align": "l",
@@ -4046,6 +9556,1807 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 0
+  }
+ ],
+ "economic_ratios/raw/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "1,000.00",
+      "700.01",
+      "0.00000",
+      "0.00000",
+      "299.99",
+      "0.70001",
+      "0.00000",
+      "0.70001",
+      "0.70001",
+      "0.00000",
+      "0.70001",
+      "1.00000",
+      "1.00000"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 500 xs 500",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-51.11"
+      },
+      "0.00000",
+      "0.00000",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      "0.51113",
+      "0.00000",
+      "0.51113",
+      "0.51113",
+      "0.00000",
+      "0.51113",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.10000"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.16296"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "900.00",
+      "648.89",
+      "0.00000",
+      "0.00000",
+      "251.11",
+      "0.72099",
+      "0.00000",
+      "0.72099",
+      "0.72099",
+      "0.00000",
+      "0.72099",
+      "0.90000",
+      "0.83704"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "P"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "E"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "C"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "LR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "ER"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "CR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "E_LR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "E_ER"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "E_CR"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c12",
+     "name": [
+      "P_share"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c13",
+     "name": [
+      "M_share"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "E"
+     },
+     {
+      "text": "C"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "ER"
+     },
+     {
+      "text": "CR"
+     },
+     {
+      "text": "E_LR"
+     },
+     {
+      "text": "E_ER"
+     },
+     {
+      "text": "E_CR"
+     },
+     {
+      "text": "P_share"
+     },
+     {
+      "text": "M_share"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "Consideration",
+      "Premium",
+      "premium",
+      "1,000.00",
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "Gross",
+      "Obligation",
+      "Loss",
+      "loss",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "593.21"
+     ]
+    },
+    {
+     "cells": [
+      "occ 500 xs 500",
+      "Consideration",
+      "occ 500 xs 500 premium",
+      "premium",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00"
+     ]
+    },
+    {
+     "cells": [
+      "occ 500 xs 500",
+      "Obligation",
+      "occ 500 xs 500 recovery",
+      "recovery",
+      "51.11",
+      "140.83"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "name": [
+      "Step"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "Side"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Label"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "kind"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "Label"
+     },
+     {
+      "text": "kind"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 0
+  }
+ ],
+ "economic_waterfall/insurer/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "299.99",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,820.00"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 300 xs 200",
+      "83.89",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 100 xs 100",
+      "63.76",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All occurrence",
+      "147.65",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "447.65",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      "\u2014"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net, each shown at its expected value and in its 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "M"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "M @ 1-in-100 standalone"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M @ 1-in-100 diversified"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "M @ 1-in-100 standalone"
+     },
+     {
+      "text": "M @ 1-in-100 diversified"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "100.0%",
+      "100.0%",
+      "70.0%",
+      "0.50708",
+      "0.165",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 300 xs 200",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.0%"
+      },
+      "28.0%",
+      "309.7%",
+      "0.49698",
+      "2.097",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 100 xs 100",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-6.0%"
+      },
+      "21.3%",
+      "206.3%",
+      "0.61492",
+      "1.063",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All occurrence",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-10.0%"
+      },
+      "49.2%",
+      "247.7%",
+      "0.58354",
+      "1.477",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "90.0%",
+      "149.2%",
+      "50.3%",
+      "1.08868",
+      "0.394",
+      "\u2014"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. Capital is the injection a 1-in-100 outcome would call for, so M / capital is a return on it; it is blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "Premium spent"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "Margin spent"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "M / SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M / capital standalone"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "M / capital diversified"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Premium spent"
+     },
+     {
+      "text": "Margin spent"
+     },
+     {
+      "text": "CR"
+     },
+     {
+      "text": "M / SD"
+     },
+     {
+      "text": "M / capital standalone"
+     },
+     {
+      "text": "M / capital diversified"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "economic_waterfall/insurer/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "299.99",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,840.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,802.99"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 500 xs 500",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "422.99"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "251.11",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      }
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net, each shown at its expected value and in its 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "M"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "M @ 1-in-100 standalone"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M @ 1-in-100 diversified"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "M @ 1-in-100 standalone"
+     },
+     {
+      "text": "M @ 1-in-100 diversified"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "100.0%",
+      "100.0%",
+      "70.0%",
+      "0.50571",
+      "0.16304",
+      "0.16639"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 500 xs 500",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-10.0%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-16.3%"
+      },
+      "51.1%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.34714"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.48887"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "90.0%",
+      "83.7%",
+      "72.1%",
+      "0.50427",
+      "0.18196",
+      "0.18196"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. Capital is the injection a 1-in-100 outcome would call for, so M / capital is a return on it; it is blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "Premium spent"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "Margin spent"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "M / SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M / capital standalone"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "M / capital diversified"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Premium spent"
+     },
+     {
+      "text": "Margin spent"
+     },
+     {
+      "text": "CR"
+     },
+     {
+      "text": "M / SD"
+     },
+     {
+      "text": "M / capital standalone"
+     },
+     {
+      "text": "M / capital diversified"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "economic_waterfall/raw/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "299.99",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,820.00"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 300 xs 200",
+      "83.89",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 100 xs 100",
+      "63.76",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All occurrence",
+      "147.65",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "447.65",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      "\u2014"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net, each shown at its expected value and in its 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "M"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "M @ 1-in-100 standalone"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M @ 1-in-100 diversified"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "M @ 1-in-100 standalone"
+     },
+     {
+      "text": "M @ 1-in-100 diversified"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "100.0%",
+      "100.0%",
+      "70.0%",
+      "0.50708",
+      "0.165",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 300 xs 200",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.0%"
+      },
+      "28.0%",
+      "309.7%",
+      "0.49698",
+      "2.097",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 100 xs 100",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-6.0%"
+      },
+      "21.3%",
+      "206.3%",
+      "0.61492",
+      "1.063",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All occurrence",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-10.0%"
+      },
+      "49.2%",
+      "247.7%",
+      "0.58354",
+      "1.477",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "90.0%",
+      "149.2%",
+      "50.3%",
+      "1.08868",
+      "0.394",
+      "\u2014"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. Capital is the injection a 1-in-100 outcome would call for, so M / capital is a return on it; it is blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "Premium spent"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "Margin spent"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "M / SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M / capital standalone"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "M / capital diversified"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Premium spent"
+     },
+     {
+      "text": "Margin spent"
+     },
+     {
+      "text": "CR"
+     },
+     {
+      "text": "M / SD"
+     },
+     {
+      "text": "M / capital standalone"
+     },
+     {
+      "text": "M / capital diversified"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "economic_waterfall/raw/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "299.99",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,840.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,802.99"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 500 xs 500",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "422.99"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "251.11",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      }
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net, each shown at its expected value and in its 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "M"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "M @ 1-in-100 standalone"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M @ 1-in-100 diversified"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "M @ 1-in-100 standalone"
+     },
+     {
+      "text": "M @ 1-in-100 diversified"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      "100.0%",
+      "100.0%",
+      "70.0%",
+      "0.50571",
+      "0.16304",
+      "0.16639"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 500 xs 500",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-10.0%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-16.3%"
+      },
+      "51.1%",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.34714"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.48887"
+      },
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      "90.0%",
+      "83.7%",
+      "72.1%",
+      "0.50427",
+      "0.18196",
+      "0.18196"
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. Capital is the injection a 1-in-100 outcome would call for, so M / capital is a return on it; it is blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "Premium spent"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "Margin spent"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CR"
+     ],
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "M / SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M / capital standalone"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "M / capital diversified"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Premium spent"
+     },
+     {
+      "text": "Margin spent"
+     },
+     {
+      "text": "CR"
+     },
+     {
+      "text": "M / SD"
+     },
+     {
+      "text": "M / capital standalone"
+     },
+     {
+      "text": "M / capital diversified"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
   }
  ],
  "reins/insurer/ReinsAggregate": [
@@ -7640,6 +14951,473 @@
    "n_stub_levels": 1
   }
  ],
+ "stats/insurer/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "\u2014",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "700.00",
+      "700.00",
+      "700.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "0.70",
+      "0.70",
+      "0.70",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "2.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "0.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.00",
+      "1.00",
+      "1.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "freq"
+      },
+      "mean",
+      "7.00",
+      "7.00",
+      "7.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.38",
+      "0.38",
+      "0.38",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.38",
+      "0.38",
+      "0.38",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "sev"
+      },
+      "mean",
+      "100.00",
+      "100.00",
+      "100.00",
+      "64.62",
+      "64.62",
+      "0.646",
+      "\u2014",
+      "100.00",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "2.00",
+      "2.00",
+      "2.00",
+      "2.19",
+      "2.19",
+      "1.094",
+      "\u2014",
+      "2.00",
+      "429.985n"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "14.00",
+      "14.00",
+      "14.00",
+      "29.76",
+      "29.76",
+      "2.126",
+      "\u2014",
+      "13.98",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.378m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "agg"
+      },
+      "mean",
+      "700.00",
+      "700.00",
+      "700.00",
+      "452.35",
+      "452.35",
+      "0.646",
+      "\u2014",
+      "700.01",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.85",
+      "0.85",
+      "0.85",
+      "0.91",
+      "0.91",
+      "1.076",
+      "\u2014",
+      "0.85",
+      "343.790n"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "4.23",
+      "4.23",
+      "4.23",
+      "8.88",
+      "8.88",
+      "2.101",
+      "\u2014",
+      "4.22",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.235m"
+      }
+     ]
+    }
+   ],
+   "caption": "Canonical moment store by component and measure across the computation views. Raw noncentral moments (ex1, ex2, ex3) are dropped from this view; the raw perspective keeps the full store.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "e0.m0"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "mixed"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c10",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "e0.m0"
+     },
+     {
+      "text": "mixed"
+     },
+     {
+      "text": "independent"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
  "stats/insurer/PnL": [
   {
    "body": [
@@ -9539,6 +17317,473 @@
    "n_stub_levels": 2
   }
  ],
+ "stats/insurer/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "\u2014",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "700.00",
+      "700.00",
+      "700.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "0.70",
+      "0.70",
+      "0.70",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "2.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "0.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.00",
+      "1.00",
+      "1.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "freq"
+      },
+      "mean",
+      "7.00",
+      "7.00",
+      "7.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.38",
+      "0.38",
+      "0.38",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.38",
+      "0.38",
+      "0.38",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "sev"
+      },
+      "mean",
+      "100.00",
+      "100.00",
+      "100.00",
+      "7.30",
+      "7.30",
+      "0.073",
+      "\u2014",
+      "100.00",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "2.00",
+      "2.00",
+      "2.00",
+      "7.21",
+      "7.21",
+      "3.605",
+      "\u2014",
+      "2.00",
+      "429.985n"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "14.00",
+      "14.00",
+      "14.00",
+      "8.11",
+      "8.11",
+      "0.579",
+      "\u2014",
+      "13.98",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.378m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "agg"
+      },
+      "mean",
+      "700.00",
+      "700.00",
+      "700.00",
+      "51.11",
+      "51.11",
+      "0.073",
+      "\u2014",
+      "700.01",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.85",
+      "0.85",
+      "0.85",
+      "2.75",
+      "2.75",
+      "3.255",
+      "\u2014",
+      "0.85",
+      "343.790n"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "4.23",
+      "4.23",
+      "4.23",
+      "3.13",
+      "3.13",
+      "0.741",
+      "\u2014",
+      "4.22",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.235m"
+      }
+     ]
+    }
+   ],
+   "caption": "Canonical moment store by component and measure across the computation views. Raw noncentral moments (ex1, ex2, ex3) are dropped from this view; the raw perspective keeps the full store.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "e0.m0"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "mixed"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c10",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "e0.m0"
+     },
+     {
+      "text": "mixed"
+     },
+     {
+      "text": "independent"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
  "stats/raw/Aggregate": [
   {
    "body": [
@@ -10468,6 +18713,611 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 1
+  }
+ ],
+ "stats/raw/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "\u2014",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "1.000k",
+      "1.000k",
+      "1.000k",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "700.000m",
+      "700.000m",
+      "700.000m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "2.000\u00a0",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.000\u00a0",
+      "1.000\u00a0",
+      "1.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      "7.000\u00a0",
+      "7.000\u00a0",
+      "7.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "56.000\u00a0",
+      "56.000\u00a0",
+      "56.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "497.000\u00a0",
+      "497.000\u00a0",
+      "497.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "7.000\u00a0",
+      "7.000\u00a0",
+      "7.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "377.964m",
+      "377.964m",
+      "377.964m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "377.964m",
+      "377.964m",
+      "377.964m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "64.622\u00a0",
+      "64.622\u00a0",
+      "0.64622",
+      "\u2014",
+      "100.001\u00a0",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "50.000k",
+      "50.000k",
+      "50.000k",
+      "24.153k",
+      "24.153k",
+      "0.48306",
+      "\u2014",
+      "50.001k",
+      "18.426\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "125.000M",
+      "125.000M",
+      "125.000M",
+      "88.185M",
+      "88.185M",
+      "0.70548",
+      "\u2014",
+      "124.849M",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.207m"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "64.622\u00a0",
+      "64.622\u00a0",
+      "0.64622",
+      "\u2014",
+      "100.001\u00a0",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "2.000\u00a0",
+      "2.000\u00a0",
+      "2.000\u00a0",
+      "2.187\u00a0",
+      "2.187\u00a0",
+      "1.09360",
+      "\u2014",
+      "2.000\u00a0",
+      "429.985n"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "14.000\u00a0",
+      "14.000\u00a0",
+      "14.000\u00a0",
+      "29.764\u00a0",
+      "29.764\u00a0",
+      "2.12602",
+      "\u2014",
+      "13.981\u00a0",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.378m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "452.353\u00a0",
+      "452.353\u00a0",
+      "0.64622",
+      "\u2014",
+      "700.006\u00a0",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "840.000k",
+      "840.000k",
+      "840.000k",
+      "373.696k",
+      "373.696k",
+      "0.44488",
+      "\u2014",
+      "840.015k",
+      "18.024\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "1.953G",
+      "1.953G",
+      "1.953G",
+      "939.297M",
+      "939.297M",
+      "0.48095",
+      "\u2014",
+      "1.952G",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-525.913\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "452.353\u00a0",
+      "452.353\u00a0",
+      "0.64622",
+      "\u2014",
+      "700.006\u00a0",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "845.154m",
+      "845.154m",
+      "845.154m",
+      "908.989m",
+      "908.989m",
+      "1.07553",
+      "\u2014",
+      "845.155m",
+      "343.790n"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "4.226\u00a0",
+      "4.226\u00a0",
+      "4.226\u00a0",
+      "8.879\u00a0",
+      "8.879\u00a0",
+      "2.10125",
+      "\u2014",
+      "4.221\u00a0",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.235m"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c2",
+     "name": [
+      "e0.m0"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "mixed"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c10",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "e0.m0"
+     },
+     {
+      "text": "mixed"
+     },
+     {
+      "text": "independent"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
   }
  ],
  "stats/raw/PnL": [
@@ -12980,6 +21830,611 @@
    "n_stub_levels": 2
   }
  ],
+ "stats/raw/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "\u2014",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "1.000k",
+      "1.000k",
+      "1.000k",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "700.000m",
+      "700.000m",
+      "700.000m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "2.000\u00a0",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.000\u00a0",
+      "1.000\u00a0",
+      "1.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      "7.000\u00a0",
+      "7.000\u00a0",
+      "7.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "56.000\u00a0",
+      "56.000\u00a0",
+      "56.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "497.000\u00a0",
+      "497.000\u00a0",
+      "497.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "7.000\u00a0",
+      "7.000\u00a0",
+      "7.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "377.964m",
+      "377.964m",
+      "377.964m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "377.964m",
+      "377.964m",
+      "377.964m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "7.302\u00a0",
+      "7.302\u00a0",
+      "0.07302",
+      "\u2014",
+      "100.001\u00a0",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "50.000k",
+      "50.000k",
+      "50.000k",
+      "2.825k",
+      "2.825k",
+      "0.05649",
+      "\u2014",
+      "50.001k",
+      "18.426\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "125.000M",
+      "125.000M",
+      "125.000M",
+      "1.244M",
+      "1.244M",
+      "0.00995",
+      "\u2014",
+      "124.849M",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.207m"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "7.302\u00a0",
+      "7.302\u00a0",
+      "0.07302",
+      "\u2014",
+      "100.001\u00a0",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "2.000\u00a0",
+      "2.000\u00a0",
+      "2.000\u00a0",
+      "7.210\u00a0",
+      "7.210\u00a0",
+      "3.60478",
+      "\u2014",
+      "2.000\u00a0",
+      "429.985n"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "14.000\u00a0",
+      "14.000\u00a0",
+      "14.000\u00a0",
+      "8.109\u00a0",
+      "8.109\u00a0",
+      "0.57924",
+      "\u2014",
+      "13.981\u00a0",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.378m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "51.113\u00a0",
+      "51.113\u00a0",
+      "0.07302",
+      "\u2014",
+      "700.006\u00a0",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "840.000k",
+      "840.000k",
+      "840.000k",
+      "22.385k",
+      "22.385k",
+      "0.02665",
+      "\u2014",
+      "840.015k",
+      "18.024\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "1.953G",
+      "1.953G",
+      "1.953G",
+      "11.875M",
+      "11.875M",
+      "0.00608",
+      "\u2014",
+      "1.952G",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-525.913\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "700.000\u00a0",
+      "51.113\u00a0",
+      "51.113\u00a0",
+      "0.07302",
+      "\u2014",
+      "700.006\u00a0",
+      "8.869\u00b5"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "845.154m",
+      "845.154m",
+      "845.154m",
+      "2.751\u00a0",
+      "2.751\u00a0",
+      "3.25508",
+      "\u2014",
+      "845.155m",
+      "343.790n"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "4.226\u00a0",
+      "4.226\u00a0",
+      "4.226\u00a0",
+      "3.133\u00a0",
+      "3.133\u00a0",
+      "0.74129",
+      "\u2014",
+      "4.221\u00a0",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.235m"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c2",
+     "name": [
+      "e0.m0"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "mixed"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c10",
+     "name": [
+      "error"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "e0.m0"
+     },
+     {
+      "text": "mixed"
+     },
+     {
+      "text": "independent"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
  "summary/insurer/Aggregate": [
   {
    "body": [
@@ -13670,6 +23125,614 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 1
+  }
+ ],
+ "summary/insurer/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Gross"
+      },
+      "Consideration",
+      "1,000.00",
+      "0.00",
+      "0.00000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "591.61",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.84515"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.221"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,820.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-556.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "299.99",
+      "591.61",
+      "1.97209",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.221"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,820.00"
+      },
+      "444.00",
+      "952.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 300 xs 200"
+      },
+      "Consideration",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      "0.00",
+      "-0.00000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "123.89",
+      "168.80",
+      "1.36250",
+      "1.561",
+      "0.00",
+      "28.00",
+      "660.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "83.89",
+      "168.80",
+      "2.01214",
+      "1.561",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-12.00"
+      },
+      "620.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      "383.89",
+      "470.55",
+      "1.22576",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-6.430"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,336.00"
+      },
+      "476.00",
+      "912.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 100 xs 100"
+      },
+      "Consideration",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "0.00",
+      "-0.00000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "123.76",
+      "103.69",
+      "0.83781",
+      "0.900",
+      "0.00",
+      "100.00",
+      "420.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "63.76",
+      "103.69",
+      "1.62622",
+      "0.900",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "40.00",
+      "360.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      "447.65",
+      "411.18",
+      "0.91855",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      "528.00",
+      "852.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "All occurrence"
+      },
+      "Consideration",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00",
+      "-0.00000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "247.65",
+      "253.03",
+      "1.02171",
+      "1.282",
+      "0.00",
+      "172.00",
+      "1,040.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "147.65",
+      "253.03",
+      "1.71368",
+      "1.282",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "72.00",
+      "940.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "All"
+      },
+      "Consideration",
+      "900.00",
+      "0.00",
+      "0.00000",
+      "\u2014",
+      "900.00",
+      "900.00",
+      "900.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-452.35"
+      },
+      "411.18",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.90899"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,036.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-372.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "447.65",
+      "411.18",
+      "0.91855",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      "528.00",
+      "852.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Impact",
+      "147.65",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-180.43"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.05354"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.659"
+      },
+      "684.00",
+      "84.00",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
   }
  ],
  "summary/insurer/PnL": [
@@ -14596,6 +24659,465 @@
    "n_stub_levels": 2
   }
  ],
+ "summary/insurer/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Gross"
+      },
+      "Consideration",
+      "1,000.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "593.21",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.847"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.178"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,840.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-560.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "299.99",
+      "593.21",
+      "1.977",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.178"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,840.00"
+      },
+      "440.00",
+      "960.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 500 xs 500"
+      },
+      "Consideration",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00",
+      "0.000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "51.11",
+      "140.83",
+      "2.755",
+      "3.137",
+      "0.00",
+      "0.00",
+      "520.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      "140.83",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2.881"
+      },
+      "3.137",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "420.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      "251.11",
+      "497.96",
+      "1.983",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      "340.00",
+      "860.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "All"
+      },
+      "Consideration",
+      "900.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "900.00",
+      "900.00",
+      "900.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-648.89"
+      },
+      "497.96",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.767"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,280.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-560.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "251.11",
+      "497.96",
+      "1.983",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      "340.00",
+      "860.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Impact",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      "140.83",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2.881"
+      },
+      "3.137",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "420.00"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
  "summary/raw/Aggregate": [
   {
    "body": [
@@ -15284,6 +25806,614 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 1
+  }
+ ],
+ "summary/raw/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Gross"
+      },
+      "Consideration",
+      "1,000.00",
+      "0.00",
+      "0.00000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "591.61",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.84515"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.221"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,820.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-556.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "299.99",
+      "591.61",
+      "1.97209",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.221"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,820.00"
+      },
+      "444.00",
+      "952.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 300 xs 200"
+      },
+      "Consideration",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      "0.00",
+      "-0.00000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "123.89",
+      "168.80",
+      "1.36250",
+      "1.561",
+      "0.00",
+      "28.00",
+      "660.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "83.89",
+      "168.80",
+      "2.01214",
+      "1.561",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-12.00"
+      },
+      "620.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      "383.89",
+      "470.55",
+      "1.22576",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-6.430"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,336.00"
+      },
+      "476.00",
+      "912.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 100 xs 100"
+      },
+      "Consideration",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "0.00",
+      "-0.00000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "123.76",
+      "103.69",
+      "0.83781",
+      "0.900",
+      "0.00",
+      "100.00",
+      "420.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "63.76",
+      "103.69",
+      "1.62622",
+      "0.900",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-60.00"
+      },
+      "40.00",
+      "360.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      "447.65",
+      "411.18",
+      "0.91855",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      "528.00",
+      "852.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "All occurrence"
+      },
+      "Consideration",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00",
+      "-0.00000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "247.65",
+      "253.03",
+      "1.02171",
+      "1.282",
+      "0.00",
+      "172.00",
+      "1,040.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "147.65",
+      "253.03",
+      "1.71368",
+      "1.282",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "72.00",
+      "940.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "All"
+      },
+      "Consideration",
+      "900.00",
+      "0.00",
+      "0.00000",
+      "\u2014",
+      "900.00",
+      "900.00",
+      "900.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-452.35"
+      },
+      "411.18",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.90899"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,036.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-372.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "447.65",
+      "411.18",
+      "0.91855",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,136.00"
+      },
+      "528.00",
+      "852.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Impact",
+      "147.65",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-180.43"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1.05354"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.659"
+      },
+      "684.00",
+      "84.00",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
   }
  ],
  "summary/raw/PnL": [
@@ -16166,6 +27296,465 @@
      },
      {
       "text": "Mean"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "summary/raw/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "Gross"
+      },
+      "Consideration",
+      "1,000.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "1,000.00",
+      "1,000.00",
+      "1,000.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-700.01"
+      },
+      "593.21",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.847"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.178"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,840.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-560.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "299.99",
+      "593.21",
+      "1.977",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.178"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,840.00"
+      },
+      "440.00",
+      "960.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ 500 xs 500"
+      },
+      "Consideration",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "0.00",
+      "0.000",
+      "\u2014",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      "51.11",
+      "140.83",
+      "2.755",
+      "3.137",
+      "0.00",
+      "0.00",
+      "520.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      "140.83",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2.881"
+      },
+      "3.137",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "420.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      "251.11",
+      "497.96",
+      "1.983",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      "340.00",
+      "860.00"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "All"
+      },
+      "Consideration",
+      "900.00",
+      "0.00",
+      "0.000",
+      "\u2014",
+      "900.00",
+      "900.00",
+      "900.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Obligation",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-648.89"
+      },
+      "497.96",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-0.767"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2,280.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-560.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-40.00"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Margin",
+      "251.11",
+      "497.96",
+      "1.983",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-1,380.00"
+      },
+      "340.00",
+      "860.00"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Impact",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-48.89"
+      },
+      "140.83",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-2.881"
+      },
+      "3.137",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-100.00"
+      },
+      "420.00"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "Side"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "SD"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "CV"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Skew"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P01"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Median"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "P99"
+     ]
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Side"
+     },
+     {
+      "text": "EX"
      },
      {
       "text": "SD"
@@ -21108,6 +32697,82 @@
    "n_stub_levels": 1
   }
  ],
+ "validation/insurer/Peel": [
+  {
+   "body": [],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "EX"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Est"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "abs_err"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "rel_err"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "leg"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "abs_err"
+     },
+     {
+      "text": "rel_err"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
  "validation/insurer/PnL": [
   {
    "body": [],
@@ -22162,6 +33827,82 @@
    "n_stub_levels": 2
   }
  ],
+ "validation/insurer/Tower": [
+  {
+   "body": [],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "EX"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Est"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "abs_err"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "rel_err"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "leg"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "abs_err"
+     },
+     {
+      "text": "rel_err"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
  "validation/raw/Aggregate": [
   {
    "body": [
@@ -22635,6 +34376,82 @@
      },
      {
       "text": "Pass"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/raw/Peel": [
+  {
+   "body": [],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "EX"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Est"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "abs_err"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "rel_err"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "leg"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "abs_err"
+     },
+     {
+      "text": "rel_err"
      }
     ]
    ],
@@ -23674,6 +35491,82 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 2
+  }
+ ],
+ "validation/raw/Tower": [
+  {
+   "body": [],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "EX"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "Est"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "abs_err"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "rel_err"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "leg"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est"
+     },
+     {
+      "text": "abs_err"
+     },
+     {
+      "text": "rel_err"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
   }
  ]
 }

@@ -1,9 +1,11 @@
 # plan-derived-programs: a program that reproduces a derived object
 
-Status: **executed** at `1.0.0a213`. Both open questions went the way the
-recommendations below argued: `sharpen_program` stayed a property, and the loss
-ratio and expense ratio stayed in the signature. One case the plan did not
-name turned up in execution and is recorded under Open.
+Status: **executed** at `1.0.0a213`, with an author-driven second half at
+`1.0.0a215`. Both open questions went the way the recommendations below argued:
+`sharpen_program` stayed a property, and the loss ratio and expense ratio stayed
+in the signature. What the plan got wrong, and the author caught on first use,
+is recorded under "Found in execution": `sharpen()` has to pin its outcome onto
+the object, not merely offer it as a separate property.
 
 Three new members of the DecL round-trip surface, each answering the same question about a different derivation: what is the program that would build this? Sharpening a grid, wrapping an object in a P&L, and adding a cession all produce a new object, and today none of them produces the text that reproduces it.
 
@@ -102,6 +104,13 @@ The property-versus-method wart above, to accept or reject. **Resolved as recomm
 Whether `pnl_program`'s defaults belong in the signature or in `constants.py`. The 0.70 loss ratio and 0.25 expense ratio are conventions rather than facts, and a convention that appears in a signature is harder to find later than one with a name. Recommendation is the signature, since they are per-call choices and a caller reading the docstring sees them immediately, but it is worth a moment's thought. **Resolved as recommended**: both live in the signature.
 
 ## Found in execution
+
+**The plan's central omission, caught by the author on first use, fixed at `a215` as `[Sharpen-Pin]`.** A separate `sharpen_program` property is not enough, because it leaves the object's *own* records wrong. `a.sharpen()` moves the grid and `a.hints` stays empty, which is merely surprising; the sharp case is a declaration pinning one axis. `hints{log2=17}` sharpened on the bucket axis leaves `hints` reading `log2=17`, silently **incomplete** rather than stale, so `build(a.program)` returns on a different bucket while `hints` reads as a complete record of the grid. The author's call: `sharpen()` writes `program`, `note` and `hints` together, so `program` means the program that *builds* this object rather than merely the one that built it, and the three never disagree. `sharpen_program` becomes the pinned program rendered to read.
+
+That in turn exposed a latent defect in the a213 form: the note merge was cumulative, so a build-sharpen-rebuild cycle would have stacked one verdict per pass. Sharpen's sentence is now namespaced (`'sharpen: '`) and **replaced** rather than appended, and a confirmation is dropped when a later probe moves the grid, since it would sit beside fresh hints contradicting them. The author's own prose never matches the prefix.
+
+**The P&L spread layout, also author-driven, also `a215`.** The premium head and both `less` keywords were glued into the block head. Each `less` now heads a sub-block over what it takes away, so the render reads as the subtraction it is. `terse` is byte-identical, because `_render_terse` space-joins a head back onto its children, which is what left `spec_to_decl`, `to_agg` and the round-trip corpus untouched.
+
 
 **A third sharpen outcome.** The plan names two, moved and confirmed. A probe run under `execute=False` is a third: it finds a better cell and does not take it, so the object still sits on its original grid. Pinning the winner would describe an object that does not exist, and writing "grid confirmed" would be false, so it carries a note recording the recommendation and no hints.
 

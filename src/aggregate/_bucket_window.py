@@ -14,6 +14,10 @@ from scipy.optimize import NoConvergence  # noqa
 from .config import get_settings
 from .constants import InfiniteVarianceError, DefectiveDistributionWarning
 from . import _validation
+# Module scope is safe: _program imports only decl_writer, which imports nothing
+# from aggregate at module scope, and _program reaches back here for _fmt_bs
+# through a deferred import inside the function.
+from . import _program
 from .utilities import round_bucket, value_type_role
 from . import tail as _tail
 from ._fits import gamma_fit, lognorm_fit, sgamma_fit, sln_fit
@@ -1738,6 +1742,7 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
                              'log20': log20, 'bs_exact': bs_exact,
                              'lattice': lattice, 'grew': False,
                              'centre_defective': False, 'passed_over': 0}
+        _program.pin_sharpen(ob)
         return ob
 
     # Thrifty rows first: the current grid size and, when there is room below,
@@ -1815,6 +1820,10 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
                          'bs_exact': bs_exact, 'lattice': lattice, 'grew': grew,
                          'centre_defective': centre_defective,
                          'passed_over': passed_over}
+    # The probe's outcome goes onto the object's own program and trailer, so
+    # `program` means the program that BUILDS this object rather than merely the
+    # one that built it, and `hints` never half describes a grid it moved.
+    _program.pin_sharpen(ob)
     return ob
 
 

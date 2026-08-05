@@ -217,22 +217,6 @@
   app commits (distortion, reins and sev all need the adapter's xy
   realization, and the adapter now also owns the same ladder), which wait
   on the app-side workstream.
-- **[Derived-Programs]** — **DONE** at `1.0.0a213`, plan in
-  `dev/done/plan-derived-programs.md`. Three members answering the same
-  question about a different derivation, namely what is the program that
-  would build this: `sharpen_program` (property, `Aggregate` / `Portfolio`),
-  `pnl_program` (method, both) and `reins_program` (method, `Aggregate`).
-  Shared machinery in `_program.py`, thin delegations on the hosts, the
-  pattern `sharpen` already follows; each parses the stored program to a
-  spec, mutates it and re-renders, never string surgery. Split out of
-  `aggregate_api/dev/plan-loss-lab-navigation.md`, which is the immediate
-  consumer and stays parked on the plots workstream. Both open questions
-  went the way the plan recommended: `sharpen_program` stays a **property**
-  (it is the residue of a probe you already ran, and the pull of `sharpen_df`
-  beside it beats uniformity with the two methods), and the 0.70 / 0.25
-  conventions stay in the **signature**, where a caller reading the docstring
-  meets them.
-
 ### Correctness & bugs
 
 - **[Signed-Bounded-Window]** — robustness: kill the `int(inf)` `OverflowError`

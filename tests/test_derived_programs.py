@@ -22,6 +22,7 @@ import warnings
 import pytest
 
 from aggregate import build, Underwriter
+from aggregate._bucket_window import _fmt_bs
 from aggregate._program import _merge_hints, _merge_note
 
 
@@ -132,6 +133,81 @@ def test_sharpen_program_merges_an_existing_note():
     assert 'a stored note' in program
     assert 'grid confirmed' in program
     assert build(program).note == 'a stored note; sharpen: grid confirmed, no change'
+
+
+# ------------------------------------------------------------- the pin
+#
+# sharpen() writes its outcome onto the object's own program and trailer, so
+# `program` means the program that BUILDS this object rather than merely the one
+# that built it, and the three records never disagree.
+
+def test_sharpen_pins_the_grid_onto_the_object():
+    a = build(MOVES)
+    assert a.hints == ''
+    a.sharpen()
+    assert a.hints == f'log2={a.log2}; bs={_fmt_bs(a.bs)}'
+    b = build(a.program)
+    assert (b.bs, b.log2) == (a.bs, a.log2)
+
+
+def test_sharpen_pin_completes_a_half_declared_grid():
+    """The case that made this worth doing.
+
+    A declaration pinning ``log2`` only, sharpened on the bucket axis, used to
+    leave ``hints`` reading as a complete record of a grid it half described:
+    ``build(a.program)`` came back on a different bucket.
+    """
+    a = build('agg DP.Half 100 claims sev lognorm 100 cv 2 poisson hints{log2=17}')
+    a.sharpen()
+    assert float(a.bs) != 1.0                  # the bucket moved
+    assert 'bs=' in a.hints and 'log2=17' in a.hints
+    assert (build(a.program).bs, build(a.program).log2) == (a.bs, a.log2)
+
+
+def test_sharpen_pin_keeps_the_three_records_agreeing():
+    a = build(BOTH)
+    a.sharpen()
+    _kind, _name, spec = build.parser.parse(a.program)
+    assert spec.get('hints', '') == a.hints
+    assert spec.get('note', '') == a.note
+
+
+def test_sharpen_pin_replaces_its_own_verdict_rather_than_stacking():
+    """Probe three times and there is one verdict, the latest."""
+    a = build(NOTED)
+    for _ in range(3):
+        a.sharpen()
+    assert a.note == 'a stored note; sharpen: grid confirmed, no change'
+    assert a.program.count('note{') == 1
+
+
+def test_sharpen_pin_drops_a_stale_verdict_when_the_grid_later_moves():
+    """A confirmation left beside fresh hints would contradict them."""
+    a = build('agg DP.Later 100 claims sev gamma 100 cv 1 poisson note{mine}')
+    a.sharpen()
+    assert 'grid confirmed' in a.note
+    a.sharpen(bs=1 / 8, log2=14)               # a bad centre, so the probe moves
+    assert a.note == 'mine'
+    assert a.hints
+
+
+def test_sharpen_pin_records_an_unexecuted_recommendation():
+    a = build(MOVES)
+    grid = (a.bs, a.log2)
+    a.sharpen(execute=False, good_enough=0)
+    assert (a.bs, a.log2) == grid
+    assert a.hints == ''
+    assert a.note.startswith('sharpen: ')
+
+
+def test_sharpen_pin_is_a_noop_without_a_program():
+    """A programmatic object has no text to merge into, and a probe still runs."""
+    from aggregate.distributions import Aggregate
+    a = Aggregate('DPBare3', exp_en=10, sev_name='lognorm', sev_mean=100,
+                  sev_cv=1, freq_name='poisson')
+    a.sharpen()
+    assert a.program == ''
+    assert a.sharpen_df is not None or a.sharpen_description
 
 
 def test_sharpen_program_merges_into_existing_hints():
@@ -381,3 +457,18 @@ def test_merge_hints_replaces_in_place_and_appends_the_rest(hints, updates,
 ])
 def test_merge_note_joins_rather_than_duplicating(note, addition, expected):
     assert _merge_note(note, addition) == expected
+
+
+@pytest.mark.parametrize('note, addition, expected', [
+    # nothing to replace: a plain append
+    ('mine', 'gen: b', 'mine; gen: b'),
+    # the previous generated chunk goes, the author's prose stays
+    ('mine; gen: a', 'gen: b', 'mine; gen: b'),
+    # several accumulated chunks all collapse onto the latest
+    ('gen: a; mine; gen: b', 'gen: c', 'mine; gen: c'),
+    # an empty addition is how a caller clears its own record
+    ('mine; gen: a', '', 'mine'),
+])
+def test_merge_note_replaces_a_namespaced_record(note, addition, expected):
+    """A generated verdict is replaceable; the author's own prose never matches."""
+    assert _merge_note(note, addition, replace_prefix='gen: ') == expected

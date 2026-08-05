@@ -76,11 +76,14 @@ usually about the math rather than the metadata, and these three are the
 exception: for :func:`sharpen_program` the trailer is the entire payload.
 """
 
+import logging
 import re
 
 import numpy as np
 
 from .decl_writer import format_program as _format_program
+
+logger = logging.getLogger(__name__)
 
 
 class ProgramMixin:
@@ -110,6 +113,14 @@ class ProgramMixin:
     #:   later steps. Read it back decoded via ``.doc``.
     #:
     #: Nobody keeps the keystrokes. For the file as written, read the ``.agg``.
+    #:
+    #: **One thing rewrites it.** :meth:`~aggregate.distributions.Aggregate.sharpen`
+    #: moves the grid, and pins the grid it moved to onto this text through
+    #: :func:`pin_sharpen`, so a probed object's program is the program that
+    #: **builds** it rather than merely the one that built it. Everything else
+    #: about the statement is untouched, the rewrite is the trailer only, and it
+    #: is still preprocessor output, so the shape above still holds. Nothing
+    #: else in the library writes here after ``build``.
     #:
     #: A class-level default so a host that is never stamped still answers;
     #: stamped hosts shadow it with an instance attribute, and ``PnL`` shadows
@@ -345,7 +356,7 @@ def _merge_hints(hints, updates):
     return '; '.join(out)
 
 
-def _merge_note(note, addition):
+def _merge_note(note, addition, replace_prefix=None):
     """Append a sentence to an existing ``note{...}`` body.
 
     One ``note`` per spec, same as :func:`_merge_hints`, so an addition joins
@@ -357,12 +368,29 @@ def _merge_note(note, addition):
         The existing note body, or ``''``.
     addition : str
         Text to add. Must not contain ``}``, which closes the clause.
+    replace_prefix : str, optional
+        When given, drop any existing ``;``-separated chunk that starts with it
+        before appending. That is what makes a generated record **replaceable**
+        rather than cumulative: sharpen twice and you want the latest verdict
+        once, not both verdicts in sequence. The author's own prose never
+        matches, because the prefixes are namespaced (``'sharpen: '``).
 
     Returns
     -------
     str
         The merged body.
+
+    Examples
+    --------
+    >>> _merge_note('mine', 'sharpen: b', replace_prefix='sharpen: ')
+    'mine; sharpen: b'
+    >>> _merge_note('mine; sharpen: a', 'sharpen: b', replace_prefix='sharpen: ')
+    'mine; sharpen: b'
     """
+    if replace_prefix:
+        kept = [c.strip() for c in (note or '').split(';')]
+        note = '; '.join(c for c in kept
+                         if c and not c.startswith(replace_prefix))
     if not note:
         return addition
     if not addition:
@@ -394,30 +422,16 @@ def _render_derived(kind, name, spec):
                            trailer=True)
 
 
-def sharpen_program(ob):
-    """The program that rebuilds ``ob`` on the grid its last probe chose.
+#: Prefix that marks sharpen's own sentence in a ``note{...}``. Namespaced so a
+#: re-probe replaces its previous verdict instead of stacking a second one, and
+#: so the author's own prose is never mistaken for it.
+_SHARPEN_NOTE = 'sharpen: '
 
-    The fourth thing :func:`aggregate._bucket_window.sharpen` produces, beside
-    ``sharpen_df`` / ``sharpen_description`` / ``sharpen_explanation``: the
-    object's own program with the outcome of the probe merged into its trailer.
-    Without it the knowledge of which grid won lives only in the live object,
-    and reopening the notebook tomorrow rebuilds on the automatic choice with
-    the audit still to run.
 
-    Parameters
-    ----------
-    ob : Aggregate or Portfolio
-        A sharpened object.
+def _sharpen_trailer(ob, spec):
+    """Merge the last probe's outcome into ``spec``'s ``note`` / ``hints``.
 
-    Returns
-    -------
-    str
-        DecL, or ``''`` before :meth:`sharpen` has run (and for an object with
-        no program at all).
-
-    Notes
-    -----
-    Three outcomes, three records.
+    Mutates ``spec`` in place. Three outcomes, three records.
 
     **The grid moved.** ``hints{log2=...; bs=...}`` pins it, and nothing else is
     added, because the hints are the record.
@@ -435,22 +449,24 @@ def sharpen_program(ob):
     recommendation would describe an object that does not exist; the note
     carries the recommendation instead.
 
-    Any ``note`` / ``hints`` the program already carried survives: the settings
-    are merged key by key (see :func:`_merge_hints`) and the note is appended
-    to.
+    Parameters
+    ----------
+    ob : Aggregate or Portfolio
+        A sharpened object, read for ``_sharpen_state`` and ``_sharpen_df``.
+    spec : dict
+        A raw transformer spec, mutated in place.
 
-    A grid the *caller* pinned at build time, ``build(program, log2=20)``, is
-    not in the program text and not visible to the probe. Sharpen confirming it
-    therefore writes the confirmation note and no hints, and the returned
-    program rebuilds on the automatic grid. Pass the grid through a ``hints{}``
-    clause instead of a ``build`` keyword if it has to be durable.
+    Notes
+    -----
+    Whatever the program already carried survives: the settings merge key by
+    key (:func:`_merge_hints`) and the note is appended to. Sharpen's own
+    sentence is *replaced* rather than repeated, so probing twice leaves one
+    verdict, the latest.
     """
     from ._bucket_window import _fmt_bs
     state = getattr(ob, '_sharpen_state', None)
-    if state is None or not getattr(ob, 'program', ''):
-        return ''
-    kind, name, spec = _require_program(ob, 'sharpen_program')
-    spec = dict(spec)
+    if state is None:
+        return
     df = getattr(ob, '_sharpen_df', None)
     won = None if df is None else df[df['selected']]
     if not state['ran'] or won is None or not len(won):
@@ -462,18 +478,114 @@ def sharpen_program(ob):
         moved = (float(win['bs']) != float(state['bs0'])
                  or int(win['log2']) != int(state['log20']))
     if not moved:
-        spec['note'] = _merge_note(spec.get('note', ''),
-                                   'sharpen: grid confirmed, no change')
+        addition = 'grid confirmed, no change'
     elif state['execute']:
         spec['hints'] = _merge_hints(
             spec.get('hints', ''),
             {'log2': str(int(win['log2'])), 'bs': _fmt_bs(win['bs'])})
+        addition = None
     else:
-        spec['note'] = _merge_note(
-            spec.get('note', ''),
-            f'sharpen: probe not executed, recommends log2 '
-            f'{int(win["log2"])} and bs {_fmt_bs(win["bs"])}')
-    return _render_derived(kind, name, spec)
+        addition = (f'probe not executed, recommends log2 '
+                    f'{int(win["log2"])} and bs {_fmt_bs(win["bs"])}')
+    if addition is not None:
+        spec['note'] = _merge_note(spec.get('note', ''),
+                                   _SHARPEN_NOTE + addition,
+                                   replace_prefix=_SHARPEN_NOTE)
+    else:
+        # The moved case pins the grid, so any stale verdict from an earlier
+        # probe has to go: it would otherwise contradict the hints beside it.
+        spec['note'] = _merge_note(spec.get('note', ''), '',
+                                   replace_prefix=_SHARPEN_NOTE)
+
+
+def pin_sharpen(ob):
+    """Write the last probe's outcome onto ``ob``'s own program and trailer.
+
+    Called by :func:`aggregate._bucket_window.sharpen` on the way out, which is
+    what makes ``program`` mean *the program that builds this object* rather
+    than merely the one that built it. Before this, an object whose grid the
+    probe had moved carried a ``program`` that rebuilt it somewhere else, and a
+    ``hints`` that was worse than empty: a declared ``hints{log2=17}`` survived
+    a probe that changed ``bs``, so it read as a complete record of a grid it
+    only half described.
+
+    Parameters
+    ----------
+    ob : Aggregate or Portfolio
+        The sharpened object, mutated in place.
+
+    Notes
+    -----
+    Sets :attr:`ProgramMixin.program`, ``note`` and ``hints`` together, so the
+    three never disagree. ``program`` is stamped the way ``build`` stamps it,
+    through :meth:`aggregate.parser.UnderwritingLexer.preprocess`, so it stays
+    one line with any ``doc{{{...}}}`` body base64 encoded.
+
+    A no-op for an object built programmatically, which has no text to merge
+    into, and for one whose program cannot be re-parsed (a reference resolvable
+    only by a custom underwriter). Neither is worth failing a probe over: the
+    grid still moved, and ``sharpen_description`` still says so.
+
+    A grid the *caller* pinned at build time, ``build(program, log2=20)``, is
+    not in the program text and not visible to the probe. Sharpen confirming it
+    therefore writes the confirmation note and no hints, and ``program``
+    continues to rebuild on the automatic grid. Pass the grid through a
+    ``hints{}`` clause rather than a ``build`` keyword when it has to be
+    durable.
+    """
+    from .parser import UnderwritingLexer
+    if not getattr(ob, 'program', ''):
+        return
+    try:
+        kind, name, spec = _parse_program(ob.program)
+        spec = dict(spec)
+        _sharpen_trailer(ob, spec)
+        text = _format_program((kind, name, spec), fmt='text', layout='terse',
+                               trailer=True)
+        program = UnderwritingLexer.preprocess(text)[0]
+    except Exception:                   # noqa: BLE001 a probe must not fail here
+        logger.info('sharpen: could not pin the outcome onto %r; its program '
+                    'is left as declared', getattr(ob, 'name', ob))
+        return
+    ob.program = program
+    ob.note = spec.get('note', '')
+    ob.hints = spec.get('hints', '')
+
+
+def sharpen_program(ob):
+    """The program that rebuilds ``ob`` on the grid its last probe chose.
+
+    The fourth thing :func:`aggregate._bucket_window.sharpen` produces, beside
+    ``sharpen_df`` / ``sharpen_description`` / ``sharpen_explanation``. Since
+    :func:`pin_sharpen` writes that outcome onto ``ob.program`` as the probe
+    finishes, this is that program rendered to read, the ``spread`` layout with
+    the trailer left in. Ask for it when you want the text; read ``ob.program``
+    when you want the one-line stamp, and ``ob.hints`` / ``ob.note`` when you
+    want the settings and the verdict on their own.
+
+    Parameters
+    ----------
+    ob : Aggregate or Portfolio
+        A sharpened object.
+
+    Returns
+    -------
+    str
+        DecL, or ``''`` before :meth:`sharpen` has run (and for an object with
+        no program at all).
+
+    Notes
+    -----
+    The result is itself a program, so the rest of the render surface applies
+    to it, for instance
+    ``format_program(a.sharpen_program, layout='terse')``.
+    """
+    if getattr(ob, '_sharpen_state', None) is None:
+        return ''
+    if not getattr(ob, 'program', ''):
+        return ''
+    return _format_program(ob.program, fmt='text', layout='spread',
+                           trailer=True)
 
 
 def _pnl_consideration(ob, loss_ratio, caller):

@@ -1017,7 +1017,16 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         their own ``valid``.
 
         Populates :attr:`sharpen_df`, :attr:`sharpen_description` and
-        :attr:`sharpen_explanation`. Returns ``self``, so the call chains.
+        :attr:`sharpen_explanation`. Returns ``self``, so the call chains; the
+        object is moved **in place**, so ``p = p.sharpen()`` rebinds the same
+        object rather than producing a second one.
+
+        **It also pins the outcome onto the portfolio's own text.**
+        :attr:`program`, :attr:`note` and :attr:`hints` are rewritten together
+        so the three agree and ``build(p.program)`` reproduces the sharpened
+        portfolio. The clauses land on the ``port`` statement, ahead of the
+        units, which is where the grammar binds a portfolio's trailer. See
+        :func:`aggregate._program.pin_sharpen`.
         """
         return _bucket_window.sharpen(
             self, bs, log2, log2_cap=log2_cap, bs_limit=bs_limit, power=power,
@@ -1064,16 +1073,16 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         """The program that rebuilds this portfolio on the sharpened grid.
 
         The fourth thing a probe produces, beside :attr:`sharpen_df`,
-        :attr:`sharpen_description` and :attr:`sharpen_explanation`: this
-        object's own program with the outcome merged into its trailer, so the
-        grid the audit chose survives the notebook. ``hints{log2=...; bs=...}``
-        when the grid moved, ``note{sharpen: grid confirmed, no change}`` when
-        it did not. The clauses land on the ``port`` statement, where the
-        grammar binds a portfolio's trailer, ahead of the units. ``''`` before
-        :meth:`sharpen` runs.
+        :attr:`sharpen_description` and :attr:`sharpen_explanation`.
+        :meth:`sharpen` pins its outcome onto :attr:`program` as it finishes,
+        so this is that program **rendered to read**: the ``spread`` layout
+        with the trailer left in. ``hints{log2=...; bs=...}`` when the grid
+        moved, a ``note{sharpen: ...}`` and no hints when it did not, on the
+        ``port`` statement ahead of the units, which is where the grammar binds
+        a portfolio's trailer. ``''`` before :meth:`sharpen` runs.
 
-        Delegated to :func:`aggregate._program.sharpen_program`, where the three
-        outcomes are documented in full.
+        Delegated to :func:`aggregate._program.sharpen_program`; the three
+        outcomes are documented on :func:`aggregate._program.pin_sharpen`.
         """
         return _program.sharpen_program(self)
 

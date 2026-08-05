@@ -845,14 +845,32 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
 
         pnl NAME <premium> premium less agg NAME_e <exposure> <body> [less <exp>]
 
-    Returns a :class:`_Block` whose head keeps ``pnl NAME <premium> premium less``
-    intact; the loss engine renders as a nested ``agg NAME_e`` sub-block (sharing
-    the ordinary :func:`_render_exposure` / severity / reinsurance / frequency /
-    ``approximate`` renderers), and any gross-expense clause follows after a second
-    ``less`` at the P&L level. The engine name round-trips when the source
-    carried one (``spec['engine_name']``); otherwise a synthetic ``NAME_e`` is
-    used. Either way it is cosmetic --- discarded at build --- but must stay a
-    valid identifier.
+    Returns a :class:`_Block` headed by ``pnl NAME`` alone. The premium head is
+    its own child, and each ``less`` heads a sub-block over what it takes away:
+    the loss engine (an ``agg NAME_e`` block sharing the ordinary
+    :func:`_render_exposure` / severity / reinsurance / frequency /
+    ``approximate`` renderers, or a ``port.NAME`` reference), then any
+    gross-expense clause. So ``spread`` reads as the subtraction it is::
+
+        pnl NAME
+          <premium> premium
+          less
+            agg NAME_e
+              <exposure>
+              ...
+          less
+            <expense>
+
+    ``terse`` is unaffected, and byte-identical to what it has always been:
+    :func:`_render_terse` space-joins a head back onto its children, so
+    ``pnl NAME <premium> premium less agg NAME_e ... less <expense>`` is what
+    both the nesting and the old flat head flatten to. That is what keeps
+    :func:`spec_to_decl` and the ``to_agg`` exporter untouched by the layout.
+
+    The engine name round-trips when the source carried one
+    (``spec['engine_name']``); otherwise a synthetic ``NAME_e`` is used. Either
+    way it is cosmetic --- discarded at build --- but must stay a valid
+    identifier.
     """
     from .parser import INHERIT_PREMIUM
     retro = spec.get('retro_terms')
@@ -894,9 +912,10 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
         ])
     expense = _render_expense(spec)
     keyword = 'xpnl' if kind == 'xpnl' else 'pnl'
-    return _Block(f'{keyword} {name}{obj_label} {premium_head} less', [
-        engine,
-        f'less {expense}' if expense else '',
+    return _Block(f'{keyword} {name}{obj_label}', [
+        premium_head,
+        _Block('less', [engine]),
+        _Block('less', [expense]) if expense else '',
         _render_peel(spec),
         *_render_trailer(spec, trailer),
     ])

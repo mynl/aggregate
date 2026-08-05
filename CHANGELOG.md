@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.0.0a215
+
+**[Sharpen-Pin] `sharpen()` writes its outcome onto the object's own program,
+so `program` means the program that *builds* this object.** Author-found, and
+the second half of `[Derived-Programs]`. `a.sharpen()` moved the grid and left
+`a.hints` empty, which is surprising on its own; the sharper form is a
+declaration that pins one axis. `hints{log2=17}` sharpened on the bucket axis
+left `hints` still reading `log2=17`, silently *incomplete* rather than merely
+stale, so `build(a.program)` came back on a different bucket while `hints` read
+as a complete record of the grid.
+
+`sharpen()` now writes `program`, `note` and `hints` **together**, through
+`_program.pin_sharpen`, so the three never disagree and `build(ob.program)`
+reproduces the sharpened object. A moved grid becomes `hints{log2=...; bs=...}`;
+a confirmed one a `note{sharpen: grid confirmed, no change}` and deliberately no
+hints, for the reason `[Derived-Programs]` gave. `program` is stamped the way
+`build` stamps it, through the preprocessor, so it stays one line with any
+`doc{{{...}}}` body encoded, and only the trailer changes.
+
+*Sharpen's sentence is replaceable, not cumulative.* The note prefix
+`'sharpen: '` is namespaced, and a new verdict removes the old one, so probing
+three times leaves one verdict rather than three. A confirmation is also dropped
+when a later probe moves the grid, since it would sit beside fresh hints
+contradicting them. Your own prose never matches the prefix and is never
+touched. This closes a latent defect in a213, where repeated build-sharpen
+cycles would have accumulated notes.
+
+`sharpen_program` is now that pinned program rendered to read, the `spread`
+layout with the trailer left in, rather than a re-derivation. Four things to
+reach for, one each: `sharpen_program` for text to read or share, `program` for
+the one-line stamp, `hints` for the settings, `note` for the verdict. Pinning is
+a no-op for an object with no program, or one whose program cannot be re-parsed;
+neither is worth failing a probe over, and `sharpen_description` still reports
+the move.
+
+**The P&L spread layout reads as the subtraction it is.** Author request. The
+premium head and both `less` keywords were glued into the block head, so a
+`pnl` rendered its first three ideas on one line and its expense clause on
+another. Each `less` now heads a sub-block over what it takes away:
+
+```
+pnl Book_PnL
+  15384.6422566226 premium
+  less
+    agg Book
+      100 claims
+      sev lognorm 100 cv 2
+      poisson
+  less
+    0.25 premium expenses
+  note{motor book, 2026 plan}
+```
+
+`terse` is **byte-identical** to what it has always been, because
+`_render_terse` space-joins a head back onto its children, so `spec_to_decl`,
+the `to_agg` exporter and the whole round-trip corpus are untouched by the
+layout. `xpnl`, `peel` and a `port.NAME` engine follow.
+
 ## 1.0.0a214
 
 **[Chart-Atomic-Support] the discretization is the distribution, and the

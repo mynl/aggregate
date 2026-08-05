@@ -782,7 +782,17 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         is pinned and only ``log2`` is probed.
 
         Populates :attr:`sharpen_df`, :attr:`sharpen_description` and
-        :attr:`sharpen_explanation`. Returns ``self``, so the call chains.
+        :attr:`sharpen_explanation`. Returns ``self``, so the call chains; the
+        object is moved **in place**, so ``a = a.sharpen()`` rebinds the same
+        object rather than producing a second one.
+
+        **It also pins the outcome onto the object's own text.**
+        :attr:`program`, :attr:`note` and :attr:`hints` are rewritten together
+        so the three agree and ``build(a.program)`` reproduces the sharpened
+        object: a moved grid becomes ``hints{log2=...; bs=...}``, a confirmed
+        one a ``note{sharpen: ...}`` and no hints. Probing twice replaces the
+        verdict rather than stacking a second one. See
+        :func:`aggregate._program.pin_sharpen`.
 
         Examples
         --------
@@ -791,6 +801,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             a = build('agg X 100 claims sev lognorm 100 cv 2 poisson')
             a.sharpen()
             print(a.sharpen_description)
+            print(a.hints)          # the grid it settled on
+            build(a.program)        # rebuilds on that grid
         """
         return _bucket_window.sharpen(
             self, bs, log2, log2_cap=log2_cap, bs_limit=bs_limit, power=power,
@@ -842,17 +854,20 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """The program that rebuilds this aggregate on the sharpened grid.
 
         The fourth thing a probe produces, beside :attr:`sharpen_df`,
-        :attr:`sharpen_description` and :attr:`sharpen_explanation`: this
-        object's own program with the outcome merged into its trailer, so the
-        grid the audit chose survives the notebook. ``hints{log2=...; bs=...}``
-        when the grid moved, ``note{sharpen: grid confirmed, no change}`` when
-        it did not (deliberately no hints: pinning a grid the automatic
-        selector would have picked anyway is noise). Any ``note`` / ``hints``
-        already in the program is merged into, never duplicated. ``''`` before
-        :meth:`sharpen` runs.
+        :attr:`sharpen_description` and :attr:`sharpen_explanation`.
+        :meth:`sharpen` pins its outcome onto :attr:`program` as it finishes,
+        so this is that program **rendered to read**: the ``spread`` layout
+        with the trailer left in, since here the trailer is the payload.
+        ``hints{log2=...; bs=...}`` when the grid moved, a
+        ``note{sharpen: ...}`` and deliberately no hints when it did not.
+        ``''`` before :meth:`sharpen` runs.
 
-        Delegated to :func:`aggregate._program.sharpen_program`, where the three
-        outcomes are documented in full.
+        Which of the four to reach for: this one for text to read or share,
+        :attr:`program` for the one-line stamp, :attr:`hints` for the settings
+        alone, :attr:`note` for the verdict alone.
+
+        Delegated to :func:`aggregate._program.sharpen_program`; the three
+        outcomes are documented on :func:`aggregate._program.pin_sharpen`.
         """
         return _program.sharpen_program(self)
 

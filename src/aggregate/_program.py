@@ -676,17 +676,22 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
 
     Notes
     -----
-    **An aggregate inlines.** The engine is the object's own body verbatim,
-    stripped of its trailer, which the wrapping ``pnl`` now owns; the
-    aggregate's own ``as`` label becomes the engine label, which is what names
-    the P&L's loss leg. The result is self-contained: it builds anywhere, with
-    no knowledge base to register against first.
+    **Self-contained either way, which is the load-bearing choice.** An
+    aggregate engine is the object's own body verbatim; a portfolio engine is
+    its units written out, ``less port PNAME <units>``. Both are stripped of
+    their trailer, which the engine slot has no room for and the wrapping
+    ``pnl`` now owns, and an aggregate's own ``as`` label becomes the engine
+    label, which is what names the P&L's loss leg.
 
-    **A portfolio references.** The grammar has no inline portfolio engine, so
-    the program reads ``less port.NAME`` and resolves against the underwriter's
-    knowledge base, where ``build`` put the portfolio when it built it. The
-    portfolio's own trailer stays on the portfolio's declaration, which this
-    text does not replace.
+    The alternative for a portfolio was ``less port.NAME``, which is
+    grammatical and shorter, but resolves only against the underwriter holding
+    NAME: the returned text would build in the session that wrote it and
+    nowhere else, and a shared server would be writing every user's books into
+    one knowledge base to make it resolve. The same argument as
+    :func:`reins_program`'s, and the reason the inline portfolio engine was
+    added to the grammar at ``1.0.0a216``. A portfolio's own trailer is dropped
+    rather than carried up, since it describes the book and not the P&L over
+    it.
 
     Examples
     --------
@@ -713,9 +718,15 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
     pnl_name = f'{name}{_PNL_SUFFIX}'
     consideration = _pnl_consideration(ob, loss_ratio, 'pnl_program')
     if kind == 'port':
-        # No inline portfolio engine in the grammar: reference the stored
-        # portfolio, whose declaration keeps its own trailer.
-        out = {'name': pnl_name, '_engine_port': name}
+        # The units written out, never a ``port.NAME`` reference: the reference
+        # resolves only against the underwriter holding the name, so the text
+        # would build in the session that wrote it and nowhere else. The
+        # portfolio's own trailer is dropped rather than carried up, since the
+        # engine slot has no trailer and the metadata describes the book, not
+        # the P&L over it.
+        out = {'name': pnl_name,
+               '_engine_port_spec': {'name': name, 'spec': spec['spec'],
+                                     'label': spec.get('label')}}
     else:
         out = dict(spec)
         out['name'] = pnl_name

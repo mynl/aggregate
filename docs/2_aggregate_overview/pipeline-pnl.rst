@@ -79,7 +79,7 @@ The grammar rules are ``pnl_out`` and ``xpnl_out`` in ``decl.lark``; they share 
     pnl  NAME [as label] <premium> less <engine> [less <expenses>] [peel <direction>] [trailer]
     xpnl NAME [as label] <premium> less <engine> [less <expenses>] [peel <direction>] [trailer]
 
-The premium head takes three forms: a fixed amount (``1000 premium``), ``inherit premium`` (copy the engine's technical premium, an error if it has none), or ``retro <collar> premium`` (a collared affine map of net account loss, so the consideration itself is stochastic). The engine is a complete stochastic object: an inline ``agg`` body, an ``agg.NAME`` reference, or a ``port.NAME`` reference. The expense clause carries one or more groups of ``fixed`` / ``premium`` / ``loss`` basis terms.
+The premium head takes three forms: a fixed amount (``1000 premium``), ``inherit premium`` (copy the engine's technical premium, an error if it has none), or ``retro <collar> premium`` (a collared affine map of net account loss, so the consideration itself is stochastic). The engine is a complete stochastic object, written out or referenced: an inline ``agg NAME <body>``, an inline ``port PNAME <units>``, or an ``agg.NAME`` / ``port.NAME`` reference. The two inline forms are self-contained, which is what a program has to be to travel between sessions; a reference resolves only against the underwriter that holds the name. The expense clause carries one or more groups of ``fixed`` / ``premium`` / ``loss`` basis terms.
 
 ``peel`` is accepted by the grammar on both kinds precisely so that ``pnl ... peel`` reads as a semantic error rather than a parse error: a consolidated view has no steps to peel.
 

@@ -1,5 +1,66 @@
 # Changelog
 
+## 1.0.0a216
+
+**[Inline-Port-Engine] a P&L can write its portfolio engine out, so a
+portfolio-backed program travels.** Raised by the author and the `aggregate_api`
+agent against `[Derived-Programs]`: an aggregate engine inlined its body and a
+portfolio engine emitted `less port.NAME`, and doing the two kinds differently
+is arbitrary. Worse, it does not work where it matters. `port.NAME` resolves
+only against the underwriter that holds NAME, so the text builds in the session
+that wrote it and nowhere else, and a shared multi-user server would have to
+write every user's book into one knowledge base to make it resolve. That is the
+same argument that made `reins_program` self-contained; it applies here and was
+not followed through.
+
+The grammar gains the portfolio twin of the inline aggregate engine:
+
+```
+agg_source: AGG name as_label agg_body   -> agg_source_inline
+          | PORT name as_label agg_list  -> agg_source_inline_port
+          | builtin_agg                  -> agg_source_ref_agg
+          | BUILTIN_PORT                 -> agg_source_ref_port
+```
+
+reusing the shared `agg_list`, minus the trailer, exactly as the inline
+aggregate reuses `agg_body`. The unit list ends where the P&L's second `less`
+begins: `less` cannot start an `agg_out`, so the greedy list has one parse, and
+`test_grammar_ambiguity` agrees.
+
+```
+pnl Book_PnL
+  11238.555678761779 premium
+  less
+    port Book
+      agg Motor
+        50 claims
+        sev lognorm 100 cv 2
+        poisson
+      agg Liability
+        20 claims
+        sev lognorm 200 cv 1
+        poisson
+  less
+    0.25 premium expenses
+```
+
+`Portfolio.pnl_program` emits that, and it builds against an `Underwriter()`
+with an empty knowledge base. The portfolio's own trailer is dropped rather than
+carried up: it describes the book, not the P&L over it.
+
+*One build path, two render forms.* The parser already resolved `port.NAME` to
+its spec at parse time and then kept only the name, so `_build_pnl_from_port`
+went back to the store for what the parser had already had in hand. Both source
+forms now carry the resolved spec on `_engine_port_spec`, and the underwriter
+performs **no knowledge-base lookup** for either. `_engine_port` survives as the
+referenced name alone, set for the reference form, so `port.NAME` still
+round-trips as the reference the author wrote instead of being expanded into the
+units it resolved to. The source kinds are `'port'` and `'port.ref'`.
+
+Nothing about the reference form changes for existing programs. Grammar
+reference regenerated; corpus entries added to `decl-testers.agg`, which can now
+round-trip a portfolio-backed P&L in isolation, having had no way to before.
+
 ## 1.0.0a215
 
 **[Sharpen-Pin] `sharpen()` writes its outcome onto the object's own program,

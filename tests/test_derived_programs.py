@@ -24,6 +24,7 @@ import pytest
 from aggregate import build, Underwriter
 from aggregate._bucket_window import _fmt_bs
 from aggregate._program import _merge_hints, _merge_note
+from aggregate.decl_writer import format_program
 
 
 # A book whose auto-sized grid the probe improves on.
@@ -302,13 +303,61 @@ def test_pnl_program_carries_the_label_to_the_loss_leg():
     assert 'agg DP.Labeled as "Motor book"' in a.pnl_program()
 
 
-def test_pnl_program_on_a_portfolio_references_it():
-    """No inline portfolio engine in the grammar, so the text references the store."""
+def test_pnl_program_on_a_portfolio_writes_the_units_out():
+    """A portfolio engine is inlined too, never referenced.
+
+    ``less port.NAME`` is grammatical and shorter, but resolves only against the
+    underwriter holding NAME, so the text would build in the session that wrote
+    it and nowhere else. A shared server would be writing every user's books
+    into one knowledge base to make it resolve.
+    """
     p = build(PORT)
     program = p.pnl_program(loss_ratio=0.8, expense_ratio=0)
-    assert 'port.DP.Port' in program
-    face = build(program)
+    assert 'port.' not in program
+    assert 'port DP.Port' in program
+    assert [u.name for u in p] == ['DP.PortA', 'DP.PortB']
+    for unit in p:
+        assert unit.name in program
+    fresh = Underwriter()                  # never heard of DP.Port
+    face = fresh.build(program)
     assert _booked_premium(face) == pytest.approx(p.est_m / 0.8)
+
+
+def test_pnl_program_on_a_portfolio_drops_the_book_trailer():
+    """The engine slot has no trailer, and a book's note is not the P&L's."""
+    p = build(PORT)
+    assert p.note == 'a stored note'
+    assert 'a stored note' not in p.pnl_program()
+
+
+def test_inline_port_engine_round_trips():
+    """The new engine form is a first-class parse, not just something we emit."""
+    program = ('pnl DP.Inline 1500 premium less port DP.InlineE '
+               'agg DP.IA 50 claims sev lognorm 100 cv 2 poisson '
+               'agg DP.IB 20 claims sev lognorm 200 cv 1 poisson '
+               'less 0.25 premium expenses note{book}')
+    face = Underwriter().build(program)
+    assert _booked_premium(face) == pytest.approx(1500.0)
+    assert face.note == 'book'
+    # the canonical render re-parses to the same spec
+    _k, _n, one = build.parser.parse(program)
+    _k, _n, two = build.parser.parse(
+        format_program((_k, _n, one), layout='terse', trailer=True))
+    assert one.keys() == two.keys()
+    assert two['_engine_port_spec']['name'] == 'DP.InlineE'
+
+
+def test_port_reference_engine_still_renders_as_a_reference():
+    """``port.NAME`` is unchanged: it round-trips as the reference it was.
+
+    Both source forms resolve to one spec now, so the underwriter never looks a
+    portfolio up. Only the render differs, and it must not expand a reference
+    the author deliberately wrote.
+    """
+    build(PORT)                            # register it in the default store
+    face = build('pnl DP.Ref 1500 premium less port.DP.Port')
+    assert 'port.DP.Port' in face.pprogram
+    assert 'agg DP.PortA' not in face.pprogram
 
 
 def test_pnl_program_rejects_a_pnl():

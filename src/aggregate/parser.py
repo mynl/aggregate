@@ -697,13 +697,25 @@ class UnderwritingTransformer(Transformer):
         bagg = c[0]
         return ("agg", bagg.get("name"), bagg)
 
+    def agg_source_inline_port(self, c):
+        # ``port PNAME <units>`` -- a complete inline portfolio, no trailer (the
+        # wrapping pnl/xpnl owns it), the twin of ``agg_source_inline``. Shaped
+        # exactly like ``port_out``'s spec so the two are interchangeable
+        # downstream: the underwriter builds the engine from this dict, and the
+        # writer renders it back as the same nested block.
+        _port, name, as_label, agg_list = c
+        return ("port", name, {"name": name, "spec": agg_list, **as_label})
+
     def agg_source_ref_port(self, c):
         # ``port.NAME`` -- resolve the stored portfolio spec; the pnl reads the
         # net-net total density. The factory builds the Portfolio engine.
         portid = str(c[0])
         portname = portid.split(".", 1)[1]
         portspec = self.safe_lookup(portid)
-        return ("port", portname, portspec)
+        # ``port.ref`` rather than ``port``: the spec is the same shape either
+        # way, and the kind is what tells the writer to render the reference
+        # back as a reference instead of expanding the units it resolved to.
+        return ("port.ref", portname, {**portspec, "name": portname})
 
     def _pnl_spec(self, kind, name, as_label, premium, source, expense,
                   peel, trailer):
@@ -712,13 +724,23 @@ class UnderwritingTransformer(Transformer):
         For an inline / ``agg.NAME`` engine the loss structure is merged into the
         pnl spec (the pnl owns identity; the engine's name/note/hints/label are
         set aside), so the underwriter's existing pnl factory path is reused. A
-        ``port.NAME`` engine cannot merge into a loss-agg spec, so it is recorded
-        under ``_engine_port`` for a dedicated factory path.
+        portfolio engine cannot merge into a loss-agg spec, so its whole spec is
+        recorded under ``_engine_port_spec`` for a dedicated factory path.
+
+        **Both portfolio forms carry the spec**, whether the source wrote the
+        units out (``port PNAME <units>``) or referenced them (``port.NAME``,
+        which ``agg_source_ref_port`` resolves here at parse time). The
+        underwriter therefore never looks a portfolio up, and the two forms
+        differ only in how the writer renders them back: ``_engine_port`` holds
+        the referenced *name* and is set for the reference form alone, so it
+        round-trips as ``port.NAME`` rather than being expanded.
         """
         ekind, ename, espec = source
         spec = {"name": name, **as_label, **expense, **peel, **trailer}
-        if ekind == "port":
-            spec["_engine_port"] = ename
+        if ekind in ("port", "port.ref"):
+            spec["_engine_port_spec"] = espec
+            if ekind == "port.ref":
+                spec["_engine_port"] = ename
         else:
             for k, v in espec.items():
                 # ``tags``/``doc`` join the existing skip list: the pnl owns its

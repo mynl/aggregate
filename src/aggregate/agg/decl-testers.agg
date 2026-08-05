@@ -1053,13 +1053,15 @@ agg DP.Noted 100 claims sev gamma 100 cv 1 poisson note{a stored note; sharpen: 
 agg DP.Hinted 100 claims sev lognorm 100 cv 2 poisson hints{bs=1/2; padding=2; log2=17};
 port DP.Port note{a stored note} hints{log2=15; bs=20} agg DP.PortA 50 claims sev lognorm 100 cv 2 poisson agg DP.PortB 20 claims sev lognorm 200 cv 1 poisson;
 
-# pnl_program: an inherited premium, a sized one, and the loss-leg label. The
-# portfolio form is `pnl DP.Port_PnL <premium> less port.DP.Port`, which needs
-# a loaded referent and so lives in the pytest module, as the ES.* engine-source
-# forms above do.
+# pnl_program: an inherited premium, a sized one, the loss-leg label, and the
+# INLINE PORTFOLIO engine (1.0.0a216). Both engine kinds write their body out,
+# so the text needs no loaded referent and round-trips here in isolation, which
+# the `port.NAME` reference form it replaced could not.
 pnl DP.Premium_PnL inherit premium less agg DP.Premium 1000 premium at 0.65 lr sev lognorm 100 cv 2 poisson less 0.25 premium expenses;
 pnl DP.Discrete_PnL 80.00000000000009 premium less agg DP.Discrete dfreq [1 2 3] dsev [10 20 30] less 0.25 premium expenses;
 pnl DP.Labeled_PnL 14285.739238292414 premium less agg DP.Labeled as "Motor book" 100 claims sev lognorm 100 cv 2 poisson less 0.25 premium expenses;
+pnl DP.Port_PnL 11238.555678761779 premium less port DP.Port agg DP.PortA 50 claims sev lognorm 100 cv 2 poisson agg DP.PortB 20 claims sev lognorm 200 cv 1 poisson less 0.25 premium expenses;
+pnl DP.InlineLabeled as "Book P&L" 1500 premium less port DP.InlineE as "Motor book" agg DP.IA 50 claims sev lognorm 100 cv 2 poisson agg DP.IB 20 claims sev lognorm 200 cv 1 poisson;
 
 # reins_program: the occurrence slot, the aggregate slot, both at once, and a
 # cession that replaces its own tier and leaves the other alone

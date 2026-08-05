@@ -887,10 +887,22 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
     obj_label = _render_label(spec.get('label'))
 
     port_engine = spec.get('_engine_port')
+    port_spec = spec.get('_engine_port_spec')
     if port_engine is not None:
-        # A ``port.NAME``-sourced P&L: the engine is a stored portfolio reference
-        # (the net-net total), not an inline agg.
+        # A ``port.NAME``-sourced P&L: the source referenced a stored portfolio,
+        # so it renders back as the reference it was, not as the units the
+        # parser resolved it to.
         engine = f'port.{port_engine}'
+    elif port_spec is not None:
+        # An inline portfolio engine: the units written out, the twin of the
+        # inline agg below and self-contained for the same reason. No trailer,
+        # which the wrapping pnl owns, so this reuses the unit rendering of
+        # :func:`_render_port` rather than the whole thing.
+        engine = _Block(
+            f'port {port_spec.get("name", f"{name}_e")}'
+            f'{_render_label(port_spec.get("label"))}',
+            [_render_agg_or_pnl(sub_kind, sub_name, sub_spec, trailer)
+             for sub_kind, sub_name, sub_spec in port_spec['spec']])
     else:
         # the loss leg is a complete ``agg NAME_e`` engine (new grammar); its
         # exposure head (claims / loss / ``premium at lr`` / dfreq) and body reuse

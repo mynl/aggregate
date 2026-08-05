@@ -1093,7 +1093,12 @@ class Underwriter(HelpMixin):
             # the consolidated single-group net view; ``xpnl`` the multi-group
             # step walk; a ``port`` engine takes the dedicated path below.
             is_tower = (kind == 'xpnl')
-            port_engine = spec.pop('_engine_port', None)
+            # The portfolio engine's whole spec, set for both source forms (the
+            # parser resolves ``port.NAME`` at parse time), so nothing is looked
+            # up here. ``_engine_port`` is the reference form's name and is only
+            # carried so the writer renders it back as ``port.NAME``.
+            port_spec = spec.pop('_engine_port_spec', None)
+            spec.pop('_engine_port', None)
             # The engine's own note (inline agg) is inner-Aggregate presentation
             # metadata, not loss structure -- strip before build. Its ``as``
             # label names the **loss leg** in the P&L ledger, so pop it into
@@ -1119,15 +1124,15 @@ class Underwriter(HelpMixin):
                     'consolidated single-group net view, so it has no steps to '
                     f"peel; write 'xpnl {name} ... peel {peel}' for the "
                     'layer-by-layer walk.')
-            if port_engine is not None:
+            if port_spec is not None:
                 if peel is not None:
                     raise ValueError(
                         f"{name}: 'peel' needs the reinsurance layers of a "
-                        'single aggregate engine; a port.NAME engine reads the '
+                        'single aggregate engine; a portfolio engine reads the '
                         'net-net portfolio total, which has no layer structure '
                         'to peel.')
                 obj = self._build_pnl_from_port(
-                    name, port_engine, consideration, expense_spec,
+                    name, port_spec, consideration, expense_spec,
                     consideration_label, loss_label, is_tower, program,
                     trailer_meta=_trailer_meta(spec))
                 parsed.object = obj
@@ -1904,10 +1909,10 @@ class Underwriter(HelpMixin):
                 "'<amount> premium' instead.")
         return total
 
-    def _build_pnl_from_port(self, name, portname, consideration, expense_spec,
+    def _build_pnl_from_port(self, name, port_spec, consideration, expense_spec,
                              consideration_label, loss_label, is_tower, program,
                              trailer_meta=None):
-        """Build a portfolio-sourced P&L: wrap a ``port.NAME`` engine's total.
+        """Build a portfolio-sourced P&L: wrap a portfolio engine's total.
 
         A ``port`` source reads the **net-net portfolio total** and sees nothing
         inside, so a port-sourced P&L is inherently the *plain* case (decision 8).
@@ -1915,6 +1920,11 @@ class Underwriter(HelpMixin):
         recipe; the :meth:`build_many` update loop updates it, then
         :meth:`_snapshot_pnl` builds the eager :class:`PnL` from its total-loss
         density. ``xpnl`` over a port is rejected (nothing to explode, decision 6).
+
+        Takes the portfolio **spec**, not a name: the parser resolves both source
+        forms to one, whether the units were written out inline or referenced as
+        ``port.NAME``, so this path performs no knowledge-base lookup and an
+        inline engine builds in a session that has never heard of the book.
         """
         if is_tower:
             raise NotImplementedError(
@@ -1922,8 +1932,7 @@ class Underwriter(HelpMixin):
                 "portfolio total hides its units, so there is nothing to explode. "
                 "Use 'pnl' for the net-net book P&L (or 'xpnl' over a single agg "
                 "engine).")
-        port_pp = self[('port', portname)]
-        port_spec = deepcopy(port_pp.spec)
+        port_spec = deepcopy(port_spec)
         port_units = [k for _i, _j, k in port_spec['spec']]
         engine = Portfolio(name, port_units, uw=self,
                            label=port_spec.get('label'))

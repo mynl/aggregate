@@ -113,9 +113,11 @@
     // ----------------------------------------------------------------------
     // ``pnl NAME <premium> less <engine> [less <expenses>]``. A P&L wraps a
     // **complete stochastic engine** and reads its loss out ("what comes out of
-    // the sausage maker"). The engine (``agg_source``) is a complete aggregate --
-    // an inline named ``agg NAME <body>``, a stored ``agg.NAME`` reference, or a
-    // stored ``port.NAME`` reference -- never an anonymous half-body. The premium
+    // the sausage maker"). The engine (``agg_source``) is a complete aggregate or
+    // a complete portfolio -- an inline named ``agg NAME <body>`` or ``port PNAME
+    // <units>``, or a stored ``agg.NAME`` / ``port.NAME`` reference -- never an
+    // anonymous half-body. Both inline forms are self-contained, which is what a
+    // program has to be to travel between sessions. The premium
     // is the *consideration* (what you book); the engine's own ``premium at lr``
     // is a separate *sizing* input. ``less`` is a dedicated keyword (not ``-``) so
     // the split never collides with severity arithmetic (``ssev 20 - lognorm``); a
@@ -147,11 +149,28 @@
     peel_clause: PEEL ID   -> peel_set
                |           -> peel_none
     
-    // The wrapped engine: a complete aggregate. ``agg NAME <body>`` reuses the
-    // shared ``agg_body`` (identical to a standalone ``agg``, minus the trailer,
-    // which the wrapping pnl/xpnl owns); ``agg.NAME`` / ``port.NAME`` reference a
-    // stored object. A ``port`` source reads the net-net portfolio total.
+    // The wrapped engine: a complete aggregate or a complete portfolio, either
+    // written out in full or referenced by name.
+    //
+    // ``agg NAME <body>`` reuses the shared ``agg_body`` (identical to a standalone
+    // ``agg``, minus the trailer, which the wrapping pnl/xpnl owns). ``port PNAME
+    // <units>`` is its portfolio twin, reusing the shared ``agg_list`` and likewise
+    // minus the trailer; a ``port`` source reads the net-net portfolio total.
+    // ``agg.NAME`` / ``port.NAME`` reference a stored object instead.
+    //
+    // The inline port form exists because the referencing form is not portable:
+    // ``port.NAME`` resolves only against the underwriter that holds NAME, so text
+    // carrying it builds in the session that wrote it and nowhere else, and a
+    // shared multi-user server would be writing every user's books into one
+    // knowledge base to make it resolve. An aggregate engine had the self-contained
+    // spelling from the start; this gives a portfolio engine the same one, which is
+    // what ``Portfolio.pnl_program`` emits. See dev/done/plan-derived-programs.md.
+    //
+    // The unit list ends where the pnl's second ``less`` begins, or at the trailer:
+    // ``less`` cannot start an ``agg_out``, so the greedy ``agg_list`` has exactly
+    // one parse.
     agg_source: AGG name as_label agg_body   -> agg_source_inline
+              | PORT name as_label agg_list        -> agg_source_inline_port
               | builtin_agg                        -> agg_source_ref_agg
               | BUILTIN_PORT                        -> agg_source_ref_port
     

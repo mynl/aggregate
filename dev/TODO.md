@@ -129,6 +129,12 @@
   active unresolvable extra would break `uv sync --all-extras`).
   `[Exhibits-Reins-Insurer]` landed `a201` (reins exhibit, two blocks,
   cession gated, insurer moment drop plus captions and total flags).
+  `[PnL-Economic-Frames]` landed `a204` (BREAKING: the PnL ledger is
+  `economic_df`, `ratio_df` is `economic_ratios_df`, and `stats_df` delegates
+  to the engine so the name means one thing across the contract).
+  `[Exhibits-Package-Split]` landed `a205` (`exhibits/` package mirroring
+  `plots/`, `register_simple_exhibit`, `bs_window` and `tail_behavior`,
+  `economic` / `economic_ratios` renames).
   `[Exhibits-PnL-Translation]` raw stage landed `a203` (pnl_ledger and
   pnl_ratios as RAW passthroughs); the INSURER framing draft awaits the
   author gate (captions, footing rules, Side sign presentation, the tower

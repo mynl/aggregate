@@ -1,17 +1,16 @@
-"""Business exhibits: first class frames translated to greater_tables IR.
+"""``aggregate.exhibits._core`` -- the exhibit machinery, class agnostic.
 
-The library owns meaning, the app owns arrangement. An *exhibit* is a small
-list of presentation ready tables (greater_tables ``TableDoc`` IR blocks)
-derived from the first class citizen frames (``summary_df``, ``tail_df``,
-``stats_df``, ...), carrying the business knowledge that would otherwise leak
-into a client: captions, row emphasis, raw moment drops, relabeling. The test
-for placement: if deleting the web app would destroy knowledge an actuary
-would want in a notebook, that knowledge belongs here.
+The base layer of the exhibits package, the analogue of ``plots._style``:
+:class:`Perspective`, :class:`Exhibit`, the singledispatch registry, the
+frame and IR stages, and the translation helpers that more than one class
+module shares. It knows **nothing** about ``Aggregate``, ``PnL`` or any other
+domain class, which is what keeps the package free of import cycles: the
+per-class modules import this one, never the reverse.
 
-This module is purely additive. It imports from the core; the core never
-imports it. It is deliberately NOT star imported in ``aggregate/__init__.py``
-(the ``Tweedie`` / ``Pentagon`` precedent): reach it with
-``from aggregate import exhibits``.
+To edit an exhibit you almost never come here. A class's treatment lives in
+its own module (``_aggregate.py``, ``_portfolio.py``, ``_pnl.py``,
+``_bivariate.py``, ``_distortion.py``), and the passthrough declarations are
+the manifest at the foot of ``__init__.py``.
 
 Design (see ``dev/plan-exhibits.md``):
 
@@ -22,7 +21,7 @@ Design (see ``dev/plan-exhibits.md``):
   are implemented; ``INSURED`` and ``REINSURER`` are stable vocabulary with
   no registrations yet.
 * Each exhibit (``summary``, ``tail``, ``stats``, ``validation``, ``reins``,
-  ``pnl_ledger``, ``pnl_ratios``, ``dependency``) is a generic function
+  ``economic``, ``economic_ratios``, ``dependency``, ...) is a generic function
   dispatching on the object's type. Registration is open: app or user code
   may register new types with ``summary.register(MyType)``, supplying a
   *frames builder* ``f(obj) -> [(block_name, DataFrame, spec_kwargs), ...]``.
@@ -48,18 +47,14 @@ from enum import Enum
 
 import pandas as pd
 
-from ._aggregate import Aggregate
-from ._pnl import PnL
-from ._portfolio import Portfolio
-from .bivariate import BivariateAggregate
-from .constants import Validation
-from .spectral import Distortion
+from ..constants import Validation
 
 __all__ = [
     'Perspective', 'Exhibit', 'EXHIBITS',
     'available_exhibits', 'exhibit_frames', 'build_exhibit',
     'summary', 'tail', 'stats', 'validation', 'reins',
-    'pnl_ledger', 'pnl_ratios', 'dependency',
+    'economic', 'economic_ratios', 'dependency',
+    'register_simple_exhibit',
 ]
 
 
@@ -513,8 +508,8 @@ reins = _make_exhibit_function(
     Exhibit
     """)
 
-pnl_ledger = _make_exhibit_function(
-    'pnl_ledger', 'P&L ledger',
+economic = _make_exhibit_function(
+    'economic', 'Economics',
     """P&L ledger exhibit. Source frame ``PnL.economic_df``.
 
     The full ledger by (Side, Label), or (Step, Side, Label) on a tower, in
@@ -534,8 +529,8 @@ pnl_ledger = _make_exhibit_function(
     Exhibit
     """)
 
-pnl_ratios = _make_exhibit_function(
-    'pnl_ratios', 'P&L ratios',
+economic_ratios = _make_exhibit_function(
+    'economic_ratios', 'Economic ratios',
     """P&L ratio exhibit. Source frames ``PnL.economic_ratios_df`` and ``legs_df``.
 
     Two blocks of raw materials: the per block amounts and LR / ER / CR
@@ -585,13 +580,112 @@ EXHIBITS = {
     'stats': (stats, _perspectives_always),
     'validation': (validation, _perspectives_always),
     'reins': (reins, _perspectives_reins),
-    'pnl_ledger': (pnl_ledger, _perspectives_always),
-    'pnl_ratios': (pnl_ratios, _perspectives_always),
+    'economic': (economic, _perspectives_always),
+    'economic_ratios': (economic_ratios, _perspectives_always),
     'dependency': (dependency, _perspectives_updated),
 }
 
 
+def _perspectives_tower(obj):
+    """Perspectives for an exhibit that needs a multi-step P&L walk.
+
+    A single group P&L has one margin row and no walk to draw, so the
+    exhibit reports itself unavailable and the app grays the chip out
+    rather than rendering a one row table.
+    """
+    return list(_IMPLEMENTED_PERSPECTIVES) if getattr(obj, '_tower', False) \
+        else []
+
+
+def register_simple_exhibit(name, title, frame_attr, classes, *,
+                            predicate=None, doc=None):
+    """Declare a passthrough exhibit over one named frame, in one line.
+
+    The common case: an exhibit that serves a single frame with no business
+    translation. It registers **no insurer override**, so INSURER equals RAW
+    by the default rule and both perspectives serve the same table, with no
+    extra code. Register an override later (``<name>.insurer.register(Cls)``)
+    and only that (exhibit, type) pair changes.
+
+    Calling it twice for one ``name`` extends the existing exhibit to more
+    classes rather than replacing it, so a class module may add itself to an
+    exhibit the manifest already declared.
+
+    Parameters
+    ----------
+    name : str
+        Registry key and the URL segment the app serves it under.
+    title : str
+        Display title, used as ``"<title>: <object>"``.
+    frame_attr : str
+        Attribute on the object holding the frame. Also the block name, so
+        the served block is self-describing.
+    classes : iterable of type
+        The types this exhibit is registered for.
+    predicate : callable, optional
+        ``perspectives_fn(obj) -> list[Perspective]``, the availability gate.
+        Defaults to :func:`_perspectives_always`.
+    doc : str, optional
+        Docstring for the generated exhibit function. A serviceable default
+        is written from ``title`` and ``frame_attr``.
+
+    Returns
+    -------
+    callable
+        The generic exhibit function, so a caller can hang an override on it.
+
+    Examples
+    --------
+    ::
+
+        register_simple_exhibit('bs_window', 'Grid sizing', 'bs_window_df',
+                                [Aggregate, Portfolio, BivariateAggregate],
+                                predicate=_perspectives_updated)
+    """
+    fn = EXHIBITS[name][0] if name in EXHIBITS else _make_exhibit_function(
+        name, title,
+        doc or f"""{title} exhibit. Source frame ``{frame_attr}``.
+
+    A passthrough: RAW and INSURER serve the same table, since no insurer
+    override is registered (the INSURER default rule).
+
+    Parameters
+    ----------
+    obj : object
+        A registered first class object.
+    perspective : Perspective or str, default Perspective.RAW
+
+    Returns
+    -------
+    Exhibit
+    """)
+    if name not in EXHIBITS:
+        EXHIBITS[name] = (fn, predicate or _perspectives_always)
+
+    def _frames(obj, _attr=frame_attr):
+        return [(_attr, getattr(obj, _attr), {})]
+
+    _frames.__name__ = f'_{name}_frames'
+    _frames.__doc__ = f'Serve ``{frame_attr}`` unchanged.'
+    for cls in classes:
+        fn.register(cls)(_frames)
+    return fn
+
+
+# --- shared translation builders --------------------------------------------
+
+def _reins_frames(obj):
+    """The two reinsurance blocks: the layering store and the stage summary.
+
+    Shared by ``Aggregate`` and ``Portfolio``, whose frames differ in shape
+    but not in which two frames make up the exhibit.
+    """
+    return [('reins_stats_df', obj.reins_stats_df, {}),
+            ('reins_summary_df', obj.reins_summary_df, {})]
+
+
 # --- shared flag helpers ----------------------------------------------------
+
 
 def _summary_flags(df):
     """Row flags for a summary frame: total and Agg subtotal rows.
@@ -638,100 +732,9 @@ def _tail_flags(df):
     return flags
 
 
-# --- summary registrations --------------------------------------------------
-
-@summary.register(Aggregate)
-def _summary_frames_aggregate(obj):
-    return [('summary_df', obj.summary_df, {})]
-
-
-@summary.register(Portfolio)
-def _summary_frames_portfolio(obj):
-    return [('summary_df', obj.summary_df, {})]
-
-
-@summary.insurer.register(Aggregate)
-def _summary_insurer_aggregate(obj, blocks):
-    block_name, df, kw = blocks[0]
-    caption = ('Moments and key percentiles by component (Freq, Sev, Agg). '
-               'Percentiles are exact grid values. Frequency percentiles are '
-               'blank by design: frequency enters through its PGF and no '
-               'count distribution is materialized.')
-    return [(block_name, df,
-             dict(kw, caption=caption, row_flags=_summary_flags(df)))]
-
-
-@summary.insurer.register(Portfolio)
-def _summary_insurer_portfolio(obj, blocks):
-    block_name, df, kw = blocks[0]
-    caption = ('Moments and key percentiles per unit plus the portfolio '
-               'total; the total block carries the Agg row only (a portfolio '
-               'has no single Freq or Sev). Frequency percentiles are blank '
-               'by design: frequency enters through its PGF and no count '
-               'distribution is materialized.')
-    return [(block_name, df,
-             dict(kw, caption=caption, row_flags=_summary_flags(df)))]
-
-
-# --- tail registrations -----------------------------------------------------
-
-@tail.register(Aggregate)
-def _tail_frames_aggregate(obj):
-    return [('tail_df', obj.tail_df, {})]
-
-
-@tail.register(Portfolio)
-def _tail_frames_portfolio(obj):
-    return [('tail_df', obj.tail_df, {})]
-
-
-@tail.insurer.register(Aggregate)
-def _tail_insurer_aggregate(obj, blocks):
-    block_name, df, kw = blocks[0]
-    caption = ('Return period ladder: VaR (the quoted number), TVaR (the '
-               'priced number), excess VaR over the mean (capital), and '
-               'VaR to mean leverage, exact from the FFT grid. The 1 in 200 '
-               '(99.5%, Solvency II) and 1 in 250 (99.6%, US capital '
-               'adequacy) anchors are emphasized.')
-    return [(block_name, df,
-             dict(kw, caption=caption, row_flags=_tail_flags(df)))]
-
-
-@tail.insurer.register(Portfolio)
-def _tail_insurer_portfolio(obj, blocks):
-    block_name, df, kw = blocks[0]
-    caption = ('Return period ladder per unit plus the portfolio total: VaR, '
-               'TVaR, excess VaR over the mean (capital), and VaR to mean '
-               'leverage, exact from the FFT grid. The 1 in 200 (99.5%, '
-               'Solvency II) and 1 in 250 (99.6%, US capital adequacy) '
-               'anchors are emphasized.')
-    return [(block_name, df,
-             dict(kw, caption=caption, row_flags=_tail_flags(df)))]
-
-
-# --- summary registrations, remaining first class classes -------------------
-# PnL / Distortion / BivariateAggregate serve their summary_df unchanged: no
-# insurer override is registered yet (INSURER equals RAW per the default
-# rule). The PnL business framing is the [Exhibits-PnL-Translation] phase,
-# behind its author gate.
-
-@summary.register(PnL)
-@summary.register(Distortion)
-@summary.register(BivariateAggregate)
-def _summary_frames_generic(obj):
-    return [('summary_df', obj.summary_df, {})]
-
-
-# --- stats registrations ----------------------------------------------------
-
-@stats.register(Aggregate)
-@stats.register(Portfolio)
-@stats.register(BivariateAggregate)
-@stats.register(PnL)
-@stats.register(Distortion)
-def _stats_frames_generic(obj):
-    return [('stats_df', obj.stats_df, {})]
-
+# --- shared translation helpers ---------------------------------------------
+# Used by more than one class module; the registrations themselves live
+# next to their class.
 
 def _drop_raw_moment_rows(df):
     """Drop rows whose ``measure`` index level is a raw noncentral moment.
@@ -747,54 +750,6 @@ def _drop_raw_moment_rows(df):
         return df
     keep = ~df.index.get_level_values('measure').isin(RAW_MOMENT_MEASURES)
     return df.loc[keep]
-
-
-@stats.insurer.register(PnL)
-def _stats_insurer_pnl(obj, blocks):
-    """The engine's moment store, or an explanation of why there is none.
-
-    Since [PnL-Economic-Frames] a P&L's ``stats_df`` is its engine's moment
-    store, so the treatment is the ordinary one. A hand-built kernel P&L
-    carries no engine and the frame is empty; rather than serve a blank
-    table with no explanation, the caption says what happened. The ledger
-    itself is the ``economic`` exhibit.
-    """
-    block_name, df, kw = blocks[0]
-    if df.empty:
-        caption = ('This P&L was built from grids rather than from a '
-                   'declared book, so it carries no stochastic engine and '
-                   'has no moment store to report. Its accounting view is '
-                   'the economic exhibit.')
-        return [(block_name, df, dict(kw, caption=caption))]
-    return _stats_insurer_moment_store(obj, blocks)
-
-
-@stats.insurer.register(Aggregate)
-@stats.insurer.register(Portfolio)
-def _stats_insurer_moment_store(obj, blocks):
-    """Drop the raw noncentral moment rows from the canonical store.
-
-    The (component, measure) MultiIndex loses its ``ex1`` / ``ex2`` / ``ex3``
-    rows; ``mean`` / ``cv`` / ``skew`` and the ``meta`` block stay. The raw
-    perspective keeps all 26 rows.
-    """
-    block_name, df, kw = blocks[0]
-    caption = ('Canonical moment store by component and measure across the '
-               'computation views. Raw noncentral moments (ex1, ex2, ex3) '
-               'are dropped from this view; the raw perspective keeps the '
-               'full store.')
-    return [(block_name, _drop_raw_moment_rows(df), dict(kw, caption=caption))]
-
-
-# --- validation registrations -----------------------------------------------
-
-@validation.register(Aggregate)
-@validation.register(Portfolio)
-@validation.register(BivariateAggregate)
-@validation.register(PnL)
-@validation.register(Distortion)
-def _validation_frames_generic(obj):
-    return [('validation_df', obj.validation_df, {})]
 
 
 def _moment_validation_emphasis(df, valid_for_unit):
@@ -833,87 +788,10 @@ def _moment_validation_emphasis(df, valid_for_unit):
     return flags
 
 
-@validation.insurer.register(Aggregate)
-def _validation_insurer_aggregate(obj, blocks):
-    block_name, df, kw = blocks[0]
-    caption = ('Moment QA: reference vs realized FFT estimate with noise '
-               'aware relative errors (the economic Gross / Net / Ceded view '
-               'when reinsurance is present). Rows failing validation at the '
-               'object\'s validation_eps gate are emphasized.')
-    flags = _moment_validation_emphasis(df, lambda unit: obj.valid)
-    return [(block_name, df, dict(kw, caption=caption, row_flags=flags))]
-
-
-@validation.insurer.register(Portfolio)
-def _validation_insurer_portfolio(obj, blocks):
-    block_name, df, kw = blocks[0]
-    caption = ('Moment QA per unit plus the portfolio total: reference vs '
-               'realized FFT estimate with noise aware relative errors (the '
-               'economic view when any unit cedes). Rows failing validation '
-               'at each object\'s validation_eps gate are emphasized.')
-    by_unit = {a.name: a.valid for a in obj}
-    by_unit['total'] = obj.valid
-    flags = _moment_validation_emphasis(df, by_unit.get)
-    return [(block_name, df, dict(kw, caption=caption, row_flags=flags))]
-
-
 def _check_table_emphasis(df):
     """Row flags for a check table with a boolean ``Pass`` column."""
     return {i: ('emphasis',) for i, ok in enumerate(df['Pass'])
             if not bool(ok)}
-
-
-@validation.insurer.register(Distortion)
-def _validation_insurer_distortion(obj, blocks):
-    block_name, df, kw = blocks[0]
-    caption = ('Structural identity checks with gates and verdicts; failing '
-               'checks are emphasized.')
-    return [(block_name, df,
-             dict(kw, caption=caption, row_flags=_check_table_emphasis(df)))]
-
-
-@validation.insurer.register(BivariateAggregate)
-def _validation_insurer_bivariate(obj, blocks):
-    block_name, df, kw = blocks[0]
-    caption = ('Joint grid checks (per axis marginal means and the tail '
-               'deficit) with gates and verdicts; failing checks are '
-               'emphasized.')
-    return [(block_name, df,
-             dict(kw, caption=caption, row_flags=_check_table_emphasis(df)))]
-
-
-# --- dependency registrations -----------------------------------------------
-
-@dependency.register(BivariateAggregate)
-def _dependency_frames_bivariate(obj):
-    return [('dependency_df', obj.dependency_df, {}),
-            ('axis_support_df', obj.axis_support_df, {})]
-
-
-# --- pnl registrations ([Exhibits-PnL-Translation], raw stage) --------------
-# Raw registrations only: the INSURER business framing (captions, footing
-# rules, Side sign presentation) lands in [Exhibits-Economic-Insurer], where
-# these two are also renamed ``economic`` / ``economic_ratios`` to mirror
-# their frames. Until then INSURER equals RAW by default.
-
-@pnl_ledger.register(PnL)
-def _pnl_ledger_frames(obj):
-    return [('economic_df', obj.economic_df, {})]
-
-
-@pnl_ratios.register(PnL)
-def _pnl_ratios_frames(obj):
-    return [('economic_ratios_df', obj.economic_ratios_df, {}),
-            ('legs_df', obj.legs_df, {})]
-
-
-# --- reins registrations ([Exhibits-Reins-Insurer]) -------------------------
-
-@reins.register(Aggregate)
-@reins.register(Portfolio)
-def _reins_frames(obj):
-    return [('reins_stats_df', obj.reins_stats_df, {}),
-            ('reins_summary_df', obj.reins_summary_df, {})]
 
 
 def _reins_summary_flags(df):
@@ -930,46 +808,16 @@ def _reins_summary_flags(df):
     return flags
 
 
-@reins.insurer.register(Aggregate)
-def _reins_insurer_aggregate(obj, blocks):
-    (stats_name, stats_frame, stats_kw), \
-        (summary_name, summary_frame, summary_kw) = blocks
-    stats_caption = (
-        'Layering analysis by view and layer: per layer columns are '
-        'conditional on a loss reaching the layer, the Ceded and Net totals '
-        'are unconditional, and the meta block carries attachment and '
-        'exhaustion probabilities and loss on line. Raw noncentral moments '
-        '(ex1, ex2, ex3) are dropped from this view; the raw perspective '
-        'keeps the full store.')
-    summary_caption = (
-        'Per stage cession impact on the eight validation columns: Change '
-        'reads as rebucketing error on the leading gross or subject row and '
-        'as the percentage impact of the cession on the ceded and net rows.')
-    return [
-        (stats_name, _drop_raw_moment_rows(stats_frame),
-         dict(stats_kw, caption=stats_caption)),
-        (summary_name, summary_frame,
-         dict(summary_kw, caption=summary_caption)),
-    ]
+def _stats_insurer_moment_store(obj, blocks):
+    """Drop the raw noncentral moment rows from the canonical store.
 
-
-@reins.insurer.register(Portfolio)
-def _reins_insurer_portfolio(obj, blocks):
-    (stats_name, stats_frame, stats_kw), \
-        (summary_name, summary_frame, summary_kw) = blocks
-    stats_caption = (
-        'End to end gross, ceded and net aggregate moments per unit plus '
-        'the convolved portfolio total. Raw noncentral moments (ex1, ex2, '
-        'ex3) are dropped from this view; the raw perspective keeps the '
-        'full store.')
-    summary_caption = (
-        'Per unit cession impact plus the end to end portfolio total: '
-        'Change reads as the percentage impact of the reinsurance program '
-        'on each moment (0 on the gross reference rows).')
-    return [
-        (stats_name, _drop_raw_moment_rows(stats_frame),
-         dict(stats_kw, caption=stats_caption)),
-        (summary_name, summary_frame,
-         dict(summary_kw, caption=summary_caption,
-              row_flags=_reins_summary_flags(summary_frame))),
-    ]
+    The (component, measure) MultiIndex loses its ``ex1`` / ``ex2`` / ``ex3``
+    rows; ``mean`` / ``cv`` / ``skew`` and the ``meta`` block stay. The raw
+    perspective keeps all 26 rows.
+    """
+    block_name, df, kw = blocks[0]
+    caption = ('Canonical moment store by component and measure across the '
+               'computation views. Raw noncentral moments (ex1, ex2, ex3) '
+               'are dropped from this view; the raw perspective keeps the '
+               'full store.')
+    return [(block_name, _drop_raw_moment_rows(df), dict(kw, caption=caption))]

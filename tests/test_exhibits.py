@@ -60,14 +60,18 @@ AGG_PROGRAM = PROGRAMS['Aggregate']
 PORT_PROGRAM = PROGRAMS['Portfolio']
 
 # Exhibit names served per fixture after [Exhibits-Reins-Insurer].
+_DIAG = ['bs_window', 'tail_behavior']
 EXPECTED_EXHIBITS = {
-    'Aggregate': ['summary', 'tail', 'stats', 'validation'],
-    'Portfolio': ['summary', 'tail', 'stats', 'validation'],
-    'BivariateAggregate': ['summary', 'stats', 'validation', 'dependency'],
-    'PnL': ['summary', 'stats', 'validation', 'pnl_ledger', 'pnl_ratios'],
+    'Aggregate': ['summary', 'tail', 'stats', 'validation', *_DIAG],
+    'Portfolio': ['summary', 'tail', 'stats', 'validation', *_DIAG],
+    'BivariateAggregate': ['summary', 'stats', 'validation', 'dependency',
+                           'bs_window'],
+    'PnL': ['summary', 'stats', 'validation', 'economic', 'economic_ratios'],
     'Distortion': ['summary', 'stats', 'validation'],
-    'ReinsAggregate': ['summary', 'tail', 'stats', 'validation', 'reins'],
-    'ReinsPortfolio': ['summary', 'tail', 'stats', 'validation', 'reins'],
+    'ReinsAggregate': ['summary', 'tail', 'stats', 'validation', 'reins',
+                       *_DIAG],
+    'ReinsPortfolio': ['summary', 'tail', 'stats', 'validation', 'reins',
+                       *_DIAG],
 }
 
 
@@ -212,7 +216,7 @@ def test_pnl_stats_is_the_engine_moment_store(objects):
         {'ex1', 'ex2', 'ex3'})
     # the ledger is a different exhibit and a different document
     assert build_exhibit(pn, 'stats').hash \
-        != build_exhibit(pn, 'pnl_ledger').hash
+        != build_exhibit(pn, 'economic').hash
 
 
 def test_validation_insurer_pass_frames_no_emphasis(objects):
@@ -240,7 +244,7 @@ def test_validation_insurer_emphasis_on_failure():
 
 
 def test_check_table_emphasis_helper():
-    from aggregate.exhibits import _check_table_emphasis
+    from aggregate.exhibits._core import _check_table_emphasis
     df = pd.DataFrame({'Est': [1.0, 2.0], 'Pass': [True, False]})
     assert _check_table_emphasis(df) == {1: ('emphasis',)}
 
@@ -295,23 +299,23 @@ def test_reins_unavailable_without_cession(dice):
 
 # --- pnl ([Exhibits-PnL-Translation], raw stage) ----------------------------
 
-def test_pnl_ledger_raw(objects):
+def test_economic_raw(objects):
     pn = objects['PnL']
-    blocks = exhibit_frames(pn, 'pnl_ledger')
+    blocks = exhibit_frames(pn, 'economic')
     assert [name for name, _, _ in blocks] == ['economic_df']
     _, df, kw = blocks[0]
     assert kw == {}
     assert list(df.index.names) in (['Side', 'Label'],
                                     ['Step', 'Side', 'Label'])
     # the insurer framing is author gated: INSURER equals RAW for now
-    _, ins_df, ins_kw = exhibit_frames(pn, 'pnl_ledger', 'insurer')[0]
+    _, ins_df, ins_kw = exhibit_frames(pn, 'economic', 'insurer')[0]
     pd.testing.assert_frame_equal(df, ins_df)
     assert ins_kw == {}
 
 
-def test_pnl_ratios_raw(objects):
+def test_economic_ratios_raw(objects):
     pn = objects['PnL']
-    blocks = exhibit_frames(pn, 'pnl_ratios')
+    blocks = exhibit_frames(pn, 'economic_ratios')
     assert [name for name, _, _ in blocks] == ['economic_ratios_df', 'legs_df']
     ratio_frame = blocks[0][1]
     assert ratio_frame.index.name == 'Step'
@@ -319,6 +323,38 @@ def test_pnl_ratios_raw(objects):
     legs_frame = blocks[1][1]
     assert {'Step', 'Side', 'Label', 'kind', 'EX', 'SD'} \
         <= set(legs_frame.columns)
+
+
+# --- register_simple_exhibit ([Exhibits-Package-Split]) ---------------------
+
+def test_simple_exhibits_are_passthroughs(dice):
+    """A manifest-declared exhibit serves one frame, raw and insurer alike."""
+    for name, attr in (('bs_window', 'bs_window_df'),
+                       ('tail_behavior', 'tail_behavior_df')):
+        blocks = exhibit_frames(dice, name)
+        assert [b for b, _, _ in blocks] == [attr]
+        raw_name, raw_df, raw_kw = blocks[0]
+        ins_name, ins_df, ins_kw = exhibit_frames(dice, name, 'insurer')[0]
+        # no override registered -> INSURER is RAW, by the default rule
+        assert raw_kw == ins_kw == {}
+        pd.testing.assert_frame_equal(raw_df, ins_df)
+
+
+def test_register_simple_exhibit_is_open(dice):
+    """User code can declare a passthrough exhibit over any frame."""
+    from aggregate.exhibits import register_simple_exhibit
+    from aggregate._aggregate import Aggregate
+    try:
+        fn = register_simple_exhibit('sev_density', 'Severity density',
+                                     'sev_density_df', [Aggregate])
+        assert 'sev_density' in EXHIBITS
+        assert fn.title == 'Severity density'
+        assert 'sev_density' in [n for n, _ in available_exhibits(dice)]
+        name, df, kw = exhibit_frames(dice, 'sev_density')[0]
+        assert name == 'sev_density_df' and kw == {}
+        assert len(df) > 0
+    finally:
+        EXHIBITS.pop('sev_density', None)
 
 
 # --- errors -----------------------------------------------------------------

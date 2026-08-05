@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.0.0a205
+
+**[Exhibits-Package-Split]: `exhibits.py` becomes `exhibits/`, and passthrough
+exhibits become one line each.**
+
+The module reached 950 lines, past the 800-line trigger the plan set for
+itself, so the split landed before the economic work and the waterfall add
+more. It mirrors `plots/` and the public import path is unchanged:
+`from aggregate import exhibits` still works exactly as before.
+
+| module | holds |
+|---|---|
+| `_core.py` | the machinery, class agnostic: `Perspective`, `Exhibit`, the registry, the frame and IR stages, the shared translation helpers |
+| `_aggregate.py`, `_portfolio.py`, `_pnl.py`, `_bivariate.py`, `_distortion.py` | one per class, holding **that class's business translation**, which is where you go to edit how an exhibit reads |
+| `__init__.py` | the public surface, plus the **passthrough manifest** at its foot |
+
+`_core.py` imports no domain class, which is what keeps the package free of
+import cycles: the per-class modules import it, never the reverse.
+
+**`register_simple_exhibit(name, title, frame_attr, classes, predicate=None)`**
+declares a passthrough exhibit over one frame in a single line. It registers
+no insurer override, so INSURER equals RAW by the default rule and both
+perspectives serve the same table with no extra code; registering an override
+later changes only that (exhibit, type) pair. Calling it twice for one name
+extends the exhibit to more classes rather than replacing it. Seven
+hand-written passthrough builders collapsed into five manifest lines.
+
+**Two diagnostics join**, both through the new helper and both gated on the
+realized grid: `bs_window` (`bs_window_df`, on Aggregate, Portfolio and
+BivariateAggregate) and `tail_behavior` (`tail_behavior_df`, on Aggregate and
+Portfolio). They are the app's "More" material.
+
+**`pnl_ledger` and `pnl_ratios` are renamed `economic` and
+`economic_ratios`**, restoring the property that an exhibit name mirrors its
+frame, which now holds everywhere: `summary_df` to `summary`, `economic_df` to
+`economic`, `dependency_df` to `dependency`. The exhibit registry is ten
+entries.
+
+Snapshot corpus grows to 78 (the two renames, the two new diagnostics across
+their kinds). The app's `check-exhibits.py` now reads the exhibit list from
+the library rather than a literal, so a new exhibit joins the sweep with no
+edit there; it reports clean, and `stats` on a P&L reads 26 rows raw and 17
+insurer through the API, confirming the `a204` engine delegation end to end.
+
 ## 1.0.0a204
 
 **[PnL-Economic-Frames]: the P&L accounting frames get their own names, and

@@ -1,4 +1,2048 @@
 {
+ "bs_window/insurer/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "moment",
+      "True",
+      "False",
+      "0.0",
+      "31.30829289650644",
+      "1.0",
+      "6",
+      "6.000",
+      "\u2014",
+      "3-moment MoM window"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "exact_discrete",
+      "True",
+      "True",
+      "0.0",
+      "18.0",
+      "1.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-2.334, logp_hi=-2.334"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "bounded_small",
+      "True",
+      "False",
+      "0.0",
+      "18.0",
+      "1.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "bounded severity x freq quantile"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sbj",
+      "True",
+      "False",
+      "0.0",
+      "22.772638660818956",
+      "1.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "single big jump: ES - mu_X + q_X(p**)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      "True",
+      "False",
+      "0.0",
+      "32.0",
+      "1.0",
+      "5",
+      "6.000",
+      "\u2014",
+      "realized grid (exact_discrete)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level_0"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "applies"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c2",
+     "name": [
+      "selected"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "x_min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "x_max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "log2"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "log2_need"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "clipped"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level_0"
+     },
+     {
+      "text": "applies"
+     },
+     {
+      "text": "selected"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/insurer/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "X",
+      "agg",
+      "10.0",
+      "4",
+      "0.0",
+      "150.0",
+      "False"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Y",
+      "agg",
+      "1.0",
+      "4",
+      "0.0",
+      "15.0",
+      "False"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "axis"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "kind"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "log2"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "x_min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "x_max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "clipped"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "axis"
+     },
+     {
+      "text": "kind"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "clipped"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/insurer/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Unit Alpha",
+      "0.000",
+      "3.00",
+      "1.000",
+      "2",
+      "2.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.4771, logp_hi=-0.4771"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "EX.UnitB",
+      "0.000",
+      "8.00",
+      "1.000",
+      "4",
+      "4.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.6021, logp_hi=-0.6021"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mm",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-3.487"
+      },
+      "19.49",
+      "1.000",
+      "5",
+      "5.000",
+      "\u2014",
+      "Portfolio MM bulk (3-moment fit on total) -- the live span"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "rms",
+      "3.728",
+      "12.27",
+      "1.000",
+      "5",
+      "4.000",
+      "\u2014",
+      "RMS-of-windows reference (normal approx); mm-rms = skew adj"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sbj",
+      "0.000",
+      "15.13",
+      "1.000",
+      "5",
+      "5.000",
+      "\u2014",
+      "single big jump look-through: actual_m + max_k(sbj_hi_k - ES_k)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sum",
+      "0.000",
+      "11.00",
+      "1.000",
+      "5",
+      "4.000",
+      "\u2014",
+      "legacy linear sum of widths (guaranteed-no-wrap bound)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      "0.000",
+      "32.00",
+      "1.000",
+      "5",
+      "6.000",
+      "\u2014",
+      "realised portfolio grid (resolution=1, extent=19.4873)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "x_min"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "x_max"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "bs"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c4",
+     "name": [
+      "log2"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "log2_need"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "clipped"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/insurer/ReinsAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "moment",
+      "True",
+      "False",
+      "0.0",
+      "181.95332741759927",
+      "10.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "3-moment MoM window"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "exact_discrete",
+      "True",
+      "True",
+      "0.0",
+      "60.0",
+      "1.0",
+      "6",
+      "6.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.7782, logp_hi=-1.255"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "bounded_small",
+      "True",
+      "False",
+      "0.0",
+      "150.51730365071754",
+      "10.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "bounded severity x freq quantile"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sbj",
+      "True",
+      "False",
+      "0.0",
+      "87.89614924990504",
+      "10.0",
+      "4",
+      "4.000",
+      "\u2014",
+      "single big jump: ES - mu_X + q_X(p**)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      "True",
+      "False",
+      "0.0",
+      "64.0",
+      "1.0",
+      "6",
+      "7.000",
+      "\u2014",
+      "realized grid (exact_discrete)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level_0"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "applies"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c2",
+     "name": [
+      "selected"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "x_min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "x_max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "log2"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "log2_need"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "clipped"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level_0"
+     },
+     {
+      "text": "applies"
+     },
+     {
+      "text": "selected"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/insurer/ReinsPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "EX.ReA",
+      "0.000",
+      "60.00",
+      "1.000",
+      "6",
+      "6.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.7782, logp_hi=-1.255"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "EX.ReB",
+      "0.000",
+      "10.00",
+      "1.000",
+      "4",
+      "4.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.301, logp_hi=-0.301"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mm",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-32.613"
+      },
+      "188.80",
+      "1.000",
+      "8",
+      "8.000",
+      "\u2014",
+      "Portfolio MM bulk (3-moment fit on total) -- the live span"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "rms",
+      "7.086",
+      "67.91",
+      "1.000",
+      "8",
+      "6.000",
+      "\u2014",
+      "RMS-of-windows reference (normal approx); mm-rms = skew adj"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sbj",
+      "0.000",
+      "95.40",
+      "1.000",
+      "8",
+      "7.000",
+      "\u2014",
+      "single big jump look-through: actual_m + max_k(sbj_hi_k - ES_k)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sum",
+      "0.000",
+      "70.00",
+      "1.000",
+      "8",
+      "7.000",
+      "\u2014",
+      "legacy linear sum of widths (guaranteed-no-wrap bound)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      "0.000",
+      "256.00",
+      "1.000",
+      "8",
+      "9.000",
+      "\u2014",
+      "realised portfolio grid (resolution=1, extent=188.803)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "x_min"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "x_max"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "bs"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c4",
+     "name": [
+      "log2"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "log2_need"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "clipped"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/raw/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "moment",
+      "True",
+      "False",
+      "0.0",
+      "31.30829289650644",
+      "1.0",
+      "6",
+      "6.000",
+      "\u2014",
+      "3-moment MoM window"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "exact_discrete",
+      "True",
+      "True",
+      "0.0",
+      "18.0",
+      "1.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-2.334, logp_hi=-2.334"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "bounded_small",
+      "True",
+      "False",
+      "0.0",
+      "18.0",
+      "1.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "bounded severity x freq quantile"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sbj",
+      "True",
+      "False",
+      "0.0",
+      "22.772638660818956",
+      "1.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "single big jump: ES - mu_X + q_X(p**)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      "True",
+      "False",
+      "0.0",
+      "32.0",
+      "1.0",
+      "5",
+      "6.000",
+      "\u2014",
+      "realized grid (exact_discrete)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level_0"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "applies"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c2",
+     "name": [
+      "selected"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "x_min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "x_max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "log2"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "log2_need"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "clipped"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level_0"
+     },
+     {
+      "text": "applies"
+     },
+     {
+      "text": "selected"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/raw/BivariateAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "X",
+      "agg",
+      "10.0",
+      "4",
+      "0.0",
+      "150.0",
+      "False"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Y",
+      "agg",
+      "1.0",
+      "4",
+      "0.0",
+      "15.0",
+      "False"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "axis"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "kind"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "log2"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "x_min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "x_max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "clipped"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "axis"
+     },
+     {
+      "text": "kind"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "clipped"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/raw/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Unit Alpha",
+      "0.000",
+      "3.00",
+      "1.000",
+      "2",
+      "2.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.4771, logp_hi=-0.4771"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "EX.UnitB",
+      "0.000",
+      "8.00",
+      "1.000",
+      "4",
+      "4.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.6021, logp_hi=-0.6021"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mm",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-3.487"
+      },
+      "19.49",
+      "1.000",
+      "5",
+      "5.000",
+      "\u2014",
+      "Portfolio MM bulk (3-moment fit on total) -- the live span"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "rms",
+      "3.728",
+      "12.27",
+      "1.000",
+      "5",
+      "4.000",
+      "\u2014",
+      "RMS-of-windows reference (normal approx); mm-rms = skew adj"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sbj",
+      "0.000",
+      "15.13",
+      "1.000",
+      "5",
+      "5.000",
+      "\u2014",
+      "single big jump look-through: actual_m + max_k(sbj_hi_k - ES_k)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sum",
+      "0.000",
+      "11.00",
+      "1.000",
+      "5",
+      "4.000",
+      "\u2014",
+      "legacy linear sum of widths (guaranteed-no-wrap bound)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      "0.000",
+      "32.00",
+      "1.000",
+      "5",
+      "6.000",
+      "\u2014",
+      "realised portfolio grid (resolution=1, extent=19.4873)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "x_min"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "x_max"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "bs"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c4",
+     "name": [
+      "log2"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "log2_need"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "clipped"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/raw/ReinsAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "moment",
+      "True",
+      "False",
+      "0.0",
+      "181.95332741759927",
+      "10.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "3-moment MoM window"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "exact_discrete",
+      "True",
+      "True",
+      "0.0",
+      "60.0",
+      "1.0",
+      "6",
+      "6.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.7782, logp_hi=-1.255"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "bounded_small",
+      "True",
+      "False",
+      "0.0",
+      "150.51730365071754",
+      "10.0",
+      "5",
+      "5.000",
+      "\u2014",
+      "bounded severity x freq quantile"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sbj",
+      "True",
+      "False",
+      "0.0",
+      "87.89614924990504",
+      "10.0",
+      "4",
+      "4.000",
+      "\u2014",
+      "single big jump: ES - mu_X + q_X(p**)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      "True",
+      "False",
+      "0.0",
+      "64.0",
+      "1.0",
+      "6",
+      "7.000",
+      "\u2014",
+      "realized grid (exact_discrete)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level_0"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "applies"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c2",
+     "name": [
+      "selected"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "x_min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "x_max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "log2"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "log2_need"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "clipped"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level_0"
+     },
+     {
+      "text": "applies"
+     },
+     {
+      "text": "selected"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/raw/ReinsPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "EX.ReA",
+      "0.000",
+      "60.00",
+      "1.000",
+      "6",
+      "6.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.7782, logp_hi=-1.255"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "EX.ReB",
+      "0.000",
+      "10.00",
+      "1.000",
+      "4",
+      "4.000",
+      "\u2014",
+      "dfreq/fixed x dsev integer lattice; logp_lo=-0.301, logp_hi=-0.301"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mm",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-32.613"
+      },
+      "188.80",
+      "1.000",
+      "8",
+      "8.000",
+      "\u2014",
+      "Portfolio MM bulk (3-moment fit on total) -- the live span"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "rms",
+      "7.086",
+      "67.91",
+      "1.000",
+      "8",
+      "6.000",
+      "\u2014",
+      "RMS-of-windows reference (normal approx); mm-rms = skew adj"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sbj",
+      "0.000",
+      "95.40",
+      "1.000",
+      "8",
+      "7.000",
+      "\u2014",
+      "single big jump look-through: actual_m + max_k(sbj_hi_k - ES_k)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sum",
+      "0.000",
+      "70.00",
+      "1.000",
+      "8",
+      "7.000",
+      "\u2014",
+      "legacy linear sum of widths (guaranteed-no-wrap bound)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      "0.000",
+      "256.00",
+      "1.000",
+      "8",
+      "9.000",
+      "\u2014",
+      "realised portfolio grid (resolution=1, extent=188.803)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "x_min"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "x_max"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "bs"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c4",
+     "name": [
+      "log2"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "log2_need"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "clipped"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
  "dependency/insurer/BivariateAggregate": [
   {
    "body": [
@@ -431,7 +2475,7 @@
    "n_stub_levels": 1
   }
  ],
- "pnl_ledger/insurer/PnL": [
+ "economic/insurer/PnL": [
   {
    "body": [
     {
@@ -826,7 +2870,7 @@
    "n_stub_levels": 2
   }
  ],
- "pnl_ledger/raw/PnL": [
+ "economic/raw/PnL": [
   {
    "body": [
     {
@@ -1221,7 +3265,7 @@
    "n_stub_levels": 2
   }
  ],
- "pnl_ratios/insurer/PnL": [
+ "economic_ratios/insurer/PnL": [
   {
    "body": [
     {
@@ -1594,7 +3638,7 @@
    "n_stub_levels": 0
   }
  ],
- "pnl_ratios/raw/PnL": [
+ "economic_ratios/raw/PnL": [
   {
    "body": [
     {
@@ -17027,6 +19071,1528 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 2
+  }
+ ],
+ "tail_behavior/insurer/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "frequency",
+      "empirical",
+      "3.000",
+      "3.000",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      "claim count"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "comp0",
+      "dhistogram",
+      "1.000",
+      "6.000",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "aggregate",
+      "severity-driven",
+      "3.000",
+      "18.000",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.28172",
+      ""
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "min"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "max"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "cv"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail_behavior/insurer/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Unit Alpha",
+      "severity-driven",
+      "1.0",
+      "3.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.40824829046386285",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "EX.UnitB",
+      "severity-driven",
+      "4.0",
+      "8.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.23570226039551587",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "total",
+      "n/a",
+      "0.0",
+      "32.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.20412414523193115",
+      "portfolio worst-of (independence)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level_0"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c8",
+     "name": [
+      "cv"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level_0"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail_behavior/insurer/ReinsAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "frequency",
+      "empirical",
+      "1.000",
+      "2.00",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      "claim count"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "comp0",
+      "dhistogram",
+      "10.000",
+      "30.00",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "severity (net occ)",
+      "dhistogram",
+      "10.000",
+      "30.00",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      "net of occ reins: tail retained"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "aggregate",
+      "severity-driven",
+      "10.000",
+      "60.00",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.47140",
+      ""
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "min"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "max"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "cv"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail_behavior/insurer/ReinsPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "EX.ReA",
+      "severity-driven",
+      "10.0",
+      "60.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.4714045207910317",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "EX.ReB",
+      "severity-driven",
+      "5.0",
+      "10.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.3333333333333333",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "total",
+      "n/a",
+      "0.0",
+      "256.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.38297084310253526",
+      "portfolio worst-of (independence)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level_0"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c8",
+     "name": [
+      "cv"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level_0"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail_behavior/raw/Aggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "frequency",
+      "empirical",
+      "3.000",
+      "3.000",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      "claim count"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "comp0",
+      "dhistogram",
+      "1.000",
+      "6.000",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "aggregate",
+      "severity-driven",
+      "3.000",
+      "18.000",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.28172",
+      ""
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "min"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "max"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "cv"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail_behavior/raw/Portfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Unit Alpha",
+      "severity-driven",
+      "1.0",
+      "3.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.40824829046386285",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "EX.UnitB",
+      "severity-driven",
+      "4.0",
+      "8.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.23570226039551587",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "total",
+      "n/a",
+      "0.0",
+      "32.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.20412414523193115",
+      "portfolio worst-of (independence)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level_0"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c8",
+     "name": [
+      "cv"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level_0"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail_behavior/raw/ReinsAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "frequency",
+      "empirical",
+      "1.000",
+      "2.00",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      "claim count"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "comp0",
+      "dhistogram",
+      "10.000",
+      "30.00",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "severity (net occ)",
+      "dhistogram",
+      "10.000",
+      "30.00",
+      "bounded",
+      "bounded",
+      "True",
+      "",
+      "\u2014",
+      "net of occ reins: tail retained"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "aggregate",
+      "severity-driven",
+      "10.000",
+      "60.00",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.47140",
+      ""
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "min"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "max"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "cv"
+     ]
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail_behavior/raw/ReinsPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "EX.ReA",
+      "severity-driven",
+      "10.0",
+      "60.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.4714045207910317",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "EX.ReB",
+      "severity-driven",
+      "5.0",
+      "10.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.3333333333333333",
+      ""
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "total",
+      "n/a",
+      "0.0",
+      "256.0",
+      "bounded",
+      "bounded",
+      "True",
+      "False",
+      "0.38297084310253526",
+      "portfolio worst-of (independence)"
+     ]
+    }
+   ],
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "level_0"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "min"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "max"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c8",
+     "name": [
+      "cv"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "level_0"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
   }
  ],
  "validation/insurer/Aggregate": [

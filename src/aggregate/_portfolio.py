@@ -36,6 +36,7 @@ from .pentagon import (PENTAGON_STATS, PENTAGON_DTYPE, complete_pentagon,
 from .moments import (MomentAggregator, xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
 from ._program import ProgramMixin
+from . import _program
 from .utilities import (ft, ift,
                         round_bucket,
                         agg_help, explain_validation,
@@ -1057,6 +1058,59 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         :attr:`sharpen_description`.
         """
         return _bucket_window.sharpen_explain(self)
+
+    @property
+    def sharpen_program(self) -> str:
+        """The program that rebuilds this portfolio on the sharpened grid.
+
+        The fourth thing a probe produces, beside :attr:`sharpen_df`,
+        :attr:`sharpen_description` and :attr:`sharpen_explanation`: this
+        object's own program with the outcome merged into its trailer, so the
+        grid the audit chose survives the notebook. ``hints{log2=...; bs=...}``
+        when the grid moved, ``note{sharpen: grid confirmed, no change}`` when
+        it did not. The clauses land on the ``port`` statement, where the
+        grammar binds a portfolio's trailer, ahead of the units. ``''`` before
+        :meth:`sharpen` runs.
+
+        Delegated to :func:`aggregate._program.sharpen_program`, where the three
+        outcomes are documented in full.
+        """
+        return _program.sharpen_program(self)
+
+    def pnl_program(self, loss_ratio=0.70, expense_ratio=0.25) -> str:
+        """The program that wraps this portfolio in a P&L.
+
+        Returns ``pnl NAME_PnL <premium> less port.NAME less <expense>``. The
+        grammar has no inline portfolio engine, so unlike the aggregate form
+        this text **references** the portfolio rather than carrying it, and
+        resolves against the underwriter's knowledge base, where ``build`` put
+        it. The premium is ``inherit premium`` when the units accumulate one,
+        and otherwise expected loss over ``loss_ratio``; ``expense_ratio=0``
+        omits the expense clause.
+
+        Delegated to :func:`aggregate._program.pnl_program`.
+
+        Parameters
+        ----------
+        loss_ratio : float, default 0.70
+            Sizes the premium, and only when there is none to inherit.
+        expense_ratio : float, default 0.25
+            Gross expense as a fraction of premium.
+
+        Returns
+        -------
+        str
+            DecL for the wrapping P&L.
+
+        Examples
+        --------
+        ::
+
+            p = build('port P agg A 10 claims sev lognorm 100 cv 1 poisson')
+            build(p.pnl_program(loss_ratio=0.65))
+        """
+        return _program.pnl_program(self, loss_ratio=loss_ratio,
+                                    expense_ratio=expense_ratio)
 
     @property
     def tail_behavior_df(self) -> 'pd.DataFrame':

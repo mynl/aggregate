@@ -41,6 +41,7 @@ from ._grid_distribution import GridDistribution, return_period_map, period_to_p
 from ._labeled import LabeledMixin
 from .decl_writer import spec_to_decl
 from ._program import ProgramMixin
+from . import _program
 import aggregate.random_agg as ar
 from .spectral import choquet_weights
 from . import tail as _tail
@@ -835,6 +836,92 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         The short form is :attr:`sharpen_description`.
         """
         return _bucket_window.sharpen_explain(self)
+
+    @property
+    def sharpen_program(self) -> str:
+        """The program that rebuilds this aggregate on the sharpened grid.
+
+        The fourth thing a probe produces, beside :attr:`sharpen_df`,
+        :attr:`sharpen_description` and :attr:`sharpen_explanation`: this
+        object's own program with the outcome merged into its trailer, so the
+        grid the audit chose survives the notebook. ``hints{log2=...; bs=...}``
+        when the grid moved, ``note{sharpen: grid confirmed, no change}`` when
+        it did not (deliberately no hints: pinning a grid the automatic
+        selector would have picked anyway is noise). Any ``note`` / ``hints``
+        already in the program is merged into, never duplicated. ``''`` before
+        :meth:`sharpen` runs.
+
+        Delegated to :func:`aggregate._program.sharpen_program`, where the three
+        outcomes are documented in full.
+        """
+        return _program.sharpen_program(self)
+
+    def pnl_program(self, loss_ratio=0.70, expense_ratio=0.25) -> str:
+        """The program that wraps this aggregate in a P&L.
+
+        Returns ``pnl NAME_PnL <premium> less <engine> less <expense>``, with
+        this object's body inlined as the engine, so the text is self-contained
+        and builds anywhere. The premium is ``inherit premium`` when the
+        exposure states one, and otherwise expected loss over ``loss_ratio``;
+        ``expense_ratio=0`` omits the expense clause.
+
+        Delegated to :func:`aggregate._program.pnl_program`, where the premium
+        rule and the trailer's move up to the wrapping ``pnl`` are documented
+        in full.
+
+        Parameters
+        ----------
+        loss_ratio : float, default 0.70
+            Sizes the premium, and only when there is none to inherit.
+        expense_ratio : float, default 0.25
+            Gross expense as a fraction of premium.
+
+        Returns
+        -------
+        str
+            DecL for the wrapping P&L.
+
+        Examples
+        --------
+        ::
+
+            a = build('agg X 100 claims sev lognorm 100 cv 2 poisson')
+            build(a.pnl_program(loss_ratio=0.65))
+        """
+        return _program.pnl_program(self, loss_ratio=loss_ratio,
+                                    expense_ratio=expense_ratio)
+
+    def reins_program(self, cession) -> str:
+        """The program that rebuilds this aggregate with ``cession`` added.
+
+        The clause lands in its correct slot, which is the point: an occurrence
+        cession sits **before** the frequency clause and an aggregate cession
+        after it, so neither can simply be appended to the program text. The
+        result is self-contained, with this object's body inlined, so it builds
+        in any session with nothing registered first.
+
+        Delegated to :func:`aggregate._program.reins_program`.
+
+        Parameters
+        ----------
+        cession : str or iterable of str
+            One cession clause per tier, each opening with ``occurrence`` or
+            ``aggregate``. The clause is authoritative for its own tier and
+            leaves the other alone.
+
+        Returns
+        -------
+        str
+            DecL for the reinsured aggregate.
+
+        Examples
+        --------
+        ::
+
+            a = build('agg X 100 claims sev lognorm 100 cv 2 poisson')
+            build(a.reins_program('occurrence net of 500 xs 500'))
+        """
+        return _program.reins_program(self, cession)
 
     def _sev_label(self) -> str:
         """Short severity family label for tail text (the family, or ``'N components'``)."""

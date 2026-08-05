@@ -1017,4 +1017,54 @@ xpnl EX.Peel 1000 premium less agg EX.PeelE 1000 premium at 70% lr sev lognorm 1
 # adding near-duplicates here.
 sev CH.SevLN lognorm 100 cv 2                                                                                     note{chart fixture: unbounded heavy tail; quantile-spaced grid};
 sev CH.SevB 500 * beta 2 3                                                                                        note{chart fixture: bounded; repeated quantiles at the ceiling};
-sev CH.SevD dhistogram xps [1 10 40] [.5 .3 .2]                                                                   note{chart fixture: discrete; pdf is identically zero, so the panel reads mass}
+sev CH.SevD dhistogram xps [1 10 40] [.5 .3 .2]                                                                   note{chart fixture: discrete; pdf is identically zero, so the panel reads mass};
+
+
+# DP. Derived programs: the text that reproduces an object you arrived at
+# ======================================================================
+# Programs behind tests/test_derived_programs.py ([Derived-Programs]). Both
+# halves belong here: the inputs the tests build, and the DecL the three
+# members hand back, since the whole point of them is producing text. The
+# outputs are shown terse and are what the members actually returned; the two
+# computed premiums drift with the FFT and are mirrored for shape, not value.
+# Note the two reinsurance slots, which sit on opposite sides of the frequency
+# clause, and the trailer clauses, which are merged rather than repeated: one
+# note and one hints per statement, however many times the object is derived
+# from. See dev/done/plan-derived-programs.md.
+
+# the inputs
+agg DP.Moves 100 claims sev lognorm 100 cv 2 poisson                                                              note{derived-programs input: the probe improves this grid, so sharpen_program pins it};
+agg DP.Clean 100 claims sev gamma 100 cv 1 poisson                                                                note{thin enough that the grid is confirmed: a note, and deliberately no hints};
+agg DP.Noted 100 claims sev gamma 100 cv 1 poisson note{a stored note};
+agg DP.Hinted 100 claims sev lognorm 100 cv 2 poisson hints{bs=1/32; padding=2};
+agg DP.Both 100 claims sev lognorm 100 cv 2 poisson note{a stored note} hints{bs=1/32; padding=2};
+agg DP.Premium 1000 premium at 0.65 lr sev lognorm 100 cv 2 poisson                                               note{states its own premium, so the P&L inherits rather than sizing one};
+agg DP.Ceded 100 claims sev lognorm 100 cv 2 occurrence net of 250 xs 250 poisson aggregate net of 9000 xs 1000;
+agg DP.Discrete dfreq [1 2 3] dsev [10 20 30];
+agg DP.Approx 100 claims sev lognorm 100 cv 2 poisson approximate sgamma                                          note{occurrence cession refused here: the fit bypasses the per-occurrence convolution};
+agg DP.Labeled as "Motor book" 100 claims sev lognorm 100 cv 2 poisson                                            note{the label rides down to the wrapping P&L as its loss-leg name};
+port DP.Port note{a stored note} agg DP.PortA 50 claims sev lognorm 100 cv 2 poisson agg DP.PortB 20 claims sev lognorm 200 cv 1 poisson;
+pnl DP.Wrapped 1000 premium less agg DP.WrappedE 100 claims sev lognorm 100 cv 2 poisson                          note{already a P&L: pnl_program refuses to wrap it twice};
+
+# sharpen_program: the grid moved, the grid was confirmed, and the two merges
+agg DP.Moves 100 claims sev lognorm 100 cv 2 poisson hints{log2=16; bs=8};
+agg DP.Clean 100 claims sev gamma 100 cv 1 poisson note{sharpen: grid confirmed, no change};
+agg DP.Noted 100 claims sev gamma 100 cv 1 poisson note{a stored note; sharpen: grid confirmed, no change};
+agg DP.Hinted 100 claims sev lognorm 100 cv 2 poisson hints{bs=1/2; padding=2; log2=17};
+port DP.Port note{a stored note} hints{log2=15; bs=20} agg DP.PortA 50 claims sev lognorm 100 cv 2 poisson agg DP.PortB 20 claims sev lognorm 200 cv 1 poisson;
+
+# pnl_program: an inherited premium, a sized one, and the loss-leg label. The
+# portfolio form is `pnl DP.Port_PnL <premium> less port.DP.Port`, which needs
+# a loaded referent and so lives in the pytest module, as the ES.* engine-source
+# forms above do.
+pnl DP.Premium_PnL inherit premium less agg DP.Premium 1000 premium at 0.65 lr sev lognorm 100 cv 2 poisson less 0.25 premium expenses;
+pnl DP.Discrete_PnL 80.00000000000009 premium less agg DP.Discrete dfreq [1 2 3] dsev [10 20 30] less 0.25 premium expenses;
+pnl DP.Labeled_PnL 14285.739238292414 premium less agg DP.Labeled as "Motor book" 100 claims sev lognorm 100 cv 2 poisson less 0.25 premium expenses;
+
+# reins_program: the occurrence slot, the aggregate slot, both at once, and a
+# cession that replaces its own tier and leaves the other alone
+agg DP.Moves 100 claims sev lognorm 100 cv 2 occurrence net of 500 xs 500 poisson;
+agg DP.Moves 100 claims sev lognorm 100 cv 2 poisson aggregate net of 9000 xs 1000;
+agg DP.Moves 100 claims sev lognorm 100 cv 2 occurrence net of 500 xs 500 poisson aggregate net of 9000 xs 1000;
+agg DP.Ceded 100 claims sev lognorm 100 cv 2 occurrence net of 500 xs 500 poisson aggregate net of 9000 xs 1000;
+agg DP.Discrete dfreq [1 2 3] dsev [10 20 30] occurrence net of 15 xs 5

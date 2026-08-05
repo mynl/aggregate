@@ -1,5 +1,75 @@
 # Changelog
 
+## 1.0.0a213
+
+**[Derived-Programs] the program that reproduces an object you arrived at.**
+The round-trip surface already said what an object *is*: `program` is the
+statement the parser received, `pprogram` is what the parser understood. It
+said nothing about objects you *arrived at*. Three ways of arriving are common
+enough to deserve text, and each is a small piece of grammar knowledge that
+every caller was otherwise re-deriving.
+
+**`sharpen_program`**, a property on `Aggregate` and `Portfolio`, is the fourth
+thing a probe produces, beside `sharpen_df`, `sharpen_description` and
+`sharpen_explanation`. `sharpen()` moves the grid and the knowledge of which
+grid then lives only in the live object; reopen the notebook tomorrow and the
+rebuild is back on the automatic choice with the audit still to run. The grid
+moved, so the program comes back carrying `hints{log2=...; bs=...}` and nothing
+else, the hints being the record. The grid was confirmed, so it carries
+`note{sharpen: grid confirmed, no change}` and deliberately **no** hints:
+pinning a grid the automatic selector would have picked anyway adds noise to a
+program someone is going to read and share, and implies the selector is not
+trusted. The note is the record that the audit ran, which is what saves running
+it twice. A probe run under `execute=False` that recommends a move it did not
+take records the recommendation, since the object still sits on its original
+grid and pinning the winner would describe an object that does not exist.
+Empty before `sharpen()` has run, exactly as `sharpen_df` is.
+
+**`pnl_program(loss_ratio=0.70, expense_ratio=0.25)`**, a method on both,
+returns `pnl NAME_PnL <premium> less <engine> less <expense>`. An `Aggregate`
+**inlines** its own body, stripped of the trailer, which the wrapping `pnl` now
+owns, and the aggregate's own `as` label becomes the engine label, which is
+what names the P&L's loss leg. A `Portfolio` **references** (`less port.NAME`),
+because the grammar has no inline portfolio engine. The premium is `inherit
+premium` when the exposure states one, and otherwise expected loss over
+`loss_ratio`, read off the computed density so the realized ratio is exactly
+the one asked for. `expense_ratio=0` omits the clause rather than writing a
+zero.
+
+**`reins_program(cession)`**, a method on `Aggregate`, takes one cession clause
+per tier and returns a **self-contained** program with the clause in its
+correct slot. The slot is the whole point: an occurrence cession sits *before*
+the frequency clause and an aggregate cession *after* it, so neither can be
+appended to the text, and anyone splicing strings rather than specs gets it
+wrong. The clause replaces its own tier and leaves the other alone. Being
+self-contained is the load-bearing choice: `agg NEW agg.OLD occurrence net of
+...` is grammatical and is the obvious first idea, but `agg.OLD` resolves only
+against an underwriter's knowledge base, so the returned text would build in
+the session that made it and nowhere else, and a shared server would be writing
+every user's builds into one store.
+
+*Two constraints shaping all three.* **The trailer is merged, never appended.**
+A spec holds one `note` and one `hints`, so a second clause would silently win
+or lose depending on the transformer; each mutation replaces the settings it
+owns in place and leaves every other chunk of the clause, recognized or not,
+exactly where the author put it. **The render asks for the trailer.**
+`format_program` defaults to `trailer=False` on the reasoning that formatting a
+program is usually about the math rather than the metadata; these three are the
+exception, and for `sharpen_program` the trailer is the entire payload.
+
+Shared machinery in `_program.py`, thin delegations on the host classes, which
+is the pattern `sharpen` itself already follows. Functions rather than
+`ProgramMixin` members, because the mixin's six hosts include `Severity`,
+`Distortion` and `BivariateAggregate`, none of which can answer any of the
+three, and a member that raises on four of six hosts is a member in the wrong
+place. All three parse the stored program back to its spec, mutate the spec and
+re-render through the writer: never string surgery. `tests/test_derived_programs.py`
+asserts the round trip for each, the cases a naive implementation breaks on
+included (a program already carrying `note{}` / `hints{}` / both, an engine
+with no premium through the P&L wrap, both reinsurance slots, and a sharpen
+that finds no improvement). Programs and the derived outputs both mirrored into
+`decl-testers.agg` under a `DP` block.
+
 ## 1.0.0a212
 
 **[Chart-IR] pass three, [Chart-Conversions]: severity, the third

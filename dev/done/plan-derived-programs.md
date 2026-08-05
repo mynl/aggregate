@@ -1,6 +1,9 @@
 # plan-derived-programs: a program that reproduces a derived object
 
-Status: **draft**, awaiting author sign-off.
+Status: **executed** at `1.0.0a213`. Both open questions went the way the
+recommendations below argued: `sharpen_program` stayed a property, and the loss
+ratio and expense ratio stayed in the signature. One case the plan did not
+name turned up in execution and is recorded under Open.
 
 Three new members of the DecL round-trip surface, each answering the same question about a different derivation: what is the program that would build this? Sharpening a grid, wrapping an object in a P&L, and adding a cession all produce a new object, and today none of them produces the text that reproduces it.
 
@@ -94,6 +97,18 @@ One version bump, one commit, carrying the code, the `pyproject.toml` bump, the 
 
 ## Open
 
-The property-versus-method wart above, to accept or reject.
+The property-versus-method wart above, to accept or reject. **Resolved as recommended**: `sharpen_program` is a property, the other two are methods.
 
-Whether `pnl_program`'s defaults belong in the signature or in `constants.py`. The 0.70 loss ratio and 0.25 expense ratio are conventions rather than facts, and a convention that appears in a signature is harder to find later than one with a name. Recommendation is the signature, since they are per-call choices and a caller reading the docstring sees them immediately, but it is worth a moment's thought.
+Whether `pnl_program`'s defaults belong in the signature or in `constants.py`. The 0.70 loss ratio and 0.25 expense ratio are conventions rather than facts, and a convention that appears in a signature is harder to find later than one with a name. Recommendation is the signature, since they are per-call choices and a caller reading the docstring sees them immediately, but it is worth a moment's thought. **Resolved as recommended**: both live in the signature.
+
+## Found in execution
+
+**A third sharpen outcome.** The plan names two, moved and confirmed. A probe run under `execute=False` is a third: it finds a better cell and does not take it, so the object still sits on its original grid. Pinning the winner would describe an object that does not exist, and writing "grid confirmed" would be false, so it carries a note recording the recommendation and no hints.
+
+**`Portfolio.pnl_program` cannot be self-contained.** The grammar's `agg_source` admits an inline `agg`, a stored `agg.NAME` or a stored `port.NAME`, and there is no inline portfolio engine, so the portfolio form references (`less port.NAME`) where the aggregate form inlines. The two-statement alternative (the `port` declaration followed by the `pnl`) was rejected: `build` takes exactly one top-level output, so the returned text would no longer be something you can hand to `build`. `Aggregate.pnl_program` and `reins_program` are self-contained as planned.
+
+**A cession clause per tier, and a sequence for both.** `reins_program` takes a string or an iterable of them, one per tier, since composing two tiers otherwise means a `build` round trip between the calls. A clause is authoritative for its own tier and leaves the other alone.
+
+**`approximate` and an occurrence cession.** The parser rejects the combination, so `reins_program` rejects it too rather than returning text that will not build.
+
+**Pre-existing, found by the full-suite gate and left alone.** `tests/test_agg_libraries.py::test_library_is_written_in_the_canonical_layout` fails at `a212` as well as here, on three `library.agg` entries (`USXOLTower` writes `90% po` where the writer renders `90% so`; `USHurr` writes `less agg.USXOLTower` where the writer inlines the engine; `BodoffFour` has a double space in `sev   4 * expon`). Two are cosmetic and one is a deliberate authorial reference, so this is the author's call, not a rider on this plan.

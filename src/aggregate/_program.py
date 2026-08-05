@@ -43,7 +43,42 @@ closes no cycle. It is aliased to ``_format_program`` because the mixin's own
 method carries the same name: the two never actually collide (class scope is
 not in a method's name-lookup chain) but reading the body should not require
 knowing that.
+
+Derived programs
+----------------
+The mixin answers "what is this object", from the text it was declared with.
+The module also answers the neighbouring question, "what is the program that
+would build the object I arrived at", for the three ways of arriving that come
+up often enough to deserve text: :func:`sharpen_program` (the grid moved),
+:func:`pnl_program` (wrapped in a P&L) and :func:`reins_program` (a cession
+added). See dev/done/plan-derived-programs.md.
+
+These are functions here rather than mixin members because the mixin's six
+hosts include :class:`~aggregate._severity.Severity`,
+:class:`~aggregate.spectral.Distortion` and
+:class:`~aggregate.bivariate.BivariateAggregate`, none of which can answer any
+of the three: a member that raises on four of six hosts is a member in the
+wrong place. :class:`~aggregate.distributions.Aggregate` and
+:class:`~aggregate.portfolio.Portfolio` carry thin delegations, the pattern
+``sharpen`` itself already follows.
+
+All three work the same way: parse the stored program back to its spec, mutate
+the spec, render the mutation through the writer. Never string surgery. A
+cession clause cannot be appended, because an occurrence cession sits before
+the frequency clause and an aggregate cession after it, and a trailer clause
+cannot be appended either, because a spec holds one ``note`` and one ``hints``
+and a second copy would silently win or lose. Both facts are grammar knowledge,
+so the library holds them rather than every caller.
+
+The renders ask for the trailer explicitly. :meth:`ProgramMixin.format_program`
+defaults to ``trailer=False``, on the reasoning that formatting a program is
+usually about the math rather than the metadata, and these three are the
+exception: for :func:`sharpen_program` the trailer is the entire payload.
 """
+
+import re
+
+import numpy as np
 
 from .decl_writer import format_program as _format_program
 
@@ -176,3 +211,538 @@ class ProgramMixin:
     def pprogram_html(self):
         """Syntax-highlighted DecL program for IPython / Jupyter display."""
         return self.format_program(fmt='html')
+
+
+# ======================================================================
+# Derived programs (dev/done/plan-derived-programs.md)
+# ======================================================================
+
+#: Spec keys owned by one reinsurance tier. ``occ_reins``, ``occ_kind`` and
+#: their per-layer companions (``occ_reins_premium`` / ``_cede`` / ``_label`` /
+#: ``_reinst``), and the aggregate twins including the variable-rating feature
+#: keys (``agg_reins_swing`` / ``agg_reins_swing_layer`` ...). Group 1 is the
+#: tier, which is what :func:`reins_program` replaces a tier's worth of.
+_REINS_KEY = re.compile(r'^(occ|agg)_(?:reins|kind)')
+
+#: Name of the throwaway carrier used to parse a bare cession clause. A
+#: fragment is not a program, so it is slotted into the smallest aggregate that
+#: has both reinsurance slots and parsed there. The name never reaches the
+#: caller and the parse registers nothing.
+_CESSION_PROBE = 'DerivedProgramCessionProbe'
+
+#: Suffix for the wrapping P&L's name in :func:`pnl_program`.
+_PNL_SUFFIX = '_PnL'
+
+
+def _parse_program(program):
+    """Parse a stored DecL statement back to its ``(kind, name, spec)`` triple.
+
+    The raw transformer spec, which is what :mod:`aggregate.decl_writer`
+    renders, not the dense ``Aggregate._spec`` constructor dict.
+
+    Parameters
+    ----------
+    program : str
+        One DecL statement, typically an object's :attr:`ProgramMixin.program`.
+
+    Returns
+    -------
+    (str, str, dict)
+        Kind, name and spec, as :meth:`aggregate.parser.UnderwritingParser.parse`
+        returns them.
+
+    Notes
+    -----
+    Deferred import of the default underwriter, exactly as
+    :func:`aggregate.decl_writer.format_program` does: it carries the configured
+    recipe base, so ``sev.X`` and ``agg.X`` references in the text resolve, and
+    a builtin reference resolves **inline**, which is what makes a derived
+    program self-contained.
+    """
+    from .underwriter import build as _build
+    return _build.parser.parse(program)
+
+
+def _require_program(ob, caller):
+    """Return ``ob``'s parsed program, or raise saying why there is none.
+
+    Parameters
+    ----------
+    ob : Aggregate or Portfolio
+        The object to derive from.
+    caller : str
+        Name of the calling member, for the message.
+
+    Returns
+    -------
+    (str, str, dict)
+        The parsed triple.
+
+    Raises
+    ------
+    ValueError
+        When the object carries no DecL program, which is the case for one
+        built programmatically rather than through ``build``.
+    """
+    program = getattr(ob, 'program', '')
+    if not program:
+        raise ValueError(
+            f"{caller}: {getattr(ob, 'name', ob)!r} carries no DecL program, so "
+            "there is nothing to derive one from. Only objects built from DecL "
+            "(through build) can answer; one constructed directly in Python "
+            "has no text to start from.")
+    return _parse_program(program)
+
+
+def _merge_hints(hints, updates):
+    """Merge ``key=value`` settings into an existing ``hints{...}`` body.
+
+    A spec holds **one** ``hints`` clause, so a second cannot be appended: the
+    duplicate would silently win or lose. Each setting is therefore replaced
+    where it already appears and appended where it does not, and every other
+    chunk survives untouched, in its original position.
+
+    Parameters
+    ----------
+    hints : str
+        The existing clause body (``'log2=18; padding=2'``), or ``''``.
+    updates : dict
+        ``{key: formatted_value}``, the values already rendered as the strings
+        they should appear as.
+
+    Returns
+    -------
+    str
+        The merged body, ready to become ``hints{...}``.
+
+    Notes
+    -----
+    Textual rather than parsed: :func:`aggregate.underwriter._parse_hints`
+    drops keys outside its allow-list with a warning, so round-tripping through
+    it would quietly delete anything it did not recognize. Chunks it would drop
+    are still the author's, so they are carried through verbatim.
+
+    Examples
+    --------
+    >>> _merge_hints('bs=1/32; padding=2', {'log2': '18', 'bs': '1/64'})
+    'bs=1/64; padding=2; log2=18'
+    """
+    done = set()
+    out = []
+    for chunk in (hints or '').split(';'):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        key = chunk.split('=')[0].strip() if chunk.count('=') == 1 else None
+        if key in updates:
+            if key in done:
+                continue                # a duplicate of a key already replaced
+            out.append(f'{key}={updates[key]}')
+            done.add(key)
+        else:
+            out.append(chunk)
+    out.extend(f'{k}={v}' for k, v in updates.items() if k not in done)
+    return '; '.join(out)
+
+
+def _merge_note(note, addition):
+    """Append a sentence to an existing ``note{...}`` body.
+
+    One ``note`` per spec, same as :func:`_merge_hints`, so an addition joins
+    the existing text rather than opening a second clause.
+
+    Parameters
+    ----------
+    note : str
+        The existing note body, or ``''``.
+    addition : str
+        Text to add. Must not contain ``}``, which closes the clause.
+
+    Returns
+    -------
+    str
+        The merged body.
+    """
+    if not note:
+        return addition
+    if not addition:
+        return note
+    return f'{note}; {addition}'
+
+
+def _render_derived(kind, name, spec):
+    """Render a mutated spec as canonical DecL, trailer and all.
+
+    Parameters
+    ----------
+    kind : str
+        ``'agg'``, ``'pnl'`` or ``'port'``.
+    name : str
+        The object name.
+    spec : dict
+        A raw transformer spec.
+
+    Returns
+    -------
+    str
+        The program, in the ``spread`` layout that :attr:`ProgramMixin.pprogram`
+        uses: each clause on its own two-space indented line. The result is
+        itself a program, so the rest of the render surface applies to it, for
+        instance ``format_program(a.sharpen_program, layout='terse')``.
+    """
+    return _format_program((kind, name, spec), fmt='text', layout='spread',
+                           trailer=True)
+
+
+def sharpen_program(ob):
+    """The program that rebuilds ``ob`` on the grid its last probe chose.
+
+    The fourth thing :func:`aggregate._bucket_window.sharpen` produces, beside
+    ``sharpen_df`` / ``sharpen_description`` / ``sharpen_explanation``: the
+    object's own program with the outcome of the probe merged into its trailer.
+    Without it the knowledge of which grid won lives only in the live object,
+    and reopening the notebook tomorrow rebuilds on the automatic choice with
+    the audit still to run.
+
+    Parameters
+    ----------
+    ob : Aggregate or Portfolio
+        A sharpened object.
+
+    Returns
+    -------
+    str
+        DecL, or ``''`` before :meth:`sharpen` has run (and for an object with
+        no program at all).
+
+    Notes
+    -----
+    Three outcomes, three records.
+
+    **The grid moved.** ``hints{log2=...; bs=...}`` pins it, and nothing else is
+    added, because the hints are the record.
+
+    **The grid was confirmed**, either because the probe gate waved it through
+    or because the probe ran and the center cell won:
+    ``note{sharpen: grid confirmed, no change}``, and deliberately **no hints**.
+    Pinning a grid the automatic selector would have picked anyway adds noise to
+    a program someone is going to read and share, and implies the selector is
+    not trusted. The note is the record that the audit ran, which is what saves
+    running it twice.
+
+    **The probe ran under** ``execute=False``, found a better cell and did not
+    take it. The object still sits on its original grid, so pinning the
+    recommendation would describe an object that does not exist; the note
+    carries the recommendation instead.
+
+    Any ``note`` / ``hints`` the program already carried survives: the settings
+    are merged key by key (see :func:`_merge_hints`) and the note is appended
+    to.
+
+    A grid the *caller* pinned at build time, ``build(program, log2=20)``, is
+    not in the program text and not visible to the probe. Sharpen confirming it
+    therefore writes the confirmation note and no hints, and the returned
+    program rebuilds on the automatic grid. Pass the grid through a ``hints{}``
+    clause instead of a ``build`` keyword if it has to be durable.
+    """
+    from ._bucket_window import _fmt_bs
+    state = getattr(ob, '_sharpen_state', None)
+    if state is None or not getattr(ob, 'program', ''):
+        return ''
+    kind, name, spec = _require_program(ob, 'sharpen_program')
+    spec = dict(spec)
+    df = getattr(ob, '_sharpen_df', None)
+    won = None if df is None else df[df['selected']]
+    if not state['ran'] or won is None or not len(won):
+        # The probe gate: the grid was already at or under target and sound, so
+        # nothing was run and nothing changed.
+        moved = False
+    else:
+        win = won.iloc[0]
+        moved = (float(win['bs']) != float(state['bs0'])
+                 or int(win['log2']) != int(state['log20']))
+    if not moved:
+        spec['note'] = _merge_note(spec.get('note', ''),
+                                   'sharpen: grid confirmed, no change')
+    elif state['execute']:
+        spec['hints'] = _merge_hints(
+            spec.get('hints', ''),
+            {'log2': str(int(win['log2'])), 'bs': _fmt_bs(win['bs'])})
+    else:
+        spec['note'] = _merge_note(
+            spec.get('note', ''),
+            f'sharpen: probe not executed, recommends log2 '
+            f'{int(win["log2"])} and bs {_fmt_bs(win["bs"])}')
+    return _render_derived(kind, name, spec)
+
+
+def _pnl_consideration(ob, loss_ratio, caller):
+    """Resolve the P&L premium: inherit it, or size it from the loss ratio.
+
+    Parameters
+    ----------
+    ob : Aggregate or Portfolio
+        The engine.
+    loss_ratio : float
+        Target loss ratio, used only when there is no premium to inherit.
+    caller : str
+        Name of the calling member, for the messages.
+
+    Returns
+    -------
+    INHERIT_PREMIUM or float
+        The sentinel when the engine carries a technical premium, so the
+        program says ``inherit premium`` and the number is resolved at build;
+        otherwise expected loss divided by ``loss_ratio``.
+
+    Raises
+    ------
+    ValueError
+        When there is no premium to inherit, and either ``loss_ratio`` is zero
+        or the object has not been updated so its expected loss is unknown.
+
+    Notes
+    -----
+    Expected loss is the **empirical** mean ``est_m``, read off the computed
+    density rather than from the analytic moments, so the P&L's realized loss
+    ratio is exactly the one asked for.
+    """
+    from .parser import INHERIT_PREMIUM
+    premium = getattr(ob, 'exp_premium', 0.0)
+    total = (0.0 if premium is None
+             else float(np.sum(np.asarray(premium, dtype=float))))
+    if total:
+        return INHERIT_PREMIUM
+    if not loss_ratio:
+        raise ValueError(
+            f"{caller}: {getattr(ob, 'name', ob)!r} carries no premium to "
+            "inherit (its exposure is stated as claims or loss), so the "
+            "premium has to be sized from loss_ratio, and loss_ratio is "
+            f"{loss_ratio!r}. Give a positive loss ratio.")
+    e_loss = float(getattr(ob, 'est_m', 0.0) or 0.0)
+    if not np.isfinite(e_loss) or e_loss <= 0:
+        raise ValueError(
+            f"{caller}: {getattr(ob, 'name', ob)!r} has no expected loss to "
+            "size a premium from. Call update() first (build does it for you); "
+            "the premium is the computed mean divided by loss_ratio.")
+    return e_loss / loss_ratio
+
+
+def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
+    """The program that wraps ``ob`` in a P&L.
+
+    Writing this out by hand means knowing that the trailer belongs to the
+    wrapping ``pnl`` rather than to the engine it swallows, and knowing what to
+    do when the engine carries no premium. Both are grammar knowledge, so the
+    library answers.
+
+    Parameters
+    ----------
+    ob : Aggregate or Portfolio
+        The loss engine to wrap.
+    loss_ratio : float, default 0.70
+        Sizes the premium as expected loss divided by this, and **only** when
+        the engine has no premium of its own. An engine declared with a
+        ``premium at lr`` exposure always inherits its own, and this is then
+        unused. A convention rather than a fact, which is why it sits in the
+        signature where the docstring puts it in front of you.
+    expense_ratio : float, default 0.25
+        Gross expense as a fraction of premium. ``0`` omits the expense clause
+        rather than writing a zero.
+
+    Returns
+    -------
+    str
+        ``pnl NAME_PnL <premium> less <engine> less <expense>``.
+
+    Raises
+    ------
+    ValueError
+        When ``ob`` carries no DecL program, when its program is already a P&L,
+        or when the premium cannot be resolved (see
+        :func:`_pnl_consideration`).
+
+    Notes
+    -----
+    **An aggregate inlines.** The engine is the object's own body verbatim,
+    stripped of its trailer, which the wrapping ``pnl`` now owns; the
+    aggregate's own ``as`` label becomes the engine label, which is what names
+    the P&L's loss leg. The result is self-contained: it builds anywhere, with
+    no knowledge base to register against first.
+
+    **A portfolio references.** The grammar has no inline portfolio engine, so
+    the program reads ``less port.NAME`` and resolves against the underwriter's
+    knowledge base, where ``build`` put the portfolio when it built it. The
+    portfolio's own trailer stays on the portfolio's declaration, which this
+    text does not replace.
+
+    Examples
+    --------
+    >>> from aggregate import build
+    >>> a = build('agg PnlProgEx 1000 premium at 0.65 lr '
+    ...           'sev lognorm 100 cv 1 poisson')
+    >>> print(a.pnl_program())
+    pnl PnlProgEx_PnL inherit premium less
+      agg PnlProgEx
+        1000 premium at 0.65 lr
+        sev lognorm 100 cv 1
+        poisson
+      less 0.25 premium expenses
+    """
+    kind, name, spec = _require_program(ob, 'pnl_program')
+    if kind in ('pnl', 'xpnl'):
+        raise ValueError(
+            f"pnl_program: {name!r} is already a P&L, so there is nothing to "
+            "wrap. Read its program directly.")
+    if kind not in ('agg', 'port'):
+        raise ValueError(
+            f"pnl_program: cannot wrap a {kind!r} declaration in a P&L; the "
+            "engine must be an aggregate or a portfolio.")
+    pnl_name = f'{name}{_PNL_SUFFIX}'
+    consideration = _pnl_consideration(ob, loss_ratio, 'pnl_program')
+    if kind == 'port':
+        # No inline portfolio engine in the grammar: reference the stored
+        # portfolio, whose declaration keeps its own trailer.
+        out = {'name': pnl_name, '_engine_port': name}
+    else:
+        out = dict(spec)
+        out['name'] = pnl_name
+        out['engine_name'] = name
+        # the aggregate's own label names the P&L's loss leg; the P&L itself
+        # starts unlabeled.
+        out['engine_label'] = out.pop('label', None)
+    out['consideration'] = consideration
+    if expense_ratio:
+        out['expense_spec'] = [(None, [('premium', float(expense_ratio))])]
+    return _render_derived('pnl', pnl_name, out)
+
+
+def _cession_spec(cession):
+    """Parse one or two bare cession clauses into their spec keys.
+
+    A cession clause is a fragment, not a program, so it is slotted into a
+    throwaway carrier aggregate that has both reinsurance slots and parsed
+    there. Which slot is read off the leading keyword, and that is the whole
+    point of the exercise: an ``occurrence`` cession sits **before** the
+    frequency clause and an ``aggregate`` cession **after** it, so text spliced
+    onto the end of a program lands in the wrong place or does not parse.
+
+    Parameters
+    ----------
+    cession : str or iterable of str
+        ``'occurrence net of 500 xs 500'``, or several such, at most one per
+        tier.
+
+    Returns
+    -------
+    (dict, set)
+        The lifted ``occ_*`` / ``agg_*`` reinsurance keys, and the set of tiers
+        (``'occ'`` / ``'agg'``) the caller is replacing.
+
+    Raises
+    ------
+    ValueError
+        For an empty cession, a clause that does not open with ``occurrence``
+        or ``aggregate``, two clauses on the same tier, or a clause that does
+        not parse.
+    """
+    fragments = [cession] if isinstance(cession, str) else list(cession)
+    slots = {}
+    for fragment in fragments:
+        fragment = str(fragment).strip()
+        head = fragment.split(None, 1)[0].lower() if fragment else ''
+        if head not in ('occurrence', 'aggregate'):
+            raise ValueError(
+                f"reins_program: a cession clause opens with 'occurrence' or "
+                f"'aggregate', naming the tier it applies to; got "
+                f"{fragment!r}. For example 'occurrence net of 500 xs 500'.")
+        tier = 'occ' if head == 'occurrence' else 'agg'
+        if tier in slots:
+            raise ValueError(
+                f"reins_program: two {head} cessions given, and a program has "
+                "one clause per tier. Put every layer in the one clause, "
+                f"joined by 'and': '{head} net of 500 xs 500 and 1000 xs 1000'.")
+        slots[tier] = fragment
+    if not slots:
+        raise ValueError(
+            'reins_program: no cession given. Pass a clause such as '
+            "'occurrence net of 500 xs 500'.")
+    probe = (f'agg {_CESSION_PROBE} 1 claims dsev [1] '
+             f'{slots.get("occ", "")} fixed {slots.get("agg", "")}')
+    try:
+        _, _, spec = _parse_program(probe)
+    except Exception as e:                # noqa: BLE001 report the fragment
+        raise ValueError(
+            f'reins_program: could not parse the cession '
+            f'{cession!r}: {e}') from None
+    return ({k: v for k, v in spec.items() if _REINS_KEY.match(k)}, set(slots))
+
+
+def reins_program(ob, cession):
+    """The program that rebuilds ``ob`` with ``cession`` added.
+
+    Parameters
+    ----------
+    ob : Aggregate
+        The aggregate to cede from.
+    cession : str or iterable of str
+        One cession clause per tier, each opening with ``occurrence`` or
+        ``aggregate``: ``'occurrence net of 500 xs 500'``.
+
+    Returns
+    -------
+    str
+        A **self-contained** program: it builds in any session, with nothing
+        registered first.
+
+    Raises
+    ------
+    ValueError
+        When ``ob`` carries no DecL program, when its program is not a plain
+        aggregate, when the cession is malformed (see :func:`_cession_spec`),
+        or when an occurrence cession would join an ``approximate`` clause.
+
+    Notes
+    -----
+    The cession is authoritative for **its own tier**: an occurrence clause
+    replaces whatever occurrence program the object had and leaves the
+    aggregate tier alone. That is the tier's whole cession program in one
+    clause, which is how the grammar reads it too.
+
+    **Self-contained, and this is the load-bearing choice.**
+    ``agg NEW agg.OLD occurrence net of ...`` is grammatical and is the obvious
+    first idea, but ``agg.OLD`` resolves only against an underwriter's
+    knowledge base, so the returned text would build in the session that made
+    it and nowhere else. A shared server would be writing every user's builds
+    into one knowledge base besides, with the name collisions and unbounded
+    growth that implies. Text that carries its own body has neither problem.
+
+    Examples
+    --------
+    >>> from aggregate import build
+    >>> a = build('agg ReinsProgEx 10 claims sev lognorm 100 cv 1 poisson')
+    >>> print(a.reins_program('occurrence net of 500 xs 500'))
+    agg ReinsProgEx
+      10 claims
+      sev lognorm 100 cv 1
+      occurrence net of
+        500 xs 500
+      poisson
+    """
+    kind, name, spec = _require_program(ob, 'reins_program')
+    if kind != 'agg':
+        raise ValueError(
+            f"reins_program: {name!r} is a {kind!r} declaration; a cession "
+            'clause belongs to an aggregate. Cede the units of a portfolio '
+            'individually.')
+    lifted, tiers = _cession_spec(cession)
+    if 'occ' in tiers and spec.get('approximate', 'exact') != 'exact':
+        raise ValueError(
+            f"reins_program: {name!r} carries 'approximate "
+            f"{spec['approximate']}', which is incompatible with occurrence "
+            'reinsurance (the method-of-moments fit bypasses the '
+            'per-occurrence convolution); cede on the aggregate tier instead.')
+    out = {k: v for k, v in spec.items()
+           if not (_REINS_KEY.match(k) and _REINS_KEY.match(k).group(1) in tiers)}
+    out.update(lifted)
+    return _render_derived(kind, name, out)

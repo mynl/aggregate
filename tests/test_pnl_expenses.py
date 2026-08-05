@@ -18,13 +18,13 @@ _BASE = 'pnl A 1000 prem less agg A_e 8 claims sev lognorm 50 cv 1 poisson'  # E
 
 
 def _leg(pnl, label):
-    """The stats_df row of one declared leg, looked up by its Line label
+    """The economic_df row of one declared leg, looked up by its Line label
     (leg-level detail lives on the stats sheet; summary_df is the fixed card)."""
-    return pnl.stats_df.xs(label, level='Label').iloc[0]
+    return pnl.economic_df.xs(label, level='Label').iloc[0]
 
 
 def _lines(pnl):
-    return list(pnl.stats_df.index.get_level_values('Label'))
+    return list(pnl.economic_df.index.get_level_values('Label'))
 
 
 def test_expense_absent_defaults_to_zero():
@@ -97,7 +97,7 @@ def test_single_tuple_expense_spec_still_accepted_via_api():
 
 def test_expense_reduces_margin_and_drives_combined_ratio():
     p = build(_BASE + ' less 200 fixed expenses')
-    s = p.stats_df
+    s = p.economic_df
     assert s.loc[('Obligation', 'expense'), 'EX'] == pytest.approx(-200.0)
     assert s.loc[('Obligation', 'expense'), 'SD'] == \
         pytest.approx(0.0, abs=1e-2)                     # deterministic
@@ -109,9 +109,9 @@ def test_expense_reduces_margin_and_drives_combined_ratio():
     assert (s.loc[('Margin', 'Total'), 'EX']
             == pytest.approx(s.loc[('Consideration', 'Premium'), 'EX']
                              + s.loc[('Obligation', 'Total'), 'EX'], abs=1e-6))
-    # ratio_df tells the same story, and now splits loss from expense: the
+    # economic_ratios_df tells the same story, and now splits loss from expense: the
     # combined ratio is (400 + 200) / 1000, its two parts 0.40 and 0.20
-    r = p.ratio_df.iloc[0]
+    r = p.economic_ratios_df.iloc[0]
     assert r['LR'] == pytest.approx(400 / 1000, rel=TOL)
     assert r['ER'] == pytest.approx(200 / 1000, rel=TOL)
     assert r['CR'] == pytest.approx((400 + 200) / 1000, rel=TOL)

@@ -353,7 +353,8 @@
 - ~~**[PnL-Ratio-Frame]**~~ **DONE `1.0.0a185`**
   (`dev/done/plan-pnl-ratio-frame.md`) — **breaking**: the `Scaled` column,
   `scaled_stats_df`, the `scale` property and the `scale=` kwarg are gone;
-  ratios live in `PnL.ratio_df`, with `PnL.legs_df` as the itemized companion.
+  ratios live in `PnL.economic_ratios_df` (named `ratio_df` until `a204`), with
+  `PnL.legs_df` as the itemized companion.
   `Scaled` divided every cell by one number (net premium on a walk), so it read
   1.43 for gross premium and -0.571 for a 0.40 gross loss ratio. `Leg` gained a
   validated `kind` (`LEG_KINDS`), which is what makes an expense ratio possible;

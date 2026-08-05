@@ -78,16 +78,16 @@ def test_gc_feat_consolidated_books_occ_constants(uw):
     pn = rd['p_agg_net_occ'].to_numpy()
     pn = pn / pn.sum()
     hand_np = _P_G - _PC_OCC + c_occ - float((_phi(_g(xs)) * pn).sum())
-    booked = p.stats_df.xs('net premium', level='Label').iloc[0]
+    booked = p.economic_df.xs('net premium', level='Label').iloc[0]
     assert booked['EX'] == pytest.approx(hand_np, abs=1e-6)
     assert booked['SD'] > 0                    # the swing premium is live
     hand_nl = -float(((xs - _g(xs)) * pn).sum())
-    assert p.stats_df.xs('Gross Loss (net)', level='Label').iloc[0]['EX'] \
+    assert p.economic_df.xs('Gross Loss (net)', level='Label').iloc[0]['EX'] \
         == pytest.approx(hand_nl, abs=1e-6)
     assert p.economics['pc_occ'] == pytest.approx(_PC_OCC)
     assert p.economics['c_occ'] == pytest.approx(c_occ)
     # consolidated rides the one net-occ source -> scenario ladder
-    assert 'κ01' in p.stats_df.columns
+    assert 'κ01' in p.economic_df.columns
 
 
 def test_gc_feat_walk_has_occ_step_and_true_gross(uw):
@@ -98,7 +98,7 @@ def test_gc_feat_walk_has_occ_step_and_true_gross(uw):
     Rows agree with the engine's exact 1-D marginals to joint-grid accuracy;
     the ladder is the footing scenario (κ) pass."""
     x = _build(uw, 'xpnl', 'CBGF')
-    s = x.stats_df
+    s = x.economic_df
     steps = list(dict.fromkeys(s.index.get_level_values('Step')))
     # the first step takes the P&L's own ``as`` label ([First-Step-Label])
     assert steps == ['W', 'Cat Program', 'Swing Program', 'All']
@@ -149,7 +149,7 @@ def test_reinst_feat_routes_through_joint_and_keeps_cap(uw):
     b = _build(uw, 'xpnl', 'CBRF')       # same + swing agg cover
     assert type(b.engine.reinstatement_terms).__name__ == 'ReinstatementTerms'
     assert type(b._source).__name__ == 'BivariateDistribution'
-    sa, sb = a.stats_df, b.stats_df
+    sa, sb = a.economic_df, b.economic_df
     # every row of the feature-less walk reappears identically
     for idx in sa.index:
         if idx[0] == 'All' or idx[1:] == ('Margin', 'Net'):
@@ -174,11 +174,11 @@ def test_reinst_feat_routes_through_joint_and_keeps_cap(uw):
     # pnl face = the consolidated net view over the SAME joint
     # ([Decision-PnL-Is-Consolidated]); agrees with the walk exactly
     pb = _build(uw, 'pnl', 'CBRF')
-    assert list(pb.stats_df.index.names) == ['Side', 'Label']
+    assert list(pb.economic_df.index.names) == ['Side', 'Label']
     assert pb.est_m == pytest.approx(
         sb.loc[('All', 'Margin', 'Net'), 'EX'], abs=1e-12)
     # the swing premium rides the net-premium leg (stochastic)
-    assert pb.stats_df.xs('net premium', level='Label').iloc[0]['SD'] > 0
+    assert pb.economic_df.xs('net premium', level='Label').iloc[0]['SD'] > 0
 
 
 def test_reinst_feat_consolidated_foots(uw):
@@ -186,7 +186,7 @@ def test_reinst_feat_consolidated_foots(uw):
     sum to the grand net result (the additive uw identity the old analysis
     audit checked, now read off the ledger)."""
     b = _build(uw, 'pnl', 'CBRF')
-    s = b.stats_df
+    s = b.economic_df
     legs = [i for i in s.index if i[1] != 'Total']   # exclude subtotal rows
     assert s.loc[('Margin', 'Total'), 'EX'] == pytest.approx(
         s.loc[legs, 'EX'].sum(), abs=1e-6)
@@ -245,7 +245,7 @@ def test_matrix_routing(uw):
            'feat': ('aggregate net of 500 xs 2000 swing basic 100 lcm 1 '
                     'min 100 max 400')}
     expect = {
-        # (occ, agg, face) -> stats_df index names (no analysis object exists
+        # (occ, agg, face) -> economic_df index names (no analysis object exists
         # post-[Decommission-Analysis-Classes])
         ('none', 'none', 'pnl'): ['Side', 'Label'],
         ('none', 'none', 'xpnl'): ['Step', 'Side', 'Label'],
@@ -261,5 +261,5 @@ def test_matrix_routing(uw):
             warnings.simplefilter('ignore')
             p = u(prog)
         assert isinstance(p, PnL)
-        assert list(p.stats_df.index.names) == names, (o, ag, face)
+        assert list(p.economic_df.index.names) == names, (o, ag, face)
         assert not hasattr(p, 'analysis'), (o, ag, face)

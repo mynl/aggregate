@@ -94,11 +94,11 @@ def test_as_is_reserved(uw):
 def _lines(pnl):
     """The declared-leg Line labels of the stats sheet (leg-level labels
     live there; summary_df is the fixed card)."""
-    return list(pnl.stats_df.index.get_level_values('Label'))
+    return list(pnl.economic_df.index.get_level_values('Label'))
 
 
 def _leg(pnl, label):
-    return pnl.stats_df.xs(label, level='Label').iloc[0]
+    return pnl.economic_df.xs(label, level='Label').iloc[0]
 
 
 def test_premium_label_names_consideration_leg():
@@ -148,8 +148,8 @@ def test_combine_vs_separate_total_matches():
     # combined (and) vs separate (juxtaposition) must give the same total expense
     combined = build(_PNL_BASE + ' less 25% premium expense and 200 fixed expense')
     separate = build(_PNL_BASE + ' less 25% premium expense 200 fixed expense')
-    tot_c = combined.stats_df.loc[('Obligation', 'Total'), 'EX']
-    tot_s = separate.stats_df.loc[('Obligation', 'Total'), 'EX']
+    tot_c = combined.economic_df.loc[('Obligation', 'Total'), 'EX']
+    tot_s = separate.economic_df.loc[('Obligation', 'Total'), 'EX']
     assert tot_c == pytest.approx(tot_s, rel=TOL)
 
 
@@ -177,7 +177,7 @@ def test_reins_label_names_cession_rows():
     lines = _lines(q)
     for row in ('Stop Loss premium', 'Stop Loss recovery'):
         assert row in lines, row
-    s = q.stats_df
+    s = q.economic_df
     assert ('Stop Loss', 'Margin', 'Total') in s.index
     assert ('Stop Loss', 'Margin', 'Net') in s.index
 

@@ -51,7 +51,7 @@ def test_acceptance_pnl_consolidated_card(cat):
     assert df.loc['Margin', 'EX'] == pytest.approx(
         df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX'], abs=1e-9)
     # single source -> the stats ladder is the scenario (κ) pass
-    assert 'κ01' in p.stats_df.columns
+    assert 'κ01' in p.economic_df.columns
 
 
 def test_acceptance_pnl_books_net_loss(cat):
@@ -60,7 +60,7 @@ def test_acceptance_pnl_books_net_loss(cat):
     xs = rd['loss'].to_numpy()
     pn = rd['p_agg_net'].to_numpy()
     e_net = float((xs * pn).sum() / pn.sum())
-    s = p.stats_df
+    s = p.economic_df
     # the engine's declared label names the loss leg, '(net)'-qualified
     # ([Flag-Net-Premium-Leg-Label] precedent)
     assert s.loc[('Obligation', 'Gross Book1 (net)'), 'EX'] == \
@@ -77,15 +77,15 @@ def test_acceptance_walk_steps(cat):
     # ([First-Step-Label]); cover steps = the reins ``as`` labels; the grand
     # step key is 'All' (a140 rename)
     steps = list(dict.fromkeys(
-        x.stats_df.index.get_level_values('Step')))
+        x.economic_df.index.get_level_values('Step')))
     assert steps == ['Gross', 'Occ Cover', 'Agg Cover', 'All']
     # the engine's own label names the direct block's loss leg and margin
-    assert ('Gross', 'Obligation', 'Gross Book1') in x.stats_df.index
-    assert ('Gross', 'Margin', 'Gross Book1') in x.stats_df.index
+    assert ('Gross', 'Obligation', 'Gross Book1') in x.economic_df.index
+    assert ('Gross', 'Margin', 'Gross Book1') in x.economic_df.index
     # ... and a labelled xpnl takes that label as its first step instead
     labelled = build(f'xpnl CatL as "Whole Account" 12000 premium less '
                      f'{_ENGINE}{_TAIL}')
-    assert labelled.stats_df.index.get_level_values('Step')[0] \
+    assert labelled.economic_df.index.get_level_values('Step')[0] \
         == 'Whole Account'
 
 
@@ -98,7 +98,7 @@ def test_walk_rows_read_engine_marginals(cat):
         pv = rd[col].to_numpy()
         return float((xs * pv).sum() / pv.sum())
 
-    s = x.stats_df
+    s = x.economic_df
     # the walk rides the occurrence (gross, ceded) joint, so its rows agree
     # with the engine's exact 1-D marginals to JOINT-GRID accuracy (the
     # joint runs on a budget-sized common bucket size): tight for linear
@@ -119,7 +119,7 @@ def test_walk_rows_read_engine_marginals(cat):
 
 def test_walk_running_nets_and_footing(cat):
     _p, x, a = cat
-    s = x.stats_df
+    s = x.economic_df
     ex = s['EX']
     # the EX column foots exactly (means add by linearity)
     legs = [i for i in s.index
@@ -140,7 +140,7 @@ def test_walk_running_nets_and_footing(cat):
 
 def test_walk_ladder_scenario_and_flagged(cat):
     _p, x, _a = cat
-    s = x.stats_df
+    s = x.economic_df
     # one shared joint -> the scenario (κ) ladder
     # ([Decision-Kappa-Shared-Source-Rule])
     assert 'κ01' in s.columns and 'P01' not in s.columns
@@ -150,7 +150,7 @@ def test_walk_ladder_scenario_and_flagged(cat):
 
 def test_walk_impact_row_is_per_atom_delta(cat):
     _p, x, _a = cat
-    s = x.stats_df
+    s = x.economic_df
     # impact = grand result - gross step result: a TRUE per-atom difference
     # (its SD / percentiles are of the difference distribution, not deltas
     # of statistics -- richer than the retired stitched per-stat delta)

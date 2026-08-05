@@ -4,7 +4,7 @@ Covers the ``pnl ... occurrence net of <layer> <premium> reinstatements ...``
 grammar, the transformer spec keys, the three locked validation rules, and the
 ``build() -> PnL`` plumbing. The reinstatement terms live on the engine
 (``p.engine.reinstatement_terms``); every stochastic-cession fact is read off
-the PnL's own ``stats_df`` (the group ledger) and the ``(L, R)`` joint source
+the PnL's own ``economic_df`` (the group ledger) and the ``(L, R)`` joint source
 (``p._source``) -- there is no separate analysis object
 ([Decommission-Analysis-Classes]).
 
@@ -41,8 +41,8 @@ def _joint_mean(pnl, fn):
 
 
 def _leg(pnl, label):
-    """One ledger leg's stats_df row, by ``Line`` label."""
-    return pnl.stats_df.xs(label, level='Label').iloc[0]
+    """One ledger leg's economic_df row, by ``Line`` label."""
+    return pnl.economic_df.xs(label, level='Label').iloc[0]
 
 
 _HUMAN = ('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
@@ -216,7 +216,7 @@ def test_ledger_rows_and_means_add():
     joint: gross sell group + occ cession buy group; the EX column adds down
     the sheet and the total impact is the cession's step delta."""
     p = build(_HUMANX)
-    s = p.stats_df
+    s = p.economic_df
     for row in (('Gross', 'Consideration', 'Premium'),
                 ('Gross', 'Obligation', 'Loss'),
                 ('Gross', 'Margin', 'Gross'),
@@ -237,7 +237,7 @@ def test_ledger_rows_and_means_add():
 
 def test_ceded_premium_is_stochastic_in_exhibit():
     p = build(_HUMANX)
-    s = p.stats_df
+    s = p.economic_df
     # the headline effect: the stochastic ceded premium D + h(R) shows a
     # nonzero SD on its ledger row, while the gross premium is fixed...
     assert s.loc[('occ 95% so 100 xs 100', 'Consideration', 'occ 95% so 100 xs 100 premium'), 'SD'] \
@@ -250,7 +250,7 @@ def test_ledger_mean_check_ceded_premium():
     p = build(_HUMANX)
     t = p.engine.reinstatement_terms
     e_h = _joint_mean(p, lambda l, r: t.reinstatement_premium(r))
-    assert p.stats_df.loc[
+    assert p.economic_df.loc[
         ('occ 95% so 100 xs 100', 'Consideration', 'occ 95% so 100 xs 100 premium'), 'EX'] == \
         pytest.approx(-(t.deposit + e_h), rel=1e-9)
 
@@ -280,7 +280,7 @@ def test_subsequent_aggregate_cover_builds():
     assert p.economics['pc_agg'] == pytest.approx(510.0)
     # the agg cover actually recovers on the net-of-occurrence loss L - A(R):
     # its ledger recovery row carries a nonzero mean.
-    s = p.stats_df
+    s = p.economic_df
     assert abs(s.loc[('agg 85% so 1500 xs 7000', 'Obligation', 'agg 85% so 1500 xs 7000 recovery'),
                      'EX']) > 0
     # decision 3: the ledger extends to the inuring both-tiers form -- a third
@@ -313,7 +313,7 @@ def test_expense_and_cede_book_as_ledger_legs():
               'occurrence net of 100 xs 100 rol 18% cede 20% reinstatements [0 1] '
               'poisson less 500 fixed expense and 10% premium expense')
     assert p.economics['c_occ'] == pytest.approx(3.6)      # 20% * (18% * 100)
-    s = p.stats_df
+    s = p.economic_df
     assert s.loc[('Gross', 'Obligation', 'expense'), 'EX'] == \
         pytest.approx(-1500.0)                             # 500 + 10% * 10000
     assert s.loc[('occ 100 xs 100', 'Obligation', 'occ 100 xs 100 commission'),
@@ -338,7 +338,7 @@ def test_no_expense_leaves_ledger_pure():
     # mean (P_G - L).
     p = build('xpnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 18% reinstatements [0 1] poisson')
-    s = p.stats_df
+    s = p.economic_df
     # no expense / commission legs on the ledger
     assert ('Gross', 'Obligation', 'expense') not in s.index
     assert p.economics.get('c_occ', 0.0) == pytest.approx(0.0)
@@ -355,7 +355,7 @@ def test_no_expense_leaves_ledger_pure():
 # ----------------------------------------------------------------------
 def test_consolidated_face_shape_and_exact_means():
     p = build(_HUMAN)
-    s = p.stats_df
+    s = p.economic_df
     assert list(s.index.names) == ['Side', 'Label']
     assert list(p.summary_df.index) == ['Consideration', 'Obligation',
                                         'Margin']
@@ -382,4 +382,4 @@ def test_consolidated_agrees_with_walk_exactly():
     p = build(_HUMAN)
     x = build(_HUMANX)
     assert p.est_m == pytest.approx(
-        x.stats_df.loc[('All', 'Margin', 'Net'), 'EX'], abs=1e-12)
+        x.economic_df.loc[('All', 'Margin', 'Net'), 'EX'], abs=1e-12)

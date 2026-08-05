@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.0.0a204
+
+**[PnL-Economic-Frames]: the P&L accounting frames get their own names, and
+`stats_df` finally means one thing. BREAKING.**
+
+Found during the exhibits review: on a `PnL`, the `stats` and `pnl_ledger`
+exhibits emitted **byte-identical documents**, same hash, same single block.
+Two exhibit names for one frame is a synonym. The root cause was deeper than
+the exhibit layer. `stats_df` meant four different things across the
+first-class contract: the `(component, measure)` by view moment store on
+`Aggregate` and `Portfolio`, a column of `D_g` statistics on `Distortion`, a
+`(basis, stat)` by axis table on `BivariateAggregate`, and on `PnL` not a
+statistics frame at all but the ledger sheet with the kappa scenario ladder.
+The FCC audit can only check that a name exists, never that it means the same
+thing, so this drifted quietly.
+
+| was | is | note |
+|---|---|---|
+| `PnL.stats_df` (the ledger) | `PnL.economic_df` | it is an accounting view, and now says so |
+| `PnL.ratio_df` | `PnL.economic_ratios_df` | joins the accounting family |
+| absent | `PnL.stats_df` delegating to `self.engine.stats_df` | one meaning everywhere: the moment store of a book |
+| `PnL.validation_df` | unchanged | its leg rebucketing audit is a real check on the P&L's own construction and does not delegate |
+
+`economic_ratios_df` is **not** a view of `economic_df`, which is why it keeps
+its own frame: splitting expense from commission needs `Leg.kind`, and the
+`E_LR` / `E_ER` / `E_CR` columns need the per-atom vectors, neither of which
+survives into the ledger sheet.
+
+`PnL.engine` is `None` on a hand-built kernel P&L, so `stats_df` returns an
+**empty** `DataFrame` there rather than `None` or a raise: the FCC contract
+says the member exists, callers reach it defensively, and greater_tables
+renders an empty frame cleanly (verified: a valid 0 by 0 document with a
+hash). The `stats` exhibit's insurer view says so in words instead of serving
+a blank table.
+
+Consequently the `stats` exhibit on a P&L now serves the engine's moment store
+and takes the ordinary insurer treatment, the raw noncentral moment drop, so
+it is a genuinely different document from the ledger. `_drop_raw_moment_rows`
+gained an empty-frame guard.
+
+Moved in the same commit, per the one-coherent-unit rule: `_pnl.py` (both
+properties plus 29 docstring references), the `qd` comment, the exhibit
+registrations, `dev/FEATURES.csv` (the `stats_df` note rewritten, an
+`economic_df` row added, `ratio_df` renamed; the auditor passes),
+`docs/2_aggregate_overview/pipeline-pnl.rst`, `docs/3_reference/3_x_PnL.rst`,
+two lines of `features.rst`, 148 references across twelve test files, and the
+app's `_CSV_FRAMES`, which gains `economic_df` and `economic_ratios_df` entries
+so the ledger stays reachable until the economics tab lands.
+
+Docs are pending a rebuild.
+
 ## 1.0.0a203
 
 **[Exhibits-Module] phase four opens, [Exhibits-PnL-Translation], raw stage.**

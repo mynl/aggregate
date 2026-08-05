@@ -7,7 +7,7 @@ engine, and returns an :class:`~aggregate.PnL` value object. ``pnl`` is the
 premium / net loss with the feature's map folded in); the two-group step ledger
 is the ``xpnl`` **walk**. The feature's terms live on the engine
 (``p.engine.variable_terms``); the treaty maps and waterfall are read off the
-PnL's own ``stats_df``. Retro (account-level rating clause) varies the gross
+PnL's own ``economic_df``. Retro (account-level rating clause) varies the gross
 premium and is the 1-D case with no reinsurance.
 """
 
@@ -39,8 +39,8 @@ def _means_add(pnl):
 
 
 def _leg(pnl, label):
-    """One declared leg's stats_df row, by Line label."""
-    return pnl.stats_df.xs(label, level='Label').iloc[0]
+    """One declared leg's economic_df row, by Line label."""
+    return pnl.economic_df.xs(label, level='Label').iloc[0]
 
 
 # ----------------------------------------------------------------------
@@ -180,7 +180,7 @@ def test_retro_premium_separates_the_two_loss_ratios():
     p = build('pnl R retro basic 3000 lcm 1.1 min 3500 max 8000 premium '
               'less agg R_e 1000 loss sev lognorm 100 cv 2 poisson')
     assert _leg(p, 'Premium')['SD'] > 0            # premium really is random
-    row = p.ratio_df.iloc[0]
+    row = p.economic_ratios_df.iloc[0]
     assert row['LR'] > 0 and row['E_LR'] > 0
     assert abs(row['E_LR'] - row['LR']) > 1e-3, \
         'a correlated premium must move the mean of the ratio off the ratio ' \
@@ -192,7 +192,7 @@ def test_fixed_premium_makes_the_two_loss_ratios_agree():
     """The control: no correlation to carry, so the readings coincide."""
     p = build('pnl F 5000 premium less agg F_e 1000 loss '
               'sev lognorm 100 cv 2 poisson')
-    row = p.ratio_df.iloc[0]
+    row = p.economic_ratios_df.iloc[0]
     assert row['E_LR'] == pytest.approx(row['LR'], rel=1e-12)
 
 
@@ -215,7 +215,7 @@ def test_acceptance_pair_gross_vs_retro_same_shape():
         'sev lognorm 50 cv 3 poisson '
         'less 5% loss expense as LAE '
         '100 fixed expense as "Fixed Exp" 10% premium expense as "Acq Exp"')
-    g, r = gross.stats_df, retro.stats_df
+    g, r = gross.economic_df, retro.economic_df
     # identical template: declared labels on every row, same columns
     assert list(g.columns) == list(r.columns)
     assert list(g.index) == [

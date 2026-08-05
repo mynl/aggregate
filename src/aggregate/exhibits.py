@@ -515,14 +515,13 @@ reins = _make_exhibit_function(
 
 pnl_ledger = _make_exhibit_function(
     'pnl_ledger', 'P&L ledger',
-    """P&L ledger exhibit. Source frame ``PnL.stats_df``.
+    """P&L ledger exhibit. Source frame ``PnL.economic_df``.
 
     The full ledger by (Side, Label), or (Step, Side, Label) on a tower, in
     currency units with the kappa scenario ladder. RAW passes the frame
-    through; the flagship INSURER business translation (captions, footing
-    rules, Side sign presentation, the tower reshape) is behind the
-    [Exhibits-PnL-Translation] author gate, so INSURER currently equals RAW
-    per the default rule.
+    through; the INSURER business translation (captions, footing rules, Side
+    sign presentation) lands in [Exhibits-Economic-Insurer], where this
+    exhibit is also renamed to ``economic`` to mirror its frame.
 
     Parameters
     ----------
@@ -537,7 +536,7 @@ pnl_ledger = _make_exhibit_function(
 
 pnl_ratios = _make_exhibit_function(
     'pnl_ratios', 'P&L ratios',
-    """P&L ratio exhibit. Source frames ``PnL.ratio_df`` and ``legs_df``.
+    """P&L ratio exhibit. Source frames ``PnL.economic_ratios_df`` and ``legs_df``.
 
     Two blocks of raw materials: the per block amounts and LR / ER / CR
     ratios, and the itemized declared legs. RAW passes both frames through;
@@ -740,9 +739,34 @@ def _drop_raw_moment_rows(df):
     The ``mean`` / ``cv`` / ``skew`` rows and any ``meta`` block stay
     (``ex1`` duplicates ``mean``, so nothing is lost). Shared by the stats
     and reins insurer overrides.
+
+    A frame carrying no ``measure`` level passes through untouched: an empty
+    moment store (a P&L with no stochastic engine) has nothing to drop.
     """
+    if 'measure' not in (df.index.names or ()):
+        return df
     keep = ~df.index.get_level_values('measure').isin(RAW_MOMENT_MEASURES)
     return df.loc[keep]
+
+
+@stats.insurer.register(PnL)
+def _stats_insurer_pnl(obj, blocks):
+    """The engine's moment store, or an explanation of why there is none.
+
+    Since [PnL-Economic-Frames] a P&L's ``stats_df`` is its engine's moment
+    store, so the treatment is the ordinary one. A hand-built kernel P&L
+    carries no engine and the frame is empty; rather than serve a blank
+    table with no explanation, the caption says what happened. The ledger
+    itself is the ``economic`` exhibit.
+    """
+    block_name, df, kw = blocks[0]
+    if df.empty:
+        caption = ('This P&L was built from grids rather than from a '
+                   'declared book, so it carries no stochastic engine and '
+                   'has no moment store to report. Its accounting view is '
+                   'the economic exhibit.')
+        return [(block_name, df, dict(kw, caption=caption))]
+    return _stats_insurer_moment_store(obj, blocks)
 
 
 @stats.insurer.register(Aggregate)
@@ -868,17 +892,18 @@ def _dependency_frames_bivariate(obj):
 
 # --- pnl registrations ([Exhibits-PnL-Translation], raw stage) --------------
 # Raw registrations only: the INSURER business framing (captions, footing
-# rules, Side sign presentation, the tower ledger reshape) is gated on author
-# review and lands separately. Until then INSURER equals RAW by default.
+# rules, Side sign presentation) lands in [Exhibits-Economic-Insurer], where
+# these two are also renamed ``economic`` / ``economic_ratios`` to mirror
+# their frames. Until then INSURER equals RAW by default.
 
 @pnl_ledger.register(PnL)
 def _pnl_ledger_frames(obj):
-    return [('stats_df', obj.stats_df, {})]
+    return [('economic_df', obj.economic_df, {})]
 
 
 @pnl_ratios.register(PnL)
 def _pnl_ratios_frames(obj):
-    return [('ratio_df', obj.ratio_df, {}),
+    return [('economic_ratios_df', obj.economic_ratios_df, {}),
             ('legs_df', obj.legs_df, {})]
 
 

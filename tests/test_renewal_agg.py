@@ -151,7 +151,7 @@ def test_years_at_rate_premium_and_lr():
 def test_pnl_inherit_premium_smoke():
     p = build('pnl RPL inherit premium less agg RPLe 1 year at 500 rate '
               'dsev [100] wait 0.1 * expon')
-    assert p.ratio_df['P'].iloc[-1] == 500.0
+    assert p.economic_ratios_df['P'].iloc[-1] == 500.0
     assert p.est_m == pytest.approx(-500.0, abs=1e-5)
 
 

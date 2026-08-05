@@ -5564,149 +5564,306 @@
    "body": [
     {
      "cells": [
-      "Consideration",
-      "Premium",
-      "1,000.00",
-      "0.00",
-      "0.000",
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
       "\u2014",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00"
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "\u2014",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "850.00",
+      "850.00",
+      "850.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "0.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "1.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "0.00",
+      "0.00",
+      "0.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.00",
+      "1.00",
+      "1.00",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
      ]
     },
     {
      "break_depth": 0,
      "cells": [
-      "Obligation",
-      "Loss",
       {
-       "flags": [
-        "neg"
-       ],
-       "text": "-850.00"
+       "rowspan": 3,
+       "text": "freq"
       },
-      "412.31",
+      "mean",
+      "8.50",
+      "8.50",
+      "8.50",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.34",
+      "0.34",
+      "0.34",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.34",
+      "0.34",
+      "0.34",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
       {
-       "flags": [
-        "neg"
-       ],
-       "text": "-0.485"
+       "rowspan": 3,
+       "text": "sev"
       },
+      "mean",
+      "100.00",
+      "100.00",
+      "100.00",
+      "\u2014",
+      "100.00",
+      "\u2014",
+      "\u2014",
+      "100.00",
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
-      },
+       "text": "-5.681n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "1.00",
+      "1.00",
+      "1.00",
+      "\u2014",
+      "1.00",
+      "\u2014",
+      "\u2014",
+      "1.00",
       {
        "flags": [
         "neg"
        ],
-       "text": "-2,080.00"
-      },
+       "text": "-270.720n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "4.00",
+      "4.00",
+      "4.00",
+      "\u2014",
+      "4.00",
+      "\u2014",
+      "\u2014",
+      "4.00",
       {
        "flags": [
         "neg"
        ],
-       "text": "-1,607.25"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-1,393.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-1,080.75"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-791.25"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-553.50"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-378.75"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-290.50"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-155.75"
+       "text": "-51.130\u00b5"
       }
      ]
     },
     {
      "break_depth": 0,
      "cells": [
-      "Margin",
-      "Total",
-      "150.00",
-      "412.31",
-      "2.749",
+      {
+       "rowspan": 3,
+       "text": "agg"
+      },
+      "mean",
+      "850.00",
+      "850.00",
+      "850.00",
+      "\u2014",
+      "850.00",
+      "\u2014",
+      "\u2014",
+      "850.00",
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
-      },
+       "text": "-5.768n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "0.49",
+      "0.49",
+      "0.49",
+      "\u2014",
+      "0.49",
+      "\u2014",
+      "\u2014",
+      "0.49",
       {
        "flags": [
         "neg"
        ],
-       "text": "-1,080.00"
-      },
+       "text": "-142.148n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "0.97",
+      "0.97",
+      "0.97",
+      "\u2014",
+      "0.97",
+      "\u2014",
+      "\u2014",
+      "0.97",
       {
        "flags": [
         "neg"
        ],
-       "text": "-607.25"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-393.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-80.75"
-      },
-      "208.75",
-      "446.50",
-      "621.25",
-      "709.50",
-      "844.25"
+       "text": "-26.569\u00b5"
+      }
      ]
     }
    ],
+   "caption": "Canonical moment store by component and measure across the computation views. Raw noncentral moments (ex1, ex2, ex3) are dropped from this view; the raw perspective keeps the full store.",
    "columns": [
     {
      "align": "l",
@@ -5714,7 +5871,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "Side"
+      "component"
      ],
      "role": "stub",
      "wrap": true
@@ -5725,7 +5882,7 @@
      "key": "c1",
      "level": 1,
      "name": [
-      "Label"
+      "measure"
      ],
      "role": "stub",
      "wrap": true
@@ -5740,7 +5897,7 @@
      },
      "key": "c2",
      "name": [
-      "EX"
+      "e0.m0"
      ]
     },
     {
@@ -5753,33 +5910,33 @@
      },
      "key": "c3",
      "name": [
-      "SD"
+      "mixed"
      ]
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },
      "key": "c4",
      "name": [
-      "CV"
+      "independent"
      ]
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },
      "key": "c5",
      "name": [
-      "Skew"
+      "after_occ"
      ]
     },
     {
@@ -5792,7 +5949,7 @@
      },
      "key": "c6",
      "name": [
-      "\u03ba01"
+      "empirical"
      ]
     },
     {
@@ -5805,7 +5962,7 @@
      },
      "key": "c7",
      "name": [
-      "\u03ba05"
+      "occ_impact"
      ]
     },
     {
@@ -5818,7 +5975,7 @@
      },
      "key": "c8",
      "name": [
-      "\u03ba10"
+      "agg_impact"
      ]
     },
     {
@@ -5831,121 +5988,56 @@
      },
      "key": "c9",
      "name": [
-      "\u03ba25"
+      "gross_empirical"
      ]
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
+      "digits": 3,
+      "kind": "si"
      },
      "key": "c10",
      "name": [
-      "\u03ba50"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c11",
-     "name": [
-      "\u03ba75"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c12",
-     "name": [
-      "\u03ba90"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c13",
-     "name": [
-      "\u03ba95"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c14",
-     "name": [
-      "\u03ba99"
+      "error"
      ]
     }
    ],
    "head": [
     [
      {
-      "text": "Side"
+      "text": "component"
      },
      {
-      "text": "Label"
+      "text": "measure"
      },
      {
-      "text": "EX"
+      "text": "e0.m0"
      },
      {
-      "text": "SD"
+      "text": "mixed"
      },
      {
-      "text": "CV"
+      "text": "independent"
      },
      {
-      "text": "Skew"
+      "text": "after_occ"
      },
      {
-      "text": "\u03ba01"
+      "text": "empirical"
      },
      {
-      "text": "\u03ba05"
+      "text": "occ_impact"
      },
      {
-      "text": "\u03ba10"
+      "text": "agg_impact"
      },
      {
-      "text": "\u03ba25"
+      "text": "gross_empirical"
      },
      {
-      "text": "\u03ba50"
-     },
-     {
-      "text": "\u03ba75"
-     },
-     {
-      "text": "\u03ba90"
-     },
-     {
-      "text": "\u03ba95"
-     },
-     {
-      "text": "\u03ba99"
+      "text": "error"
      }
     ]
    ],
@@ -8302,146 +8394,467 @@
    "body": [
     {
      "cells": [
-      "Consideration",
-      "Premium",
-      "1,000.00",
-      "0.00",
-      "0.000",
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
       "\u2014",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00",
-      "1,000.00"
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      "\u2014",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      "850.000\u00a0",
+      "850.000\u00a0",
+      "850.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      "1.000\u00a0",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "0.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      "1.000\u00a0",
+      "1.000\u00a0",
+      "1.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
      ]
     },
     {
      "break_depth": 0,
      "cells": [
-      "Obligation",
-      "Loss",
       {
-       "flags": [
-        "neg"
-       ],
-       "text": "-850.00"
+       "rowspan": 6,
+       "text": "freq"
       },
-      "412.31",
+      "ex1",
+      "8.500\u00a0",
+      "8.500\u00a0",
+      "8.500\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "80.750\u00a0",
+      "80.750\u00a0",
+      "80.750\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "839.375\u00a0",
+      "839.375\u00a0",
+      "839.375\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "8.500\u00a0",
+      "8.500\u00a0",
+      "8.500\u00a0",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "342.997m",
+      "342.997m",
+      "342.997m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "342.997m",
+      "342.997m",
+      "342.997m",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014",
+      "\u2014"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
       {
-       "flags": [
-        "neg"
-       ],
-       "text": "-0.485"
+       "rowspan": 6,
+       "text": "sev"
       },
+      "ex1",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "\u2014",
+      "100.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "100.000\u00a0",
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
-      },
+       "text": "-5.681n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "20.000k",
+      "20.000k",
+      "20.000k",
+      "\u2014",
+      "20.000k",
+      "\u2014",
+      "\u2014",
+      "20.000k",
       {
        "flags": [
         "neg"
        ],
-       "text": "-2,080.00"
-      },
+       "text": "-282.083n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "8.000M",
+      "8.000M",
+      "8.000M",
+      "\u2014",
+      "8.000M",
+      "\u2014",
+      "\u2014",
+      "8.000M",
       {
        "flags": [
         "neg"
        ],
-       "text": "-1,607.25"
-      },
+       "text": "-26.191\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "100.000\u00a0",
+      "\u2014",
+      "100.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "100.000\u00a0",
       {
        "flags": [
         "neg"
        ],
-       "text": "-1,393.00"
-      },
+       "text": "-5.681n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "1.000\u00a0",
+      "1.000\u00a0",
+      "1.000\u00a0",
+      "\u2014",
+      "1000.000m",
+      "\u2014",
+      "\u2014",
+      "1000.000m",
       {
        "flags": [
         "neg"
        ],
-       "text": "-1,080.75"
-      },
+       "text": "-270.720n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "4.000\u00a0",
+      "4.000\u00a0",
+      "4.000\u00a0",
+      "\u2014",
+      "4.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "4.000\u00a0",
       {
        "flags": [
         "neg"
        ],
-       "text": "-791.25"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-553.50"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-378.75"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-290.50"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "text": "-155.75"
+       "text": "-51.130\u00b5"
       }
      ]
     },
     {
      "break_depth": 0,
      "cells": [
-      "Margin",
-      "Total",
-      "150.00",
-      "412.31",
-      "2.749",
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      "850.000\u00a0",
+      "850.000\u00a0",
+      "850.000\u00a0",
+      "\u2014",
+      "850.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "850.000\u00a0",
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
-      },
+       "text": "-5.768n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      "892.500k",
+      "892.500k",
+      "892.500k",
+      "\u2014",
+      "892.500k",
+      "\u2014",
+      "\u2014",
+      "892.500k",
       {
        "flags": [
         "neg"
        ],
-       "text": "-1,080.00"
-      },
+       "text": "-65.687n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      "1.116G",
+      "1.116G",
+      "1.116G",
+      "\u2014",
+      "1.116G",
+      "\u2014",
+      "\u2014",
+      "1.116G",
       {
        "flags": [
         "neg"
        ],
-       "text": "-607.25"
-      },
+       "text": "-1.773\u00b5"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      "850.000\u00a0",
+      "850.000\u00a0",
+      "850.000\u00a0",
+      "\u2014",
+      "850.000\u00a0",
+      "\u2014",
+      "\u2014",
+      "850.000\u00a0",
       {
        "flags": [
         "neg"
        ],
-       "text": "-393.00"
-      },
+       "text": "-5.768n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      "485.071m",
+      "485.071m",
+      "485.071m",
+      "\u2014",
+      "485.071m",
+      "\u2014",
+      "\u2014",
+      "485.071m",
       {
        "flags": [
         "neg"
        ],
-       "text": "-80.75"
-      },
-      "208.75",
-      "446.50",
-      "621.25",
-      "709.50",
-      "844.25"
+       "text": "-142.148n"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      "970.143m",
+      "970.143m",
+      "970.143m",
+      "\u2014",
+      "970.117m",
+      "\u2014",
+      "\u2014",
+      "970.117m",
+      {
+       "flags": [
+        "neg"
+       ],
+       "text": "-26.569\u00b5"
+      }
      ]
     }
    ],
@@ -8452,7 +8865,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "Side"
+      "component"
      ],
      "role": "stub",
      "wrap": true
@@ -8463,7 +8876,7 @@
      "key": "c1",
      "level": 1,
      "name": [
-      "Label"
+      "measure"
      ],
      "role": "stub",
      "wrap": true
@@ -8472,26 +8885,12 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
+      "digits": 3,
+      "kind": "si"
      },
      "key": "c2",
      "name": [
-      "EX"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c3",
-     "name": [
-      "SD"
+      "e0.m0"
      ]
     },
     {
@@ -8499,25 +8898,23 @@
      "dtype": "float",
      "format": {
       "digits": 3,
-      "group": true,
-      "kind": "dec"
+      "kind": "si"
      },
-     "key": "c4",
+     "key": "c3",
      "name": [
-      "CV"
+      "mixed"
      ]
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 3,
+      "kind": "si"
      },
-     "key": "c5",
+     "key": "c4",
      "name": [
-      "Skew"
+      "independent"
      ]
     },
     {
@@ -8528,9 +8925,21 @@
       "group": true,
       "kind": "dec"
      },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ]
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
      "key": "c6",
      "name": [
-      "\u03ba01"
+      "empirical"
      ]
     },
     {
@@ -8543,7 +8952,7 @@
      },
      "key": "c7",
      "name": [
-      "\u03ba05"
+      "occ_impact"
      ]
     },
     {
@@ -8556,134 +8965,68 @@
      },
      "key": "c8",
      "name": [
-      "\u03ba10"
+      "agg_impact"
      ]
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
+      "digits": 3,
+      "kind": "si"
      },
      "key": "c9",
      "name": [
-      "\u03ba25"
+      "gross_empirical"
      ]
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
+      "digits": 3,
+      "kind": "si"
      },
      "key": "c10",
      "name": [
-      "\u03ba50"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c11",
-     "name": [
-      "\u03ba75"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c12",
-     "name": [
-      "\u03ba90"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c13",
-     "name": [
-      "\u03ba95"
-     ]
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c14",
-     "name": [
-      "\u03ba99"
+      "error"
      ]
     }
    ],
    "head": [
     [
      {
-      "text": "Side"
+      "text": "component"
      },
      {
-      "text": "Label"
+      "text": "measure"
      },
      {
-      "text": "EX"
+      "text": "e0.m0"
      },
      {
-      "text": "SD"
+      "text": "mixed"
      },
      {
-      "text": "CV"
+      "text": "independent"
      },
      {
-      "text": "Skew"
+      "text": "after_occ"
      },
      {
-      "text": "\u03ba01"
+      "text": "empirical"
      },
      {
-      "text": "\u03ba05"
+      "text": "occ_impact"
      },
      {
-      "text": "\u03ba10"
+      "text": "agg_impact"
      },
      {
-      "text": "\u03ba25"
+      "text": "gross_empirical"
      },
      {
-      "text": "\u03ba50"
-     },
-     {
-      "text": "\u03ba75"
-     },
-     {
-      "text": "\u03ba90"
-     },
-     {
-      "text": "\u03ba95"
-     },
-     {
-      "text": "\u03ba99"
+      "text": "error"
      }
     ]
    ],

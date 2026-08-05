@@ -56,7 +56,7 @@ def test_build_pnl_returns_pnl():
 def test_obligation_books_signed():
     """The obligation row books the signed loss (-E[X] = -700), and EX foots."""
     a = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
-    assert a.stats_df.loc[('Obligation', 'Loss'), 'EX'] == \
+    assert a.economic_df.loc[('Obligation', 'Loss'), 'EX'] == \
         pytest.approx(-700.0, rel=TOL)
     # net = 1000 - 700 = 300
     assert a.est_m == pytest.approx(300.0, rel=TOL, abs=2.0)
@@ -288,8 +288,8 @@ def test_summary_df_fixed_card_and_additive_result():
     # the defining identity: the EX column adds down the card
     assert df.loc['Margin', 'EX'] == pytest.approx(
         df.loc['Consideration', 'EX'] + df.loc['Obligation', 'EX'], abs=1e-6)
-    # the loss ratio reads off ratio_df, the card being currency only
-    assert a.ratio_df.loc['B', 'LR'] == pytest.approx(0.70, rel=TOL)
+    # the loss ratio reads off economic_ratios_df, the card being currency only
+    assert a.economic_ratios_df.loc['B', 'LR'] == pytest.approx(0.70, rel=TOL)
     # the margin SD is the loss SD (constant consideration adds no spread)
     assert df.loc['Margin', 'SD'] == pytest.approx(df.loc['Obligation', 'SD'])
 
@@ -597,7 +597,7 @@ def test_consolidated_pnl_single_group_net_view():
     pnl = agg.make_pnl(gross=5500, ceded=1800)
     assert isinstance(pnl, PnL)
     assert len(pnl.groups) == 1
-    s = pnl.stats_df
+    s = pnl.economic_df
     assert list(s.index) == [('Consideration', 'net premium'),
                              ('Obligation', 'Loss (net)'),
                              ('Margin', 'Total')]
@@ -635,7 +635,7 @@ def test_xpnl_walk_rows_and_means_add():
     agg = build(_REINS)
     x = build_xpnl_walk(agg, gross=5500, ceded=1800)
     assert isinstance(x, PnL)
-    s = x.stats_df
+    s = x.economic_df
     assert list(s.index) == _WALK_ROWS
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
         s.loc[('Gross', 'Margin', 'Gross'), 'EX']

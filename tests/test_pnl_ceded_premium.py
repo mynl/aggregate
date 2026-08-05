@@ -23,12 +23,12 @@ _BASE = 'pnl T 5000 prem less agg T_e 100 claims sev lognorm 50 cv 1.5 '
 
 
 def _leg(pnl, label):
-    """One declared leg's stats_df row, by Line label."""
-    return pnl.stats_df.xs(label, level='Label').iloc[0]
+    """One declared leg's economic_df row, by Line label."""
+    return pnl.economic_df.xs(label, level='Label').iloc[0]
 
 
 def _lines(pnl):
-    return list(pnl.stats_df.index.get_level_values('Label'))
+    return list(pnl.economic_df.index.get_level_values('Label'))
 
 
 def test_deposit_rol_rate_resolution():
@@ -89,14 +89,14 @@ def test_any_reinsurance_yields_consolidated_pnl():
         plain = build(_BASE + 'poisson aggregate net of 2000 xs 3000')
     assert isinstance(plain, PnL)
     assert plain.economics['pc_agg'] == 0.0
-    assert list(plain.stats_df.index.names) == ['Side', 'Label']
+    assert list(plain.economic_df.index.names) == ['Side', 'Label']
     # zero ceded premium: net premium = the full gross premium
     assert _leg(plain, 'net premium')['EX'] == pytest.approx(5000.0)
     assert 'Loss (net)' in _lines(plain)
     # a premium clause -> the same consolidated face, priced
     p = build(_BASE + 'poisson aggregate net of 2000 xs 3000 deposit 1500')
     assert isinstance(p, PnL)
-    assert list(p.stats_df.index.names) == ['Side', 'Label']
+    assert list(p.economic_df.index.names) == ['Side', 'Label']
     assert list(p.summary_df.index) == ['Consideration', 'Obligation',
                                         'Margin']
     # consideration = net premium: 5000 - 1500
@@ -114,7 +114,7 @@ def test_zero_premium_cession_walks():
     with pytest.warns(ZeroPremiumCessionWarning):
         x = build(_BASE.replace('pnl T', 'xpnl TX', 1)
                   + 'poisson aggregate net of 2000 xs 3000')
-    s = x.stats_df
+    s = x.economic_df
     steps = list(dict.fromkeys(s.index.get_level_values('Step')))
     assert steps == ['Gross', 'agg 2000 xs 3000', 'All']
     assert _leg(x, 'agg 2000 xs 3000 premium')['EX'] == 0.0
@@ -130,7 +130,7 @@ def test_occurrence_only_consolidates_over_net_occ():
     assert 'Loss (net)' in _lines(p)
     assert p.economics['pc_occ'] == pytest.approx(0.10 * 100)
     assert p.economics['pc_agg'] == 0.0
-    assert list(p.stats_df.index.names) == ['Side', 'Label']
+    assert list(p.economic_df.index.names) == ['Side', 'Label']
 
 
 def test_both_sides_split_and_walk_ledger():
@@ -152,7 +152,7 @@ def test_both_sides_split_and_walk_ledger():
                 'agg 2000 xs 3000 premium', 'agg 2000 xs 3000 recovery',
                 'agg 2000 xs 3000 commission'):
         assert row in lines, row
-    steps = list(x.stats_df.index.get_level_values('Step'))
+    steps = list(x.economic_df.index.get_level_values('Step'))
     assert 'Gross' in steps and 'occ 100 xs 200' in steps \
         and 'agg 2000 xs 3000' in steps and 'All' in steps
 
@@ -161,7 +161,7 @@ def test_walk_means_add_down_the_sheet():
     x = build(_BASE.replace('pnl T', 'xpnl TX', 1)
               + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
-    s = x.stats_df
+    s = x.economic_df
     # step results foot to their signed legs (means add by linearity)
     assert s.loc[('Gross', 'Margin', 'Gross'), 'EX'] == pytest.approx(
         _leg(x, 'Premium')['EX'] + _leg(x, 'Loss')['EX'], abs=1e-9)

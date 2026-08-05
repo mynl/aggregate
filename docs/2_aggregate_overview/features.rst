@@ -1759,7 +1759,7 @@ they scale with: ``% loss expense`` rides the loss (so it is stochastic),
                      '10000 xs 0 sev 10.808 * lognorm 1.75 mixed gamma 0.25 '
                      'less 5% loss expense as LAE 100 fixed expense '
                      'and 10% premium expense')
-    qd(book_pnl.stats_df)
+    qd(book_pnl.economic_df)
 
 The LAE row has the same CV and skew as the Loss row because it *is* the loss,
 scaled. The expense row has zero SD. That separation is the point: a single Total
@@ -1926,7 +1926,7 @@ The ledger's index: ``Side`` and ``Label`` (a189, a191)
 
 .. ipython:: python
 
-    print('single group:', pnl.stats_df.index.names)
+    print('single group:', pnl.economic_df.index.names)
     print('walk        :', tower.stats_df.index.names)
     print('labels      :', tower.stats_df.index.get_level_values('Label').unique().tolist())
 

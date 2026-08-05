@@ -42,7 +42,7 @@ Reading the sheets
 add, so the card's percentile cells do not foot down the card. That is a
 property of quantiles, not an error.
 
-:attr:`PnL.stats_df` is the **sheet**: every ledger row, with ``κ`` ladder
+:attr:`PnL.economic_df` is the **sheet**: every ledger row, with ``κ`` ladder
 columns that are scenario states anchored on the grand result. Column ``κq``
 shows every row's conditional mean given the result lands at its ``q``-quantile,
 so each column is one internally consistent state and **foots exactly**. The

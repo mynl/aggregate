@@ -123,7 +123,7 @@ def test_port_engine_expenses_supported(uw):
            'and 50 fixed expense')
     assert isinstance(p, PnL)
     # one obligation leg for the and-joined group, booked signed
-    assert p.stats_df.loc[('Obligation', 'expense'), 'EX'] == pytest.approx(
+    assert p.economic_df.loc[('Obligation', 'expense'), 'EX'] == pytest.approx(
         -(0.10 * 1000 + 50.0))
 
 
@@ -140,7 +140,7 @@ def test_xpnl_returns_walk_pnl_over_gcn_engine(uw):
            'poisson')
     assert isinstance(t, PnL)
     assert [g.label for g in t.groups] == ['Gross', 'occ 500 xs 500']
-    s = t.stats_df
+    s = t.economic_df
     assert list(s.index.names) == ['Step', 'Side', 'Label']
     # means add down the walk exactly (per-atom partial sums)
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
@@ -161,7 +161,7 @@ def test_xpnl_over_plain_engine_one_step_walk(uw):
     t = uw('xpnl X 1000 premium less agg e 100 claims sev lognorm 100 cv 2 '
            'poisson')
     assert isinstance(t, PnL)
-    s = t.stats_df
+    s = t.economic_df
     assert list(s.index.names) == ['Step', 'Side', 'Label']
     steps = list(dict.fromkeys(s.index.get_level_values('Step')))
     assert steps == ['Gross']

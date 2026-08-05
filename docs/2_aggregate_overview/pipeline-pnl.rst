@@ -54,8 +54,8 @@ The end-to-end data flow::
         └─ _assemble_rows()           derived rows as per-atom partial sums
         │
         ▼
-    summary_df / stats_df             the card and the footing sheet (κ ladder)
-    ratio_df / legs_df                raw materials for ratio exhibits
+    summary_df / economic_df             the card and the footing sheet (κ ladder)
+    economic_ratios_df / legs_df                raw materials for ratio exhibits
     density_df / validation_df        per-row GDs; rebucketing audit
     evaluate()                        Cherny-Madan breakeven acceptability panel
 
@@ -175,12 +175,12 @@ Field       Meaning
 ``kind``    One of ``LEG_KINDS``: ``premium``, ``loss``, ``expense``, ``recovery``, ``commission``
 ==========  =========================================================================
 
-Magnitudes are written as the caller thinks of them; the group's ``role`` supplies the sign. ``kind`` is **accounting metadata the ledger never reads**: nothing in evaluation touches it, but :attr:`PnL.ratio_df` needs it to separate loss from expense inside a group's obligation, and :attr:`PnL.legs_df` reports it. An unclassified obligation leg folds into ``L``, so a ledger that declares no expense legs correctly reports ``E = 0`` rather than guessing.
+Magnitudes are written as the caller thinks of them; the group's ``role`` supplies the sign. ``kind`` is **accounting metadata the ledger never reads**: nothing in evaluation touches it, but :attr:`PnL.economic_ratios_df` needs it to separate loss from expense inside a group's obligation, and :attr:`PnL.legs_df` reports it. An unclassified obligation leg folds into ``L``, so a ledger that declares no expense legs correctly reports ``E = 0`` rather than guessing.
 
 :class:`Group`
 ==============
 
-One mini-P&L: a label, a ``role``, and ordered consideration and obligation legs (at least one leg between them). A cession is declared **conceptually**, the way a reinsurer would write it (consideration is the ceded premium, obligation is recovery plus commission), and the ``buy`` role books it as ``-premium / +recovery``. Declaring the economics once and letting the role handle the sign is what keeps a cession's ratios conventionally signed on ``ratio_df`` without any special casing.
+One mini-P&L: a label, a ``role``, and ordered consideration and obligation legs (at least one leg between them). A cession is declared **conceptually**, the way a reinsurer would write it (consideration is the ceded premium, obligation is recovery plus commission), and the ``buy`` role books it as ``-premium / +recovery``. Declaring the economics once and letting the role handle the sign is what keeps a cession's ratios conventionally signed on ``economic_ratios_df`` without any special casing.
 
 ``margin_label`` names the group's own result row under ``Margin``. Only the direct (``sell``) block of a ledger that *buys* something reads it, and only then does it appear: the subject business names its own margin the way it already names its loss leg, defaulting to ``'Gross'``.
 
@@ -305,8 +305,8 @@ Seven objects plus the evaluation panel, on ``PnL``:
 Object                      Shape         One-line role
 ==========================  ============  ==================================================================
 ``summary_df``              DataFrame     the **card**: fixed rows, marginal range percentiles
-``stats_df``                DataFrame     the **sheet**: every ledger row, κ or P ladder, foots
-``ratio_df``                DataFrame     amounts and ratios per block: raw materials, not a card
+``economic_df``                DataFrame     the **sheet**: every ledger row, κ or P ladder, foots
+``economic_ratios_df``                DataFrame     amounts and ratios per block: raw materials, not a card
 ``legs_df``                 DataFrame     one row per declared leg, the only place ``kind`` surfaces
 ``density_df``              OrderedDict   ``{row label: GridDistribution}``, no shared axis
 ``validation_df``           DataFrame     Est-vs-EX audit of every ``bs > 0`` leg
@@ -327,11 +327,11 @@ Per step, ``Margin`` is the group result and ``Net`` the running net through the
 
 **Rows scale with steps, never with legs.** That is the fixed-shape contract, and it is what lets the card be a card. Columns are ``EX`` / ``SD`` / ``CV`` / ``Skew`` / ``P01`` / ``Median`` / ``P99``.
 
-The percentiles here are **marginal quantiles of each row's own distribution**. The card answers "how big is each total", a question about range, so its percentile cells do **not** foot down the card. That is a property of quantiles, not an error, and it is stated in the ``_repr_html_`` intro rather than left for the reader to discover from a column that does not add up. The card is currency only: ratios live in ``ratio_df``, per the reporting rule that a column carries one unit.
+The percentiles here are **marginal quantiles of each row's own distribution**. The card answers "how big is each total", a question about range, so its percentile cells do **not** foot down the card. That is a property of quantiles, not an error, and it is stated in the ``_repr_html_`` intro rather than left for the reader to discover from a column that does not add up. The card is currency only: ratios live in ``economic_ratios_df``, per the reporting rule that a column carries one unit.
 
 ``_card_side_row`` resolves a side total without any extra computation, and on the massive route without extra sweep keys: with more than one leg the ``group_total`` row exists, with exactly one the leg row *is* the side total, and with none the total is a constant zero.
 
-``stats_df``: the footing sheet
+``economic_df``: the footing sheet
 ===============================
 
 Every ledger row, in ledger order, indexed by ``_side_index``: two-level ``(Side, Label)`` for a single group, three-level ``(Step, Side, Label)`` on a tower. Columns are ``EX`` / ``SD`` / ``CV`` / ``Skew`` plus the full nine-point ladder. ``EX`` / ``SD`` / ``CV`` / ``Skew`` are row properties and stay marginal whatever the ladder does.
@@ -342,16 +342,16 @@ A ledger that **buys** something distinguishes three margins that all used to re
 
 The flat plan labels stay the canonical row keys everywhere else (``density_df``, ``validation_df``, the sweep result keys); the index is presentation only.
 
-``ratio_df`` and ``legs_df``: raw materials
+``economic_ratios_df`` and ``legs_df``: raw materials
 ===========================================
 
-``ratio_df`` reports one row per block (each group, each tier subtotal, and ``'All'`` on a multi-group ledger). Deliberately unformatted and absent from ``qd`` and the notebook repr: this is the frame to slice, unstack and build presentation tables from, in the spirit of ``Portfolio.analyze_distortions``' ``pricing_df``.
+``economic_ratios_df`` reports one row per block (each group, each tier subtotal, and ``'All'`` on a multi-group ledger). Deliberately unformatted and absent from ``qd`` and the notebook repr: this is the frame to slice, unstack and build presentation tables from, in the spirit of ``Portfolio.analyze_distortions``' ``pricing_df``.
 
 Columns are ``P``, ``L``, ``E``, ``C``, ``M``, ``LR``, ``ER``, ``CR``, ``E_LR``, ``E_ER``, ``E_CR``, ``P_share``, ``M_share``. The four amounts are signed in the **gross direction**: consideration as booked, obligations negated. A cession's ceded premium and recovery are therefore both negative, which makes every ratio built from them come out with its conventional sign, makes the amounts add across blocks, and makes ``M == P - L - E - C`` hold identically, since it *is* the signed row sum. ``L``, ``M``, ``P`` and ``LR`` keep the ``pentagon.PENTAGON_STATS`` spelling so a P&L ratio frame concatenates and diffs against a pricing frame; ``E`` / ``C`` / ``ER`` / ``CR`` extend it, and ``Q`` / ``a`` / ``PQ`` / ``ROE`` have no meaning on a ledger.
 
 ``LR`` / ``ER`` / ``CR`` are **ratios of means**, the convention of a rate filing, re-derived from the row's own amounts and never averaged from the blocks below. ``E_LR`` / ``E_ER`` / ``E_CR`` are the same three as **means of ratios**. The pair parts company exactly when premium is random and correlated with loss, which is what a retro-rated account or a swing, slide or profit-commission cession *is*. Availability turns on whether the **denominator** is random, not on whether a joint happens to exist: a constant premium factors straight out of :math:`\mathsf E[X/P]`, so the mean-of-ratio columns are exact on every route and simply repeat the plain ratios; a random premium needs atoms to average over, so it reads ``nan`` on the stitched and massive routes and ``nan`` where any atom carrying probability has a vanishing premium. Never a silent fallback to the ratio of the means.
 
-``legs_df`` is the itemized companion: one row per **declared** leg, columns ``Step`` / ``Side`` / ``Label`` / ``kind`` / ``EX`` / ``SD``, matching the ``stats_df`` level names. Derived rows are absent by design, being sums of these.
+``legs_df`` is the itemized companion: one row per **declared** leg, columns ``Step`` / ``Side`` / ``Label`` / ``kind`` / ``EX`` / ``SD``, matching the ``economic_df`` level names. Derived rows are absent by design, being sums of these.
 
 ``density_df`` and ``validation_df``
 ====================================
@@ -412,9 +412,9 @@ Notes to remember
 * **Build the engine, then snapshot the P&L.** ``_factory`` attaches a recipe; ``_snapshot_pnl`` runs after the update loop. A P&L has no engine dependency to recompute through, so there is nothing to read until the FFT has run.
 * ``_ledger_plan`` **is the only row template.** Three routes materialize it three ways. Any new row kind must be handled in ``_assemble_rows``, ``_init_massive``, ``_init_stitched`` and ``_side_index``, all four of which raise on an unknown kind.
 * **The header is the flag.** ``κ`` means conditioning happened and the column foots; ``P`` means a marginal quantile of that row and it does not. The reader never has to know which route built the object.
-* **The card's percentiles do not foot, and that is correct.** Marginal quantiles never add. ``summary_df`` answers "how big is each total"; ``stats_df`` is the footing sheet. Two exhibits, deliberately different in kind.
-* **Signed in the gross direction on the ratio frame, signed by role everywhere else.** The ledger books by ``role`` so the ``EX`` column adds down the sheet; ``ratio_df`` re-signs to the gross direction so amounts add *across* blocks and a cession's loss ratio reads positive. Two conventions, each doing one job.
-* **Ratio of means and mean of ratio are different numbers.** They agree identically when premium is deterministic and part company exactly when it is random and correlated with loss, which is the whole point of a retro or a swing. ``ratio_df`` reports both rather than picking one.
+* **The card's percentiles do not foot, and that is correct.** Marginal quantiles never add. ``summary_df`` answers "how big is each total"; ``economic_df`` is the footing sheet. Two exhibits, deliberately different in kind.
+* **Signed in the gross direction on the ratio frame, signed by role everywhere else.** The ledger books by ``role`` so the ``EX`` column adds down the sheet; ``economic_ratios_df`` re-signs to the gross direction so amounts add *across* blocks and a cession's loss ratio reads positive. Two conventions, each doing one job.
+* **Ratio of means and mean of ratio are different numbers.** They agree identically when premium is deterministic and part company exactly when it is random and correlated with loss, which is the whole point of a retro or a swing. ``economic_ratios_df`` reports both rather than picking one.
 * **The occurrence tier forces the joint.** The ceded-occurrence aggregate is not a function of the gross aggregate. Every design decision downstream, the 2-D walk, the peel route split, the marginal stitch, follows from that one fact.
 * **Normalize the source probabilities.** Otherwise a clipped tail gives a *constant* leg a variance, which is nonsense on the face of it and hard to trace back.
 
@@ -426,7 +426,7 @@ Open items
 Tracked in ``dev/TODO.md``; listed here so this document says what it does not cover.
 
 * **[Walk-Validation-DF]** Joint-sourced walks (the guaranteed-cost occurrence ``xpnl``, the composed feature walks) ship **no attached exact-versus-realized audit frame**. Their runtime guards are the joint's deficit bookkeeping and :class:`CoarseJointGridWarning`; the exact-versus-realized comparison lives in the tests and in the ``biv.summary_df`` a caller would have to build themselves, since the walk retains only ``pnl.source`` (the joint) and ``pnl.engine`` (the :class:`Aggregate`). A ``validation_df`` on joint-sourced walks, each row's realized ``EX`` against the engine's exact marginal mean, is the per-program version of what the tests already assert, and is the same computation as ``[Joint-Padding-Window-Tradeoff]``'s means guard: build once, serve both. It remains a small, well-defined addition. (The reinstatement route once carried such a frame on ``pnl.analysis.validation_df``, but the analysis classes were decommissioned at 1.0.0a144, so a reinstatement walk and a guaranteed-cost walk now stand on the same footing.)
-* **[Massive-Kappa-Second-Sweep]** Bring the scenario percentiles to the massive one-sweep route. Conditioning needs the joint per atom *and* the grand-result quantiles before indicator-weighted means can accumulate, hence a second band sweep. Until then the massive ``stats_df`` keeps marginal ladders, visibly so since a136.
+* **[Massive-Kappa-Second-Sweep]** Bring the scenario percentiles to the massive one-sweep route. Conditioning needs the joint per atom *and* the grand-result quantiles before indicator-weighted means can accumulate, hence a second band sweep. Until then the massive ``economic_df`` keeps marginal ladders, visibly so since a136.
 * **[Consolidated-LAE-Off-Source]** The guaranteed-cost consolidated ``pnl`` books loss-basis LAE deterministically as ``rate * E[gross loss]``, because its source is the net marginal and the gross loss is not measurable there. The reinstatement consolidated face does not have this problem, axis 0 of its joint carrying the gross loss. Candidate fixes: a (gross, net) bivariate source for the guaranteed-cost consolidated face, or a stitched extra row.
 * **[Peel-Aggregate-Tier-Only]** The stitched route is all-or-nothing, so peeling the occurrence layers of a program that *also* carries aggregate layers pulls the aggregate steps onto the marginal ladder too, even though they would foot per atom on their own. Peeling one tier and leaving the other lumped would keep the κ ladder for the common "several occurrence layers, one aggregate cover" shape.
 * **[Ratio-Distribution]** A per-atom P&L holds the joint of loss and premium, so the loss **ratio** is available as a :class:`GridDistribution`, not just its two scalar means. That is what a sliding commission actually needs: ``SlideTerms.phi`` maps a *realized* loss ratio to a commission, so the commission is :math:`\mathsf E[\phi(LR)]`, which no moment of ``LR`` determines.

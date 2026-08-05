@@ -192,11 +192,27 @@ def test_stats_insurer_drops_raw_moments(dice, port):
 
 
 def test_stats_identity_for_other_kinds(objects):
-    for kind in ('BivariateAggregate', 'PnL', 'Distortion'):
+    for kind in ('BivariateAggregate', 'Distortion'):
         obj = objects[kind]
         _, raw_df, _ = exhibit_frames(obj, 'stats')[0]
         _, ins_df, _ = exhibit_frames(obj, 'stats', 'insurer')[0]
         pd.testing.assert_frame_equal(raw_df, ins_df)
+
+
+def test_pnl_stats_is_the_engine_moment_store(objects):
+    """[PnL-Economic-Frames]: a P&L's stats_df is its engine's, not the ledger."""
+    pn = objects['PnL']
+    _, raw_df, _ = exhibit_frames(pn, 'stats')[0]
+    assert list(raw_df.index.names) == ['component', 'measure']
+    pd.testing.assert_frame_equal(raw_df, pn.engine.stats_df)
+    # and it takes the ordinary insurer treatment, the raw-moment drop
+    _, ins_df, _ = exhibit_frames(pn, 'stats', 'insurer')[0]
+    assert len(ins_df) < len(raw_df)
+    assert set(ins_df.index.get_level_values('measure')).isdisjoint(
+        {'ex1', 'ex2', 'ex3'})
+    # the ledger is a different exhibit and a different document
+    assert build_exhibit(pn, 'stats').hash \
+        != build_exhibit(pn, 'pnl_ledger').hash
 
 
 def test_validation_insurer_pass_frames_no_emphasis(objects):
@@ -282,7 +298,7 @@ def test_reins_unavailable_without_cession(dice):
 def test_pnl_ledger_raw(objects):
     pn = objects['PnL']
     blocks = exhibit_frames(pn, 'pnl_ledger')
-    assert [name for name, _, _ in blocks] == ['stats_df']
+    assert [name for name, _, _ in blocks] == ['economic_df']
     _, df, kw = blocks[0]
     assert kw == {}
     assert list(df.index.names) in (['Side', 'Label'],
@@ -296,7 +312,7 @@ def test_pnl_ledger_raw(objects):
 def test_pnl_ratios_raw(objects):
     pn = objects['PnL']
     blocks = exhibit_frames(pn, 'pnl_ratios')
-    assert [name for name, _, _ in blocks] == ['ratio_df', 'legs_df']
+    assert [name for name, _, _ in blocks] == ['economic_ratios_df', 'legs_df']
     ratio_frame = blocks[0][1]
     assert ratio_frame.index.name == 'Step'
     assert {'P', 'L', 'M', 'LR', 'ER', 'CR'} <= set(ratio_frame.columns)

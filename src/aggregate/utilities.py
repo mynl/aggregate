@@ -338,7 +338,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
         elif isinstance(x, PnL):
             # P&L headline: the repr then the fixed summary card (marginal
-            # range percentiles; the footing sheet is stats_df).
+            # range percentiles; the footing sheet is economic_df).
             print(repr(x))
             qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
         elif isinstance(x, pd.DataFrame):

@@ -73,7 +73,7 @@ Two exhibits, deliberately different in kind:
   the card answers "how big is each total" (range feel). Marginal quantiles
   never add, so the card's percentile cells do **not** foot down the card;
   that is a property of quantiles, not an error.
-* :attr:`PnL.stats_df` -- the **sheet**: every ledger row, and ``κ`` ladder
+* :attr:`PnL.economic_df` -- the **sheet**: every ledger row, and ``κ`` ladder
   columns that are **scenario states** anchored on the grand result
   ([Kappa-Scenario-Percentiles]): column ``κq`` shows every row's
   conditional mean given the result lands at its ``q``-quantile, so each
@@ -92,7 +92,7 @@ Where the result is non-monotone in the source (slides, swings, humps -- the
 result value; well-defined, but read with care. The default ``Side`` labels
 (``Consideration`` / ``Obligation`` / ``Margin``) rename at serve time::
 
-    pnl.stats_df.rename({'Obligation': 'Loss & LAE'}, level='Side')
+    pnl.economic_df.rename({'Obligation': 'Loss & LAE'}, level='Side')
 """
 from __future__ import annotations
 
@@ -111,7 +111,7 @@ __all__ = ['Leg', 'Group', 'PnL', 'stack_marginal_pnls', 'LEG_KINDS']
 
 
 #: What a declared :class:`Leg` *is*, economically. Accounting metadata the
-#: ledger itself never reads: :attr:`PnL.ratio_df` uses it to split a group's
+#: ledger itself never reads: :attr:`PnL.economic_ratios_df` uses it to split a group's
 #: obligation into loss and expense (there is no other way to tell ``'Loss'``
 #: from ``'LAE'`` but the label text), and :attr:`PnL.legs_df` reports it.
 #: ``'premium'`` and ``'commission'`` are consideration-side flows on a ``sell``
@@ -119,7 +119,7 @@ __all__ = ['Leg', 'Group', 'PnL', 'stack_marginal_pnls', 'LEG_KINDS']
 LEG_KINDS = ('premium', 'loss', 'expense', 'recovery', 'commission')
 
 
-#: The detailed percentile ladder used by :attr:`PnL.stats_df` and
+#: The detailed percentile ladder used by :attr:`PnL.economic_df` and
 #: :func:`stack_marginal_pnls`. On the stats
 #: sheets the ladder columns are **scenario states** (conditional means given
 #: the grand result lands at its ``q``-quantile -- [Kappa-Scenario-Percentiles])
@@ -159,10 +159,10 @@ class Leg:
         a 1-D source is an error ([One-2D-Source]).
     kind : str, optional
         What the flow *is*, one of :data:`LEG_KINDS`. Accounting metadata, not
-        behavior: nothing in the ledger reads it, but :attr:`PnL.ratio_df` needs
+        behavior: nothing in the ledger reads it, but :attr:`PnL.economic_ratios_df` needs
         it to separate loss from expense inside a group's obligation, and
         :attr:`PnL.legs_df` reports it. ``None`` (the default) leaves the leg
-        unclassified, and ``ratio_df`` folds an unclassified obligation into
+        unclassified, and ``economic_ratios_df`` folds an unclassified obligation into
         ``L``, so a ledger that declares no expense legs correctly reports
         ``E = 0``. Distinct from the ledger **row** kinds of
         :func:`_ledger_plan`, which describe a row's role in the sheet rather
@@ -236,7 +236,7 @@ class Group:
         shorthands. At least one leg between the two.
     margin_label : str, optional
         What this group's **own result** row is called under ``Margin`` on
-        :attr:`PnL.stats_df`. Only the direct (``sell``) block of a ledger that
+        :attr:`PnL.economic_df`. Only the direct (``sell``) block of a ledger that
         buys something reads it, and only then does it appear
         ([First-Step-Label]): the subject business names its own margin, the way
         it already names its loss leg. ``None`` falls back to ``'Gross'``
@@ -507,9 +507,9 @@ class _EvaluatedLeg:
         The ladder here is **marginal** (each ``Pq`` is this row's own
         quantile). Serves :func:`stack_marginal_pnls` (independent
         perspectives share no joint, so there is nothing to condition on) and
-        the massive one-sweep :attr:`PnL.stats_df` (conditioning needs a
+        the massive one-sweep :attr:`PnL.economic_df` (conditioning needs a
         second sweep -- [Massive-Kappa-Second-Sweep] in ``dev/TODO.md``); the
-        in-memory :attr:`PnL.stats_df` ladder is the conditional
+        in-memory :attr:`PnL.economic_df` ladder is the conditional
         [Kappa-Scenario-Percentiles] pass instead.
         """
         m, sd, cv, skew = self.moments
@@ -714,7 +714,7 @@ def _stat_names(scenario=False):
 
     ``scenario=True`` gives the ladder ``κ`` headers (the conditional
     [Kappa-Scenario-Percentiles] columns of the in-memory
-    :attr:`PnL.stats_df`); the default plain ``P`` headers mark a **marginal**
+    :attr:`PnL.economic_df`); the default plain ``P`` headers mark a **marginal**
     ladder (the massive one-sweep route, :func:`stack_marginal_pnls`, the
     stitched guaranteed-cost ``xpnl`` tower). Positional access or
     ``df.filter(like=...)`` avoids typing the ``κ`` glyph.
@@ -729,7 +729,7 @@ def _stat_names(scenario=False):
 _CARD_COLS = ['EX', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
 
 
-#: The four signed amounts :attr:`PnL.ratio_df` accumulates per block, and which
+#: The four signed amounts :attr:`PnL.economic_ratios_df` accumulates per block, and which
 #: :data:`LEG_KINDS` feeds each. An unclassified leg falls back on its side:
 #: consideration to ``P``, obligation to ``L`` (the residual), so a ledger that
 #: declares no expense legs reports ``E = 0`` rather than guessing.
@@ -737,7 +737,7 @@ _RATIO_AMOUNTS = ('P', 'L', 'E', 'C')
 _RATIO_BUCKET = {'premium': 'P', 'loss': 'L', 'recovery': 'L',
                  'expense': 'E', 'commission': 'C'}
 
-#: Fixed column order of :attr:`PnL.ratio_df`: the amounts, the block's signed
+#: Fixed column order of :attr:`PnL.economic_ratios_df`: the amounts, the block's signed
 #: result, the three ratios of means, their three mean-of-ratio twins, then the
 #: two shares of the gross block. ``L``, ``M``, ``P`` and ``LR`` keep the
 #: :data:`aggregate.pentagon.PENTAGON_STATS` spelling so a P&L ratio frame
@@ -747,7 +747,7 @@ _RATIO_COLS = ('P', 'L', 'E', 'C', 'M', 'LR', 'ER', 'CR',
                'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
 
 
-#: Default ``Side`` level names for the :attr:`PnL.stats_df` row MultiIndex,
+#: Default ``Side`` level names for the :attr:`PnL.economic_df` row MultiIndex,
 #: keyed by the internal side codes (``margin`` covers every result-flavored
 #: row: group results, running nets, the grand result, total impact).
 #: Capitalized, presentation-ready.
@@ -1442,9 +1442,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         ``P99``. The percentiles are **marginal quantiles of each card row's
         own distribution** -- the card answers "how big is each total" (range),
         so its percentile cells do **not** add down the card (marginal
-        quantiles never add). The footing sheet is :attr:`stats_df`, whose
+        quantiles never add). The footing sheet is :attr:`economic_df`, whose
         scenario columns condition on the grand result and foot exactly. The
-        card is currency only: ratios live in :attr:`ratio_df`, their own
+        card is currency only: ratios live in :attr:`economic_ratios_df`, their own
         table, per the reporting rule that a column carries one unit.
 
         Returns
@@ -1452,14 +1452,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         pandas.DataFrame
             Flat index named ``'Side'`` (single group) or a ``(Step, Side)``
             MultiIndex (tower); columns as above. The card's ``Side`` level
-            merges the two :attr:`stats_df` levels: ``Net`` and ``Impact`` are
+            merges the two :attr:`economic_df` levels: ``Net`` and ``Impact`` are
             ``Label`` values there, but on a fixed-shape card they are rows of
             their own, so both frames name the level the same way rather than
             inventing a second word for it.
 
         See Also
         --------
-        stats_df : the full ledger sheet (every leg, footing columns).
+        economic_df : the full ledger sheet (every leg, footing columns).
         """
         if not self._tower:
             rows = OrderedDict((
@@ -1512,7 +1512,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             index=pd.MultiIndex.from_tuples(index, names=['Step', 'Side']))
 
     def _side_index(self):
-        """The row MultiIndex for :attr:`stats_df`, aligned with the ledger
+        """The row MultiIndex for :attr:`economic_df`, aligned with the ledger
         plan order.
 
         Single-group: two-level ``(Side, Label)``. ``Side`` buckets every
@@ -1630,8 +1630,42 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
     @property
     def stats_df(self):
+        """The wrapped engine's canonical moment store, or an empty frame.
+
+        ``stats_df`` means **one thing** across every first-class citizen: the
+        ``(component, measure)`` by view moment store of a book
+        ([PnL-Economic-Frames], 1.0.0a204). A P&L is a ledger over a book, so
+        the natural reading is the book's own moments, and this delegates to
+        :attr:`engine`.
+
+        The ledger sheet that used to answer to this name is
+        :attr:`economic_df`, which is what it always was: an accounting view,
+        not a statistics frame.
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``self.engine.stats_df`` when a stochastic engine is attached; an
+            **empty** frame on a hand-built kernel P&L, which carries no
+            engine (see :attr:`engine`). Empty rather than ``None`` or a
+            raise: the FCC contract says the member exists, callers reach it
+            defensively, and greater_tables renders an empty frame cleanly.
+        """
+        engine = self.engine
+        if engine is None:
+            return pd.DataFrame()
+        return engine.stats_df
+
+    @property
+    def economic_df(self):
         """The full ledger x metrics sheet, in currency units -- the
         alignment/footing exhibit.
+
+        Renamed from ``economic_df`` at 1.0.0a204 ([PnL-Economic-Frames]): this
+        is an **accounting** view of the ledger, never a statistics frame, and
+        the old name both misdescribed it and collided with the moment store
+        every other first-class citizen serves under that name. See
+        :attr:`economic_df`, which now delegates to the engine.
 
         Rows = the whole ledger (legs, totals, results, running nets, grand
         rows), in ledger order, indexed by :meth:`_side_index`: two-level
@@ -1701,7 +1735,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     # raw materials for ratio exhibits ([PnL-Ratio-Frame])
     # ------------------------------------------------------------------
     def _blocks(self):
-        """The ``(step label, group indices)`` pairs :attr:`ratio_df` reports.
+        """The ``(step label, group indices)`` pairs :attr:`economic_ratios_df` reports.
 
         Every group, then each tier span, then the whole ledger under ``'All'``
         (only where the grand rows exist, i.e. a genuinely multi-group ledger).
@@ -1773,8 +1807,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return float(np.sum(probs[live] * num[live] / den[live]))
 
     @property
-    def ratio_df(self):
+    def economic_ratios_df(self):
         """Amounts and ratios per ledger block -- **raw materials**, not a card.
+
+        Renamed from ``economic_ratios_df`` at 1.0.0a204 ([PnL-Economic-Frames]), which
+        joins :attr:`economic_df` in naming the accounting family. It is
+        **not** a view of that frame: splitting expense from commission needs
+        :attr:`Leg.kind`, and the ``E_`` columns need the per-atom vectors,
+        neither of which survives into the ledger sheet.
 
         One row per block: each group, each tier subtotal, and ``'All'`` on a
         multi-group ledger. Deliberately unformatted and absent from ``qd`` /
@@ -1873,9 +1913,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     def legs_df(self):
         """One row per **declared** leg: where it sits, what it is, what it costs.
 
-        The itemized companion to :attr:`ratio_df`, and the only place
-        :attr:`Leg.kind` surfaces. Raw materials, like ``ratio_df``: the frame
-        to group and pivot when the ratio you want is not one ``ratio_df``
+        The itemized companion to :attr:`economic_ratios_df`, and the only place
+        :attr:`Leg.kind` surfaces. Raw materials, like ``economic_ratios_df``: the frame
+        to group and pivot when the ratio you want is not one ``economic_ratios_df``
         carries. Derived rows (totals, results, running nets) are absent by
         design -- they are sums of these.
 
@@ -1883,8 +1923,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         pandas.DataFrame
             Columns ``Step`` / ``Side`` / ``Label`` / ``kind`` / ``EX`` /
-            ``SD``, in ledger order, matching the :attr:`stats_df` level names.
-            ``EX`` is the **signed booked** mean, as on :attr:`stats_df`;
+            ``SD``, in ledger order, matching the :attr:`economic_df` level names.
+            ``EX`` is the **signed booked** mean, as on :attr:`economic_df`;
             ``kind`` is ``None`` for an unclassified leg.
         """
         recs = []
@@ -2290,7 +2330,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
         The card is the fixed one settled at ``a134``: its percentiles are
         **marginal** and deliberately do not foot, because the footing sheet is
-        ``stats_df``. That is said in the intro rather than left for the reader
+        ``economic_df``. That is said in the intro rather than left for the reader
         to discover from a column that does not add up.
         """
         ng = len(self._egroups)
@@ -2328,7 +2368,7 @@ def stack_marginal_pnls(perspectives, *, impacts=None, name=None):
     across the stack; SDs and percentiles are per-row ("means add, SDs
     don't"). The ladder columns here are **marginal by construction** --
     independent perspectives share no joint, so there is nothing to
-    condition on (contrast the scenario columns of :attr:`PnL.stats_df`).
+    condition on (contrast the scenario columns of :attr:`PnL.economic_df`).
 
     Parameters
     ----------

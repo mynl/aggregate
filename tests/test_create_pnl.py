@@ -6,7 +6,7 @@ everything else derived. These tests exercise the cross-domain core -- a raw
 ``(values, probs)`` slot, a :class:`GridDistribution` slot, and a coupled
 bivariate joint -- plus the ledger algebra, role orientation, the
 [One-2D-Source] rule, per-leg ``bs`` rebucketing with its ``validation_df``
-audit, ``ratio_df`` / ``legs_df``, ``+`` composition, and
+audit, ``economic_ratios_df`` / ``legs_df``, ``+`` composition, and
 :func:`stack_marginal_pnls`. The insurance builders are covered by their own
 suites.
 """
@@ -39,7 +39,7 @@ def test_raw_pair_and_gd_slots_agree():
     gd = GridDistribution(_VALS, _PROBS)
     b = PnL(name='t', source=gd, role='sell', consideration=15.0,
             obligation=lambda x: x)
-    np.testing.assert_allclose(a.stats_df.to_numpy(), b.stats_df.to_numpy())
+    np.testing.assert_allclose(a.economic_df.to_numpy(), b.economic_df.to_numpy())
     np.testing.assert_allclose(a.summary_df.to_numpy(), b.summary_df.to_numpy())
 
 
@@ -49,7 +49,7 @@ def test_exact_moments_no_rebucketing():
     Ledger rows are **signed**: the sold obligation books at ``-E[X]`` and the
     EX column adds down the sheet to the result.
     """
-    s = _simple().stats_df
+    s = _simple().economic_df
     # E[loss] = 10, booked -10 (sold obligation); Var = 100 either way
     assert s.loc[('Obligation', 'obligation'), 'EX'] == pytest.approx(-10.0, abs=TOL)
     assert s.loc[('Obligation', 'obligation'), 'SD'] == pytest.approx(10.0, abs=1e-9)
@@ -80,7 +80,7 @@ def test_buy_role_flips_every_row_and_percentiles():
     buy = PnL(name='b', source=(_VALS, probs), role='buy',
               consideration=4.0, obligation=lambda x: np.minimum(x, 20) * 0.5)
     assert sell.est_m == pytest.approx(-buy.est_m, abs=TOL)
-    ss, bs = sell.stats_df, buy.stats_df
+    ss, bs = sell.economic_df, buy.economic_df
     pcols = [c for c in ss.columns if c.startswith('κ')]
     assert len(pcols) == 9                   # the scenario ladder is present
     for row in ss.index:
@@ -101,11 +101,11 @@ def test_multileg_totals_rows():
               consideration={'premium': 15.0},
               obligation={'loss': lambda x: x, 'expense': 3.0})
     # signed: -(10 + 3)
-    assert two.stats_df.loc[('Obligation', 'Total'), 'EX'] == \
+    assert two.economic_df.loc[('Obligation', 'Total'), 'EX'] == \
         pytest.approx(-13.0)
     one = _simple()
-    assert ('Obligation', 'Total') not in one.stats_df.index
-    assert ('Consideration', 'Total') not in one.stats_df.index
+    assert ('Obligation', 'Total') not in one.economic_df.index
+    assert ('Consideration', 'Total') not in one.economic_df.index
     # the card never varies with the leg count
     assert list(two.summary_df.index) == list(one.summary_df.index) == \
         ['Consideration', 'Obligation', 'Margin']
@@ -119,8 +119,8 @@ def test_leg_shorthand_and_leg_objects_agree():
     b = PnL(name='b', source=(_VALS, _PROBS), role='sell',
             consideration=[Leg('premium', 15.0)],
             obligation=[Leg('loss', lambda x: x)])
-    assert list(a.stats_df.index) == list(b.stats_df.index)
-    np.testing.assert_allclose(a.stats_df.to_numpy(), b.stats_df.to_numpy())
+    assert list(a.economic_df.index) == list(b.economic_df.index)
+    np.testing.assert_allclose(a.economic_df.to_numpy(), b.economic_df.to_numpy())
 
 
 def test_duplicate_row_labels_raise():
@@ -144,7 +144,7 @@ def test_group_results_are_step_deltas_and_grand_result_sums():
     """Group result rows = step deltas of the running net; grand result = sum
     of the group results; means add but SDs do not (covariance per atom)."""
     t = _two_group()
-    s = t.stats_df
+    s = t.economic_df
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
         s.loc[('base', 'Margin', 'Gross'), 'EX']
         + s.loc[('cover', 'Margin', 'Total'), 'EX'], abs=1e-9)
@@ -172,9 +172,9 @@ def test_plus_composition_concatenates_ledgers():
               {'recovery': lambda x: np.maximum(x - 20, 0)})])
     combined = a + b
     ref = _two_group()
-    assert list(combined.stats_df.index) == list(ref.stats_df.index)
-    np.testing.assert_allclose(combined.stats_df.to_numpy(),
-                               ref.stats_df.to_numpy())
+    assert list(combined.economic_df.index) == list(ref.economic_df.index)
+    np.testing.assert_allclose(combined.economic_df.to_numpy(),
+                               ref.economic_df.to_numpy())
 
 
 def test_plus_requires_same_source():
@@ -186,16 +186,16 @@ def test_plus_requires_same_source():
 
 
 # ----------------------------------------------------------------------
-# stats_df MultiIndex: (Side, Label) single-group, (Step, Side, Label) tower
+# economic_df MultiIndex: (Side, Label) single-group, (Step, Side, Label) tower
 # ----------------------------------------------------------------------
 def test_stats_df_side_label_multiindex():
-    """stats_df rows carry a (Side, Label) MultiIndex: legs under their side,
+    """economic_df rows carry a (Side, Label) MultiIndex: legs under their side,
     total rows -> (Side, 'Total'), the result -> ('Margin', 'Total'). The
     flat ledger labels stay the canonical keys on the other exhibits."""
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
             consideration={'premium': 15.0},
             obligation={'loss': lambda x: x, 'expense': 3.0})
-    s = p.stats_df
+    s = p.economic_df
     assert list(s.index.names) == ['Side', 'Label']
     assert list(s.index) == [
         ('Consideration', 'premium'),
@@ -221,7 +221,7 @@ def test_stats_df_multiindex_multigroup():
         Group('cover', 'buy', {'ceded premium': 2.0},
               {'recovery': lambda x: np.maximum(x - 20, 0)}),
     ])
-    s = t.stats_df
+    s = t.economic_df
     assert list(s.index.names) == ['Step', 'Side', 'Label']
     assert list(s.index) == [
         ('base', 'Consideration', 'premium'),
@@ -235,7 +235,7 @@ def test_stats_df_multiindex_multigroup():
         ('All', 'Consideration', 'Net'), ('All', 'Obligation', 'Net'),
         ('All', 'Margin', 'Net'), ('All', 'Margin', 'Impact')]
     # single-group frames stay two-level
-    assert list(_simple().stats_df.index.names) == ['Side', 'Label']
+    assert list(_simple().economic_df.index.names) == ['Side', 'Label']
     assert ('All', 'Margin', 'Total') not in s.index
 
 
@@ -258,7 +258,7 @@ def test_direct_block_and_net_need_something_bought():
         Group('book B', 'sell', {'B premium': 4.0},
               {'B loss': lambda x: 0.2 * x}),
     ])
-    s = both_sold.stats_df
+    s = both_sold.economic_df
     # margin_label is declared and still ignored: no purchase, no direct block
     assert set(s.xs('Margin', level='Side').index.get_level_values('Label')) \
         == {'Total', 'Net', 'Impact'}
@@ -266,7 +266,7 @@ def test_direct_block_and_net_need_something_bought():
         assert ('All', side, 'Total') in s.index
     assert ('book B', 'Margin', 'Net') in s.index      # still a running net
     # ... and the single-group case
-    assert ('Margin', 'Total') in _simple().stats_df.index
+    assert ('Margin', 'Total') in _simple().economic_df.index
 
 
 def test_margin_label_names_the_direct_block():
@@ -281,12 +281,12 @@ def test_margin_label_names_the_direct_block():
         Group('cover', 'buy', {'ceded premium': 2.0},
               {'recovery': lambda x: np.maximum(x - 20, 0)}),
     ])
-    assert ('base', 'Margin', 'Motor') in named.stats_df.index
-    assert ('base', 'Margin', 'Gross') in _two_group().stats_df.index
+    assert ('base', 'Margin', 'Motor') in named.economic_df.index
+    assert ('base', 'Margin', 'Gross') in _two_group().economic_df.index
 
 
 # ----------------------------------------------------------------------
-# ratio_df / legs_df ([PnL-Ratio-Frame]) -- the retired scale / Scaled /
+# economic_ratios_df / legs_df ([PnL-Ratio-Frame]) -- the retired scale / Scaled /
 # scaled_stats_df surface is replaced by these two raw-materials frames
 # ----------------------------------------------------------------------
 def _classified_two_group():
@@ -308,9 +308,9 @@ def test_the_retired_scale_surface_is_gone():
         assert not hasattr(p, name), name
     assert 'Scaled' not in p.summary_df.columns
     # E_consideration went with it: one committed ledger-wide premium number
-    # was the same idea as Scaled. ratio_df reads P per block from the leg
+    # was the same idea as Scaled. economic_ratios_df reads P per block from the leg
     # kinds, and evaluate() targets the canonical shift, not a premium.
-    assert p.ratio_df['P'].iloc[-1] == pytest.approx(15.0)
+    assert p.economic_ratios_df['P'].iloc[-1] == pytest.approx(15.0)
 
 
 def test_ratio_df_amounts_foot_to_the_margin():
@@ -319,7 +319,7 @@ def test_ratio_df_amounts_foot_to_the_margin():
             consideration=[Leg('premium', 20.0, kind='premium')],
             obligation=[Leg('loss', lambda x: x, kind='loss'),
                         Leg('expense', 2.0, kind='expense')])
-    r = p.ratio_df
+    r = p.economic_ratios_df
     assert list(r.index) == ['p']
     row = r.loc['p']
     assert row['P'] == pytest.approx(20.0)
@@ -340,16 +340,16 @@ def test_ratio_df_unclassified_obligation_folds_into_loss():
     p = PnL(name='u', source=(_VALS, _PROBS), role='sell',
             consideration={'premium': 20.0},
             obligation={'loss': lambda x: x, 'expense': 2.0})
-    row = p.ratio_df.loc['u']
+    row = p.economic_ratios_df.loc['u']
     assert row['E'] == 0.0 and row['C'] == 0.0
-    obl = -p.stats_df.loc[('Obligation', 'Total'), 'EX']
+    obl = -p.economic_df.loc[('Obligation', 'Total'), 'EX']
     assert row['L'] == pytest.approx(obl, abs=TOL)   # loss AND expense
     assert row['M'] == pytest.approx(row['P'] - row['L'], abs=TOL)
 
 
 def test_ratio_df_ratios_are_re_derived_not_averaged():
     """The pricing_df rule: amounts add, ratios come off the summed amounts."""
-    r = _classified_two_group().ratio_df
+    r = _classified_two_group().economic_ratios_df
     assert list(r.index) == ['base', 'cover', 'All']
     for col in ('P', 'L', 'E', 'C', 'M'):
         assert r.loc['All', col] == pytest.approx(
@@ -367,7 +367,7 @@ def test_ratio_df_cession_ratios_read_positive():
     A cession's premium and recovery are both negative contributions, so their
     ratio comes out positive: "this cover paid back a multiple of its premium".
     """
-    r = _classified_two_group().ratio_df
+    r = _classified_two_group().economic_ratios_df
     assert r.loc['cover', 'P'] < 0 and r.loc['cover', 'L'] < 0
     assert r.loc['cover', 'LR'] > 0
     assert r.loc['base', 'P_share'] == pytest.approx(1.0)
@@ -379,7 +379,7 @@ def test_ratio_df_mean_of_ratio_equals_ratio_of_means_when_premium_is_fixed():
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
             consideration=[Leg('premium', 20.0, kind='premium')],
             obligation=[Leg('loss', lambda x: x, kind='loss')])
-    row = p.ratio_df.loc['p']
+    row = p.economic_ratios_df.loc['p']
     assert row['E_LR'] == pytest.approx(row['LR'], abs=TOL)
 
 
@@ -409,7 +409,7 @@ def test_mean_of_ratio_survives_a_missing_joint_when_premium_is_fixed():
     The gate is whether the **denominator** is random, not whether a joint
     happens to exist: ``E[L / P] == E[L] / P`` exactly for constant ``P``.
     """
-    row = _stitched(premium_sd=0.0).ratio_df.loc['base']
+    row = _stitched(premium_sd=0.0).economic_ratios_df.loc['base']
     assert row['LR'] == pytest.approx(5.0 / 15.0, abs=TOL)
     assert row['E_LR'] == row['LR']            # exactly, not approximately
     assert row['E_ER'] == row['ER'] and row['E_CR'] == row['CR']
@@ -421,7 +421,7 @@ def test_mean_of_ratio_is_nan_when_premium_is_random_and_the_joint_is_gone():
     Never a silent fallback to the ratio of the means, which is a different
     number precisely when the denominator is random.
     """
-    row = _stitched(premium_sd=5.0).ratio_df.loc['base']
+    row = _stitched(premium_sd=5.0).economic_ratios_df.loc['base']
     assert row['LR'] == pytest.approx(5.0 / 15.0, abs=TOL)
     assert np.isnan(row['E_LR'])
     assert np.isnan(row['E_ER']) and np.isnan(row['E_CR'])
@@ -434,7 +434,7 @@ def test_legs_df_itemizes_declared_legs_only():
     assert list(df['kind']) == ['premium', 'loss', 'expense', 'premium',
                                 'recovery']
     assert list(df['Step']) == ['base'] * 3 + ['cover'] * 2
-    # EX is the signed booked mean, matching stats_df
+    # EX is the signed booked mean, matching economic_df
     assert df.loc[0, 'EX'] == pytest.approx(40.0)
     assert df.loc[3, 'EX'] == pytest.approx(-6.0)
 
@@ -482,7 +482,7 @@ def test_bs_leg_rebuckets_and_feeds_validation_df():
     # the linear scheme preserves the mean
     assert v.loc['loss', 'abs_err'] == pytest.approx(0.0, abs=1e-12)
     # the leg GD sits on the regular bs grid; the exact EX is off the atoms
-    assert bucketed.stats_df.loc[('Obligation', 'loss'), 'EX'] == \
+    assert bucketed.economic_df.loc[('Obligation', 'loss'), 'EX'] == \
         pytest.approx(-10.0)
 
 
@@ -519,7 +519,7 @@ def test_1d_legs_over_2d_source_read_axis_0():
                                np.array([0.5, 0.5]))
     p = PnL(name='p', source=joint, role='sell', consideration=6.0,
             obligation=lambda l: l)                  # axis-0 only
-    assert p.stats_df.loc[('Obligation', 'obligation'), 'EX'] == \
+    assert p.economic_df.loc[('Obligation', 'obligation'), 'EX'] == \
         pytest.approx(-5.0)
 
 
@@ -547,8 +547,8 @@ def test_crop_revenue_negative_dependence_lowers_risk():
              obligation=[put])
     pi = PnL(name='i', source=indep, role='sell', consideration=60.0,
              obligation=[put])
-    assert pc.stats_df.loc[('Obligation', 'shortfall put'), 'SD'] < \
-        pi.stats_df.loc[('Obligation', 'shortfall put'), 'SD']
+    assert pc.economic_df.loc[('Obligation', 'shortfall put'), 'SD'] < \
+        pi.economic_df.loc[('Obligation', 'shortfall put'), 'SD']
 
 
 def test_count_axis_fixed_plus_variable_cost():
@@ -563,13 +563,13 @@ def test_count_axis_fixed_plus_variable_cost():
                         is2d=True)],
         result_name='margin')
     # E[cost] = 50*E[N] + 1.5*E[X] = 50*1 + 1.5*100 = 200, booked -200
-    assert plant.stats_df.loc[('Obligation', 'cost'), 'EX'] == \
+    assert plant.economic_df.loc[('Obligation', 'cost'), 'EX'] == \
         pytest.approx(-200.0)
     assert plant.est_m == pytest.approx(400.0 - 200.0)
 
 
 # ----------------------------------------------------------------------
-# [Kappa-Scenario-Percentiles]: stats_df ladder columns are states
+# [Kappa-Scenario-Percentiles]: economic_df ladder columns are states
 # ----------------------------------------------------------------------
 # scenario (kappa) ladder headers -- the κ marks conditioning on the sheet
 # ([Decision-Ladder-Column-Names]); marginal ladders keep plain P01... headers
@@ -579,7 +579,7 @@ _KCOLS = ['κ01', 'κ05', 'κ10', 'κ25', 'κ50', 'κ75', 'κ90', 'κ95', 'κ99'
 def _assert_columns_foot(pnl):
     """Every scenario column foots: the declared legs sum to the grand
     result's cell, which is the grand result's own marginal quantile."""
-    s = pnl.stats_df
+    s = pnl.economic_df
     multi = 'Step' in s.index.names
     legs = [lbl for g in pnl.groups
             for leg in (g.consideration + g.obligation)
@@ -619,7 +619,7 @@ def test_scenario_direction_retro_premium_high_in_bad_columns():
     p = PnL(name='r', source=(_VALS, _PROBS), role='sell',
             consideration={'retro premium': lambda x: 10.0 + 0.5 * x},
             obligation={'loss': lambda x: x})
-    s = p.stats_df
+    s = p.economic_df
     prem = s.loc[('Consideration', 'retro premium')]
     # result = 10 - 0.5x is decreasing in x: bad state (P1) = big loss = big premium
     assert prem['κ01'] > prem['κ50'] > prem['κ99']
@@ -632,7 +632,7 @@ def test_scenario_monotone_1d_cells_evaluate_at_state():
     """Monotone result over distinct atoms: each cell is pointwise 'evaluate
     every leg at the state'."""
     p = _simple('sell')                      # result = 15 - x, monotone
-    s = p.stats_df
+    s = p.economic_df
     for c, q in zip(_KCOLS, (.01, .05, .10, .25, .50, .75, .90, .95, .99)):
         x_q = float(p.result.q(q))
         x_atom = 15.0 - x_q                  # invert the state
@@ -646,7 +646,7 @@ def test_scenario_switcheroo_level_set_means():
     p = PnL(name='h', source=(_VALS, _PROBS), role='sell',
             consideration=15.0, obligation=lambda x: np.abs(x - 15.0))
     # obligation values 15,5,5,15 -> result values 0,10,10,0: two level sets
-    s = p.stats_df
+    s = p.economic_df
     # result = 0 pools atoms {0, 30} (prob .4/.1): E[x|slice] = 6, loss cell -15
     # result = 10 pools atoms {10, 20} (prob .3/.2): loss cell -5
     lo = float(p.result.q(0.01))            # 0, the bad-side level set
@@ -664,7 +664,7 @@ def test_scenario_constant_result_cells_equal_ex():
     p = PnL(name='c', source=(_VALS, _PROBS), role='sell',
             consideration={'swap': lambda x: x + 5.0},
             obligation={'loss': lambda x: x})
-    s = p.stats_df
+    s = p.economic_df
     for key in s.index:
         for c in _KCOLS:
             assert s.loc[key, c] == pytest.approx(s.loc[key, 'EX'], abs=TOL)
@@ -674,7 +674,7 @@ def test_scenario_moment_columns_stay_marginal():
     """EX / SD / CV / Skew are row properties -- unchanged by the scenario
     ladder; per-row marginal quantiles remain one line away via density_df."""
     p = _simple('sell')
-    s = p.stats_df
+    s = p.economic_df
     assert s.loc[('Obligation', 'obligation'), 'SD'] == \
         pytest.approx(10.0, abs=1e-9)
     gd = p.density_df['obligation']
@@ -718,7 +718,7 @@ def test_card_tower_blocks():
         ('All', 'Margin'), ('All', 'Impact')]
     assert list(df.index.names) == ['Step', 'Side']
     # per-step Margin = the step delta; Total block foots on EX
-    s = t.stats_df
+    s = t.economic_df
     assert df.loc[('base', 'Margin'), 'EX'] == pytest.approx(
         s.loc[('base', 'Margin', 'Gross'), 'EX'])
     assert df.loc[('All', 'Margin'), 'EX'] == pytest.approx(
@@ -730,7 +730,7 @@ def test_card_tower_blocks():
 
 
 def test_ratio_df_reads_as_a_combined_ratio_decomposition():
-    """The combined ratio now lives in ``ratio_df``, its own table.
+    """The combined ratio now lives in ``economic_ratios_df``, its own table.
 
     The card is currency only ([Reporting-Guidelines] rule 2: one unit per
     column), so the decomposition the retired ``Scaled`` column carried is read
@@ -739,7 +739,7 @@ def test_ratio_df_reads_as_a_combined_ratio_decomposition():
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
             consideration=[Leg('premium', 20.0, kind='premium')],
             obligation=[Leg('loss', lambda x: x, kind='loss')])
-    row = p.ratio_df.loc['p']
+    row = p.economic_ratios_df.loc['p']
     assert row['LR'] == pytest.approx(0.5)         # E[loss] 10 / premium 20
     assert row['CR'] == pytest.approx(0.5)         # no expense declared
     assert row['M'] / row['P'] == pytest.approx(0.5)
@@ -763,7 +763,7 @@ def test_card_marginal_vs_stats_scenario_differ_on_dependent_legs():
     # comonotone with it. Card P99 (best state for the result) vs the
     # obligation's own marginal 99th differ.
     card = p.summary_df.loc['Obligation', 'P99']            # marginal: 0
-    scen = p.stats_df.loc[('Obligation', 'Total'), 'κ99']   # state: -10
+    scen = p.economic_df.loc[('Obligation', 'Total'), 'κ99']   # state: -10
     assert card == pytest.approx(0.0, abs=TOL)
     assert scen == pytest.approx(-10.0, abs=TOL)
     assert card != scen
@@ -835,7 +835,7 @@ def test_stitched_rows_kernel_mode_direct():
     p = PnL(name='stitched', source=None, groups=groups,
             result_name='result', stitched_rows=entries)
     assert p._stitched
-    s = p.stats_df
+    s = p.economic_df
     # marginal ladder (plain P headers) -- no shared atoms, no kappa
     assert 'P01' in s.columns and '\u03ba01' not in s.columns
     # supplied exact means surface on EX; the impact row is a per-stat delta

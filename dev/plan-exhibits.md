@@ -1,87 +1,180 @@
 # Plan [Exhibits-Module]: business exhibits, stats frames to greater_tables IR
 
-> **Status: DRAFT, approved 2026-08-04 for phased execution.** New `aggregate/exhibits.py`, purely additive (imports from core, core never imports it), provisional at 1.0. Companion plan: `dev/plan-chart-ir.md`. Both derive from the author's design notes on the aggregate to aLL (aggregate_api) interface.
+> **Status: REVISED 2026-08-05 after the author's review of the executed phases.** Phases 1 to 4a are SHIPPED (`1.0.0a200`, `a201`, `a203`; app `1.0.0a39`). This revision folds in the review decisions: the PnL frame rename, the package split, the economic exhibits including the waterfall, and the app's envelope-only consolidation. Purely additive to the core (exhibits import from core, core never imports exhibits), provisional at 1.0. Companion plan: `dev/plan-chart-ir.md`, executing in parallel. Both derive from the author's design notes on the aggregate to aLL (aggregate_api) interface.
 
 ## Principle and placement test
 
-aggregate owns meaning, the app owns arrangement. Test for placement: if deleting the web app would destroy knowledge an actuary would want in a notebook, that knowledge is in the wrong place. Today it leaks: aggregate_api carries ROW_FLAGS and FORMATS (`tables.py:113`, `:132`), `_drop_raw_moments` (`objects.py:1407`), exhibit titles and captions (`main.js:646-655`), and the reinsSeries survival accumulation. The FCC stats frames are raw materials; the business translation that makes them resonate (especially `PnL.stats_df` and parts of `reins_stats_df`) belongs in the library. Exhibits are allowed to be domain specific; core aggregate stays domain agnostic.
+aggregate owns meaning, the app owns arrangement. Test for placement: if deleting the web app would destroy knowledge an actuary would want in a notebook, that knowledge is in the wrong place. Today it leaks: aggregate_api carries ROW_FLAGS and FORMATS (`tables.py:113`, `:132`), `_drop_raw_moments` (`objects.py:1407`), exhibit titles and captions (`main.js:646-655`), and the reinsSeries survival accumulation. The FCC stats frames are raw materials; the business translation that makes them resonate belongs in the library. Exhibits are allowed to be domain specific; core aggregate stays domain agnostic.
 
-## Decisions taken (author, 2026-08-04)
+**Layout never moves into the library** (author, 2026-08-05, confirming the founding principle against the temptation below). The app's tab shape maps almost one to one onto the exhibit names, which is evidence the vocabulary is right, not a reason to let the library hint at grouping. No `group` or `tab` field on `Exhibit`, now or later.
 
-1. GT dependency: new optional extra `exhibits = ["greater_tables>=6.0.0a8"]` with lazy import inside the IR conversion step. `import aggregate` and `import aggregate.exhibits` never touch greater_tables; a clear ImportError names the extra when missing. GT must publish to PyPI before aggregate ships the extra (it is path installed alpha today); until then the extra is documented as requiring the sibling checkout, as aggregate_api already does.
+**Scope of the business exhibits: show, do not exhaust** (author, 2026-08-05). There will always be more economics worth exhibiting, and most of it is a business decision this library should not be making for its users. The library ships two or three exemplary business exhibits, done properly, and the open registration is how everyone else builds their own. `economic_waterfall` is the one flagship the author is prepared to specify.
+
+## Decisions taken
+
+Numbered decisions from 2026-08-04 unless dated otherwise.
+
+1. GT dependency: optional extra `exhibits = ["greater_tables>=6.0.0a8"]` with lazy import inside the IR conversion step. `import aggregate` and `import aggregate.exhibits` never touch greater_tables; a clear ImportError names the extra when missing. **Status 2026-08-05:** the extra is written but commented in `pyproject.toml`, because greater_tables 6 is not yet on PyPI (5.3.0 is the latest published) and an active unresolvable extra breaks `uv sync --all-extras`. GT 6 publishes shortly; uncomment verbatim on the day, no other change needed.
 2. The perspective enum is named `Perspective`, kwarg `perspective=`, URL `?perspective=`. This avoids the three existing senses of "view" (the reins frame column levels, the app's REINS_VIEWS, the app's table-view toggle). Values are RAW, INSURED, INSURER, REINSURER (author, 2026-08-05, replacing the earlier RAW/BUYER/SELLER: buyer and seller are relative and confusing, since the insured buys insurance, the insurer sells insurance while buying reinsurance, and the reinsurer sells reinsurance while buying retro).
 3. RAW serializes as a TableDoc like every other perspective: one client path, uniform ETag, MultiIndex structure survives.
 4. Signature default is `Perspective.RAW`: passthrough always works, translation is opt in.
-5. v1.0 implements RAW and INSURER only (author, 2026-08-05). INSURER defaults to RAW unless an override is registered for the (exhibit, type) pair. The override is custom per exhibit and unbounded in scope: some are identity (no override at all), some thin (renaming a column or two), and some extensively different from the raw frame, the xpnl tower ledger above all. Which treatment each exhibit gets is decided case by case with the author once the infrastructure is in place. INSURED and REINSURER stay in the enum as stable vocabulary with no 1.0 registrations.
+5. v1.0 implements RAW and INSURER only. INSURER defaults to RAW unless an override is registered for the (exhibit, type) pair. The override is custom per exhibit and unbounded in scope: some are identity (no override at all), some thin, and some extensively different from the raw frame. INSURED and REINSURER stay in the enum as stable vocabulary with no 1.0 registrations.
+6. **Signs stay as booked** (author, 2026-08-05). Signed values throughout, never flipped to positive magnitudes for readability. It takes getting used to and is the easiest long run, and it is the only way the ledger and the kappa ladder foot. greater_tables stamps `neg` cell flags automatically, so the renderer can style the sign without the library lying about it.
+7. **The API always serves the wrapped envelope, never a bare TableDoc** (author, 2026-08-05). One client path for every table in the app. This retires `GET /frame/{which}?format=ir`, whose whole job is what an exhibit at RAW perspective already does.
+8. **Three consumer-facing API paths, each with one job** (author, 2026-08-05): bulk raw JSON for the large frames (the densities, paginated, feeding the grid and the charts), exhibit envelopes for everything curated, and CSV for non-aLL consumers who want raw values rather than a presentation. The CSV path is kept deliberately and permanently.
+9. **`exhibits` becomes a package mirroring `plots/`** (author, 2026-08-05). Already overdue: the single module hit 950 lines, past the 800-line trigger this plan set for itself, before the PnL work and the waterfall land.
+10. **Empty frames are legal and render** (author, 2026-08-05). Verified: `gt.build(pd.DataFrame())` produces a valid 0 by 0 document and a frame with columns but no rows keeps its columns. The library returns an empty frame rather than None or a raise where a frame does not apply, and the insurer view explains the emptiness in its caption. The app's `frame_document` refuses empties ("nothing to render"), which is one more reason it retires under decision 7.
 
 ## Background facts
 
-greater_tables 6.0.0a8 IR is `TableDoc` (frozen pydantic, `ir_version` 1, JSON Schema, `canonical_dict` / `canonical_json` / `doc_hash` / `stamp`; byte deterministic). GT has no "block" concept, the unit is one whole table, so a multi table exhibit is a list of TableDocs. `build(df, TableSpec) -> TableDoc` is the conversion entry; TableSpec carries caption, notes, formatters (sugar strings such as `',.1%'`), row_flags, cell_flags, include_raw, max_rows, sparsify. The app already renders TableDocs end to end (server `tables.py: frame_document`, ETag = doc hash, client walker `renderTable` plus `irToGridInput`). The library side has the FCC contract (`constants.py:96-151`), `dev/FEATURES.csv`, `dev/reporting-guidelines.md`, LabeledMixin relabeling at the serve step, and no singledispatch precedent (the informal dispatch is `utilities.qd`'s isinstance chain).
+greater_tables 6.0.0a8 IR is `TableDoc` (frozen pydantic, `ir_version` 1, JSON Schema, `canonical_dict` / `canonical_json` / `doc_hash` / `stamp`; byte deterministic). GT has no "block" concept, the unit is one whole table, so a multi table exhibit is a list of TableDocs. `build(df, TableSpec) -> TableDoc` is the conversion entry; TableSpec carries caption, notes, formatters (sugar strings such as `',.1%'`), row_flags, cell_flags, include_raw, max_rows, sparsify. Row and cell flag vocabulary is `total`, `subtotal`, `emphasis`, `muted`, plus the automatic `neg`. The app already renders TableDocs end to end (server `tables.py: frame_document`, ETag = doc hash, client walker `renderTable` plus `irToGridInput`). The library side has the FCC contract (`constants.py:96-151`), `dev/FEATURES.csv`, `dev/reporting-guidelines.md`, and LabeledMixin relabeling at the serve step.
 
-## Library design: src/aggregate/exhibits.py (new, single module)
+## Library design: the `aggregate/exhibits/` package
 
-Not star imported in `__init__.py` (same precedent as Tweedie, Pentagon, pedagogy); users write `from aggregate import exhibits`. Names vetted: `Exhibit`, `Perspective`, `stats`, `reins`, `available_exhibits` are free; a star exported `tail` would shadow the `aggregate.tail` submodule binding, which the non star decision moots. Split into a package post 1.0 only if it grows past roughly 800 lines.
+Not star imported in `__init__.py` (the Tweedie / Pentagon / pedagogy precedent); users write `from aggregate import exhibits`. The package split (decision 9) mirrors `plots/` exactly, and the public import path is unchanged by it.
 
-Public surface, all inside `aggregate.exhibits`:
+```
+exhibits/__init__.py      machinery + public surface (Perspective, Exhibit, registry,
+                          available_exhibits, exhibit_frames, build_exhibit,
+                          register_simple_exhibit, shared flag helpers)
+exhibits/_aggregate.py    Aggregate registrations
+exhibits/_portfolio.py    Portfolio registrations
+exhibits/_pnl.py          PnL registrations, including the economic family
+exhibits/_bivariate.py    BivariateAggregate registrations
+exhibits/_distortion.py   Distortion registrations
+```
 
-- `Perspective(Enum)`: `RAW` (pass the underlying frame through, essentially GT(df) to IR), `INSURED` (the policyholder, buyer of insurance), `INSURER` (seller of insurance and buyer of reinsurance; the cedent, the object holder on the reins exhibits), `REINSURER` (seller of reinsurance; sign and label flips relative to the insurer; retro, where the reinsurer buys, is parked). Only RAW and INSURER are implemented at 1.0 (decision 5); INSURED and REINSURER are vocabulary only until their implementations land post 1.0.
-- `Exhibit` frozen dataclass: `ir_blocks: list` (TableDocs), `name`, `title`, `perspective`, `meta: dict` (captions per block, source frame names). `to_payload() -> dict` (canonical_dict per block plus envelope fields); `hash` property (sha256 over concatenated block doc_hash values, first 12 hex) for ETags.
-- Generic exhibit functions via `functools.singledispatch`, one canonical implementation per (exhibit, perspective) pair, living here and only here: `summary`, `tail`, `stats`, `validation`, `reins`, `pnl_ledger`, `pnl_ratios`, `dependency`. Signature `f(obj, perspective=Perspective.RAW) -> Exhibit`. The base raises NotImplementedError naming the type. Registration is open: app or user code may register new types. When REINSURER lands post 1.0 it shares the insurer implementation with an internal sign and label switch, never a parallel copy.
-- `exhibit_frames(obj, name, perspective) -> list[tuple[str, DataFrame, dict]]`: the pure pandas frame stage returning (block name, translated frame, TableSpec kwargs). Testable and usable without GT installed.
+Public surface, all reachable as `aggregate.exhibits.X`:
+
+- `Perspective(Enum)`: `RAW`, `INSURED`, `INSURER`, `REINSURER`. Only RAW and INSURER are implemented at 1.0 (decision 5).
+- `Exhibit` frozen dataclass: `ir_blocks` (TableDocs), `name`, `title`, `perspective`, `meta`. `to_payload() -> dict`; `hash` property (sha256 over the concatenated block `doc_hash` values, first 12 hex) for ETags.
+- Generic exhibit functions via `functools.singledispatch`, one canonical implementation per (exhibit, perspective) pair. Signature `f(obj, perspective=Perspective.RAW) -> Exhibit`. Each carries two open registries: `f.register` / `f.frames` for the RAW frames builder, and `f.insurer` for the per (exhibit, type) override hook whose default is identity. The base raises NotImplementedError naming the type. Registration is open: app or user code may register new types, which is how users build their own economics (see the scope note above).
+- `exhibit_frames(obj, name, perspective) -> list[tuple[str, DataFrame, dict]]`: the pure pandas frame stage returning (block name, translated frame, TableSpec kwargs). Testable and usable without GT installed. This is the layer to review a translation.
 - `build_exhibit(obj, name, perspective) -> Exhibit`: registry lookup, frame stage, then GT `build(df, TableSpec(**kw))` per block. This and `to_payload` are the only lazy import sites.
-- `EXHIBITS: dict[name, (generic_fn, perspectives_fn)]` where `perspectives_fn(obj) -> list[Perspective]` is the per object predicate. At 1.0 the predicate gates exhibit availability (reins only when `obj.occ_reins or obj.agg_reins`) and the perspectives list is `[RAW, INSURER]` for every available exhibit, since INSURER always works via the default rule below; post 1.0, REINSURER appears only where a flip is defined. `available_exhibits(obj) -> list[tuple[str, list[Perspective]]]` derives from the singledispatch registries (MRO hit) plus the predicates, so it cannot go stale. Needs no GT import.
+- `EXHIBITS: dict[name, (generic_fn, perspectives_fn)]` where `perspectives_fn(obj) -> list[Perspective]` is the per object availability predicate. `available_exhibits(obj) -> list[tuple[str, list[Perspective]]]` derives from the singledispatch registries (MRO hit) plus the predicates, so it cannot go stale. Needs no GT import.
+- **`register_simple_exhibit(name, title, frame_attr, classes, *, predicate=None)`** (new, author ask 2026-08-05): declare a passthrough exhibit over one named frame in a single line, generating the exhibit function, the registry entry and the per class frames builders together. It registers no insurer override, so INSURER equals RAW automatically by the default rule, which is exactly the "raw, and insurer the same" behavior wanted for the diagnostic frames. Example: `register_simple_exhibit('bs_window', 'Grid sizing', 'bs_window_df', [Aggregate, Portfolio, BivariateAggregate])`.
 
-The INSURER default rule (author, 2026-08-05): **INSURER equals RAW unless an override is registered** for the (exhibit, type) pair. Mechanically, the insurer path serves the raw frames passed through a per (exhibit, type) override hook whose default is identity. The hook is a full frame translation, not a styling knob: light cases rename a column or two, heavy cases rebuild the presentation entirely (the xpnl tower ledger is the expected heavy case, per the original design notes' "esp. true of xpnl stats_df"). The inventory's "knowledge migrating in" column is the starting point for each override (the raw moment drop, the row flags, the caption text, renames), not a bound on it; the actual treatment is settled case by case at each phase, with the author, once the scaffold exists. The rule keeps the generic path total, makes every override an explicit reviewable delta on the raw frame, and means a new exhibit is useful the moment its raw registration exists.
+All served frames pass through LabeledMixin `_relabel` (honoring `use_labels` and `renamer`); titles use `_title_name` ("{label} ({name})").
 
-All served frames pass through LabeledMixin `_relabel` (honoring `use_labels` and `renamer`); titles use `_title_name` ("{label} ({name})"). Plain Python plus pandas; no exhibit meta language. If a declarative pattern emerges after several exhibits are written, extract it post 1.0 with the hand written ones as test cases.
+## The PnL frame rename ([PnL-Economic-Frames], breaking)
 
-## Exhibit inventory (initial; author confirms at review)
+Author decision 2026-08-05, arising from the review finding that `stats` and `pnl_ledger` produced **byte-identical documents** on a PnL (same hash, same single block). Two exhibit names for one frame is a synonym, against the one-canonical-name rule.
 
-| name | source frame(s) | perspectives | kinds | knowledge migrating in |
-|---|---|---|---|---|
-| summary | summary_df | raw, insurer | agg, port, pnl, distortion, bvagg (Severity is near first class and exempt; verify its surface at scaffold time) | "Summary" title; caption including Freq percentiles blank by design; `_summary_flags` (total, Agg subtotal) from app tables.py |
-| tail | tail_df | raw, insurer | agg, port | capital anchor caption; `_tail_flags` (emphasis at T in (200, 250), total row) |
-| stats | stats_df | raw, insurer | all five FCCs | insurer drops ex1/ex2/ex3 (raw keeps all 26 rows); measure formats |
-| validation | validation_df | raw, insurer | all five FCCs | insurer adds emphasis on failing rows |
-| reins | reins_stats_df + reins_summary_df (two blocks) | raw, insurer | agg, port when reinsurance present | raw moment drop; summary flags |
-| pnl_ledger | PnL.stats_df | raw, insurer | pnl | the flagship translation: kappa scenario ladder captions, footing rules, Side sign presentation |
-| pnl_ratios | PnL.ratio_df + legs_df | raw, insurer | pnl | arranges the "raw materials, not a card" frame (`_pnl.py:1776`) into the LR/ER/CR card |
-| dependency | dependency_df + axis_support_df | raw, insurer | bvagg | none today |
+The root cause is that `stats_df` means four different things across the FCC contract. On Aggregate and Portfolio it is the (component, measure) by view moment store; on Distortion a column of D_g statistics; on bvagg a (basis, stat) by axis table; on PnL it is not a statistics frame at all but the ledger sheet with the kappa scenario ladder. The FCC audit can only check that the name exists, never that it means the same thing.
 
-The perspectives column is the 1.0 surface: raw plus insurer everywhere, per decision 5, with the insurer column of the table realized as overrides on the raw frame. INSURED and REINSURER register nothing at 1.0; they are in the vocabulary now so the enum does not churn when their implementations arrive. The reinsurer semantics questions (does the reinsurer see Ceded relabeled as its gross; does Net render at all; the cede and assume swap on pnl) travel with that deferred work as its opening review gate. A retro perspective (the reinsurer as buyer of retrocession) is parked behind even that.
+The rename:
 
-Deferred from the inventory: pricing and pentagon exhibits (parameterized by distortion calibration and computed in POST routes, they do not fit the parameter free GET envelope; park until the app's upstream asks land: a `density=`/`basis=` kwarg on `calibrate_distortions` and a public `GridDistribution` export), bounds, bs_window.
+| now | becomes | note |
+|---|---|---|
+| `PnL.stats_df` (the ledger) | `PnL.economic_df` | names what it is |
+| `PnL.ratio_df` | `PnL.economic_ratios_df` | not a view of `economic_df`: it needs `Leg.kind` to split expense from commission, and the per atom vectors for the means-of-ratios columns, neither of which survives into the ledger sheet |
+| absent | `PnL.stats_df` delegating to `self.engine.stats_df` | makes `stats_df` mean one thing everywhere: the moment store of a book |
+| `PnL.validation_df` | **unchanged** | author correction 2026-08-05: PnL's own leg rebucketing audit stays, it is a real check on the P&L's own construction and does not delegate |
+
+`PnL.engine` is `None` on a hand-built kernel P&L (`_pnl.py:858`), so `stats_df` returns an empty `pd.DataFrame()` there, per decision 10. Likewise `validation_df` is legitimately empty when every leg is exact (only `bs > 0` legs are audited), which the insurer caption states in words rather than rendering a blank table.
+
+"Economic" already appears in the codebase as prose, naming the Gross / Ceded / Net presentation in the reins frames. No identifier collides (`economic_df`, `economic_ratios_df` are both free). The overlap is accepted deliberately: both senses are the accounting reading of a frame, and the family will grow.
+
+This is a breaking change on a public surface, so it lands as **its own labelled version bump ahead of everything else**, with `dev/FEATURES.csv`, the `qd` PnL branch, `docs/`, and the app's `_CSV_FRAMES` / route resolvers moved in the same commit.
+
+## The economic exhibits
+
+Three, all on PnL, all in `exhibits/_pnl.py`. Frame names and exhibit names mirror each other, restoring the property that holds everywhere else (`summary_df` to `summary`, `tail_df` to `tail`, `dependency_df` to `dependency`).
+
+- **`economic`**: the ledger, source `economic_df`. RAW passthrough. INSURER adds the caption explaining the kappa semantics (scenario states, not per row quantiles; the ladder foots; `κ01` is the adverse state under the payoff convention; plain `P` headers mean no shared atoms and a marginal, non-footing ladder) and row flags (grand result `total`, group and tier results `subtotal`, running nets `muted`).
+- **`economic_ratios`**: sources `economic_ratios_df` plus `legs_df`. RAW passes both through. INSURER splits into pure blocks per the reporting guideline, one unit per column: amounts (P, L, E, C, M, signed in the gross direction, captioned that `M == P - L - E - C` foots identically), ratios (LR, ER, CR, E_LR, E_ER, E_CR, P_share, M_share, declared as `ratio_cols` so they render as percentages, captioned on ratios-of-means versus means-of-ratios and when the two part company), and legs unchanged.
+- **`economic_waterfall`**: the flagship. Specified below.
+
+### `economic_waterfall` specification (author, 2026-08-05)
+
+The walk from gross margin, through the amount ceded at each layer, to net margin, with the margin evaluated at every stop. **Everything it needs is already computed**; the exhibit is arithmetic over existing columns, which is why it lives wholly in the exhibit layer and adds no frame columns.
+
+One row per step (each group, each tier subtotal, the closing net). Columns:
+
+| column | definition | source |
+|---|---|---|
+| Premium spent | the step's P over the gross block's P | `economic_ratios_df.P_share` |
+| Margin spent | the step's M over the gross block's M | `economic_ratios_df.M_share` |
+| CR | combined ratio at the step | `economic_ratios_df.CR` |
+| M / SD(M) | margin over the standard deviation of the step's own margin | `economic_df.SD` on the step's margin row |
+| M / 100yr standalone | `M / -M_100`, where `M_100` is the step's own 1-in-100 margin | `density_df[row].q(0.01)` |
+| M / 100yr diversified | `M / -M_100`, where `M_100` is the step's margin **conditional on the whole book's 1-in-100** | `economic_df` column `κ01` |
+
+The diversified column is the point of the exhibit: `κ01` is `E[row | grand result at its 1st percentile]`, so the diversified walk **foots down the sheet exactly**, while the standalone column does not (standalone tail measures do not add). Showing the two side by side is the diversification benefit, made visible, per layer.
+
+Three constraints, all settled by the author 2026-08-05:
+
+1. **The ratio is `M / -M_100`.** `M_100` is a bad outcome and therefore negative, so `-M_100` **is the capital you need to inject** at that return period, and the ratio reads directly as margin over required capital, positive for a sound book. Not the literal `M / M_100`, which would come out negative. The same definition serves both bases; only the source of `M_100` changes.
+2. **The kappa ladder is not always present, and blanks when absent.** When a ledger has no shared atoms (the massive one-sweep route, the stitched guaranteed-cost tower) the columns fall back to marginal `P01…P99` and no conditioning ever happened. The diversified column blanks there, exactly as the frequency percentiles blank in `summary_df`: the value is not missing, it is undefined on that route, and the caption says so. The standalone column always works.
+3. **It needs a tower with steps.** The exhibit is for an `xpnl` walk; a single group P&L has one margin row and no walk to draw. Availability gates on the tower, the way `reins` gates on a cession, and the chip grays out rather than showing a one row waterfall.
+
+Orientation follows decision 6 (signed as booked): a purchased layer's margin is negative by construction and stays that way, so the walk foots. `1-in-100` is `p = 0.01` for a payoff, per `period_to_p`'s downside mapping, which is the same `p` the `κ01` header names.
+
+## Exhibit inventory (revised)
+
+| name | source frame(s) | kinds | insurer treatment |
+|---|---|---|---|
+| summary | `summary_df` | all five | caption, total / subtotal flags on agg and port; identity elsewhere |
+| tail | `tail_df` | agg, port | caption, 1-in-200 and 1-in-250 anchors emphasized, portfolio total flagged |
+| stats | `stats_df` | all five (PnL via the engine, post rename) | drops raw noncentral moments (ex1/ex2/ex3) on agg and port; identity elsewhere |
+| validation | `validation_df` | all five | emphasis on failing rows (Validation flags on agg and port, `Pass == False` on distortion and bvagg); PnL caption explains an empty audit |
+| reins | `reins_stats_df` + `reins_summary_df` | agg, port when ceding | raw moment drop, captions, portfolio total flags |
+| dependency | `dependency_df` + `axis_support_df` | bvagg | none registered, none needed |
+| economic | `economic_df` | pnl | kappa captions, footing rules, ledger row flags |
+| economic_ratios | `economic_ratios_df` + `legs_df` | pnl | three pure blocks, ratio columns declared |
+| economic_waterfall | derived from `economic_df` and `economic_ratios_df` | pnl with a tower | the exhibit **is** the translation; RAW serves the same table |
+| bs_window | `bs_window_df` | agg, port, bvagg | none (via `register_simple_exhibit`) |
+| tail_behavior | `tail_behavior_df` | agg, port | none (via `register_simple_exhibit`) |
+
+Not exhibits, deliberately: `density_df`, `unit_density_df`, `reins_density_df`, `sev_density_df`. These are bulk paginated data feeding the grid and the charts, and they stay on the raw JSON path (decision 8).
+
+`economic_waterfall` is the one exhibit whose RAW and INSURER agree while still being a full translation, because the exhibit itself is the business object; there is no underlying frame to pass through.
 
 ## App API surface (aggregate_api)
 
-Two routes in `routes/objects.py`, reusing `_locked_entry` and the `frame_document` ETag pattern (`objects.py:1533-1539`):
+Landed at app `1.0.0a39`: `GET /v1/objects/{oid}/exhibits` (a passthrough of `available_exhibits`) and `GET /v1/objects/{oid}/exhibit/{name}?perspective=raw|insurer` (the envelope `{name, title, perspective, meta, blocks, hash}`, ETag from the exhibit hash, 304 on If-None-Match, 404 listing the capability set, 400 on an unsupported perspective). New library exhibits appear with zero endpoint changes.
 
-- `GET /v1/objects/{oid}/exhibits`: passthrough of `available_exhibits(entry.obj)` as `{"exhibits": [{"name", "title", "perspectives"}]}`. No per kind tables in the route.
-- `GET /v1/objects/{oid}/exhibit/{name}?perspective=raw|insurer` (the enum has four values; 1.0 serves these two, and anything unserved is a 400 like any other unsupported perspective): the envelope `{name, title, perspective, meta, blocks: [TableDoc canonical dicts]}`. ETag is the Exhibit hash; 304 on If-None-Match; 404 listing the capability set on unknown name; 400 on unsupported perspective.
+Still to do, per decisions 7 and 8: retire `GET /frame/{which}?format=ir` in favor of exhibit envelopes; retire the `xxx_df` JSON routes for frames an exhibit now covers, keeping the bulk density routes; keep `/frame/{which}.csv` permanently for non-aLL consumers; delete `_drop_raw_moments` and the migrated ROW_FLAGS, FORMATS and caption literals once the client reads envelopes.
 
-The client renders blocks with existing machinery (mountTable static walker plus irToGridInput grid), unchanged. New library exhibits appear with zero endpoint changes. Pages (exhibit plus plot combinations) are app content: a page composes (exhibit_name, perspective) and (plot_name, options) chips; layout, grid, tabs live app side. Narrative text derived from the object is a library chip (Exhibit.meta captions); text about the page is app content.
+`dev/scripts/check-exhibits.py` (app, landed a39) sweeps every exhibit across every kind and asserts the capability and envelope routes agree, that envelopes are byte deterministic, and that the insurer blocks match the frame routes row for row while both exist. It is the regression net for the consolidation and belongs in CI.
 
-## Menu from capability; gray out reconciled
+## Menu and the perspective switch
 
-The app house rule (index.html:160-163) is never hide, gray out. Reconciliation: the page's chip set per kind is app content and fixed; a chip whose capability is absent renders grayed and disabled with an explanatory title (the Bounds tab pattern). `applyKindGating` and the hardcoded NA tables in main.js are rewritten to read the capability response; `has_reins` gating collapses into it. Exhibits present in capability but unknown to the page layout appear in a generated list under the More tab: chrome the app never knew was never on the menu to hide.
+The page shape is app content and authored, never derived from the library (see the principle section). The author's intended shape, 2026-08-05:
+
+**summary | economics | reinsurance | price/evaluate | more**
+
+Each tab carries both plots and exhibits. `more` holds the diagnostics: stats, validation, tail behavior, grid sizing. **The page takes a single raw / insurer switch at the top**, so the perspective is page level state and every exhibit on the page changes together. That works uniformly because INSURER is total by the default rule: every exhibit answers at both perspectives, whether or not it registers an override.
+
+Note for planning: `price/evaluate` has no exhibits to serve at 1.0. Pricing exhibits are deferred (see below), so that tab carries plots only until the upstream asks land.
+
+The house rule holds throughout: never hide, gray out. A chip whose capability is absent renders grayed and disabled with an explanatory title.
 
 ## Tests
 
-Library, `tests/test_exhibits.py`: one small object per kind via `build()`; `available_exhibits` shapes and predicates (no reins perspectives without reinsurance); frame stage structure via `exhibit_frames` (indexes, dropped rows, relabeling honored), all GT free. Under `pytest.importorskip('greater_tables')`: `build_exhibit` returns TableDocs, and committed canonical_dict JSON snapshots per (exhibit, perspective, kind) guard both the translation and IR drift. `tests/test_plots_boundary.py` gains two assertions: importing aggregate does not import greater_tables; importing aggregate.exhibits imports neither matplotlib nor greater_tables. `dev/FEATURES.csv` gains the exhibits surface; `dev/TODO.md` kept current.
+Library, `tests/test_exhibits.py`: one small object per kind via `build()`; `available_exhibits` shapes and predicates; frame stage structure via `exhibit_frames` (indexes, dropped rows, relabeling honored), all GT free. Under `pytest.importorskip('greater_tables')`: `build_exhibit` returns TableDocs, and committed `canonical_dict` JSON snapshots per (exhibit, perspective, kind) guard both the translation and IR drift, regenerated by `tests/capture_exhibit_snapshots.py`. The snapshot file drives the case list, and a coverage test asserts it matches the live registry. `tests/test_plots_boundary.py` carries the two lazy-import guards. Fixture programs live in `decl-testers.agg` section EX. `dev/FEATURES.csv` and `dev/TODO.md` stay current.
 
-App: `tests/test_objects.py` capability plus envelope contract (ETag, 304, 404, 400, byte determinism); new `dev/scripts/check-exhibits.py` (sibling of check-frames.py) asserting exhibit blocks agree with frame routes where they cover the same frame; `capture_fixtures.py` captures envelope payloads.
+The waterfall needs numeric tests beyond the snapshots: that the diversified column foots down the sheet (it must, by the kappa construction) and that the standalone column does not, which is the exhibit's whole thesis stated as an assertion.
 
 ## Phases and cadence
 
-Each library phase bumps `1.0.0aNNN` with a CHANGELOG section and a one line commit `[Exhibits-Module] aNNN: summary`; app phases follow the app's own conventions. From phase 2 on, each exhibit's insurer treatment (identity, thin override, or full reshape) is decided with the author at its phase, not scoped in advance; the phase descriptions below name the expected starting overrides only.
+Phases 1 to 4a are shipped. Each remaining library phase bumps `1.0.0aNNN` with a CHANGELOG section and a one line commit `[<Label>] aNNN: summary`; app phases follow the app's own conventions. Version numbers interleave with the parallel `[Chart-IR]` plan, so check `git log` and the CHANGELOG before claiming one.
 
-1. **[Exhibits-Scaffold]** (library): the module with Perspective, Exhibit, registry, available_exhibits, exhibit_frames, build_exhibit; summary and tail for Aggregate and Portfolio; the `exhibits` extra in pyproject; boundary tests.
-2. **[Exhibits-Stats-Validation]** (library): stats and validation across the five FCCs; dependency for bvagg; the raw moment drop semantics move in (the app keeps its copy until the app phase).
-3. **[Exhibits-Reins-Insurer]** (library): reins, raw plus the insurer overrides (raw moment drop, summary flags, captions).
-4. **[Exhibits-PnL-Translation]** (library): pnl_ledger and pnl_ratios, raw plus insurer. The tower (xpnl built) ledger is the expected heavy insurer override, extensively different from the raw frame. GATE: author reviews the PnL business framing (captions, footing rules, Side sign presentation, the tower reshape) before merge.
-5. **[Exhibits-App-Endpoint]** (app): the two routes; menu from capability; delete migrated ROW_FLAGS and FORMATS entries and the main.js title and caption literals for migrated exhibits (pricing FORMATS stay); check-exhibits.py in CI.
-6. **[Exhibits-App-Cleanup]** (app, after a soak): retire `_drop_raw_moments` once the stats and reins frame routes re-point at exhibit raw and insurer, or explicitly keep the frame routes as the raw CSV path forever (decide during the endpoint phase).
+1. ~~**[Exhibits-Scaffold]**~~ SHIPPED `a200`.
+2. ~~**[Exhibits-Stats-Validation]**~~ SHIPPED `a200`.
+3. ~~**[Exhibits-Reins-Insurer]**~~ SHIPPED `a201`.
+4. ~~**[Exhibits-PnL-Translation] raw stage**~~ SHIPPED `a203` (`pnl_ledger`, `pnl_ratios` as RAW passthroughs; both superseded by phase 6 below).
+5. ~~**[PnL-Economic-Frames]**~~ SHIPPED `a204` (library, breaking): the rename table above, plus `stats_df` delegating to the engine with the empty frame fallback. Landed with `_pnl.py`, `qd`, the exhibit registrations, `FEATURES.csv`, docs, 148 test references and the app's `_CSV_FRAMES` in one commit.
+6. **[Exhibits-Package-Split]** (library): `exhibits.py` becomes `exhibits/`, mirroring `plots/`; add `register_simple_exhibit`; retire `pnl_ledger` and `pnl_ratios` in favor of `economic` and `economic_ratios`; add `bs_window` and `tail_behavior` through the new helper. Pure motion plus the helper, so the snapshots should move unchanged except for the two renamed keys and the two new exhibits.
+7. **[Exhibits-Economic-Insurer]** (library): the `economic` and `economic_ratios` insurer treatments per the section above.
+8. **[Exhibits-Waterfall]** (library): `economic_waterfall`, to the specification above, which is now fully specified. GATE: the author reviews the first rendered output on a worked `xpnl` tower before merge. Base case in, then iterate.
+9. **[Exhibits-App-Consolidation]** (app): the client reads envelopes; `applyKindGating` and the hardcoded NA tables read the capability response; the page gains the raw / insurer switch; `/frame/{which}?format=ir` and the covered `xxx_df` routes retire; `_drop_raw_moments`, ROW_FLAGS, FORMATS and the `main.js` caption literals are deleted; `check-exhibits.py` goes into CI. The CSV route and the bulk density routes stay.
 
 ## Explicitly deferred
 
-INSURED and REINSURER implementations (the reinsurer semantics review is that work's opening gate; see the inventory note); the retro perspective; pricing exhibits; exhibit meta language; narrative describe and explain chips; GT PyPI publication (external prerequisite); Sphinx pages beyond docstrings.
+INSURED and REINSURER implementations (the reinsurer semantics review is that work's opening gate: does the reinsurer see Ceded relabeled as its gross, does Net render at all, does cede and assume swap on a P&L); the retro perspective; pricing exhibits, which are parameterized by distortion calibration and computed in POST routes and so do not fit the parameter free GET envelope, parked until the app's upstream asks land (a `density=` or `basis=` kwarg on `calibrate_distortions`, and a public `GridDistribution` export); bounds and `bs_window` beyond the simple passthrough; an exhibit meta language, to be extracted post 1.0 only if a declarative pattern emerges with the hand written exhibits as its test cases; narrative describe and explain chips; Sphinx pages beyond docstrings.
+
+## Open questions
+
+1. **Whether `tail` keeps its insurer treatment** or is demoted to a simple passthrough. RECOMMENDED: keep it. The 1-in-200 and 1-in-250 anchors are exactly the app knowledge this plan exists to migrate.
+2. **Per measure formats on the stats exhibit.** greater_tables declares formats per column, and the canonical store runs measures down a column, so the app's per measure formats have no TableSpec home as the frame stands. Options: pivot inside the insurer override, ask greater_tables for a row format concept, or drop the idea. Blocks nothing; surfaces the moment anyone formats `stats`.

@@ -81,12 +81,12 @@ TWO_EACH = (
 
 
 def _steps(pnl):
-    """The ordered ``Step`` index keys of a walk's ``stats_df``."""
-    return list(dict.fromkeys(pnl.stats_df.index.get_level_values(0)))
+    """The ordered ``Step`` index keys of a walk's ``economic_df``."""
+    return list(dict.fromkeys(pnl.economic_df.index.get_level_values(0)))
 
 
 def _kappa_columns(pnl):
-    return [c for c in pnl.stats_df.columns if c.startswith('κ')]
+    return [c for c in pnl.economic_df.columns if c.startswith('κ')]
 
 
 def _side_total(frame, step, side, column):
@@ -116,7 +116,7 @@ def _step_result(frame, step, column):
 
 def _assert_column_foots(pnl, column):
     """``margin == consideration + obligation`` at every step and at ``All``."""
-    s = pnl.stats_df
+    s = pnl.economic_df
     for step in _steps(pnl):
         margin = _step_result(s, step, column)
         parts = (_side_total(s, step, 'Consideration', column)
@@ -140,13 +140,13 @@ def test_one_layer_per_tier_reproduces_the_tier_walk(direction):
     peeled = build(f'{ONE_EACH} peel {direction}')
     assert not peeled._stitched
     assert _steps(peeled) == _steps(walk)
-    assert peeled.stats_df.equals(walk.stats_df)
+    assert peeled.economic_df.equals(walk.economic_df)
 
 
 def test_one_layer_per_tier_keeps_the_kappa_ladder():
     peeled = build(f'{ONE_EACH} peel top-down')
     assert _kappa_columns(peeled), 'per-atom peel must keep the kappa ladder'
-    assert 'P01' not in peeled.stats_df.columns
+    assert 'P01' not in peeled.economic_df.columns
 
 
 # ----------------------------------------------------------------------
@@ -207,7 +207,7 @@ def test_aggregate_layers_sum_to_the_lumped_tier_recovery():
     rd = p.engine.reins_density_df
     xs = rd['loss'].to_numpy(dtype=float)
     engine_ceded = float((xs * rd['p_agg_ceded'].to_numpy()).sum())
-    s = p.stats_df
+    s = p.economic_df
     peeled = sum(
         s.loc[(step, 'Obligation', f'{step} recovery'), 'EX']
         for step in _steps(p) if step.startswith('agg '))
@@ -222,7 +222,7 @@ def test_occurrence_peel_takes_the_marginal_route():
     assert p._stitched
     assert not _kappa_columns(p), \
         'no shared source, so no kappa ladder ([Decision-Kappa-Shared-Source-Rule])'
-    assert 'P01' in p.stats_df.columns
+    assert 'P01' in p.economic_df.columns
 
 
 @pytest.mark.parametrize('direction', ['top-down', 'bottom-up'])
@@ -238,7 +238,7 @@ def test_occurrence_layers_sum_to_the_engine_cession(direction):
     rd = p.engine.reins_density_df
     xs = rd['loss'].to_numpy(dtype=float)
     engine_ceded = float((xs * rd['p_agg_ceded_occ'].to_numpy()).sum())
-    s = p.stats_df
+    s = p.economic_df
     peeled = sum(
         s.loc[(step, 'Obligation', f'{step} recovery'), 'EX']
         for step in _steps(p) if step.startswith('occ '))
@@ -253,18 +253,18 @@ def test_peel_total_agrees_with_the_consolidated_pnl():
     """
     peeled = build(f'{OCC2} peel top-down')
     consolidated = build(OCC2.replace('xpnl', 'pnl', 1))
-    assert peeled.stats_df.loc[('All', 'Margin', 'Net'), 'EX'] == \
+    assert peeled.economic_df.loc[('All', 'Margin', 'Net'), 'EX'] == \
         pytest.approx(consolidated.est_m, abs=1e-8)
 
 
 @pytest.mark.parametrize('direction', ['top-down', 'bottom-up'])
 def test_peel_order_does_not_change_the_total(direction):
     """The order layers are introduced in cannot move the closing margin."""
-    total = build(f'{OCC2} peel {direction}').stats_df.loc[
+    total = build(f'{OCC2} peel {direction}').economic_df.loc[
         ('All', 'Margin', 'Net'), 'EX']
     other = 'bottom-up' if direction == 'top-down' else 'top-down'
     assert total == pytest.approx(
-        build(f'{OCC2} peel {other}').stats_df.loc[
+        build(f'{OCC2} peel {other}').economic_df.loc[
             ('All', 'Margin', 'Net'), 'EX'], abs=FOOTS)
 
 
@@ -280,7 +280,7 @@ def test_aggregate_tier_rides_the_occurrence_net_subject():
     rd = p.engine.reins_density_df
     xs = rd['loss'].to_numpy(dtype=float)
     engine_agg_ceded = float((xs * rd['p_agg_ceded'].to_numpy()).sum())
-    got = p.stats_df.loc[
+    got = p.economic_df.loc[
         ('agg 150 xs 300', 'Obligation', 'agg 150 xs 300 recovery'), 'EX']
     assert got == pytest.approx(engine_agg_ceded, abs=1e-8)
     _assert_column_foots(p, 'EX')
@@ -324,7 +324,7 @@ def test_stitched_peel_evaluates_its_nets_and_flags_underpriced_layers():
 # ----------------------------------------------------------------------
 def test_each_layer_books_its_own_ceded_premium():
     p = build(f'{OCC2} peel top-down')
-    s = p.stats_df
+    s = p.economic_df
     assert s.loc[('occ 100 xs 100', 'Consideration',
                   'occ 100 xs 100 premium'), 'EX'] == pytest.approx(-60.0)
     assert s.loc[('occ 300 xs 200', 'Consideration',
@@ -343,7 +343,7 @@ def test_per_layer_commission_books_as_its_own_leg():
         '300 xs 200 deposit 40 poisson peel bottom-up'
     )
     p = build(prog)
-    s = p.stats_df
+    s = p.economic_df
     assert s.loc[('occ 100 xs 100', 'Obligation',
                   'occ 100 xs 100 commission'), 'EX'] == pytest.approx(12.0)
     # the unceded layer has no commission leg at all
@@ -533,7 +533,7 @@ def _side(frame, step, view, column='EX'):
 
 def test_two_layer_tier_earns_a_subtotal_block():
     p = build(f'{OCC2} peel top-down')
-    s = p.stats_df
+    s = p.economic_df
     assert 'All occurrence' in _steps(p)
     for view in ('Consideration', 'Obligation', 'Margin'):
         assert ('All occurrence', view, 'Total') in s.index
@@ -561,8 +561,8 @@ def test_tier_subtotal_matches_the_lumped_tier_walk(direction):
     independent code paths, one answer. The walk rides the coarser 2-D joint,
     so it is the looser of the two.
     """
-    walk = build(OCC2).stats_df
-    peeled = build(f'{OCC2} peel {direction}').stats_df
+    walk = build(OCC2).economic_df
+    peeled = build(f'{OCC2} peel {direction}').economic_df
     for view in ('Consideration', 'Obligation', 'Margin'):
         assert _side(peeled, 'All occurrence', view) == pytest.approx(
             _side(walk, 'ceded occ', view), abs=1e-6)
@@ -571,7 +571,7 @@ def test_tier_subtotal_matches_the_lumped_tier_walk(direction):
 def test_tier_subtotal_sums_its_own_layers():
     """Consideration and obligation add over exactly the tier's own steps."""
     p = build(f'{TWO_EACH} peel top-down')
-    s = p.stats_df
+    s = p.economic_df
     for tier, prefix in (('All occurrence', 'occ '), ('All aggregate', 'agg ')):
         layers = [st for st in _steps(p) if st.startswith(prefix)]
         assert len(layers) == 2
@@ -588,7 +588,7 @@ def test_tier_subtotals_chain_into_the_running_net():
     the rebucketing's first-moment accuracy.
     """
     p = build(f'{TWO_EACH} peel top-down')
-    s = p.stats_df
+    s = p.economic_df
     total = (s.loc[('Gross', 'Margin', 'Gross'), 'EX']
              + s.loc[('All occurrence', 'Margin', 'Total'), 'EX']
              + s.loc[('All aggregate', 'Margin', 'Total'), 'EX'])
@@ -646,7 +646,7 @@ def test_tier_spans_shift_on_composition():
     left, right = two_group('L'), two_group('R')
     both = left + right
     assert both._tier_spans == (('All L', 0, 2), ('All R', 2, 4))
-    s = both.stats_df
+    s = both.economic_df
     # each span still totals its OWN two groups, not the other pair's
     for tag, steps in (('L', ['La', 'Lb']), ('R', ['Ra', 'Rb'])):
         assert _side(s, f'All {tag}', 'Margin') == pytest.approx(
@@ -670,17 +670,17 @@ def test_unknown_row_kind_raises(monkeypatch):
 
 
 # ----------------------------------------------------------------------
-# ratio_df / legs_df over a peeled ledger ([PnL-Ratio-Frame])
+# economic_ratios_df / legs_df over a peeled ledger ([PnL-Ratio-Frame])
 # ----------------------------------------------------------------------
 def test_ratio_df_has_a_row_per_block_including_the_tier_subtotals():
     p = build(f'{TWO_EACH} peel top-down')
-    assert list(p.ratio_df.index) == _steps(p)
+    assert list(p.economic_ratios_df.index) == _steps(p)
 
 
 def test_ratio_df_amounts_add_across_the_peeled_blocks():
     """Layers add into their tier, tiers into ``All``; ratios re-derived."""
     p = build(f'{TWO_EACH} peel top-down')
-    r = p.ratio_df
+    r = p.economic_ratios_df
     for tier, prefix in (('All occurrence', 'occ '), ('All aggregate', 'agg ')):
         layers = [s for s in r.index if s.startswith(prefix)]
         for col in ('P', 'L', 'E', 'C', 'M'):
@@ -693,7 +693,7 @@ def test_ratio_df_amounts_add_across_the_peeled_blocks():
 
 def test_ratio_df_margin_identity_holds_on_every_peeled_block():
     p = build(f'{TWO_EACH} peel top-down')
-    r = p.ratio_df
+    r = p.economic_ratios_df
     for step in r.index:
         row = r.loc[step]
         assert row['M'] == pytest.approx(
@@ -702,7 +702,7 @@ def test_ratio_df_margin_identity_holds_on_every_peeled_block():
 
 
 def test_ratio_df_gross_shares_are_one_and_cessions_are_negative():
-    r = build(f'{TWO_EACH} peel top-down').ratio_df
+    r = build(f'{TWO_EACH} peel top-down').economic_ratios_df
     assert r.loc['Gross', 'P_share'] == pytest.approx(1.0)
     assert r.loc['Gross', 'M_share'] == pytest.approx(1.0)
     assert r.loc['All occurrence', 'P_share'] < 0     # premium paid away
@@ -719,7 +719,7 @@ def test_ratio_df_e_columns_survive_the_stitched_peel():
     """
     p = build(f'{OCC2} peel top-down')
     assert p._stitched
-    r = p.ratio_df
+    r = p.economic_ratios_df
     assert r[['E_LR', 'E_ER', 'E_CR']].notna().all().all()
     for plain, mean_of in (('LR', 'E_LR'), ('ER', 'E_ER'), ('CR', 'E_CR')):
         assert (r[plain] == r[mean_of]).all(), plain
@@ -728,7 +728,7 @@ def test_ratio_df_e_columns_survive_the_stitched_peel():
 def test_ratio_df_ex_columns_are_live_on_the_per_atom_peel():
     p = build(f'{AGG2} peel top-down')
     assert not p._stitched
-    r = p.ratio_df
+    r = p.economic_ratios_df
     assert r[['E_LR', 'E_CR']].notna().all().all()
     # every premium here is deterministic, so the two readings coincide
     for step in r.index:
@@ -758,7 +758,7 @@ def test_expense_legs_are_classified_as_expense():
     df = p.legs_df
     assert df.loc[df['Label'] == 'LAE', 'kind'].iloc[0] == 'expense'
     # ...so the ratio frame can split the gross block's LR from its ER
-    gross = p.ratio_df.loc['Gross']
+    gross = p.economic_ratios_df.loc['Gross']
     assert gross['E'] > 0
     assert gross['CR'] == pytest.approx(gross['LR'] + gross['ER'], abs=FOOTS)
 

@@ -1587,10 +1587,12 @@ port NumericsBodoff
     sev dhistogram xps [0 100] [0.95 0.05]
     fixed;
 
-port BodoffFour note{Bodoff Thought Experiment No. 4 (check!)}
-    agg a 0.25 claims sev   4 * expon poisson
-    agg b 0.05 claims sev  20 * expon poisson
-    agg c 0.05 claims sev 100 * expon poisson
+port BodoffFour
+  note{Bodoff Thought Experiment No. 4; exponential severity requires sharpen}
+  tags{topic:portfolio, role:paper, topic:numerics}
+  agg a 0.25 claims sev   4 * expon poisson
+  agg b 0.05 claims sev  20 * expon poisson
+  agg c 0.05 claims sev 100 * expon poisson
 
 port PIRCatNonCatGross
   note{PIR Cat-Noncat gross case study.}

@@ -15,7 +15,7 @@ resolution-markers = [
 
 [[package]]
 name = "aggregate"
-version = "1.0.0a210"
+version = "1.0.0a211"
 source = { editable = "." }
 dependencies = [
     { name = "ipython" },

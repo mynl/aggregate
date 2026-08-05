@@ -171,9 +171,17 @@ def test_renderer_draws_two_panels_sharing_x(both):
     assert len(fig.axes) == 2
     assert density.get_xlim() == tail.get_xlim()
     assert tail.get_yscale() == 'log'
-    # the initial view honors the emitter's window rather than the grid
-    lo, hi = {a.id: a for a in doc.axes}['loss'].suggested_range
-    assert density.get_xlim() == pytest.approx((lo, hi))
+    # the initial view honors the emitter's window rather than the grid: the
+    # window inset by the renderer's own margin, and above all a crop, since
+    # the whole point is that the heavy tail would squash the visible mass
+    # into a sliver at the origin
+    axes = {a.id: a for a in doc.axes}
+    lo, hi = axes['loss'].suggested_range
+    x0, x1 = density.get_xlim()
+    assert x0 < lo and x1 > hi
+    assert x1 < both.reins_density_df['loss'].to_numpy()[-1]
+    # a log range arrives as decades and is drawn as decades
+    assert tail.get_ylim() == pytest.approx(axes['survival'].suggested_range)
     plt.close('all')
 
 

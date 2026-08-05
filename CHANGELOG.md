@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.0a211
+
+**[Chart-Conversions] the suggested range is the range of the data, not of
+the frame.** Author correction to a210: pinning `Distortion.plot` to
+`[0, 1]` was wrong, and deliberately so in the original. A distortion is
+legitimately 0 or 1 over whole stretches of s, and an axis pinned to the
+unit interval draws those stretches along the frame, where they cannot be
+read. The `[0, 1]` pin is reverted and the compositor is back to
+autoscale's margin, with a comment recording why the margin is deliberate
+so it is not "tidied" again.
+
+The renderer keeps honoring `suggested_range`, which it must (the reins
+window is the difference between a readable chart and a sliver at the
+origin), but now treats it as the extent of the *data* and insets a linear
+axis by matplotlib's own `axes.xmargin` / `axes.ymargin`, exactly as
+autoscale would. A log range arrives as whole decades and is drawn as whole
+decades, because a decade gridline is how that axis is read. The distortion
+baseline regenerates **byte-identical to its a209 form**, so the correction
+is exact rather than approximate, and the conversion residual stays 0.
+
 ## 1.0.0a210
 
 **[Chart-IR] pass three, [Chart-Conversions]: the reinsurance triple, and

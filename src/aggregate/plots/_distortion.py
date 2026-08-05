@@ -99,12 +99,11 @@ def plot_distortion(dist, xs=None, n=101, both=True, ax=None, plot_points=True,
     # what the ChartDoc renderer draws from the same axis labels.
     ax.set(title=dist.label, aspect='equal', xlabel='s', ylabel='g(s)')
     if scale == 'linear':
-        # The unit square, drawn as the unit square: g maps [0, 1] to
-        # [0, 1], so autoscale's 5% margin only adds white where no
-        # distortion can go, and it puts the identity diagonal off the
-        # corners it belongs in.
-        ax.set(xlim=[0, 1], ylim=[0, 1],
-               xticks=np.linspace(0, 1, 6),
+        # Ticks pinned, limits left to autoscale's margin deliberately: a
+        # distortion is legitimately 0 or 1 over whole ranges of s, and
+        # pinning the axes to [0, 1] would draw those stretches along the
+        # frame where they cannot be read.
+        ax.set(xticks=np.linspace(0, 1, 6),
                yticks=np.linspace(0, 1, 6))
     if both:
         ax.legend(loc='upper left', fontsize='x-small')

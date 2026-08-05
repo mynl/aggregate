@@ -108,12 +108,24 @@ def _apply_axis(ax, which, axis):
     a readable chart and every visible mass in a sliver at the origin. So
     the initial view honors it, exactly as :class:`ChartAxis` documents;
     panning and zooming afterwards is the reader's business.
+
+    It is the range of the *data*, not of the frame, so a linear axis is
+    then inset by matplotlib's own margin, exactly as autoscale would inset
+    it. That is not cosmetic: a curve legitimately sitting at the end of
+    its range (a distortion is 0 or 1 over whole stretches of s) would
+    otherwise be drawn along the frame, where it cannot be read. A log
+    range arrives as whole decades and is drawn as whole decades, because
+    a decade gridline is how that axis is read.
     """
     if axis.scale == 'log':
         getattr(ax, f'set_{which}scale')('log')
     if axis.suggested_range is not None:
         lo, hi = axis.suggested_range
-        getattr(ax, f'set_{which}lim')(lo, hi)
+        if axis.scale == 'log':
+            getattr(ax, f'set_{which}lim')(lo, hi)
+        else:
+            margin = plt.rcParams[f'axes.{which}margin'] * (hi - lo)
+            getattr(ax, f'set_{which}lim')(lo - margin, hi + margin)
         # The unit interval draws with pinned round ticks: the reference
         # gridlines of a probability square are part of how it is read.
         if (lo, hi) == (0.0, 1.0) and axis.scale == 'linear':

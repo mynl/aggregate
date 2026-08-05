@@ -48,17 +48,26 @@ PROGRAMS = {
     'PnL': ('pnl EX.B 1000 premium less agg EX.Be 850 loss '
             'sev lognorm 100 cv 1 poisson'),
     'Distortion': 'dist EX.PH ph 0.5',
+    # ceding fixtures for the reins exhibit ([Exhibits-Reins-Insurer])
+    'ReinsAggregate': ('agg EX.Re dfreq [1 2] dsev [10 20 30] '
+                       'occurrence net of 10 xs 10'),
+    'ReinsPortfolio': ('port EX.RePort '
+                       'agg EX.ReA dfreq [1 2] dsev [10 20 30] '
+                       'occurrence net of 10 xs 10 '
+                       'agg EX.ReB 1 claim dsev [5 10] fixed'),
 }
 AGG_PROGRAM = PROGRAMS['Aggregate']
 PORT_PROGRAM = PROGRAMS['Portfolio']
 
-# Exhibit names served per kind after [Exhibits-Stats-Validation].
+# Exhibit names served per fixture after [Exhibits-Reins-Insurer].
 EXPECTED_EXHIBITS = {
     'Aggregate': ['summary', 'tail', 'stats', 'validation'],
     'Portfolio': ['summary', 'tail', 'stats', 'validation'],
     'BivariateAggregate': ['summary', 'stats', 'validation', 'dependency'],
     'PnL': ['summary', 'stats', 'validation'],
     'Distortion': ['summary', 'stats', 'validation'],
+    'ReinsAggregate': ['summary', 'tail', 'stats', 'validation', 'reins'],
+    'ReinsPortfolio': ['summary', 'tail', 'stats', 'validation', 'reins'],
 }
 
 
@@ -229,6 +238,43 @@ def test_dependency_two_blocks(objects):
     raw = exhibit_frames(objects['BivariateAggregate'], 'dependency',
                          'insurer')
     pd.testing.assert_frame_equal(raw[0][1], blocks[0][1])
+
+
+# --- reins ([Exhibits-Reins-Insurer]) ---------------------------------------
+
+def test_reins_two_blocks_and_moment_drop(objects):
+    for kind in ('ReinsAggregate', 'ReinsPortfolio'):
+        obj = objects[kind]
+        raw = exhibit_frames(obj, 'reins')
+        ins = exhibit_frames(obj, 'reins', 'insurer')
+        assert [name for name, _, _ in raw] == ['reins_stats_df',
+                                                'reins_summary_df']
+        # raw is untouched; insurer drops the raw noncentral moment rows
+        assert raw[0][2] == {} and raw[1][2] == {}
+        raw_measures = set(raw[0][1].index.get_level_values('measure'))
+        ins_measures = set(ins[0][1].index.get_level_values('measure'))
+        assert {'ex1', 'ex2', 'ex3'} <= raw_measures
+        assert ins_measures.isdisjoint({'ex1', 'ex2', 'ex3'})
+        # both insurer blocks are captioned
+        assert 'caption' in ins[0][2] and 'caption' in ins[1][2]
+
+
+def test_reins_portfolio_total_flags(objects):
+    _, df, kw = exhibit_frames(objects['ReinsPortfolio'], 'reins',
+                               'insurer')[1]
+    flags = kw['row_flags']
+    for i, key in enumerate(df.index):
+        if key[0] == 'total':
+            assert flags[i] == ('total',)
+        else:
+            assert i not in flags
+    assert flags  # the total block exists
+
+
+def test_reins_unavailable_without_cession(dice):
+    assert 'reins' not in [n for n, _ in available_exhibits(dice)]
+    with pytest.raises(ValueError, match='not available'):
+        exhibit_frames(dice, 'reins')
 
 
 # --- errors -----------------------------------------------------------------

@@ -38,6 +38,13 @@ PROGRAMS = {
     'PnL': ('pnl EX.B 1000 premium less agg EX.Be 850 loss '
             'sev lognorm 100 cv 1 poisson'),
     'Distortion': 'dist EX.PH ph 0.5',
+    # ceding fixtures for the reins exhibit ([Exhibits-Reins-Insurer])
+    'ReinsAggregate': ('agg EX.Re dfreq [1 2] dsev [10 20 30] '
+                       'occurrence net of 10 xs 10'),
+    'ReinsPortfolio': ('port EX.RePort '
+                       'agg EX.ReA dfreq [1 2] dsev [10 20 30] '
+                       'occurrence net of 10 xs 10 '
+                       'agg EX.ReB 1 claim dsev [5 10] fixed'),
 }
 
 

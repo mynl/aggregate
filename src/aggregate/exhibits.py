@@ -496,8 +496,11 @@ reins = _make_exhibit_function(
     'reins', 'Reinsurance',
     """Reinsurance exhibit: ``reins_stats_df`` and ``reins_summary_df`` blocks.
 
-    Available only when the object carries a cession. Registrations land in
-    the [Exhibits-Reins-Insurer] phase.
+    Available only when the object (or a portfolio unit) carries a cession
+    and the grid is realized. Two blocks: the layering / end to end moment
+    store and the per stage cession impact summary. The INSURER view drops
+    the raw noncentral moment rows from the stats block, captions both
+    blocks, and flags the portfolio total block on the summary.
 
     Parameters
     ----------
@@ -722,6 +725,17 @@ def _stats_frames_generic(obj):
     return [('stats_df', obj.stats_df, {})]
 
 
+def _drop_raw_moment_rows(df):
+    """Drop rows whose ``measure`` index level is a raw noncentral moment.
+
+    The ``mean`` / ``cv`` / ``skew`` rows and any ``meta`` block stay
+    (``ex1`` duplicates ``mean``, so nothing is lost). Shared by the stats
+    and reins insurer overrides.
+    """
+    keep = ~df.index.get_level_values('measure').isin(RAW_MOMENT_MEASURES)
+    return df.loc[keep]
+
+
 @stats.insurer.register(Aggregate)
 @stats.insurer.register(Portfolio)
 def _stats_insurer_moment_store(obj, blocks):
@@ -732,12 +746,11 @@ def _stats_insurer_moment_store(obj, blocks):
     perspective keeps all 26 rows.
     """
     block_name, df, kw = blocks[0]
-    keep = ~df.index.get_level_values('measure').isin(RAW_MOMENT_MEASURES)
     caption = ('Canonical moment store by component and measure across the '
                'computation views. Raw noncentral moments (ex1, ex2, ex3) '
                'are dropped from this view; the raw perspective keeps the '
                'full store.')
-    return [(block_name, df.loc[keep], dict(kw, caption=caption))]
+    return [(block_name, _drop_raw_moment_rows(df), dict(kw, caption=caption))]
 
 
 # --- validation registrations -----------------------------------------------
@@ -842,3 +855,71 @@ def _validation_insurer_bivariate(obj, blocks):
 def _dependency_frames_bivariate(obj):
     return [('dependency_df', obj.dependency_df, {}),
             ('axis_support_df', obj.axis_support_df, {})]
+
+
+# --- reins registrations ([Exhibits-Reins-Insurer]) -------------------------
+
+@reins.register(Aggregate)
+@reins.register(Portfolio)
+def _reins_frames(obj):
+    return [('reins_stats_df', obj.reins_stats_df, {}),
+            ('reins_summary_df', obj.reins_summary_df, {})]
+
+
+def _reins_summary_flags(df):
+    """Row flags for a reins summary frame: the portfolio ``total`` block.
+
+    The Aggregate frame (``(stage, view, component)`` index) has no total
+    block and takes no flags; the Portfolio frame leads with a ``stage``
+    level whose ``total`` block carries the end to end portfolio moments.
+    """
+    flags = {}
+    for i, key in enumerate(df.index):
+        if isinstance(key, tuple) and key[0] == 'total':
+            flags[i] = ('total',)
+    return flags
+
+
+@reins.insurer.register(Aggregate)
+def _reins_insurer_aggregate(obj, blocks):
+    (stats_name, stats_frame, stats_kw), \
+        (summary_name, summary_frame, summary_kw) = blocks
+    stats_caption = (
+        'Layering analysis by view and layer: per layer columns are '
+        'conditional on a loss reaching the layer, the Ceded and Net totals '
+        'are unconditional, and the meta block carries attachment and '
+        'exhaustion probabilities and loss on line. Raw noncentral moments '
+        '(ex1, ex2, ex3) are dropped from this view; the raw perspective '
+        'keeps the full store.')
+    summary_caption = (
+        'Per stage cession impact on the eight validation columns: Change '
+        'reads as rebucketing error on the leading gross or subject row and '
+        'as the percentage impact of the cession on the ceded and net rows.')
+    return [
+        (stats_name, _drop_raw_moment_rows(stats_frame),
+         dict(stats_kw, caption=stats_caption)),
+        (summary_name, summary_frame,
+         dict(summary_kw, caption=summary_caption)),
+    ]
+
+
+@reins.insurer.register(Portfolio)
+def _reins_insurer_portfolio(obj, blocks):
+    (stats_name, stats_frame, stats_kw), \
+        (summary_name, summary_frame, summary_kw) = blocks
+    stats_caption = (
+        'End to end gross, ceded and net aggregate moments per unit plus '
+        'the convolved portfolio total. Raw noncentral moments (ex1, ex2, '
+        'ex3) are dropped from this view; the raw perspective keeps the '
+        'full store.')
+    summary_caption = (
+        'Per unit cession impact plus the end to end portfolio total: '
+        'Change reads as the percentage impact of the reinsurance program '
+        'on each moment (0 on the gross reference rows).')
+    return [
+        (stats_name, _drop_raw_moment_rows(stats_frame),
+         dict(stats_kw, caption=stats_caption)),
+        (summary_name, summary_frame,
+         dict(summary_kw, caption=summary_caption,
+              row_flags=_reins_summary_flags(summary_frame))),
+    ]

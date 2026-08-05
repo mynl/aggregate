@@ -126,9 +126,10 @@
   raw moment drop and failing row emphasis; dependency for bvagg; snapshot
   tests, lazy GT boundary; the `exhibits` extra is documented but commented
   in `pyproject.toml` until greater_tables 6 publishes to PyPI, since an
-  active unresolvable extra would break `uv sync --all-extras`). Next:
-  `[Exhibits-Reins-Insurer]`, then `[Exhibits-PnL-Translation]` behind its
-  author gate. Open with the author: per measure formats for the stats
+  active unresolvable extra would break `uv sync --all-extras`).
+  `[Exhibits-Reins-Insurer]` landed `a201` (reins exhibit, two blocks,
+  cession gated, insurer moment drop plus captions and total flags). Next:
+  `[Exhibits-PnL-Translation]` behind its author gate. Open with the author: per measure formats for the stats
   insurer view (greater_tables formats are per column, the store mixes
   measures down a column, so the app's measure formats have no TableSpec
   home yet) and whether the PnL validation audit ever gets a failure gate.
@@ -154,10 +155,17 @@
   `test_charts_ir.py` for now because `test_plots_boundary.py` was
   mid-edit in the parallel exhibits workstream); pilot library side landed
   a199 (`chart_joint_surface` emitter with the migrated surfaceGrid
-  reduction, `plots/_chartdoc.py` renderer with the capability pattern).
-  Next: the pilot's aggregate_api commit (route, chartdoc-to-echarts
-  adapter, surfaceGrid deletion), then conversions in plan order
-  (distortion g(s) first).
+  reduction, `plots/_chartdoc.py` renderer with the capability pattern);
+  pilot app side landed as aggregate_api a38 (`/chart/{name}` route with
+  doc-hash ETag, generic `chartdoc-to-echarts.js` adapter plus
+  `surfaceOverrides` chrome dict, `surfaceGrid`/`surfaceOption` deleted,
+  fixtures and node smoke updated); first conversion, distortion g(s),
+  landed a202 (emitter, xy renderer growth, and the image gate:
+  compositor-generated baseline, measured conversion residual RMS 0.05,
+  PROVISIONAL pins mpl 3.10.9 / tolerance 2.0 awaiting author
+  confirmation). Next: the distortion's paired app commit (adapter xy
+  realization), then reins triple, sev, agg, pnl, port, bvagg heatmap in
+  plan order.
 
 ### Correctness & bugs
 

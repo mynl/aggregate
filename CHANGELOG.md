@@ -1,5 +1,65 @@
 # Changelog
 
+## 1.0.0a202
+
+**[Chart-IR] pass three continues, [Chart-Conversions]: distortion g(s),
+the first conversion.** `charts/_emit_distortion.py`:
+`chart_distortion(dist, dual=True)` reads the knot-spliced `density_df`
+grid verbatim (splicing is meaning, exactly why the compositor reads the
+frame rather than re-evaluating `g`) and emits one equal-aspect 'xy' panel:
+the distortion curve, optionally its dual, and the identity diagonal as a
+role-carrying series. Registered, so `available_charts` on a `Distortion`
+answers `['distortion']`.
+
+The renderer grew its 'xy' realization: role-styled curves ('identity'
+draws neutral, thin, legendless; band series fill between `y` and `y2`),
+gaps broken at `None`, mark verticals and horizontals, pinned round ticks
+on a probability unit interval, equal aspect from the panel, the compact
+square figure for an equal-aspect single panel, and the legend rule
+(upper left, x-small, only with more than one named series). Axis *labels*
+are deliberately not drawn yet: the converted compositor never drew them,
+and the gate below is pixel parity; whether the mpl look should gain them
+is an author call recorded with the gate pins.
+
+The acceptance gate landed with the conversion:
+`tests/test_chartdoc_render.py` compares the rendered ChartDoc against a
+committed baseline PNG generated from the *compositor* (the before side),
+plus a second test pinning the compositor itself to the baseline so
+neither side of the seam drifts silently. Measured conversion residual at
+setup: RMS 0.05 on the 0-255 scale, sub-perceptual antialiasing only.
+PROVISIONAL PINS awaiting author confirmation per the plan's gate-setup
+step: matplotlib 3.10.9 (tests skip on other versions rather than fail on
+font differences) and RMS tolerance 2.0. `--regen` on the test module
+rewrites baselines.
+
+The paired app commit (the app distortion exhibit consuming
+`chart/distortion` through the adapter, which needs the adapter's 'xy'
+realization) is the next app-side step and is not part of this commit.
+
+## 1.0.0a201
+
+**[Exhibits-Module] phase three, [Exhibits-Reins-Insurer].** The `reins`
+exhibit registered for Aggregate and Portfolio: two blocks,
+`reins_stats_df` (the layering / end to end moment store) and
+`reins_summary_df` (the per stage cession impact on the eight validation
+columns). Availability is gated on a cession being present (any unit, on a
+portfolio) and the grid realized; the predicate reads `occ_reins` /
+`agg_reins` directly, so it costs nothing. The INSURER view drops the raw
+noncentral moment rows (ex1/ex2/ex3) from the stats block through the same
+`_drop_raw_moment_rows` helper the stats exhibit now shares, captions both
+blocks (conditional per layer columns vs unconditional totals on an
+Aggregate; end to end gross / ceded / net per unit plus the convolved total
+on a Portfolio; Change as rebucketing error on the leading row, percentage
+cession impact on ceded / net), and flags the portfolio summary's `total`
+block. RAW passes both frames through untouched.
+
+Tests: ceding Aggregate and Portfolio fixtures join `tests/test_exhibits.py`
+(availability, the two block shape, the moment drop, total flags, and the
+not available path without a cession) and the snapshot corpus, now 56
+committed canonical_dict snapshots. Fixture programs (bv and pnl fixtures
+included, previously missing) added to `decl-testers.agg` section EX; both
+DecL corpus suites round-trip them.
+
 ## 1.0.0a200
 
 **[Exhibits-Module] phases one and two, [Exhibits-Scaffold] plus

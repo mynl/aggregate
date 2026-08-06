@@ -31,9 +31,7 @@ BSD 3.
 Dependencies
 =============
 
-See pyproject.toml. Requirements are split between those needed to run the project, and a larger set needed to build the documentation.
-
-Apart from ``sly`` and ``titlecase``, all run-dependencies are standard.
+See pyproject.toml. Requirements are split between those needed to run the project, and a larger set needed to build the documentation. All dependencies are standard packages.
 
 Help Parameters and Examples
 ================================
@@ -44,19 +42,19 @@ Help Parameters and Examples
 Help Structure
 ===============
 
-This help is structured around **access**, **application**, **theory**, and **implementation**. There are six parts.
+This help is in four parts.
 
 #. Getting Started (this document).
-#. :doc:`2_Aggregate_Overview`, explaining how ``aggregate`` computes and how to steer it.
-#. :doc:`3_Reference`: all functions, classes, methods, and properties.
+#. :doc:`2_Aggregate_Overview`, explaining how ``aggregate`` computes and providing several examples.
 #. :doc:`4_dec_Language_Reference`: syntax and grammar.
+#. :doc:`3_Reference`: all functions, classes, methods, and properties.
 
 There is also a :doc:`Bibliography<7_bibliography>`.
 
 Help Coding Conventions
 =======================
 
-Throughout the help, you will see input code inside code blocks such as:
+Throughout the help, you will see input code inside blocks such as:
 
 ::
 

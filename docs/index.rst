@@ -34,7 +34,7 @@ This help document is in four parts plus a bibliography.
 
    1_Getting_Started
    2_Aggregate_Overview
-   3_Reference
    4_dec_Language_Reference
+   3_Reference
    7_bibliography
 

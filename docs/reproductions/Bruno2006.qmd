@@ -1,0 +1,239 @@
+---
+title: "92,832 convolutions in five seconds"
+subtitle: "Reproducing Bruno, Camerini, Manna and Tomassetti (2006)"
+author: "Stephen J. Mildenhall"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    df-print: kable
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+---
+
+## Context and problem
+
+@Bruno2006 proposes a direct method for the aggregate claims distribution, competing with Panjer recursion, De Pril transforms and the FFT. The idea is thresholded direct convolution: at each convolution order, keep only the outcomes whose probability exceeds a cutoff chosen so that the retained mass and the first three moments are correct to a prescribed tolerance, here $10^{-6}$, and discard the rest.
+
+The claimed advantages are that no assumption is needed on the counting distribution, that severities need not be identically distributed, and that the method avoids the underflow that kills Panjer recursion at large $\lambda$ and the overflow and bit-reversal overhead of the FFT. Tables 3 to 5 count multiplications, Table 4 reports timings, and the authors conclude their method is "more flexible, easier and cheaper than the (exact and approximated) methods using recursion and FFT", with the advantage growing as the number of convolutions rises.
+
+This is a method paper of the most useful kind for a reproduction: it gives the full input specification and tabulates the output distribution to six decimal places.
+
+## Paper solution and gold standard
+
+Severity is a 14-point discrete law on the integers 14 to 60 (Table 1), the same for every claim. Three counting distributions are used:
+
+| Table | Counting distribution | Content |
+|---|---|---|
+| 6 | Poisson, $\lambda = 504.814259$ | probability and CDF at 28 quantiles |
+| 7 | Poisson, $\lambda = 91{,}000$ | CDF at 28 quantiles, 92,832 convolutions |
+| 8 | Poisson mixed by a generalized Pareto | CDF at 17 quantiles |
+
+The quantiles are quoted as $\mu + k\sigma$ for stated $\mu$ and $\sigma$ and then truncated to integers, so the comparison is unambiguous: evaluate at the integers printed.
+
+```{python}
+#| label: setup
+import numpy as np
+import pandas as pd
+from scipy.integrate import quad
+from scipy.special import gammaln
+from aggregate import build
+
+XS = [14, 15, 16, 17, 18, 19, 20, 24, 26, 28, 30, 31, 55, 60]
+PS = [.0103301, .0307990, .0293511, .0103301, .0730414, .0111568, .0264554,
+      .1002133, .0815418, .0252146, .0212857, .0254214, .0991756, .4556837]
+DSEV = ('dsev [' + ' '.join(map(str, XS)) + '] ['
+        + ' '.join(f'{q:.7f}' for q in PS) + ']')
+x, p = np.array(XS, float), np.array(PS)
+m1, m2 = (x * p).sum(), (x ** 2 * p).sum()
+pd.DataFrame([{'sum of probabilities': p.sum(), 'severity mean': m1,
+               'E[U^2]': m2, 'severity sd': np.sqrt(m2 - m1 ** 2)}])
+```
+
+## Table 6: Poisson, $\lambda = 504.814259$
+
+The severity is integer valued, so the aggregate lives on the integer lattice and `bs = 1` is exact. The support runs to $658 \times 60 = 39{,}480$, comfortably inside $2^{17}$.
+
+```{python}
+#| label: table-6
+LAM6 = 504.814259
+a6 = build(f'agg B {LAM6} claims {DSEV} poisson', log2=17, bs=1,
+           padding=1, normalize=False)
+pd.DataFrame([
+    {'quantity': 'mean', 'aggregate': a6.est_m, 'lambda E[U]': LAM6 * m1,
+     'paper': 21586.462129},
+    {'quantity': 'standard deviation', 'aggregate': a6.est_sd,
+     'lambda E[U]': np.sqrt(LAM6 * m2), 'paper': 1047.695834},
+    {'quantity': 'total mass', 'aggregate': a6.agg_density.sum(),
+     'lambda E[U]': 1.0, 'paper': 1.0},
+])
+```
+
+```{python}
+#| label: table-6-values
+T6 = [(16347, .000000, .000000), (17395, .000000, .000017),
+      (18443, .000004, .001051), (18967, .000015, .005405),
+      (19491, .000051, .021317), (19595, .000062, .027153),
+      (19700, .000075, .034326), (19752, .000082, .038411),
+      (19805, .000090, .042970), (19857, .000098, .047852),
+      (19910, .000107, .053271), (20014, .000125, .065289),
+      (20538, .000235, .158591), (20800, .000292, .227754),
+      (21062, .000340, .310857), (21324, .000371, .404499),
+      (21586, .000381, .503536), (21848, .000367, .601928),
+      (22110, .000332, .693829), (22372, .000283, .774593),
+      (22634, .000227, .841425), (23158, .000122, .931859),
+      (23681, .000052, .975826), (24205, .000018, .992972),
+      (24729, .000005, .998325), (25777, .000000, .999947),
+      (26824, .000000, .999999), (29968, .000000, 1.000000)]
+d6 = a6.density_df
+t6 = pd.DataFrame([{'x': xx, 'agg probability': d6.loc[xx, 'p_total'],
+                    'Table 6 probability': pp, 'agg CDF': d6.loc[xx, 'F'],
+                    'Table 6 CDF': cc} for xx, pp, cc in T6])
+t6['CDF diff'] = (t6['agg CDF'] - t6['Table 6 CDF']).abs()
+t6
+```
+
+```{python}
+#| label: table-6-summary
+pd.DataFrame([{'rows compared': len(t6),
+               'largest CDF difference': float(t6['CDF diff'].max()),
+               'largest probability difference':
+                   float((t6['agg probability']
+                          - t6['Table 6 probability']).abs().max())}])
+```
+
+Both columns match to $5\times10^{-7}$, which is exact at the six decimals printed. The aggregate mean agrees with $\lambda \mathsf E[U]$ to twelve digits.
+
+## Table 8: Poisson mixed by a generalized Pareto
+
+The counting law is $N \mid \Theta \sim \mathrm{Poisson}(\Theta)$ with $\Theta$ generalized Pareto, $a = 3.4959$, $b = 30.1234$, $c = 1.99321$, in the Klugman parameterization
+
+$$u(\lambda) = \frac{a^{b}\,\Gamma(b+c)}{\Gamma(b)\Gamma(c)} \cdot \frac{\lambda^{c-1}}{(a+\lambda)^{b+c}}.$$
+
+This mixing family is not one of the built-in `mixed` frequencies, which cover gamma, inverse Gaussian, Sichel, Delaporte and beta. It does not need to be: the paper's method and `aggregate` agree that what a compound distribution needs from the frequency is a probability vector, so compute $p(n) = \mathsf E[e^{-\Theta}\Theta^n/n!]$ by quadrature and hand it over as a `dfreq`.
+
+The mixing moments are $\mathsf E[\Theta] = ac/(b-1)$ and $\mathsf E[\Theta^2] = a^2 c(c+1)/((b-1)(b-2))$, which give an independent check on the parameterization before any of it is used.
+
+```{python}
+#| label: mixing
+A, B, C = 3.4959, 30.1234, 1.99321
+ETH = A * C / (B - 1)
+ETH2 = A ** 2 * C * (C + 1) / ((B - 1) * (B - 2))
+pd.DataFrame([
+    {'quantity': 'E[Theta] = E[N]', 'recomputed': ETH, 'paper': np.nan},
+    {'quantity': 'aggregate mean', 'recomputed': ETH * m1, 'paper': 10.2310},
+    {'quantity': 'aggregate standard deviation',
+     'recomputed': np.sqrt(ETH * m2 + (ETH2 - ETH ** 2) * m1 ** 2),
+     'paper': 24.0489},
+])
+```
+
+```{python}
+#| label: table-8
+lc = np.log(A) * B + gammaln(B + C) - gammaln(B) - gammaln(C)
+mix_pdf = lambda lam: np.exp(lc + (C - 1) * np.log(lam)
+                             - (B + C) * np.log(A + lam))
+pn = np.array([quad(lambda t: np.exp(-t + n * np.log(t) - gammaln(n + 1))
+                    * mix_pdf(t), 0, np.inf, limit=400)[0]
+               for n in range(401)])
+keep = pn > 1e-14
+ns, qs = np.arange(401)[keep], pn[keep]
+FREQ = ('dfreq [' + ' '.join(map(str, ns)) + '] ['
+        + ' '.join(f'{q:.14e}' for q in qs) + ']')
+a8 = build(f'agg B8 {FREQ} {DSEV}', log2=16, bs=1, padding=1, normalize=False)
+
+T8 = [(0, .798708), (4, .798708), (10, .798708), (16, .810615), (22, .831052),
+      (28, .866018), (34, .874409), (46, .877189), (58, .896084),
+      (70, .973562), (82, .980304), (106, .987965), (130, .997091),
+      (202, .999813), (250, .999972), (491, 1.000000), (1212, 1.000000)]
+t8 = pd.DataFrame([{'x': xx, 'agg CDF': a8.density_df.loc[xx, 'F'],
+                    'Table 8 CDF': cc} for xx, cc in T8])
+t8['diff'] = (t8['agg CDF'] - t8['Table 8 CDF']).abs()
+t8
+```
+
+```{python}
+#| label: table-8-summary
+pd.DataFrame([{'counts retained above 1e-14': int(ns[-1]),
+               'sum of p(n)': float(pn.sum()),
+               'p(0)': float(pn[0]), 'Table 8 CDF at 0': 0.798708,
+               'agg mean': a8.est_m, 'agg sd': a8.est_sd,
+               'largest CDF difference': float(t8['diff'].max())}])
+```
+
+All seventeen values exact at six decimals, including $p(0) = 0.798708$, which is the probability of no claim and so the CDF's value everywhere below 14.
+
+## Table 7: $\lambda = 91{,}000$, the case the competitors could not do
+
+This is the paper's showcase. At $\lambda = 91{,}000$ the aggregate mean is 3.89 million, the method needs 92,832 convolutions, and Table 4 records that Panjer recursion and De Pril both **underflow** at $\lambda$ as low as 1004.8. The authors report 1,950 seconds for their own method here. Their FFT comparison stops at $\lambda = 5004.8$, where it took 3,850 seconds.
+
+The support runs to $92{,}832 \times 60 = 5.57$ million, so a grid of $2^{23}$ at `bs = 1` holds it whole and no padding is needed: with the support strictly inside the grid there is nowhere for aliasing to come from.
+
+```{python}
+#| label: table-7
+import time
+t0 = time.time()
+a7 = build(f'agg B7 91000 claims {DSEV} poisson', log2=23, bs=1,
+           padding=0, normalize=False)
+elapsed = time.time() - t0
+pd.DataFrame([{'seconds': elapsed, 'grid points': 2 ** 23,
+               'x_max': a7.xs[-1], 'mean': a7.est_m, 'sd': a7.est_sd,
+               'paper mean': 3891268.954300, 'paper sd': 14066.631372,
+               'total mass': a7.agg_density.sum()}])
+```
+
+```{python}
+#| label: table-7-values
+T7 = [(3820935, .000000), (3835002, .000030), (3849069, .001327),
+      (3856102, .006149), (3863135, .022643), (3864542, .028604),
+      (3865949, .035817), (3866652, .039943), (3867355, .044447),
+      (3868059, .049359), (3868762, .054687), (3870169, .066705),
+      (3877202, .158658), (3880718, .226704), (3884235, .308708),
+      (3887752, .401538), (3891268, .500249), (3894785, .598941),
+      (3898302, .691642), (3901818, .773450), (3905335, .841343),
+      (3912368, .933083), (3919402, .977145), (3926435, .993730),
+      (3933468, .998627), (3947535, .999967), (3961602, 1.000000),
+      (4003802, 1.000000)]
+F7 = a7.density_df['F']
+t7 = pd.DataFrame([{'x': xx, 'agg CDF': F7.loc[xx], 'Table 7 CDF': cc}
+                   for xx, cc in T7])
+t7['diff'] = (t7['agg CDF'] - t7['Table 7 CDF']).abs()
+t7
+```
+
+```{python}
+#| label: table-7-summary
+pd.DataFrame([{'rows compared': len(t7),
+               'largest CDF difference': float(t7['diff'].max()),
+               'paper seconds for its own method': 1950,
+               'aggregate seconds': elapsed}])
+```
+
+All 28 values exact at six decimals, in a few seconds.
+
+## Comments
+
+### The timing claim has not aged well
+
+The paper's case rests on operation counts and wall clock. Table 3 argues the FFT needs 6 to 41 times more real multiplications than direct thresholded convolution, and Table 4 shows the FFT taking 3,850 seconds at $\lambda = 5004.8$ against 41 for the proposed method.
+
+The multiplication count was never the right proxy, and the paper half says so: "the number of multiplications is only one of so many elements affecting the procedure's processing time". What it misses is the direction of the error. The authors count the FFT as $O(N \log N)$ per convolution and then sum over 92,832 convolutions, because their formalization performs the convolutions **one at a time**, each an inverse transform of $\phi_{n-1}\phi_1$. That is not how one computes a compound distribution with an FFT. The frequency enters through its probability generating function applied pointwise to the severity transform, so the whole compound distribution costs **two** transforms of length $2^{23}$ regardless of whether $\lambda$ is 500 or 91,000. Their equation (19) sums a per-convolution cost that a correct implementation never pays.
+
+That is why the reproduction runs in seconds rather than hours, and why the ratio to their reported time is four orders of magnitude rather than the factor of 40 they anticipated in the other direction. Some of the gap is twenty years of hardware. The structural part is not.
+
+### What survives, and it is not nothing
+
+The threshold idea is sound and `aggregate` uses a version of it. Table 8 above needed the frequency vector only out to $n = 17$, because $p(n)$ had fallen below $10^{-14}$ by then, and that truncation is exactly the paper's first phase. Their control, choosing the cutoff so that the retained mass **and the first three moments** are accurate to a stated tolerance, rather than by eye, is a good discipline and the closest thing in the paper to a genuinely portable idea. `aggregate`'s validation reports the analogous quantity as a moment comparison after the fact.
+
+The underflow point also survives. Panjer recursion really does fail at $\lambda = 1004.8$ here while the transform does not, and that is a real structural difference between recursions that propagate a small $g(0)$ and methods that do not. It just happens to be an argument for the FFT rather than against it.
+
+### The severity is the interesting part
+
+The 14-point severity carries 45.6% of its mass at the single value 60 and another 9.9% at 55, so more than half the distribution sits on two atoms at the top of the range. That is what makes the case a fair stress test: the aggregate is a convolution of a very lumpy lattice law, and a method that smoothed it would show up immediately. Both the paper's method and `aggregate` reproduce the probability column, not just the CDF, which is the stronger test of the two.
+
+## References
+
+::: {#refs}
+:::

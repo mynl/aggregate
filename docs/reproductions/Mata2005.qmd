@@ -1,0 +1,217 @@
+---
+title: "Trend by layer, and a discrepancy in Table 1"
+subtitle: "Reproducing Mata and Verheyen (2005)"
+author: "Stephen J. Mildenhall"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    df-print: kable
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+---
+
+## Context and problem
+
+Two practical problems spoil excess of loss experience rating. Reinsurers often receive individual claim detail only above a reporting threshold, so lower layers cannot be trended claim by claim; and when the ceding company's limits profile shifts during the experience period, averaging loss costs across years compares things that are not comparable.
+
+@Mata2005 fixes both with the mathematics of exposure rating. A trend factor **for a layer** can be derived from the ground up trend, the severity curve and the limits profile, without touching individual claims, by asking what the expected severity in the layer costs at two claim cost levels:
+
+$$(\text{Excess Trend})_p = \frac{\mathsf E_Y[Y \wedge T] - \mathsf E_Y[Y \wedge B]}{\mathsf E_X[X \wedge T] - \mathsf E_X[X \wedge B]},$$
+
+with $T$ and $B$ the top and bottom of the layer capped at the policy limit. The same apparatus, run against two limits profiles instead of two cost levels, gives an exposure adjustment by layer. Both are then split into frequency and severity components, since the count of claims reaching a layer moves with ground up severity trend even when ground up frequency is flat.
+
+Everything reduces to limited expected values, which makes it a clean `aggregate` exercise.
+
+## Paper solution and gold standard
+
+The worked example runs through Tables 1 to 14. A ceding company writes limits from \$250,000 to \$5,000,000, severity is lognormal with $\mu = 9.31$ and $\sigma = 2.29$ in 2005 values, ground up severity trend is 8% a year, the expected gross loss ratio is 60%, and rates rose a cumulative 50% between 2000 and 2005. Five layers are priced. The 2000 severity is the same lognormal with $\mu' = \mu - \ln(1.08^5) = 8.93$.
+
+The headline results are that the \$4MM xs \$1MM layer trends at 9.59% a year against an unlimited 8%, that the same layer's exposure has doubled while total limits exposure rose only 9%, and that most of the excess trend is additional claims reaching the layer rather than larger claims within it.
+
+```{python}
+#| label: setup
+import numpy as np
+import pandas as pd
+from aggregate import build
+
+MU, SIGMA, TREND, YEARS, ELR, OL = 9.31, 2.29, 1.08, 5, 0.60, 1.50
+CV = float(np.sqrt(np.exp(SIGMA ** 2) - 1))
+M05 = float(np.exp(MU + SIGMA ** 2 / 2))
+M00 = M05 / TREND ** YEARS
+PL = [250e3, 500e3, 750e3, 1e6, 5e6]
+SP05 = [2_250_000, 5_400_000, 2_925_000, 6_300_000, 9_000_000]
+SP00 = [2_250_000, 4_500_000, 2_925_000, 3_150_000, 3_000_000]
+LAYERS = [(250e3, 0.), (250e3, 250e3), (500e3, 500e3), (4e6, 1e6), (5e6, 0.)]
+LN = ['$250k xs 0', '$250k xs $250k', '$500k xs $500k', '$4MM xs $1MM',
+      '$5MM xs 0']
+LOG2, BS = 20, 25.0                 # one grid, x_max = 26.2M
+```
+
+The 2000 mean uses the unrounded $\mu' = 8.925195$. Using the printed 8.93 instead moves the limited expected values by about half a percent, more than the effects the paper is measuring, and the paper's own Table 1 is consistent with the unrounded value.
+
+## The `aggregate` reproduction
+
+```{python}
+#| label: table-1
+def lev(a, mean):
+    if a == 0:
+        return 0.0
+    return build(f'agg M 1 claim {a} xs 0 sev lognorm {mean} cv {CV} fixed',
+                 log2=LOG2, bs=BS, normalize=False).est_m
+
+PTS = sorted({0.} | set(PL) | {min(p, t + l) for p in PL for l, t in LAYERS}
+             | {min(p, t) for p in PL for l, t in LAYERS})
+AGG = {(a, y): lev(a, M05 if y == 2005 else M00)
+       for y in (2005, 2000) for a in PTS}
+PAP = {(p, 2005): v for p, v in zip(PL, [48539, 64416, 74252, 81301, 117221])}
+PAP.update({(p, 2000): v for p, v in zip(PL, [38900, 50191, 56947, 61681, 84401])})
+PAP.update({(0., 2005): 0.0, (0., 2000): 0.0})
+
+t1 = pd.DataFrame({'policy limit': PL, 'premium 2005': SP05,
+                   'agg EY[Y and PL]': [AGG[(p, 2005)] for p in PL],
+                   'Table 1 2005': [PAP[(p, 2005)] for p in PL],
+                   'agg EX[X and PL]': [AGG[(p, 2000)] for p in PL],
+                   'Table 1 2000': [PAP[(p, 2000)] for p in PL]})
+t1['2005 paper / agg'] = t1['Table 1 2005'] / t1['agg EY[Y and PL]']
+t1['2000 paper / agg'] = t1['Table 1 2000'] / t1['agg EX[X and PL]']
+t1
+```
+
+The limited expected values do not agree. The paper is 0.04% high at \$250,000 and drifts steadily to 0.24% low at \$5,000,000, in both years. The discrepancy is small but it is systematic, and it is worth settling before reading anything downstream.
+
+`aggregate` is not the source. The lognormal limited expected value has a closed form, $\mathsf E[X \wedge a] = e^{\mu + \sigma^2/2}\,\Phi\!\left(\frac{\ln a - \mu - \sigma^2}{\sigma}\right) + a\,S(a)$:
+
+```{python}
+#| label: closed-form
+import scipy.stats as ss
+FZ05 = ss.lognorm(SIGMA, scale=np.exp(MU))
+
+def closed(a):
+    return (M05 * ss.norm.cdf((np.log(a) - MU - SIGMA ** 2) / SIGMA)
+            + a * FZ05.sf(a))
+
+chk = pd.DataFrame({'a': PL, 'aggregate': [AGG[(p, 2005)] for p in PL],
+                    'closed form': [closed(p) for p in PL],
+                    'Table 1': [PAP[(p, 2005)] for p in PL]})
+chk['agg / closed form - 1'] = chk['aggregate'] / chk['closed form'] - 1
+chk['Table 1 / closed form - 1'] = chk['Table 1'] / chk['closed form'] - 1
+chk
+```
+
+`aggregate` reproduces the closed form to better than five parts in a hundred million at every limit. Table 1 is out by up to twenty-four parts in ten thousand.
+
+## The decisive test
+
+The question that matters is whether the *method* reproduces, so run the entire pipeline twice: once on `aggregate`'s limited expected values, once on the paper's own Table 1 figures. The five policy limits happen to include every layer boundary the example needs, so the second run is possible with nothing but what the paper prints.
+
+```{python}
+#| label: pipeline
+def sf(a, mean):
+    if a == 0:
+        return 1.0          # continuous severity, no atom at the origin
+    return float(build(f'agg M 1 claim sev lognorm {mean} cv {CV} fixed',
+                       log2=LOG2, bs=BS, normalize=False).density_df.loc[a, 'S'])
+
+def pipeline(L):
+    def lsev(p, limit, att, y):
+        return L[(min(p, att + limit), y)] - L[(min(p, att), y)]
+
+    pct = pd.DataFrame({n: [lsev(p, l, a, 2005) / L[(p, 2005)] for p in PL]
+                        for n, (l, a) in zip(LN, LAYERS)},
+                       index=[f'{p:,.0f}' for p in PL])
+    lc05 = pct.mul(np.array(SP05) * ELR, axis=0)
+    lc00 = pct.mul(np.array(SP00) * OL * ELR, axis=0)
+    tr = pd.DataFrame({n: [(lambda d: lsev(p, l, a, 2005) / d if d > 0 else np.nan)
+                           (lsev(p, l, a, 2000)) for p in PL]
+                       for n, (l, a) in zip(LN, LAYERS)},
+                      index=[f'{p:,.0f}' for p in PL])
+    layer_trend = pd.Series({c: (tr[c] * lc05[c]).sum() / lc05[c].sum()
+                             for c in tr.columns})
+    EN = {p: s * ELR / L[(p, 2005)] for p, s in zip(PL, SP05)}
+    EM = {p: s * OL * ELR / L[(p, 2005)] for p, s in zip(PL, SP00)}
+    ft = {n: (sum(EN[p] * sf(a, M05) for p in PL if p > a)
+              / sum(EN[p] * sf(a, M00) for p in PL if p > a))
+          for n, (l, a) in zip(LN, LAYERS)}
+    fa = {n: (sum(EN[p] * sf(a, M05) for p in PL if p > a)
+              / sum(EM[p] * sf(a, M05) for p in PL if p > a))
+          for n, (l, a) in zip(LN, LAYERS)}
+    ea = lc05.sum() / lc00.sum()
+    return pd.DataFrame({'T3 layer trend': layer_trend,
+                         'T4 freq trend': pd.Series(ft),
+                         'T5 sev trend': layer_trend / pd.Series(ft),
+                         'T11 exposure adj': ea,
+                         'T13 freq adj': pd.Series(fa),
+                         'T14 sev adj': ea / pd.Series(fa)}), lc05
+
+from_agg, lc_agg = pipeline(AGG)
+from_paper, lc_paper = pipeline(PAP)
+PRINTED = pd.DataFrame(
+    {'T3 layer trend': [1.248, 1.406, 1.468, 1.581, 1.328],
+     'T4 freq trend': [1.00, 1.37, 1.44, 1.50, 1.00],
+     'T5 sev trend': [1.248, 1.023, 1.022, 1.053, 1.328],
+     'T11 exposure adj': [0.982, 1.066, 1.354, 2.000, 1.090],
+     'T13 freq adj': [0.982, 1.066, 1.245, 2.000, 0.982],
+     'T14 sev adj': [1.000, 1.000, 1.087, 1.000, 1.110]}, index=LN)
+from_paper.round(4)
+```
+
+```{python}
+#| label: verdict
+pd.DataFrame({"largest deviation, driven by the paper's Table 1":
+                  (from_paper - PRINTED).abs().max(),
+              'largest deviation, driven by aggregate':
+                  (from_agg - PRINTED).abs().max(),
+              'decimals the paper prints': [3, 2, 3, 3, 3, 3]})
+```
+
+Driven by the paper's own Table 1, every column reproduces to the last digit printed. The `T4 freq trend` column looks worse only because the paper prints it to two decimals, and it is identical in both runs since the frequency trend depends on survival probabilities alone and never touches a limited expected value.
+
+Table 2's layer loss costs come back within \$60 on layers of up to \$9.4 million.
+
+```{python}
+#| label: table-2
+pd.DataFrame({'from paper Table 1': lc_paper.sum(),
+              'paper Table 2': [9_431_473, 2_643_382, 1_795_428, 1_654_717,
+                                15_525_000],
+              'from aggregate': lc_agg.sum()})
+```
+
+So the implementation of the method is verified exactly, and the only discrepancy in the whole reproduction is Table 1. Driven by `aggregate`, the derived quantities move in the third decimal: the \$4MM xs \$1MM layer trend is 1.5792 rather than 1.5810, an annualized 9.57% rather than 9.59%.
+
+```{python}
+#| label: annualized
+pd.DataFrame({'agg layer trend': from_agg['T3 layer trend'],
+              'agg annualized': from_agg['T3 layer trend'] ** (1 / YEARS) - 1,
+              'paper layer trend': PRINTED['T3 layer trend'],
+              'paper annualized': PRINTED['T3 layer trend'] ** (1 / YEARS) - 1,
+              'agg freq trend': from_agg['T4 freq trend'],
+              'agg freq annualized': from_agg['T4 freq trend'] ** (1 / YEARS) - 1})
+```
+
+## Comments
+
+### What is wrong with Table 1
+
+The paper's limited expected values are 0.04% high at the lowest limit and 0.24% low at the highest, in a smooth progression, in both years. That shape is the signature of a numerical integration that loses tail as the upper limit moves out, which is what a spreadsheet doing $\int_0^a x f(x)\,\mathrm dx$ on a fixed number of uniform steps would produce. A uniform-step trapezoid rule with roughly 900 to 1000 steps gets close to the pattern but does not match it at every limit, so the scheme is not identified here, only its symptom.
+
+Nothing about the paper's conclusions depends on it. The published deltas are large, a 9.59% layer trend against 8% unlimited, and a doubled exposure against a 9% total limits increase, and the third-decimal correction leaves all of them intact. The finding is worth recording because it is exactly the kind of thing a reproduction is for: two independent computations of the same quantity, one of which turns out to be a numerical approximation nobody flagged as one.
+
+### Reading the survival function of a very heavy lognormal
+
+The frequency trend needs $S(A)$ at each attachment, and $\sigma = 2.29$ gives a coefficient of variation of 13.7. On a grid reaching \$26M the build reports a mass deficit of $3.4\times10^{-4}$, which is severity mass above the grid, and the survival values carry a relative error of about $4\times10^{-5}$.
+
+Pushing the grid out does not help, it hurts. Reaching far enough to make the deficit negligible would need $x_{\max} \approx 4\times10^{9}$, and at any affordable bucket count the discretization error then dominates: at `bs = 3906` the survival error is $6\times10^{-3}$, two orders of magnitude worse than at `bs = 25`. For reading a survival function in the body of a distribution, resolution beats reach.
+
+One related detail: the paper prints $1 - F_Y(A) = 1.000$ for the layers attaching at zero. A continuous severity has no atom at the origin, so the exact value is 1, but `aggregate` returns $F(0) = P(X \le \mathrm{bs}/2) = 0.0015$ at `bs = 25`. The code above returns 1 explicitly at $A = 0$ rather than reading it off the grid; without that the frequency trend for the two ground up layers comes out at 1.0011 instead of the correct 1.
+
+### Where the compound machinery would come in
+
+As with @Mack2003, this is a severity and layer paper. `aggregate` supplies limited expected values and survival probabilities; the frequency in equation (3.3) is a derived count, $\mathsf E[N_p] = (\mathrm{SP})(\mathrm{ELR})\beta_p / \mathsf E_Y[S_{Y,p}]$, not a distribution. The natural extension, which the paper does not take, is that once the layer expected loss and the claim count are both in hand, the layer's *aggregate* distribution is one more DecL clause away, and with it the aggregate deductibles and reinstatements that a real treaty carries.
+
+## References
+
+::: {#refs}
+:::

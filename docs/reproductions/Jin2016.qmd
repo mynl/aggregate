@@ -1,0 +1,235 @@
+---
+title: "Why this one is not a reproduction"
+subtitle: "Assessing Jin, Provost and Ren (2016)"
+author: "Stephen J. Mildenhall"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    df-print: kable
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+---
+
+## Verdict
+
+@Jin2016 was ranked Tier 1 in the candidate assessment, on the reading that it offers "fully-specified Poisson/NegBin x Gamma/IG/Pareto with FFT comparison tables" and that one could "reproduce the FFT column exactly". Reading the paper closely, that is not right, and the error is worth recording because it is easy to make from an abstract.
+
+The paper has two halves. In the **univariate** half there are six fully specified compound models and **no tabulated output at all**: every result is a figure, and the numbered tables are Kolmogorov-Smirnov statistics computed against simulated samples, not distribution values. Exactly one published number in the whole half can be checked, and it checks out.
+
+In the **bivariate** half there are eight tables with an FFT column, 96 reference values, and they are genuine. But the dependence structure is a common shock on the *claim counts*, which is not the dependence `aggregate`'s `bivariate` construct expresses. The joint law is reproducible with a short direct transform built on `aggregate`'s severity discretization, and it is reproduced below, but that is a demonstration of what the library would need rather than a use of what it has.
+
+So: not a reproduction. What follows is the evidence.
+
+## What the paper does
+
+The method is moment based. Approximate the density of $S = X \mid X > 0$ by a gamma base density times a polynomial,
+
+$$\tilde f_{S,t}(s) = g(s) \sum_{r=0}^{t} c_r s^r,$$
+
+with $g$ a gamma matched to the first two moments of $S$ and the $c_r$ recovered from a linear system matching the first $t$. The appeal is that it needs only moments, so it works from sample moments when the frequency and severity are not separately known. The benchmark throughout is the FFT, which the authors treat as ground truth.
+
+```{python}
+#| label: setup
+import numpy as np
+import pandas as pd
+from aggregate import build
+```
+
+## The one checkable univariate number
+
+Example 1 is $N \sim \mathrm{Poisson}(3)$, $U \sim \gamma(3,2)$, polynomial order $t = 15$. The text states: "it then follows from (2.4) that the base distribution is gamma (2.684349, 7.056877)". Those two numbers are functions of the first two moments of $S = X \mid X > 0$, with $\tau = 1 - \mathsf P(N = 0)$ and $\mu_S(a) = \mu_X(a)/\tau$.
+
+```{python}
+#| label: base-gamma
+a = build('agg J 3 claims sev 2 * gamma 3 poisson', log2=18, bs=1 / 64,
+          normalize=False)
+tau = 1 - np.exp(-3.0)
+ex1 = a.actual_m
+ex2 = a.actual_m ** 2 * (1 + a.actual_cv ** 2)
+mu1, mu2 = ex1 / tau, ex2 / tau
+pd.DataFrame([
+    {'quantity': 'E[X]', 'aggregate': ex1, 'exact': 18.0},
+    {'quantity': 'E[X^2]', 'aggregate': ex2, 'exact': 468.0},
+    {'quantity': 'base gamma shape alpha',
+     'aggregate': mu1 ** 2 / (mu2 - mu1 ** 2), 'exact': 2.684349},
+    {'quantity': 'base gamma scale theta',
+     'aggregate': (mu2 - mu1 ** 2) / mu1, 'exact': 7.056877},
+])
+```
+
+Both to six figures. This also pins the parameter conventions for the rest of the paper: $\gamma(3,2)$ is shape 3 and scale 2, so mean 6, since any other reading misses the base gamma.
+
+## The other five univariate examples publish nothing
+
+```{python}
+#| label: univariate
+EX = [('1', 'agg J 3 claims sev 2 * gamma 3 poisson', 15,
+       'Figures 1, 2, 3; Table 1 is K-S on simulated samples'),
+      ('2', 'agg J 15 claims sev 2 * invgauss 1.5 poisson', 13,
+       'Figures 4, 5, 6; Table 2 is K-S'),
+      ('3', 'agg J 50 claims sev 2 * gamma 3 mixed gamma 0.3162277660168379',
+       10, 'Figures 7, 8, 9; Table 3 is K-S'),
+      ('4', 'agg J 50 claims sev 2 * invgauss 1.5 mixed gamma 0.3162277660168379',
+       10, 'Figures 10, 11, 12; Table 4 is K-S'),
+      ('5', 'agg J 3 claims sev 100 * lomax 20 poisson', 15,
+       'Figures 13, 14, 15; Table 5 is K-S'),
+      ('6', 'agg J 6 claims sev 100 * lomax 20 mixed gamma 0.5773502691896257',
+       16, 'Figures 16, 17, 18; Table 6 is K-S')]
+rows = []
+for name, prog, t, published in EX:
+    o = build(prog, log2=20, bs=1 / 32, normalize=False)
+    rows.append({'example': name, 'DecL': prog.replace('agg J ', ''),
+                 'order t': t, 'agg mean': o.est_m, 'agg CV': o.est_cv,
+                 'published values': published})
+pd.DataFrame(rows)
+```
+
+Every model builds in one line, which is why the paper looked like a good target. The last column is the problem. Tables 1 to 6 are the same six rows of Kolmogorov-Smirnov statistics at $n = 100, 500, 1000, 10000$ with their critical values, and the statistic is computed between a **simulated** empirical distribution and the approximation fitted to that sample's own moments. Nothing in it is a property of the model, so nothing in it is reproducible: a different seed gives different numbers, and the paper does not report one.
+
+The translations above are worth keeping regardless. $\mathrm{IG}(\eta, \theta)$ in the paper's parameterization is `{theta} * invgauss {eta/theta}`; $\mathrm{Pareto}(\gamma, \delta)$ with density $\gamma\delta^\gamma/(u+\delta)^{\gamma+1}$ is `{delta} * lomax {gamma}`; and $\mathrm{NB}(r, \beta)$ is a gamma-mixed Poisson with mean $r\beta$ and mixing CV $1/\sqrt{r}$, since matching $n + n^2 c^2 = r\beta(1+\beta)$ at $n = r\beta$ gives $c^2 = \beta/n = 1/r$. The mixing CV does not depend on $\beta$.
+
+```{python}
+#| label: nb-check
+r, beta = 10.0, 5.0
+c = 1 / np.sqrt(r)
+nb = build(f'agg NB {r * beta} claims dsev [1] mixed gamma {c}', log2=12, bs=1,
+           normalize=False)
+pd.DataFrame([{'mixing CV': c, 'mean': nb.est_m, 'want r*beta': r * beta,
+               'variance': nb.est_sd ** 2, 'want r*beta*(1+beta)':
+                   r * beta * (1 + beta)}])
+```
+
+## The bivariate tables are real, and are not `aggregate`'s dependence
+
+The eight bivariate examples use Hesselager's common shock counts: $N = N_0 + N_1$ and $W = N_0 + N_2$ with $N_0, N_1, N_2$ independent, and all severities $U_i, V_j$ mutually independent. Dependence between $X$ and $Y$ comes entirely from the shared count $N_0$.
+
+`aggregate`'s `bivariate` construct has a different shape. It puts a **shared outer frequency** over both perils and couples the two per-claim severities with a copula. To ask it for Hesselager's model, thin the total count: with $\lambda = \lambda_0 + \lambda_1 + \lambda_2$ events, each event independently triggers peril $X$ with probability $p_X = (\lambda_0+\lambda_1)/\lambda$ and peril $Y$ with $p_Y = (\lambda_0+\lambda_2)/\lambda$, and the two triggers must co-occur with probability $\lambda_0/\lambda$.
+
+```{python}
+#| label: copula-obstruction
+L0, L1, L2 = 7.0, 8.0, 9.0
+L = L0 + L1 + L2
+pX, pY = (L0 + L1) / L, (L0 + L2) / L
+pd.DataFrame([
+    {'coupling of the two triggers': 'required by Hesselager',
+     'P(both perils trigger)': L0 / L},
+    {'coupling of the two triggers': 'independence copula',
+     'P(both perils trigger)': pX * pY},
+    {'coupling of the two triggers': 'comonotone, Frechet upper bound',
+     'P(both perils trigger)': min(pX, pY)},
+    {'coupling of the two triggers': 'countermonotone, Frechet lower bound',
+     'P(both perils trigger)': max(0.0, pX + pY - 1)},
+])
+```
+
+The required probability is exactly the Fréchet **lower** bound, since $p_X + p_Y - 1 = \lambda_0/\lambda$ identically. So there is a unique copula that gets the triggers right, and it is the countermonotone one. But the same copula then forces the two severities to be countermonotone whenever both perils fire, and Hesselager needs them independent. One copula cannot be countermonotone on the triggers and independent on the severities, so the model is outside the construct. This is a structural mismatch, not a parameterization difficulty.
+
+## The joint law does reproduce, with a direct transform
+
+What the model *is* is a two dimensional transform with a joint probability generating function. Since $\mathsf P_{N,W}(z_1, z_2) = \mathsf P_{N_0}(z_1 z_2)\,\mathsf P_{N_1}(z_1)\,\mathsf P_{N_2}(z_2)$, the joint characteristic function of $(X, Y)$ is that pgf evaluated at the two severity transforms. `aggregate` supplies the severity discretization; the rest is a dozen lines.
+
+```{python}
+#| label: joint
+def joint(pgf, sev_u, sev_v, h, n):
+    """Joint CDF of (X, Y) = (sum_{N0+N1} U, sum_{N0+N2} V) on an h-lattice."""
+    du = build(f'agg U dfreq [1] {sev_u}', log2=int(np.log2(n)), bs=h,
+               normalize=False).agg_density
+    dv = build(f'agg V dfreq [1] {sev_v}', log2=int(np.log2(n)), bs=h,
+               normalize=False).agg_density
+    zu, zv = np.fft.fft(du), np.fft.fft(dv)
+    g = np.fft.ifft2(pgf(zu[:, None], zv[None, :])).real
+    return np.cumsum(np.cumsum(g, axis=0), axis=1)
+
+H, N = 0.0625, 4096
+F1 = joint(lambda z1, z2: np.exp(L0 * (z1 * z2 - 1) + L1 * (z1 - 1)
+                                 + L2 * (z2 - 1)),
+           'sev 2 * gamma 2', 'sev 1.5 * gamma 3', H, N)
+T7 = [(52, 54, .106406), (62, 59, .201156), (67, 65, .304023),
+      (74, 69, .401565), (75, 76, .512051), (81, 80, .604866),
+      (89, 85, .708083), (92, 93, .807833), (101, 103, .905475),
+      (112, 110, .950726), (130, 127, .990449), (150, 150, .999286)]
+t7 = pd.DataFrame([{'x': x, 'y': y,
+                    'direct 2-D transform': F1[int(round(x / H)), int(round(y / H))],
+                    'Table 7 FFT': f} for x, y, f in T7])
+t7['diff'] = (t7['direct 2-D transform'] - t7['Table 7 FFT']).abs()
+t7
+```
+
+Bivariate Example 3 swaps Poisson for negative binomial counts, $\mathrm{NB}(6,5)$, $\mathrm{NB}(7,5)$, $\mathrm{NB}(8,5)$, and needs only a different pgf.
+
+```{python}
+#| label: joint-nb
+R0, R1, R2, BETA = 6.0, 7.0, 8.0, 5.0
+def nb_pgf(z1, z2):
+    P = lambda z, r: (1 - BETA * (z - 1)) ** -r
+    return P(z1 * z2, R0) * P(z1, R1) * P(z2, R2)
+
+H3 = 0.25
+F3 = joint(nb_pgf, 'sev 2 * gamma 2', 'sev 1.5 * gamma 3', H3, 4096)
+T11 = [(223, 225, .100787), (253, 257, .202233), (280, 280, .303393),
+       (304, 300, .400091), (321, 325, .504903), (348, 345, .601492),
+       (369, 373, .703603), (405, 403, .802411), (450, 452, .903216),
+       (494, 491, .950212), (580, 580, .990640), (698, 698, .999271)]
+t11 = pd.DataFrame([{'x': x, 'y': y,
+                     'direct 2-D transform':
+                         F3[int(round(x / H3)), int(round(y / H3))],
+                     'Table 11 FFT': f} for x, y, f in T11])
+t11['diff'] = (t11['direct 2-D transform'] - t11['Table 11 FFT']).abs()
+t11
+```
+
+Both land within $3.5\times10^{-4}$, with a residual that is uniformly positive, largest in the body of the distribution and vanishing in the tail. That is the signature of a half bucket offset rather than a disagreement about the model, and halving the bucket confirms it.
+
+```{python}
+#| label: convergence
+rows = []
+for h, log2 in [(0.5, 9), (0.25, 10), (0.125, 11), (0.0625, 12)]:
+    F = joint(lambda z1, z2: np.exp(L0 * (z1 * z2 - 1) + L1 * (z1 - 1)
+                                    + L2 * (z2 - 1)),
+              'sev 2 * gamma 2', 'sev 1.5 * gamma 3', h, 2 ** log2)
+    rows.append({'bucket': h, 'grid': 2 ** log2, 'reach': h * 2 ** log2,
+                 **{f'({x},{y})': F[int(round(x / h)), int(round(y / h))] - f
+                    for x, y, f in [T7[0], T7[4], T7[8], T7[11]]}})
+pd.DataFrame(rows)
+```
+
+The deviation falls monotonically at every halving, by a factor of thirty-five overall from `bs = 0.5` to `bs = 0.0625`, so the paper's FFT column is the exact joint distribution function and the reproduction agrees with it.
+
+## Why the marginals are not enough
+
+The candidate assessment suggested falling back on marginals. That does not rescue the reproduction, because the marginals miss precisely the quantity the tables are reporting.
+
+```{python}
+#| label: dependence-gap
+mx = build('agg X 15 claims sev 2 * gamma 2 poisson', log2=18, bs=1 / 32,
+           normalize=False)
+my = build('agg Y 16 claims sev 1.5 * gamma 3 poisson', log2=18, bs=1 / 32,
+           normalize=False)
+gap = pd.DataFrame([
+    {'x': x, 'y': y, 'joint F(x,y)': F1[int(round(x / H)), int(round(y / H))],
+     'FX(x) FY(y) under independence': (mx.density_df.loc[x, 'F']
+                                        * my.density_df.loc[y, 'F']),
+     'Table 7': f} for x, y, f in T7])
+gap['dependence gap'] = gap['joint F(x,y)'] - gap['FX(x) FY(y) under independence']
+gap
+```
+
+The margins are right: $N = N_0 + N_1 \sim \mathrm{Poisson}(15)$ and $W = N_0 + N_2 \sim \mathrm{Poisson}(16)$, both one-line builds. But the common shock moves the joint distribution function up to 4.5 points of probability away from the independent product, so a marginals-only reproduction would be reporting a number the paper never computed.
+
+## What would make this a reproduction
+
+One feature: a common shock count mode for `bivariate`, in which the two components share a frequency component $N_0$ and carry independent private components $N_1$, $N_2$, with severities independent throughout. That is the Hesselager model, it is standard in bivariate aggregate work, and the machinery to compute it is the twelve line `joint` function above sitting on the existing 2-D grid and severity discretization. It would turn 96 published reference values across eight tables into a regression suite, and it would give `aggregate` a count-driven dependence to sit beside the copula-driven one it already has.
+
+Two smaller notes for whoever picks it up.
+
+**The paper has a specification defect in bivariate Example 6.** The text reads "Let $N_0 \sim \mathrm{NB}(5)$, $N_1 \sim \mathrm{NB}(6)$, $N_2 \sim \mathrm{NB}(7)$", giving one parameter to a two parameter family. The surrounding examples all use $\beta = 5$, so $\mathrm{NB}(5,5)$, $\mathrm{NB}(6,5)$, $\mathrm{NB}(7,5)$ is the obvious reading, but it is a guess and Tables 18 to 20 would decide it.
+
+**Tables 8, 10, 12, 14, 16, 17, 19, 20, 22 and 24 are simulation output** and share the univariate half's problem: they compare an empirical distribution from 5,000 simulated draws against the approximation fitted to that sample's moments. Only the odd-numbered tables carry the FFT column that is worth anything as a reference.
+
+## References
+
+::: {#refs}
+:::

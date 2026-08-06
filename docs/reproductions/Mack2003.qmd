@@ -1,0 +1,206 @@
+---
+title: "The threshold above which Riebesell is consistent"
+subtitle: "Reproducing Mack and Fackler (2003)"
+author: "Stephen J. Mildenhall"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    df-print: kable
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+---
+
+## Context and problem
+
+German liability insurers price increased limits by a rule Paul Riebesell published in 1936: doubling the sum insured multiplies the net premium by a constant factor $1+z$, typically $z = 20\%$. Written out,
+
+$$b(v) = b_0 (1+z)^{\mathrm{ld}(v/v_0)} = b_0 \left(\frac{v}{v_0}\right)^{\mathrm{ld}(1+z)},$$
+
+a pure power law in the sum insured, and so invariant to inflation and to currency. That invariance is why it survives: unlike a property exposure curve it never needs re-basing.
+
+@Mack2003 asks whether the rule is consistent with the collective risk model, where $b(v) = \mathsf E[N]\,\mathsf E[X \wedge v]$. Differentiating gives $S(v) = b'(v)/\mathsf E[N]$, and a power law premium forces a power law survival function, that is a Pareto with
+
+$$\alpha = 1 - \mathrm{ld}(1+z) \in (0,1).$$
+
+An $\alpha$ below one means an infinite mean, so the implied claim size law cannot be Pareto everywhere. The paper's contribution is to show it does not have to be. There is a threshold $u$ such that any realistic claim size law, fitted with a Pareto tail above $u$, satisfies Riebesell's rule exactly for all sums insured above $u$, and the threshold turns out to sit below the range of sums insured actually written.
+
+## Paper solution and gold standard
+
+The condition on the threshold is that
+
+$$\alpha_F(u) := 1 - \frac{u\,S(u)}{\int_0^u S(x)\,\mathrm dx} = 1 - \frac{u\,S(u)}{\mathsf E[X \wedge u]}$$
+
+equals $\alpha$. The quantity $\alpha_F(u)$ runs from 0 at $u=0$ to 1 as $u \to \infty$ for any continuous $F$ with a finite mean, so a solution always exists. Table 1 tabulates it for four severities at seven multiples of the mean, and that table is the paper's one block of numbers.
+
+The formulation is convenient for `aggregate`: $\alpha_F$ is built from a limited expected value and a survival function, both of which come straight out of a build.
+
+```{python}
+#| label: setup
+import numpy as np
+import pandas as pd
+from aggregate import build
+
+US = [0.01, 0.1, 1, 3, 10, 30, 100]
+CV18 = float(np.sqrt(np.exp(1.8 ** 2) - 1))
+SEVS = {                                  # all normalized to E(X) = 1
+    'Exponential': 'sev 1 * expon',
+    'Gamma a=0.1': 'sev 10 * gamma 0.1',
+    'Lognormal s=1.8': f'sev lognorm 1 cv {CV18}',
+    'American Pareto a=1.5': 'sev 0.5 * lomax 1.5',
+}
+PAPER = {
+    'Exponential': [0.005, 0.049, 0.418, 0.842, 0.9996, None, None],
+    'Gamma a=0.1': [0.092, 0.151, 0.294, 0.442, 0.709, 0.952, 0.9999],
+    'Lognormal s=1.8': [0.028, 0.185, 0.5, 0.663, 0.815, 0.914, 0.972],
+    'American Pareto a=1.5': [0.0147, 0.127, 0.545, 0.740, 0.867, 0.928, 0.962],
+}
+```
+
+Two readings had to be settled first. **"American Pareto"** is the two parameter Pareto $S(x) = (\theta/(\theta+x))^\alpha$, `lomax` in DecL, as against the European single parameter form; with $\alpha = 1.5$ the scale $\theta = 0.5$ gives mean 1. **"Gamma $\alpha = 0.1$"** is the shape, so scale 10 for a unit mean. Both are confirmed below by the table reproducing.
+
+## The `aggregate` reproduction
+
+```{python}
+#| label: table-1
+def lev(prog, u, log2=20):
+    """E[X and u]: one fixed claim in the layer u xs 0."""
+    return build(f'agg S 1 claim {u} xs 0 {prog} fixed',
+                 log2=log2, bs=u / 2 ** (log2 - 2), normalize=False).est_m
+
+def sf(prog, u, log2=20):
+    """S(u) read off an unlimited build on a grid reaching well past u."""
+    obj = build(f'agg S 1 claim {prog} fixed', log2=log2,
+                bs=4 * u / 2 ** log2, normalize=False)
+    return float(obj.density_df.loc[u, 'S'])
+
+rows = []
+for name, prog in SEVS.items():
+    for i, u in enumerate(US):
+        L, S = lev(prog, u), sf(prog, u)
+        rows.append({'F': name, 'u / E(X)': u, 'agg E[X and u]': L,
+                     'agg S(u)': S, 'alpha_F(u)': 1 - u * S / L,
+                     'Table 1': PAPER[name][i]})
+t1 = pd.DataFrame(rows)
+t1['abs diff'] = (t1['alpha_F(u)'] - t1['Table 1']).abs()
+t1
+```
+
+```{python}
+#| label: table-1-summary
+pd.DataFrame([{'largest absolute difference over the 26 tabulated cells':
+               float(t1['abs diff'].max()),
+               'cells compared': int(t1['abs diff'].notna().sum())}])
+```
+
+All 26 cells land within $8\times10^{-4}$, inside the paper's three decimal rounding. The two blank cells are the exponential at $u = 30$ and $u = 100$, where $\alpha_F$ is 1 to more places than the table prints and Mack and Fackler leave the entries empty.
+
+Three exact statements in the text follow directly.
+
+```{python}
+#| label: constants
+Z = 0.20
+ALPHA = 1 - np.log(1 + Z) / np.log(2)
+pd.DataFrame([
+    {'quantity': 'alpha = 1 - ld(1+z), z = 20%', 'recomputed': ALPHA,
+     'paper': 0.737},
+    {'quantity': 'exposure exponent 1 - alpha', 'recomputed': 1 - ALPHA,
+     'paper': 0.263},
+    {'quantity': 'mixed tail index alpha + beta, beta = 1.3',
+     'recomputed': ALPHA + 1.3, 'paper': 2.037},
+])
+```
+
+The last of these is the paper's resolution of an apparent contradiction. Riebesell forces $\alpha < 1$ on the claim size law of a *single* risk, whereas observed portfolio tails in liability run near 2. Section 8 shows the two are compatible: mixing the individual laws over a Pareto distribution of sums insured with index $\beta$ gives a portfolio tail of index $\alpha + \beta$, and with $\beta = 1.3$ that is 2.037.
+
+## Theorem 2, end to end
+
+The theorem says: take any realistic $F$, find the $u$ solving $\alpha_F(u) = \alpha$, replace the tail above $u$ with a Pareto, and Riebesell's rule holds exactly from $u$ upward. The worked instance in the text is the lognormal with $\sigma = 1.8$, for which the paper reads off Table 1 that "we replace the lognormal above $u \approx 5 \cdot \mathsf E(X)$".
+
+Scale to the paper's own liability context, $\mathsf E(X)$ below €50,000 and sums insured from about €500,000.
+
+```{python}
+#| label: splice
+import scipy.stats as ss
+from scipy.integrate import quad
+from scipy.optimize import brentq
+from aggregate.distributions import Aggregate
+
+SIGMA, EX = 1.8, 50_000.0
+FZ = ss.lognorm(SIGMA, scale=EX * np.exp(-SIGMA ** 2 / 2))
+U = brentq(lambda u: 1 - u * FZ.sf(u) / quad(FZ.sf, 0, u, limit=300)[0] - ALPHA,
+           EX, 20 * EX, xtol=1e-6)
+
+W = 1e12
+edges = np.concatenate((np.linspace(0.0, U, 60001),
+                        np.exp(np.linspace(np.log(U), np.log(W), 60001))[1:]))
+S = np.where(edges <= U, FZ.sf(edges), FZ.sf(U) * (edges / U) ** -ALPHA)
+S[0] = 1.0
+probs = -np.diff(S)
+probs[-1] += S[-1]
+
+pd.DataFrame([{'E(X)': EX, 'threshold u*': U, 'u* / E(X)': U / EX,
+               'paper': 'u ~ 5 E(X)', 'S(u*)': FZ.sf(U)}])
+```
+
+The spliced severity goes into `aggregate` as a `chistogram`. Every limited expected value below is read off **one** grid, which matters: a limited expected value computed on a grid tuned to its own limit is not comparable with one computed on a different grid when the severity has structure far below the limit, and this severity has all its density three orders of magnitude below the largest sum insured.
+
+```{python}
+#| label: exposure-curve
+LOG2, BS = 22, 5.0                      # x_max = 21.0M, covers every a below
+
+def lev_spliced(a):
+    obj = Aggregate('R', exp_en=1, exp_limit=a, exp_attachment=0,
+                    sev_name='chistogram', sev_xs=edges, sev_ps=probs,
+                    freq_name='fixed')
+    obj.update(log2=LOG2, bs=BS, normalize=False)
+    return obj.est_m
+
+v = 5_000_000.0
+lev_v = lev_spliced(v)
+rows = []
+for a in [50_000., 100_000., 250_000., U, 500_000., 1e6, 2e6, 5e6]:
+    ra = lev_spliced(a) / lev_v
+    rows.append({'a': a, 'a >= u*': a >= U - 1, 'agg E[X and a]': lev_spliced(a),
+                 'agg r(a)': ra, 'Riebesell (a/v)^0.263': (a / v) ** (1 - ALPHA),
+                 'ratio': ra / (a / v) ** (1 - ALPHA)})
+pd.DataFrame(rows)
+```
+
+Above the threshold the loss elimination ratio matches Riebesell's $(a/v)^{1-\alpha}$ to nine significant figures. Below it the agreement fails, and fails hard: at $a = \mathsf E(X)$ the true ratio is 17% under the Riebesell value. That is not a numerical artifact, it is Theorem 2 being tight. The rule is not asymptotic or approximate above $u$, and it is simply wrong below it.
+
+The premium form of the same statement is sharper still, because the rule was stated as a premium rule in the first place.
+
+```{python}
+#| label: doubling
+pd.DataFrame([{'sum insured v': v0, 'v >= u*': v0 >= U,
+               'b(2v)/b(v) = E[X and 2v] / E[X and v]':
+                   lev_spliced(2 * v0) / lev_spliced(v0),
+               "Riebesell's 1 + z": 1.20}
+              for v0 in [300_000., 600_000., 1_200_000., 100_000.]])
+```
+
+Doubling the sum insured multiplies the collective risk premium by exactly 1.200000 at every sum insured above the threshold, and by 1.271 below it. A 1936 rating rule turns out to be an exact consequence of the collective risk model on the range where it is used, and only there.
+
+## Comments
+
+### What `aggregate` is doing here, and what it is not
+
+This is a severity paper. There is no aggregate distribution anywhere in it: $\mathsf E[N]$ enters every formula and cancels out of every one. `aggregate` is being used as a limited expected value engine on a spliced severity, which it does well, but the compound machinery is idle.
+
+The reproduction is still worth having for two reasons. Mack and Fackler's threshold condition is stated entirely in terms of $\mathsf E[X \wedge u]$ and $S(u)$, which are the two things exposure rating is built from, so the whole paper is one short expression away from quantities `aggregate` already reports. And the splice is a genuine exercise of the severity layer: `Mack2003.RiebesellPareto` is in `actuarial-severity-curves.agg` with $\alpha = 0.737$, which has no finite mean and raises `InfiniteVarianceError` unbounded, so it can only be used the way the paper uses it, inside a limit.
+
+### A grid caveat worth carrying forward
+
+The first attempt at the exposure curve gave a clean power law with the wrong constant, off by 2.6%. The cause was giving each limit its own bucket size, `bs = a / 2**17`. That is normally sensible, but here the severity has essentially all its density below €300,000 while the largest limit is €5,000,000, so a grid tuned to the top limit puts the entire lognormal body in its first few buckets. Limited expected values that are going to be **compared with each other** have to come off a common grid. The version above uses one grid for all eight limits and the artifact disappears.
+
+### The far tail does not matter, and the paper says so
+
+The Pareto tail with $\alpha = 0.737$ has an infinite mean, so it has to be cut somewhere for `aggregate` to build it; the code cuts at $10^{12}$ and sweeps the residual $2.7\times10^{-8}$ onto the last bin. This is not a fudge, it is the paper's own observation: "we can replace $F_u$ above some very high amount $w \gg u$ with something else, e.g. in order to ascertain a finite expectation", because the behaviour of the law above the range where Riebesell is applied does not enter equation (2).
+
+## References
+
+::: {#refs}
+:::

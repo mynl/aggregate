@@ -1,12 +1,23 @@
 # [Paper-Reproductions] — candidate assessment
 
-**Status:** a curated backlog, not an execution plan — nothing here is scheduled.
-A reproduction now lands as a **cookbook recipe** (`docs/cookbook/`, see
-`docs/cookbook/plan.md`) on the standard five beats, with beat 4 = *"matches the
-published value."* The retired `docs/example_library/` Quarto-website scaffold
-that this assessment was written for is gone; only the assessment survives.
+## Execution status
 
-Assessment of eighteen references for suitability as `aggregate` reproductions /
+The six top-ranked candidates have been written up. Five are reproductions; one is not.
+
+| Key | Document | Outcome |
+|---|---|---|
+| Venter1983 | `Venter1983.qmd` | **Reproduced.** Exhibit 3, all three columns. Severity moments (18,198 / 2.6600 / 3.6746) confirm the piecewise-linear transcription. `bs=500` matches the recursive column to 5e-5; refining to `bs=5` matches the characteristic-function column to 7e-5. The transformed gamma **is** `scipy.stats.gengamma(r, alpha, scale=1/lambda)`, matching all 34 rows to 5e-5. Exhibit 3's printed aggregate mean 250,600 is a scan artefact of 250,000. |
+| Mack2003 | `Mack2003.qmd` | **Reproduced.** Table 1 (26 cells, all within 8e-4). "American Pareto" = `lomax`; "Gamma a=0.1" = shape. Theorem 2 verified end to end: the spliced lognormal gives `b(2v)/b(v) = 1.200000` exactly for `v >= u*`, and 1.271 below. Threshold u\* = 5.186 E(X), paper's "u ~ 5 E(X)". |
+| Mata2005 | `Mata2005.qmd` | **Reproduced, with a finding.** Driven by the paper's own Table 1 the pipeline reproduces Tables 2, 3, 4, 5, 11, 13, 14 to the last printed digit. But **Table 1's LEVs are not the exact lognormal LEVs**: 0.04% high at $250k drifting to 0.24% low at $5M, in both years, while `aggregate` matches the closed form to 8 figures. Conclusions unaffected (third decimal). |
+| Bruno2006 | `Bruno2006.qmd` | **Reproduced.** Tables 6, 7 and 8, every value exact at the printed six decimals. Table 7 (lambda=91,000, 92,832 convolutions) runs in **under 2 seconds** against the paper's reported 1,950. Table 8's Poisson/generalized-Pareto mixture is not a built-in `mixed` family; computed p(n) by quadrature and passed as `dfreq`. |
+| Bodoff2017 | `Bodoff2017.qmd` | **Reproduced.** Exhibit 4, every cell. Two inferred model choices confirmed by the fit: the severity is the **two-parameter** Pareto (`lomax`), and Exhibit 3's "$25M / p=100%" row is a **global cap on the XPL branch**, not a limits-profile row. |
+| Jin2016 | `Jin2016.qmd` | **NOT a reproduction.** See the corrected assessment below. |
+
+Recorded for whoever picks up the remaining candidates: check whether the paper's own tabulated inputs are exact before blaming a mismatch on `aggregate` (Mata2005), and put every LEV that will be **compared** with another on a **common grid** (Mack2003).
+
+---
+
+**Status:** a curated assessment of eighteen references for suitability as `aggregate` reproductions /
 examples. Each paper is rated on how well its worked example(s) map onto what
 `aggregate` does: compound (frequency × severity) distributions via FFT, severity
 layers/limits, reinsurance, stop-loss, risk measures, distortion pricing, and
@@ -23,7 +34,16 @@ Two kinds of fit:
 
 Source full-text was read from the archivum extracts
 (`…/archivum/full-text/<hash>/…pdftotext.md`); Venter (1983) was read from the
-author-supplied PDF and added to the archivum store.
+author-supplied PDF and added to the archivum store. There is an aggregate API that will return the pdf given <<tag>>: http://192.168.4.43:9124/view/<<Mildenhall1998>>. Tags are always AuthorYear format.
+
+Reproductions should follow the pattern
+
+1. Context and problem
+2. Paper solution and gold-standard
+3. ``aggregate`` reproduction
+4. Comments if any
+
+A simple reproduction can be very short. Something unusual or unfamiliar to actuaries may need more context.
 
 ---
 
@@ -35,7 +55,7 @@ author-supplied PDF and added to the archivum store.
 | 1 | **Mack2003** | Strong | Collective-risk exposure rating, Pareto-tail splicing, Riebesell α=0.737, loss-elimination curves — core engine. |
 | 1 | **Mata2005** | Strong | Complete XOL experience/exposure-rating example; lognormal σ=2.29, trend, limit profile, layer-split trend. |
 | 1 | **Bruno2006** | Strong | Explicit discrete severity + Poisson(λ); tabulated PMF/CDF (Tables 6–8) to ~6 dp — gold benchmark. |
-| 1 | **Jin2016** | Strong | Fully-specified Poisson/NegBin × Gamma/IG/Pareto with FFT comparison tables; reproduce the FFT column exactly. |
+| ~~1~~ 3 | **Jin2016** | ~~Strong~~ **Weak** | **Corrected on reading.** The univariate half publishes *no* output tables (figures plus K-S statistics on simulated samples); the FFT columns are all in the *bivariate* half, whose common-shock count structure `aggregate` cannot express. |
 | 1 | **Bodoff2017** | Strong | XPL exposure rating (Pareto θ=50k α=1.5, Bernoulli limit). Thin example; *not* the Bodoff already in the repo. |
 | 2 | **Berens1997** | Moderate→Strong | Surcharge tables for multi-year aggregate limits; native single-year pieces + a carry-forward wrapper. |
 | 2 | **Clark2005** | Moderate | Stop-loss + RMK allocation; compound distribution native, allocation is post-processing. |
@@ -142,13 +162,41 @@ tables).
   bivariate, benchmarked against FFT.
 - **Examples (univariate 1–6):** Poisson(3)×γ(3,2), Poisson(15)×IG(3,2),
   NB(10,5)×γ(3,2), NB(10,5)×IG(3,2), Poisson(3)×Pareto(20,100), NB(3,2)×
-  Pareto(20,100), each with polynomial order t and K-S statistics. Bivariate
-  examples give CDF tables (FFT vs approx) at specific (x,y).
-- **Fit:** **Strong** — clean, fully-specified compound models; the paper's own
-  ground truth is FFT, which is exactly `aggregate`.
-- **Reproduce:** the FFT column of each univariate/bivariate comparison table.
-- **Caveats:** the bivariate joint (shared-shock N₀) is out of scope —
-  marginals only; very heavy Pareto (missing moments) limits some cases.
+  Pareto(20,100). All six build in one line of DecL.
+- **Fit:** ~~**Strong**~~ **Weak. This entry was wrong; corrected after reading
+  the paper. See `Jin2016.qmd` for the evidence.**
+- **What the univariate half actually publishes:** figures, and nothing else.
+  Tables 1–6 are Kolmogorov–Smirnov statistics between a *simulated* empirical
+  distribution and the approximation fitted to that sample's own moments, so they
+  are not properties of the model and not reproducible (no seed is given).
+  **Exactly one univariate number is checkable**, Example 1's base gamma
+  (2.684349, 7.056877), and `aggregate` reproduces it to six figures.
+- **What the bivariate half publishes:** 96 genuine reference values in the FFT
+  columns of Tables 7, 9, 11, 13, 15, 18, 21, 23.
+- **Why `aggregate` cannot claim them:** the dependence is Hesselager common-shock
+  *counts*, N = N₀+N₁ and W = N₀+N₂ with independent severities. `aggregate`'s
+  `bivariate` is a shared outer frequency with **copula-coupled severities**.
+  Thinning the total count shows the required trigger co-occurrence λ₀/λ is
+  exactly the Fréchet *lower* bound p_X + p_Y − 1, so the only copula that fixes
+  the triggers is the countermonotone one, which then also forces the severities
+  to be countermonotone when Hesselager needs them independent. Structural
+  mismatch, not a parameterization difficulty. Marginals alone do not rescue it:
+  the common shock moves the joint CDF up to 4.5 points from the independent
+  product.
+- **Verified anyway:** a twelve-line direct 2-D transform over `aggregate`'s
+  severity discretization reproduces Tables 7 and 11 to 1.3e-4 and 3.5e-4, the
+  residual falling monotonically under grid refinement. The paper's FFT column is
+  right; only the route is missing.
+- **Feature that would unlock it:** a common-shock count mode for `bivariate`
+  (shared N₀ plus private N₁, N₂, severities independent throughout). Would turn
+  96 published values into a regression suite and give `aggregate` a
+  count-driven dependence beside its copula-driven one.
+- **Defect noted:** bivariate Example 6 reads "N₀ ~ NB(5), N₁ ~ NB(6),
+  N₂ ~ NB(7)", one parameter for a two-parameter family. β = 5 is the obvious
+  reading from the neighbouring examples but it is a guess.
+- **Conversions worth keeping:** IG(η, θ) = `{θ} * invgauss {η/θ}`;
+  Pareto(γ, δ) with density γδ^γ/(u+δ)^(γ+1) = `{δ} * lomax {γ}`;
+  NB(r, β) = gamma-mixed Poisson, mean rβ, **mixing CV 1/√r**, independent of β.
 
 ### Bodoff2017 — *An Actuarial Model of Excess of Policy Limits Losses*
 - **Not** the Bodoff already reproduced in the repo (that is **Bodoff 2007**,

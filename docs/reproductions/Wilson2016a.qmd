@@ -1,0 +1,170 @@
+---
+title: "Accurate FFT convolution: what breaks, and how you know"
+subtitle: "Reproducing Wilson and Keich (2016)"
+author: "Stephen J. Mildenhall"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    df-print: kable
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+---
+
+## Introduction
+
+@Wilson2016a asks a narrow question with a wide answer: given two non-negative vectors, can you compute their convolution by FFT and *guarantee* the relative accuracy of every entry?
+
+The answer is yes, and the algorithm is aFFT-C. It matters here because `aggregate` computes compound distributions by exactly the FFT convolution these authors show is unreliable, and because the companion paper @BenRached2024 reaches the same conclusion by a different route and recommends abandoning the FFT entirely. This paper does not. It keeps the FFT and fixes it, which is the better outcome for a library that needs $O(N \log N)$.
+
+The mechanism has three parts:
+
+1. **A computable error bound.** For each output index, a bound on the FFT roundoff error that can be evaluated at runtime. This is the part that matters most, because it converts a silent failure into a detected one.
+2. **PITS (partitioning into thin slices).** Decompose each input pmf into components of reduced dynamic range, so that FFT-C applied to each pair is accurate, then reassemble. Roundoff cannot swamp small values if the small values are never in the same vector as the large ones.
+3. **An exponential shift.** Precondition by $p_\theta(k) = p(k)e^{k\theta}/M_p(\theta)$, which commutes with convolution, so it can be peeled off afterward. Its role here is to reduce the number of slices PITS needs, and hence the number of FFT calls.
+
+## What is reproducible
+
+| Table / result | Content | Reproducible |
+|---|---|---|
+| Section 1 toy example | A four-element pmf with exact rational convolution, and the measured relative errors of NC, FFT-C and aFFT-C | Yes, completely |
+| Table 1 | Number of PITS splits with and without the exponential shift | No, internal to aFFT-C |
+| Table 2 | Median and maximum relative error of aFFT-C and FFT-C over six declared pmf classes | The FFT-C columns, statistically |
+| Figures 4 and 5 | Timing of aFFT-C against naive convolution and FFT-C | No, implementation timing |
+
+The aFFT-C columns of Table 2 are not reproducible without implementing aFFT-C. The FFT-C columns are, because FFT-C is what `aggregate` already does.
+
+## The Section 1 example
+
+This is the whole paper in seven numbers. Take $p = (0, a, b, c)$ with $b = 10^{-5}$, $c = 10^{-20}$ and $a = 1 - b - c$. Then
+
+$$p * p = (0,\ 0,\ a^2,\ 2ab,\ 2ac + b^2,\ 2bc,\ c^2),$$
+
+which is exact and needs no numerics at all. The last two entries are $2 \times 10^{-25}$ and $10^{-40}$, both far below double precision machine epsilon relative to the leading entry of $1$.
+
+```{python}
+#| label: toy
+import numpy as np
+import pandas as pd
+from aggregate import build
+
+b, c = 1e-5, 1e-20
+a = 1 - b - c
+exact = np.array([0.0, 0.0, a * a, 2 * a * b, 2 * a * c + b * b, 2 * b * c, c * c])
+
+naive = np.convolve([0, a, b, c], [0, a, b, c])                 # NC
+fftc = np.fft.irfft(np.fft.rfft([0, a, b, c], 8) ** 2, 8)[:7]   # FFT-C
+
+# the same convolution through aggregate: a three-point severity, two claims
+obj = build(f'agg Toy dfreq [2] dsev [1 2 3] [{a!r} {b!r} {c!r}]',
+            log2=6, bs=1, normalize=False)
+agg = np.array([obj.agg_density[k] for k in range(7)])
+
+def rel(x):
+    return np.where(exact > 0, np.abs(x - exact) / np.where(exact > 0, exact, 1.0), 0.0)
+
+pd.DataFrame({'k': range(7), 'exact': exact, 'NC': naive, 'FFT-C': fftc,
+              'agg': agg, 'rel NC': rel(naive), 'rel FFT-C': rel(fftc),
+              'rel agg': rel(agg)})
+```
+
+Three things to read off.
+
+**Naive convolution is exact here.** The paper reports $r_{NC,64} = (0, 0, 2\cdot 10^{-16}, 10^{-20}, 2\cdot 10^{-16}, 10^{-16}, 3\cdot 10^{-17})$, and this run gives zero throughout because the individual products happen to be exactly representable. Either way the point stands: NC preserves relative accuracy at every entry, because a sum of non-negative products has no cancellation.
+
+**FFT-C destroys the last two entries.** Index 5 has a relative error around $10^{8}$ and index 6 around $10^{23}$. Both computed values are *negative*, which is impossible for a convolution of non-negative vectors.
+
+**`aggregate` behaves exactly like textbook FFT-C.** Same failure at the same two indices, same orders of magnitude of error. The signs differ, agg returning a positive value at index 5 where FFT-C returns a negative one, because the sign of accumulated rounding is arbitrary and the two routines pad and transform slightly differently. That is the confirmation that agg's engine is FFT-C and inherits its properties without modification, and also a warning that a negative-value check catches only some of these failures.
+
+Note also index 4, where the true value is $10^{-10}$: FFT-C is already wrong in the seventh significant figure and agg in the sixth. The degradation is gradual on the way down to the cliff, not sudden.
+
+For contrast the paper reports what aFFT-C achieves on this example:
+
+> $r_{\text{aFFT-C},10^9} = (0, 0, 8 \cdot 10^{-15}, 4 \cdot 10^{-12}, 2 \cdot 10^{-15}, 4 \cdot 10^{-12}, 1 \cdot 10^{-14})$
+
+Every entry to eleven significant figures or better, including the $10^{-40}$ one, at $O(N \log N)$ cost.
+
+## Table 2: the FFT-C columns
+
+Table 2 measures relative error over six pmf classes, which the paper defines precisely. With $a, b, c \sim U(0,1)$ fixed per pmf, $u_i \sim U(0,1)$ per entry, and $A$ normalizing:
+
+1. constant, $p(i) \equiv A$
+2. random, $p(i) = A\exp(-40u_i)$
+3. quadratic, $p(i) = A\exp(-30(a+1)x_i^2 + 20(2b-1)x_i + 20(2c-1))$, $x$ even on $[0,1]$
+4. sinusoid, $p(i) = A\exp(10(3a+1)\sin(x_i + b/10) + 10(5c-4)x_i)$, $x$ even on $[0, 3\pi]$
+5. multi-scaled I, a random fifth are $A\exp(-30u_i)$, the rest $A\exp(-100(u_i+1))$
+6. multi-scaled II, a random third are $A\exp(-15(2a+1)u_i)$, the rest $A\exp(-50((2a+1)u_i + 2b + 1))$
+
+```{python}
+#| label: classes
+from scipy.special import logsumexp
+
+rng = np.random.default_rng(20260806)
+N_DRAW = 12          # the paper uses 100 per class
+
+def make(cls, L, rng):
+    a_, b_, c_ = rng.uniform(size=3)
+    u = rng.uniform(size=L)
+    if cls == 1:
+        lv = np.zeros(L)
+    elif cls == 2:
+        lv = -40 * u
+    elif cls == 3:
+        x = np.linspace(0, 1, L)
+        lv = -30 * (a_ + 1) * x ** 2 + 20 * (2 * b_ - 1) * x + 20 * (2 * c_ - 1)
+    elif cls == 4:
+        x = np.linspace(0, 3 * np.pi, L)
+        lv = 10 * (3 * a_ + 1) * np.sin(x + b_ / 10) + 10 * (5 * c_ - 4) * x
+    elif cls == 5:
+        idx = rng.permutation(L)
+        lv = -100 * (u + 1)
+        lv[idx[:L // 5]] = -30 * u[idx[:L // 5]]
+    else:
+        idx = rng.permutation(L)
+        lv = -50 * ((2 * a_ + 1) * u + 2 * b_ + 1)
+        lv[idx[:L // 3]] = -15 * (2 * a_ + 1) * u[idx[:L // 3]]
+    return np.exp(lv - logsumexp(lv))
+
+published = {8: ('7e62', '4e303'), 128: ('2e69', 'Overflow'),
+             1024: ('2e70', 'Overflow'), 8192: ('1e69', 'Overflow')}
+
+rows = []
+for L in [8, 128, 1024, 8192]:
+    worst, per_pair = 0.0, []
+    for cls in range(1, 7):
+        ps = [make(cls, L, rng) for _ in range(N_DRAW)]
+        for i in range(N_DRAW):
+            for j in range(i, N_DRAW):
+                ex = np.convolve(ps[i], ps[j])
+                nq = 1 << int(np.ceil(np.log2(2 * L - 1)))
+                ap = np.fft.irfft(np.fft.rfft(ps[i], nq)
+                                  * np.fft.rfft(ps[j], nq), nq)[:2 * L - 1]
+                ok = ex > 0
+                r = np.abs(ap[ok] - ex[ok]) / ex[ok]
+                per_pair.append(r.max())
+                worst = max(worst, r.max())
+    pm, px = published[L]
+    rows.append({'L': L, 'FFT-C median (here)': np.median(per_pair),
+                 'FFT-C max (here)': worst,
+                 'paper median': pm, 'paper max': px})
+pd.DataFrame(rows)
+```
+
+Qualitatively this is an exact reproduction: FFT-C's relative error on these classes is astronomically large at every length, and the maxima run into the hundreds of orders of magnitude. Quantitatively it is not a close match. The medians here are around $10^{29}$ to $10^{43}$ against the paper's $10^{62}$ to $10^{70}$. With 12 draws per class rather than 100, a different generator, and a statistic that spans three hundred orders of magnitude, that gap is unsurprising and I would not read anything into it. This block establishes the regime, not the digits.
+
+## Discussion
+
+The result that matters for `aggregate` is not the size of the error but its detectability. In the toy example the two wrong entries came back negative, which is a free diagnostic. In general they do not: FFT-C can return a plausible positive number that is wrong by a hundred orders of magnitude, with nothing in the output to indicate it.
+
+That is the gap aFFT-C closes. Its contribution is less the slicing than the runtime bound, which lets the algorithm report which indices are trustworthy. A convolution routine that returns values and a certificate is categorically more useful than one that returns values alone, and it is the piece `aggregate` currently lacks. The refinement heuristic used on the @BenRached2024 page, build twice and compare, is a poor substitute: it costs a second build and it only detects instability, not error.
+
+Two caveats on transferring this wholesale. First, the paper's setting is pairwise convolution of two arbitrary lattice pmfs, whereas `aggregate` iterates one severity against itself under a frequency distribution, which is the setting of the companion paper @Wilson2017. Second, the dynamic ranges here are extreme by construction. Classes 5 and 6 mix components differing by $e^{-100}$ against $e^{-30}$, which is far beyond a severity curve. The failure is real, but the test problems are adversarial, and an actuarial severity is closer to the benign end.
+
+Where this bites in practice is not a pathological pmf but an ordinary one evaluated far into a tail, which is exactly what @Wilson2017 addresses.
+
+## References
+
+::: {#refs}
+:::

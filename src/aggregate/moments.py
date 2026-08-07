@@ -319,16 +319,38 @@ class MomentAggregator:
         severity gives ``ex2 = ex3 = inf``). ``nan`` is the right answer for
         an undefined CV or skewness, so the guard suppresses numpy's account
         of arithmetic that has already reached it. See :meth:`agg_from_fs`.
+
+        ``var = ex2 - ex1**2`` is a subtraction of two numbers that are equal
+        when the variance is zero, so a degenerate component (a severity
+        capped to a point mass) reaches it as pure cancellation and lands a
+        few ulp on either side of 0. The floor is therefore **relative** to
+        the magnitudes being subtracted: the cancellation error is of order
+        ``eps * max(|ex2|, ex1**2)``, and anything inside
+        ``VALIDATION_NOISE`` of that scale is snapped to exact 0. An absolute
+        floor cannot do this job. The previous ``np.allclose(var, 0)`` carried
+        numpy's default ``atol = 1e-8``, which is a sensible size for a
+        variance of order 1 and far too tight for one whose moments are of
+        order 5e7: a point mass at 6961.69 gave ``var = -3.7e-08``, one
+        machine epsilon in relative terms, and produced ``sqrt`` of a
+        negative number and a ``nan`` CV and skewness.
         """
         m = ex1
         with np.errstate(invalid='ignore'):
             var = ex2 - ex1 ** 2
-        # rounding errors...
-        if np.allclose(var, 0):
-            var = 0
+            # Cancellation floor, relative to what was subtracted. The
+            # isfinite test is load-bearing: an undefined variance is ``inf``
+            # against an ``inf`` scale, and ``inf <= inf`` would snap a
+            # genuinely infinite variance to exactly 0.
+            scale = max(abs(ex2), ex1 * ex1)
+            if np.isfinite(var) and abs(var) <= VALIDATION_NOISE * scale:
+                var = 0.0
         if var < 0:
+            # A deficit this large is not cancellation: the moments are
+            # mutually inconsistent. Reported here, so the sqrt below has
+            # nothing to add and is guarded.
             logger.error(f'MomentAggregator.static_moments_to_mcvsk | weird var < 0 = {var}; ex={ex1}, ex2={ex2}')
-        sd = np.sqrt(var)
+        with np.errstate(invalid='ignore'):
+            sd = np.sqrt(var)
         if m == 0:
             cv = np.nan
             logger.info('MomentAggregator.static_moments_to_mcvsk | encountered zero mean, called with '

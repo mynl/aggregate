@@ -13,7 +13,7 @@ subtitle: "Reproducing Venter (1983), Exhibit 3"
 
 Venter's conclusion is that "the two exact methods are extremely similar, indicating that not much is lost by the discrete approximation to severity", and that the transformed gamma "is reasonably close over a wide range of loss sizes".
 
-This is an unusually good reproduction target for `aggregate`, because the two exact columns are not two different models. They are one model computed at two resolutions, and `aggregate` computes both by changing a single token in one DecL statement. The transformed gamma is reproducible too, since the transformed gamma *is* `scipy.stats.gengamma`.
+This is an unusually good reproduction target for `aggregate`, because the two exact columns are not two different models. They are one model computed at two resolutions, and `aggregate` computes both by changing a single argument. The transformed gamma is reproducible too, since the transformed gamma *is* `scipy.stats.gengamma`.
 
 ## Paper solution and gold standard
 
@@ -26,7 +26,7 @@ Transcribing a 1983 table from a scanned page needs an acceptance test, and the 
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
-from aggregate import build
+from aggregate.distributions import Aggregate
 from greater_tables import GT
 
 KX = np.array([0, 1e3, 5e3, 6e3, 7e3, 8e3, 9e3, 10e3, 12.5e3, 15e3, 17.5e3,
@@ -66,39 +66,27 @@ All six agree, so the transcription is correct. The severity mean is 18,198.195 
 
 The severity is a piecewise uniform density with an atom at the policy limit. `aggregate` builds the density part as a `chistogram`, whose bins are exactly the tabulated knots. The atom is easier to obtain than to declare: carry the limit mass in one wide bin above \$250,000 and then apply a `250000 xs 0` layer, which folds everything above the limit onto the limit itself.
 
-That severity ships in the library as `Venter1983.Piecewise`, so the whole model is one DecL statement. The grid settings ride in the `hints{}` clause rather than arriving as arguments to `update`, which puts the one thing that varies between Venter's two exact columns inside the program where it can be read.
-
 ```{python}
 #| label: build
+edges = np.concatenate((KX, [LIMIT * 1.2]))
+probs = np.concatenate((seg, [ATOM]))
+
 def venter(bs, log2):
-    """Exhibit 3's model. The bucket size is the only thing that changes."""
-    return build(f'agg Venter {LAM} claims {LIMIT:g} xs 0 sev.Venter1983.Piecewise '
-                 f'poisson hints{{log2={log2}; bs={bs}; normalize=False; padding=1}}')
+    obj = Aggregate('V', exp_en=LAM, exp_limit=LIMIT, exp_attachment=0,
+                    sev_name='chistogram', sev_xs=edges, sev_ps=probs,
+                    freq_name='poisson')
+    obj.update(log2=log2, bs=bs, normalize=False, padding=1)
+    return obj
 
 a500 = venter(500, 16)
-print(a500.program)
-```
-
-```{python}
-#| label: build-check
 GT(pd.DataFrame([{'bucket size': 500, 'mean': a500.est_m, 'CV': a500.est_cv,
                   'total mass': a500.agg_density.sum()}]).set_index('bucket size'),
    formatters={'mean': 2, 'CV': 4, 'total mass': 12})
 ```
 
-The shipped curve has to be the transcription this page verified, so check it rather than trust it. `Venter1983.Piecewise` carries the 23 knots plus the wide top bin, and the 22 CDF increments plus the limit mass.
-
 ```{python}
-#| label: curve-check
-spec = build.recipe('Venter1983.Piecewise').spec
-GT(pd.DataFrame([
-    {'quantity': 'knots, transcribed here vs shipped',
-     'largest absolute difference':
-         float(np.abs(spec['sev_xs'] - np.concatenate((KX, [LIMIT * 1.2]))).max())},
-    {'quantity': 'probabilities, transcribed here vs shipped',
-     'largest absolute difference':
-         float(np.abs(spec['sev_ps'] - np.concatenate((seg, [ATOM]))).max())},
-]).set_index('quantity'), formatters={'largest absolute difference': '{x:.2e}'})
+from aggregate import format_program
+print(a500.program)
 ```
 
 
@@ -168,9 +156,9 @@ GT(pd.DataFrame([
    float_format=5)
 ```
 
-At Venter's own \$500 discretization, `aggregate` agrees with his **recursive** column to $5\times10^{-5}$ over all 34 rows, which is exact at the four decimal places printed, and differs from his **characteristic function** column by up to $8.2\times10^{-4}$. Refine the bucket and the two allegiances swap: by `bs = 5` the agreement with the characteristic function column is $7\times10^{-5}$ and the disagreement with the recursive column has grown to $8.4\times10^{-4}$.
+At Venter's \$500 discretization, `aggregate` agrees with his **recursive** column to $5\times10^{-5}$ over all 34 rows, which is exact at the four decimal places printed, and differs from his **characteristic function** column by up to $8.2\times10^{-4}$. Refine the bucket and the two allegiances swap: by `bs = 5` the agreement with the characteristic function column is $7\times10^{-5}$ and the disagreement with the recursive column has grown to $8.4\times10^{-4}$.
 
-This is worth stating plainly because it is the whole point. Venter presents two *methods*; forty years later they are one method at two resolutions. `aggregate`'s FFT with a \$500 bucket **is** the Adelson and Panjer recursion, and the same FFT with a \$5 bucket **is** the characteristic function inversion. The 0.0008 that Venter reports as the gap between his two exact methods is not a difference between characteristic functions and recursion at all. It is the discretization error of a \$500 bucket, and it is the same error `aggregate` incurs when asked for the same bucket.
+Venter presents two *methods* but we can reproduce both using FFTs at two resolutions. `aggregate`'s FFT with a \$500 bucket agrees with the Adelson and Panjer recursion, and FFT with a \$5 bucket agrees with the characteristic function inversion. The 0.0008 that Venter reports as the gap between his two exact methods is not a difference between characteristic functions and recursion at all. It is the discretization error of a \$500 bucket, and it is the same error `aggregate` incurs when asked for the same bucket.
 
 ### The excess ratio and the transformed gamma
 

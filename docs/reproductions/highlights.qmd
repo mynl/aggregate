@@ -5,13 +5,13 @@ subtitle: "The short version"
 
 ## How to read this chapter
 
-Five published results, one page each. Every page has the same four parts: what the paper was doing, the exhibit it printed, the DecL program that reproduces it, and the answer beside the paper's own numbers.
+This section presents a DecL version of five published results. Each has the same four parts: what the paper was doing, the exhibit it printed, the DecL program that reproduces it, and the answer beside the paper's own numbers.
 
 The program on each page is not typed into the page. It is read back off the object that produced the table below it, so the two cannot drift apart. Nothing else is shown, because nothing else is needed: no discretization, no grid loop, no convolution. The bucket size and grid, where they matter, ride inside the program in the `hints{}` clause.
 
-The five are chosen to make five different points. @Venter1983 is about accuracy against a paper that computed the same thing two other ways. @Bear1990 is about the language, six treaty features in six clauses. @Homer2003 is about reach, a joint distribution that is a view of a program rather than a second model. @Bruno2006 is about speed. @Mata2005 is about the reproduction checking the paper rather than the other way round.
+The five results are chosen to make five different points. @Venter1983 is about accuracy against a paper that computed the same thing two other ways. @Bear1990 is about the language, six treaty features in six clauses. @Homer2003 is about reach, a joint distribution that is a view of a program rather than a second model. @Bruno2006 is about speed. @Mata2005 is about the reproduction checking the paper rather than the other way round.
 
-The rest of this book is the detail: fifteen papers, the transcription decisions, the readings that had to be inferred, and the cases that did not work. This chapter is the part you can read in ten minutes.
+The rest of this book is the detail: fifteen papers, the transcription decisions, the readings that had to be inferred, and the cases that did not work. This chapter gives just the DecL highlights and omits the standard Python scaffolding.
 
 ```{python}
 #| label: setup
@@ -22,7 +22,7 @@ import time
 
 import numpy as np
 import pandas as pd
-from aggregate import build
+from aggregate import build, format_program
 from greater_tables import GT
 
 
@@ -32,34 +32,42 @@ def show(obj, width=76):
     Whitespace runs are collapsed: `program` is preprocessor output, and the
     bracket collapse step leaves double spaces around a list. Cosmetic only.
     """
-    text = re.sub(r'\s+', ' ', obj.program).strip()
-    print('\n'.join(textwrap.wrap(text, width, break_long_words=False,
-                                  break_on_hyphens=False)))
-
+    TW = textwrap.TextWrapper(width, subsequent_indent='    ')
+    # the issue is the CHist gets injected
+    text = format_program(obj.program).split('\n')
+    print('\n'.join(TW.fill(t) for t in text))
 
 def summary(**kw):
     """One row of headline numbers."""
     return GT(pd.DataFrame([kw]))
 ```
 
-## Venter (1983): one engine, two of his three columns
+## Venter (PCAS, 1983): Transformed Beta And Gamma Distributions And Aggregate Losses
 
-@Venter1983 introduced the transformed gamma to actuarial work and closed by testing it against the exact aggregate distribution. Exhibit 3 computes the cumulative probability of one compound Poisson three ways over \$25,000 to \$850,000: by characteristic function inversion, by the Adelson and Panjer recursion, and by a transformed gamma matched to three moments. Frequency is Poisson with $\lambda = 13.7376$ and severity is a piecewise linear claim size CDF to a \$250,000 policy limit, tabulated at 23 points.
+@Venter1983 introduced the transformed gamma to actuarial work and closed by testing it against the exact aggregate distribution. His Exhibit 3 computes the cumulative probability distribution of one compound Poisson three ways over \$25,000 to \$850,000: by characteristic function inversion, by the Adelson and Panjer recursion, and by a transformed gamma matched to three moments. Frequency is Poisson with $\lambda = 13.7376$ and severity is a piecewise linear claim size CDF to a \$250,000 policy limit, tabulated at 23 points.
 
-::: {.callout-note appearance="simple"}
-**Exhibit placeholder.** Drop the scan at `img/Venter1983-Exhibit3.png`, then replace this block with `![Venter (1983), Exhibit 3, Part 1](img/Venter1983-Exhibit3.png){width=100%}`.
-:::
+![Venter (1983), Exhibit 3, Part 1](img/cff2lsd2x0.png){width=75%}
 
 ```{python}
 #| label: venter-program
 #| echo: false
+# The pwl severity is available in the standard library
 def venter(bs, log2):
-    return build(f'agg Venter 13.7376 claims 250000 xs 0 sev.Venter1983.Piecewise '
+    """DecL program to build Venter aggregate with input bs and log2."""
+    return build(f'agg Venter 13.7376 claims 250000 xs 0 sev  sev.Venter1983.Piecewise '
                  f'poisson hints{{log2={log2}; bs={bs}; normalize=False; padding=1}}')
-
-v500, v5 = venter(500, 16), venter(5, 22)
+# default algo bs = 80, but need at Venter points
+# so use 100
+v500, v5, vdef = venter(500, 16), venter(5, 18), venter(100, 16)
 show(v500)
 ```
+
+The small bucket size does not have full extent and triggers the (harmless) DefectiveDistributionWarning. The validation explains.
+
+```{python}
+print(textwrap.fill(v5.validation_explanation, 72))
+```
+
 
 ```{python}
 #| label: venter-exhibit
@@ -75,13 +83,14 @@ RECU = np.array([.0516, .1298, .2015, .2683, .3295, .3848, .4346, .4793, .5193,
                  .9729, .9773, .9810, .9844, .9873, .9897, .9916])
 F500 = np.array([v500.density_df.loc[x, 'F'] for x in XS])
 F5 = np.array([v5.density_df.loc[x, 'F'] for x in XS])
+FD = np.array([vdef.density_df.loc[x, 'F'] for x in XS])
 ven = pd.DataFrame({'aggregate loss': XS, 'Venter char fn': CHAR,
                     'Venter recursive': RECU, 'agg bs=500': F500,
-                    'agg bs=5': F5}).set_index('aggregate loss')
+                    'agg bs=5': F5, f'agg bs={vdef.bs}': FD}).set_index('aggregate loss')
 GT(ven.iloc[8:16], float_format=4)
 ```
 
-Eight of the thirty four rows, at the middle of the range. Over all thirty four:
+The table shows eight of the thirty four rows, at the middle of the range. Over all thirty four:
 
 ```{python}
 #| label: venter-verdict
@@ -93,15 +102,14 @@ summary(**{'rows compared': len(XS),
                f'{np.abs(F5 - CHAR).max():.1e}'})
 ```
 
-Venter presents two exact *methods* that differ by up to 0.0008, and reads that gap as the cost of discretizing severity. Forty years later they are one method at two resolutions. Change `bs=500` to `bs=5`, one token in one program, and `aggregate` stops agreeing with his recursion and starts agreeing with his characteristic function instead. The 0.0008 was never a difference between the methods. It was the \$500 bucket, and it is the same error `aggregate` incurs when asked for the same bucket.
+Venter presents two exact *methods* that differ by up to 0.0008, and reads that gap as the cost of discretizing severity. Forty years later we can reproduce both with one method using two resolutions. Change `bs=500` to `bs=5`, one token in one program, and `aggregate` stops agreeing with his recursion and starts agreeing with his characteristic function instead. The 0.0008 was never a difference between the methods. It was the \$500 bucket, and it is the same error `aggregate` incurs when asked for the same bucket.
 
 ## Bear and Nemlick (1990): six treaty features, six clauses
 
-@Bear1990 prices six reinsurance treaties that each carry one adjustable feature, comparing a lognormal approximation of the aggregate against the collective risk model. Table I is the six answers. The subject book is two excess casualty classes written at \$160,000 xs 0 with Pareto severities and gamma mixed Poisson counts. Treaty I puts an annual aggregate deductible of \$360,000 against \$450,000 of expected layer loss, an entry ratio of 0.800, and the indicated rate is the loss cost surviving the deductible loaded 100/75.
+@Bear1990 price six reinsurance treaties that each carry one adjustable feature, comparing a lognormal approximation of the aggregate against the collective risk model. Table I shows the six answers. The subject book is two excess casualty classes written at \$160,000 xs 0 with Pareto severities and gamma mixed Poisson counts. Treaty I puts an annual aggregate deductible of \$360,000 against \$450,000 of expected layer loss, an entry ratio of 0.800, and the indicated rate is the loss cost surviving the deductible loaded 100/75.
 
-::: {.callout-note appearance="simple"}
-**Exhibit placeholder.** Drop the scan at `img/Bear1990-TableI.png`, then replace this block with `![Bear and Nemlick (1990), Table I](img/Bear1990-TableI.png){width=100%}`.
-:::
+![Bear and Nemlick (1990), Table I](img/eov99n5jwp.png){width=100%}
+
 
 ```{python}
 #| label: bear-program
@@ -128,7 +136,7 @@ summary(**{'expected layer loss, 000s': f'{gross.actual_m:,.1f}',
 
 The exact answer is 1.5755% against 1.58% printed, and the lognormal shortcut the paper was testing reads 1.47%. The other five treaties are one clause each, and the detail chapter prices all six.
 
-| Treaty | Feature | The clause that carries it |
+| Treaty | Feature | DecL clause |
 |---|---|---|
 | I | annual aggregate deductible | `aggregate net of 360 xs 0` |
 | II | three free reinstatements | `reinstatements 3 free` |
@@ -138,6 +146,60 @@ The exact answer is 1.5755% against 1.58% printed, and the lognormal shortcut th
 | VI | sliding scale commission | `slide` |
 
 Six treaties, six clauses, and no arithmetic outside the loading factors the slips specify. The detail chapter reproduces the lognormal column exactly at every printed digit and the collective risk column to the printed digit in five of the six.
+
+Here are all six programs, at Poisson counts, as the detail chapter writes them. They are worth reading side by side: every one is the same shape, a subject book with a feature clause on the end, and the differences between the six treaties are differences of one clause. Five wrap in an `xpnl`, the walk face, which books each cession as its own step so the recovery, the ceded premium and any commission come back as separate legs. Treaty IV uses `pnl` instead, because a retro plan varies the gross premium rather than ceding anything, so there is no cession to walk and the plan replaces the premium at the head of the program.
+
+These are shown as authored rather than as parsed, which is the one place in this chapter where that distinction matters. The canonical form the parser renders back spells several of these clauses differently: `reinstatements 3 free` is stored as a vector of three zero charges and comes back `reinstatements [0 0 0]`, percentages resolve to decimals so `corridor 100% po 100% xs 100%` comes back `corridor 1 po 1 xs 1`, and `exposure at rate` and `premium at lr` are one construct with `premium` as the canonical spelling. Everything downstream is driven by the parse, not by this text. The slip language is what is worth reading here.
+
+```{python}
+#| label: bear-all-programs
+#| echo: false
+TREATIES = {
+    'I: annual aggregate deductible': '''
+agg BN.One [9000 3000] exposure at [0.04 0.03] rate 160 xs 0
+    sev 40 * pareto [0.90 0.95] - 40
+    poisson
+    aggregate net of 360 xs 0''',
+    'II: three free reinstatements': '''
+xpnl BN.TreatyII 1172 premium less
+    agg BN.Two [2000 2000 2000] exposure at [0.10 0.14 0.21] rate 700 xs 0
+        sev 300 * pareto [1.5 1.3 1.1] - 300
+        occurrence net of 700 xs 0 deposit 1172 reinstatements 3 free as "Layer"
+        poisson''',
+    'III: loss corridor': '''
+xpnl BN.TreatyIII 10000 premium less
+    agg BN.Three [4500 4500 1000] exposure at [0.032 0.038 0.035] rate 400 xs 0
+        sev 100 * pareto 1.1 - 100
+        poisson
+        aggregate net of 10000 xs 0 deposit 350
+                       corridor 100% po 100% xs 100% as "Corridor"''',
+    'IV: retrospective rating': '''
+pnl BN.TreatyIV retro basic 0 lcm 1.3333333333 min 360 max 1200 premium less
+    agg BN.Four [9000 3000] exposure at [0.04 0.03] rate 160 xs 0
+        sev 40 * pareto [0.90 0.95] - 40
+        poisson''',
+    'V: three year profit commission': '''
+xpnl BN.TreatyV 18000 premium less
+    agg BN.Five [6000 6000 6000] exposure at [0.10 0.14 0.21] rate 700 xs 0
+        sev 300 * pareto [1.5 1.3 1.1] - 300
+        poisson
+        aggregate net of 80% so 100000 xs 0 deposit 5625
+                       pc 25% after 20% as "PC layer"''',
+    'VI: sliding scale commission': '''
+xpnl BN.TreatyVI 25000 premium less
+    agg BN.Six 25000 exposure at 0.10 rate 900 xs 0
+        sev 100 * pareto 0.98 - 100
+        poisson
+        aggregate net of 100000 xs 0 deposit 5000
+                       slide 40% at 35% and 25% at 55% and 20% at 65% as "Slide"''',
+}
+for label, program in TREATIES.items():
+    print(f'Treaty {label}{format_program(program)}\n')
+```
+
+Three details these programs make visible that the prose above glosses over. The nominal wide layers in III, V and VI (`10000 xs 0`, `100000 xs 0`) are not terms of the treaty: a decorator clause has to sit on an aggregate layer, so the layer is written high enough to reach everything the aggregate does and the feature supplies the only binding term. The `deposit` in each is the base premium the feature prices against, which is why the corridor's `100% po 100% xs 100%` reads in loss ratio points exactly as the slip does. And the `80% so` in Treaty V is a placement rather than a cession: premium clauses are quoted at 100% and scaled by the fraction placed, so the slip's \$4,500 on an 80% placement is a `deposit` of \$5,625.
+
+The one genuine constraint is that each program carries exactly one feature. Three of the five features read a ceded loss ratio, and that ratio is only a deterministic rescaling of the ceded loss while the denominator stays fixed. Put two features on one program and the second reads a random denominator. The paper reaches the same conclusion from the other side in its section 5, and proposes running the collective risk model a second time on the post-coinsurance distribution: a two stage construction, not a single decorated layer.
 
 ## Homer and Clark (2003): the joint distribution is a view, not a second model
 
@@ -190,9 +252,8 @@ All five to the digit, and the last two are the paper's point. The per-occurrenc
 
 @Bruno2006 proposes thresholded direct convolution as a cheaper alternative to Panjer recursion, De Pril transforms and the FFT. Table 7 is the showcase: a Poisson with $\lambda = 91{,}000$ against a fourteen point discrete severity, which their formalization reaches in 92,832 convolutions. Table 4 records that Panjer recursion and De Pril both underflow at $\lambda$ as low as 1,004.8, that their own method took 1,950 seconds here, and that their FFT comparison stopped at $\lambda = 5{,}004.8$ after 3,850 seconds.
 
-::: {.callout-note appearance="simple"}
-**Exhibit placeholder.** Drop the scan at `img/Bruno2006-Table7.png`, then replace this block with `![Bruno et al (2006), Table 7](img/Bruno2006-Table7.png){width=100%}`.
-:::
+
+![Bruno et al (2006), Table 7](img/rmx0mj59gm.png){width=100%}
 
 ```{python}
 #| label: bruno-program
@@ -237,7 +298,7 @@ summary(**{'rows compared': len(T7ALL),
            'mean': f'{a7.est_m:,.4f}', 'paper mean': '3,891,268.9543'})
 ```
 
-All twenty eight published values exact at the six decimals printed. The paper counted the FFT as one transform per convolution and summed over 92,832 of them, which is not how a compound distribution is computed: the frequency enters through its probability generating function applied pointwise to the severity transform, so the whole distribution costs two transforms whether $\lambda$ is 500 or 91,000. Some of the gap is twenty years of hardware. The structural part is not.
+All twenty eight published values exact at the six decimals printed. The paper counted the FFT as one transform per convolution and summed over 92,832 of them, which is not how a compound distribution is computed: the frequency enters through its probability generating function applied pointwise to the severity transform, so the whole distribution costs two transforms whether $\lambda$ is 500 or 91,000. Some of the timing gap is twenty years of hardware but that structural part is not.
 
 ## Mata and Verheyen (2005): the check runs both ways
 

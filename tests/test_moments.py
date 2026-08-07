@@ -9,13 +9,16 @@ missing mass at the implied maximum loss.
 from __future__ import annotations
 
 import logging
+import warnings
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from aggregate import build
 from aggregate.config import get_settings
 from aggregate.moments import (
+    MomentAggregator,
     xsden_to_mwrangler,
     xsden_to_meancv,
     xsden_to_meancvskew,
@@ -123,3 +126,80 @@ def test_snap_noise():
     out = _snap_noise(pd.Series([1e-14, 1e-6], index=["x", "y"]))
     assert isinstance(out, pd.Series)
     assert out["x"] == 0.0 and out["y"] == 1e-6
+
+
+# --------------------------------------------------------------------------
+# static_moments_to_mcvsk: the variance cancellation floor
+#
+# var = ex2 - ex1**2 subtracts two numbers that are EQUAL when the variance is
+# zero, so a degenerate component reaches it as pure cancellation and lands a
+# few ulp either side of 0. The floor must be relative to what was subtracted;
+# the absolute atol=1e-8 that np.allclose(var, 0) carried is a sensible size
+# for a variance of order 1 and far too tight for one of order 5e7.
+# --------------------------------------------------------------------------
+
+_MCVSK = MomentAggregator.static_moments_to_mcvsk
+
+
+def test_point_mass_at_scale_has_zero_variance():
+    """The Mack2003 splice case: a point mass at 6961.69, var = -3.7e-08.
+
+    That is one machine epsilon relative to ex1**2 ~ 4.85e7, so the variance
+    is zero. Before the relative floor it survived as negative, gave sqrt of a
+    negative number and a nan CV.
+    """
+    ex1, ex2 = 6961.6903826, 48465132.98318529
+    assert ex2 - ex1 ** 2 < 0                     # genuinely negative as computed
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        m, cv, skew = _MCVSK(ex1, ex2, 3.373e11)
+    assert m == ex1
+    assert cv == 0.0
+    assert np.isnan(skew)                          # undefined for a point mass
+
+
+@pytest.mark.parametrize("mean", [1e-6, 1.0, 1e3, 1e6, 1e9])
+def test_exact_point_mass_at_any_scale(mean):
+    """A point mass has zero variance whatever its magnitude."""
+    m, cv, skew = _MCVSK(mean, mean ** 2, mean ** 3)
+    assert cv == 0.0
+    assert np.isnan(skew)
+
+
+@pytest.mark.parametrize("scale", [1e-6, 1.0, 1e6])
+def test_a_real_variance_survives_the_floor(scale):
+    """The floor snaps cancellation, not signal: CV 1 stays CV 1 at any scale."""
+    ex1, ex2, ex3 = scale, 2 * scale ** 2, 6 * scale ** 3
+    m, cv, skew = _MCVSK(ex1, ex2, ex3)
+    assert cv == pytest.approx(1.0)
+    assert skew == pytest.approx(2.0)
+
+
+def test_infinite_variance_is_not_snapped_to_zero():
+    """``inf <= inf`` is True, so the floor needs its isfinite test.
+
+    Without it an undefined variance would be reported as exactly zero, which
+    is the opposite of the truth.
+    """
+    m, cv, skew = _MCVSK(1.0, np.inf, np.inf)
+    assert np.isinf(cv)
+    assert np.isnan(skew)
+
+
+def test_materially_negative_variance_is_still_reported(caplog):
+    """Inconsistent moments are an error, not cancellation, and say so."""
+    with caplog.at_level(logging.ERROR, logger="aggregate.moments"):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            m, cv, skew = _MCVSK(2.0, 1.0, 1.0)
+    assert "weird var < 0" in caplog.text
+    assert np.isnan(cv) and np.isnan(skew)
+
+
+def test_degenerate_severity_builds_without_a_nan_cv():
+    """End to end: a fixed severity is a point mass and reports cv 0."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        a = build("agg MZ.Point 1 claim sev dhistogram xps [6961.6903826] [1] fixed")
+    assert a.sev_m == pytest.approx(6961.6903826)
+    assert a.sev_cv == pytest.approx(0.0, abs=1e-12)

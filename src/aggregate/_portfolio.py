@@ -1664,6 +1664,53 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return self._reins_density_df
 
     @property
+    def reins_views(self):
+        """The distributions this book's cessions make available for pricing.
+
+        ``['gross', 'ceded', 'net']`` when any unit cedes, ``[]`` otherwise.
+        Shorter than an :attr:`Aggregate.reins_views` by design: a portfolio's
+        :attr:`reins_density_df` convolves each unit's **end to end** view, so
+        there is no portfolio-wide occurrence stage to name. Units cede on
+        different stages, and a book-level ``net occ`` would have to pretend
+        they cede on the same one.
+
+        The accepted values of the ``reins_view=`` keyword on
+        :meth:`calibrate_distortions`, :meth:`analyze_distortions` and
+        :meth:`evaluate`.
+
+        Returns
+        -------
+        list of str
+        """
+        return list(self._reins_view_columns())
+
+    def _reins_view_columns(self):
+        """Map ``reins_view`` name to its :attr:`reins_density_df` column."""
+        if self._reins_after_label() is None:
+            return {}
+        return {'gross': 'p_agg_gross', 'ceded': 'p_agg_ceded',
+                'net': 'p_agg_net'}
+
+    def _reins_view_density(self, view):
+        """The portfolio density of one named reinsurance view, as a ``Series``.
+
+        The pricing surface's private hook; :attr:`reins_views` is the public
+        question. Raises ``ValueError`` for a view this book cannot answer,
+        including the no-reinsurance case.
+
+        Notes
+        -----
+        The three views are *separate* distributions (portfolio gross / ceded
+        / net loss) convolved unit by unit, so they no more satisfy
+        ``gross = net (+) ceded`` than the unit-level views do. Pricing each
+        is meaningful; differencing two prices is a comparison of two books,
+        not a decomposition of one.
+        """
+        column = _reinsurance.resolve_reins_view(
+            view, self._reins_view_columns(), self.name)
+        return self.reins_density_df[column].rename(view)
+
+    @property
     def reins_stats_df(self):
         """Per-unit and portfolio-total end-to-end gross / ceded / net moments.
 
@@ -2940,7 +2987,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return _density.add_exa(self, df, unit_state)
 
     def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower',
-                              names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS):
+                              names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS,
+                              reins_view=None):
         """
         Calibrate the standard pricing distortion set to a cost-of-capital target.
 
@@ -2957,6 +3005,12 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             must be provided.
         kind : {'lower', 'upper'}, optional
             VaR kind when ``p`` is provided. Default ``'lower'``.
+        reins_view : str, optional
+            Which of the book's reinsurance views to calibrate on, one of
+            :attr:`reins_views` (``gross`` / ``ceded`` / ``net``). The default
+            ``None`` is the portfolio's own total, which already **is** its net
+            view: the units convolved are the units as built, cessions applied.
+            So ``reins_view='gross'`` is the one that says something new here.
 
         Returns
         -------
@@ -2987,11 +3041,18 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         ``names`` selects the distortion families to calibrate (default the
         standard set).
+
+        Both frames carry ``attrs['reins_view']``, recording which distribution
+        they were fitted to. The three portfolio views are separate
+        distributions and do not satisfy ``gross = net (+) ceded`` (see
+        :attr:`reins_density_df`), so a gross premium less a net premium is a
+        comparison of two books rather than a decomposition of one.
         """
         return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind,
-                                              names=names)
+                                              names=names,
+                                              reins_view=reins_view)
 
-    def evaluate(self, P=None, *, unit='total', names=None):
+    def evaluate(self, P=None, *, unit='total', names=None, reins_view=None):
         """Evaluate the position ``P - X``: the breakeven acceptability panel.
 
         The ``Portfolio`` counterpart of :meth:`Aggregate.evaluate`, on the
@@ -3015,6 +3076,13 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         names : sequence of str, optional
             Distortion families. Defaults to
             :data:`~aggregate._pricing.EVAL_FAMILIES`.
+        reins_view : str, optional
+            Which reinsurance view to evaluate, one of :attr:`reins_views`.
+            Applies to the total and to each named unit alike: a unit's view
+            comes from its own program, so a unit that does not cede refuses by
+            name rather than quietly reporting its own distribution under
+            another label. ``P`` is not adjusted with the view; pass the
+            premium that goes with it.
 
         Returns
         -------
@@ -3022,7 +3090,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)``, one
             ``Step`` per evaluated unit, and columns ``role`` / ``param_name`` /
             ``param`` / ``gini_p`` / ``error`` / ``status``. ``role`` is always
-            ``'sell'``: every unit is an obligation written.
+            ``'sell'``: every unit is an obligation written. With a
+            ``reins_view`` each ``Step`` is suffixed by it, so panels for
+            several views concatenate without collapsing.
 
         Warns
         -----
@@ -3047,20 +3117,23 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             if len(prems) != len(units):
                 raise ValueError(
                     f'{len(prems)} premiums for {len(units)} units.')
+        suffix = '' if reins_view is None else f' {reins_view}'
         blocks, steps = [], []
         for name, prem in zip(units, prems):
             if name == 'total':
                 prem = self._resolve_evaluation_premium(prem)
-                s = self.density_df['p_total']
+                s = (self.density_df['p_total'] if reins_view is None
+                     else self._reins_view_density(reins_view))
                 block = _pricing.evaluate_constant_premium(
                     s.index.to_numpy(dtype=float), s.to_numpy(dtype=float),
                     self.bs, prem, names=names)
-                steps.append(self.name)
+                steps.append(f'{self.name}{suffix}')
             else:
                 # a unit's marginal is its stand-alone law (units independent)
-                block = self[name].evaluate(prem, names=names) \
+                block = self[name].evaluate(prem, names=names,
+                                            reins_view=reins_view) \
                     .droplevel('Step')
-                steps.append(name)
+                steps.append(f'{name}{suffix}')
             blocks.append(block)
         panel = pd.concat(blocks, keys=steps, names=['Step'])
         _pricing.warn_degenerate(panel, self.name)
@@ -3712,7 +3785,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             audit_df=self._relabel(audit_df),
         )
 
-    def analyze_distortions(self, *, p=None, a=None, distortions=None):
+    def analyze_distortions(self, *, p=None, a=None, distortions=None,
+                            reins_view=None):
         """
         Pricing readout for a set of distortions at probability ``p`` or asset ``a``.
 
@@ -3727,6 +3801,16 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         distortions : dict[str, Distortion], optional
             The distortions to analyse. Defaults to ``self.distortions`` (populated
             by :meth:`calibrate_distortions`).
+        reins_view : {None, 'net'}, optional
+            Which of the book's reinsurance views to allocate on. ``None`` and
+            ``'net'`` are the same thing and are the whole accepted set: a
+            portfolio's own total already **is** its net view, so the existing
+            path answers it exactly, per-unit allocation included. ``'gross'``
+            and ``'ceded'`` raise, since allocating either needs a twin
+            portfolio of gross (or ceded) units that the library does not
+            build. Accepting the keyword and refusing the two it cannot honour
+            is the point: a caller sweeping :attr:`reins_views` gets an error
+            rather than three identical net answers under three labels.
 
         Returns
         -------
@@ -3748,11 +3832,29 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         lifted frame (the mass lands on the last represented bucket); such
         members of the sweep are skipped with a ``UserWarning`` -- price
         them explicitly with ``price(..., allocation='linear')``.
+
+        Raises
+        ------
+        NotImplementedError
+            For ``reins_view='gross'`` or ``'ceded'``.
+        ValueError
+            For a ``reins_view`` this book does not carry at all.
         """
         if (p is None) == (a is None):
             raise ValueError(
                 'analyze_distortions requires exactly one of p= (probability) '
                 'or a= (asset level).')
+        if reins_view is not None:
+            # validate against the object first, so an unknown name and an
+            # unallocatable one give different errors.
+            _reinsurance.resolve_reins_view(
+                reins_view, self._reins_view_columns(), self.name)
+            if reins_view != 'net':
+                raise NotImplementedError(
+                    f'analyze_distortions allocates on net only; '
+                    f'reins_view={reins_view!r} needs a twin portfolio of '
+                    f'{reins_view} units, which the library does not build. '
+                    f'Calibrate on it with calibrate_distortions instead.')
         distortions = distortions or self.distortions
         if not distortions:
             raise ValueError(

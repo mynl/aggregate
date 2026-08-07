@@ -1334,6 +1334,42 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _reinsurance.reins_density_df(self)
 
+    @property
+    def reins_views(self):
+        """The distributions this aggregate's cession makes available for pricing.
+
+        The accepted values of the ``reins_view=`` keyword on
+        :meth:`calibrate_distortions` and :meth:`evaluate`, and the answer to
+        "what can I price this on": ``[]`` when nothing cedes,
+        ``['gross', 'ceded', 'net']`` with one stage, and those plus
+        ``'ceded occ'`` / ``'net occ'`` when a program has both. Mirrors
+        :func:`~aggregate.charts.available_charts` and
+        :func:`~aggregate.exhibits.available_exhibits`, which answer the same
+        shape of question about the same object.
+
+        ``ceded`` and ``net`` are **end to end**, so on an occurrence-only
+        program they are the occurrence stage's cession and retention, not the
+        empty aggregate-stage columns of :attr:`reins_density_df`.
+
+        Returns
+        -------
+        list of str
+
+        See Also
+        --------
+        aggregate._reinsurance.reins_view_columns : the mapping onto columns.
+        """
+        return list(_reinsurance.reins_view_columns(self))
+
+    def _reins_view_density(self, view):
+        """The aggregate density of one named reinsurance view, as a ``Series``.
+
+        The pricing surface's private hook; :attr:`reins_views` is the public
+        question. Raises ``ValueError`` for a view this aggregate cannot
+        answer, including the no-reinsurance case.
+        """
+        return _reinsurance.reins_view_density(self, view)
+
     def reins_occ_plot(self, axs=None, **kwargs):
         """
         Plots for occurrence reinsurance: occurrence log density and aggregate
@@ -6249,7 +6285,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             self, p=p, a=a, L=L, M=M, P=P, Q=Q, LR=LR, PQ=PQ, ROE=ROE)
 
     def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower',
-                              names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS):
+                              names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS,
+                              reins_view=None):
         """Calibrate the standard pricing distortion set to a cost-of-capital target.
 
         The ``Aggregate`` counterpart of :meth:`Portfolio.calibrate_distortions`
@@ -6270,6 +6307,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             Asset level; snapped to the grid. Exactly one of ``p`` or ``a``.
         kind : {'lower', 'upper'}, optional
             VaR kind when ``p`` is provided. Default ``'lower'``.
+        reins_view : str, optional
+            Which of a cession's distributions to calibrate on, one of
+            :attr:`reins_views`. The default ``None`` is this aggregate's own
+            density, which under a cession is whichever view the program asked
+            for: a ``net of`` program holds its net, a ``ceded to`` program
+            holds its ceded.
 
         Returns
         -------
@@ -6278,7 +6321,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             per distortion in ``[ccoc, ph, wang, dual, tvar]``. The shared
             calibration target is stored once on ``self.calibration_df`` and the
             calibrated objects on ``self.distortions`` keyed by name -- same
-            schema as :meth:`Portfolio.calibrate_distortions`.
+            schema as :meth:`Portfolio.calibrate_distortions`. Both frames carry
+            ``attrs['reins_view']``, recording which distribution they were
+            fitted to.
 
         Notes
         -----
@@ -6289,11 +6334,27 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ``names`` selects the distortion families to calibrate (default the
         standard set); signed / payoff supports are handled transparently (see
         :func:`aggregate._pricing.calibrate_distortions`).
+
+        Calibrating gross and net separately and differencing the premiums is
+        the allowance for reinsurance in the rate. The asset level resolves on
+        the chosen view, so ``p=`` holds the threshold fixed across views
+        rather than the capital.
+
+        Examples
+        --------
+        ::
+
+            a = build('agg Re 100 claims sev lognorm 50 cv 2 poisson '
+                      'occurrence net of 100 xs 100')
+            a.reins_views                                    # ['gross', 'ceded', 'net']
+            gross = a.calibrate_distortions(0.10, p=0.999, reins_view='gross')
+            net = a.calibrate_distortions(0.10, p=0.999, reins_view='net')
         """
         return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind,
-                                              names=names)
+                                              names=names,
+                                              reins_view=reins_view)
 
-    def evaluate(self, P=None, *, names=None):
+    def evaluate(self, P=None, *, names=None, reins_view=None):
         """Evaluate the position ``P - X``: the breakeven acceptability panel.
 
         Pricing asks what the obligation is worth; evaluation asks how much
@@ -6312,6 +6373,14 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             Distortion families. Defaults to
             :data:`~aggregate._pricing.EVAL_FAMILIES` (``ph`` / ``wang`` /
             ``dual`` / ``tvar``).
+        reins_view : str, optional
+            Which of a cession's distributions to evaluate, one of
+            :attr:`reins_views`. The default ``None`` is this aggregate's own.
+            ``P`` is **not** adjusted with the view: evaluating the gross
+            distribution against the net premium asks what stress the position
+            would survive if the cover failed to respond, which is a question
+            worth being able to ask deliberately, and a wrong answer to ask by
+            accident. Pass the premium that goes with the view.
 
         Returns
         -------
@@ -6337,11 +6406,13 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         calibrate_distortions : the pricing counterpart, given a CoC target.
         """
         P = self._resolve_evaluation_premium(P)
-        s = self.density_df['p_total']
+        s = (self.density_df['p_total'] if reins_view is None
+             else self._reins_view_density(reins_view))
         panel = _pricing.evaluate_constant_premium(
             s.index.to_numpy(dtype=float), s.to_numpy(dtype=float), self.bs, P,
             names=names)
-        panel = pd.concat([panel], keys=[self.name], names=['Step'])
+        step = self.name if reins_view is None else f'{self.name} {reins_view}'
+        panel = pd.concat([panel], keys=[step], names=['Step'])
         _pricing.warn_degenerate(panel, self.name)
         return panel
 

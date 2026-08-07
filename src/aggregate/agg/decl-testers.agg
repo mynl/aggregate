@@ -1096,3 +1096,21 @@ agg WP.Tower as "US Hurricane Reinsurance" 1.74 claims sev lognorm 8.501 cv 14.6
 # makes the mean exactly alpha*xm/(alpha-1). Compare Liu2026 in the
 # reproductions, which is entirely Type-I Pareto.
 agg PT.TypeOne 1 claim sev 1 * pareto 2.5 fixed                                                                   note{Type-I Pareto: analytic partial moments, mean alpha*xm/(alpha-1) = 5/3}
+
+
+# RV. Reinsurance pricing views (1.0.0a223)
+# =========================================
+# Programs behind tests/test_reins_view_pricing.py ([Loss-Lab-Round-3] phase
+# A). The `reins_view=` keyword names which of a cession's distributions to
+# price on, so the fixtures are the three shapes a program can take: one stage,
+# both stages, and a `ceded to` cession whose own density is its CEDED view
+# rather than its net. The last is the point of the phase: an object holds one
+# of its distributions and which one depends on how the program was written,
+# so a caller reading `density_df` and calling it "net" is right half the time.
+# The portfolio pairs a ceding unit with a clean one, since a book's own total
+# already IS its net view and only `gross` says something new there.
+agg RV.Occ 100 claims sev lognorm 50 cv 2 occurrence net of 100 xs 100 poisson                                     note{one stage: reins_views is gross, ceded, net};
+agg RV.Both 100 claims sev lognorm 50 cv 2 occurrence net of 100 xs 100 poisson aggregate net of 1000 xs 4000      note{two stages: adds ceded occ and net occ};
+agg RV.Ceded 100 claims sev lognorm 50 cv 2 occurrence ceded to 100 xs 100 poisson                                 note{own density is the CEDED view, not the net};
+agg RV.Clean 30 claims sev lognorm 40 cv 1.2 poisson                                                               note{no cession: reins_views is empty and reins_view= is refused};
+port RV.Book agg RV.Occ 100 claims sev lognorm 50 cv 2 occurrence net of 100 xs 100 poisson agg RV.Clean 30 claims sev lognorm 40 cv 1.2 poisson

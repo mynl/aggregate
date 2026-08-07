@@ -49,6 +49,22 @@
 
 ### Interface & reporting
 
+- **[Loss-Lab-Round-3]** — what the Loss Lab app needs from the library after its
+  first end-to-end run. Plan: `dev/plan-loss-lab-round-3.md`; the api half is
+  `aggregate_api/dev/plan-ui-round-3.md`. Five phases, each its own version bump.
+  **Phase A DONE** (`1.0.0a223`): `reins_view=` on `calibrate_distortions` /
+  `evaluate` / `analyze_distortions`, plus the `reins_views` property, which is
+  the one the app was blocked on and which deletes the reason for its
+  `_BasisView` shim. Remaining: **B** `reins_price_df`, a distortion-priced
+  cession (nothing in the library prices one today); **C** a Portfolio emitter
+  for `chart_reins`, which is registered for `Aggregate` alone so a reinsured
+  book's chart reads as unbuilt; **D** captions and column formats on the
+  passthrough exhibits (`register_simple_exhibit` returns `{}` for frame kwargs,
+  so `bs_window` / `stats` / `summary` / `validation` / `tail` / `economic`
+  arrive caption-less under RAW), and `:g` formatting of `x_min` / `x_max` / `W`
+  in the window prose; **E** housekeeping, a string-returning `to_agg` sibling
+  with `'pnl'` in `_KIND_WRITE_ORDER`, removing the ignored
+  `format_program(width=)`, and giving `PnL` / `BivariateAggregate` a `tail_df`.
 - **[Reporting-Guidelines]** — *define what "first-class citizen" means* for a
   reporting object: a report's **rows are fixed** (it does not morph as the
   object gains properties), columns are **pure** (one unit per column — currency

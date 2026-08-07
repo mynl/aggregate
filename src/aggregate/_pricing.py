@@ -512,8 +512,45 @@ def _calibration_frames(dists, coc, p_val, Fa, exa, P, a):
     return distortion_df, calibration_df
 
 
+def _reins_view_source(obj, reins_view):
+    """The density, and the ``q`` / ``cdf`` / ``snap`` trio, for one named view.
+
+    A cession gives an object more than one distribution worth pricing, and the
+    object holds exactly one of them. This resolves the other four (and confirms
+    the object can answer at all) and hands back the quantile surface for the
+    chosen one, built on a :class:`~aggregate._grid_distribution.GridDistribution`
+    so every quantile in the library still comes from the same kernel.
+
+    Parameters
+    ----------
+    obj : Aggregate or Portfolio
+        Supplying ``_reins_view_density``.
+    reins_view : str
+        One of the object's :attr:`reins_views`.
+
+    Returns
+    -------
+    tuple
+        ``(density, q, cdf, snap)``: the mass as a ``Series`` on the model
+        grid, then the three bound methods the calibration reads.
+
+    Raises
+    ------
+    ValueError
+        When the object cannot answer about ``reins_view``.
+    """
+    from ._grid_distribution import GridDistribution
+
+    density = obj._reins_view_density(reins_view)
+    gd = GridDistribution.from_series(
+        density, bs=obj.bs, name=f'{obj.name} {reins_view}',
+        is_loss_value=obj._is_loss_value)
+    return density, gd.q, gd.cdf, gd.snap
+
+
 def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
-                          names=DEFAULT_CALIBRATION_DISTORTIONS):
+                          names=DEFAULT_CALIBRATION_DISTORTIONS,
+                          reins_view=None):
     """Calibrate the standard pricing distortion set to a cost-of-capital target
     on a single distribution (an ``Aggregate`` or a ``Portfolio`` total).
 
@@ -526,6 +563,22 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
     The expected loss is read from the object's ``exa_total`` column when it has
     one (a ``Portfolio``, byte-for-byte the legacy value) and otherwise computed
     on the full grid via :func:`_limited_ev` (an ``Aggregate``).
+
+    Reinsurance views
+    -----------------
+    ``reins_view`` names which of a cession's distributions to calibrate on.
+    The default ``None`` is the object's own, so every existing call is
+    unchanged. A cession makes three to five distributions available (see
+    :attr:`Aggregate.reins_views`), and which one the object holds is a
+    property of how the program was written: a ``net of`` program holds its
+    net, a ``ceded to`` program holds its ceded. Calibrating gross and net
+    separately and differencing the premiums is the **allowance for
+    reinsurance in the rate**.
+
+    The asset level is resolved on the chosen view, so ``p=`` holds the
+    *threshold* fixed across views rather than the capital. That is the honest
+    comparison: a reinsured book needs less capital at the same probability,
+    and that saving is part of what the cession bought.
 
     Signed and payoff supports
     --------------------------
@@ -541,6 +594,9 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
     classic ``X >= 0`` loss path (``c = 0``, no reverse) is byte-for-byte
     unchanged. For a signed/payoff object the asset anchor is resolved as the
     lower quantile on ``Z`` (``kind`` is honoured only on the classic path).
+    A ``reins_view`` is refused on that path: the canonical-frame bookkeeping is
+    written against the object's own support, and a cession of a signed outcome
+    has no settled meaning to hold it to.
     """
     if (p is None) == (a is None):
         raise ValueError(
@@ -549,16 +605,25 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
 
     transform = (not obj._is_loss_value
                  or float(obj.density_df.index.min()) < 0)
+    if transform and reins_view is not None:
+        raise NotImplementedError(
+            f'{obj.name} has a signed or payoff support, where a cession has '
+            f'no settled meaning: drop reins_view={reins_view!r}.')
     if not transform:
         # ---- classic non-negative loss frame (c = 0): legacy path verbatim ---
+        if reins_view is None:
+            density = obj.density_df['p_total']
+            q_, cdf_, snap_ = obj.q, obj.cdf, obj.snap
+        else:
+            density, q_, cdf_, snap_ = _reins_view_source(obj, reins_view)
         if a is None:
-            a = obj.q(p, kind)
+            a = q_(p, kind)
             p_val = p
         else:
-            a = obj.snap(a)
-            p_val = obj.cdf(a)
-        density = obj.density_df['p_total']
-        if 'exa_total' in obj.density_df.columns:
+            a = snap_(a)
+            p_val = cdf_(a)
+        if reins_view is None and 'exa_total' in obj.density_df.columns:
+            # the object's own cached limited expected value, byte-for-byte
             exa = obj.density_df.loc[a, 'exa_total']
         else:
             exa = _limited_ev(density, obj.bs, a)
@@ -571,7 +636,7 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
             S=S, dx=obj.bs, premium_target=P, ess_sup=ess_sup, assets=a,
             el=exa, names=names)
         distortion_df, calibration_df = _calibration_frames(
-            dists, coc, p_val, obj.cdf(a), exa, P, a)
+            dists, coc, p_val, cdf_(a), exa, P, a)
     else:
         # ---- signed / payoff: calibrate on the canonical loss frame Z --------
         bs = obj.bs
@@ -609,6 +674,11 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
         distortion_df, calibration_df = _calibration_frames(
             dists, coc, p_val, Fa, exa_z - c, P_z - c, a_z - c)
 
+    # Provenance: which distribution these were fitted to. Without it a
+    # gross-calibrated set stored on the object is indistinguishable from an
+    # own-density one, and the object's own density is not always its net.
+    distortion_df.attrs['reins_view'] = reins_view
+    calibration_df.attrs['reins_view'] = reins_view
     obj.distortions = dists
     obj.distortion_df = distortion_df
     obj.calibration_df = calibration_df

@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.0a223
+
+**[Loss-Lab-Round-3] Phase A: `reins_view=` names which of a cession's distributions to price on.** A reinsured object holds one distribution and the whole pricing surface read it with no way to say otherwise. Which one it holds is a property of how the program was written, not of what the caller wants: a `net of` program holds its net, a `ceded to` program holds its **ceded**. So an entry point reading `density_df` and calling it "the net" is right half the time, silently.
+
+**The keyword.** `reins_view=` on `calibrate_distortions` (both classes), `evaluate` (both classes) and `analyze_distortions` (Portfolio). The default `None` is the object's own density, so every existing call is unchanged, byte for byte: the cached `exa_total` shortcut still fires on the untouched path, and the signed / payoff branch is reached exactly as before.
+
+The name is neither `basis` nor `view`, both of which are taken. `basis` is the `EX` / `Est` level of `reins_stats_df` and the triple selector of `chart_reins`. `view` is worse: it is already a kwarg on the very methods this touches, meaning **bid / ask** (`Portfolio.price`, both `apply_distortion` fronts, `build_augmented`, `unit_capital_at`, `Distortion.effective_g`), with a third meaning (`agg` / `sev`) on `Portfolio.unit_density`. `analyze_distortions` reaches `apply_distortion(view='ask')` internally, so a bare `view=` would have carried two meanings one call apart.
+
+**The vocabulary** is the `view` level of `reins_stats_df`, extended by the stage word where a program has two stages:
+
+| `reins_view` | Aggregate | Portfolio |
+|---|---|---|
+| `gross` | `p_agg_gross` | `p_agg_gross` |
+| `ceded` | `p_agg_ceded` with an aggregate cover, else `p_agg_ceded_occ` | `p_agg_ceded` |
+| `net` | `p_agg_net` with an aggregate cover, else `p_agg_net_occ` | `p_agg_net` |
+| `ceded occ` | `p_agg_ceded_occ`, both stages only | not offered |
+| `net occ` | `p_agg_net_occ`, both stages only | not offered |
+
+`ceded` and `net` resolve **end to end**, by the rule `Portfolio._reins_unit_views` already encodes, reused rather than rewritten. Naming the raw column instead would be the silent-wrong-answer this phase exists to close: with no aggregate cover `p_agg_ceded` carries the no-cession value, so a caller asking an occurrence-only program for its `ceded` would have been handed a point mass at 0. The `occ` pair appears only when **both** stages are present, since with one stage it duplicates `ceded` / `net` exactly and a reader offered five views assumes five answers. `p_agg_subject` is deliberately unnamed: it equals `net occ` or `ceded occ` according to `occ_kind`.
+
+**`reins_views`, new, on `Aggregate` and `Portfolio`.** The accepted list, `[]` with no cession. The keyword refuses what an object cannot answer, so a caller has to be able to ask, and the accepted set is object dependent. A Portfolio's is shorter by design: a book convolves each unit's end-to-end view, so there is no book-wide occurrence stage to name, and units cede on different stages. Mirrors `available_charts` / `available_exhibits`.
+
+**A Portfolio's own total already IS its net view** (`p_agg_net` equals `density_df['p_total']` exactly). So `analyze_distortions(reins_view='net')` is the existing path under a name, per-unit allocation included, and `'gross'` / `'ceded'` raise `NotImplementedError`: allocating either needs a twin portfolio of gross (or ceded) units, which the library does not build. Accepting the keyword and refusing the two it cannot honor is the point, since a caller sweeping `reins_views` gets an error rather than three identical net answers under three labels.
+
+**Provenance.** `distortion_df` and `calibration_df` carry `attrs['reins_view']`. Without it a gross-calibrated set stored on the object is indistinguishable from an own-density one.
+
+**`evaluate` does not adjust `P` with the view**, and says so. Evaluating the gross distribution against the net premium asks what stress the position would survive if the cover failed to respond, which is worth being able to ask deliberately and is a wrong answer to ask by accident. The `Step` label is suffixed by the view, so panels for several views concatenate. A Portfolio passes the view down to each named unit, and a unit that does not cede refuses **by name**.
+
+A `reins_view` is refused on the signed / payoff path: that branch's canonical-frame bookkeeping is written against the object's own support, and a cession of a signed outcome has no settled meaning to hold it to.
+
+New in `_reinsurance.py`: `REINS_VIEWS`, `reins_view_columns`, `resolve_reins_view` (the one place the refusal is worded, shared by both classes) and `reins_view_density`. Quantiles on a chosen view come from a `GridDistribution` built over it, so nothing here hand-rolls a search. Tests in `tests/test_reins_view_pricing.py`, fixtures mirrored in `decl-testers.agg` section RV.
+
+This deletes the reason for the api's `_BasisView` shim, and closes `alloc`: the app lost every per-unit allocation table on a reinsured portfolio because its reinsurance pricing path could not reach `analyze_distortions` at all.
+
+
 ## 1.0.0a222
 
 **[Undefined-Moment-Reporting] A moment that does not exist is reported as `inf` or `0`, whichever it is, and never as `nan` from a subtraction that cancelled.** Two sites, one theme: a value the arithmetic could not represent was reaching a user-visible CV or skewness.

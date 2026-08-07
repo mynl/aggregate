@@ -1,8 +1,57 @@
 # Plan [Loss-Lab-Round-3]: what the app needs from the library
 
-> **Status: not started.** Written 2026-08-07, split out of
+> **Status: in execution.** Written 2026-08-07, split out of
 > `aggregate_api/dev/plan-ui-round-3.md`, which is the immediate consumer and
-> holds the api half of the same round. Current version `1.0.0a217`.
+> holds the api half of the same round. Current version `1.0.0a222`.
+>
+> **Author decisions, 2026-08-07.** Four calls that the first draft left open,
+> now settled and folded into the phases below.
+>
+> 1. The keyword is **`reins_view=`**, one kwarg, taking the vocabulary
+>    `reins_stats_df` already spells on its `view` level. Both shorter names
+>    are taken. `basis` is the `EX` / `Est` level of `reins_stats_df`
+>    (`_reinsurance.py:494`) and the triple selector of `chart_reins`
+>    (`_emit_reins.py:92`). Worse, plain `view` is already a kwarg on the very
+>    methods this phase touches, meaning **bid / ask**: `Portfolio.price`
+>    (`_portfolio.py:3372`), both `apply_distortion` fronts
+>    (`_portfolio.py:3082`, `_aggregate.py:4132`), `build_augmented` and
+>    `unit_capital_at` (`_portfolio_common.py:90`, `:226`) and
+>    `Distortion.effective_g` (`spectral.py:857`), with a third meaning
+>    (`agg` / `sev`) on `Portfolio.unit_density` (`:2737`).
+>    `analyze_distortions` reaches `apply_distortion(view='ask')` internally,
+>    so a bare `view=` would carry two meanings one call apart. The `reins_`
+>    prefix is the house `reins_*` surface a41 settled on, and it pairs with
+>    the `reins_views` property that lists what the keyword accepts.
+> 2. `analyze_distortions` answers on **net only** for now, and raises for
+>    `gross` / `ceded`, which need a twin portfolio the library does not build.
+>    That is enough to close `alloc`: the app loses its per-unit tables because
+>    the reinsurance path cannot reach `analyze_distortions` at all, not because
+>    net is the wrong answer.
+> 3. `format_program(width=)` is **removed**, not implemented.
+> 4. `kinds` adds **`tail_df` only**. `summary_df` on `PnL` and
+>    `BivariateAggregate` keeps its own meaning; those two frames are already
+>    right for their objects, which is what the a113 deferral was protecting.
+>
+> Two names this plan introduces, vetted against the existing surface per the
+> house rule: **`reins_price_df`** (phase B), joining `reins_density_df` /
+> `reins_stats_df` / `reins_summary_df`, and **`reins_views`** (phase A), the
+> property naming what a given object can be priced on.
+>
+> **A correction to the api's reading, found while checking phase A.** For a
+> `ceded to` program the object's own density is the **ceded** view, not the
+> net one: `p_agg_ceded` reproduces `density_df['p_total']` exactly and
+> `p_agg_net` does not. The comment above `_BasisView`
+> (`aggregate_api/src/aggregate_api/pricing.py:255-259`) asserts the reverse,
+> so the app is calibrating a `ceded to` program's "net" basis against a
+> distribution the object does not hold. Fixing that is the api's, once
+> `reins_view=` lands.
+>
+> **`behavior` needs nothing on this side.** Checked against the running
+> registry, not the source: the library registers **both** exhibits, `tail`
+> over `tail_df` and `tail_behavior` over `tail_behavior_df`, for `Aggregate`
+> and `Portfolio` (`exhibits/__init__.py:80`, `:89`), and `available_exhibits`
+> answers both. The api plan already carries the correction at its `:96-110`
+> and `:350-361`.
 
 The Loss Lab app had its first end-to-end run and the author wrote a punch list.
 Most of it is the app's own, and stays there. This doc holds the part that is
@@ -76,28 +125,57 @@ pricing path cannot call `analyze_distortions` at all, so it returns none.
 Phase A closes the hole and lets the shim be deleted. It is the only phase the
 app is blocked on, so it goes first.
 
-## Phase A: a basis keyword on the pricing surface
+## Phase A: a `reins_view` keyword on the pricing surface
 
-**What lands.** A keyword, `basis` or `density`, on the three entry points that
-currently read `self`'s density with no way to say otherwise:
+**What lands.** A `reins_view=` keyword on the three entry points that currently read
+`self`'s density with no way to say otherwise:
 
 * `calibrate_distortions`, implementation `src/aggregate/_pricing.py:515`,
   fronted at `_portfolio.py:2942` and `_aggregate.py:6251`
 * `analyze_distortions`, `_portfolio.py:3715`
-* `evaluate`
+* `evaluate`, `_aggregate.py:6296` and `_portfolio.py:2994`
 
-The vocabulary should be the one the app already speaks and the reinsurance
-frames already carry: gross, net of occurrence, net. `_reinsurance.reins_density_df`
-(`src/aggregate/_reinsurance.py:345`) has `p_agg_gross`, `p_agg_ceded`,
-`p_agg_net`, `p_agg_ceded_occ` and `p_agg_net_occ` on an Aggregate, and a
-Portfolio's (`_portfolio.py:1622-1640`) has only gross, ceded and net, so the
-accepted set is object-dependent and the keyword must reject what an object
-cannot answer rather than quietly returning the wrong one. The app has a bug of
-exactly this shape today, offering three basis buttons where a Portfolio has two.
+`reins_view=None` is the object's own density, so every existing call is unchanged.
+
+**The vocabulary** is the one `reins_stats_df` already carries on its `view`
+level, extended by the stage word where a program has two stages:
+
+| `reins_view` | Aggregate | Portfolio |
+|---|---|---|
+| `gross` | `p_agg_gross` | `p_agg_gross` |
+| `ceded` | `p_agg_ceded` with an aggregate cover, else `p_agg_ceded_occ` | `p_agg_ceded` |
+| `net` | `p_agg_net` with an aggregate cover, else `p_agg_net_occ` | `p_agg_net` |
+| `ceded occ` | `p_agg_ceded_occ`, both stages only | not offered |
+| `net occ` | `p_agg_net_occ`, both stages only | not offered |
+
+`ceded` and `net` are **end to end**, so the stage-aware resolution is
+`Portfolio._reins_unit_views`' (`_portfolio.py:1594`), reused rather than
+rewritten. Naming the raw column instead would be the silent-wrong-answer trap
+the plan exists to close: on an occurrence-only program `p_agg_ceded` is a point
+mass at 0, so a caller asking for `ceded` would be handed nothing.
+
+`ceded occ` and `net occ` are offered **only when both stages are present**.
+With one stage they duplicate `ceded` / `net` exactly, and a reader who sees
+five views assumes five answers. `subject` is deliberately not exposed: it
+equals `net occ` or `ceded occ` depending on `occ_kind`, and the house rule is
+one canonical name per concept.
+
+**`reins_views`.** A property on `Aggregate` and `Portfolio` returning the
+accepted list, `[]` with no cession. The keyword must reject what an object
+cannot answer, so a caller needs to be able to *ask*, and today the api
+reimplements this as `reins_bases` (`aggregate_api/src/aggregate_api/pricing.py:324`).
+Mirrors `available_charts` / `available_exhibits`.
+
+**Portfolio scope.** A Portfolio's own density already *is* its net view
+(verified: `p_agg_net` equals `density_df['p_total']` exactly), so `reins_view='net'`
+on `analyze_distortions` is the existing path under a name, per-unit allocation
+included. `gross` and `ceded` raise there: allocating them needs per-unit views
+the object does not carry. `calibrate_distortions` and `evaluate` read one
+distribution and take all three.
 
 **What to watch.** `_portfolio.py:1637-1640` already warns that the three
 portfolio marginals are separate distributions and do not satisfy
-gross = net (+) ceded. Whatever the keyword does, it must not imply they do.
+gross = net (+) ceded. The keyword must not imply they do.
 
 **Why the app cannot do this.** It has tried. The result is `_BasisView`, which
 reaches past the public surface, and the api's own comment says the hole is the

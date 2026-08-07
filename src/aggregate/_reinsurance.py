@@ -429,6 +429,133 @@ def reins_density_df(agg):
     return agg._reins_density_df
 
 
+# ----- pricing views: which distribution a cession makes available ---
+
+#: The distributions a cession makes available for pricing, in program
+#: order. ``ceded`` and ``net`` are **end to end** (the whole program);
+#: the ``occ`` pair names the intermediate occurrence stage.
+REINS_VIEWS = ('gross', 'ceded', 'net', 'ceded occ', 'net occ')
+
+
+def reins_view_columns(agg):
+    """Map ``reins_view`` name to its :func:`reins_density_df` column.
+
+    The vocabulary is the ``view`` level of :func:`reins_stats_df`, extended
+    by the stage word where a program has two stages. Empty when nothing
+    cedes, which is what makes it usable as the availability list: the
+    accepted set is object dependent, so a caller has to be able to ask.
+
+    ``ceded`` and ``net`` resolve **end to end**, exactly as
+    ``Portfolio._reins_unit_views`` resolves a unit: with an aggregate cover
+    they are the aggregate stage's columns, otherwise the occurrence
+    stage's. Naming the raw column instead would hand a caller asking for
+    ``ceded`` on an occurrence-only program a point mass at 0, since
+    ``p_agg_ceded`` carries the no-cession value when there is no aggregate
+    cover.
+
+    ``ceded occ`` and ``net occ`` appear **only when both stages are
+    present**. With one stage they duplicate ``ceded`` / ``net`` exactly, and
+    a reader offered five views assumes five answers. ``p_agg_subject`` is
+    deliberately unnamed: it equals ``net occ`` or ``ceded occ`` according to
+    ``occ_kind``, and the house rule is one canonical name per concept.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        Any aggregate; the cession is read from ``occ_reins`` / ``agg_reins``.
+
+    Returns
+    -------
+    dict
+        ``view name -> column of reins_density_df``, in program order.
+        Empty when the aggregate carries no reinsurance.
+
+    See Also
+    --------
+    reins_view_density : the density itself.
+    """
+    has_occ = agg.occ_reins is not None
+    has_agg = agg.agg_reins is not None
+    if not (has_occ or has_agg):
+        return {}
+    columns = {
+        'gross': 'p_agg_gross',
+        'ceded': 'p_agg_ceded' if has_agg else 'p_agg_ceded_occ',
+        'net': 'p_agg_net' if has_agg else 'p_agg_net_occ',
+    }
+    if has_occ and has_agg:
+        columns['ceded occ'] = 'p_agg_ceded_occ'
+        columns['net occ'] = 'p_agg_net_occ'
+    return columns
+
+
+def resolve_reins_view(view, columns, obj_name):
+    """Validate ``view`` against ``columns`` and return the column it names.
+
+    The one place the refusal is worded, shared by ``Aggregate`` and
+    ``Portfolio`` (whose accepted sets differ). Refusing is the point: an
+    object silently answering about a distribution it was not asked about is
+    the failure this keyword exists to prevent.
+
+    Parameters
+    ----------
+    view : str
+        The requested view name.
+    columns : dict
+        The object's accepted map, from :func:`reins_view_columns` or a
+        ``Portfolio``'s own.
+    obj_name : str
+        Named in the error, so the message says which object refused.
+
+    Returns
+    -------
+    str
+        The column of ``reins_density_df`` holding ``view``.
+
+    Raises
+    ------
+    ValueError
+        When ``view`` is not one this object can answer, including the case
+        of no reinsurance at all, where the object has only its own
+        distribution.
+    """
+    if view in columns:
+        return columns[view]
+    if not columns:
+        raise ValueError(
+            f'{obj_name} carries no reinsurance, so it has only its own '
+            f'distribution: drop reins_view={view!r}.')
+    raise ValueError(
+        f'unknown reins_view {view!r} for {obj_name}. Expected one of '
+        f'{", ".join(columns)}.')
+
+
+def reins_view_density(agg, view):
+    """The aggregate density of one named reinsurance view, as a ``Series``.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        A built aggregate carrying reinsurance.
+    view : str
+        One of :func:`reins_view_columns`.
+
+    Returns
+    -------
+    pandas.Series
+        Probability mass on the model grid, indexed by ``loss``. Named
+        ``view``, so a :class:`~aggregate._grid_distribution.GridDistribution`
+        built from it labels itself.
+
+    Raises
+    ------
+    ValueError
+        Via :func:`resolve_reins_view`, when the aggregate cannot answer.
+    """
+    column = resolve_reins_view(view, reins_view_columns(agg), agg.name)
+    return reins_density_df(agg)[column].rename(view)
+
+
 # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------
 
 def reins_moments6_from_raw(e1, e2, e3):

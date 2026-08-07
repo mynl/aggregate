@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0a225
+
+**[Loss-Lab-Round-3] Phase C: the reinsurance chart draws a book, not just an aggregate.** `chart_reins` carried `@chart_reins.register(Aggregate)` and nothing else, and its availability gate read `occ_reins` / `agg_reins` off the object, which a `Portfolio` does not have in that form. So `available_charts` never answered `'reins'` for a reinsured book. The visible casualty was the app's Reinsurance Plot leaf, the only one gated on the chart registry rather than the exhibit registry, which greyed out and read as unbuilt. It was built.
+
+**A `Portfolio` emitter, and a fourth basis, `'total'`.** A book's `reins_density_df` convolves each unit's **end-to-end** view, so there is no book-wide occurrence stage to draw and no `p_agg_subject`: units cede on different stages, and a book-level `'occ'` triple would have to pretend they cede on the same one. `'total'` is its own key rather than a reuse of `'agg'` because the first series really is gross here, where on `'agg'` it is the **subject**, which equals true gross only when no occurrence program sits underneath. Reusing the key would have put two meanings under one label, which is what the module docstring already warns against.
+
+`meta['bases_available']` is `('total',)`, so a client offers the buttons that exist rather than assuming three, and any other basis is refused by name rather than quietly drawing the one that does exist.
+
+**`_cession_stages` is now dispatched, not sniffed**, because the answer is a different fact about each class: an aggregate's stages come from its own two reinsurance slots, a book's from whether any unit cedes at all, which `reins_views` (a223) already answers. The document body is class agnostic and shared, reading only `reins_density_df`, `bs` and `label`, which both classes carry.
+
+The three portfolio series are separate distributions and do not satisfy `gross = net (+) ceded`. The chart draws three laws on one grid, which is what it should show; the panel is not a decomposition and must not be read as one.
+
+Tests use the existing `RR.Port` corpus program, whose units cede on *different* stages (A occurrence, B aggregate, C not at all), which is precisely why a book has no stage of its own.
+
+
 ## 1.0.0a224
 
 **[Loss-Lab-Round-3] Phase B: `reins_price_df`, what a stated risk measure says a cession is worth.** `grep -n 'distortion' src/aggregate/_reinsurance.py` returned nothing. The library computed cessions thoroughly and priced ceded premium from the DecL clause that declared it, and `Distortion.price` took any pmf, but nothing walked one through the other. So a ceded premium could only be a price someone agreed. This asks the other question.

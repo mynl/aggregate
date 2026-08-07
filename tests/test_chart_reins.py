@@ -33,11 +33,23 @@ _BOTH = ('agg RR.Both 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 '
          'occurrence net of 3500 po 4000 xs 1000 poisson '
          'aggregate net of 2000 xs 3000')
 _GROSS = 'agg RR.Gross 10 claims sev lognorm 100 cv 2 poisson'
+_PORT = ('port RR.Port agg A 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 '
+         'occurrence net of 2000 xs 1000 poisson '
+         'agg B 50 claims sev lognorm 100 cv 2 poisson '
+         'aggregate net of 1000 xs 2000 '
+         'agg C 20 claims sev lognorm 30 cv 1 poisson')
+_PORT_GROSS = ('port RR.Gross agg A 10 claims sev lognorm 100 cv 2 poisson '
+               'agg B 5 claims sev lognorm 50 cv 1 poisson')
 
 
 @pytest.fixture(scope='module')
 def both():
     return build(_BOTH)
+
+
+@pytest.fixture(scope='module')
+def port():
+    return build(_PORT)
 
 
 # ----------------------------------------------------------- capability
@@ -159,6 +171,60 @@ def test_deterministic(both):
     assert canonical_json(chart_reins(both)) == canonical_json(chart_reins(both))
     assert doc_hash(chart_reins(both, basis='occ')) != \
         doc_hash(chart_reins(both, basis='agg'))
+
+
+# ------------------------------------------------------------- portfolio
+# [Loss-Lab-Round-3] phase C. The chart was registered for Aggregate alone,
+# so a reinsured book's Reinsurance Plot leaf greyed out and read as
+# unbuilt. RR.Port cedes on different stages per unit (A occurrence, B
+# aggregate, C not at all), which is exactly why a book has no occurrence
+# stage of its own to draw.
+
+def test_portfolio_is_available_only_with_a_cession(port):
+    assert available_charts(port) == ['reins']
+    assert available_charts(build(_PORT_GROSS)) == []
+
+
+def test_portfolio_basis_is_total(port):
+    doc = chart_reins(port)
+    assert doc.meta == {'basis': 'total', 'bases_available': ('total',)}
+
+
+def test_portfolio_refuses_an_aggregate_stage(port):
+    """A book has no occurrence stage: its units cede on different ones."""
+    with pytest.raises(ValueError, match='no cession on'):
+        chart_reins(port, basis='occ')
+    with pytest.raises(ValueError, match='no cession on'):
+        chart_reins(port, basis='agg')
+    with pytest.raises(ValueError, match='unknown reinsurance basis'):
+        chart_reins(port, basis='nope')
+
+
+def test_portfolio_first_series_is_true_gross(port):
+    """Unlike the 'agg' triple, where the first series is the subject."""
+    doc = chart_reins(port)
+    assert [s.role for s in doc.series[:3]] == ['gross', 'ceded', 'net']
+    assert [s.name for s in doc.series[:3]] == ['Gross', 'Ceded', 'Net']
+
+
+def test_portfolio_panels_match_the_aggregate_shape(port):
+    doc = chart_reins(port)
+    assert [p.id for p in doc.panels] == ['density', 'tail']
+    assert [a.id for a in doc.axes] == ['loss', 'density', 'survival']
+    assert [s.panel_id for s in doc.series] == ['density'] * 3 + ['tail'] * 3
+    assert doc.marks == ()
+
+
+def test_portfolio_density_series_are_the_pmf_columns(port):
+    doc = chart_reins(port)
+    df = port.reins_density_df
+    for series, column in zip(doc.series[:3],
+                              ('p_agg_gross', 'p_agg_ceded', 'p_agg_net')):
+        assert np.array_equal(np.array(series.y), df[column].to_numpy())
+
+
+def test_portfolio_deterministic(port):
+    assert canonical_json(chart_reins(port)) == canonical_json(chart_reins(port))
 
 
 # ------------------------------------------------------------- renderer

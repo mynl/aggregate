@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0a224
+
+**[Loss-Lab-Round-3] Phase B: `reins_price_df`, what a stated risk measure says a cession is worth.** `grep -n 'distortion' src/aggregate/_reinsurance.py` returned nothing. The library computed cessions thoroughly and priced ceded premium from the DecL clause that declared it, and `Distortion.price` took any pmf, but nothing walked one through the other. So a ceded premium could only be a price someone agreed. This asks the other question.
+
+`Aggregate.reins_price_df(distortion=None, *, p=None, a=None, views=None)`, with the `Portfolio` twin, since both classes gained `reins_views` in `a223` and the implementation is then identical. Rows are `(distortion, view)`, columns `a` / `el` / `bid` / `ask` / `margin`, with `margin = ask - el`, what the risk measure charges over the expected loss.
+
+`distortion=` takes a `Distortion`, a name in `obj.distortions`, a `{name: Distortion}` mapping, or `None` for the whole calibrated set, which is the usual call after `calibrate_distortions`. At most one of `p=` (each view resolves **its own** `a = q(p)`, holding the threshold fixed rather than the capital) or `a=`; with neither the price is unlimited, the natural quote for a cession, a layer already bounded by its own terms.
+
+The stage selection is model knowledge, which is why this is here: which views exist for a given program is the judgment `reins_view_columns` encodes, and an api reproducing it would duplicate that judgment.
+
+**What ties and what does not.** The unlimited `el` of the `ceded` view is the ceded mean, so it ties to `reins_stats_df` exactly. It does **not** tie to a DecL-declared ceded premium, and should not: one is a price agreed, the other a price implied, and the gap is the reading worth having. Views are separate distributions rather than a decomposition, so the `ceded` row is the price of the cession and a gross price less a net price is not.
+
+**A distortion with a mass wants a finite asset level.** `ccoc` weights the essential supremum, so at the default `a = inf` over an unbounded support it charges the largest outcome the grid happens to represent and the quote moves with `log2` rather than with the risk. An aggregate cession is unbounded whenever the frequency is, since a bounded per-occurrence layer times an unbounded claim count still has no ceiling, so this bites on ordinary programs. Documented on the method; the same fact already makes `Portfolio.analyze_distortions` skip mass families on an unbounded book.
+
+**Also, while in the file: `reins_audit_df` is gone from the docstrings.** The frame has not existed for some time, but the name survived at `_reinsurance.py:183`, `:270`, `:306` and `_aggregate.py:4082`, `:4097`, `:4110`, where anything grepping for it, including a future agent, would conclude it was there. Repointed to `reins_stats_df`, which is the live per-layer frame.
+
+
 ## 1.0.0a223
 
 **[Loss-Lab-Round-3] Phase A: `reins_view=` names which of a cession's distributions to price on.** A reinsured object holds one distribution and the whole pricing surface read it with no way to say otherwise. Which one it holds is a property of how the program was written, not of what the caller wants: a `net of` program holds its net, a `ceded to` program holds its **ceded**. So an entry point reading `density_df` and calling it "the net" is right half the time, silently.

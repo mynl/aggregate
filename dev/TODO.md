@@ -55,10 +55,12 @@
   **Phase A DONE** (`1.0.0a223`): `reins_view=` on `calibrate_distortions` /
   `evaluate` / `analyze_distortions`, plus the `reins_views` property, which is
   the one the app was blocked on and which deletes the reason for its
-  `_BasisView` shim. Remaining: **B** `reins_price_df`, a distortion-priced
-  cession (nothing in the library prices one today); **C** a Portfolio emitter
-  for `chart_reins`, which is registered for `Aggregate` alone so a reinsured
-  book's chart reads as unbuilt; **D** captions and column formats on the
+  `_BasisView` shim. **Phase B DONE** (`1.0.0a224`): `reins_price_df` on both
+  classes, the missing glue between reinsurance and distortions, plus the six
+  stale `reins_audit_df` docstring references repointed. Remaining: **C** a
+  Portfolio emitter for `chart_reins`, which is registered for `Aggregate`
+  alone so a reinsured book's chart reads as unbuilt; **D** captions and
+  column formats on the
   passthrough exhibits (`register_simple_exhibit` returns `{}` for frame kwargs,
   so `bs_window` / `stats` / `summary` / `validation` / `tail` / `economic`
   arrive caption-less under RAW), and `:g` formatting of `x_min` / `x_max` / `W`

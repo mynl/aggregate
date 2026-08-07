@@ -1710,6 +1710,42 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             view, self._reins_view_columns(), self.name)
         return self.reins_density_df[column].rename(view)
 
+    def reins_price_df(self, distortion=None, *, p=None, a=None, views=None):
+        """What a stated risk measure says this book's cessions are worth.
+
+        The :class:`Portfolio` twin of :meth:`Aggregate.reins_price_df`; see
+        :func:`aggregate._reinsurance.reins_price_df` for the full contract.
+        The three views here are the convolved end-to-end marginals, so the
+        ``ceded`` row prices the book's whole ceded program as one position.
+
+        Parameters
+        ----------
+        distortion : Distortion, str, dict, or None
+            A distortion, a name in :attr:`distortions`, a mapping, or
+            ``None`` for the whole calibrated set.
+        p : float, optional
+            Asset probability; each view resolves its own ``a = q(p)``.
+        a : float, optional
+            A common asset level. At most one of ``p`` or ``a``; with neither
+            the price is unlimited.
+        views : sequence of str, optional
+            Defaults to all of :attr:`reins_views`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``(distortion, view)`` rows by ``a`` / ``el`` / ``bid`` / ``ask``
+            / ``margin``.
+
+        Notes
+        -----
+        The three views are separate distributions and do not satisfy
+        ``gross = net (+) ceded``, so the ``ceded`` row is the price of the
+        ceded program and a gross price less a net price is not.
+        """
+        return _reinsurance.reins_price_df(self, distortion, p=p, a=a,
+                                           views=views)
+
     @property
     def reins_stats_df(self):
         """Per-unit and portfolio-total end-to-end gross / ceded / net moments.

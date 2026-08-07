@@ -180,7 +180,7 @@ def make_ceder_netter(reins_list, debug=False):
 
 def apply_reins_work(agg, reins_list, base_density, debug=False):
     """
-    Actually do the work. Called by apply_reins and reins_audit_df.
+    Actually do the work. Called by apply_reins.
     Only needs ``agg`` to get limits, which it must guess without q (not computed
     at this stage). Does not need to know if occ or agg reins,
     only that the correct base_density is supplied.
@@ -267,7 +267,7 @@ def apply_reins_work(agg, reins_list, base_density, debug=False):
 def apply_occ_reins(agg, debug=False):
     """
     Apply the entire occ reins structure and save output
-    For by layer detail create reins_audit_df
+    For by layer detail see reins_stats_df.
     Makes sev_density_gross, sev_density_net and sev_density_ceded, and updates sev_density to the requested view.
 
     Not reflected in statistics df.
@@ -303,7 +303,7 @@ def apply_occ_reins(agg, debug=False):
 def apply_agg_reins(agg, debug=False, padding=1):
     """
     Apply the entire agg reins structure and save output.
-    For by layer detail create reins_audit_df.
+    For by layer detail see reins_stats_df.
     Makes agg_density_gross, agg_density_net and agg_density_ceded, and
     updates agg_density to the requested view.
 
@@ -554,6 +554,147 @@ def reins_view_density(agg, view):
     """
     column = resolve_reins_view(view, reins_view_columns(agg), agg.name)
     return reins_density_df(agg)[column].rename(view)
+
+
+# ----- pricing a cession with a distortion ---------------------------
+
+#: Columns of :func:`reins_price_df`, in reading order.
+REINS_PRICE_COLUMNS = ['a', 'el', 'bid', 'ask', 'margin']
+
+
+def _resolve_price_distortions(obj, distortion):
+    """``{name: Distortion}`` from the several things a caller may pass."""
+    from .spectral import Distortion
+
+    if isinstance(distortion, Distortion):
+        return {distortion.name: distortion}
+    if isinstance(distortion, dict):
+        if not distortion:
+            raise ValueError('reins_price_df: the distortion dict is empty.')
+        return dict(distortion)
+    calibrated = getattr(obj, 'distortions', None) or {}
+    if distortion is None:
+        if not calibrated:
+            raise ValueError(
+                f'{obj.name} has no calibrated distortions to price with: '
+                f'pass distortion=, or call calibrate_distortions first.')
+        return dict(calibrated)
+    if distortion not in calibrated:
+        raise ValueError(
+            f'unknown distortion {distortion!r} on {obj.name}. Expected one '
+            f'of {", ".join(calibrated) or "(none calibrated)"}.')
+    return {distortion: calibrated[distortion]}
+
+
+def reins_price_df(obj, distortion=None, *, p=None, a=None, views=None):
+    """Price every view of a cession with one or more distortions.
+
+    The glue that was missing between the two halves of the library. The
+    cession itself is computed thoroughly (:func:`reins_density_df`) and the
+    distortion prices any pmf (:meth:`~aggregate.spectral.Distortion.price`),
+    but nothing walked one through the other, so a ceded premium could only
+    come from the DecL clause that declared it. This asks the other question:
+    what would that cession cost under a stated risk measure.
+
+    Parameters
+    ----------
+    obj : Aggregate or Portfolio
+        A built object carrying reinsurance.
+    distortion : Distortion, str, dict, or None
+        A distortion, the name of one in ``obj.distortions``, a
+        ``{name: Distortion}`` mapping, or ``None`` for the whole calibrated
+        set (which is the usual call, after
+        :meth:`~aggregate.Aggregate.calibrate_distortions`).
+    p : float, optional
+        Asset probability. Each view resolves **its own** asset level
+        ``a = q(p)``, so the comparison holds the threshold fixed rather than
+        the capital. At most one of ``p`` or ``a``.
+    a : float, optional
+        A common asset level, snapped to the shared model grid. At most one of
+        ``p`` or ``a``; with neither, the price is unlimited (``a = inf``),
+        which is the natural quote for a cession, a layer already bounded by
+        its own terms.
+    views : sequence of str, optional
+        Which views to price. Defaults to all of the object's
+        :attr:`~aggregate.Aggregate.reins_views`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ``MultiIndex (distortion, view)`` rows, columns ``a`` / ``el`` /
+        ``bid`` / ``ask`` / ``margin``. ``el`` is the limited expected loss
+        ``E[X and a]``, ``ask`` and ``bid`` are the two sides of the distorted
+        quote, and ``margin = ask - el`` is what the risk measure charges over
+        the expected loss.
+
+    Raises
+    ------
+    ValueError
+        When the object carries no cession, when both ``p`` and ``a`` are
+        given, or when a named view or distortion is not one it can answer.
+
+    Notes
+    -----
+    The stage selection is model knowledge, which is why this is here and not
+    in a client: which views exist for a given program is the judgment
+    :func:`reins_view_columns` encodes, and reproducing it elsewhere would
+    duplicate that judgment.
+
+    The ``el`` of the ``ceded`` view at ``a = inf`` is the ceded mean, so it
+    ties to ``reins_stats_df``. It will **not** tie to the ceded premium a
+    DecL clause declared: the clause is a price someone agreed, and this is a
+    price a risk measure implies. That the two differ is the point of
+    computing it.
+
+    Views are separate distributions, not a decomposition, so a gross price
+    less a net price is a comparison of two programs rather than the price of
+    the cession. The ``ceded`` row is the price of the cession.
+
+    **A distortion with a mass wants a finite asset level.** ``ccoc`` puts
+    weight on the essential supremum, so at the default ``a = inf`` over an
+    unbounded support it charges the largest outcome the grid happens to
+    represent, and the quote moves with ``log2`` rather than with the risk. An
+    aggregate cession is unbounded whenever the frequency is (a bounded
+    per-occurrence layer times an unbounded claim count still has no ceiling),
+    so this bites on ordinary programs. Pass ``p=`` or ``a=`` for the mass
+    families. The same fact makes :meth:`Portfolio.analyze_distortions` skip
+    them on an unbounded book.
+    """
+    if p is not None and a is not None:
+        raise ValueError(
+            'reins_price_df takes at most one of p= (probability) or '
+            'a= (asset level); with neither the price is unlimited.')
+    from ._grid_distribution import GridDistribution
+
+    if not obj.reins_views:
+        raise ValueError(
+            f'{obj.name} carries no reinsurance, so there is no cession to '
+            f'price.')
+    # ``_reins_view_density`` is the one validator, so a bad name is refused
+    # in the same words here as on the pricing keyword.
+    views = list(obj.reins_views) if views is None else list(views)
+    dists = _resolve_price_distortions(obj, distortion)
+
+    rows, index = [], []
+    for name, dist in dists.items():
+        for view in views:
+            density = obj._reins_view_density(view)
+            if p is not None:
+                # each view answers at its own quantile: same threshold,
+                # different capital, which is what the cession bought
+                assets = float(GridDistribution.from_series(
+                    density, bs=obj.bs, name=view).q(p))
+            elif a is not None:
+                assets = float(obj.snap(a))
+            else:
+                assets = np.inf
+            quote = dist.price(density, a=assets, kind='both')
+            rows.append([assets, quote.el, quote.bid, quote.ask,
+                         quote.ask - quote.el])
+            index.append((name, view))
+    return pd.DataFrame(
+        rows, columns=REINS_PRICE_COLUMNS,
+        index=pd.MultiIndex.from_tuples(index, names=['distortion', 'view']))
 
 
 # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------

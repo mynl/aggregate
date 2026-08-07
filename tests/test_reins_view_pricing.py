@@ -250,3 +250,106 @@ def test_portfolio_evaluate_passes_the_view_to_units(book):
     with pytest.raises(ValueError, match='RV.Clean carries no reinsurance'):
         book.evaluate([3000, 1500], unit=['RV.Occ', 'RV.Clean'],
                       reins_view='gross')
+
+
+# ----------------------------------------------------------------------------
+# reins_price_df: a distortion-priced cession (phase B)
+# ----------------------------------------------------------------------------
+
+@pytest.fixture(scope='module')
+def priced(occ):
+    occ.calibrate_distortions(0.10, p=0.999)
+    return occ.reins_price_df()
+
+
+def test_price_df_shape(priced, occ):
+    assert list(priced.columns) == ['a', 'el', 'bid', 'ask', 'margin']
+    assert priced.index.names == ['distortion', 'view']
+    assert priced.index.get_level_values('view').unique().tolist() == \
+        occ.reins_views
+
+
+def test_price_df_ties_to_reins_stats(priced, occ):
+    """The plan's acceptance test: the expected loss leg ties to the moments."""
+    stats = occ.reins_stats_df
+    ceded_mean = float(stats.loc[('agg', 'mean'), ('occ', 'Ceded')])
+    priced_el = priced.loc[('wang', 'ceded'), 'el']
+    assert priced_el == pytest.approx(ceded_mean, rel=1e-9)
+
+
+def test_price_df_margin_is_ask_less_el(priced):
+    assert np.allclose(priced['margin'], priced['ask'] - priced['el'])
+
+
+def test_price_df_bid_below_el_below_ask(priced):
+    # ccoc at a=inf on an unbounded support prices the grid ceiling, so it is
+    # excluded here; the documented reason it wants a finite asset level
+    shaped = priced.drop('ccoc', level='distortion')
+    assert (shaped['bid'] <= shaped['el']).all()
+    assert (shaped['el'] <= shaped['ask']).all()
+
+
+def test_price_df_unlimited_el_is_the_mean(priced, occ):
+    # ``forwards`` parks the grid deficit at the largest represented outcome,
+    # so the priced el sits a touch above the raw first moment of the pmf
+    assert priced.loc[('wang', 'gross'), 'el'] == \
+        pytest.approx(mean_of(occ._reins_view_density('gross')), rel=1e-6)
+    assert np.isinf(priced.loc[('wang', 'gross'), 'a'])
+
+
+def test_price_df_at_p_uses_each_view_own_assets(occ):
+    occ.calibrate_distortions(0.10, p=0.999)
+    df = occ.reins_price_df('wang', p=0.999)
+    assert df.loc[('wang', 'gross'), 'a'] > df.loc[('wang', 'net'), 'a']
+    assert df.loc[('wang', 'net'), 'a'] > df.loc[('wang', 'ceded'), 'a']
+
+
+def test_price_df_accepts_one_named_distortion(occ):
+    occ.calibrate_distortions(0.10, p=0.999)
+    df = occ.reins_price_df('ph')
+    assert df.index.get_level_values('distortion').unique().tolist() == ['ph']
+
+
+def test_price_df_accepts_a_distortion_object(occ):
+    from aggregate.spectral import Distortion
+
+    d = Distortion('ph', 0.7)
+    df = occ.reins_price_df(d, views=['ceded'])
+    assert len(df) == 1
+
+
+def test_price_df_refuses_both_anchors(occ):
+    occ.calibrate_distortions(0.10, p=0.999)
+    with pytest.raises(ValueError, match='at most one of'):
+        occ.reins_price_df(p=0.99, a=1000)
+
+
+def test_price_df_refuses_without_a_cession():
+    with pytest.raises(ValueError, match='no reinsurance'):
+        build(CLEAN).reins_price_df()
+
+
+def test_price_df_refuses_an_unknown_view(occ):
+    occ.calibrate_distortions(0.10, p=0.999)
+    with pytest.raises(ValueError, match='unknown reins_view'):
+        occ.reins_price_df(views=['net occ'])
+
+
+def test_price_df_refuses_an_unknown_distortion(occ):
+    occ.calibrate_distortions(0.10, p=0.999)
+    with pytest.raises(ValueError, match='unknown distortion'):
+        occ.reins_price_df('nonesuch')
+
+
+def test_price_df_without_calibration_says_so():
+    a = build(OCC.replace('RV.Occ', 'RV.Occ2'))
+    with pytest.raises(ValueError, match='no calibrated distortions'):
+        a.reins_price_df()
+
+
+def test_portfolio_price_df(book):
+    book.calibrate_distortions(0.10, p=0.999)
+    df = book.reins_price_df(p=0.999)
+    assert df.index.get_level_values('view').unique().tolist() == \
+        ['gross', 'ceded', 'net']
+    assert (df['margin'] > 0).all()

@@ -1370,6 +1370,52 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _reinsurance.reins_view_density(self, view)
 
+    def reins_price_df(self, distortion=None, *, p=None, a=None, views=None):
+        """What a stated risk measure says this cession is worth.
+
+        The fourth ``reins_*`` frame, and the one that crosses over into
+        pricing: :attr:`reins_density_df` computes the cession,
+        :meth:`~aggregate.spectral.Distortion.price` prices any pmf, and this
+        walks one through the other. The DecL ``ceded premium`` clause records
+        a price someone agreed; this is the price a distortion implies, and
+        the gap between them is the reading worth having.
+
+        See :func:`aggregate._reinsurance.reins_price_df` for the full
+        contract. The usual call is after
+        :meth:`calibrate_distortions`, with no ``distortion`` argument, which
+        prices every view with every calibrated family.
+
+        Parameters
+        ----------
+        distortion : Distortion, str, dict, or None
+            A distortion, a name in :attr:`distortions`, a mapping, or
+            ``None`` for the whole calibrated set.
+        p : float, optional
+            Asset probability; each view resolves its own ``a = q(p)``.
+        a : float, optional
+            A common asset level. At most one of ``p`` or ``a``; with neither
+            the price is unlimited.
+        views : sequence of str, optional
+            Defaults to all of :attr:`reins_views`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``(distortion, view)`` rows by ``a`` / ``el`` / ``bid`` / ``ask``
+            / ``margin``.
+
+        Examples
+        --------
+        ::
+
+            a = build('agg Re 100 claims sev lognorm 50 cv 2 '
+                      'occurrence net of 100 xs 100 poisson')
+            a.calibrate_distortions(0.10, p=0.999)
+            a.reins_price_df().loc[(slice(None), 'ceded'), :]
+        """
+        return _reinsurance.reins_price_df(self, distortion, p=p, a=a,
+                                           views=views)
+
     def reins_occ_plot(self, axs=None, **kwargs):
         """
         Plots for occurrence reinsurance: occurrence log density and aggregate
@@ -4033,7 +4079,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
     def _apply_reins_work(self, reins_list, base_density, debug=False):
         """
-        Actually do the work. Called by apply_reins and reins_audit_df.
+        Actually do the work. Called by apply_reins.
         Only needs self to get limits, which it must guess without q (not computed
         at this stage). Does not need to know if occ or agg reins,
         only that the correct base_density is supplied.
@@ -4048,7 +4094,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
     def apply_occ_reins(self, debug=False):
         """
         Apply the entire occ reins structure and save output
-        For by layer detail create reins_audit_df
+        For by layer detail see reins_stats_df.
         Makes sev_density_gross, sev_density_net and sev_density_ceded, and updates sev_density to the requested view.
 
         Not reflected in statistics df.
@@ -4061,7 +4107,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
     def apply_agg_reins(self, debug=False, padding=1):
         """
         Apply the entire agg reins structure and save output.
-        For by layer detail create reins_audit_df.
+        For by layer detail see reins_stats_df.
         Makes agg_density_gross, agg_density_net and agg_density_ceded, and
         updates agg_density to the requested view.
 

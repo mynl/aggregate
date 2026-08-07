@@ -1817,3 +1817,7 @@ sev Mata2005.Lognorm 11048 * lognorm 2.29
   note{Mata2005}
   tags{topic:severity, role:reference, role:paper};
 
+sev Venter1983.Piecewise chistogram xps [0 1000 5000 6000 7000 8000 9000 10000 12500 15000 17500 20000 25000 35000 50000 75000 100000 125000 150000 175000 200000 225000 250000 300000] [0.38935 0.38935 0.00568 0.00543 0.00517 0.00495 0.00473 0.01098 0.00989 0.00896 0.00815 0.01426 0.02237 0.02353 0.02459 0.01517 0.01021 0.00732 0.00547 0.00423 0.00337 0.00274 0.0241]
+  note{Venter1983. Piecewise linear claim size CDF to the 250,000 policy limit; the top bin carries the limit mass, so use only inside a 250000 xs 0 layer.}
+  tags{topic:severity, role:reference, role:paper};
+

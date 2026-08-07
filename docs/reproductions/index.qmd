@@ -12,6 +12,10 @@ This book reproduces published figures, tables and results using `aggregate`. Ev
 
 That is the point of the exercise. A library that computes compound distributions has to be right, and the only external check on "right" is a published number computed by somebody else, by a different method, who had no interest in making this software look good. Fifteen papers are worked through here. Most of them confirm the library. Several of them correct it, or locate a limit in it that was not previously known. Three of them turn out to contain errors of their own, which is not a criticism of the authors so much as evidence that the check runs in both directions.
 
+## Start here
+
+The first chapter is the short version: five of these papers at one page each, each with the DecL program that reproduces the published exhibit and the answer set beside the paper's own numbers. It takes ten minutes. Everything after it is the detail, and the detail is the point of the exercise, but it is not the place to begin.
+
 ## The shape of a chapter
 
 Each chapter follows the same four movements: the context and the problem the paper is solving, the paper's own solution and the gold standard it publishes, the `aggregate` reproduction, and comments. A simple reproduction can be very short. Something unusual, or unfamiliar to actuaries, needs more context.

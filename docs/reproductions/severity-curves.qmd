@@ -5,7 +5,7 @@ subtitle: "What each published curve in the shipped library is, and where it cam
 
 ## What this page is
 
-`src/aggregate/agg/library.agg` ships ten reusable severity objects named `<CitationKey>.<Curve>`, harvested from the candidate assessment in `plan-examples.md` while the reproductions in this folder were being written. Each carries its citation key in `note{}` and nothing else. This page is the rest of the record: which paper, which table or exhibit the parameters came out of, what the paper uses the curve for, and every transcription decision that stands between the printed parameters and the DecL.
+`src/aggregate/agg/library.agg` ships eleven reusable severity objects named `<CitationKey>.<Curve>`, harvested from the candidate assessment in `plan-examples.md` while the reproductions in this folder were being written. Each carries its citation key in `note{}`, and little else. This page is the rest of the record: which paper, which table or exhibit the parameters came out of, what the paper uses the curve for, and every transcription decision that stands between the printed parameters and the DecL.
 
 The curves are working definitions, not reproductions. Where a reproduction exists it is cited, and it is the authority; where none exists the entry says so.
 
@@ -23,16 +23,21 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     for name in build.discover(kind='sev', tags='role:paper').index:
         fz = build(f'agg T 1 claim sev.{name} fixed', update=False).sevs[0].fz
-        m, v = fz.stats('mv')
-        rows.append({'curve': name, 'scipy': fz.dist.name,
-                     'shape': ', '.join(f'{a:g}' for a in fz.args),
-                     'scale': float(fz.kwds['scale']), 'mean': float(m),
+        # `moments=` by keyword: a tabulated curve's `fz` is an unfrozen
+        # rv_histogram, which reads a positional 'mv' as a shape parameter.
+        m, v = fz.stats(moments='mv')
+        dist = getattr(fz, 'dist', None)
+        rows.append({'curve': name,
+                     'scipy': getattr(dist, 'name', None) or type(fz).__name__,
+                     'shape': ', '.join(f'{a:g}' for a in getattr(fz, 'args', ())),
+                     'scale': float(getattr(fz, 'kwds', {}).get('scale', np.nan)),
+                     'mean': float(m),
                      'cv': float(np.sqrt(v) / m) if np.isfinite(v) else np.nan})
 
 GT(pd.DataFrame(rows).set_index('curve'), float_format=lambda x: f'{x:,.4g}')
 ```
 
-A blank coefficient of variation means the second moment does not exist, and an infinite mean means the first does not either. The table is built from the library, so it cannot drift from what actually ships.
+A blank coefficient of variation means the second moment does not exist, and an infinite mean means the first does not either. A blank shape and scale means the curve is a tabulation rather than a parametric family, which is why `Venter1983.Piecewise` has neither, and why its mean and CV here are the *unlimited* ones and so do not match the paper: that curve is only itself inside the layer described below. The table is built from the library, so it cannot drift from what actually ships.
 
 ## Summary: paper to curve
 
@@ -44,14 +49,14 @@ A blank coefficient of variation means the second moment does not exist, and an 
 | @Bodoff2017 | `Bodoff2017.Pareto` | Exhibit 2 |
 | @Jin2016 | `Jin2016.Gamma`, `Jin2016.Pareto` | the univariate test severities |
 | @Kang2019 | `Kang2019.Pareto` | the running heavy tailed illustration |
-| @Venter1983 | none | the severity is a piecewise linear CDF plus a discrete PMF at \$500 steps, not a named family |
+| @Venter1983 | `Venter1983.Piecewise` | the claim size law behind Exhibit 3, a tabulated CDF rather than a named family |
 | @Bruno2006 | none | a 14 point discrete severity, likewise not a named family |
 | @Clark2005 | none | three lognormal lines specified by premium and CV, nothing worth naming |
 | @Lau1984 | none | moments only. The severity form is never stated and has to be reverse fitted |
 | @Braithwaite1997 | none | never assessed. It surfaced only as the conceptual pair to @Bodoff2017 |
 | @Goffard2020, @Nadarajah2016, @Vernic1999, @Bakar2022, @Provost2005, @Hilbe2014, @Lindsay2000 | none | Tier 3 in the assessment: no reproducible parameters, no compounding, or no insurance content |
 
-Two of the papers with no curve, @Venter1983 and @Bruno2006, are nonetheless full reproductions. A severity does not have to be a named family to be reproducible, it just cannot be a one line `sev`.
+@Bruno2006 has no curve and is a full reproduction anyway. A severity does not have to be a named family to be worth carrying: `Venter1983.Piecewise` is a tabulated CDF, and Bruno's 14 point law would sit in the library just as well as a `dsev` if anything besides its own chapter needed it.
 
 The rare event and numerical accuracy set (`Asmussen2016a`, `BenAmar2023`, `BenRached2024`, `Liu2026`, `Wilson2016a`, `Wilson2017`, `Homer2003`) contributed no named curves. Those papers are about estimator accuracy in the far tail, and their test severities are unit scale lognormals, Paretos and Lévy laws chosen to stress the estimator rather than published as models of anything.
 
@@ -122,6 +127,18 @@ for four severities at seven multiples of the mean. Three of the four columns ar
 **`Kang2019.Pareto` = `3.5 * lomax 3.5`.** The paper defines Pareto II$(\alpha, \beta)$ explicitly, density $\alpha\beta^\alpha/(x+\beta)^{\alpha+1}$ on $x \ge 0$, and names it Lomax, so the mapping is unambiguous: shape $\alpha = 3.5$, scale $\beta = 3.5$. Mean 1.4, CV 1.5275, skewness 11.78. Moments exist up to order 3 only, so there is no kurtosis. Watch the parameters: §6.3.1 of the paper switches to a simulated sample from Pareto II(3.5, **35**), rescaled, and the VaR and TVaR figures there are not comparable. The library object is the analytic Pareto II(3.5, 3.5) of §6.1.
 
 **Status.** No reproduction. The paper's "aggregate" is severity only, with no compounding, so it exercises the quantile machinery and nothing else. It is a good heavy tail VaR and TVaR accuracy benchmark, which is why the curve was kept.
+
+### Venter1983
+
+**Paper.** @Venter1983, *Transformed beta and gamma distributions and aggregate losses*, PCAS. Reproduced in `Venter1983.qmd` and in the highlights chapter.
+
+**What the paper does with it.** It is the claim size law of Exhibit 3, the paper's test of the transformed gamma as a three moment approximation to the aggregate. Exhibit 3 Part 2 states it as a piecewise linear CDF from \$0 to a \$250,000 policy limit, tabulated at 23 points, with the residual 2.41% of probability sitting as a point mass at the limit. Frequency is Poisson with $\lambda = 13.7376$, and the compound distribution has mean \$250,000, CV 0.7667 and skewness 1.0744.
+
+**`Venter1983.Piecewise` = `chistogram xps [...] [...]`.** The 23 knots are Venter's own, and the 23 probabilities are the successive CDF increments with the limit mass appended. **The top bin is not part of the paper.** The atom at the limit is easier to obtain than to declare, so the limit mass is carried in one wide bin from \$250,000 to \$300,000 and a `250000 xs 0` layer then folds it back onto the limit. That makes the curve correct only inside that layer; used unlimited it spreads 2.41% of probability uniformly over a \$50,000 interval that Venter never wrote. Like `Mack2003.RiebesellPareto`, this one carries a usage constraint rather than a free standing distribution.
+
+The transcription has an acceptance test built in, which is why the curve can be trusted: read the knots wrongly and the severity mean, CV and skewness (18,198.195, 2.6600, 3.6746) stop matching the exhibit. They match.
+
+**What is not carried.** Exhibit 3 Part 2 also prints Venter's own \$500 discrete PMF, whose first five rows could not be decoded. Nothing depends on it, since `aggregate` discretizes the piecewise linear CDF itself.
 
 ## The reference curves with no paper attached
 

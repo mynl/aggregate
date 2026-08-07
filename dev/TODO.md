@@ -236,6 +236,20 @@
   `lb` not consistent with attachment equals zero; flag **fixed** frequency with
   a non-integer expected value; flag **mixing** with an inconsistent frequency
   distribution.
+- **[Unparse-Dense-Spec-Guard]** — `decl_writer.spec_to_decl` silently emits
+  *wrong* DecL when handed the dense `Aggregate.spec` instead of the sparse
+  parser spec it documents. Found while checking whether an object built with
+  the constructor could be decompiled (a218). The dense dict spells "unset" as
+  `0`/`None` while the parser simply omits the key, and `0` is legitimate for
+  `exp_premium` and `sev_scale`, so `13.7376 claims` renders as
+  `0 premium at 0 lr`, the severity picks up a `0 *` scale, and a spurious
+  `poisson 0 0 loss` appears. The result re-parses and builds to `est_m = 0`,
+  `est_cv = nan` with no error anywhere. First it raises `AttributeError` on
+  `label_map` (present-but-`None` defeats the `.get('label_map', {})` default),
+  which is the only reason this is not already biting. Fix is a guard, not a
+  decompiler: detect the dense shape and raise pointing at the parser spec.
+  A real object-to-DecL decompiler needs a per-key inverse of the constructor's
+  defaulting and is a separate, larger question — do not conflate them.
 ### Tests & example libraries
 
 - **[Unparser-Reference-Gaps]** (surfaced by `[Library-Canonical-Layout]`, a178)

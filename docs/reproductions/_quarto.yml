@@ -10,6 +10,9 @@ book:
   search: true
   chapters:
     - index.qmd
+    - part: "The short version"
+      chapters:
+        - highlights.qmd
     - part: "Actuarial models"
       chapters:
         - Venter1983.qmd
@@ -18,7 +21,6 @@ book:
         - Bodoff2017.qmd
         - Homer2003.qmd
         - Bear1990.qmd
-        - Homer2003.qmd
     - part: "Exact computation and convolution accuracy"
       chapters:
         - Bruno2006.qmd

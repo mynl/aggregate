@@ -119,39 +119,40 @@ Scale to the paper's own liability context, $\mathsf E(X)$ below €50,000 and s
 import scipy.stats as ss
 from scipy.integrate import quad
 from scipy.optimize import brentq
-from aggregate.distributions import Aggregate
 
 SIGMA, EX = 1.8, 50_000.0
-FZ = ss.lognorm(SIGMA, scale=EX * np.exp(-SIGMA ** 2 / 2))
+LN_SCALE = EX * np.exp(-SIGMA ** 2 / 2)
+FZ = ss.lognorm(SIGMA, scale=LN_SCALE)
 U = brentq(lambda u: 1 - u * FZ.sf(u) / quad(FZ.sf, 0, u, limit=300)[0] - ALPHA,
            EX, 20 * EX, xtol=1e-6)
-
-W = 1e12
-edges = np.concatenate((np.linspace(0.0, U, 60001),
-                        np.exp(np.linspace(np.log(U), np.log(W), 60001))[1:]))
-S = np.where(edges <= U, FZ.sf(edges), FZ.sf(U) * (edges / U) ** -ALPHA)
-S[0] = 1.0
-probs = -np.diff(S)
-probs[-1] += S[-1]
+SU = float(FZ.sf(U))
 
 GT(pd.DataFrame([{'E(X)': EX, 'threshold u*': U, 'u* / E(X)': U / EX,
-                  'paper': 'u ~ 5 E(X)', 'S(u*)': FZ.sf(U)}]),
+                  'paper': 'u ~ 5 E(X)', 'S(u*)': SU}]),
    formatters={'E(X)': '{x:,.0f}', 'threshold u*': '{x:,.1f}',
                'u* / E(X)': 4, 'S(u*)': 8})
 ```
 
-The spliced severity goes into `aggregate` as a `chistogram`. Every limited expected value below is read off **one** grid, which matters: a limited expected value computed on a grid tuned to its own limit is not comparable with one computed on a different grid when the severity has structure far below the limit, and this severity has all its density three orders of magnitude below the largest sum insured.
+The splice is a DecL clause, so Theorem 2's construction can be written rather than tabulated. Two components, each conditioned to its own interval: the lognormal below $u^*$ and a single parameter Pareto with the Riebesell index above it, weighted $1 - S(u^*)$ and $S(u^*)$ so the survival function is continuous at the join.
+
+```{python}
+#| label: splice-decl
+SPLICE = (f'sev [{LN_SCALE:.10g} {U:.10g}] * [lognorm pareto] '
+          f'[{SIGMA:g} {ALPHA:.10g}] '
+          f'wts [{1 - SU:.12g} {SU:.12g}] '
+          f'splice [0 {U:.10g}] [{U:.10g} inf]')
+print(SPLICE)
+```
+
+Every limited expected value below is read off **one** grid, which matters: a limited expected value computed on a grid tuned to its own limit is not comparable with one computed on a different grid when the severity has structure far below the limit, and this severity has all its density three orders of magnitude below the largest sum insured.
 
 ```{python}
 #| label: exposure-curve
 LOG2, BS = 22, 5.0                      # x_max = 21.0M, covers every a below
 
 def lev_spliced(a):
-    obj = Aggregate('R', exp_en=1, exp_limit=a, exp_attachment=0,
-                    sev_name='chistogram', sev_xs=edges, sev_ps=probs,
-                    freq_name='fixed')
-    obj.update(log2=LOG2, bs=BS, normalize=False)
-    return obj.est_m
+    return build(f'agg Riebesell 1 claim {a:.10g} xs 0 {SPLICE} fixed',
+                 log2=LOG2, bs=BS, normalize=False).est_m
 
 v = 5_000_000.0
 lev_v = lev_spliced(v)
@@ -190,7 +191,7 @@ Doubling the sum insured multiplies the collective risk premium by exactly 1.200
 
 This is a severity paper. There is no aggregate distribution anywhere in it: $\mathsf E[N]$ enters every formula and cancels out of every one. `aggregate` is being used as a limited expected value engine on a spliced severity, which it does well, but the compound machinery is idle.
 
-The reproduction is still worth having for two reasons. Mack and Fackler's threshold condition is stated entirely in terms of $\mathsf E[X \wedge u]$ and $S(u)$, which are the two things exposure rating is built from, so the whole paper is one short expression away from quantities `aggregate` already reports. And the splice is a genuine exercise of the severity layer: `Mack2003.RiebesellPareto` is in `actuarial-severity-curves.agg` with $\alpha = 0.737$, which has no finite mean and raises `InfiniteVarianceError` unbounded, so it can only be used the way the paper uses it, inside a limit.
+The reproduction is still worth having for two reasons. Mack and Fackler's threshold condition is stated entirely in terms of $\mathsf E[X \wedge u]$ and $S(u)$, which are the two things exposure rating is built from, so the whole paper is one short expression away from quantities `aggregate` already reports. And Theorem 2's construction is a `splice` clause: two components, two conditioning windows and two weights, which is the same shape as the theorem's own statement. `Mack2003.RiebesellPareto` in the library carries the Riebesell index on its own, ground up rather than spliced, and has no finite mean, so it can only be used the way the paper uses it, inside a limit.
 
 ### A grid caveat worth carrying forward
 
@@ -198,5 +199,9 @@ The first attempt at the exposure curve gave a clean power law with the wrong co
 
 ### The far tail does not matter, and the paper says so
 
-The Pareto tail with $\alpha = 0.737$ has an infinite mean, so it has to be cut somewhere for `aggregate` to build it; the code cuts at $10^{12}$ and sweeps the residual $2.7\times10^{-8}$ onto the last bin. This is not a fudge, it is the paper's own observation: "we can replace $F_u$ above some very high amount $w \gg u$ with something else, e.g. in order to ascertain a finite expectation", because the behaviour of the law above the range where Riebesell is applied does not enter equation (2).
+The Pareto tail with $\alpha = 0.737$ has an infinite mean, so it has no unconditional moments to report. The `splice` clause carries it anyway, with no cutoff and no residual swept onto a last bin, because every limited expected value on this page is taken inside a limit, which is the only way the paper ever uses the curve. The paper says as much: "we can replace $F_u$ above some very high amount $w \gg u$ with something else, e.g. in order to ascertain a finite expectation", because the behaviour of the law above the range where Riebesell is applied does not enter equation (2). Useful licence, and not needed here.
+
+The construction is exact rather than approximate, which is why nine significant figures are available to agree to. The weights $1 - S(u^*)$ and $S(u^*)$ against the two conditioning windows reproduce $S$ continuously at the join by definition, so the spliced survival function *is* the theorem's $F_u$, not a discretization of it.
+
+One diagnostic follows from the missing moments and is worth naming so it is not read as an error. At some limits the Pareto component is capped to a point mass, its variance is zero to rounding and so comes out very slightly negative, and `aggregate` reports that along with a `nan` skewness. It reaches the moment diagnostics only. Limited expected values, which are all this page reads, are unaffected.
 

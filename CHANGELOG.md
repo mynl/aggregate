@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.0a218
+
+**[Reproductions-Highlights] The reproductions book opens with a short version: five papers, one page each, each page a DecL program beside the exhibit it reproduces.** The detail chapters are the point of the exercise but they are not the way in. Each of the fifteen carries its transcription decisions, its inferred readings and its grid caveats, and a reader wanting to know whether the library reproduces published work had to wade through Python to find out. The new first chapter answers that in ten minutes: @Venter1983 for accuracy, @Bear1990 for the language, @Homer2003 for reach, @Bruno2006 for speed, @Mata2005 for the reproduction auditing the paper rather than the reverse. One paragraph of context, the program, the answer, one number.
+
+The program shown on each page is read back off the object that produced the table beneath it, so the two cannot drift, and every other line of Python is hidden. Grid settings ride inside the program in `hints{}` rather than arriving as arguments to `update`, which is what makes the page's claim literally true: the declaration is the whole program.
+
+**Two chapters stop using the constructor.** `Venter1983.qmd` and `Mack2003.qmd` were the only reproductions built through `Aggregate(...)` plus `update()` rather than through `build`, which meant the two best examples in the book had no DecL to show. Both convert, and neither changes a number.
+
+Venter's severity now ships as **`sev Venter1983.Piecewise`**, the eleventh named curve in `library.agg`, so his whole model is one statement: `agg Venter 13.7376 claims 250000 xs 0 sev.Venter1983.Piecewise poisson hints{log2=16; bs=500; normalize=False; padding=1}`. That reproduces his Exhibit 3 recursive column to 5.1e-05 over all 34 rows, and switching `bs=500` to `bs=5` lands on his characteristic function column to 7.3e-05 instead. **The curve carries a usage constraint**, recorded in its `note{}` and in `severity-curves.qmd`: the limit mass rides in one wide bin above 250,000 and needs a `250000 xs 0` layer to fold it back onto the limit, so used unlimited it spreads 2.41% of probability over an interval Venter never wrote. Same shape of constraint as `Mack2003.RiebesellPareto`.
+
+Mack's spliced lognormal-into-Pareto was a **120,000 point `chistogram` cut at 1e12** with the residual swept onto the last bin. It is now a two component `splice` clause, which is the same shape as Theorem 2's own statement: two conditioning windows, two weights, and the survival function continuous at the join by construction. No cutoff and no residual. Limited expected values agree with the construction they replace to within four parts in a billion, the Riebesell loss elimination ratio still matches to nine significant figures above the threshold, and doubling the sum insured still gives exactly 1.200000. One benign diagnostic follows from the Pareto's missing moments: at some limits its component is capped to a point mass whose variance is zero to rounding, so `aggregate` reports a tiny negative variance and a `nan` skewness. It reaches the moment diagnostics only.
+
+**Also.** `severity-curves.qmd` gains the Venter provenance entry, and its summary cell now tolerates a tabulated curve: a `chistogram`'s `fz` is an unfrozen `rv_histogram` with no `.args`, no `.kwds['scale']` and no `.dist.name`, and it reads a positional `stats('mv')` as a shape parameter, so the call is now `stats(moments='mv')`. `_quarto.yml` listed `Homer2003.qmd` twice and rendered it as two chapters; the duplicate is gone.
+
+No API change. `library.agg` gains one entry, so `build.discover(kind='sev', tags='role:paper')` returns eleven rows rather than ten.
+
 ## 1.0.0a217
 
 **[Consolidated-Density-Columns] `add_exa` attaches its columns in one concat,

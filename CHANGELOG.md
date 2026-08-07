@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.0a222
+
+**[Undefined-Moment-Reporting] A moment that does not exist is reported as `inf` or `0`, whichever it is, and never as `nan` from a subtraction that cancelled.** Two sites, one theme: a value the arithmetic could not represent was reaching a user-visible CV or skewness.
+
+**The variance cancellation floor is now relative.** `var = ex2 - ex1**2` subtracts two numbers that are *equal* when the variance is zero, so a degenerate component (a severity capped to a point mass) reaches it as pure cancellation and lands a few ulp either side of 0. The guard was `np.allclose(var, 0)`, which carries numpy's default **absolute** `atol = 1e-8`: a sensible size for a variance of order 1, and far too tight for one whose moments are of order 5e7. Mack2003's spliced Pareto hit exactly that, a point mass at 6961.69 giving
+
+```
+var = 48465132.98318529 - 6961.6903826**2 = -3.725e-08
+```
+
+which is `7.7e-16` relative, one machine epsilon. It survived the guard, logged `weird var < 0`, took the square root of a negative number and reported a `nan` CV and skewness for that component. The floor is now relative to the magnitudes being subtracted, `VALIDATION_NOISE * max(|ex2|, ex1**2)`, which is what the arithmetic actually says: the cancellation error is of order `eps` times the scale. The `isfinite` test in that condition is load-bearing, since `inf <= inf` would otherwise snap a genuinely infinite variance to exactly 0.
+
+A *materially* negative variance still logs `weird var < 0`; it means the moments are mutually inconsistent, which is an error and not cancellation. The `sqrt` below it is guarded, because the logger has already said it.
+
+**An unlimited layer over a heavy tail reports an infinite moment.** `_moms_analytic` expands `E[((X-a)^+ ^ l)^m]` binomially in the partial expectations, and that expansion cannot survive an infinite term: at attachment 0 the low-order coefficients are 0, so a term reads `0 * inf`; above 0 the alternating signs give `inf - inf`. Both produce `nan` for a layer moment that is simply infinite. A Pareto with `alpha = 1.5` has a mean and nothing above it, so an unlimited layer on it returned `[1, 3, inf, nan]` where `[1, 3, inf, inf]` is the truth.
+
+Short-circuited instead. A layer capped at a finite limit is bounded by `limit**m`, so every partial expectation to a finite detachment is finite and the sum is always safe; only an unlimited layer can diverge, and the `m`-th moment of an unlimited excess layer exists exactly when `E[X**m]` does. That is one `isfinite` test, and the sum below it is then only ever evaluated on finite terms.
+
+This was latent, and `[Pareto-Type-I-Analytic]` (`1.0.0a221`) surfaced it: the analytic branch reports a missing moment as `inf`, where the quadrature it replaced had returned a large finite number that hid the `inf - inf`. Both answers were wrong; this one is right.
+
+**Effect on the reproductions book**, which is where the whole sequence started: the seven chapters that carried 226 stderr lines now carry **one**, the genuine 96% grid deficit on Mack's infinite-mean Pareto, which is the chapter's own subject.
+
+No API change.
+
 ## 1.0.0a221
 
 **[Pareto-Type-I-Analytic] The single-parameter Pareto gets closed-form partial moments, so `sev {xm} * pareto {alpha}` stops integrating a heavy tail to infinity on every build.** `_partial_e` had an analytic branch for the *shifted* (Lomax) form, `scale = lam, loc = -lam`, and sent everything else to quadrature. The Type-I form, `scale = xm, loc = 0`, support `[xm, inf)`, is what DecL's `sev {xm} * pareto {alpha}` builds and what the rare-event literature uses, and it took the fallback every time: a logged warning, an `IntegrationWarning` reporting the integral as probably divergent, and a numerical answer where an exact one exists. The reproductions book's `Liu2026`, which is Type-I Pareto throughout, carried 80 stderr lines from this one gap.

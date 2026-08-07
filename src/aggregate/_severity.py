@@ -258,9 +258,22 @@ def _moms_analytic(fz, limit, attachment, n, analytic=True):
         pe_attach = _partial_e_numeric(fz, attachment, n)
         pe_detach = _partial_e_numeric(fz, detachment, n)
 
-    ans1 = np.array([sum([(-1) ** (m - k) * binom(m, k) * attachment ** (m - k) * (pe_detach[k] - pe_attach[k])
-                          for k in range(m + 1)])
-                     for m in range(n + 1)])
+    # The binomial expansion is unusable the moment any partial expectation is
+    # infinite: with attachment 0 the low-order coefficients are 0, so a term
+    # reads 0 * inf, and with attachment > 0 the alternating signs give
+    # inf - inf. Both produce nan for a layer moment that is simply infinite.
+    #
+    # Short-circuit instead. A layer capped at a finite limit is bounded by
+    # limit**m, so every partial expectation to a finite detachment is finite
+    # and the sum is safe. Only an UNLIMITED layer can diverge, and the m-th
+    # moment of an unlimited excess layer exists exactly when E[X**m] does,
+    # which is what pe_detach[m] reports. Lower orders are then finite too
+    # (Lyapunov), so the sum below is only ever evaluated on finite terms.
+    ans1 = np.array([
+        np.inf if not np.isfinite(pe_detach[m]) else
+        sum([(-1) ** (m - k) * binom(m, k) * attachment ** (m - k) * (pe_detach[k] - pe_attach[k])
+             for k in range(m + 1)])
+        for m in range(n + 1)])
 
     if np.isinf(limit):
         ans2 = np.zeros_like(ans1)

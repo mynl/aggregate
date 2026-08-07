@@ -1,0 +1,4 @@
+/_book/
+/.quarto/
+/_freeze/
+*.quarto_ipynb

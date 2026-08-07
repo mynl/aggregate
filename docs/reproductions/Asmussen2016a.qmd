@@ -1,16 +1,6 @@
 ---
 title: "The log-normal left tail: saddlepoint, importance sampling, and FFT"
 subtitle: "Reproducing Asmussen, Jensen and Rojas-Nandayapa (2016)"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## The paper
@@ -260,7 +250,3 @@ None of this diminishes the paper. The saddlepoint approximation costs almost no
 
 The parameterization is worth recording, since it is the one place a reproduction can silently go wrong. The paper writes $X \sim \mathrm{LN}(0, \sigma^2)$ with $\mu = 0$ throughout, noting that $\mu$ is only a scaling factor, and tabulates against $x$ while evaluating at $nx$. In DecL that is `sev 1 * lognorm sigma` with `dfreq [n]`, and the argument to `cdf` is $n x$.
 
-## References
-
-::: {#refs}
-:::

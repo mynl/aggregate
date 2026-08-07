@@ -1,16 +1,6 @@
 ---
 title: "k-moment tilting, and the exact answer it is approximating"
 subtitle: "Reproducing Liu, Wu and Yao (2026)"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Introduction
@@ -231,7 +221,3 @@ On the substance, KMT looks right for what it claims. The power tilt is the natu
 
 For the library, the note to carry forward is the parameterization trap and the grid lesson. Type I Pareto takes $x_m$ as a scale, `sev {xm} * pareto {alpha}`, and getting that wrong costs a few percent in a way that shrinks with $u$ and so looks like a convergence issue rather than a specification error. And when the target probability approaches $10^{-13}$, the question to ask is not whether the grid is fine enough but whether it is too fine.
 
-## References
-
-::: {#refs}
-:::

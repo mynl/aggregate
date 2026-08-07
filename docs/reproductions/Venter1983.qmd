@@ -1,16 +1,6 @@
 ---
 title: "One engine, three columns"
 subtitle: "Reproducing Venter (1983), Exhibit 3"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Context and problem
@@ -37,6 +27,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as ss
 from aggregate.distributions import Aggregate
+from greater_tables import GT
 
 KX = np.array([0, 1e3, 5e3, 6e3, 7e3, 8e3, 9e3, 10e3, 12.5e3, 15e3, 17.5e3,
                20e3, 25e3, 35e3, 50e3, 75e3, 100e3, 125e3, 150e3, 175e3,
@@ -56,7 +47,7 @@ def raw_moment(k):
 
 s1, s2, s3 = raw_moment(1), raw_moment(2), raw_moment(3)
 sv = s2 - s1 ** 2
-pd.DataFrame([
+GT(pd.DataFrame([
     {'quantity': 'severity mean', 'recomputed': s1, 'Exhibit 3': 18198},
     {'quantity': 'severity CV', 'recomputed': np.sqrt(sv) / s1, 'Exhibit 3': 2.6600},
     {'quantity': 'severity skewness',
@@ -66,7 +57,7 @@ pd.DataFrame([
      'Exhibit 3': 0.7667},
     {'quantity': 'aggregate skewness', 'recomputed': LAM * s3 / (LAM * s2) ** 1.5,
      'Exhibit 3': 1.0744},
-])
+]).set_index('quantity'), formatters={'recomputed': 4, 'Exhibit 3': 4})
 ```
 
 All six land, so the transcription is right. The severity mean is 18,198.195 against a printed 18,198, and the aggregate mean is 249,999.5 against a printed 250,000. The scanned copy shows the aggregate mean as 250,600, which the arithmetic identifies as a scanning artifact of 250,000.
@@ -88,7 +79,9 @@ def venter(bs, log2):
     return obj
 
 a500 = venter(500, 16)
-f'mean {a500.est_m:,.2f}   CV {a500.est_cv:.4f}   mass {a500.agg_density.sum():.12f}'
+GT(pd.DataFrame([{'bucket size': 500, 'mean': a500.est_m, 'CV': a500.est_cv,
+                  'total mass': a500.agg_density.sum()}]).set_index('bucket size'),
+   formatters={'mean': 2, 'CV': 4, 'total mass': 12})
 ```
 
 Venter's third column needs no new machinery either. His transformed gamma, with distribution function $G(x; r, \alpha, \lambda) = \mathrm{IG}((\lambda x)^{\alpha}; r)$, is the generalized gamma: `gengamma(a=r, c=alpha, scale=1/lam)`.
@@ -97,10 +90,12 @@ Venter's third column needs no new machinery either. His transformed gamma, with
 #| label: gengamma
 R, ALPHA, LAM_TG = 0.5613125, 1.8300318, 1 / 417896.414
 tg = ss.gengamma(R, ALPHA, scale=1 / LAM_TG)
-pd.DataFrame([{'from Venter parameters': v, 'Exhibit 3': p, 'quantity': q}
-              for q, v, p in [('mean', tg.mean(), 250000),
-                              ('CV', tg.std() / tg.mean(), 0.7667),
-                              ('skewness', float(tg.stats('s')), 1.0744)]])
+GT(pd.DataFrame([{'quantity': q, 'from Venter parameters': v, 'Exhibit 3': p}
+                 for q, v, p in [('mean', tg.mean(), 250000),
+                                 ('CV', tg.std() / tg.mean(), 0.7667),
+                                 ('skewness', float(tg.stats('s')), 1.0744)]]
+                ).set_index('quantity'),
+   formatters={'from Venter parameters': 4, 'Exhibit 3': 4})
 ```
 
 Now the exhibit itself. The bucket size is the only thing that changes between the two exact columns, so run it at Venter's \$500 and at three finer settings.
@@ -136,7 +131,7 @@ for bs, log2 in [(500, 16), (100, 18), (20, 20), (5, 22)]:
 out['Venter excess ratio'] = XR
 out['Venter transf gamma'] = TG
 out['gengamma cdf'] = [tg.cdf(x) for x in XS]
-out.head(12)
+GT(out.set_index('aggregate loss').head(12), float_format=4)
 ```
 
 ## Comments
@@ -145,13 +140,14 @@ out.head(12)
 
 ```{python}
 #| label: convergence
-pd.DataFrame([
+GT(pd.DataFrame([
     {'bucket size': bs,
      'max abs diff vs characteristic function':
          float(np.abs(out[f'agg bs={bs}'] - out['Venter char fn']).max()),
      'max abs diff vs recursive':
          float(np.abs(out[f'agg bs={bs}'] - out['Venter recursive']).max())}
-    for bs in [500, 100, 20, 5]])
+    for bs in [500, 100, 20, 5]]).set_index('bucket size'),
+   float_format=5)
 ```
 
 At Venter's own \$500 discretization, `aggregate` agrees with his **recursive** column to $5\times10^{-5}$ over all 34 rows, which is exact at the four decimal places printed, and differs from his **characteristic function** column by up to $8.2\times10^{-4}$. Refine the bucket and the two allegiances swap: by `bs = 5` the agreement with the characteristic function column is $7\times10^{-5}$ and the disagreement with the recursive column has grown to $8.4\times10^{-4}$.
@@ -162,14 +158,14 @@ This is worth stating plainly because it is the whole point. Venter presents two
 
 ```{python}
 #| label: residuals
-pd.DataFrame([
+GT(pd.DataFrame([
     {'comparison': 'agg excess ratio at bs=500 vs Venter',
      'max abs diff': float(np.abs(out['agg excess ratio']
                                   - out['Venter excess ratio']).max())},
     {'comparison': 'scipy gengamma vs Venter transformed gamma column',
      'max abs diff': float(np.abs(out['gengamma cdf']
                                   - out['Venter transf gamma']).max())},
-])
+]).set_index('comparison'), float_format=6)
 ```
 
 Both to $5\times10^{-5}$, so both columns reproduce exactly at the printed precision. The excess ratio comes straight off `density_df['lev']`, since $R(a) = 1 - \mathsf E[L \wedge a] / \mathsf E[L]$.
@@ -184,14 +180,14 @@ Venter's own verdict, that the transformed gamma is "reasonably close over a wid
 #| label: tg-error
 err = 100 * (np.array(TG) - np.array(CHAR))
 inside = [x for i, x in enumerate(XS) if np.all(np.abs(err[i:]) < 0.1)]
-pd.DataFrame([
+GT(pd.DataFrame([
     {'statistic': 'largest overstatement, points of probability',
      'value': err.max(), 'at': XS[err.argmax()]},
     {'statistic': 'largest understatement, points of probability',
      'value': err.min(), 'at': XS[err.argmin()]},
     {'statistic': 'first loss size beyond which the error stays under 0.1 points',
      'value': np.nan, 'at': inside[0]},
-])
+]).set_index('statistic'), formatters={'value': 2, 'at': '{x:,.0f}'})
 ```
 
 The three-moment fit crosses the exact distribution four times over the range, running 1.1 points of probability high at \$25,000, 1.6 points low at \$125,000, and 2.5 points high at \$250,000, its worst single row. It does not settle inside a tenth of a point until \$725,000. The excess ratio column holds up better where it matters commercially, within 2% of the ratio through \$650,000, before degrading to 10% at \$850,000 where the ratio itself is down to 0.0039.
@@ -202,7 +198,3 @@ That is a fair result for a three-parameter fit and a poor substitute for the ex
 
 Exhibit 3 Part 2 also prints Venter's \$500 discrete PDF, and I could not decode its first five rows. The rule stated for the body of the table, that the probability at $N$ is the piecewise linear probability from $N - 250$ to $N + 250$, reproduces the tabulated 0.04866875 for the \$1,500 to \$4,000 block exactly, but does not give the printed values at \$500, \$1,000, \$4,500 or \$5,000, and the printed \$500 entry is more than twice what any nearest-bucket rule allows. Nothing here depends on it: `aggregate` does its own discretization from the piecewise linear CDF, and the CDF is verified independently by the three severity moments.
 
-## References
-
-::: {#refs}
-:::

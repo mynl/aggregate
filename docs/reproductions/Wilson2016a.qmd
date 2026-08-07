@@ -1,16 +1,6 @@
 ---
 title: "Accurate FFT convolution: what breaks, and how you know"
 subtitle: "Reproducing Wilson and Keich (2016)"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Introduction
@@ -164,7 +154,3 @@ Two caveats on transferring this wholesale. First, the paper's setting is pairwi
 
 Where this bites in practice is not a pathological pmf but an ordinary one evaluated far into a tail, which is exactly what @Wilson2017 addresses.
 
-## References
-
-::: {#refs}
-:::

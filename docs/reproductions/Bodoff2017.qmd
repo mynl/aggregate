@@ -1,16 +1,6 @@
 ---
 title: "A policy limit that only usually holds"
 subtitle: "Reproducing Bodoff (2017), Exhibit 4"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Context and problem
@@ -45,6 +35,7 @@ Two model choices in those three exhibits are not spelled out and have to be inf
 import numpy as np
 import pandas as pd
 from aggregate import build
+from greater_tables import GT
 
 LIMITS = [50e3, 100e3, 500e3, 1e6, 2e6, 3e6, 4e6, 5e6, 10e6]
 WEIGHT = [.01, .01, .02, .80, .10, .01, .01, .03, .01]
@@ -74,7 +65,7 @@ LEV = {a: lev(a) for a in pts}
 chk = pd.DataFrame({'a': pts, 'aggregate': [LEV[a] for a in pts],
                     'closed form': [closed_form(a) for a in pts]})
 chk['relative error'] = (chk['aggregate'] / chk['closed form'] - 1).abs()
-chk
+GT(chk)
 ```
 
 `aggregate` agrees with the closed form to within 1.2 parts in ten million at every limit, so the exposure rating below rests on the severity and the arithmetic, not on the grid.
@@ -102,13 +93,16 @@ ex4.loc['Total', ['traditional %', 'proposed %']] = ex4[
     ['traditional %', 'proposed %']].sum()
 ex4.loc['Total', 'XPL loading %'] = 100 * (ex4.loc['Total', 'proposed %']
                                            / ex4.loc['Total', 'traditional %'] - 1)
-ex4
+ex4.index = [f'${l/1000:,.0f}k xs {a/1000:,.0f}k' for l, a in  ex4[[
+    'limit', 'attachment']].values[:-1]] + ['Total']
+ex4.index.name = 'Layer'
+GT(ex4.iloc[:, 2:], float_format=3)
 ```
 
 Against the paper:
 
 | Layer | Traditional | Proposed | Loading |
-|---|---|---|---|
+|---|---:|---:|---:|
 | \$500k xs 0 | 88.420% | 88.440% | 0.023% |
 | \$500k xs \$500k | 10.067% | 10.074% | 0.072% |
 | \$1M xs \$1M | 1.150% | 1.219% | 5.989% |
@@ -130,7 +124,7 @@ Bodoff's point is not the total, which is a modest 0.237% load on the whole towe
 sh = ex4.drop('Total')[['attachment', 'traditional %', 'proposed %',
                         'XPL loading %']].copy()
 sh['share of gross loss'] = sh['proposed %'] / ex4.loc['Total', 'proposed %']
-sh
+GT(sh.set_index('attachment'))
 ```
 
 One parameter, a single flat $p = 99\%$ applied to every policy, produces XPL loadings that run from 2 basis points on the working layer to 119% on \$5M xs \$5M and to an infinite relative load on \$15M xs \$10M, where traditional exposure rating returns exactly zero because no policy in the profile has a limit above \$10M. That last column is the practical payoff: a layer that traditional exposure rating prices at zero is not in fact free, and the method gives a number for it rather than a shrug.
@@ -147,7 +141,3 @@ That said, the paper's section 3.1.1 sketches exactly the collective risk model 
 
 `Bodoff2017.Pareto` is one of the curves already transcribed into `actuarial-severity-curves.agg`. With $\alpha = 1.5$ it has infinite variance, so it raises `InfiniteVarianceError` if built unlimited. Every use here is inside a layer, which bounds it. The mean is finite, $\theta/(\alpha-1) = 100{,}000$, and the \$25M cap in Exhibit 3 brings even the XPL branch down to 95,532.
 
-## References
-
-::: {#refs}
-:::

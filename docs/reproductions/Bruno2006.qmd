@@ -1,16 +1,6 @@
 ---
 title: "92,832 convolutions in five seconds"
 subtitle: "Reproducing Bruno, Camerini, Manna and Tomassetti (2006)"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Context and problem
@@ -40,6 +30,7 @@ import pandas as pd
 from scipy.integrate import quad
 from scipy.special import gammaln
 from aggregate import build
+from greater_tables import GT
 
 XS = [14, 15, 16, 17, 18, 19, 20, 24, 26, 28, 30, 31, 55, 60]
 PS = [.0103301, .0307990, .0293511, .0103301, .0730414, .0111568, .0264554,
@@ -48,8 +39,10 @@ DSEV = ('dsev [' + ' '.join(map(str, XS)) + '] ['
         + ' '.join(f'{q:.7f}' for q in PS) + ']')
 x, p = np.array(XS, float), np.array(PS)
 m1, m2 = (x * p).sum(), (x ** 2 * p).sum()
-pd.DataFrame([{'sum of probabilities': p.sum(), 'severity mean': m1,
-               'E[U^2]': m2, 'severity sd': np.sqrt(m2 - m1 ** 2)}])
+GT(pd.DataFrame([{'sum of probabilities': p.sum(), 'severity mean': m1,
+                  'E[U^2]': m2, 'severity sd': np.sqrt(m2 - m1 ** 2)}]),
+   formatters={'sum of probabilities': 10, 'severity mean': 6, 'E[U^2]': 4,
+               'severity sd': 6})
 ```
 
 ## Table 6: Poisson, $\lambda = 504.814259$
@@ -61,14 +54,14 @@ The severity is integer valued, so the aggregate lives on the integer lattice an
 LAM6 = 504.814259
 a6 = build(f'agg B {LAM6} claims {DSEV} poisson', log2=17, bs=1,
            padding=1, normalize=False)
-pd.DataFrame([
+GT(pd.DataFrame([
     {'quantity': 'mean', 'aggregate': a6.est_m, 'lambda E[U]': LAM6 * m1,
      'paper': 21586.462129},
     {'quantity': 'standard deviation', 'aggregate': a6.est_sd,
      'lambda E[U]': np.sqrt(LAM6 * m2), 'paper': 1047.695834},
     {'quantity': 'total mass', 'aggregate': a6.agg_density.sum(),
      'lambda E[U]': 1.0, 'paper': 1.0},
-])
+]).set_index('quantity'), float_format=6)
 ```
 
 ```{python}
@@ -92,16 +85,20 @@ t6 = pd.DataFrame([{'x': xx, 'agg probability': d6.loc[xx, 'p_total'],
                     'Table 6 probability': pp, 'agg CDF': d6.loc[xx, 'F'],
                     'Table 6 CDF': cc} for xx, pp, cc in T6])
 t6['CDF diff'] = (t6['agg CDF'] - t6['Table 6 CDF']).abs()
-t6
+GT(t6.set_index('x'),
+   formatters={'agg probability': 6, 'Table 6 probability': 6, 'agg CDF': 6,
+               'Table 6 CDF': 6, 'CDF diff': '{x:.2e}'})
 ```
 
 ```{python}
 #| label: table-6-summary
-pd.DataFrame([{'rows compared': len(t6),
-               'largest CDF difference': float(t6['CDF diff'].max()),
-               'largest probability difference':
-                   float((t6['agg probability']
-                          - t6['Table 6 probability']).abs().max())}])
+GT(pd.DataFrame([{'rows compared': len(t6),
+                  'largest CDF difference': float(t6['CDF diff'].max()),
+                  'largest probability difference':
+                      float((t6['agg probability']
+                             - t6['Table 6 probability']).abs().max())}]),
+   formatters={'largest CDF difference': '{x:.2e}',
+               'largest probability difference': '{x:.2e}'})
 ```
 
 Both columns match to $5\times10^{-7}$, which is exact at the six decimals printed. The aggregate mean agrees with $\lambda \mathsf E[U]$ to twelve digits.
@@ -121,13 +118,13 @@ The mixing moments are $\mathsf E[\Theta] = ac/(b-1)$ and $\mathsf E[\Theta^2] =
 A, B, C = 3.4959, 30.1234, 1.99321
 ETH = A * C / (B - 1)
 ETH2 = A ** 2 * C * (C + 1) / ((B - 1) * (B - 2))
-pd.DataFrame([
+GT(pd.DataFrame([
     {'quantity': 'E[Theta] = E[N]', 'recomputed': ETH, 'paper': np.nan},
     {'quantity': 'aggregate mean', 'recomputed': ETH * m1, 'paper': 10.2310},
     {'quantity': 'aggregate standard deviation',
      'recomputed': np.sqrt(ETH * m2 + (ETH2 - ETH ** 2) * m1 ** 2),
      'paper': 24.0489},
-])
+]).set_index('quantity'), float_format=6)
 ```
 
 ```{python}
@@ -151,16 +148,20 @@ T8 = [(0, .798708), (4, .798708), (10, .798708), (16, .810615), (22, .831052),
 t8 = pd.DataFrame([{'x': xx, 'agg CDF': a8.density_df.loc[xx, 'F'],
                     'Table 8 CDF': cc} for xx, cc in T8])
 t8['diff'] = (t8['agg CDF'] - t8['Table 8 CDF']).abs()
-t8
+GT(t8.set_index('x'),
+   formatters={'agg CDF': 6, 'Table 8 CDF': 6, 'diff': '{x:.2e}'})
 ```
 
 ```{python}
 #| label: table-8-summary
-pd.DataFrame([{'counts retained above 1e-14': int(ns[-1]),
-               'sum of p(n)': float(pn.sum()),
-               'p(0)': float(pn[0]), 'Table 8 CDF at 0': 0.798708,
-               'agg mean': a8.est_m, 'agg sd': a8.est_sd,
-               'largest CDF difference': float(t8['diff'].max())}])
+GT(pd.DataFrame([{'counts retained above 1e-14': int(ns[-1]),
+                  'sum of p(n)': float(pn.sum()),
+                  'p(0)': float(pn[0]), 'Table 8 CDF at 0': 0.798708,
+                  'agg mean': a8.est_m, 'agg sd': a8.est_sd,
+                  'largest CDF difference': float(t8['diff'].max())}]),
+   formatters={'sum of p(n)': 12, 'p(0)': 6, 'Table 8 CDF at 0': 6,
+               'agg mean': 6, 'agg sd': 6,
+               'largest CDF difference': '{x:.2e}'})
 ```
 
 All seventeen values exact at six decimals, including $p(0) = 0.798708$, which is the probability of no claim and so the CDF's value everywhere below 14.
@@ -178,10 +179,14 @@ t0 = time.time()
 a7 = build(f'agg B7 91000 claims {DSEV} poisson', log2=23, bs=1,
            padding=0, normalize=False)
 elapsed = time.time() - t0
-pd.DataFrame([{'seconds': elapsed, 'grid points': 2 ** 23,
-               'x_max': a7.xs[-1], 'mean': a7.est_m, 'sd': a7.est_sd,
-               'paper mean': 3891268.954300, 'paper sd': 14066.631372,
-               'total mass': a7.agg_density.sum()}])
+GT(pd.DataFrame([{'seconds': elapsed, 'grid points': 2 ** 23,
+                  'x_max': a7.xs[-1], 'mean': a7.est_m, 'sd': a7.est_sd,
+                  'paper mean': 3891268.954300, 'paper sd': 14066.631372,
+                  'total mass': a7.agg_density.sum()}]),
+   formatters={'seconds': 2, 'grid points': '{x:,.0f}', 'x_max': '{x:,.0f}',
+               'mean': '{x:,.4f}', 'sd': '{x:,.4f}',
+               'paper mean': '{x:,.4f}', 'paper sd': '{x:,.4f}',
+               'total mass': 12})
 ```
 
 ```{python}
@@ -200,15 +205,17 @@ F7 = a7.density_df['F']
 t7 = pd.DataFrame([{'x': xx, 'agg CDF': F7.loc[xx], 'Table 7 CDF': cc}
                    for xx, cc in T7])
 t7['diff'] = (t7['agg CDF'] - t7['Table 7 CDF']).abs()
-t7
+GT(t7.set_index('x'),
+   formatters={'agg CDF': 6, 'Table 7 CDF': 6, 'diff': '{x:.2e}'})
 ```
 
 ```{python}
 #| label: table-7-summary
-pd.DataFrame([{'rows compared': len(t7),
-               'largest CDF difference': float(t7['diff'].max()),
-               'paper seconds for its own method': 1950,
-               'aggregate seconds': elapsed}])
+GT(pd.DataFrame([{'rows compared': len(t7),
+                  'largest CDF difference': float(t7['diff'].max()),
+                  'paper seconds for its own method': 1950,
+                  'aggregate seconds': elapsed}]),
+   formatters={'largest CDF difference': '{x:.2e}', 'aggregate seconds': 2})
 ```
 
 All 28 values exact at six decimals, in a few seconds.
@@ -233,7 +240,3 @@ The underflow point also survives. Panjer recursion really does fail at $\lambda
 
 The 14-point severity carries 45.6% of its mass at the single value 60 and another 9.9% at 55, so more than half the distribution sits on two atoms at the top of the range. That is what makes the case a fair stress test: the aggregate is a convolution of a very lumpy lattice law, and a method that smoothed it would show up immediately. Both the paper's method and `aggregate` reproduce the probability column, not just the CDF, which is the stronger test of the two.
 
-## References
-
-::: {#refs}
-:::

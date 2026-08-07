@@ -1,16 +1,6 @@
 ---
 title: "Where the FFT floor is, and why it cannot be pushed lower"
 subtitle: "Reproducing Ben Rached, Hoel and Meo (2024), and testing its central claim against `aggregate`"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Introduction
@@ -173,7 +163,3 @@ It is worth being clear about what the tradeoff buys, because the comparison is 
 
 There is an obvious way to extend the reach, and it is the one @Asmussen2016a uses: tilt. Replace the severity density $f$ by the Esscher transform $f_\theta(x) = e^{-\theta x} f(x) / L(\theta)$, build the aggregate from the tilted severity, and recover the true probability from the likelihood ratio $L(\theta)^n e^{\theta \gamma}$. Under the tilted measure the left tail is no longer rare, so the FFT never has to resolve a $10^{-31}$ number, and the ratio of bulk to tail that creates the floor disappears. That is not implemented here, and it would need care with the choice of $\theta$ and with the normalization, but it is the natural route if the deep tail ever matters.
 
-## References
-
-::: {#refs}
-:::

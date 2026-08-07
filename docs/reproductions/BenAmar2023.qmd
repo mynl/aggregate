@@ -1,16 +1,6 @@
 ---
 title: "State-dependent importance sampling, and what `aggregate` computes instead"
 subtitle: "Reproducing Ben Amar, Ben Rached, Haji-Ali and Tempone (2023)"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## The paper
@@ -212,7 +202,3 @@ The second application is the sharper illustration. `aggregate` returns a densit
 
 The limits are obviously in the deep tail, where double precision FFT convolution runs out below roughly $10^{-13}$, and any severity whose right tail is too heavy to carry on a uniform grid. Both are explored on the @BenRached2024 page.
 
-## References
-
-::: {#refs}
-:::

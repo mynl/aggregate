@@ -1,16 +1,6 @@
 ---
 title: "The threshold above which Riebesell is consistent"
 subtitle: "Reproducing Mack and Fackler (2003)"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Context and problem
@@ -42,6 +32,7 @@ The formulation is convenient for `aggregate`: $\alpha_F$ is built from a limite
 import numpy as np
 import pandas as pd
 from aggregate import build
+from greater_tables import GT
 
 US = [0.01, 0.1, 1, 3, 10, 30, 100]
 CV18 = float(np.sqrt(np.exp(1.8 ** 2) - 1))
@@ -85,14 +76,16 @@ for name, prog in SEVS.items():
                      'Table 1': PAPER[name][i]})
 t1 = pd.DataFrame(rows)
 t1['abs diff'] = (t1['alpha_F(u)'] - t1['Table 1']).abs()
-t1
+GT(t1.set_index(['F', 'u / E(X)']),
+   formatters={'agg E[X and u]': 6, 'agg S(u)': 6, 'alpha_F(u)': 6,
+               'Table 1': 4, 'abs diff': '{x:.2e}'})
 ```
 
 ```{python}
 #| label: table-1-summary
-pd.DataFrame([{'largest absolute difference over the 26 tabulated cells':
-               float(t1['abs diff'].max()),
-               'cells compared': int(t1['abs diff'].notna().sum())}])
+GT(pd.DataFrame([{'cells compared': int(t1['abs diff'].notna().sum()),
+                  'largest absolute difference': float(t1['abs diff'].max())}]),
+   formatters={'largest absolute difference': '{x:.2e}'})
 ```
 
 All 26 cells land within $8\times10^{-4}$, inside the paper's three decimal rounding. The two blank cells are the exponential at $u = 30$ and $u = 100$, where $\alpha_F$ is 1 to more places than the table prints and Mack and Fackler leave the entries empty.
@@ -103,14 +96,14 @@ Three exact statements in the text follow directly.
 #| label: constants
 Z = 0.20
 ALPHA = 1 - np.log(1 + Z) / np.log(2)
-pd.DataFrame([
+GT(pd.DataFrame([
     {'quantity': 'alpha = 1 - ld(1+z), z = 20%', 'recomputed': ALPHA,
      'paper': 0.737},
     {'quantity': 'exposure exponent 1 - alpha', 'recomputed': 1 - ALPHA,
      'paper': 0.263},
     {'quantity': 'mixed tail index alpha + beta, beta = 1.3',
      'recomputed': ALPHA + 1.3, 'paper': 2.037},
-])
+]).set_index('quantity'), float_format=6)
 ```
 
 The last of these is the paper's resolution of an apparent contradiction. Riebesell forces $\alpha < 1$ on the claim size law of a *single* risk, whereas observed portfolio tails in liability run near 2. Section 8 shows the two are compatible: mixing the individual laws over a Pareto distribution of sums insured with index $\beta$ gives a portfolio tail of index $\alpha + \beta$, and with $\beta = 1.3$ that is 2.037.
@@ -141,8 +134,10 @@ S[0] = 1.0
 probs = -np.diff(S)
 probs[-1] += S[-1]
 
-pd.DataFrame([{'E(X)': EX, 'threshold u*': U, 'u* / E(X)': U / EX,
-               'paper': 'u ~ 5 E(X)', 'S(u*)': FZ.sf(U)}])
+GT(pd.DataFrame([{'E(X)': EX, 'threshold u*': U, 'u* / E(X)': U / EX,
+                  'paper': 'u ~ 5 E(X)', 'S(u*)': FZ.sf(U)}]),
+   formatters={'E(X)': '{x:,.0f}', 'threshold u*': '{x:,.1f}',
+               'u* / E(X)': 4, 'S(u*)': 8})
 ```
 
 The spliced severity goes into `aggregate` as a `chistogram`. Every limited expected value below is read off **one** grid, which matters: a limited expected value computed on a grid tuned to its own limit is not comparable with one computed on a different grid when the severity has structure far below the limit, and this severity has all its density three orders of magnitude below the largest sum insured.
@@ -166,7 +161,9 @@ for a in [50_000., 100_000., 250_000., U, 500_000., 1e6, 2e6, 5e6]:
     rows.append({'a': a, 'a >= u*': a >= U - 1, 'agg E[X and a]': lev_spliced(a),
                  'agg r(a)': ra, 'Riebesell (a/v)^0.263': (a / v) ** (1 - ALPHA),
                  'ratio': ra / (a / v) ** (1 - ALPHA)})
-pd.DataFrame(rows)
+GT(pd.DataFrame(rows).set_index('a'),
+   formatters={'agg E[X and a]': '{x:,.2f}', 'agg r(a)': 9,
+               'Riebesell (a/v)^0.263': 9, 'ratio': 9})
 ```
 
 Above the threshold the loss elimination ratio matches Riebesell's $(a/v)^{1-\alpha}$ to nine significant figures. Below it the agreement fails, and fails hard: at $a = \mathsf E(X)$ the true ratio is 17% under the Riebesell value. That is not a numerical artifact, it is Theorem 2 being tight. The rule is not asymptotic or approximate above $u$, and it is simply wrong below it.
@@ -175,11 +172,14 @@ The premium form of the same statement is sharper still, because the rule was st
 
 ```{python}
 #| label: doubling
-pd.DataFrame([{'sum insured v': v0, 'v >= u*': v0 >= U,
-               'b(2v)/b(v) = E[X and 2v] / E[X and v]':
-                   lev_spliced(2 * v0) / lev_spliced(v0),
-               "Riebesell's 1 + z": 1.20}
-              for v0 in [300_000., 600_000., 1_200_000., 100_000.]])
+GT(pd.DataFrame([{'sum insured v': v0, 'v >= u*': v0 >= U,
+                  'b(2v)/b(v) = E[X and 2v] / E[X and v]':
+                      lev_spliced(2 * v0) / lev_spliced(v0),
+                  "Riebesell's 1 + z": 1.20}
+                 for v0 in [300_000., 600_000., 1_200_000., 100_000.]]
+                ).set_index('sum insured v'),
+   formatters={'b(2v)/b(v) = E[X and 2v] / E[X and v]': 6,
+               "Riebesell's 1 + z": 2})
 ```
 
 Doubling the sum insured multiplies the collective risk premium by exactly 1.200000 at every sum insured above the threshold, and by 1.271 below it. A 1936 rating rule turns out to be an exact consequence of the collective risk model on the range where it is used, and only there.
@@ -200,7 +200,3 @@ The first attempt at the exposure curve gave a clean power law with the wrong co
 
 The Pareto tail with $\alpha = 0.737$ has an infinite mean, so it has to be cut somewhere for `aggregate` to build it; the code cuts at $10^{12}$ and sweeps the residual $2.7\times10^{-8}$ onto the last bin. This is not a fudge, it is the paper's own observation: "we can replace $F_u$ above some very high amount $w \gg u$ with something else, e.g. in order to ascertain a finite expectation", because the behaviour of the law above the range where Riebesell is applied does not enter equation (2).
 
-## References
-
-::: {#refs}
-:::

@@ -12,8 +12,11 @@ The six top-ranked candidates have been written up. Five are reproductions; one 
 | Bruno2006 | `Bruno2006.qmd` | **Reproduced.** Tables 6, 7 and 8, every value exact at the printed six decimals. Table 7 (lambda=91,000, 92,832 convolutions) runs in **under 2 seconds** against the paper's reported 1,950. Table 8's Poisson/generalized-Pareto mixture is not a built-in `mixed` family; computed p(n) by quadrature and passed as `dfreq`. |
 | Bodoff2017 | `Bodoff2017.qmd` | **Reproduced.** Exhibit 4, every cell. Two inferred model choices confirmed by the fit: the severity is the **two-parameter** Pareto (`lomax`), and Exhibit 3's "$25M / p=100%" row is a **global cap on the XPL branch**, not a limits-profile row. |
 | Jin2016 | `Jin2016.qmd` | **NOT a reproduction.** See the corrected assessment below. |
+| **Homer2003** | `Homer2003.qmd` | **Reproduced, and the best fit of the lot.** Not on the original eighteen; surfaced because Jin2016 cites it. All three examples plus both appendices, every published cell inside 0.007 points. Each construction is a shipped DecL form: section 2 is `netceded` / `occ_bivariate` (so the paper's hand-built Table 2.3 falls out of `occurrence net of 400000 xs 600000`), sections 3 and 4 are `bivariate ... dbvsev`, and section 4's dollars-against-counts axes are `bs=(200000, 1)`. |
 
-Recorded for whoever picks up the remaining candidates: check whether the paper's own tabulated inputs are exact before blaming a mismatch on `aggregate` (Mata2005), and put every LEV that will be **compared** with another on a **common grid** (Mack2003).
+Recorded for whoever picks up the remaining candidates: check whether the paper's own tabulated inputs are exact before blaming a mismatch on `aggregate` (Mata2005 Table 1, Homer2003 Table 3.3); put every LEV that will be **compared** with another on a **common grid** (Mack2003); and on a bivariate build **read the deficit first** (Homer2003, where a too-small pinned axis silently clipped and displaced the whole grid).
+
+**Chase the citations.** Homer2003 was not on the eighteen and is the strongest fit found so far. It surfaced only because Jin2016 cites it. Worth sweeping the reference lists of the papers already assessed before adding new candidates from scratch.
 
 ---
 

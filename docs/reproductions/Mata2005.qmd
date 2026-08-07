@@ -1,16 +1,6 @@
 ---
 title: "Trend by layer, and a discrepancy in Table 1"
 subtitle: "Reproducing Mata and Verheyen (2005)"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Context and problem
@@ -36,6 +26,7 @@ The headline results are that the \$4MM xs \$1MM layer trends at 9.59% a year ag
 import numpy as np
 import pandas as pd
 from aggregate import build
+from greater_tables import GT
 
 MU, SIGMA, TREND, YEARS, ELR, OL = 9.31, 2.29, 1.08, 5, 0.60, 1.50
 CV = float(np.sqrt(np.exp(SIGMA ** 2) - 1))
@@ -77,7 +68,11 @@ t1 = pd.DataFrame({'policy limit': PL, 'premium 2005': SP05,
                    'Table 1 2000': [PAP[(p, 2000)] for p in PL]})
 t1['2005 paper / agg'] = t1['Table 1 2005'] / t1['agg EY[Y and PL]']
 t1['2000 paper / agg'] = t1['Table 1 2000'] / t1['agg EX[X and PL]']
-t1
+GT(t1.set_index('policy limit'),
+   formatters={'premium 2005': '{x:,.0f}', 'agg EY[Y and PL]': '{x:,.2f}',
+               'Table 1 2005': '{x:,.0f}', 'agg EX[X and PL]': '{x:,.2f}',
+               'Table 1 2000': '{x:,.0f}', '2005 paper / agg': 6,
+               '2000 paper / agg': 6})
 ```
 
 The limited expected values do not agree. The paper is 0.04% high at \$250,000 and drifts steadily to 0.24% low at \$5,000,000, in both years. The discrepancy is small but it is systematic, and it is worth settling before reading anything downstream.
@@ -98,7 +93,10 @@ chk = pd.DataFrame({'a': PL, 'aggregate': [AGG[(p, 2005)] for p in PL],
                     'Table 1': [PAP[(p, 2005)] for p in PL]})
 chk['agg / closed form - 1'] = chk['aggregate'] / chk['closed form'] - 1
 chk['Table 1 / closed form - 1'] = chk['Table 1'] / chk['closed form'] - 1
-chk
+GT(chk.set_index('a'),
+   formatters={'aggregate': '{x:,.4f}', 'closed form': '{x:,.4f}',
+               'Table 1': '{x:,.0f}', 'agg / closed form - 1': '{x:.2e}',
+               'Table 1 / closed form - 1': '{x:.2e}'})
 ```
 
 `aggregate` reproduces the closed form to better than five parts in a hundred million at every limit. Table 1 is out by up to twenty-four parts in ten thousand.
@@ -155,16 +153,19 @@ PRINTED = pd.DataFrame(
      'T11 exposure adj': [0.982, 1.066, 1.354, 2.000, 1.090],
      'T13 freq adj': [0.982, 1.066, 1.245, 2.000, 0.982],
      'T14 sev adj': [1.000, 1.000, 1.087, 1.000, 1.110]}, index=LN)
-from_paper.round(4)
+GT(from_paper.rename_axis('layer'), float_format=4)
 ```
 
 ```{python}
 #| label: verdict
-pd.DataFrame({"largest deviation, driven by the paper's Table 1":
-                  (from_paper - PRINTED).abs().max(),
-              'largest deviation, driven by aggregate':
-                  (from_agg - PRINTED).abs().max(),
-              'decimals the paper prints': [3, 2, 3, 3, 3, 3]})
+GT(pd.DataFrame({"largest deviation, driven by the paper's Table 1":
+                     (from_paper - PRINTED).abs().max(),
+                 'largest deviation, driven by aggregate':
+                     (from_agg - PRINTED).abs().max(),
+                 'decimals the paper prints': [3, 2, 3, 3, 3, 3]}).rename_axis('quantity'),
+   formatters={"largest deviation, driven by the paper's Table 1": 6,
+               'largest deviation, driven by aggregate': 6,
+               'decimals the paper prints': 0})
 ```
 
 Driven by the paper's own Table 1, every column reproduces to the last digit printed. The `T4 freq trend` column looks worse only because the paper prints it to two decimals, and it is identical in both runs since the frequency trend depends on survival probabilities alone and never touches a limited expected value.
@@ -173,22 +174,26 @@ Table 2's layer loss costs come back within \$60 on layers of up to \$9.4 millio
 
 ```{python}
 #| label: table-2
-pd.DataFrame({'from paper Table 1': lc_paper.sum(),
-              'paper Table 2': [9_431_473, 2_643_382, 1_795_428, 1_654_717,
-                                15_525_000],
-              'from aggregate': lc_agg.sum()})
+GT(pd.DataFrame({'from paper Table 1': lc_paper.sum(),
+                 'paper Table 2': [9_431_473, 2_643_382, 1_795_428, 1_654_717,
+                                   15_525_000],
+                 'from aggregate': lc_agg.sum()}).rename_axis('layer'), float_format=0)
 ```
 
 So the implementation of the method is verified exactly, and the only discrepancy in the whole reproduction is Table 1. Driven by `aggregate`, the derived quantities move in the third decimal: the \$4MM xs \$1MM layer trend is 1.5792 rather than 1.5810, an annualized 9.57% rather than 9.59%.
 
 ```{python}
 #| label: annualized
-pd.DataFrame({'agg layer trend': from_agg['T3 layer trend'],
-              'agg annualized': from_agg['T3 layer trend'] ** (1 / YEARS) - 1,
-              'paper layer trend': PRINTED['T3 layer trend'],
-              'paper annualized': PRINTED['T3 layer trend'] ** (1 / YEARS) - 1,
-              'agg freq trend': from_agg['T4 freq trend'],
-              'agg freq annualized': from_agg['T4 freq trend'] ** (1 / YEARS) - 1})
+GT(pd.DataFrame({'agg layer trend': from_agg['T3 layer trend'],
+                 'agg annualized': from_agg['T3 layer trend'] ** (1 / YEARS) - 1,
+                 'paper layer trend': PRINTED['T3 layer trend'],
+                 'paper annualized': PRINTED['T3 layer trend'] ** (1 / YEARS) - 1,
+                 'agg freq trend': from_agg['T4 freq trend'],
+                 'agg freq annualized':
+                     from_agg['T4 freq trend'] ** (1 / YEARS) - 1}).rename_axis('layer'),
+   formatters={'agg layer trend': 4, 'paper layer trend': 4,
+               'agg freq trend': 4, 'agg annualized': '{x:.2%}',
+               'paper annualized': '{x:.2%}', 'agg freq annualized': '{x:.2%}'})
 ```
 
 ## Comments
@@ -211,7 +216,3 @@ One related detail: the paper prints $1 - F_Y(A) = 1.000$ for the layers attachi
 
 As with @Mack2003, this is a severity and layer paper. `aggregate` supplies limited expected values and survival probabilities; the frequency in equation (3.3) is a derived count, $\mathsf E[N_p] = (\mathrm{SP})(\mathrm{ELR})\beta_p / \mathsf E_Y[S_{Y,p}]$, not a distribution. The natural extension, which the paper does not take, is that once the layer expected loss and the claim count are both in hand, the layer's *aggregate* distribution is one more DecL clause away, and with it the aggregate deductibles and reinstatements that a real treaty carries.
 
-## References
-
-::: {#refs}
-:::

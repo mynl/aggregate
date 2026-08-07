@@ -1,16 +1,6 @@
 ---
 title: "sisFFT: keeping the FFT and fixing the tail"
 subtitle: "Reproducing Wilson and Keich (2017), and repairing `aggregate` on its own worst case"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Introduction
@@ -185,7 +175,3 @@ What this suggests for the library, in increasing order of ambition:
 
 A note on scope, to keep the enthusiasm honest. Everything above concerns probabilities below about $10^{-13}$. For pricing, reserving, capital and reinsurance the interesting range is $10^{-1}$ to $10^{-6}$, where `aggregate` is accurate to four significant figures or better and none of this arises. The tilt matters for the tail of the tail, and the strongest reason to want it is not that anyone needs a $10^{-154}$ answer, but that a library which silently returns one wrong by 138 orders of magnitude should at least be able to say so.
 
-## References
-
-::: {#refs}
-:::

@@ -1,16 +1,6 @@
 ---
 title: "Why this one is not a reproduction"
 subtitle: "Assessing Jin, Provost and Ren (2016)"
-author: "Stephen J. Mildenhall"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 3
-    code-fold: false
-    df-print: kable
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 ## Verdict
@@ -36,6 +26,7 @@ with $g$ a gamma matched to the first two moments of $S$ and the $c_r$ recovered
 import numpy as np
 import pandas as pd
 from aggregate import build
+from greater_tables import GT
 ```
 
 ## The one checkable univariate number
@@ -50,14 +41,14 @@ tau = 1 - np.exp(-3.0)
 ex1 = a.actual_m
 ex2 = a.actual_m ** 2 * (1 + a.actual_cv ** 2)
 mu1, mu2 = ex1 / tau, ex2 / tau
-pd.DataFrame([
+GT(pd.DataFrame([
     {'quantity': 'E[X]', 'aggregate': ex1, 'exact': 18.0},
     {'quantity': 'E[X^2]', 'aggregate': ex2, 'exact': 468.0},
     {'quantity': 'base gamma shape alpha',
      'aggregate': mu1 ** 2 / (mu2 - mu1 ** 2), 'exact': 2.684349},
     {'quantity': 'base gamma scale theta',
      'aggregate': (mu2 - mu1 ** 2) / mu1, 'exact': 7.056877},
-])
+]).set_index('quantity'), float_format=6)
 ```
 
 Both to six figures. This also pins the parameter conventions for the rest of the paper: $\gamma(3,2)$ is shape 3 and scale 2, so mean 6, since any other reading misses the base gamma.
@@ -84,7 +75,8 @@ for name, prog, t, published in EX:
     rows.append({'example': name, 'DecL': prog.replace('agg J ', ''),
                  'order t': t, 'agg mean': o.est_m, 'agg CV': o.est_cv,
                  'published values': published})
-pd.DataFrame(rows)
+GT(pd.DataFrame(rows).set_index('example'),
+   formatters={'agg mean': 4, 'agg CV': 4, 'order t': 0})
 ```
 
 Every model builds in one line, which is why the paper looked like a good target. The last column is the problem. Tables 1 to 6 are the same six rows of Kolmogorov-Smirnov statistics at $n = 100, 500, 1000, 10000$ with their critical values, and the statistic is computed between a **simulated** empirical distribution and the approximation fitted to that sample's own moments. Nothing in it is a property of the model, so nothing in it is reproducible: a different seed gives different numbers, and the paper does not report one.
@@ -97,9 +89,9 @@ r, beta = 10.0, 5.0
 c = 1 / np.sqrt(r)
 nb = build(f'agg NB {r * beta} claims dsev [1] mixed gamma {c}', log2=12, bs=1,
            normalize=False)
-pd.DataFrame([{'mixing CV': c, 'mean': nb.est_m, 'want r*beta': r * beta,
-               'variance': nb.est_sd ** 2, 'want r*beta*(1+beta)':
-                   r * beta * (1 + beta)}])
+GT(pd.DataFrame([{'mixing CV': c, 'mean': nb.est_m, 'want r*beta': r * beta,
+                  'variance': nb.est_sd ** 2, 'want r*beta*(1+beta)':
+                      r * beta * (1 + beta)}]), float_format=6)
 ```
 
 ## The bivariate tables are real, and are not `aggregate`'s dependence
@@ -113,7 +105,7 @@ The eight bivariate examples use Hesselager's common shock counts: $N = N_0 + N_
 L0, L1, L2 = 7.0, 8.0, 9.0
 L = L0 + L1 + L2
 pX, pY = (L0 + L1) / L, (L0 + L2) / L
-pd.DataFrame([
+GT(pd.DataFrame([
     {'coupling of the two triggers': 'required by Hesselager',
      'P(both perils trigger)': L0 / L},
     {'coupling of the two triggers': 'independence copula',
@@ -122,7 +114,7 @@ pd.DataFrame([
      'P(both perils trigger)': min(pX, pY)},
     {'coupling of the two triggers': 'countermonotone, Frechet lower bound',
      'P(both perils trigger)': max(0.0, pX + pY - 1)},
-])
+]).set_index('coupling of the two triggers'), float_format=6)
 ```
 
 The required probability is exactly the Fréchet **lower** bound, since $p_X + p_Y - 1 = \lambda_0/\lambda$ identically. So there is a unique copula that gets the triggers right, and it is the countermonotone one. But the same copula then forces the two severities to be countermonotone whenever both perils fire, and Hesselager needs them independent. One copula cannot be countermonotone on the triggers and independent on the severities, so the model is outside the construct. This is a structural mismatch, not a parameterization difficulty.
@@ -155,7 +147,9 @@ t7 = pd.DataFrame([{'x': x, 'y': y,
                     'direct 2-D transform': F1[int(round(x / H)), int(round(y / H))],
                     'Table 7 FFT': f} for x, y, f in T7])
 t7['diff'] = (t7['direct 2-D transform'] - t7['Table 7 FFT']).abs()
-t7
+GT(t7.set_index(['x', 'y']),
+   formatters={'direct 2-D transform': 6, 'Table 7 FFT': 6,
+               'diff': '{x:.2e}'})
 ```
 
 Bivariate Example 3 swaps Poisson for negative binomial counts, $\mathrm{NB}(6,5)$, $\mathrm{NB}(7,5)$, $\mathrm{NB}(8,5)$, and needs only a different pgf.
@@ -178,7 +172,9 @@ t11 = pd.DataFrame([{'x': x, 'y': y,
                          F3[int(round(x / H3)), int(round(y / H3))],
                      'Table 11 FFT': f} for x, y, f in T11])
 t11['diff'] = (t11['direct 2-D transform'] - t11['Table 11 FFT']).abs()
-t11
+GT(t11.set_index(['x', 'y']),
+   formatters={'direct 2-D transform': 6, 'Table 11 FFT': 6,
+               'diff': '{x:.2e}'})
 ```
 
 Both land within $3.5\times10^{-4}$, with a residual that is uniformly positive, largest in the body of the distribution and vanishing in the tail. That is the signature of a half bucket offset rather than a disagreement about the model, and halving the bucket confirms it.
@@ -193,7 +189,9 @@ for h, log2 in [(0.5, 9), (0.25, 10), (0.125, 11), (0.0625, 12)]:
     rows.append({'bucket': h, 'grid': 2 ** log2, 'reach': h * 2 ** log2,
                  **{f'({x},{y})': F[int(round(x / h)), int(round(y / h))] - f
                     for x, y, f in [T7[0], T7[4], T7[8], T7[11]]}})
-pd.DataFrame(rows)
+GT(pd.DataFrame(rows).set_index('bucket'),
+   formatters={f'({x},{y})': '{x:.2e}'
+               for x, y, f in [T7[0], T7[4], T7[8], T7[11]]})
 ```
 
 The deviation falls monotonically at every halving, by a factor of thirty-five overall from `bs = 0.5` to `bs = 0.0625`, so the paper's FFT column is the exact joint distribution function and the reproduction agrees with it.
@@ -214,7 +212,7 @@ gap = pd.DataFrame([
                                         * my.density_df.loc[y, 'F']),
      'Table 7': f} for x, y, f in T7])
 gap['dependence gap'] = gap['joint F(x,y)'] - gap['FX(x) FY(y) under independence']
-gap
+GT(gap.set_index(['x', 'y']), float_format=6)
 ```
 
 The margins are right: $N = N_0 + N_1 \sim \mathrm{Poisson}(15)$ and $W = N_0 + N_2 \sim \mathrm{Poisson}(16)$, both one-line builds. But the common shock moves the joint distribution function up to 4.5 points of probability away from the independent product, so a marginals-only reproduction would be reporting a number the paper never computed.
@@ -229,7 +227,3 @@ Two smaller notes for whoever picks it up.
 
 **Tables 8, 10, 12, 14, 16, 17, 19, 20, 22 and 24 are simulation output** and share the univariate half's problem: they compare an empirical distribution from 5,000 simulated draws against the approximation fitted to that sample's moments. Only the odd-numbered tables carry the FFT column that is worth anything as a reference.
 
-## References
-
-::: {#refs}
-:::

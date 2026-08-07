@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.0a221
+
+**[Pareto-Type-I-Analytic] The single-parameter Pareto gets closed-form partial moments, so `sev {xm} * pareto {alpha}` stops integrating a heavy tail to infinity on every build.** `_partial_e` had an analytic branch for the *shifted* (Lomax) form, `scale = lam, loc = -lam`, and sent everything else to quadrature. The Type-I form, `scale = xm, loc = 0`, support `[xm, inf)`, is what DecL's `sev {xm} * pareto {alpha}` builds and what the rare-event literature uses, and it took the fallback every time: a logged warning, an `IntegrationWarning` reporting the integral as probably divergent, and a numerical answer where an exact one exists. The reproductions book's `Liu2026`, which is Type-I Pareto throughout, carried 80 stderr lines from this one gap.
+
+For `S(x) = (xm/x)^alpha`:
+
+```
+int_xm^a x^k f(x) dx = alpha * xm^alpha * (a^(k-alpha) - xm^(k-alpha)) / (k - alpha)
+```
+
+with `alpha * xm^alpha * log(a/xm)` at the removable case `k = alpha`. At `a = inf` and `k < alpha` this is `alpha * xm^k / (alpha - k)`, so `k = 1` is the textbook mean `alpha*xm/(alpha-1)`; at `k >= alpha` it is `inf`, which is correct, and the moment machinery downstream already reports a non-existent moment as `nan` rather than complaining (`[RuntimeWarning-Census]`, `1.0.0a220`).
+
+**More accurate, not just quieter.** It agrees with the quadrature path it replaces to 8e-16 relative, and beats scipy's own `moment(3)`: for `alpha = 3.5, xm = 250` the closed form gives exactly `109375000.0` where `scipy` gives `109375000.00679`. No baseline moved, because nothing in the suite was reading a Type-I Pareto moment precisely enough to notice the quadrature error.
+
+**The fallback is hardened too**, for the genuinely shifted Paretos that still reach it. It now integrates from the distribution's own support lower bound rather than from 0: quadrature over a dead region where the density is identically zero is exactly what made `quad` conclude "probably divergent", since it samples the flat part and finds nothing. `IntegrationWarning` is suppressed there because the caller already tests the returned absolute error estimate, which is the honest convergence check. The `Pareto not shifted to x>0 range` and `Potential convergence issues` lines drop from `logger.warning` to `logger.debug`: taking the fallback is a routine code path, not a problem, and it was 41 uncontrolled stderr lines in the rendered book.
+
+**Measured.** The five Type-I Pareto builds behind `Liu2026`'s cells, run standalone: 21 stderr lines before (10 `IntegrationWarning`, 10 logger lines, 1 defective), 0 after.
+
+No API change. `_partial_e_pareto_type_1` is a new private helper beside `_partial_e_numeric`, which stays as the auditing reference its docstring describes and is now the test oracle.
+
 ## 1.0.0a220
 
 **[RuntimeWarning-Census] The benign numpy boundary noise is guarded, and four sites that were quietly returning `nan` into results are fixed.** Closes the `dev/TODO.md` item of the same name, opened when `[TVaR-Endpoint-Noise]` (`1.0.0a179`) cleared the first three sites and left the rest for case-by-case review. `pytest -W error::RuntimeWarning` over the full suite went from 75 failures to 0; the census itself, the count of distinct source lines emitting a `RuntimeWarning`, went from 14 to none.

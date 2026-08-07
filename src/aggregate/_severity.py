@@ -6,9 +6,10 @@ Extracted from ``distributions.py`` (Phase 1, kind split). Imported through the
 
 from functools import cached_property, lru_cache
 import logging
+import warnings
 import numpy as np
 import pandas as pd
-from scipy.integrate import quad
+from scipy.integrate import quad, IntegrationWarning
 import scipy.stats as ss
 from scipy.optimize import newton
 from scipy.special import loggamma, binom
@@ -46,13 +47,88 @@ def _partial_e_numeric(fz, a, n):
     """
     Simple numerical integration version of partial_e for auditing purposes.
 
+    Notes
+    -----
+    Integrates from the distribution's own support lower bound rather than
+    from 0. Quadrature over a dead region where the density is identically
+    zero (a Type-I Pareto on ``[lambda, inf)`` asked to start at 0) is what
+    makes ``quad`` report "the integral is probably divergent": it samples the
+    flat part, finds nothing, and concludes badly. ``IntegrationWarning`` is
+    suppressed because the caller already tests the returned absolute error
+    estimate, which is the honest convergence check and the only one that
+    knows the tolerance that matters here.
     """
+    lo = float(np.max([0.0, fz.support()[0]]))
     ans = []
     for k in range(n+1):
-        temp = quad(lambda x: x ** k * fz.pdf(x), 0, a)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', IntegrationWarning)
+            temp = quad(lambda x: x ** k * fz.pdf(x), lo, a)
         if temp[1] > 1e-4:
-            logger.warning('Potential convergence issues with numerical integral')
+            logger.debug('Potential convergence issues with numerical integral')
         ans.append(temp[0])
+    return ans
+
+
+def _partial_e_pareto_type_1(alpha, lam, a, n):
+    r"""Partial expected values of a Type-I (single-parameter) Pareto.
+
+    The scipy parameterisation is ``ss.pareto(alpha, scale=lam, loc=0)``:
+    support :math:`[\lambda, \infty)`, :math:`S(x) = (\lambda/x)^\alpha` and
+    :math:`f(x) = \alpha \lambda^\alpha x^{-\alpha-1}`.
+
+    Parameters
+    ----------
+    alpha : float
+        Shape (tail index).
+    lam : float
+        Scale, and the lower end of the support.
+    a : float
+        Upper limit of integration; may be ``np.inf``.
+    n : int
+        Highest power required; returns ``k = 0 .. n``.
+
+    Returns
+    -------
+    list of float
+        :math:`\int_\lambda^a x^k f(x)\,dx` for ``k = 0, ..., n``.
+
+    Notes
+    -----
+    .. math::
+
+        \int_\lambda^a x^k f(x)\,dx
+          = \alpha\lambda^\alpha\,
+            \frac{a^{k-\alpha} - \lambda^{k-\alpha}}{k - \alpha},
+        \qquad k \neq \alpha
+
+    and :math:`\alpha\lambda^\alpha\log(a/\lambda)` at the removable case
+    :math:`k = \alpha`, which is the limit of the same expression.
+
+    Checks: ``k = 0`` gives :math:`1 - (\lambda/a)^\alpha`, the cdf. With
+    ``a = inf`` and :math:`k < \alpha` it gives
+    :math:`\alpha\lambda^k/(\alpha-k)`, so ``k = 1`` is the Type-I mean
+    :math:`\alpha\lambda/(\alpha-1)`. With :math:`k \geq \alpha` it gives
+    ``inf``, which is correct: the moment does not exist, and the moment
+    machinery downstream is guarded to report that as ``nan`` rather than
+    complain (`[RuntimeWarning-Census]`, 1.0.0a220).
+
+    This replaces a quadrature fallback that ran for *every* Type-I Pareto,
+    logged a warning each time and integrated a heavy tail to infinity.
+    """
+    if a <= lam:
+        # The limit sits at or below the support, so no mass is captured.
+        return [0.0] * (n + 1)
+    ans = []
+    for k in range(n + 1):
+        d = k - alpha
+        if a == np.inf:
+            # Converges only while the moment exists.
+            ans.append(alpha * lam ** k / (-d) if d < 0 else np.inf)
+        elif d == 0:
+            ans.append(alpha * lam ** alpha * np.log(a / lam))
+        else:
+            ans.append(alpha * lam ** alpha * (a ** d - lam ** d) / d)
     return ans
 
 
@@ -127,8 +203,10 @@ def _partial_e(sev_name, fz, a, n):
         # regular Pareto is scale=lambda, loc=-lambda, so this has no effect
         # single parameter Pareto is scale=lambda, loc=0
         # these formulae for regular pareto, hence
+        if loc == 0.0:
+            return _partial_e_pareto_type_1(α, λ, a, n)
         if λ + loc != 0:
-            logger.warning('Pareto not shifted to x>0 range...using numeric moments.')
+            logger.debug('Pareto not shifted to x>0 range...using numeric moments.')
             return _partial_e_numeric(fz, a, n)
         ans = []
         # will return inf if the Pareto does not have the relevant moments

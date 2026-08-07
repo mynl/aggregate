@@ -1085,3 +1085,14 @@ agg WP.Defective 1 claim sev 0.5 * lomax 1.5 fixed                              
 agg WP.Clean 100 claims sev lognorm 100 cv 2 poisson                                                              note{immaterial deficit: the floor exists so this one says nothing};
 port WP.Port agg WP.PA 50 claims sev lognorm 100 cv 2 poisson agg WP.PB 20 claims sev lognorm 200 cv 1 poisson;
 agg WP.Tower as "US Hurricane Reinsurance" 1.74 claims sev lognorm 8.501 cv 14.624 splice [0 500] poisson    note{probe fixture: warn_once_isolated keeps every cell's warning countable}
+
+
+# PT. Type-I Pareto fixtures (1.0.0a221)
+# ======================================
+# Program behind tests/test_partial_e_pareto.py. `sev {xm} * pareto {alpha}` is
+# the single-parameter (Type-I) form, support [xm, inf), which scipy spells
+# scale=xm, loc=0. It had no analytic partial-moment branch, so every build
+# quadratured a heavy tail to infinity and logged about it; the closed form
+# makes the mean exactly alpha*xm/(alpha-1). Compare Liu2026 in the
+# reproductions, which is entirely Type-I Pareto.
+agg PT.TypeOne 1 claim sev 1 * pareto 2.5 fixed                                                                   note{Type-I Pareto: analytic partial moments, mean alpha*xm/(alpha-1) = 5/3}

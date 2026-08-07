@@ -60,7 +60,7 @@ GT(pd.DataFrame([
 ]).set_index('quantity'), formatters={'recomputed': 4, 'Exhibit 3': 4})
 ```
 
-All six land, so the transcription is right. The severity mean is 18,198.195 against a printed 18,198, and the aggregate mean is 249,999.5 against a printed 250,000. The scanned copy shows the aggregate mean as 250,600, which the arithmetic identifies as a scanning artifact of 250,000.
+All six agree, so the transcription is correct. The severity mean is 18,198.195 against a printed 18,198, and the aggregate mean is 249,999.5 against a printed 250,000. The scanned copy shows the aggregate mean as 250,600, which the arithmetic identifies as a scanning artifact of 250,000.
 
 ## The `aggregate` reproduction
 
@@ -84,6 +84,12 @@ GT(pd.DataFrame([{'bucket size': 500, 'mean': a500.est_m, 'CV': a500.est_cv,
    formatters={'mean': 2, 'CV': 4, 'total mass': 12})
 ```
 
+```{python}
+from aggregate import format_program
+print(a500.program)
+```
+
+
 Venter's third column needs no new machinery either. His transformed gamma, with distribution function $G(x; r, \alpha, \lambda) = \mathrm{IG}((\lambda x)^{\alpha}; r)$, is the generalized gamma: `gengamma(a=r, c=alpha, scale=1/lam)`.
 
 ```{python}
@@ -98,7 +104,7 @@ GT(pd.DataFrame([{'quantity': q, 'from Venter parameters': v, 'Exhibit 3': p}
    formatters={'from Venter parameters': 4, 'Exhibit 3': 4})
 ```
 
-Now the exhibit itself. The bucket size is the only thing that changes between the two exact columns, so run it at Venter's \$500 and at three finer settings.
+Now the exhibit itself (Exhibit 3, Part 1). The bucket size is the only thing that changes between the two exact columns, so run it at Venter's \$500 and at three finer settings.
 
 ```{python}
 #| label: exhibit-3

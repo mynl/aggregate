@@ -2,7 +2,7 @@
 
 <!--
 RENDERING: cd docs\reproductions
-$env:QUARTO_PYTHON = "T:\worktrees\aggregate_REFACTOR\.venv\Scripts\python.exe"
+    $env:QUARTO_PYTHON = "T:\worktrees\aggregate_REFACTOR\.venv\Scripts\python.exe"
 quarto render                # both formats into _book
 quarto render --to html
 quarto render --to pdf
@@ -10,7 +10,7 @@ quarto render --to pdf
 
 This book reproduces published figures, tables and results using `aggregate`. Every number in it is computed when the book is rendered. Nothing is transcribed from a previous run, so a chapter that still claims a match is a chapter whose match still holds against the current library.
 
-That is the point of the exercise. A library that computes compound distributions has to be right, and the only external check on "right" is a published number computed by somebody else, by a different method, who had no interest in making this software look good. Fourteen papers are worked through here. Most of them confirm the library. Several of them correct it, or locate a limit in it that was not previously known. Three of them turn out to contain errors of their own, which is not a criticism of the authors so much as evidence that the check runs in both directions.
+That is the point of the exercise. A library that computes compound distributions has to be right, and the only external check on "right" is a published number computed by somebody else, by a different method, who had no interest in making this software look good. Fifteen papers are worked through here. Most of them confirm the library. Several of them correct it, or locate a limit in it that was not previously known. Three of them turn out to contain errors of their own, which is not a criticism of the authors so much as evidence that the check runs in both directions.
 
 ## The shape of a chapter
 
@@ -22,7 +22,7 @@ A chapter named for a paper that turned out **not** to be reproducible says so a
 
 The papers fall into two groups, and what counts as success differs between them.
 
-A **model paper** poses an insurance structure with explicit parameters. Reproduction means building it in DecL and matching the published numbers, and the paper is the authority. @Venter1983, @Mack2003, @Mata2005, @Bodoff2017 and @Homer2003 are of this kind, and they make up the first part.
+A **model paper** poses an insurance structure with explicit parameters. Reproduction means building it in DecL and matching the published numbers, and the paper is the authority. @Venter1983, @Mack2003, @Mata2005, @Bodoff2017, @Homer2003 and @Bear1990 are of this kind, and they make up the first part.
 
 A **method paper** proposes a competing numerical technique for the aggregate distribution. Here `aggregate` is the exact ground truth against which the paper's own approximation is measured, so the roles reverse: the paper is the thing being checked. Whether reproduction is possible at all depends on whether the paper published concrete input parameters **and** tabulated output. Several rare-event papers publish neither, reporting only sample counts and CPU seconds, and that is a large part of why the later parts read the way they do.
 
@@ -30,7 +30,7 @@ The two groups also arrived differently. The actuarial chapters come out of a ca
 
 ## What came out of it
 
-**The library is confirmed on its core.** @Venter1983's Exhibit 3 reproduces in all three columns, including the transformed gamma, which is `scipy.stats.gengamma` under a different name. @Bruno2006's Tables 6, 7 and 8 come back exact at every printed decimal. @Bodoff2017's Exhibit 4 reproduces cell for cell. @Homer2003 reproduces every published cell of sections 2 and 4, and 136 of the 147 cells of section 3.
+**The library is confirmed on its core.** @Venter1983's Exhibit 3 reproduces in all three columns, including the transformed gamma, which is `scipy.stats.gengamma` under a different name. @Bruno2006's Tables 6, 7 and 8 come back exact at every printed decimal. @Bodoff2017's Exhibit 4 reproduces cell for cell. @Homer2003 reproduces every published cell of sections 2 and 4, and 136 of the 147 cells of section 3. @Bear1990's Table I reproduces in both of its reproducible columns, six adjustable features priced by six DecL clauses.
 
 **Three papers have errors the reproduction found.** @Mata2005's Table 1 limited expected values are not the exact lognormal ones, running 0.04% high at \$250,000 and drifting to 0.24% low at \$5M, while the closed form matches to eight figures. @Homer2003's Table 3.3 does not sum to one, carrying 99.97% of the mass, and those missing eleven cells are the consequence. @Asmussen2016a has a row where its two published saddlepoint columns and its Monte Carlo column disagree, and `aggregate`, being neither a saddlepoint expansion nor a sampler, can say which one to trust.
 
@@ -47,6 +47,7 @@ The two groups also arrived differently. The actuarial chapters come out of a ca
 | @Mata2005 | Tables 1 to 14, trend and exposure adjustment by layer | Reproduced, and a discrepancy found in the paper's Table 1 |
 | @Bodoff2017 | Exhibit 4, excess of policy limits | Reproduced. Two unstated model choices inferred and confirmed by fit |
 | @Homer2003 | All three worked examples of the bivariate FFT | Reproduced. Every construction is a shipped DecL form |
+| @Bear1990 | Table I, six treaties with adjustable features | Reproduced. The lognormal column exactly, the collective risk column to the printed digit in five of six |
 | @Bruno2006 | Tables 6, 7 and 8 | Reproduced exact at six decimals. 92,832 convolutions in seconds against the paper's 1,950 |
 | @Wilson2016a | Table 2, the FFT-C columns | Reproduced. The finding is detectability, not error size |
 | @Wilson2017 | The worst case, and its repair | Reproduced to the digit, and the repair demonstrated |

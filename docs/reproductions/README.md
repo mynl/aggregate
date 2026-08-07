@@ -16,6 +16,7 @@ Actuarial papers
 * `Bruno2006.qmd` — thresholded direct convolution; Tables 6, 7 and 8 exact at six decimals, including 92,832 convolutions in under two seconds.
 * `Homer2003.qmd` — the bivariate FFT; all three examples, every published cell. The best fit in the folder: each construction is a shipped DecL form (`netceded`, `dbvsev`, per-axis `bs`).
 * `Bodoff2017.qmd` — excess of policy limits losses as a Bernoulli policy limit; Exhibit 4.
+* `Bear1990.qmd` — adjustable features and loss sharing provisions; Table I, six treaties, six DecL clauses. Reproduces the paper's own lognormal arithmetic exactly and its collective risk column by FFT.
 * `Jin2016.qmd` — **not a reproduction.** Why the univariate half publishes nothing checkable and the bivariate half needs a common-shock count mode. Read alongside `Homer2003.qmd`: Jin cites Clark and Homer for its FFT benchmark, and the two sit on opposite sides of the feature boundary.
 
 Rare-event and numerical-accuracy papers

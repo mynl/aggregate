@@ -5,19 +5,23 @@ subtitle: "Reproducing Homer and Clark (2003)"
 
 ## Context and problem
 
-The collective risk model gives the distribution of a sum of claims. It does not, on its own, give the *joint* distribution of two quantities that both depend on the same claims. That is a real gap in pricing work, and @Homer2003 name three places it bites.
+The collective risk model gives the distribution of a sum of claims. It does not, on its own, give the *joint* distribution of two quantities that both depend on the same claims. @Homer2003 gives three examples where the joint distribution is needed.
 
-An insured retains the first \$600,000 of each occurrence and buys a stop loss on the total retention. The reinsurer can price either cover alone, but not their sum, because the two are dependent: an excess loss can only happen if the retention was breached. A general liability policy caps indemnity but pays defense costs in addition, so the aggregate is loss capped at a policy aggregate plus uncapped expense, with the two correlated at the claim level. A dynamic financial analysis model simulates small losses in aggregate and large losses individually, and treating them as independent understates the tail, because a high claim count raises both.
+1. An insured retains the first \$600,000 of each occurrence and buys a stop loss on the total retention. The insurer thus writes two covers: a per occurrence excess of $600,000 and an aggregate stop loss on the retention, a "specific and agg". It can price either cover alone, but not their sum, because the two are dependent: an excess loss can only happen if the retention was breached.
+2. A general liability policy caps indemnity but pays defense costs in addition, so the aggregate is loss capped at a policy aggregate plus uncapped expense, with the two correlated at the claim level.
+3. A dynamic financial analysis model simulates small losses in aggregate and large losses individually, and treating them as independent understates the tail, because a high claim count raises both.
 
-Their answer is one line. Build a bivariate per-claim severity matrix $M_x$ whose $(j,k)$ entry is the joint probability of the two components, then
-
-$$M_z = \mathrm{IFFT}\left(\mathrm{PGF}\left(\mathrm{FFT}(M_x)\right)\right)$$
-
+Their answer is the 2-d analog of our standard FFT-convolution algorithm: build a bivariate per-claim severity matrix $M_x$ whose $(j,k)$ entry is the joint probability of the two components, then
+$$
+M_z = \mathrm{IFFT}\left(\mathrm{PGF}\left(\mathrm{FFT}(M_x)\right)\right)
+$$
 with a two-dimensional transform and the claim count probability generating function applied elementwise. The frequency couples the two axes; the severity matrix carries the per-claim dependence; and one transform delivers the joint aggregate.
+
+@Mildenhall2005b describes a second approach with a bivariate frequency distribution, but that is not considered here.
 
 ## Paper solution and gold standard
 
-Three fully specified examples, each with the input matrix printed and the output matrix printed.
+The paper provides three fully specified examples, each with the input and output matrices.
 
 | Section | Axes | Frequency | Published |
 |---|---|---|---|
@@ -25,9 +29,17 @@ Three fully specified examples, each with the input matrix printed and the outpu
 | 3 | indemnity loss, ALAE | NB mean 4, variance 8 | Tables 3.3 to 3.6 |
 | 4 | small loss dollars, large loss **counts** | NB mean 10, variance 20 | Tables 4.2 to 4.4 |
 
-Appendix A prints an R session doing a $3\times3$ two-dimensional FFT by hand, and Appendix B derives a closed-form covariance between small and large aggregate losses. Both are checkable.
+Appendix A provides an R code doing a $3\times3$ two-dimensional FFT by hand, and Appendix B derives a closed-form covariance between small and large aggregate losses. Both are checkable.
 
-The negative binomial enters through its probability generating function, which the paper writes in terms of mean $M$ and variance $V$ as $(V/M - (V/M - 1)t)^{-M^2/(V-M)}$. `aggregate` reaches the same law as a gamma-mixed Poisson: matching $n + n^2c^2 = V$ at $n = M$ gives mixing coefficient of variation $c = \sqrt{(V-M)/M^2}$.
+The negative binomial enters through its probability generating function, which the paper writes in terms of mean $M$ and variance $V$ as
+$$
+\phi(t) = (V/M - (V/M - 1)t)^{-M^2/(V-M)}.
+$$
+Note that for over-dispersed distributions $V>M$, with the Poisson lower limit $V=M$. `aggregate` describes the same law as a gamma-mixed Poisson: matching $n + n^2c^2 = V$ at $n = M$ gives mixing coefficient of variation
+$$
+c = \sqrt{(V-M)/M^2} = \sqrt{(\nu-1)/n}
+$$
+where $\nu=V/M$ is the variance-to-mean ratio.
 
 ```{python}
 #| label: setup
@@ -43,16 +55,20 @@ def nb_cv(mean, var):
     return float(np.sqrt((var - mean) / mean ** 2))
 
 GT(pd.DataFrame([
-    {'section': 2, 'NB mean': 5, 'NB variance': 6, 'paper PGF': '(1.2 - 0.2t)^-25',
+    {'section': 2, 'NB mean': 5, 'NB variance': 6, 'paper PGF': '$(1.2 - 0.2t)^{-25}$',
      'mixed gamma cv': nb_cv(5, 6)},
-    {'section': 3, 'NB mean': 4, 'NB variance': 8, 'paper PGF': '(2 - t)^-4',
+    {'section': 3, 'NB mean': 4, 'NB variance': 8, 'paper PGF': '$(2 - t)^{-4}$',
      'mixed gamma cv': nb_cv(4, 8)},
-    {'section': 4, 'NB mean': 10, 'NB variance': 20, 'paper PGF': '(2 - t)^-10',
+    {'section': 4, 'NB mean': 10, 'NB variance': 20, 'paper PGF': '$(2 - t)^{-10}$',
      'mixed gamma cv': nb_cv(10, 20)},
 ]))
 ```
 
-Before the insurance examples, the arithmetic check. Appendix A convolves $M_x = \begin{pmatrix}.4 & 0 & 0\\ .3 & .3 & 0\\ 0&0&0\end{pmatrix}$ with itself and prints the answer. In DecL that is a fixed count of two against a discrete bivariate severity.
+Before introducing the insurance examples, we provide an arithmetic check. Appendix A convolves
+$$
+M_x = \begin{pmatrix}.4 & 0 & 0\\ .3 & .3 & 0\\ 0&0&0\end{pmatrix}
+$$
+with itself and prints the answer. In DecL that is a fixed count of two against a discrete bivariate severity.
 
 ```{python}
 #| label: appendix-a
@@ -64,7 +80,7 @@ GT(pd.DataFrame(toy.density[:3, :3], index=[0, 1, 2], columns=[0, 1, 2]),
 
 The paper's R session returns `0.16, 0.24, 0.09` down the first column and `0.24, 0.18, 0.09` for the rest, which is what came back.
 
-## Section 2: per-occurrence and stop loss
+## Section 2: Per-Occurrence And Stop Loss
 
 Dietrichson Drilling retains \$600,000 per occurrence and buys \$400,000 xs \$600,000 per occurrence plus \$5,000,000 xs \$3,000,000 on the aggregate retention. Severity is a five point discrete law; frequency is negative binomial with mean 5 and variance 6.
 

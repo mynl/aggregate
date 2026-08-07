@@ -882,10 +882,15 @@ Validation: noise-aware, with honest deficit warnings (a17)
 
 Validation moments are tested against a definite noise floor (1e-12), so a fair
 die no longer "fails skew" on floating-point dust, and ``describe`` snaps dust to
-zero. A genuinely defective pmf, FFT mass off the top of the grid, raises
-``DefectiveDistributionWarning`` at construction instead of surfacing silently in
-pricing. The cast's ``defective`` (Pareto 1.3, infinite variance) is built to
-show this:
+zero. A genuinely defective pmf, FFT mass off the top of the grid, sets
+``Validation.DEFECTIVE`` and raises ``DefectiveDistributionWarning`` at
+construction instead of surfacing silently in pricing. Since a218 the warning
+fires above ``deficit_materiality`` (1e-4, the level at which the deficit can
+move a price) and once per session, so a sweep that rebuilds the same shape
+sixty-four times reports one fault rather than sixty-four copies of it; the
+per-object verdict is always in ``valid`` and ``validation_explanation``, which
+is where to look for the rest. The cast's ``defective`` (Pareto 1.3, infinite
+variance) is built to show this:
 
 .. ipython:: python
 
@@ -1242,9 +1247,10 @@ Finally (a195), **a grid that loses mass off its top end is disqualified, howeve
 well it scores**. A moment score cannot see lost mass and never will: on a cat
 tower the winning cell sat 13 times *inside* mean tolerance while shedding
 2.1e-08 of its mass out at the far tail. It is a **gate, not a penalty**, and the
-threshold is the level at which ``DefectiveDistributionWarning`` already fires,
-so a cell rejected here is exactly one that would warn when you used it. Three
-frame columns carry it:
+threshold is ``VALIDATION_NOISE``, deliberately tighter than the materiality
+floor at which ``DefectiveDistributionWarning`` fires: choosing among candidate
+grids, losing nothing at all is free to insist on, while interrupting the user
+is not. Three frame columns carry it:
 
 .. ipython:: python
 

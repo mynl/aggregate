@@ -40,6 +40,7 @@ import hashlib
 from ._help import HelpMixin
 from .config import get_settings
 from .constants import (DefectiveDistributionError,
+                        DefectiveDistributionWarning, warn_once,
                         FIG_H, FIG_W, INFO_NA, info_row)
 from ._labeled import LabeledMixin
 from ._program import ProgramMixin
@@ -158,7 +159,11 @@ def choquet_weights(x, p, g, *, S_calculation='forwards',
         probability at unknown loss values is an economic error, and the
         default ``False`` raises
         :class:`~aggregate.constants.DefectiveDistributionError`.
-        ``True`` opts into the parking policy above. Deficits between the
+        ``True`` opts into the parking policy above, and emits one
+        :class:`~aggregate.constants.DefectiveDistributionWarning` per
+        session (key ``'defective-pricing'``): a material deficit priced
+        either way gives two defensible answers differing by exactly the
+        deficit, which the caller should know once. Deficits between the
         noise floor ``tol`` and the materiality floor (small
         FFT-truncation losses, already advertised at construction by
         ``DefectiveDistributionWarning``) are parked without complaint;
@@ -225,14 +230,29 @@ def choquet_weights(x, p, g, *, S_calculation='forwards',
             raise DefectiveDistributionError(
                 f'probability vector sums to {p.sum():.12g} > 1; '
                 f'invalid law (surplus {-deficit:.3e})')
-    elif deficit <= DEFICIT_MATERIALITY or allow_deficit:
+    elif deficit <= DEFICIT_MATERIALITY:
         # small FFT-truncation loss (advertised by the construction-time
-        # DefectiveDistributionWarning) or an explicit truncation policy:
-        # park per S_calculation -- forwards at the top atom, backwards
-        # at the bottom atom
+        # DefectiveDistributionWarning): park per S_calculation -- forwards
+        # at the top atom, backwards at the bottom atom
         logger.debug(
             f'choquet_weights: parking pmf deficit {deficit:.3e} '
             f'({S_calculation})')
+    elif allow_deficit:
+        # An explicit truncation policy over a MATERIAL deficit. This is the
+        # moment the deficit stops being a grid property and starts changing
+        # an answer: the two parking directions differ by exactly this much,
+        # so the same book priced 'forwards' and 'backwards' returns two
+        # different numbers and neither is wrong. Worth its own line even
+        # when construction already warned, hence its own warn_once key.
+        parked = 'top' if S_calculation == 'forwards' else 'bottom'
+        warn_once(
+            f'pricing a law with a material PMF deficit {deficit:.3e} '
+            f'> {DEFICIT_MATERIALITY:.0e}; parked at the {parked} atom '
+            f'({S_calculation}). The two parking directions differ by '
+            f'exactly the deficit -- widen the grid to make the choice '
+            f'immaterial.',
+            DefectiveDistributionWarning,
+            key='defective-pricing', stacklevel=4)
     else:
         raise DefectiveDistributionError(
             f'probability vector carries a material deficit '

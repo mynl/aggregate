@@ -26,6 +26,7 @@ from .constants import (DefectiveDistributionWarning,
                         INFO_NA, info_row,
                         InfiniteVarianceError,
                         ZeroModifiedExposureWarning,
+                        warn_once,
                         REINS_LABEL_GROSS, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT)
 from .config import get_settings
@@ -58,7 +59,8 @@ from ._bucket_window import (
     _estimate_agg_percentile, estimate_agg_window, bs_describe, bs_explain,
 )
 from . import _bucket_window
-from ._validation import VALIDATION_NOISE, ALIASING_RATIO, explain_validation
+from ._validation import (VALIDATION_NOISE, DEFICIT_MATERIALITY,
+                          ALIASING_RATIO, explain_validation)
 from . import _validation
 from . import _reinsurance
 from ._aggregate_compute import discretize_severities, freq_sev_convolution
@@ -2093,6 +2095,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         # Cached lazy functions (built on demand)
         self._valid = None
+        self._deficit = np.nan
         # GridDistribution views over the aggregate and severity grids; own the
         # var/tvar kernel cache. Rebuilt (set None -> lazily) when update runs.
         self._dist = None
@@ -3379,6 +3382,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self._dist = None
         self._sev_dist = None
         self._valid = None
+        self._deficit = np.nan
         self.sev_calc = sev_calc
         self.discretization_calc = discretization_calc
         self.normalize = normalize
@@ -3509,23 +3513,43 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self.stats_df.loc[('agg', 'skew'), 'empirical'] = self.est_skew
 
         # Defective-distribution check. The aggregate FFT loses mass off the
-        # right end of the grid when log2 is too small. A genuine deficit
-        # (above VALIDATION_NOISE, well clear of fp dust) makes forwards and
-        # backwards S diverge by exactly the deficit in Distortion.price,
-        # so surface it loudly at construction time rather than have one
-        # answer silently differ from another downstream.
+        # right end of the grid when log2 is too small, and a deficit makes
+        # forwards and backwards S diverge by exactly that amount in
+        # Distortion.price, so one answer silently differs from another
+        # downstream.
         #
-        # When the sizer already issued a far-tail *clip* warning
-        # (``self._bs_clip`` set -- the positive single-big-jump reach did not
-        # fit the log2 budget), that warning is the same mass with actionable
-        # advice (the exact log2 to raise to), so we do not double-warn here.
-        deficit = 1.0 - float(np.sum(self.agg_density))
-        if deficit > VALIDATION_NOISE and self._bs_clip is None:
-            warnings.warn(
+        # The gate is DEFICIT_MATERIALITY (1e-4), the same floor
+        # choquet_weights uses to separate an economic problem from FFT
+        # truncation -- not VALIDATION_NOISE (1e-12), which measures
+        # arithmetic dust and fires on deficits no one can act on. Every
+        # object records its own verdict either way (Validation.DEFECTIVE);
+        # this is only about whether to interrupt.
+        #
+        # warn_once, so a sweep that rebuilds the same shape 64 times reports
+        # one fault rather than 64 copies of it.
+        #
+        # When the sizer already WARNED about a far-tail clip, that warning is
+        # the same mass with actionable advice (the exact log2 to raise to),
+        # so we do not double-warn here. Note the test is "did the sizer
+        # warn", not "is ``_bs_clip`` set": ``_bs_clip`` is recorded for the
+        # bs report at any size, and an immaterial estimate there must not
+        # silence a material measured deficit here.
+        clip = self._bs_clip
+        clip_warned = clip is not None and (
+            not np.isfinite(clip.get('clipped_mass', np.nan))
+            or clip['clipped_mass'] > DEFICIT_MATERIALITY)
+        # Recorded on the object here, where it is already in hand, rather
+        # than lazily inside ``valid``: the deficit is a fact about the
+        # update, and reading it should not depend on having asked for a
+        # validation verdict first.
+        self._deficit = deficit = _validation.pmf_deficit(self)
+        if deficit > DEFICIT_MATERIALITY and not clip_warned:
+            warn_once(
                 f'{self.name}: aggregate PMF deficit {deficit:.3e} '
                 f'(Σp = 1 − {deficit:.3e} < 1); forwards and backwards '
                 f'S diverge by the deficit (forwards > backwards).',
-                DefectiveDistributionWarning, stacklevel=2)
+                DefectiveDistributionWarning,
+                key='defective-construction', stacklevel=3)
 
         # Staged reinsurance reporting -- §1.2 of the aggregate refactor plan.
         #

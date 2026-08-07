@@ -12,7 +12,8 @@ import pandas as pd
 import scipy.stats as ss
 from scipy.optimize import NoConvergence  # noqa
 from .config import get_settings
-from .constants import InfiniteVarianceError, DefectiveDistributionWarning
+from .constants import (InfiniteVarianceError, DefectiveDistributionWarning,
+                        warn_once, warn_once_isolated)
 from . import _validation
 # Module scope is safe: _program imports only decl_writer, which imports nothing
 # from aggregate at module scope, and _program reaches back here for _fmt_bs
@@ -871,12 +872,23 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                     need_log2=int(need), clipped_mass=float(clipped))
                 cm = (f'~{clipped:.3g} of the aggregate mass'
                       if np.isfinite(clipped) else 'a sliver')
-                warnings.warn(
-                    f'{agg.name}: heavy right tail reaches {sbj_hi:.6g} but '
-                    f'the grid top is {grid_top:.6g} at log2={sel_l2}, '
-                    f'bs={keep_bs:.6g}; {cm} is clipped. Raise log2 to '
-                    f'~{need} (keeping this bs) to capture it.',
-                    DefectiveDistributionWarning, stacklevel=2)
+                # ``_bs_clip`` above is recorded whatever the size, because
+                # the bs report wants it. The WARNING is gated on the same
+                # materiality floor as every other defective report: a
+                # clipped mass of 1e-8 is a fact about the grid, not
+                # something the reader can act on. A non-finite estimate is
+                # warned anyway -- unknown is not the same as small, and the
+                # reach test is then the only evidence there is.
+                if not np.isfinite(clipped) \
+                        or clipped > _validation.DEFICIT_MATERIALITY:
+                    warn_once(
+                        f'{agg.name}: heavy right tail reaches {sbj_hi:.6g} '
+                        f'but the grid top is {grid_top:.6g} at '
+                        f'log2={sel_l2}, bs={keep_bs:.6g}; {cm} is clipped. '
+                        f'Raise log2 to ~{need} (keeping this bs) to '
+                        f'capture it.',
+                        DefectiveDistributionWarning,
+                        key='defective-construction', stacklevel=3)
 
     # ---- realized grid (the ``used`` row) ---------------------------
     sel_bs = float(rows[selected]['bs'])
@@ -1127,9 +1139,12 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     # the *selected method* row, not the padded ``used`` row, for the width.
     # Quiet the pre-pass: a unit may emit a clip warning here that the real
     # combine re-issues once (deduped) -- silence the speculative pass.
+    # ``warn_once_isolated`` restores the once-per-session budget on exit, so
+    # a warning swallowed here does not spend the one emission the real
+    # combine is entitled to.
     rows = []
     bs_ks, x_min_ks, W_ks = [], [], []
-    with warnings.catch_warnings():
+    with warn_once_isolated(), warnings.catch_warnings():
         warnings.simplefilter('ignore', DefectiveDistributionWarning)
         for a in port.agg_list:
             bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, bucket_sizing_p)
@@ -1478,27 +1493,6 @@ def _note(row, text):
     row['note'] = f'{row["note"]}; {text}' if row['note'] else text
 
 
-def _sharpen_deficit(ob):
-    """Probability mass the grid failed to hold, ``1 - sum(p)``.
-
-    The same quantity ``update_work`` measures before raising
-    :class:`~aggregate.constants.DefectiveDistributionWarning`
-    (``_aggregate.py``, ``_portfolio.py``): mass that runs off the top of the
-    grid is dropped rather than wrapped, so the realized law sums to less than
-    one and forwards ``S = 1 - cumsum`` and backwards ``S`` differ by exactly
-    this amount.
-    """
-    if _sharpen_is_port(ob):
-        df = getattr(ob, 'density_df', None)
-        if df is None or 'p_total' not in df:
-            return np.nan
-        return 1.0 - float(np.sum(df['p_total']))
-    dens = getattr(ob, 'agg_density', None)
-    if dens is None:
-        return np.nan
-    return 1.0 - float(np.sum(dens))
-
-
 def _pick_cell(df):
     """Index of the best cell: sound first, then thrifty, then best score.
 
@@ -1512,10 +1506,13 @@ def _pick_cell(df):
     looking pricing routes disagreeing by exactly the lost mass. A moment score
     cannot see it either, far tail mass being negligible for the first three
     moments and decisive for tail pricing, so the two measures are orthogonal
-    and the gate is the only thing that catches it. The threshold is the
-    library's own: ``VALIDATION_NOISE``, the level at which
-    ``DefectiveDistributionWarning`` fires, so "rejected here" and "warns when
-    you use it" are the same set by construction.
+    and the gate is the only thing that catches it. The threshold is
+    ``VALIDATION_NOISE``, deliberately tighter than the
+    ``DEFICIT_MATERIALITY`` floor at which ``DefectiveDistributionWarning``
+    fires. The two answer different questions: choosing among candidate grids,
+    losing no mass at all is free to insist on, so insist; interrupting the
+    user is not free, so reserve it for a deficit large enough to move a
+    price.
 
     **Thrifty.** Cells within :data:`SHARPEN_FALLBACK_SLACK` of the best score
     count as tied, and ties break on ``log2`` first, so a free memory saving is
@@ -1643,7 +1640,7 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
     def _record(d_bs, d_log2, seconds, note='', caught=()):
         terms = _validation.validation_score_terms(ob)
         xs = getattr(ob, 'xs', None)
-        deficit = _sharpen_deficit(ob)
+        deficit = _validation.pmf_deficit(ob)
         row = {'d_bs': d_bs, 'd_log2': d_log2, 'bs': float(ob.bs),
                'log2': int(ob.log2),
                'extent': float(ob.bs) * (1 << int(ob.log2)),
@@ -1652,8 +1649,8 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
         row.update(terms)
         row['aliasing'] = _sharpen_aliasing(ob)
         row['deficit'] = deficit
-        # The gate: the library's own threshold, so a cell rejected here is
-        # exactly one that would warn when you used it.
+        # The gate, deliberately tighter than the warning: choosing among
+        # candidate grids, losing no mass at all is free to insist on.
         row['defective'] = bool(np.isfinite(deficit)
                                 and deficit > _validation.VALIDATION_NOISE)
         row['validation'] = ob.validation_description
@@ -1682,7 +1679,12 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
         bs_c, log2_c = bs0 * (2.0 ** k), log20 + j
         t0 = time.perf_counter()
         try:
-            with warnings.catch_warnings(record=True) as caught:
+            # ``warn_once_isolated`` makes every cell warn: the probe COUNTS
+            # warnings per cell (see ``_record``), so once-per-session
+            # semantics would report the fault for the first cell only and
+            # score every later one as clean. The budget is restored on exit.
+            with warn_once_isolated(), \
+                    warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always')
                 _sharpen_update(ob, bs_c, log2_c, locked, final=False)
             return _record(k, j, time.perf_counter() - t0, caught=caught)

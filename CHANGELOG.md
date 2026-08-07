@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.0.0a219
+
+**[Warning-Policy] A defective distribution is announced once, at the level where it can change a price, and again when a defective law is actually priced.** Found by reading the rendered reproductions book, which carried about 250 stderr lines across 17 pages. They were not spread thin: 208 of them came from nine source lines, and two chapters produced 72% of the total. `Mata2005` printed the *same two messages* 64 times. The genuinely interesting facts, that Mack's Pareto splice has no finite mean and that BenRached's Lévy severity loses 12.6% of its mass, were buried in the repetition rather than surfaced by it.
+
+Three things were wrong, and they compounded.
+
+**The threshold was three orders of magnitude too tight.** `DefectiveDistributionWarning` fired on any deficit above `validation.noise` (1e-12), a floor that measures arithmetic dust. Meanwhile the library's own pricer already treats `validation.deficit_materiality` (1e-4) as the line between FFT truncation and an economic problem. Sixteen of the book's 95 defective warnings were below 1e-4, three below 1e-7, and one was 1.6e-12: real, in the sense that the number was not zero, and useless, in the sense that no reader could act on it. Construction now warns at the materiality floor, so the two agree on what "defective" means.
+
+**Nothing deduplicated.** The message embeds the measured deficit, and Python's default filter keys on `(text, category, lineno)`, so every distinct value counted as a new warning. Jupyter then clears `__warningregistry__` between cells, so even identical messages repeat once per cell. New in `constants`:
+
+```python
+warn_once(message, category, *, key=None, stacklevel=3)
+reset_warn_once()          # re-arm; public
+warn_once_isolated()       # context manager, library machinery
+```
+
+`warn_once` keys on the *condition*, not the text, so the first occurrence carries its numbers and the rest stay silent behind one appended sentence saying so. A sweep that rebuilds the same shape 64 times reports one fault. `warn_once_isolated` both bypasses the registry and restores it on exit, which is what the library's two warning-provoking internals need: the portfolio window pre-pass must not *spend* the session's one emission on a warning it then filters away, and `sharpen`'s probe **counts** warnings per candidate cell, so it needs every cell to warn.
+
+**The one moment it mattered was silent.** A deficit is a grid property until someone prices through it; then forwards `S` parks the missing mass at the top atom, backwards parks it at the bottom, and the same book returns two defensible numbers differing by exactly the deficit. `choquet_weights` is the single gate every pricing route passes (`Distortion.price`, `Portfolio.price`, `Aggregate.apply_distortion`), and a material deficit with `allow_deficit=True` only wrote `logger.debug` there. It now warns, once, on its own key, so neither channel swallows the other.
+
+**Every object carries its own verdict.** New `Validation.DEFECTIVE`, set from the measured deficit and deliberately **not** in the passing set: a defective object reports `valid = False` and says why.
+
+```
+>>> a.validation_description
+'fails pmf deficit 4.141e-01, sev mean, agg mean'
+```
+
+The deficit leads the failure list, on the same argument that already puts mean before CV: mass missing from the realized law makes every moment comparison below it uninformative. `validation_explanation` gains the long form. The magnitude is recorded on the object at update time by `_validation.pmf_deficit`, the one definition of `1 - sum(p)`, which replaces the identical private `_sharpen_deficit`.
+
+**Also fixed, same cause, different family.** Two `ss.rv_histogram` calls left `density` at its `None` default, so scipy emitted `RuntimeWarning: Bin widths are not constant` (30 lines in the book) for every unequally spaced `chistogram` and for **every** `meta` severity, whose bins are `bs*1e-7, bs/2, bs, bs, ...` and so can never be constant. Passing `density=True` states what scipy already assumed: output is bit-identical, checked.
+
+**Deliberately unchanged.** The `sharpen` grid probe still gates on `VALIDATION_NOISE`, now explicitly tighter than the warning. Choosing among candidate grids, losing no mass at all is free to insist on; interrupting the reader is not free, so that waits for a deficit large enough to move a price. The docs that asserted the two thresholds were the same are corrected.
+
+**Newly loud, on purpose.** A massive/bivariate update whose pinned `(bs, log2)` cannot cover the measured window reported it through `logger.warning`, which is silent by default. That clip is not a sliver: a 64x64 pin loses a measured 0.9999 of the joint. It is now a `DefectiveDistributionWarning`.
+
+**Measured.** `Mata2005`'s two heaviest cells, run standalone: 32 warnings before, 1 after, and the survivor is a real 3.4e-04 deficit. The library is not warning-free; the remaining `RuntimeWarning` noise is `[RuntimeWarning-Census]` in `dev/TODO.md`.
+
+**Opting out** is unchanged and needs nothing new: `silence_warnings(DefectiveDistributionWarning)` covers both channels, and `reset_warn_once()` is the inverse.
+
+**Breaking, narrowly.** `Validation` gains a member and `valid` now returns `False` for an object with a material deficit that previously passed. Test suites that use `pytest.warns` on library warnings need the registry reset between tests; the aggregate suite does this with an autouse `conftest` fixture. `_bucket_window._sharpen_deficit` is gone, replaced by `_validation.pmf_deficit`.
+
 ## 1.0.0a218
 
 **[Reproductions-Highlights] The reproductions book opens with a short version: five papers, one page each, each page a DecL program beside the exhibit it reproduces.** The detail chapters are the point of the exercise but they are not the way in. Each of the fifteen carries its transcription decisions, its inferred readings and its grid caveats, and a reader wanting to know whether the library reproduces published work had to wade through Python to find out. The new first chapter answers that in ten minutes: @Venter1983 for accuracy, @Bear1990 for the language, @Homer2003 for reach, @Bruno2006 for speed, @Mata2005 for the reproduction auditing the paper rather than the reverse. One paragraph of context, the program, the answer, one number.

@@ -66,6 +66,19 @@ def silence_warnings(category=Warning, message='', module=''):
     blunter ``warnings.simplefilter('ignore')`` it does **not** discard
     existing filters. The effect is process-wide and is an explicit
     end-user-only convenience -- never call it from library code.
+
+    This is also the opt-out for a *deliberately* clipped grid: reading
+    ``E[X and a]`` off a one-claim build in a loop, say, where the missing
+    far tail is beside the point. The library already reports each condition
+    once per session (:func:`aggregate.constants.warn_once`), so a sweep of
+    sixty-four builds costs one line, but silencing that line outright is a
+    filter away::
+
+        silence_warnings(DefectiveDistributionWarning)     # the whole class
+
+    The inverse is :func:`aggregate.constants.reset_warn_once`, which re-arms
+    every once-per-session warning for a session that has moved on to a
+    different book.
     """
     import warnings
     warnings.filterwarnings('ignore', message=message, category=category, module=module)

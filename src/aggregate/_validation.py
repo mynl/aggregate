@@ -19,12 +19,50 @@ logger = logging.getLogger(__name__)
 VALIDATION_NOISE = get_settings().validation.noise
 
 
+# DEFICIT_MATERIALITY: economic-materiality floor on the pmf deficit
+# ``1 - sum(p)``. Above it a realized law is missing enough mass to change an
+# answer: the DEFECTIVE flag sets, the construction-time
+# DefectiveDistributionWarning fires, and the exact-discrete Choquet helper
+# refuses to price without an explicit parking policy. Deliberately three
+# orders of magnitude looser than VALIDATION_NOISE, which measures arithmetic
+# dust and has nothing to say about economics.
+DEFICIT_MATERIALITY = get_settings().validation.deficit_materiality
+
+
 # ALIASING_RATIO: the ALIASING flag fires when the agg-mean relative error
 # exceeds this multiple of the sev-mean relative error (FFT wrap-around).
 ALIASING_RATIO = get_settings().validation.aliasing_ratio
 
 
-def explain_validation(rv):
+def pmf_deficit(ob):
+    """Probability mass the realized grid failed to hold, ``1 - sum(p)``.
+
+    Works for an ``Aggregate`` (``agg_density``) or a ``Portfolio``
+    (``density_df['p_total']``) by duck test, which keeps this module a leaf.
+    Returns ``nan`` when the object has not been updated and there is no
+    realized law to measure.
+
+    Notes
+    -----
+    Mass that runs off the top of the grid is dropped rather than wrapped, so
+    the realized law sums to less than one and forwards ``S = 1 - cumsum``
+    and backwards ``S`` differ by exactly this amount. Above
+    :data:`DEFICIT_MATERIALITY` that difference is large enough to move a
+    price, which is what :attr:`~aggregate.constants.Validation.DEFECTIVE`
+    and :class:`~aggregate.constants.DefectiveDistributionWarning` report.
+    """
+    if hasattr(ob, 'agg_list'):                  # Portfolio
+        df = getattr(ob, 'density_df', None)
+        if df is None or 'p_total' not in df:
+            return np.nan
+        return 1.0 - float(np.sum(df['p_total']))
+    dens = getattr(ob, 'agg_density', None)
+    if dens is None:
+        return np.nan
+    return 1.0 - float(np.sum(dens))
+
+
+def explain_validation(rv, deficit=None):
     """
     Explain the validation result rv.
     Don't over report: if you fail CV don't need to be told you fail Skew too.
@@ -34,6 +72,16 @@ def explain_validation(rv):
     the hood (§1.3 of the aggregate refactor plan). The message reports
     that subject status alongside the ``reinsurance`` marker, so the user
     can tell whether the underlying gross object is sound.
+
+    Parameters
+    ----------
+    rv : Validation
+        The flag set to explain.
+    deficit : float, optional
+        The measured pmf deficit, quoted when ``rv`` carries
+        :attr:`~aggregate.constants.Validation.DEFECTIVE`. Optional because
+        the flag alone is enough to name the failure; the magnitude is what
+        tells the reader whether it matters.
     """
     if rv == Validation.NOT_UNREASONABLE:
         return "not unreasonable"
@@ -42,6 +90,12 @@ def explain_validation(rv):
     # Collect failures from the SEV/AGG/ALIASING flags (suppressing higher
     # moments once a lower-order moment already failed).
     parts = []
+    # DEFECTIVE leads: mass missing from the realized law makes every moment
+    # comparison below it uninformative, the same argument that puts mean
+    # before CV.
+    if rv & Validation.DEFECTIVE:
+        parts.append('pmf deficit' if deficit is None
+                     else f'pmf deficit {deficit:.3e}')
     if rv & Validation.SEV_MEAN:
         parts.append('sev mean')
     if rv & Validation.AGG_MEAN:
@@ -180,6 +234,17 @@ def valid_aggregate(agg):
             logger.info('FAIL: %s skew error > eps', comp)
             rv |= flag
 
+    # Defective: the realized law does not sum to 1, so mass ran off the top
+    # of the grid. ``update_work`` records it; recompute only if this object
+    # reached here by some other route. Recorded at every size, flagged only
+    # above DEFICIT_MATERIALITY, where the missing mass is enough to separate
+    # the two pricing routes.
+    if not np.isfinite(getattr(agg, '_deficit', np.nan)):
+        agg._deficit = pmf_deficit(agg)
+    if np.isfinite(agg._deficit) and agg._deficit > DEFICIT_MATERIALITY:
+        logger.info('FAIL: pmf deficit %.3e > materiality', agg._deficit)
+        rv |= Validation.DEFECTIVE
+
     # Reinsurance: the realised (after-reins) object has no independent
     # theoretical, so its sev/agg moments cannot be validated. The
     # checks above ran against the SUBJECT moments and remain
@@ -233,6 +298,23 @@ def valid_portfolio(port):
         port._valid = Validation.NOT_UPDATED
         return Validation.NOT_UPDATED
 
+    # Defective: the portfolio's OWN total. ``update`` records it; recompute
+    # only if this object reached here by some other route. Held in a separate
+    # flag rather than OR-ed into ``rv`` here, because ``rv`` drives the early
+    # return below, which is about the UNITS failing; a defective total is
+    # not a reason to skip the total's own moment checks. (A defective unit
+    # folds its flag in through ``rv |= r``, exactly as its moment failures
+    # do.)
+    if not np.isfinite(getattr(port, '_deficit', np.nan)):
+        port._deficit = pmf_deficit(port)
+    defective = (Validation.DEFECTIVE
+                 if np.isfinite(port._deficit)
+                 and port._deficit > DEFICIT_MATERIALITY
+                 else Validation.NOT_UNREASONABLE)
+    if defective:
+        logger.info('FAIL: Portfolio pmf deficit %.3e > materiality',
+                    port._deficit)
+
     for a in port.agg_list:
         r = a.valid
         if r & Validation.REINSURANCE:
@@ -243,8 +325,8 @@ def valid_portfolio(port):
 
     if rv != Validation.NOT_UNREASONABLE:
         logger.info('Exiting: Portfolio validation steps skipped due to failed or n/a Aggregate validation')
-        port._valid = rv
-        return rv
+        port._valid = rv | defective
+        return port._valid
     else:
         logger.info('No Aggregate object fails validation')
 
@@ -294,6 +376,7 @@ def valid_portfolio(port):
             logger.info('FAIL: Portfolio %s skew error > eps', comp)
             rv |= flag
 
+    rv |= defective
     if rv == Validation.NOT_UNREASONABLE:
         logger.info('Portfolio does not fail any validation: not unreasonable')
     port._valid = rv
@@ -447,7 +530,9 @@ def validation_description(obj):
     moved to the name that describes it, and ``validation_explanation`` became
     the long form it always claimed to be.
     """
-    return explain_validation(obj.valid)
+    # ``obj.valid`` first: it is what records ``_deficit``.
+    rv = obj.valid
+    return explain_validation(rv, getattr(obj, '_deficit', None))
 
 
 def validation_explanation(obj):
@@ -464,7 +549,7 @@ def validation_explanation(obj):
     and the reinsurance caveat where they apply.
     """
     rv = obj.valid
-    short = explain_validation(rv)
+    short = explain_validation(rv, getattr(obj, '_deficit', None))
     if rv & Validation.NOT_UPDATED:
         return ('Not validated: the object has not been updated, so there is no '
                 'realized grid to compare the analytic moments against. Call '
@@ -477,6 +562,16 @@ def validation_explanation(obj):
            f'aggregate, and a relative error above {tol} fails; only the '
            f'lowest-order failure is reported, since a mean that is wrong makes '
            f'the higher moments uninformative.']
+    if rv & Validation.DEFECTIVE:
+        d = getattr(obj, '_deficit', None)
+        amount = f'{d:.3e}' if isinstance(d, float) and np.isfinite(d) \
+            else 'some'
+        out.append(f'The realized law does not sum to 1: {amount} of the '
+                   f'probability ran off the top of the grid and was dropped '
+                   f'rather than wrapped. Forwards S = 1 - cumsum carries the '
+                   f'missing mass as a tail blob and backwards S drops it, so '
+                   f'the two pricing routes disagree by exactly this amount '
+                   f'and neither is wrong. Raise log2, or widen the grid.')
     if rv & Validation.ALIASING:
         out.append('The aggregate mean error is far larger than the severity '
                    'error, which is the signature of FFT wrap-around: mass is '

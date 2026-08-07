@@ -4,10 +4,25 @@ from pathlib import Path
 
 import pytest
 
+from aggregate.constants import reset_warn_once
 from aggregate.parser import UnderwritingLexer
 from aggregate.underwriter import Underwriter
 
 TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test_suite.agg"
+
+
+@pytest.fixture(autouse=True)
+def _reset_warn_once():
+    """Re-arm the once-per-session warnings before every test.
+
+    ``warn_once`` state is process-wide by design, which is right for a
+    session and wrong for a test suite: without this, the first test to
+    provoke a condition silences ``pytest.warns`` for every later test in the
+    same worker, and which test that is depends on ordering and on the xdist
+    split. Reset before, not after, so a test can inspect the registry it
+    leaves behind.
+    """
+    reset_warn_once()
 
 
 @pytest.fixture(scope="session")

@@ -338,6 +338,11 @@
   **is** `pᵢ` at `xᵢ`, no jump detection; `qd` is the doc-only fixed-font
   exception); cover the v1.0 shifts (linear allocation default, bounded
   detection, forwards-`S`, pentagon columns, `DefectiveDistributionWarning`).
+  The warnings half of that philosophy is now settled and just needs writing up:
+  `[Warning-Policy]` (`1.0.0a219`, `dev/done/plan-warning-policy.md`) says a
+  condition is announced once per session at the level where it can change an
+  answer, the per-object verdict lives in `valid` / `validation_explanation`,
+  and `silence_warnings` / `reset_warn_once` are the two user controls.
 - **[Grammar-Reference-From-Lark]** (#17) — regenerate
   `docs/4_agg_language_reference/` from `decl.lark` via `grammar(add_to_doc=True)`
   (it still describes the SLY-era grammar). The generator writes straight to the

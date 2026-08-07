@@ -1070,3 +1070,18 @@ agg DP.Moves 100 claims sev lognorm 100 cv 2 poisson aggregate net of 9000 xs 10
 agg DP.Moves 100 claims sev lognorm 100 cv 2 occurrence net of 500 xs 500 poisson aggregate net of 9000 xs 1000;
 agg DP.Ceded 100 claims sev lognorm 100 cv 2 occurrence net of 500 xs 500 poisson aggregate net of 9000 xs 1000;
 agg DP.Discrete dfreq [1 2 3] dsev [10 20 30] occurrence net of 15 xs 5
+
+
+# WP. Warning-policy fixtures (1.0.0a219)
+# =======================================
+# Programs behind tests/test_warning_policy.py ([Warning-Policy]). Defective is
+# an unlimited Lomax with alpha 1.5, so no grid of finite extent holds it and
+# the deficit is set by bs alone: coarse enough and it clears the materiality
+# floor, which is what makes it warn. Clean is thin enough that what its grid
+# loses is immaterial, so it must stay silent. Tower is the sharpen fixture
+# reused: the probe counts a warning per cell, which once-per-session must not
+# blind. See dev/done/plan-warning-policy.md.
+agg WP.Defective 1 claim sev 0.5 * lomax 1.5 fixed                                                                note{unlimited infinite-variance Lomax: a material pmf deficit at any affordable grid};
+agg WP.Clean 100 claims sev lognorm 100 cv 2 poisson                                                              note{immaterial deficit: the floor exists so this one says nothing};
+port WP.Port agg WP.PA 50 claims sev lognorm 100 cv 2 poisson agg WP.PB 20 claims sev lognorm 200 cv 1 poisson;
+agg WP.Tower as "US Hurricane Reinsurance" 1.74 claims sev lognorm 8.501 cv 14.624 splice [0 500] poisson    note{probe fixture: warn_once_isolated keeps every cell's warning countable}

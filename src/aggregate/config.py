@@ -235,15 +235,22 @@ class ValidationSettings:
         where exeqa-derived quantities become unreliable (formerly
         ``EXEQA_NOISE_FLOOR``).
     deficit_materiality : float
-        Economic-materiality floor on the pmf deficit ``1 - Sum p`` in the
-        exact-discrete Choquet helper (:func:`aggregate.spectral.choquet_weights`).
-        Below ``noise`` a deficit is fp dust and is renormalized away; between
-        ``noise`` and this value it is a small FFT-truncation loss already
-        advertised by ``DefectiveDistributionWarning`` and is parked; above it the
-        missing mass sits at unknown loss values and pricing raises
-        ``DefectiveDistributionError`` unless the caller passes ``allow_deficit``
-        (formerly ``DEFICIT_MATERIALITY``). The 1e-4 default is a judgment call
-        pending review (numerics-3).
+        Economic-materiality floor on the pmf deficit ``1 - Sum p``: the one
+        line between "the grid lost some arithmetic dust" and "the grid lost
+        enough mass to change a price". Below ``noise`` a deficit is fp dust
+        and is renormalized away; between ``noise`` and this value it is a
+        small FFT-truncation loss and is parked silently; above it the missing
+        mass sits at unknown loss values, so
+        :attr:`~aggregate.constants.Validation.DEFECTIVE` sets, a
+        ``DefectiveDistributionWarning`` fires once per session at
+        construction, and the exact-discrete Choquet helper
+        (:func:`aggregate.spectral.choquet_weights`) raises
+        ``DefectiveDistributionError`` unless the caller passes
+        ``allow_deficit`` (which warns once instead). Note the grid *probe*
+        (``sharpen``) gates on ``noise``, deliberately tighter: choosing among
+        candidate grids, losing nothing at all is free to insist on.
+        (Formerly ``DEFICIT_MATERIALITY``.) The 1e-4 default is a judgment
+        call pending review (numerics-3).
     """
 
     eps: float = 1e-4

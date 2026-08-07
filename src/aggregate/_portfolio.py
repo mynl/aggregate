@@ -11,6 +11,7 @@ import warnings
 from ._help import HelpMixin
 from .constants import (DefectiveDistributionWarning,
                         FIG_H, FIG_W, INFO_NA, info_row,
+                        warn_once,
                         REINS_LABEL_OUTPUT)
 from .config import get_settings
 from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
@@ -20,10 +21,13 @@ from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
 # Resolved once per session from config (see aggregate.config). VALIDATION_NOISE
 # is the absolute dust floor used throughout validation; ALIASING_RATIO is the
 # agg-vs-sev mean-error multiple for the ALIASING flag; EXEQA_NOISE_FLOOR is the
-# exeqa_err floor below which a bucket's conditional decomposition is reliable.
+# exeqa_err floor below which a bucket's conditional decomposition is reliable;
+# DEFICIT_MATERIALITY is the economic floor on the pmf deficit, above which a
+# realized law is missing enough mass to change an answer.
 VALIDATION_NOISE = get_settings().validation.noise
 ALIASING_RATIO = get_settings().validation.aliasing_ratio
 EXEQA_NOISE_FLOOR = get_settings().validation.exeqa_noise_floor
+DEFICIT_MATERIALITY = get_settings().validation.deficit_materiality
 
 __all__ = ['Portfolio', 'make_awkward']
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
@@ -143,6 +147,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self.agg_list = []
         self.unit_names = []
         self._valid = None
+        self._deficit = np.nan
         self.sample_df = None
         logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name}')
         # logger.debug(f'Portfolio.__init__| creating new Portfolio {self.name} at {super(Portfolio, self).__repr__()}')
@@ -2198,6 +2203,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         :return:
         """
         self._valid = None # reset valid flag
+        self._deficit = np.nan
 
         if log2 <= 0:
             raise ValueError('log2 must be >= 0')
@@ -2360,8 +2366,13 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         # deficit (the wrapped tail would be truncated by the final [:N]).
         # Surface it loudly, like the Aggregate path, and record it as the
         # portfolio far-tail clip for the bs report.
+        #
+        # ``_deficit`` is recorded on EVERY path, rolled or not, and here
+        # rather than lazily inside ``valid``: it is a fact about the update,
+        # and reading it should not depend on having asked for a validation
+        # verdict first.
+        self._deficit = deficit = _validation.pmf_deficit(self)
         if use_roll:
-            deficit = 1.0 - float(np.sum(self.density_df['p_total']))
             if deficit > VALIDATION_NOISE:
                 top = float(x_min_tot + N * self.bs)
                 self._bs_clip = dict(
@@ -2371,13 +2382,16 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                 if self._bs_window_df is not None \
                         and 'used' in self._bs_window_df.index:
                     self._bs_window_df.loc['used', 'clipped'] = float(deficit)
-                kind = 'signed' if signed else 'windowed'
-                warnings.warn(
-                    f'{self.name}: portfolio PMF deficit {deficit:.3e} '
-                    f'(Σp = 1 − {deficit:.3e} < 1); the {kind} window is '
-                    f'narrower than the combined support -- raise log2 or '
-                    f'widen the grid.', DefectiveDistributionWarning,
-                    stacklevel=2)
+                # The record above is kept for any deficit (it feeds the bs
+                # report); only the interruption is gated on materiality.
+                if deficit > DEFICIT_MATERIALITY:
+                    kind = 'signed' if signed else 'windowed'
+                    warn_once(
+                        f'{self.name}: portfolio PMF deficit {deficit:.3e} '
+                        f'(Σp = 1 − {deficit:.3e} < 1); the {kind} window is '
+                        f'narrower than the combined support -- raise log2 or '
+                        f'widen the grid.', DefectiveDistributionWarning,
+                        key='defective-construction', stacklevel=3)
 
         # Empirical portfolio-total agg moments from the FFT output, via
         # ``xsden_to_mwrangler`` on a de-fuzzed copy -- mirrors

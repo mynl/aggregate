@@ -1954,7 +1954,12 @@ class SeverityCHistogram(Severity):
         self.sev1 = np.sum(xsm * ps)
         self.sev2 = np.sum(xsm ** 2 * ps)
         self.sev3 = np.sum(xsm ** 3 * ps)
-        self.fz = ss.rv_histogram((aps, xss))
+        # density=True is explicit, not a change: ``aps`` is already a density
+        # (probability per unit width) and scipy assumes exactly that when
+        # ``density`` is left None. Stating it silences scipy's "Bin widths
+        # are not constant" RuntimeWarning, which fires for every unequally
+        # spaced ``sev_xs`` -- which is the whole point of chistogram.
+        self.fz = ss.rv_histogram((aps, xss), density=True)
 
 
 class SeverityFixed(SeverityDHistogram):
@@ -2027,7 +2032,11 @@ class SeverityMeta(Severity):
         b1size = 1e-7
         xss = np.hstack((-bs * b1size, 0, xs[1:] - bs / 2, xs[-1] + bs / 2))
         pss = np.hstack((ps[0] / b1size, 0, ps[1:]))
-        self.fz = ss.rv_histogram((pss, xss))
+        # density=True is explicit, not a change: it is what scipy assumes
+        # when ``density`` is left None. The bins here are bs*1e-7, then
+        # bs/2, then bs, so they are NEVER constant and every meta severity
+        # tripped scipy's "Bin widths are not constant" RuntimeWarning.
+        self.fz = ss.rv_histogram((pss, xss), density=True)
         self.sev1 = np.sum(xs * ps)
         self.sev2 = np.sum(xs ** 2 * ps)
         self.sev3 = np.sum(xs ** 3 * ps)

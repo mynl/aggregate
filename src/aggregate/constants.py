@@ -23,6 +23,8 @@ below stay here permanently (used in default-argument expressions; user
 restyling goes through matplotlib's native ``mplstyle`` / ``rcParams``).
 """
 
+import warnings
+from contextlib import contextmanager
 from enum import Flag, auto
 
 
@@ -31,8 +33,10 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'DISTORTION_DUAL_LABEL', 'DISTORTION_DUAL_TEX',
            'Validation', 'DefectiveDistributionWarning',
            'DefectiveDistributionError', 'InfiniteVarianceError',
-           'IgnoredDecLClauseWarning', 'ZeroPremiumCessionWarning',
+           'IgnoredDecLClauseWarning', 'ZeroModifiedExposureWarning',
+           'ZeroPremiumCessionWarning',
            'CoarseJointGridWarning', 'DegenerateEvaluationWarning',
+           'warn_once', 'reset_warn_once', 'warn_once_isolated',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
            'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row',
@@ -176,8 +180,9 @@ class Validation(Flag):
     are individual failure modes that combine via bitwise OR. ``SEV_*`` and
     ``AGG_*`` flag moment-matching errors (analytic vs empirical mean, CV,
     skew) above the validation ``eps`` tolerance. ``ALIASING`` flags FFT
-    wrap-around; ``REINSURANCE`` flags reinsurance-induced moment drift;
-    ``NOT_UPDATED`` signals the object hasn't been ``update``-d yet.
+    wrap-around; ``DEFECTIVE`` flags a realized law that does not sum to 1;
+    ``REINSURANCE`` flags reinsurance-induced moment drift; ``NOT_UPDATED``
+    signals the object hasn't been ``update``-d yet.
     """
 
     NOT_UNREASONABLE = 0
@@ -190,6 +195,7 @@ class Validation(Flag):
     ALIASING = auto()
     REINSURANCE = auto()
     NOT_UPDATED = auto()
+    DEFECTIVE = auto()
 
     @property
     def passes(self):
@@ -205,16 +211,35 @@ class Validation(Flag):
 
 
 class DefectiveDistributionWarning(UserWarning):
-    """Emitted when an aggregate empirical PMF carries a genuine deficit.
+    """Emitted when a realized PMF carries an economically material deficit.
 
-    The aggregate FFT loses mass off the right end of the grid when ``log2``
-    is too small for the support. A deficit `1 - Σp_agg` above the validation
-    noise floor (``config`` ``validation.noise``) is real, not numerical dust:
-    forwards `S = 1 - cumsum` plateaus at the deficit (carries it as a tail
-    blob) while backwards `S` reaches zero (drops the deficit silently). The
-    two pricing answers therefore differ by exactly the deficit. Surface the
-    deficit at construction time so the divergence in `Distortion.price` is
-    never silent.
+    The FFT loses mass off the right end of the grid when ``log2`` is too
+    small for the support. Forwards ``S = 1 - cumsum`` plateaus at the deficit
+    (carrying it as a tail blob) while backwards ``S`` reaches zero (dropping
+    it silently), so the two pricing answers differ by exactly the deficit.
+
+    Fires above ``config`` ``validation.deficit_materiality`` (1e-4), the same
+    floor :func:`aggregate.spectral.choquet_weights` uses to separate an
+    economic problem from FFT truncation. Below it the deficit is real but
+    immaterial, and reporting it says nothing the user can act on; the
+    ``validation.noise`` floor (1e-12) is for arithmetic dust and is far too
+    tight to interrupt anyone over.
+
+    Reported through :func:`warn_once`, on two independent keys:
+
+    * ``'defective-construction'`` -- the grid is losing mass. Once per
+      session, because a sweep that builds the same shape 64 times has one
+      fault, not 64. Every object carries its own verdict silently in
+      ``valid`` / ``validation_explanation`` (:attr:`Validation.DEFECTIVE`),
+      which is where to look for the rest.
+    * ``'defective-pricing'`` -- a materially defective law was actually
+      priced through a distortion. This is the moment the deficit stops being
+      a grid property and starts changing an answer, so it is worth its own
+      line even when construction already warned.
+
+    Silence either with
+    ``silence_warnings(DefectiveDistributionWarning)``; re-arm both with
+    :func:`reset_warn_once`.
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).
@@ -350,3 +375,120 @@ class InfiniteVarianceError(ValueError):
     Subclasses :class:`ValueError` so existing broad ``except ValueError``
     handlers continue to treat it as a build failure.
     """
+
+
+# ===========================================================================
+# Once-per-session warnings
+# ===========================================================================
+#
+# Python's default filter shows a warning once per (text, category, lineno),
+# so a message that embeds a computed number defeats it: every distinct value
+# is a distinct message and prints again. Worse, Jupyter clears
+# ``__warningregistry__`` between cells, so even an identical message repeats
+# once per cell. A sweep that builds the same object 64 times therefore
+# printed 64 copies of two messages into the rendered documentation.
+#
+# The library's advisory warnings are about a *condition*, not an occurrence:
+# knowing once that a grid is losing mass is what changes what the user does.
+# ``warn_once`` keys on the condition rather than the text, so the first
+# occurrence carries its numbers and the rest stay silent.
+
+#: Keys already warned in this session. Never read directly; see ``warn_once``.
+_WARNED_ONCE = set()
+
+#: Depth of nested ``warn_once_isolated`` scopes. Non-zero means "probe":
+#: bypass the registry entirely.
+_WARN_ONCE_ISOLATION = 0
+
+#: Appended to the one emission, so the reader knows the silence downstream is
+#: policy rather than absence. One sentence on the message line, no block.
+_WARN_ONCE_SUFFIX = (' Further occurrences this session are suppressed; each '
+                     'object records its own verdict in validation.')
+
+
+def warn_once(message, category, *, key=None, stacklevel=3, suffix=True):
+    """Emit ``message`` the first time this session, then stay silent.
+
+    Parameters
+    ----------
+    message : str
+        The warning text. Free to carry computed numbers: the dedup key is
+        ``key``, not the text.
+    category : type[Warning]
+        Warning class, as for :func:`warnings.warn`.
+    key : hashable, optional
+        Dedup key. Defaults to ``category``, giving once-per-session per
+        warning class. Pass an explicit key to split one class into several
+        independently-once channels, e.g. ``DefectiveDistributionWarning``
+        fires once at construction and once again at pricing time, which are
+        different facts about different moments in the user's workflow.
+    stacklevel : int, default 3
+        Passed through to :func:`warnings.warn`. The default assumes one
+        wrapper frame between the reporting code and the user's call.
+    suffix : bool, default True
+        Append :data:`_WARN_ONCE_SUFFIX` to the emitted message.
+
+    Returns
+    -------
+    bool
+        Whether the warning was emitted.
+
+    Notes
+    -----
+    Inside :func:`warn_once_isolated` the registry is bypassed and every call
+    warns, which is what a probe that *counts* warnings needs.
+
+    The state is process-wide and deliberately not per-object: the same grid
+    fault reported by 64 sibling objects is one fact, not 64. Call
+    :func:`reset_warn_once` to re-arm.
+    """
+    if _WARN_ONCE_ISOLATION:
+        warnings.warn(message, category, stacklevel=stacklevel)
+        return True
+    k = category if key is None else key
+    if k in _WARNED_ONCE:
+        return False
+    _WARNED_ONCE.add(k)
+    warnings.warn(message + (_WARN_ONCE_SUFFIX if suffix else ''),
+                  category, stacklevel=stacklevel)
+    return True
+
+
+def reset_warn_once():
+    """Re-arm every once-per-session warning.
+
+    Clears the :func:`warn_once` registry, so the next occurrence of each
+    condition reports again. Intended for a long-running session that has
+    moved on to a different book, and for test isolation (the aggregate test
+    suite resets it before every test, otherwise the first test to trigger a
+    condition would silence ``pytest.warns`` in all the others).
+    """
+    _WARNED_ONCE.clear()
+
+
+@contextmanager
+def warn_once_isolated():
+    """Run a probe without touching the once-per-session budget.
+
+    Inside the block :func:`warn_once` warns on **every** call, and on exit
+    the registry is restored to what it was on entry. Both halves matter, and
+    the library needs each:
+
+    * A speculative pre-pass whose warnings are filtered away must not *spend*
+      the session's one emission before the real computation runs.
+    * A grid probe that evaluates many candidate cells and counts the warnings
+      each one raises needs every cell to warn, not just the first.
+
+    This is library machinery for code that deliberately provokes warnings.
+    An end user who simply wants quiet wants
+    :func:`aggregate.utilities.silence_warnings`.
+    """
+    global _WARN_ONCE_ISOLATION
+    saved = set(_WARNED_ONCE)
+    _WARN_ONCE_ISOLATION += 1
+    try:
+        yield
+    finally:
+        _WARN_ONCE_ISOLATION -= 1
+        _WARNED_ONCE.clear()
+        _WARNED_ONCE.update(saved)

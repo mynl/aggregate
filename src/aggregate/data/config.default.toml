@@ -124,10 +124,16 @@
 # numerically resolved; the augmented frame is truncated past it. Typical 1e-5..1e-3.
 # exeqa_noise_floor = 1e-4
 
-# deficit_materiality: economic-materiality floor on the pmf deficit 1 - sum(p)
-# in the exact-discrete Choquet pricer. Below `noise` = fp dust (renormalized);
-# between `noise` and this = parked FFT-truncation loss; above this pricing raises
-# DefectiveDistributionError unless allow_deficit=True. 1e-4 is a judgment call.
+# deficit_materiality: economic-materiality floor on the pmf deficit 1 - sum(p).
+# The one line between "the grid lost some arithmetic dust" and "the grid lost
+# enough mass to change a price", so three things read it. Below `noise` = fp
+# dust (renormalized); between `noise` and this = parked FFT-truncation loss;
+# above this: the Validation.DEFECTIVE flag sets, a DefectiveDistributionWarning
+# fires once per session at construction, and the exact-discrete Choquet pricer
+# raises DefectiveDistributionError unless allow_deficit=True (which warns once
+# instead). Note the grid PROBE (sharpen) gates on `noise`, deliberately
+# tighter: choosing among candidate grids, losing nothing is free to insist on.
+# 1e-4 is a judgment call.
 # deficit_materiality = 1e-4
 
 

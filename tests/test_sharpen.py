@@ -14,8 +14,8 @@ import pytest
 
 from aggregate import build
 from aggregate._bucket_window import (SHARPEN_LOG2_FLOOR, _bucket_is_exact,
-                                      _fmt_bs, _sharpen_deficit)
-from aggregate._validation import (SCORE_TERMS, validation_score,
+                                      _fmt_bs)
+from aggregate._validation import (SCORE_TERMS, pmf_deficit, validation_score,
                                    validation_score_terms)
 
 
@@ -109,7 +109,7 @@ def test_portfolio_carries_the_score_too():
 def test_probe_gate_skips_a_good_grid():
     """A grid at or under the target AND holding all its mass is left alone."""
     a = build(CLEAN)
-    assert _sharpen_deficit(a) < 1e-12
+    assert pmf_deficit(a) < 1e-12
     bs0, log20 = a.bs, a.log2
     a.sharpen()
     assert len(a.sharpen_df) == 1
@@ -315,10 +315,10 @@ def test_growing_log2_cures_a_deficit():
 def test_deficit_helper_matches_the_realized_mass():
     a = build(TOWER)
     a.update(log2=16, bs=1 / 64)
-    assert _sharpen_deficit(a) == pytest.approx(
+    assert pmf_deficit(a) == pytest.approx(
         1.0 - float(a.density_df.p_total.sum()), abs=1e-15)
     p = build(PORT)
-    assert _sharpen_deficit(p) == pytest.approx(
+    assert pmf_deficit(p) == pytest.approx(
         1.0 - float(p.density_df.p_total.sum()), abs=1e-15)
 
 

@@ -59,8 +59,10 @@ import scipy.sparse as ssp
 from ._help import HelpMixin
 from ._labeled import LabeledMixin
 from ._program import ProgramMixin
-from .constants import DefectiveDistributionWarning, info_row, INFO_NA
+from .constants import (DefectiveDistributionWarning, info_row, INFO_NA,
+                        warn_once)
 from .config import get_settings
+from ._validation import DEFICIT_MATERIALITY
 from .moments import (MomentAggregator, xsden_to_mwrangler, xsden_to_meancvskew,
                       _noise_aware_rel_error, _snap_noise)
 from .utilities import round_bucket, balanced_window
@@ -452,12 +454,13 @@ def _finalize_pushforward(values, weights, *, bs, log2, window, scheme,
     mass, clipped = _scatter_1d(values, weights, z0, bs_out, n_out, scheme)
     grid = z0 + bs_out * np.arange(n_out)
     total = float(weights.sum())
-    if total > 0 and clipped / total > 1e-8:
-        warnings.warn(
+    if total > 0 and clipped / total > DEFICIT_MATERIALITY:
+        warn_once(
             f'pushforward {name!r}: {clipped / total:.2e} of mass fell outside '
             f'the output window [{grid[0]:g}, {grid[-1]:g}] and was clipped onto '
             f'the edge buckets. Widen with window=/log2=/bs=.',
-            DefectiveDistributionWarning, stacklevel=3)
+            DefectiveDistributionWarning,
+            key='defective-construction', stacklevel=3)
     gd = GridDistribution(grid, mass, bs=bs_out, name=name or '',
                           is_loss_value=is_loss_value)
     gd.clipped_mass = clipped
@@ -776,12 +779,13 @@ def _pushforward_functions(bands, xs0, xs1, total_mass, functions, bs, *,
 def _warn_pushforward_clip(name, clipped, total, grid):
     """Warn when a material fraction of mass clipped onto the window edges
     (the shared convention of :func:`_finalize_pushforward`)."""
-    if total > 0 and clipped / total > 1e-8:
-        warnings.warn(
+    if total > 0 and clipped / total > DEFICIT_MATERIALITY:
+        warn_once(
             f'pushforward {name!r}: {clipped / total:.2e} of mass fell outside '
             f'the output window [{grid[0]:g}, {grid[-1]:g}] and was clipped onto '
             f'the edge buckets. Widen with windows= or coarsen bs.',
-            DefectiveDistributionWarning, stacklevel=3)
+            DefectiveDistributionWarning,
+            key='defective-construction', stacklevel=3)
 
 
 def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
@@ -955,12 +959,15 @@ def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
             log2_0 = max(total_log2 - log2_1, _MIN_AXIS_LOG2)
         else:
             log2_1 = max(total_log2 - log2_0, _MIN_AXIS_LOG2)
-        warnings.warn(
+        # A budget test, not a deficit test, so the trigger is unchanged; it
+        # goes through warn_once for cadence only.
+        warn_once(
             f'{agg.name}: netceded ({views[0]}, {views[1]}) windows need more '
             f'than the budget 2**{total_log2} at the pinned bs={bs:g}; the wider '
             f'axis is clipped (a tail deficit). Raise update(log2=...) or relax '
             f'the bs pin.',
-            DefectiveDistributionWarning, stacklevel=3)
+            DefectiveDistributionWarning,
+            key='defective-construction', stacklevel=3)
     n0 = 1 << log2_0
     n1 = 1 << log2_1
 
@@ -1528,9 +1535,18 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         clipped = any(((1 << log2s[i]) - 1) * bss[i] < widths[i] - bss[i]
                       for i in range(2))
         if clipped:
-            logger.warning(
-                'bivariate %s: pinned (bs, log2) does not cover the measured '
-                'window on an axis -- expect a tail deficit.', self.name)
+            # A visible warning, not a logger line. Coverage fails only when
+            # BOTH bs and log2 are pinned too small, and the resulting deficit
+            # is not a sliver: the 2-D grid can miss almost the whole joint
+            # (a measured 0.9999 on a 64x64 pin). The logger is silent by
+            # default, so the one structural certainty that the answer is
+            # wrong was the one signal nobody saw.
+            warn_once(
+                f'bivariate {self.name}: pinned (bs, log2) does not cover the '
+                f'measured window on an axis, so the joint loses mass off the '
+                f'grid -- raise log2, coarsen bs, or unpin one of them.',
+                DefectiveDistributionWarning,
+                key='defective-construction', stacklevel=3)
         return bss, log2s, x_mins, his, clipped
 
     # ------------------------------------------------------------------

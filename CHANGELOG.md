@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.0a228
+
+**[Chart-Support-Serialized] `ChartSeries.support` reaches the client, so a discretized density can be drawn as one.** The IR always carried the fact and the library's own renderer always honored it; the serializer deleted it in exactly the case that carries an instruction.
+
+`SUPPORT_KINDS` states the contract (`charts/ir.py:88-102`): ``'atomic'`` means the points **are** the law and there is nothing between them, so a renderer draws stems where the atoms are far enough apart to see, steps where they are not, and a plain line only once a bucket is sub-pixel. `plots/_chartdoc.py` implements exactly that ladder off `series.support`, which is why `plot_chartdoc` has always drawn lollipops and steps.
+
+`_canonical` omits any field equal to its dataclass default unless the class lists it in `_ALWAYS`, and `support` defaults to `'atomic'`. So the payload carried `support` on a severity pdf and a distortion curve (`'continuous'`, the exception) and carried **nothing** on every aggregate density, survival and reinsurance triple. The polarity was inverted against the meaning: the value that says *draw steps or stems* was the one deleted, and the value that says *a plain line is right* was the one that survived. A client reading that payload sees an absent field, which reads as "nothing special", and draws a line. It also has nothing to threshold a stem-versus-step switch on.
+
+`support` joins `_ALWAYS[ChartSeries]`. **Every chart document hash changes**, once and deliberately: the `_ALWAYS` comment's promise that "adding an optional field never changes existing hashes" is what caused this, and it now carries the rule that produced the bug. Omit-at-default is right when absent means the neutral thing (an absent `scale` is linear, an absent `read_axis` is x, an absent `faint` is full weight, and a reader ignoring all three still draws an honest picture). It is wrong when the **default is the active case**. Before adding a field to a canonical form, ask which of its values a consumer must act on; if that value is the default, it belongs in the always list. Checked: `support` was the only field with the inverted polarity.
+
+A sweep test now asserts that every series every live emitter produces declares its support in `canonical_dict`, so it cannot silently vanish again. The values were verified semantically, not just for presence: reinsurance densities and survivals `atomic`, the severity pdf and the distortion curves `continuous`.
+
+**Consumers must read the new field.** A client that special-cased the field's absence needs to switch on `support` instead; absent should be treated as `'atomic'`, not as a line.
+
+
 ## 1.0.0a227
 
 **[Loss-Lab-Round-3] Phase E: three housekeeping items, and the plan closes.**

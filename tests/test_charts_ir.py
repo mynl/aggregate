@@ -182,18 +182,53 @@ def test_grid_panel_accepts_xy_overlays():
     assert json.loads(canonical_json(over))['series'][1]['role'] == 'iso_total'
 
 
-def test_support_defaults_to_atomic_and_costs_no_hash():
-    """The default writes the library's own worldview into the schema: a
-    discretized distribution IS the distribution, so 'continuous' is the
-    exception a series has to claim."""
+def test_support_is_always_serialized():
+    """Both values reach a consumer, because both are instructions (a228).
+
+    The default writes the library's worldview into the schema: a discretized
+    distribution IS the distribution, so ``'continuous'`` is the exception a
+    series claims. But omit-at-default then deleted ``'atomic'`` from every
+    payload, which is the value that says *draw stems or steps, never a slope
+    the law does not have*. ``'continuous'`` survived and ``'atomic'`` did
+    not, so a client saw the field only on the series that wanted a plain
+    line, and every discretized density arrived bare.
+    """
     plain = small_xy_doc()
     assert {s.support for s in plain.series} == {'atomic'}
-    assert 'support' not in canonical_dict(plain)['series'][0]
+    assert canonical_dict(plain)['series'][0]['support'] == 'atomic'
     cts = dataclasses.replace(
         plain, series=tuple(dataclasses.replace(s, support='continuous')
                             for s in plain.series))
     assert canonical_dict(cts)['series'][0]['support'] == 'continuous'
     assert doc_hash(cts) != doc_hash(plain)
+
+
+def test_every_emitted_series_declares_its_support():
+    """Sweep the live emitters: no series may reach a client without it.
+
+    The drawing ladder (stems, steps, line) is chosen from ``support`` plus
+    the room on screen, so a series without it cannot be drawn honestly by
+    anyone who only has the payload.
+    """
+    from aggregate import build
+    from aggregate.charts import available_charts, CHARTS
+
+    objs = [
+        build('agg IR.Chk 100 claims sev lognorm 50 cv 2 '
+              'occurrence net of 100 xs 100 poisson'),
+        build('port IR.ChkP agg A 50 claims sev lognorm 50 cv 1.5 '
+              'occurrence net of 100 xs 100 poisson '
+              'agg B 30 claims sev lognorm 40 cv 1.2 poisson'),
+    ]
+    seen = 0
+    for obj in objs:
+        for name in available_charts(obj):
+            doc = CHARTS[name][0](obj)
+            for s in canonical_dict(doc)['series']:
+                assert s.get('support') in ('atomic', 'continuous'), \
+                    f'{name}/{s["name"]} reaches a client with no support'
+                seen += 1
+    assert seen                          # the sweep actually swept something
 
 
 def test_support_vocabulary_is_closed():

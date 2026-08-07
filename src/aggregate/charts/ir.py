@@ -497,13 +497,27 @@ class ChartDoc:
 # --------------------------------------------------------------------------
 
 # Fields always present in canonical form, per class: the structural core a
-# reader keys on. Everything else appears only when it differs from its
-# default, so adding an optional field never changes existing hashes.
+# reader keys on, plus any field whose **default is an instruction**.
+# Everything else appears only when it differs from its default, so adding a
+# genuinely optional field never changes existing hashes.
+#
+# That last rule has one trap, and ``support`` fell into it (fixed 1.0.0a228).
+# Omit-at-default is right when absent means the neutral thing: an absent
+# ``scale`` is linear, an absent ``read_axis`` is x, an absent ``faint`` is
+# full weight, and a reader that ignores all three still draws an honest
+# picture. It is wrong when the default is the *active* case. ``support``
+# defaults to ``'atomic'``, which tells a renderer to draw stems or steps and
+# never a slope the law does not have, so omitting it shipped that instruction
+# to nobody: ``'continuous'`` (a severity pdf, a distortion) survived
+# serialization and every discretized density arrived bare, which reads as
+# "nothing special" and draws as a plain line. The polarity was inverted
+# against the meaning. Before adding a field here, ask which of its values a
+# consumer must act on; if that value is the default, it belongs in this list.
 _ALWAYS = {
     ChartDoc: ('ir_version', 'name'),
     Panel: ('id', 'kind', 'x_axis', 'y_axis'),
     ChartAxis: ('id', 'label'),
-    ChartSeries: ('name', 'role', 'panel_id'),
+    ChartSeries: ('name', 'role', 'panel_id', 'support'),
     Mark: ('panel_id', 'orient', 'at'),
     SurfaceData: ('x', 'y', 'z'),
 }

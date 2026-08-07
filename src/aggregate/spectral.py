@@ -826,8 +826,29 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
             f"{type(self).__name__} must override g_inv()")
 
     def g_prime(self, x):
-        """Default: central-difference numerical derivative of ``g``."""
-        return (self.g(x + 1e-6) - self.g(x - 1e-6)) / 2e-6
+        """Default: central-difference numerical derivative of ``g``.
+
+        Notes
+        -----
+        The stencil is one-sided at the ends of ``[0, 1]``. A distortion is a
+        function on the unit interval and nothing defines it outside, so a
+        centred stencil at ``x = 0`` asked ``g`` for ``g(-1e-6)``: the CLL
+        family evaluates a fractional power of a negative number there, the
+        LEP family takes the square root of a negative product, and both
+        returned ``nan`` for a slope that exists. Clamping the two stencil
+        points into the interval and dividing by their realized separation
+        gives a forward difference at 0 and a backward difference at 1.
+
+        The interior is deliberately left bit-identical: the clamp only
+        engages within ``h`` of an endpoint, and the divisor stays the exact
+        literal ``2e-6`` everywhere else, so no existing slope moves.
+        """
+        h = 1e-6
+        x = np.clip(np.asarray(x, dtype=float), 0.0, 1.0)
+        interior = (x >= h) & (x <= 1.0 - h)
+        lo = np.where(interior, x - h, np.clip(x - h, 0.0, 1.0))
+        hi = np.where(interior, x + h, np.clip(x + h, 0.0, 1.0))
+        return (self.g(hi) - self.g(lo)) / np.where(interior, 2 * h, hi - lo)
 
     def g_dual(self, x):
         """The dual distortion ``1 - g(1 - x)``."""
@@ -1181,9 +1202,15 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         eps = 1e-6
         # central difference for g''; clamp to [eps, 1-eps] to keep finite
         s_clip = np.clip(s, eps, 1.0 - eps)
-        gpp = (self._broadcast(self.g_prime(s_clip + eps), s_clip)
-               - self._broadcast(self.g_prime(s_clip - eps), s_clip)) / (2 * eps)
-        out = -(1.0 - p) * gpp
+        # A distortion with an infinite g' at 0 (PH, and every other one with
+        # an unbounded slope at the origin) makes gpp infinite, and at p = 1
+        # the product is then 0 * inf. The very next line discards every
+        # non-finite value, so the guard suppresses numpy's report of a
+        # number that cannot reach the answer.
+        with np.errstate(invalid='ignore'):
+            gpp = (self._broadcast(self.g_prime(s_clip + eps), s_clip)
+                   - self._broadcast(self.g_prime(s_clip - eps), s_clip)) / (2 * eps)
+            out = -(1.0 - p) * gpp
         return np.where(np.isfinite(out) & (out > 0), out, 0.0)
 
     # --- compute methods ------------------------------------------------
@@ -2355,8 +2382,19 @@ class PHDistortion(Distortion):
         return x ** (1.0 / self.shape)
 
     def g_prime(self, x):
+        """Slope ``rho * x**(rho - 1)``, unbounded at the origin.
+
+        Notes
+        -----
+        ``np.where`` evaluates both branches, so ``0 ** (rho - 1)`` with
+        ``rho < 1`` is still computed at ``x = 0`` and reported as a divide
+        by zero. Its value is discarded in favour of the explicit ``inf``,
+        which is the correct limit, so the ``errstate`` guard suppresses an
+        account of arithmetic that never reaches the answer.
+        """
         rho = self.shape
-        return np.where(x > 0, rho * x ** (rho - 1.0), np.inf)
+        with np.errstate(divide='ignore'):
+            return np.where(x > 0, rho * x ** (rho - 1.0), np.inf)
 
     def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
@@ -2450,8 +2488,33 @@ class WangDistortion(Distortion):
         return n.cdf(n.ppf(x) - self.shape)
 
     def g_prime(self, x):
-        n = self._norm
-        return n.pdf(n.ppf(x) + self.shape) / n.pdf(n.ppf(x))
+        r"""Slope of the Wang transform, in closed form.
+
+        Notes
+        -----
+        The definition ``phi(z + lam) / phi(z)`` with ``z = Phi^-1(x)`` is
+        ``0 / 0`` at both endpoints, where ``z`` is infinite and the normal
+        density underflows to zero, so it returned ``nan`` for two values
+        whose limits exist. Cancelling the exponentials first removes the
+        indeterminate form entirely:
+
+        .. math::
+
+            \frac{\phi(z + \lambda)}{\phi(z)}
+              = \exp\left(-\lambda z - \tfrac{1}{2}\lambda^2\right)
+
+        which gives ``+inf`` at ``x = 0`` and ``0`` at ``x = 1`` for
+        ``lambda > 0`` (reversed for ``lambda < 0``), the correct one-sided
+        limits. It is also cheaper: one ``ppf`` and one ``exp`` rather than
+        two ``ppf`` and two ``pdf``. The identity distortion ``lambda = 0``
+        is separated out because ``-0 * inf`` is ``nan``; its slope is 1
+        everywhere.
+        """
+        lam = self.shape
+        if lam == 0:
+            return np.ones_like(np.asarray(x, dtype=float))
+        z = self._norm.ppf(x)
+        return np.exp(-lam * z - 0.5 * lam * lam)
 
     def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
                   assets=0.0, el=None, **kwargs):
@@ -3902,13 +3965,25 @@ class LEPDistortion(Distortion):
                                    + spread * np.sqrt(x * (1 - x))))
 
     def g_inv(self, y):
+        """Left inverse, by the quadratic formula.
+
+        Notes
+        -----
+        The discriminant is non-negative for every ``y`` in the range of
+        ``g``, and slightly negative outside it: below the mass ``d``, and
+        above the level where ``g`` saturates at 1. Both of those branches
+        are already resolved by the ``where`` / ``maximum`` below, and
+        rounding can push a ``y`` that is *on* the boundary a few ulp the
+        wrong side, so the radicand is floored at 0 rather than allowed to
+        return ``nan`` from ``sqrt``.
+        """
         d = self._d
         spread = self._spread
         spread2 = spread ** 2
         a = (1 - d) ** 2 + spread2
         mb = (2 * (y - d) * (1 - d) + spread2)  # -b
         c = (y - d) ** 2
-        rad = np.sqrt(mb * mb - 4 * a * c)
+        rad = np.sqrt(np.maximum(mb * mb - 4 * a * c, 0.0))
         u = (mb - rad) / (2 * a)
         return np.where(y < d, 0, np.maximum(0, u))
 

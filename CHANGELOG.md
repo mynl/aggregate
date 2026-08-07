@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.0.0a220
+
+**[RuntimeWarning-Census] The benign numpy boundary noise is guarded, and four sites that were quietly returning `nan` into results are fixed.** Closes the `dev/TODO.md` item of the same name, opened when `[TVaR-Endpoint-Noise]` (`1.0.0a179`) cleared the first three sites and left the rest for case-by-case review. `pytest -W error::RuntimeWarning` over the full suite went from 75 failures to 0; the census itself, the count of distinct source lines emitting a `RuntimeWarning`, went from 14 to none.
+
+The item was filed as benign noise. Ten of the fourteen sites were, and the other four were bugs.
+
+**Guarded, because the value never reaches the answer.** `np.errstate` plus a `Notes` paragraph saying why, following the a179 pattern. `moments.py` `agg_from_fs`, `cumulate_moments` and `static_moments_to_mcvsk`: a severity with no finite second or third moment (a Pareto with `alpha <= 3`, a Lévy) makes the raw moments infinite, so the central combinations evaluate `inf - inf` and `0 * inf`. `nan` is the correct report for a moment that does not exist. `PHDistortion.g_prime`: `np.where` evaluates both branches, so `0 ** (rho - 1)` is computed at `x = 0` and then discarded in favour of the explicit `inf`. `Distortion._kusuoka_density`: the next line discards every non-finite value. `pedagogy`'s two `log10(Z)` calls: the next two lines mask `-inf` out of the figure.
+
+**Fixed, because the `nan` was the answer.**
+
+`WangDistortion.g_prime` returned `nan` at **both** endpoints. It evaluated `phi(z + lambda) / phi(z)` with `z = Phi^-1(x)`, which is `0 / 0` where `z` is infinite and the normal density underflows. Cancelling the exponentials first removes the indeterminate form:
+
+```
+phi(z + lam) / phi(z) = exp(-lam * z - lam^2 / 2)
+```
+
+giving `+inf` at 0 and `0` at 1, the correct one-sided limits, at half the cost (one `ppf` and one `exp` rather than two `ppf` and two `pdf`). The identity case `lambda = 0` is separated out, since `-0 * inf` is `nan`.
+
+The base-class `g_prime` central difference evaluated `g` **outside `[0, 1]`**, where a distortion is not defined. At `x = 0` it asked for `g(-1e-6)`: the CLL family takes a fractional power of a negative number there and the LEP family a square root of a negative product, so both returned `nan` for a slope that exists. The stencil is now clamped into the interval, giving a forward difference at 0 and a backward difference at 1. **The interior is bit-identical on purpose:** the clamp only engages within `h` of an endpoint and the divisor stays the exact literal `2e-6` everywhere else, so no existing slope moves. This fixes every distortion that inherits the default, not just the two that showed up.
+
+`LEPDistortion.g_inv` took the square root of a discriminant that rounding can push a few ulp negative for a `y` sitting exactly on the mass level or on the saturation level. Both branches are already resolved by the enclosing `where` / `maximum`, so the radicand is floored at 0.
+
+`_aggregate_compute.discretize` divided by a zero normalizer. A severity whose support lies entirely off the grid discretizes to all zeros: `build('agg HF 1 claim sev gamma 50 cv 0.1 fixed hints{bs=1/64; log2=10}')` puts a mean-50 severity on a grid topping out at 16. `appx / 0` then replaced a truthful "no mass here" with `nan` in every bucket, and **`nan` survives the FFT**, so the entire aggregate came back `nan` with nothing said anywhere. The zeros are now left alone, which makes the deficit exactly 1 and hands the report to `[Warning-Policy]`'s machinery:
+
+```
+>>> a.validation_description
+'fails pmf deficit 1.000e+00, sev mean, agg mean'
+```
+
+plus a `DefectiveDistributionWarning` naming the fix. A `logger.warning` records which component was empty.
+
+**Not made a standing gate.** `-W error::RuntimeWarning` is clean on the full suite, but `tests/test_bivariate.py::test_mv_explain_flags_clipped_book` failed under it in two runs out of four and could not be reproduced: the module passes alone, and all three bivariate modules pass together. That suite is the one already carrying `xdist_group` for memory pressure, so load is the first suspect. Tracked in `dev/TODO.md` as `[Bivariate-Gate-Flake]`; the gate is documented as a release-time command rather than added to `addopts` until it is understood.
+
+No API change.
+
 ## 1.0.0a219
 
 **[Warning-Policy] A defective distribution is announced once, at the level where it can change a price, and again when a defective law is actually priced.** Found by reading the rendered reproductions book, which carried about 250 stderr lines across 17 pages. They were not spread thin: 208 of them came from nine source lines, and two chapters produced 72% of the total. `Mata2005` printed the *same two messages* 64 times. The genuinely interesting facts, that Mack's Pareto splice has no finite mean and that BenRached's Lévy severity loses 12.6% of its mass, were buried in the repetition rather than surfaced by it.

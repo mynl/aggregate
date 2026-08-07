@@ -517,19 +517,18 @@
   four shipped corpora asserting zero `Token.Error` and derives the brace
   clauses and operator literals from the grammar, so the reserved-word walk is
   no longer the only check.
-- **[RuntimeWarning-Census]** — audit the remaining benign numpy boundary
-  warnings. `[TVaR-Endpoint-Noise]` (`1.0.0a179`) guarded the three sites on the
-  `p = 1` quantile path (`make_var_tvar`'s vectorized `tvar`,
-  `GridDistribution.tvar_of_limited`, `Distortion.tvar_terms`), taking
-  `pytest -W error::RuntimeWarning` from 71 failed / 4 errors to 52 failed / 0
-  errors. The rest concentrate in `test_distortion_quartet` (34) and
-  `test_tail` (6); a census over five affected files named `spectral.py`
-  (1156, 2304, 2399, 3607, 3847, 3856), `moments.py` (193, 284, 285, 299, 315),
-  `pedagogy.py` (1571, 1711), and `_aggregate_compute.py:330`. Each needs
-  deciding on its merits: a guard where the discarded branch is genuinely
-  unreachable, a fix where the NaN can reach a result. Nothing in the package
-  promotes warnings to errors, so this bites only users whose kernel does.
-  Worth finishing so `-W error::RuntimeWarning` can become a standing gate.
+- **[Bivariate-Gate-Flake]** — `tests/test_bivariate.py::test_mv_explain_flags_clipped_book`
+  failed under `pytest -m 'slow or not slow' -W error::RuntimeWarning` in two
+  full-suite runs out of four (`1.0.0a220`), and would not reproduce: the test
+  passes alone, the module passes alone, and all three bivariate modules pass
+  together under the same flag. That suite is the one already carrying
+  `xdist_group` for memory pressure (several 2-D grids allocated concurrently
+  once produced a numpy allocation failure in a test whose own grid was 64x64),
+  so worker load is the first suspect, and the runs that failed were back to
+  back with other full-suite runs. Until it is understood, `-W error::RuntimeWarning`
+  stays a release-time command rather than going into `addopts`. Reproduce by
+  running the whole suite under the flag repeatedly; capture the traceback
+  (`--tb=long -rf` to a file) the first time it fires.
 - **[Colorizer-Style-Choice]** — `decl_writer._colorize` hard-codes
   `style='friendly'` for html, ansi and latex alike. A `style=` axis on
   `format_program`, and a dark-background default for the terminal path, is a

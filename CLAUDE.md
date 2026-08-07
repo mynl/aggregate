@@ -262,6 +262,14 @@ Three tiers. Use the first one that covers the change:
 **Do NOT rely on eyeballing blast radius as the *only* check.** Use tier 1 to
 iterate; always finish with tier 2 before declaring a change done, and tier 3
 before a bump.
+- **Numerics gate — `uv run pytest -m 'slow or not slow' -W error::RuntimeWarning`.**
+  The library emits no `RuntimeWarning` of its own as of `1.0.0a220`
+  (`[RuntimeWarning-Census]`), so a new one is a real finding: either
+  arithmetic whose result is discarded, which wants an `np.errstate` guard and
+  a `Notes` paragraph saying why, or a `NaN` that reaches an answer, which
+  wants a fix. Deliberately **not** in `addopts`: a third-party release could
+  break the everyday loop, and one bivariate case flakes under it
+  (`[Bivariate-Gate-Flake]`). Run it at a numerics-touching bump.
 - **`slow` marker — fast-by-default.** `addopts` carries `-m 'not slow'`, so the
   everyday `uv run pytest` skips the quarantined heavy cases. The three
   bleeding-edge bivariate suites (`test_bivariate.py`, `test_massive_bivariate.py`,

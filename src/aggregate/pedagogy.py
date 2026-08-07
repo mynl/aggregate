@@ -1568,7 +1568,11 @@ def plot_bivariate(port, fig, ax, min_loss, max_loss, jump,
     X, Y = np.meshgrid(bit.index, bit.index)
 
     if log:
-        z = np.log10(Z)
+        # An empty bucket gives log10(0) = -inf, which the very next two lines
+        # mask out of the plot; the guard suppresses numpy's report of a value
+        # that never reaches the figure.
+        with np.errstate(divide='ignore'):
+            z = np.log10(Z)
         mask = np.zeros_like(z)
         mask[z == -np.inf] = True
         mz = np.ma.array(z, mask=mask)
@@ -1708,7 +1712,10 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
             Z = Z / np.sum(Z)
             X, Y = np.meshgrid(bit.index, bit.index)
             if biv_log:
-                z = np.log10(Z)
+                # log10(0) = -inf is masked out two lines down; see the same
+                # pattern in bivariate_density_plot.
+                with np.errstate(divide='ignore'):
+                    z = np.log10(Z)
                 mask = np.zeros_like(z)
                 mask[z == -np.inf] = True
                 mz = np.ma.array(z, mask=mask)

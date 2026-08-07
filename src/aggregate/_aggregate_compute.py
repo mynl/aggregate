@@ -10,10 +10,14 @@ A leaf: numpy / scipy.fft / the ``utilities`` FFT helpers only; it never imports
 ``_aggregate``.
 """
 
+import logging
+
 import numpy as np
 import scipy.fft as sfft
 
 from .utilities import ft, ift
+
+logger = logging.getLogger(__name__)
 
 
 def freq_sev_convolution(sev_density, freq_pgf, n, *, N, bs, i0=0, x_min=0.0,
@@ -327,7 +331,22 @@ def discretize_severities(sevs, xs, bs, *, i0=0, sev_calc='discrete',
             raise ValueError(
                 f'Invalid options {discretization_calc} to double_diff; options are density, survival or both')
         if normalize:
-            beds.append(appx / np.sum(appx))
-        else:
-            beds.append(appx)
+            # A severity whose support lies entirely off the grid discretizes
+            # to all zeros (e.g. mean 50, sd 5, on a grid topping out at 16
+            # because bs and log2 were both pinned). Dividing by a zero total
+            # replaces a truthful "no mass here" with NaN in every bucket,
+            # and NaN survives the FFT, so the whole aggregate comes back
+            # NaN with nothing said. Leave the zeros: the resulting 100%
+            # deficit is what ``update_work`` reports, and that warning names
+            # the fix.
+            total = np.sum(appx)
+            if total > 0:
+                appx = appx / total
+            else:
+                logger.warning(
+                    'discretize | severity %r contributes no mass to this '
+                    'grid (support is entirely outside it); leaving it at '
+                    'zero rather than normalizing 0/0.',
+                    getattr(sev, 'name', '?'))
+        beds.append(appx)
     return beds

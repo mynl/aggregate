@@ -187,10 +187,20 @@ class MomentAggregator:
         :param s2:
         :param s3:
         :return:
+
+        Notes
+        -----
+        A severity with no finite second or third moment (a Pareto with
+        ``alpha <= 3``, a Levy) makes ``s2`` or ``s3`` infinite, and the sums
+        below then evaluate ``inf - inf`` or ``0 * inf``. ``nan`` is the
+        correct report for a moment that does not exist, so the ``errstate``
+        guard suppresses numpy's account of arithmetic whose answer is
+        already right.
         """
-        return f1 * s1, \
-               f1 * s2 + (f2 - f1) * s1 ** 2, \
-               f1 * s3 + f3 * s1 ** 3 + 3 * (f2 - f1) * s1 * s2 + (- 3 * f2 + 2 * f1) * s1 ** 3
+        with np.errstate(invalid='ignore'):
+            return f1 * s1, \
+                   f1 * s2 + (f2 - f1) * s1 ** 2, \
+                   f1 * s3 + f3 * s1 ** 3 + 3 * (f2 - f1) * s1 * s2 + (- 3 * f2 + 2 * f1) * s1 ** 3
 
     @staticmethod
     def agg_from_fs2(f1, vf, s1, vs):
@@ -278,11 +288,18 @@ class MomentAggregator:
         :param n2:
         :param n3:
         :return:
+
+        Notes
+        -----
+        Cumulating an undefined moment (``inf``) against a zero one gives
+        ``0 * inf``; ``nan`` is the correct report and the guard suppresses
+        numpy's account of it. See :meth:`agg_from_fs`.
         """
         # figure out moments of the sum
-        t1 = m1 + n1
-        t2 = m2 + 2 * m1 * n1 + n2
-        t3 = m3 + 3 * m2 * n1 + 3 * m1 * n2 + n3
+        with np.errstate(invalid='ignore'):
+            t1 = m1 + n1
+            t2 = m2 + 2 * m1 * n1 + n2
+            t3 = m3 + 3 * m2 * n1 + 3 * m1 * n2 + n3
         return t1, t2, t3
 
     @staticmethod
@@ -294,9 +311,18 @@ class MomentAggregator:
         :param ex2:
         :param ex3:
         :return:
+
+        Notes
+        -----
+        Both central combinations below are ``inf - inf`` when the raw
+        moments they are built from do not exist (an infinite-variance
+        severity gives ``ex2 = ex3 = inf``). ``nan`` is the right answer for
+        an undefined CV or skewness, so the guard suppresses numpy's account
+        of arithmetic that has already reached it. See :meth:`agg_from_fs`.
         """
         m = ex1
-        var = ex2 - ex1 ** 2
+        with np.errstate(invalid='ignore'):
+            var = ex2 - ex1 ** 2
         # rounding errors...
         if np.allclose(var, 0):
             var = 0
@@ -312,7 +338,8 @@ class MomentAggregator:
         if sd == 0:
             skew = np.nan
         else:
-            skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
+            with np.errstate(invalid='ignore'):
+                skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
         return m, cv, skew
 
     @staticmethod

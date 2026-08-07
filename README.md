@@ -34,7 +34,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ## Installation
 
-`aggregate` requires Python 3.11 or later. The strongly recommended way to
+`aggregate` requires Python 3.12 or later. The strongly recommended way to
 install and manage it is with [uv](https://docs.astral.sh/uv/), Astral's fast
 Python package and project manager — follow the
 [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/)

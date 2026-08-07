@@ -31,10 +31,11 @@ Design (see ``dev/plan-exhibits.md``):
   translated blocks. Light overrides add a caption or row flags; heavy ones
   may rebuild the presentation entirely. The rule keeps the generic path
   total: a new exhibit is useful the moment its raw registration exists.
-* The frame stage (:func:`exhibit_frames`) is pure pandas, testable and
-  usable without greater_tables installed. Only :func:`build_exhibit` and
-  :meth:`Exhibit.to_payload` touch greater_tables, through a lazy import
-  that names the ``exhibits`` extra when the package is missing.
+* The frame stage (:func:`exhibit_frames`) is pure pandas: testable, and
+  usable on its own by a caller that wants the numbers rather than a table.
+  Only :func:`build_exhibit` and :meth:`Exhibit.to_payload` touch
+  greater_tables, through an import at the point of use, so the frame stage
+  never pays for it.
 
 All served frames pass through the host's ``LabeledMixin._relabel`` (honoring
 ``use_labels`` and ``renamer``); exhibit titles use ``_title_name``.
@@ -192,14 +193,21 @@ class Exhibit:
 
 
 def _import_greater_tables():
-    """Lazy import of greater_tables, naming the extra when missing."""
+    """Import greater_tables at the point of use.
+
+    A plain dependency since 1.0.0a229, so this normally cannot fail. It stays
+    lazy for two reasons that outlive the packaging question: the frame stage
+    is pure pandas and must not pay the import, and a broken or partial
+    install should say what is wrong here rather than at ``import aggregate``.
+    """
     try:
         import greater_tables
     except ImportError as exc:
         raise ImportError(
-            'greater_tables is required to build exhibit IR blocks: install the '
-            "exhibits extra (greater_tables>=6.0.0a8; until GT 6 publishes to "
-            'PyPI this means a sibling checkout, see pyproject.toml)') from exc
+            'greater_tables is required to build exhibit IR blocks. It is a '
+            'dependency of aggregate (greater_tables>=6), so this means a '
+            'broken environment: reinstall with '
+            '`uv sync --all-extras` or `pip install -U aggregate`.') from exc
     return greater_tables
 
 

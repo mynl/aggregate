@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.0a229
+
+**[Greater-Tables-Dependency] `greater_tables` is a plain dependency, and the Python floor rises to 3.12.** GT 6.0.0 published to PyPI on 2026-08-07, so the workaround it forced can go: the `exhibits` extra had stayed commented out because an active extra naming an unpublished package would make `uv sync --all-extras` unresolvable, and the install instruction was a sibling checkout.
+
+It lands in `dependencies` rather than as an extra. The exhibit surface is part of what the library is for, and an extra bought nothing once the package resolved normally.
+
+**Three floors move with it**, because GT declares them and inheriting them silently would be worse than stating them:
+
+| | was | now | why |
+|---|---|---|---|
+| `requires-python` | `>=3.11` | `>=3.12` | GT 6.0.0 is `>=3.12` |
+| `numpy` | `>=1.26` | `>=2.0` | GT's floor |
+| `pandas` | `>=2.1` | `>=2.2` | GT's floor |
+
+The 3.11 classifier is dropped, and `pydantic` and `pyyaml` join the tree transitively. The alternative, a `python_version >= '3.12'` marker on the dependency, was rejected: it would have left the exhibit surface raising `ImportError` on 3.11, which is the optionality this change exists to end, only now silent and version dependent.
+
+**The import stays at the point of use** in `_import_greater_tables`. That was never really about the packaging: the frame stage (`exhibit_frames`) is pure pandas and must not pay the import, and a broken install should say so where the tables are built rather than at `import aggregate`. Its error message no longer names an extra, because there is not one.
+
+
 ## 1.0.0a228
 
 **[Chart-Support-Serialized] `ChartSeries.support` reaches the client, so a discretized density can be drawn as one.** The IR always carried the fact and the library's own renderer always honored it; the serializer deleted it in exactly the case that carries an instruction.

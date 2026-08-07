@@ -29,10 +29,10 @@ is a manifest line. A new insurer translation of an existing exhibit is a
 function in the class module. A wholly new multi block exhibit declares its
 generic function in ``_core`` and registers builders in the class module.
 
-Nothing here imports greater_tables. The IR conversion step
-(:func:`build_exhibit`, :meth:`Exhibit.to_payload`) imports it lazily and
-names the ``exhibits`` extra when it is missing, so ``import aggregate`` and
-``import aggregate.exhibits`` both stay free of it.
+Nothing at module scope imports greater_tables. The IR conversion step
+(:func:`build_exhibit`, :meth:`Exhibit.to_payload`) imports it at the point of
+use, so ``import aggregate`` and ``import aggregate.exhibits`` both stay free
+of it even though it is a plain dependency (since 1.0.0a229).
 """
 
 from .._aggregate import Aggregate

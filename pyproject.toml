@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a228"
+version = "1.0.0a229"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -18,7 +18,6 @@ classifiers = [
     "Intended Audience :: Education",
     "Intended Audience :: Financial and Insurance Industry",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -26,19 +25,24 @@ classifiers = [
     "Topic :: Office/Business :: Financial",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
+# greater_tables 6 requires Python >= 3.12 and floors numpy at 2.0 and pandas
+# at 2.2, so making it a plain dependency at 1.0.0a229 raised this project's
+# floors to match rather than leaving them to be inherited silently. It also
+# brings pydantic and pyyaml in transitively.
 dependencies = [
+    "greater_tables>=6",
     "IPython",
     "lark>=1.1",
     "matplotlib>=3.5",
-    "numpy>=1.26",
-    "pandas>=2.1",
+    "numpy>=2.0",
+    "pandas>=2.2",
     "Pygments",
     "scipy>=1.11",
     # made optional in 0.27
     # "numba",
 ]
 license = "BSD-3-Clause"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 
 [project.urls]
 Documentation = "https://aggregate.readthedocs.io/en/latest/"
@@ -76,7 +80,6 @@ notebook = [
     "jupytext",
     "attrs",
     "ipython-autotime",
-    # "greater_tables",
 ]
 # Opt-in accelerator: numba-compiled TVaR / biTVaR inner loops in utilities.py.
 # Pure-numpy fallbacks exist, so this is not required (numba was dropped as a
@@ -87,7 +90,7 @@ numba = [
     "numba",
 ]
 # disk-backed (out-of-core) bivariate update -- dev/plan-bv.md. zarr 3 needs
-# py >= 3.11, matching requires-python.
+# py >= 3.12, matching requires-python.
 massive = [
     "zarr>=3",
 ]
@@ -97,16 +100,14 @@ viz = [
     "holoviews",
     "bokeh",
 ]
-# Business exhibits to greater_tables table-document IR (dev/plan-exhibits.md,
-# [Exhibits-Module]). greater_tables 6 is NOT yet on PyPI (latest published is
-# 5.3.0), so the extra stays commented until it publishes: an active extra
-# would make `uv sync --all-extras` unresolvable. Until then install the
-# sibling checkout ad hoc, as aggregate_api does:
+# The exhibits IR (dev/plan-exhibits.md, [Exhibits-Module]) needs
+# greater_tables 6, which published to PyPI on 2026-08-07. It is a plain
+# dependency above rather than an `exhibits` extra: the exhibit surface is
+# part of what the library is for, and an extra bought nothing once the
+# package resolved normally. Developing greater_tables alongside this repo
+# still works, but a `uv sync` will replace an editable checkout with the
+# published wheel, so re-install it after syncing:
 #   UV_PROJECT_ENVIRONMENT=.venv uv pip install -e C:/S/AI/greatest-tables
-# Activate when GT 6 publishes:
-# exhibits = [
-#     "greater_tables>=6.0.0a8",
-# ]
 
 [tool.setuptools]
 include-package-data = true

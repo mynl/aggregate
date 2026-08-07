@@ -21,12 +21,24 @@ book:
         - Bodoff2017.qmd
         - Homer2003.qmd
         - Bear1990.qmd
-    - part: "Conditional expectations given the sum"
+    - part: "Distortion pricing"
       chapters:
+        - Wang2000.qmd
+        - Wang2002.qmd
+    - part: "Risk sharing and conditional expectations given the sum"
+      chapters:
+        - Denuit2019.qmd
+        - Denuit2022b.qmd
         - Denuit2025a.qmd
         - Denuit2025.qmd
     - part: "Exact computation and convolution accuracy"
       chapters:
+        - Gerber1982.qmd
+        - Robertson1992.qmd
+        - Embrechts1993.qmd
+        - Grubel1999.qmd
+        - Embrechts2009a.qmd
+        - Schaller2008.qmd
         - Bruno2006.qmd
         - Wilson2016a.qmd
         - Wilson2017.qmd

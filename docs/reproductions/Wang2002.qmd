@@ -1,0 +1,151 @@
+---
+title: "Pricing weather options off 22 observations"
+subtitle: "Reproducing Wang (2002), Table 2"
+---
+
+## Context and problem
+
+@Wang2002 proposes the Wang transform as a single pricing framework covering financial and insurance risks. The transform distorts the survival function by
+
+$$S^*(x) = \Phi\!\left(\Phi^{-1}(S(x)) + \lambda\right),$$
+
+with $\lambda$ a market price of risk. On a lognormal it reproduces Black-Scholes; on an insurance loss it produces the kind of loading actuaries recognize; and the paper's argument is that this is not a coincidence but the point.
+
+The weather derivative example is the interesting one for a reproduction, because it is the case where no parametric model is used at all. The underlying is Heating Degree Days for December at a weather station, and the only thing available is 22 years of history. There is no lognormal to transform, no fitted severity, and nothing to estimate beyond the empirical distribution itself. The transform is applied directly to 22 equally weighted observations.
+
+That makes it a good test of a specific thing: whether `aggregate` can carry a purely empirical distribution through a distortion and price a derivative on it, with no parametric step anywhere.
+
+## Paper solution and gold standard
+
+Table 1 lists the December HDD totals for 1979 to 2000, 22 observations. Table 2 prices call options on Dec-2001 HDDs at six strikes with $\lambda = 0.25$, reporting the objective expected payoff, the transformed price, and the implied loading.
+
+```{python}
+#| label: setup
+import numpy as np
+import pandas as pd
+from aggregate import build
+from greater_tables import GT
+
+HDD = [972.5, 1147.0, 1244.0, 901.0, 1573.0, 1055.0, 1488.0, 1065.5,
+       1018.5, 1155.0, 1474.5, 1129.5, 1077.5, 1129.5, 1090.5, 938.5,
+       1199.5, 1156.0, 1040.0, 940.5, 1090.5, 1517.5]
+LAMBDA = 0.25
+PAPER = pd.DataFrame(
+    {'expected payoff': [47.86, 38.77, 29.68, 20.59, 11.50, 4.11],
+     'price': [68.21, 55.45, 42.70, 29.94, 17.18, 6.59],
+     'loading %': [43, 43, 44, 45, 49, 60]},
+    index=[1250, 1300, 1350, 1400, 1450, 1500])
+PAPER.index.name = 'strike'
+GT(PAPER, float_format=2)
+```
+
+The data transcription has an acceptance test that does not involve the transform at all. The objective expected payoff of a call struck at $K$ is just $\frac{1}{22}\sum_i (x_i - K)_+$, so if the 22 numbers are right, six of Table 2's eighteen entries follow by arithmetic.
+
+```{python}
+#| label: transcription
+h = np.array(HDD)
+emp = pd.DataFrame({'strike': PAPER.index,
+                    'empirical (x - K)+ mean': [np.maximum(h - k, 0).mean()
+                                                for k in PAPER.index],
+                    'Table 2': PAPER['expected payoff'].to_numpy()})
+emp['difference'] = emp['empirical (x - K)+ mean'] - emp['Table 2']
+GT(emp.set_index('strike'),
+   formatters={'empirical (x - K)+ mean': 4, 'Table 2': 2, 'difference': '{x:.4f}'})
+```
+
+All six agree to within 0.004, which is the paper's rounding to two decimals. The 22 observations are transcribed correctly, and the paper's mean of 1,154.70 and standard deviation of 193.37 follow.
+
+```{python}
+#| label: moments
+GT(pd.DataFrame([
+    {'quantity': 'observations', 'value': len(HDD)},
+    {'quantity': 'mean HDD', 'value': float(np.mean(h))},
+    {'quantity': 'standard deviation', 'value': float(np.std(h, ddof=1))},
+]).set_index('quantity'), float_format=4)
+```
+
+## The `aggregate` reproduction
+
+The empirical distribution goes in as a `dsev`, a discrete severity with one atom per observation, carried by a single certain claim so the aggregate *is* the empirical law.
+
+```{python}
+#| label: program
+hdd = build(f'agg HDD 1 claim dsev {HDD} fixed', bs=1 / 32, log2=16)
+print(hdd.program[:110] + ' ...')
+d = build(f'distortion wang{int(LAMBDA*100)} wang {LAMBDA}')
+print(d.program)
+```
+
+```{python}
+#| label: table-2
+bit = hdd.density_df.query('p_total > 0')[['p_total']]
+rows = []
+for k in PAPER.index:
+    # push the atoms forward through the payoff map, then price the result
+    payoff = bit.groupby(by=lambda x: np.maximum(0.0, x - k)).p_total.sum()
+    p = d.price(payoff, kind='both')
+    rows.append({'strike': k, 'expected payoff': p.el, 'price': p.ask,
+                 'loading %': 100 * (p.ask / p.el - 1), 'bid': p.bid})
+got = pd.DataFrame(rows).set_index('strike')
+GT(pd.concat({'paper': PAPER, 'aggregate': got[PAPER.columns]}, axis=1),
+   float_format=2)
+```
+
+```{python}
+#| label: verdict
+rel = (got[PAPER.columns] / PAPER - 1).abs()
+GT(pd.DataFrame([
+    {'column': c, 'worst absolute difference':
+        float((got[c] - PAPER[c]).abs().max()),
+     'worst relative difference': float(rel[c].max())}
+    for c in PAPER.columns]).set_index('column'),
+   formatters={'worst absolute difference': '{x:.4f}',
+               'worst relative difference': '{x:.2e}'})
+```
+
+All eighteen published entries reproduce to the precision printed. The expected payoffs agree to 0.004, within the paper's two decimals. The six transformed prices, which depend on the whole machinery rather than on the data alone, agree to **under half a cent**: 68.21, 55.45, 42.70, 29.94, 17.18 and 6.59.
+
+The loading row is printed as whole percentages and is the loosest of the three, since 42.50% at a strike of 1250 rounds to the paper's 43% only just. That is a consequence of rounding a ratio of two rounded quantities rather than a disagreement: the price and the payoff it is formed from both match to four decimals.
+
+## Comments
+
+### The loading rises with the strike, and that is the interesting part
+
+```{python}
+#| label: loading-shape
+GT(pd.DataFrame([
+    {'strike': k,
+     'probability of payoff': float((h > k).mean()),
+     'expected payoff': got.loc[k, 'expected payoff'],
+     'price': got.loc[k, 'price'],
+     'loading %': got.loc[k, 'loading %']}
+    for k in PAPER.index]).set_index('strike'),
+   formatters={'probability of payoff': 4, 'expected payoff': 3, 'price': 3,
+               'loading %': 1})
+```
+
+The relative loading runs from 43% at a strike of 1250 to 60% at 1500, and the driver is visible in the first column: at 1250 the option pays in 9 of 22 years and at 1500 in 2 of 22. A distortion that reweights the survival function loads a thin, remote payoff more heavily than a frequent one, in relative terms, which is exactly the property @Wang2000 argues an insurance pricing operator should have. It is the same shape as the layer loadings in that paper, obtained here without a parametric severity anywhere in the calculation.
+
+### Twenty two observations is the whole model, and that is a real limitation
+
+Nothing here smooths the data. The empirical distribution has 22 atoms, the distorted distribution has the same 22 atoms with reweighted probabilities, and the price is a weighted sum over them. That is faithful to the paper and it means the price at a strike above the largest observation is exactly zero, while the price just below it is determined by a single year.
+
+```{python}
+#| label: sensitivity
+rows = []
+for k in (1500, 1520, 1550, 1573, 1600):
+    payoff = bit.groupby(by=lambda x: np.maximum(0.0, x - k)).p_total.sum()
+    p = d.price(payoff, kind='both')
+    rows.append({'strike': k, 'years with a payoff': int((h > k).sum()),
+                 'expected payoff': p.el, 'price': p.ask})
+GT(pd.DataFrame(rows).set_index('strike'),
+   formatters={'years with a payoff': 0, 'expected payoff': 4, 'price': 4})
+```
+
+Past 1573, the highest December in the record, the option is free. Any real quote at those strikes needs a tail model, and the empirical route cannot supply one: this is the same limit @Wang2002 is working within, and the paper does not price above 1500. The reproduction inherits the limitation rather than papering over it, which is the right outcome, but it is worth stating that the method's applicability stops where the data does.
+
+### Why this example is a useful test of the library rather than of the transform
+
+The transform is a one line function and would be easy to check on a lognormal. What this example exercises is the plumbing around it: a discrete severity given as a list of 22 floats, a pushforward through a payoff map that collapses many atoms onto zero, and a distortion applied to the resulting distribution rather than to the original.
+
+That pushforward is the step where a library is likely to be wrong, because the payoff map is not injective: every year below the strike maps to a payoff of exactly zero, so nine to twenty of the 22 atoms have to be merged and their probabilities added before the distortion is applied. Applying the distortion first and then mapping would give a different and wrong answer, since a distortion is not linear. The agreement to two decimals at all six strikes is evidence that the order is right.

@@ -8,17 +8,15 @@ quarto render --to html
 quarto render --to pdf
 -->
 
-This book reproduces published figures, tables and results using `aggregate`. Every number in it is computed when the book is rendered. Nothing is transcribed from a previous run, so a chapter that still claims a match is a chapter whose match still holds against the current library.
+This book reproduces published figures, tables and results using `aggregate`. Every number in it is computed when the book is rendered. Nothing is transcribed from a previous run, so a match demonstrates the correctness of the current library version.
 
-That is the point of the exercise. A library that computes compound distributions has to be right, and the only external check on "right" is a published number computed by somebody else, by a different method, who had no interest in making this software look good. Seventeen papers are worked through here. Most of them confirm the library. Several of them correct it, or locate a limit in it that was not previously known. Four of them turn out to contain errors of their own, which is not a criticism of the authors so much as evidence that the check runs in both directions.
+A library that computes compound distributions has to be correct. `aggregate` has an extensive set of *internal* correctness checks embodied in its validation system: these check for a match between the first three theoretical and empirical moments. However, a published number computed by somebody independent using a different method is a good *external* check. We work through results from twenty seven papers. Most of them confirm the library. Several of them correct it, or locate a limit in it that was not previously known. Seven of them turn out to contain an error, an internal inconsistency or a misprint, which is not a criticism of the authors so much as evidence that the check runs in both directions.
 
-## Start here
-
-The first chapter is the short version: five of these papers at one page each, each with the DecL program that reproduces the published exhibit and the answer set beside the paper's own numbers. It takes ten minutes. Everything after it is the detail, and the detail is the point of the exercise, but it is not the place to begin.
+The first chapter is the short version: five papers, each with the DecL program that reproduces the published exhibit and the answer set beside the paper's own numbers. It takes ten minutes. Everything after it is the detail, which is the point of the exercise but not the place to begin!
 
 ## The shape of a chapter
 
-Each chapter follows the same four movements: the context and the problem the paper is solving, the paper's own solution and the gold standard it publishes, the `aggregate` reproduction, and comments. A simple reproduction can be very short. Something unusual, or unfamiliar to actuaries, needs more context.
+Each chapter follows the same four structure: the context and the problem the paper is solving, the paper's own solution and the gold standard it publishes, the `aggregate` reproduction, and comments. A simple reproduction can be very short. Something unusual, or unfamiliar to actuaries, needs more context.
 
 A chapter named for a paper that turned out **not** to be reproducible says so and gives the evidence. There is one, @Jin2016, and it has a part to itself. A negative result that explains precisely which feature is missing is more useful than silence, and in that case the missing feature is named: a common shock count mode for bivariate frequencies.
 
@@ -53,6 +51,16 @@ The two groups also arrived differently. The actuarial chapters come out of a ca
 | @Mata2005 | Tables 1 to 14, trend and exposure adjustment by layer | Reproduced, and a discrepancy found in the paper's Table 1 |
 | @Denuit2025a | Figure 1, the comonotonic repair of a conditional mean allocation | Reproduced, and the published figure cannot hold at its right hand edge |
 | @Denuit2025 | Figures 2, 5 and 6, conditional expectation given the sum | Reproduced. The turning point lands at 64.46, which is what settles the index convention |
+| @Denuit2019 | Figure 1 and the shares at $s = 1$, four participant pool | Reproduced. The horizontal line resolves a table that contradicts its own text |
+| @Denuit2022b | Example 4.5, Figure 6, mortality credits at three pool sizes | Reproduced. Shares add up exactly at every pool size |
+| @Wang2000 | Table 1, risk load by layer under two distortions | Reproduced to 0.31%, and the basic limit expected loss is misprinted |
+| @Wang2002 | Table 2, weather derivative calls off 22 observations | Reproduced. Prices to under half a cent |
+| @Gerber1982 | Tables 1 to 3, the exact stop loss premium columns | Reproduced. All 28 values inside the printed precision |
+| @Robertson1992 | Table 4, the piecewise uniform algorithm | **Partial.** Exact for the paper, $O(h)$ for a lattice, so the printed precision is out of reach |
+| @Embrechts1993 | Figure 1, discretization error and Richardson extrapolation | Reproduced. The $O(h^2)$ rate measured at 3.998 |
+| @Grubel1999 | Tables 1 and 2, the L1 sums, the Theorem 2 bound | Reproduced, including the bound at 0.4641 |
+| @Embrechts2009a | Table 1, three arithmetization designs | Reproduced **exactly**, all twelve values |
+| @Schaller2008 | Table 4.3, operational risk quantiles | Reproduced to 2.2e-4, all twelve distinct values |
 | @Bodoff2017 | Exhibit 4, excess of policy limits | Reproduced. Two unstated model choices inferred and confirmed by fit |
 | @Homer2003 | All three worked examples of the bivariate FFT | Reproduced. Every construction is a shipped DecL form |
 | @Bear1990 | Table I, six treaties with adjustable features | Reproduced. The lognormal column exactly, the collective risk column to the printed digit in five of six |

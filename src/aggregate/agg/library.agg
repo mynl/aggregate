@@ -127,9 +127,10 @@
 # `decl_writer.format_program(..., layout='spread')` and refuses to write
 # unless every statement still parses to the same spec.
 #
-# Sixteen entries are exempt, and stay hand-written. The unparser cannot invert
-# a named object reference (`sev.UnitSeverity` is resolved and inlined at parse
-# time), the `tweedie` clause (it expands to the equivalent
+# Seventeen entries are exempt, and stay hand-written. The unparser cannot
+# invert a named object reference (`sev.UnitSeverity` is resolved and inlined at
+# parse time, and since a216 an engine reference like `less agg.USXOLTower`
+# writes its whole body out), the `tweedie` clause (it expands to the equivalent
 # compound-Poisson-gamma), or the `minimum` distortion combinator (the child
 # names are not retained). Three more keep the compact `ssev <c> - <dist>`
 # spelling, whose canonical form `-1 * <dist> + <c>` parses two ways. All are
@@ -213,13 +214,13 @@ agg USXOLTower as "US Hurricane Reinsurance"
   1.74 claims
   sev lognorm 8.501 cv 14.624
   occurrence net of
-      90% po 100 xs 100 deposit 4 and
-      95% po 200 xs 200 deposit 3.75 as "Occ re"
+    90% so 100 xs 100 deposit 4 and
+    95% so 200 xs 200 deposit 3.75 as "Occ re"
   poisson
   aggregate net of
-      50% po 20 xs 100 deposit 3 as "Agg re"
-  tags{role:hero, topic:reinsurance}
+    50% so 20 xs 100 deposit 3 as "Agg re"
   note{ILW model of US Cat. Amounts in billions. From St John's RMI3388 course. Industry estimates, as of 2019: 100 year PML USD132.5B and 250 year USD300.3B.}
+  tags{role:hero, topic:reinsurance}
   hints{bs=2;log2=16;normalize=False;};
 
 xpnl USHurr as "US Hurricane"
@@ -949,47 +950,59 @@ agg ReinsuranceOccurrenceWithAggLimit
 # ----------------------------------------------------------------------
 port PnLBook
   tags{topic:portfolio, topic:pnl}
-  pnl Cat 2000 premium less
-    agg Cat_e
-      2000 premium at 0.55 lr
-      sev lognorm 500 cv 3
-      poisson
-  pnl Prop 5000 premium less
-    agg Prop_e
-      5000 premium at 0.65 lr
-      sev lognorm 100 cv 2
-      poisson;
+  pnl Cat
+    2000 premium
+    less
+      agg Cat_e
+        2000 premium at 0.55 lr
+        sev lognorm 500 cv 3
+        poisson
+  pnl Prop
+    5000 premium
+    less
+      agg Prop_e
+        5000 premium at 0.65 lr
+        sev lognorm 100 cv 2
+        poisson;
 
-pnl PnLClaims 100 premium less
-  agg PnLprem.Claims_e
-    10 claims
-    sev lognorm 8 cv 1.5
-    poisson
+pnl PnLClaims
+  100 premium
+  less
+    agg PnLprem.Claims_e
+      10 claims
+      sev lognorm 8 cv 1.5
+      poisson
   note{claims form: premium independent of the loss model}
   tags{topic:pnl};
 
-pnl PnLLoss 100 premium less
-  agg PnLprem.Loss_e
-    85 loss
-    sev lognorm 8 cv 1.5
-    poisson
+pnl PnLLoss
+  100 premium
+  less
+    agg PnLprem.Loss_e
+      85 loss
+      sev lognorm 8 cv 1.5
+      poisson
   note{expected-loss form: E[loss]=85, margin 15}
   tags{topic:pnl};
 
-pnl PnLLossRatio 1000 premium less
-  agg PnLprem.LR_e
-    1000 premium at 0.7 lr
-    sev lognorm 100 cv 2
-    poisson
+pnl PnLLossRatio
+  1000 premium
+  less
+    agg PnLprem.LR_e
+      1000 premium at 0.7 lr
+      sev lognorm 100 cv 2
+      poisson
   note{loss ratio form: E[loss]=700, margin 300}
   tags{topic:pnl};
 
-pnl PnLMixed [100 200 100] premium less
-  agg E.PnLMix_e
-    [100 200 100] premium at 0.8 lr
-    [1000 2000 5000] xs 0
-    sev lognorm 500 cv 2
-    poisson
+pnl PnLMixed
+  [100 200 100] premium
+  less
+    agg E.PnLMix_e
+      [100 200 100] premium at 0.8 lr
+      [1000 2000 5000] xs 0
+      sev lognorm 500 cv 2
+      poisson
   note{Vector premium: shift 400, mean 80 = sum premium_i (1 - lr).}
   tags{topic:pnl};
 
@@ -998,17 +1011,21 @@ pnl PnLMixed [100 200 100] premium less
 #    pnl Cat 2000 prem less agg Cat_e 2000 prem at 55% lr sev lognorm 500 cv 3 poisson
 #    pnl Prop 5000 prem less agg Prop_e 5000 prem at 65% lr sev lognorm 100 cv 2 poisson;
 
-pnl PnLSignedAsymmetric 10 premium less
-  agg PnLsigned.Asym_e
-    dfreq [2]
-    dsev [-2 1 3] [0.5 0.3 0.2]
+pnl PnLSignedAsymmetric
+  10 premium
+  less
+    agg PnLsigned.Asym_e
+      dfreq [2]
+      dsev [-2 1 3] [0.5 0.3 0.2]
   note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2}
   tags{topic:pnl};
 
-pnl PnLSignedDsev 5 premium less
-  agg PnLsigned.Dsev_e
-    dfreq [3]
-    dsev [-1 1]
+pnl PnLSignedDsev
+  5 premium
+  less
+    agg PnLsigned.Dsev_e
+      dfreq [3]
+      dsev [-1 1]
   note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3}
   tags{topic:pnl};
 
@@ -1020,21 +1037,25 @@ pnl PnLSignedSsev 100 premium less
   note{continuous signed severity: E[loss]=50, margin 50}
   tags{topic:pnl};
 
-pnl PnLSimple 1000 premium less
-  agg E.PNL_e
-    1000 premium at 0.9 lr
-    1000 xs 0
-    sev lognorm 120 cv 1
-    mixed gamma 0.25
+pnl PnLSimple
+  1000 premium
+  less
+    agg E.PNL_e
+      1000 premium at 0.9 lr
+      1000 xs 0
+      sev lognorm 120 cv 1
+      mixed gamma 0.25
   note{Single profit-and-loss line.}
   tags{topic:pnl};
 
-pnl PnLVector [100 200 100] premium less
-  agg PnLprem.Vec_e
-    [100 200 100] premium at 0.8 lr
-    [1000 2000 5000] xs 0
-    sev lognorm 500 cv 2
-    poisson
+pnl PnLVector
+  [100 200 100] premium
+  less
+    agg PnLprem.Vec_e
+      [100 200 100] premium at 0.8 lr
+      [1000 2000 5000] xs 0
+      sev lognorm 500 cv 2
+      poisson
   note{vector premium: shift 400, mean 80 = sum premium_i (1-lr)}
   tags{topic:pnl};
 
@@ -1302,10 +1323,12 @@ bivariate BivariatePnLAxis
   agg A
     dfreq [0 1] [0.3 0.7]
     sev lognorm 40 cv 1.2
-  pnl B 900 premium less
-    agg B_e
-      dfreq [0 1]
-      sev lognorm 60 cv 1.5
+  pnl B
+    900 premium
+    less
+      agg B_e
+        dfreq [0 1]
+        sev lognorm 60 cv 1.5
   copula gumbel 0.4
   poisson
   tags{topic:bivariate};
@@ -1378,12 +1401,14 @@ agg ApproximateLeftReflect
   approximate sgamma
   tags{topic:numerics};
 
-pnl ApproximatePnL 600000 premium less
-  agg APX.PnL_e
-    5000 claims
-    sev lognorm 100 cv 2
-    poisson
-    approximate sgamma
+pnl ApproximatePnL
+  600000 premium
+  less
+    agg APX.PnL_e
+      5000 claims
+      sev lognorm 100 cv 2
+      poisson
+      approximate sgamma
   tags{topic:pnl, topic:numerics};
 
 agg ApproximateRightSgamma
@@ -1424,14 +1449,18 @@ port NumericsOneDice
 port NumericsPayPair
   note{homogeneous payoff book prices through the dual}
   tags{topic:portfolio, topic:numerics}
-  pnl P1 10 premium less
-    agg P1_e
-      dfreq [1]
-      dsev [2 5]
-  pnl P2 8 premium less
-    agg P2_e
-      dfreq [1]
-      dsev [1 3];
+  pnl P1
+    10 premium
+    less
+      agg P1_e
+        dfreq [1]
+        dsev [2 5]
+  pnl P2
+    8 premium
+    less
+      agg P2_e
+        dfreq [1]
+        dsev [1 3];
 
 port NumericsSignedDiscrete
   note{signed totals price via dot(kappa, gp); shares NaN}
@@ -1590,9 +1619,18 @@ port NumericsBodoff
 port BodoffFour
   note{Bodoff Thought Experiment No. 4; exponential severity requires sharpen}
   tags{topic:portfolio, role:paper, topic:numerics}
-  agg a 0.25 claims sev   4 * expon poisson
-  agg b 0.05 claims sev  20 * expon poisson
-  agg c 0.05 claims sev 100 * expon poisson
+  agg a
+    0.25 claims
+    sev 4 * expon
+    poisson
+  agg b
+    0.05 claims
+    sev 20 * expon
+    poisson
+  agg c
+    0.05 claims
+    sev 100 * expon
+    poisson;
 
 port PIRCatNonCatGross
   note{PIR Cat-Noncat gross case study.}

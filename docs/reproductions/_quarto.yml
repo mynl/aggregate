@@ -21,6 +21,10 @@ book:
         - Bodoff2017.qmd
         - Homer2003.qmd
         - Bear1990.qmd
+    - part: "Conditional expectations given the sum"
+      chapters:
+        - Denuit2025a.qmd
+        - Denuit2025.qmd
     - part: "Exact computation and convolution accuracy"
       chapters:
         - Bruno2006.qmd

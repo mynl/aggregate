@@ -151,6 +151,13 @@ UNPARSER_EXEMPT = {
     'BernoulliFrequency', 'BinomialSimple', 'FixedFrequency',
     'GeometricFrequency', 'NegativeBinomialFrequency', 'NegativeBinomialMixed',
     'PoissonSimple', 'BasicMixedSev', 'InverseGaussianMixed',
+    # named ENGINE reference: `xpnl USHurr ... less agg.USXOLTower`. Since
+    # a216 [Inline-Port-Engine] an engine writes its body out, so the
+    # canonical form inlines the whole referenced aggregate and the source's
+    # one-line reference cannot be recovered from the spec. Same cause as the
+    # group above; kept separate because the fix is different (the spec would
+    # have to record that a reference was written).
+    'USHurr',
     # tweedie clause
     'TweedieCompound', 'TweedieDispersion', 'TweedieSimple',
     # distortion combinator

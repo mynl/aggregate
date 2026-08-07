@@ -9,7 +9,7 @@ This section presents a DecL version of five published results. Each has the sam
 
 The program on each page is not typed into the page. It is read back off the object that produced the table below it, so the two cannot drift apart. Nothing else is shown, because nothing else is needed: no discretization, no grid loop, no convolution. The bucket size and grid, where they matter, ride inside the program in the `hints{}` clause.
 
-The five results are chosen to make five different points. @Venter1983 is about accuracy against a paper that computed the same thing two other ways. @Bear1990 is about the language, six treaty features in six clauses. @Homer2003 is about reach, a joint distribution that is a view of a program rather than a second model. @Bruno2006 is about speed. @Mata2005 is about the reproduction checking the paper rather than the other way round.
+The five results are chosen to make five different points. @Venter1983 is about accuracy against a paper that computed the same thing two other ways. @Bear1990 is about the language, six treaty features in six clauses. @Homer2003 is about reach, a joint distribution that is a view of a program rather than a second model. @Bruno2006 is about speed. @Denuit2025a is about the reproduction checking the paper rather than the other way round, and it is the one target here that is not an insurance pricing problem at all.
 
 The rest of this book is the detail: fifteen papers, the transcription decisions, the readings that had to be inferred, and the cases that did not work. This chapter gives just the DecL highlights and omits the standard Python scaffolding.
 
@@ -300,55 +300,114 @@ summary(**{'rows compared': len(T7ALL),
 
 All twenty eight published values exact at the six decimals printed. The paper counted the FFT as one transform per convolution and summed over 92,832 of them, which is not how a compound distribution is computed: the frequency enters through its probability generating function applied pointwise to the severity transform, so the whole distribution costs two transforms whether $\lambda$ is 500 or 91,000. Some of the timing gap is twenty years of hardware but that structural part is not.
 
-## Mata and Verheyen (2005): the check runs both ways
+## Denuit, Dhaene, Ghossoub and Robert (2025): the check runs both ways
 
-@Mata2005 derives trend and exposure adjustment by layer from the mathematics of exposure rating, so that lower layers can be trended without individual claim detail. Everything reduces to limited expected values, and Table 1 is the paper's foundation: $\mathsf E[X \wedge a]$ for a lognormal with $\mu = 9.31$ and $\sigma = 2.29$ at the five policy limits the example writes. The lognormal limited expected value has a closed form, so this is a rare case where a third opinion is available.
+@Denuit2025a settle a question about risk sharing rather than insurance pricing. Given a pool of losses $S = X_1 + \dots + X_n$, the conditional mean risk sharing rule allocates $\kappa_i(s) = \mathsf E[X_i \mid S = s]$ to agent $i$. That rule is not always **comonotonic**: an agent's share can *fall* as the pool's total loss rises, which violates the no-sabotage condition and is not Pareto optimal for the convex order. The paper's contribution is an explicit algorithm, from majorization theory, that converts any such allocation into a comonotonic one that improves every agent in convex order while preserving every expectation. Its section 3.2 example is three independent agents: agents 1 and 2 carry a truncated exponential on $[0, 10]$ with $\beta = 1/2$, and agent 3 a truncated equal mixture of an exponential and a $\Gamma(8)$ on $[0, 30]$.
+
+This is a natural reproduction target because $\kappa_i$ is not a special quantity here. It is the `exeqa_` column of a portfolio's `density_df`, the same conditional expectation `aggregate` uses for capital allocation, and the paper's algorithm ships as `Portfolio.make_comonotonic_allocations`.
 
 ::: {.callout-note appearance="simple"}
-**Exhibit placeholder.** Drop the scan at `img/Mata2005-Table1.png`, then replace this block with `![Mata and Verheyen (2005), Table 1](img/Mata2005-Table1.png){width=100%}`.
+**Exhibit placeholder.** Drop the scan at `img/Denuit2025a-Figure1.png`, then replace this block with `![Denuit, Dhaene, Ghossoub and Robert (2025), Figure 1](img/Denuit2025a-Figure1.png){width=100%}`.
 :::
 
 ```{python}
-#| label: mata-program
+#| label: denuit-program
 #| echo: false
 import scipy.stats as ss
 
-MU, SIGMA = 9.31, 2.29
-MEAN = float(np.exp(MU + SIGMA ** 2 / 2))
-PL = [250e3, 500e3, 750e3, 1e6, 5e6]
-
-def mata(a):
-    """One limit. `exp(9.31)` is the paper's own mu, evaluated by the parser."""
-    return build(f'agg M 1 claim {a:.0f} xs 0 sev exp({MU}) * lognorm {SIGMA} fixed '
-                 'hints{log2=20; bs=25; normalize=False}')
-
-builds = {a: mata(a).est_m for a in PL}
-show(mata(1e6))
+BETA, M, ALPHA, N = 0.5, 10.0, 8.0, 30.0
+SCALE = 1 / BETA
+# The paper's g is the 50/50 mixture of the two UNtruncated densities,
+# renormalized over [0, N]. Equivalently, a mixture of the two truncated
+# densities with weights proportional to 0.5 F_component(N).
+W = np.array([0.5 * ss.gamma(1, scale=SCALE).cdf(N),
+              0.5 * ss.gamma(ALPHA, scale=SCALE).cdf(N)])
+W = W / W.sum()
+pool = build(
+    f'port Denuit.Pool hints{{log2=16; bs=0.002; normalize=False; padding=1}}\n'
+    f'    agg Agent1 1 claim sev {SCALE:g} * expon splice [0] [{M:g}] fixed\n'
+    f'    agg Agent2 1 claim sev {SCALE:g} * expon splice [0] [{M:g}] fixed\n'
+    f'    agg Agent3 1 claim sev {SCALE:g} * gamma [1 {ALPHA:g}] '
+    f'wts [{W[0]:.12g} {W[1]:.12g}] splice [0 0] [{N:g} {N:g}] fixed\n')
+show(pool)
 ```
 
-The program carries the paper's parameters as the paper writes them. DecL evaluates arithmetic in a declaration, so $\mu = 9.31$ goes in as `exp(9.31)`, the scale a lognormal actually takes, with no rounding step in between for a discrepancy to hide in.
+A truncated distribution is a `splice`, and the mixture is a two component severity, so the whole three agent pool is one portfolio declaration. Before reading any allocation, check the model against the paper's own specification.
 
 ```{python}
-#| label: mata-exhibit
+#| label: denuit-check
 #| echo: false
-FZ = ss.lognorm(SIGMA, scale=np.exp(MU))
-closed = {a: MEAN * ss.norm.cdf((np.log(a) - MU - SIGMA ** 2) / SIGMA)
-             + a * FZ.sf(a) for a in PL}
-PAPER = dict(zip(PL, [48539, 64416, 74252, 81301, 117221]))
-mata = pd.DataFrame([
-    {'policy limit': a, 'closed form': closed[a], 'aggregate': builds[a],
-     'Table 1': PAPER[a], 'agg / closed - 1': builds[a] / closed[a] - 1,
-     'Table 1 / closed - 1': PAPER[a] / closed[a] - 1} for a in PL
-]).set_index('policy limit')
-GT(mata, formatters={'closed form': '{x:,.2f}', 'aggregate': '{x:,.2f}',
-                     'Table 1': '{x:,.0f}', 'agg / closed - 1': '{x:.2e}',
-                     'Table 1 / closed - 1': '{x:.2e}'})
+ex, gm = ss.gamma(1, scale=SCALE), ss.gamma(ALPHA, scale=SCALE)
+m12 = ex.expect(lambda x: x, lb=0, ub=M) / ex.cdf(M)
+m3 = ((0.5 * ex.expect(lambda x: x, lb=0, ub=N)
+       + 0.5 * gm.expect(lambda x: x, lb=0, ub=N))
+      / (0.5 * ex.cdf(N) + 0.5 * gm.cdf(N)))
+kap = [pool.density_df[f'exeqa_Agent{i}'] for i in (1, 2, 3)]
+GT(pd.DataFrame([
+    {'quantity': 'E[X_1], truncated exponential on [0, 10]',
+     'quadrature': m12, 'aggregate': pool.agg_list[0].est_m},
+    {'quantity': 'E[X_3], truncated mixture on [0, 30]',
+     'quadrature': m3, 'aggregate': pool.agg_list[2].est_m},
+    {'quantity': 'E[S]', 'quadrature': 2 * m12 + m3, 'aggregate': pool.est_m},
+]).set_index('quantity'), float_format=8)
 ```
 
-`aggregate` matches the closed form to better than five parts in a hundred million at every limit. The paper's own Table 1 runs 0.04% high at \$250,000 and drifts steadily to 0.24% low at \$5,000,000, in a smooth progression, which is the signature of a numerical integration losing tail as its upper limit moves out. Nothing in the paper's conclusions depends on it, and the detail chapter reproduces every derived table to the last printed digit when driven off the paper's own Table 1. The finding is what a reproduction is for: two independent computations of one quantity, and one of them turns out to be an approximation nobody flagged.
+Two structural facts follow from the specification and hold to numerical precision, which is what says the pool is built right. Agents 1 and 2 are identically distributed, so $\kappa_1 \equiv \kappa_2$; and an allocation adds up, so $\sum_i \kappa_i(s) = s$ at every $s$.
+
+```{python}
+#| label: denuit-invariants
+#| echo: false
+sl = (pool.density_df.index >= 0.5) & (pool.density_df.index <= 45)
+tot = sum(k[sl] for k in kap)
+summary(**{'max |kappa_1 - kappa_2| over s in [0.5, 45]':
+               f'{float(np.abs(kap[0][sl] - kap[1][sl]).max()):.1e}',
+           'max |sum of kappa_i minus s|':
+               f'{float(np.abs(tot - tot.index).max()):.1e}'})
+```
+
+Now the figure. The black curves are the conditional mean allocations, the red the comonotonic Pareto optimal improvement from the paper's algorithm.
+
+```{python}
+#| label: denuit-figure
+#| echo: false
+#| fig-cap: "Reproducing Figure 1. The dashed line on the agent 1 and 2 panels is the top of the published axis."
+import matplotlib.pyplot as plt
+from aggregate.constants import FIG_W, FIG_H
+
+comon = pool.make_comonotonic_allocations(max_loss=50)
+fig, axs = plt.subplots(2, 2, figsize=(2 * FIG_W, 2 * FIG_H), layout='constrained')
+d = pool.density_df.loc[:40]
+axs[0, 0].plot(d.index, d.p_total / pool.bs, lw=1, c='C0')
+axs[0, 0].set(title='Probability density function of S', xlabel='s', ylim=(0, None))
+for i, ax in zip((1, 2, 3), axs.flat[1:]):
+    ax.plot(comon.index, comon[f'exeqa_Agent{i}'], lw=1, c='k',
+            label='CMRS allocation')
+    ax.plot(comon.index, comon[f'exeqa_Agent{i}_t'], lw=1, c='r',
+            label='PO allocation')
+    ax.set(title=f"Agent {i}'s allocations", xlabel='s', xlim=(0, 40))
+    if i < 3:
+        ax.axhline(4, ls='--', lw=0.75, c='C7')
+    ax.legend(loc='upper left', fontsize=6)
+```
+
+```{python}
+#| label: denuit-verdict
+#| echo: false
+GT(pd.DataFrame([{'s': s, 'kappa_1 = kappa_2': float(kap[0].loc[s]),
+                  'kappa_3': float(kap[2].loc[s]),
+                  'sum': float(sum(k.loc[s] for k in kap))}
+                 for s in (10, 15, 20, 25, 30, 35, 40)]).set_index('s'),
+   float_format=5)
+```
+
+The paper's qualitative claim reproduces exactly: $\kappa_1$ and $\kappa_2$ rise to 2.63 at $s = 10$, **fall** to 1.79 by $s = 15$, and rise thereafter, so the conditional mean allocation is not comonotonic and not Pareto optimal, and the algorithm flattens precisely that stretch.
+
+The published figure cannot be right at its own right hand edge, and it takes no computation to see why. Agent 3's loss is capped at $N = 30$, so at $s = 40$ adding up forces $\kappa_1 + \kappa_2 \ge 10$, and by symmetry $\kappa_1 = \kappa_2 \ge 5$. The published panels for agents 1 and 2 are drawn on an axis whose top tick is 4. The true values are $\kappa_1(35) = 4.19$ and $\kappa_1(40) = 6.08$, which leave the box. Dropping the $N = 30$ truncation of agent 3, and only that, brings $\kappa_1(40)$ down to 3.31 and inside it, which is the one reading of the model consistent with what is printed.
+
+Nothing in the paper's theorems depends on this. The algorithm is right, the code that ships it here is the paper's, and the interesting part of the figure, the non-monotone stretch the algorithm exists to repair, is exactly where the paper says it is.
 
 ## Where the detail is
 
-Each of these has a chapter, and the chapters carry what a page cannot: the transcription decisions, the readings that had to be inferred and then confirmed by fit, the grid caveats, and the arithmetic behind every acceptance test. @Venter1983, @Bear1990 and @Homer2003 are in the actuarial models part, @Bruno2006 in the part on exact computation, @Mata2005 alongside @Mack2003 in the actuarial models part as well.
+Each of these has a chapter, and the chapters carry what a page cannot: the transcription decisions, the readings that had to be inferred and then confirmed by fit, the grid caveats, and the arithmetic behind every acceptance test. @Venter1983, @Bear1990 and @Homer2003 are in the actuarial models part, @Bruno2006 in the part on exact computation, and @Denuit2025a sits with @Denuit2025 in the part on conditional expectations given the sum.
 
 The book also carries what did not work, which is the more informative half. @Jin2016 has a part to itself and is not a reproduction: the feature it needs, common shock dependence on frequencies rather than on a joint severity, does not exist. @BenRached2024 and @Wilson2016a locate a floor under FFT accuracy, below roughly $10^{-13}$, and @Wilson2017 shows the repair. Three of the fifteen papers contain errors the reproduction found, which is not a criticism of the authors so much as evidence that the check runs in both directions.

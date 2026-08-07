@@ -331,6 +331,76 @@ def test_to_agg_writes_dependencies_first(tmp_path):
     assert ('agg', 'Dep:Agg') in uw2._recipes
 
 
+# --- format_agg: the same selection as text ([Loss-Lab-Round-3] phase E) -----
+
+def test_format_agg_is_the_body_to_agg_writes(tmp_path):
+    """One selection and one ordering, so nothing has to reimplement them."""
+    uw = Underwriter(databases=None)
+    uw.build_many('sev FA:Sev lognorm 10 cv 1', update=False)
+    uw.build('agg FA:Agg 100 claims sev.FA:Sev poisson', update=False)
+    text = uw.format_agg()
+    out = uw.to_agg(tmp_path / 'fa')
+    written = out.read_text(encoding='utf-8')
+    assert text in written                       # body, under a header
+    assert written.startswith('# written by aggregate')
+    assert text.index('sev FA:Sev') < text.index('agg FA:Agg')
+
+
+def test_format_agg_spread_layout_still_reloads(tmp_path):
+    """``spread`` is a layout, not a dialect: the same programs re-parse."""
+    uw = Underwriter(databases=None)
+    uw.build('agg SP:A 100 claims sev lognorm 50 cv 1 poisson', update=False)
+    uw.build('port SP:P agg P1 5 claims sev lognorm 30 cv 1 poisson '
+             'agg P2 3 claims sev lognorm 20 cv 1 poisson', update=False)
+    spread = uw.format_agg(layout='spread')
+    assert '\n  sev ' in spread                  # one clause per line
+    out = uw.to_agg(tmp_path / 'sp', layout='spread')
+    uw2 = Underwriter(databases=None)
+    uw2.load(out)
+    assert ('agg', 'SP:A') in uw2._recipes and ('port', 'SP:P') in uw2._recipes
+    assert (uw2._recipes[('agg', 'SP:A')].spec
+            == uw._recipes[('agg', 'SP:A')].spec)
+
+
+def test_format_agg_bad_layout_raises():
+    uw = Underwriter(databases=None)
+    with pytest.raises(ValueError, match='unknown layout'):
+        uw.format_agg(layout='nope')
+
+
+def test_to_agg_survives_a_pnl(tmp_path):
+    """A P&L no longer takes the whole export down.
+
+    The recipe stores the P&L's *engine aggregate* spec under the P&L's name,
+    so ``spec_to_decl`` raises ``TypeError`` reaching for a ``consideration``
+    that is not there. That escaped ``_entry_to_decl``'s ``NotImplementedError``
+    fallback and failed the export outright. It now warns and writes the stored
+    program, which re-loads by construction.
+    """
+    uw = Underwriter(databases=None)
+    uw.build('pnl PE:L 600 premium less agg PE:Le 5 claims sev lognorm 50 '
+             'cv 0.5 poisson', update=False)
+    out = uw.to_agg(tmp_path / 'withpnl')
+    uw2 = Underwriter(databases=None)
+    uw2.load(out)
+    assert ('pnl', 'PE:L') in uw2._recipes
+
+
+def test_pnl_sorts_after_the_aggregate_it_wraps(tmp_path):
+    """``_KIND_WRITE_ORDER`` now names the P&L kinds instead of defaulting."""
+    from aggregate.underwriter import _KIND_WRITE_ORDER
+
+    assert _KIND_WRITE_ORDER['pnl'] > _KIND_WRITE_ORDER['agg']
+    assert _KIND_WRITE_ORDER['pnl'] > _KIND_WRITE_ORDER['port']
+    assert _KIND_WRITE_ORDER['xpnl'] == _KIND_WRITE_ORDER['pnl']
+    uw = Underwriter(databases=None)
+    uw.build('pnl WO:L 600 premium less agg WO:Le 5 claims sev lognorm 50 '
+             'cv 0.5 poisson', update=False)
+    uw.build('agg WO:A 1 claim sev lognorm 10 cv 1 fixed', update=False)
+    text = uw.format_agg()
+    assert text.index('agg WO:A') < text.index('pnl WO:L')
+
+
 def test_to_agg_default_mode_x_raises_on_existing(tmp_path):
     """Default mode 'x' is safe: it refuses to clobber an existing file."""
     uw = Underwriter(databases=None)

@@ -2600,6 +2600,84 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         df.index.name = 'axis'
         return self._relabel(df)
 
+    def tail_periods_df(self, periods=None):
+        """Per-axis return period table on a caller's ladder.
+
+        The parametrized worker behind :attr:`tail_df`, matching
+        :meth:`Aggregate.tail_periods_df` and
+        :meth:`Portfolio.tail_periods_df`.
+
+        Parameters
+        ----------
+        periods : array_like of float, optional
+            Return period ladder. Defaults to
+            :data:`~aggregate._aggregate.DEFAULT_RETURN_PERIODS`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``MultiIndex (axis, T)`` rows, columns ``p | VaR | TVaR | xsVaR |
+            VaR/Mean``, the same shape :attr:`Portfolio.tail_df` uses for its
+            per-unit blocks.
+
+        Notes
+        -----
+        Read off the **realized marginals** of the joint grid, through a
+        :class:`~aggregate._grid_distribution.GridDistribution` per axis, so
+        the quantiles come from the same kernel as everywhere else and agree
+        with the support :attr:`axis_support_df` reports. These are the axis
+        *aggregate* distributions, compounded under the shared frequency, and
+        so are not the distributions of the ``units`` the program names: a
+        unit there is the per claim component (its own ``dfreq`` and
+        severity), and the axis is that component compounded. The mean in
+        ``.attrs`` and behind ``xsVaR`` is the realized first moment of the
+        marginal, which is what the rest of the row is read from.
+
+        **There is no total block**, unlike :attr:`Portfolio.tail_df`. The two
+        axes are sized independently and routinely carry *different* bucket
+        sizes (``bs`` is a list, one per axis), so the sum has no common
+        lattice to land on and forming one would mean a rebucketing choice
+        this class has never made. A dependent sum is also not a portfolio
+        total, which assumes independence. Build the sum deliberately if you
+        want it.
+        """
+        from ._aggregate import return_period_frame
+        from ._grid_distribution import GridDistribution
+
+        self._require_density()
+        blocks, keys = [], []
+        for i, (name, marginal) in enumerate(
+                zip(self.unit_names, self.marginals)):
+            gd = GridDistribution(self.axis_xs[i],
+                                  np.asarray(marginal, dtype=float),
+                                  bs=self.bs[i], name=name)
+            mean = float(np.asarray(self.axis_xs[i], dtype=float)
+                         @ np.asarray(marginal, dtype=float))
+            blocks.append(return_period_frame(gd.q, gd.tvar, mean, True,
+                                              periods))
+            keys.append(name)
+        df = pd.concat(blocks, keys=keys, names=['axis', 'T'])
+        return self._relabel(df)
+
+    @property
+    def tail_df(self):
+        """Per-axis return period ladder (``1.0.0a227``).
+
+        The bivariate half of the deferred `[Loss-Lab-Round-3]` `kinds` item.
+        ``BivariateAggregate`` had no ``tail_df`` at all after ``a171``
+        renamed its old one to :attr:`axis_support_df` (which was a name
+        collision, not an analogy), so a consumer holding four kinds had to
+        dispatch on kind to know whether the frame existed.
+
+        One block per axis; see :meth:`tail_periods_df`, which this calls with
+        the default ladder, for why there is no total.
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
+        return self.tail_periods_df()
+
     @property
     def tail_description(self) -> str:
         """One-unit per-axis support summary.

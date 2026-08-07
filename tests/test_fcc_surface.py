@@ -429,30 +429,51 @@ def test_pnl_prob_eq_0_is_the_break_even_atom():
 # tail_df is a property; tail_periods_df is the worker
 # ---------------------------------------------------------------------------
 
-def test_tail_df_is_a_property_on_every_class_that_has_it(agg, port):
-    for obj in (agg, port):
+def test_tail_df_is_a_property_on_all_four_kinds(agg, port, pnl, biv):
+    """a227 [Loss-Lab-Round-3] ``kinds``: all four carry it, so no consumer
+    has to dispatch on kind to know whether the frame exists."""
+    for obj in (agg, port, pnl, biv):
         assert isinstance(type(obj).tail_df, property), \
             f'{type(obj).__name__}.tail_df is not a property'
-        assert isinstance(obj.tail_df, pd.DataFrame)
+        df = obj.tail_df
+        assert isinstance(df, pd.DataFrame)
+        assert list(df.columns) == ['p', 'VaR', 'TVaR', 'xsVaR', 'VaR/Mean']
 
 
-def test_bivariate_axis_support_df_no_longer_collides_with_tail_df(biv):
-    """a171: the per-axis support frame is not a return-period table.
+def test_pnl_tail_df_reads_the_downside(pnl):
+    """A P&L is a payoff, so T maps to the lower tail: ``p = 1/T``."""
+    df = pnl.tail_df
+    assert df.loc[200, 'p'] == pytest.approx(1 / 200)
+    # the ladder falls as T rises, the bad end being the small result
+    assert df['VaR'].is_monotonic_decreasing
 
-    ``Aggregate.tail_df`` / ``Portfolio.tail_df`` are return-period ladders; the
-    bivariate frame reports where the realized mass sits, per axis. Sharing the
-    name made them look like the same report.
+
+def test_bivariate_tail_df_is_per_axis_with_no_total(biv):
+    """One block per axis, and no total: the axes are sized independently and
+    routinely carry different bucket sizes, so the sum has no lattice."""
+    df = biv.tail_df
+    assert df.index.names == ['axis', 'T']
+    assert list(df.index.get_level_values('axis').unique()) == \
+        list(biv.unit_names)
+    assert 'total' not in df.index.get_level_values('axis')
+
+
+def test_bivariate_keeps_both_frames_and_they_differ(biv):
+    """a171 split the names; a227 filled the second one in.
+
+    ``axis_support_df`` reports where the realized mass sits, per axis;
+    ``tail_df`` is the return-period ladder. Sharing one name made them look
+    like one report, which is why they were split.
     """
-    assert not hasattr(biv, 'tail_df'), 'the colliding name survived'
-    df = biv.axis_support_df
-    assert isinstance(df, pd.DataFrame)
-    assert df.index.name == 'axis'
-    assert list(df.index) == list(biv.unit_names)
-    assert {'support_min', 'support_max', 'right_heavy'} <= set(df.columns)
+    support, tail = biv.axis_support_df, biv.tail_df
+    assert list(support.index) == list(biv.unit_names)
+    assert {'support_min', 'support_max', 'right_heavy'} <= set(support.columns)
+    assert set(support.columns).isdisjoint(tail.columns)
+    assert support.index.name == 'axis' and tail.index.names == ['axis', 'T']
 
 
-def test_tail_periods_df_takes_a_custom_ladder(agg, port):
-    for obj in (agg, port):
+def test_tail_periods_df_takes_a_custom_ladder(agg, port, pnl, biv):
+    for obj in (agg, port, pnl, biv):
         df = obj.tail_periods_df([3, 7])
         assert list(df.index.get_level_values(-1).unique()) == [3, 7]
         # the property is the default ladder, not the custom one

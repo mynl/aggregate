@@ -187,6 +187,20 @@ def test_roundtrip(program):
 _SMOKE = 'agg X 10 claims sev lognorm 50 cv 0.8 occurrence net of 50% so 10 xs 0 poisson note{hi}'
 
 
+def test_format_program_has_no_width_parameter():
+    """a227: ``width`` was accepted and ignored, a documented lie.
+
+    ``layout`` is structural, one clause per line, not width driven, and
+    nothing ever needed the parameter. A signature that takes an argument and
+    discards it is worse than one that does not take it.
+    """
+    import inspect
+
+    assert 'width' not in inspect.signature(format_program).parameters
+    with pytest.raises(TypeError):
+        format_program(_SMOKE, width=40)
+
+
 def test_format_text_is_plain():
     # default layout is now 'spread': multiline, each clause on its own line
     out = format_program(_SMOKE, fmt='text')

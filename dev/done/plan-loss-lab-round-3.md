@@ -1,8 +1,27 @@
 # Plan [Loss-Lab-Round-3]: what the app needs from the library
 
-> **Status: in execution.** Written 2026-08-07, split out of
+> **Status: DONE, 1.0.0a223 to a227.** Written 2026-08-07, split out of
 > `aggregate_api/dev/plan-ui-round-3.md`, which is the immediate consumer and
-> holds the api half of the same round. Current version `1.0.0a222`.
+> holds the api half of the same round. All five phases landed the same day:
+> **A** `a223` `reins_view=` + `reins_views`, **B** `a224` `reins_price_df`,
+> **C** `a225` the Portfolio reinsurance chart, **D** `a226` exhibit captions
+> and the window prose, **E** `a227` `format_agg` / `width` / `kinds`.
+>
+> **Two findings recorded rather than fixed**, each needing its own decision.
+> (1) `GridDistribution.tvar` has no orientation flip, so on a **payoff** a
+> return-period row's `VaR` reads the downside while its `TVaR` averages the
+> other side. Predates this plan; affects `Aggregate.tail_df` and
+> `Portfolio.tail_df` on any payoff object. Documented on
+> `PnL.tail_periods_df`. (2) A `pnl` recipe stores its *engine aggregate's*
+> spec under the P&L's name, so `spec_to_decl` cannot render it; `to_agg` now
+> warns and writes the stored program verbatim instead of failing the export.
+>
+> **One scope deviation.** `BivariateAggregate.tail_df` is per axis with **no
+> total block**, where the approved option said "per axis, plus the joint
+> total". The two axes are sized independently and routinely carry different
+> bucket sizes, so the sum has no common lattice; forming one needs a
+> rebucketing choice the class has never made, and a conditional total row
+> would break the fixed-rows reporting rule.
 >
 > **Author decisions, 2026-08-07.** Four calls that the first draft left open,
 > now settled and folded into the phases below.

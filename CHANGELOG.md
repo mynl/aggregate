@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.0a227
+
+**[Loss-Lab-Round-3] Phase E: three housekeeping items, and the plan closes.**
+
+**`writer`.** The api had reimplemented `to_agg`'s dependency-ordered walk because the library offered the export only as a *file*, and the two orders had drifted apart. `Underwriter.format_agg(pattern, kind, source, *, layout)` returns the same selection as a string; `to_agg` calls it and adds the header, so there is one selection and one ordering in the world. `to_agg` gains the same `layout=`: `'terse'` is the historical one-statement-per-line `.agg` form, `'spread'` puts each clause on its own line. Both re-parse to the same spec, so a spread export re-loads exactly as a terse one does.
+
+`_KIND_WRITE_ORDER` gains `'pnl'` and `'xpnl'`, after `port`. They previously sorted last by the 99 fallback, which was the right answer for the wrong reason and gave anything copying the order nothing to copy.
+
+**Found while doing it: `to_agg` failed outright on any session that had built a P&L.** The recipe stores the P&L's *engine aggregate* spec under the P&L's name, with no `consideration` key, so `spec_to_decl` dispatches on the kind and raises `TypeError` reaching for one. `_entry_to_decl` caught only `NotImplementedError` (the combinator-distortion case), so the exception escaped and took the export with it. It now warns, naming the entry, and writes the recipe's stored `program`, which re-loads by construction. The underlying spec-shape question is a separate item.
+
+**`width`.** `format_program(spec_or_text, *, fmt, layout, trailer, width)` accepted `width` and ignored it, documented as reserved. Removed. `layout` is structural, one clause per line rather than width driven, nothing ever needed it, and a signature that takes an argument and discards it is worse than one that does not take it.
+
+**`kinds`, the deferred half of `dev/done/plan-summary-tail-tables.md`.** The a113 rename executed for `Aggregate` and `Portfolio` and left `PnL` and `BivariateAggregate` without a `tail_df` at all, so a consumer holding four kinds had to dispatch on kind to know whether the frame existed. Both now carry `tail_df` (property) and `tail_periods_df(periods=)` (worker), the same pair and the same five columns. Their `summary_df` is **unchanged**: the PnL card (Consideration / Obligation / Margin) and the bivariate summary are right for their objects, which is what the a113 deferral was protecting.
+
+* **`PnL.tail_df`** is the grand result read on the **downside**, because a P&L is a payoff: `T` maps to `p = 1/T`, not `1 - 1/T`, so a 1 in 200 year is one that goes 200-to-1 against you. The orientation is read from the result's `is_loss_value` rather than assumed.
+* **`BivariateAggregate.tail_df`** is one block per axis, `MultiIndex (axis, T)`, off the **realized marginals** of the joint grid through a `GridDistribution` per axis. These are the axis *aggregate* distributions compounded under the shared frequency, so they are not the distributions of the `units` the program names, a unit there being the per claim component. **There is no total block:** the two axes are sized independently and routinely carry different bucket sizes (`bs` is a list, one per axis), so the sum has no common lattice and forming one would mean a rebucketing choice this class has never made. A dependent sum is also not a portfolio total, which assumes independence.
+
+**A defect found and recorded, not silently changed.** `GridDistribution.tvar(p)` is the upper tail measure `E[X | X > VaR(p)]` at every `p`, with **no orientation flip**, despite `PnL.tvar`'s docstring claiming otherwise. On a payoff ladder, where `p` is small, that averages nearly the whole distribution and lands near the mean: the row's `VaR` reads the downside while its `TVaR` reads the other side. The matching measure would be the lower `E[X | X <= VaR(p)]`, which the library does not compute. This predates the new frames and already affects `Aggregate.tail_df` and `Portfolio.tail_df` on any payoff object, so it is documented on `PnL.tail_periods_df` and left for its own decision rather than changed at the end of this plan.
+
+`dev/plan-loss-lab-round-3.md` moves to `dev/done/`.
+
+
 ## 1.0.0a226
 
 **[Loss-Lab-Round-3] Phase D: every exhibit block says what it is, and a window prints as a window.**

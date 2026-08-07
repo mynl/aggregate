@@ -49,23 +49,19 @@
 
 ### Interface & reporting
 
-- **[Loss-Lab-Round-3]** — what the Loss Lab app needs from the library after its
-  first end-to-end run. Plan: `dev/plan-loss-lab-round-3.md`; the api half is
-  `aggregate_api/dev/plan-ui-round-3.md`. Five phases, each its own version bump.
-  **Phase A DONE** (`1.0.0a223`): `reins_view=` on `calibrate_distortions` /
-  `evaluate` / `analyze_distortions`, plus the `reins_views` property, which is
-  the one the app was blocked on and which deletes the reason for its
-  `_BasisView` shim. **Phase B DONE** (`1.0.0a224`): `reins_price_df` on both
-  classes, the missing glue between reinsurance and distortions, plus the six
-  stale `reins_audit_df` docstring references repointed. **Phase C DONE**
-  (`1.0.0a225`): a `Portfolio` emitter for `chart_reins` on a fourth basis,
-  `total`, so `available_charts` answers `reins` for a reinsured book.
-  **Phase D DONE** (`1.0.0a226`): a caption on every exhibit block, one per
-  class group where a frame reads differently per class, guarded by a sweep;
-  `fmt_amount` / `fmt_window` so the grid narratives print money as money and
-  the window as an interval. Remaining: **E** housekeeping, a string-returning
-  `to_agg` sibling with `'pnl'` in `_KIND_WRITE_ORDER`, removing the ignored
-  `format_program(width=)`, and giving `PnL` / `BivariateAggregate` a `tail_df`.
+- **[Loss-Lab-Round-3]** — **DONE** (`1.0.0a223`–`a227`), plan in
+  `dev/done/plan-loss-lab-round-3.md`; the api half is
+  `aggregate_api/dev/plan-ui-round-3.md`. All five phases landed: `reins_view=`
+  and `reins_views` on the pricing surface, `reins_price_df`, the Portfolio
+  reinsurance chart, exhibit captions and the window prose, and the `writer` /
+  `width` / `kinds` housekeeping. **Two findings left open** for their own
+  decisions, both recorded in the plan's header: (1) `GridDistribution.tvar`
+  has no orientation flip, so on a **payoff** a return-period row's `VaR` reads
+  the downside while its `TVaR` averages the other side, which affects
+  `Aggregate.tail_df` / `Portfolio.tail_df` on any payoff object and predates
+  the plan; (2) a `pnl` recipe stores its *engine aggregate's* spec under the
+  P&L's name, so `spec_to_decl` cannot render it and `to_agg` falls back to the
+  stored program with a warning.
 - **[Reporting-Guidelines]** — *define what "first-class citizen" means* for a
   reporting object: a report's **rows are fixed** (it does not morph as the
   object gains properties), columns are **pure** (one unit per column — currency

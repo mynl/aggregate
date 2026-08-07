@@ -106,23 +106,64 @@ def ignored_clauses_message(name, spec):
 # Write order for to_agg: .agg files load sequentially and named references
 # (sev.X, agg.X, dist.X) must resolve as each line is parsed, so a definition
 # must precede anything that references it. Severities and distortions come
-# before the aggregates that use them; aggregates before portfolios.
-_KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'bvagg': 3, 'port': 4}
+# before the aggregates that use them; aggregates before portfolios; the P&L
+# kinds last, since a ``pnl`` wraps an aggregate and an ``xpnl`` may wrap a
+# portfolio. ``pnl`` / ``xpnl`` were missing before 1.0.0a227 and sorted last
+# by the 99 fallback, which was the right answer for the wrong reason and
+# gave anything reimplementing this order nothing to copy.
+_KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'bvagg': 3,
+                     'port': 4, 'pnl': 5, 'xpnl': 5}
 
 
-def _entry_to_decl(r):
+def _entry_to_decl(r, layout='terse'):
     """Render one :class:`~aggregate.recipe.Recipe` to canonical DecL for :meth:`Underwriter.to_agg`.
 
     Uses :func:`aggregate.decl_writer.spec_to_decl` (the parser's inverse) so the
-    exported ``.agg`` is canonical and re-loads cleanly. Falls back to the stored
-    verbatim ``program`` only for a ``minimum`` / ``mixture`` combinator
-    distortion, whose child references are not retained on the spec and so cannot
-    be unparsed.
+    exported ``.agg`` is canonical and re-loads cleanly, and falls back to the
+    recipe's stored verbatim ``program`` when it cannot.
+
+    Parameters
+    ----------
+    r : Recipe
+    layout : {'terse', 'spread'}, default 'terse'
+        ``terse`` is ``spec_to_decl``'s byte-for-byte one-statement-per-line
+        form, what ``.agg`` files have always held. ``spread`` routes the same
+        spec through :func:`~aggregate.decl_writer.format_program` for one
+        clause per line. Both re-parse to the same spec, so either re-loads.
+
+    Returns
+    -------
+    str
+
+    Notes
+    -----
+    Two fallback cases, and they are not the same.
+
+    A ``minimum`` / ``mixture`` combinator distortion raises
+    ``NotImplementedError`` by design: its child references are not retained on
+    the spec, so it cannot be unparsed. Expected, silent.
+
+    Anything else is a **gap in the writer**, so it warns while still exporting
+    correctly. The live case is a ``pnl`` / ``xpnl``: the recipe stores its
+    *engine aggregate's* spec under the P&L's name, with no ``consideration``
+    key, so ``spec_to_decl`` dispatches on the kind and raises ``TypeError``
+    reaching for one. Before 1.0.0a227 that escaped and took the whole export
+    with it, which is why ``to_agg`` failed outright on any session that had
+    built a P&L. The stored ``program`` re-loads by construction, so the file
+    is still right; the warning says which entry did not render canonically.
     """
-    from .decl_writer import spec_to_decl
+    from .decl_writer import format_program, spec_to_decl
     try:
+        if layout == 'spread':
+            return format_program((r.kind, r.name, r.spec), layout='spread',
+                                  trailer=True)
         return spec_to_decl(r.spec, r.kind, r.name)
     except NotImplementedError:
+        return r.program
+    except Exception as e:                     # noqa: BLE001 - reported, not raised
+        logger.warning(
+            'to_agg: could not unparse %s %s (%s: %s); exporting the stored '
+            'program verbatim.', r.kind, r.name, type(e).__name__, e)
         return r.program
 
 
@@ -2512,7 +2553,94 @@ class Underwriter(HelpMixin):
             return (objects[0] if len(objects) == 1 else objects), df
         return df
 
-    def to_agg(self, path, pattern='.*', kind='all', source='session', mode='x'):
+    def _select_recipes(self, pattern='.*', kind='all', source='session'):
+        """The recipes a ``to_agg`` selection covers, in dependency order.
+
+        Split out of :meth:`to_agg` so :meth:`format_agg` and :meth:`to_agg`
+        share one selection and one ordering rather than two that can drift.
+
+        Parameters
+        ----------
+        pattern, kind, source
+            As :meth:`to_agg`.
+
+        Returns
+        -------
+        list of Recipe
+            Sorted by ``_KIND_WRITE_ORDER`` then name, so the file re-loads
+            sequentially: definitions precede the entries that reference them.
+        """
+        if not self._loaded:
+            self.load()
+        name_re = re.compile(pattern)
+
+        def _source_match(entry_source):
+            if source in (None, 'all'):
+                return True
+            if source == 'session':
+                return entry_source == 'session'
+            # a file stem or Path: match on the file stem (suffix-insensitive)
+            want = Path(str(source)).stem
+            if isinstance(entry_source, Path):
+                return entry_source.stem == want
+            return str(entry_source) == str(source)
+
+        return sorted(
+            (r for (k, n), r in self._recipes.items()
+             if (kind in ('', 'all') or k == kind)
+             and name_re.match(n)
+             and _source_match(r.source)),
+            key=lambda r: (_KIND_WRITE_ORDER.get(r.kind, 99), r.name),
+        )
+
+    def format_agg(self, pattern='.*', kind='all', source='session', *,
+                   layout='terse'):
+        """The same selection :meth:`to_agg` writes, returned as a string.
+
+        The text former to :meth:`to_agg`'s writer; ``to_agg`` calls this and
+        writes the result under a header. Everything about *which* programs and
+        in *what order* is decided here, so a caller that wants the export
+        without a file, a web service serving a book's source, say, does not
+        have to reimplement the dependency ordering and end up with a different
+        one.
+
+        Parameters
+        ----------
+        pattern, kind, source
+            As :meth:`to_agg`.
+        layout : {'terse', 'spread'}, default 'terse'
+            ``terse`` is the historical one-statement-per-line ``.agg`` form.
+            ``spread`` puts each clause on its own indented line, which reads
+            far better on screen. Both re-parse to the same spec, so a spread
+            export re-loads exactly as a terse one does.
+
+        Returns
+        -------
+        str
+            The programs, blank-line separated, with **no** file header. Empty
+            when the selection is empty.
+
+        Notes
+        -----
+        Entries are blank-line separated because under the blank-line / ``;``
+        statement rule a single newline is a continuation, so entries have to
+        be paragraph-separated to re-load as distinct statements. That is also
+        why ``spread`` is safe: its intra-statement newlines collapse.
+
+        See Also
+        --------
+        to_agg : the same text, written to a file.
+        aggregate.decl_writer.format_program : one program, same layouts.
+        """
+        if layout not in ('terse', 'spread'):
+            raise ValueError(
+                f"format_agg: unknown layout {layout!r}; expected 'terse' or "
+                "'spread'.")
+        selected = self._select_recipes(pattern, kind, source)
+        return '\n\n'.join(_entry_to_decl(r, layout) for r in selected)
+
+    def to_agg(self, path, pattern='.*', kind='all', source='session', mode='x',
+               *, layout='terse'):
         """
         Write a selection of recipes to a ``.agg`` file (pandas-style export).
 
@@ -2555,6 +2683,10 @@ class Underwriter(HelpMixin):
             * ``'a'`` — append the selection as a new block at the end of an
               existing file (a fresh dated comment precedes the block); if the
               file does not exist it is created like ``'w'``.
+        layout : {'terse', 'spread'}, default 'terse'
+            Passed to :meth:`format_agg`. ``terse`` is the historical
+            one-statement-per-line form; ``spread`` puts each clause on its own
+            indented line. Both re-load identically.
 
         Returns
         -------
@@ -2563,13 +2695,17 @@ class Underwriter(HelpMixin):
 
         Notes
         -----
+        The body is :meth:`format_agg`; this method adds the header and does the
+        writing. Everything about which programs and in what order lives there.
+
         Entries are written in dependency order — severities and distortions,
-        then aggregates, then portfolios (:data:`_KIND_WRITE_ORDER`) — because
-        ``.agg`` files load sequentially and a named reference (``sev.X`` /
-        ``agg.X`` / ``dist.X``) must resolve as its line is parsed. (One residual
-        case: a *combo* distortion that references other distortions by name is
-        only guaranteed to follow them if it sorts after them by name; deep
-        distortion chains may still need a manual reorder.)
+        then aggregates, then portfolios, then the P&L kinds
+        (:data:`_KIND_WRITE_ORDER`) — because ``.agg`` files load sequentially
+        and a named reference (``sev.X`` / ``agg.X`` / ``dist.X``) must resolve
+        as its line is parsed. (One residual case: a *combo* distortion that
+        references other distortions by name is only guaranteed to follow them
+        if it sorts after them by name; deep distortion chains may still need a
+        manual reorder.)
 
         ``mode='a'`` orders only the newly appended block; it does not merge or
         re-sort against what is already in the file, so a freshly appended
@@ -2578,32 +2714,8 @@ class Underwriter(HelpMixin):
         """
         if mode not in ('x', 'w', 'a'):
             raise ValueError(f"mode must be one of 'x', 'w', 'a'; got {mode!r}.")
-        # make sure the configured databases are available to filter against
-        if not self._loaded:
-            self.load()
-
-        name_re = re.compile(pattern)
-
-        def _source_match(entry_source):
-            if source in (None, 'all'):
-                return True
-            if source == 'session':
-                return entry_source == 'session'
-            # a file stem or Path: match on the file stem (suffix-insensitive)
-            want = Path(str(source)).stem
-            if isinstance(entry_source, Path):
-                return entry_source.stem == want
-            return str(entry_source) == str(source)
-
-        # Order by kind dependency-priority, then name, so the file re-loads
-        # sequentially: definitions precede the entries that reference them.
-        selected = sorted(
-            (r for (k, n), r in self._recipes.items()
-             if (kind in ('', 'all') or k == kind)
-             and name_re.match(n)
-             and _source_match(r.source)),
-            key=lambda r: (_KIND_WRITE_ORDER.get(r.kind, 99), r.name),
-        )
+        n_selected = len(self._select_recipes(pattern, kind, source))
+        body = self.format_agg(pattern, kind, source, layout=layout)
 
         out = Path(path).expanduser()
         if out.suffix == '':
@@ -2612,10 +2724,6 @@ class Underwriter(HelpMixin):
             out = self.user_dir / out.name
 
         stamp = f'{datetime.now():%Y-%m-%d %H:%M:%S}'
-        # Blank line between entries: under the blank-line / `;` statement rule a
-        # single newline is a continuation, so entries must be paragraph-separated
-        # to re-load as distinct statements (a multi-line port stays one block).
-        body = '\n\n'.join(_entry_to_decl(r) for r in selected)
 
         if mode == 'x' and out.exists():
             raise FileExistsError(
@@ -2625,22 +2733,22 @@ class Underwriter(HelpMixin):
         if mode == 'a' and out.exists():
             # Append a dated block at the end; leading newline guarantees a
             # clean separation even if the file did not end with one.
-            block = (f'\n# added {stamp} — {len(selected)} program(s); '
+            block = (f'\n# added {stamp} — {n_selected} program(s); '
                      f'pattern={pattern!r}, kind={kind!r}, source={source!r}\n'
                      f'{body}' + ('\n' if body else ''))
             with out.open('a', encoding='utf-8') as fh:
                 fh.write(block)
-            logger.info('Appended %d program(s) to %s.', len(selected), out)
+            logger.info('Appended %d program(s) to %s.', n_selected, out)
         else:
             # 'w', 'x' (new), or 'a' on a missing file: a fresh file with the
             # full provenance header.
             if mode == 'w' and out.exists():
                 logger.info('Overwriting %s.', out)
             header = (f'# written by aggregate {self.version} on {stamp}\n'
-                      f'# {len(selected)} program(s); pattern={pattern!r}, '
+                      f'# {n_selected} program(s); pattern={pattern!r}, '
                       f'kind={kind!r}, source={source!r}\n')
             out.write_text(header + body + ('\n' if body else ''), encoding='utf-8')
-            logger.info('Wrote %d program(s) to %s.', len(selected), out)
+            logger.info('Wrote %d program(s) to %s.', n_selected, out)
         return out
 
 # Module-level singleton — the canonical user-facing entry point. Importable

@@ -101,6 +101,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
+from ._aggregate import return_period_frame
 from ._help import HelpMixin
 from .constants import INFO_NA, info_row
 from .moments import VALIDATION_NOISE, _snap_noise
@@ -1402,6 +1403,72 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         gd = row.gd
         return [m, _snap_noise(sd), cv, _snap_noise(skew),
                 float(gd.q(0.01)), float(gd.q(0.50)), float(gd.q(0.99))]
+
+    def tail_periods_df(self, periods=None):
+        """Return period table for the grand result on a caller's ladder.
+
+        The parametrized worker behind :attr:`tail_df`, matching
+        :meth:`Aggregate.tail_periods_df` and
+        :meth:`Portfolio.tail_periods_df`, so a consumer holding four kinds
+        reads one contract.
+
+        Parameters
+        ----------
+        periods : array_like of float, optional
+            Return period ladder. Defaults to
+            :data:`~aggregate._aggregate.DEFAULT_RETURN_PERIODS`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by return period ``T``; columns ``p | VaR | TVaR | xsVaR |
+            VaR/Mean``; ``E[result]`` carried in ``.attrs['mean']``.
+
+        Notes
+        -----
+        A P&L is a **payoff**, so ``T`` maps to the *lower* tail (``p = 1/T``,
+        not ``1 - 1/T``): the bad outcome is a rare small result, and a 1 in
+        200 year is one that goes 200-to-1 against you. The orientation is
+        read from the result's :attr:`GridDistribution.is_loss_value` rather
+        than assumed, so a ledger that is loss valued reports as one.
+
+        ``xsVaR`` is ``VaR - E[result]``, which on the downside is negative:
+        how far below expectation the 1 in T outcome falls. ``VaR/Mean``
+        blanks near break-even, where the ratio has no content.
+
+        **Read the ``TVaR`` column with care on a payoff.**
+        :meth:`GridDistribution.tvar` is the upper tail measure
+        ``E[X | X > VaR(p)]`` at every ``p``, with no orientation flip, so at
+        the small ``p`` a payoff ladder uses it averages almost the whole
+        distribution and sits near the mean. It is the downside ``VaR`` on
+        that row and the *other* side's conditional mean, which is not the
+        pairing a reader assumes. The matching measure would be the lower
+        ``E[X | X <= VaR(p)]``, which the library does not compute today. The
+        same applies to :attr:`Aggregate.tail_df` and
+        :attr:`Portfolio.tail_df` on any payoff object and predates this
+        method; it is recorded rather than silently changed here.
+        """
+        return return_period_frame(self.q, self.tvar, self.est_m,
+                                   self.result.is_loss_value, periods)
+
+    @property
+    def tail_df(self):
+        """Return period ladder for the grand result (``1.0.0a227``).
+
+        The P&L half of the deferred `[Loss-Lab-Round-3]` `kinds` item: the
+        rename to user-facing ``summary_df`` / ``tail_df`` executed for
+        ``Aggregate`` and ``Portfolio`` at ``1.0.0a113`` and left ``PnL``
+        without a ``tail_df`` at all, so a consumer holding four kinds had to
+        dispatch on kind to know whether the frame existed.
+
+        Read on the **downside**, because a P&L is a payoff: see
+        :meth:`tail_periods_df`, which this calls with the default ladder.
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
+        return self.tail_periods_df()
 
     @property
     def summary_df(self):

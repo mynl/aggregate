@@ -1228,7 +1228,7 @@ def _render_statement(underwriter, statement: str, trailer: bool = True):
 
 
 def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
-                   trailer=False, width=None) -> str:
+                   trailer=False) -> str:
     """Render a DecL program in canonical form, optionally colorized.
 
     The public entry point backing ``pprogram`` / ``pprogram_html`` and the
@@ -1274,10 +1274,6 @@ def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
         semantic ``!`` markers (unconditional severity, the zero-modified mean
         pin, defective ``dwait``) are clause syntax, not trailer, and are never
         affected.
-    width : int, optional
-        Reserved for future per-line wrapping of long clauses; currently ignored
-        (``layout`` is structural --- one clause per line, not width-driven).
-
     Returns
     -------
     str

@@ -184,7 +184,7 @@ def swap_density_df(port, new_df, padding=1):
             ft_all *= ft_p
     port.density_df['p_total'] = np.real(ift(ft_all, padding))
 
-    port.add_exa(port.density_df, unit_state)
+    port.density_df = port.add_exa(port.density_df, unit_state)
     port._augmented_dfs.clear()
 
     # Refresh empirical rows of stats_df from the swapped densities.

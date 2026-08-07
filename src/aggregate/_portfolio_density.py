@@ -18,6 +18,7 @@ A near-leaf: it takes the ``Portfolio`` as a parameter and never imports
 
 import logging
 import numpy as np
+import pandas as pd
 
 from ._validation import VALIDATION_NOISE
 from .utilities import ft, ift
@@ -98,10 +99,19 @@ def add_exa(port, df, unit_state):
         The portfolio whose ``bs`` / ``name`` / ``unit_names`` drive the
         combine. ``Portfolio.add_exa`` is the thin method wrapper.
     df : pandas.DataFrame
-        Frame to extend in place, carrying ``loss`` (the total output
+        Frame to extend, carrying ``loss`` (the total output
         grid, any snapped origin — zero, positive or negative) and
         ``p_total``. ``update`` passes ``self.density_df``;
         :func:`aggregate._portfolio_sample.swap_density_df` passes its own frame.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A **new** frame: ``df`` with the objective columns appended.
+        The columns are attached in one :func:`pandas.concat` rather
+        than assigned one at a time, so the result is consolidated
+        instead of carrying a block per column. That is why this does
+        not extend ``df`` in place; callers must take the return value.
     unit_state : dict[str, dict]
         Per-unit native-grid state captured at combine time (transient
         — the caller frees it after this returns): ``xs`` the unit's
@@ -151,30 +161,36 @@ def add_exa(port, df, unit_state):
         logger.warning(f'p_total has {n_neg} negative values; NOT setting to zero...')
     sum_p_total = p_total.sum()
     logger.info(f'{port.name}: sum of p_total is 1 - {1 - sum_p_total:12.8e} NOT rescaling.')
-    df['F'] = np.cumsum(p_total)
-    df['S'] = 1 - df.F
-    F = df['F'].to_numpy()
-    S = df['S'].to_numpy()
+    F = np.cumsum(p_total)
+    S = 1 - F
     F_small = F <= tol
     S_small = S <= tol
 
     logger.info(
-        f'Portfolio.add_exa | {port.name}: S <= 0 values has length {len(np.argwhere((df.S <= 0).to_numpy()))}')
+        f'Portfolio.add_exa | {port.name}: S <= 0 values has length {len(np.argwhere(S <= 0))}')
+
+    # Every column below is accumulated here and attached to ``df`` in a
+    # SINGLE concat at the end. Assigning them one at a time inserts a
+    # block per column, and a book with enough units pushes the frame past
+    # pandas' 100-block threshold, which both fragments the frame and emits
+    # a PerformanceWarning into every rendered notebook that builds one.
+    # Insertion order is the historical column order, which dict preserves.
+    cols = {'F': F, 'S': S}
 
     # total columns by direct sums carrying the origin
     cum_x = np.cumsum(loss * p_total)
     e_total = np.sum(loss * p_total)
-    df['exa_total'] = cum_x + loss * S
-    df['lev_total'] = df['exa_total']
+    cols['exa_total'] = cum_x + loss * S
+    cols['lev_total'] = cols['exa_total']
     with np.errstate(divide='ignore', invalid='ignore'):
         exlea_total = cum_x / F
         exgta_total = (e_total - cum_x) / S
     exlea_total[F_small] = np.nan
     exgta_total[S_small] = np.nan
-    df['exlea_total'] = exlea_total
-    df['e_total'] = e_total
-    df['exgta_total'] = exgta_total
-    df['exeqa_total'] = loss  # E[X | X=a] = a
+    cols['exlea_total'] = exlea_total
+    cols['e_total'] = e_total
+    cols['exgta_total'] = exgta_total
+    cols['exeqa_total'] = loss  # E[X | X=a] = a
 
     # kappa numerators: not-unit FT products plus the native
     # first-moment FTs, all in the physical-zero buffer convention
@@ -204,7 +220,7 @@ def add_exa(port, df, unit_state):
             kappa = np.real(num[:n_out]) / p_total
         # p_total ≈ 0 ⇒ exeqa is unreliable; zero it.
         kappa[p_total < cut_eps] = 0.0
-        df[f'exeqa_{col}'] = kappa
+        cols[f'exeqa_{col}'] = kappa
 
         # stand-alone lev_{col} = E[X_i ∧ a] from the native unit pmf:
         # cum_xp[i(a)] + a·(1 − cum_p[i(a)]), valid whether or not the
@@ -217,12 +233,12 @@ def add_exa(port, df, unit_state):
                               side='right') - 1
         inside = pos >= 0
         pos_c = np.maximum(pos, 0)
-        df[f'lev_{col}'] = np.where(
+        cols[f'lev_{col}'] = np.where(
             inside, cum_xp_n[pos_c] + loss * (1 - cum_p_n[pos_c]), loss)
 
         # e_{col} from the native pmf (the unit's represented mean)
         e_col = float(np.sum(xs_n * p_n))
-        df[f'e_{col}'] = e_col
+        cols[f'e_{col}'] = e_col
 
         # conditional means by direct sums of kappa · p_total
         kp = kappa * p_total
@@ -232,17 +248,17 @@ def add_exa(port, df, unit_state):
             exgta = (e_col - cum_xi) / S
         exlea[F_small] = np.nan
         exgta[S_small] = np.nan
-        df[f'exlea_{col}'] = exlea
-        df[f'exgta_{col}'] = exgta
+        cols[f'exlea_{col}'] = exlea
+        cols[f'exgta_{col}'] = exgta
 
         if signed:
             # kappa/x is not a recovery share on a signed grid
             # (steering 6): blank rather than divide through zero.
-            df[f'exi_x_{col}'] = np.nan
-            df[f'exi_xlea_{col}'] = np.nan
-            df[f'exi_xgta_{col}'] = np.nan
-            df[f'exi_xeqa_{col}'] = np.nan
-            df[f'exa_{col}'] = np.nan
+            cols[f'exi_x_{col}'] = np.nan
+            cols[f'exi_xlea_{col}'] = np.nan
+            cols[f'exi_xgta_{col}'] = np.nan
+            cols[f'exi_xeqa_{col}'] = np.nan
+            cols[f'exa_{col}'] = np.nan
             continue
 
         # share s_i(x) = kappa_i(x)/x; the origin row x=0 takes the
@@ -250,12 +266,12 @@ def add_exa(port, df, unit_state):
         with np.errstate(divide='ignore', invalid='ignore'):
             share = np.where(np.abs(loss) < bs / 2, 0.0, kappa / loss)
         sp = share * p_total
-        df[f'exi_x_{col}'] = np.sum(sp)
+        cols[f'exi_x_{col}'] = np.sum(sp)
         cum_sp = np.cumsum(sp)
         with np.errstate(divide='ignore', invalid='ignore'):
             exi_xlea = cum_sp / F
         exi_xlea[F_small] = 0.0
-        df[f'exi_xlea_{col}'] = exi_xlea
+        cols[f'exi_xlea_{col}'] = exi_xlea
 
         # tail_share_k = Σ_{j>k} share_j·p_j (reverse cumsum);
         # alpha = exi_xgta = tail_share / S. The last row has no
@@ -268,14 +284,16 @@ def add_exa(port, df, unit_state):
         alpha[S_small] = 0.0
         if S[-1] > tol:
             alpha[-1] = np.nan
-        df[f'exi_xgta_{col}'] = alpha
-        df[f'exi_xeqa_{col}'] = share
+        cols[f'exi_xgta_{col}'] = alpha
+        cols[f'exi_xeqa_{col}'] = share
 
         # exa_{col} = E[X_i(a)] = Σ_{x≤a} kappa_i·p + a·tail_share(a)
         # — the direct-sum form of ∫ S·alpha dx, carrying the origin.
-        df[f'exa_{col}'] = cum_xi + loss * tail_share
+        cols[f'exa_{col}'] = cum_xi + loss * tail_share
 
-    # Sum-of-shares check columns.
+    df = pd.concat([df, pd.DataFrame(cols, index=df.index)], axis=1)
+
+    # Sum-of-shares check columns, read back off the concatenated frame.
     for metric in ['exi_xlea_', 'exi_xgta_', 'exi_xeqa_']:
         df[metric + 'sum'] = df.filter(regex=metric + '[^η]').sum(axis=1)
 

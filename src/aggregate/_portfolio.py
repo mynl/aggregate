@@ -2347,7 +2347,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         # signed (P&L) windows too (the shifted-support kappa carries unit
         # origins; share-based columns are blanked per steering 6).
         if add_exa:
-            self.add_exa(self.density_df, unit_state)
+            self.density_df = self.add_exa(self.density_df, unit_state)
         else:
             # at least want F and S to get quantile functions
             self.density_df['F'] = np.cumsum(self.density_df.p_total)
@@ -2918,8 +2918,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         Thin wrapper over :func:`aggregate._portfolio_density.add_exa` -- the
         independent-sum ``exeqa_*`` / ``exa_*`` kernel (the density subsystem).
-        Extends ``df`` in place and returns it. See the free function for the
-        full column list and the shifted-support kappa notes.
+        Returns a **new** frame carrying ``df`` plus the objective columns;
+        it does not extend ``df`` in place, so take the return value. See the
+        free function for the full column list and the shifted-support kappa
+        notes.
         """
         return _density.add_exa(self, df, unit_state)
 

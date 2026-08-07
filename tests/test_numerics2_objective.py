@@ -190,7 +190,7 @@ def test_kappa_positive_origin_direct():
         kappa_a = np.where(p_tot > 0, kappa_a / p_tot, 0.0)
 
     df = pd.DataFrame(dict(loss=loss, p_total=p_tot), index=loss)
-    port.add_exa(df, {'A': state(xa, pa), 'B': state(xb, pb)})
+    df = port.add_exa(df, {'A': state(xa, pa), 'B': state(xb, pb)})
 
     mat = p_tot > 1e-12
     assert np.allclose(df['exeqa_A'].to_numpy()[mat], kappa_a[mat],

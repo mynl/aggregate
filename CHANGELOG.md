@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.0a217
+
+**[Consolidated-Density-Columns] `add_exa` attaches its columns in one concat,
+so a wide book no longer fragments `density_df`.** Found while clearing the
+errors out of the monograph's published-problems page: every portfolio built
+there printed a wall of pandas `PerformanceWarning: DataFrame is highly
+fragmented` into the rendered output, 53 of them on one page. The source was
+the library, not the documents. `add_exa` assigned each of its columns to
+`density_df` individually, twelve per unit plus the totals, and pandas inserts
+a block per assignment. Past a hundred blocks pandas warns, and the frame it
+leaves behind is slow to read column-wise for the rest of its life.
+
+The columns are now accumulated in a dict and attached in a single
+`pd.concat`. A twelve-unit book goes from 133 blocks to 6 and warns not at
+all. Output is unchanged: same columns, same order, bit-for-bit identical
+values, checked against the previous implementation.
+
+**Breaking, narrowly.** `add_exa` no longer extends its frame in place; it
+returns a new one, because a consolidated frame cannot be produced in place.
+Both internal call sites (`Portfolio.update` and
+`_portfolio_sample.swap_density_df`) already assigned to `density_df` and were
+updated. Code that called `port.add_exa(df, state)` for the side effect and
+then read `df` must now take the return value:
+
+```python
+df = port.add_exa(df, unit_state)
+```
+
 ## 1.0.0a216
 
 **[Inline-Port-Engine] a P&L can write its portfolio engine out, so a

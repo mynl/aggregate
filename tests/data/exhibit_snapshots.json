@@ -77,6 +77,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -244,6 +245,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -440,6 +442,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -650,6 +653,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -889,6 +893,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -1099,6 +1104,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -1266,6 +1272,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -1462,6 +1469,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -1672,6 +1680,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -1911,6 +1920,7 @@
      ]
     }
    ],
+   "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
    "columns": [
     {
      "align": "l",
@@ -2064,6 +2074,7 @@
      ]
     }
    ],
+   "caption": "How the two axes move together, by level: covariance and linear correlation, and Kendall tau, which reads the ranks rather than the values and so survives the marginals being reshaped.",
    "columns": [
     {
      "align": "l",
@@ -2162,6 +2173,7 @@
      ]
     }
    ],
+   "caption": "Where each marginal actually has mass, with its theoretical moments alongside. The full tail class ladder lives on each axis's own standalone aggregate, not here.",
    "columns": [
     {
      "align": "l",
@@ -2280,6 +2292,7 @@
      ]
     }
    ],
+   "caption": "How the two axes move together, by level: covariance and linear correlation, and Kendall tau, which reads the ranks rather than the values and so survives the marginals being reshaped.",
    "columns": [
     {
      "align": "l",
@@ -2378,6 +2391,7 @@
      ]
     }
    ],
+   "caption": "Where each marginal actually has mass, with its theoretical moments alongside. The full tail class ladder lives on each axis's own standalone aggregate, not here.",
    "columns": [
     {
      "align": "l",
@@ -5644,6 +5658,7 @@
      ]
     }
    ],
+   "caption": "The full ledger by side and label in currency units, then the kappa columns: what each line comes to when the book as a whole lands at that percentile. Read down for the ledger, across for a scenario.",
    "columns": [
     {
      "align": "l",
@@ -6053,6 +6068,7 @@
      ]
     }
    ],
+   "caption": "The full ledger by side and label in currency units, then the kappa columns: what each line comes to when the book as a whole lands at that percentile. Read down for the ledger, across for a scenario.",
    "columns": [
     {
      "align": "l",
@@ -6849,6 +6865,7 @@
      ]
     }
    ],
+   "caption": "The full ledger by side and label in currency units, then the kappa columns: what each line comes to when the book as a whole lands at that percentile. Read down for the ledger, across for a scenario.",
    "columns": [
     {
      "align": "l",
@@ -8784,6 +8801,7 @@
      ]
     }
    ],
+   "caption": "Raw materials: the amounts each block contributes and the loss, expense and combined ratios they imply, in one frame to slice. Currency and ratio columns sit side by side here; the insurer view separates them.",
    "columns": [
     {
      "align": "l",
@@ -9094,6 +9112,7 @@
      ]
     }
    ],
+   "caption": "The declared legs, one row each, as written into the ledger.",
    "columns": [
     {
      "align": "l",
@@ -9207,6 +9226,7 @@
      ]
     }
    ],
+   "caption": "Raw materials: the amounts each block contributes and the loss, expense and combined ratios they imply, in one frame to slice. Currency and ratio columns sit side by side here; the insurer view separates them.",
    "columns": [
     {
      "align": "l",
@@ -9467,6 +9487,7 @@
      ]
     }
    ],
+   "caption": "The declared legs, one row each, as written into the ledger.",
    "columns": [
     {
      "align": "l",
@@ -9643,6 +9664,7 @@
      ]
     }
    ],
+   "caption": "Raw materials: the amounts each block contributes and the loss, expense and combined ratios they imply, in one frame to slice. Currency and ratio columns sit side by side here; the insurer view separates them.",
    "columns": [
     {
      "align": "l",
@@ -9928,6 +9950,7 @@
      ]
     }
    ],
+   "caption": "The declared legs, one row each, as written into the ledger.",
    "columns": [
     {
      "align": "l",
@@ -12969,6 +12992,7 @@
      ]
     }
    ],
+   "caption": "The program layer by layer, by view: the moments of what is subject to each layer, what it cedes and what is retained. Per layer columns are conditional on a loss reaching the layer; the Ceded and Net totals are not.",
    "columns": [
     {
      "align": "l",
@@ -13266,6 +13290,7 @@
      ]
     }
    ],
+   "caption": "What each stage of the program does to the book, stage by stage, in the eight column validation layout.",
    "columns": [
     {
      "align": "l",
@@ -13627,6 +13652,7 @@
      ]
     }
    ],
+   "caption": "The program layer by layer, by view: the moments of what is subject to each layer, what it cedes and what is retained. Per layer columns are conditional on a loss reaching the layer; the Ceded and Net totals are not.",
    "columns": [
     {
      "align": "l",
@@ -13967,6 +13993,7 @@
      ]
     }
    ],
+   "caption": "What each stage of the program does to the book, stage by stage, in the eight column validation layout.",
    "columns": [
     {
      "align": "l",
@@ -14694,6 +14721,7 @@
      ]
     }
    ],
+   "caption": "Theoretical against realized moments, one column per axis.",
    "columns": [
     {
      "align": "l",
@@ -14879,6 +14907,7 @@
      ]
     }
    ],
+   "caption": "Moments of the distortion, computed against closed form where one exists, with the error between them.",
    "columns": [
     {
      "align": "l",
@@ -18203,6 +18232,7 @@
      ]
     }
    ],
+   "caption": "The canonical moment store: a meta block (limit, attachment, expected loss, premium, loss ratio, severity CV) over the moments at each stage of the calculation, from the analytic mix through any cession to the realized empirical grid, with the error between the last two.",
    "columns": [
     {
      "align": "l",
@@ -18458,6 +18488,7 @@
      ]
     }
    ],
+   "caption": "Theoretical against realized moments, one column per axis.",
    "columns": [
     {
      "align": "l",
@@ -18643,6 +18674,7 @@
      ]
     }
    ],
+   "caption": "Moments of the distortion, computed against closed form where one exists, with the error between them.",
    "columns": [
     {
      "align": "l",
@@ -19144,6 +19176,7 @@
      ]
     }
    ],
+   "caption": "The canonical moment store: a meta block (limit, attachment, expected loss, premium, loss ratio, severity CV) over the moments at each stage of the calculation, from the analytic mix through any cession to the realized empirical grid, with the error between the last two.",
    "columns": [
     {
      "align": "l",
@@ -19789,6 +19822,7 @@
      ]
     }
    ],
+   "caption": "The canonical moment store: a meta block (limit, attachment, expected loss, premium, loss ratio, severity CV) over the moments at each stage of the calculation, from the analytic mix through any cession to the realized empirical grid, with the error between the last two.",
    "columns": [
     {
      "align": "l",
@@ -20375,6 +20409,7 @@
      ]
     }
    ],
+   "caption": "The canonical moment store: a meta block (limit, attachment, expected loss, premium, loss ratio, severity CV) over the moments at each stage of the calculation, from the analytic mix through any cession to the realized empirical grid, with the error between the last two.",
    "columns": [
     {
      "align": "l",
@@ -21008,6 +21043,7 @@
      ]
     }
    ],
+   "caption": "The canonical moment store: a meta block (limit, attachment, expected loss, premium, loss ratio, severity CV) over the moments at each stage of the calculation, from the analytic mix through any cession to the realized empirical grid, with the error between the last two.",
    "columns": [
     {
      "align": "l",
@@ -21647,6 +21683,7 @@
      ]
     }
    ],
+   "caption": "The canonical moment store: a meta block (limit, attachment, expected loss, premium, loss ratio, severity CV) over the moments at each stage of the calculation, from the analytic mix through any cession to the realized empirical grid, with the error between the last two.",
    "columns": [
     {
      "align": "l",
@@ -22259,6 +22296,7 @@
      ]
     }
    ],
+   "caption": "The canonical moment store: a meta block (limit, attachment, expected loss, premium, loss ratio, severity CV) over the moments at each stage of the calculation, from the analytic mix through any cession to the realized empirical grid, with the error between the last two.",
    "columns": [
     {
      "align": "l",
@@ -22740,6 +22778,7 @@
      ]
     }
    ],
+   "caption": "Reference against realized moments for the shared frequency, each marginal, and their total.",
    "columns": [
     {
      "align": "l",
@@ -23043,6 +23082,7 @@
      ]
     }
    ],
+   "caption": "Moments of the distortion g and of its dual, each against its closed form where one exists, with the error between them.",
    "columns": [
     {
      "align": "l",
@@ -23139,7 +23179,7 @@
       "Consideration",
       "1,000.00",
       "0.00",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "1,000.00",
       "1,000.00",
@@ -23161,7 +23201,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.84515"
+       "text": "-84.5%"
       },
       {
        "flags": [
@@ -23195,7 +23235,7 @@
       "Margin",
       "299.99",
       "591.61",
-      "1.97209",
+      "197.2%",
       {
        "flags": [
         "neg"
@@ -23227,7 +23267,7 @@
        "text": "-40.00"
       },
       "0.00",
-      "-0.00000",
+      "-0.0%",
       "\u2014",
       {
        "flags": [
@@ -23255,7 +23295,7 @@
       "Obligation",
       "123.89",
       "168.80",
-      "1.36250",
+      "136.3%",
       "1.561",
       "0.00",
       "28.00",
@@ -23268,7 +23308,7 @@
       "Margin",
       "83.89",
       "168.80",
-      "2.01214",
+      "201.2%",
       "1.561",
       {
        "flags": [
@@ -23291,7 +23331,7 @@
       "Net",
       "383.89",
       "470.55",
-      "1.22576",
+      "122.6%",
       {
        "flags": [
         "neg"
@@ -23323,7 +23363,7 @@
        "text": "-60.00"
       },
       "0.00",
-      "-0.00000",
+      "-0.0%",
       "\u2014",
       {
        "flags": [
@@ -23351,7 +23391,7 @@
       "Obligation",
       "123.76",
       "103.69",
-      "0.83781",
+      "83.8%",
       "0.900",
       "0.00",
       "100.00",
@@ -23364,7 +23404,7 @@
       "Margin",
       "63.76",
       "103.69",
-      "1.62622",
+      "162.6%",
       "0.900",
       {
        "flags": [
@@ -23382,7 +23422,7 @@
       "Net",
       "447.65",
       "411.18",
-      "0.91855",
+      "91.9%",
       {
        "flags": [
         "neg"
@@ -23414,7 +23454,7 @@
        "text": "-100.00"
       },
       "0.00",
-      "-0.00000",
+      "-0.0%",
       "\u2014",
       {
        "flags": [
@@ -23442,7 +23482,7 @@
       "Obligation",
       "247.65",
       "253.03",
-      "1.02171",
+      "102.2%",
       "1.282",
       "0.00",
       "172.00",
@@ -23455,7 +23495,7 @@
       "Margin",
       "147.65",
       "253.03",
-      "1.71368",
+      "171.4%",
       "1.282",
       {
        "flags": [
@@ -23477,7 +23517,7 @@
       "Consideration",
       "900.00",
       "0.00",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "900.00",
       "900.00",
@@ -23499,7 +23539,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.90899"
+       "text": "-90.9%"
       },
       {
        "flags": [
@@ -23533,7 +23573,7 @@
       "Margin",
       "447.65",
       "411.18",
-      "0.91855",
+      "91.9%",
       {
        "flags": [
         "neg"
@@ -23565,7 +23605,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-1.05354"
+       "text": "-105.4%"
       },
       {
        "flags": [
@@ -23584,6 +23624,7 @@
      ]
     }
    ],
+   "caption": "The ledger in three rows: what was received (Consideration), what is owed (Obligation) and what is left (Margin), each with its moments and key percentiles.",
    "columns": [
     {
      "align": "l",
@@ -23637,9 +23678,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
@@ -23651,7 +23691,6 @@
      "dtype": "float",
      "format": {
       "digits": 3,
-      "group": true,
       "kind": "dec"
      },
      "key": "c5",
@@ -23743,7 +23782,7 @@
       "Consideration",
       "1,000.00",
       "0.00",
-      "0.000",
+      "0.0%",
       "\u2014",
       "1,000.00",
       "1,000.00",
@@ -23765,13 +23804,13 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.485"
+       "text": "-48.5%"
       },
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
+       "text": "-0.970"
       },
       {
        "flags": [
@@ -23799,12 +23838,12 @@
       "Margin",
       "150.00",
       "412.31",
-      "2.749",
+      "274.9%",
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
+       "text": "-0.970"
       },
       {
        "flags": [
@@ -23817,6 +23856,7 @@
      ]
     }
    ],
+   "caption": "The ledger in three rows: what was received (Consideration), what is owed (Obligation) and what is left (Margin), each with its moments and key percentiles.",
    "columns": [
     {
      "align": "l",
@@ -23859,9 +23899,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c3",
      "name": [
@@ -23872,8 +23911,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
@@ -24671,7 +24709,7 @@
       "Consideration",
       "1,000.00",
       "0.00",
-      "0.000",
+      "0.0%",
       "\u2014",
       "1,000.00",
       "1,000.00",
@@ -24693,7 +24731,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.847"
+       "text": "-84.7%"
       },
       {
        "flags": [
@@ -24727,7 +24765,7 @@
       "Margin",
       "299.99",
       "593.21",
-      "1.977",
+      "197.7%",
       {
        "flags": [
         "neg"
@@ -24759,7 +24797,7 @@
        "text": "-100.00"
       },
       "0.00",
-      "0.000",
+      "0.0%",
       "\u2014",
       {
        "flags": [
@@ -24787,7 +24825,7 @@
       "Obligation",
       "51.11",
       "140.83",
-      "2.755",
+      "275.5%",
       "3.137",
       "0.00",
       "0.00",
@@ -24809,7 +24847,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-2.881"
+       "text": "-288.1%"
       },
       "3.137",
       {
@@ -24833,7 +24871,7 @@
       "Net",
       "251.11",
       "497.96",
-      "1.983",
+      "198.3%",
       {
        "flags": [
         "neg"
@@ -24860,7 +24898,7 @@
       "Consideration",
       "900.00",
       "0.00",
-      "0.000",
+      "0.0%",
       "\u2014",
       "900.00",
       "900.00",
@@ -24882,7 +24920,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.767"
+       "text": "-76.7%"
       },
       {
        "flags": [
@@ -24916,7 +24954,7 @@
       "Margin",
       "251.11",
       "497.96",
-      "1.983",
+      "198.3%",
       {
        "flags": [
         "neg"
@@ -24948,7 +24986,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-2.881"
+       "text": "-288.1%"
       },
       "3.137",
       {
@@ -24967,6 +25005,7 @@
      ]
     }
    ],
+   "caption": "The ledger in three rows: what was received (Consideration), what is owed (Obligation) and what is left (Margin), each with its moments and key percentiles.",
    "columns": [
     {
      "align": "l",
@@ -25020,9 +25059,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
@@ -25034,7 +25072,6 @@
      "dtype": "float",
      "format": {
       "digits": 3,
-      "group": true,
       "kind": "dec"
      },
      "key": "c5",
@@ -25126,7 +25163,7 @@
       "Freq",
       "3.000",
       "0.000",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "\u2014",
       "\u2014",
@@ -25139,8 +25176,8 @@
       "Sev",
       "3.500",
       "1.708",
-      "0.48795",
-      "0.00000",
+      "48.8%",
+      "0.000",
       "1.000",
       "3.000",
       "6.00"
@@ -25152,14 +25189,15 @@
       "Agg",
       "10.500",
       "2.958",
-      "0.28172",
-      "0.00000",
+      "28.2%",
+      "0.000",
       "4.000",
       "10.000",
       "17.00"
      ]
     }
    ],
+   "caption": "Headline moments and key percentiles by component: count risk (Freq), single claim severity (Sev) and total loss (Agg), one block per unit on a portfolio. Percentiles are exact grid values. Frequency percentiles are blank by design, because frequency enters through its PGF and no count distribution is ever materialized.",
    "columns": [
     {
      "align": "l",
@@ -25202,9 +25240,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c3",
      "name": [
@@ -25215,8 +25252,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
@@ -25421,6 +25457,7 @@
      ]
     }
    ],
+   "caption": "Reference against realized moments for the shared frequency, each marginal, and their total.",
    "columns": [
     {
      "align": "l",
@@ -25724,6 +25761,7 @@
      ]
     }
    ],
+   "caption": "Moments of the distortion g and of its dual, each against its closed form where one exists, with the error between them.",
    "columns": [
     {
      "align": "l",
@@ -25820,7 +25858,7 @@
       "Consideration",
       "1,000.00",
       "0.00",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "1,000.00",
       "1,000.00",
@@ -25842,7 +25880,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.84515"
+       "text": "-84.5%"
       },
       {
        "flags": [
@@ -25876,7 +25914,7 @@
       "Margin",
       "299.99",
       "591.61",
-      "1.97209",
+      "197.2%",
       {
        "flags": [
         "neg"
@@ -25908,7 +25946,7 @@
        "text": "-40.00"
       },
       "0.00",
-      "-0.00000",
+      "-0.0%",
       "\u2014",
       {
        "flags": [
@@ -25936,7 +25974,7 @@
       "Obligation",
       "123.89",
       "168.80",
-      "1.36250",
+      "136.3%",
       "1.561",
       "0.00",
       "28.00",
@@ -25949,7 +25987,7 @@
       "Margin",
       "83.89",
       "168.80",
-      "2.01214",
+      "201.2%",
       "1.561",
       {
        "flags": [
@@ -25972,7 +26010,7 @@
       "Net",
       "383.89",
       "470.55",
-      "1.22576",
+      "122.6%",
       {
        "flags": [
         "neg"
@@ -26004,7 +26042,7 @@
        "text": "-60.00"
       },
       "0.00",
-      "-0.00000",
+      "-0.0%",
       "\u2014",
       {
        "flags": [
@@ -26032,7 +26070,7 @@
       "Obligation",
       "123.76",
       "103.69",
-      "0.83781",
+      "83.8%",
       "0.900",
       "0.00",
       "100.00",
@@ -26045,7 +26083,7 @@
       "Margin",
       "63.76",
       "103.69",
-      "1.62622",
+      "162.6%",
       "0.900",
       {
        "flags": [
@@ -26063,7 +26101,7 @@
       "Net",
       "447.65",
       "411.18",
-      "0.91855",
+      "91.9%",
       {
        "flags": [
         "neg"
@@ -26095,7 +26133,7 @@
        "text": "-100.00"
       },
       "0.00",
-      "-0.00000",
+      "-0.0%",
       "\u2014",
       {
        "flags": [
@@ -26123,7 +26161,7 @@
       "Obligation",
       "247.65",
       "253.03",
-      "1.02171",
+      "102.2%",
       "1.282",
       "0.00",
       "172.00",
@@ -26136,7 +26174,7 @@
       "Margin",
       "147.65",
       "253.03",
-      "1.71368",
+      "171.4%",
       "1.282",
       {
        "flags": [
@@ -26158,7 +26196,7 @@
       "Consideration",
       "900.00",
       "0.00",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "900.00",
       "900.00",
@@ -26180,7 +26218,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.90899"
+       "text": "-90.9%"
       },
       {
        "flags": [
@@ -26214,7 +26252,7 @@
       "Margin",
       "447.65",
       "411.18",
-      "0.91855",
+      "91.9%",
       {
        "flags": [
         "neg"
@@ -26246,7 +26284,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-1.05354"
+       "text": "-105.4%"
       },
       {
        "flags": [
@@ -26265,6 +26303,7 @@
      ]
     }
    ],
+   "caption": "The ledger in three rows: what was received (Consideration), what is owed (Obligation) and what is left (Margin), each with its moments and key percentiles.",
    "columns": [
     {
      "align": "l",
@@ -26318,9 +26357,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
@@ -26332,7 +26370,6 @@
      "dtype": "float",
      "format": {
       "digits": 3,
-      "group": true,
       "kind": "dec"
      },
      "key": "c5",
@@ -26424,7 +26461,7 @@
       "Consideration",
       "1,000.00",
       "0.00",
-      "0.000",
+      "0.0%",
       "\u2014",
       "1,000.00",
       "1,000.00",
@@ -26446,13 +26483,13 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.485"
+       "text": "-48.5%"
       },
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
+       "text": "-0.970"
       },
       {
        "flags": [
@@ -26480,12 +26517,12 @@
       "Margin",
       "150.00",
       "412.31",
-      "2.749",
+      "274.9%",
       {
        "flags": [
         "neg"
        ],
-       "text": "-0.97011"
+       "text": "-0.970"
       },
       {
        "flags": [
@@ -26498,6 +26535,7 @@
      ]
     }
    ],
+   "caption": "The ledger in three rows: what was received (Consideration), what is owed (Obligation) and what is left (Margin), each with its moments and key percentiles.",
    "columns": [
     {
      "align": "l",
@@ -26540,9 +26578,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c3",
      "name": [
@@ -26553,8 +26590,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
@@ -26647,7 +26683,7 @@
       "Freq",
       "1.000",
       "0.00000",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "\u2014",
       "\u2014",
@@ -26660,8 +26696,8 @@
       "Sev",
       "2.000",
       "0.81650",
-      "0.40825",
-      "0.00000",
+      "40.8%",
+      "0.000",
       "1.000",
       "2.000",
       "3.000"
@@ -26673,8 +26709,8 @@
       "Agg",
       "2.000",
       "0.81650",
-      "0.40825",
-      "0.00000",
+      "40.8%",
+      "0.000",
       "1.000",
       "2.000",
       "3.000"
@@ -26690,7 +26726,7 @@
       "Freq",
       "2.000",
       "0.00000",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "\u2014",
       "\u2014",
@@ -26703,8 +26739,8 @@
       "Sev",
       "3.000",
       "1.00000",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "2.000",
       "2.000",
       "4.000"
@@ -26716,8 +26752,8 @@
       "Agg",
       "6.000",
       "1.41421",
-      "0.23570",
-      "0.00000",
+      "23.6%",
+      "0.000",
       "4.000",
       "6.000",
       "8.000"
@@ -26730,14 +26766,15 @@
       "Agg",
       "8.000",
       "1.63299",
-      "0.20412",
-      "0.00000",
+      "20.4%",
+      "0.000",
       "5.000",
       "8.000",
       "11.000"
      ]
     }
    ],
+   "caption": "Headline moments and key percentiles by component: count risk (Freq), single claim severity (Sev) and total loss (Agg), one block per unit on a portfolio. Percentiles are exact grid values. Frequency percentiles are blank by design, because frequency enters through its PGF and no count distribution is ever materialized.",
    "columns": [
     {
      "align": "l",
@@ -26791,9 +26828,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
@@ -26804,8 +26840,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c5",
@@ -26897,8 +26932,8 @@
       "Freq",
       "1.50",
       "0.500",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "\u2014",
       "\u2014",
       "\u2014"
@@ -26910,8 +26945,8 @@
       "Sev",
       "13.33",
       "4.714",
-      "0.35355",
-      "0.70711",
+      "35.4%",
+      "0.707",
       "10.00",
       "10.00",
       "20.00"
@@ -26923,14 +26958,15 @@
       "Agg",
       "20.00",
       "8.819",
-      "0.44096",
-      "0.48595",
+      "44.1%",
+      "0.486",
       "10.00",
       "20.00",
       "40.00"
      ]
     }
    ],
+   "caption": "Headline moments and key percentiles by component: count risk (Freq), single claim severity (Sev) and total loss (Agg), one block per unit on a portfolio. Percentiles are exact grid values. Frequency percentiles are blank by design, because frequency enters through its PGF and no count distribution is ever materialized.",
    "columns": [
     {
      "align": "l",
@@ -26973,9 +27009,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c3",
      "name": [
@@ -26986,8 +27021,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
@@ -27080,8 +27114,8 @@
       "Freq",
       "1.50",
       "0.500",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "\u2014",
       "\u2014",
       "\u2014"
@@ -27093,8 +27127,8 @@
       "Sev",
       "13.33",
       "4.714",
-      "0.35355",
-      "0.70711",
+      "35.4%",
+      "0.707",
       "10.000",
       "10.00",
       "20.00"
@@ -27106,8 +27140,8 @@
       "Agg",
       "20.00",
       "8.819",
-      "0.44096",
-      "0.48595",
+      "44.1%",
+      "0.486",
       "10.000",
       "20.00",
       "40.00"
@@ -27123,7 +27157,7 @@
       "Freq",
       "1.00",
       "0.000",
-      "0.00000",
+      "0.0%",
       "\u2014",
       "\u2014",
       "\u2014",
@@ -27136,8 +27170,8 @@
       "Sev",
       "7.50",
       "2.500",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "5.000",
       "5.00",
       "10.00"
@@ -27149,8 +27183,8 @@
       "Agg",
       "7.50",
       "2.500",
-      "0.33333",
-      "0.00000",
+      "33.3%",
+      "0.000",
       "5.000",
       "5.00",
       "10.00"
@@ -27163,14 +27197,15 @@
       "Agg",
       "27.50",
       "9.167",
-      "0.33333",
-      "0.43276",
+      "33.3%",
+      "0.433",
       "15.000",
       "25.00",
       "50.00"
      ]
     }
    ],
+   "caption": "Headline moments and key percentiles by component: count risk (Freq), single claim severity (Sev) and total loss (Agg), one block per unit on a portfolio. Percentiles are exact grid values. Frequency percentiles are blank by design, because frequency enters through its PGF and no count distribution is ever materialized.",
    "columns": [
     {
      "align": "l",
@@ -27224,9 +27259,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
@@ -27237,8 +27271,7 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c5",
@@ -27334,7 +27367,7 @@
       "Consideration",
       "1,000.00",
       "0.00",
-      "0.000",
+      "0.0%",
       "\u2014",
       "1,000.00",
       "1,000.00",
@@ -27356,7 +27389,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.847"
+       "text": "-84.7%"
       },
       {
        "flags": [
@@ -27390,7 +27423,7 @@
       "Margin",
       "299.99",
       "593.21",
-      "1.977",
+      "197.7%",
       {
        "flags": [
         "neg"
@@ -27422,7 +27455,7 @@
        "text": "-100.00"
       },
       "0.00",
-      "0.000",
+      "0.0%",
       "\u2014",
       {
        "flags": [
@@ -27450,7 +27483,7 @@
       "Obligation",
       "51.11",
       "140.83",
-      "2.755",
+      "275.5%",
       "3.137",
       "0.00",
       "0.00",
@@ -27472,7 +27505,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-2.881"
+       "text": "-288.1%"
       },
       "3.137",
       {
@@ -27496,7 +27529,7 @@
       "Net",
       "251.11",
       "497.96",
-      "1.983",
+      "198.3%",
       {
        "flags": [
         "neg"
@@ -27523,7 +27556,7 @@
       "Consideration",
       "900.00",
       "0.00",
-      "0.000",
+      "0.0%",
       "\u2014",
       "900.00",
       "900.00",
@@ -27545,7 +27578,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-0.767"
+       "text": "-76.7%"
       },
       {
        "flags": [
@@ -27579,7 +27612,7 @@
       "Margin",
       "251.11",
       "497.96",
-      "1.983",
+      "198.3%",
       {
        "flags": [
         "neg"
@@ -27611,7 +27644,7 @@
        "flags": [
         "neg"
        ],
-       "text": "-2.881"
+       "text": "-288.1%"
       },
       "3.137",
       {
@@ -27630,6 +27663,7 @@
      ]
     }
    ],
+   "caption": "The ledger in three rows: what was received (Consideration), what is owed (Obligation) and what is left (Margin), each with its moments and key percentiles.",
    "columns": [
     {
      "align": "l",
@@ -27683,9 +27717,8 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
@@ -27697,7 +27730,6 @@
      "dtype": "float",
      "format": {
       "digits": 3,
-      "group": true,
       "kind": "dec"
      },
      "key": "c5",
@@ -29406,6 +29438,7 @@
      ]
     }
    ],
+   "caption": "Return period ladder read off the realized grid: VaR (the quoted number), TVaR (the priced number), excess VaR over the mean (the capital), and VaR to mean leverage.",
    "columns": [
     {
      "align": "l",
@@ -29864,6 +29897,7 @@
      ]
     }
    ],
+   "caption": "Return period ladder read off the realized grid: VaR (the quoted number), TVaR (the priced number), excess VaR over the mean (the capital), and VaR to mean leverage.",
    "columns": [
     {
      "align": "l",
@@ -30103,6 +30137,7 @@
      ]
     }
    ],
+   "caption": "Return period ladder read off the realized grid: VaR (the quoted number), TVaR (the priced number), excess VaR over the mean (the capital), and VaR to mean leverage.",
    "columns": [
     {
      "align": "l",
@@ -30570,6 +30605,7 @@
      ]
     }
    ],
+   "caption": "Return period ladder read off the realized grid: VaR (the quoted number), TVaR (the priced number), excess VaR over the mean (the capital), and VaR to mean leverage.",
    "columns": [
     {
      "align": "l",
@@ -30739,6 +30775,7 @@
      ]
     }
    ],
+   "caption": "What each tail looks like, as opposed to how far out it reaches: the realized support, the tail class on each side, whether the law is bounded, and the coefficient of variation. A different question from the return period ladder, which is the tail exhibit.",
    "columns": [
     {
      "align": "l",
@@ -30931,6 +30968,7 @@
      ]
     }
    ],
+   "caption": "What each tail looks like, as opposed to how far out it reaches: the realized support, the tail class on each side, whether the law is bounded, and the coefficient of variation. A different question from the return period ladder, which is the tail exhibit.",
    "columns": [
     {
      "align": "l",
@@ -31127,6 +31165,7 @@
      ]
     }
    ],
+   "caption": "What each tail looks like, as opposed to how far out it reaches: the realized support, the tail class on each side, whether the law is bounded, and the coefficient of variation. A different question from the return period ladder, which is the tail exhibit.",
    "columns": [
     {
      "align": "l",
@@ -31319,6 +31358,7 @@
      ]
     }
    ],
+   "caption": "What each tail looks like, as opposed to how far out it reaches: the realized support, the tail class on each side, whether the law is bounded, and the coefficient of variation. A different question from the return period ladder, which is the tail exhibit.",
    "columns": [
     {
      "align": "l",
@@ -31500,6 +31540,7 @@
      ]
     }
    ],
+   "caption": "What each tail looks like, as opposed to how far out it reaches: the realized support, the tail class on each side, whether the law is bounded, and the coefficient of variation. A different question from the return period ladder, which is the tail exhibit.",
    "columns": [
     {
      "align": "l",
@@ -31692,6 +31733,7 @@
      ]
     }
    ],
+   "caption": "What each tail looks like, as opposed to how far out it reaches: the realized support, the tail class on each side, whether the law is bounded, and the coefficient of variation. A different question from the return period ladder, which is the tail exhibit.",
    "columns": [
     {
      "align": "l",
@@ -31888,6 +31930,7 @@
      ]
     }
    ],
+   "caption": "What each tail looks like, as opposed to how far out it reaches: the realized support, the tail class on each side, whether the law is bounded, and the coefficient of variation. A different question from the return period ladder, which is the tail exhibit.",
    "columns": [
     {
      "align": "l",
@@ -32080,6 +32123,7 @@
      ]
     }
    ],
+   "caption": "What each tail looks like, as opposed to how far out it reaches: the realized support, the tail class on each side, whether the law is bounded, and the coefficient of variation. A different question from the return period ladder, which is the tail exhibit.",
    "columns": [
     {
      "align": "l",
@@ -32700,6 +32744,7 @@
  "validation/insurer/Peel": [
   {
    "body": [],
+   "caption": "Ledger QA: each declared amount against the realized estimate, with absolute and relative error.",
    "columns": [
     {
      "align": "l",
@@ -32776,6 +32821,7 @@
  "validation/insurer/PnL": [
   {
    "body": [],
+   "caption": "Ledger QA: each declared amount against the realized estimate, with absolute and relative error.",
    "columns": [
     {
      "align": "l",
@@ -33830,6 +33876,7 @@
  "validation/insurer/Tower": [
   {
    "body": [],
+   "caption": "Ledger QA: each declared amount against the realized estimate, with absolute and relative error.",
    "columns": [
     {
      "align": "l",
@@ -33953,6 +34000,7 @@
      ]
     }
    ],
+   "caption": "Moment QA: the reference moment against the realized FFT estimate, with noise aware relative errors, for the frequency, severity and aggregate of each unit. Errors of this size are discretization, not model error.",
    "columns": [
     {
      "align": "l",
@@ -34140,6 +34188,7 @@
      ]
     }
    ],
+   "caption": "Identity checks: the realized value against its reference, the gate it has to clear, and whether it cleared it.",
    "columns": [
     {
      "align": "l",
@@ -34286,6 +34335,7 @@
      ]
     }
    ],
+   "caption": "Identity checks: the realized value against its reference, the gate it has to clear, and whether it cleared it.",
    "columns": [
     {
      "align": "l",
@@ -34387,6 +34437,7 @@
  "validation/raw/Peel": [
   {
    "body": [],
+   "caption": "Ledger QA: each declared amount against the realized estimate, with absolute and relative error.",
    "columns": [
     {
      "align": "l",
@@ -34463,6 +34514,7 @@
  "validation/raw/PnL": [
   {
    "body": [],
+   "caption": "Ledger QA: each declared amount against the realized estimate, with absolute and relative error.",
    "columns": [
     {
      "align": "l",
@@ -34687,6 +34739,7 @@
      ]
     }
    ],
+   "caption": "Moment QA: the reference moment against the realized FFT estimate, with noise aware relative errors, for the frequency, severity and aggregate of each unit. Errors of this size are discretization, not model error.",
    "columns": [
     {
      "align": "l",
@@ -34917,6 +34970,7 @@
      ]
     }
    ],
+   "caption": "Moment QA: the reference moment against the realized FFT estimate, with noise aware relative errors, for the frequency, severity and aggregate of each unit. Errors of this size are discretization, not model error.",
    "columns": [
     {
      "align": "l",
@@ -35278,6 +35332,7 @@
      ]
     }
    ],
+   "caption": "Moment QA: the reference moment against the realized FFT estimate, with noise aware relative errors, for the frequency, severity and aggregate of each unit. Errors of this size are discretization, not model error.",
    "columns": [
     {
      "align": "l",
@@ -35496,6 +35551,7 @@
  "validation/raw/Tower": [
   {
    "body": [],
+   "caption": "Ledger QA: each declared amount against the realized estimate, with absolute and relative error.",
    "columns": [
     {
      "align": "l",

@@ -11,8 +11,19 @@ from ._core import dependency, validation, _check_table_emphasis
 
 @dependency.register(BivariateAggregate)
 def _dependency_frames_bivariate(obj):
-    return [('dependency_df', obj.dependency_df, {}),
-            ('axis_support_df', obj.axis_support_df, {})]
+    """Joint dependence, then the per axis support the marginals realized."""
+    return [
+        ('dependency_df', obj.dependency_df,
+         {'caption': 'How the two axes move together, by level: covariance '
+                     'and linear correlation, and Kendall tau, which reads '
+                     'the ranks rather than the values and so survives the '
+                     'marginals being reshaped.'}),
+        ('axis_support_df', obj.axis_support_df,
+         {'caption': 'Where each marginal actually has mass, with its '
+                     'theoretical moments alongside. The full tail class '
+                     'ladder lives on each axis\'s own standalone '
+                     'aggregate, not here.'}),
+    ]
 
 
 @validation.insurer.register(BivariateAggregate)

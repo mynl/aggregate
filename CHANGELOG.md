@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.0a226
+
+**[Loss-Lab-Round-3] Phase D: every exhibit block says what it is, and a window prints as a window.**
+
+**Captions on the passthrough exhibits.** `register_simple_exhibit` returned `{}` for its frame kwargs, and captions are lifted from exactly those, so every passthrough (`summary`, `stats`, `validation`, `tail`, `economic`, `bs_window`, `tail_behavior`, plus the two multi block builders `reins` under RAW, `economic_ratios` and `dependency`) arrived as a bare table. The insurer builders did carry captions, which is what made the gap easy to miss. The consequence was downstream: a client that wanted prose wrote its own, so a frame's description came to have three possible sources that could disagree.
+
+`register_simple_exhibit` gains `caption=` and `formatters=`. **One frame does not have one description across five classes**, so an exhibit registered for several is now declared once per class group, which the existing "calling it twice extends" behavior already supported. `summary_df` is the clear case: count risk / severity / total loss on an `Aggregate`, the three ledger rows on a `PnL`, moments of `g` and its dual on a `Distortion`. A caption true of all three would say nothing.
+
+RAW captions say what the frame **is**; the insurer overrides say what it **means** for the business, and replace them where they exist. `tests/test_exhibits.py` now sweeps every (object, exhibit, perspective) and fails if any block ships without prose, so a new passthrough cannot reopen the gap.
+
+**The `Perspective.RAW` contract is restated** rather than quietly broken. RAW is still no business translation, no row emphasis, no dropped rows, no rearrangement. It now carries a caption and the column formats for units the frame cannot carry itself, both of which describe the table rather than interpret it. `summary` under RAW gains `MEASURE_FORMATS`, so a CV reads as a percentage exactly as the insurer view already showed it, which is the only snapshot change beyond captions.
+
+**The window prose.** `x_min`, `x_max` and `W` formatted with `:g`, so a grid top of 12,182,881 printed as `1.21829e+07`, and nothing on the page said the three numbers were one fact. Two helpers in `_bucket_window.py`, used at every site in `bs_describe` / `bs_explain` and `Portfolio.bs_description` / `bs_explanation`:
+
+* **`fmt_amount`** groups thousands and drops the fractional part above 1,000, where it is noise against the bucket size. `nan` reads `n/a` and the infinities read `infinite`, so a missing bound reads as missing rather than as a number.
+* **`fmt_window`** writes the window as the interval it is: `[0, 131,072] of width 131,072`.
+
+`bs` now renders through the existing `_fmt_bs`, so a sub-unit bucket reads `1/65536` rather than `1.52588e-05`.
+
+Writing the interval and the width together exposed a real inconsistency the loose numbers had hidden: on an `Aggregate` the realized grid `[x_min, x_max]` and the winning method's recommended `W` are **different numbers**, the grid being the larger. The narrative now reports the window's width from its own ends, and leaves the method's recommended width in the sentence about methods, where it belongs.
+
+
 ## 1.0.0a225
 
 **[Loss-Lab-Round-3] Phase C: the reinsurance chart draws a book, not just an aggregate.** `chart_reins` carried `@chart_reins.register(Aggregate)` and nothing else, and its availability gate read `occ_reins` / `agg_reins` off the object, which a `Portfolio` does not have in that form. So `available_charts` never answered `'reins'` for a reinsured book. The visible casualty was the app's Reinsurance Plot leaf, the only one gated on the chart registry rather than the exhibit registry, which greyed out and read as unbuilt. It was built.

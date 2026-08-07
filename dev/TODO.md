@@ -60,12 +60,11 @@
   stale `reins_audit_df` docstring references repointed. **Phase C DONE**
   (`1.0.0a225`): a `Portfolio` emitter for `chart_reins` on a fourth basis,
   `total`, so `available_charts` answers `reins` for a reinsured book.
-  Remaining: **D** captions and column formats on the passthrough exhibits
-  (`register_simple_exhibit` returns `{}` for frame kwargs,
-  so `bs_window` / `stats` / `summary` / `validation` / `tail` / `economic`
-  arrive caption-less under RAW), and `:g` formatting of `x_min` / `x_max` / `W`
-  in the window prose; **E** housekeeping, a string-returning `to_agg` sibling
-  with `'pnl'` in `_KIND_WRITE_ORDER`, removing the ignored
+  **Phase D DONE** (`1.0.0a226`): a caption on every exhibit block, one per
+  class group where a frame reads differently per class, guarded by a sweep;
+  `fmt_amount` / `fmt_window` so the grid narratives print money as money and
+  the window as an interval. Remaining: **E** housekeeping, a string-returning
+  `to_agg` sibling with `'pnl'` in `_KIND_WRITE_ORDER`, removing the ignored
   `format_program(width=)`, and giving `PnL` / `BivariateAggregate` a `tail_df`.
 - **[Reporting-Guidelines]** — *define what "first-class citizen" means* for a
   reporting object: a report's **rows are fixed** (it does not morph as the

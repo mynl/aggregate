@@ -307,8 +307,8 @@ def bs_describe(agg, *, color: bool = False) -> str:
     method = sel[0] if len(sel) else 'moment'
     used = df.loc['used']
     top = _bs_grid_top(used)
-    text = (f'{method} grid: bs={float(used["bs"]):g}, log2={int(used["log2"])}, '
-            f'x_min={float(used["x_min"]):g} (x_max={top:g})')
+    text = (f'{method} grid: bs={_fmt_bs(used["bs"])}, log2={int(used["log2"])}, '
+            f'window {fmt_window(float(used["x_min"]), top)}')
     clip = agg._bs_clip
     if clip is not None:
         cm = clip.get('clipped_mass', float('nan'))
@@ -367,18 +367,22 @@ def bs_explain(agg, *, color: bool = False) -> str:
                if i not in ('used',) and bool(df.loc[i].get('applies'))]
     blurb = _METHOD_BLURB.get(method, method)
     if applied:
-        cand_txt = ', '.join(f'{i} {float(df.loc[i, "W"]):g}' for i in applied)
+        cand_txt = ', '.join(
+            f'{i} {fmt_amount(df.loc[i, "W"])}' for i in applied)
         parts.append(
             f'Of the methods that applied ({cand_txt}), the {method} method won '
-            f'(window width {W:g}) -- {blurb}.')
+            f'(window width {fmt_amount(W)}) -- {blurb}.')
     else:
-        parts.append(f'The {method} method won (window width {W:g}) -- {blurb}.')
+        parts.append(
+            f'The {method} method won (window width {fmt_amount(W)}) '
+            f'-- {blurb}.')
 
     raw = getattr(agg, '_bs_raw', None)
     if raw is not None:
         parts.append(
-            f'The window produces a raw bs {raw:g} which dyadically rounds to '
-            f'{bs:g} producing a final {W:g} window width.')
+            f'The window produces a raw bs {_fmt_bs(raw)} which dyadically '
+            f'rounds to {_fmt_bs(bs)} producing a final window width of '
+            f'{fmt_amount(W)}.')
 
     # natural support bounds + concentration from the aggregate tail row
     try:
@@ -387,21 +391,26 @@ def bs_explain(agg, *, color: bool = False) -> str:
         trow = None
     if trow is not None:
         if trow['left_tail'] == 'bounded' and np.isfinite(float(trow['min'])):
-            parts.append(f'It has a natural lower support bound of {float(trow["min"]):g}.')
+            parts.append('It has a natural lower support bound of '
+                         f'{fmt_amount(trow["min"])}.')
         if trow['right_tail'] == 'bounded' and np.isfinite(float(trow['max'])):
-            parts.append(f'It has a natural upper support bound of {float(trow["max"]):g}.')
+            parts.append('It has a natural upper support bound of '
+                         f'{fmt_amount(trow["max"])}.')
         cv = trow.get('cv')
         if bool(trow.get('concentrated')) and cv is not None and np.isfinite(float(cv)):
             parts.append(f'The distribution is concentrated with a CV of {float(cv):g}.')
 
-    parts.append(f'The recommended x_min is {x_min:g} resulting in x_max of {x_max:g}.')
+    parts.append(f'The recommended x_min is {fmt_amount(x_min)} and the '
+                 f'x_max that follows is {fmt_amount(x_max)}, so the window '
+                 f'is {fmt_window(x_min, x_max)}.')
 
     clip = agg._bs_clip
     if clip is not None:
         cm = clip.get('clipped_mass', float('nan'))
         cm_txt = f'~{cm:.3g}' if np.isfinite(cm) else 'a sliver'
-        msg = (f'The heavy right tail reaches {float(clip["reach"]):g}, past the '
-               f'grid x_max {x_max:g} ({cm_txt} of the mass clipped, a reported '
+        msg = (f'The heavy right tail reaches {fmt_amount(clip["reach"])}, past '
+               f'the grid x_max {fmt_amount(x_max)} ({cm_txt} of the mass '
+               f'clipped, a reported '
                f'deficit not normalized); the analysis suggests increasing log2 '
                f'to {int(clip["need_log2"])}.')
         if color:
@@ -1854,6 +1863,63 @@ def _fmt_bs(bs):
     if abs(inv - round(inv)) < 1e-9 and round(inv) > 1:
         return f'1/{round(inv)}'
     return f'{bs:.6g}'
+
+
+def fmt_amount(x):
+    """Format a loss-scale number for prose: grouped, never in exponent form.
+
+    ``:g`` is right for a score and wrong for money. A grid whose top is
+    12,182,881 prints as ``1.21829e+07``, which a reader has to decode before
+    they can compare it to anything, and that is the number the grid
+    narratives are mostly made of. Thousands are grouped and the fractional
+    part is dropped once it cannot matter at this scale.
+
+    Parameters
+    ----------
+    x : float
+
+    Returns
+    -------
+    str
+        ``'12,182,881'``, ``'123.457'``, ``'0.000125'``; ``'infinite'`` /
+        ``'-infinite'`` for the infinities and ``'n/a'`` for ``nan``, so a
+        missing bound reads as missing rather than as a number.
+    """
+    x = float(x)
+    if np.isnan(x):
+        return 'n/a'
+    if not np.isfinite(x):
+        return 'infinite' if x > 0 else '-infinite'
+    if x == 0:
+        return '0'
+    if abs(x) >= 1000:
+        return f'{x:,.0f}'
+    return f'{x:,.6g}'
+
+
+def fmt_window(x_min, x_max, W=None):
+    """The grid window as the interval it is, with its width.
+
+    Every narrative reported ``x_min`` and ``x_max`` as two loose numbers and
+    the width as a third, so nothing on the page said they were the same
+    fact. Written once, here.
+
+    Parameters
+    ----------
+    x_min, x_max : float
+        The window ends.
+    W : float, optional
+        The width; defaults to ``x_max - x_min``.
+
+    Returns
+    -------
+    str
+        ``'[0, 12,182,881] of width 12,182,881'``.
+    """
+    if W is None:
+        W = float(x_max) - float(x_min)
+    return (f'[{fmt_amount(x_min)}, {fmt_amount(x_max)}] '
+            f'of width {fmt_amount(W)}')
 
 
 def _move_phrase(st, win):

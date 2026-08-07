@@ -143,7 +143,11 @@ def test_frames_raw_aggregate(dice):
     block_name, df, kw = blocks[0]
     assert block_name == 'summary_df'
     assert list(df.index) == ['Freq', 'Sev', 'Agg']
-    assert kw == {}  # RAW is the untouched passthrough
+    # RAW is the untouched frame, described but not interpreted (a226): a
+    # caption saying what it is and the column formats, no row emphasis, no
+    # dropped rows, no rearrangement
+    assert set(kw) == {'caption', 'formatters'}
+    assert 'count risk' in kw['caption']
 
 
 def test_frames_insurer_aggregate(dice):
@@ -200,7 +204,7 @@ def test_stats_insurer_drops_raw_moments(dice, port):
     for obj in (dice, port):
         _, raw_df, raw_kw = exhibit_frames(obj, 'stats')[0]
         _, ins_df, ins_kw = exhibit_frames(obj, 'stats', 'insurer')[0]
-        assert len(raw_df) == 26 and raw_kw == {}
+        assert len(raw_df) == 26 and set(raw_kw) == {'caption'}
         assert len(ins_df) == 17
         measures = set(ins_df.index.get_level_values('measure'))
         assert measures.isdisjoint({'ex1', 'ex2', 'ex3'})
@@ -269,7 +273,8 @@ def test_dependency_two_blocks(objects):
     assert [name for name, _, _ in blocks] == ['dependency_df',
                                                'axis_support_df']
     for _, df, kw in blocks:
-        assert kw == {}  # no insurer override: raw and insurer agree
+        # no insurer override: raw and insurer agree, both described
+        assert set(kw) == {'caption'}
     raw = exhibit_frames(objects['BivariateAggregate'], 'dependency',
                          'insurer')
     pd.testing.assert_frame_equal(raw[0][1], blocks[0][1])
@@ -284,8 +289,8 @@ def test_reins_two_blocks_and_moment_drop(objects):
         ins = exhibit_frames(obj, 'reins', 'insurer')
         assert [name for name, _, _ in raw] == ['reins_stats_df',
                                                 'reins_summary_df']
-        # raw is untouched; insurer drops the raw noncentral moment rows
-        assert raw[0][2] == {} and raw[1][2] == {}
+        # raw keeps every row; insurer drops the raw noncentral moment rows
+        assert set(raw[0][2]) == set(raw[1][2]) == {'caption'}
         raw_measures = set(raw[0][1].index.get_level_values('measure'))
         ins_measures = set(ins[0][1].index.get_level_values('measure'))
         assert {'ex1', 'ex2', 'ex3'} <= raw_measures
@@ -319,7 +324,7 @@ def test_economic_raw(objects):
     blocks = exhibit_frames(pn, 'economic')
     assert [name for name, _, _ in blocks] == ['economic_df']
     _, df, kw = blocks[0]
-    assert kw == {}
+    assert set(kw) == {'caption'}
     assert list(df.index.names) in (['Side', 'Label'],
                                     ['Step', 'Side', 'Label'])
     # RAW stays the untouched passthrough; INSURER translates the same frame
@@ -498,8 +503,54 @@ def test_simple_exhibits_are_passthroughs(dice):
         raw_name, raw_df, raw_kw = blocks[0]
         ins_name, ins_df, ins_kw = exhibit_frames(dice, name, 'insurer')[0]
         # no override registered -> INSURER is RAW, by the default rule
-        assert raw_kw == ins_kw == {}
+        assert raw_kw == ins_kw
+        assert set(raw_kw) == {'caption'}
         pd.testing.assert_frame_equal(raw_df, ins_df)
+
+
+def test_every_block_carries_a_caption(objects):
+    """No exhibit block ships without prose ([Loss-Lab-Round-3] phase D).
+
+    The gap this closes: a passthrough returned ``{}`` for its frame kwargs
+    and captions are lifted from exactly those, so a raw frame arrived with
+    nothing said about it, and the client that wanted prose wrote its own.
+    That is how one frame's description came to have three possible sources
+    that could disagree. Sweeping every (object, exhibit, perspective) keeps
+    a new passthrough from reopening it.
+    """
+    missing = []
+    for kind, obj in objects.items():
+        for name, perspectives in available_exhibits(obj):
+            for perspective in perspectives:
+                for block, _, kw in exhibit_frames(obj, name, perspective):
+                    if not kw.get('caption'):
+                        missing.append(f'{name}/{perspective.value}/{kind}'
+                                       f' block {block}')
+    assert missing == []
+
+
+def test_captions_are_per_class_where_the_frame_differs(objects):
+    """One frame does not have one description across five classes.
+
+    ``summary_df`` is count risk / severity / total loss on an Aggregate and
+    the three ledger rows on a PnL. A caption true of both would say nothing.
+    """
+    caption_of = lambda kind: exhibit_frames(
+        objects[kind], 'summary')[0][2]['caption']
+    assert 'count risk' in caption_of('Aggregate')
+    assert 'Consideration' in caption_of('PnL')
+    assert 'distortion' in caption_of('Distortion')
+    assert len({caption_of(k) for k in
+                ('Aggregate', 'PnL', 'Distortion', 'BivariateAggregate')}) == 4
+
+
+def test_insurer_caption_wins_over_the_manifest(dice):
+    """RAW says what the frame is; INSURER says what it means, and replaces."""
+    raw = exhibit_frames(dice, 'tail')[0][2]['caption']
+    insurer = exhibit_frames(dice, 'tail', 'insurer')[0][2]['caption']
+    assert raw != insurer
+    assert 'anchors are emphasized' in insurer      # the business reading
+    assert 'anchors are emphasized' not in raw
 
 
 def test_register_simple_exhibit_is_open(dice):
@@ -546,7 +597,7 @@ def test_unavailable_predicate():
 def test_perspective_resolution(dice):
     for p in ('raw', 'RAW', Perspective.RAW):
         blocks = exhibit_frames(dice, 'summary', p)
-        assert blocks[0][2] == {}
+        assert set(blocks[0][2]) == {'caption', 'formatters'}
     with pytest.raises(ValueError, match='unknown perspective'):
         exhibit_frames(dice, 'summary', 'bogus')
 

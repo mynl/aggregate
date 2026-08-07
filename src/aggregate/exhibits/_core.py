@@ -95,12 +95,18 @@ _AGG_FAILURES = (Validation.AGG_MEAN | Validation.AGG_CV
 class Perspective(Enum):
     """Who is looking at the numbers.
 
-    ``RAW`` passes the underlying frame through, essentially ``GT(df)`` to
-    IR. ``INSURED`` is the policyholder (buyer of insurance). ``INSURER`` is
+    ``RAW`` serves the underlying frame with **no business translation**: no
+    row emphasis, no dropped rows, no rearrangement. Since 1.0.0a226 it does
+    carry a caption saying what the frame is, and the column formats for
+    units the frame cannot carry itself (a ``CV`` reads as a percentage).
+    Those describe the table rather than interpret it, and a table with no
+    prose at all only pushes the writing of that prose to whoever displays
+    it. ``INSURED`` is the policyholder (buyer of insurance). ``INSURER`` is
     the seller of insurance and buyer of reinsurance (the cedent, the object
-    holder on the reins exhibits). ``REINSURER`` is the seller of
-    reinsurance, a sign and label flip relative to the insurer (retro, where
-    the reinsurer buys, is parked).
+    holder on the reins exhibits), and is where the business reading lives:
+    what the frame *means*, over ``RAW``'s what it *is*. ``REINSURER`` is the
+    seller of reinsurance, a sign and label flip relative to the insurer
+    (retro, where the reinsurer buys, is parked).
 
     Only ``RAW`` and ``INSURER`` are implemented at 1.0. ``INSURED`` and
     ``REINSURER`` are stable vocabulary so the enum does not churn when
@@ -649,7 +655,8 @@ EXHIBITS = {
 
 
 def register_simple_exhibit(name, title, frame_attr, classes, *,
-                            predicate=None, doc=None):
+                            predicate=None, doc=None, caption=None,
+                            formatters=None):
     """Declare a passthrough exhibit over one named frame, in one line.
 
     The common case: an exhibit that serves a single frame with no business
@@ -660,7 +667,11 @@ def register_simple_exhibit(name, title, frame_attr, classes, *,
 
     Calling it twice for one ``name`` extends the existing exhibit to more
     classes rather than replacing it, so a class module may add itself to an
-    exhibit the manifest already declared.
+    exhibit the manifest already declared. That is also how one exhibit
+    carries a **different caption per class**: one call per class group. A
+    single sentence cannot describe ``summary_df`` on an ``Aggregate`` (count
+    risk, severity, total loss) and on a ``PnL`` (consideration, obligation,
+    margin) at once, and a caption that tries is worse than none.
 
     Parameters
     ----------
@@ -679,6 +690,16 @@ def register_simple_exhibit(name, title, frame_attr, classes, *,
     doc : str, optional
         Docstring for the generated exhibit function. A serviceable default
         is written from ``title`` and ``frame_attr``.
+    caption : str, optional
+        What the frame is, in a sentence or two, carried into the served
+        block's ``TableSpec`` and lifted onto ``Exhibit.meta['captions']``.
+        Without one a passthrough arrives with no prose at all, and a client
+        that wants any has to write its own, which is how a frame's
+        description ends up with three sources that can disagree.
+    formatters : dict, optional
+        Column formats, ``{column: format spec}``, for the columns whose
+        units the frame itself does not carry (a ``CV`` reads as a
+        percentage, a skewness does not).
 
     Returns
     -------
@@ -713,8 +734,16 @@ def register_simple_exhibit(name, title, frame_attr, classes, *,
     if name not in EXHIBITS:
         EXHIBITS[name] = (fn, predicate or _perspectives_always)
 
-    def _frames(obj, _attr=frame_attr):
-        return [(_attr, getattr(obj, _attr), {})]
+    kw = {}
+    if caption is not None:
+        kw['caption'] = caption
+    if formatters is not None:
+        kw['formatters'] = formatters
+
+    def _frames(obj, _attr=frame_attr, _kw=kw):
+        # a fresh dict per call: the builders downstream do dict(kw, ...) but
+        # an insurer override is free to mutate, and this one is shared
+        return [(_attr, getattr(obj, _attr), dict(_kw))]
 
     _frames.__name__ = f'_{name}_frames'
     _frames.__doc__ = f'Serve ``{frame_attr}`` unchanged.'
@@ -731,8 +760,17 @@ def _reins_frames(obj):
     Shared by ``Aggregate`` and ``Portfolio``, whose frames differ in shape
     but not in which two frames make up the exhibit.
     """
-    return [('reins_stats_df', obj.reins_stats_df, {}),
-            ('reins_summary_df', obj.reins_summary_df, {})]
+    return [
+        ('reins_stats_df', obj.reins_stats_df,
+         {'caption': 'The program layer by layer, by view: the moments of '
+                     'what is subject to each layer, what it cedes and what '
+                     'is retained. Per layer columns are conditional on a '
+                     'loss reaching the layer; the Ceded and Net totals are '
+                     'not.'}),
+        ('reins_summary_df', obj.reins_summary_df,
+         {'caption': 'What each stage of the program does to the book, stage '
+                     'by stage, in the eight column validation layout.'}),
+    ]
 
 
 # --- shared flag helpers ----------------------------------------------------

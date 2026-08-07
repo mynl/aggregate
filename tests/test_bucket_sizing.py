@@ -493,6 +493,45 @@ def test_bs_window_df_public_view():
     assert Aggregate(**a.spec).bs_window_df is None
 
 
+def test_fmt_amount_and_fmt_window():
+    """[Loss-Lab-Round-3] phase D: loss-scale numbers read as money in prose.
+
+    ``:g`` printed a grid top of 12,182,881 as ``1.21829e+07``, which the
+    reader has to decode before comparing it to anything, and grid narratives
+    are mostly made of such numbers.
+    """
+    from aggregate._bucket_window import fmt_amount, fmt_window
+
+    assert fmt_amount(12182881.0) == '12,182,881'
+    assert fmt_amount(1234.5678) == '1,235'      # decimals are noise up here
+    assert fmt_amount(123.4568) == '123.457'
+    assert fmt_amount(0.000125) == '0.000125'
+    assert fmt_amount(0) == '0'
+    assert fmt_amount(-2000) == '-2,000'
+    # a missing bound reads as missing, not as a number
+    assert fmt_amount(float('nan')) == 'n/a'
+    assert fmt_amount(float('inf')) == 'infinite'
+    assert fmt_amount(float('-inf')) == '-infinite'
+    # the window is one fact, so it is written as one
+    assert fmt_window(0, 131072) == '[0, 131,072] of width 131,072'
+    assert fmt_window(-8, 8, 16) == '[-8, 8] of width 16'
+
+
+def test_window_prose_says_it_is_an_interval():
+    """The narratives name the window, not three loose numbers."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg WP 100 claims sev lognorm 100 cv 2 poisson')
+        p = build('port WPP agg A 100 claims sev lognorm 100 cv 2 poisson '
+                  'agg B 50 claims sev gamma 50 cv 1 poisson')
+    for text in (a.bs_description, p.bs_description):
+        assert 'window [' in text and 'of width' in text
+        assert 'e+0' not in text                 # no exponent-form money
+    for text in (a.bs_explanation, p.bs_explanation):
+        assert 'x_min' in text and 'x_max' in text
+        assert 'so the window is [' in text
+
+
 def test_bs_description_and_explanation():
     """``bs_description`` / ``bs_explanation`` narrate the chosen grid + the clip."""
     with warnings.catch_warnings():

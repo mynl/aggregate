@@ -128,8 +128,16 @@ def _economic_insurer(obj, blocks):
 @economic_ratios.register(PnL)
 def _economic_ratios_frames(obj):
     """The per block amounts and ratios, plus the itemized declared legs."""
-    return [('economic_ratios_df', obj.economic_ratios_df, {}),
-            ('legs_df', obj.legs_df, {})]
+    return [
+        ('economic_ratios_df', obj.economic_ratios_df,
+         {'caption': 'Raw materials: the amounts each block contributes and '
+                     'the loss, expense and combined ratios they imply, in '
+                     'one frame to slice. Currency and ratio columns sit '
+                     'side by side here; the insurer view separates them.'}),
+        ('legs_df', obj.legs_df,
+         {'caption': 'The declared legs, one row each, as written into the '
+                     'ledger.'}),
+    ]
 
 
 #: The ratio frame splits into pure blocks under INSURER, per the reporting

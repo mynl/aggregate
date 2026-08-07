@@ -904,8 +904,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             return 'portfolio grid not sized yet (call update())'
         u = df.loc['used']
         top = float(u['x_min']) + (1 << int(u['log2'])) * float(u['bs'])
-        txt = (f'portfolio grid: bs={float(u["bs"]):g}, log2={int(u["log2"])}, '
-               f'x_min={float(u["x_min"]):g} (x_max={top:g})')
+        txt = (f'portfolio grid: bs={_bucket_window._fmt_bs(u["bs"])}, '
+               f'log2={int(u["log2"])}, window '
+               f'{_bucket_window.fmt_window(float(u["x_min"]), top)}')
         clip = getattr(self, '_bs_clip', None)
         if clip is not None:
             cm = clip.get('clipped_mass', float('nan'))
@@ -962,31 +963,38 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             parts.append(f'The unit tails are: {unit_txt}.')
 
         if {'mm', 'rms', 'sum', 'sbj'}.issubset(df.index):
+            fa = _bucket_window.fmt_amount
             parts.append(
-                f'The recommended window width {W:g} is based on portfolio method '
-                f'of moments {float(df.loc["mm", "W"]):g}, RMS(units) '
-                f'{float(df.loc["rms", "W"]):g}, sum(units) '
-                f'{float(df.loc["sum", "W"]):g}, and single big jump of '
-                f'{float(df.loc["sbj", "W"]):g}.')
+                f'The recommended window width {fa(W)} is based on portfolio '
+                f'method of moments {fa(df.loc["mm", "W"])}, RMS(units) '
+                f'{fa(df.loc["rms", "W"])}, sum(units) '
+                f'{fa(df.loc["sum", "W"])}, and single big jump of '
+                f'{fa(df.loc["sbj", "W"])}.')
 
         raw = getattr(self, '_bs_raw', None)
         if raw is not None:
             parts.append(
-                f'The window produces a raw bs {raw:g} which dyadically rounds to '
-                f'{bs:g} producing a final {W:g} window width.')
+                f'The window produces a raw bs {_bucket_window._fmt_bs(raw)} '
+                f'which dyadically rounds to {_bucket_window._fmt_bs(bs)} '
+                f'producing a final window width of '
+                f'{_bucket_window.fmt_amount(W)}.')
 
         lo, hi = _as_float(tot['min']), _as_float(tot['max'])
         if tot['left_tail'] == 'bounded' and np.isfinite(lo):
-            parts.append(f'It has a natural lower support bound of {lo:g}.')
+            parts.append('It has a natural lower support bound of '
+                         f'{_bucket_window.fmt_amount(lo)}.')
         if tot['right_tail'] == 'bounded' and np.isfinite(hi):
-            parts.append(f'It has a natural upper support bound of {hi:g}.')
+            parts.append('It has a natural upper support bound of '
+                         f'{_bucket_window.fmt_amount(hi)}.')
 
         conc_flag, conc_cv = _tail.concentration(float(self.actual_m), float(self.actual_sd))
         if conc_flag and conc_cv is not None and np.isfinite(conc_cv):
             parts.append(f'The distribution is concentrated with a CV of {conc_cv:g}.')
 
-        parts.append(f'The recommended x_min is {x_min:g} resulting in '
-                     f'x_max of {x_max:g}.')
+        parts.append(
+            f'The recommended x_min is {_bucket_window.fmt_amount(x_min)} and '
+            f'the x_max that follows is {_bucket_window.fmt_amount(x_max)}, so '
+            f'the window is {_bucket_window.fmt_window(x_min, x_max)}.')
 
         clip = getattr(self, '_bs_clip', None)
         if clip is not None:

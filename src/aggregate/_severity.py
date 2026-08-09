@@ -1805,26 +1805,52 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         #    four analytic specials, plus any histogram with a layer).
         return _numerical_moms(self)
 
-    def plot(self, n=100, axd=None, figsize=(2 * FIG_W, 2 * FIG_H), layout='AB\nCD',
-             **kwargs):
-        r"""
-        Quick plot, updated for 0.9.3 with mosaic and no grid lines. (F(x), x) plot
-        replaced with log density plot.
+    def plot(self, n=None, log=False, full_range=False, return_period=False):
+        """Plot the severity: its density, and its quantile (Lee) diagram.
 
-        The docstring is raw so the ``'AB\nCD'`` default below stays literal
-        text; unescaped it becomes a real newline and breaks the field list.
+        Parameters
+        ----------
+        n : int, optional
+            Grid points. The grid is quantile spaced, so this buys
+            resolution in probability rather than in loss.
+        log : bool
+            Read both axes of the density panel on log, which is the log
+            density panel this plot used to draw as a third picture.
+        full_range : bool
+            Show the whole computed grid, out to the 1-in-100,000 loss,
+            rather than the crop at the 0.1% exceedance.
+        return_period : bool
+            Read the Lee panel against return period rather than
+            non-exceedance probability.
 
-        :param n: number of points to plot.
-        :param axd: axis dictionary, if None, create new figure. Must have keys 'A', 'B', 'C', 'D'.
-        :param figsize: (width, height) in inches.
-        :param layout: the subplot_mosaic layout of the figure. Default is 'AB\nCD'.
-        :param kwargs: Lee-panel options forwarded to the quantile worker,
-                       notably ``quantile_x='return'`` and ``max_return_period``.
-        :return:
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Also stashed on ``self.figure``.
+
+        Notes
+        -----
+        Draws the document ``charts.chart_severity`` emits. Four panels
+        became two, and neither collapse loses anything. The density and
+        the log density were one quantity read two ways, so log is a
+        declared reading of the one panel. The distribution and the Lee
+        diagram are **inverses**, the same curve with its axes exchanged,
+        so only one of them carries information the other does not; the Lee
+        orientation is kept because it is the one that pairs with a
+        return-period reading.
+
+        A severity is the one genuinely continuous law in this library, so
+        its series says ``support='continuous'`` and the renderer draws a
+        line rather than steps. A discrete severity has no density at all,
+        so it is drawn as probability mass and is atomic.
         """
-        from .plots import plot_severity
-        return plot_severity(self, n=n, axd=axd, figsize=figsize, layout=layout,
-                             **kwargs)
+        from .charts import build_chart_doc
+        from .plots import plot_chartdoc
+        options = {} if n is None else {'n': n}
+        self.figure = plot_chartdoc(
+            build_chart_doc(self, 'severity', **options),
+            log=log, full_range=full_range, return_period=return_period)
+        return self.figure
 
 
 # ---------------------------------------------------------------------------

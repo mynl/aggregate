@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a239
+
+**[Chart-Severity] a severity emits its density and its Lee diagram, and the compositor goes.** `Severity.plot` draws the document `charts.chart_severity` emits and `plots/_severity.py` is deleted. Four panels become two, and **neither collapse loses anything**, which is why this was a redesign rather than a rewire.
+
+The density and the log density were one quantity read two ways, so the density panel declares both scales and the reader picks, exactly as on the aggregate. The distribution and the Lee diagram are **inverses**: the same curve with its axes exchanged, so neither carries information the other does not, and only one of them needs drawing. The Lee orientation is the one kept, because it is the one that pairs with a return-period reading, which is how a tail is actually quoted. The curve costs nothing to build and is exact: the grid is *already* a quantile grid, inverted from log-spaced exceedance probabilities, so `(F, loss)` is the pair the grid was computed from rather than an accumulation of it.
+
+**A severity says it is continuous**, because it is: it is the one genuinely continuous law this library holds, a frozen scipy variable with no `xs` and no discretization, which happens in `Aggregate` and not here. So the renderer draws a line and no rung of the atomic ladder applies. A **discrete** severity has no density at all, so it reads as probability mass, says so in `meta['ordinate']`, and is atomic; the two readings are never mixed in one document.
+
+`Severity.plot(n=None, log=False, full_range=False, return_period=False)`, returning the figure and stashing it on `self.figure`. `axd`, `figsize` and `layout` are gone with the mosaic they described, and `quantile_x='return'` is `return_period=True`. The loss axis gained a `full_range` out to the 1-in-100,000 loss, where the window still crops at the 0.1% exceedance.
+
+---
+
 ## 1.0.0a238
 
 **[Chart-Payload-Weight] a document stops writing out what it can state, and `CHART_IR_VERSION` moves to 2.** Two facts about this library's data, neither of them compression: both are statements about the data that happen to save a great deal of space. The aggregate document for a `log2 = 16` book falls from **7.4 MB to 5.4 MB**, and for a lattice book from **1.6 MB to 0.05 MB**, a 32-fold cut. Nothing rounds, thins or samples: every value a document carried before, it carries still.

@@ -1,4 +1,4 @@
-"""Severity chart emitter: the density and its tail, on a quantile grid.
+"""Severity chart emitter: the density and the Lee diagram, on a quantile grid.
 
 A :class:`~aggregate.distributions.Severity` is a look-through onto a
 frozen scipy variable rather than a compute result, so it carries no
@@ -12,16 +12,27 @@ truncates the tail or spends nearly every point on it; quantile spacing
 puts the points where the probability is. That choice is meaning, which is
 why it belongs in an emitter and not in a renderer.
 
+**Two panels, and the compositor's four collapse into them.** Its density
+and log density are one quantity read two ways, so the density panel
+declares both scales and the reader picks. Its distribution and its Lee
+diagram are *inverses*, the same curve with the axes exchanged, so they
+carry no different information and only one of them needs drawing; the Lee
+orientation is the one kept, because it is the one that pairs with a
+return-period reading, which is how a tail is actually quoted.
+
 The ordinate is a **pdf**, not a mass. An aggregate's ``p_total`` is
 probability per bucket and sums to one; this does not, and must never be
-summed. The axis says ``pdf`` for that reason.
+summed. The axis says ``pdf`` for that reason, and the series says
+``support='continuous'``: a severity is the one place this library holds a
+genuinely continuous law, because discretization happens in ``Aggregate``
+and not here.
 
 A discrete severity is the exception, and it has to be: it has no density
 at all, so its pdf is identically zero and a pdf panel would draw a flat
 line along the axis and call it a distribution. Where that happens the
-emitter draws the probability mass instead, says so on the axis, and
-records which reading it gave in ``meta['ordinate']``. The two are never
-mixed in one document.
+emitter draws the probability mass instead, says so on the axis, records
+which reading it gave in ``meta['ordinate']``, and the series is atomic.
+The two are never mixed in one document.
 
 Pure numpy and pandas; no matplotlib.
 """
@@ -30,7 +41,7 @@ import numpy as np
 
 from .._severity import Severity
 from . import register_chart, _emitter_base
-from ._two_panel import gapped, pad_window, survival_window
+from ._two_panel import SURVIVAL_FLOOR, pad_window
 from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, complete_tex
 
 __all__ = ['chart_severity']
@@ -78,16 +89,22 @@ def _severity(sev, n=GRID_POINTS):
     Returns
     -------
     ChartDoc
-        Two 'xy' panels sharing one loss axis: 'density' (the pdf
-        ordinate, or the probability mass for a law that has no density,
-        per ``meta['ordinate']``) and 'tail' (log survival,
-        ``read_axis='y'``).
+        Two 'xy' panels over one loss axis: 'density' (the pdf ordinate, or
+        the probability mass for a law that has no density, per
+        ``meta['ordinate']``), both of whose axes declare a log reading;
+        and 'lee' (the quantile function drawn sideways), whose probability
+        axis carries the paired return-period reading.
 
     Notes
     -----
-    No marks: a severity chart carries no mean line and no capital
-    anchors, because neither is a severity question (the app draws none
-    either, and the inventory records the omission as deliberate).
+    The Lee curve costs nothing to build here and is exact: the grid is
+    *already* a quantile grid, inverted from log-spaced exceedance
+    probabilities, so the curve is the pair the grid was computed from
+    rather than an accumulation of it.
+
+    No marks: a severity chart carries no mean line and no capital anchors,
+    because neither is a severity question (the app draws none either, and
+    the inventory records the omission as deliberate).
     """
     loss = _quantile_grid(sev, n)
     if loss.size == 0:
@@ -96,7 +113,6 @@ def _severity(sev, n=GRID_POINTS):
     with np.errstate(divide='ignore', invalid='ignore'):
         pdf = np.asarray(sev.pdf(loss), dtype=float)
         cdf = np.asarray(sev.cdf(loss), dtype=float)
-        sf = np.asarray(sev.sf(loss), dtype=float)
     # No density anywhere on the grid means the law has none: read the
     # jumps of the step cdf, which are exactly the atoms. Tested on the
     # symptom rather than on the severity's kind, so a wrapper around a
@@ -111,7 +127,6 @@ def _severity(sev, n=GRID_POINTS):
     # is atomic.
     support = 'atomic' if mass_reading else 'continuous'
     xs = tuple(float(v) for v in loss)
-    survival = gapped(sf)
     name = str(sev.label)
 
     # An unsigned severity is read from zero: starting the axis at the
@@ -125,26 +140,35 @@ def _severity(sev, n=GRID_POINTS):
         title=name,
         axes=(
             ChartAxis(id='loss', label='Loss', unit='currency',
-                      suggested_range=pad_window(lo, hi)),
-            ChartAxis(id='pdf', label=y_label, unit='density'),
-            ChartAxis(id='survival', label='Survival', unit='probability',
-                      scale='log',
-                      suggested_range=survival_window([survival])),
+                      scales=('linear', 'log'),
+                      suggested_range=pad_window(lo, hi),
+                      full_range=(lo, float(loss[-1]))),
+            ChartAxis(id='pdf', label=y_label, unit='density',
+                      scales=('linear', 'log')),
+            ChartAxis(id='p', label='Non-exceeding probability',
+                      unit='probability', suggested_range=(0.0, 1.0)),
+            # Not named by any panel: the alternative reading of 'p'.
+            ChartAxis(id='return_period', label='Return period',
+                      unit='return_period', scale='log', reciprocal_of='p',
+                      suggested_range=(1.0,
+                                       float(round(1.0 / SURVIVAL_FLOOR)))),
         ),
         panels=(
             Panel(id='density', kind='xy', x_axis='loss', y_axis='pdf',
                   title='Severity density'),
-            Panel(id='tail', kind='xy', x_axis='loss', y_axis='survival',
-                  read_axis='y', title='Survival'),
+            Panel(id='lee', kind='xy', x_axis='p', y_axis='loss',
+                  title='Quantile (Lee) plot'),
         ),
         series=(
             ChartSeries(name=name, role='density', panel_id='density',
                         x=xs, y=tuple(float(v) for v in ordinate),
                         support=support),
-            ChartSeries(name=name, role='survival', panel_id='tail',
-                        x=xs, y=survival, support=support),
+            ChartSeries(name=name, role='cdf', panel_id='lee',
+                        x=tuple(float(v) for v in cdf), y=xs,
+                        support=support),
         ),
-        meta={'ordinate': 'mass' if mass_reading else 'pdf'},
+        meta={'ordinate': 'mass' if mass_reading else 'pdf',
+              'return_period_map': 'complement'},
     ))
 
 

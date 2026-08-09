@@ -512,12 +512,29 @@
   `('linear',)` only, `return_period_map` is `reciprocal` so the anchors
   land on 100 and 250 exactly, and break even at 0 is a mark in both
   panels. **Jobs 1 to 4 are done (a233, a234, a235, a236, a237).**
-  **Next: job 5 `[Chart-Severity]`**, which is a redesign and not a
-  rewire, so it opens by asking what the severity chart should be and
-  moves to the back with `[Chart-Portfolio]` and `[Chart-Reins]` if that
-  design is not ready. Job 6 `[Chart-Bounds]` is settled (two panels,
-  the cloud and all five calibrated distortions on one band) and could
-  be taken first if the severity design is not.
+  `[Chart-Payload-Weight]` landed a238, outside the nine jobs and at the
+  author's request: a series carries a regular grid as a lattice
+  (`x_lattice` / `y_lattice`, `(start, step, count)`, taken only where it
+  is exact) and an empty run as its endpoints, which took the aggregate
+  document from 7.4 MB to 5.4 MB and a lattice book's from 1.6 MB to
+  0.05 MB. **`CHART_IR_VERSION` is 2**, the first application of the
+  version rule written down at a233: a reader that ignores `x_lattice`
+  sees a series with no coordinates at all. Job 5 `[Chart-Severity]`
+  landed a239, on the author's design: four panels to two, because the
+  log density is a reading of the density and the distribution is the
+  Lee diagram transposed; the series is `continuous` unless the law has
+  no density.
+  **Next: job 6 `[Chart-Bounds]`** (settled: two panels, the weighted
+  cloud and all five calibrated distortions on one band), then
+  `[Chart-Bivariate]`, then `[Chart-Portfolio]` and `[Chart-Reins]`
+  last, both still blocked on author design work.
+  **OPEN, raised by the author at a239:** an `inverse` reading, a panel
+  declaring that its axes may be exchanged, which would let the severity
+  and aggregate Lee panels also be read as distribution functions. Small
+  to build (one `Panel` field, and the renderer already resolves both
+  axes symbolically); the open question is the switch count on
+  `plot_chartdoc`, which the four-switch decision at a233 makes a
+  keyword rather than a dict entry.
 
 ---
 

@@ -147,7 +147,7 @@ def test_aggregate_linear_default_no_regression():
 
 def test_severity_return():
     a = build('sev RetSev lognorm 100 cv 2')
-    a.plot(quantile_x='return')
+    a.plot(return_period=True)
     ax = _lee_axis()
     assert ax.get_xscale() == 'log'
     assert ax.get_xlabel() == 'Return period'

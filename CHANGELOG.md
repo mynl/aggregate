@@ -20,6 +20,20 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a243
+
+**[Chart-Equal-Aspect] the matplotlib renderer stops treating equal aspect as a box shape and treats it as a reading.** `Panel.aspect` has been in the IR since v1 and the distortion and envelope charts have always set it, but honoring it meant no more than `set_aspect('equal')`, which squares the *box* while leaving the two axes on different ranges. That is a square drawn over a rectangle of data, and on a panel whose axes measure the same thing it misreads: a 45 degree line has to *be* at 45 degrees.
+
+So an equal-aspect panel now gets **one window for both axes**. The top is the higher of the two, so nothing an emitter declared is cropped; the bottom is where the data actually starts, so a panel whose curves begin well inside its window no longer opens with an empty corner, which a loss window anchored at zero routinely gives. It never widens past what the emitter asked for: the data can raise the floor, never lower it. A renderer that has no use for the hint may still ignore it; this one does not.
+
+**A square panel no longer shares its x axis.** Sharing let squareness drag a neighbour's window around to keep itself square, which is the tail wagging the dog, since the neighbour's window was computed from the data it draws. Equal aspect is the stronger statement, so it wins and the axis goes unshared.
+
+**The portfolio's kappa panel is now square**, which is what prompted this: both its axes are losses and the total's curve is the diagonal, so the reading is each unit's slope against 45 degrees.
+
+No baseline moves. The distortion's window is the unit square on both axes already, so merging them changes nothing, which the image gate confirms.
+
+---
+
 ## 1.0.0a242
 
 **[Chart-Portfolio] a portfolio emits total, units and the kappa reading.** `Portfolio.plot` draws the document `charts.chart_port` emits and `plots._portfolio.plot_portfolio` is deleted. The density and the log density were one quantity read two ways, so log is a declared reading of the one panel, and the panel that frees up is the **kappa** panel, which is the author's design and the reason a book is not an aggregate with more curves on it.

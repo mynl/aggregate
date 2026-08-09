@@ -390,6 +390,33 @@ def _legend_corner(drawn, window):
     return 'upper right' if heights[0] >= heights[1] else 'upper left'
 
 
+def _square_window(x_window, y_window, all_x, all_y):
+    """One window for both axes of an equal-aspect panel.
+
+    Equal aspect with two different ranges is a square box drawn over a
+    rectangle of data, and it misreads: on a panel whose axes measure the
+    same thing, a 45 degree line has to *be* at 45 degrees. So the two
+    windows become one.
+
+    The top is the higher of the two, so nothing an emitter declared is
+    cropped. The bottom is where the data actually starts, because a panel
+    whose curves begin well inside its window opens with an empty corner
+    otherwise, and a loss window anchored at zero routinely does. It never
+    widens past what the emitter asked for: the data can raise the floor,
+    never lower it.
+    """
+    windows = [w for w in (x_window, y_window) if w is not None]
+    if not windows:
+        return None
+    seen = [v[np.isfinite(v)] for v in (all_x, all_y) if v.size]
+    seen = np.concatenate(seen) if seen else np.array([])
+    lo = min(w[0] for w in windows)
+    if seen.size:
+        lo = max(lo, float(seen.min()))
+    hi = max(w[1] for w in windows)
+    return (lo, hi) if hi > lo else windows[0]
+
+
 def _panel_window(window, values):
     """The range the panel will show, before anything is drawn.
 
@@ -516,11 +543,13 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     # axis exists to show sits far outside the window computed for the
     # probability reading, so the companion axis follows the data instead.
     # The compositor's quantile worker does the same by relim-and-autoscale.
+    x_scale, y_scale = _axis_scale(x_axis, log), _axis_scale(y_axis, log)
     y_window = None if x_map else _axis_window(y_axis, full)
-    _apply_axis(ax, 'x', x_axis, _axis_scale(x_axis, log),
-                None if y_map else x_window, _decade_floor(all_x))
-    _apply_axis(ax, 'y', y_axis, _axis_scale(y_axis, log), y_window,
-                _decade_floor(all_y))
+    x_only = None if y_map else x_window
+    if panel.aspect == 'equal' and x_scale == y_scale:
+        x_only = y_window = _square_window(x_only, y_window, all_x, all_y)
+    _apply_axis(ax, 'x', x_axis, x_scale, x_only, _decade_floor(all_x))
+    _apply_axis(ax, 'y', y_axis, y_scale, y_window, _decade_floor(all_y))
     # The document labels its axes and the renderer draws what it is given,
     # as the grid panels already do.
     ax.set(xlabel=_typeset(doc, x_axis.label),
@@ -646,12 +675,20 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
         # Panels naming the same x axis share it: that is what makes a
         # density and its tail one reading rather than two pictures, and
         # zooming one must move the other.
-        shared = len({p.x_axis for p in doc.panels}) == 1
+        #
+        # An equal-aspect panel cannot join in. Its window is settled by its
+        # own squareness, so sharing lets it drag its neighbour's window
+        # around to keep itself square, which is the tail wagging the dog:
+        # the neighbour's window was computed from the data it draws. Equal
+        # aspect is the stronger statement, so it wins and the axis is not
+        # shared.
+        square = any(p.aspect == 'equal' for p in doc.panels)
+        shared = len({p.x_axis for p in doc.panels}) == 1 and not square
         # Equal-aspect panels are squares, and squares in a row need a
         # canvas that is as many squares wide, or constrained layout
         # collapses them to slivers trying to honor the aspect.
-        square = all(p.aspect == 'equal' for p in doc.panels)
-        size = (len(doc.panels) * FIG_H, FIG_H) if square else None
+        all_square = all(p.aspect == 'equal' for p in doc.panels)
+        size = (len(doc.panels) * FIG_H, FIG_H) if all_square else None
         _, grid = make_grid(1, len(doc.panels), squeeze=False, sharex=shared,
                             **({} if size is None else {'figsize': size}))
         axs = list(grid[0])

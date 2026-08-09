@@ -283,6 +283,69 @@ def test_a_band_fills_the_other_way_round():
     close(fig)
 
 
+# ------------------------------------------------------------ equal aspect
+
+def square_doc(**panel_kw):
+    """Two axes measuring the same thing, over data starting well inside."""
+    return ChartDoc(
+        name='t',
+        axes=(ChartAxis(id='a', label='a', unit='currency',
+                        suggested_range=(0.0, 100.0)),
+              ChartAxis(id='b', label='b', unit='currency',
+                        suggested_range=(0.0, 80.0))),
+        panels=(Panel(id='sq', kind='xy', x_axis='a', y_axis='b',
+                      aspect='equal', **panel_kw),),
+        series=(ChartSeries(name='s', role='density', panel_id='sq',
+                            x=(40.0, 60.0, 100.0), y=(30.0, 50.0, 80.0),
+                            support='continuous'),))
+
+
+def test_equal_aspect_gives_both_axes_one_window():
+    """A 45 degree line has to be at 45 degrees, so one window serves both."""
+    ax, fig = drawn(square_doc())
+    assert ax.get_xlim() == ax.get_ylim()
+    assert ax.get_aspect() == 1.0
+    close(fig)
+
+
+def test_the_square_window_takes_the_higher_top():
+    """Nothing an emitter declared is cropped to make the panel square."""
+    ax, fig = drawn(square_doc())
+    assert ax.get_ylim()[1] > 100.0             # the taller of 100 and 80
+    close(fig)
+
+
+def test_the_square_window_trims_the_empty_corner():
+    """A window anchored at zero over data starting at 30 opens empty."""
+    ax, fig = drawn(square_doc())
+    assert ax.get_xlim()[0] > 10.0              # nowhere near the declared 0
+    close(fig)
+
+
+def test_a_square_panel_does_not_share_its_axis():
+    """Sharing would let squareness drag a neighbour's window around."""
+    doc = ChartDoc(
+        name='t',
+        axes=(ChartAxis(id='a', label='a', suggested_range=(0.0, 100.0)),
+              ChartAxis(id='b', label='b', suggested_range=(0.0, 80.0)),
+              ChartAxis(id='c', label='c', suggested_range=(0.0, 1.0))),
+        panels=(Panel(id='plain', kind='xy', x_axis='a', y_axis='c'),
+                Panel(id='sq', kind='xy', x_axis='a', y_axis='b',
+                      aspect='equal')),
+        series=(ChartSeries(name='s', role='density', panel_id='plain',
+                            x=(0.0, 100.0), y=(0.0, 1.0),
+                            support='continuous'),
+                ChartSeries(name='t', role='density', panel_id='sq',
+                            x=(40.0, 100.0), y=(30.0, 80.0),
+                            support='continuous')))
+    from aggregate.plots import plot_chartdoc, plt
+    fig = plot_chartdoc(doc)
+    plain, square = fig.axes
+    assert plain.get_xlim()[0] < 0.0            # its own window, still at zero
+    assert square.get_xlim()[0] > 10.0          # trimmed, and independent
+    plt.close(fig)
+
+
 # ---------------------------------------------------------- panel kinds
 
 def grid_doc(kinds):

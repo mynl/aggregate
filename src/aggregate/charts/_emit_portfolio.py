@@ -183,8 +183,11 @@ def _port(port, xmax=None):
         panels=(
             Panel(id='density', kind='xy', x_axis='outcome', y_axis='mass',
                   title='Probability mass function'),
+            # Equal aspect is semantic here: both axes are losses, and the
+            # total's curve is the diagonal, so the reading is each unit's
+            # slope against 45 degrees. A stretched box misstates it.
             Panel(id='kappa', kind='xy', x_axis='outcome', y_axis='kappa',
-                  title='Conditional loss by unit'),
+                  aspect='equal', title='Conditional loss by unit'),
         ),
         series=tuple(series),
         marks=(

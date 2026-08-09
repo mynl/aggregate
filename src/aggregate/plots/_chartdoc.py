@@ -261,8 +261,10 @@ def _render_grid_panel(ax, doc, panel, series_list, log=False):
     for s in series_list:
         if s.surface is not None:
             continue
-        xs = np.array([np.nan if v is None else v for v in s.x], dtype=float)
-        ys = np.array([np.nan if v is None else v for v in s.y], dtype=float)
+        xs = np.array([np.nan if v is None else v for v in s.x_values],
+                      dtype=float)
+        ys = np.array([np.nan if v is None else v for v in s.y_values],
+                      dtype=float)
         ax.plot(xs, ys, color='k', lw=0.35, alpha=0.5)
     # An overlay states a relationship, not an extent: a family of iso-total
     # diagonals reaching past the mesh must not widen the window the grid set.
@@ -404,7 +406,7 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
                        dtype=float)
         return _return_periods(out, mapping) if mapping else out
 
-    drawn = [(s, coords(s.x, x_map), coords(s.y, y_map),
+    drawn = [(s, coords(s.x_values, x_map), coords(s.y_values, y_map),
               None if s.y2 is None else coords(s.y2, y_map))
              for s in series_list]
     all_x = np.concatenate([x for _, x, _, _ in drawn]) if drawn else np.array([])

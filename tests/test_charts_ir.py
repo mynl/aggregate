@@ -444,6 +444,92 @@ def test_return_period_map_vocabulary():
         small_xy_doc(meta={'return_period_map': 'inverse'})
 
 
+# --------------------------------------------- [Chart-Payload-Weight] forms
+
+def test_a_lattice_expands_to_the_values_it_stands_for():
+    s = ChartSeries(name='s', role='density', panel_id='p',
+                    x_lattice=(0.0, 0.5, 4), y=(1.0, 2.0, 3.0, 4.0))
+    assert s.x_values == (0.0, 0.5, 1.0, 1.5)
+    assert s.y_values == (1.0, 2.0, 3.0, 4.0)
+    assert s.x is None                       # the explicit form is not filled
+
+
+def test_a_lattice_round_trips_the_grid_exactly():
+    """``start + step * i`` is the arithmetic the grid was built with."""
+    import numpy as np
+    for step in (1.0, 0.5, 1 / 1024, 2.0 ** -7):
+        grid = np.arange(1000) * step
+        s = ChartSeries(name='s', role='density', panel_id='p',
+                        x_lattice=(0.0, step, 1000),
+                        y=tuple(range(1000)))
+        assert np.array_equal(np.asarray(s.x_values), grid)
+
+
+def test_exactly_one_form_per_coordinate():
+    with pytest.raises(ValueError, match='exactly one of x and x_lattice'):
+        ChartSeries(name='s', role='density', panel_id='p',
+                    x=(0.0, 1.0), x_lattice=(0.0, 1.0, 2), y=(1.0, 2.0))
+    with pytest.raises(ValueError, match='exactly one of y and y_lattice'):
+        ChartSeries(name='s', role='density', panel_id='p', x=(0.0, 1.0))
+
+
+def test_a_lattice_counts_toward_the_length_check():
+    with pytest.raises(ValueError, match='len'):
+        ChartSeries(name='s', role='density', panel_id='p',
+                    x_lattice=(0.0, 1.0, 5), y=(1.0, 2.0))
+    with pytest.raises(ValueError, match='must be'):
+        ChartSeries(name='s', role='density', panel_id='p',
+                    x_lattice=(0.0, 1.0), y=(1.0, 2.0))
+
+
+def test_the_lattice_form_is_why_the_version_moved():
+    """A reader ignoring it sees a series with no coordinates at all.
+
+    That is the rule stated in ``ir.py`` next to the constant: the version
+    marks the point where a reader that ignores what it does not know would
+    draw something wrong, and an unread lattice draws nothing.
+    """
+    assert CHART_IR_VERSION == 2
+    with pytest.raises(ValueError, match='unsupported ir_version'):
+        small_xy_doc(ir_version=1)
+
+
+def test_the_cheapest_exact_form_is_chosen_per_series():
+    """Regular grids go out as lattices; anything else goes out in full."""
+    import numpy as np
+    from aggregate.charts._payload import lattice_payload
+    assert lattice_payload(np.arange(10) * 0.25, 0.25) == \
+        {'x_lattice': (0.0, 0.25, 10)}
+    # a trimmed grid is still arithmetic, just starting elsewhere
+    assert lattice_payload(np.arange(4, 10) * 2.0, 2.0, 'y') == \
+        {'y_lattice': (8.0, 2.0, 6)}
+    # an irregular grid falls back rather than approximating
+    assert 'x' in lattice_payload(np.array([0.0, 1.0, 3.0]), 1.0)
+    assert 'x' in lattice_payload(np.array([0.0, 1.0, 2.0]), None)
+
+
+def test_empty_runs_collapse_only_when_they_pay():
+    """The break-even is arithmetic, not a threshold someone picked."""
+    import numpy as np
+    from aggregate.charts._payload import collapse_empty_runs
+
+    # a lattice book: mass at every tenth point, so collapsing wins big
+    x = np.arange(100, dtype=float)
+    mass = np.where(x % 10 == 0, 0.1, 0.0)
+    kx, km = collapse_empty_runs(x, mass)
+    assert len(kx) < len(x)
+    assert set(kx) >= set(x[mass > 0])                 # every atom survives
+    for i, v in enumerate(km):                         # and its zero neighbours
+        if v > 0:
+            assert i == 0 or km[i - 1] == 0
+
+    # a smooth book: a handful of empty buckets, so it is left alone
+    mass = np.full(100, 0.01)
+    mass[:3] = 0.0
+    kx, km = collapse_empty_runs(x, mass)
+    assert len(kx) == len(x)
+
+
 # -------------------------------------------------------------- determinism
 
 def test_canonical_json_roundtrip():

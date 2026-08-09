@@ -56,6 +56,7 @@ from .._portfolio import Portfolio
 from ..constants import (REINS_LABEL_CEDED, REINS_LABEL_GROSS,
                          REINS_LABEL_NET, REINS_LABEL_SUBJECT)
 from . import register_chart, _emitter_base
+from ._payload import lattice_payload
 from ._two_panel import gapped, loss_window, survival_window
 from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, complete_tex
 
@@ -152,7 +153,6 @@ def _emit(obj, basis, default):
 
     df = obj.reins_density_df
     x = df['loss'].to_numpy(dtype=float)
-    xs = tuple(float(v) for v in x)
     columns, roles, names = BASES[basis]
 
     grids = [GridDistribution(x, df[c].to_numpy(dtype=float), bs=obj.bs,
@@ -160,13 +160,16 @@ def _emit(obj, basis, default):
              for c, n in zip(columns, names)]
     survivals = [gapped(gd.sf(x)) for gd in grids]
 
+    # One loss grid under six series: carried as a lattice rather than
+    # written out six times (``charts._payload``).
+    grid = lattice_payload(x, obj.bs)
     series = []
     for gd, role, name in zip(grids, roles, names):
         series.append(ChartSeries(name=name, role=role, panel_id='density',
-                                  x=xs, y=tuple(float(v) for v in gd.p)))
+                                  y=tuple(float(v) for v in gd.p), **grid))
     for surv, role, name in zip(survivals, roles, names):
         series.append(ChartSeries(name=name, role=role, panel_id='tail',
-                                  x=xs, y=surv))
+                                  y=surv, **grid))
 
     return complete_tex(ChartDoc(
         name='reins',

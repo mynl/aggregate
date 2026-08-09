@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a238
+
+**[Chart-Payload-Weight] a document stops writing out what it can state, and `CHART_IR_VERSION` moves to 2.** Two facts about this library's data, neither of them compression: both are statements about the data that happen to save a great deal of space. The aggregate document for a `log2 = 16` book falls from **7.4 MB to 5.4 MB**, and for a lattice book from **1.6 MB to 0.05 MB**, a 32-fold cut. Nothing rounds, thins or samples: every value a document carried before, it carries still.
+
+**A computed grid is a lattice.** `ChartSeries.x_lattice` and `y_lattice` carry `(start, step, count)` in place of a list of evenly spaced numbers. An aggregate lives on `k * bs`, so four series over one loss grid were four copies of it, 2 MB of a 7.4 MB document. The lattice form is taken **only where `start + step * i` reproduces the values exactly**, checked rather than assumed, so a trimmed, collapsed or genuinely irregular coordinate (a severity's quantile grid, a cumulative probability) falls back to the explicit form on its own and no caller has to reason about it. `ChartSeries.x_values` and `y_values` expand whichever form is present, and the renderer reads those.
+
+**An empty stretch of that grid is one fact, not thousands.** A lattice severity leaves most buckets with no probability at all, and a run of them says nothing beyond where it starts and stops, so the interior goes. The endpoints **stay**: delete a run outright and a stepped or straight line bridges the hole and draws mass where the law has none, so keeping one zero either side makes the collapse exact under every rung of the renderer's ladder rather than only under stems. Collapsing is applied exactly when it pays, and the arithmetic says when rather than a threshold someone picked: an untouched lattice ships `count` masses plus three numbers, a collapsed one ships `k` masses **and** `k` coordinates, so it pays when `2k < count`. On a smooth book that is never, and on a lattice book it is always.
+
+**The version moves to 2, and this is the first real application of the rule** written into `ir.py` at `a233`: it marks the point where a reader that ignores what it does not know would draw something *wrong*. A reader that does not know `x_lattice` sees a series with no coordinates at all, so it must refuse the document rather than draw an empty panel, which `ChartDoc` now makes it do by name. Every hash changes with it.
+
+---
+
 ## 1.0.0a237
 
 **[Chart-PnL] a P&L delegates to the aggregate emitter over its signed result, read from the low tail.** `PnL.plot` draws the document `charts.chart_pnl` emits and `plots._aggregate.plot_pnl` is deleted. A P&L's result is a `GridDistribution` like any other, so the chart is the aggregate's: the same two panels, the same one outcome axis read by both, the same quantile curve. The emitter is a delegation, not a second drawing, over the shared `outcome_doc` builder that `chart_agg` now also goes through.

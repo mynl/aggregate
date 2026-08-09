@@ -141,9 +141,9 @@ def test_the_lee_curve_is_trimmed_at_the_saturating_top(dice):
     loss the book can suffer.
     """
     lee = [s for s in chart_agg(dice).series if s.panel_id == 'lee'][0]
-    assert len(lee.x) < len(dice.density_df)
-    assert lee.x[-1] == pytest.approx(1.0, abs=1e-9)
-    assert lee.y[-1] == pytest.approx(18.0)
+    assert len(lee.x_values) < len(dice.density_df)
+    assert lee.x_values[-1] == pytest.approx(1.0, abs=1e-9)
+    assert lee.y_values[-1] == pytest.approx(18.0)
 
 
 def test_marks_carry_their_reading(cont):

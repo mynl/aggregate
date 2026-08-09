@@ -85,7 +85,7 @@ def _pnl(pnl):
         'pnl', str(pnl.label), (str(pnl.result_name), x, mass),
         window=loss_window(gd.q, float(x[0])),
         full_range=(float(x[0]), float(x[-1])),
-        ordinate_top=float(mass.max()), marks=marks,
+        ordinate_top=float(mass.max()), marks=marks, step=gd.bs,
         outcome_label='P&L', outcome_scales=('linear',),
         is_loss_value=gd.is_loss_value)
 

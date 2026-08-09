@@ -27,6 +27,7 @@ Pure numpy and pandas; no matplotlib.
 
 from .._aggregate import Aggregate
 from . import register_chart, _emitter_base
+from ._payload import collapse_empty_runs, lattice_payload
 from ._two_panel import SURVIVAL_FLOOR, loss_window, quantile_curve
 from .ir import ChartAxis, ChartDoc, ChartSeries, Mark, Panel, complete_tex
 
@@ -60,7 +61,7 @@ def _updated(agg):
 
 
 def outcome_doc(name, title, subject, companion=None, *, window, full_range,
-                ordinate_top, marks=(), outcome_label='Loss',
+                ordinate_top, marks=(), outcome_label='Loss', step=None,
                 outcome_scales=('linear', 'log'), is_loss_value=True):
     """The mass-and-Lee document, shared by the aggregate and the P&L.
 
@@ -86,6 +87,12 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
     marks : iterable of Mark
     outcome_label : str
         What the outcome axis is called ('Loss', 'P&L').
+    step : float, optional
+        The grid spacing (a ``bs``), which lets the outcome coordinates go
+        out as a lattice instead of as a list of evenly spaced numbers
+        repeated once per series. Checked, not assumed: a run of empty
+        buckets collapsed out of a density, or a quantile curve trimmed to
+        its support, falls back to the explicit form on its own.
     outcome_scales : tuple of str
         The scales the outcome axis may be read on. A signed axis declares
         ``('linear',)``: half its values are negative and no log reading of
@@ -101,19 +108,18 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
     ChartDoc
     """
     series = []
-    for panel, curve in (('density', 0), ('lee', 1)):
-        for label, x, mass in filter(None, (subject, companion)):
-            if curve == 0:
-                series.append(ChartSeries(
-                    name=label, role='density', panel_id='density',
-                    x=tuple(float(v) for v in x),
-                    y=tuple(float(v) for v in mass)))
-            else:
-                p, outcome = quantile_curve(x, mass)
-                series.append(ChartSeries(
-                    name=label, role='cdf', panel_id='lee',
-                    x=tuple(float(v) for v in p),
-                    y=tuple(float(v) for v in outcome)))
+    for label, x, mass in filter(None, (subject, companion)):
+        drawn_x, drawn_mass = collapse_empty_runs(x, mass)
+        series.append(ChartSeries(
+            name=label, role='density', panel_id='density',
+            y=tuple(float(v) for v in drawn_mass),
+            **lattice_payload(drawn_x, step)))
+    for label, x, mass in filter(None, (subject, companion)):
+        p, outcome = quantile_curve(x, mass)
+        series.append(ChartSeries(
+            name=label, role='cdf', panel_id='lee',
+            x=tuple(float(v) for v in p),
+            **lattice_payload(outcome, step, 'y')))
     return complete_tex(ChartDoc(
         name=name,
         title=title,
@@ -214,7 +220,7 @@ def _agg(agg, xmax=None):
         'agg', str(agg.label),
         ('Aggregate', x, mass), ('Severity', sev_x, sev_mass),
         window=window, full_range=(min(0.0, float(x[0])), float(x[-1])),
-        ordinate_top=ordinate_top, marks=marks,
+        ordinate_top=ordinate_top, marks=marks, step=agg.bs,
         is_loss_value=agg._is_loss_value)
 
 

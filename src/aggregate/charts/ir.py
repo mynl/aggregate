@@ -77,12 +77,20 @@ __all__ = [
 #: that ignores what it does not know would draw something *wrong*. Adding
 #: a field whose absence leaves the default reading correct and complete
 #: does not qualify, however visible the field is, and however many hashes
-#: it changes. ``support`` (1.0.0a214) and the declared readings below
-#: (``scales``, ``full_range``, ``kinds``) both landed at version 1 on that
+#: it changes. ``support`` (1.0.0a214) and the declared readings
+#: (``scales``, ``full_range``, ``kinds``) all landed at version 1 on that
 #: rule: ignore them and you get the one reading the document already named
 #: as its default. A field a reader must act on to draw the *default* right,
 #: a changed meaning for an existing field, or a removal, all bump it.
-CHART_IR_VERSION = 1
+#:
+#: **Version 2** (1.0.0a238) is that rule's first real application. A series
+#: may carry a coordinate as a lattice, ``(start, step, count)``, instead of
+#: spelling every value out (:attr:`ChartSeries.x_lattice`). A reader that
+#: does not know the field sees a series with no coordinates at all and can
+#: draw nothing, which is exactly the "would draw something wrong" case, so
+#: the version moves and an old reader refuses the document by name rather
+#: than drawing an empty panel.
+CHART_IR_VERSION = 2
 
 #: Panel kinds. 'xy' is a family of curves over a shared pair of axes;
 #: 'heatmap' and 'surface' carry one z grid each (a ``SurfaceData``), read
@@ -168,6 +176,18 @@ class ChartCapabilityError(RuntimeError):
 
 def _freeze_seq(obj, name, converter=tuple):
     object.__setattr__(obj, name, converter(getattr(obj, name)))
+
+
+def _expand(values, lattice):
+    """Coordinates from whichever form carries them.
+
+    ``start + step * i`` reproduces the grid exactly, because that is the
+    arithmetic the grid was built with; no accumulation, so no drift.
+    """
+    if lattice is None:
+        return values
+    start, step, count = lattice
+    return tuple(start + step * i for i in range(int(count)))
 
 
 @dataclass(frozen=True)
@@ -426,6 +446,17 @@ class ChartSeries:
         are semantic gaps (a log axis cannot place an exact zero; survival
         values below the floating-point dust floor are noise, not tail)
         and renderers must break the line there, never bridge it.
+    x_lattice, y_lattice : tuple, optional
+        ``(start, step, count)`` in place of ``x`` or ``y``, for a
+        coordinate that is an arithmetic progression, which in this library
+        is nearly all of them: an aggregate is computed on a uniform bucket
+        grid, so listing 65,536 evenly spaced numbers spells out a fact
+        three numbers already state. Expand as ``start + step * i`` for
+        ``i`` in ``range(count)``, which is how the grid was built, so the
+        values round-trip exactly; :attr:`x_values` and :attr:`y_values` do
+        it for you. Exactly one of ``x`` and ``x_lattice`` is set, and the
+        same for y. An emitter uses the lattice form only where the values
+        really are exactly arithmetic, so it is never an approximation.
     y2 : tuple, optional
         The second edge of a band series (the margin between F and gF, a
         min/max envelope): the series *is* the region between ``y`` and
@@ -455,34 +486,65 @@ class ChartSeries:
     panel_id: str
     x: tuple = None
     y: tuple = None
+    x_lattice: tuple = None
+    y_lattice: tuple = None
     y2: tuple = None
     surface: SurfaceData = None
     support: str = 'atomic'
+
+    @property
+    def x_values(self):
+        """The x payload, expanding a lattice if that is how it is carried."""
+        return _expand(self.x, self.x_lattice)
+
+    @property
+    def y_values(self):
+        """The y payload, expanding a lattice if that is how it is carried."""
+        return _expand(self.y, self.y_lattice)
 
     def __post_init__(self):
         if self.support not in SUPPORT_KINDS:
             raise ValueError(f'unknown support {self.support!r}; '
                              f'expected one of {SUPPORT_KINDS}')
-        if (self.surface is None) == (self.x is None and self.y is None):
+        carries_xy = not (self.x is None and self.y is None
+                          and self.x_lattice is None and self.y_lattice is None)
+        if (self.surface is None) == (not carries_xy):
             raise ValueError(
                 f'series {self.name!r} must carry either x/y or surface')
         if self.surface is not None and self.y2 is not None:
             raise ValueError(f'series {self.name!r}: y2 needs an x/y payload')
-        if self.surface is None:
-            if self.x is None or self.y is None:
-                raise ValueError(f'series {self.name!r} needs both x and y')
-            _freeze_seq(self, 'x')
-            _freeze_seq(self, 'y')
-            if len(self.x) != len(self.y):
+        if self.surface is not None:
+            return
+        lengths = {}
+        for side in ('x', 'y'):
+            values, spec = getattr(self, side), getattr(self, f'{side}_lattice')
+            if (values is None) == (spec is None):
                 raise ValueError(
-                    f'series {self.name!r}: len(x) = {len(self.x)} '
-                    f'!= len(y) = {len(self.y)}')
-            if self.y2 is not None:
-                _freeze_seq(self, 'y2')
-                if len(self.y2) != len(self.y):
-                    raise ValueError(
-                        f'series {self.name!r}: len(y2) = {len(self.y2)} '
-                        f'!= len(y) = {len(self.y)}')
+                    f'series {self.name!r} needs exactly one of {side} and '
+                    f'{side}_lattice')
+            if spec is None:
+                _freeze_seq(self, side)
+                lengths[side] = len(getattr(self, side))
+            else:
+                _freeze_seq(self, f'{side}_lattice')
+                spec = getattr(self, f'{side}_lattice')
+                if len(spec) != 3:
+                    raise ValueError(f'series {self.name!r}: {side}_lattice '
+                                     'must be (start, step, count)')
+                if int(spec[2]) < 0:
+                    raise ValueError(f'series {self.name!r}: {side}_lattice '
+                                     'count must not be negative')
+                lengths[side] = int(spec[2])
+        if lengths['x'] != lengths['y']:
+            raise ValueError(
+                f"series {self.name!r}: len(x) = {lengths['x']} "
+                f"!= len(y) = {lengths['y']}")
+        if self.y2 is not None:
+            _freeze_seq(self, 'y2')
+            if len(self.y2) != lengths['y']:
+                raise ValueError(
+                    f'series {self.name!r}: len(y2) = {len(self.y2)} '
+                    f"!= len(y) = {lengths['y']}")
 
 
 @dataclass(frozen=True)

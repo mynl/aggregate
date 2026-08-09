@@ -50,14 +50,15 @@ from functools import singledispatch
 from .ir import (
     CHART_IR_VERSION, SUPPORT_KINDS, ChartAxis, ChartCapabilityError,
     ChartDoc, ChartSeries, Mark, Panel, SurfaceData,
-    canonical_dict, canonical_json, doc_hash, stamp,
+    canonical_dict, canonical_json, complete_tex, doc_hash, human_strings,
+    stamp,
 )
 
 __all__ = [
     'CHART_IR_VERSION', 'CHARTS', 'SUPPORT_KINDS', 'ChartAxis',
     'ChartCapabilityError', 'ChartDoc', 'ChartSeries', 'Mark', 'Panel',
     'SurfaceData', 'available_charts', 'canonical_dict', 'canonical_json',
-    'doc_hash', 'register_chart', 'stamp',
+    'complete_tex', 'doc_hash', 'human_strings', 'register_chart', 'stamp',
 ]
 
 #: The chart registry: ``name -> (emitter, predicate)``. The emitter is a

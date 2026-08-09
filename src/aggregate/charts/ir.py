@@ -40,12 +40,21 @@ synonym for a role that already exists.
 
 **Every human-facing string in a document is plain text**, never markup in
 any renderer's language. ECharts has no TeX, so a mathtext series name
-would already be broken on one of the two renderers that exist. Where a
-string has a typeset form, the document carries it in
-:attr:`ChartDoc.tex`, a plain-to-TeX lookup a renderer consults only if it
-can typeset; one that cannot ignores the field entirely and is still
-correct. Plain text is also the legend identity renderers link series
-toggles by, so it is the form that must stay stable.
+would already be broken on one of the two renderers that exist. Plain text
+is also the legend identity renderers link series toggles by, so it is the
+form that must stay stable.
+
+**And every one of them carries both forms.** :attr:`ChartDoc.tex` is a
+**total** lookup, not a partial one: the analogy is alt text in HTML, where
+you write both because they serve different consumers and you do not make
+one consumer guess. matplotlib reads the typeset form, ECharts reads the
+plain one, and the emitter that writes a string writes both, a plain word
+mapping to itself. A missing entry is therefore an emitter bug and not a
+document saying "this string has no typeset form";
+:func:`complete_tex` is how an emitter satisfies it without writing the
+identities out by hand, and :func:`human_strings` is the set the contract
+is checked over. Renderers keep a fallback to the plain string, as a net
+under a bug rather than as a licensed state.
 """
 
 from __future__ import annotations
@@ -59,7 +68,8 @@ from dataclasses import dataclass, field
 __all__ = [
     'CHART_IR_VERSION', 'SUPPORT_KINDS', 'ChartAxis', 'ChartCapabilityError',
     'ChartDoc', 'ChartSeries', 'Mark', 'Panel', 'SurfaceData',
-    'canonical_dict', 'canonical_json', 'doc_hash', 'stamp',
+    'canonical_dict', 'canonical_json', 'complete_tex', 'doc_hash',
+    'human_strings', 'stamp',
 ]
 
 #: The IR version. **When to bump it**, which is the question every
@@ -538,14 +548,18 @@ class ChartDoc:
         stage of a reinsurance program is drawn, and which exist).
         JSON-representable values only.
     tex : dict
-        Plain string to its typeset form, for the strings in this document
-        that have one: ``{'ǧ(s)': r'$\check g(s)$'}``. A renderer that can
-        typeset looks a string up and falls back to the string itself; one
-        that cannot ignores the field. Values are stored exactly as
-        matplotlib consumes them, delimiters included, so a renderer never
-        guesses where the math starts and an emitter can mix text and math
-        in one string. Keyed by string value rather than by field, so one
-        entry covers a name, an axis label and a title that read alike.
+        Plain string to its typeset form, for **every** human-facing string
+        in the document: ``{'ǧ(s)': r'$\check g(s)$', 's': 's'}``. The
+        lookup is total, a plain word mapping to itself, so a missing entry
+        is an emitter bug rather than a statement that a string has no
+        typeset form. Build it with :func:`complete_tex` rather than by
+        hand. A renderer that can typeset looks a string up; one that
+        cannot ignores the field and is still correct. Values are stored
+        exactly as matplotlib consumes them, delimiters included, so a
+        renderer never guesses where the math starts and an emitter can mix
+        text and math in one string. Keyed by string value rather than by
+        field, so one entry covers a name, an axis label and a title that
+        read alike.
     ir_version : int
         Always :data:`CHART_IR_VERSION` for documents this build writes.
     generator : str, optional
@@ -790,6 +804,82 @@ def doc_hash(doc):
     """
     return hashlib.sha256(
         canonical_json(doc, include_hash=False)).hexdigest()[:12]
+
+
+def human_strings(doc):
+    """Every human-facing string a document exposes, in document order.
+
+    The document's title, each panel's title, each axis label, each series
+    name and each mark label: the strings a renderer puts in front of a
+    reader, and therefore exactly the strings :attr:`ChartDoc.tex` must
+    cover. Deduplicated, because the map is keyed by string value: one
+    entry covers a name and an axis label that read alike.
+
+    Parameters
+    ----------
+    doc : ChartDoc
+
+    Returns
+    -------
+    tuple of str
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+    """
+    out = []
+    for text in ([doc.title] + [p.title for p in doc.panels]
+                 + [a.label for a in doc.axes]
+                 + [s.name for s in doc.series]
+                 + [m.label for m in doc.marks]):
+        if text and text not in out:
+            out.append(text)
+    return tuple(out)
+
+
+def complete_tex(doc, typeset=None):
+    """Return ``doc`` with a total :attr:`ChartDoc.tex` map.
+
+    The emitter supplies the strings that have a distinct typeset form and
+    this fills the rest with themselves, which is what makes the lookup
+    total without every emitter writing out a line of identities. A
+    ``typeset`` key the document does not expose is an error rather than a
+    harmless extra: it is a typo or a string that stopped being emitted,
+    and either way a renderer would go on drawing the plain form while the
+    map claimed otherwise.
+
+    Parameters
+    ----------
+    doc : ChartDoc
+        The document to complete. Any existing ``tex`` entries are kept.
+    typeset : dict, optional
+        Plain string to typeset form, for the strings that have one, stored
+        exactly as matplotlib consumes them (delimiters included).
+
+    Returns
+    -------
+    ChartDoc
+        A copy whose ``tex`` covers :func:`human_strings` exactly.
+
+    Raises
+    ------
+    ValueError
+        For a ``typeset`` key the document does not expose.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+    """
+    forms = dict(doc.tex)
+    forms.update(typeset or {})
+    strings = human_strings(doc)
+    unknown = sorted(set(forms) - set(strings))
+    if unknown:
+        raise ValueError(
+            f'typeset entries {unknown} name strings document {doc.name!r} '
+            'does not expose; the map is keyed by the string a reader sees')
+    return dataclasses.replace(
+        doc, tex={text: forms.get(text, text) for text in strings})
 
 
 def stamp(doc, generator=None):

@@ -38,11 +38,14 @@ def test_document_shape(dist):
 
 
 def test_dual_optional(dist):
+    from aggregate.charts import human_strings
     doc = chart_distortion(dist, dual=False)
     roles = [s.role for s in doc.series]
     assert roles == ['distortion', 'identity']
-    # nothing left to typeset once the dual is gone
-    assert doc.tex == {}
+    # The map stays total, and with the one string that has a typeset form
+    # gone every entry is now a plain word mapping to itself.
+    assert set(doc.tex) == set(human_strings(doc))
+    assert all(k == v for k, v in doc.tex.items())
 
 
 def test_dual_name_is_plain_text_with_a_tex_companion(dist):

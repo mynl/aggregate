@@ -113,6 +113,13 @@ def test_emitter_document_shape(bv):
     assert labels['z'] == 'density'
 
 
+def test_emitter_tex_is_total(bv):
+    """The joint half of the totality sweep in tests/test_charts_ir.py."""
+    from aggregate.charts import human_strings
+    doc = chart_joint_surface(bv, display_log2=4)
+    assert not set(human_strings(doc)) - set(doc.tex)
+
+
 def test_emitter_orientation(bv):
     # z[r][c] sits at (x[c], y[r]): row count is len(y), col count len(x).
     doc = chart_joint_surface(bv, display_log2=5)

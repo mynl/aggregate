@@ -57,7 +57,7 @@ from ..constants import (REINS_LABEL_CEDED, REINS_LABEL_GROSS,
                          REINS_LABEL_NET, REINS_LABEL_SUBJECT)
 from . import register_chart, _emitter_base
 from ._two_panel import gapped, pad_window, survival_window
-from .ir import ChartAxis, ChartDoc, ChartSeries, Panel
+from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, complete_tex
 
 __all__ = ['chart_reins']
 
@@ -181,7 +181,7 @@ def _emit(obj, basis, default):
         series.append(ChartSeries(name=name, role=role, panel_id='tail',
                                   x=xs, y=surv))
 
-    return ChartDoc(
+    return complete_tex(ChartDoc(
         name='reins',
         title=f'{obj.label}: {basis} gross, ceded and net',
         axes=(
@@ -201,7 +201,7 @@ def _emit(obj, basis, default):
         ),
         series=tuple(series),
         meta={'basis': basis, 'bases_available': tuple(stages)},
-    )
+    ))
 
 
 @chart_reins.register(Aggregate)

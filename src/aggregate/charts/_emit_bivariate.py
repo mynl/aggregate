@@ -16,7 +16,8 @@ import numpy as np
 
 from ..bivariate import BivariateAggregate
 from . import register_chart, _emitter_base
-from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, SurfaceData
+from .ir import (ChartAxis, ChartDoc, ChartSeries, Panel, SurfaceData,
+                 complete_tex)
 
 __all__ = ['chart_joint_surface']
 
@@ -117,7 +118,7 @@ def _joint_surface(bv, display_log2=None):
         # reduced matrix is [x-block, y-block]: transpose once here.
         z=tuple(tuple(float(v) for v in row) for row in z.T),
     )
-    return ChartDoc(
+    return complete_tex(ChartDoc(
         name='joint_surface',
         title=f'Joint density: {labels[0]} vs {labels[1]}',
         axes=(
@@ -134,7 +135,7 @@ def _joint_surface(bv, display_log2=None):
             ChartSeries(name='joint density', role='joint',
                         panel_id='joint', surface=surface),
         ),
-    )
+    ))
 
 
 register_chart(

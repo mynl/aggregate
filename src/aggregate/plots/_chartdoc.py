@@ -179,11 +179,17 @@ def _draw_atomic(ax, x, y, label, y_axis, window):
 
 
 def _typeset(doc, text):
-    """The typeset form of ``text`` if the document carries one.
+    """The typeset form of ``text``, which the document always carries.
 
     matplotlib can render mathtext, so it consults ``ChartDoc.tex``; a
     renderer that cannot typeset skips this and draws the plain string,
     which is why the plain form is the one the schema requires.
+
+    The lookup is total (``complete_tex`` in the IR builds it that way and
+    a test holds every emitter to it), so the fallback here is a net under
+    an emitter bug rather than a state the schema licenses: a renderer that
+    silently drew nothing, or drew the key, would turn a missing entry into
+    a mystery instead of a plain string.
     """
     return doc.tex.get(text, text) if text else text
 

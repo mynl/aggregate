@@ -13,7 +13,7 @@ Pure numpy and pandas; no matplotlib.
 from ..constants import DISTORTION_DUAL_LABEL, DISTORTION_DUAL_TEX
 from ..spectral import Distortion
 from . import register_chart, _emitter_base
-from .ir import ChartAxis, ChartDoc, ChartSeries, Panel
+from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, complete_tex
 
 __all__ = ['chart_distortion']
 
@@ -62,21 +62,23 @@ def _distortion(dist, dual=True):
     series.append(
         ChartSeries(name='identity', role='identity', panel_id='square',
                     x=(0.0, 1.0), y=(0.0, 1.0), support='continuous'))
-    return ChartDoc(
-        name='distortion',
-        title=str(dist.label),
-        axes=(
-            ChartAxis(id='s', label='s', unit='probability',
-                      suggested_range=(0.0, 1.0)),
-            ChartAxis(id='g', label='g(s)', unit='probability',
-                      suggested_range=(0.0, 1.0)),
+    return complete_tex(
+        ChartDoc(
+            name='distortion',
+            title=str(dist.label),
+            axes=(
+                ChartAxis(id='s', label='s', unit='probability',
+                          suggested_range=(0.0, 1.0)),
+                ChartAxis(id='g', label='g(s)', unit='probability',
+                          suggested_range=(0.0, 1.0)),
+            ),
+            panels=(
+                Panel(id='square', kind='xy', x_axis='s', y_axis='g',
+                      aspect='equal'),
+            ),
+            series=tuple(series),
         ),
-        panels=(
-            Panel(id='square', kind='xy', x_axis='s', y_axis='g',
-                  aspect='equal'),
-        ),
-        series=tuple(series),
-        tex=({DISTORTION_DUAL_LABEL: DISTORTION_DUAL_TEX} if dual else {}),
+        {DISTORTION_DUAL_LABEL: DISTORTION_DUAL_TEX} if dual else None,
     )
 
 

@@ -16,8 +16,8 @@ import pytest
 from aggregate import charts
 from aggregate.charts import (
     CHART_IR_VERSION, ChartAxis, ChartDoc, ChartSeries, Mark, Panel,
-    SurfaceData, available_charts, canonical_dict, canonical_json, doc_hash,
-    stamp,
+    SurfaceData, available_charts, canonical_dict, canonical_json,
+    complete_tex, doc_hash, human_strings, stamp,
 )
 
 
@@ -237,15 +237,71 @@ def test_support_vocabulary_is_closed():
                     x=(0.0,), y=(1.0,), support='lattice')
 
 
-def test_tex_map_is_optional_and_costs_no_hash():
-    """A document with nothing to typeset serializes exactly as before."""
+def test_tex_map_is_content_and_hashes():
+    """A hand-built document may still carry none; an emitted one may not."""
     plain = small_xy_doc()
     assert plain.tex == {}
     assert 'tex' not in canonical_dict(plain)
     typeset = dataclasses.replace(plain, tex={'total': r'$T$'})
     assert canonical_dict(typeset)['tex'] == {'total': '$T$'}
-    # it is content, so it hashes; absent, it cannot perturb an existing hash
     assert doc_hash(typeset) != doc_hash(plain)
+
+
+def test_human_strings_are_the_strings_a_reader_sees():
+    doc = small_xy_doc()
+    assert set(human_strings(doc)) == {
+        'Dice (Dice)',                       # the document title
+        'Density', 'Survival',               # panel titles
+        'loss', 'density', 'S(x)', 'return period',   # axis labels
+        'total',                             # series name, seen twice, kept once
+        'mean', '1-in-250',                  # mark labels
+    }
+    assert human_strings(doc).count('total') == 1
+
+
+def test_complete_tex_is_total_and_keeps_the_typeset_forms():
+    doc = complete_tex(small_xy_doc(), {'S(x)': r'$S(x)$'})
+    assert set(doc.tex) == set(human_strings(doc))
+    assert doc.tex['S(x)'] == r'$S(x)$'
+    assert doc.tex['Density'] == 'Density'   # a plain word maps to itself
+
+
+def test_complete_tex_refuses_a_string_the_document_does_not_expose():
+    """A typo, or a string that stopped being emitted; either is a bug."""
+    with pytest.raises(ValueError, match='does not expose'):
+        complete_tex(small_xy_doc(), {'S(y)': r'$S(y)$'})
+
+
+def test_tex_is_total_over_every_emitted_document():
+    """The contract, swept over the live emitters (a2NN).
+
+    Totality is what lets a consumer stop guessing: matplotlib reads the
+    typeset form, ECharts reads the plain one, and neither derives one from
+    the other. A missing entry is an emitter bug, so the check is the set
+    difference over the strings a document exposes.
+    """
+    from aggregate import build
+    from aggregate.charts import available_charts, CHARTS
+
+    objs = [
+        build('agg IR.Tex 100 claims sev lognorm 50 cv 2 '
+              'occurrence net of 100 xs 100 poisson'),
+        build('port IR.TexP agg A 50 claims sev lognorm 50 cv 1.5 '
+              'occurrence net of 100 xs 100 poisson '
+              'agg B 30 claims sev lognorm 40 cv 1.2 poisson'),
+        build('sev IR.TexS lognorm 100 cv 2'),
+        build('distortion IR.TexD ph 0.7'),
+    ]
+    swept = set()
+    for obj in objs:
+        for name in available_charts(obj):
+            doc = CHARTS[name][0](obj)
+            missing = set(human_strings(doc)) - set(doc.tex)
+            assert not missing, f'{name} on {type(obj).__name__}: {missing}'
+            swept.add(name)
+    # Every registered chart but the bivariate, which needs a joint grid and
+    # is swept in tests/test_chart_surface_pilot.py instead.
+    assert swept == set(CHARTS) - {'joint_surface'}
 
 
 def test_xy_lengths_must_agree():

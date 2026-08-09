@@ -31,7 +31,7 @@ import numpy as np
 from .._severity import Severity
 from . import register_chart, _emitter_base
 from ._two_panel import gapped, pad_window, survival_window
-from .ir import ChartAxis, ChartDoc, ChartSeries, Panel
+from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, complete_tex
 
 __all__ = ['chart_severity']
 
@@ -120,7 +120,7 @@ def _severity(sev, n=GRID_POINTS):
     lo = min(0.0, float(loss[0]))
     hi = float(sev.isf(0.001))
 
-    return ChartDoc(
+    return complete_tex(ChartDoc(
         name='severity',
         title=name,
         axes=(
@@ -145,7 +145,7 @@ def _severity(sev, n=GRID_POINTS):
                         x=xs, y=survival, support=support),
         ),
         meta={'ordinate': 'mass' if mass_reading else 'pdf'},
-    )
+    ))
 
 
 register_chart('severity', chart_severity)

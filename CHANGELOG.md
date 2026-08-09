@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a234
+
+**[Chart-Tex-Totality] every human-facing string in a chart document carries both forms.** `ChartDoc.tex` was documented as a partial lookup with a fallback. It is now **total**: the plain string and its typeset form are both written, a plain word mapping to itself, and a missing entry is an emitter bug rather than a document saying "this string has no typeset form". The analogy is alt text in HTML. You write both because they serve different consumers, matplotlib reading one and ECharts the other, and you do not make either consumer guess or derive.
+
+**`complete_tex(doc, typeset=None)` is how an emitter satisfies it** without writing a line of identities by hand: it fills every string the document exposes, using the typeset forms supplied and the string itself elsewhere. A `typeset` key the document does not expose raises, because it is either a typo or a string that stopped being emitted, and either way a renderer would go on drawing the plain form while the map claimed otherwise. **`human_strings(doc)`** is the set the contract is checked over, the document title, each panel title, each axis label, each series name and each mark label, deduplicated because the map is keyed by the string a reader sees.
+
+All four emitters now return through `complete_tex`, and a test sweeps every registered chart and asserts the set difference is empty. The renderer keeps its fallback to the plain string, restated in the docstring as a net under a bug rather than a licensed state.
+
+**Nothing drawn changed**, and the distortion image gate confirms it at 0, pixel for pixel: an identity entry renders the string it already rendered. Document hashes change again, since `tex` is content. The related point stands and costs nothing: the plain form does not have to be ASCII, and `ǧ(s)` remains the working example.
+
+---
+
 ## 1.0.0a233
 
 **[Chart-Declared-Readings] an axis declares the scales and ranges it may be read on, and a panel the forms it may take.** The third deliberate reopening of the signed-off chart IR, after `support` at `a214`, and the first job of part two of `dev/plan-chart-ir.md`. The principle is the one `scale` already stated, widened from one reading to the set of them: **which readings a quantity admits is a fact about the quantity, not about the drawing.** A log reading of a heavy tail is meaningful; a log reading of a distortion's unit square is not. So the document says which readings exist and a caller picks one, rather than every consumer inventing a per-chart list of buttons.

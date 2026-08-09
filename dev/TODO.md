@@ -485,9 +485,12 @@
   mapping or per-axis overrides; and the Lee panel keeps **non-exceedance
   p** on its probability axis, so `reciprocal_of` is widened by
   `meta['return_period_map']` rather than the axis being changed to carry
-  the interrogated tail. `ChartDoc.tex` totality is job 1b, next, and it
-  does touch every emitter, since totality means each writes an entry for
-  every human-facing string it emits.
+  the interrogated tail. Job 1b `[Chart-Tex-Totality]` landed a234
+  (`complete_tex` / `human_strings` in `ir.py`, all four emitters
+  returning through it, a sweep asserting the set difference is empty,
+  the renderer's fallback restated as a net under a bug). It landed as
+  its own bump rather than inside job 1, because totality touches every
+  emitter and the declared readings do not.
 
 ---
 

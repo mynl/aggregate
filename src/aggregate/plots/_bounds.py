@@ -1,10 +1,16 @@
 """Layer 2 compositor for the pricing-bounds objects in
 :mod:`aggregate.bounds`.
 
-Holds the bodies of ``Bounds.plot_envelope`` (three-panel envelope cloud),
-``Bounds.plot_weights`` (weight contour) and ``_HullEngine.plot`` (per-item
-convex-envelope curves with optional premium slice). Each class keeps a
-one-line delegating stub.
+Holds the bodies of ``Bounds.plot_weights`` (weight contour) and
+``_HullEngine.plot`` (per-item convex-envelope curves with optional premium
+slice). Each class keeps a one-line delegating stub.
+
+``plot_bounds_envelope`` is gone: ``Bounds.plot_envelope`` draws the
+document ``charts.chart_envelope`` emits, two panels where it drew three.
+The weight contour and the hull view stay bespoke, the first because a
+level set over ``(p_lo, p_hi)`` is a grid panel nobody has asked for yet
+and the second because it reads private engine state (``_T``, ``_A``,
+``_hulls``) with no public frame behind it.
 
 These are single-consumer exhibits -- the envelope cloud, the weight contour
 and the hull-bounds figure have no cross-class content reuse -- so each
@@ -12,114 +18,9 @@ content worker and its compositor collapse into this one module (the §1
 single-consumer case).
 """
 
-from itertools import cycle
-
 import numpy as np
 
 from ._style import plt, mpl, FIG_W
-
-
-def plot_bounds_envelope(bounds, *, axs=None, n_resamples=0, alpha=0.05,
-                         distortions='ordered', title='',
-                         lim=(-0.025, 1.025)):
-    """Three-panel envelope figure (formerly ``cloud_view``).
-
-    Panel 1: scatter of sampled cloud columns shaded by weight, plus the
-    min/max envelope band. Panels 2-3: the calibrated distortions overlaid on
-    the envelope band.
-
-    Parameters
-    ----------
-    bounds : Bounds
-        The bounds object holding ``cloud_df`` / ``weight_df``.
-    axs : array of 3 Axes, optional
-        If omitted, a new ``1 x 3`` figure is created.
-    n_resamples : int, default 0
-        If positive, draw this many bracket columns from ``cloud_df``,
-        restricted to ``p_lo == 0`` (pricing distortions, those that pin the
-        mean), and overplot them coloured by weight.
-    alpha : float, default 0.05
-        Opacity of the resampled curves.
-    distortions : ``'ordered'``, list of dict, or ``'space'``
-        What to overlay in panels 2-3. ``'ordered'`` only works for
-        ``Portfolio`` objects with calibrated distortions.
-    title : str, default ``''``
-        Suptitle (applied to all panels).
-    lim : tuple, default ``(-0.025, 1.025)``
-        x and y axis limits.
-
-    Returns
-    -------
-    fig, axs : matplotlib figure and array of three Axes.
-    """
-    if axs is None:
-        fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_W),
-                                constrained_layout=True, squeeze=False)
-        axs = axs[0]
-    else:
-        axs = np.atleast_1d(axs).flatten()
-        fig = axs[0].get_figure()
-
-    norm = mpl.colors.Normalize(0, 1)
-    cm = mpl.cm.ScalarMappable(norm=norm, cmap='viridis_r')
-    mapper = cm.get_cmap()
-    s_eval = np.linspace(0, 1, 1001)
-
-    def _band(ax):
-        ax.fill_between(bounds.cloud_df.index, bounds.cloud_df.min(1),
-                        bounds.cloud_df.max(1), facecolor='C7', alpha=.15)
-        bounds.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=1, c='k')
-        bounds.cloud_df.max(1).plot(ax=ax, label='_nolegend_', lw=1, c='k')
-
-    if distortions == 'ordered':
-        from ..portfolio import Portfolio
-        if not isinstance(bounds._obj, Portfolio):
-            raise ValueError("distortions='ordered' requires a Portfolio")
-        distortions = [
-            {k: bounds._obj.distortions[k] for k in ['ccoc', 'tvar']},
-            {k: bounds._obj.distortions[k] for k in ['ph', 'wang', 'dual']},
-        ]
-
-    ax = axs[0]
-    if n_resamples > 0:
-        bit = bounds.weight_df.xs(0, drop_level=False) \
-                              .sample(n=n_resamples, replace=True) \
-                              .reset_index()
-        for _, row in bit.iterrows():
-            pl, pu = row['p_lower'], row['p_upper']
-            w = row['weight']
-            bounds.cloud_df[(pl, pu)].plot(ax=ax, lw=1, c=mapper(w),
-                                           alpha=alpha, label=None)
-        fig.colorbar(cm, ax=ax, shrink=.5, aspect=16,
-                     label='Weight to upper threshold')
-    _band(ax)
-    ax.plot([0, 1], [0, 1], c='k', lw=.25)
-    ax.set(xlim=lim, ylim=lim, aspect='equal')
-
-    if isinstance(distortions, dict):
-        distortions = [distortions]
-    if isinstance(distortions, list):
-        name_mapper = {'ccoc': 'CCoC', 'tvar': 'TVaR(p*)',
-                       'ph': 'PH', 'wang': 'Wang', 'dual': 'Dual'}
-        ls_cycle = list(mpl.lines.lineStyles.keys())
-        for ax, dist_dict in zip(axs[1:], distortions):
-            lssi = iter(cycle(ls_cycle))
-            for k, d in dist_dict.items():
-                ax.plot(s_eval, d.g(s_eval), lw=1, ls=next(lssi),
-                        label=name_mapper.get(k, k))
-            _band(ax)
-            ax.plot([0, 1], [0, 1], c='k', lw=.25)
-            ax.legend(loc='lower right', ncol=3, fontsize='large')
-            ax.set(xlim=lim, ylim=lim, aspect='equal')
-        # Average extreme overlay on the last panel
-        bounds.cloud_df.mean(1).plot(ax=axs[-1], c=f'C{len(distortions[-1])}',
-                                     ls='-.', lw=.5, label='Avg extreme')
-
-    if title:
-        for ax in axs:
-            ax.set(title=title)
-
-    return fig, axs
 
 
 def plot_bounds_weights(bounds, ax=None, *, levels=20, colorbar=True):

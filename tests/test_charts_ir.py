@@ -301,9 +301,10 @@ def test_tex_is_total_over_every_emitted_document():
             missing = set(human_strings(doc)) - set(doc.tex)
             assert not missing, f'{name} on {type(obj).__name__}: {missing}'
             swept.add(name)
-    # Every registered chart but the bivariate, which needs a joint grid and
-    # is swept in tests/test_chart_surface_pilot.py instead.
-    assert swept == set(CHARTS) - {'joint_surface'}
+    # Every registered chart but two, swept where their objects are built:
+    # the bivariate in tests/test_chart_surface_pilot.py (a joint grid) and
+    # the envelope in tests/test_chart_bounds.py (a calibrated Bounds).
+    assert swept == set(CHARTS) - {'joint_surface', 'envelope'}
 
 
 def test_xy_lengths_must_agree():

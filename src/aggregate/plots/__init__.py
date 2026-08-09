@@ -33,7 +33,7 @@ from ._style import (
 from ._aggregate import plot_reins_occ
 from ._distortion import plot_distortion_affine
 from ._portfolio import plot_portfolio, plot_scatter, plot_sample_compare
-from ._bounds import plot_bounds_envelope, plot_bounds_weights, plot_hull_bounds
+from ._bounds import plot_bounds_weights, plot_hull_bounds
 from ._bivariate import plot_bivariate, plot_bivariate_distribution
 from ._bivariate_massive import (plot_bivariate_massive,
                                  plot_bivariate_massive_slice)
@@ -53,7 +53,7 @@ __all__ = [
     'plot_reins_occ',
     'plot_distortion_affine',
     'plot_portfolio', 'plot_scatter', 'plot_sample_compare',
-    'plot_bounds_envelope', 'plot_bounds_weights', 'plot_hull_bounds',
+    'plot_bounds_weights', 'plot_hull_bounds',
     'plot_bivariate', 'plot_bivariate_distribution',
     'plot_bivariate_massive', 'plot_bivariate_massive_slice',
     'plot_fourier', 'plot_fourier_wraps', 'plot_fourier_simpson',

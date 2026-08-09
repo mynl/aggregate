@@ -473,42 +473,49 @@ class Bounds(HelpMixin):
     # Plots
     # ------------------------------------------------------------------
 
-    def plot_envelope(self, *, axs=None, n_resamples=0, alpha=0.05,
-                      distortions='ordered', title='',
-                      lim=(-0.025, 1.025)):
-        """
-        Three-panel envelope figure (formerly ``cloud_view``).
+    def plot_envelope(self, n_resamples=0):
+        """Plot the envelope of admissible prices, and what sits inside it.
 
-        Panel 1: scatter of sampled cloud columns shaded by weight, plus the
-        min/max envelope band.
-        Panels 2-3: the calibrated distortions overlaid on the envelope band.
+        Two equal-aspect unit squares. The first is the min/max envelope
+        band with the bracketing cloud inside it, shaded by each bracket's
+        weight; the second is the band again under every calibrated
+        distortion the priced object carries, with the average extreme for
+        comparison. The second is omitted where there is nothing calibrated
+        to draw on it.
 
         Parameters
         ----------
-        axs : array of 3 Axes, optional
-            If omitted, a new ``1 x 3`` figure is created.
         n_resamples : int, default 0
-            If positive, draw this many bracket columns from ``cloud_df``,
-            restricted to ``p_lo == 0`` (pricing distortions, those that pin
-            the mean), and overplot them coloured by weight.
-        alpha : float, default 0.05
-            Opacity of the resampled curves.
-        distortions : ``'ordered'``, list of dict, or ``'space'``
-            What to overlay in panels 2-3. ``'ordered'`` only works for
-            ``Portfolio`` objects with calibrated distortions.
-        title : str, default ``''``
-            Suptitle (applied to all panels).
-        lim : tuple, default ``(-0.025, 1.025)``
-            x and y axis limits.
+            How many bracketing curves to draw inside the band. It says how
+            densely to show the set of admissible prices; zero draws the
+            band alone.
 
         Returns
         -------
-        fig, axs : matplotlib figure and array of three Axes.
+        matplotlib.figure.Figure
+            Also stashed on ``self.figure``.
+
+        Notes
+        -----
+        Draws the document ``charts.chart_envelope`` emits. **Two panels
+        where this used to draw three**: the five calibrated distortions
+        were split across the last two, which was an accident of the order
+        they were added rather than a reading anyone wants, since the
+        question is how the five compare and five curves on one band answer
+        it (author's decision, ``dev/plan-chart-ir.md``).
+
+        The band is one series and not two curves: it *is* the region
+        between the extremes, which is what an envelope means. Everything
+        the old signature carried about appearance (``alpha``, ``lim``,
+        ``title``, an axes array) belonged to the drawing and is the
+        renderer's now; ``distortions=`` is gone with the split it selected
+        between.
         """
-        from .plots import plot_bounds_envelope
-        return plot_bounds_envelope(self, axs=axs, n_resamples=n_resamples,
-                                    alpha=alpha, distortions=distortions,
-                                    title=title, lim=lim)
+        from .charts import build_chart_doc
+        from .plots import plot_chartdoc
+        self.figure = plot_chartdoc(
+            build_chart_doc(self, 'envelope', n_resamples=n_resamples))
+        return self.figure
 
     def plot_weights(self, ax=None, *, levels=20, colorbar=True):
         """

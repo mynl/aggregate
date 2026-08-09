@@ -528,13 +528,26 @@
   cloud and all five calibrated distortions on one band), then
   `[Chart-Bivariate]`, then `[Chart-Portfolio]` and `[Chart-Reins]`
   last, both still blocked on author design work.
-  **OPEN, raised by the author at a239:** an `inverse` reading, a panel
-  declaring that its axes may be exchanged, which would let the severity
-  and aggregate Lee panels also be read as distribution functions. Small
-  to build (one `Panel` field, and the renderer already resolves both
-  axes symbolically); the open question is the switch count on
-  `plot_chartdoc`, which the four-switch decision at a233 makes a
-  keyword rather than a dict entry.
+  `[Chart-Invertible-Lee]` landed a240 (author's call: keep the named
+  switches, they are discoverable and documented and there will not be
+  many more): `Panel.invertible` plus `inverse_title`, and
+  `plot(invert=True)` on the aggregate, P&L and severity draws the
+  distribution function their Lee panels invert to. The ladder and the
+  return-period pairing both followed the exchange with no special case,
+  which is what reading them off the axes bought. Job 6
+  `[Chart-Bounds]` landed a241: two panels, the cloud shaded by weight
+  and all five calibrated distortions on one band, `y2` used for the
+  first time, `ChartSeries.value` added for the bracket weight.
+  **Next: job 7 `[Chart-Bivariate]`. ASK FOR THE 3-D PUNCHUPS FIRST**,
+  before any emitter is written: the author wants them and they have not
+  been written down (`aggregate_api/dev/api-punchlist.md`, Punchups
+  Round 4 item 6, also holds open items). Then `[Chart-Portfolio]` and
+  `[Chart-Reins]`, both still blocked on author design work.
+  Not a job but noted at a241: `AllocationBounds` and `PricingBounds`
+  are `_HullEngine` subclasses on a `Portfolio`, **not** built around a
+  `Bounds`, so they carry no `cloud_df` and the envelope chart does not
+  serve them; `plot_hull_bounds` stays bespoke and would need its own
+  emitter.
 
 ---
 

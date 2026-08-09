@@ -491,6 +491,14 @@ class ChartSeries:
         are the whole law or samples of a function that lives between
         them. How that is *drawn* is the renderer's, and depends on how
         much room each atom gets.
+    value : float, optional
+        One number the series carries **as a whole**: the weight of the
+        bracket a curve in an envelope cloud belongs to. It is a property
+        of the series and not a styling instruction, so a renderer chooses
+        how to encode it, a color ramp or an opacity or a legend entry, and
+        one that has no use for it ignores it and is still correct. Reach
+        for it only where the number is a fact a reader would ask about; it
+        is not a channel for passing appearance through.
 
     Notes
     -----
@@ -514,6 +522,7 @@ class ChartSeries:
     y2: tuple = None
     surface: SurfaceData = None
     support: str = 'atomic'
+    value: float = None
 
     @property
     def x_values(self):

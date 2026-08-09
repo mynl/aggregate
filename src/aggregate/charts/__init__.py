@@ -251,10 +251,12 @@ def _emitter_base(name):
 # imports; none may touch matplotlib).
 from ._emit_aggregate import chart_agg  # noqa: E402
 from ._emit_bivariate import chart_joint_surface  # noqa: E402
+from ._emit_bounds import chart_envelope  # noqa: E402
 from ._emit_distortion import chart_distortion  # noqa: E402
 from ._emit_pnl import chart_pnl  # noqa: E402
 from ._emit_reins import chart_reins  # noqa: E402
 from ._emit_severity import chart_severity  # noqa: E402
 
-__all__ += ['chart_agg', 'chart_distortion', 'chart_joint_surface',
-            'chart_pnl', 'chart_reins', 'chart_severity']
+__all__ += ['chart_agg', 'chart_distortion', 'chart_envelope',
+            'chart_joint_surface', 'chart_pnl', 'chart_reins',
+            'chart_severity']

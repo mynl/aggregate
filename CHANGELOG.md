@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a241
+
+**[Chart-Bounds] the envelope is two panels, the cloud and all five calibrated distortions on one band.** `Bounds.plot_envelope` draws the document `charts.chart_envelope` emits and `plots._bounds.plot_bounds_envelope` is deleted. The compositor drew **three** panels and split the five distortions across the last two, `['ccoc', 'tvar']` on one and `['ph', 'wang', 'dual']` on the other. That was an accident of the order they were added rather than a reading anyone wants: the question is how the five compare, and five curves on one band answer it (author's decision, `dev/plan-chart-ir.md`).
+
+**The band is one series, not two curves**, which is the first real use of `ChartSeries.y2`, carried since v1 and never emitted: the series *is* the region between the extremes, which is what an envelope means, rather than two curves a reader has to associate. The renderer strokes both edges as well as filling between them, because a band whose boundary cannot be seen reads as vaguer than the data.
+
+**`ChartSeries.value` carries one number a series has as a whole**, and the cloud is what it was added for: each curve is one bracketing BiTVaR and its weight is a fact a reader asks about, so it travels as data and the renderer decides how to encode it (the house ramp, and a colorbar named by `meta['value_label']`). It is a property of the series and **not** a channel for passing appearance through: a renderer with no use for it ignores it and is still correct. A series carrying one stays out of the legend, because forty legend entries are forty names nobody asked for. Omitted at default, so `CHART_IR_VERSION` stays 2.
+
+Both panels are equal-aspect unit squares and neither axis declares a log or a full-range reading: the unit square *is* the window, so a zoom-out on it would do nothing and a log reading of it says nothing. The renderer learned to size a row of equal-aspect panels as a row of squares, which constrained layout was otherwise collapsing to slivers. The second panel is **omitted** rather than drawn empty where the priced object carries nothing calibrated, which a `Bounds` built on a bare `Aggregate` does not.
+
+`plot_envelope(n_resamples=0)`, returning the figure and stashing it on `self.figure`. `axs`, `alpha`, `lim` and `title` belonged to the drawing and are the renderer's now; `distortions=` goes with the split it selected between. `plot_weights` and the hull view stay bespoke, the first because a level set over `(p_lo, p_hi)` is a grid panel nobody has asked for and the second because it reads private engine state with no public frame behind it.
+
+**Note for `AllocationBounds` and `PricingBounds`:** they are `_HullEngine` subclasses built on a `Portfolio`, not on a `Bounds`, and carry a vertex table (`_T`, `_A`, `_hulls`) rather than a `cloud_df`, so this chart does not serve them. Their drawing is `plot_hull_bounds`, still bespoke, and it needs an emitter of its own.
+
+---
+
 ## 1.0.0a240
 
 **[Chart-Invertible-Lee] a panel may declare that its axes exchange, and a Lee diagram does.** Mechanically an exchange is a transpose; what it *performs* is an inversion, which is the name it takes: a quantile function and a distribution function are inverses, so a Lee diagram read the other way round **is** the cdf, drawn from the same pairs. `Panel.invertible` declares it, `plot_chartdoc(invert=True)` and `plot(invert=True)` do it, and the aggregate, P&L and severity Lee panels all declare it. It is a fact about the quantities and not about the drawing: exchanging a density's axes says nothing, because mass against loss does not invert.

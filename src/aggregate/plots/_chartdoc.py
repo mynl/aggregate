@@ -321,6 +321,30 @@ def _apply_axis(ax, which, axis, scale, window, floor=None):
             getattr(ax, f'set_{which}ticks')(np.linspace(0, 1, 6))
 
 
+#: Where on the house ramp a value-carrying family starts. The ramp runs
+#: from white, and a curve drawn in white is not drawn at all, so the family
+#: uses the visible part of it and the lightest member still reads.
+VALUE_RAMP_FLOOR = 0.3
+
+
+def _value_norm(series_list):
+    """Normalizer over the ``value`` a family of series carries.
+
+    Normalized over what the panel actually holds rather than over a fixed
+    range, because ``ChartSeries.value`` is any quantity the emitter says is
+    a fact about the series, and only the emitter knows its scale.
+    """
+    seen = [s.value for s in series_list if s.value is not None]
+    lo, hi = (min(seen), max(seen)) if seen else (0.0, 1.0)
+    return mpl.colors.Normalize(lo, hi if hi > lo else lo + 1.0)
+
+
+def _value_color(series_list, value):
+    """The ramp color for one member of a value-carrying family."""
+    at = _value_norm(series_list)(value)
+    return _house_ramp()(VALUE_RAMP_FLOOR + (1 - VALUE_RAMP_FLOOR) * at)
+
+
 def _paired_reading(doc, axis_id):
     """The paired return-period axis for ``axis_id``, if the document has one."""
     for a in doc.axes:
@@ -444,13 +468,28 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
             continue
         if y2 is not None:
             # A band is the region between two edges of one coordinate, so
-            # exchanged axes fill between them horizontally.
+            # exchanged axes fill between them horizontally. Both edges are
+            # stroked: a band whose boundary cannot be seen reads as vaguer
+            # than the data, and each edge is a curve in its own right.
             band = _typeset(doc, s.name)
             if inverted:
-                ax.fill_betweenx(y, x, y2, alpha=0.15, label=band)
+                fill = ax.fill_betweenx(y, x, y2, alpha=0.15, label=band)
+                edges = [(x, y), (y2, y)]
             else:
-                ax.fill_between(x, y, y2, alpha=0.15, label=band)
+                fill = ax.fill_between(x, y, y2, alpha=0.15, label=band)
+                edges = [(x, y), (x, y2)]
+            edge_color = fill.get_facecolor()[0][:3]
+            for ex, ey in edges:
+                ax.plot(ex, ey, lw=0.6, color=edge_color)
             labeled = True
+            continue
+        if s.value is not None:
+            # One of a family, labeled by a number rather than by a name:
+            # the number is the reading, so it is encoded on the ramp and
+            # the curve stays out of the legend. Forty legend entries would
+            # be forty names nobody asked for.
+            ax.plot(x, y, lw=0.75, alpha=0.55,
+                    color=_value_color(series_list, s.value))
             continue
         label = _typeset(doc, s.name)
         if s.support == 'continuous':
@@ -492,6 +531,17 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
         corner = _legend_corner([(x, y) for s, x, y, _ in drawn
                                  if s.role != 'identity'], x_window)
         ax.legend(loc=corner, fontsize='xx-small')
+    value_label = doc.meta.get('value_label')
+    if value_label and any(s.value is not None for s in series_list):
+        # A family shaded by a number needs the number named, and only the
+        # document can name it.
+        ramp = mpl.colors.LinearSegmentedColormap.from_list(
+            'aggregate_value',
+            [_value_color(series_list, v) for v in
+             np.linspace(*_value_norm(series_list).inverse((0., 1.)), 16)])
+        ax.figure.colorbar(
+            mpl.cm.ScalarMappable(_value_norm(series_list), ramp),
+            ax=ax, shrink=0.7, aspect=18, label=_typeset(doc, value_label))
 
 
 def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
@@ -597,7 +647,13 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
         # density and its tail one reading rather than two pictures, and
         # zooming one must move the other.
         shared = len({p.x_axis for p in doc.panels}) == 1
-        _, grid = make_grid(1, len(doc.panels), squeeze=False, sharex=shared)
+        # Equal-aspect panels are squares, and squares in a row need a
+        # canvas that is as many squares wide, or constrained layout
+        # collapses them to slivers trying to honor the aspect.
+        square = all(p.aspect == 'equal' for p in doc.panels)
+        size = (len(doc.panels) * FIG_H, FIG_H) if square else None
+        _, grid = make_grid(1, len(doc.panels), squeeze=False, sharex=shared,
+                            **({} if size is None else {'figsize': size}))
         axs = list(grid[0])
 
     for panel, realization, panel_ax in zip(doc.panels, realized, axs):

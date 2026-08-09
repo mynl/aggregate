@@ -1,63 +1,20 @@
-"""Layer 2 compositor for :class:`aggregate.portfolio.Portfolio`.
+"""What is left of the layer 2 compositor for :class:`Portfolio`.
 
-Holds the bodies of ``Portfolio.plot`` (density / log-density two-panel
-exhibit), ``Portfolio.scatter`` (exeqa scatter matrix) and the plotting half of
-``Portfolio.sample_compare``. The class keeps one-line delegating stubs.
+``plot_portfolio`` is gone: ``Portfolio.plot`` draws the document
+``charts.chart_port`` emits, whose second panel is the kappa reading rather
+than a log density drawn as a picture of its own.
 
-The limit logic stays on the class as ``Portfolio._limits`` (a data method).
+Holds the bodies of ``Portfolio.scatter`` (exeqa scatter matrix) and the
+plotting half of ``Portfolio.sample_compare``, both listed as bespoke: a
+scatter matrix is a family of panels the schema has no way to say, and the
+sample comparison is a diagnostic rather than an exhibit. The class keeps
+one-line delegating stubs, and the limit logic stays on it as
+``Portfolio._limits`` (a data method).
 """
 
 import pandas as pd
 
 from ._style import make_mosaic, FIG_W, FIG_H
-
-
-def plot_portfolio(port, axd=None, figsize=(2 * FIG_W, FIG_H)):
-    """Density and log-density two-panel plot of a :class:`Portfolio`.
-
-    Draws the total and each unit on its native grid: linear density (A) and
-    log density (B).
-
-    Parameters
-    ----------
-    port : Portfolio
-        The (updated) portfolio to plot.
-    axd : dict of str to Axes, optional
-        Mosaic with keys ``'A'`` and ``'B'``. A new figure is created if
-        omitted and stored on ``port.figure``.
-    figsize : tuple of float, default ``(2*FIG_W, FIG_H)``
-        Figure size used when ``axd`` is None.
-    """
-    if axd is None:
-        port.figure, axd = make_mosaic('AB', figsize=figsize)
-
-    ax = axd['A']
-    xl = port._limits()
-    yl = port._limits(stat='density', zero_mass='exclude')
-    # total first = Book standard, then each unit on its native grid
-    # (numerics-1); on a legacy zero-origin book the grids coincide.
-    bit = pd.concat(
-        [port.density_df.p_total] +
-        [port.unit_density(unit) for unit in port.unit_names], axis=1)
-    # Legend labels are the ``p_<handle>`` series names. Relabel only the units
-    # carrying an explicit ``as "..."`` label (dev/plan-labels.md D2/D4), so an
-    # unlabeled portfolio's legend is unchanged; the ``p_`` prefix is kept as the
-    # data handle otherwise.
-    if port.use_labels:
-        legend_ren = {f'p_{a.name}': a.label
-                      for a in port.agg_list if a.label is not None}
-        if legend_ren:
-            bit = bit.rename(columns=legend_ren)
-    bit.plot(ax=ax, xlim=xl, ylim=yl)
-    ax.set(xlabel='Loss', ylabel='Density')
-    ax.legend()
-
-    ax = axd['B']
-    xl = port._limits(kind='log')
-    yl = port._limits(stat='logy')
-    bit.plot(ax=ax, logy=True, xlim=xl, ylim=yl)
-    ax.set(xlabel='Loss', ylabel='Log density')
-    ax.legend().set(visible=False)
 
 
 def plot_scatter(port, marker='.', s=5, alpha=1, figsize=(10, 10), diagonal='kde', **kwargs):

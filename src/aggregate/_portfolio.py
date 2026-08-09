@@ -2995,16 +2995,49 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         # A display adapter -- relabel the unit axis (no-op when unlabeled).
         return self._relabel(out)
 
-    def plot(self, axd=None, figsize=(2 * FIG_W, FIG_H)):
-        """
-        Defualt plot of density, survival functions (linear and log)
+    def plot(self, xmax=None, log=False, full_range=False):
+        """Plot the book: its mass, and where its losses come from.
 
-        :param axd: dictionary with plots A and B for density and log density
-        :param figsize: figure size used by ``plt.subplot_mosaic`` if ``axd`` is not provided
-        :return:
+        Parameters
+        ----------
+        xmax : float, optional
+            Upper end of the loss window, in place of the computed one, for
+            reading two books against one common scale.
+        log : bool
+            Read the loss, mass and kappa axes on log. On the first panel
+            that is the log density this plot used to draw as a second
+            picture; on the second it is the log-log reading that says
+            which unit dominates far out in the tail.
+        full_range : bool
+            Show the whole grid rather than the ``q(0.001)`` to ``q(0.999)``
+            crop.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Also stashed on ``self.figure``.
+
+        Notes
+        -----
+        Draws the document ``charts.chart_port`` emits. Two panels, and the
+        second is the reason a book is not an aggregate with more curves on
+        it: ``exeqa_i`` is ``E[X_i | X = x]``, what each unit contributes
+        when the book as a whole lands at ``x``, so reading up from a total
+        loss gives the split that produced it, and the vertical at the
+        1-in-200 is the natural allocation at capital.
+
+        The kappa curves are drawn only where the total carries more
+        probability than :data:`~aggregate.charts._emit_portfolio.KAPPA_FLOOR`.
+        A conditional expectation divides by that mass, so where it is
+        arithmetic dust the quotient is noise rather than allocation; the
+        constant is measured against the identity the curves must satisfy,
+        not chosen.
         """
-        from .plots import plot_portfolio
-        return plot_portfolio(self, axd=axd, figsize=figsize)
+        from .charts import build_chart_doc
+        from .plots import plot_chartdoc
+        self.figure = plot_chartdoc(build_chart_doc(self, 'port', xmax=xmax),
+                                    log=log, full_range=full_range)
+        return self.figure
 
     def scatter(self, marker='.', s=5, alpha=1, figsize=(10, 10), diagonal='kde', **kwargs):
         """

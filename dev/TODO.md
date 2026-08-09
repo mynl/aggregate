@@ -538,6 +538,14 @@
   `[Chart-Bounds]` landed a241: two panels, the cloud shaded by weight
   and all five calibrated distortions on one band, `y2` used for the
   first time, `ChartSeries.value` added for the bracket weight.
+  Job 8 `[Chart-Portfolio]` landed a242, on the author's design: density
+  (with log declared) plus the **kappa** panel, `exeqa_*` filtered to
+  `p_total > KAPPA_FLOOR = 1e-14`. The floor was **measured**, not
+  chosen: the unit kappas sum to `x` by construction, so that identity's
+  residual is kappa's own error, and it runs (median, worst) 4.6e-9 /
+  3.2e-4 at 1e-14 against 9.9e-5 / **0.52** with no floor, with the same
+  numbers at log2 16 and 18. The kappa axis takes the *loss* window,
+  since the curves sum to the diagonal.
   **Next: job 7 `[Chart-Bivariate]`. ASK FOR THE 3-D PUNCHUPS FIRST**,
   before any emitter is written: the author wants them and they have not
   been written down (`aggregate_api/dev/api-punchlist.md`, Punchups

@@ -187,8 +187,10 @@ def test_deterministic(both):
 # stage of its own to draw.
 
 def test_portfolio_is_available_only_with_a_cession(port):
-    assert available_charts(port) == ['reins']
-    assert available_charts(build(_PORT_GROSS)) == []
+    """As for an aggregate: the book's own chart is always there once it is
+    updated, and ``reins`` joins it exactly when some unit cedes."""
+    assert 'reins' in available_charts(port)
+    assert 'reins' not in available_charts(build(_PORT_GROSS))
 
 
 def test_portfolio_basis_is_total(port):

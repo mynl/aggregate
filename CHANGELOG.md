@@ -20,6 +20,20 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a242
+
+**[Chart-Portfolio] a portfolio emits total, units and the kappa reading.** `Portfolio.plot` draws the document `charts.chart_port` emits and `plots._portfolio.plot_portfolio` is deleted. The density and the log density were one quantity read two ways, so log is a declared reading of the one panel, and the panel that frees up is the **kappa** panel, which is the author's design and the reason a book is not an aggregate with more curves on it.
+
+**`exeqa_i` is `E[X_i | X = x]`**: what each unit contributes when the book as a whole lands at `x`. Read up from a total loss and you get the split that produced it, and the vertical at the 1-in-200 is then the natural allocation at capital, which is why the same anchor sits on both panels. The unit curves sum to the diagonal by construction, and the total's curve is that diagonal exactly (`exeqa_total` is `E[X | X = x] = x`), so it is drawn: seeing the parts sum to it is the reading.
+
+**The floor on that panel is measured, not chosen.** A conditional expectation *divides* by `p_total`, so where that mass is arithmetic dust the quotient is noise rather than allocation. Because the unit curves must sum to `x` exactly, the residual of that identity measures kappa's own error, and on a two-lognormal book it runs, as (median, worst): `1e-12` → (4.6e-11, 4.1e-07); **`1e-14` → (4.6e-09, 3.2e-04)**; `1e-15` → (7.3e-05, 1.2e-03); no floor → (9.9e-05, **0.52**). The cliff is real rather than gradual and `KAPPA_FLOOR = 1e-14` sits a decade above it, which is also a decade above `LOG_FLOOR`, the dust floor for a mass that is only *displayed*. The same numbers come back at `log2` 16 and 18, so the floor does not need to scale with the grid, and on that book kappa stays trustworthy out to ten times `q(0.999)`: inside the default window the floor never bites, and what it protects is the zoomed-out reading. The test re-runs the measurement rather than asserting the constant.
+
+The kappa axis declares its window as the **loss** window, because the curves sum to the diagonal and so the tallest thing on the panel sits at the window's right edge. Without saying so the panel scales to kappa at losses far off the right of the shared axis and squashes every curve a reader can see into the bottom eighth.
+
+Draw order is meaning: units first, **total last**, so the book sits on top of the parts it is made of, which reverses what the compositor did. Each unit draws on its **own native grid** through `unit_density`, which a windowed book does not share with the portfolio's. Units are named by their resolved label, so a client links a unit's legend toggle across both panels by name. `plot(xmax=None, log=False, full_range=False)`; `axd` and `figsize` are gone. `scatter` and `sample_compare` stay bespoke.
+
+---
+
 ## 1.0.0a241
 
 **[Chart-Bounds] the envelope is two panels, the cloud and all five calibrated distortions on one band.** `Bounds.plot_envelope` draws the document `charts.chart_envelope` emits and `plots._bounds.plot_bounds_envelope` is deleted. The compositor drew **three** panels and split the five distortions across the last two, `['ccoc', 'tvar']` on one and `['ph', 'wang', 'dual']` on the other. That was an accident of the order they were added rather than a reading anyone wants: the question is how the five compare, and five curves on one band answer it (author's decision, `dev/plan-chart-ir.md`).

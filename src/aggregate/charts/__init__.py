@@ -1,5 +1,18 @@
 """``aggregate.charts``: chart semantics as data, the chart IR.
 
+.. warning::
+
+   **Provisional module, in the sense of PEP 411.** ``aggregate.charts`` is
+   additive to the 1.0 release and is **not part of the 1.0 API contract**. Its
+   API may change in a minor release with no deprecation period, unlike the
+   stable core (:class:`~aggregate.Aggregate`, :class:`~aggregate.Portfolio`,
+   :class:`~aggregate.PnL`, :class:`~aggregate.Severity`,
+   :class:`~aggregate.Distortion`, :class:`~aggregate.Underwriter`,
+   :func:`~aggregate.build` and the DecL grammar), which does carry the usual
+   promise. The module is deliberately public rather than underscore prefixed:
+   use it, and report what does not fit. That feedback is how it graduates to
+   stable in a later minor release. See :doc:`/3_reference/3_x_API_Stability`.
+
 The chart-side sibling of the exhibits module: where a table's meaning is a
 ``TableDoc``, a chart's meaning is a :class:`~aggregate.charts.ir.ChartDoc`.
 Emitters here read public frames and ``GridDistribution`` accessors and
@@ -10,6 +23,21 @@ may import charts, never the reverse.
 
 Users write ``from aggregate import charts``; nothing is star exported from
 the package root.
+
+**Dependencies point inward.** This package imports from the core; the core's
+pre-existing classes and modules do not import it, so nothing here can
+destabilize or delay 1.0. There is exactly one edge into an existing package:
+:mod:`aggregate.plots` gained :func:`~aggregate.plots.plot_chartdoc`, the
+renderer, which imports :mod:`aggregate.charts.ir`. That is a new public
+function in an old package, and nothing else in ``plots`` depends on it. The
+one other class of change to existing code is the per-chart conversion of a
+bespoke plot to an emitter plus renderer, gated by before-and-after image
+diffs (``tests/data/chartdoc_baselines/``) and deferrable chart by chart past
+1.0.
+
+Work continues as attention allows and 1.0 ships whether or not it is
+finished. Explicitly post-1.0: conversion of the charts the app does not use,
+full convergence on matplotlib-renders-the-IR, and any chart meta-language.
 
 Emitters register in :data:`CHARTS` as ``functools.singledispatch``
 generics, one per chart name, with an optional availability predicate;
@@ -55,6 +83,10 @@ def register_chart(name, emitter, predicate=None):
     predicate : callable, optional
         ``predicate(obj) -> bool``, an availability gate beyond type
         dispatch. ``None`` means available wherever the type dispatches.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     if name in CHARTS:
         raise ValueError(f'chart {name!r} is already registered')
@@ -81,6 +113,10 @@ def available_charts(obj):
     -------
     list of str
         Registry names, in registration order.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     out = []
     for name, (emitter, predicate) in CHARTS.items():

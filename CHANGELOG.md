@@ -1,5 +1,25 @@
 # Changelog
 
+## API stability, and how to read these notes
+
+**This section is standing policy, not a release entry.** It applies to every version below and to 1.0 itself.
+
+The public surface has two tiers.
+
+**Stable.** `Aggregate`, `Portfolio`, `PnL`, `Severity`, `Frequency`, `Distortion`, `BivariateAggregate`, `Underwriter`, `build`, `qd`, and the DecL grammar in `decl.lark`. From 1.0 onward a documented name here keeps its meaning: a breaking change waits for a major release and is preceded by a deprecation period. Breaking changes recorded in the alpha entries below happened *before* that promise took effect, which is what the alpha series was for.
+
+**Provisional, in the sense of [PEP 411](https://peps.python.org/pep-0411/): `aggregate.charts` and `aggregate.exhibits`.** These two modules are **not part of the 1.0 API contract**. Their APIs may change in a *minor* release, with no deprecation period. That covers the chart IR schema and its document hash, the chart registry and the set of charts that exist, and on the exhibits side the exhibit names, block structure, captions, row flags and the `Perspective` vocabulary.
+
+They are additive side projects to the 1.0 release rather than part of it. Their dependencies point inward, so both import from the core and the core does not import them, and nothing in either module touches an existing class. They therefore cannot destabilize or delay 1.0, and 1.0 ships whether or not either is finished. The one edge into pre-existing code is per-chart conversion of a bespoke plot to the emitter-plus-renderer form, each conversion gated by a before-and-after image diff and deferrable past 1.0. Explicitly post-1.0: conversion of the charts the app does not use, full convergence on matplotlib rendering the IR, the `INSURED` and `REINSURER` perspectives, and any exhibit meta-language.
+
+They are public and not underscore prefixed on purpose. Use them, and report what does not fit: that feedback is how a provisional module graduates to stable in a later minor release. Full statement in `docs/3_reference/3_x_API_Stability.rst`.
+
+**A note on `greater_tables`.** It became a plain dependency at `1.0.0a229` rather than an optional extra, so the exhibit surface never raises `ImportError` on a supported interpreter. That is a fact about installation and not a stability promise. It does not move `aggregate.exhibits` into the 1.0 contract.
+
+**Numbers are a separate question from names.** A correctness fix changes results within any release and is called out in the entry that makes it. A number that was wrong is not an interface to be preserved.
+
+---
+
 ## 1.0.0a229
 
 **[Greater-Tables-Dependency] `greater_tables` is a plain dependency, and the Python floor rises to 3.12.** GT 6.0.0 published to PyPI on 2026-08-07, so the workaround it forced can go: the `exhibits` extra had stayed commented out because an active extra naming an unpublished package would make `uv sync --all-extras` unresolvable, and the install instruction was a sibling checkout.

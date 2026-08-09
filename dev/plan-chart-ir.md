@@ -1,5 +1,7 @@
 # Plan [Chart-IR]: a chart intermediate representation, semantics vs realization
 
+> **Release status: additive side project, does NOT gate `1.0.0b1`.** `aggregate.charts` ships marked **provisional in the sense of PEP 411**: public and encouraged, but not part of the 1.0 API contract, and free to change in a minor release with no deprecation period. That covers the IR schema, the canonical form and therefore the document hash, the registry, and the set of charts that exist; `CHART_IR_VERSION` is how a consumer detects a change. Dependencies point inward, so **1.0 ships whether or not this plan is finished.** The one edge into pre-existing code is the per-chart conversion of a bespoke plot, each gated by a before-and-after image diff (`tests/data/chartdoc_baselines/`) and **deferrable chart by chart past 1.0**, so an unconverted chart is a valid shipping state rather than a loose end. Explicitly post-1.0: conversion of the charts the app does not use, and full matplotlib-renders-the-IR convergence. Live items sit in the *Provisional modules* section of `dev/TODO.md`, outside the beta gate. Status recorded in the module docstrings, `docs/3_reference/3_x_API_Stability.rst`, and the `CHANGELOG.md` preamble.
+
 > **Status: DRAFT, approved 2026-08-04 for phased execution.** Three passes, each lands independently; matplotlib rendering the IR is the committed post 1.0 convergence. Companion plan: `dev/plan-exhibits.md`.
 
 ## Principle

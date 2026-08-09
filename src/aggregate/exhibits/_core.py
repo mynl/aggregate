@@ -1,5 +1,12 @@
 """``aggregate.exhibits._core`` -- the exhibit machinery, class agnostic.
 
+.. warning::
+
+   **Provisional, in the sense of PEP 411**, along with the rest of
+   :mod:`aggregate.exhibits`: not part of the 1.0 API contract, and subject to
+   change in a minor release with no deprecation period. See
+   :doc:`/3_reference/3_x_API_Stability`.
+
 The base layer of the exhibits package, the analogue of ``plots._style``:
 :class:`Perspective`, :class:`Exhibit`, the singledispatch registry, the
 frame and IR stages, and the translation helpers that more than one class
@@ -18,8 +25,11 @@ Design (see ``dev/plan-exhibits.md``):
   underlying frame passed through), ``INSURED`` (buyer of insurance),
   ``INSURER`` (seller of insurance, buyer of reinsurance; the cedent), and
   ``REINSURER`` (seller of reinsurance). At 1.0 only ``RAW`` and ``INSURER``
-  are implemented; ``INSURED`` and ``REINSURER`` are stable vocabulary with
-  no registrations yet.
+  are implemented; ``INSURED`` and ``REINSURER`` are declared vocabulary with
+  no registrations yet, so that adding them later does not churn the enum.
+  Declared is not the same as promised: like everything in this package the
+  enum is provisional, and the reinsurer semantics review may yet rename or
+  respell a member.
 * Each exhibit (``summary``, ``tail``, ``stats``, ``validation``, ``reins``,
   ``economic``, ``economic_ratios``, ``dependency``, ...) is a generic function
   dispatching on the object's type. Registration is open: app or user code
@@ -110,8 +120,14 @@ class Perspective(Enum):
     (retro, where the reinsurer buys, is parked).
 
     Only ``RAW`` and ``INSURER`` are implemented at 1.0. ``INSURED`` and
-    ``REINSURER`` are stable vocabulary so the enum does not churn when
-    their implementations arrive.
+    ``REINSURER`` are declared here so the enum does not churn when their
+    implementations arrive, which is a courtesy to readers rather than a
+    promise: this module is provisional, and the reinsurer semantics review
+    may yet rename or respell a member.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     RAW = 'raw'
@@ -153,6 +169,10 @@ class Exhibit:
     meta : dict
         Envelope metadata: object identity (``kind``, ``object``, ``label``),
         block names, per block captions and source frame names.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     ir_blocks: tuple
@@ -336,6 +356,10 @@ def available_exhibits(obj):
         ``(name, perspectives)`` pairs in registry order; an exhibit whose
         predicate fails (for example ``reins`` without reinsurance, ``tail``
         before ``update``) is omitted.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     out = []
     for name, (fn, perspectives_fn) in EXHIBITS.items():
@@ -372,6 +396,10 @@ def exhibit_frames(obj, name, perspective=Perspective.RAW):
         ``(block_name, frame, spec_kwargs)`` triples; ``spec_kwargs`` are
         greater_tables ``TableSpec`` keyword arguments (caption, row_flags,
         formatters, ...), plain data so this stage stays GT free.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     try:
         fn, perspectives_fn = EXHIBITS[name]
@@ -420,6 +448,10 @@ def build_exhibit(obj, name, perspective=Perspective.RAW):
     -------
     Exhibit
         Frozen; ``ir_blocks`` hold one hash stamped ``TableDoc`` per block.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     perspective = _resolve_perspective(perspective)
     blocks = exhibit_frames(obj, name, perspective)
@@ -721,6 +753,10 @@ def register_simple_exhibit(name, title, frame_attr, classes, *,
         register_simple_exhibit('bs_window', 'Grid sizing', 'bs_window_df',
                                 [Aggregate, Portfolio, BivariateAggregate],
                                 predicate=_perspectives_updated)
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     fn = EXHIBITS[name][0] if name in EXHIBITS else _make_exhibit_function(
         name, title,

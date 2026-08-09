@@ -1,5 +1,16 @@
 """Chart-document IR: frozen dataclasses, ``CHART_IR_VERSION`` 1.
 
+.. warning::
+
+   **Provisional module, in the sense of PEP 411**, along with the rest of
+   :mod:`aggregate.charts`. The schema below is **not part of the 1.0 API
+   contract** and may change in a minor release with no deprecation period.
+   ``CHART_IR_VERSION`` is how a consumer detects that it has; pin it and
+   check it. "Frozen" on the dataclasses below means immutable instances, and
+   version 1 being closed to additions is a rule about how the schema changes
+   in an orderly way, neither is a stability promise across releases. See
+   :doc:`/3_reference/3_x_API_Stability`.
+
 The IR is the contract between the library's chart emitters and every
 renderer (the matplotlib renderer in ``aggregate.plots._chartdoc``, the
 app's generic ECharts adapter, and anything after them). It carries
@@ -110,6 +121,10 @@ class ChartCapabilityError(RuntimeError):
     instance, where the honest non-strict answer is a labeled 2-D
     projection). Defined here, inside the IR, so emitter-side code and
     tests can name it without importing any renderer.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
 
@@ -141,6 +156,10 @@ class SurfaceData:
     the emitting chart's semantics and is documented there; when the grid
     was reduced from a finer computational grid, the reduction must be mass
     preserving, because that reduction is meaning, not styling.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     x: tuple
@@ -189,6 +208,10 @@ class ChartAxis:
         renderer may realize the pair as one axis with a twin. JUDGMENT
         CALL flagged in ``dev/chart-inventory.md``: the author confirms the
         twin is IR, not a renderer trick, at schema sign off.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     id: str
@@ -246,6 +269,10 @@ class Panel:
     A panel does not list its series; each series names its panel via
     ``panel_id`` and draw order is document order. One source of truth,
     checked in :meth:`ChartDoc.__post_init__`.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     id: str
@@ -309,6 +336,10 @@ class ChartSeries:
     overlay, drawn over the mesh in document order: the iso-total diagonals
     of a joint density, a contour trace, a reference curve. The grid panel
     itself carries exactly one surface series; an 'xy' panel carries none.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     name: str
@@ -366,6 +397,10 @@ class Mark:
         A de-emphasized mark (the paired capital anchors on the tail
         panel) versus a full-weight one (the mean). Semantic emphasis, not
         a color choice.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     panel_id: str
@@ -417,6 +452,10 @@ class ChartDoc:
     hash : str, optional
         The 12-hex content hash, stamped by :func:`stamp`, excluded from
         the hashed form so stamping does not perturb the digest.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     name: str
@@ -577,6 +616,10 @@ def canonical_dict(doc, *, include_hash=True):
     dict
         Deterministic field presence, NFC strings, tuples as lists. Key
         ordering is left to the JSON writer (sorted there).
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     skip = () if include_hash else ('hash', 'generator')
     return _canonical(doc, skip=skip)
@@ -597,6 +640,10 @@ def canonical_json(doc, *, include_hash=True):
     Returns
     -------
     bytes
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     data = canonical_dict(doc, include_hash=include_hash)
     text = json.dumps(data, sort_keys=True, separators=(',', ':'),
@@ -605,13 +652,23 @@ def canonical_json(doc, *, include_hash=True):
 
 
 def doc_hash(doc):
-    """Return the 12-hex-character sha256 content hash of a document."""
+    """Return the 12-hex-character sha256 content hash of a document.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+    """
     return hashlib.sha256(
         canonical_json(doc, include_hash=False)).hexdigest()[:12]
 
 
 def stamp(doc, generator=None):
-    """Return a copy of ``doc`` with ``hash`` (and ``generator``) set."""
+    """Return a copy of ``doc`` with ``hash`` (and ``generator``) set.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+    """
     changes = {'hash': doc_hash(doc)}
     if generator is not None:
         changes['generator'] = generator

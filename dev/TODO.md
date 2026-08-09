@@ -11,6 +11,14 @@
 > install, tagging, the branch merge) live in `plan-for-v1.md` §1 and are not
 > repeated here.
 >
+> **Three sections, and only the first one gates.** *Beta gate* blocks
+> `1.0.0b1`. *Provisional modules* (`aggregate.charts`, `aggregate.exhibits`)
+> run in parallel and **never** block it: they are additive, PEP 411
+> provisional, and ship in whatever state they are in. *After the cut* is
+> everything deliberately deferred. When triaging, the question is which of the
+> three an item belongs in, and the default for anything touching only
+> `charts/` or `exhibits/` is the second.
+>
 > **Labels, not codes.** Every item has a descriptive `[Bracket-Label]` (CLAUDE.md,
 > Naming conventions). GitHub issue numbers are kept in parentheses as the stable
 > external cross-reference.
@@ -18,8 +26,18 @@
 > **Where plans live.** `dev/` = live · `dev/deferred/` = parked past the beta,
 > not closed · `dev/done/` = closed (shipped, `-REJECTED`, or `-SUPERSEDED`).
 >
-> **Last updated: 2026-08-05.** Added `[Exhibits-Module]` and `[Chart-IR]`: the
-> aggregate to aLL interface work from the author's design notes (business
+> **Last updated: 2026-08-09.** `[Exhibits-Module]` and `[Chart-IR]` moved out
+> of the beta gate into their own **Provisional modules** section. They were
+> filed under the gate when they were added on 2026-08-05, which was a
+> transcription error against the original design: both are additive side
+> projects, ship marked provisional in the PEP 411 sense, and do not gate
+> `1.0.0b1`. The status is now recorded in the module docstrings, in
+> `docs/3_reference/3_x_API_Stability.rst` (plus a warning admonition on each
+> module page and `versionadded:: 1.0` on the public objects), and in the
+> `CHANGELOG.md` preamble.
+>
+> **Previous update, 2026-08-05.** Added `[Exhibits-Module]` and `[Chart-IR]`:
+> the aggregate to aLL interface work from the author's design notes (business
 > exhibits over greater_tables IR with raw/insured/insurer/reinsurer
 > perspectives, 1.0 implementing raw and insurer, and a chart intermediate
 > representation with a 3-D surface
@@ -116,120 +134,6 @@
   discrete and continuous branches. **Its own task** (author, 2026-07-29): it is
   independent of the reporting cluster above, so do not scope it with them.
   Plan: `dev/plan-plotting-punchups.md`.
-- **[Exhibits-Module]**: new `aggregate/exhibits.py` translating the raw FCC
-  stats frames into greater_tables IR envelopes. `Perspective` enum
-  (raw/insured/insurer/reinsurer), singledispatch generics (summary, tail, stats,
-  validation, reins, pnl_ledger, pnl_ratios, dependency), a registry derived
-  `available_exhibits(obj)` capability query, a new `exhibits` optional extra
-  (lazy GT import), and one generic aLL endpoint pair (capability plus
-  envelope with ETag). Migrates the app's ROW_FLAGS/FORMATS/caption knowledge
-  into the library. Purely additive, provisional at 1.0. Six phases; author
-  gate on the PnL business framing. 1.0 implements RAW and INSURER only,
-  with INSURER = RAW unless a per (exhibit, type) override is registered;
-  overrides are custom per exhibit (identity, thin renames, or an extensive
-  reshape for the xpnl tower ledger), settled case by case with the author
-  once the infrastructure lands. INSURED and REINSURER are
-  enum vocabulary, implementations deferred with the reinsurer semantics
-  review as that work's opening gate. Approved 2026-08-04; perspectives
-  renamed and scoped 2026-08-05 (buyer/seller were relative and confusing,
-  the insurer both sells and buys). Plan: `dev/plan-exhibits.md`.
-  **Progress:** `[Exhibits-Scaffold]` and `[Exhibits-Stats-Validation]`
-  landed together at `a200` (module, registry, summary and tail for
-  Aggregate/Portfolio; stats and validation across the five FCCs with the
-  raw moment drop and failing row emphasis; dependency for bvagg; snapshot
-  tests, lazy GT boundary; the `exhibits` extra is documented but commented
-  in `pyproject.toml` until greater_tables 6 publishes to PyPI, since an
-  active unresolvable extra would break `uv sync --all-extras`).
-  `[Exhibits-Reins-Insurer]` landed `a201` (reins exhibit, two blocks,
-  cession gated, insurer moment drop plus captions and total flags).
-  `[PnL-Economic-Frames]` landed `a204` (BREAKING: the PnL ledger is
-  `economic_df`, `ratio_df` is `economic_ratios_df`, and `stats_df` delegates
-  to the engine so the name means one thing across the contract).
-  `[Exhibits-Package-Split]` landed `a205` (`exhibits/` package mirroring
-  `plots/`, `register_simple_exhibit`, `bs_window` and `tail_behavior`,
-  `economic` / `economic_ratios` renames). `[Exhibits-Economic-Insurer]`
-  landed `a206` (ledger captions stating the kappa regime, ledger row flags,
-  the ratio frame split into pure-unit blocks, `MEASURE_FORMATS`).
-  `[Exhibits-Waterfall]` landed `a207` (`economic_waterfall`: the margin walk
-  in two blocks, tower gated, capital as `M / -M_100`, the diversified column
-  footing where the standalone one cannot). **Its author gate is still open**,
-  along with the CV-on-the-ledger question; both are in the plan's open list.
-  Next: the app consolidation (`[Exhibits-App-Consolidation]`), which is the
-  SPA reading envelopes and the migrated app knowledge finally being deleted.
-  `[Exhibits-PnL-Translation]` raw stage landed `a203` (pnl_ledger and
-  pnl_ratios as RAW passthroughs); the INSURER framing draft awaits the
-  author gate (captions, footing rules, Side sign presentation, the tower
-  reshape; see the draft section appended to `dev/plan-exhibits.md`). Open with the author: per measure formats for the stats
-  insurer view (greater_tables formats are per column, the store mixes
-  measures down a column, so the app's measure formats have no TableSpec
-  home yet) and whether the PnL validation audit ever gets a failure gate.
-- **[Chart-IR]**: a minimal versioned chart IR in a new `aggregate/charts/`
-  package (frozen dataclasses, no pydantic; ChartDoc/ChartSeries/ChartAxis/
-  Panel/Mark), with the one generic mpl renderer at `plots/_chartdoc.py` and
-  matplotlib-renders-the-IR as the committed post 1.0 convergence. Three
-  independently landing passes: inventory (`dev/chart-inventory.md`, review
-  gate), schema (sign off gate), conversion (one chart per commit, image diff
-  and fixture diff acceptance). Pilot: the bvagg 3-D surface (emitter block
-  sums the joint; ECharts true 3-D; mpl renders the 2-D projection or raises
-  under `strict=True`). 1.0 scope is the 8 app facing charts plus schema
-  representability (not conversion) of the `plot_twelve` panels, inventoried
-  per panel: the kappa and two unit independence panels are expected future
-  aLL charts, deliberately not developed before the IR, then born as
-  emitters. Emitters read the numerics-2 accessors (`unit_density_df`,
-  `allocation_diagnostics`), never legacy `density_df` `p_<unit>` columns.
-  Approved 2026-08-04, panel scope added 2026-08-05.
-  Plan: `dev/plan-chart-ir.md`. **Progress:** inventory landed a197
-  (`dev/chart-inventory.md`, six judgment calls awaiting author picks);
-  schema v1 landed a198 (`charts/ir.py` plus `tests/test_charts_ir.py`,
-  field list awaiting sign off; the charts boundary assertion lives in
-  `test_charts_ir.py` for now because `test_plots_boundary.py` was
-  mid-edit in the parallel exhibits workstream); pilot library side landed
-  a199 (`chart_joint_surface` emitter with the migrated surfaceGrid
-  reduction, `plots/_chartdoc.py` renderer with the capability pattern);
-  pilot app side landed as aggregate_api a38 (`/chart/{name}` route with
-  doc-hash ETag, generic `chartdoc-to-echarts.js` adapter plus
-  `surfaceOverrides` chrome dict, `surfaceGrid`/`surfaceOption` deleted,
-  fixtures and node smoke updated); first conversion, distortion g(s),
-  landed a202 (emitter, xy renderer growth, and the image gate:
-  compositor-generated baseline, measured conversion residual RMS 0.05,
-  pins mpl 3.10.9 / tolerance 2.0). **Sign-off gate closed 2026-08-05**:
-  all six judgment calls agreed, the gate pins confirmed, and the schema
-  changes they imply executed from `dev/plan-chart-schema-signoff.md`.
-  `[Chart-Grid-Overlays]` landed a208 (grid panels carry one surface plus
-  any number of x/y overlays, the `iso_total` role, the twelve-plot
-  bivariate panel representability test, and `LOG_FLOOR = 1e-15` in
-  `constants.py` settling J5). `[Chart-Plain-Text-Names]` with
-  `[Chart-Axis-Labels]` landed a209 (the plain-text naming rule and the
-  `ChartDoc.tex` lookup, the dual settled on `ǧ(s)` in `constants.py`, the
-  renderer drawing the axis labels the document carries, `plot_distortion`
-  gaining the labels it never had, and the baseline regenerated: the
-  conversion residual is now 0, pixel for pixel). Chart IR version 1 is
-  **signed off and closed to additions**: a chart the schema cannot express
-  changes it by a fresh author decision or stays bespoke. Second conversion,
-  the reins triple, landed a210 (`chart_reins` with the basis semantic
-  option and the cession predicate, survival through `GridDistribution.sf`
-  exactly matching the app's accumulation; the renderer grew multi-panel
-  layout with shared x axes, and now honors `suggested_range`, which it had
-  never applied; corrected at a211, where the suggested range became the
-  extent of the *data*, inset by the renderer's own margin, since a
-  distortion legitimately sits at 0 or 1 and must not be drawn along the
-  frame). Third conversion, severity, landed a212 (`chart_severity`
-  absorbing the app's log-spaced sf inversion, and reading probability
-  mass where a law has no density instead of drawing a flat zero;
-  `charts/_two_panel.py` now holds the window and survival-floor
-  semantics the five two-panel charts share). `[Chart-Atomic-Support]`
-  landed a214, the one deliberate reopening of the frozen schema (author
-  decision, 2026-08-05): `ChartSeries.support` is `'atomic'` or
-  `'continuous'` and defaults to atomic, because a discretized
-  distribution **is** the distribution here; the renderer owns the ladder
-  from that flag plus the room each atom gets (stems, then steps read as
-  bars, then a plain line once a bucket is sub-pixel), counted in visible
-  atoms so a cropped window is judged on what it shows, and cumulative
-  functions step right-continuously off the *axis* rather than the series
-  role. Next: agg, pnl, port, bvagg heatmap in plan order, plus the paired
-  app commits (distortion, reins and sev all need the adapter's xy
-  realization, and the adapter now also owns the same ladder), which wait
-  on the app-side workstream.
 ### Correctness & bugs
 
 - **[Signed-Bounded-Window]** — robustness: kill the `int(inf)` `OverflowError`
@@ -394,6 +298,146 @@
   calls the snapshot the main test. Confirm `[Agg-Library-Build-Check]` covers
   the shipped libraries; decide whether `decl-testers.agg` needs its own
   permanent parse harness.
+
+---
+
+## Provisional modules: parallel to the release, they do **NOT** gate `1.0.0b1`
+
+> **These two items are additive side projects, not part of the 1.0 contract.**
+> `aggregate.charts` and `aggregate.exhibits` ship marked **provisional in the
+> sense of PEP 411**: public, encouraged, and free to change in a minor release
+> with no deprecation period. Their dependencies point **inward** (they import
+> the core, the core does not import them), so no amount of churn here reaches
+> an existing class, and **1.0 ships whether or not either is finished**.
+>
+> The one edge into pre-existing code is the per-chart conversion of a bespoke
+> plot to emitter-plus-renderer, gated by before-and-after image diffs
+> (`tests/data/chartdoc_baselines/`) and deferrable **chart by chart** past 1.0.
+>
+> Work them as attention allows. Nothing below is a reason to hold the tag.
+> Explicitly post-1.0: conversion of the charts the app does not use, full
+> matplotlib-renders-the-IR convergence, the `INSURED` / `REINSURER`
+> perspectives, and any exhibit meta-language.
+>
+> Recorded in three places, per the design: the module docstrings, the Sphinx
+> docs (`docs/3_reference/3_x_API_Stability.rst` plus a warning admonition on
+> each module page and `versionadded:: 1.0` on the public objects), and the
+> `CHANGELOG.md` preamble.
+
+- **[Exhibits-Module]**: new `aggregate/exhibits.py` translating the raw FCC
+  stats frames into greater_tables IR envelopes. `Perspective` enum
+  (raw/insured/insurer/reinsurer), singledispatch generics (summary, tail, stats,
+  validation, reins, pnl_ledger, pnl_ratios, dependency), a registry derived
+  `available_exhibits(obj)` capability query, a new `exhibits` optional extra
+  (lazy GT import), and one generic aLL endpoint pair (capability plus
+  envelope with ETag). Migrates the app's ROW_FLAGS/FORMATS/caption knowledge
+  into the library. Purely additive, provisional at 1.0. Six phases; author
+  gate on the PnL business framing. 1.0 implements RAW and INSURER only,
+  with INSURER = RAW unless a per (exhibit, type) override is registered;
+  overrides are custom per exhibit (identity, thin renames, or an extensive
+  reshape for the xpnl tower ledger), settled case by case with the author
+  once the infrastructure lands. INSURED and REINSURER are
+  enum vocabulary, implementations deferred with the reinsurer semantics
+  review as that work's opening gate. Approved 2026-08-04; perspectives
+  renamed and scoped 2026-08-05 (buyer/seller were relative and confusing,
+  the insurer both sells and buys). Plan: `dev/plan-exhibits.md`.
+  **Progress:** `[Exhibits-Scaffold]` and `[Exhibits-Stats-Validation]`
+  landed together at `a200` (module, registry, summary and tail for
+  Aggregate/Portfolio; stats and validation across the five FCCs with the
+  raw moment drop and failing row emphasis; dependency for bvagg; snapshot
+  tests, lazy GT boundary; the `exhibits` extra is documented but commented
+  in `pyproject.toml` until greater_tables 6 publishes to PyPI, since an
+  active unresolvable extra would break `uv sync --all-extras`).
+  `[Exhibits-Reins-Insurer]` landed `a201` (reins exhibit, two blocks,
+  cession gated, insurer moment drop plus captions and total flags).
+  `[PnL-Economic-Frames]` landed `a204` (BREAKING: the PnL ledger is
+  `economic_df`, `ratio_df` is `economic_ratios_df`, and `stats_df` delegates
+  to the engine so the name means one thing across the contract).
+  `[Exhibits-Package-Split]` landed `a205` (`exhibits/` package mirroring
+  `plots/`, `register_simple_exhibit`, `bs_window` and `tail_behavior`,
+  `economic` / `economic_ratios` renames). `[Exhibits-Economic-Insurer]`
+  landed `a206` (ledger captions stating the kappa regime, ledger row flags,
+  the ratio frame split into pure-unit blocks, `MEASURE_FORMATS`).
+  `[Exhibits-Waterfall]` landed `a207` (`economic_waterfall`: the margin walk
+  in two blocks, tower gated, capital as `M / -M_100`, the diversified column
+  footing where the standalone one cannot). **Its author gate is still open**,
+  along with the CV-on-the-ledger question; both are in the plan's open list.
+  Next: the app consolidation (`[Exhibits-App-Consolidation]`), which is the
+  SPA reading envelopes and the migrated app knowledge finally being deleted.
+  `[Exhibits-PnL-Translation]` raw stage landed `a203` (pnl_ledger and
+  pnl_ratios as RAW passthroughs); the INSURER framing draft awaits the
+  author gate (captions, footing rules, Side sign presentation, the tower
+  reshape; see the draft section appended to `dev/plan-exhibits.md`). Open with the author: per measure formats for the stats
+  insurer view (greater_tables formats are per column, the store mixes
+  measures down a column, so the app's measure formats have no TableSpec
+  home yet) and whether the PnL validation audit ever gets a failure gate.
+- **[Chart-IR]**: a minimal versioned chart IR in a new `aggregate/charts/`
+  package (frozen dataclasses, no pydantic; ChartDoc/ChartSeries/ChartAxis/
+  Panel/Mark), with the one generic mpl renderer at `plots/_chartdoc.py` and
+  matplotlib-renders-the-IR as the committed post 1.0 convergence. Three
+  independently landing passes: inventory (`dev/chart-inventory.md`, review
+  gate), schema (sign off gate), conversion (one chart per commit, image diff
+  and fixture diff acceptance). Pilot: the bvagg 3-D surface (emitter block
+  sums the joint; ECharts true 3-D; mpl renders the 2-D projection or raises
+  under `strict=True`). 1.0 scope is the 8 app facing charts plus schema
+  representability (not conversion) of the `plot_twelve` panels, inventoried
+  per panel: the kappa and two unit independence panels are expected future
+  aLL charts, deliberately not developed before the IR, then born as
+  emitters. Emitters read the numerics-2 accessors (`unit_density_df`,
+  `allocation_diagnostics`), never legacy `density_df` `p_<unit>` columns.
+  Approved 2026-08-04, panel scope added 2026-08-05.
+  Plan: `dev/plan-chart-ir.md`. **Progress:** inventory landed a197
+  (`dev/chart-inventory.md`, six judgment calls awaiting author picks);
+  schema v1 landed a198 (`charts/ir.py` plus `tests/test_charts_ir.py`,
+  field list awaiting sign off; the charts boundary assertion lives in
+  `test_charts_ir.py` for now because `test_plots_boundary.py` was
+  mid-edit in the parallel exhibits workstream); pilot library side landed
+  a199 (`chart_joint_surface` emitter with the migrated surfaceGrid
+  reduction, `plots/_chartdoc.py` renderer with the capability pattern);
+  pilot app side landed as aggregate_api a38 (`/chart/{name}` route with
+  doc-hash ETag, generic `chartdoc-to-echarts.js` adapter plus
+  `surfaceOverrides` chrome dict, `surfaceGrid`/`surfaceOption` deleted,
+  fixtures and node smoke updated); first conversion, distortion g(s),
+  landed a202 (emitter, xy renderer growth, and the image gate:
+  compositor-generated baseline, measured conversion residual RMS 0.05,
+  pins mpl 3.10.9 / tolerance 2.0). **Sign-off gate closed 2026-08-05**:
+  all six judgment calls agreed, the gate pins confirmed, and the schema
+  changes they imply executed from `dev/plan-chart-schema-signoff.md`.
+  `[Chart-Grid-Overlays]` landed a208 (grid panels carry one surface plus
+  any number of x/y overlays, the `iso_total` role, the twelve-plot
+  bivariate panel representability test, and `LOG_FLOOR = 1e-15` in
+  `constants.py` settling J5). `[Chart-Plain-Text-Names]` with
+  `[Chart-Axis-Labels]` landed a209 (the plain-text naming rule and the
+  `ChartDoc.tex` lookup, the dual settled on `ǧ(s)` in `constants.py`, the
+  renderer drawing the axis labels the document carries, `plot_distortion`
+  gaining the labels it never had, and the baseline regenerated: the
+  conversion residual is now 0, pixel for pixel). Chart IR version 1 is
+  **signed off and closed to additions**: a chart the schema cannot express
+  changes it by a fresh author decision or stays bespoke. Second conversion,
+  the reins triple, landed a210 (`chart_reins` with the basis semantic
+  option and the cession predicate, survival through `GridDistribution.sf`
+  exactly matching the app's accumulation; the renderer grew multi-panel
+  layout with shared x axes, and now honors `suggested_range`, which it had
+  never applied; corrected at a211, where the suggested range became the
+  extent of the *data*, inset by the renderer's own margin, since a
+  distortion legitimately sits at 0 or 1 and must not be drawn along the
+  frame). Third conversion, severity, landed a212 (`chart_severity`
+  absorbing the app's log-spaced sf inversion, and reading probability
+  mass where a law has no density instead of drawing a flat zero;
+  `charts/_two_panel.py` now holds the window and survival-floor
+  semantics the five two-panel charts share). `[Chart-Atomic-Support]`
+  landed a214, the one deliberate reopening of the frozen schema (author
+  decision, 2026-08-05): `ChartSeries.support` is `'atomic'` or
+  `'continuous'` and defaults to atomic, because a discretized
+  distribution **is** the distribution here; the renderer owns the ladder
+  from that flag plus the room each atom gets (stems, then steps read as
+  bars, then a plain line once a bucket is sub-pixel), counted in visible
+  atoms so a cropped window is judged on what it shows, and cumulative
+  functions step right-continuously off the *axis* rather than the series
+  role. Next: agg, pnl, port, bvagg heatmap in plan order, plus the paired
+  app commits (distortion, reins and sev all need the adapter's xy
+  realization, and the adapter now also owns the same ladder), which wait
+  on the app-side workstream.
 
 ---
 
@@ -562,8 +606,6 @@
 - **[Plot-Severity-Outside-Window]** (#8) — plot severity when its grid doesn't
   overlap the aggregate window (inset, broken axis, or separate figure; `info`
   already warns). Approach undecided.
-
----
 
 ## Post-v1.0 ideas
 

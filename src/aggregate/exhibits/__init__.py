@@ -1,5 +1,21 @@
 """``aggregate.exhibits`` -- business exhibits over greater_tables IR.
 
+.. warning::
+
+   **Provisional module, in the sense of PEP 411.** ``aggregate.exhibits`` is
+   additive to the 1.0 release and is **not part of the 1.0 API contract**.
+   Its API may change in a minor release with no deprecation period, unlike
+   the stable core (:class:`~aggregate.Aggregate`,
+   :class:`~aggregate.Portfolio`, :class:`~aggregate.PnL`,
+   :class:`~aggregate.Severity`, :class:`~aggregate.Distortion`,
+   :class:`~aggregate.Underwriter`, :func:`~aggregate.build` and the DecL
+   grammar), which does carry the usual promise. Exhibit names, block
+   structure, captions, row flags and the :class:`Perspective` vocabulary may
+   all move. The module is deliberately public rather than underscore
+   prefixed: use it, and report what does not fit. That feedback is how it
+   graduates to stable in a later minor release. See
+   :doc:`/3_reference/3_x_API_Stability`.
+
 The library owns meaning, the app owns arrangement. An *exhibit* is a small
 list of presentation ready tables (greater_tables ``TableDoc`` IR blocks)
 derived from the first class citizen frames (``summary_df``, ``tail_df``,
@@ -8,10 +24,14 @@ leak into a client: captions, row emphasis, raw moment drops, relabeling. The
 test for placement: if deleting the web app would destroy knowledge an actuary
 would want in a notebook, that knowledge belongs here.
 
-Purely additive: exhibits import from the core, the core never imports
-exhibits. Deliberately NOT star imported in ``aggregate/__init__.py`` (the
-``Tweedie`` / ``Pentagon`` precedent). Reach it with ``from aggregate import
-exhibits``, then ``exhibits.summary(obj, 'insurer')``.
+**Dependencies point inward.** This package imports from the core; the core
+never imports it, so nothing here touches an existing class and nothing here
+can destabilize or delay 1.0. Work continues as attention allows and 1.0 ships
+whether or not it is finished; anything incomplete, in particular any exhibit
+meta-language, is explicitly post-1.0. Deliberately NOT star imported in
+``aggregate/__init__.py`` (the ``Tweedie`` / ``Pentagon`` precedent). Reach it
+with ``from aggregate import exhibits``, then
+``exhibits.summary(obj, 'insurer')``.
 
 Layout, mirroring :mod:`aggregate.plots` (``dev/plan-exhibits.md``):
 
@@ -32,7 +52,11 @@ generic function in ``_core`` and registers builders in the class module.
 Nothing at module scope imports greater_tables. The IR conversion step
 (:func:`build_exhibit`, :meth:`Exhibit.to_payload`) imports it at the point of
 use, so ``import aggregate`` and ``import aggregate.exhibits`` both stay free
-of it even though it is a plain dependency (since 1.0.0a229).
+of it even though it is a plain dependency (since 1.0.0a229). That greater_tables
+is a plain dependency rather than an extra is a fact about installation, chosen
+so the exhibit surface never raises ``ImportError`` on a supported interpreter.
+It is not a stability promise, and it does not move this module into the 1.0
+contract.
 """
 
 from .._aggregate import Aggregate

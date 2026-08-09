@@ -24,6 +24,14 @@ The paper describes the purpose, implementation, and use `Aggregate`, showing ho
 
 See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
+## API stability
+
+Almost everything is **stable**. `Aggregate`, `Portfolio`, `PnL`, `Severity`, `Frequency`, `Distortion`, `BivariateAggregate`, `Underwriter`, `build`, `qd` and the DecL grammar carry the usual promise: from 1.0 onward a documented name keeps its meaning, and a breaking change waits for a major release after a deprecation period.
+
+Two modules are **provisional**, in the sense of [PEP 411](https://peps.python.org/pep-0411/): `aggregate.charts` and `aggregate.exhibits`. They are not part of the 1.0 API contract and may change in a minor release with no deprecation period. They are additive side projects to the release, they import from the core and the core does not import them, so nothing in them can reach the stable surface. They are public on purpose: use them and report what does not fit, which is how a provisional module graduates to stable.
+
+The full statement, including exactly what "provisional" covers in each, is in the [API Stability](https://aggregate.readthedocs.io/en/latest/3_reference/3_x_API_Stability.html) page of the documentation.
+
 ## Documentation
 
 <https://aggregate.readthedocs.io/>

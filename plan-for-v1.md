@@ -64,12 +64,14 @@ Existing docs use nice header format
 
 ### 1. Beta tag `1.0.0b1` — no publicity
 
+> **What is NOT on this list: `aggregate.charts` and `aggregate.exhibits`.** Both are additive side projects to the release, not part of its contract. They ship marked **provisional in the sense of PEP 411**: public and encouraged, but free to change in a minor release with no deprecation period. Their dependencies point inward (they import the core; the core does not import them), so they touch no existing class and cannot destabilize or delay the tag. **Work them in parallel as attention allows and cut the tag whether or not they are finished.** The one edge into existing code is the per-chart conversion of a bespoke plot, each gated by a before-and-after image diff and deferrable chart by chart past 1.0. Live items are in the *Provisional modules* section of `dev/TODO.md`, which sits deliberately outside the beta gate. The status is recorded in the module docstrings, in `docs/3_reference/3_x_API_Stability.rst`, and in the `CHANGELOG.md` preamble.
+
 - [ ] FEATURES.csv defines the public interface coverage table and provides an automated check: iterate until it is correct.
 - [ ] Known punch list
     - [x] pollaczeck_khinchine audits poisson freq (a153, `[Ruin-Wiener-Hopf]`)
     - [x] Wiener-Hopf factorization extension of PK (a153, `Aggregate.wiener_hopf`)
     - [x] pedagogy w-h version (a153, `pedagogy.ruin_example`)
-    - [ ] ZM and ZT frequency adjustments
+    - [x] ZM and ZT frequency adjustments (a152, `[ZT-ZM-Frequency-Fix]`: reparameterized to the textbook `(a, b, 1)` form, so the exposure clause states the base mean and `E[N]` is an output)
 - [ ] Extend `tests/test_agg_libraries.py`. Today it only checks each example **parses**.
       It should check the example **builds**, and that the result has the methods it should
       (`valid`, `validation_explanation`, `summary_df`, `stats_df`, `plot`) — and that its
@@ -85,6 +87,7 @@ Existing docs use nice header format
 - [ ] Chapters 2 and 5: frozen, nothing added, **nothing removed yet**
 - [ ] Cheat sheets regenerated
 - [ ] README updated as the GitHub front door
+- [x] API stability stated in three places: the module docstrings, the Sphinx docs (`docs/3_reference/3_x_API_Stability.rst`, a warning admonition on each provisional module page, `versionadded:: 1.0` on the public objects), and the `CHANGELOG.md` preamble
 - [ ] CHANGELOG, LICENSE, version all agree
 - [ ] Install the beta into a fresh empty environment, run one showcase example, check the number
 - [ ] Tag `1.0.0b1`, merge `REFACTOR`, start the beta branch

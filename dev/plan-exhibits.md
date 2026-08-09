@@ -1,5 +1,7 @@
 # Plan [Exhibits-Module]: business exhibits, stats frames to greater_tables IR
 
+> **Release status: additive side project, does NOT gate `1.0.0b1`.** `aggregate.exhibits` ships marked **provisional in the sense of PEP 411**: public and encouraged, but not part of the 1.0 API contract, and free to change in a minor release with no deprecation period. Dependencies point inward (exhibits import the core, the core does not import exhibits), so nothing here touches an existing class and nothing here can delay the release: **1.0 ships whether or not this plan is finished.** Anything incomplete, in particular the `INSURED` / `REINSURER` perspectives and any exhibit meta-language, is explicitly post-1.0. Live items sit in the *Provisional modules* section of `dev/TODO.md`, outside the beta gate. Status recorded in the module docstrings, `docs/3_reference/3_x_API_Stability.rst`, and the `CHANGELOG.md` preamble.
+
 > **Status: REVISED 2026-08-05 after the author's review of the executed phases.** Phases 1 to 4a are SHIPPED (`1.0.0a200`, `a201`, `a203`; app `1.0.0a39`). This revision folds in the review decisions: the PnL frame rename, the package split, the economic exhibits including the waterfall, and the app's envelope-only consolidation. Purely additive to the core (exhibits import from core, core never imports exhibits), provisional at 1.0. Companion plan: `dev/plan-chart-ir.md`, executing in parallel. Both derive from the author's design notes on the aggregate to aLL (aggregate_api) interface.
 
 ## Principle and placement test

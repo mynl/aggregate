@@ -1416,16 +1416,48 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return _reinsurance.reins_price_df(self, distortion, p=p, a=a,
                                            views=views)
 
-    def reins_occ_plot(self, axs=None, **kwargs):
-        """
-        Plots for occurrence reinsurance: occurrence log density and aggregate
-        quantile plot. Reads the gross/ceded/net views from ``reins_density_df``.
+    def reins_occ_plot(self, log=False, full_range=False, return_period=False,
+                       invert=False):
+        """Plot the occurrence program: per claim, and in total.
 
-        :param kwargs: Lee-panel options forwarded to the quantile worker --
-               notably ``quantile_x='return'`` and ``max_return_period``.
+        Parameters
+        ----------
+        log : bool
+            Read the aggregate panel's axes on log. The occurrence panel is
+            read on log either way, and offers no other reading.
+        full_range : bool
+            Show the whole grid rather than the cropped windows.
+        return_period : bool
+            Read the aggregate panel against return period rather than
+            non-exceedance probability.
+        invert : bool
+            Exchange the aggregate panel's axes, which draws the
+            distribution function the Lee diagram inverts to.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Also stashed on ``self.figure``.
+
+        Notes
+        -----
+        Draws the document ``charts.chart_reins`` emits. Two panels, and
+        they share nothing, not even a loss axis: a per-claim loss and an
+        annual aggregate are different quantities, and one window across
+        both would say they were the same. The left is the gross, ceded and
+        net severity as the treaty sees each claim; the right is the same
+        three for the year, as a Lee diagram.
+
+        The three curves are separate distributions and not a
+        decomposition: they no more satisfy ``gross = net (+) ceded`` than
+        a portfolio's marginals do.
         """
-        from .plots import plot_reins_occ
-        return plot_reins_occ(self, axs=axs, **kwargs)
+        from .charts import build_chart_doc
+        from .plots import plot_chartdoc
+        self.figure = plot_chartdoc(
+            build_chart_doc(self, 'reins'), log=log, full_range=full_range,
+            return_period=return_period, invert=invert)
+        return self.figure
 
     def occ_bivariate(self, views=('net', 'ceded'), bs=None,
                       log2_x=None, log2_y=None):

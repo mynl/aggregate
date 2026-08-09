@@ -546,7 +546,19 @@
   3.2e-4 at 1e-14 against 9.9e-5 / **0.52** with no floor, with the same
   numbers at log2 16 and 18. The kappa axis takes the *loss* window,
   since the curves sum to the diagonal.
-  **Next: job 7 `[Chart-Bivariate]`. ASK FOR THE 3-D PUNCHUPS FIRST**,
+  `[Chart-Equal-Aspect]` landed a243 (author's ask): an equal-aspect
+  panel gets **one window for both axes**, topped by the higher of the
+  two and floored where the data starts, and it no longer shares an axis,
+  since squareness would otherwise drag a neighbour's window about. The
+  kappa panel is square. Job 9 `[Chart-Reins]` landed a244, on the
+  author's spec: the document is the occurrence plot (per claim on log
+  only, the year as a Lee diagram carrying log, return period and
+  inversion), **Aggregate only at 1.0**, so the `Portfolio` registration
+  and the `basis` option are gone and an aggregate-cover-only object has
+  no reinsurance chart. `plots/_aggregate.py` and `plots/_quantile.py`
+  are deleted with it; `MAX_RETURN_PERIOD` moved to the renderer.
+  **Only job 7 `[Chart-Bivariate]` is left. ASK FOR THE 3-D PUNCHUPS
+  FIRST**,
   before any emitter is written: the author wants them and they have not
   been written down (`aggregate_api/dev/api-punchlist.md`, Punchups
   Round 4 item 6, also holds open items). Then `[Chart-Portfolio]` and

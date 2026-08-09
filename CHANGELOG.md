@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a244
+
+**[Chart-Reins] the reinsurance document is redrawn as the occurrence plot, and the last compositor goes.** `chart_reins` is rewritten to the shape `Aggregate.reins_occ_plot` draws, that method now renders it, and `plots/_aggregate.py` and `plots/_quantile.py` are both **deleted**: the occurrence plot was the quantile worker's last caller. This is the ninth and last job of `dev/plan-chart-ir.md` part two.
+
+**Two panels that share nothing, not even a loss axis.** A per-claim loss and an annual aggregate are different quantities, and one window across both would say they were the same. The left is the gross, ceded and net severity as the treaty sees each claim, windowed by the occurrence limit because a cession is bounded by its limit. The right is the same three for the year, as a **Lee diagram**, where the old chart drew survival: a chosen probability now reads off as a loss.
+
+**Every reading lives on the right panel**, as the author specified: log on both axes, the paired return-period reading of its probability axis, and the inversion that turns it into the distribution function. The occurrence panel reads on log and declares **no linear alternative**, because a layered severity is a spike and a tail and the linear reading of it is a spike and nothing else, so offering the control would offer a worse picture.
+
+**Aggregate only at 1.0** (author's decision), which is a deliberate narrowing. `chart_reins` was registered for `Portfolio` since `a225` and carried a `basis` option choosing among four triples; both are gone. A book's units cede on different stages, so a book-level triple would have to pretend they cede on the same one, and an **aggregate cover is a separate contract with a separate picture**, so an aggregate-cover-only object now has no reinsurance chart rather than a misleading one. Both are restorable in a few lines and neither is guessed at here.
+
+`reins_occ_plot(log=False, full_range=False, return_period=False, invert=False)`, returning the figure and stashing it on `self.figure`; `axs` and the worker passthrough are gone. `MAX_RETURN_PERIOD` moves into `plots/_chartdoc.py`, where it is now a renderer constant like the rest of the drawing ladder, and it stands in only where a document declares no window for its paired reading.
+
+**`plots/` now holds no two-panel compositor at all.** What remains is bespoke by design: the scatter matrix, the sample comparison, the bounds weight contour and hull view, the affine envelope, the bivariate contours and the massive pyramid, plus `pedagogy` and `ft`.
+
+---
+
 ## 1.0.0a243
 
 **[Chart-Equal-Aspect] the matplotlib renderer stops treating equal aspect as a box shape and treats it as a reading.** `Panel.aspect` has been in the IR since v1 and the distortion and envelope charts have always set it, but honoring it meant no more than `set_aspect('equal')`, which squares the *box* while leaving the two axes on different ranges. That is a square drawn over a rectangle of data, and on a panel whose axes measure the same thing it misreads: a 45 degree line has to *be* at 45 degrees.

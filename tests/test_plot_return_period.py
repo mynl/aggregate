@@ -1,180 +1,77 @@
-"""Return-period x-axis for the Lee/quantile panel (``quantile_x='return'``).
+"""The return-period reading, across the classes whose charts offer it.
 
-Smoke tests across the classes that own a Lee panel -- ``Aggregate``,
-``Severity`` and the occurrence-reinsurance plot -- plus a unit test of the
-transform itself. Each checks that ``quantile_x='return'`` runs, makes the Lee
-axis log, and labels it "Return period", with no regression to the linear
-default.
+Once ``quantile_x='return'`` was an argument threaded down to a drawing
+worker; since ``[Chart-Aggregate]`` it is a reading the document declares
+on its probability axis (``ChartAxis.reciprocal_of``) and the renderer
+selects with ``return_period=True``. The transform itself is unit-tested in
+``tests/test_chartdoc_readings.py``, against synthetic documents that say
+exactly what is under test; what is checked here is that each class that
+should offer the reading does, and that the linear default did not move.
+
+The worker these grew from, ``plots/_quantile.py``, is gone: the renderer
+owns the transform, the cap and the axis, and the emitters own the curve.
 """
 
 import matplotlib
 matplotlib.use('Agg')  # headless
 
-import numpy as np
-import pytest
-
 from aggregate import build
-from aggregate._grid_distribution import GridDistribution
-from aggregate.plots._quantile import plot_quantile, MAX_RETURN_PERIOD
 
 
-def _gd(p, loss, is_loss_value=True):
-    """Wrap a (non-exceedance ``p``, outcome) curve as a GD.
-
-    The worker derives the curve from ``(cumsum(gd.p), gd.x)``, so the mass is
-    ``diff(p)`` with ``cumsum`` reconstructing the intended ``F = p``; the
-    outcomes are the GD index ``x``.
-    """
-    p = np.asarray(p, dtype=float)
-    loss = np.asarray(loss, dtype=float)
-    return GridDistribution(loss, np.diff(p, prepend=0.0),
-                            is_loss_value=is_loss_value)
-
-
-# ----------------------------------------------------------------------
-# Layer-1 worker: the transform itself
-# ----------------------------------------------------------------------
-def test_quantile_transform_loss_branch():
-    """Loss value: large p -> large T via T = 1/(1-p); p=1 endpoint dropped."""
-    fig, ax = matplotlib.pyplot.subplots()
-    p = np.array([0.0, 0.5, 0.9, 1.0])
-    loss = np.array([0.0, 10.0, 90.0, 100.0])
-    (line,) = plot_quantile(ax, _gd(p, loss, True), quantile_x='return')
-    xs, ys = line.get_data()
-    # the p == 1 atom is dropped (T would be infinite)
-    assert len(xs) == 3
-    np.testing.assert_allclose(xs, [1.0, 2.0, 10.0])      # 1/(1-p)
-    np.testing.assert_allclose(ys, [0.0, 10.0, 90.0])
-    assert ax.get_xscale() == 'log'
-    assert ax.get_xlabel() == 'Return period'
-
-
-def test_quantile_transform_payoff_branch():
-    """Payoff value: small p -> large T via T = 1/p; p=0 endpoint dropped."""
-    fig, ax = matplotlib.pyplot.subplots()
-    p = np.array([0.0, 0.1, 0.5, 1.0])
-    loss = np.array([-100.0, -50.0, 0.0, 100.0])
-    (line,) = plot_quantile(ax, _gd(p, loss, False), quantile_x='return')
-    xs, ys = line.get_data()
-    assert len(xs) == 3                                   # p == 0 dropped
-    np.testing.assert_allclose(xs, [10.0, 2.0, 1.0])      # 1/p
-    np.testing.assert_allclose(ys, [-50.0, 0.0, 100.0])
-    assert ax.get_xscale() == 'log'
-
-
-def test_quantile_caps_return_period():
-    """Points beyond MAX_RETURN_PERIOD are dropped (T stays finite)."""
-    fig, ax = matplotlib.pyplot.subplots()
-    # p = 1 - 1e-12 -> T = 1e12, well past the 1e9 cap -> dropped.
-    p = np.array([0.5, 1.0 - 1e-6, 1.0 - 1e-12])
-    loss = np.array([10.0, 50.0, 9999.0])
-    (line,) = plot_quantile(ax, _gd(p, loss, True), quantile_x='return')
-    xs, ys = line.get_data()
-    assert xs.max() <= MAX_RETURN_PERIOD
-    assert 9999.0 not in ys                               # the off-cap point is gone
-
-
-def test_quantile_return_bounds_y_to_cap():
-    """The cap bounds the outcome (y) axis to the deepest plotted point."""
-    fig, ax = matplotlib.pyplot.subplots()
-    ax.set_ylim(0, 1)                                     # a stale linear y-limit
-    p = np.array([0.0, 0.9, 1.0 - 1e-12])
-    loss = np.array([0.0, 90.0, 1e9])                     # huge off-cap outcome
-    plot_quantile(ax, _gd(p, loss, True), quantile_x='return')
-    # y rescaled to the kept data (top ~90), not the stale [0,1] nor the 1e9 atom
-    lo, hi = ax.get_ylim()
-    assert hi < 1e6
-
-
-def test_quantile_linear_default_unchanged():
-    """The linear default plots x = p, no log scale, no relabel by the worker."""
-    fig, ax = matplotlib.pyplot.subplots()
-    p = np.array([0.0, 0.5, 1.0])
-    loss = np.array([0.0, 10.0, 20.0])
-    (line,) = plot_quantile(ax, _gd(p, loss))             # default quantile_x='linear'
-    xs, _ = line.get_data()
-    np.testing.assert_allclose(xs, p)
-    assert ax.get_xscale() == 'linear'
-
-
-def test_quantile_bad_arg_raises():
-    fig, ax = matplotlib.pyplot.subplots()
-    with pytest.raises(ValueError, match="quantile_x"):
-        plot_quantile(ax, _gd([0.5], [1.0]), quantile_x='nope')
-
-
-# ----------------------------------------------------------------------
-# Per-class smoke tests
-# ----------------------------------------------------------------------
-def _lee_axis():
-    """The Lee/quantile panel of the current figure: the Axes titled 'Lee'."""
-    fig = matplotlib.pyplot.gcf()
+def _lee_axis(fig):
+    """The panel read probability to loss: titled Lee, or Aggregate."""
     for ax in fig.axes:
-        if 'Lee' in ax.get_title():
+        if 'Lee' in ax.get_title() or ax.get_title() == 'Aggregate':
             return ax
-    raise AssertionError('no Lee panel found')
+    raise AssertionError('no quantile panel found')
 
 
-def test_aggregate_continuous_return():
-    """``quantile_x='return'`` is now the document's declared reading.
-
-    ``[Chart-Aggregate]`` moved the aggregate onto the chart IR, where the
-    return period is a paired reading of the probability axis rather than an
-    argument threaded down to a drawing worker. The reading itself is
-    unchanged, which is what these still check.
-    """
+def test_aggregate_return():
     a = build('agg RetCont 100 claims sev gamma 100 cv 1 poisson')
-    a.plot(return_period=True)
-    ax = _lee_axis()
+    ax = _lee_axis(a.plot(return_period=True))
     assert ax.get_xscale() == 'log'
     assert ax.get_xlabel() == 'Return period'
 
 
 def test_aggregate_discrete_return():
     a = build('agg RetDice dfreq [3] dsev [1:6]')
-    a.plot(return_period=True)
-    ax = _lee_axis()
-    assert ax.get_xscale() == 'log'
+    assert _lee_axis(a.plot(return_period=True)).get_xscale() == 'log'
 
 
 def test_aggregate_linear_default_no_regression():
     a = build('agg RetLin 100 claims sev gamma 100 cv 1 poisson')
-    a.plot()
-    ax = _lee_axis()
+    ax = _lee_axis(a.plot())
     assert ax.get_xscale() == 'linear'
     assert ax.get_xlabel() == 'Non-exceeding probability'
 
 
 def test_severity_return():
     a = build('sev RetSev lognorm 100 cv 2')
-    a.plot(return_period=True)
-    ax = _lee_axis()
+    ax = _lee_axis(a.plot(return_period=True))
     assert ax.get_xscale() == 'log'
     assert ax.get_xlabel() == 'Return period'
+
+
+def test_pnl_return_reads_from_the_shortfall():
+    """A payoff is interrogated at T = 1 / p, not 1 / (1 - p)."""
+    p = build('pnl RetPnL 1000 premium less agg RetPnLe 100 claims '
+              'sev lognorm 5 cv 2 poisson')
+    assert p.result.is_loss_value is False
+    ax = _lee_axis(p.plot(return_period=True))
+    assert ax.get_xscale() == 'log'
 
 
 def test_reins_occ_return():
-    a = build('agg RetReins 100 claims sev gamma 100 cv 1 '
+    a = build('agg RetReins 100 claims 1000 xs 0 sev gamma 100 cv 1 '
               'occurrence net of 50 xs 50 poisson')
-    a.reins_occ_plot(quantile_x='return')
-    # the reins plot titles its quantile panel 'Aggregate', not 'Lee'
-    ax = [x for x in a.figure.axes if x.get_title() == 'Aggregate'][0]
+    ax = _lee_axis(a.reins_occ_plot(return_period=True))
     assert ax.get_xscale() == 'log'
     assert ax.get_xlabel() == 'Return period'
 
 
-def test_lee_kwargs_ride_through_compositor():
-    """The ride-through still holds for the compositors that remain.
-
-    ``Aggregate.plot`` no longer forwards worker options: it draws a
-    document, whose return-period axis carries its own window, so a caller
-    reaching past the reading to the drawing has nothing to reach for.
-    ``reins_occ_plot`` is still a compositor and still forwards, which is
-    what this now covers.
-    """
-    a = build('agg RetKw 100 claims sev gamma 100 cv 1 '
-              'occurrence net of 50 xs 50 poisson')
-    a.reins_occ_plot(quantile_x='return', max_return_period=1e3)
-    ax = [x for x in a.figure.axes if x.get_title() == 'Aggregate'][0]
-    # x capped near the lowered 1e3, not the 1e9 default
-    assert ax.get_xlim()[1] < 1e5
+def test_the_cap_stands_in_where_no_window_is_declared():
+    """The saturating end of a quantile function has to stop somewhere."""
+    from aggregate.plots._chartdoc import MAX_RETURN_PERIOD
+    a = build('agg RetCap 100 claims sev gamma 100 cv 1 poisson')
+    ax = _lee_axis(a.plot(return_period=True))
+    assert ax.get_xlim()[1] <= MAX_RETURN_PERIOD

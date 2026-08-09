@@ -29,7 +29,6 @@ import numpy as np
 
 from ..charts.ir import ChartCapabilityError
 from ..constants import LOG_FLOOR
-from ._quantile import MAX_RETURN_PERIOD
 from ._style import plt, mpl, FIG_H, FIG_W, make_grid
 
 __all__ = ['plot_chartdoc']
@@ -124,6 +123,13 @@ LOLLIPOP_ATOMS = 40
 #: Under it, steps and a line are the same picture and steps cost three
 #: times the vertices.
 STEP_PIXELS = 3.0
+
+#: Largest return period drawn when a document declares no window for its
+#: paired reading. The quantile function saturates as its probability
+#: reaches the end of the grid, where T diverges; a billion-year event is
+#: past anyone's question and keeps both axes finite. Inherited from the
+#: quantile worker this renderer replaced.
+MAX_RETURN_PERIOD = 1e9
 
 
 def _axes_width_px(ax):

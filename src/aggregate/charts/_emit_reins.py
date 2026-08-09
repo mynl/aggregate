@@ -1,268 +1,169 @@
-"""Reinsurance chart emitter: the gross / ceded / net triple.
+"""Reinsurance chart emitter: an occurrence program, per claim and in total.
 
-``chart_reins`` reads ``reins_density_df`` and emits the two-panel exhibit
-the app draws today: a density panel and a survival panel over one shared
-loss window, three series each.
+The chart is the occurrence-reinsurance plot: what the program does to a
+single claim, and what that does to the year. So the two panels answer two
+different questions and share nothing, not even a loss axis, because a
+per-claim loss and an annual aggregate are not the same quantity and
+drawing them against one window would say they were.
 
-The frame carries three triples, one per stage of the program, and which
-one is drawn is a **semantic option** to the emitter rather than renderer
-view state: they answer different questions of different contracts, and
-they do not share a y scale in any meaningful sense.
+**Left, per claim.** The gross, ceded and net severity as the treaty sees
+each claim, from the ``p_sev_*`` triple. Read on log and only on log: a
+layered severity puts most of its mass in a spike the linear reading
+flattens everything else against, so this axis declares no linear alternative
+rather than offering a control that draws a worse picture.
 
-=======  ===================================================================
-basis    the triple
-=======  ===================================================================
-'sev'    the occurrence program seen per claim (``p_sev_*``)
-'occ'    the aggregate before, ceded by, and after the occurrence program
-'agg'    the aggregate cover: its subject, its cession, and the net
-'total'  a **portfolio's** end-to-end gross, ceded and net
-=======  ===================================================================
+**Right, in total.** The same three distributions for the year, as a Lee
+diagram, so a chosen probability reads off as a loss. It is the panel the
+readings live on: log on both axes, the return-period reading of its
+probability axis, and the inversion that turns it into the distribution
+function.
 
-On the 'agg' triple the first series is **subject**, never relabeled gross:
-it equals true gross only when no occurrence program sits underneath it,
-and calling it gross wherever one does would misstate the contract.
+**Aggregate only, at 1.0** (author's decision). A portfolio's units cede on
+different stages, so a book-level triple would have to pretend they cede on
+the same one, and the aggregate cover is a separate contract with a
+separate picture. Both are restorable; neither is guessed at here.
 
-A :class:`~aggregate.Portfolio` offers 'total' and nothing else. Its
-``reins_density_df`` convolves each unit's **end-to-end** view, so there is
-no book-wide occurrence stage to draw and no ``p_agg_subject``: units cede
-on different stages, and a book-level 'occ' triple would have to pretend
-they cede on the same one. 'total' is its own key rather than a reuse of
-'agg' because the first series really is gross here, where on 'agg' it is
-the subject. The emitter reports what it has in
-``meta['bases_available']``, so a client offers the buttons that exist
-rather than assuming three.
+The three curves are separate distributions, not a decomposition: they no
+more satisfy ``gross = net (+) ceded`` than a portfolio's marginals do. The
+panel draws three laws on one grid, which is what it should show, and it
+must not be read as an accounting.
 
-The three portfolio marginals are separate distributions and do not satisfy
-``gross = net (+) ceded`` (see :attr:`Portfolio.reins_density_df`). The
-chart draws three laws on one grid, which is exactly what it should show;
-it is not a decomposition and the panel must not be read as one.
-
-Survival is accumulated here rather than client side, through
-:class:`~aggregate._grid_distribution.GridDistribution`: each column is a
-pmf on one grid, so ``sf`` is exact (it agrees with the app's
-``1 - cumsum`` to the last bit, verified at conversion). Values at or under
-:data:`~aggregate.constants.LOG_FLOOR` are emitted as gaps, because a log
-axis cannot place them and drawing them puts a fringe of arithmetic noise
-where a reader expects tail.
+Survival is not accumulated here any more: the right panel is a quantile
+curve, and :func:`~aggregate.charts._two_panel.quantile_curve` builds it
+from each column's own pmf, trimmed to its support at both ends.
 
 Pure numpy and pandas; no matplotlib.
 """
 
-from functools import singledispatch
-
 from .._aggregate import Aggregate
 from .._grid_distribution import GridDistribution
-from .._portfolio import Portfolio
 from ..constants import (REINS_LABEL_CEDED, REINS_LABEL_GROSS,
-                         REINS_LABEL_NET, REINS_LABEL_SUBJECT)
+                         REINS_LABEL_NET)
 from . import register_chart, _emitter_base
-from ._payload import lattice_payload
-from ._two_panel import gapped, loss_window, survival_window
+from ._payload import collapse_empty_runs, lattice_payload
+from ._two_panel import SURVIVAL_FLOOR, loss_window, quantile_curve
 from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, complete_tex
 
 __all__ = ['chart_reins']
 
-#: ``basis -> (columns, roles, names)``, in draw order. Net draws last and
-#: so on top: the reader's question is what did I keep, and the answer must
-#: not be hidden under the subject it came from.
-BASES = {
-    'sev': (('p_sev_gross', 'p_sev_ceded', 'p_sev_net'),
-            ('gross', 'ceded', 'net'),
-            (REINS_LABEL_GROSS, REINS_LABEL_CEDED, REINS_LABEL_NET)),
-    'occ': (('p_agg_gross', 'p_agg_ceded_occ', 'p_agg_net_occ'),
-            ('gross', 'ceded', 'net'),
-            (REINS_LABEL_GROSS, REINS_LABEL_CEDED, REINS_LABEL_NET)),
-    'agg': (('p_agg_subject', 'p_agg_ceded', 'p_agg_net'),
-            ('subject', 'ceded', 'net'),
-            (REINS_LABEL_SUBJECT, REINS_LABEL_CEDED, REINS_LABEL_NET)),
-    'total': (('p_agg_gross', 'p_agg_ceded', 'p_agg_net'),
-              ('gross', 'ceded', 'net'),
-              (REINS_LABEL_GROSS, REINS_LABEL_CEDED, REINS_LABEL_NET)),
-}
+#: The per-claim triple and the annual one, in draw order. Net draws last
+#: and so on top: the reader's question is what did I keep, and the answer
+#: must not be hidden under the subject it came from.
+SEV_COLUMNS = ('p_sev_gross', 'p_sev_ceded', 'p_sev_net')
+AGG_COLUMNS = ('p_agg_gross', 'p_agg_ceded_occ', 'p_agg_net_occ')
+ROLES = ('gross', 'ceded', 'net')
+NAMES = (REINS_LABEL_GROSS, REINS_LABEL_CEDED, REINS_LABEL_NET)
+
+#: How far below the occurrence limit the per-claim window starts, as a
+#: fraction of it. The compositor's ``-l / 50``: a cession is bounded by
+#: its limit, so the limit is the window, and the sliver below zero is what
+#: keeps a mass at zero off the frame.
+LIMIT_PAD = 0.02
 
 chart_reins = _emitter_base('reins')
 
 
-@singledispatch
-def _cession_stages(obj):
-    """The bases ``obj`` can actually draw, as :data:`BASES` keys.
+def _has_occurrence(agg):
+    """Availability: there is an occurrence program to draw."""
+    return getattr(agg, 'occ_reins', None) is not None
 
-    Dispatched rather than sniffed, because the answer is a different fact
-    about each class: an aggregate's stages come from its own two
-    reinsurance slots, a book's from whether any unit cedes at all.
+
+def _claim_window(agg):
+    """The per-claim window: the occurrence limit, which bounds the cession.
+
+    Falls back to the drawn support where the program is unlimited, since
+    an infinite limit is not a window.
     """
-    return []
-
-
-@_cession_stages.register(Aggregate)
-def _agg_stages(agg):
-    stages = []
-    if agg.occ_reins is not None:
-        stages += ['occ', 'sev']
-    if agg.agg_reins is not None:
-        stages += ['agg']
-    return stages
-
-
-@_cession_stages.register(Portfolio)
-def _port_stages(port):
-    # one end-to-end triple, and only when some unit cedes; reins_views is
-    # empty exactly then, so the availability question is already answered
-    return ['total'] if port.reins_views else []
-
-
-def _has_cession(obj):
-    """Availability gate: some stage of the program cedes something."""
-    return bool(_cession_stages(obj))
-
-
-def _emit(obj, basis, default):
-    """Build the two-panel document for one basis of ``obj``.
-
-    The whole body is class agnostic: it reads ``reins_density_df``, ``bs``
-    and ``label``, which an ``Aggregate`` and a ``Portfolio`` both carry.
-    Only the basis vocabulary differs, and that arrives resolved.
-
-    Parameters
-    ----------
-    obj : Aggregate or Portfolio
-    basis : str or None
-        The requested basis; ``None`` takes ``default``.
-    default : str
-        The basis to draw when none is asked for. Always one that cedes.
-
-    Returns
-    -------
-    ChartDoc
-
-    Raises
-    ------
-    ValueError
-        For an unknown basis, or one this object cannot draw.
-    """
-    stages = _cession_stages(obj)
-    if basis is None:
-        basis = default
-    if basis not in BASES:
-        raise ValueError(f'unknown reinsurance basis {basis!r}; '
-                         f'expected one of {tuple(BASES)}')
-    if basis not in stages:
-        raise ValueError(
-            f'{obj.name!r} has no cession on the {basis!r} basis; '
-            f'available: {stages or "none"}')
-
-    df = obj.reins_density_df
-    x = df['loss'].to_numpy(dtype=float)
-    columns, roles, names = BASES[basis]
-
-    grids = [GridDistribution(x, df[c].to_numpy(dtype=float), bs=obj.bs,
-                              name=n)
-             for c, n in zip(columns, names)]
-    survivals = [gapped(gd.sf(x)) for gd in grids]
-
-    # One loss grid under six series: carried as a lattice rather than
-    # written out six times (``charts._payload``).
-    grid = lattice_payload(x, obj.bs)
-    series = []
-    for gd, role, name in zip(grids, roles, names):
-        series.append(ChartSeries(name=name, role=role, panel_id='density',
-                                  y=tuple(float(v) for v in gd.p), **grid))
-    for surv, role, name in zip(survivals, roles, names):
-        series.append(ChartSeries(name=name, role=role, panel_id='tail',
-                                  y=surv, **grid))
-
-    return complete_tex(ChartDoc(
-        name='reins',
-        title=f'{obj.label}: {basis} gross, ceded and net',
-        axes=(
-            # One axis id referenced by both panels IS the shared window.
-            # From the first (widest) series of the triple: a cession is
-            # bounded by its subject.
-            ChartAxis(id='loss', label='Loss', unit='currency',
-                      suggested_range=loss_window(grids[0].q,
-                                                  float(grids[0].x[0]))),
-            ChartAxis(id='density', label='Density', unit='density'),
-            ChartAxis(id='survival', label='Survival', unit='probability',
-                      scale='log',
-                      suggested_range=survival_window(survivals)),
-        ),
-        panels=(
-            Panel(id='density', kind='xy', x_axis='loss', y_axis='density',
-                  title='Density'),
-            Panel(id='tail', kind='xy', x_axis='loss', y_axis='survival',
-                  read_axis='y', title='Survival'),
-        ),
-        series=tuple(series),
-        meta={'basis': basis, 'bases_available': tuple(stages)},
-    ))
+    limit = agg.spec.get('exp_limit', float('inf'))
+    limit = float(limit) if not hasattr(limit, '__len__') else float(max(limit))
+    if not limit < float('inf'):
+        return None
+    return (-LIMIT_PAD * limit, limit * (1 + LIMIT_PAD / 2))
 
 
 @chart_reins.register(Aggregate)
-def _reins(agg, basis=None):
-    """Emit the gross / ceded / net two-panel chart for an aggregate.
+def _reins(agg):
+    """Emit the occurrence-reinsurance chart for an aggregate.
 
     Parameters
     ----------
     agg : Aggregate
-        Must carry a cession; :func:`~aggregate.charts.available_charts`
-        answers ``['reins']`` exactly when it does.
-    basis : str, optional
-        Which triple to draw: 'sev', 'occ' or 'agg' (see the module
-        docstring). Defaults to 'occ' when the occurrence program cedes,
-        otherwise 'agg', so the default is always a triple that carries a
-        cession.
+        Must carry an occurrence program;
+        :func:`~aggregate.charts.available_charts` answers ``'reins'``
+        exactly when it does.
 
     Returns
     -------
     ChartDoc
-        Two 'xy' panels sharing one loss axis: 'density' (mass by loss) and
-        'tail' (log survival, ``read_axis='y'``, because at a chosen
-        survival the answer a reader wants is the loss).
-
-    Raises
-    ------
-    ValueError
-        For an unknown basis, or one whose stage cedes nothing.
+        Two 'xy' panels with **no shared axis**: 'occurrence' (the gross,
+        ceded and net severity per claim, read on log) and 'aggregate' (the
+        same three for the year, as a Lee diagram). The aggregate panel
+        carries every reading: log on both axes, the paired return period,
+        and the inversion to the distribution function.
     """
-    stages = _cession_stages(agg)
-    return _emit(agg, basis, 'occ' if 'occ' in stages else 'agg')
+    df = agg.reins_density_df
+    x = df['loss'].to_numpy(dtype=float)
+    grid = lattice_payload(x, agg.bs)
+
+    series = []
+    for column, role, name in zip(SEV_COLUMNS, ROLES, NAMES):
+        mass = df[column].to_numpy(dtype=float)
+        drawn_x, drawn_mass = collapse_empty_runs(x, mass)
+        series.append(ChartSeries(
+            name=name, role=role, panel_id='occurrence',
+            y=tuple(float(v) for v in drawn_mass),
+            **lattice_payload(drawn_x, agg.bs)))
+    tops = []
+    for column, role, name in zip(AGG_COLUMNS, ROLES, NAMES):
+        p, outcome = quantile_curve(x, df[column].to_numpy(dtype=float))
+        tops.append(float(outcome[-1]) if outcome.size else 0.0)
+        series.append(ChartSeries(
+            name=name, role=role, panel_id='aggregate',
+            x=tuple(float(v) for v in p),
+            **lattice_payload(outcome, agg.bs, 'y')))
+
+    # The annual window comes from the gross curve, the widest of the
+    # three: a cession is bounded by its subject.
+    gross = GridDistribution(x, df[AGG_COLUMNS[0]].to_numpy(dtype=float),
+                             bs=agg.bs, name=NAMES[0])
+    annual = loss_window(gross.q, float(x[0]))
+    claim = _claim_window(agg)
+
+    return complete_tex(ChartDoc(
+        name='reins',
+        title=f'{agg.label}: occurrence program, per claim and in total',
+        axes=(
+            ChartAxis(id='claim', label='Loss per claim', unit='currency',
+                      suggested_range=claim,
+                      full_range=None if claim is None
+                      else (min(0.0, float(x[0])), float(x[-1]))),
+            # Log only. A layered severity is a spike and a tail, and the
+            # linear reading of it is a spike and nothing else, so there is
+            # no second reading to offer.
+            ChartAxis(id='sev_density', label='Occurrence density',
+                      unit='density', scale='log'),
+            ChartAxis(id='p', label='Non-exceeding probability',
+                      unit='probability', suggested_range=(0.0, 1.0)),
+            ChartAxis(id='annual', label='Aggregate loss', unit='currency',
+                      scales=('linear', 'log'), suggested_range=annual,
+                      full_range=(min(0.0, float(x[0])), max(tops))),
+            # Not named by any panel: the alternative reading of 'p'.
+            ChartAxis(id='return_period', label='Return period',
+                      unit='return_period', scale='log', reciprocal_of='p',
+                      suggested_range=(1.0,
+                                       float(round(1.0 / SURVIVAL_FLOOR)))),
+        ),
+        panels=(
+            Panel(id='occurrence', kind='xy', x_axis='claim',
+                  y_axis='sev_density', title='Occurrence'),
+            Panel(id='aggregate', kind='xy', x_axis='p', y_axis='annual',
+                  invertible=True, title='Aggregate',
+                  inverse_title='Distribution function'),
+        ),
+        series=tuple(series),
+        meta={'ordinate': 'mass', 'return_period_map': 'complement'},
+    ))
 
 
-@chart_reins.register(Portfolio)
-def _reins_port(port, basis=None):
-    """Emit the gross / ceded / net two-panel chart for a book.
-
-    The same two panels the aggregate chart draws, over the portfolio's
-    convolved end-to-end marginals. Its one basis is 'total': a book has no
-    occurrence stage of its own, because its units cede on different ones.
-
-    Parameters
-    ----------
-    port : Portfolio
-        Must carry a cession on some unit;
-        :func:`~aggregate.charts.available_charts` answers ``['reins']``
-        exactly when one does.
-    basis : str, optional
-        Only 'total', which is also the default. Accepted for signature
-        parity with the aggregate emitter, and refused by name otherwise
-        rather than quietly drawing the one basis that exists.
-
-    Returns
-    -------
-    ChartDoc
-        Two 'xy' panels sharing one loss axis, as for an aggregate.
-
-    Raises
-    ------
-    ValueError
-        For any basis other than 'total'.
-
-    Notes
-    -----
-    The three series are separate distributions, not a decomposition: they
-    no more satisfy ``gross = net (+) ceded`` than the unit-level views do.
-    """
-    return _emit(port, basis, 'total')
-
-
-register_chart('reins', chart_reins, predicate=_has_cession)
+register_chart('reins', chart_reins, predicate=_has_occurrence,
+               primary=None)

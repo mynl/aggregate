@@ -2201,7 +2201,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     # ------------------------------------------------------------------
     # Plot: the net result density + distribution
     # ------------------------------------------------------------------
-    def plot(self, log=False, full_range=False, return_period=False):
+    def plot(self, log=False, full_range=False, return_period=False,
+             invert=False):
         """Plot the grand result: its mass, and its quantile (Lee) diagram.
 
         Parameters
@@ -2216,6 +2217,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return_period : bool
             Read the Lee panel against return period. A P&L is
             interrogated from its shortfall, so ``T = 1 / p``.
+        invert : bool
+            Exchange the Lee panel's axes, which draws the distribution
+            function: a quantile function and a cdf are inverses, so it is
+            the same pairs read the other way round.
 
         Returns
         -------
@@ -2235,7 +2240,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         from .plots import plot_chartdoc
         self.figure = plot_chartdoc(
             build_chart_doc(self, 'pnl'),
-            log=log, full_range=full_range, return_period=return_period)
+            log=log, full_range=full_range, return_period=return_period,
+            invert=invert)
         return self.figure
 
     # ------------------------------------------------------------------

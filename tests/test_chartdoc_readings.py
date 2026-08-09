@@ -189,6 +189,100 @@ def test_a_panel_with_no_pairing_is_untouched():
     close(fig)
 
 
+# ------------------------------------------------------------- inversion
+
+def lee_doc(invertible=True, **panel_kw):
+    """A quantile panel: probability on x, outcome on y, atoms."""
+    return ChartDoc(
+        name='t',
+        axes=(ChartAxis(id='p', label='Non-exceeding probability',
+                        unit='probability', suggested_range=(0.0, 1.0)),
+              ChartAxis(id='loss', label='Loss', unit='currency')),
+        panels=(Panel(id='lee', kind='xy', x_axis='p', y_axis='loss',
+                      title='Quantile (Lee) plot', invertible=invertible,
+                      **panel_kw),),
+        series=(ChartSeries(name='s', role='cdf', panel_id='lee',
+                            x=(0.25, 0.5, 1.0), y=(1.0, 2.0, 3.0)),),
+        marks=(Mark(panel_id='lee', orient='v', at=0.5, label='median'),))
+
+
+def test_inverting_exchanges_the_axes_and_the_curve():
+    ax, fig = drawn(lee_doc(), invert=True)
+    line, = [ln for ln in ax.get_lines() if ln.get_label() == 's']
+    np.testing.assert_allclose(line.get_xdata(), (1.0, 2.0, 3.0))
+    np.testing.assert_allclose(line.get_ydata(), (0.25, 0.5, 1.0))
+    assert ax.get_xlabel() == 'Loss'
+    assert ax.get_ylabel() == 'Non-exceeding probability'
+    close(fig)
+
+
+def test_inverting_a_quantile_gives_a_right_continuous_step():
+    """The ladder reads the axes, so the drawing follows the exchange.
+
+    A quantile function steps *before* its atom; the cdf it inverts to
+    steps *after* it. Neither the emitter nor the switch says so: it falls
+    out of which axis carries the probability.
+    """
+    ax, fig = drawn(lee_doc())
+    assert [ln.get_drawstyle() for ln in ax.get_lines()
+            if ln.get_label() == 's'] == ['steps-pre']
+    close(fig)
+    ax, fig = drawn(lee_doc(), invert=True)
+    assert [ln.get_drawstyle() for ln in ax.get_lines()
+            if ln.get_label() == 's'] == ['steps-post']
+    close(fig)
+
+
+def test_a_mark_travels_to_the_axis_it_names():
+    ax, fig = drawn(lee_doc(), invert=True)
+    flat = [ln for ln in ax.get_lines()
+            if ln.get_label() != 's' and len(set(ln.get_ydata())) == 1]
+    assert any(ln.get_ydata()[0] == pytest.approx(0.5) for ln in flat)
+    close(fig)
+
+
+def test_the_document_names_the_inverted_picture():
+    ax, fig = drawn(lee_doc(inverse_title='Distribution function'),
+                    invert=True)
+    assert ax.get_title() == 'Distribution function'
+    close(fig)
+    # with no name to use the renderer says what it did, never invents one
+    ax, fig = drawn(lee_doc(), invert=True)
+    assert ax.get_title() == 'Quantile (Lee) plot, inverted'
+    close(fig)
+
+
+def test_a_panel_that_does_not_declare_it_is_untouched():
+    ax, fig = drawn(lee_doc(invertible=False), invert=True)
+    line, = [ln for ln in ax.get_lines() if ln.get_label() == 's']
+    np.testing.assert_allclose(line.get_xdata(), (0.25, 0.5, 1.0))
+    close(fig)
+
+
+def test_naming_an_inverse_of_a_fixed_panel_is_refused():
+    """A name nothing can ever use is a mistake, not a harmless extra."""
+    with pytest.raises(ValueError, match='not\n?\\s*invertible'):
+        Panel(id='p', kind='xy', x_axis='a', y_axis='b',
+              inverse_title='Distribution function')
+
+
+def test_a_band_fills_the_other_way_round():
+    """A band is between two edges of one coordinate, so it turns with it."""
+    doc = ChartDoc(
+        name='t',
+        axes=(ChartAxis(id='p', label='p', unit='probability'),
+              ChartAxis(id='v', label='v', unit='currency')),
+        panels=(Panel(id='band', kind='xy', x_axis='p', y_axis='v',
+                      invertible=True),),
+        series=(ChartSeries(name='envelope', role='density', panel_id='band',
+                            x=(0.0, 1.0), y=(0.0, 1.0), y2=(0.5, 1.5),
+                            support='continuous'),))
+    ax, fig = drawn(doc, invert=True)
+    assert ax.collections                      # the fill landed
+    assert ax.get_xlabel() == 'v'
+    close(fig)
+
+
 # ---------------------------------------------------------- panel kinds
 
 def grid_doc(kinds):

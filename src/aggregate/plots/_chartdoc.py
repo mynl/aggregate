@@ -381,13 +381,22 @@ def _panel_window(window, values):
 
 
 def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
-                     return_period=False):
+                     return_period=False, invert=False):
     """Render one 'xy' panel: role-styled curves, gaps broken, marks drawn.
 
     ``return_period`` swaps a drawn probability axis for the paired reading
     the document offers on it, which is a change of coordinates and not of
     data: the same curve, interrogated at 1 in 200 rather than at 0.995.
     Panels the document offers no pairing for are untouched.
+
+    ``invert`` exchanges the two axes of a panel that declares itself
+    invertible, drawing the same pairs the other way round: a quantile
+    function becomes the distribution function it inverts. Everything that
+    follows reads the axes rather than the panel, so the exchange is the
+    only thing that has to happen: the ladder picks a right-continuous step
+    where it was picking a left-continuous one, the window and the labels
+    follow their axes, and a paired return-period reading rides along on
+    whichever axis it was attached to.
     """
     axes = {a.id: a for a in doc.axes}
     x_axis, y_axis = axes[panel.x_axis], axes[panel.y_axis]
@@ -400,15 +409,25 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
         pair = _paired_reading(doc, panel.y_axis)
         if pair is not None:
             y_axis, y_map = pair, how
+    inverted = bool(invert) and panel.invertible
+    if inverted:
+        x_axis, y_axis = y_axis, x_axis
+        x_map, y_map = y_map, x_map
 
     def coords(values, mapping):
         out = np.array([np.nan if v is None else v for v in values],
                        dtype=float)
         return _return_periods(out, mapping) if mapping else out
 
-    drawn = [(s, coords(s.x_values, x_map), coords(s.y_values, y_map),
-              None if s.y2 is None else coords(s.y2, y_map))
-             for s in series_list]
+    drawn = []
+    for s in series_list:
+        # The document's x and y, mapped; the exchange happens after, so a
+        # band's second edge stays with the coordinate it is an edge of.
+        px = coords(s.x_values, y_map if inverted else x_map)
+        py = coords(s.y_values, x_map if inverted else y_map)
+        p2 = None if s.y2 is None else coords(s.y2,
+                                              x_map if inverted else y_map)
+        drawn.append((s, py, px, p2) if inverted else (s, px, py, p2))
     all_x = np.concatenate([x for _, x, _, _ in drawn]) if drawn else np.array([])
     all_y = np.concatenate([y for _, _, y, _ in drawn]) if drawn else np.array([])
     x_window = _panel_window(_axis_window(x_axis, full), all_x)
@@ -424,7 +443,13 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
             ax.plot(x, y, color='k', lw=0.5, alpha=0.5)
             continue
         if y2 is not None:
-            ax.fill_between(x, y, y2, alpha=0.15, label=_typeset(doc, s.name))
+            # A band is the region between two edges of one coordinate, so
+            # exchanged axes fill between them horizontally.
+            band = _typeset(doc, s.name)
+            if inverted:
+                ax.fill_betweenx(y, x, y2, alpha=0.15, label=band)
+            else:
+                ax.fill_between(x, y, y2, alpha=0.15, label=band)
             labeled = True
             continue
         label = _typeset(doc, s.name)
@@ -438,12 +463,14 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     for m in doc.marks:
         if m.panel_id != panel.id:
             continue
-        at, mapping = m.at, (x_map if m.orient == 'v' else y_map)
+        # A mark names the axis it sits on, so exchanged axes exchange it too.
+        orient = m.orient if not inverted else ('h' if m.orient == 'v' else 'v')
+        at, mapping = m.at, (x_map if orient == 'v' else y_map)
         if mapping:
             at = float(_return_periods(np.array([at]), mapping)[0])
             if not np.isfinite(at):
                 continue
-        line = ax.axvline if m.orient == 'v' else ax.axhline
+        line = ax.axvline if orient == 'v' else ax.axhline
         line(at, lw=0.75 if not m.faint else 0.5, color='C7', ls='--',
              alpha=0.45 if m.faint else 1.0)
     # A paired reading re-slices the panel: the deep tail a return-period
@@ -468,7 +495,7 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
 
 
 def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
-                  return_period=False, kind=None):
+                  return_period=False, invert=False, kind=None):
     """Render a chart document with matplotlib.
 
     Parameters
@@ -496,6 +523,11 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
         reading as that reading (:attr:`ChartAxis.reciprocal_of`), which
         spreads the rare tail so it can be read off directly. The
         transform comes from ``meta['return_period_map']``.
+    invert : bool
+        Exchange the two axes of every panel that declares itself
+        invertible, which draws the same pairs the other way round: a Lee
+        diagram becomes the distribution function it inverts. Panels that
+        do not declare it are untouched.
     kind : str, optional
         Realize every panel that declares this kind as this kind, for a
         panel offering more than one (a joint density as 'heatmap' rather
@@ -571,9 +603,15 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
     for panel, realization, panel_ax in zip(doc.panels, realized, axs):
         series = [s for s in doc.series if s.panel_id == panel.id]
         panel_title = panel.title or title
+        if invert and panel.invertible:
+            # Exchanged axes draw a different picture, and the document
+            # names it; with no name to use, say so rather than invent one.
+            panel_title = (panel.inverse_title
+                           or f'{panel_title}, inverted')
         if realization == 'xy':
             _render_xy_panel(panel_ax, doc, panel, series, log=log,
-                             full=full_range, return_period=return_period)
+                             full=full_range, return_period=return_period,
+                             invert=invert)
         else:
             _render_grid_panel(panel_ax, doc, panel, series, log=log)
             if realization in _DEGRADED:

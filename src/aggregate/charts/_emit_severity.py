@@ -156,8 +156,11 @@ def _severity(sev, n=GRID_POINTS):
         panels=(
             Panel(id='density', kind='xy', x_axis='loss', y_axis='pdf',
                   title='Severity density'),
+            # Inverting it gives the distribution function, which is the
+            # fourth panel the compositor drew as a picture of its own.
             Panel(id='lee', kind='xy', x_axis='p', y_axis='loss',
-                  title='Quantile (Lee) plot'),
+                  invertible=True, title='Quantile (Lee) plot',
+                  inverse_title='Distribution function'),
         ),
         series=(
             ChartSeries(name=name, role='density', panel_id='density',

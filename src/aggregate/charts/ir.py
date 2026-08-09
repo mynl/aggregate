@@ -364,6 +364,23 @@ class Panel:
         'x' or 'y': which axis the reader interrogates. A density is read
         by loss ('x'); a tail panel is read probability to loss ('y'),
         because at a chosen survival the answer is the VaR.
+    invertible : bool
+        The panel's two axes may be exchanged. Mechanically that is a
+        transpose, but what it performs is an **inversion**: a Lee diagram
+        exchanged is the distribution function, because a quantile function
+        and a cdf are inverses and the drawn pairs are the same pairs.
+        Declaring it says the exchange is meaningful, which is a fact about
+        the quantities and not about the drawing: exchanging a density's
+        axes says nothing, because mass against loss does not invert.
+        A consumer that offers the reading also swaps ``read_axis``, since
+        the reader still interrogates the same quantity.
+    inverse_title : str, optional
+        What the panel is called when its axes are exchanged, because that
+        is a different picture with a name of its own ('Distribution
+        function' for an inverted Lee diagram) and naming it is the
+        library's job, not the renderer's. Only meaningful with
+        ``invertible``; a renderer with no name to use says the title is
+        inverted rather than inventing one.
     aspect : str, optional
         ``'equal'`` when equal data aspect is semantic (the g(s) unit
         square, the complex-plane Fourier disk), ``None`` otherwise. Never
@@ -391,8 +408,10 @@ class Panel:
     kinds: tuple = None
     z_axis: str = None
     read_axis: str = 'x'
+    invertible: bool = False
     aspect: str = None
     title: str = None
+    inverse_title: str = None
 
     def __post_init__(self):
         if self.kind not in PANEL_KINDS:
@@ -420,6 +439,10 @@ class Panel:
             raise ValueError("read_axis must be 'x' or 'y'")
         if self.aspect not in (None, 'equal'):
             raise ValueError("aspect must be 'equal' or None")
+        if self.inverse_title is not None and not self.invertible:
+            raise ValueError(
+                f'panel {self.id!r} names an inverse_title but is not '
+                'invertible, so nothing can ever use it')
         if self.kind in ('heatmap', 'surface') and self.z_axis is None:
             raise ValueError(f"panel {self.id!r} kind {self.kind!r} "
                              'requires a z_axis')
@@ -891,6 +914,7 @@ def human_strings(doc):
     """
     out = []
     for text in ([doc.title] + [p.title for p in doc.panels]
+                 + [p.inverse_title for p in doc.panels]
                  + [a.label for a in doc.axes]
                  + [s.name for s in doc.series]
                  + [m.label for m in doc.marks]):

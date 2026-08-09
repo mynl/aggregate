@@ -4554,7 +4554,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return RuinFunction(ruin, find_u, mean, pmf_max[:n])
 
     def plot(self, xmax=None, log=False, full_range=False,
-             return_period=False):
+             return_period=False, invert=False):
         """Plot the aggregate and its severity: the mass, and the Lee diagram.
 
         Parameters
@@ -4572,6 +4572,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             Read the Lee panel against return period rather than
             non-exceedance probability, which spreads the rare tail so it
             can be read off directly. This was ``quantile_x='return'``.
+        invert : bool
+            Exchange the Lee panel's axes, which draws the distribution
+            function: a quantile function and a cdf are inverses, so it is
+            the same pairs read the other way round.
 
         Returns
         -------
@@ -4596,7 +4600,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         from .plots import plot_chartdoc
         self.figure = plot_chartdoc(
             build_chart_doc(self, 'agg', xmax=xmax),
-            log=log, full_range=full_range, return_period=return_period)
+            log=log, full_range=full_range, return_period=return_period,
+            invert=invert)
         return self.figure
 
     def _limits(self, stat='range', kind='linear', zero_mass='include'):

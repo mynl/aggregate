@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a240
+
+**[Chart-Invertible-Lee] a panel may declare that its axes exchange, and a Lee diagram does.** Mechanically an exchange is a transpose; what it *performs* is an inversion, which is the name it takes: a quantile function and a distribution function are inverses, so a Lee diagram read the other way round **is** the cdf, drawn from the same pairs. `Panel.invertible` declares it, `plot_chartdoc(invert=True)` and `plot(invert=True)` do it, and the aggregate, P&L and severity Lee panels all declare it. It is a fact about the quantities and not about the drawing: exchanging a density's axes says nothing, because mass against loss does not invert.
+
+**Two things fell out rather than being written**, and both say the earlier rules went in the right place. The renderer's ladder reads its drawing off the **axes** rather than the series role, so an inverted quantile function picks up the right-continuous step of a cdf on its own, where it had been drawing the left-continuous step of a quantile. And the paired return-period reading is resolved by axis id, so it rides along on whichever axis it was attached to. The only real work was a band, which fills between two edges of one coordinate and so turns with it, and a mark, which names the axis it sits on.
+
+**`Panel.inverse_title` names the other picture**, because it is a different picture and naming it is the library's job: the Lee panels carry 'Distribution function'. A renderer with no name to use says the title is inverted rather than inventing one, and naming an inverse on a panel that is not invertible is refused, since nothing could ever use it. It joins `human_strings`, so `tex` stays total over it.
+
+`CHART_IR_VERSION` stays 2: a reader ignoring `invertible` draws the panel in the orientation the document already named as its default, which is correct and complete.
+
+---
+
 ## 1.0.0a239
 
 **[Chart-Severity] a severity emits its density and its Lee diagram, and the compositor goes.** `Severity.plot` draws the document `charts.chart_severity` emits and `plots/_severity.py` is deleted. Four panels become two, and **neither collapse loses anything**, which is why this was a redesign rather than a rewire.

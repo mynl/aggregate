@@ -82,6 +82,13 @@ def test_the_old_log_panel_is_a_reading_of_the_first(cont):
     assert ax['outcome'].scale == ax['mass'].scale == 'linear'
 
 
+def test_the_lee_panel_inverts_to_the_distribution_function(cont):
+    """The compositor's cdf panel, one click away rather than drawn twice."""
+    lee = chart_agg(cont).panels[1]
+    assert lee.invertible
+    assert lee.inverse_title == 'Distribution function'
+
+
 def test_the_probability_axis_offers_the_return_period(cont):
     doc = chart_agg(cont)
     ax = axes_of(doc)

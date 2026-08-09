@@ -76,6 +76,13 @@ def test_the_distribution_panel_is_the_lee_panel_transposed(sev):
     assert (np.diff(loss) > 0).all()
 
 
+def test_the_lee_panel_inverts_to_the_distribution_function(sev):
+    """The compositor's cdf panel, one click away rather than drawn twice."""
+    lee = chart_severity(sev).panels[1]
+    assert lee.invertible
+    assert lee.inverse_title == 'Distribution function'
+
+
 def test_the_probability_axis_offers_the_return_period(sev):
     doc = chart_severity(sev)
     assert axes_of(doc)['return_period'].reciprocal_of == 'p'

@@ -146,8 +146,11 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
         panels=(
             Panel(id='density', kind='xy', x_axis='outcome', y_axis='mass',
                   title='Probability mass function'),
+            # Inverting it gives the distribution function, which is why
+            # the compositor's cdf panel did not survive as a panel.
             Panel(id='lee', kind='xy', x_axis='p', y_axis='outcome',
-                  title='Quantile (Lee) plot'),
+                  invertible=True, title='Quantile (Lee) plot',
+                  inverse_title='Distribution function'),
         ),
         series=tuple(series),
         marks=tuple(marks),

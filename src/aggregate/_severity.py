@@ -1805,7 +1805,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         #    four analytic specials, plus any histogram with a layer).
         return _numerical_moms(self)
 
-    def plot(self, n=None, log=False, full_range=False, return_period=False):
+    def plot(self, n=None, log=False, full_range=False, return_period=False,
+             invert=False):
         """Plot the severity: its density, and its quantile (Lee) diagram.
 
         Parameters
@@ -1822,6 +1823,10 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         return_period : bool
             Read the Lee panel against return period rather than
             non-exceedance probability.
+        invert : bool
+            Exchange the Lee panel's axes, which draws the distribution
+            function: a quantile function and a cdf are inverses, so it is
+            the same pairs read the other way round.
 
         Returns
         -------
@@ -1849,7 +1854,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         options = {} if n is None else {'n': n}
         self.figure = plot_chartdoc(
             build_chart_doc(self, 'severity', **options),
-            log=log, full_range=full_range, return_period=return_period)
+            log=log, full_range=full_range, return_period=return_period,
+            invert=invert)
         return self.figure
 
 

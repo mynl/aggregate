@@ -143,6 +143,11 @@
   before it can execute. Independent of everything else — do whenever; the
   regression bar is "ordinary aggregates byte-for-byte unchanged". The repro
   still crashes today. Plan: `dev/plan-signed-bounded-window-overflow.md`.
+  Smaller blast radius since a230 (`[Reflected-Loss-Severity]`): a bounded
+  reflection like `10 - lognorm 1.5 splice [0 10]` used to need `ssev`, and with
+  it the identity layering; it can now be declared with plain `sev`, where the
+  layer is a real layer. The half-applied layer remains for genuinely signed
+  severities, and is still silent.
 - **[Validation-Calc-Review]** (#49) — audit the validation algorithm against the
   published *Aggregate* paper and make the docs match the actual algo. The
   "all switches → config" sub-goal is done (`eps`/`noise`, `aliasing_ratio`,
@@ -170,29 +175,27 @@
 ### Tests & example libraries
 
 - **[Unparser-Reference-Gaps]** (surfaced by `[Library-Canonical-Layout]`, a178)
-  — `decl_writer` cannot render four constructs back to what was written, so 16
+  — `decl_writer` cannot render three constructs back to what was written, so 13
   `library.agg` entries are exempt from the canonical layout and hand-written.
   The list is `UNPARSER_EXEMPT` in `tests/test_agg_libraries.py`; shrinking it
-  is progress.
+  is progress. The `tweedie` clause was the fourth and is **done** (`a231`,
+  `dev/done/plan-tweedie.md`): it carries a `_tweedie` provenance key, renders
+  its clause back, and no longer overwrites the author's `note{}`. The pattern
+  it established, record what was declared and render from that, is what item 1
+  wants.
   1. **Named object reference** (9 entries) — `sev.UnitSeverity` is resolved and
      inlined at parse time, and nothing on the spec records that a reference was
      written, so it renders as `dsev [1]`. Fixing it means carrying the
      reference on the spec (a `sev_ref` key, say) and rendering from that. This
      is the one worth doing: named-severity reuse is a documented feature that
      would otherwise appear nowhere in the shipped library.
-  2. **`tweedie` clause** (3) — expands to the equivalent compound-Poisson-gamma
-     with 16-significant-digit parameters. Carries a **live second bug**: the
-     transformer overwrites the author's `note{}` with a machine conversion
-     string (`Tw(p=1.005, mu=1.0, ...)`), so `discover()` and any generated page
-     show the machine text, not what was written. Fix the note clobber first; it
-     is independent and visible today.
-  3. **Distortion combinator** (1) — `minimum` / `mixture` drop their child
+  2. **Distortion combinator** (1) — `minimum` / `mixture` drop their child
      distortion names, so `format_program` raises rather than rendering.
-  4. **`ssev <c> - <dist>`** (3) — renders in the general affine form
+  3. **`ssev <c> - <dist>`** (3) — renders in the general affine form
      `-1 * <dist> + <c>`, whose leading `-1 *` parses two ways
      (`tests/test_grammar_ambiguity.py`, `KNOWN_AMBIGUOUS`). Either teach the
      writer the compact spelling when the scale is exactly `-1`, or resolve the
-     grammar ambiguity. `dev/reflow_library.py` refuses any rendering more
+     grammar ambiguity. `dev/done/reflow_library.py` refuses any rendering more
      ambiguous than its source, so this cannot regress silently.
 - **[Agg-Library-Build-Check]** (from `plan-for-v1.md` §1 — *"the one change that
   makes step 1.2 real"*) — `tests/test_agg_libraries.py` today only checks each
@@ -288,8 +291,8 @@
   `decl-testers`, `cookbook`) and a temporary SLY-parity scaffold
   (`_test_suite.agg`, `_test_suite2.agg`). The scaffold has done its job (proving
   the Lark parser matches the retired SLY parser). Delete both files and retire
-  their dependents: the SLY snapshot (`tests/data/expected_specs.json` +
-  `capture_sly_snapshot.py`), `test_decl_parser.py`, `test_splice_suite.py`, the
+  their dependents: the spec snapshot (`tests/data/expected_specs.json` +
+  `capture_spec_snapshot.py`), `test_decl_parser.py`, `test_splice_suite.py`, the
   `conftest` `test_suite_lines` / `underwriter` fixtures, `config.py`
   `TEST_SUITE_FILENAME` + `Underwriter.test_suite_file` + `interpret_file`'s
   default, the `freeze_knowledge.py` / `bucket_baseline.py` `DEFAULT_DATABASES`,
@@ -434,10 +437,43 @@
   bars, then a plain line once a bucket is sub-pixel), counted in visible
   atoms so a cropped window is judged on what it shows, and cumulative
   functions step right-continuously off the *axis* rather than the series
-  role. Next: agg, pnl, port, bvagg heatmap in plan order, plus the paired
-  app commits (distortion, reins and sev all need the adapter's xy
-  realization, and the adapter now also owns the same ladder), which wait
-  on the app-side workstream.
+  role. **Part two of the plan is the rest of pass four restated as one
+  job per first-class class. Drafted and APPROVED 2026-08-09**, six open
+  gates settled the same day. It changes two things the original did not
+  anticipate: `Object.plot()` moves onto the IR **now** rather than post
+  1.0, with the compositor deleted in the same commit, and the schema
+  reopens a third time (after `support` at a214) to carry the view
+  toggles, as `[Chart-Declared-Readings]`: `ChartAxis.scales` and
+  `full_range`, the first use of `reciprocal_of`, and `Panel.kinds`
+  answering `heatmap | surface` with one document declaring two
+  realizations, `CHART_IR_VERSION` staying 1. Both follow from the app
+  going purist about IR charts, which makes `chart_agg` the critical path
+  for the whole app rather than one item in a queue. Nine jobs in order:
+  `[Chart-Declared-Readings]`, `[Chart-Aggregate]`, `[Chart-Distortion]`,
+  `[Chart-PnL]`, `[Chart-Severity]`, `[Chart-Bounds]`,
+  `[Chart-Bivariate]`, then `[Chart-Portfolio]` and `[Chart-Reins]`
+  **last**, both blocked on author design work (kappas for the portfolio,
+  a fine-tuning pass for reinsurance) so they are not written twice. The
+  severity drawing is **also** expected to change, so `[Chart-Severity]`
+  is a redesign and not a rewire, and keeps its slot only while its
+  design is ready.
+  The settled gates: `charts.build_chart_doc` / `primary_chart` as module
+  functions mirroring `build_exhibit` (no new method on any class);
+  **panel arrangement is renderer-side**, the document says which panels
+  in what order and order is only a hint, so no `ChartDoc.layout`;
+  `chart_agg` is **the density and the Lee panel**, with the old log
+  panel becoming log x plus log y declared on the density panel, which
+  changes what `Aggregate.plot()` draws and needs a fresh baseline;
+  `ChartDoc.tex` is **total**, both forms always written like alt text,
+  which is stronger than today's docstring and gains a test.
+  `[Chart-Bounds]` is two panels, the weighted cloud and all five
+  calibrated distortions on one band, consolidating today's three.
+  **REMINDER the author asked for: 3-D plot punchups are wanted and not
+  yet written down. Prompt for them when `[Chart-Bivariate]` starts,
+  before the emitter.** The app's written ask is
+  `dev/note-all-chart-asks.md`; its half is
+  `aggregate_api/dev/plan-plot-ir-api.md`. Note `chart_reins` **is**
+  already registered for `Portfolio`, so that ask in the note is stale.
 
 ---
 
@@ -634,6 +670,35 @@
   so nothing depends on the gap; closing it means deciding whether `density_df`
   is "rows with a law" (add them) or "declared plus subtotal rows" (leave it and
   say so in the docstring).
+- **[Range-Sugar-Round-Trip]** (logged 2026-08-09; **post-v1.0, do not start
+  before the cut**) — range sugar is expanded at parse time and never rebuilt,
+  so `dsev [1:6]` renders back as `dsev [1 2 3 4 5 6]` and `[0:10:2]` as
+  `[0 2 4 6 8 10]`. **The wanted behavior is to NOT expand them**: a range
+  should round-trip as the range that was written. `decl_writer._fmt_seq`
+  currently says so in as many words, that re-folding "would be cosmetic only",
+  which is the judgment this item overturns. It is cosmetic for a six-element
+  vector and not at all cosmetic for `[1:1000]`.
+  Four grammar productions are involved, the two-part and three-part forms of
+  each of `numbers_range` / `numbers_range_step` (`decl.lark:625`) and
+  `doutcomes_range` / `doutcomes_range_step` (`:491`).
+  Same shape of fix as `[Tweedie-Round-Trip]` (`a231`): record what was
+  declared and render from that, rather than reconstructing it from the
+  expansion. Harder in one specific way, though. Tweedie's provenance is one
+  key on one object; a range is a property of an *individual array-valued spec
+  entry*, and vectors appear in `dfreq`, `dsev`, exposure and limit profiles,
+  weights and layer lists. So the record has to hang off the array, not the
+  spec, which is the design question to settle first. Detecting an arithmetic
+  progression after the fact is the wrong answer: it would re-fold a list the
+  author wrote out longhand, exactly the canonicalizing-with-opinions failure
+  the tweedie work was careful to avoid.
+- **[Power-Variance-Family]** (from `dev/done/plan-tweedie.md`, 2026-08-09) — the
+  `tweedie` clause covers only the `1 < p < 2` slice of the power variance
+  family, but the `Tweedie` class already spans the whole p range: Gaussian at
+  0, Poisson at 1, gamma at 2, inverse Gaussian and Lévy at 3, extreme stable
+  outside. Extend the DecL surface to the rest of the family. Depends on
+  `[Tweedie-Round-Trip]` landing first, since that is what makes a declared
+  member of the family survive the parse at all; the naming, the clause shape
+  and which members are worth a keyword are all open.
 - **[Rate-Based-Reins-Clauses]** — extend reinsurance clauses to accept e.g.
   `net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros` (rate on subject
   = quota share).

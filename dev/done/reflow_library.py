@@ -2,14 +2,23 @@
 
 One clause per line at a two-space indent, a ``;`` terminating each statement
 and a blank line between statements. That is the layout ``Recipe.decl`` renders
-and every generated cookbook page already shows, so after this run the source
-stops being the one place the library is still written dense (median statement
-length before: 153 characters, 40 statements over 200).
+and every generated cookbook page already shows, so the source is not the one
+place the library is still written dense (median statement length before the
+first run: 153 characters, 40 statements over 200).
 
 Run from the repo root::
 
-    python dev/reflow_library.py            # rewrite in place
-    python dev/reflow_library.py --check    # report, write nothing
+    python dev/done/reflow_library.py            # rewrite in place
+    python dev/done/reflow_library.py --check    # report, write nothing
+
+**Filed under ``dev/done/`` but not retired.** What is closed is the one-shot
+``[Library-Canonical-Layout]`` migration this was written for; the script itself
+is the library's formatter and stays runnable. Re-run it whenever entries are
+added or edited, and whenever an unparser gap closes, since a construct that
+starts inverting can leave the held-back set and be laid out by machine (three
+Tweedie entries did exactly that at 1.0.0a231). ``--check`` is the read-only
+form, and ``tests/test_agg_libraries.py`` fails if the shipped file drifts from
+what this renders.
 
 How it works
 ------------
@@ -21,9 +30,11 @@ form when the writer cannot invert it:
 
 * a named object reference (``sev.UnitSeverity``) is resolved and inlined at
   parse time, with nothing on the spec recording that a reference was written;
-* the ``tweedie`` clause expands to its compound-Poisson-gamma equivalent;
 * ``minimum`` / ``mixture`` distortion combinators drop their child names, so
   rendering raises.
+
+The ``tweedie`` clause was a third case until 1.0.0a231, when it gained the
+``_tweedie`` provenance key and started inverting like everything else.
 
 A statement is also held back when the canonical form is **more ambiguous** than
 the source. The writer renders ``ssev 100 - lognorm 80 cv .2`` in the general
@@ -53,14 +64,29 @@ import numpy as np
 from aggregate import Underwriter
 from aggregate.decl_writer import format_program
 
-LIBRARY = Path(__file__).resolve().parents[1] / 'src' / 'aggregate' / 'agg' / 'library.agg'
+def _repo_root() -> Path:
+    """The repo root, found by walking up to the directory holding ``pyproject.toml``.
+
+    Was ``parents[1]``, a fixed hop that silently assumed this file sat directly
+    in ``dev/``. Moving it to ``dev/done/`` made it resolve to ``dev/src/...``
+    and the script died on a ``FileNotFoundError``. Searching for the marker
+    costs nothing and does not care how deep the script is filed.
+    """
+    for parent in Path(__file__).resolve().parents:
+        if (parent / 'pyproject.toml').exists():
+            return parent
+    raise RuntimeError(
+        f'reflow_library: no pyproject.toml above {Path(__file__).resolve()}; '
+        f'run this from inside the repo.')
+
+
+LIBRARY = _repo_root() / 'src' / 'aggregate' / 'agg' / 'library.agg'
 
 #: Constructs :mod:`aggregate.decl_writer` cannot render back to what was
 #: written. Matched against the *source* statement, because the spec no longer
 #: carries the evidence.
 NON_INVERTIBLE = re.compile(
     r'\b(?:sev|dist|distortion|agg|port)\.[A-Za-z]'   # named object reference
-    r'|\btweedie\b'                                   # tweedie clause
     r'|\b(?:minimum|mixture)\s+dist'                  # distortion combinator
 )
 

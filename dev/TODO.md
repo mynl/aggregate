@@ -499,7 +499,18 @@
   **The author reviewed the new figure before the baseline was cut**, as
   the plan requires; `quantile_x='return'` is now `return_period=True`
   and `axd` / `figsize` / `max_return_period` are gone from
-  `Aggregate.plot`.
+  `Aggregate.plot`. Job 3 `[Chart-Distortion]` landed a236: the rewire
+  and the deletion of `plot_distortion`, licensed by a re-measured RMS 0;
+  `both=` becomes `dual=` (five pedagogy call sites and
+  `plot_distortion_affine` follow), and `scale='return'` is **removed**
+  rather than relocated, on the plan's own statement that a log reading
+  of a distortion's unit square is not meaningful. Nothing called it; it
+  returns as `scales=('linear', 'log')` the day it is wanted.
+  **Next: job 4 `[Chart-PnL]`**, a thin registration over the aggregate
+  emitter once its signed differences are handled: the window is not
+  anchored at zero, the cumulative panel reads F where a loss reads S,
+  the `break_even` mark at 0 is the reading, there is no severity
+  companion, and `meta['return_period_map']` flips to `reciprocal`.
 
 ---
 

@@ -179,10 +179,10 @@ def plot_similar_risks_graphs(axd, bounds, port, pnew, roe, prem, p_reg=1):
     ax = axd['A']
     plot_max_min(bounds, ax)
     n = len(ax.lines)
-    roe_d.plot(ax=ax, both=False)
-    tvar_d.plot(ax=ax, both=False)
-    max_d.plot(ax=ax, both=False)
-    min_d.plot(ax=ax, both=False)
+    roe_d.plot(ax=ax, dual=False)
+    tvar_d.plot(ax=ax, dual=False)
+    max_d.plot(ax=ax, dual=False)
+    min_d.plot(ax=ax, dual=False)
 
     ax.lines[n + 0].set(label='roe', color='C0', ls='--')
     ax.lines[n + 2].set(color='C1', label='tvar', ls='-.')
@@ -225,7 +225,7 @@ def plot_similar_risks_graphs(axd, bounds, port, pnew, roe, prem, p_reg=1):
     ax = axd['F']
     plot_max_min(bounds, ax)
     for c, dd in zip(['C0', 'C1', 'C2'], ['ph', 'wang', 'dual']):
-        port.distortions[dd].plot(ax=ax, both=False, lw=1)
+        port.distortions[dd].plot(ax=ax, dual=False)
         ax.lines[n].set(c=c, label=dd)
         n += 2
     ax.legend(loc='lower right')

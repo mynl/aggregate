@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a236
+
+**[Chart-Distortion] a distortion draws through its own document and the compositor goes.** `Distortion.plot` now renders the document `charts.chart_distortion` emits, and `plots._distortion.plot_distortion` is deleted. The deletion is licensed by a measurement rather than an argument: the two paths had been pixel identical since `a209` and were re-measured at RMS 0 immediately before, so nothing about the picture changed here.
+
+**The argument list was decided one argument at a time**, which is what a conversion is for. `both` survives as the semantic option it always was, under the emitter's spelling `dual`, because whether to draw the dual is a statement about the pricing and not about the drawing. `ax` survives. `xs`, `n`, `c`, `c_dual`, `size`, `plot_points` and the `**kwargs` passthrough are realization and are gone; `plot_points` had been dead since `ConvexDistortion` was removed. The method returns the figure rather than the axes, matching the other converted plots.
+
+**`scale='return'` is gone with them**, and this is the one capability removed rather than relocated. The log-log unit square is a *reading*, so under `[Chart-Declared-Readings]` its home would be `scales=('linear', 'log')` on both axes, and the plan's own statement of the principle uses this exact case as the counterexample: a log reading of a heavy tail is meaningful, a log reading of a distortion's unit square is not. Nothing in the library, the docs or the test suite called it. It comes back as two declared scales the day that reading is wanted, and the picture will then be the same one.
+
+`plot_distortion_affine` stays bespoke, as planned: it overlays the TVaR decomposition's affine lines on the curve, which the schema cannot express, so it is listed as bespoke rather than half-expressed. It and the five `pedagogy` call sites move to `dual=`; the pedagogy bounds figure loses a `lw=1` it was passing through to matplotlib.
+
+---
+
 ## 1.0.0a235
 
 **[Chart-Aggregate] an aggregate emits density and Lee, and the log panel becomes a reading of the first.** The first conversion that *replaces* a compositor rather than shipping alongside one. `Aggregate.plot` now draws the document `charts.chart_agg` emits, through `plots.plot_chartdoc`, and `plots._aggregate.plot_aggregate` is deleted. One set of semantic decisions, two renderers, no third path.

@@ -1672,42 +1672,38 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     # Plotting
     # ------------------------------------------------------------------
 
-    def plot(self, xs=None, n=101, both=True, ax=None, plot_points=True,
-             scale='linear', c=None, c_dual=None, size='small', **kwargs):
-        """
-        Plot the distortion.
+    def plot(self, dual=True, ax=None):
+        """Plot the distortion: ``g`` on the unit square.
 
         Parameters
         ----------
-        xs : array_like, optional
-            x values; defaults to ``density_df.index`` (linear) or a
-            log-spaced grid (return scale).
-        n : int
-            Grid size for ``scale='return'`` (ignored on linear scale, which
-            uses the cached ``density_df`` grid).
-        both : bool
-            Also plot ``g_dual``.
+        dual : bool
+            Also draw ``g_dual``. A semantic choice, not a style one: the
+            pair says how the distortion prices a loss and its complement.
         ax : matplotlib.axes.Axes, optional
-            Existing Axes; if ``None`` a new figure is created.
-        plot_points : bool
-            Legacy flag (was used by the removed ``ConvexDistortion``).
-        scale : {'linear', 'return'}
-            Linear plot on ``[0, 1]^2`` or log-log return-period scale.
-        size : str or float
-            ``'small'`` / ``'large'`` figure preset or a numeric side length.
-        **kwargs
-            Forwarded to ``ax.plot``.
+            Existing Axes; ``None`` makes a square figure.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
 
         Notes
         -----
-        On linear scale the curve is read straight from ``density_df`` so the
-        knot splicing (TVaR kink, BiTVaR/WtdTVaR knots, mass-at-0 epsilon)
-        is reflected directly in the plot.
+        Draws the chart document ``charts.chart_distortion`` emits, through
+        the one generic renderer, so the picture the browser draws and the
+        picture matplotlib draws come from a single set of decisions. The
+        curve is read straight from ``density_df``, so the knot splicing
+        (TVaR kink, BiTVaR and WtdTVaR knots, the mass-at-0 epsilon) is in
+        the plot rather than sampled over.
+
+        Equal aspect is semantic here and the document says so: concavity
+        is the only thing anyone reads a distortion plot to see, and a
+        stretched box misrepresents it.
         """
-        from .plots import plot_distortion
-        return plot_distortion(self, xs=xs, n=n, both=both, ax=ax,
-                               plot_points=plot_points, scale=scale,
-                               c=c, c_dual=c_dual, size=size, **kwargs)
+        from .charts import build_chart_doc
+        from .plots import plot_chartdoc
+        return plot_chartdoc(build_chart_doc(self, 'distortion', dual=dual),
+                             ax=ax)
 
     # ------------------------------------------------------------------
     # Static factory shortcuts

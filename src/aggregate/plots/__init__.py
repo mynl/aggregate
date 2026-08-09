@@ -32,7 +32,7 @@ from ._style import (
 # Layer 2 compositors (the public entry points the class stubs delegate to).
 from ._aggregate import plot_pnl, plot_reins_occ
 from ._severity import plot_severity
-from ._distortion import plot_distortion, plot_distortion_affine
+from ._distortion import plot_distortion_affine
 from ._portfolio import plot_portfolio, plot_scatter, plot_sample_compare
 from ._bounds import plot_bounds_envelope, plot_bounds_weights, plot_hull_bounds
 from ._bivariate import plot_bivariate, plot_bivariate_distribution
@@ -53,7 +53,7 @@ __all__ = [
     # Layer 2 compositors
     'plot_pnl', 'plot_reins_occ',
     'plot_severity',
-    'plot_distortion', 'plot_distortion_affine',
+    'plot_distortion_affine',
     'plot_portfolio', 'plot_scatter', 'plot_sample_compare',
     'plot_bounds_envelope', 'plot_bounds_weights', 'plot_hull_bounds',
     'plot_bivariate', 'plot_bivariate_distribution',

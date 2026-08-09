@@ -62,6 +62,16 @@ __all__ = [
     'canonical_dict', 'canonical_json', 'doc_hash', 'stamp',
 ]
 
+#: The IR version. **When to bump it**, which is the question every
+#: reopening of the schema asks: the version marks the point where a reader
+#: that ignores what it does not know would draw something *wrong*. Adding
+#: a field whose absence leaves the default reading correct and complete
+#: does not qualify, however visible the field is, and however many hashes
+#: it changes. ``support`` (1.0.0a214) and the declared readings below
+#: (``scales``, ``full_range``, ``kinds``) both landed at version 1 on that
+#: rule: ignore them and you get the one reading the document already named
+#: as its default. A field a reader must act on to draw the *default* right,
+#: a changed meaning for an existing field, or a removal, all bump it.
 CHART_IR_VERSION = 1
 
 #: Panel kinds. 'xy' is a family of curves over a shared pair of axes;
@@ -73,6 +83,18 @@ PANEL_KINDS = ('xy', 'heatmap', 'surface')
 #: Axis scales. Log or linear is statistical meaning (a heavy tail is
 #: legible only on log), never styling.
 AXIS_SCALES = ('linear', 'log')
+
+#: How a paired return-period axis is computed from the probability axis it
+#: points at (see :attr:`ChartAxis.reciprocal_of`), given the value ``v`` on
+#: that axis. 'reciprocal': ``T = 1 / v``, the literal reading, and the
+#: default when a document says nothing. It is the map for a survival axis
+#: (``T = 1 / S``) and for the shortfall probability of a signed outcome,
+#: where the adverse tail is the low one. 'complement': ``T = 1 / (1 - v)``,
+#: the map for a non-exceedance axis of a loss, where the adverse tail is
+#: the high one and ``1 - p`` is the exceedance the reader is asking about.
+#: Carried in ``ChartDoc.meta['return_period_map']``, because it is one fact
+#: about the whole document rather than a property of either axis.
+RETURN_PERIOD_MAPS = ('reciprocal', 'complement')
 
 #: Axis units, the working vocabulary (open; documented additions only):
 #: 'currency' (a loss or outcome amount), 'probability', 'density'
@@ -192,22 +214,47 @@ class ChartAxis:
     label : str
         The human reading ('loss', 'S(x)', a component's resolved label).
     scale : str
-        'linear' or 'log'. Statistical meaning, never styling.
+        'linear' or 'log', the reading this axis is drawn on by default.
+        Statistical meaning, never styling.
+    scales : tuple of str, optional
+        Every scale this axis may be read on, ``scale`` among them. Omitted
+        means the axis has one honest reading, and ``__post_init__`` fills
+        ``(scale,)``, so a consumer never handles ``None``: a singleton is
+        "fixed", anything longer is a reading the reader may choose. Which
+        readings a quantity admits is a fact about the quantity, not about
+        the drawing: a log reading of a heavy tail is meaningful, a log
+        reading of a distortion's unit square is not.
     suggested_range : tuple of float, optional
         The (lo, hi) window the emitter computed from the data (a quantile
         crop, a unit interval). A suggestion: renderers may pan or zoom,
         but the initial view honors it.
+    full_range : tuple of float, optional
+        The whole data extent, offered as the alternative reading to
+        ``suggested_range``, which it therefore requires. Presence is the
+        declaration: an axis carrying both offers the zoom-out, one
+        carrying only ``suggested_range`` has no other honest reading, and
+        a chart whose window *is* its meaning (the unit square) sets only
+        the one. Carried as numbers rather than as a flag because the
+        extent of a log axis with an exact zero, or of a survival curve
+        floored at ``LOG_FLOOR``, is not the naive min and max of the
+        series, and working that out is emitter knowledge.
     kind : str
         'value' (continuous) or 'category' (ordinal positions).
     unit : str, optional
         One of :data:`AXIS_UNITS`; what the numbers measure.
     reciprocal_of : str, optional
-        The id of another axis in the document of which this axis is the
-        reciprocal reading (return period ``T = 1/S`` of a survival axis).
-        The pairing is semantic: the two scales name the same curve, and a
-        renderer may realize the pair as one axis with a twin. JUDGMENT
-        CALL flagged in ``dev/chart-inventory.md``: the author confirms the
-        twin is IR, not a renderer trick, at schema sign off.
+        The id of the drawn probability axis this axis is the paired
+        return-period reading of. Its presence is the declaration that the
+        reading is on offer; the map from that axis' value to ``T`` is
+        ``ChartDoc.meta['return_period_map']`` (see
+        :data:`RETURN_PERIOD_MAPS`), which is 'reciprocal' unless a
+        document says otherwise. The pairing is semantic: the two scales
+        name the same curve, and a renderer may realize the pair as one
+        axis with a twin, or as a control that redraws it. A paired axis
+        sits in ``ChartDoc.axes`` and is **not** named by any panel, since
+        it is an alternative reading of a drawn axis rather than a drawn
+        axis of its own; both halves of that are checked in
+        :meth:`ChartDoc.__post_init__`.
 
     .. versionadded:: 1.0
        Provisional, in the sense of PEP 411: not part of the 1.0 API
@@ -217,7 +264,9 @@ class ChartAxis:
     id: str
     label: str
     scale: str = 'linear'
+    scales: tuple = None
     suggested_range: tuple = None
+    full_range: tuple = None
     kind: str = 'value'
     unit: str = None
     reciprocal_of: str = None
@@ -229,10 +278,31 @@ class ChartAxis:
         if self.kind not in ('value', 'category'):
             raise ValueError(f'unknown axis kind {self.kind!r}; '
                              "expected 'value' or 'category'")
-        if self.suggested_range is not None:
-            _freeze_seq(self, 'suggested_range')
-            if len(self.suggested_range) != 2:
-                raise ValueError('suggested_range must be (lo, hi)')
+        if self.scales is None:
+            object.__setattr__(self, 'scales', (self.scale,))
+        else:
+            _freeze_seq(self, 'scales')
+            for s in self.scales:
+                if s not in AXIS_SCALES:
+                    raise ValueError(f'axis {self.id!r} declares unknown '
+                                     f'scale {s!r}; expected one of '
+                                     f'{AXIS_SCALES}')
+            if self.scale not in self.scales:
+                raise ValueError(
+                    f'axis {self.id!r} is drawn on {self.scale!r}, which is '
+                    f'not among the scales it declares, {self.scales}')
+        for name in ('suggested_range', 'full_range'):
+            if getattr(self, name) is not None:
+                _freeze_seq(self, name)
+                if len(getattr(self, name)) != 2:
+                    raise ValueError(f'{name} must be (lo, hi)')
+        if self.full_range is not None and self.suggested_range is None:
+            # The full extent is the alternative to a window, so without a
+            # window it declares a control that would do nothing.
+            raise ValueError(
+                f'axis {self.id!r} declares full_range with no '
+                'suggested_range: the full extent is the alternative '
+                'reading to a window, and is already the view without one')
 
 
 @dataclass(frozen=True)
@@ -244,7 +314,16 @@ class Panel:
     id : str
         Referenced by series and marks. Unique within the document.
     kind : str
-        One of :data:`PANEL_KINDS`.
+        One of :data:`PANEL_KINDS`, the realization drawn by default.
+    kinds : tuple of str, optional
+        Every realization this panel supports, ``kind`` among them. Omitted
+        means one, and ``__post_init__`` fills ``(kind,)``, exactly as
+        :attr:`ChartAxis.scales` does. A z grid read flat or in relief is
+        **one document declaring two realizations**, never two chart
+        entries that must be kept in step by hand; a renderer picks one it
+        can realize and only degrades when the panel offers none. 'xy' does
+        not combine with the grid kinds: they take different payloads, so
+        they are different charts and not two readings of one.
     x_axis, y_axis : str
         Axis ids. Two panels referencing the *same* axis id share that
         axis (the two-panel exhibits share one loss window this way).
@@ -279,6 +358,7 @@ class Panel:
     kind: str
     x_axis: str
     y_axis: str
+    kinds: tuple = None
     z_axis: str = None
     read_axis: str = 'x'
     aspect: str = None
@@ -288,6 +368,24 @@ class Panel:
         if self.kind not in PANEL_KINDS:
             raise ValueError(f'unknown panel kind {self.kind!r}; '
                              f'expected one of {PANEL_KINDS}')
+        if self.kinds is None:
+            object.__setattr__(self, 'kinds', (self.kind,))
+        else:
+            _freeze_seq(self, 'kinds')
+            for k in self.kinds:
+                if k not in PANEL_KINDS:
+                    raise ValueError(f'panel {self.id!r} declares unknown '
+                                     f'kind {k!r}; expected one of '
+                                     f'{PANEL_KINDS}')
+            if self.kind not in self.kinds:
+                raise ValueError(
+                    f'panel {self.id!r} is drawn as {self.kind!r}, which is '
+                    f'not among the kinds it declares, {self.kinds}')
+            if 'xy' in self.kinds and len(self.kinds) > 1:
+                raise ValueError(
+                    f'panel {self.id!r} declares {self.kinds}: an xy panel '
+                    'carries curves and a grid panel carries a z grid, so '
+                    'they are different charts, not two readings of one')
         if self.read_axis not in ('x', 'y'):
             raise ValueError("read_axis must be 'x' or 'y'")
         if self.aspect not in (None, 'equal'):
@@ -417,7 +515,7 @@ class Mark:
 
 @dataclass(frozen=True)
 class ChartDoc:
-    """The chart document: the versioned IR a chart emitter returns.
+    r"""The chart document: the versioned IR a chart emitter returns.
 
     Parameters
     ----------
@@ -433,9 +531,12 @@ class ChartDoc:
         on top; that ordering is meaning).
     marks : tuple of Mark
     meta : dict
-        Chart-level semantic facts that are not drawable objects
-        (``z_log_ok``: the z grid spans enough orders of magnitude that a
-        log height reading is meaningful). JSON-representable values only.
+        Chart-level semantic facts that are not drawable objects and belong
+        to no single axis, panel or series: ``return_period_map`` (see
+        :data:`RETURN_PERIOD_MAPS`), ``ordinate`` (whether a severity panel
+        drew a pdf or a mass), ``basis`` and ``bases_available`` (which
+        stage of a reinsurance program is drawn, and which exist).
+        JSON-representable values only.
     tex : dict
         Plain string to its typeset form, for the strings in this document
         that have one: ``{'ǧ(s)': r'$\check g(s)$'}``. A renderer that can
@@ -492,11 +593,35 @@ class ChartDoc:
                 if ax is not None and ax not in axis_ids:
                     raise ValueError(
                         f'panel {p.id!r} references unknown axis {ax!r}')
+        drawn = {ax for p in self.panels
+                 for ax in (p.x_axis, p.y_axis, p.z_axis) if ax is not None}
         for a in self.axes:
-            if a.reciprocal_of is not None and a.reciprocal_of not in axis_ids:
+            if a.reciprocal_of is None:
+                continue
+            if a.reciprocal_of not in axis_ids:
                 raise ValueError(
                     f'axis {a.id!r} reciprocal_of unknown axis '
                     f'{a.reciprocal_of!r}')
+            # A paired reading is an alternative to a drawn axis, so it
+            # points at one and is not one itself. Both halves matter: a
+            # pair drawn as its own panel axis would put the same curve on
+            # screen twice, and a pair pointing at nothing on screen names
+            # a reading of a quantity nobody can see.
+            if a.id in drawn:
+                raise ValueError(
+                    f'axis {a.id!r} is the paired reading of '
+                    f'{a.reciprocal_of!r} and must not be named by a panel: '
+                    'it is an alternative reading of a drawn axis, not a '
+                    'drawn axis of its own')
+            if a.reciprocal_of not in drawn:
+                raise ValueError(
+                    f'axis {a.id!r} is the paired reading of '
+                    f'{a.reciprocal_of!r}, which no panel draws')
+        rp_map = self.meta.get('return_period_map')
+        if rp_map is not None and rp_map not in RETURN_PERIOD_MAPS:
+            raise ValueError(
+                f'unknown return_period_map {rp_map!r}; expected one of '
+                f'{RETURN_PERIOD_MAPS}')
         kinds = {p.id: p.kind for p in self.panels}
         # A grid panel carries exactly one surface, plus any number of x/y
         # overlays drawn over it (the iso-total diagonals of a joint
@@ -552,10 +677,15 @@ class ChartDoc:
 # "nothing special" and draws as a plain line. The polarity was inverted
 # against the meaning. Before adding a field here, ask which of its values a
 # consumer must act on; if that value is the default, it belongs in this list.
+#
+# ``scales`` and ``kinds`` are here for the same reason, from the other
+# side: their default is filled in rather than omitted, so a consumer reads
+# "this axis has one reading" as a fact rather than inferring it from an
+# absence, and the singleton case costs a handful of bytes.
 _ALWAYS = {
     ChartDoc: ('ir_version', 'name'),
-    Panel: ('id', 'kind', 'x_axis', 'y_axis'),
-    ChartAxis: ('id', 'label'),
+    Panel: ('id', 'kind', 'kinds', 'x_axis', 'y_axis'),
+    ChartAxis: ('id', 'label', 'scales'),
     ChartSeries: ('name', 'role', 'panel_id', 'support'),
     Mark: ('panel_id', 'orient', 'at'),
     SurfaceData: ('x', 'y', 'z'),

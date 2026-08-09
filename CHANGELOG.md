@@ -20,6 +20,26 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a233
+
+**[Chart-Declared-Readings] an axis declares the scales and ranges it may be read on, and a panel the forms it may take.** The third deliberate reopening of the signed-off chart IR, after `support` at `a214`, and the first job of part two of `dev/plan-chart-ir.md`. The principle is the one `scale` already stated, widened from one reading to the set of them: **which readings a quantity admits is a fact about the quantity, not about the drawing.** A log reading of a heavy tail is meaningful; a log reading of a distortion's unit square is not. So the document says which readings exist and a caller picks one, rather than every consumer inventing a per-chart list of buttons.
+
+Four declarations. `ChartAxis.scales` is the scales an axis may be read on, with `scale` staying the default; `ChartAxis.full_range` is the whole extent, offered as the alternative to `suggested_range`, which it therefore requires, and carried as numbers rather than as a flag because the extent of a log axis with an exact zero, or of a survival curve floored at `LOG_FLOOR`, is not the naive min and max of the series and working that out is emitter knowledge. `ChartAxis.reciprocal_of` was drafted at schema time and never emitted; it now has a stated contract, that the paired axis sits in `doc.axes`, is not named by any panel, points at an axis some panel does draw, and by its presence offers the return-period reading. `Panel.kinds` is the realizations a panel supports, so a joint density read flat or in relief is **one document declaring two realizations** rather than two registry entries to keep in step by hand forever.
+
+`scales` and `kinds` fill themselves with `(scale,)` and `(kind,)` when omitted, so a consumer never handles `None`, and both are always serialized: a singleton must read as "fixed" rather than as an absence to interpret. That is the polarity rule the `support` bug taught, applied from the other side.
+
+**`meta['return_period_map']` says how a paired axis is computed**, `reciprocal` for `T = 1 / v` and `complement` for `T = 1 / (1 - v)`, defaulting to the literal reciprocal the field name promises. It is needed because the return period of a *non-exceedance* axis of a loss is `1 / (1 - p)` and not `1 / p`, while a survival axis, and the shortfall probability of a signed P&L, both take the reciprocal directly. One fact about the document, so it lives in `meta` rather than on either axis.
+
+**`plot_chartdoc` gained the switches that select among the declarations**: `log`, `full_range`, `return_period` and `kind`, in the canonical control order the app also follows. Each acts on **every** axis or panel that declares the reading and on no other, so a document that declares nothing draws its one reading whatever it is asked for, and a caller never has to know which chart it is holding. `log_z` is deleted and `log` covers it. A log view of a window whose low end is an exact zero drops to the decade under the smallest positive value drawn, which is renderer knowledge: the emitter cannot know a reader will ask for log, and a fixed epsilon would crop or pad by orders of magnitude depending on the book.
+
+**The capability pattern improves.** A panel that declares a realization matplotlib draws natively gets it, rather than the 2-D projection with `(projection)` stamped on the title as a confession, and `strict=True` stops raising for it. Degradation is now what happens when a panel offers nothing this renderer can draw, which is what it always should have meant.
+
+`meta['z_log_ok']` retires: the surface pilot's z axis declares `scales=('linear', 'log')` instead, which is the same fact in the place that owns it. **Every document hash changes**, since `scales` and `kinds` are always serialized. That is a content address changing when content changes, and clients re-capture fixtures. `CHART_IR_VERSION` **stays 1**, and the rule for when it would move is now recorded in `ir.py` next to the constant: the version marks the point where a reader that ignores what it does not know would draw something *wrong*. A reader ignoring all four of these draws the default reading, which is correct and complete.
+
+No baseline moves: nothing about any default reading changed, and the distortion image gate still lands at 0, pixel for pixel.
+
+---
+
 ## 1.0.0a232
 
 **[Tweedie-Live-Object] `Aggregate.as_tweedie()` reports an aggregate's reproductive Tweedie parameters.** Returns a `TweedieParameters` named tuple, `(p, mean, dispersion)`, satisfying `variance = dispersion * mean ** p`, or `None`.

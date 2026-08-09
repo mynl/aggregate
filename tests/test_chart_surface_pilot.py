@@ -93,7 +93,11 @@ def test_emitter_document_shape(bv):
     doc = chart_joint_surface(bv)
     assert doc.name == 'joint_surface'
     assert [p.kind for p in doc.panels] == ['surface']
-    assert doc.meta['z_log_ok'] is True
+    # The log height reading is declared on the z axis itself, which is what
+    # retired the meta['z_log_ok'] flag at [Chart-Declared-Readings].
+    z_axis, = [a for a in doc.axes if a.id == 'z']
+    assert z_axis.scale == 'linear' and z_axis.scales == ('linear', 'log')
+    assert 'z_log_ok' not in doc.meta
     surf = doc.series[0].surface
     assert len(surf.x) <= DISPLAY_CELLS
     assert len(surf.y) <= DISPLAY_CELLS
@@ -156,7 +160,7 @@ def test_renderer_projection_stamp(bv):
 def test_renderer_log_z(bv):
     from aggregate.plots import plot_chartdoc, plt
     doc = chart_joint_surface(bv, display_log2=5)
-    fig = plot_chartdoc(doc, log_z=True)
+    fig = plot_chartdoc(doc, log=True)
     plt.close(fig)
 
 

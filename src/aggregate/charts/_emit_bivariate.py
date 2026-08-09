@@ -91,10 +91,10 @@ def _joint_surface(bv, display_log2=None):
     -------
     ChartDoc
         One 'surface' panel: axes labeled with the resolved component
-        labels, z linear with ``meta['z_log_ok'] = True`` declaring the
-        log-height toggle meaningful (a joint density spans four or five
-        orders of magnitude, so the log view is where tail dependence
-        lives). Values are display-cell *masses*, not ordinates.
+        labels, and a z axis read linearly by default that declares
+        ``scales=('linear', 'log')``, because a joint density spans four or
+        five orders of magnitude and the log reading is where tail
+        dependence lives. Values are display-cell *masses*, not ordinates.
     """
     density = getattr(bv, 'density', None)
     if density is None:
@@ -123,7 +123,8 @@ def _joint_surface(bv, display_log2=None):
         axes=(
             ChartAxis(id='x0', label=str(labels[0]), unit='currency'),
             ChartAxis(id='x1', label=str(labels[1]), unit='currency'),
-            ChartAxis(id='z', label='density', unit='density'),
+            ChartAxis(id='z', label='density', unit='density',
+                      scales=('linear', 'log')),
         ),
         panels=(
             Panel(id='joint', kind='surface', x_axis='x0', y_axis='x1',
@@ -133,7 +134,6 @@ def _joint_surface(bv, display_log2=None):
             ChartSeries(name='joint density', role='joint',
                         panel_id='joint', surface=surface),
         ),
-        meta={'z_log_ok': True},
     )
 
 

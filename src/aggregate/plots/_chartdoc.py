@@ -1,25 +1,35 @@
 """The one generic ChartDoc renderer: matplotlib realizes the chart IR.
 
 Grows exactly what each converted chart needs (``dev/plan-chart-ir.md``,
-pass three). Today, from the surface pilot: the 'surface' and 'heatmap'
-panel kinds. matplotlib has no faithful 3-D surface, so a 'surface' panel
-renders as its honest 2-D reading, a ``pcolormesh`` projection of the z
-grid with a contour overlay, and the title is stamped ``(projection)``;
-``strict=True`` raises :class:`~aggregate.charts.ir.ChartCapabilityError`
-instead. That is the capability-declaration pattern every later kind
-follows: degrade honestly and say so, or refuse loudly, never approximate
-silently.
+pass three). matplotlib has no faithful 3-D surface, so a 'surface' panel
+that offers no other realization renders as its honest 2-D reading, a
+``pcolormesh`` projection of the z grid with a contour overlay, and the
+title is stamped ``(projection)``; ``strict=True`` raises
+:class:`~aggregate.charts.ir.ChartCapabilityError` instead. A panel that
+declares ``kinds`` this renderer *can* draw is drawn that way instead, with
+no confession to make. That is the capability-declaration pattern every
+later kind follows: prefer a declared realization, degrade honestly and say
+so, or refuse loudly, never approximate silently.
+
+The four switches on :func:`plot_chartdoc` are the matplotlib side of the
+document's declared readings, and they follow the same surfacing rule as
+the app's control strip: a switch acts on **every** axis or panel that
+declares the reading and is ignored everywhere else, so one call draws one
+coherent picture rather than a per-axis patchwork. Which readings exist is
+the document's business; which one is on screen is the caller's.
 
 Renderer-side decisions only live here: the sequential ramp (white to the
 house primary, one-directional like the density it colors), figure sizing,
-the colorbar. Everything semantic (grids, labels, scales, the log-toggle
-meaningfulness flag) comes off the document.
+the colorbar, and the floor a log view puts under a window whose declared
+low end is zero. Everything semantic (grids, labels, the scales an axis may
+be read on, the forms a panel may take) comes off the document.
 """
 
 import numpy as np
 
 from ..charts.ir import ChartCapabilityError
 from ..constants import LOG_FLOOR
+from ._quantile import MAX_RETURN_PERIOD
 from ._style import plt, mpl, FIG_H, FIG_W, make_grid
 
 __all__ = ['plot_chartdoc']
@@ -29,6 +39,70 @@ __all__ = ['plot_chartdoc']
 # conversion lands.
 _NATIVE = {'heatmap', 'xy'}
 _DEGRADED = {'surface'}
+
+
+def _realization(panel, requested):
+    """The kind this renderer will draw ``panel`` as.
+
+    A panel declares the realizations it supports; this picks one. An
+    explicit request wins and is refused by name if the panel does not
+    offer it, because silently drawing something else is the failure the
+    capability pattern exists to prevent. Otherwise the panel's default
+    kind is taken when this renderer draws it natively, then any other
+    declared kind it draws natively (which is how a joint density asked
+    for in relief arrives as a heatmap here and a surface in the browser),
+    and only failing both does it fall through to the default for the
+    caller to accept or refuse.
+    """
+    if requested is not None:
+        if requested not in panel.kinds:
+            raise ChartCapabilityError(
+                f'panel {panel.id!r} was asked for kind {requested!r}, which '
+                f'it does not declare; it offers {panel.kinds}')
+        return requested
+    if panel.kind in _NATIVE:
+        return panel.kind
+    for k in panel.kinds:
+        if k in _NATIVE:
+            return k
+    return panel.kind
+
+
+def _decade_floor(values):
+    """The decade at or under the smallest positive value, or ``None``.
+
+    A log view of a window whose declared low end is zero needs a bottom,
+    and the honest one is a round decade under the smallest thing actually
+    drawn: gridlines land on powers of ten, which is how a log axis is
+    read, and nothing real is cropped.
+    """
+    v = np.asarray(values, dtype=float)
+    v = v[np.isfinite(v) & (v > 0)]
+    if not v.size:
+        return None
+    return float(10.0 ** np.floor(np.log10(v.min())))
+
+
+def _axis_scale(axis, log):
+    """The scale this axis is drawn on: its default, or its log reading.
+
+    ``log`` acts on every axis that declares a log reading and on no other,
+    which is the surfacing rule the app's control strip follows: one switch,
+    applied wherever the document says a log reading is meaningful.
+    """
+    return 'log' if (log and 'log' in axis.scales) else axis.scale
+
+
+def _axis_window(axis, full):
+    """The window this axis is drawn in: its suggestion, or its full extent.
+
+    An axis offers the zoom-out only by carrying ``full_range``; where it
+    does not, ``full`` finds nothing to act on and the suggestion stands,
+    because a chart whose window is its meaning has no other reading.
+    """
+    if full and axis.full_range is not None:
+        return axis.full_range
+    return axis.suggested_range
 
 
 # The ladder for an atomic series, in atoms and in pixels. Both are
@@ -126,19 +200,24 @@ def _house_ramp():
         'aggregate_seq', ['#ffffff', c0])
 
 
-def _render_grid_panel(ax, doc, panel, series_list, log_z):
+def _render_grid_panel(ax, doc, panel, series_list, log=False):
     """Render one z-grid panel (surface projection or heatmap).
 
     The panel's one surface series draws as the mesh; any x/y series on the
     same panel are overlays, drawn over it in document order (the iso-total
     diagonals of a joint density). Overlays are neutral and thin: the mesh
     is the subject, and a heavy line over a color field hides it.
+
+    ``log`` acts on the z axis when the document declares a log reading of
+    it, which for a joint density is where tail dependence lives, and on
+    the plane axes on the same terms.
     """
     surf = next(s for s in series_list if s.surface is not None).surface
     x = np.asarray(surf.x, dtype=float)
     y = np.asarray(surf.y, dtype=float)
     z = np.asarray(surf.z, dtype=float)
     axes = {a.id: a for a in doc.axes}
+    log_z = _axis_scale(axes[panel.z_axis], log) == 'log'
     if log_z:
         # One decade under the smallest mass actually present (ignoring
         # float dust), the app's floor-not-holes rule: a zero cell sits on
@@ -169,17 +248,20 @@ def _render_grid_panel(ax, doc, panel, series_list, log_z):
     ax.set(xlim=xlim, ylim=ylim,
            xlabel=_typeset(doc, axes[panel.x_axis].label),
            ylabel=_typeset(doc, axes[panel.y_axis].label))
+    for which, axis_id in (('x', panel.x_axis), ('y', panel.y_axis)):
+        if _axis_scale(axes[axis_id], log) == 'log':
+            getattr(ax, f'set_{which}scale')('log')
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
 
 
-def _apply_axis(ax, which, axis):
+def _apply_axis(ax, which, axis, scale, window, floor=None):
     """Realize one ChartAxis on a matplotlib axis ('x' or 'y').
 
-    The suggested range is the emitter's answer to which slice of the grid
-    is worth looking at, and a heavy tail makes that the difference between
-    a readable chart and every visible mass in a sliver at the origin. So
-    the initial view honors it, exactly as :class:`ChartAxis` documents;
+    The window is the emitter's answer to which slice of the grid is worth
+    looking at, and a heavy tail makes that the difference between a
+    readable chart and every visible mass in a sliver at the origin. So the
+    initial view honors it, exactly as :class:`ChartAxis` documents;
     panning and zooming afterwards is the reader's business.
 
     It is the range of the *data*, not of the frame, so a linear axis is
@@ -189,51 +271,115 @@ def _apply_axis(ax, which, axis):
     otherwise be drawn along the frame, where it cannot be read. A log
     range arrives as whole decades and is drawn as whole decades, because
     a decade gridline is how that axis is read.
+
+    A window read on log needs a positive bottom, and the low end of a loss
+    or density window is routinely an exact zero. ``floor`` supplies the
+    decade under the smallest positive value drawn: the emitter cannot
+    compute it, since it does not know the reader will ask for log, and
+    inventing a fixed epsilon here would crop or pad by orders of magnitude
+    depending on the book.
     """
-    if axis.scale == 'log':
+    if scale == 'log':
         getattr(ax, f'set_{which}scale')('log')
-    if axis.suggested_range is not None:
-        lo, hi = axis.suggested_range
-        if axis.scale == 'log':
+    if window is not None:
+        lo, hi = window
+        if scale == 'log':
+            if lo <= 0:
+                if floor is None:
+                    return
+                lo = floor
             getattr(ax, f'set_{which}lim')(lo, hi)
         else:
             margin = plt.rcParams[f'axes.{which}margin'] * (hi - lo)
             getattr(ax, f'set_{which}lim')(lo - margin, hi + margin)
         # The unit interval draws with pinned round ticks: the reference
         # gridlines of a probability square are part of how it is read.
-        if (lo, hi) == (0.0, 1.0) and axis.scale == 'linear':
+        if (lo, hi) == (0.0, 1.0) and scale == 'linear':
             getattr(ax, f'set_{which}ticks')(np.linspace(0, 1, 6))
 
 
-def _panel_window(panel, axes, series_list):
-    """The x range the panel will show, before anything is drawn.
+def _paired_reading(doc, axis_id):
+    """The paired return-period axis for ``axis_id``, if the document has one."""
+    for a in doc.axes:
+        if a.reciprocal_of == axis_id:
+            return a
+    return None
 
-    The emitter's suggestion where there is one, else the data's own
-    extent. Computed off the document rather than off the axes so the
-    atom count does not depend on the order things are plotted in.
+
+def _return_periods(values, how):
+    """Return periods from the probabilities on a paired axis.
+
+    ``T = 1 / v`` under the 'reciprocal' map, ``T = 1 / (1 - v)`` under
+    'complement' (see :data:`~aggregate.charts.ir.RETURN_PERIOD_MAPS`).
+    The quantile function saturates at its far end, where ``T`` diverges,
+    so a non-finite or non-positive result becomes a gap: the curve stops
+    where the grid stops knowing, rather than running out to an invented
+    bound.
     """
-    window = axes[panel.x_axis].suggested_range
+    v = np.asarray(values, dtype=float)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        t = 1.0 / (1.0 - v) if how == 'complement' else 1.0 / v
+    return np.where(np.isfinite(t) & (t > 0.0), t, np.nan)
+
+
+def _panel_window(window, values):
+    """The range the panel will show, before anything is drawn.
+
+    The emitter's window where there is one, else the data's own extent.
+    Computed off the document rather than off the axes so the atom count
+    does not depend on the order things are plotted in.
+    """
     if window is not None:
         return window
-    xs = [v for s in series_list if s.x for v in s.x if v is not None]
-    return (min(xs), max(xs)) if xs else (0.0, 1.0)
+    finite = values[np.isfinite(values)] if values.size else values
+    return ((float(finite.min()), float(finite.max())) if finite.size
+            else (0.0, 1.0))
 
 
-def _render_xy_panel(ax, doc, panel, series_list):
-    """Render one 'xy' panel: role-styled curves, gaps broken, marks drawn."""
+def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
+                     return_period=False):
+    """Render one 'xy' panel: role-styled curves, gaps broken, marks drawn.
+
+    ``return_period`` swaps a drawn probability axis for the paired reading
+    the document offers on it, which is a change of coordinates and not of
+    data: the same curve, interrogated at 1 in 200 rather than at 0.995.
+    Panels the document offers no pairing for are untouched.
+    """
     axes = {a.id: a for a in doc.axes}
-    window = _panel_window(panel, axes, series_list)
+    x_axis, y_axis = axes[panel.x_axis], axes[panel.y_axis]
+    x_map = y_map = None
+    if return_period:
+        how = doc.meta.get('return_period_map', 'reciprocal')
+        pair = _paired_reading(doc, panel.x_axis)
+        if pair is not None:
+            x_axis, x_map = pair, how
+        pair = _paired_reading(doc, panel.y_axis)
+        if pair is not None:
+            y_axis, y_map = pair, how
+
+    def coords(values, mapping):
+        out = np.array([np.nan if v is None else v for v in values],
+                       dtype=float)
+        return _return_periods(out, mapping) if mapping else out
+
+    drawn = [(s, coords(s.x, x_map), coords(s.y, y_map),
+              None if s.y2 is None else coords(s.y2, y_map))
+             for s in series_list]
+    all_x = np.concatenate([x for _, x, _, _ in drawn]) if drawn else np.array([])
+    all_y = np.concatenate([y for _, _, y, _ in drawn]) if drawn else np.array([])
+    x_window = _panel_window(_axis_window(x_axis, full), all_x)
+    if x_map and _axis_window(x_axis, full) is None:
+        # Nothing declared a window for the return-period reading, and its
+        # top is the saturating end of the quantile function, so the house
+        # cap stands in: a billion-year event is past anyone's question.
+        x_window = (x_window[0], min(x_window[1], MAX_RETURN_PERIOD))
     labeled = False
-    for s in series_list:
-        x = np.array([np.nan if v is None else v for v in s.x], dtype=float)
-        y = np.array([np.nan if v is None else v for v in s.y], dtype=float)
+    for s, x, y, y2 in drawn:
         if s.role == 'identity':
             # The reference diagonal: neutral, thin, never in the legend.
             ax.plot(x, y, color='k', lw=0.5, alpha=0.5)
             continue
-        if s.y2 is not None:
-            y2 = np.array([np.nan if v is None else v for v in s.y2],
-                          dtype=float)
+        if y2 is not None:
             ax.fill_between(x, y, y2, alpha=0.15, label=_typeset(doc, s.name))
             labeled = True
             continue
@@ -243,27 +389,35 @@ def _render_xy_panel(ax, doc, panel, series_list):
             # truthful drawing and no ladder applies.
             ax.plot(x, y, label=label)
         else:
-            _draw_atomic(ax, x, y, label, axes[panel.y_axis], window)
+            _draw_atomic(ax, x, y, label, y_axis, x_window)
         labeled = True
     for m in doc.marks:
         if m.panel_id != panel.id:
             continue
+        at, mapping = m.at, (x_map if m.orient == 'v' else y_map)
+        if mapping:
+            at = float(_return_periods(np.array([at]), mapping)[0])
+            if not np.isfinite(at):
+                continue
         line = ax.axvline if m.orient == 'v' else ax.axhline
-        line(m.at, lw=0.75 if not m.faint else 0.5, color='C7', ls='--',
+        line(at, lw=0.75 if not m.faint else 0.5, color='C7', ls='--',
              alpha=0.45 if m.faint else 1.0)
-    _apply_axis(ax, 'x', axes[panel.x_axis])
-    _apply_axis(ax, 'y', axes[panel.y_axis])
+    _apply_axis(ax, 'x', x_axis, _axis_scale(x_axis, log), x_window,
+                _decade_floor(all_x))
+    _apply_axis(ax, 'y', y_axis, _axis_scale(y_axis, log),
+                _axis_window(y_axis, full), _decade_floor(all_y))
     # The document labels its axes and the renderer draws what it is given,
     # as the grid panels already do.
-    ax.set(xlabel=_typeset(doc, axes[panel.x_axis].label),
-           ylabel=_typeset(doc, axes[panel.y_axis].label))
+    ax.set(xlabel=_typeset(doc, x_axis.label),
+           ylabel=_typeset(doc, y_axis.label))
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
     if labeled and sum(s.role != 'identity' for s in series_list) > 1:
         ax.legend(loc='upper left', fontsize='x-small')
 
 
-def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
+def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
+                  return_period=False, kind=None):
     """Render a chart document with matplotlib.
 
     Parameters
@@ -276,12 +430,26 @@ def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
         canvas helpers. Single-panel documents only, since a shared axis
         is a property of the figure and not of one axes.
     strict : bool
-        Raise :class:`ChartCapabilityError` for any panel kind this
-        renderer cannot realize faithfully ('surface'), instead of the
-        declared degradation.
-    log_z : bool
-        Log color scale for the z grid. Only honored when the document
-        declares ``meta['z_log_ok']``; meaningless otherwise and ignored.
+        Raise :class:`ChartCapabilityError` for any panel this renderer
+        can only degrade, instead of drawing the declared degradation.
+    log : bool
+        Read every axis that declares a log scale on log. An axis that
+        declares one reading is untouched, so a document with nothing to
+        say about log draws identically either way.
+    full_range : bool
+        Read every axis that carries a ``full_range`` at its full extent
+        instead of at the window it suggests. Axes carrying only a
+        suggestion are untouched.
+    return_period : bool
+        Draw a probability axis the document pairs with a return-period
+        reading as that reading (:attr:`ChartAxis.reciprocal_of`), which
+        spreads the rare tail so it can be read off directly. The
+        transform comes from ``meta['return_period_map']``.
+    kind : str, optional
+        Realize every panel that declares this kind as this kind, for a
+        panel offering more than one (a joint density as 'heatmap' rather
+        than 'surface'). ``None`` lets the renderer pick, preferring the
+        panel's own default and then any declared kind it draws natively.
 
     Returns
     -------
@@ -291,24 +459,36 @@ def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
     Raises
     ------
     ChartCapabilityError
-        Under ``strict`` for degraded kinds, and always for kinds with no
-        realization here yet.
+        For a requested kind a panel does not declare, under ``strict``
+        for degraded kinds, and always for kinds with no realization here
+        yet.
+
+    Notes
+    -----
+    The four reading switches act on **every** axis or panel that declares
+    the reading and on no other, which is the same surfacing rule the app
+    applies to its control strip: declaring a reading on an axis asserts
+    both that it is meaningful there and that it is reasonable for it to
+    move when its siblings do. A document that declares nothing draws its
+    one reading whatever is asked for, so a caller never has to know which
+    chart it holds.
     """
-    for panel in doc.panels:
-        if panel.kind in _NATIVE:
+    if not doc.panels:
+        raise ChartCapabilityError(f'document {doc.name!r} has no panels')
+    realized = [_realization(panel, kind) for panel in doc.panels]
+    for panel, realization in zip(doc.panels, realized):
+        if realization in _NATIVE:
             continue
-        if panel.kind in _DEGRADED:
+        if realization in _DEGRADED:
             if strict:
                 raise ChartCapabilityError(
-                    f"panel {panel.id!r} kind {panel.kind!r}: matplotlib "
+                    f"panel {panel.id!r} kind {realization!r}: matplotlib "
                     'has no faithful 3-D surface; non-strict renders the '
                     '2-D projection')
             continue
         raise ChartCapabilityError(
-            f'panel {panel.id!r} kind {panel.kind!r} is not yet realized '
+            f'panel {panel.id!r} kind {realization!r} is not yet realized '
             'by the matplotlib renderer')
-    if not doc.panels:
-        raise ChartCapabilityError(f'document {doc.name!r} has no panels')
     if ax is not None and len(doc.panels) > 1:
         raise ChartCapabilityError(
             f'document {doc.name!r} has {len(doc.panels)} panels and cannot '
@@ -318,7 +498,7 @@ def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
     if len(doc.panels) == 1:
         panel = doc.panels[0]
         if ax is None:
-            if panel.kind == 'xy':
+            if realized[0] == 'xy':
                 # An equal-aspect single panel is a square figure (the unit
                 # square reads at the small preset, as the compositor does).
                 size = ((FIG_H, FIG_H) if panel.aspect == 'equal'
@@ -337,15 +517,15 @@ def plot_chartdoc(doc, ax=None, strict=False, log_z=False):
         _, grid = make_grid(1, len(doc.panels), squeeze=False, sharex=shared)
         axs = list(grid[0])
 
-    for panel, panel_ax in zip(doc.panels, axs):
+    for panel, realization, panel_ax in zip(doc.panels, realized, axs):
         series = [s for s in doc.series if s.panel_id == panel.id]
         panel_title = panel.title or title
-        if panel.kind == 'xy':
-            _render_xy_panel(panel_ax, doc, panel, series)
+        if realization == 'xy':
+            _render_xy_panel(panel_ax, doc, panel, series, log=log,
+                             full=full_range, return_period=return_period)
         else:
-            _render_grid_panel(panel_ax, doc, panel, series,
-                               bool(log_z) and bool(doc.meta.get('z_log_ok')))
-            if panel.kind == 'surface':
+            _render_grid_panel(panel_ax, doc, panel, series, log=log)
+            if realization in _DEGRADED:
                 panel_title = f'{panel_title} (projection)'
         panel_ax.set_title(_typeset(doc, panel_title))
     fig = axs[0].figure

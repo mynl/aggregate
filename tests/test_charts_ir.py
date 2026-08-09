@@ -68,17 +68,17 @@ def small_surface_doc():
         axes=(
             ChartAxis(id='x0', label='Wind', unit='currency'),
             ChartAxis(id='x1', label='Flood', unit='currency'),
-            ChartAxis(id='z', label='density', unit='density'),
+            ChartAxis(id='z', label='density', unit='density',
+                      scales=('linear', 'log')),
         ),
         panels=(
             Panel(id='joint', kind='surface', x_axis='x0', y_axis='x1',
-                  z_axis='z'),
+                  z_axis='z', kinds=('surface', 'heatmap')),
         ),
         series=(
             ChartSeries(name='joint density', role='joint',
                         panel_id='joint', surface=surf),
         ),
-        meta={'z_log_ok': True},
     )
 
 
@@ -285,6 +285,105 @@ def test_band_series_y2():
     with pytest.raises(ValueError, match='y2'):
         ChartSeries(name='m', role='band', panel_id='p',
                     x=(0.0, 1.0), y=(0.0, 0.5), y2=(0.1,))
+
+
+# ------------------------------------------ [Chart-Declared-Readings] fields
+
+def test_scales_fill_with_the_drawn_scale():
+    """Always concrete, so no consumer handles ``None``."""
+    assert ChartAxis(id='a', label='a').scales == ('linear',)
+    assert ChartAxis(id='a', label='a', scale='log').scales == ('log',)
+    assert ChartAxis(id='a', label='a', scales=['linear', 'log']).scales == \
+        ('linear', 'log')
+
+
+def test_kinds_fill_with_the_drawn_kind():
+    p = Panel(id='p', kind='xy', x_axis='a', y_axis='b')
+    assert p.kinds == ('xy',)
+    grid = Panel(id='p', kind='surface', x_axis='a', y_axis='b', z_axis='z',
+                 kinds=['surface', 'heatmap'])
+    assert grid.kinds == ('surface', 'heatmap')
+
+
+def test_declared_readings_are_always_serialized():
+    """A singleton reads as "fixed" rather than as an absence to interpret."""
+    doc = small_xy_doc()
+    axis = canonical_dict(doc)['axes'][0]
+    panel = canonical_dict(doc)['panels'][0]
+    assert axis['scales'] == ['linear']
+    assert panel['kinds'] == ['xy']
+
+
+def test_the_drawn_reading_must_be_among_those_declared():
+    with pytest.raises(ValueError, match='not among the scales'):
+        ChartAxis(id='a', label='a', scale='log', scales=('linear',))
+    with pytest.raises(ValueError, match='declares unknown scale'):
+        ChartAxis(id='a', label='a', scales=('linear', 'probit'))
+    with pytest.raises(ValueError, match='not among the kinds'):
+        Panel(id='p', kind='xy', x_axis='a', y_axis='b', kinds=('heatmap',))
+    with pytest.raises(ValueError, match='declares unknown kind'):
+        Panel(id='p', kind='xy', x_axis='a', y_axis='b', kinds=('xy', 'pie'))
+
+
+def test_xy_does_not_combine_with_a_grid_kind():
+    """Different payloads, so different charts rather than two readings."""
+    with pytest.raises(ValueError, match='different charts'):
+        Panel(id='p', kind='xy', x_axis='a', y_axis='b',
+              kinds=('xy', 'heatmap'))
+
+
+def test_full_range_declares_the_zoom_out():
+    """Presence is the declaration, and it needs a window to be the other of."""
+    axis = ChartAxis(id='loss', label='Loss', suggested_range=(0.0, 10.0),
+                     full_range=(0.0, 1e6))
+    assert axis.full_range == (0.0, 1e6)
+    # the distortion case: a window that IS the meaning offers nothing else
+    assert ChartAxis(id='s', label='s',
+                     suggested_range=(0.0, 1.0)).full_range is None
+    with pytest.raises(ValueError, match='no suggested_range'):
+        ChartAxis(id='loss', label='Loss', full_range=(0.0, 1e6))
+    with pytest.raises(ValueError, match='full_range must be'):
+        ChartAxis(id='loss', label='Loss', suggested_range=(0.0, 1.0),
+                  full_range=(0.0, 1.0, 2.0))
+
+
+def test_full_range_is_content_and_hashes():
+    plain = small_xy_doc()
+    wider = small_xy_doc(axes=tuple(
+        dataclasses.replace(a, full_range=(0.0, 100.0)) if a.id == 'loss'
+        else a for a in plain.axes))
+    assert doc_hash(wider) != doc_hash(plain)
+    assert 'full_range' not in canonical_dict(plain)['axes'][0]
+
+
+def test_a_paired_axis_is_not_itself_drawn():
+    """It is an alternative reading of a drawn axis, not a second axis."""
+    doc = small_xy_doc()
+    rp, = [a for a in doc.axes if a.id == 'rp']
+    assert rp.reciprocal_of == 'surv'
+    with pytest.raises(ValueError, match='must not be named by a panel'):
+        small_xy_doc(panels=(
+            Panel(id='density', kind='xy', x_axis='loss', y_axis='dens'),
+            Panel(id='tail', kind='xy', x_axis='loss', y_axis='rp'),
+        ))
+
+
+def test_a_paired_axis_points_at_something_drawn():
+    with pytest.raises(ValueError, match='which no panel draws'):
+        ChartDoc(name='t',
+                 axes=(ChartAxis(id='a', label='a'),
+                       ChartAxis(id='b', label='b'),
+                       ChartAxis(id='hidden', label='hidden'),
+                       ChartAxis(id='rp', label='return period',
+                                 reciprocal_of='hidden')),
+                 panels=(Panel(id='p', kind='xy', x_axis='a', y_axis='b'),))
+
+
+def test_return_period_map_vocabulary():
+    for how in ('reciprocal', 'complement'):
+        assert small_xy_doc(meta={'return_period_map': how})
+    with pytest.raises(ValueError, match='unknown return_period_map'):
+        small_xy_doc(meta={'return_period_map': 'inverse'})
 
 
 # -------------------------------------------------------------- determinism

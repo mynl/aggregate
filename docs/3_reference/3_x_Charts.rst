@@ -42,6 +42,8 @@ The document schema. ``CHART_IR_VERSION`` is how a consumer detects a schema cha
 
 :func:`~aggregate.charts.ir.canonical_dict` and :func:`~aggregate.charts.ir.canonical_json` give a deterministic serialization, and :func:`~aggregate.charts.ir.doc_hash` the first twelve hex characters of its sha256. The same document gives the same bytes and the same hash on any machine on any run, which is what lets a client cache on an ETag.
 
+A document also declares the **readings** each quantity admits, which is a fact about the quantity and not about the drawing: a log reading of a heavy tail is meaningful, a log reading of a distortion's unit square is not. :attr:`~aggregate.charts.ir.ChartAxis.scales` lists the scales an axis may be read on and :attr:`~aggregate.charts.ir.ChartAxis.full_range` the extent it may be zoomed out to, both alongside the default reading rather than replacing it; :attr:`~aggregate.charts.ir.ChartAxis.reciprocal_of` pairs a probability axis with its return-period reading, computed by the map in ``meta['return_period_map']`` (see :data:`~aggregate.charts.ir.RETURN_PERIOD_MAPS`); and :attr:`~aggregate.charts.ir.Panel.kinds` lists the forms a panel may take, so a joint density read flat or in relief is one document declaring two realizations rather than two charts to keep in step. A reader that ignores all four draws the default reading, which is correct and complete, which is why they landed without a version bump.
+
 .. currentmodule:: aggregate.charts.ir
 
 .. autosummary::
@@ -59,6 +61,7 @@ The document schema. ``CHART_IR_VERSION`` is how a consumer detects a schema cha
    stamp
    CHART_IR_VERSION
    SUPPORT_KINDS
+   RETURN_PERIOD_MAPS
 
 .. automodule:: aggregate.charts.ir
 
@@ -67,7 +70,9 @@ Rendering
 
 .. currentmodule:: aggregate.plots
 
-:func:`~aggregate.plots.plot_chartdoc` is the generic matplotlib renderer: it draws any document the schema can express, choosing stems, steps or a line from each series' declared support and the room each atom gets. A renderer asked strictly for a panel kind it cannot realize raises :class:`~aggregate.charts.ir.ChartCapabilityError` rather than approximating silently; matplotlib and a 3-D surface is the live case, where the honest non-strict answer is a labeled 2-D projection.
+:func:`~aggregate.plots.plot_chartdoc` is the generic matplotlib renderer: it draws any document the schema can express, choosing stems, steps or a line from each series' declared support and the room each atom gets. A renderer asked strictly for a panel kind it cannot realize raises :class:`~aggregate.charts.ir.ChartCapabilityError` rather than approximating silently; matplotlib and a 3-D surface is the live case, where the honest non-strict answer is a labeled 2-D projection, and a panel offering a realization the renderer does draw natively gets that one instead, with nothing to confess.
+
+Its ``log``, ``full_range``, ``return_period`` and ``kind`` switches select among the readings a document declares. Each acts on every axis or panel that declares the reading and on no other, which is the same surfacing rule the browser applies to its control strip, so a document that declares nothing draws its one reading whatever it is asked for and a caller never has to know which chart it is holding.
 
 .. autosummary::
 

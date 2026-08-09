@@ -474,6 +474,20 @@
   `dev/note-all-chart-asks.md`; its half is
   `aggregate_api/dev/plan-plot-ir-api.md`. Note `chart_reins` **is**
   already registered for `Portfolio`, so that ask in the note is stale.
+  **Part two progress:** job 1 `[Chart-Declared-Readings]` landed a233
+  (`ChartAxis.scales` / `full_range`, `Panel.kinds`, the stated
+  `reciprocal_of` contract, `meta['return_period_map']` carrying the
+  `1/v` versus `1/(1-v)` branch, `plot_chartdoc`'s four switches with
+  `log_z` deleted, `meta['z_log_ok']` retired, every hash changed,
+  `CHART_IR_VERSION` still 1 with the bump rule now written down).
+  Two author decisions taken before execution, 2026-08-09: the renderer
+  selects a reading through four named switches rather than a `reading=`
+  mapping or per-axis overrides; and the Lee panel keeps **non-exceedance
+  p** on its probability axis, so `reciprocal_of` is widened by
+  `meta['return_period_map']` rather than the axis being changed to carry
+  the interrogated tail. `ChartDoc.tex` totality is job 1b, next, and it
+  does touch every emitter, since totality means each writes an entry for
+  every human-facing string it emits.
 
 ---
 

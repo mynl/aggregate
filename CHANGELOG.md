@@ -20,6 +20,25 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a245
+
+**[View-Pair-Spread] the view-pair keyword gets its own line in the spread layout.** `netceded`, `grossceded` and `grossnet` used to be glued onto the aggregate's head line, so a spread render opened `grossceded agg Property` and put the clauses one level in. The keyword is now the block head with the whole aggregate as its single child, which reads as what it is: a view pair taken *of* an aggregate.
+
+```
+grossceded
+  agg Property
+    80 claims
+    500 xs 0
+    sev lognorm 50 cv 1.2
+    occurrence net of
+      50% so 375 xs 126
+    poisson
+```
+
+Terse output is byte-for-byte unchanged (`_render_terse` space-joins a head back onto its children, so the single-line form still reads `grossceded agg Property 80 claims ...`), and so are round trips. `src/aggregate/agg/library.agg` still writes its four `netceded` entries in the old flat form, which parses the same and is left alone.
+
+---
+
 ## 1.0.0a244
 
 **[Chart-Reins] the reinsurance document is redrawn as the occurrence plot, and the last compositor goes.** `chart_reins` is rewritten to the shape `Aggregate.reins_occ_plot` draws, that method now renders it, and `plots/_aggregate.py` and `plots/_quantile.py` are both **deleted**: the occurrence plot was the quantile worker's last caller. This is the ninth and last job of `dev/plan-chart-ir.md` part two.

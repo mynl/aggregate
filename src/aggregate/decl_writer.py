@@ -1087,8 +1087,11 @@ def _render_bvagg(name: str, spec: dict, trailer: bool = True) -> _Block:
         kw = _kw_for.get(views, 'netceded')
         kind, sub_name, sub_spec = spec['units'][0]
         unit = _render_agg_or_pnl(kind, sub_name, sub_spec, trailer)
-        # prepend the view keyword to the unit's head line
-        return _Block(f'{kw} {unit.head}', unit.children, unit.sep, unit.tab)
+        # the view keyword is the block head and the whole unit its single
+        # child, so spread puts ``grossceded`` on its own line with ``agg NAME``
+        # indented under it and the unit's clauses one level deeper again;
+        # terse space-joins the two back into the historical single line
+        return _Block(kw, [unit])
 
     components = [_render_agg_or_pnl(k, n, s, trailer) for k, n, s in spec['units']]
     return _Block(f'bivariate {name}', [

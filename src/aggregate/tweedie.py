@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 #: Produced by :meth:`aggregate.Aggregate.as_tweedie`, and carried on a parsed
 #: spec under the private ``_tweedie`` key as the record that a ``tweedie``
 #: clause (rather than its expansion) is what the author wrote. See
-#: ``dev/plan-tweedie.md`` ([Tweedie-Round-Trip]).
+#: ``dev/done/plan-tweedie.md`` ([Tweedie-Round-Trip]).
 TweedieParameters = namedtuple('TweedieParameters', ['p', 'mean', 'dispersion'])
 
 

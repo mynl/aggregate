@@ -1944,7 +1944,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             public constructor contract. It is an argument rather than an
             underwriter-applied stamp because a parsed spec is splatted
             straight into this constructor at eleven call sites and there is no
-            choke point to pop it at. See dev/plan-tweedie.md.
+            choke point to pop it at. See dev/done/plan-tweedie.md.
         """
 
         # have to be ready for inputs to be in a list, e.g. comes that way from Pandas via Excel
@@ -4805,6 +4805,87 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         from .underwriter import build
         return build(self._frequency_program(f'{self.name}.freq'))
+
+    def as_tweedie(self):
+        """The reproductive Tweedie parameters of this aggregate, or ``None``.
+
+        A Tweedie with ``1 < p < 2`` *is* a compound Poisson distribution with
+        gamma severity, so any aggregate of that shape has reproductive
+        parameters whether or not it was declared with the ``tweedie`` keyword.
+        This reports them.
+
+        Returns
+        -------
+        TweedieParameters or None
+            ``(p, mean, dispersion)``, with ``variance = dispersion * mean ** p``.
+            ``None`` when the aggregate is not a plain compound Poisson-gamma.
+
+        Notes
+        -----
+        Two sources, one answer. When the object was declared as
+        ``tweedie <p> <mean> <dispersion>`` the declared triple is returned
+        verbatim, off the private ``_tweedie`` provenance key the parser
+        records. Otherwise the triple is *derived* from the engine by
+        :func:`aggregate.tweedie.tweedie_convert`, running its
+        ``(lambda, alpha, beta)`` to ``(p, mu, sigma^2)`` direction over the
+        Poisson mean and the gamma shape and scale.
+
+        That second path is the point. ``10.05 claims sev gamma 0.0995 cv
+        0.0709 poisson`` is the same distribution as ``tweedie 1.005 1 0.1`` and
+        answers here too, so the feature is about the mathematics rather than
+        about which spelling was used. The unparser deliberately does *not*
+        work this way: it renders from provenance alone, because rewriting an
+        aggregate into a spelling its author did not choose is not its job.
+        See ``dev/done/plan-tweedie.md``.
+
+        Recognition is refused for anything that is no longer a bare compound
+        Poisson-gamma: reinsurance or a layer at either level, a limit or
+        attachment on the severity, a mixed or weighted severity, a location
+        shift or splice, a reflected severity, a limit profile, a zero-modified
+        or truncated frequency, and any method-of-moments ``approximate``
+        fit (whose engine is a fitted single severity on a fixed count, not the
+        requested compound at all).
+
+        Examples
+        --------
+        >>> from aggregate import build
+        >>> from aggregate.tweedie import Tweedie
+        >>> a = build('agg Doc tweedie 1.5 100 0.5')
+        >>> a.as_tweedie()
+        TweedieParameters(p=1.5, mean=100.0, dispersion=0.5)
+
+        The named tuple splats, which is how you reach the analytic object and
+        its exact density::
+
+            tw = Tweedie(*a.as_tweedie())
+        """
+        from .tweedie import TweedieParameters, tweedie_convert
+
+        if self._tweedie is not None:
+            return self._tweedie
+        # Structural gates. Each one is a way for the object to stop being a
+        # bare compound Poisson-gamma; none is recoverable by reparameterizing.
+        if self.approximation:
+            return None
+        if self.occ_reins is not None or self.agg_reins is not None:
+            return None
+        if len(self.sevs) != 1 or len(np.atleast_1d(self.en)) != 1:
+            return None
+        freq = self.frequency
+        if getattr(freq, 'freq_name', '') != 'poisson' or freq.freq_zm:
+            return None
+        sev = self.sevs[0]
+        if sev.sev_name != 'gamma' or sev.sev_reflect:
+            return None
+        if sev.sev_loc != 0 or sev.sev_lb != 0 or not np.isinf(sev.sev_ub):
+            return None
+        if not np.isinf(sev.limit) or (sev.attachment or 0) != 0:
+            return None
+        if not np.isclose(sev.sev_wt, 1.0):
+            return None
+        ans = tweedie_convert(λ=self.n, α=sev.sev_a, β=sev.sev_scale)
+        return TweedieParameters(p=float(ans['p']), mean=float(ans['μ']),
+                                 dispersion=float(ans['σ^2']))
 
     @property
     def validation_df(self):

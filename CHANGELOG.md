@@ -20,6 +20,29 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a232
+
+**[Tweedie-Live-Object] `Aggregate.as_tweedie()` reports an aggregate's reproductive Tweedie parameters.** Returns a `TweedieParameters` named tuple, `(p, mean, dispersion)`, satisfying `variance = dispersion * mean ** p`, or `None`.
+
+**It recognizes, it does not merely remember.** A Tweedie with `1 < p < 2` *is* a compound Poisson distribution with gamma severity, so any aggregate of that shape has reproductive parameters whether or not anyone typed `tweedie`. `10.05 claims sev gamma 0.0995 cv 0.0709 poisson` and `10.05 claims sev 0.0005 * gamma 199 poisson`, the two long-hand entries in `library.agg`, both report the same `(1.005, 1, 0.1)` as the keyword does. A declared triple is returned verbatim; anything else is derived from the engine by running `tweedie_convert` in its `(lambda, alpha, beta)` to `(p, mu, sigma^2)` direction.
+
+**This is the deliberate opposite of what the unparser does**, and the split is the point. `as_tweedie` is generous because generosity there costs nothing. The writer renders from provenance alone, so those two long-hand programs still read back long-hand: rewriting an author's program into a spelling they did not choose is not its job.
+
+`None` is returned for anything that is no longer a bare compound Poisson-gamma: reinsurance or a layer at either level, a limit or attachment, a weighted or mixed severity, a location shift or splice, a reflected severity, a limit profile, a zero-modified or truncated frequency, and any method-of-moments `approximate` fit, whose engine is a fitted single severity on a fixed count rather than the requested compound at all.
+
+The named tuple splats into the analytic class, which is where the exact series density, the characteristic function and the dual live:
+
+```python
+from aggregate.tweedie import Tweedie
+tw = Tweedie(*a.as_tweedie())
+```
+
+**No display surface changed.** `qd` and `_repr_html_` do not name a distribution family for any other object and there was no reason to make Tweedie the exception.
+
+The monograph's `tweedie` section is rewritten around the keyword surviving rather than around inspecting its expansion, and picked up a repair while it was open: its three-statement `build_many` program had one DecL statement per line with no `;` and no blank line, which stopped being legal when `[DecL-Newline]` landed. Plan, with its execution record, in `dev/done/plan-tweedie.md`.
+
+---
+
 ## 1.0.0a231
 
 **[Tweedie-Round-Trip] the `tweedie` keyword survives the parse.** It used to be a one-way rewrite. `agg A tweedie ...` was expanded at parse time into its compound-Poisson-gamma equivalent and nothing downstream learned a Tweedie had been declared, so `pprogram` printed `10.050251256281404 claims / sev 0.0004999999999999894 * gamma 199.00000000000426 / poisson` and the word `tweedie` was gone. The declaration is now recorded on the spec and renders back as written.
@@ -32,7 +55,7 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 **`Tweedie.__init__` takes its reproductive parameters positionally.** The keyword-only marker is gone, so `Tweedie(*params)` splats. The additive pair stays keyword by convention. Purely additive: every existing call site already passed by name.
 
-Three `library.agg` entries and one `_test_suite.agg` line leave their round-trip exemption lists, so `UNPARSER_EXEMPT` drops from seventeen to fourteen and `_FIDELITY_EXEMPT` is now empty. Closes `[Unparser-Reference-Gaps]` item 2 in `dev/TODO.md`, both halves. `TweedieParameters` is exported from `aggregate.tweedie`; `Tweedie` itself stays submodule-only. Plan in `dev/plan-tweedie.md`, whose second phase (`[Tweedie-Live-Object]`) is still open. No grammar change, so the DecL reference is unaffected.
+Three `library.agg` entries and one `_test_suite.agg` line leave their round-trip exemption lists, so `UNPARSER_EXEMPT` drops from seventeen to fourteen and `_FIDELITY_EXEMPT` is now empty. Closes `[Unparser-Reference-Gaps]` item 2 in `dev/TODO.md`, both halves. `TweedieParameters` is exported from `aggregate.tweedie`; `Tweedie` itself stays submodule-only. Plan in `dev/done/plan-tweedie.md`; its second phase, `[Tweedie-Live-Object]`, follows at a232. No grammar change, so the DecL reference is unaffected.
 
 ---
 

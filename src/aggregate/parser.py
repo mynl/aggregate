@@ -617,7 +617,7 @@ class UnderwritingTransformer(Transformer):
         # written, so ``decl_writer`` renders the clause back rather than its
         # expansion. Provenance only: an aggregate written the long way carries
         # no ``_tweedie`` and still renders as its author wrote it. See
-        # dev/plan-tweedie.md ([Tweedie-Round-Trip]).
+        # dev/done/plan-tweedie.md ([Tweedie-Round-Trip]).
         from .tweedie import TweedieParameters, tweedie_convert
 
         _tw, pp, mu, sig2 = c

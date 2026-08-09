@@ -55,8 +55,14 @@ def port():
 # ----------------------------------------------------------- capability
 
 def test_available_only_with_a_cession(both):
-    assert available_charts(both) == ['reins']
-    assert available_charts(build(_GROSS)) == []
+    """Reinsurance is a *view* of an aggregate, so it comes and goes.
+
+    The aggregate's own chart is always there once the object is updated,
+    which is what ``primary_chart`` answers; ``reins`` joins it exactly
+    when some stage of the program cedes.
+    """
+    assert 'reins' in available_charts(both)
+    assert 'reins' not in available_charts(build(_GROSS))
 
 
 def test_default_basis_is_a_stage_that_cedes():

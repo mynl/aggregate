@@ -140,4 +140,5 @@ def _joint_surface(bv, display_log2=None):
 
 register_chart(
     'joint_surface', chart_joint_surface,
-    predicate=lambda bv: getattr(bv, 'density', None) is not None)
+    predicate=lambda bv: getattr(bv, 'density', None) is not None,
+    primary=BivariateAggregate)

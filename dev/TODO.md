@@ -490,7 +490,16 @@
   returning through it, a sweep asserting the set difference is empty,
   the renderer's fallback restated as a net under a bug). It landed as
   its own bump rather than inside job 1, because totality touches every
-  emitter and the declared readings do not.
+  emitter and the declared readings do not. Job 2 `[Chart-Aggregate]`
+  landed a235: `chart_agg`, `Aggregate.plot` rewired and
+  `plot_aggregate` deleted, `build_chart_doc` / `primary_chart` /
+  `register_chart(primary=)` / `ChartEntry`, and the renderer growing
+  the sideways step, the paired-reading re-slice and the legend restyle
+  (smaller, in the emptier upper corner) the author asked for on review.
+  **The author reviewed the new figure before the baseline was cut**, as
+  the plan requires; `quantile_x='return'` is now `return_period=True`
+  and `axd` / `figsize` / `max_return_period` are gone from
+  `Aggregate.plot`.
 
 ---
 

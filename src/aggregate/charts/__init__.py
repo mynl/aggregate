@@ -45,6 +45,7 @@ generics, one per chart name, with an optional availability predicate;
 plus the predicates, so it cannot go stale.
 """
 
+from collections import namedtuple
 from functools import singledispatch
 
 from .ir import (
@@ -56,12 +57,18 @@ from .ir import (
 
 __all__ = [
     'CHART_IR_VERSION', 'CHARTS', 'SUPPORT_KINDS', 'ChartAxis',
-    'ChartCapabilityError', 'ChartDoc', 'ChartSeries', 'Mark', 'Panel',
-    'SurfaceData', 'available_charts', 'canonical_dict', 'canonical_json',
-    'complete_tex', 'doc_hash', 'human_strings', 'register_chart', 'stamp',
+    'ChartCapabilityError', 'ChartDoc', 'ChartEntry', 'ChartSeries', 'Mark',
+    'Panel', 'SurfaceData', 'available_charts', 'build_chart_doc',
+    'canonical_dict', 'canonical_json', 'complete_tex', 'doc_hash',
+    'human_strings', 'primary_chart', 'register_chart', 'stamp',
 ]
 
-#: The chart registry: ``name -> (emitter, predicate)``. The emitter is a
+#: One registry entry: the emitter, its availability predicate, and the
+#: classes this chart is the *primary* picture of. A namedtuple rather than
+#: a bare tuple so a reader of ``CHARTS`` sees what each slot is.
+ChartEntry = namedtuple('ChartEntry', 'emitter predicate primary')
+
+#: The chart registry: ``name -> ChartEntry``. The emitter is a
 #: ``singledispatch`` generic ``f(obj, **semantic_options) -> ChartDoc``
 #: whose base raises ``NotImplementedError`` naming the type; the predicate
 #: (or None for always) is a per-object gate over and above type dispatch
@@ -71,7 +78,7 @@ __all__ = [
 CHARTS = {}
 
 
-def register_chart(name, emitter, predicate=None):
+def register_chart(name, emitter, predicate=None, primary=None):
     """Register a chart emitter under ``name``.
 
     Parameters
@@ -84,6 +91,12 @@ def register_chart(name, emitter, predicate=None):
     predicate : callable, optional
         ``predicate(obj) -> bool``, an availability gate beyond type
         dispatch. ``None`` means available wherever the type dispatches.
+    primary : type or tuple of type, optional
+        The classes this chart is the *primary* picture of, meaning the one
+        a caller with no other information should draw (see
+        :func:`primary_chart`). Most charts are primary for nothing:
+        reinsurance is a view of a book and severity is a component of an
+        aggregate, and neither is the object's own picture.
 
     .. versionadded:: 1.0
        Provisional, in the sense of PEP 411: not part of the 1.0 API
@@ -91,12 +104,21 @@ def register_chart(name, emitter, predicate=None):
     """
     if name in CHARTS:
         raise ValueError(f'chart {name!r} is already registered')
-    CHARTS[name] = (emitter, predicate)
+    if primary is not None and not isinstance(primary, tuple):
+        primary = (primary,)
+    CHARTS[name] = ChartEntry(emitter, predicate, primary)
 
 
 def _dispatches(emitter, obj):
     """True when ``emitter`` has a non-base registration for ``obj``."""
     return emitter.dispatch(type(obj)) is not emitter.registry[object]
+
+
+def _serves(entry, obj):
+    """True when this entry can emit a document for ``obj``."""
+    if not _dispatches(entry.emitter, obj):
+        return False
+    return entry.predicate is None or bool(entry.predicate(obj))
 
 
 def available_charts(obj):
@@ -119,14 +141,99 @@ def available_charts(obj):
        Provisional, in the sense of PEP 411: not part of the 1.0 API
        contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
-    out = []
-    for name, (emitter, predicate) in CHARTS.items():
-        if not _dispatches(emitter, obj):
-            continue
-        if predicate is not None and not predicate(obj):
-            continue
-        out.append(name)
-    return out
+    return [name for name, entry in CHARTS.items() if _serves(entry, obj)]
+
+
+def primary_chart(obj):
+    """Return the name of the chart that is ``obj``'s own picture, or None.
+
+    :func:`available_charts` answers what *can* be drawn, which for an
+    aggregate carrying reinsurance is three things. This answers which one
+    to draw when nothing else has been asked for, which is the question a
+    landing page has and cannot otherwise put to the library: an aggregate's
+    own picture is its aggregate chart, its severity is a component of it,
+    and its reinsurance is a view of it.
+
+    Parameters
+    ----------
+    obj : object
+
+    Returns
+    -------
+    str or None
+        None when no registered chart claims ``obj``, including when the
+        chart that would claim it is unavailable (an object that has not
+        been updated has no picture yet).
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+    """
+    for name, entry in CHARTS.items():
+        if entry.primary and isinstance(obj, entry.primary) \
+                and _serves(entry, obj):
+            return name
+    return None
+
+
+def build_chart_doc(obj, name, **options):
+    """Build the chart document ``name`` for ``obj``, stamped with its hash.
+
+    The sibling of ``exhibits.build_exhibit``, and the one entry point a
+    consumer needs: it resolves the registry entry, checks availability,
+    dispatches on the type, and stamps the content hash, so an emitter is
+    left with nothing to do but the semantics. A module function rather
+    than a method on each class, exactly as on the exhibits side, which
+    keeps it reachable for a class that owns no chart of its own and adds
+    nothing to any instance namespace.
+
+    Parameters
+    ----------
+    obj : object
+        A first-class object (``Aggregate``, ``Portfolio``, ``Severity``,
+        ``Distortion``, ...).
+    name : str
+        Chart registry name.
+    **options
+        Semantic options for the emitter (``basis`` for reinsurance,
+        ``xmax`` for an aggregate). Never renderer options: how a document
+        is drawn is the renderer's argument list, not this one.
+
+    Returns
+    -------
+    ChartDoc
+        Stamped: ``hash`` set, ``generator`` naming the producing build.
+
+    Raises
+    ------
+    KeyError
+        For an unknown chart name, listing the registry.
+    NotImplementedError
+        When no emitter is registered for this type.
+    ValueError
+        When the chart exists for the type but not for this object (a
+        reinsurance chart on a book that cedes nothing).
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+    """
+    try:
+        entry = CHARTS[name]
+    except KeyError:
+        raise KeyError(f'unknown chart {name!r}; known charts: '
+                       + ', '.join(CHARTS)) from None
+    if not _dispatches(entry.emitter, obj):
+        entry.emitter(obj)      # raises NotImplementedError naming the type
+    if entry.predicate is not None and not entry.predicate(obj):
+        raise ValueError(
+            f'chart {name!r} is not available for {type(obj).__name__} '
+            f'{getattr(obj, "name", "")!r}: its availability predicate '
+            'failed (missing update() grid, or required structure such as '
+            'reinsurance)')
+    from .. import __version__
+    return stamp(entry.emitter(obj, **options),
+                 generator=f'aggregate {__version__}')
 
 
 def _emitter_base(name):
@@ -142,10 +249,11 @@ def _emitter_base(name):
 
 # Emitter modules populate the registry at import (each guards its own
 # imports; none may touch matplotlib).
+from ._emit_aggregate import chart_agg  # noqa: E402
 from ._emit_bivariate import chart_joint_surface  # noqa: E402
 from ._emit_distortion import chart_distortion  # noqa: E402
 from ._emit_reins import chart_reins  # noqa: E402
 from ._emit_severity import chart_severity  # noqa: E402
 
-__all__ += ['chart_distortion', 'chart_joint_surface', 'chart_reins',
-            'chart_severity']
+__all__ += ['chart_agg', 'chart_distortion', 'chart_joint_surface',
+            'chart_reins', 'chart_severity']

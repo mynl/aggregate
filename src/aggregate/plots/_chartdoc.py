@@ -69,15 +69,21 @@ def _realization(panel, requested):
 
 
 def _decade_floor(values):
-    """The decade at or under the smallest positive value, or ``None``.
+    """The decade at or under the smallest value worth drawing, or ``None``.
 
     A log view of a window whose declared low end is zero needs a bottom,
     and the honest one is a round decade under the smallest thing actually
     drawn: gridlines land on powers of ten, which is how a log axis is
     read, and nothing real is cropped.
+
+    Values at or under ``LOG_FLOOR`` are arithmetic noise rather than a
+    tail, the same rule the grid panels floor a color scale by and the
+    emitters cut a survival curve at. Without it one dust value at 1e-17
+    would open six empty decades under a panel whose mass all sits in the
+    top three.
     """
     v = np.asarray(values, dtype=float)
-    v = v[np.isfinite(v) & (v > 0)]
+    v = v[np.isfinite(v) & (v > LOG_FLOOR)]
     if not v.size:
         return None
     return float(10.0 ** np.floor(np.log10(v.min())))
@@ -138,7 +144,7 @@ def _atom_room(ax, window, x):
     return seen, (_axes_width_px(ax) / seen if seen else float('inf'))
 
 
-def _draw_atomic(ax, x, y, label, y_axis, window):
+def _draw_atomic(ax, x, y, label, x_axis, y_axis, window):
     """Draw an atomic series at the honest density for the room available.
 
     Three drawings of one truth, chosen by how much room each atom gets,
@@ -155,18 +161,27 @@ def _draw_atomic(ax, x, y, label, y_axis, window):
     A **cumulative** function is different in kind and skips the lollipop
     rung entirely: F and S take a value at every x, not only at the
     atoms, so the honest drawing is a right-continuous step that jumps at
-    the atom, however few atoms there are.
+    the atom, however few atoms there are. A **quantile** function is that
+    same cumulative read the other way round, probability on x and outcome
+    on y, and the sideways step is left-continuous: it is the jump of F
+    seen from the other axis, so it rises *before* its atom where F steps
+    after it.
 
-    Which of the two it is comes off the **axis**, not the series role: a
-    reinsurance series is called gross or ceded in both panels, and only
-    the axis knows that one of them carries mass and the other carries
-    accumulated probability.
+    Which of the three it is comes off the **axes**, not the series role:
+    a reinsurance series is called gross or ceded in every panel it
+    appears in, and only the axes know that one panel carries mass,
+    another accumulated probability, and a third the same probability
+    read back to an outcome.
     """
     seen, pixels = _atom_room(ax, window, x)
     unit = getattr(y_axis, 'unit', None)
     if unit == 'probability':
         ax.plot(x, y, label=label,
                 drawstyle='steps-post' if pixels >= STEP_PIXELS else 'default')
+        return
+    if getattr(x_axis, 'unit', None) in ('probability', 'return_period'):
+        ax.plot(x, y, label=label,
+                drawstyle='steps-pre' if pixels >= STEP_PIXELS else 'default')
         return
     if unit == 'density' and seen <= LOLLIPOP_ATOMS:
         # Markers first so the series takes the next prop-cycle color, then
@@ -328,6 +343,27 @@ def _return_periods(values, how):
     return np.where(np.isfinite(t) & (t > 0.0), t, np.nan)
 
 
+def _legend_corner(drawn, window):
+    """The upper corner with less curve under it: where a key hides nothing.
+
+    That a legend exists is realization, but *where* it sits is not
+    arbitrary, and it is not a per-chart setting either. A density family
+    piles up on the left of its window and leaves the upper right free; a
+    monotone family (a distortion, a cumulative) rises to the right and
+    leaves the upper left free. So the corner is read off the drawn values,
+    the taller half taking the legend away from itself, which is one rule
+    for every chart and needs no instruction in the document.
+    """
+    mid = 0.5 * (window[0] + window[1])
+    heights = [0.0, 0.0]
+    for x, y in drawn:
+        for half, keep in enumerate((x <= mid, x > mid)):
+            seen = y[keep & np.isfinite(y)]
+            if seen.size:
+                heights[half] = max(heights[half], float(seen.max()))
+    return 'upper right' if heights[0] >= heights[1] else 'upper left'
+
+
 def _panel_window(window, values):
     """The range the panel will show, before anything is drawn.
 
@@ -395,7 +431,7 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
             # truthful drawing and no ladder applies.
             ax.plot(x, y, label=label)
         else:
-            _draw_atomic(ax, x, y, label, y_axis, x_window)
+            _draw_atomic(ax, x, y, label, x_axis, y_axis, x_window)
         labeled = True
     for m in doc.marks:
         if m.panel_id != panel.id:
@@ -408,10 +444,15 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
         line = ax.axvline if m.orient == 'v' else ax.axhline
         line(at, lw=0.75 if not m.faint else 0.5, color='C7', ls='--',
              alpha=0.45 if m.faint else 1.0)
-    _apply_axis(ax, 'x', x_axis, _axis_scale(x_axis, log), x_window,
-                _decade_floor(all_x))
-    _apply_axis(ax, 'y', y_axis, _axis_scale(y_axis, log),
-                _axis_window(y_axis, full), _decade_floor(all_y))
+    # A paired reading re-slices the panel: the deep tail a return-period
+    # axis exists to show sits far outside the window computed for the
+    # probability reading, so the companion axis follows the data instead.
+    # The compositor's quantile worker does the same by relim-and-autoscale.
+    y_window = None if x_map else _axis_window(y_axis, full)
+    _apply_axis(ax, 'x', x_axis, _axis_scale(x_axis, log),
+                None if y_map else x_window, _decade_floor(all_x))
+    _apply_axis(ax, 'y', y_axis, _axis_scale(y_axis, log), y_window,
+                _decade_floor(all_y))
     # The document labels its axes and the renderer draws what it is given,
     # as the grid panels already do.
     ax.set(xlabel=_typeset(doc, x_axis.label),
@@ -419,7 +460,9 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
     if labeled and sum(s.role != 'identity' for s in series_list) > 1:
-        ax.legend(loc='upper left', fontsize='x-small')
+        corner = _legend_corner([(x, y) for s, x, y, _ in drawn
+                                 if s.role != 'identity'], x_window)
+        ax.legend(loc=corner, fontsize='xx-small')
 
 
 def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,

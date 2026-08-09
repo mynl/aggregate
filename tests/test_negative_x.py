@@ -434,26 +434,28 @@ def test_density_property_is_live_support():
     assert len(a.density_df) > len(d)
 
 
-def test_signed_lee_plot_anchor_not_zero():
-    """The discrete plot's zero-mass anchor must sit at its own (signed) index.
+def test_signed_lee_plot_starts_at_the_support_minimum():
+    """A signed Lee curve begins at the worst outcome, never at zero.
 
-    Regression: the anchor row used ``loss=0``, so the Lee panel drew a
-    spurious vertical segment from ``(F=0, loss=0)`` down to the first point.
+    Regression, in its second form. The compositor prepended a zero-mass
+    anchor row and once gave it ``loss=0``, which drew a spurious vertical
+    from ``(F=0, loss=0)`` down to the first real point. ``[Chart-Aggregate]``
+    retired the anchor row along with the compositor: the emitter trims the
+    quantile curve to the support at both ends, so the curve starts at the
+    smallest outcome that carries probability. Same guarantee, no artifact
+    to get wrong.
     """
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
     a = build('agg X dfreq [1] dsev [-5 -3 -1 2 4]')
-    _, axd = plt.subplot_mosaic('ABC')
-    a.plot(axd=axd)
-    # panel C is the Lee plot: y = loss against x = F. The Aggregate line's
-    # value at F == 0 is the anchor; it must be the true minimum, not 0.
-    line = axd['C'].lines[0]
+    fig = a.plot()
+    lee = [ax for ax in fig.axes if 'Lee' in ax.get_title()][0]
+    line = lee.lines[0]
     x, y = line.get_xdata(), line.get_ydata()
-    y_at_zero = y[np.argmin(np.abs(x))]
-    assert y_at_zero < 0                  # near the support minimum, not 0
-    assert abs(y_at_zero - (a.q(0) - 0.5)) < 1e-9
+    assert y[np.argmin(x)] == pytest.approx(a.q(0))     # -5, not 0, not xs[0]
+    assert y.min() == pytest.approx(a.q(0))
     plt.close('all')
 
 

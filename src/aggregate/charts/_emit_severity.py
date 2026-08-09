@@ -148,4 +148,4 @@ def _severity(sev, n=GRID_POINTS):
     ))
 
 
-register_chart('severity', chart_severity)
+register_chart('severity', chart_severity, primary=Severity)

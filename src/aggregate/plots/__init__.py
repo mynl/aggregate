@@ -30,7 +30,7 @@ from ._style import (
 )
 
 # Layer 2 compositors (the public entry points the class stubs delegate to).
-from ._aggregate import plot_aggregate, plot_pnl, plot_reins_occ
+from ._aggregate import plot_pnl, plot_reins_occ
 from ._severity import plot_severity
 from ._distortion import plot_distortion, plot_distortion_affine
 from ._portfolio import plot_portfolio, plot_scatter, plot_sample_compare
@@ -51,7 +51,7 @@ __all__ = [
     'FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
     'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
     # Layer 2 compositors
-    'plot_aggregate', 'plot_reins_occ',
+    'plot_pnl', 'plot_reins_occ',
     'plot_severity',
     'plot_distortion', 'plot_distortion_affine',
     'plot_portfolio', 'plot_scatter', 'plot_sample_compare',

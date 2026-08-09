@@ -82,4 +82,4 @@ def _distortion(dist, dual=True):
     )
 
 
-register_chart('distortion', chart_distortion)
+register_chart('distortion', chart_distortion, primary=Distortion)

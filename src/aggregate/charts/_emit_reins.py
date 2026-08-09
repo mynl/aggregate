@@ -56,7 +56,7 @@ from .._portfolio import Portfolio
 from ..constants import (REINS_LABEL_CEDED, REINS_LABEL_GROSS,
                          REINS_LABEL_NET, REINS_LABEL_SUBJECT)
 from . import register_chart, _emitter_base
-from ._two_panel import gapped, pad_window, survival_window
+from ._two_panel import gapped, loss_window, survival_window
 from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, complete_tex
 
 __all__ = ['chart_reins']
@@ -113,19 +113,6 @@ def _port_stages(port):
 def _has_cession(obj):
     """Availability gate: some stage of the program cedes something."""
     return bool(_cession_stages(obj))
-
-
-def _loss_window(gd):
-    """The shared x window, from the first (widest) series of the triple.
-
-    Mirrors ``Aggregate._limits`` as the app does: a heavy tail otherwise
-    squashes every visible mass into a sliver at the origin. An unsigned
-    grid is read from zero, because starting a loss axis at ``q(0.001)``
-    hides the mass at and near zero that a discrete book routinely has; a
-    signed grid has no such anchor and takes ``q(0.001)``.
-    """
-    lo = float(gd.q(0.001)) if float(gd.x[0]) < 0 else min(0.0, float(gd.x[0]))
-    return pad_window(lo, float(gd.q(0.999)))
 
 
 def _emit(obj, basis, default):
@@ -186,8 +173,11 @@ def _emit(obj, basis, default):
         title=f'{obj.label}: {basis} gross, ceded and net',
         axes=(
             # One axis id referenced by both panels IS the shared window.
+            # From the first (widest) series of the triple: a cession is
+            # bounded by its subject.
             ChartAxis(id='loss', label='Loss', unit='currency',
-                      suggested_range=_loss_window(grids[0])),
+                      suggested_range=loss_window(grids[0].q,
+                                                  float(grids[0].x[0]))),
             ChartAxis(id='density', label='Density', unit='density'),
             ChartAxis(id='survival', label='Survival', unit='probability',
                       scale='log',

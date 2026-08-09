@@ -116,8 +116,15 @@ def _lee_axis():
 
 
 def test_aggregate_continuous_return():
+    """``quantile_x='return'`` is now the document's declared reading.
+
+    ``[Chart-Aggregate]`` moved the aggregate onto the chart IR, where the
+    return period is a paired reading of the probability axis rather than an
+    argument threaded down to a drawing worker. The reading itself is
+    unchanged, which is what these still check.
+    """
     a = build('agg RetCont 100 claims sev gamma 100 cv 1 poisson')
-    a.plot(quantile_x='return')
+    a.plot(return_period=True)
     ax = _lee_axis()
     assert ax.get_xscale() == 'log'
     assert ax.get_xlabel() == 'Return period'
@@ -125,7 +132,7 @@ def test_aggregate_continuous_return():
 
 def test_aggregate_discrete_return():
     a = build('agg RetDice dfreq [3] dsev [1:6]')
-    a.plot(quantile_x='return')
+    a.plot(return_period=True)
     ax = _lee_axis()
     assert ax.get_xscale() == 'log'
 
@@ -135,7 +142,7 @@ def test_aggregate_linear_default_no_regression():
     a.plot()
     ax = _lee_axis()
     assert ax.get_xscale() == 'linear'
-    assert ax.get_xlabel() == 'Non-exceeding probability p'
+    assert ax.get_xlabel() == 'Non-exceeding probability'
 
 
 def test_severity_return():
@@ -157,10 +164,17 @@ def test_reins_occ_return():
 
 
 def test_lee_kwargs_ride_through_compositor():
-    """A Lee-worker option neither stub nor compositor names (``max_return_period``)
-    still reaches the worker through ``**kwargs`` -- the point of (a)."""
-    a = build('agg RetKw 100 claims sev gamma 100 cv 1 poisson')
-    a.plot(quantile_x='return', max_return_period=1e3)
-    ax = _lee_axis()
+    """The ride-through still holds for the compositors that remain.
+
+    ``Aggregate.plot`` no longer forwards worker options: it draws a
+    document, whose return-period axis carries its own window, so a caller
+    reaching past the reading to the drawing has nothing to reach for.
+    ``reins_occ_plot`` is still a compositor and still forwards, which is
+    what this now covers.
+    """
+    a = build('agg RetKw 100 claims sev gamma 100 cv 1 '
+              'occurrence net of 50 xs 50 poisson')
+    a.reins_occ_plot(quantile_x='return', max_return_period=1e3)
+    ax = [x for x in a.figure.axes if x.get_title() == 'Aggregate'][0]
     # x capped near the lowered 1e3, not the 1e9 default
     assert ax.get_xlim()[1] < 1e5

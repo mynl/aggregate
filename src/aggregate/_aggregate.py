@@ -4553,21 +4553,51 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         find_u = _ruin_find_u(ruin, kind)
         return RuinFunction(ruin, find_u, mean, pmf_max[:n])
 
-    def plot(self, axd=None, xmax=0, **kwargs):
-        """
-        Basic plot with severity and aggregate, linear and log plots and Lee plot.
+    def plot(self, xmax=None, log=False, full_range=False,
+             return_period=False):
+        """Plot the aggregate and its severity: the mass, and the Lee diagram.
 
-        :param xmax: Enter a "hint" for the xmax scale. E.g., if plotting gross and net you want all on
-               the same scale. Only used on linear scales?
-        :param axd:
-        :param kwargs: Lee-panel options forwarded to the quantile worker --
-               notably ``quantile_x='return'`` (plot the Lee panel against log
-               return period instead of ``p``) and ``max_return_period``; plus
-               ``figsize`` for the canvas.
-        :return:
+        Parameters
+        ----------
+        xmax : float, optional
+            Upper end of the loss window, in place of the computed one. How
+            a gross and a net aggregate are read against one common scale.
+        log : bool
+            Read both axes of the mass panel on log, which is the log
+            density panel this plot used to draw as a third picture.
+        full_range : bool
+            Show the whole grid rather than the ``q(0.001)`` to ``q(0.999)``
+            crop.
+        return_period : bool
+            Read the Lee panel against return period rather than
+            non-exceedance probability, which spreads the rare tail so it
+            can be read off directly. This was ``quantile_x='return'``.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            Also stashed on ``self.figure``.
+
+        Notes
+        -----
+        Draws the chart document ``charts.chart_agg`` emits, through the one
+        generic renderer, so this picture and the one a browser draws come
+        from a single set of semantic decisions rather than two that must be
+        kept in step by hand.
+
+        The two panels are one reading of one book: the loss axis is a
+        single axis, the density panel's x and the Lee panel's y, so a
+        window moves both. Which drawing each series gets (stems for a small
+        discrete book, steps, or a line once a bucket is sub-pixel) is the
+        renderer's, from the declared support and the room on screen, which
+        is what retired the old discrete and continuous branches.
         """
-        from .plots import plot_aggregate
-        return plot_aggregate(self, axd=axd, xmax=xmax, **kwargs)
+        from .charts import build_chart_doc
+        from .plots import plot_chartdoc
+        self.figure = plot_chartdoc(
+            build_chart_doc(self, 'agg', xmax=xmax),
+            log=log, full_range=full_range, return_period=return_period)
+        return self.figure
 
     def _limits(self, stat='range', kind='linear', zero_mass='include'):
         """

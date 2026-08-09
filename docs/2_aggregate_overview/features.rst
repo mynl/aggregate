@@ -915,16 +915,19 @@ reproduces ``po_p`` to the kernel noise floor, which is the Poisson process
 recovered as a special case. The diagnostic is capped at mean 1000 or less: it is
 a small-count eyeball tool.
 
-Return-period quantile plots (a110)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Return-period quantile plots (a110, a235)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``quantile_x='return'`` puts the Lee plot on a return-period x-axis, which is how
-catastrophe results are usually read:
+``return_period=True`` puts the Lee plot on a return-period x-axis, which is how
+catastrophe results are usually read. It was ``quantile_x='return'`` until a235,
+when the aggregate chart moved onto the chart IR and the return period became a
+reading the document declares rather than an argument threaded down to a drawing
+worker:
 
 .. ipython:: python
 
     @savefig features_return_period.png scale=20
-    simple.plot(quantile_x='return')
+    simple.plot(return_period=True)
 
 ``help`` on every first-class class (a98, a101, a142, a150, a180)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -15,8 +15,8 @@ import numpy as np
 
 from ..constants import LOG_FLOOR
 
-__all__ = ['SURVIVAL_FLOOR', 'WINDOW_PAD', 'gapped', 'pad_window',
-           'survival_window']
+__all__ = ['SURVIVAL_FLOOR', 'WINDOW_PAD', 'gapped', 'loss_window',
+           'pad_window', 'quantile_curve', 'survival_window']
 
 #: The deepest survival worth a panel, one over the longest return period
 #: anyone reads off a picture. Past it the curve is a line of float dust.
@@ -45,6 +45,70 @@ def pad_window(lo, hi):
         return None
     pad = WINDOW_PAD * (hi - lo)
     return (float(lo - pad), float(hi + pad))
+
+
+def loss_window(q, first):
+    """``(lo, hi)`` for an outcome axis: the slice worth looking at.
+
+    Parameters
+    ----------
+    q : callable
+        The distribution's quantile function, ``q(p) -> outcome``.
+    first : float
+        The first point of the grid, which is what says whether the axis is
+        signed.
+
+    Returns
+    -------
+    tuple of float or None
+        Padded by :data:`WINDOW_PAD`, or None for a degenerate window.
+
+    Notes
+    -----
+    Mirrors ``Aggregate._limits``, as the app does: a heavy tail otherwise
+    squashes every visible mass into a sliver at the origin. An unsigned
+    grid is read from zero, because starting a loss axis at ``q(0.001)``
+    hides the mass at and near zero that a discrete book routinely has; a
+    signed grid has no such anchor and takes ``q(0.001)``.
+    """
+    lo = float(q(0.001)) if first < 0 else min(0.0, float(first))
+    return pad_window(lo, float(q(0.999)))
+
+
+def quantile_curve(outcome, mass):
+    """``(p, outcome)`` for a Lee diagram: the quantile function sideways.
+
+    Parameters
+    ----------
+    outcome : array_like
+        Grid points, ascending.
+    mass : array_like
+        The probability at each grid point.
+
+    Returns
+    -------
+    tuple of ndarray
+        Non-exceedance probability and outcome, trimmed to the support.
+
+    Notes
+    -----
+    The trim is meaning, not tidying, and it is the same statement at both
+    ends: a bucket outside the support carries no probability, so drawing
+    it asserts an outcome the book cannot have. Past the top, ``F`` has
+    already reached its maximum and the line would run flat out to the
+    largest number the grid happens to hold; below the bottom, ``F`` is
+    still zero and the line would drop at ``p = 0`` to the grid's left
+    edge, which on a signed grid is an arbitrary distance below the worst
+    thing that can happen. So the curve starts at the smallest outcome
+    carrying probability and ends at the largest.
+    """
+    outcome = np.asarray(outcome, dtype=float)
+    p = np.cumsum(np.asarray(mass, dtype=float))
+    if not p.size or not p.max() > 0:
+        return p, outcome
+    lo = int(np.argmax(p > 0))
+    hi = int(np.argmax(p >= p.max())) + 1
+    return p[lo:hi], outcome[lo:hi]
 
 
 def gapped(values):

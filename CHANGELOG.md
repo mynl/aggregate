@@ -20,6 +20,28 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a235
+
+**[Chart-Aggregate] an aggregate emits density and Lee, and the log panel becomes a reading of the first.** The first conversion that *replaces* a compositor rather than shipping alongside one. `Aggregate.plot` now draws the document `charts.chart_agg` emits, through `plots.plot_chartdoc`, and `plots._aggregate.plot_aggregate` is deleted. One set of semantic decisions, two renderers, no third path.
+
+**Breaking, and deliberate: `Aggregate.plot()` draws a different picture.** Three panels become two. The old middle panel was never a third reading of the book, it was the first panel read on log, so it is now a declared reading of the density panel, whose axes both offer log. The Lee diagram keeps its panel, because interrogating a probability and reading back a loss is a different question and not a rescaling. The author reviewed the new figure before the baseline was generated from it.
+
+**The signature changes with it.** `plot(xmax=None, log=False, full_range=False, return_period=False)`, returning the figure and still stashing it on `self.figure`. `quantile_x='return'` is now `return_period=True`, the reading the document declares rather than an argument threaded down to a drawing worker; `axd`, `figsize`, `max_return_period` and the `**kwargs` ride-through are gone, since a document is realized by the renderer's own argument list. `reins_occ_plot` is untouched and still forwards to the quantile worker.
+
+**The ordinate is a probability mass, not a density.** The continuous branch used to divide by `bs`. A discretized aggregate *is* the distribution here, which is what `support='atomic'` says and what the renderer's ladder draws, so the ordinate is the mass at each atom, `meta['ordinate']` says so, and the app already drew it that way. The y numbers therefore scale with `bs`.
+
+**One rule replaces each of the old branches.** Discrete or continuous is gone as a branch: the renderer's ladder picks stems, steps or a line from the declared support and the room on screen, which is what `a214` built it for. The compositor's zero-mass anchor row is gone, a drawing artifact that once shipped a bug of its own; instead the emitter trims the quantile curve to the support at **both** ends, so a signed book's Lee curve starts at the worst outcome that can actually happen rather than dropping to the grid's left edge at `p = 0`. The ordinate window is the aggregate's own peak, widened for a companion within `COMPANION_HEADROOM` of it and clipping one that dwarfs it, which reproduces what the compositor did in its two separate branches.
+
+The document carries four marks with their labels, the mean and the 1-in-200 at full weight on the density panel and the 1-in-100 and 1-in-250 faint on the Lee panel, all read from `tail_periods_df`, so a browser draws the same lines from the same numbers instead of inventing them. The loss axis is **one** axis, the density panel's x and the Lee panel's y, so a window moves both.
+
+**`charts.build_chart_doc(obj, name, **options)` and `charts.primary_chart(obj)`**, module functions mirroring `exhibits.build_exhibit`, so no first-class class gains a method and the `self.approximate` shadowing hazard cannot recur. `build_chart_doc` resolves the registry entry, checks availability, dispatches and stamps the content hash, which stops being every emitter's job. `primary_chart` answers which chart is an object's *own* picture, a question `available_charts` cannot: an aggregate's severity is a component of it and its reinsurance is a view of it, and a landing page needs to know which one is the aggregate. `register_chart` gained `primary=`, and registry values are now a `ChartEntry` named tuple rather than a bare pair.
+
+**Renderer growth, all of it in terms the schema already had.** A quantile function draws as a left-continuous step, because it is the cumulative seen from the other axis, and the renderer reads that off the axes rather than the series role, so it needs no per-chart instruction. A paired reading re-slices its panel, so the companion axis follows the data instead of holding a window computed for the other reading, which is the relim-and-autoscale the quantile worker always did. A log view floors at the decade under the smallest value above `LOG_FLOOR`, so one dust value at 1e-17 no longer opens six empty decades.
+
+**Legends restyled, at the author's request:** smaller, and placed in the emptier upper corner rather than always upper left. The corner is computed from the drawn values, the taller half of the window pushing the key away from itself, so a density family takes the upper right and a monotone family the upper left, one rule for every chart. This moves the committed `distortion` baseline, which had been pixel identical since `a209` and was re-measured at RMS 0 immediately before; the image gate now covers `agg` too.
+
+---
+
 ## 1.0.0a234
 
 **[Chart-Tex-Totality] every human-facing string in a chart document carries both forms.** `ChartDoc.tex` was documented as a partial lookup with a fallback. It is now **total**: the plain string and its typeset form are both written, a plain word mapping to itself, and a missing entry is an emitter bug rather than a document saying "this string has no typeset form". The analogy is alt text in HTML. You write both because they serve different consumers, matplotlib reading one and ECharts the other, and you do not make either consumer guess or derive.

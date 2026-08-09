@@ -1807,7 +1807,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                  value_type='loss',
                  approximate='exact',
                  label=None, label_map=None,
-                 note='', hints='', tags=(), doc=''):
+                 note='', hints='', tags=(), doc='', _tweedie=None):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
         It allows for very flexible creation of Aggregate distributions. Severity
@@ -1936,6 +1936,15 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         :param hints:           raw ``hints{...}`` build-settings string
             (``key=value;`` form). Pure annotation here; the underwriter
             parses it on build (caller-supplied ``build()`` kwargs win).
+        :param _tweedie:        private provenance, a
+            :class:`aggregate.tweedie.TweedieParameters` or ``None``. Set only
+            by the parser, when a ``tweedie`` clause (rather than its
+            compound-Poisson-gamma expansion) is what the author wrote; read
+            only by ``decl_writer`` and :meth:`as_tweedie`. Not part of the
+            public constructor contract. It is an argument rather than an
+            underwriter-applied stamp because a parsed spec is splatted
+            straight into this constructor at eleven call sites and there is no
+            choke point to pop it at. See dev/plan-tweedie.md.
         """
 
         # have to be ready for inputs to be in a list, e.g. comes that way from Pandas via Excel
@@ -1953,6 +1962,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self._spec = dict(inspect.getargvalues(frame).locals)
         for n in ['frame', 'get_value', 'self']:
             if n in self._spec: self._spec.pop(n)
+        # ``_tweedie`` is dropped when unset so adding it did not change
+        # ``_spec_hash`` for every object in the library. A real Tweedie keeps
+        # it, so ``Aggregate(**a.spec)`` preserves the provenance.
+        if self._spec.get('_tweedie') is None:
+            self._spec.pop('_tweedie', None)
+        self._tweedie = _tweedie
 
         # Method-of-moments approximation (the ``approximate`` DecL keyword). When
         # not ``'exact'`` the requested freq x sev aggregate is replaced, right

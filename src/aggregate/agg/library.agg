@@ -123,15 +123,14 @@
 # indent, each statement closed by `;` and separated by a blank line. It is
 # what `build.recipe('X').decl` prints and what every generated cookbook page
 # shows, so the file and the docs read alike. Regenerate it with
-# `python dev/reflow_library.py`, which renders each entry through
+# `python dev/done/reflow_library.py`, which renders each entry through
 # `decl_writer.format_program(..., layout='spread')` and refuses to write
 # unless every statement still parses to the same spec.
 #
-# Seventeen entries are exempt, and stay hand-written. The unparser cannot
+# Fourteen entries are exempt, and stay hand-written. The unparser cannot
 # invert a named object reference (`sev.UnitSeverity` is resolved and inlined at
 # parse time, and since a216 an engine reference like `less agg.USXOLTower`
-# writes its whole body out), the `tweedie` clause (it expands to the equivalent
-# compound-Poisson-gamma), or the `minimum` distortion combinator (the child
+# writes its whole body out), or the `minimum` distortion combinator (the child
 # names are not retained). Three more keep the compact `ssev <c> - <dist>`
 # spelling, whose canonical form `-1 * <dist> + <c>` parses two ways. All are
 # laid out in the same style by hand; tests/test_agg_libraries.py holds the
@@ -783,8 +782,8 @@ agg ThreeDiceSum
   tags{topic:aggregate};
 
 agg TweedieCompound
-  tweedie 1 1.005 0.1
-  note{Tweedie by mean, power p, and dispersion (variance = dispersion * mean**p).}
+  tweedie 1.005 1 0.1
+  note{Tweedie by power p, mean, and dispersion (variance = dispersion * mean**p).}
   tags{topic:aggregate};
 
 agg TweedieDirect
@@ -795,8 +794,8 @@ agg TweedieDirect
   tags{topic:aggregate};
 
 agg TweedieDispersion
-  tweedie 1 1.005 0.1
-  note{Tweedie defined using mean, p, and dispersion, variance = dispersion xs mean**p}
+  tweedie 1.005 1 0.1
+  note{Tweedie defined using p, mean, and dispersion, variance = dispersion xs mean**p}
   tags{topic:aggregate};
 
 agg TweedieFromMoments
@@ -807,8 +806,8 @@ agg TweedieFromMoments
   tags{topic:aggregate};
 
 agg TweedieSimple
-  tweedie 1 1.005 0.1
-  note{Tweedie via mean, p, dispersion; variance = dispersion * mean**p.}
+  tweedie 1.005 1 0.1
+  note{Tweedie via p, mean, dispersion; variance = dispersion * mean**p.}
   tags{topic:aggregate};
 
 # ----------------------------------------------------------------------

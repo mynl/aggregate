@@ -5,10 +5,11 @@ Provides the :class:`Tweedie` class spanning the full p-parameter range
 plus the small parameter-translation helpers :func:`tweedie_convert` and
 the series-expansion density :func:`tweedie_density`. ``Tweedie`` itself
 is *not* re-exported at the top-level ``aggregate`` namespace — reach for
-it via ``from aggregate.tweedie import Tweedie``. The two helpers are
-top-level public.
+it via ``from aggregate.tweedie import Tweedie``. The helpers and the
+:class:`TweedieParameters` named tuple are top-level public.
 """
 
+from collections import namedtuple
 from enum import Enum
 import logging
 from typing import Optional, Tuple
@@ -25,10 +26,23 @@ from .underwriter import build
 # ``Tweedie`` class deliberately NOT in ``__all__`` -- reach it via
 # ``from aggregate.tweedie import Tweedie``. Only the parameter-translation
 # helpers are part of the top-level public surface.
-__all__ = ['tweedie_convert', 'tweedie_density']
+__all__ = ['TweedieParameters', 'tweedie_convert', 'tweedie_density']
 from .ft import FourierTools
 
 logger = logging.getLogger(__name__)
+
+
+#: The reproductive parameters of a Tweedie, in the order the ``tweedie`` DecL
+#: clause writes them and the order :class:`Tweedie` takes them, so
+#: ``Tweedie(*params)`` splats. ``p`` leads because it is the shape parameter:
+#: it selects the member of the family, which is why the standard notation is
+#: ``Tw_p(mean, dispersion)``. The variance is ``dispersion * mean ** p``.
+#:
+#: Produced by :meth:`aggregate.Aggregate.as_tweedie`, and carried on a parsed
+#: spec under the private ``_tweedie`` key as the record that a ``tweedie``
+#: clause (rather than its expansion) is what the author wrote. See
+#: ``dev/plan-tweedie.md`` ([Tweedie-Round-Trip]).
+TweedieParameters = namedtuple('TweedieParameters', ['p', 'mean', 'dispersion'])
 
 
 def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=None, cv=None):
@@ -192,15 +206,24 @@ class Tweedie:
                 'frequency': '$\\lambda$', 'shape': '$\\alpha$', 'rate': '$\\beta$', 'sev_m': '$\\mu_X$',
                 'sev_cv': '$\\nu_X$', 'cv': '$\\nu$', 'p0': '$\\Pr(X=0)$'}
 
-    def __init__(self, p: float, *, mean: Optional[float] = None, dispersion: Optional[float] = 1,
+    def __init__(self, p: float, mean: Optional[float] = None, dispersion: Optional[float] = 1,
                  theta: Optional[float] = None, index: Optional[float] = 1):
         """
         Initialize object from either reproductive p, mean (mu), dispersion (sigma^2) or additive
-        p, theta (canonical), index (phi or lambda) parameters. All parameters except p, which is
-        required must be given by name. See also the static method ``Tweedie.from_po_gamma`` to
-        create a Tweedie distribution (1 < p < 2) from the claim count and severity parameters.
+        p, theta (canonical), index (phi or lambda) parameters. See also the static method
+        ``Tweedie.from_po_gamma`` to create a Tweedie distribution (1 < p < 2) from the claim
+        count and severity parameters.
 
         Notice that alpha - 1 = -1 / (p - 1) (p. 131 after eq 4.10).
+
+        Notes
+        -----
+        The reproductive triple ``(p, mean, dispersion)`` is positional, so a
+        :class:`TweedieParameters` splats: ``Tweedie(*a.as_tweedie())``. That is
+        the whole reason the keyword-only marker came out at 1.0.0a231; it had
+        made every call site spell the two commonest arguments by name. The
+        additive pair stays keyword by convention, since reaching it
+        positionally would mean passing ``mean=None`` first.
 
         See Also
         ---------
@@ -208,7 +231,6 @@ class Tweedie:
         * ``Tweedie.dual``: create the dual object.
         * ``Tweedie.from_p_mean_cv``: create a Tweedie object from p, mean, and cv.
         * ``Tweedie.from_po_gamma``: create a Tweedie object from the Poisson-gamma parameters.
-        * ``Tweedie.from_p_mean_cv``: create a Tweedie object from p, mean, and cv.
 
 
         """
@@ -841,9 +863,18 @@ class Tweedie:
         return self.to_series().to_dict()
 
     def to_decl(self, name='TW'):
-        """Parameters needed to feed to Aggregate using tweedie keyword."""
+        """The DecL program that rebuilds this distribution as an ``Aggregate``.
+
+        Notes
+        -----
+        The clause is ``tweedie <p> <mean> <dispersion>``. The argument order
+        changed at 1.0.0a231 to put the shape parameter first, matching this
+        class and :func:`tweedie_convert`; it read ``<mean> <p> <dispersion>``
+        before. Round-trips: ``build(t.to_decl()).as_tweedie()`` returns this
+        object's reproductive parameters.
+        """
         if self.mode == Mode.REPRODUCTIVE:
-            return f'agg {name} tweedie {self.mean} {self.p} {self.dispersion}'
+            return f'agg {name} tweedie {self.p} {self.mean} {self.dispersion}'
         else:
             raise NotImplementedError('Additive decl not yet implemented')
 

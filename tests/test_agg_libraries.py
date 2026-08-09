@@ -137,15 +137,18 @@ def test_library_is_the_default_recipe_base():
 # Layout and trailer placement (1.0.0a178)
 # ----------------------------------------------------------------------
 #: Entries `decl_writer` cannot render back to what was written, so they are
-#: hand-written and exempt from the canonical-layout check. Four causes, all
+#: hand-written and exempt from the canonical-layout check. Three causes, all
 #: recorded as `[Unparser-Reference-Gaps]` in `dev/TODO.md`: a named object
 #: reference (`sev.UnitSeverity`) is resolved and inlined at parse time with
-#: nothing on the spec recording that a reference was written; the `tweedie`
-#: clause expands to its compound-Poisson-gamma equivalent; the `minimum`
+#: nothing on the spec recording that a reference was written; the `minimum`
 #: combinator drops its child distortion names; and the compact `ssev <c> -
 #: <dist>` spelling renders in the general affine form `-1 * <dist> + <c>`,
 #: whose leading `-1 *` parses two ways (see `tests/test_grammar_ambiguity.py`).
 #: Shrinking this set is progress; growing it needs a reason.
+#:
+#: The `tweedie` clause was a fourth cause until 1.0.0a231, when it gained the
+#: `_tweedie` provenance key: three entries left this set, which is what fixing
+#: one of these gaps looks like.
 UNPARSER_EXEMPT = {
     # named object reference
     'BernoulliFrequency', 'BinomialSimple', 'FixedFrequency',
@@ -158,8 +161,6 @@ UNPARSER_EXEMPT = {
     # group above; kept separate because the fix is different (the spec would
     # have to record that a reference was written).
     'USHurr',
-    # tweedie clause
-    'TweedieCompound', 'TweedieDispersion', 'TweedieSimple',
     # distortion combinator
     'MinimumDistortion',
     # canonical form would be ambiguous
@@ -170,7 +171,7 @@ UNPARSER_EXEMPT = {
 def test_library_is_written_in_the_canonical_layout():
     """Every non-exempt entry is byte-identical to what ``format_program`` renders.
 
-    The shipped library is formatted by ``dev/reflow_library.py``, which is just
+    The shipped library is formatted by ``dev/done/reflow_library.py``, which is just
     ``format_program(..., layout='spread')`` over the file. Pinning that here
     makes the layout mechanical rather than a matter of taste, and makes a
     regeneration a no-op instead of a diff.
@@ -194,7 +195,7 @@ def test_library_is_written_in_the_canonical_layout():
             offenders.append(name)
     assert not offenders, (
         f'{offenders} are not in canonical form -- run '
-        f'`python dev/reflow_library.py`, or add a name to UNPARSER_EXEMPT '
+        f'`python dev/done/reflow_library.py`, or add a name to UNPARSER_EXEMPT '
         f'with a reason')
 
 

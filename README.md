@@ -193,7 +193,7 @@ The individual test modules:
 Regenerating golden / baseline files (scripts, not pytest cases —
 only when intentionally updating snapshots):
 
-    uv run python tests/capture_sly_snapshot.py        # expected_specs.json
+    uv run python tests/capture_spec_snapshot.py       # expected_specs.json
     uv run python tests/capture_peg_baseline.py        # peg_baseline.json
     uv run python tests/capture_severity_golden.py     # severity_layer_golden.json
 

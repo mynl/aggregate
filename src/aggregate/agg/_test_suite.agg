@@ -204,7 +204,7 @@ agg J.Re18d 1 claim dsev [10] occurrence net of 5 po 10 xs 0 fixed
 # =====================
 agg K.Tweedie0 10.050251256281404 claims sev gamma 0.0995 cv 0.07088812050083283 poisson note{Tweedie defined by claim count, gamma mean and cv};
 agg K.Tweedie1 10.050251256281404 claims sev 0.0005 * gamma 199 poisson                  note{Tweedie defined by claim count, gamma scale and shape};
-agg K.Tweedie2 tweedie 1 1.005 0.1                                                       note{Tweedie defined using mean, p, and dispersion, variance = dispersion xs mean**p}
+agg K.Tweedie2 tweedie 1.005 1 0.1                                                       note{Tweedie defined using p, mean, and dispersion, variance = dispersion xs mean**p}
 
 # Examples from books and papers
 # ==============================

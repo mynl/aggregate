@@ -4670,7 +4670,7 @@
       "hints": ""
     }
   },
-  "agg K.Tweedie2 tweedie 1 1.005 0.1                                                       note{Tweedie defined using mean, p, and dispersion, variance = dispersion xs mean**p}": {
+  "agg K.Tweedie2 tweedie 1.005 1 0.1                                                       note{Tweedie defined using p, mean, and dispersion, variance = dispersion xs mean**p}": {
     "kind": "agg",
     "name": "K.Tweedie2",
     "spec": {
@@ -4680,7 +4680,12 @@
       "sev_name": "gamma",
       "sev_a": 199.00000000000426,
       "sev_scale": 0.0004999999999999894,
-      "note": "Tw(p=1.005, \u03bc=1.0, \u03c3^2=0.1) --> CP(\u03bb= 10.0503, ga(\u03b1=199, \u03b2=0.0005), scale=0.0005",
+      "_tweedie": [
+        1.005,
+        1.0,
+        0.1
+      ],
+      "note": "Tweedie defined using p, mean, and dispersion, variance = dispersion xs mean**p",
       "hints": ""
     }
   },

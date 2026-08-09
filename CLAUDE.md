@@ -209,9 +209,9 @@ All authored documents — Quarto `.qmd` pages and any future artifact that supp
 The pytest suite at `tests/` is the primary test mechanism — run with `uv run pytest`. Each line of `aggregate/agg/test_suite.agg` (categories A–O: frequencies, severities, reinsurance, distortions, case studies, papers) becomes two parametrized cases:
 
 - `test_line_parses` — the line parses to a valid `(kind, name, spec)` shape.
-- `test_spec_matches_snapshot` — the spec matches `tests/data/expected_specs.json`, a snapshot captured from the legacy SLY parser before the Lark migration. This catches semantic drift in the grammar/transformer.
+- `test_spec_matches_snapshot` — the spec matches `tests/data/expected_specs.json`. This catches semantic drift in the grammar/transformer.
 
-The snapshot can be regenerated with `uv run python tests/capture_sly_snapshot.py` IF the SLY parser is restored from git history; otherwise treat it as a frozen reference.
+Regenerate the snapshot with `uv run python tests/capture_spec_snapshot.py`. It is **not** frozen: the script runs the current Lark parser and re-capturing is routine after any grammar or transformer change. What it gives you is a change detector, not a correctness oracle. It cannot prove the parser right, since it is captured from the parser it checks; it makes an edit's blast radius show up as a diff you must read and accept deliberately. A line you did not expect to move is a finding.
 
 Validation failures surface as warnings via `explain_validation()`; numerical issues (aliasing, CV mismatch, skewness) set flags in `constants.py`.
 

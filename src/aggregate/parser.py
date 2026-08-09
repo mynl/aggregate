@@ -528,11 +528,14 @@ class UnderwritingTransformer(Transformer):
     # embedded engine of a ``pnl`` / ``xpnl`` reuses the identical body. Each
     # ``agg_body_*`` returns a plain spec-fragment dict (no name / as_label
     # / trailer); ``agg_out_named`` (top level) and ``agg_source_inline``
-    # (embedded) add the identity and, for the top level, the trailer. Tweedie
-    # synthesises its own descriptive note, carried on the fragment under the
-    # private ``_engine_note`` key so the wrapper can prefer it over the trailer
-    # note (matching the old ``agg_out_tweedie`` behaviour). See
+    # (embedded) add the identity and, for the top level, the trailer. See
     # dev/plan-pnl-engine-source.md.
+    #
+    # Until 1.0.0a231 the tweedie body also synthesised a descriptive note and
+    # carried it on a private ``_engine_note`` key that both wrappers preferred
+    # over the trailer, which silently destroyed the author's ``note{}``. The
+    # provenance now rides the structured ``_tweedie`` key instead, the clause
+    # round-trips, and no body form rewrites the trailer.
     # Interior-label temp keys emitted by the sub-object fragments (exposure /
     # layer / inline severity clause). They are gathered into one ``label_map``
     # sub-dict here in the body assembly and stripped from the flat spec; the
@@ -602,30 +605,43 @@ class UnderwritingTransformer(Transformer):
         return spec
 
     def agg_body_tweedie(self, c):
-        # Tweedie distribution in (mean, p, sigma^2) form. The variance
-        # function is sigma^2 * mean^p; phi = sigma^2 in Jorgenson p. 127
-        # notation. The Tweedie -> compound-Poisson(gamma) reparameterization
-        # is delegated to ``tweedie_convert`` (imported lazily because this
-        # module is also runnable as ``python -m`` for grammar printing).
-        from .tweedie import tweedie_convert
+        # Tweedie distribution in reproductive (p, mean, sigma^2) form. The
+        # variance function is sigma^2 * mean^p; phi = sigma^2 in Jorgenson
+        # p. 127 notation. The Tweedie -> compound-Poisson(gamma)
+        # reparameterization is delegated to ``tweedie_convert`` (imported
+        # lazily because this module is also runnable as ``python -m`` for
+        # grammar printing).
+        #
+        # The expansion is exact and the engine sees an ordinary poisson x
+        # gamma, but ``_tweedie`` records that a ``tweedie`` clause is what was
+        # written, so ``decl_writer`` renders the clause back rather than its
+        # expansion. Provenance only: an aggregate written the long way carries
+        # no ``_tweedie`` and still renders as its author wrote it. See
+        # dev/plan-tweedie.md ([Tweedie-Round-Trip]).
+        from .tweedie import TweedieParameters, tweedie_convert
 
-        _tw, mu, pp, sig2 = c
+        _tw, pp, mu, sig2 = c
+        if not 1 < pp < 2:
+            # The compound Poisson-gamma representation exists only strictly
+            # inside (1, 2): at p = 1 the gamma shape alpha = (2-p)/(p-1) is
+            # infinite and at p = 2 the Poisson rate diverges, so
+            # ``tweedie_convert`` would raise a bare ZeroDivisionError. Outside
+            # the interval the family has no frequency x severity form at all,
+            # which is what [Power-Variance-Family] in dev/TODO.md would need
+            # a different representation for.
+            raise ValueError(
+                f'tweedie: p must be strictly between 1 and 2, got {pp}. The '
+                f'clause is `tweedie <p> <mean> <dispersion>`, shape parameter '
+                f'first. (It read `<mean> <p> <dispersion>` before 1.0.0a231, '
+                f'so an older program needs its first two numbers swapped.)')
         ans = tweedie_convert(p=pp, μ=mu, σ2=sig2)
-        alpha = ans["α"]
-        lam = ans["λ"]
-        beta = ans["β"]
         return {
-            "exp_en": lam,
+            "exp_en": ans["λ"],
             "freq_name": "poisson",
             "sev_name": "gamma",
-            "sev_a": alpha,
-            "sev_scale": beta,
-            # tweedie synthesises its own descriptive note (the user note is
-            # not preserved, as before); hints still flow through the trailer.
-            "_engine_note": (
-                f"Tw(p={pp}, μ={mu}, σ^2={sig2}) --> "
-                f"CP(λ={lam:8g}, ga(α={alpha:.8g}, β={beta:.8g}), scale={beta:.8g}"
-            ),
+            "sev_a": ans["α"],
+            "sev_scale": ans["β"],
+            "_tweedie": TweedieParameters(p=pp, mean=mu, dispersion=sig2),
         }
 
     def agg_body_rename(self, c):
@@ -636,12 +652,7 @@ class UnderwritingTransformer(Transformer):
 
     def agg_out_named(self, c):
         _, name, as_label, body, trailer = c
-        # Tweedie's synthetic note wins over any (absent) user note; hints ride
-        # the trailer. Non-tweedie bodies carry no ``_engine_note``.
-        note = body.pop("_engine_note", None) or trailer["note"]
-        # ``**trailer`` first so the synthetic tweedie note overrides it.
-        spec = {"name": name, **as_label, **body, **trailer, "note": note}
-        return ("agg", name, spec)
+        return ("agg", name, {"name": name, **as_label, **body, **trailer})
 
     def agg_out_builtin(self, c):
         bagg, agg_reins, trailer = c
@@ -682,14 +693,12 @@ class UnderwritingTransformer(Transformer):
     def agg_source_inline(self, c):
         # ``agg NAME <body>`` -- a complete inline aggregate, no trailer (the
         # wrapping pnl/xpnl owns it). Returns the engine spec fragment; the
-        # engine's own note (tweedie) and display label are carried through so
-        # the inner Aggregate is faithfully the declared engine.
+        # engine's display label is carried through so the inner Aggregate is
+        # faithfully the declared engine, and so is a ``_tweedie`` provenance
+        # key, which is what lets a tweedie engine inside a pnl render its
+        # clause back.
         _agg, name, as_label, body = c
-        engine_note = body.pop("_engine_note", None)
-        spec = {"name": name, **as_label, **body}
-        if engine_note:
-            spec["note"] = engine_note
-        return ("agg", name, spec)
+        return ("agg", name, {"name": name, **as_label, **body})
 
     def agg_source_ref_agg(self, c):
         # ``agg.NAME`` (optionally scaled) -- ``builtin_agg`` already resolves it
@@ -748,8 +757,10 @@ class UnderwritingTransformer(Transformer):
                 if k in ("name", "note", "hints", "label", "tags", "doc"):
                     continue
                 spec[k] = v
-            # The engine's own note (tweedie) and label are inner-Aggregate
-            # presentation; keep them without shadowing the pnl's trailer/label.
+            # The engine's own note and label are inner-Aggregate presentation;
+            # keep them without shadowing the pnl's trailer/label. (A tweedie
+            # engine's ``_tweedie`` is not metadata and is not skipped above, so
+            # it rides the loop into the pnl spec and the clause round-trips.)
             if espec.get("note"):
                 spec["engine_note"] = espec["note"]
             if "label" in espec:

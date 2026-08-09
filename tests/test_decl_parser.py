@@ -26,7 +26,7 @@ SNAPSHOT_PATH = Path(__file__).parent / "data" / "expected_specs.json"
 
 VALID_KINDS = {"agg", "sev", "port", "distortion", "expr"}
 
-# Sentinels used by tests/capture_sly_snapshot.py for non-JSON floats.
+# Sentinels used by tests/capture_spec_snapshot.py for non-JSON floats.
 POS_INF_SENTINEL = "__inf__"
 NEG_INF_SENTINEL = "__-inf__"
 NAN_SENTINEL = "__nan__"

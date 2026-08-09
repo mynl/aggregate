@@ -1,13 +1,22 @@
-"""Capture (kind, name, spec) output from the current SLY parser for every line
-of _test_suite.agg, writing it to tests/data/expected_specs.json.
+"""Capture (kind, name, spec) output from the parser for every line of
+_test_suite.agg, writing it to tests/data/expected_specs.json.
 
-This script is a migration artifact: it produces the regression snapshot that
-the Lark-based parser is verified against. Once the migration is complete and
-the snapshot is in place, the script's only future use is regenerating the
-snapshot if _test_suite.agg changes meaningfully.
+The snapshot is a change detector, not a correctness oracle. It is regenerated
+from the same parser that tests/test_decl_parser.py checks it against, so it
+cannot prove the parser right; what it does is make any grammar or transformer
+edit show its full blast radius as a diff you have to look at and accept
+deliberately. dev/done/refactor-plan.md calls it the spec-shape canary.
+
+Re-capture after any change that moves the parse of an existing line, then read
+the diff: a line you did not expect to move is a finding. A corpus edit is the
+least common reason to run this.
+
+Named capture_sly_snapshot.py until 1.0.0a231, from the migration that first
+produced it. Nothing here has touched SLY since the Lark parser landed; the
+imports below are the current parser.
 
 Run with:
-    uv run python tests/capture_sly_snapshot.py
+    uv run python tests/capture_spec_snapshot.py
 """
 
 import json

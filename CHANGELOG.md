@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a231
+
+**[Tweedie-Round-Trip] the `tweedie` keyword survives the parse.** It used to be a one-way rewrite. `agg A tweedie ...` was expanded at parse time into its compound-Poisson-gamma equivalent and nothing downstream learned a Tweedie had been declared, so `pprogram` printed `10.050251256281404 claims / sev 0.0004999999999999894 * gamma 199.00000000000426 / poisson` and the word `tweedie` was gone. The declaration is now recorded on the spec and renders back as written.
+
+**Breaking: the argument order is now `tweedie <p> <mean> <dispersion>`.** It read `<mean> <p> <dispersion>`. `p` is the shape parameter, it selects the member of the family, and the standard notation is `Tw_p(mean, dispersion)`. Everything else in the module was already p-first, `Tweedie.__init__`, `tweedie_convert`, `__repr__` and `to_series`, so this makes one order out of two. An old program does not silently build a different distribution: the clause now rejects `p` outside the open interval `(1, 2)`, which is the only range where the compound Poisson-gamma representation exists, with a message naming the order. `tweedie 1 1.005 0.1` reads `p=1` and is refused; before, the same numbers reached `tweedie_convert` and raised a bare `ZeroDivisionError` from `alpha = (2-p)/(p-1)`. The one case that can still misread is an old program whose *mean* happened to lie in `(1, 2)`.
+
+**The author's `note{}` is no longer destroyed.** The transformer synthesized a note of its own, `Tw(p=1.005, mu=1.0, ...) --> CP(...)`, and overwrote whatever was written; `tags`, `hints` and `doc` survived, only `note` did not. Every `tweedie` entry in `library.agg` had lost its authored sentence this way, so `build.recipe('TweedieSimple').note` returned machine text. The synthetic note is deleted outright, not repaired. It carried a defect of its own, an unbalanced `CP(`, the gamma scale printed twice under two names, `lambda` formatted to a different precision than `alpha` and `beta`, and it was the only Aggregate-facing string containing Greek, so reading `a.note` raised `UnicodeEncodeError` on a cp1252 Windows console.
+
+**How it works.** The parser records the declared parameters under a private `_tweedie` key, a `TweedieParameters` named tuple, beside the expansion it already produced; the engine is unchanged and still sees an ordinary poisson x gamma. `decl_writer` renders the clause from that key. This is provenance, not recognition: an aggregate written the long way carries no `_tweedie` and still renders as its author wrote it, because the unparser is the inverse of the parser and not a canonicalizer that rewrites people's programs into a spelling they did not choose. `_tweedie` is a private `Aggregate.__init__` argument because a parsed spec is splatted straight into that constructor at eleven call sites with no choke point to intercept it at; it is dropped from `_spec` when unset, so `_spec_hash` is unchanged for every object that is not a Tweedie.
+
+**`Tweedie.__init__` takes its reproductive parameters positionally.** The keyword-only marker is gone, so `Tweedie(*params)` splats. The additive pair stays keyword by convention. Purely additive: every existing call site already passed by name.
+
+Three `library.agg` entries and one `_test_suite.agg` line leave their round-trip exemption lists, so `UNPARSER_EXEMPT` drops from seventeen to fourteen and `_FIDELITY_EXEMPT` is now empty. Closes `[Unparser-Reference-Gaps]` item 2 in `dev/TODO.md`, both halves. `TweedieParameters` is exported from `aggregate.tweedie`; `Tweedie` itself stays submodule-only. Plan in `dev/plan-tweedie.md`, whose second phase (`[Tweedie-Live-Object]`) is still open. No grammar change, so the DecL reference is unaffected.
+
+---
+
 ## 1.0.0a230
 
 **[Reflected-Loss-Severity] a reflected severity is now legal under plain `sev`, and clamps at zero like every other negative-support severity.** `sev 10 - lognorm 1.5 splice [0 10]` used to be rejected outright, with a message directing the user to `ssev`. That was inconsistent: the library already accepts `sev 10 * norm + 5` and `sev lognorm 5 cv 1 - 10`, both of which reach below zero, builds them as ordinary non-signed losses, clamps the negative part through the layered-loss transform, and returns correct clamped moments. Reflection was the one shape singled out.

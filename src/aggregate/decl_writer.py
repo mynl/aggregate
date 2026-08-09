@@ -33,9 +33,10 @@ The unparser is the inverse of the parser, not of the user's keystrokes. Many
 distinct programs collapse to one spec (``50% so`` vs ``5 so`` for a $10 line,
 ``[1:6]`` vs ``[1 2 3 4 5 6]``, ``exp(.5)`` vs its evaluated float, a builtin
 reference vs its resolved body), and several transformer rules are deliberately
-lossy or normalizing (Tweedie discards its note and bakes a CP-gamma spec;
-builtin scaling mangles the name; a negative multiplier folds into
-``sev_reflect``). So the achievable invariant is **idempotence one step
+lossy or normalizing (builtin scaling mangles the name; a negative multiplier
+folds into ``sev_reflect``). Tweedie was on that list until 1.0.0a231, when it
+baked a CP-gamma spec and overwrote the author's note; it now records what was
+declared under ``_tweedie`` and round-trips. So the achievable invariant is **idempotence one step
 removed**: with ``f = spec_to_decl``, ``f(f(f(x))) == f(x)``. The original text
 ``x`` need not equal ``f(x)`` --- it is only functionally equivalent (it builds
 the same object). The canonical text is a fixed point reached after one
@@ -808,6 +809,31 @@ def _render_spread(node, depth: int = 0, indent: str = '  ') -> str:
 # Top-level kind renderers
 # ======================================================================
 
+def _render_tweedie(spec: dict) -> str:
+    """Render the ``tweedie`` clause, or ``''`` when the spec is not one.
+
+    Inverts ``agg_body_tweedie``. The transformer expands a ``tweedie`` clause
+    into its compound-Poisson-gamma equivalent and the engine sees nothing else,
+    so the clause can only be recovered from the ``_tweedie`` provenance key the
+    transformer records beside the expansion.
+
+    Notes
+    -----
+    Provenance, deliberately, not recognition. Every unlayered poisson x gamma
+    aggregate *is* a Tweedie, so this could be reconstructed from the engine
+    parameters alone; doing that would rewrite ``K.Tweedie0`` and
+    ``K.Tweedie1``, which their author wrote the long way on purpose, into a
+    spelling they did not choose. The unparser is the inverse of the parser, not
+    a canonicalizer with opinions. ``Aggregate.as_tweedie`` is where recognition
+    lives, because there the generosity costs nothing.
+    """
+    tw = spec.get('_tweedie')
+    if not tw:
+        return ''
+    p, mean, dispersion = tw
+    return f'tweedie {_fmt_num(p)} {_fmt_num(mean)} {_fmt_num(dispersion)}'
+
+
 def _render_agg(name: str, spec: dict, trailer: bool = True) -> _Block:
     """Render an ordinary loss aggregate (``agg NAME ...``).
 
@@ -817,10 +843,18 @@ def _render_agg(name: str, spec: dict, trailer: bool = True) -> _Block:
     :class:`_Block` (head ``agg NAME``, the clauses its children) so it renders
     terse on one line or spread with each clause on its own indented line.
 
+    A ``tweedie`` body short-circuits all of that: the clause is the whole body,
+    the grammar gives it no reinsurance or layer slots, and its expansion is
+    exactly what must *not* be rendered.
+
     ``trailer=False`` drops the ``note{...}`` / ``tags{...}`` / ``hints{...}``
     / ``doc{{{...}}}`` tail; each surviving clause is its own child, so spread
     puts it on its own line.
     """
+    tweedie = _render_tweedie(spec)
+    if tweedie:
+        return _Block(f'agg {name}{_render_label(spec.get("label"))}',
+                      [tweedie, *_render_trailer(spec, trailer)])
     return _Block(f'agg {name}{_render_label(spec.get("label"))}', [
         _render_exposure(spec),
         _render_layers(spec),
@@ -916,7 +950,11 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
         # (dev/plan-yapnl.md label plumbing), so it must round-trip.
         engine_label = _render_label(spec.get('engine_label'))
         engine_name = spec.get('engine_name', f'{name}_e')
-        engine = _Block(f'agg {engine_name}{engine_label}', [
+        # A tweedie engine short-circuits the body the same way `_render_agg`
+        # does; `_merge_engine_spec` copies `_tweedie` into the pnl spec because
+        # it is structure, not metadata, so it is not on the skip list there.
+        tweedie = _render_tweedie(spec)
+        engine = _Block(f'agg {engine_name}{engine_label}', [tweedie] if tweedie else [
             _render_exposure(spec),
             _render_layers(spec),
             _render_sev_clause(spec),

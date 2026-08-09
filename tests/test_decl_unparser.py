@@ -35,10 +35,12 @@ from aggregate.parser import UnderwritingLexer
 _AGG_DIR = Path(aggregate.__file__).parent / 'agg'
 _CORPUS_FILES = ['_test_suite.agg', '_test_suite2.agg', 'decl-testers.agg']
 
-# Genuinely lossy / non-canonical-spec constructs: idempotence holds, but the
-# first parse's spec is not a fixed point (tweedie discards its note and bakes a
-# CP-gamma spec that bypasses the sev_weighted defaults), so fidelity is exempt.
-_FIDELITY_EXEMPT = {'K.Tweedie2'}
+# Genuinely lossy / non-canonical-spec constructs: idempotence holds but the
+# first parse's spec is not a fixed point, so fidelity is exempt. Empty since
+# 1.0.0a231, when the tweedie clause (its only member: it discarded its note and
+# baked a CP-gamma spec that bypassed the sev_weighted defaults) started
+# round-tripping through the ``_tweedie`` provenance key.
+_FIDELITY_EXEMPT: set[str] = set()
 
 # The corpus is the _test_suite family, whose programs reference builtins it
 # defines (e.g. ``sev.One``). Parse against an underwriter that loads it, NOT

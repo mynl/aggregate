@@ -22,7 +22,9 @@ import numpy as np
 import pytest
 
 from aggregate import build
-from aggregate.constants import DefectiveDistributionWarning
+from aggregate.constants import (DefectiveDistributionWarning,
+                                 ReflectedSeverityClampWarning,
+                                 reset_warn_once)
 from aggregate.distributions import (
     estimate_agg_window, validate_discrete_distribution)
 
@@ -534,11 +536,168 @@ def test_unary_minus_double_negation_cancels():
     assert a.sev_m == pytest.approx(10.0, rel=1e-9)
 
 
-@pytest.mark.parametrize('program', [
-    'agg Bad1 10 claims sev -lognorm 10 cv 0.5 poisson',   # unary minus
-    'agg Bad2 10 claims sev 0 - lognorm 10 cv 0.5 poisson',  # rsub reflection
+# ---------------------------------------------------------------------------
+# Reflected severity as an ordinary loss (1.0.0a230)
+# dev/done/plan-reflected-loss-severity.md
+# ---------------------------------------------------------------------------
+# A reflected body under plain ``sev`` builds like any other severity whose
+# support reaches below zero (``10 * norm + 5``, ``lognorm 5 cv 1 - 10``): the
+# layered-loss transform clamps x<0 -> 0, the severity stays non-signed, and
+# layers work. It warns when it actually clamps something.
+
+
+def _ln_conditional_mean(sigma, ub):
+    """``E[X | X <= ub]`` for ``X ~ lognorm(sigma)``, by direct quadrature."""
+    from scipy.integrate import quad
+    from scipy.stats import lognorm
+    fz = lognorm(sigma)
+    return quad(lambda x: x * fz.pdf(x), 0, ub)[0] / fz.cdf(ub)
+
+
+def test_sev_reflected_bounded_no_clamp(recwarn):
+    """A splice can bound the reflection so nothing clamps and nothing warns.
+
+    ``10 - (X | 0 <= X <= 10)`` lives on ``[0, 10]``. This is the case the
+    feature exists for: an ordinary bounded loss that used to need ``ssev``
+    and with it the whole signed code path.
+    """
+    a = build('agg RSa 1 claims sev 10 - lognorm 1.5 splice [0 10] fixed')
+    sev = a.sevs[0]
+    assert sev.signed is False
+    assert sev.fz.support() == (0.0, 10.0)
+    exact = 10 - _ln_conditional_mean(1.5, 10)
+    assert sev.moms()[0] == pytest.approx(exact, rel=1e-9)
+    assert a.est_m == pytest.approx(exact, rel=1e-6)
+    assert not [w for w in recwarn
+                if issubclass(w.category, ReflectedSeverityClampWarning)]
+
+
+def test_sev_reflected_clamps_and_warns():
+    """A reflection that reaches below 0 clamps there, and says so."""
+    from scipy.integrate import quad
+    from scipy.stats import lognorm
+    sigma = np.sqrt(np.log(1 + 0.2 ** 2))
+    fz = lognorm(sigma, scale=80 / np.sqrt(1 + 0.2 ** 2))
+    exact = quad(lambda x: max(100 - x, 0) * fz.pdf(x), 0, 500, limit=300)[0]
+
+    reset_warn_once()
+    with pytest.warns(ReflectedSeverityClampWarning, match='clamps'):
+        a = build('agg RSb 1 claims sev 100 - lognorm 80 cv .2 fixed')
+    sev = a.sevs[0]
+    assert sev.signed is False
+    assert sev.moms()[0] == pytest.approx(exact, rel=1e-6)   # E[(100 - X)+]
+    # The signed sibling keeps the negative tail, so its mean is lower.
+    signed = build('agg RSc 1 claims ssev 100 - lognorm 80 cv .2 fixed')
+    assert signed.sevs[0].moms()[0] == pytest.approx(20.0, rel=1e-9)
+    assert sev.moms()[0] > signed.sevs[0].moms()[0]
+
+
+def test_sev_reflected_no_spurious_moment_validation(capsys):
+    """``sev 100 - lognorm 80 cv .2`` must not report a mean/cv mismatch.
+
+    The ``mean cv`` target describes the base ``X``, not ``100 - X``, and the
+    reflection shift rides in ``sev_loc``. Adding it to the target compared 180
+    against an achieved 80 and printed a warning on a correct declaration.
+    """
+    reset_warn_once()
+    with pytest.warns(ReflectedSeverityClampWarning):
+        build('agg RSd 1 claims sev 100 - lognorm 80 cv .2 fixed')
+    assert 'not close' not in capsys.readouterr().out
+
+
+def test_sev_reflected_all_negative_degenerate():
+    """``sev -X`` clamps everything: a point mass at 0, with a warning."""
+    reset_warn_once()
+    with pytest.warns(ReflectedSeverityClampWarning, match='point mass'):
+        a = build('agg RSe 1 claims sev -lognorm 10 cv 0.5 fixed')
+    sev = a.sevs[0]
+    assert sev.signed is False
+    assert sev.moms() == pytest.approx((0.0, 0.0, 0.0), abs=1e-12)
+    assert a.est_m == pytest.approx(0.0, abs=1e-12)
+
+
+def test_sev_reflected_zero_rsub_matches_unary_minus():
+    """``sev 0 - X`` and ``sev -X`` are the same declaration."""
+    reset_warn_once()
+    with pytest.warns(ReflectedSeverityClampWarning):
+        a = build('agg RSf 1 claims sev 0 - lognorm 10 cv 0.5 fixed')
+    assert a.sevs[0].moms() == pytest.approx((0.0, 0.0, 0.0), abs=1e-12)
+
+
+def test_sev_reflected_layer_applies():
+    """A layer on a non-signed reflected severity is a real layer.
+
+    The contrast is the signed sibling, where ``_apply_signed`` makes
+    attachment and limit the identity, so the same clause does nothing to the
+    severity (dev/plan-negative-x-agg.md S6).
+    """
+    from scipy.integrate import quad
+    from scipy.stats import lognorm
+    fz = lognorm(1.5)
+    p = fz.cdf(10)
+    # E[min(max(Y - 1, 0), 8)] for Y = 10 - X, X | X <= 10, conditional on
+    # attaching (the default ``sev_conditional``).
+    lay = quad(lambda x: min(max((10 - x) - 1, 0), 8) * fz.pdf(x) / p,
+               0, 10, limit=200)[0]
+    attach = quad(lambda x: (1.0 if (10 - x) > 1 else 0.0) * fz.pdf(x) / p,
+                  0, 10, limit=200)[0]
+
+    a = build('agg RSg 1 claims 8 xs 1 sev 10 - lognorm 1.5 splice [0 10] fixed',
+              update=False)
+    assert a.sevs[0].moms()[0] == pytest.approx(lay / attach, rel=1e-6)
+
+    plain = build('agg RSh 1 claims sev 10 - lognorm 1.5 splice [0 10] fixed',
+                  update=False)
+    assert a.sevs[0].moms()[0] != pytest.approx(plain.sevs[0].moms()[0], rel=1e-3)
+
+
+@pytest.mark.parametrize('program,keyword', [
+    ('agg RSi 1 claims sev 10 - lognorm 1.5 splice [0 10] fixed', 'sev'),
+    ('agg RSj 1 claims ssev 10 - lognorm 1.5 splice [0 10] fixed', 'ssev'),
 ])
-def test_reflected_severity_rejected_under_plain_sev(program):
-    """A reflected (signed) severity needs ``ssev``; plain ``sev`` rejects it."""
-    with pytest.raises(Exception, match="needs 'ssev'"):
-        build(program)
+def test_reflected_round_trip_keeps_keyword(program, keyword):
+    """The unparser keys the keyword off ``sev_signed``, not ``sev_reflect``.
+
+    Rewriting ``sev 10 - X`` as ``ssev 10 - X`` would silently un-clamp the
+    declaration, which is a different distribution.
+    """
+    from aggregate import Underwriter
+    from aggregate.decl_writer import spec_to_decl
+    kind, name, spec = Underwriter().parser.parse(program)
+    text = spec_to_decl(spec, kind, name)
+    assert f' {keyword} ' in f' {text} '
+    if keyword == 'sev':
+        assert ' ssev ' not in f' {text} '
+
+
+# ---------------------------------------------------------------------------
+# Spliced raw moments (1.0.0a230)
+# ---------------------------------------------------------------------------
+# ``_apply_lb_ub`` swaps cdf/sf/pdf/ppf/isf/support on the frozen RV but not
+# ``moment``, so the signed paths used to read UNSPLICED raw moments.
+
+
+def test_ssev_splice_moments_reflected():
+    """``ssev 10 - lognorm 1.5 splice [0 10]`` reports the spliced mean.
+
+    Regression: reported 6.9198 (``10`` less the unspliced 3.0802) where the
+    truth is 8.3115, which failed validation on a correct build.
+    """
+    a = build('agg RSk 1 claims ssev 10 - lognorm 1.5 splice [0 10] fixed')
+    exact = 10 - _ln_conditional_mean(1.5, 10)
+    assert a.sevs[0].sev1 == pytest.approx(exact, rel=1e-9)
+    assert a.est_m == pytest.approx(exact, rel=1e-6)
+
+
+def test_ssev_splice_moments_unreflected():
+    """The same defect without a reflection: ``ssev X splice [0 10]``."""
+    a = build('agg RSl 1 claims ssev lognorm 1.5 splice [0 10] fixed')
+    exact = _ln_conditional_mean(1.5, 10)
+    assert a.sevs[0].sev1 == pytest.approx(exact, rel=1e-9)
+    assert a.est_m == pytest.approx(exact, rel=1e-6)
+
+
+def test_ssev_unspliced_moments_stay_closed_form():
+    """No splice means no quadrature: the exact ``fz.moment`` path is kept."""
+    a = build('agg RSm 1 claims ssev 100 - lognorm 80 cv .2 fixed')
+    assert a.sevs[0].sev1 == pytest.approx(20.0, rel=1e-13)

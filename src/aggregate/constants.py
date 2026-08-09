@@ -36,6 +36,7 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'IgnoredDecLClauseWarning', 'ZeroModifiedExposureWarning',
            'ZeroPremiumCessionWarning',
            'CoarseJointGridWarning', 'DegenerateEvaluationWarning',
+           'ReflectedSeverityClampWarning',
            'warn_once', 'reset_warn_once', 'warn_once_isolated',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
@@ -343,6 +344,37 @@ class DegenerateEvaluationWarning(UserWarning):
     differs by family and carries no information about the position, so a
     number there would invite comparisons that mean nothing; the panel's
     ``status`` column names which case fired.
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
+
+
+class ReflectedSeverityClampWarning(UserWarning):
+    """Emitted when a reflected ``sev`` severity clamps mass at zero.
+
+    A reflected severity (``shift - X``, or the bare ``-X``) declared with plain
+    ``sev`` is an ordinary loss: the layered-loss transform clamps ``x < 0`` to
+    ``0``, exactly as it does for ``sev 10 * norm + 5`` or
+    ``sev lognorm 5 cv 1 - 10``. That is usually what the user wants when the
+    reflection is bounded (``sev 10 - lognorm 1.5 splice [0 10]`` lives on
+    ``[0, 10]`` and never clamps), and usually a mistake when it is not, because
+    the negative half of a premium-minus-loss position is the interesting half.
+
+    The warning fires only when both conditions hold: the severity is reflected,
+    and its reflected support actually reaches below zero. It names the mass
+    being clamped, so a 0.01% tail and a wholesale truncation read differently,
+    and points at ``ssev``, which keeps the negative support instead. In the
+    limit the whole law clamps (``sev -lognorm 1.5`` has support
+    ``(-inf, 0]``) and the severity is a point mass at zero; that follows from
+    the rule rather than being an error. See
+    ``dev/done/plan-reflected-loss-severity.md`` ([Reflected-Clamp-Warning]).
+
+    Reported through :func:`warn_once`, keyed on the severity name, shift, and
+    splice window, so ten like units warn once but two genuinely different
+    declarations both warn. Silence it with
+    ``silence_warnings(ReflectedSeverityClampWarning)``; re-arm with
+    :func:`reset_warn_once`.
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).

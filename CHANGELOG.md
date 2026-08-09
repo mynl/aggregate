@@ -20,6 +20,30 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a230
+
+**[Reflected-Loss-Severity] a reflected severity is now legal under plain `sev`, and clamps at zero like every other negative-support severity.** `sev 10 - lognorm 1.5 splice [0 10]` used to be rejected outright, with a message directing the user to `ssev`. That was inconsistent: the library already accepts `sev 10 * norm + 5` and `sev lognorm 5 cv 1 - 10`, both of which reach below zero, builds them as ordinary non-signed losses, clamps the negative part through the layered-loss transform, and returns correct clamped moments. Reflection was the one shape singled out.
+
+The rule is now one rule. Under `sev` a reflected body is built like any other severity whose support reaches below zero: `x < 0` clamps to `0`, the severity stays non-signed, and layers, attachments, and occurrence reinsurance work normally. Under `ssev` nothing changes; it still keeps the negative support.
+
+**This matters most where the reflection never goes negative.** `10 - (X | 0 <= X <= 10)` lives on `[0, 10]`, because the splice applies to the underlying law and the reflection composes on top of it. Declaring that with `ssev` was the only route before, and it dragged in the whole signed code path: identity layering, so an occurrence layer was silently ignored, plus the two-sided grid and the signed `Portfolio` combine. It is now an ordinary bounded loss.
+
+**A reflection that does reach below zero warns.** `ReflectedSeverityClampWarning` names the clamped mass, so a 0.01% tail and a wholesale truncation read differently, and points at `ssev`. It fires only when both conditions hold, reflected *and* actually below zero, so the bounded case above stays silent. In the limit the whole law clamps: `sev -lognorm 1.5` has support `(-inf, 0]` and is a point mass at zero, with a warning. Reported through `warn_once`, keyed on the severity name, shift, and splice window.
+
+**Breaking, narrowly.** A program that relied on `sev <reflected>` raising now builds instead. Nothing that parsed before parses differently.
+
+**[Splice-Moment-Defect] a spliced signed severity reported unspliced moments.** `_apply_lb_ub` swaps `cdf`, `sf`, `pdf`, `ppf`, `isf`, and `support` on the frozen RV but not `moment`, and both `_apply_reflect` and `_apply_signed` read `moment` off it. So `ssev 10 - lognorm 1.5 splice [0 10]` reported a severity mean of 6.9198, which is 10 less the *unspliced* 3.0802, where the truth is 8.3115. The FFT answer was right throughout; the analytic moments were not, which failed validation on a correct build and sized the automatic bucket window from the wrong numbers. The same defect applied without a reflection, to any spliced `ssev`.
+
+Raw moments now come from `Severity._raw_moments`, which keeps the exact closed-form `fz.moment` when there is no splice and integrates the patched `isf` in quantile space when there is. Unspliced results are bit-identical; spliced ones change, from wrong to right.
+
+**The `approximate sgamma` / `slognorm` left-skew fit sets `sev_signed` explicitly.** It fits the reflected aggregate and maps back through `sev_reflect`, and had been relying on reflection implying signedness. It now declares the flag through the same low-quantile test the other branches use, which is what its docstring already promised.
+
+**The unparser keys the severity keyword off `sev_signed` alone.** It used to emit `ssev` whenever `sev_reflect` was set. With both forms legal that would rewrite `sev 100 - lognorm` as `ssev 100 - lognorm` and silently un-clamp the declaration.
+
+Plan in `dev/done/plan-reflected-loss-severity.md`. No grammar change, so the DecL reference is unaffected.
+
+---
+
 ## 1.0.0a229
 
 **[Greater-Tables-Dependency] `greater_tables` is a plain dependency, and the Python floor rises to 3.12.** GT 6.0.0 published to PyPI on 2026-08-07, so the workaround it forced can go: the `exhibits` extra had stayed commented out because an active extra naming an unpublished package would make `uv sync --all-extras` unresolvable, and the install instruction was a sibling checkout.

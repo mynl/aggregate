@@ -298,10 +298,13 @@ def _render_sev_clause(spec: dict) -> str:
     label = _render_label(spec.get('label_map', {}).get('severity'))
     if _is_dsev(spec):
         return _render_dsev(spec) + label
-    # A reflected severity is signed (negative support) and the parser now
-    # rejects it under the clamped ``sev`` clause, so it must round-trip as
-    # ``ssev`` regardless of the explicit ``sev_signed`` flag.
-    kw = 'ssev' if (spec.get('sev_signed') or spec.get('sev_reflect')) else 'sev'
+    # The keyword follows ``sev_signed`` alone. Reflection is orthogonal: both
+    # ``sev 100 - lognorm`` (clamps at 0) and ``ssev 100 - lognorm`` (keeps the
+    # negative support) are legal and mean different things, so keying the
+    # keyword off ``sev_reflect`` would rewrite the former as the latter and
+    # silently change the declaration. See
+    # dev/done/plan-reflected-loss-severity.md ([Reflect-Unparser-Round-Trip]).
+    kw = 'ssev' if spec.get('sev_signed') else 'sev'
     return f'{kw} {_render_dist(spec)}{label}'
 
 

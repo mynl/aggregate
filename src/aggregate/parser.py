@@ -1661,16 +1661,15 @@ class UnderwritingTransformer(Transformer):
 
     # ----- severity (continuous) ------------------------------------
     def sev_clause_sev(self, c):
+        # A reflected severity (``-X`` / ``shift - X``) is accepted here and
+        # built like any other severity whose support reaches below zero
+        # (``10 * norm + 5``, ``lognorm 5 cv 1 - 10``): the layered-loss
+        # transform clamps x<0 -> 0, the severity stays non-signed, and layers
+        # and occurrence reinsurance work normally. When the reflected support
+        # does reach below zero the Severity warns, names the clamped mass, and
+        # points at ``ssev``. See dev/done/plan-reflected-loss-severity.md; the
+        # rejection this replaced is in dev/done/plan-decl-sev-unary-minus.md.
         _sev, sev, as_label = c
-        if sev.get("sev_reflect", False):
-            # A reflected severity (``-X`` / ``shift - X``) is inherently signed
-            # -- it carries negative support. The plain ``sev`` clause builds a
-            # clamped, non-negative severity, so accepting a reflected body here
-            # would be ambiguous (does the negative half survive?). Require the
-            # explicit signed keyword instead. See dev/done/plan-decl-sev-unary-minus.md.
-            raise ValueError(
-                "DecL: a reflected (signed) severity needs 'ssev', not 'sev' "
-                "(reflection produces negative support; use 'ssev' to keep it)")
         sev["_severity_label"] = as_label.get("label")
         return sev
 
@@ -1791,9 +1790,11 @@ class UnderwritingTransformer(Transformer):
         reflected else ``+1``. A pure reflection ``-X = -Lx + (-s)*base`` negates
         any location and toggles ``sev_reflect``. An *absent* ``sev_loc`` is left
         absent (``-0 == 0``), matching the ``sev1_scaled`` convention so the form
-        is byte-identical to the canonical ``-1 * X`` under the unparser. Valid
-        only under ``ssev`` (a reflected severity is signed); ``sev_clause_sev``
-        rejects it under plain ``sev``.
+        is byte-identical to the canonical ``-1 * X`` under the unparser. Legal
+        under both keywords: ``ssev -X`` keeps the negative support, ``sev -X``
+        clamps it, which for a pure negation means the whole law clamps and the
+        severity is a point mass at 0 (with a warning). See
+        dev/done/plan-reflected-loss-severity.md.
         """
         _minus, sev1 = c
         if "sev_loc" in sev1:

@@ -305,7 +305,11 @@ def _approximate_sev_kwargs(m, cv, skew, approx_type, warn_degenerate=False):
     - **left (negative) skew**: fit the *reflected* aggregate ``-A`` (which is
       right-skewed) and map back through the ``sev_reflect`` machinery
       (``Y = sev_loc - X`` with the base built at loc 0); the returned dict
-      carries ``sev_reflect=True`` and a signed (negative-support) severity.
+      carries ``sev_reflect=True``, plus ``sev_signed=True`` on the same
+      low-quantile test the other branches use. The flag is explicit because
+      reflection stopped implying signedness at 1.0.0a230: a reflected severity
+      under plain ``sev`` clamps at zero, and a fit that clamps would not
+      reproduce the moments it was built to match.
 
     Parameters
     ----------
@@ -358,6 +362,21 @@ def _approximate_sev_kwargs(m, cv, skew, approx_type, warn_degenerate=False):
             sev['sev_signed'] = True
         return sev
 
+    def _mark_signed_reflected(sev, fz_base):
+        """The same test for a reflected fit ``Y = sev_loc - X``.
+
+        ``q_Y(p) = sev_loc - q_X(1 - p)``, so the low quantile of ``Y`` is the
+        shift less the *upper* quantile of the base. Reflection does not decide
+        signedness on its own (a reflected severity under plain ``sev`` clamps
+        at zero like any other), so a reflected fit has to declare it the same
+        way every other branch here does. In practice it nearly always is
+        signed: the base families are unbounded above, so ``Y`` reaches well
+        below zero unless the shift is enormous.
+        """
+        if float(sev['sev_loc'] - fz_base.isf(signed_tail)) < 0:
+            sev['sev_signed'] = True
+        return sev
+
     # ---- unshifted, skew-independent families -------------------------------
     if approx_type == 'norm':
         return _mark_signed({'sev_name': 'norm', 'sev_scale': sd, 'sev_loc': m},
@@ -400,8 +419,12 @@ def _approximate_sev_kwargs(m, cv, skew, approx_type, warn_degenerate=False):
     skew_r = -skew
     if approx_type == 'sgamma':
         shift_r, alpha, theta = sgamma_fit(m_r, cv_r, skew_r)
-        return {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta,
-                'sev_loc': -shift_r, 'sev_reflect': True}
+        return _mark_signed_reflected(
+            {'sev_name': 'gamma', 'sev_a': alpha, 'sev_scale': theta,
+             'sev_loc': -shift_r, 'sev_reflect': True},
+            ss.gamma(alpha, scale=theta))
     shift_r, mu, sigma = sln_fit(m_r, cv_r, skew_r)
-    return {'sev_name': 'lognorm', 'sev_a': sigma, 'sev_scale': float(np.exp(mu)),
-            'sev_loc': -shift_r, 'sev_reflect': True}
+    return _mark_signed_reflected(
+        {'sev_name': 'lognorm', 'sev_a': sigma, 'sev_scale': float(np.exp(mu)),
+         'sev_loc': -shift_r, 'sev_reflect': True},
+        ss.lognorm(sigma, scale=float(np.exp(mu))))

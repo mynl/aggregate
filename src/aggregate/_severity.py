@@ -15,7 +15,9 @@ from scipy.optimize import newton
 from scipy.special import loggamma, binom
 from scipy.optimize import NoConvergence  # noqa
 from ._help import HelpMixin
-from .constants import (FIG_H, FIG_W, INFO_NA, info_row)
+from .constants import (FIG_H, FIG_W, INFO_NA, ReflectedSeverityClampWarning,
+                        info_row, warn_once)
+from .moments import VALIDATION_NOISE
 from ._grid_distribution import GridDistribution
 from ._labeled import LabeledMixin
 from ._program import ProgramMixin
@@ -1086,30 +1088,36 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         self._build()
 
         # ---- shared post-build steps -------------------------------------
+        # Order is load-bearing: splice (lb/ub) modifies the underlying
+        # distribution FIRST; then the optional reflection maps it to
+        # ``shift - X``; then either the signed (identity) layering or the
+        # ordinary clamped layer wraps on top. Attachment probabilities are
+        # computed against the fully transformed fz, so the layer sees the
+        # reflected law when there is one.
+        #
+        # Signedness and reflection are independent. ``ssev`` sets ``signed``
+        # through the constructor, a discrete ``_build`` sets it when it finds a
+        # negative atom, and a reflection under plain ``sev`` sets neither: it
+        # clamps at zero like ``10 * norm + 5`` does. See
+        # dev/done/plan-reflected-loss-severity.md.
+        self._apply_lb_ub()
+        if not self.signed:
+            # Targets from ``mean cv`` describe the pre-reflection base X, not
+            # ``shift - X``, so validate before reflecting.
+            self._validate_moments()
         if self.sev_reflect:
-            # Reflected severity ``shift - X``: build the positive base (loc 0),
-            # then reflect into signed support. ``_apply_reflect`` sets the raw
-            # moments and the reflected fz methods; ``_apply_signed`` then wires
-            # the identity (no-clamp) layering from them.
-            self._apply_lb_ub()
             self._apply_reflect()
-            self._apply_signed()
-        elif self.signed:
-            # Signed (never-clamp) severity: keep the raw distribution. Honour
-            # an explicit splice, but skip the x<0 -> 0 / attachment clamp and
-            # the layered-loss transform -- the layered methods are the raw fz
-            # methods (identity). Moments are the raw distribution's; discrete
-            # kinds already populated sev1/sev2/sev3 in ``_build``.
-            self._apply_lb_ub()
+            if not self.signed:
+                self._warn_reflected_clamp()
+        if self.signed:
+            # Signed (never-clamp) severity: keep the (possibly spliced,
+            # possibly reflected) distribution. Skip the x<0 -> 0 / attachment
+            # clamp and the layered-loss transform; the layered methods are the
+            # raw fz methods (identity). Moments are the raw distribution's;
+            # discrete kinds already populated sev1/sev2/sev3 in ``_build``.
             self._apply_signed()
         else:
-            # Order is load-bearing: splice (lb/ub) modifies the underlying
-            # distribution FIRST, then attachment probabilities are computed
-            # against the already-spliced fz, then validation, then the policy
-            # layer wraps on top of everything.
-            self._apply_lb_ub()
             self._compute_attachment_probs()
-            self._validate_moments()
             self._apply_layer_attachment()
 
         assert self.fz is not None
@@ -1425,16 +1433,29 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         and support ``[shift - hi_X, shift - lo_X]``. Moments:
         ``E[Y^k] = E[(shift - X)^k]`` by binomial expansion.
 
-        Used for ``-1 * dist (+/- shift)`` (e.g. ``100 - lognorm``). Marks the
-        severity signed so the no-clamp path in ``_apply_signed`` is used.
+        Used for ``-1 * dist (+/- shift)`` (e.g. ``100 - lognorm``). Reflection
+        does **not** decide signedness: ``ssev 100 - lognorm`` keeps the negative
+        support through ``_apply_signed``, while ``sev 100 - lognorm`` clamps it
+        at zero through the ordinary layered-loss transform, exactly as
+        ``sev 10 * norm + 5`` does. See dev/done/plan-reflected-loss-severity.md.
+
+        The raw moments are set **only** on the signed path, where ``Y`` itself
+        is the answer. Under plain ``sev`` the answer is the *clamped* law
+        ``max(Y, 0)``, so populating ``sev1`` here would divert :meth:`moms`
+        into its precomputed-moment fast path and return the unclamped value
+        (``sev -lognorm 10 cv 0.5`` would report a mean of -10 for a severity
+        that is identically 0). Leaving them ``None`` routes the clamped case
+        through :func:`_numerical_moms`, which integrates the reflected ``isf``
+        over the positive part and is correct by construction.
         """
         Z = self.fz
         d = float(self._reflect_shift)
-        # raw moments first (before the method swap below)
-        z1 = float(Z.moment(1)); z2 = float(Z.moment(2)); z3 = float(Z.moment(3))
-        self.sev1 = d - z1
-        self.sev2 = d * d - 2 * d * z1 + z2
-        self.sev3 = d ** 3 - 3 * d * d * z1 + 3 * d * z2 - z3
+        if self.signed:
+            # raw moments first (before the method swap below)
+            z1, z2, z3 = self._raw_moments(Z)
+            self.sev1 = d - z1
+            self.sev2 = d * d - 2 * d * z1 + z2
+            self.sev3 = d ** 3 - 3 * d * d * z1 + 3 * d * z2 - z3
         # capture the originals, then install reflected versions on the frozen RV
         zcdf, zsf, zppf, zisf, zpdf = Z.cdf, Z.sf, Z.ppf, Z.isf, Z.pdf
         zlo, zhi = Z.support()
@@ -1444,7 +1465,91 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         self.fz.ppf = lambda q, _f=zisf, _d=d: _d - _f(q)
         self.fz.isf = lambda q, _f=zppf, _d=d: _d - _f(q)
         self.fz.support = lambda _d=d, _lo=zlo, _hi=zhi: (_d - _hi, _d - _lo)
-        self.signed = True
+        # ``fz.stats`` is deliberately NOT swapped. Its one internal caller is
+        # the finiteness check in ``_numerical_moms``, and finiteness is
+        # invariant under reflection: E[(d - X)^k] is finite exactly when
+        # E[X^j] is finite for every j <= k. A reflected ``stats`` would still
+        # ignore any splice (``_apply_lb_ub`` does not swap it either), so
+        # patching it would look fixed without being fixed.
+
+    def _raw_moments(self, fz):
+        """First three raw non-central moments of the (possibly spliced) ``fz``.
+
+        Parameters
+        ----------
+        fz : frozen scipy RV
+            The distribution whose moments are wanted, after
+            :meth:`_apply_lb_ub` has installed any splice.
+
+        Returns
+        -------
+        (m1, m2, m3) : tuple of float
+
+        Notes
+        -----
+        Two paths. With no splice, ``fz.moment(k)`` is exact and closed form for
+        the scipy families, so use it and change nothing.
+
+        With a splice, ``fz.moment`` is **wrong**: :meth:`_apply_lb_ub` swaps
+        ``cdf``, ``sf``, ``pdf``, ``ppf``, ``isf``, and ``support`` on the frozen
+        RV but not ``moment``, which therefore still reports the unconditional
+        law. That defect reached the answer, not just a diagnostic:
+        ``ssev 10 - lognorm 1.5 splice [0 10]`` reported a severity mean of
+        6.9198 (``10`` less the *unspliced* 3.0802) where the truth is 8.3115,
+        which failed validation on a correct build and sized the automatic
+        bucket window from the wrong moments.
+
+        The spliced path integrates in quantile space,
+        :math:`E[X^k] = \\int_0^1 q(p)^k dp` with :math:`q` the (patched)
+        ``isf``, reusing the same :func:`_safe_integrate` machinery as
+        :func:`_numerical_moms`. Quantile space rather than the x-axis because
+        the interval is compact and the splice has already truncated the tail.
+        A spliced law has no closed form to give up, so nothing is lost.
+        """
+        if self.sev_lb == 0 and self.sev_ub == np.inf:
+            return (float(fz.moment(1)), float(fz.moment(2)),
+                    float(fz.moment(3)))
+        return tuple(
+            _safe_integrate(
+                (lambda p, _n=n: np.asarray(fz.isf(p), dtype=float) ** _n),
+                0.0, 1.0, n, self.sev_name)[0]
+            for n in (1, 2, 3))
+
+    def _warn_reflected_clamp(self):
+        """Warn when a non-signed reflected severity clamps mass at zero.
+
+        Notes
+        -----
+        Called from ``__init__`` right after :meth:`_apply_reflect`, so
+        ``self.fz`` is already the reflected law and its support is exact.
+        Silent unless the reflected support genuinely reaches below zero: the
+        common bounded case (``sev 10 - lognorm 1.5 splice [0 10]``, support
+        ``[0, 10]``) clamps nothing and says nothing.
+
+        The clamped mass is ``P(Y < 0) = F_Y(0)``, one cdf call on the reflected
+        law. It goes in the message because it is the number that tells the user
+        whether they care: a 0.01% tail and a wholesale truncation are different
+        situations wearing the same warning.
+
+        The lower-edge test uses ``VALIDATION_NOISE`` rather than a bare ``< 0``
+        so a support edge that lands at ``-1e-16`` through floating-point
+        arithmetic does not warn about nothing.
+        """
+        lo, hi = self.fz.support()
+        if lo >= -VALIDATION_NOISE:
+            return
+        p0 = float(np.asarray(self.fz.cdf(0.0)).reshape(-1)[0])
+        degenerate = (' The severity is a point mass at 0.'
+                      if p0 >= 1 - VALIDATION_NOISE else '')
+        warn_once(
+            f"Severity '{self.sev_name}': reflected support "
+            f"[{lo:g}, {hi:g}] reaches below 0, so 'sev' clamps "
+            f"{100 * p0:.4g}% of the mass to 0.{degenerate} "
+            f"Did you mean 'ssev'?",
+            ReflectedSeverityClampWarning,
+            key=('reflected-clamp', str(self.sev_name),
+                 self._reflect_shift, self.sev_lb, self.sev_ub),
+            stacklevel=3)
 
     def _apply_signed(self):
         """Post-build for a signed (never-clamp) severity: identity layering.
@@ -1468,10 +1573,10 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         self.moment_pattach = 1.0
         self.pdetach = 0.0
         if self.sev1 is None:
-            # continuous (scipy) signed severity: raw non-central moments
-            self.sev1 = float(self.fz.moment(1))
-            self.sev2 = float(self.fz.moment(2))
-            self.sev3 = float(self.fz.moment(3))
+            # continuous (scipy) signed severity: raw non-central moments.
+            # ``_raw_moments`` because ``fz.moment`` ignores an active splice
+            # (``_apply_lb_ub`` does not swap it); see its Notes.
+            self.sev1, self.sev2, self.sev3 = self._raw_moments(self.fz)
         # identity layering: the severity IS the (spliced) raw distribution
         self._layered_cdf = self.fz.cdf
         self._layered_sf = self.fz.sf
@@ -1520,15 +1625,24 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         ``sev_loc`` is added to the target mean so that DecL forms like
         ``lognorm 5 cv .3 + 10`` (a shifted lognormal with the loc applied
         afterwards) compare correctly.
+
+        A **reflected** severity is the exception: there ``sev_loc`` is the
+        shift in ``shift - X``, not an additive location on the base, and the
+        base was built at loc 0. Adding it would compare the user's target
+        against ``target + shift`` and fail every time (``100 - lognorm 80
+        cv .2`` would check 180 against an achieved 80). This runs *before*
+        :meth:`_apply_reflect`, so ``self.fz`` is still the base ``X`` that the
+        ``mean cv`` target actually describes; compare against it directly.
         """
         if not (self.sev_mean > 0 or self.sev_cv > 0):
             return
+        loc = 0.0 if self.sev_reflect else self.sev_loc
         mean, var = self.fz.stats('mv')
         acv = var ** .5 / mean
-        if self.sev_mean > 0 and not np.isclose(self.sev_mean + self.sev_loc, mean):
+        if self.sev_mean > 0 and not np.isclose(self.sev_mean + loc, mean):
             print(f'WARNING target mean {self.sev_mean} and achieved mean {mean} not close')
         if self.sev_cv > 0 and not np.isclose(
-                self.sev_cv * self.sev_mean / (self.sev_mean + self.sev_loc), acv):
+                self.sev_cv * self.sev_mean / (self.sev_mean + loc), acv):
             print(f'WARNING target cv {self.sev_cv} and achieved cv {acv} not close')
         logger.debug(
             f'Severity.__init__ | parameters {self.sev_a}, {self.sev_scale}: '
@@ -1655,8 +1769,14 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             return self.sev1, self.sev2, self.sev3
 
         # 2. Closed-form via partial expected values for the supported kinds.
+        # ``not self.sev_reflect`` is required, not defensive: ``sev -lognorm``
+        # leaves sev_loc at 0 with the default splice, so it satisfies every
+        # other clause here and would be handed the UNREFLECTED closed form.
+        # A reflected law has no partial-expected-value shortcut, so it belongs
+        # on the numerical path below.
         if (isinstance(self.sev_name, str)
                 and self.sev_name in ('lognorm', 'pareto', 'gamma', 'expon')
+                and not self.sev_reflect
                 and self.sev_loc == 0
                 and self.sev_lb == 0
                 and self.sev_ub == np.inf):

@@ -617,10 +617,10 @@ xpnl EV.CedeTower 33333.33333333321 premium as GWP less agg EV.CedeTower_e as Su
 # ============================================================
 # Bare unary minus `ssev -X` reflects the severity, sugar for the working
 # `ssev 0 - X`. Unary minus binds tighter than the additive shift, so
-# `-lognorm 2 + 5` is `(-X) + 5 == 5 - X`. A reflected severity is signed, so
-# the clamped `sev` clause rejects it (see tests/test_parser_errors.py). Round-
-# trips via the canonical `-1 * X` scaled form. See tests/test_decl_parser.py
-# and dev/done/plan-decl-sev-unary-minus.md.
+# `-lognorm 2 + 5` is `(-X) + 5 == 5 - X`. Round-trips via the canonical
+# `-1 * X` scaled form. See tests/test_decl_parser.py and
+# dev/done/plan-decl-sev-unary-minus.md. Reflection under the clamped `sev`
+# clause is the RS section below (it was rejected outright until 1.0.0a230).
 agg UM.Negate 10 claims ssev -lognorm 10 cv 0.5 poisson                                                          note{bare unary minus reflects; parity with `ssev 0 - lognorm`};
 agg UM.Shift  10 claims ssev -lognorm 2 cv 0.5 + 5 poisson                                                       note{tight bind: (-X) + 5 == 5 - X, mean 3};
 agg UM.Scaled 10 claims ssev -3 * lognorm 2 cv 0.5 poisson                                                       note{negative NUMBER -3 stays on the scaled path, mean -6}
@@ -1114,3 +1114,24 @@ agg RV.Both 100 claims sev lognorm 50 cv 2 occurrence net of 100 xs 100 poisson 
 agg RV.Ceded 100 claims sev lognorm 50 cv 2 occurrence ceded to 100 xs 100 poisson                                 note{own density is the CEDED view, not the net};
 agg RV.Clean 30 claims sev lognorm 40 cv 1.2 poisson                                                               note{no cession: reins_views is empty and reins_view= is refused};
 port RV.Book agg RV.Occ 100 claims sev lognorm 50 cv 2 occurrence net of 100 xs 100 poisson agg RV.Clean 30 claims sev lognorm 40 cv 1.2 poisson
+
+# ============================================================
+# RS. Reflected severity as an ordinary loss (1.0.0a230)
+# ============================================================
+# A reflected body (`shift - X`, or the bare `-X`) under plain `sev` is built
+# like any other severity whose support reaches below zero (`10 * norm + 5`,
+# `lognorm 5 cv 1 - 10`): the layered-loss transform clamps x<0 -> 0, the
+# severity stays non-signed, and layers and occurrence reinsurance work. It was
+# rejected outright before 1.0.0a230, which forced `ssev` and with it the whole
+# signed code path even on a bounded reflection that never goes negative.
+# `ssev` keeps the negative support and is unchanged. A `sev` reflection that
+# does reach below zero warns (ReflectedSeverityClampWarning) naming the clamped
+# mass; in the limit everything clamps and the severity is a point mass at 0.
+# The keyword follows sev_signed alone under the unparser, so these round-trip
+# as `sev`, not `ssev`. See tests/test_negative_x.py and
+# dev/done/plan-reflected-loss-severity.md.
+agg RS.Bounded  10 claims sev 10 - lognorm 1.5 splice [0 10] poisson                                                note{splice bounds the reflection to [0, 10]: an ordinary loss, nothing clamps};
+agg RS.Clamped  10 claims sev 100 - lognorm 80 cv .2 poisson                                                        note{premium minus loss read as a loss: the negative tail clamps at 0 and warns};
+agg RS.Negate   10 claims sev -lognorm 10 cv 0.5 poisson                                                            note{fully reflected: everything clamps, severity is a point mass at 0};
+agg RS.Shift    10 claims sev -lognorm 2 cv 0.5 + 5 poisson                                                         note{tight bind (-X) + 5 == 5 - X, clamped at 0};
+agg RS.Splice   10 claims ssev lognorm 1.5 splice [0 10] poisson                                                    note{signed and spliced: raw moments follow the splice (fixed 1.0.0a230)}

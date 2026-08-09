@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a237
+
+**[Chart-PnL] a P&L delegates to the aggregate emitter over its signed result, read from the low tail.** `PnL.plot` draws the document `charts.chart_pnl` emits and `plots._aggregate.plot_pnl` is deleted. A P&L's result is a `GridDistribution` like any other, so the chart is the aggregate's: the same two panels, the same one outcome axis read by both, the same quantile curve. The emitter is a delegation, not a second drawing, over the shared `outcome_doc` builder that `chart_agg` now also goes through.
+
+**Four things differ, and every one is a fact about what the outcome means.** The outcome axis is **signed**, so its window is the two-sided quantile crop rather than being anchored at zero: a loss window reads from zero because the mass at and near zero is real, and half a P&L's outcomes are on the other side of it. For the same reason it declares `scales=('linear',)` and offers no log reading at all, which is a declaration doing exactly its job; the ordinate still declares one. The adverse tail is the **low** end, so `meta['return_period_map']` is `reciprocal` and the reader interrogates the shortfall, the same branch `PnL.tail_periods_df` already takes: ask for the return-period reading and the 1-in-100 and 1-in-250 anchors land on 100 and 250 exactly. And break even at zero is a **reading**, not decoration, so it is a mark in both panels, vertical where the outcome is on x and horizontal where it is on y.
+
+There is no severity companion, a P&L being an accounting result rather than a compound of one. The panels gain the Lee diagram the compositor never drew: it drew a mass panel and a cdf panel, and the cdf is the Lee curve seen from the other axis, so nothing is lost and the tail is now readable at a chosen probability.
+
+`PnL.plot(log=False, full_range=False, return_period=False)`, returning the figure and still stashing it on `self.figure`; `axd` and the canvas `**kwargs` are gone, as on `Aggregate.plot`.
+
+---
+
 ## 1.0.0a236
 
 **[Chart-Distortion] a distortion draws through its own document and the compositor goes.** `Distortion.plot` now renders the document `charts.chart_distortion` emits, and `plots._distortion.plot_distortion` is deleted. The deletion is licensed by a measurement rather than an argument: the two paths had been pixel identical since `a209` and were re-measured at RMS 0 immediately before, so nothing about the picture changed here.

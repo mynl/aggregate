@@ -6,9 +6,12 @@ became two, its two branches became one, and the discrete-or-continuous
 question it asked (``bs == 1`` and a small mean) is now the renderer's
 ladder reading the declared support and the room on screen.
 
-What remains here is ``plot_pnl`` (until ``[Chart-PnL]``) and
-``plot_reins_occ``. Both read the public ``density_df`` /
-``reins_density_df`` surfaces and the object's grid metadata; the limit
+``plot_pnl`` went the same way at ``[Chart-PnL]``: a P&L's result is a
+``GridDistribution`` like any other, so it draws the aggregate's document
+over its own signed grid rather than a second two-panel picture.
+
+What remains here is ``plot_reins_occ``, which reads the public
+``reins_density_df`` surface and the object's grid metadata; the limit
 logic stays on the class as ``Aggregate._limits`` (a data method, shared
 with reporting).
 """
@@ -22,47 +25,6 @@ from ._style import make_grid
 from ._quantile import plot_quantile
 
 logger = logging.getLogger(__name__)
-
-
-def plot_pnl(pnl, axd=None, **kwargs):
-    """Net result density and distribution for a :class:`~aggregate.PnL`.
-
-    Two panels -- the result (net) density (A) and distribution / CDF (B) --
-    read from the P&L's exact result :class:`GridDistribution`
-    (:attr:`PnL.result`). There is **no severity panel** (a P&L is an accounting
-    object, not a compound of a severity), and no component overlay: the cession
-    waterfall is the ledger's own rows. The break-even line at 0 is marked.
-
-    Parameters
-    ----------
-    pnl : PnL
-        The position to plot.
-    axd : dict of str to Axes, optional
-        Mosaic with keys ``'A'`` (density) and ``'B'`` (distribution). A new
-        figure is created if omitted and stored on ``pnl.figure``.
-    **kwargs
-        Passed to the canvas creator (e.g. ``figsize``).
-    """
-    import numpy as np
-    import pandas as pd
-    if axd is None:
-        # make_grid defaults to the house (2*FIG_W, FIG_H) for a 1x2 grid
-        pnl.figure, axs = make_grid(1, 2, **kwargs)
-        axd = {'A': axs[0], 'B': axs[1]}
-    else:
-        pnl.figure = axd['A'].figure
-
-    gd = pnl.result                              # the exact net result GD
-    label = pnl.result_name
-    ser = gd.to_series(name=label)
-    cdf = pd.Series(np.cumsum(gd.p), index=gd.x, name=label)
-    ser.plot(ax=axd['A'], drawstyle='steps-mid', lw=2)
-    cdf.plot(ax=axd['B'], drawstyle='steps-post', lw=2)
-    axd['A'].set(title='Probability mass function', xlabel='P&L')
-    for a in (axd['A'], axd['B']):
-        a.axvline(0.0, lw=0.75, color='C7', ls='--')   # break-even reference
-    axd['B'].set(title='Distribution function', xlabel='P&L')
-    return pnl.figure
 
 
 def plot_reins_occ(agg, axs=None, **kwargs):

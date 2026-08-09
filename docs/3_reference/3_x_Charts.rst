@@ -23,13 +23,20 @@ The registry
 
 .. currentmodule:: aggregate.charts
 
+:func:`~aggregate.charts.build_chart_doc` is the entry point: it resolves the registry entry, checks availability, dispatches on the type and stamps the content hash, so an emitter is left with nothing to do but the semantics. It is a module function taking the object as an argument, mirroring ``exhibits.build_exhibit``, so no first-class class gains a method. :func:`~aggregate.charts.available_charts` answers what *can* be drawn for an object, and :func:`~aggregate.charts.primary_chart` which of those is the object's **own** picture: an aggregate's severity is a component of it and its reinsurance is a view of it, so neither is what a landing page should draw.
+
 .. autosummary::
 
+   build_chart_doc
    available_charts
+   primary_chart
    register_chart
    CHARTS
+   ChartEntry
+   chart_agg
    chart_distortion
    chart_joint_surface
+   chart_pnl
    chart_reins
    chart_severity
 

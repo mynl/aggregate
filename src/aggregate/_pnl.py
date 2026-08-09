@@ -2201,18 +2201,42 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     # ------------------------------------------------------------------
     # Plot: the net result density + distribution
     # ------------------------------------------------------------------
-    def plot(self, axd=None, **kwargs):
-        """Plot the grand result density and distribution (CDF).
+    def plot(self, log=False, full_range=False, return_period=False):
+        """Plot the grand result: its mass, and its quantile (Lee) diagram.
 
-        Two panels: the result density (A) and distribution (B), with the
-        break-even line at 0 marked.
+        Parameters
+        ----------
+        log : bool
+            Read the mass axis on log. The outcome axis has no log reading
+            and is untouched: it is signed, and half its values are
+            negative.
+        full_range : bool
+            Show the whole result grid rather than the ``q(0.001)`` to
+            ``q(0.999)`` crop.
+        return_period : bool
+            Read the Lee panel against return period. A P&L is
+            interrogated from its shortfall, so ``T = 1 / p``.
 
         Returns
         -------
         matplotlib.figure.Figure
+            Also stashed on ``self.figure``.
+
+        Notes
+        -----
+        Draws the document ``charts.chart_pnl`` emits, which is the
+        aggregate's chart over the signed result grid: a P&L's result is a
+        ``GridDistribution`` like any other. There is no severity panel, a
+        P&L being an accounting result rather than a compound of one, and
+        break even at zero is marked in both panels because it is the line
+        the chart is asked about.
         """
-        from .plots import plot_pnl
-        return plot_pnl(self, axd=axd, **kwargs)
+        from .charts import build_chart_doc
+        from .plots import plot_chartdoc
+        self.figure = plot_chartdoc(
+            build_chart_doc(self, 'pnl'),
+            log=log, full_range=full_range, return_period=return_period)
+        return self.figure
 
     # ------------------------------------------------------------------
     # Construction introspection ([Construction-Introspection])

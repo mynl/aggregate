@@ -506,11 +506,18 @@
   rather than relocated, on the plan's own statement that a log reading
   of a distortion's unit square is not meaningful. Nothing called it; it
   returns as `scales=('linear', 'log')` the day it is wanted.
-  **Next: job 4 `[Chart-PnL]`**, a thin registration over the aggregate
-  emitter once its signed differences are handled: the window is not
-  anchored at zero, the cumulative panel reads F where a loss reads S,
-  the `break_even` mark at 0 is the reading, there is no severity
-  companion, and `meta['return_period_map']` flips to `reciprocal`.
+  Job 4 `[Chart-PnL]` landed a237: `chart_pnl` over the shared
+  `outcome_doc` builder, `PnL.plot` rewired and `plot_pnl` deleted; the
+  signed window is the two-sided crop, the outcome axis declares
+  `('linear',)` only, `return_period_map` is `reciprocal` so the anchors
+  land on 100 and 250 exactly, and break even at 0 is a mark in both
+  panels. **Jobs 1 to 4 are done (a233, a234, a235, a236, a237).**
+  **Next: job 5 `[Chart-Severity]`**, which is a redesign and not a
+  rewire, so it opens by asking what the severity chart should be and
+  moves to the back with `[Chart-Portfolio]` and `[Chart-Reins]` if that
+  design is not ready. Job 6 `[Chart-Bounds]` is settled (two panels,
+  the cloud and all five calibrated distortions on one band) and could
+  be taken first if the severity design is not.
 
 ---
 

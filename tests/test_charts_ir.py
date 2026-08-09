@@ -291,6 +291,8 @@ def test_tex_is_total_over_every_emitted_document():
               'agg B 30 claims sev lognorm 40 cv 1.2 poisson'),
         build('sev IR.TexS lognorm 100 cv 2'),
         build('distortion IR.TexD ph 0.7'),
+        build('pnl IR.TexPnL 1000 premium less agg IR.TexPnLe 100 claims '
+              'sev lognorm 5 cv 2 poisson'),
     ]
     swept = set()
     for obj in objs:

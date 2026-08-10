@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a247
+
+**[Exhibit-Row-Cap] how many rows a served block carries is the caller's question.** `build_exhibit` and the eleven convenience functions (`exhibits.summary(obj, 'insurer')` and its siblings) take a keyword-only `max_rows`, defaulting to `exhibits.MAX_ROWS` (200, `greater_tables`' own default, so nothing changes by default) and accepting `None` for the whole frame.
+
+The counterpart to `include_raw` at a246, and deliberately the opposite call. Carrying the numbers is not negotiable, because a document that drops them destroys what no consumer can recover. Row extent is negotiable, because a preview pane and a full download want different answers and neither is more correct, and because truncating loses nothing silently: `greater_tables` records it in the block's `notes` as `Showing first N of M rows`. So `INCLUDE_RAW` is a library constant and `max_rows` is a parameter, and the line between them is whether the document can say what it did.
+
+`max_rows` wins over a block's own kwargs, which no block sets. No exhibit is near the cap today: the longest block measured across every exhibit on an `Aggregate` and a `PnL` is 17 rows.
+
+This is the last of the three carriage requests from `aggregate_api`'s round 5 note. The third, a `formatters={}` plus wide `float_format` passthrough for a full precision reading, is **not** implemented and is not needed: with raw values travelling since a246, a client formats from the numbers rather than asking the library to stop formatting them.
+
+---
+
 ## 1.0.0a246
 
 **[Exhibit-Raw-Values] a served exhibit block carries its numbers, not only its formatted strings.** `build_exhibit` now sets `include_raw` on every `TableSpec` it builds (`exhibits._core.INCLUDE_RAW`), so a body cell arrives as `{'text': '17.50', 'raw': 17.5000001}` rather than as `'17.50'` alone.

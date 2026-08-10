@@ -88,6 +88,18 @@ RAW_MOMENT_MEASURES = ('ex1', 'ex2', 'ex3')
 #: and it needs the numbers to do it.
 INCLUDE_RAW = True
 
+#: Rows a served block carries before it truncates, matching greater_tables'
+#: own default. Unlike :data:`INCLUDE_RAW` this **is** the caller's to set
+#: (``build_exhibit(..., max_rows=...)``, ``None`` for the whole frame),
+#: because how much of a frame to ship is a question about the request and
+#: not about the numbers: a preview pane and a download want different
+#: answers to it, and neither is more correct. Truncating is not a silent
+#: loss, since greater_tables records it in the block's ``notes`` as
+#: "Showing first N of M rows", which is why a cap is honest where dropping
+#: the raw values was not. No exhibit reaches it today; the longest block
+#: measured is 17 rows.
+MAX_ROWS = 200
+
 #: Per measure formats for the INSURER views, as greater_tables format sugar
 #: (author, 2026-08-05). Applies wherever a measure **is a column**: the
 #: summary card and the P&L ledger. It cannot apply to the canonical moment
@@ -269,8 +281,8 @@ def _make_exhibit_function(name, title, doc):
     def insurer(obj, blocks):
         return blocks
 
-    def fn(obj, perspective=Perspective.RAW):
-        return build_exhibit(obj, name, perspective)
+    def fn(obj, perspective=Perspective.RAW, *, max_rows=MAX_ROWS):
+        return build_exhibit(obj, name, perspective, max_rows=max_rows)
 
     fn.__name__ = name
     fn.__qualname__ = name
@@ -442,7 +454,8 @@ def exhibit_frames(obj, name, perspective=Perspective.RAW):
     return blocks
 
 
-def build_exhibit(obj, name, perspective=Perspective.RAW):
+def build_exhibit(obj, name, perspective=Perspective.RAW, *,
+                  max_rows=MAX_ROWS):
     """Build an :class:`Exhibit`: frame stage, then greater_tables IR per block.
 
     The only greater_tables import site besides :meth:`Exhibit.to_payload`.
@@ -454,6 +467,13 @@ def build_exhibit(obj, name, perspective=Perspective.RAW):
     name : str
         Exhibit registry name.
     perspective : Perspective or str, default Perspective.RAW
+    max_rows : int or None, default :data:`MAX_ROWS`
+        Rows each block carries before it truncates; ``None`` ships the whole
+        frame. The one presentation question the caller answers rather than
+        the frame stage, because how much of a frame to ship belongs to the
+        request: a preview pane and a full download want different answers
+        and neither is more correct. It wins over a block's own kwargs, which
+        no block sets. A truncated block says so in its ``notes``.
 
     Returns
     -------
@@ -493,8 +513,8 @@ def build_exhibit(obj, name, perspective=Perspective.RAW):
     ir_blocks = []
     captions = {}
     for block_name, df, kw in blocks:
-        ir_blocks.append(
-            gt.build(df, gt.TableSpec(**{'include_raw': INCLUDE_RAW, **kw})))
+        ir_blocks.append(gt.build(df, gt.TableSpec(
+            **{'include_raw': INCLUDE_RAW, **kw, 'max_rows': max_rows})))
         if kw.get('caption'):
             captions[block_name] = kw['caption']
     title_name = getattr(obj, '_title_name', type(obj).__name__)

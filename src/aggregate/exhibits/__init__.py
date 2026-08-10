@@ -66,8 +66,8 @@ from ..bivariate import BivariateAggregate
 from ..spectral import Distortion
 
 from ._core import (
-    CAPITAL_ANCHOR_PERIODS, EXHIBITS, Exhibit, MEASURE_FORMATS, Perspective,
-    RAW_MOMENT_MEASURES,
+    CAPITAL_ANCHOR_PERIODS, EXHIBITS, Exhibit, INCLUDE_RAW, MAX_ROWS,
+    MEASURE_FORMATS, Perspective, RAW_MOMENT_MEASURES,
     available_exhibits, build_exhibit, exhibit_frames, register_simple_exhibit,
     dependency, economic, economic_ratios, economic_waterfall, reins, stats,
     summary, tail, validation,

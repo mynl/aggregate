@@ -1286,24 +1286,26 @@ bivariate BivariateIndependent
   poisson
   tags{topic:bivariate};
 
-netceded agg BivariateNetCeded
-  8 claims
-  sev 300 * beta 2 3
-  occurrence net of
-    1.1666666666666665% so 60 xs 40
-  poisson
-  tags{topic:bivariate, topic:reinsurance};
+netceded
+  agg BivariateNetCeded
+    8 claims
+    sev 300 * beta 2 3
+    occurrence net of
+      1.1666666666666665% so 60 xs 40
+    poisson
+    tags{topic:bivariate, topic:reinsurance};
 
-netceded agg BivariateNetCededPair
-  15 claims
-  10000 xs 0
-  sev lognorm 1500 cv 1
-  occurrence net of
-    50% so 2500 xs 2500 and
-    90% so 5000 xs 5000
-  mixed gamma 0.25
-  note{Gross / ceded / net joint view of a reinsured book.}
-  tags{topic:bivariate, topic:reinsurance};
+netceded
+  agg BivariateNetCededPair
+    15 claims
+    10000 xs 0
+    sev lognorm 1500 cv 1
+    occurrence net of
+      50% so 2500 xs 2500 and
+      90% so 5000 xs 5000
+    mixed gamma 0.25
+    note{Gross / ceded / net joint view of a reinsured book.}
+    tags{topic:bivariate, topic:reinsurance};
 
 bivariate BivariateNormal
   25 claims
@@ -1332,25 +1334,27 @@ bivariate BivariatePnLAxis
   poisson
   tags{topic:bivariate};
 
-netceded agg NetCededJoint
-  15 claims
-  10000 xs 0
-  sev lognorm 1500 cv 1
-  occurrence net of
-    50% so 2500 xs 2500 and
-    90% so 5000 xs 5000
-  mixed gamma 0.25
-  note{Joint gross / ceded / net view of the reinsured book.}
-  tags{topic:bivariate, topic:reinsurance};
+netceded
+  agg NetCededJoint
+    15 claims
+    10000 xs 0
+    sev lognorm 1500 cv 1
+    occurrence net of
+      50% so 2500 xs 2500 and
+      90% so 5000 xs 5000
+    mixed gamma 0.25
+    note{Joint gross / ceded / net view of the reinsured book.}
+    tags{topic:bivariate, topic:reinsurance};
 
-netceded agg NetCededShowcase
-  8 claims
-  sev 300 * beta 2 3
-  occurrence net of
-    1.1666666666666665% so 60 xs 40
-  poisson
-  note{Bivariate distribution of net and ceded for XOL reinsurance program.}
-  tags{topic:bivariate, topic:reinsurance};
+netceded
+  agg NetCededShowcase
+    8 claims
+    sev 300 * beta 2 3
+    occurrence net of
+      1.1666666666666665% so 60 xs 40
+    poisson
+    note{Bivariate distribution of net and ceded for XOL reinsurance program.}
+    tags{topic:bivariate, topic:reinsurance};
 
 # ----------------------------------------------------------------------
 # Distortions (risk measures)

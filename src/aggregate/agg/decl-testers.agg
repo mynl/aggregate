@@ -49,7 +49,7 @@ agg P.Base.DfreqOne dfreq [1] sev lognorm 100 cv 0.5                            
 agg P.Sym.Dice     dfreq [1] dsev [1:6]                                                                                  note{symmetric discrete; skew dust regression};
 agg P.Tail.LN      5 claims sev lognorm 100 cv 3 poisson                                                                 note{thick tail; tail accuracy on wide grid};
 agg P.Re.Both    100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate reinsurance};
-agg ReBucket      10 claims sev lognorm 100 cv 2 occurrence net of 0.8 so 250 xs 175 poisson                              note{off-grid excess attach; reins_bucket linear/nearest rebucketing};
+agg ReBucket      10 claims sev lognorm 100 cv 2 occurrence net of 0.8 po 250 xs 175 poisson                              note{off-grid excess attach; reins_bucket linear/nearest rebucketing};
 agg P.Def.Pareto   1 claim sev 1000 * pareto 1.5 - 1000 fixed                                                            note{defective; no finite 2nd moment} hints{normalize=False};
 agg P.Mix         [10 20] claims [100 400] xs 0 sev lognorm [20 40 100] cv [.5 .6 .7] wts=3 mixed gamma .2                note{bounded mixture, mixed gamma frequency}
 
@@ -180,15 +180,15 @@ dist W.tbe       beta 0.5 2
 #
 # Structural cases (consistent columns, mass, describe shape) on lognormal
 # books -- one per stage combination.
-agg RR.Occ  10 claims sev lognorm 100 cv 2 occurrence net of 0.8 so 250 xs 175 poisson                       note{occurrence only; off-grid excess attach};
+agg RR.Occ  10 claims sev lognorm 100 cv 2 occurrence net of 0.8 po 250 xs 175 poisson                       note{occurrence only; off-grid excess attach};
 agg RR.Agg  10 claims sev lognorm 100 cv 2 poisson aggregate net of 500 xs 750                                note{aggregate only};
 agg RR.Both 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 3500 po 4000 xs 1000 poisson aggregate net of 2000 xs 3000   note{occurrence + aggregate};
 # Bounded severities for the EX-vs-Est numeric checks: a bounded aggregate has
 # a negligible FFT deficit, so linear preserves the rebucketed mean exactly and
 # nearest stays within bs/2. Fractional-share off-grid cessions exercise the
 # rebucketing scatter.
-agg RR.OccB 10 claims sev 500 * beta 2 3 occurrence net of 0.8 so 150 xs 100 poisson                          note{bounded; off-grid occ cession};
-agg RR.AggB 10 claims sev 200 * beta 2 3 poisson aggregate net of 0.7 so 300 xs 400                           note{bounded; off-grid agg cession};
+agg RR.OccB 10 claims sev 500 * beta 2 3 occurrence net of 0.8 po 150 xs 100 poisson                          note{bounded; off-grid occ cession};
+agg RR.AggB 10 claims sev 200 * beta 2 3 poisson aggregate net of 0.7 po 300 xs 400                           note{bounded; off-grid agg cession};
 # Portfolio end-to-end gcn: a ceding port (occ on A, agg on B, gross C) and a
 # gross-only control (reins objects return None).
 port RR.Port agg A 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 2000 xs 1000 poisson agg B 50 claims sev lognorm 100 cv 2 poisson aggregate net of 1000 xs 2000 agg C 20 claims sev lognorm 30 cv 1 poisson;
@@ -203,9 +203,9 @@ port RR.Gross agg A 10 claims sev lognorm 100 cv 2 poisson agg B 5 claims sev lo
 # ceded/net aggregates and the anti-diagonal reproduces the gross aggregate.
 # See tests/test_reins_bivariate.py and dev/done/reins-bivariate.md.
 agg BV.Occ  10 claims sev lognorm 50 cv 1.5 occurrence net of 50 xs 50 poisson                               note{lognormal; general deficit-carrying path};
-agg BV.OccB 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson                            note{bounded; tightest marginal match; positive corr};
+agg BV.OccB 8 claims sev 300 * beta 2 3 occurrence net of 0.7 po 60 xs 40 poisson                            note{bounded; tightest marginal match; positive corr};
 agg BV.Fix  dfreq [4] dsev [1:20] occurrence net of 6 xs 6                                                    note{fixed count; empirical-freq PGF on the 2D grid};
-agg BV.Ced  8 claims sev 300 * beta 2 3 occurrence ceded to 0.7 so 60 xs 40 poisson                          note{ceded-to output view; bivariate ignores the view}
+agg BV.Ced  8 claims sev 300 * beta 2 3 occurrence ceded to 0.7 po 60 xs 40 poisson                          note{ceded-to output view; bivariate ignores the view}
 
 
 # P&L. Negative-support (signed) severity and the output window (1.0.0a21)
@@ -316,9 +316,9 @@ bivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg
 # as Aggregate.occ_bivariate()). Body is an ordinary agg carrying occurrence
 # reinsurance. The three view-pair prefixes name the (x, y) axes x-then-y:
 # netceded -> (Net, Ceded); grossceded -> (Gross, Ceded); grossnet -> (Gross, Net).
-netceded agg MV.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson;
-grossceded agg MV.GrossCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson;
-grossnet agg MV.GrossNet 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson;
+netceded agg MV.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 po 60 xs 40 poisson;
+grossceded agg MV.GrossCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 po 60 xs 40 poisson;
+grossnet agg MV.GrossNet 8 claims sev 300 * beta 2 3 occurrence net of 0.7 po 60 xs 40 poisson;
 # CLASH statement: shared-event clash model. (na, nb, nc) = A-only / B-only /
 # both; the solver derives the shared count n and the per-event triggers, so the
 # two components are independent-copula Bernoulli factories on a shared frequency.
@@ -493,16 +493,30 @@ agg USE.OccNetFinite 100 claims sev lognorm 50 cv 1.5 occurrence net of 500 xs 1
 port USE.Port agg A 100 claims sev lognorm 100 cv 2 poisson agg B 50 claims sev gamma 50 cv 1 poisson         # [bs-reporting] portfolio bs_window_df / bs_description
 
 # ============================================================
-# HY3. Hygiene-3 batch: number separators + 'of' synonym (1.0.0a52)
+# HY3. Hygiene-3 batch: number separators + placement readings (1.0.0a52)
 # ============================================================
 # Item 1: Python-style `_` digit-group separators in numbers (equal to their
-# underscore-free forms). Item 4: `of` as a natural-language share synonym for
-# `so` / `po` in a reinsurance clause (`90% of` == `90% so`). See
-# tests/test_hygiene3.py and dev/done/plan-hygiene-3.md.
+# underscore-free forms). Item 4 was the `of` share synonym, retired with `so`
+# at 1.0.0a249; the two cases below now pin what survives it, the two readings
+# of the leading quantity in a `po` clause. See tests/test_hygiene3.py and
+# dev/done/plan-hygiene-3.md, dev/done/plan-single-placement-keyword.md.
 agg HY3.Sep   10_000_000 claims dsev [1 2] poisson                                                          note{underscore digit separators == 10000000};
 agg HY3.SepFl 1_000.5 claims sev lognorm 100 cv 1 poisson                                                   note{underscore in the integer part of a float};
-agg HY3.OfPct 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 90% of 6000 xs 4000 poisson       note{'of' percentage share == 'so'};
-agg HY3.OfAmt 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 3000 of 6000 xs 4000 poisson      note{'of' bare amount -> amount/limit share}
+agg HY3.PoPct 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 90% po 6000 xs 4000 poisson       note{'po' percentage -> share used directly};
+agg HY3.PoAmt 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 occurrence net of 3000 po 6000 xs 4000 poisson      note{'po' bare amount -> amount/limit share}
+
+# ============================================================
+# SPK. Single placement keyword: what retiring 'so' freed (1.0.0a249)
+# ============================================================
+# `so` left the reserved-word list when the SHARE_OF terminal went, so it is an
+# ordinary identifier again. The first case names an aggregate `so`; the second
+# uses it as a severity name, the position where a bare word follows a keyword.
+# No longer parseable, listed for reference only (commented so the corpus
+# parsers skip them):
+#   agg SPK.Dead 1 claim dsev [10] occurrence net of 50% so 10 xs 0 fixed
+#   agg SPK.Dead 1 claim dsev [10] occurrence net of 90% of 10 xs 0 fixed
+sev so dsev [1 2 3]                                                                                          note{'so' as a severity name: freed by retiring SHARE_OF};
+agg so 3 claims dsev [1 2 3] poisson                                                                         note{'so' as an aggregate name; decl-testers reuses names across kinds deliberately}
 
 # ============================================================
 # DW. decl_writer unparser coverage (1.0.0a53)
@@ -610,7 +624,7 @@ pnl EV.Pnl   1000 prem less agg EV.Pnl_e 1000 prem at 0.7 lr sev gamma 100 cv 0.
 pnl EV.Arb   1000 prem less agg EV.Arb_e dfreq [1] dsev [1 2]                                                     note{M >= 0 a.s.: acceptable at every stress, reports NaN};
 port EV.Port agg EV.U1 1000 premium at 0.65 lr sev gamma 100 cv 0.5 poisson agg EV.U2 500 premium at 0.75 lr sev gamma 50 cv 1.2 poisson   note{unit profile: the book beats both units};
 xpnl EV.Peel 1000 premium less agg EV.Peel_e 1000 premium at 0.7 lr sev lognorm 100 cv 2 poisson aggregate net of 200 xs 600 deposit 50 and 400 xs 800 deposit 30 peel top-down  note{tower: gini_p rises down the running nets as cover is bought};
-xpnl EV.CedeTower 33333.33333333321 premium as GWP less agg EV.CedeTower_e as Subject 2 claims sev 20000 * uniform occurrence net of 50% so 5000 xs 10000 rate 0.3 cede 0.3 as "Occ1" and 50% so 5000 xs 15000 rate 0.2 cede 0.3 as "Occ2" fixed aggregate net of 2500 xs 23500 rol 0.25 as "Agg1" and 2000 xs 26000 rol 0.15 as "Agg2" less 5% loss expense as LAE 500 fixed expense as "Fixed Exp" 20% premium expense as "Acq Exp" peel top-down  note{two tiers priced to leave the reinsurer a margin: every ceded layer evaluates from the seller's side}
+xpnl EV.CedeTower 33333.33333333321 premium as GWP less agg EV.CedeTower_e as Subject 2 claims sev 20000 * uniform occurrence net of 50% po 5000 xs 10000 rate 0.3 cede 0.3 as "Occ1" and 50% po 5000 xs 15000 rate 0.2 cede 0.3 as "Occ2" fixed aggregate net of 2500 xs 23500 rol 0.25 as "Agg1" and 2000 xs 26000 rol 0.15 as "Agg2" less 5% loss expense as LAE 500 fixed expense as "Fixed Exp" 20% premium expense as "Acq Exp" peel top-down  note{two tiers priced to leave the reinsurer a margin: every ceded layer evaluates from the seller's side}
 
 # ============================================================
 # UM. DecL unary minus on a severity (1.0.0a109)
@@ -830,7 +844,7 @@ agg AD.Ruin.Defective 2 years dsev [1] dwait [1 2] [.4 .5] !                    
 bivariate AE.Trailer.BivariateBare 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 note{ambiguous shape: binds to the bivariate};
 bivariate AE.Trailer.BivariateSeparated 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula gumbel 0.4 poisson note{copula and freq separate the trailer: unambiguous};
 bivariate AE.Trailer.BivariateInner 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 note{inner wind} agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 note{inner flood} copula gumbel 0.4 poisson note{outer bivariate};
-netceded agg AE.Trailer.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 so 60 xs 40 poisson note{binds to the netceded view-pair};
+netceded agg AE.Trailer.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0.7 po 60 xs 40 poisson note{binds to the netceded view-pair};
 clash AE.Trailer.Clash 8 5 2 claims sev lognorm 50 cv 1.2 sev lognorm 60 cv 1.5 mixed gamma 0.2 note{binds to the clash};
 port AE.Trailer.Port note{on the portfolio} agg AE.Trailer.PortUnit 5 claims sev lognorm 10 cv 1 poisson note{on the last unit}
 
@@ -962,7 +976,7 @@ xpnl AI.Agg    1000 premium less agg AI.Agg_e 1000 premium at 70% lr sev lognorm
 xpnl AI.Mix    1000 premium less agg AI.Mix_e 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 60 cede 0.2 and 300 xs 200 deposit 40 poisson aggregate net of 150 xs 300 deposit 25 peel top-down   note{both tiers plus a per-layer ceding commission leg};
 xpnl AI.One    1000 premium less agg AI.One_e 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 500 xs 500 deposit 100 poisson aggregate net of 200 xs 400 deposit 40 peel top-down               note{one layer per tier: degenerates to the tier walk, per-atom};
 xpnl AI.Label  1000 premium less agg AI.Label_e 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 60 as "Working layer" and 300 xs 200 deposit 40 poisson peel bottom-up       note{a declared layer label names its step; undeclared falls back to the DecL descriptor};
-xpnl AI.Share  1000 premium less agg AI.Share_e 1000 premium at 70% lr sev lognorm 100 cv 2 poisson aggregate net of 50% so 200 xs 600 deposit 20 and 400 xs 800 deposit 15 peel top-down                    note{partial-share descriptor: the step reads "agg 50% so 200 xs 600"};
+xpnl AI.Share  1000 premium less agg AI.Share_e 1000 premium at 70% lr sev lognorm 100 cv 2 poisson aggregate net of 50% po 200 xs 600 deposit 20 and 400 xs 800 deposit 15 peel top-down                    note{partial-share descriptor: the step reads "agg 50% po 200 xs 600"};
 xpnl AI.Both   1000 premium less agg AI.Both_e 1000 premium at 70% lr sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 60 cede 0.2 and 300 xs 200 deposit 40 poisson aggregate net of 100 xs 300 deposit 25 and 200 xs 400 deposit 15 peel top-down   note{two layers per tier: both All occurrence and All aggregate subtotal blocks}
 
 # ============================================================

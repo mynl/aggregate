@@ -220,19 +220,19 @@ def test_ledger_rows_and_means_add():
     for row in (('Gross', 'Consideration', 'Premium'),
                 ('Gross', 'Obligation', 'Loss'),
                 ('Gross', 'Margin', 'Gross'),
-                ('occ 95% so 100 xs 100', 'Consideration', 'occ 95% so 100 xs 100 premium'),
-                ('occ 95% so 100 xs 100', 'Obligation', 'occ 95% so 100 xs 100 recovery'),
-                ('occ 95% so 100 xs 100', 'Margin', 'Total'),
-                ('occ 95% so 100 xs 100', 'Margin', 'Net'),
+                ('occ 95% po 100 xs 100', 'Consideration', 'occ 95% po 100 xs 100 premium'),
+                ('occ 95% po 100 xs 100', 'Obligation', 'occ 95% po 100 xs 100 recovery'),
+                ('occ 95% po 100 xs 100', 'Margin', 'Total'),
+                ('occ 95% po 100 xs 100', 'Margin', 'Net'),
                 ('All', 'Margin', 'Net'),
                 ('All', 'Margin', 'Impact')):
         assert row in s.index, row
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
         s.loc[('Gross', 'Margin', 'Gross'), 'EX']
-        + s.loc[('occ 95% so 100 xs 100', 'Margin', 'Total'), 'EX'],
+        + s.loc[('occ 95% po 100 xs 100', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
     assert s.loc[('All', 'Margin', 'Impact'), 'EX'] == pytest.approx(
-        s.loc[('occ 95% so 100 xs 100', 'Margin', 'Total'), 'EX'], abs=1e-9)
+        s.loc[('occ 95% po 100 xs 100', 'Margin', 'Total'), 'EX'], abs=1e-9)
 
 
 def test_ceded_premium_is_stochastic_in_exhibit():
@@ -240,7 +240,7 @@ def test_ceded_premium_is_stochastic_in_exhibit():
     s = p.economic_df
     # the headline effect: the stochastic ceded premium D + h(R) shows a
     # nonzero SD on its ledger row, while the gross premium is fixed...
-    assert s.loc[('occ 95% so 100 xs 100', 'Consideration', 'occ 95% so 100 xs 100 premium'), 'SD'] \
+    assert s.loc[('occ 95% po 100 xs 100', 'Consideration', 'occ 95% po 100 xs 100 premium'), 'SD'] \
         > 0.0
     assert s.loc[('Gross', 'Consideration', 'Premium'), 'SD'] == 0.0
 
@@ -251,7 +251,7 @@ def test_ledger_mean_check_ceded_premium():
     t = p.engine.reinstatement_terms
     e_h = _joint_mean(p, lambda l, r: t.reinstatement_premium(r))
     assert p.economic_df.loc[
-        ('occ 95% so 100 xs 100', 'Consideration', 'occ 95% so 100 xs 100 premium'), 'EX'] == \
+        ('occ 95% po 100 xs 100', 'Consideration', 'occ 95% po 100 xs 100 premium'), 'EX'] == \
         pytest.approx(-(t.deposit + e_h), rel=1e-9)
 
 
@@ -281,17 +281,17 @@ def test_subsequent_aggregate_cover_builds():
     # the agg cover actually recovers on the net-of-occurrence loss L - A(R):
     # its ledger recovery row carries a nonzero mean.
     s = p.economic_df
-    assert abs(s.loc[('agg 85% so 1500 xs 7000', 'Obligation', 'agg 85% so 1500 xs 7000 recovery'),
+    assert abs(s.loc[('agg 85% po 1500 xs 7000', 'Obligation', 'agg 85% po 1500 xs 7000 recovery'),
                      'EX']) > 0
     # decision 3: the ledger extends to the inuring both-tiers form -- a third
     # buy group over the SAME joint (no new dimension).
     for row in (('Gross', 'Margin', 'Gross'),
                 ('occ 100 xs 100', 'Margin', 'Total'),
                 ('occ 100 xs 100', 'Margin', 'Net'),
-                ('agg 85% so 1500 xs 7000', 'Consideration', 'agg 85% so 1500 xs 7000 premium'),
-                ('agg 85% so 1500 xs 7000', 'Obligation', 'agg 85% so 1500 xs 7000 recovery'),
-                ('agg 85% so 1500 xs 7000', 'Margin', 'Total'),
-                ('agg 85% so 1500 xs 7000', 'Margin', 'Net'),
+                ('agg 85% po 1500 xs 7000', 'Consideration', 'agg 85% po 1500 xs 7000 premium'),
+                ('agg 85% po 1500 xs 7000', 'Obligation', 'agg 85% po 1500 xs 7000 recovery'),
+                ('agg 85% po 1500 xs 7000', 'Margin', 'Total'),
+                ('agg 85% po 1500 xs 7000', 'Margin', 'Net'),
                 ('All', 'Margin', 'Net')):
         assert row in s.index, row
     # means add tier by tier down the sheet
@@ -301,7 +301,7 @@ def test_subsequent_aggregate_cover_builds():
         rel=1e-6, abs=1e-6)
     assert s.loc[('All', 'Margin', 'Net'), 'EX'] == pytest.approx(
         s.loc[('occ 100 xs 100', 'Margin', 'Net'), 'EX']
-        + s.loc[('agg 85% so 1500 xs 7000', 'Margin', 'Total'), 'EX'],
+        + s.loc[('agg 85% po 1500 xs 7000', 'Margin', 'Total'), 'EX'],
         rel=1e-6, abs=1e-6)
 
 

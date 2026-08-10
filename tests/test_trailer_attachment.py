@@ -71,7 +71,7 @@ CASES = [
         # onto the bivariate spec -- so it legitimately appears in both places.
         'netceded',
         'netceded agg T 8 claims sev 300 * beta 2 3 '
-        'occurrence net of 0.7 so 60 xs 40 poisson note{outer}',
+        'occurrence net of 0.7 po 60 xs 40 poisson note{outer}',
         'outer',
         ['outer'],
     ),

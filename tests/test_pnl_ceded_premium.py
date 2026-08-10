@@ -44,17 +44,17 @@ def test_deposit_rol_rate_resolution():
 
 def test_premium_scales_by_placement_share():
     # All premium forms are quoted at 100% placement and scaled by the share
-    # placed. A 50% placement (``50% so 2000 xs 3000``) halves deposit and rate;
+    # placed. A 50% placement (``50% po 2000 xs 3000``) halves deposit and rate;
     # rol already carries the share (``share x rol x limit``) so it is
     # unchanged by the explicit factor but still tracks the share.
-    dep = build(_BASE + 'poisson aggregate net of 50% so 2000 xs 3000 deposit 1500')
+    dep = build(_BASE + 'poisson aggregate net of 50% po 2000 xs 3000 deposit 1500')
     assert dep.economics['pc_agg'] == pytest.approx(0.5 * 1500)          # 750
-    rate = build(_BASE + 'poisson aggregate net of 50% so 2000 xs 3000 rate 30%')
+    rate = build(_BASE + 'poisson aggregate net of 50% po 2000 xs 3000 rate 30%')
     assert rate.economics['pc_agg'] == pytest.approx(0.5 * 0.30 * 5000)  # 750
-    rol = build(_BASE + 'poisson aggregate net of 50% so 2000 xs 3000 rol 8%')
+    rol = build(_BASE + 'poisson aggregate net of 50% po 2000 xs 3000 rol 8%')
     assert rol.economics['pc_agg'] == pytest.approx(0.5 * 0.08 * 2000)   # 80
     # cede is a fraction of the *placed* premium, so it follows the scaling
-    ced = build(_BASE + 'poisson aggregate net of 50% so 2000 xs 3000 '
+    ced = build(_BASE + 'poisson aggregate net of 50% po 2000 xs 3000 '
                 'deposit 1500 cede 25%')
     assert ced.economics['c_agg'] == pytest.approx(0.25 * 0.5 * 1500)    # 187.5
     # a 100% placement is unchanged (share = 1)

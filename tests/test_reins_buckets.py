@@ -30,7 +30,7 @@ REINS_BUCKET_DEFAULT = get_settings().discretization.reins_bucket
 # bucket: 0.8 share of 250 xs 175 on a lognormal book.
 OFF_GRID_PROG = (
     'agg ReBucket 10 claims sev lognorm 100 cv 2 '
-    'occurrence net of 0.8 so 250 xs 175 poisson'
+    'occurrence net of 0.8 po 250 xs 175 poisson'
 )
 
 

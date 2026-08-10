@@ -513,10 +513,15 @@ def _render_reins_clause(clause, premium=None, cede=None, reinst=None,
     """Render one ``(share, limit, attach)`` cession tuple with its decorators.
 
     A full-line share (1.0) renders as ``limit xs attach``; a partial share
-    renders as a percentage ``share of limit`` clause (``50% so limit xs
+    renders as a percentage ``part of limit`` clause (``50% po limit xs
     attach``). The ``%`` marker tells the parser to read the leading number as a
-    share directly, so the percentage form round-trips regardless of how the
-    original was written (``so`` / ``po``, percent or absolute amount).
+    share directly.
+
+    The spec stores only the resolved fraction, so this function has no record
+    of how the original was written and the percentage form is the only form the
+    library emits. A partial placement entered as a bare amount (``5 po 15 xs
+    5``) therefore round-trips to ``33.3333% po 15 xs 5``: same layer, canonical
+    spelling. Before 1.0.0a249 the canonical keyword was ``so``.
 
     An optional ceded-premium ``premium`` (``(basis, value)`` with basis
     ``deposit`` / ``rol`` / ``rate``) and ceding-commission ``cede`` (a fraction)
@@ -532,7 +537,7 @@ def _render_reins_clause(clause, premium=None, cede=None, reinst=None,
     if float(share) == 1.0:
         base = f'{_fmt_num(limit)} xs {_fmt_num(attach)}'
     else:
-        base = (f'{_fmt_num(float(share) * 100)}% so '
+        base = (f'{_fmt_num(float(share) * 100)}% po '
                 f'{_fmt_num(limit)} xs {_fmt_num(attach)}')
     parts = [base]
     if premium is not None:

@@ -20,6 +20,24 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a249
+
+**[Single-Placement-Keyword] there is one way to write a partial placement, and it is `po`. Breaking.** DecL offered three keywords for the same layer: `50% so 100 xs 0`, `50% po 100 xs 0` and `50% of 100 xs 0`. `so` and `of` are retired. `po` (*part of*) is the survivor, unchanged in meaning: the leading quantity picks the reading, a percentage is the share directly and a bare number is an absolute amount whose share is `amount / limit`.
+
+The three rules computed the identical `(share, limit, attach)` tuple, so nothing is lost. `so` is an ordinary English word and therefore a poor reserved word; `of` forked the Earley parse against the `net of` that precedes it, and deleting it removes that ambiguity outright. `po` was kept because `corridor <share> po <width> xs <attach>` already speaks it, so the language now says "part of" in one voice. Retiring `so` returns it to the identifier space: `agg so ...` and `sev so ...` build, pinned by new cases in `decl-testers.agg` and `tests/test_hygiene3.py`.
+
+**The canonical output form moved with it, which is the visible half.** `decl_writer` renders every partial placement as `<pct>% po <limit> xs <attach>` where it used to render `<pct>% so ...`. That string is what `pprogram` shows back, and `_pnl_builders._layer_descriptor` calls the same renderer, so an undeclared cover step in a P&L walk now reads `agg 85% po 1500 xs 7000`. Code that indexes an `xpnl` frame by the old literal will raise `KeyError`. A declared `as` label still wins and is unaffected.
+
+Nothing records how a placement was written. `_PercentNumber` carries the `%` marker only as far as the clause rule, which returns a resolved fraction; the spec stores that fraction and nothing else. So the percentage form is the only form the library can emit, and a placement entered by amount round-trips to a percentage: `5 po 15 xs 5` renders `33.3333% po 15 xs 5`. Same layer, canonical spelling.
+
+**The `po` small-share warning now names the fix.** It read "Did you mean share of?", which was useless advice even before the retirement, since a bare number under `so` did exactly what it does under `po`. It now shows both readings and the percentage form that expresses the other one. It earned its keep immediately: it found a live monograph program, `occurrence net of 0.25 so inf xs 0`, whose intended 25% coinsurance was silently a 0% placement, because a bare amount over an `inf` limit is zero.
+
+Corpora reformatted and derived artifacts regenerated: `library.agg`, `_test_suite.agg` and `decl-testers.agg` (whose four `J.Re18*` cases collapse to two, and whose two `HY3.Of*` cases become `HY3.Po*`), the spec snapshot, `ref_include.rst`, and the generated cookbook reinsurance page. **No spec value moved**: the snapshot re-keys on the new program text and every `(share, limit, attach)` is identical, which is the check this change turns on. `agg.sublime-syntax` and `decl_pygments` drop `so` in step with the grammar, as `test_grammar_sync` requires. The web app's `decl-keywords.json`, which lives in a separate repository, needs the same edit.
+
+Plan: `dev/done/plan-single-placement-keyword.md`.
+
+---
+
 ## 1.0.0a248
 
 **[PnL-Value-Type] a P&L says which sign convention it is read on, instead of leaving consumers to infer it from the class name.** `PnL.value_type` joins `Aggregate.value_type` and `Portfolio.value_type`, returning the payoff label through the same `value_type_label` helper, so a `[labels]` relabel moves all three together. `PnL.info` gains the matching row, in the same position the other two carry it.

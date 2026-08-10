@@ -52,7 +52,7 @@ DISCRETE_PROG = ('bv DBV dfreq [1 2 3] [.5 .3 .2] '
                  'dbvsev [0 1 2] [0 5 10] [[.4 .1 .0] [.1 .1 .1] [.0 .05 .15]]')
 
 NC_PROG = ('agg NC 8 claims sev 300 * beta 2 3 '
-           'occurrence net of 0.7 so 60 xs 40 poisson')
+           'occurrence net of 0.7 po 60 xs 40 poisson')
 
 
 def _copula_kernel_kwargs(mv, store_dir, **overrides):

@@ -307,8 +307,8 @@ def _layer_descriptor(site, clause):
     """One layer as its DecL descriptor, e.g. ``'occ 300 xs 200'``.
 
     Reuses the writer's cession renderer, so the descriptor is exactly the DecL
-    the layer round-trips to (a bare share renders ``limit xs attach``, a
-    partial share ``share% so limit xs attach``).
+    the layer round-trips to (a full-line share renders ``limit xs attach``, a
+    partial share ``share% po limit xs attach``).
     """
     from .decl_writer import _render_reins_clause
     return f'{_SITE_PREFIX[site]} {_render_reins_clause(clause)}'

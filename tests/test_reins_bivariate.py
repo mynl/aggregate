@@ -41,7 +41,7 @@ OCC = (
 # Bounded severity: negligible grid deficit -> tightest marginal match.
 OCC_BOUNDED = (
     'agg BV.OccB 8 claims sev 300 * beta 2 3 '
-    'occurrence net of 0.7 so 60 xs 40 poisson'
+    'occurrence net of 0.7 po 60 xs 40 poisson'
 )
 # Fixed claim count (count > 1 exercises the general 2D path with z**n PGF).
 OCC_FIXED = (
@@ -52,7 +52,7 @@ OCC_FIXED = (
 # always reports the joint per-occurrence (ceded, net) aggregate.
 OCC_CEDED = (
     'agg BV.Ced 8 claims sev 300 * beta 2 3 '
-    'occurrence ceded to 0.7 so 60 xs 40 poisson'
+    'occurrence ceded to 0.7 po 60 xs 40 poisson'
 )
 
 
@@ -237,9 +237,9 @@ def test_poisson_count_increases_correlation():
     correlation than the same book with a fixed count.
     """
     pois = _build('agg BV.CP 8 claims sev 300 * beta 2 3 '
-                  'occurrence net of 0.7 so 60 xs 40 poisson')
+                  'occurrence net of 0.7 po 60 xs 40 poisson')
     fixed = _build('agg BV.CF dfreq [8] sev 300 * beta 2 3 '
-                   'occurrence net of 0.7 so 60 xs 40')
+                   'occurrence net of 0.7 po 60 xs 40')
     assert pois.occ_bivariate().corr > fixed.occ_bivariate().corr > 0
 
 

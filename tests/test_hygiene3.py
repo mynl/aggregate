@@ -67,23 +67,37 @@ def test_sev_label_multicomponent_no_raise():
 
 
 # ----------------------------------------------------------------------
-# Item 4 -- 'of' as a share synonym
+# Item 4 -- the two readings of a placement quantity.
+#
+# This item shipped as the ``of`` share synonym. ``of`` and ``so`` were retired
+# at 1.0.0a249 ([Single-Placement-Keyword]), leaving ``po`` as the one spelling;
+# what survives the retirement is the percent-versus-bare distinction, which is
+# what these now pin. See dev/done/plan-single-placement-keyword.md.
 # ----------------------------------------------------------------------
 
-def test_of_equals_so_and_po(uw):
-    """``90% of`` yields the same (share, limit, attach) as ``so`` / ``po``."""
-    base = ("agg B 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 "
-            "occurrence net of 90% {kw} 6000 xs 4000 poisson")
-    of_ = _parse(uw, base.format(kw="of"))[2]["occ_reins"]
-    so_ = _parse(uw, base.format(kw="so"))[2]["occ_reins"]
-    po_ = _parse(uw, base.format(kw="po"))[2]["occ_reins"]
-    assert of_ == so_ == po_ == [(0.9, 6000.0, 4000.0)]
+_PLACEMENT = ("agg B 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 "
+              "occurrence net of {qty} {kw} 6000 xs 4000 poisson")
 
 
-def test_of_bare_amount_is_share(uw):
-    """A bare amount with ``of`` reads as ``amount / limit`` (share), like ``so``."""
-    of_ = _parse(uw, "agg B 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 "
-                     "occurrence net of 3000 of 6000 xs 4000 poisson")[2]["occ_reins"]
-    so_ = _parse(uw, "agg B 1 claim 10000 xs 0 sev lognorm 120 cv 1.5 "
-                     "occurrence net of 3000 so 6000 xs 4000 poisson")[2]["occ_reins"]
-    assert of_ == so_ == [(0.5, 6000.0, 4000.0)]
+def test_po_percent_is_the_share(uw):
+    """``90% po`` uses the percentage as the share directly."""
+    spec = _parse(uw, _PLACEMENT.format(qty="90%", kw="po"))[2]["occ_reins"]
+    assert spec == [(0.9, 6000.0, 4000.0)]
+
+
+def test_po_bare_amount_is_amount_over_limit(uw):
+    """A bare amount with ``po`` reads as ``amount / limit``."""
+    spec = _parse(uw, _PLACEMENT.format(qty="3000", kw="po"))[2]["occ_reins"]
+    assert spec == [(0.5, 6000.0, 4000.0)]
+
+
+@pytest.mark.parametrize("kw", ["so", "of"])
+def test_retired_placement_keywords_are_rejected(uw, kw):
+    """``so`` and ``of`` no longer start a placement clause."""
+    with pytest.raises(ValueError):
+        _parse(uw, _PLACEMENT.format(qty="90%", kw=kw))
+
+
+def test_so_is_an_ordinary_identifier_again(uw):
+    """Retiring ``SHARE_OF`` returned ``so`` to the identifier space."""
+    assert _parse(uw, "agg so 3 claims dsev [1 2 3] poisson")[:2] == ("agg", "so")

@@ -2643,7 +2643,7 @@
       "hints": ""
     }
   },
-  "agg J.Re01  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson": {
+  "agg J.Re01  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence net of 50% po 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson": {
     "kind": "agg",
     "name": "J.Re01",
     "spec": {
@@ -2681,7 +2681,7 @@
       "hints": ""
     }
   },
-  "agg J.Re02  5 claims 100 xs 0 sev lognorm 10 cv .75                                                                 poisson aggregate net of 50% so 25 xs 0 and 75 xs 25": {
+  "agg J.Re02  5 claims 100 xs 0 sev lognorm 10 cv .75                                                                 poisson aggregate net of 50% po 25 xs 0 and 75 xs 25": {
     "kind": "agg",
     "name": "J.Re02",
     "spec": {
@@ -2714,7 +2714,7 @@
       "hints": ""
     }
   },
-  "agg J.Re03  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence net of 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson aggregate net of 50% so 25 xs 0 and 100 xs 25": {
+  "agg J.Re03  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence net of 50% po 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson aggregate net of 50% po 25 xs 0 and 100 xs 25": {
     "kind": "agg",
     "name": "J.Re03",
     "spec": {
@@ -2765,7 +2765,7 @@
       "hints": ""
     }
   },
-  "agg J.Re04  5 claims 100 xs 0 dsev  [1:100]           occurrence net of 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson aggregate net of 50% so 25 xs 0 and 100 xs 25": {
+  "agg J.Re04  5 claims 100 xs 0 dsev  [1:100]           occurrence net of 50% po 5 xs 0 and 5 po 15 xs 5 and 30 xs 20   poisson aggregate net of 50% po 25 xs 0 and 100 xs 25": {
     "kind": "agg",
     "name": "J.Re04",
     "spec": {
@@ -3014,7 +3014,7 @@
       "hints": ""
     }
   },
-  "agg J.Re05  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson": {
+  "agg J.Re05  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 50% po 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson": {
     "kind": "agg",
     "name": "J.Re05",
     "spec": {
@@ -3052,7 +3052,7 @@
       "hints": ""
     }
   },
-  "agg J.Re06  5 claims 100 xs 0 sev lognorm 10 cv .75                                                                 poisson aggregate ceded to 50% so 25 xs 0 and 75 xs 25": {
+  "agg J.Re06  5 claims 100 xs 0 sev lognorm 10 cv .75                                                                 poisson aggregate ceded to 50% po 25 xs 0 and 75 xs 25": {
     "kind": "agg",
     "name": "J.Re06",
     "spec": {
@@ -3085,7 +3085,7 @@
       "hints": ""
     }
   },
-  "agg J.Re07  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson aggregate ceded to 50% so 25 xs 0 and 100 xs 25": {
+  "agg J.Re07  5 claims 100 xs 0 sev lognorm 10 cv .75 occurrence ceded to 50% po 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson aggregate ceded to 50% po 25 xs 0 and 100 xs 25": {
     "kind": "agg",
     "name": "J.Re07",
     "spec": {
@@ -3136,7 +3136,7 @@
       "hints": ""
     }
   },
-  "agg J.Re08  5 claims 100 xs 0 dsev  [1:100]           occurrence ceded to 50% so 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson aggregate ceded to 50% so 25 xs 0 and 100 xs 25": {
+  "agg J.Re08  5 claims 100 xs 0 dsev  [1:100]           occurrence ceded to 50% po 5 xs 0 and 5 po 15 xs 5 and 30 xs 20 poisson aggregate ceded to 50% po 25 xs 0 and 100 xs 25": {
     "kind": "agg",
     "name": "J.Re08",
     "spec": {
@@ -3945,7 +3945,7 @@
       "hints": ""
     }
   },
-  "agg J.Re14  1000 prem at .5 lr sev lognorm 10 cv  [.2 .35 .5]  wts=3 occurrence ceded to .5 xs .5 and .5 po 1.0 xs 1.0 and 25% so 3.0 xs 2.0       mixed gamma 0.5  aggregate ceded to 1.5 xs 1.5 and 5.0 po 10.0 xs 12.5": {
+  "agg J.Re14  1000 prem at .5 lr sev lognorm 10 cv  [.2 .35 .5]  wts=3 occurrence ceded to .5 xs .5 and .5 po 1.0 xs 1.0 and 25% po 3.0 xs 2.0       mixed gamma 0.5  aggregate ceded to 1.5 xs 1.5 and 5.0 po 10.0 xs 12.5": {
     "kind": "agg",
     "name": "J.Re14",
     "spec": {
@@ -4005,7 +4005,7 @@
       "hints": ""
     }
   },
-  "agg J.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence net of 1 xs 1 and 2.5 po 5 xs 5 and 25% so 30 xs 20 and inf xs 100 poisson          aggregate net of 10 xs 15": {
+  "agg J.Re15  10 claims          sev lognorm  3 cv 0.35              occurrence net of 1 xs 1 and 2.5 po 5 xs 5 and 25% po 30 xs 20 and inf xs 100 poisson          aggregate net of 10 xs 15": {
     "kind": "agg",
     "name": "J.Re15",
     "spec": {
@@ -4531,7 +4531,7 @@
       "hints": ""
     }
   },
-  "agg J.Re18a 1 claim dsev  [10]  occurrence net of 50% so 10 xs 0 fixed": {
+  "agg J.Re18a 1 claim dsev  [10]  occurrence net of 50% po 10 xs 0 fixed": {
     "kind": "agg",
     "name": "J.Re18a",
     "spec": {
@@ -4557,63 +4557,11 @@
       "hints": ""
     }
   },
-  "agg J.Re18b 1 claim dsev  [10]  occurrence net of 50% po 10 xs 0 fixed": {
+  "agg J.Re18b 1 claim dsev  [10]  occurrence net of 5 po 10 xs 0 fixed": {
     "kind": "agg",
     "name": "J.Re18b",
     "spec": {
       "name": "J.Re18b",
-      "exp_en": 1.0,
-      "sev_name": "dhistogram",
-      "sev_xs": [
-        10.0
-      ],
-      "sev_ps": [
-        1.0
-      ],
-      "occ_reins": [
-        [
-          0.5,
-          10.0,
-          0.0
-        ]
-      ],
-      "occ_kind": "net of",
-      "freq_name": "fixed",
-      "note": "",
-      "hints": ""
-    }
-  },
-  "agg J.Re18c 1 claim dsev  [10]  occurrence net of 5 so 10 xs 0 fixed": {
-    "kind": "agg",
-    "name": "J.Re18c",
-    "spec": {
-      "name": "J.Re18c",
-      "exp_en": 1.0,
-      "sev_name": "dhistogram",
-      "sev_xs": [
-        10.0
-      ],
-      "sev_ps": [
-        1.0
-      ],
-      "occ_reins": [
-        [
-          0.5,
-          10.0,
-          0.0
-        ]
-      ],
-      "occ_kind": "net of",
-      "freq_name": "fixed",
-      "note": "",
-      "hints": ""
-    }
-  },
-  "agg J.Re18d 1 claim dsev  [10]  occurrence net of 5 po 10 xs 0 fixed": {
-    "kind": "agg",
-    "name": "J.Re18d",
-    "spec": {
-      "name": "J.Re18d",
       "exp_en": 1.0,
       "sev_name": "dhistogram",
       "sev_xs": [

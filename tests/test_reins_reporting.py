@@ -28,7 +28,7 @@ from aggregate import build
 
 OCC_ONLY = (
     'agg RR.Occ 10 claims sev lognorm 100 cv 2 '
-    'occurrence net of 0.8 so 250 xs 175 poisson'
+    'occurrence net of 0.8 po 250 xs 175 poisson'
 )
 AGG_ONLY = (
     'agg RR.Agg 10 claims sev lognorm 100 cv 2 poisson '
@@ -48,11 +48,11 @@ BOTH = (
 # the rebucketing signal on the aggregate mean.)
 OCC_BOUNDED = (
     'agg RR.OccB 10 claims sev 500 * beta 2 3 '
-    'occurrence net of 0.8 so 150 xs 100 poisson'
+    'occurrence net of 0.8 po 150 xs 100 poisson'
 )
 AGG_BOUNDED = (
     'agg RR.AggB 10 claims sev 200 * beta 2 3 poisson '
-    'aggregate net of 0.7 so 300 xs 400'
+    'aggregate net of 0.7 po 300 xs 400'
 )
 
 DENSITY_COLS = [
@@ -141,7 +141,7 @@ def test_stats_df_meta_rows():
     """Each layer carries share / limit / attach / pr_attach; non-layer
     columns NaN on those rows."""
     a = build('agg A 2 claims sev 128 * uniform '
-              'occurrence net of 50% so 32 xs 32 poisson')
+              'occurrence net of 50% po 32 xs 32 poisson')
     rs = a.reins_stats_df
     assert rs.loc[('meta', 'share'), ('occ', 'layer.1')] == pytest.approx(0.5)
     assert rs.loc[('meta', 'limit'), ('occ', 'layer.1')] == pytest.approx(32)

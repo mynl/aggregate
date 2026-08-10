@@ -272,7 +272,7 @@ class AggLexer(RegexLexer):
                  'expense', 'expenses', 'cede', 'deposit', 'rol', 'less',
                  'port', 'rate', 'net', 'sev', 'agg', 'xps', 'wts',
                  'and', 'as', 'exp', 'at', 'cv', 'lr', 'xs',
-                 'of', 'to', 'po', 'so', 'zm', 'zt',
+                 'of', 'to', 'po', 'zm', 'zt',
                  # reinstatements
                  'reinstatements', 'reinstatement', 'free', 'no',
                  # variable rating

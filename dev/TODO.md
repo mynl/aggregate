@@ -635,7 +635,8 @@
 - ~~**[Walk-Step-Default-Labels]**~~ **DONE `1.0.0a183`** (with
   `[Layer-Peeling-Shorthand]`, `dev/done/plan-layer-peeling.md`) — an undeclared
   cover step whose tier holds exactly **one** layer is now named by that layer's
-  DecL descriptor (`'occ 4750 xs 250'`, `'agg 85% so 1500 xs 7000'`) via
+  DecL descriptor (`'occ 4750 xs 250'`, `'agg 85% po 1500 xs 7000'`, respelled
+  from `so` at `1.0.0a249`) via
   `_tier_label`; a multi-layer tier keeps the generic `'ceded occ'` / `'ceded
   agg'`, because it has no single descriptor and `peel` is how you see those
   layers separately. Peeling forced the pick: `_ledger_plan` raises on duplicate
@@ -644,6 +645,15 @@
 - **[Doc-Fix]** — clear the executed-cell `*Error`s in the docs build. **Last —
   after the code has settled** (it churns with every API change). Plan:
   `dev/doc-fix.md`.
+- **[Bucket-Baseline-Script-Rot]** (found at `1.0.0a249`) —
+  `scripts/bucket_baseline.py` no longer runs: it reads `uw.knowledge`, which
+  the `Underwriter` has not had for a long time, and raises `AttributeError` on
+  a clean tree. Its output `tests/data/bucket_baseline_summary.csv` was last
+  written at `a49` and the script last touched at `a71`, so the committed
+  baseline is ~200 versions stale and quietly wrong (it still shows the retired
+  `so` spelling). No test reads it, which is why the rot went unnoticed. Decide
+  between fixing the script and regenerating, or deleting both: a review
+  artifact nothing checks and nobody can regenerate is worse than no artifact.
 
 ### Numerics & pricing core
 
@@ -794,7 +804,7 @@
   member of the family survive the parse at all; the naming, the clause shape
   and which members are worth a keyword are all open.
 - **[Rate-Based-Reins-Clauses]** — extend reinsurance clauses to accept e.g.
-  `net of 50% of 500 xs 500 at .3 rol or 3000 ceded or .25 ros` (rate on subject
+  `net of 50% po 500 xs 500 at .3 rol or 3000 ceded or .25 ros` (rate on subject
   = quota share).
 - **[Reinstatement-Event-Date-Terms]** — reinstatement terms depending on event
   date (pro-rata as to time); from `dev/done/pre-plan-reinstatements.md`.

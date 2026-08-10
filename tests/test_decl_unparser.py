@@ -186,7 +186,7 @@ def test_roundtrip(program):
 # format_program smoke tests
 # ----------------------------------------------------------------------
 
-_SMOKE = 'agg X 10 claims sev lognorm 50 cv 0.8 occurrence net of 50% so 10 xs 0 poisson note{hi}'
+_SMOKE = 'agg X 10 claims sev lognorm 50 cv 0.8 occurrence net of 50% po 10 xs 0 poisson note{hi}'
 
 
 def test_format_program_has_no_width_parameter():
@@ -272,13 +272,13 @@ def test_format_port_is_multiline():
 
 def test_format_reins_cessions_indent():
     prog = ('agg R 10 claims sev lognorm 50 cv 0.8 occurrence net of '
-            '75% so 100 xs 200 and 50% so 100 xs 300 poisson')
+            '75% po 100 xs 200 and 50% po 100 xs 300 poisson')
     lines = format_program(prog).split('\n')
     assert '  occurrence net of' in lines
     i = lines.index('  occurrence net of')
     # cessions indented one level past the clause keyword; first ends with ' and'
-    assert lines[i + 1] == '    75% so 100 xs 200 and'
-    assert lines[i + 2] == '    50% so 100 xs 300'
+    assert lines[i + 1] == '    75% po 100 xs 200 and'
+    assert lines[i + 2] == '    50% po 100 xs 300'
 
 
 def test_format_html_spread_preserves_newlines():

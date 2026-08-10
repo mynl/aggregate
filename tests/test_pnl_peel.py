@@ -380,11 +380,11 @@ def test_partial_share_layer_descriptor():
     prog = (
         'xpnl PeelPart 1000 premium less agg PeelPart_e 1000 premium at 70% lr '
         'sev lognorm 100 cv 2 poisson '
-        'aggregate net of 50% so 200 xs 600 deposit 20 and '
+        'aggregate net of 50% po 200 xs 600 deposit 20 and '
         '400 xs 800 deposit 15 peel top-down'
     )
     assert _steps(build(prog)) == [
-        'Gross', 'agg 400 xs 800', 'agg 50% so 200 xs 600',
+        'Gross', 'agg 400 xs 800', 'agg 50% po 200 xs 600',
         'All aggregate', 'All']
 
 

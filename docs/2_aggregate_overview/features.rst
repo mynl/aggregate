@@ -1797,7 +1797,7 @@ exact rather than simulated.
 
 **Breaking at a183.** That middle step used to be called ``ceded occ``. An
 undeclared cover step whose tier holds exactly **one** layer is now named by that
-layer's own DecL descriptor, so a partial share reads ``agg 85% so 1500 xs 7000``
+layer's own DecL descriptor, so a partial share reads ``agg 85% po 1500 xs 7000``
 and the step name says what it covers. A multi-layer tier keeps the generic
 ``ceded occ`` / ``ceded agg``, because it has no single descriptor, and section
 14.5 is how you see those layers separately. A layer's declared ``as`` label

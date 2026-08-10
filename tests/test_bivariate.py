@@ -377,7 +377,7 @@ def test_mv_copula_independent_no_param():
 # ----------------------------------------------------------------------
 
 NC_PROG = ('agg NC 8 claims sev 300 * beta 2 3 '
-           'occurrence net of 0.7 so 60 xs 40 poisson')
+           'occurrence net of 0.7 po 60 xs 40 poisson')
 
 
 def test_netceded_via_decl():

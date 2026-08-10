@@ -79,7 +79,7 @@ def test_swing_terms_scale_by_placement_share():
     head = ('pnl V 10000 premium less agg V_e 10000 prem at 85% lr sev lognorm '
             '50 cv 3 poisson aggregate net of ')
     sw = ' swing basic 500 lcm 0.5 min 500 max 3000'
-    half = build(head + '50% so 5000 xs 4000' + sw)
+    half = build(head + '50% po 5000 xs 4000' + sw)
     t = half.engine.variable_terms
     assert t.basic == pytest.approx(250.0)               # 0.5 x 500
     assert t.minimum == pytest.approx(250.0)             # 0.5 x 500

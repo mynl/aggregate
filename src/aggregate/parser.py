@@ -347,12 +347,17 @@ def _check_vectorizable(value):
 class _PercentNumber(float):
     """Float that remembers it was written with a trailing ``%``.
 
-    Used by ``reins_clause_share`` / ``reins_clause_part`` to
-    distinguish a percentage share (``50%``) from an absolute amount
-    (``5``) in ``so`` / ``po`` reinsurance clauses. Arithmetic on a
-    ``_PercentNumber`` produces a plain ``float`` (the % marker only
-    survives literal use), so an expression like ``25 * 2 %`` doesn't
-    sneak through as a percentage.
+    Used by ``reins_clause_part`` to distinguish a percentage share
+    (``50%``) from an absolute amount (``5``) in a ``po`` reinsurance
+    clause. Arithmetic on a ``_PercentNumber`` produces a plain
+    ``float`` (the % marker only survives literal use), so an
+    expression like ``25 * 2 %`` doesn't sneak through as a percentage.
+
+    The marker is consumed where it is read: ``reins_clause_part``
+    returns a plain ``(share, limit, attach)`` tuple, so the spec keeps
+    the resolved fraction and nothing records which form was written.
+    That is why :func:`aggregate.decl_writer._render_reins_clause`
+    always renders the percentage form.
     """
     __slots__ = ()
 
@@ -1431,37 +1436,22 @@ class UnderwritingTransformer(Transformer):
         limit, _xs, attach = c
         return (1.0, limit, attach)
 
-    def reins_clause_share(self, c):
-        # ``so`` and ``po`` are synonyms; meaning is set by the leading
-        # quantity: a literal percentage (``50%``) is the share
-        # directly, a bare number is an absolute amount and the share
-        # is ``amount / limit``. The ``_PercentNumber`` carries the
-        # ``%``-suffix marker through the parse so this branch can
-        # decide. The canonical / PIR usage is ``%`` with ``so`` and
-        # absolute with ``po`` — both forms now work either way.
-        n, _so, limit, _xs, attach = c
-        if isinstance(n, _PercentNumber):
-            return (float(n), limit, attach)
-        return (n / limit, limit, attach)
-
-    def reins_clause_of(self, c):
-        # ``of`` is a natural-language synonym for ``so`` (share of): a
-        # literal percentage (``90%``) is the share directly, a bare number
-        # is an absolute amount and the share is ``amount / limit``. Reads as
-        # a share, so -- unlike ``po`` -- no "suspiciously small" warning.
-        n, _of, limit, _xs, attach = c
-        if isinstance(n, _PercentNumber):
-            return (float(n), limit, attach)
-        return (n / limit, limit, attach)
-
     def reins_clause_part(self, c):
+        # ``po`` (part of) is the one partial-placement keyword. The leading
+        # quantity says which reading is meant: a literal percentage (``50%``)
+        # is the share directly, a bare number is an absolute amount and the
+        # share is ``amount / limit``. The ``_PercentNumber`` carries the
+        # ``%``-suffix marker through the parse so this branch can decide.
+        # ``so`` / ``of`` were retired at 1.0.0a249 (identical arithmetic).
         n, _po, limit, _xs, attach = c
         if isinstance(n, _PercentNumber):
             return (float(n), limit, attach)
         if n / limit < 0.05:
             logger.warning(
-                f"Part of clause with proportion {n / limit} is "
-                "suspiciously small. Did you mean share of?"
+                f"'{n:.6g} po {limit:.6g} xs {attach:.6g}' reads {n:.6g} as an "
+                f"amount, giving a {n / limit:.4%} placement, which is "
+                f"suspiciously small. If you meant a share, write it as a "
+                f"percentage: '{n * 100:.6g}% po {limit:.6g} xs {attach:.6g}'."
             )
         return (n / limit, limit, attach)
 

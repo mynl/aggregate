@@ -367,10 +367,17 @@ reins_list: reins_list AND reins_clause   -> reins_list_cons
 // ride alongside for the P&L.
 reins_clause: reins_layer reins_premium reins_cede reins_reinst reins_variable as_label   -> reins_clause
 
+// ``po`` (part of) is the ONE way to write a partial placement. The leading
+// quantity says which reading is meant: a literal percentage (``50%``) is the
+// share directly, a bare number is an absolute amount and the share is
+// ``amount / limit``. A full-line layer omits the clause and reads ``y xs a``.
+// The ``so`` (share of) and ``of`` spellings were retired at 1.0.0a249: all
+// three computed the identical tuple, ``so`` is an ordinary English word and so
+// a poor reserved word, and ``of`` forked the Earley parse against the ``net
+// of`` that precedes it. ``po`` was kept because ``corridor <share> po <width>
+// xs <attach>`` already speaks it. See dev/done/plan-single-placement-keyword.md.
 reins_layer: expr XS expr                   -> reins_clause_xs
-           | expr SHARE_OF expr XS expr     -> reins_clause_share
            | expr PART_OF expr XS expr      -> reins_clause_part
-           | expr OF expr XS expr           -> reins_clause_of
 
 reins_premium: DEPOSIT expr   -> reins_premium_deposit
              | ROL expr       -> reins_premium_rol
@@ -733,7 +740,6 @@ XS.2:         /xs(?![a-zA-Z0-9._:~\-])/
 OF.2:         /of(?![a-zA-Z0-9._:~\-])/
 TO.2:         /to(?![a-zA-Z0-9._:~\-])/
 PART_OF.2:    /po(?![a-zA-Z0-9._:~\-])/
-SHARE_OF.2:   /so(?![a-zA-Z0-9._:~\-])/
 ZM.2:         /zm(?![a-zA-Z0-9._:~\-])/
 ZT.2:         /zt(?![a-zA-Z0-9._:~\-])/
 DISTORTION.2: /(?:distortion|dist)(?![a-zA-Z0-9._:~\-])/
@@ -792,7 +798,7 @@ NUMBER.2: /-?(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|so|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

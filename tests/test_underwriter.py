@@ -98,7 +98,7 @@ _ONE_PER_KIND = [
                      'agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson',
      BivariateAggregate),
     ('bvagg netceded', 'netceded agg MV.NetCeded 8 claims sev 300 * beta 2 3 '
-                       'occurrence net of 0.7 so 60 xs 40 poisson',
+                       'occurrence net of 0.7 po 60 xs 40 poisson',
      BivariateAggregate),
     ('bvagg dbvsev', 'bivariate MV.DBVUniform 5 claims dbvsev [0 1 2] [0 5 10]',
      BivariateAggregate),

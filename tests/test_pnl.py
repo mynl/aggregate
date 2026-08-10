@@ -458,9 +458,9 @@ xpnl CedeTower 33333.33333333321 premium as GWP less
     2 claims
     sev 20000 * uniform
     occurrence net of
-      50% so 5000 xs 10000 rate 0.3 cede 0.3 as "Occ1"
+      50% po 5000 xs 10000 rate 0.3 cede 0.3 as "Occ1"
       and
-      50% so 5000 xs 15000 rate 0.2 cede 0.3 as "Occ2"
+      50% po 5000 xs 15000 rate 0.2 cede 0.3 as "Occ2"
     fixed
     aggregate net of
       2500 xs 23500 rol 0.25 as "Agg1"

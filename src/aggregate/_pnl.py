@@ -101,14 +101,30 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from ._aggregate import return_period_frame
+from ._aggregate import return_period_frame, value_type_label
 from ._help import HelpMixin
 from .constants import INFO_NA, info_row
 from .moments import VALIDATION_NOISE, _snap_noise
 from ._labeled import LabeledMixin
 from ._program import ProgramMixin
 
-__all__ = ['Leg', 'Group', 'PnL', 'stack_marginal_pnls', 'LEG_KINDS']
+__all__ = ['Leg', 'Group', 'PnL', 'stack_marginal_pnls', 'LEG_KINDS',
+           'PNL_IS_LOSS_VALUE']
+
+
+#: A P&L reads on the **payoff** convention, always, and this is where that
+#: is said. Profit is positive and loss is negative, which the name states,
+#: so the adverse tail is the *low* one: ``q``, ``tvar`` and the return
+#: period all read off the bottom, ``T = 1 / p`` rather than
+#: ``1 / (1 - p)``, and the chart marks break even at zero. It is a property
+#: of the kind rather than of an instance, unlike :class:`Aggregate`, where
+#: ``value_type`` is declared per object and a :class:`Portfolio`, which
+#: derives it from unanimous units.
+#:
+#: Every ledger row, every leg and the grand result orient by this one name
+#: rather than by a literal ``False`` repeated at each construction, so the
+#: convention is stated once and cannot drift between them.
+PNL_IS_LOSS_VALUE = False
 
 
 #: What a declared :class:`Leg` *is*, economically. Accounting metadata the
@@ -473,14 +489,15 @@ class _EvaluatedLeg:
     def gd(self):
         """The row's signed :class:`GridDistribution` -- exact irregular when
         ``bs == 0``, the audited regular-``bs`` rebucket otherwise. Signed cash
-        to the holder, so payoff orientation (``is_loss_value=False``)."""
+        to the holder, so payoff orientation (:data:`PNL_IS_LOSS_VALUE`)."""
         if self._gd is None:
             if self.bs:
                 from .bivariate import _finalize_pushforward
                 self._gd = _finalize_pushforward(
                     self.values, self.probs, bs=self.bs, log2=None,
                     window=None, scheme='linear', name=self.label,
-                    is_loss_value=False, source='pnl-leg')
+                    is_loss_value=PNL_IS_LOSS_VALUE,
+                    source='pnl-leg')
             else:
                 from ._grid_distribution import GridDistribution
                 ser = (pd.Series(self.probs, index=self.values)
@@ -488,7 +505,8 @@ class _EvaluatedLeg:
                 self._gd = GridDistribution(
                     ser.index.to_numpy(dtype=float),
                     ser.to_numpy(dtype=float),
-                    bs=None, name=self.label, is_loss_value=False)
+                    bs=None, name=self.label,
+                    is_loss_value=PNL_IS_LOSS_VALUE)
         return self._gd
 
     @property
@@ -1097,7 +1115,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         total_key = '__sweep_total__'
         results = source.pushforward(funcs, bs_list, bs_total=max(bs_list),
                                      total_key=total_key,
-                                     is_loss_value=False)
+                                     is_loss_value=PNL_IS_LOSS_VALUE)
         audit = results[next(iter(funcs))].pushforward_audit_df
         rows = OrderedDict()
         self._egroups = []
@@ -1287,6 +1305,40 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return self._grand_result.gd
 
+    #: The sign convention, a class attribute rather than an instance one
+    #: because it is a fact about the kind (:data:`PNL_IS_LOSS_VALUE`).
+    #: :class:`Aggregate` sets its own per object from DecL and
+    #: :class:`Portfolio` derives one from unanimous units; a P&L has nothing
+    #: to derive, so the name resolves on the class and every instance agrees
+    #: by construction.
+    _is_loss_value = PNL_IS_LOSS_VALUE
+
+    @property
+    def value_type(self):
+        """The sign convention this P&L is read on: always the payoff label.
+
+        Returns
+        -------
+        str
+            ``settings.labels.payoff``, through the same
+            :func:`~aggregate.distributions.value_type_label` helper
+            :attr:`Aggregate.value_type` and :attr:`Portfolio.value_type` use,
+            so a ``[labels]`` relabel moves all three together and the string
+            exists in one place.
+
+        Notes
+        -----
+        Constant, and the one first class kind where it is: profit is
+        positive and loss is negative, which is what the name says, so the
+        adverse tail is the low one. Everything that branches on the
+        convention reads the boolean ``_is_loss_value``
+        (:data:`PNL_IS_LOSS_VALUE`) and never this label text, which is
+        display.
+
+        .. versionadded:: 1.0
+        """
+        return value_type_label(self._is_loss_value)
+
     # The four moments carry the ``est_`` prefix, not ``actual_``: a P&L is
     # evaluated per-atom over the *source's realised grid*, so every moment
     # inherits that grid's discretization. (Within the ledger those per-atom
@@ -1377,7 +1429,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return _EvaluatedLeg(
             'zero', gd=GridDistribution(np.array([0.0]), np.array([1.0]),
                                         bs=None, name='zero',
-                                        is_loss_value=False),
+                                        is_loss_value=PNL_IS_LOSS_VALUE),
             exact_mean=0.0, exact_sd=0.0)
 
     def _card_side_row(self, gi, side):
@@ -2339,6 +2391,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         rows = [
             ('pnl object name', self.name),
             ('label', self.label),
+            ('value_type', self.value_type),
             ('groups', len(self._egroups)),
             ('legs', sum(len(g.cons) + len(g.obl) for g in self._egroups)),
             ('role', self.role or 'multi-group'),

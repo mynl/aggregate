@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a248
+
+**[PnL-Value-Type] a P&L says which sign convention it is read on, instead of leaving consumers to infer it from the class name.** `PnL.value_type` joins `Aggregate.value_type` and `Portfolio.value_type`, returning the payoff label through the same `value_type_label` helper, so a `[labels]` relabel moves all three together. `PnL.info` gains the matching row, in the same position the other two carry it.
+
+A P&L is the one first class kind whose convention is fixed by what it is: profit is positive and loss is negative, which the name states, so the adverse tail is the low one. `Aggregate` declares its convention per object in DecL and `Portfolio` derives one from unanimous units; a P&L has nothing to declare or derive, so `_is_loss_value` is a **class attribute** rather than an instance one and every instance agrees by construction.
+
+The fact was already true and was stated six times. `is_loss_value=False` appeared as a literal at four sites in `_pnl.py` and two in `_pnl_builders.py`, so a consumer could see the orientation on `pnl.result` but not on the P&L, and the app was left asserting a fact about a library class from outside it. All six now read the new module constant `PNL_IS_LOSS_VALUE`, which is where the convention is stated and the only place it can be read from.
+
+`dev/FEATURES.csv` corrects the row that recorded `value_type` as absent from `PnL`, and `docs/2_aggregate_overview/info-strings.rst` gains the new row.
+
+---
+
 ## 1.0.0a247
 
 **[Exhibit-Row-Cap] how many rows a served block carries is the caller's question.** `build_exhibit` and the eleven convenience functions (`exhibits.summary(obj, 'insurer')` and its siblings) take a keyword-only `max_rows`, defaulting to `exhibits.MAX_ROWS` (200, `greater_tables`' own default, so nothing changes by default) and accepting `None` for the whole frame.

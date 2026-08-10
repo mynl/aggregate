@@ -224,6 +224,11 @@ Row                          Source / meaning                                   
 ===========================  =======================================================  =========================
 pnl object name              ``self.name``
 label                        ``self.label`` (resolved display label)
+value_type                   constant: the payoff label. A P&L is the one kind
+                             whose convention is fixed by what it is, so unlike
+                             :class:`Aggregate` (declared) and
+                             :class:`Portfolio` (derived) there is nothing to
+                             read off the object
 groups                       number of ledger groups
 legs                         total declared legs across groups
 role                         the single group's role, else ``multi-group``

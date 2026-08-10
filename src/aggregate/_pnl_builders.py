@@ -804,16 +804,20 @@ def _affine_row(x, p, *, sign=1.0, shift=0.0, label=''):
     v = sign * x + shift
     if sign < 0:
         v, p = v[::-1], p[::-1]
-    return (GridDistribution(v, p, bs=None, name=label, is_loss_value=False),
+    from ._pnl import PNL_IS_LOSS_VALUE
+    return (GridDistribution(v, p, bs=None, name=label,
+                             is_loss_value=PNL_IS_LOSS_VALUE),
             sign * m1 + shift, sd)
 
 
 def _const_row(value, label=''):
     """A stitched ledger row that is a known constant (premium, commission)."""
     from ._grid_distribution import GridDistribution
+    from ._pnl import PNL_IS_LOSS_VALUE
     value = float(value)
     return (GridDistribution(np.array([value]), np.array([1.0]), bs=None,
-                             name=label, is_loss_value=False), value, 0.0)
+                             name=label, is_loss_value=PNL_IS_LOSS_VALUE),
+            value, 0.0)
 
 
 def _sev_transform_marginal(agg, f):

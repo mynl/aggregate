@@ -77,6 +77,17 @@ CAPITAL_ANCHOR_PERIODS = (200.0, 250.0)
 #: raw perspective keeps every row of the canonical 26 row store).
 RAW_MOMENT_MEASURES = ('ex1', 'ex2', 'ex3')
 
+#: Every served block carries its raw values beside its formatted strings.
+#: The formatted string is this library's reading of a number and the raw
+#: value is the number, and a document that ships only the reading has
+#: destroyed information no consumer can recover: it cannot be sorted
+#: numerically, downloaded at full precision, or rendered interactively at
+#: all. See :func:`build_exhibit` for the measured payload cost. A library
+#: default rather than a caller option, on the same reasoning that keeps
+#: renderer passthrough out of the chart IR: presentation is the consumer's,
+#: and it needs the numbers to do it.
+INCLUDE_RAW = True
+
 #: Per measure formats for the INSURER views, as greater_tables format sugar
 #: (author, 2026-08-05). Applies wherever a measure **is a column**: the
 #: summary card and the P&L ledger. It cannot apply to the canonical moment
@@ -449,6 +460,28 @@ def build_exhibit(obj, name, perspective=Perspective.RAW):
     Exhibit
         Frozen; ``ir_blocks`` hold one hash stamped ``TableDoc`` per block.
 
+    Notes
+    -----
+    **Every block carries its raw values** (:data:`INCLUDE_RAW`), so a cell
+    arrives as ``{'text': '17.50', 'raw': 17.5000001}`` rather than as the
+    string alone. It is a library default and not a caller option, because a
+    document that has dropped its numbers cannot be sorted, downloaded at
+    full precision, or drawn by an interactive renderer at all, and no
+    consumer can put back what the document threw away. The formatted string
+    is this library's reading of the number; the raw value is the number, and
+    a served document owes both. Alongside them each column already carries a
+    machine readable format spec, so a client can render the reading, restate
+    it, or ignore it.
+
+    Measured across every exhibit on an ``Aggregate`` and a ``PnL``, carrying
+    the numbers costs about 1.5x the payload (worst case 2x, on the 26 row
+    moment store) on documents of a few kilobytes.
+
+    A frame builder may still pass ``include_raw`` in its own block kwargs
+    and win, since the default is applied under them rather than over them.
+    Nothing does, and anything that did would be opting its consumers out of
+    interactivity, so it wants a comment saying why.
+
     .. versionadded:: 1.0
        Provisional, in the sense of PEP 411: not part of the 1.0 API
        contract. See :doc:`/3_reference/3_x_API_Stability`.
@@ -460,7 +493,8 @@ def build_exhibit(obj, name, perspective=Perspective.RAW):
     ir_blocks = []
     captions = {}
     for block_name, df, kw in blocks:
-        ir_blocks.append(gt.build(df, gt.TableSpec(**kw)))
+        ir_blocks.append(
+            gt.build(df, gt.TableSpec(**{'include_raw': INCLUDE_RAW, **kw})))
         if kw.get('caption'):
             captions[block_name] = kw['caption']
     title_name = getattr(obj, '_title_name', type(obj).__name__)

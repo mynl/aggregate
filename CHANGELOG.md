@@ -20,6 +20,20 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a246
+
+**[Exhibit-Raw-Values] a served exhibit block carries its numbers, not only its formatted strings.** `build_exhibit` now sets `include_raw` on every `TableSpec` it builds (`exhibits._core.INCLUDE_RAW`), so a body cell arrives as `{'text': '17.50', 'raw': 17.5000001}` rather than as `'17.50'` alone.
+
+The default was `False`, which meant the library formatted each number, shipped the string and threw the number away. A consumer cannot put back what the document destroyed: it cannot sort numerically, download at full precision, or render interactively at all, since `greater_tables`' own `irToGridInput` needs a raw value for every non-string data column. Downstream that pushed clients back onto `exhibit_frames()` and pandas to fetch the numbers a second time, which forks the contract instead of using it. The formatted string is this library's *reading* of a number and the raw value is the number, and a served document owes both; each column already carried a machine readable format spec beside them, so a client can render the reading, restate it, or ignore it.
+
+A library default rather than a caller option, on the same reasoning that keeps renderer passthrough out of the chart IR: presentation belongs to the consumer, and the consumer needs the numbers to do it. A frame builder may still pass `include_raw` in its own block kwargs and win, since the default is applied under them; nothing does.
+
+**Nothing about formatting changed.** Every format spec, every formatted string and every caption is byte identical; `tests/data/exhibit_snapshots.json` is re-captured and the diff is provably additive, in that stripping the new raw carriage reproduces the previous file exactly across all 102 cases. Payload cost measured over every exhibit on an `Aggregate` and a `PnL` is about 1.5x, worst case 2x on the 26 row moment store, on documents of a few kilobytes.
+
+**Breaking for anyone pinning an exhibit hash.** `TableDoc.hash`, `Exhibit.hash` and therefore the ETag a client revalidates against all move once, for every exhibit and both perspectives. `aggregate.exhibits` is provisional, so this is a minor-release change by policy.
+
+---
+
 ## 1.0.0a245
 
 **[View-Pair-Spread] the view-pair keyword gets its own line in the spread layout.** `netceded`, `grossceded` and `grossnet` used to be glued onto the aggregate's head line, so a spread render opened `grossceded agg Property` and put the clauses one level in. The keyword is now the block head with the whole aggregate as its single child, which reads as what it is: a view pair taken *of* an aggregate.

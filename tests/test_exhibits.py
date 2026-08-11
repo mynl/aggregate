@@ -400,21 +400,72 @@ def test_dependency_two_blocks(objects):
 
 # --- reins ([Exhibits-Reins-Insurer]) ---------------------------------------
 
-def test_reins_two_blocks_and_moment_drop(objects):
+def test_reins_raw_is_two_blocks_in_the_frames_own_orientation(objects):
     for kind in ('ReinsAggregate', 'ReinsPortfolio'):
-        obj = objects[kind]
-        raw = exhibit_frames(obj, 'reins')
-        ins = exhibit_frames(obj, 'reins', 'insurer')
+        raw = exhibit_frames(objects[kind], 'reins')
         assert [name for name, _, _ in raw] == ['reins_stats_df',
                                                 'reins_summary_df']
-        # raw keeps every row; insurer drops the raw noncentral moment rows
         assert set(raw[0][2]) == set(raw[1][2]) == {'caption'}
-        raw_measures = set(raw[0][1].index.get_level_values('measure'))
-        ins_measures = set(ins[0][1].index.get_level_values('measure'))
-        assert {'ex1', 'ex2', 'ex3'} <= raw_measures
-        assert ins_measures.isdisjoint({'ex1', 'ex2', 'ex3'})
-        # both insurer blocks are captioned
-        assert 'caption' in ins[0][2] and 'caption' in ins[1][2]
+        # raw keeps every row, the noncentral moments among them
+        measures = set(raw[0][1].index.get_level_values('measure'))
+        assert {'ex1', 'ex2', 'ex3'} <= measures
+
+
+def test_reins_portfolio_insurer_drops_the_noncentral_moments(objects):
+    """The book's frame has no layer axis, so its insurer view is unchanged."""
+    ins = exhibit_frames(objects['ReinsPortfolio'], 'reins', 'insurer')
+    assert [name for name, _, _ in ins] == ['reins_stats_df',
+                                            'reins_summary_df']
+    measures = set(ins[0][1].index.get_level_values('measure'))
+    assert measures.isdisjoint({'ex1', 'ex2', 'ex3'})
+    assert 'caption' in ins[0][2] and 'caption' in ins[1][2]
+
+
+def test_reins_aggregate_insurer_turns_the_layering_over(objects):
+    """[Reins-Insurer-Orientation]: layers down the rows, in two blocks.
+
+    Two different kinds of thing were reading as one table, so a column
+    header changed meaning half way down: what the layer **is**, and what it
+    **does** to the three distributions. Gross, ceded and net now read down a
+    column, which is the comparison a reinsurance reader makes.
+    """
+    obj = objects['ReinsAggregate']
+    ins = exhibit_frames(obj, 'reins', 'insurer')
+    assert [name for name, _, _ in ins] == [
+        'reins_layer_terms', 'reins_layer_moments', 'reins_summary_df']
+    terms, moments = ins[0][1], ins[1][1]
+    # layers down the rows in both, on the same rows
+    assert terms.index.names == ['view', 'layer']
+    assert list(terms.index) == list(moments.index)
+    assert list(terms.columns) == ['share', 'limit', 'attach', 'pr_attach',
+                                   'pr_detach', 'pr_loss', 'lol', 'output']
+    assert list(moments.columns.get_level_values(0).unique()) == \
+        ['freq', 'sev', 'agg']
+    assert list(moments.columns.get_level_values(1).unique()) == \
+        ['mean', 'cv', 'skew']
+    # the contract and the consequence share no column
+    assert set(terms.columns).isdisjoint(
+        c for c in moments.columns.get_level_values(1))
+    # still no noncentral moments in the insurer reading
+    assert 'ex1' not in moments.columns.get_level_values(1)
+    assert all('caption' in kw for _, _, kw in ins)
+
+
+def test_reins_aggregate_insurer_is_a_reading_of_the_raw_frame(objects):
+    """Both new blocks come out of ``reins_stats_df``, nothing else."""
+    obj = objects['ReinsAggregate']
+    raw = exhibit_frames(obj, 'reins')[0][1]
+    terms, moments = [b[1] for b in
+                      exhibit_frames(obj, 'reins', 'insurer')[:2]]
+    for view, layer in terms.index:
+        for measure in terms.columns:
+            got, want = terms.loc[(view, layer), measure], \
+                raw.loc[('meta', measure), (view, layer)]
+            assert (got == want) or (pd.isna(got) and pd.isna(want))
+        for component, measure in moments.columns:
+            got = moments.loc[(view, layer), (component, measure)]
+            want = raw.loc[(component, measure), (view, layer)]
+            assert (got == want) or (pd.isna(got) and pd.isna(want))
 
 
 def test_reins_portfolio_total_flags(objects):

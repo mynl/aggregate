@@ -20,6 +20,20 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a256
+
+**[Reins-Insurer-Orientation] the layering analysis turns over, and splits in two.** `reins_stats_df` is built measures down the stub and layers across the columns, which is right for the library: a layer is a natural column of an analysis, and the frame is built once for every consumer. It is not how a reinsurance reader reads. Under INSURER on an `Aggregate` the layering analysis is now two blocks with **layers down the rows**, gross then the layer then ceded then net, because that is the comparison and the eye makes it down a column rather than across a row.
+
+**Two blocks, because they are two kinds of thing.** `reins_layer_terms` is the contract: the share of a limit over an attachment, the chance a loss reaches it and exhausts it, and the loss on line. `reins_layer_moments` is the consequence: what the layer does to the frequency, severity and aggregate, each with its mean, CV and skewness. Read as one table those two make a column header change meaning half way down. An aggregate stage leaves the frequency and severity columns blank, having changed neither.
+
+Three blocks under insurer against RAW's two, per `[Perspective-May-Restructure]`. Neither new block has a frame behind it, which is what an INSURER block is for: both are readings of `reins_stats_df`, which RAW still serves whole in its own orientation, noncentral moments included.
+
+**The `Portfolio` reading is unchanged**, and deliberately: a book's `reins_stats_df` is indexed by view and measure with units across and has no layer axis at all, so there is no layering to turn over. It keeps its noncentral moment drop and its total row flags.
+
+**Closes round 6 item 1** (`dev/note-from-aggregate-api-round-6.md`), the last of the four table asks and a live regression in the app's Reinsurance / Stats pane until it syncs. The app deleted `_reins_stats_transposed` at a71 ahead of this landing, so nothing waits on it there except the reading. One snapshot moves.
+
+---
+
 ## 1.0.0a255
 
 **[Sharpen-Exhibit] the grid probe says what it scored and why.** The bucket probe left an audit that no exhibit served, so the one leaf that showed it wrote its own prose about the library's own search, which is the kind of second opinion this whole line of work is removing. `sharpen` is the twelfth registered exhibit, on `Aggregate` and `Portfolio`, available once `sharpen_df` is present. Not gated on `update`: a probe implies one.

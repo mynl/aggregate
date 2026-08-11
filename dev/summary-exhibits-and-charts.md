@@ -16,7 +16,7 @@ The governing rule is that **INSURER equals RAW unless an override is registered
 | `tail` | Return periods | Aggregate, Portfolio | 1: `tail_df` | updated | both: caption, 1-in-200 and 1-in-250 row emphasis |
 | `stats` | Statistics | Aggregate, Portfolio, PnL, Distortion, BivariateAggregate | 1: `stats_df` | always | Aggregate, Portfolio, PnL: drops the raw noncentral rows `ex1`, `ex2`, `ex3` (26 rows becomes 23), caption |
 | `validation` | Validation | Aggregate, Portfolio, PnL, Distortion, BivariateAggregate | 1: `validation_df` | always | Aggregate, Portfolio, Distortion, BivariateAggregate: caption, emphasis on rows failing the object's `validation_eps` gate |
-| `reins` | Reinsurance | Aggregate, Portfolio | 2: `reins_stats_df`, `reins_summary_df` | cedes and updated | both: drops raw noncentral rows from the stats block, captions; Portfolio also flags the summary rows |
+| `reins` | Reinsurance | Aggregate, Portfolio | RAW 2: `reins_stats_df`, `reins_summary_df` | cedes and updated | Aggregate **restructures into 3 blocks**: `reins_layer_terms` and `reins_layer_moments`, layers down the rows, then the summary. Portfolio (no layer axis) drops the raw noncentral rows and flags the summary rows |
 | `economic` | Economics | PnL | 1: `economic_df` | always | caption switches on whether the ladder is a kappa scenario or a marginal `P` ladder, ledger row flags, measure formats |
 | `economic_ratios` | Economic ratios | PnL | RAW 2: `economic_ratios_df`, `legs_df` | always | **restructures into 3 blocks**: `amounts` (P, L, E, C, M), `ratios` (LR, ER, CR, E_*, shares), `legs`, so no column mixes two units |
 | `economic_waterfall` | Economic waterfall | PnL | 2: `walk_df`, `evaluation_df` | multi-step walk (`_tower`) | none |

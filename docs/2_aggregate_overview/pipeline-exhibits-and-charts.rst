@@ -113,9 +113,9 @@ What is published
    * - ``reins``
      - Reinsurance
      - Aggregate, Portfolio
-     - 2: ``reins_stats_df``, ``reins_summary_df``
+     - RAW 2: ``reins_stats_df``, ``reins_summary_df``
      - cedes and updated
-     - both: drops raw noncentral rows from the stats block, captions; Portfolio also flags the summary rows
+     - Aggregate restructures into 3 blocks, ``reins_layer_terms`` and ``reins_layer_moments`` with layers down the rows, then the summary; Portfolio (no layer axis) drops the raw noncentral rows and flags the summary rows
    * - ``economic``
      - Economics
      - PnL

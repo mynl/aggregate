@@ -391,7 +391,11 @@
   layer per `[Waterfall-Frames-Are-Owed]`); `[BS-Window-Diagnostics]` landed
   a254 (note item 2, `W` and `coverage` published, and four served frames
   given honest index names); `[Sharpen-Exhibit]` landed a255 (note item 3,
-  the twelfth exhibit, RAW one block and INSURER two). Phase 7 struck,
+  the twelfth exhibit, RAW one block and INSURER two);
+  `[Reins-Insurer-Orientation]` landed a256 (note item 1, the Aggregate
+  layering analysis turned over and split into contract and consequence).
+  **Note items 1, 2, 3, 5 and 6 are all closed**; only item 4, the computed
+  pricing exhibits, is open. Phase 7 struck,
   its bug fixed at a250. Phases 8 to 10, the Pricing pane redesign keyed on
   result objects, wait on the design discussion, and with them the question of
   whether `REINSURER` gets implemented.

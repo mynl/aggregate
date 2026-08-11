@@ -20,6 +20,20 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a257
+
+**[Joint-Density-Clip] small in magnitude is noise; large and negative is not.** Both 2-D FFT paths in `bivariate.py` finish by zeroing round-off dust, and both did it with `density[abs(density) < 1e-15] = 0`. That predicate came from `utilities.remove_fuzz`, whose docstring justifies its two-sidedness explicitly for the signed P&L columns of a frame, and it does not transfer. A joint density is non-negative even where its **support** is signed, which is the ordinary case for a P&L axis, so the `abs` was zeroing the harmless negatives and **preserving** exactly the ones that mean something. A large negative cell is a broken construction, not fuzz.
+
+Both sites now route through `_clip_density_fuzz`, which clips the dust, then warns naming the count and the worst cell before clipping any survivor. The warning is the point; the clipping is housekeeping around it. **The deficit is a free second detector**: both callers take `1 - density.sum()` afterward, so clipping a genuine negative raises the sum and drives the deficit below zero, which every validation frame already shows.
+
+**The floor is now a fraction of the mass the grid carries** rather than an absolute constant, because the depth an absolute constant reaches moves with the grid: the same `1e-15` sits 12.4 decades under the peak on one joint and 10.7 on another. A 2-D FFT accumulates round-off in proportion to the total it sums, not to the tallest cell it produced, so the sum is what the floor is anchored to. On a normalized joint that reproduces the absolute constant exactly, which is why no number in the suite moves.
+
+Robustness, not a live bug: measured at 1024², 2048² and 4096² nothing trips it. The tests therefore **inject** a negative rather than wait for one, since a test that waits for nature passes forever without testing anything.
+
+The first of the LIB items in `dev/plan-3d-plot.md` (its section 5.3), and the one independent of the rest.
+
+---
+
 ## 1.0.0a256
 
 **[Reins-Insurer-Orientation] the layering analysis turns over, and splits in two.** `reins_stats_df` is built measures down the stub and layers across the columns, which is right for the library: a layer is a natural column of an analysis, and the frame is built once for every consumer. It is not how a reinsurance reader reads. Under INSURER on an `Aggregate` the layering analysis is now two blocks with **layers down the rows**, gross then the layer then ceded then net, because that is the comparison and the eye makes it down a column rather than across a row.

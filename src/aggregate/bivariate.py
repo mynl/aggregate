@@ -75,6 +75,14 @@ logger = logging.getLogger(__name__)
 # 16-bit grid (65,536 buckets) over its realized range is ample and cheap.
 _PUSHFORWARD_LOG2 = 16
 
+# Noise floor for a finished joint density, as a fraction of the mass the grid
+# carries. A 2-D FFT accumulates round-off proportional to the total it sums,
+# not to the tallest cell it produced, so the floor is anchored to the sum: on
+# a normalized joint that is 1e-15 in absolute terms, which is where the two
+# de-fuzz sites here have always sat, and on an unnormalized one it still means
+# the same depth. See :func:`_clip_density_fuzz`.
+_DENSITY_FUZZ = 1e-15
+
 # Coverage of the per-axis sizing window: 1 - 10**-_WINDOW_NINES per tail.
 # First-class bivariate setting (see aggregate.config [bivariate]);
 # independent of the 1-D distributions.WINDOW_NINES because the 2-D per-axis
@@ -788,6 +796,60 @@ def _warn_pushforward_clip(name, clipped, total, grid):
             key='defective-construction', stacklevel=3)
 
 
+def _clip_density_fuzz(density, where):
+    """Zero the FFT dust in a finished joint density, in place.
+
+    Parameters
+    ----------
+    density : ndarray
+        The joint mass matrix, modified in place.
+    where : str
+        The construction being finished, for the warning text.
+
+    Returns
+    -------
+    ndarray
+        The same array.
+
+    Notes
+    -----
+    **Small in magnitude is noise; large and negative is not.** The two-sided
+    predicate this replaces was inherited from
+    :func:`aggregate.utilities.remove_fuzz`, whose docstring justifies the
+    ``abs`` explicitly for the signed P&L columns of a frame. That does not
+    transfer. A joint density is non-negative even where its **support** is
+    signed, which is the ordinary case for a P&L axis, so a large negative
+    cell is a broken construction rather than dust. A one-sided clip would
+    zero it just as quietly as the two-sided one did, which is why the
+    warning is the point of this function and the clipping is the
+    housekeeping around it.
+
+    The floor is a fraction of the mass the grid carries rather than an
+    absolute constant, because the depth an absolute constant reaches moves
+    with the grid: the same ``1e-15`` sits 12.4 decades under the peak on one
+    joint and 10.7 on another. Anchoring it to the sum (see
+    :data:`_DENSITY_FUZZ`) holds the depth still, and on a normalized joint
+    reproduces the absolute constant these two sites have always used.
+
+    **The deficit is a free detector.** Both callers compute
+    ``1 - density.sum()`` after this returns, so clipping a genuine negative
+    raises the sum and drives the deficit negative. A negative deficit means
+    something was clipped upward and this warning should have fired.
+    """
+    total = float(np.abs(density).sum())
+    floor = _DENSITY_FUZZ * total if total > 0 else _DENSITY_FUZZ
+    density[np.abs(density) < floor] = 0.0
+    if density.size and density.min() < 0:
+        logger.warning(
+            '%s: joint density has %d negative cells, worst %.3e; clipped to '
+            'zero. A density is non-negative even where its support is '
+            'signed, so this is a broken construction rather than FFT fuzz, '
+            'and the reported deficit goes negative by what was clipped.',
+            where, int((density < 0).sum()), float(density.min()))
+        density[density < 0] = 0.0
+    return density
+
+
 def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
                          log2_x=None, log2_y=None, total_log2=None):
     """Joint per-occurrence density of two of {gross, ceded, net} for one aggregate.
@@ -879,7 +941,7 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
         ftagg = agg.frequency.freq_pgf(agg.base_mean, z.ravel()).reshape(z.shape)
         density = np.real(_sfft.irfft2(ftagg, s=s_shape))[:n0, :n1]
 
-    density[np.abs(density) < 1e-15] = 0.0
+    _clip_density_fuzz(density, f'netceded joint {agg.name!r}')
     deficit = float(1.0 - density.sum())
     return density, grid_x, grid_y, bs_x, bs_y, sev2, deficit, clipped
 
@@ -1950,7 +2012,7 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             a = np.roll(a, (-j0_0, -j0_1), axis=(0, 1))
             density = a[:N0, :N1]
 
-        density[np.abs(density) < 1e-15] = 0.0
+        _clip_density_fuzz(density, f'bivariate {self.name!r}')
 
         self.density = density
         self.deficit = float(1.0 - density.sum())

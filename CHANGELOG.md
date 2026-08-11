@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a250
+
+**[Reins-Density-Fuzz] `reins_density_df` removes its FFT fuzz, like every other density frame. Bug fix.** `calibrate_distortions(reins_view=...)` raised a bare `AssertionError` with no message, and past that `reins_price_df` returned `NaN`. Measured over six program shapes and every view each carries: four of five shapes failed to calibrate on at least one view, `net` failed on three of five, and pricing lost four of the five calibrated families. All of it is fixed by one line.
+
+**One frame was swept and its sibling was not.** `density_df` has called `remove_fuzz` since it was written (`_aggregate.py`, "remove the fuzz, same method as `Portfolio.remove_fuzz`"), so its minimum is exactly `0.0`. `reins_density_df` never did, so the gross / ceded / net columns kept the inverse FFT's sub-epsilon negatives: worst measured `-9.1e-17` in a bucket and `9.2e-14` summed across a view. Nothing read those columns until `reins_view=` landed at `a223`, and then everything downstream of a cumulative sum broke at once, because negative mass makes `1 - cumsum` tick back **up**. A survival that increases is not a survival, so `_calibration_survival` stopped on the exactness assertion it has carried since the initial commit in 2018, and past that an `S` above 1 sent `(1 - S) ** shape` to `NaN` for every fractional shape family (`ph`, `wang`, `dual`) and put a mass distortion's weight on a negative atom (`ccoc`, reported as an atom weight of `-9.1e-02`). Only `tvar` came through, being piecewise linear.
+
+**The assertion was correct and is untouched.** It asserts a property that follows from "this is a pmf", and the fix restores that property at the one place it had stopped holding, rather than relaxing the test that noticed. The default calibration path never read the unswept frame and never failed, in this release or any before it.
+
+**Numbers move in the last digits, and only where they were already zero.** De-fuzzing changes every reinsurance moment at the ulp level, so `tests/data/exhibit_snapshots.json` is re-captured: the four `reins` entries shift their raw values, and ten displayed strings change, every one of them at pico or femto scale (a skew reading `118.177f` now reads `112.038f`). No quantity a reader would act on moved. This is the direction `remove_fuzz` exists for, since far-tail fuzz is weighted by `x**k` and corrupts exactly these moments.
+
+---
+
 ## 1.0.0a249
 
 **[Single-Placement-Keyword] there is one way to write a partial placement, and it is `po`. Breaking.** DecL offered three keywords for the same layer: `50% so 100 xs 0`, `50% po 100 xs 0` and `50% of 100 xs 0`. `so` and `of` are retired. `po` (*part of*) is the survivor, unchanged in meaning: the leading quantity picks the reading, a percentage is the share directly and a bare number is an absolute amount whose share is `amount / limit`.

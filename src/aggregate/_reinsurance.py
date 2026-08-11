@@ -15,7 +15,7 @@ from .constants import (REINS_LABEL_GROSS, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT)
 from .moments import (MomentAggregator, MomentWrangler, xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
-from .utilities import ft
+from .utilities import ft, remove_fuzz
 
 logger = logging.getLogger(__name__)
 
@@ -424,7 +424,8 @@ def reins_density_df(agg):
             df['p_agg_ceded'] = zero
             df['p_agg_net'] = np.asarray(agg.agg_density, dtype=float)
 
-        agg._reins_density_df = df
+        # remove the fuzz, same method as density_df and Portfolio.remove_fuzz
+        agg._reins_density_df = remove_fuzz(df)
 
     return agg._reins_density_df
 

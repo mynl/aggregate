@@ -353,3 +353,40 @@ def test_portfolio_price_df(book):
     assert df.index.get_level_values('view').unique().tolist() == \
         ['gross', 'ceded', 'net']
     assert (df['margin'] > 0).all()
+
+
+# ----------------------------------------------------------------------------
+# The de-fuzz invariant (1.0.0a250)
+#
+# ``density_df`` has called ``remove_fuzz`` since forever and ``reins_density_df``
+# never did, so the view columns kept the inverse FFT's sub-epsilon negatives.
+# Nothing read them until ``reins_view=`` landed at a223, and then everything
+# downstream of a cumulative sum broke at once: negative mass makes ``1 - cumsum``
+# tick back *up*, so the survival is not monotone and can exceed 1. That tripped
+# the exactness assertion in ``_calibration_survival`` (a bare ``AssertionError``)
+# and, past it, sent ``(1 - S) ** shape`` to NaN in the Choquet weights.
+# ----------------------------------------------------------------------------
+
+def test_reins_density_df_carries_no_negative_mass(both):
+    """The invariant the fix restores: a density frame holds densities.
+
+    Asserted on the frame rather than on a symptom, because the symptoms are
+    several and each one is a long way downstream of the cause.
+    """
+    floats = both.reins_density_df.select_dtypes('float')
+    assert (floats.to_numpy() >= 0).all()
+
+
+def test_every_view_calibrates(both):
+    """The symptom, swept over all five views rather than the three that failed."""
+    for view in both.reins_views:
+        both.calibrate_distortions(0.10, p=0.99, reins_view=view)
+        assert np.isclose(both.calibration_df['ROE'].iloc[0], 0.10)
+
+
+def test_every_view_prices_without_nan(both):
+    """Past the calibration, the same dust turned four of five families to NaN."""
+    both.calibrate_distortions(0.10, p=0.99, reins_view='gross')
+    df = both.reins_price_df(p=0.99)
+    assert len(df) == len(both.distortions) * len(both.reins_views)
+    assert df.notna().to_numpy().all()

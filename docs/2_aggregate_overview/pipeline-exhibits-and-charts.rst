@@ -226,7 +226,7 @@ Chart-level facts, one line each. Options are semantic arguments to the emitter,
 ``envelope``
     On Bounds, primary. Always. Options ``n_resamples`` (bracketing curves inside the band, each carrying its weight as ``ChartSeries.value``) and ``n`` (curve points, default 1001). Entry point ``Bounds.plot_envelope(n_resamples)``.
 ``joint_surface``
-    On BivariateAggregate, primary. Needs the in-memory joint density. Option ``display_log2``, default 128 cells per side, block summed mass preservingly. **No class method yet**: reach it through ``charts.build_chart_doc`` and :func:`~aggregate.plots.plot_chartdoc`.
+    On BivariateAggregate, primary. Needs the in-memory joint density. Options ``window`` (default 4: keep ``q(1e-4)`` to ``q(1 - 1e-4)`` of each marginal, measured on the fine lattice **before** the reduction; 0 keeps the whole grid), ``detail`` (default 128 cells per axis, a ceiling reached by a power-of-two block sum, mass preservingly) and ``encoding`` (default ``f32b64``; ``json`` for the plain arrays alone). The surface block carries both lattices as origin, step and count, the fine bucket size and block factor each was reduced from, the exact marginals, the fine-lattice means and the realized window. **No class method yet**: reach it through ``charts.build_chart_doc`` and :func:`~aggregate.plots.plot_chartdoc`.
 
 Panel by panel
 ~~~~~~~~~~~~~~

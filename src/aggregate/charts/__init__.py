@@ -49,17 +49,21 @@ from collections import namedtuple
 from functools import singledispatch
 
 from .ir import (
-    CHART_IR_VERSION, SUPPORT_KINDS, ChartAxis, ChartCapabilityError,
-    ChartDoc, ChartSeries, Mark, Panel, SurfaceData,
-    canonical_dict, canonical_json, complete_tex, doc_hash, human_strings,
-    load_chart_doc, stamp,
+    CHART_IR_VERSION, SUPPORT_KINDS, SURFACE_DTYPES, SURFACE_EDGES,
+    ChartAxis, ChartCapabilityError,
+    ChartDoc, ChartSeries, Mark, Panel, SurfaceData, SurfaceZBlock,
+    canonical_dict, canonical_json, complete_tex, decode_z_block, doc_hash,
+    encode_z_block, human_strings, load_chart_doc, stamp,
 )
 
 __all__ = [
-    'CHART_IR_VERSION', 'CHARTS', 'SUPPORT_KINDS', 'ChartAxis',
+    'CHART_IR_VERSION', 'CHARTS', 'SUPPORT_KINDS', 'SURFACE_DTYPES',
+    'SURFACE_EDGES', 'ChartAxis',
     'ChartCapabilityError', 'ChartDoc', 'ChartEntry', 'ChartSeries', 'Mark',
-    'Panel', 'SurfaceData', 'available_charts', 'build_chart_doc',
-    'canonical_dict', 'canonical_json', 'complete_tex', 'doc_hash',
+    'Panel', 'SurfaceData', 'SurfaceZBlock', 'available_charts',
+    'build_chart_doc',
+    'canonical_dict', 'canonical_json', 'complete_tex', 'decode_z_block',
+    'doc_hash', 'encode_z_block',
     'human_strings', 'load_chart_doc', 'primary_chart', 'register_chart',
     'stamp',
 ]

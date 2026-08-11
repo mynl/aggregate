@@ -53,6 +53,10 @@ The document schema. ``CHART_IR_VERSION`` is how a consumer detects a schema cha
 
 A document also declares the **readings** each quantity admits, which is a fact about the quantity and not about the drawing: a log reading of a heavy tail is meaningful, a log reading of a distortion's unit square is not. :attr:`~aggregate.charts.ir.ChartAxis.scales` lists the scales an axis may be read on and :attr:`~aggregate.charts.ir.ChartAxis.full_range` the extent it may be zoomed out to, both alongside the default reading rather than replacing it; :attr:`~aggregate.charts.ir.ChartAxis.reciprocal_of` pairs a probability axis with its return-period reading, computed by the map in ``meta['return_period_map']`` (see :data:`~aggregate.charts.ir.RETURN_PERIOD_MAPS`); and :attr:`~aggregate.charts.ir.Panel.kinds` lists the forms a panel may take, so a joint density read flat or in relief is one document declaring two realizations rather than two charts to keep in step. A reader that ignores all four draws the default reading, which is correct and complete, which is why they landed without a version bump.
 
+A grid panel's data is a :class:`~aggregate.charts.ir.SurfaceData`, and it carries its two lattices as an origin, a step and a count rather than as coordinate arrays. That is normative and the reason is not size: an aggregate lives on a lattice by construction and a power-of-two block reduction leaves one, so sending ``x0 + i * dx`` sends a derived quantity and invites a reader to wonder whether it might not be uniform this time. Everything a consumer does off the grid divides by a constant step, and against arrays that division is an assumption the format permits an emitter to violate. Beside the lattices the surface says what a coordinate names (:data:`~aggregate.charts.ir.SURFACE_EDGES`), what the grid is a reduction *of* (the fine bucket size and the block factor per axis), what window was kept and what share of the mass is in it, the exact marginals on the display lattice, and the means from the fine lattice, which is the reference a consumer checks its own arithmetic against rather than integrating the picture.
+
+The z values travel twice: as the plain nested array, and as a :class:`~aggregate.charts.ir.SurfaceZBlock`, base64 of little-endian bytes under a declared dtype (:data:`~aggregate.charts.ir.SURFACE_DTYPES`), built and read with :func:`~aggregate.charts.ir.encode_z_block` and :func:`~aggregate.charts.ir.decode_z_block`. Naming the dtype is what lets the default change without a format change. The default is float32 and not float64, which points the other way from intuition: the low mantissa bits of an FFT-built density are genuine digits that no compressor touches, so a float64 payload measures about twice the size of the JSON text it replaces.
+
 Every human-facing string in a document is plain text, never markup in any renderer's language, and carries **both** forms: :attr:`~aggregate.charts.ir.ChartDoc.tex` is a total lookup from the plain string to its typeset form, a plain word mapping to itself. The analogy is alt text in HTML: you write both because they serve different consumers, and you do not make one consumer guess. matplotlib reads the typeset form, the browser reads the plain one, and neither derives one from the other. A missing entry is an emitter bug, so emitters build the map with :func:`~aggregate.charts.ir.complete_tex`, which fills the identities, and the contract is checked as a set difference against :func:`~aggregate.charts.ir.human_strings`. The plain form does not have to be ASCII: Unicode carries most actuarial labels honestly, and the dual distortion ``ǧ(s)`` is the working example.
 
 .. currentmodule:: aggregate.charts.ir
@@ -65,6 +69,7 @@ Every human-facing string in a document is plain text, never markup in any rende
    ChartAxis
    Mark
    SurfaceData
+   SurfaceZBlock
    ChartCapabilityError
    canonical_dict
    canonical_json
@@ -72,9 +77,13 @@ Every human-facing string in a document is plain text, never markup in any rende
    complete_tex
    human_strings
    doc_hash
+   encode_z_block
+   decode_z_block
    stamp
    CHART_IR_VERSION
    SUPPORT_KINDS
+   SURFACE_DTYPES
+   SURFACE_EDGES
    RETURN_PERIOD_MAPS
 
 .. automodule:: aggregate.charts.ir

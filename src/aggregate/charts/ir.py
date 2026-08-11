@@ -1,4 +1,4 @@
-"""Chart-document IR: frozen dataclasses, ``CHART_IR_VERSION`` 1.
+"""Chart-document IR: frozen dataclasses, ``CHART_IR_VERSION`` 2.
 
 .. warning::
 
@@ -66,16 +66,21 @@ under a bug rather than as a licensed state.
 
 from __future__ import annotations
 
+import base64
 import dataclasses
 import hashlib
 import json
 import unicodedata
 from dataclasses import dataclass, field
 
+import numpy as np
+
 __all__ = [
-    'CHART_IR_VERSION', 'SUPPORT_KINDS', 'ChartAxis', 'ChartCapabilityError',
-    'ChartDoc', 'ChartSeries', 'Mark', 'Panel', 'SurfaceData',
-    'canonical_dict', 'canonical_json', 'complete_tex', 'doc_hash',
+    'CHART_IR_VERSION', 'SUPPORT_KINDS', 'SURFACE_DTYPES', 'SURFACE_EDGES',
+    'ChartAxis', 'ChartCapabilityError',
+    'ChartDoc', 'ChartSeries', 'Mark', 'Panel', 'SurfaceData', 'SurfaceZBlock',
+    'canonical_dict', 'canonical_json', 'complete_tex', 'decode_z_block',
+    'doc_hash', 'encode_z_block',
     'human_strings', 'load_chart_doc', 'stamp',
 ]
 
@@ -159,6 +164,51 @@ MARK_ROLES = ('mean', 'break_even', 'capital_anchor')
 #: once a bucket is sub-pixel and the two are indistinguishable anyway.
 SUPPORT_KINDS = ('atomic', 'continuous')
 
+#: What a display-grid coordinate *names*, the fact whose absence made a
+#: whole display bucket of bias invisible for four releases (see
+#: :class:`SurfaceData`). 'left': the coordinate is the low edge of the cell
+#: it labels, which spans ``[x_i, x_i + dx)``. 'mid': it is the cell's
+#: midpoint. There is no 'right', because a right-edge convention labels a
+#: cell with a coordinate no point in it reaches, which is how the bias got
+#: in.
+SURFACE_EDGES = ('left', 'mid')
+
+#: How a :class:`SurfaceZBlock` carries its numbers. A closed vocabulary,
+#: and the point of naming it in the document is that the default may change
+#: without a format change.
+#:
+#: ================ ============ ====================== ===================
+#: dtype            bytes/cell   worst relative error   when
+#: ================ ============ ====================== ===================
+#: ``f32b64``       4            1.2e-7                 the default
+#: ``f64b64``       8            exact                  never by default
+#: ``u16log12b64``  2            2.1e-4                 large grids
+#: ================ ============ ====================== ===================
+#:
+#: **Do not default to float64.** The low mantissa bits of an FFT-built
+#: density are genuine digits rather than fuzz, so no compressor touches
+#: them: measured on a 128 x 128 display grid, float64 with a byte shuffle
+#: and zstd came to 92.3 kB against 43.6 kB for float32 and 21.4 kB for the
+#: quantized form, which makes a float64 pipeline twice the size of the JSON
+#: text it replaces. Choosing the dtype *is* the compression decision.
+#:
+#: Bytes are little-endian in every case, so the wire does not depend on the
+#: machine that wrote it, and base64 is applied last. There is no
+#: in-payload compression: base64 costs 33% and the transport's
+#: ``Content-Encoding`` gives back all but 0.5% of it, so compressing twice
+#: would spend CPU on incompressible bytes.
+SURFACE_DTYPES = ('f32b64', 'f64b64', 'u16log12b64')
+
+#: Decades below the peak that ``u16log12b64`` spans, and the count of live
+#: codes over them. Code 0 is reserved for an exact zero (a real joint
+#: density is 14% to 59% exact zeros, and a reserved code is what keeps them
+#: exact rather than decoding to a spurious ``peak * 1e-12``); codes 1 to
+#: 65535 are log-uniform over the twelve decades, which resolves a value to
+#: 2.1e-4 relative, four significant figures. A reader printing more digits
+#: than that under this dtype is inventing precision the wire never carried.
+U16_DECADES = 12
+U16_LEVELS = 65535
+
 
 class ChartCapabilityError(RuntimeError):
     """A renderer was asked (strictly) for a panel kind it cannot realize.
@@ -197,6 +247,162 @@ def _expand(values, lattice):
     return tuple(start + step * i for i in range(int(count)))
 
 
+def _deep_freeze(value):
+    """Lists to tuples, recursively, through dict values.
+
+    The dict-valued surface fields (``window``, ``marginals``, ``moments``)
+    arrive as tuples from an emitter and as lists from
+    :func:`load_chart_doc`, and a dataclass that stored them as they came
+    would compare unequal across a round trip that hashes identically.
+    """
+    if isinstance(value, (list, tuple)):
+        return tuple(_deep_freeze(v) for v in value)
+    if isinstance(value, dict):
+        return {k: _deep_freeze(v) for k, v in value.items()}
+    return value
+
+
+@dataclass(frozen=True)
+class SurfaceZBlock:
+    """The z values of a :class:`SurfaceData`, encoded.
+
+    Parameters
+    ----------
+    dtype : str
+        One of :data:`SURFACE_DTYPES`; how ``data`` decodes.
+    data : str
+        Base64 of the little-endian raw bytes, ``nx * ny`` values.
+    order : str
+        'yx', the only order: row major over ``(y, x)``, so value
+        ``i * nx + j`` sits at ``(x0 + j * dx, y0 + i * dy)``. Named rather
+        than assumed because an off-by-a-transpose on a non-square grid
+        raises an error and on a square one draws a plausible lie.
+    peak, decades : float, optional
+        For ``u16log12b64`` only: the value code 65535 stands for, and how
+        many decades below it the code range spans. Absent for the plain
+        float dtypes, which need no scale.
+
+    Notes
+    -----
+    Build one with :func:`encode_z_block` and read it with
+    :func:`decode_z_block` rather than by hand, so the reserved zero code
+    and the endianness are stated once.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+    """
+
+    dtype: str
+    data: str
+    order: str = 'yx'
+    peak: float = None
+    decades: float = None
+
+    def __post_init__(self):
+        if self.dtype not in SURFACE_DTYPES:
+            raise ValueError(f'unknown surface dtype {self.dtype!r}; '
+                             f'expected one of {SURFACE_DTYPES}')
+        if self.order != 'yx':
+            raise ValueError(f"surface z order must be 'yx', "
+                             f'got {self.order!r}')
+        if (self.dtype == 'u16log12b64') and (self.peak is None
+                                              or self.decades is None):
+            raise ValueError(
+                "u16log12b64 needs 'peak' and 'decades': without the scale "
+                'the codes decode to nothing.')
+
+
+def encode_z_block(values, dtype='f32b64', order='yx'):
+    """Encode a flat sequence of z values as a :class:`SurfaceZBlock`.
+
+    Parameters
+    ----------
+    values : array_like
+        The grid, flattened in ``order``. Raveled here, so a 2-D array in
+        the right orientation is accepted as it stands.
+    dtype : str
+        One of :data:`SURFACE_DTYPES`.
+    order : str
+        'yx'; carried through to the block.
+
+    Returns
+    -------
+    SurfaceZBlock
+
+    Notes
+    -----
+    Everything is written little-endian and base64'd last, so the bytes do
+    not depend on the machine, which is what keeps :func:`canonical_json`
+    deterministic across builds.
+
+    For ``u16log12b64`` the peak is the largest value present and code 0 is
+    reserved for an exact zero, so::
+
+        value = 0                                              if code == 0
+        value = peak * 10 ** ((code - 1) / 65534 * 12 - 12)     otherwise
+
+    Anything more than twelve decades under the peak encodes as zero, which
+    is a statement that the wire cannot carry it rather than a claim that it
+    is absent: a consumer that needs that depth asks for a float dtype.
+    """
+    a = np.asarray(values, dtype=float).ravel()
+    peak = decades = None
+    if dtype == 'f32b64':
+        raw = a.astype('<f4').tobytes()
+    elif dtype == 'f64b64':
+        raw = a.astype('<f8').tobytes()
+    elif dtype == 'u16log12b64':
+        decades = float(U16_DECADES)
+        peak = float(a.max()) if a.size else 0.0
+        if peak <= 0:
+            codes = np.zeros(a.size, dtype=np.int64)
+        else:
+            with np.errstate(divide='ignore', invalid='ignore'):
+                rel = np.log10(np.where(a > 0.0, a, np.nan) / peak)
+            live = 1.0 + np.rint((rel + decades) / decades * (U16_LEVELS - 1))
+            codes = np.where(np.isfinite(live), live, 0.0)
+        raw = np.clip(codes, 0, U16_LEVELS).astype('<u2').tobytes()
+    else:
+        raise ValueError(f'unknown surface dtype {dtype!r}; '
+                         f'expected one of {SURFACE_DTYPES}')
+    return SurfaceZBlock(dtype=dtype, data=base64.b64encode(raw).decode('ascii'),
+                         order=order, peak=peak, decades=decades)
+
+
+def decode_z_block(block):
+    """Decode a :class:`SurfaceZBlock` to a flat float array.
+
+    Parameters
+    ----------
+    block : SurfaceZBlock
+
+    Returns
+    -------
+    ndarray
+        One dimension, ``nx * ny`` values in the block's ``order``. Reshape
+        to ``(ny, nx)`` for 'yx'.
+
+    Notes
+    -----
+    The inverse of :func:`encode_z_block`, exact for ``f64b64`` and to the
+    dtype's declared error otherwise. Present here, beside the encoder, so
+    the round trip is checkable in one place rather than only against a
+    consumer written in another language.
+    """
+    raw = base64.b64decode(block.data)
+    if block.dtype == 'f32b64':
+        return np.frombuffer(raw, dtype='<f4').astype(float)
+    if block.dtype == 'f64b64':
+        return np.frombuffer(raw, dtype='<f8').astype(float)
+    if block.dtype == 'u16log12b64':
+        codes = np.frombuffer(raw, dtype='<u2').astype(float)
+        out = block.peak * 10.0 ** ((codes - 1.0) / (U16_LEVELS - 1)
+                                    * block.decades - block.decades)
+        return np.where(codes == 0.0, 0.0, out)
+    raise ValueError(f'unknown surface dtype {block.dtype!r}')
+
+
 @dataclass(frozen=True)
 class SurfaceData:
     """One z grid: the data of a 'heatmap' or 'surface' panel.
@@ -204,10 +410,49 @@ class SurfaceData:
     Parameters
     ----------
     x, y : tuple of float
-        Grid cell centers along the panel's x and y axes.
+        The coordinate of each cell along the panel's x and y axes. What a
+        coordinate *names* is :attr:`edge`; a grid that declares nothing is
+        read as cell midpoints, which is what these were documented as
+        before the lattice fields arrived.
     z : tuple of tuple of float
         Row-major values, ``z[i][j]`` at ``(x[j], y[i])``: ``len(y)`` rows
         of ``len(x)`` values, matplotlib's ``pcolormesh`` orientation.
+    x0, dx, nx : float, float, int, optional
+        The x lattice as an origin, a step and a count, in place of the
+        array. See the Notes.
+    y0, dy, ny : float, float, int, optional
+        The y lattice. Independent of x in both step and count: one real
+        joint comes out 64 wide against 128 deep with ``dx = 2`` against
+        ``dy = 512``, so any consumer that assumes a square mesh, or reads a
+        line of constant ``x + y`` off the index anti-diagonal, is wrong on
+        real data.
+    edge : str, optional
+        One of :data:`SURFACE_EDGES`: what a coordinate names.
+    bs : tuple of float, optional
+        The **fine** bucket size each axis was reduced from, so
+        ``dx == bs[0] * k[0]``.
+    k : tuple of int, optional
+        The block factor per axis. With ``bs`` this says what the grid is a
+        reduction *of*, which is the difference between "the support starts
+        at 508" and "the first display cell covers ``[0, 512)``".
+    window : dict, optional
+        ``{'p': depth, 'x': (lo, hi), 'y': (lo, hi), 'kept': fraction}``:
+        the depth that was asked for, the resulting outer edges in data
+        coordinates, and the share of the grid's mass inside them.
+    marginals : dict, optional
+        ``{'x': (...), 'y': (...)}``, each of length ``nx`` / ``ny``: the
+        **exact** marginals on the display lattice, from the emitting object
+        rather than integrated off the reduced and windowed joint, which is
+        a different and worse curve. Same units as ``z``.
+    moments : dict, optional
+        ``{'mean': (mx, my)}`` and whatever else an emitter documents,
+        computed on the **fine** lattice. A reference the consumer can check
+        its own arithmetic against, and cheap: two numbers.
+    deficit : float, optional
+        Mass the construction never placed, already computed upstream.
+    z_block : SurfaceZBlock, optional
+        ``z`` again, encoded (see :func:`encode_z_block`). A new consumer
+        prefers it; an old one reads ``z`` and is unaffected.
 
     Notes
     -----
@@ -215,6 +460,21 @@ class SurfaceData:
     the emitting chart's semantics and is documented there; when the grid
     was reduced from a finer computational grid, the reduction must be mass
     preserving, because that reduction is meaning, not styling.
+
+    **Both lattices go as origin, step and count, and the reason is not
+    size.** The grids *are* arithmetic sequences: an aggregate lives on a
+    lattice by construction and a block reduction by a power-of-two factor
+    leaves one. Everything a consumer does off the grid (a bilinear lookup,
+    the line of constant total, a mean along a cut) divides by a constant
+    step, and against arrays that division is an assumption the format
+    permits the emitter to violate. Against ``x0``, ``dx``, ``nx`` there is
+    nothing to violate. With ``bs`` and ``k`` alongside, the fine lattice
+    comes free.
+
+    The ``x``/``y``/``z`` arrays are the older form of the same grid, kept
+    beside the lattice fields for one release so a consumer can move at its
+    own pace. Dropping them is the breaking change and is what bumps
+    :data:`CHART_IR_VERSION`.
 
     .. versionadded:: 1.0
        Provisional, in the sense of PEP 411: not part of the 1.0 API
@@ -224,6 +484,20 @@ class SurfaceData:
     x: tuple
     y: tuple
     z: tuple
+    x0: float = None
+    dx: float = None
+    nx: int = None
+    y0: float = None
+    dy: float = None
+    ny: int = None
+    edge: str = None
+    bs: tuple = None
+    k: tuple = None
+    window: dict = None
+    marginals: dict = None
+    moments: dict = None
+    deficit: float = None
+    z_block: SurfaceZBlock = None
 
     def __post_init__(self):
         _freeze_seq(self, 'x')
@@ -238,6 +512,30 @@ class SurfaceData:
             raise ValueError(
                 f'SurfaceData has {len(self.z)} rows, '
                 f'expected len(y) = {len(self.y)}')
+        if self.edge is not None and self.edge not in SURFACE_EDGES:
+            raise ValueError(f'unknown surface edge {self.edge!r}; '
+                             f'expected one of {SURFACE_EDGES}')
+        for name in ('bs', 'k'):
+            if getattr(self, name) is not None:
+                _freeze_seq(self, name)
+                if len(getattr(self, name)) != 2:
+                    raise ValueError(f'SurfaceData {name} must be a pair, '
+                                     f'got {getattr(self, name)!r}')
+        for name in ('window', 'marginals', 'moments'):
+            if getattr(self, name) is not None:
+                object.__setattr__(self, name,
+                                   _deep_freeze(getattr(self, name)))
+        for side, values in (('x', self.x), ('y', self.y)):
+            count = getattr(self, f'n{side}')
+            if count is not None and int(count) != len(values):
+                raise ValueError(
+                    f'SurfaceData n{side} = {count} against '
+                    f'len({side}) = {len(values)}')
+            marginal = (self.marginals or {}).get(side)
+            if marginal is not None and len(marginal) != len(values):
+                raise ValueError(
+                    f'SurfaceData marginals[{side!r}] has {len(marginal)} '
+                    f'values, expected {len(values)}')
 
 
 @dataclass(frozen=True)
@@ -804,6 +1102,7 @@ _ALWAYS = {
     ChartSeries: ('name', 'role', 'panel_id', 'support'),
     Mark: ('panel_id', 'orient', 'at'),
     SurfaceData: ('x', 'y', 'z'),
+    SurfaceZBlock: ('dtype', 'data', 'order'),
 }
 
 
@@ -890,10 +1189,18 @@ def _load_member(cls, data):
     return cls(**data)
 
 
+def _load_surface(data):
+    """One canonical surface dict, rebuilding its nested z block if it has one."""
+    if isinstance(data.get('z_block'), dict):
+        data = {**data,
+                'z_block': _load_member(SurfaceZBlock, data['z_block'])}
+    return _load_member(SurfaceData, data)
+
+
 def _load_series(data):
     """One canonical series dict, rebuilding its nested surface if it has one."""
     if isinstance(data, dict) and isinstance(data.get('surface'), dict):
-        data = {**data, 'surface': _load_member(SurfaceData, data['surface'])}
+        data = {**data, 'surface': _load_surface(data['surface'])}
     return _load_member(ChartSeries, data)
 
 
@@ -946,9 +1253,10 @@ def load_chart_doc(d):
     not, and the one that does not is the one that accepts a version it cannot
     read without noticing.
 
-    :class:`SurfaceData` is the only nested payload, so a reader that forgets
-    it fails on exactly the bivariate documents, which are both the largest
-    and the least often exercised.
+    :class:`SurfaceData`, and :class:`SurfaceZBlock` inside it, are the only
+    nested payloads, so a reader that forgets them fails on exactly the
+    bivariate documents, which are both the largest and the least often
+    exercised.
 
     **The hash is what makes this checkable at all.** The ``agg`` chart runs to
     megabytes of canonical JSON, most of it explicit curve coordinates, and a

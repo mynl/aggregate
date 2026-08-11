@@ -47,7 +47,7 @@ Chart-level facts, one line each. Options are semantic arguments to the emitter,
 * **`reins`** on Aggregate, primary for nothing (it is a view of a book, not the book's own picture). Needs an occurrence program. No options. Entry point `Aggregate.reins_occ_plot(log, full_range, return_period, invert)`.
 * **`distortion`** on Distortion, primary. Always. Option `dual`. Entry point `Distortion.plot(dual, ax)`.
 * **`envelope`** on Bounds, primary. Always. Options `n_resamples` (bracketing curves inside the band, each carrying its weight as `ChartSeries.value`), `n`. Entry point `Bounds.plot_envelope(n_resamples)`.
-* **`joint_surface`** on BivariateAggregate, primary. Needs the in-memory joint density. Option `display_log2` (default 128 cells per side, block summed mass preservingly). **No class method yet**: reach it through `charts.build_chart_doc` and `plots.plot_chartdoc`.
+* **`joint_surface`** on BivariateAggregate, primary. Needs the in-memory joint density. Options `window` (default 4, the marginal quantile depth kept, measured on the fine lattice **before** the reduction; 0 = whole grid), `detail` (default 128 cells per axis, a ceiling reached by a power-of-two block sum, mass preservingly) and `encoding` (default `f32b64`, also `f64b64` / `u16log12b64` / `json`). The surface block carries `x0/dx/nx`, `y0/dy/ny`, `edge='left'`, `bs`, `k`, `window`, the exact `marginals`, fine-lattice `moments` and `deficit`. **No class method yet**: reach it through `charts.build_chart_doc` and `plots.plot_chartdoc`.
 
 | Chart / panel | x axis | y axis | Series | Marks | Readings offered |
 |---|---|---|---|---|---|

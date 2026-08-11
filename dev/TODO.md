@@ -582,11 +582,30 @@
   and the `basis` option are gone and an aggregate-cover-only object has
   no reinsurance chart. `plots/_aggregate.py` and `plots/_quantile.py`
   are deleted with it; `MAX_RETURN_PERIOD` moved to the renderer.
-  **Only job 7 `[Chart-Bivariate]` is left. ASK FOR THE 3-D PUNCHUPS
-  FIRST**,
-  before any emitter is written: the author wants them and they have not
-  been written down (`aggregate_api/dev/api-punchlist.md`, Punchups
-  Round 4 item 6, also holds open items). Then `[Chart-Portfolio]` and
+  **Only job 7 `[Chart-Bivariate]` is left**, and the 3-D punchups the
+  author wanted are now written down: `dev/plan-3d-plot.md` (a symlink to
+  the canonical copy in `aggregate_api/dev/`), a three-party plan over
+  LIB, API and the SPA.
+  **The LIB half of that plan is done**, in two bumps, with review notes
+  and the five points where the code and the plan disagree recorded in
+  `dev/plan-3d-plot-LIB.md`. a257 `[Joint-Density-Clip]`: both 2-D FFT
+  de-fuzz sites route through one helper that warns on a large negative
+  rather than preserving it, on a floor relative to the mass the grid
+  carries. a258 `[Joint-Surface-Contract]`: the display coordinate is the
+  block's **first** fine cell rather than its last (a support reported as
+  starting at 508 on a distribution supported from 0, and a mean biased up
+  by close to a whole display bucket); the window is measured on the fine
+  lattice and cropped **before** the block factor is chosen, which is
+  worth a factor of fourteen in resolution; and the surface block carries
+  both lattices as origin, step and count, `bs` and `k`, the realized
+  window, the exact marginals, the fine-lattice means, the deficit, and
+  `z` again as a declared-dtype base64 block. Additive, so
+  `CHART_IR_VERSION` stays 2; **phase two, dropping the `x` / `y` / `z`
+  arrays, is the breaking change and bumps it to 3**, and waits on the SPA
+  having moved. Still open on the LIB side and out of that plan's scope:
+  a `Portfolio` to bivariate route (post 1.0), and the massive disk-backed
+  joint, which has no surface chart.
+  Then `[Chart-Portfolio]` and
   `[Chart-Reins]`, both still blocked on author design work.
   Not a job but noted at a241: `AllocationBounds` and `PricingBounds`
   are `_HullEngine` subclasses on a `Portfolio`, **not** built around a

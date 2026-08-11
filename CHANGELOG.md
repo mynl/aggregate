@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a253
+
+**[Exhibit-Perspective-Contract] a RAW block is exactly one public frame, and the exhibit layer stops inventing frames.** The invariant is now written into the `aggregate.exhibits` docstring and onto `Perspective`, and swept in `tests/test_exhibits.py`: every RAW block of every exhibit available on every fixture names an attribute on the object and serves that frame, in the frame's own orientation, with no split and no dropped rows. `INSURER` is the only perspective that may restructure, and ruling `[Perspective-May-Restructure]` says it may change the **block list** and not merely each block's content, so `meta['blocks']` is a property of the (exhibit, perspective) pair. `economic_ratios` already exercises it, two blocks raw and three under insurer, and a client assuming parity would be wrong about that today.
+
+**`PnL.walk_df` and `PnL.evaluation_df` are new public frames.** The invariant is a forcing function before it is a contract, and it found one violation in shipped code on the day it was written: `economic_waterfall` computed its two tables inside the exhibit layer and no public frame stood behind them. Ruling `[Waterfall-Frames-Are-Owed]`: promote, rather than write the invariant with an exemption in it. The margin walk in currency is `walk_df` (the expected result, the step's own 1-in-100 state, and the state conditional on the whole book's, so the reader can see the diversification benefit as the gap between the two) and the same walk as ratios is `evaluation_df` (premium and margin spent, combined ratio, margin over standard deviation, and return on the capital each 1-in-100 reading calls for). A notebook reader can now reach what only the app could see.
+
+Nothing is newly estimated: both frames are arithmetic over quantities the P&L had already computed, which is what made the exhibit layer look like a reasonable home for them. `WATERFALL_RETURN_PERIOD` moves to `_pnl.py` with the frames it describes, unchanged at 100 and still a constant rather than a keyword. The two blocks are renamed `walk` to `walk_df` and `evaluation` to `evaluation_df`, so a block still says which frame it is, which is the convention every other exhibit already followed.
+
+Part of `[Exhibit-Official-Channels]` (`dev/plan-exhibit-official-channels.md`). Exhibit snapshots are untouched: block names live in the envelope's `meta`, not in the `TableDoc` a snapshot captures.
+
+---
+
 ## 1.0.0a252
 
 **[Chart-Doc-Reader] a served chart document has a way home.** The two registries were the same shape end to end except at one point: `greater_tables.TableDoc` is a pydantic model, so an exhibit block reconstructs from its own wire form and redraws without knowing an `Aggregate` ever existed, while `canonical_dict` went out and nothing read it back. The obvious guess failed, `ChartDoc(**canonical_dict(doc))` raising `AttributeError: 'dict' object has no attribute 'id'`, because panels, axes, series and marks arrive as plain dicts and `__post_init__` validates them as dataclasses. `load_chart_doc(d)` closes it, in `charts/ir.py` beside `canonical_dict` and exported from `aggregate.charts`.

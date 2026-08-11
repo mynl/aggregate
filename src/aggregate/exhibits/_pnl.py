@@ -10,21 +10,11 @@ case; the ledger has its own exhibit under its own name.
 import numpy as np
 import pandas as pd
 
-from .._pnl import PnL
+from .._pnl import PnL, WATERFALL_RETURN_PERIOD
 from ._core import (
     MEASURE_FORMATS, economic, economic_ratios, economic_waterfall, stats,
     _stats_insurer_moment_store,
 )
-
-#: Return period the waterfall evaluates capital at. A business choice, not a
-#: law, and deliberately a constant here rather than a kwarg: the exhibit is
-#: the place to change it (author, 2026-08-05, declining to build a
-#: configurable capital-level framework).
-WATERFALL_RETURN_PERIOD = 100
-
-#: Ledger row kinds that ARE a step's own result. A running net is excluded:
-#: it is the cumulative position after the step, not the step itself.
-_RESULT_KINDS = ('group_result', 'tier_result', 'grand_result')
 
 #: Ledger row kind to greater_tables row flag ([Exhibits-Economic-Insurer]).
 #: The grand result is the bottom line; each group's and each tier's own
@@ -191,89 +181,19 @@ def _economic_ratios_insurer(obj, blocks):
 
 # --- the waterfall ([Exhibits-Waterfall]) -----------------------------------
 
-def _step_result_rows(obj):
-    """Map each walk step to its own result row: ``{step: (position, label)}``.
-
-    Reads the ledger plan rather than pattern matching the index, because a
-    step's own result and the running net *after* it both sit under
-    ``Margin`` and only the plan distinguishes them. The plan label doubles
-    as the :attr:`PnL.density_df` key, which is how the standalone quantile
-    is reached. A later result for the same step wins, so a tier subtotal
-    supersedes the groups it spans.
-    """
-    plan = getattr(obj, '_plan', None)
-    index = obj.economic_df.index
-    if plan is None or len(plan) != len(index):
-        return {}
-    out = {}
-    for i, (idx, (label, kind, _payload)) in enumerate(zip(index, plan)):
-        if kind in _RESULT_KINDS and isinstance(idx, tuple):
-            out[idx[0]] = (i, label)
-    return out
-
-
-def _capital_ratio(margin, bad_outcome):
-    """``M / -M_100``: margin over the capital that outcome would call for.
-
-    ``bad_outcome`` is the margin in the 1-in-100 state and is normally
-    negative, so ``-bad_outcome`` is the capital you would have to inject and
-    the ratio reads as a return on it. ``NaN`` when no capital is called for
-    (a non-negative outcome, so nothing to inject and no denominator) or when
-    either input is missing.
-    """
-    if not (np.isfinite(margin) and np.isfinite(bad_outcome)):
-        return np.nan
-    capital = -bad_outcome
-    return margin / capital if capital > 0 else np.nan
-
-
 @economic_waterfall.register(PnL)
 def _economic_waterfall_frames(obj):
-    """Build the walk and its evaluation from the ledger and the ratio frame.
+    """Serve the two walk frames the P&L publishes, with their captions.
 
-    Arithmetic over numbers the P&L has already computed: the margin and its
-    SD off :attr:`PnL.economic_df`, the diversified 1-in-100 off that frame's
-    kappa column, the standalone 1-in-100 off each result row's own
-    :class:`GridDistribution`, and the shares and combined ratio off
-    :attr:`PnL.economic_ratios_df`. Nothing new is estimated here, which is
-    why the exhibit layer is the right home for it.
+    The arithmetic moved onto :attr:`PnL.walk_df` and
+    :attr:`PnL.evaluation_df` at ``1.0.0a253``: a RAW block is exactly one
+    public frame, and this exhibit was the one place left where the exhibit
+    layer invented the frame it served.
     """
-    ledger, ratios = obj.economic_df, obj.economic_ratios_df
-    steps = _step_result_rows(obj)
-    p = 1.0 / WATERFALL_RETURN_PERIOD
-    kappa = f'κ{int(round(p * 100)):02d}'
-    diversified_available = kappa in ledger.columns
-    densities = obj.density_df
-
-    walk, evaluation, index = [], [], []
-    for step in ratios.index:
-        if step not in steps:
-            continue
-        pos, label = steps[step]
-        row = ledger.iloc[pos]
-        margin, sd = float(row['EX']), float(row['SD'])
-        gd = densities.get(label)
-        standalone = float(gd.q(p)) if gd is not None else np.nan
-        divers = float(row[kappa]) if diversified_available else np.nan
-        r = ratios.loc[step]
-        index.append(step)
-        walk.append([margin, standalone, divers])
-        evaluation.append([
-            float(r['P_share']), float(r['M_share']), float(r['CR']),
-            margin / sd if sd > 0 else np.nan,
-            _capital_ratio(margin, standalone),
-            _capital_ratio(margin, divers),
-        ])
-
-    idx = pd.Index(index, name='Step')
+    walk_df, evaluation_df = obj.walk_df, obj.evaluation_df
+    idx = walk_df.index
     t = WATERFALL_RETURN_PERIOD
-    walk_df = pd.DataFrame(
-        walk, index=idx,
-        columns=['M', f'M @ 1-in-{t} standalone', f'M @ 1-in-{t} diversified'])
-    evaluation_df = pd.DataFrame(
-        evaluation, index=idx,
-        columns=['Premium spent', 'Margin spent', 'CR', 'M / SD',
-                 'M / capital standalone', 'M / capital diversified'])
+    diversified_available = not walk_df[f'M @ 1-in-{t} diversified'].isna().all()
 
     total_row = {len(idx) - 1: ('total',)} if len(idx) > 1 else {}
     walk_caption = (
@@ -297,8 +217,8 @@ def _economic_waterfall_frames(obj):
         f'meaningful of the two.')
 
     return [
-        ('walk', walk_df, dict(caption=walk_caption, row_flags=total_row)),
-        ('evaluation', evaluation_df,
+        ('walk_df', walk_df, dict(caption=walk_caption, row_flags=total_row)),
+        ('evaluation_df', evaluation_df,
          dict(caption=evaluation_caption, row_flags=total_row,
               ratio_cols=['Premium spent', 'Margin spent', 'CR'])),
     ]

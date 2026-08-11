@@ -21,7 +21,7 @@ These carry the normal promise: from 1.0 onward a documented name keeps its mean
    * - :class:`~aggregate.Portfolio`
      - The same, plus allocation, calibration and the diagnostic frames
    * - :class:`~aggregate.PnL`
-     - The ledger surface: ``summary_df``, ``economic_df``, ``economic_ratios_df``, ``stats_df``, ``tail_df``, ``evaluate``
+     - The ledger surface: ``summary_df``, ``economic_df``, ``economic_ratios_df``, ``walk_df``, ``evaluation_df``, ``stats_df``, ``tail_df``, ``evaluate``
    * - :class:`~aggregate.Severity`, :class:`~aggregate.Frequency`
      - The component distributions
    * - :class:`~aggregate.Distortion`

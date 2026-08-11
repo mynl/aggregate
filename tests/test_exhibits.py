@@ -115,6 +115,50 @@ def test_available_exhibits_by_kind(kind, objects):
         assert perspectives == [Perspective.RAW, Perspective.INSURER]
 
 
+# --- the RAW invariant ([Exhibit-Perspective-Contract]) ----------------------
+
+def test_every_raw_block_is_a_public_frame(objects):
+    """RAW is exactly the public frame, one block per frame, no inventions.
+
+    The invariant this sweep installs: a RAW block names an attribute on the
+    object and serves that frame, in the frame's own orientation, with no
+    split and no dropped rows. It is a forcing function as much as a contract,
+    because it says what a new exhibit owes: a block with no frame behind it
+    means the frame is the thing that is missing, and the exhibit layer is not
+    the place to invent one.
+    """
+    seen = 0
+    for obj in objects.values():
+        for name, _ in available_exhibits(obj):
+            for block, served, _kw in exhibit_frames(obj, name):
+                assert hasattr(obj, block), (
+                    f'{type(obj).__name__}/{name}: RAW block {block!r} names '
+                    'no public frame')
+                source = getattr(obj, block)
+                relabel = getattr(obj, '_relabel', None)
+                if relabel is not None:
+                    source = relabel(source)
+                pd.testing.assert_frame_equal(served, source)
+                seen += 1
+    assert seen > 20                         # the sweep actually swept
+
+
+def test_a_perspective_may_restructure_the_block_list(tower):
+    """[Perspective-May-Restructure]: block lists differ between perspectives.
+
+    So ``meta['blocks']`` is a property of the (exhibit, perspective) pair,
+    and a client must not assume parity across perspectives. Only INSURER may
+    do this: it re-orients, splits, merges and re-captions to say what a frame
+    *means*, over RAW's what it *is*.
+    """
+    raw = [b for b, _, _ in exhibit_frames(tower, 'economic_ratios')]
+    insurer = [b for b, _, _ in
+               exhibit_frames(tower, 'economic_ratios', Perspective.INSURER)]
+    assert raw == ['economic_ratios_df', 'legs_df']
+    assert insurer == ['amounts', 'ratios', 'legs']
+    assert len(insurer) != len(raw)
+
+
 def test_available_exhibits_pre_update():
     a = build(AGG_PROGRAM, update=False)
     names = [name for name, _ in available_exhibits(a)]
@@ -432,12 +476,24 @@ def test_waterfall_needs_a_tower(objects, tower):
 
 def test_waterfall_two_blocks_pure_units(tower):
     blocks = exhibit_frames(tower, 'economic_waterfall')
-    assert [b for b, _, _ in blocks] == ['walk', 'evaluation']
+    assert [b for b, _, _ in blocks] == ['walk_df', 'evaluation_df']
     walk, evaluation = blocks[0][1], blocks[1][1]
     assert walk.index.name == 'Step' and evaluation.index.name == 'Step'
     assert list(walk.index) == list(evaluation.index)
     # walk is currency, evaluation is dimensionless: no column in both
     assert set(walk.columns).isdisjoint(evaluation.columns)
+
+
+def test_waterfall_serves_the_frames_the_pnl_publishes(tower):
+    """[Waterfall-Frames-Are-Owed]: the blocks are frames, not inventions.
+
+    Until a253 this exhibit computed its two tables in the exhibit layer and
+    no public frame stood behind them, which is the one thing the RAW
+    invariant forbids.
+    """
+    blocks = exhibit_frames(tower, 'economic_waterfall')
+    for name, served, _kw in blocks:
+        pd.testing.assert_frame_equal(served, getattr(tower, name))
 
 
 def test_waterfall_diversified_foots_and_standalone_does_not(tower):

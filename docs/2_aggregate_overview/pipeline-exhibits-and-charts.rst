@@ -131,7 +131,7 @@ What is published
    * - ``economic_waterfall``
      - Economic waterfall
      - PnL
-     - 2: ``walk``, ``evaluation``
+     - 2: ``walk_df``, ``evaluation_df``
      - multi-step walk (``_tower``)
      - none
    * - ``dependency``

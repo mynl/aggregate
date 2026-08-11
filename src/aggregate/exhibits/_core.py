@@ -148,6 +148,24 @@ class Perspective(Enum):
     promise: this module is provisional, and the reinsurer semantics review
     may yet rename or respell a member.
 
+    Notes
+    -----
+    **The contract between the two implemented members.** A ``RAW`` block is
+    exactly one public frame: one block per frame, named for the attribute
+    holding it, in the frame's own orientation, no split and no dropped rows.
+    ``INSURER`` is the only perspective that may restructure, and
+    ``[Perspective-May-Restructure]`` says it may change the **block list**
+    and not merely each block's content. So the served block names are a
+    property of the (exhibit, perspective) pair: ``economic_ratios`` serves
+    two blocks raw and three under insurer, and a client that assumed parity
+    would be wrong about that today. Read the block list off
+    :attr:`Exhibit.meta`'s ``blocks`` rather than assuming it.
+
+    A ``RAW`` block with no public frame behind it is a **missing frame**,
+    not a licensed exception: the exhibit layer is not a second place where
+    frames are invented, since a frame invented here is one a notebook reader
+    cannot reach.
+
     .. versionadded:: 1.0
        Provisional, in the sense of PEP 411: not part of the 1.0 API
        contract. See :doc:`/3_reference/3_x_API_Stability`.

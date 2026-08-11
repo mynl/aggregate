@@ -385,7 +385,10 @@
   about, complete, used and working; whether a given exhibit reads the business
   right is a separate conversation. **Progress:**
   `[PnL-Consideration-Rounding]` landed a251 (note item 5);
-  `[Chart-Doc-Reader]` landed a252 (note item 6, `load_chart_doc`). Phase 7 struck,
+  `[Chart-Doc-Reader]` landed a252 (note item 6, `load_chart_doc`);
+  `[Exhibit-Perspective-Contract]` landed a253 (the RAW invariant written and
+  swept, `PnL.walk_df` / `PnL.evaluation_df` promoted out of the exhibit
+  layer per `[Waterfall-Frames-Are-Owed]`). Phase 7 struck,
   its bug fixed at a250. Phases 8 to 10, the Pricing pane redesign keyed on
   result objects, wait on the design discussion, and with them the question of
   whether `REINSURER` gets implemented.

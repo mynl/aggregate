@@ -19,7 +19,7 @@ The governing rule is that **INSURER equals RAW unless an override is registered
 | `reins` | Reinsurance | Aggregate, Portfolio | 2: `reins_stats_df`, `reins_summary_df` | cedes and updated | both: drops raw noncentral rows from the stats block, captions; Portfolio also flags the summary rows |
 | `economic` | Economics | PnL | 1: `economic_df` | always | caption switches on whether the ladder is a kappa scenario or a marginal `P` ladder, ledger row flags, measure formats |
 | `economic_ratios` | Economic ratios | PnL | RAW 2: `economic_ratios_df`, `legs_df` | always | **restructures into 3 blocks**: `amounts` (P, L, E, C, M), `ratios` (LR, ER, CR, E_*, shares), `legs`, so no column mixes two units |
-| `economic_waterfall` | Economic waterfall | PnL | 2: `walk`, `evaluation` | multi-step walk (`_tower`) | none |
+| `economic_waterfall` | Economic waterfall | PnL | 2: `walk_df`, `evaluation_df` | multi-step walk (`_tower`) | none |
 | `dependency` | Dependency | BivariateAggregate | 2: `dependency_df`, `axis_support_df` | updated | none |
 | `bs_window` | Grid sizing | Aggregate, Portfolio, BivariateAggregate | 1: `bs_window_df` | updated | none |
 | `tail_behavior` | Tail behavior | Aggregate, Portfolio | 1: `tail_behavior_df` | updated | none |

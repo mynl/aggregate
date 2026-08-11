@@ -24,6 +24,25 @@ leak into a client: captions, row emphasis, raw moment drops, relabeling. The
 test for placement: if deleting the web app would destroy knowledge an actuary
 would want in a notebook, that knowledge belongs here.
 
+**The RAW invariant: a RAW block is exactly one public frame.** One block per
+frame, named for the attribute that holds it, in the frame's own orientation,
+with no split, no dropped rows and no rearrangement. A RAW block carries a
+caption saying what the frame *is*, and the column formats for units the frame
+cannot carry itself. Nothing else. **INSURER is the only perspective that may
+restructure**: it re-orients, splits one frame into several blocks, merges,
+drops rows and re-captions to say what the frame *means*. Ruling
+``[Perspective-May-Restructure]``: the **block list itself** may differ between
+perspectives, not merely the content of each block, so ``meta['blocks']`` is a
+property of the (exhibit, perspective) pair and a client must not assume parity
+across the two. Both halves are swept in ``tests/test_exhibits.py``.
+
+The invariant is also a forcing function, which is its real value: it says what
+a new exhibit owes. A RAW block with no frame behind it means the **frame** is
+what is missing, and this package is not the place to invent one. The
+``economic_waterfall`` blocks were the last exception and were promoted to
+:attr:`~aggregate.PnL.walk_df` and :attr:`~aggregate.PnL.evaluation_df` at
+``1.0.0a253`` rather than exempted.
+
 **Dependencies point inward.** This package imports from the core; the core
 never imports it, so nothing here touches an existing class and nothing here
 can destabilize or delay 1.0. Work continues as attention allows and 1.0 ships

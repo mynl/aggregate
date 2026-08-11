@@ -53,6 +53,7 @@ The end-to-end data flow::
         v
     summary_df / economic_df        the card and the footing sheet
     economic_ratios_df / legs_df    raw materials for ratio exhibits
+    walk_df / evaluation_df         the margin walk, in currency and as ratios
     density_df / validation_df      per-row GDs; rebucketing audit
     evaluate()                      Cherny-Madan breakeven panel
 
@@ -306,7 +307,7 @@ The shared-source rule: scenario columns exist exactly when the ledger shares on
 The reporting surface
 ---------------------
 
-Seven objects plus the evaluation panel, on :class:`PnL`:
+Nine objects plus the evaluation panel, on :class:`PnL`:
 
 ==========================  ============  ==================================================================
 Object                      Shape         Role
@@ -315,6 +316,8 @@ Object                      Shape         Role
 ``economic_df``             DataFrame     the sheet: every ledger row, kappa or P ladder, foots
 ``economic_ratios_df``      DataFrame     amounts and ratios per block: raw materials, not a card
 ``legs_df``                 DataFrame     one row per declared leg, the only place ``kind`` surfaces
+``walk_df``                 DataFrame     the margin walk in currency, at EV and in the 1-in-100 state
+``evaluation_df``           DataFrame     the same walk as ratios: shares, combined, return on capital
 ``density_df``              OrderedDict   ``{row label: GridDistribution}``, no shared axis
 ``validation_df``           DataFrame     Est-against-EX audit of every ``bs > 0`` leg
 ``info``                    str           fixed-layout summary, one row per line, ``n/a`` where absent

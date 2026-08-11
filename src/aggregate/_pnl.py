@@ -765,6 +765,33 @@ _RATIO_BUCKET = {'premium': 'P', 'loss': 'L', 'recovery': 'L',
 _RATIO_COLS = ('P', 'L', 'E', 'C', 'M', 'LR', 'ER', 'CR',
                'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
 
+#: Return period the margin walk evaluates capital at, for :attr:`PnL.walk_df`
+#: and :attr:`PnL.evaluation_df`. A business choice, not a law, and
+#: deliberately a constant rather than a keyword: one place to change it
+#: (author, 2026-08-05, declining to build a configurable capital-level
+#: framework). It sat in the exhibit layer until ``1.0.0a253`` and moved here
+#: with the two frames it describes.
+WATERFALL_RETURN_PERIOD = 100
+
+#: Ledger row kinds that ARE a step's own result, for the walk. A running net
+#: is excluded: it is the cumulative position after the step, not the step.
+_RESULT_KINDS = ('group_result', 'tier_result', 'grand_result')
+
+
+def _capital_ratio(margin, bad_outcome):
+    """``M / -M_100``: margin over the capital that outcome would call for.
+
+    ``bad_outcome`` is the margin in the 1-in-100 state and is normally
+    negative, so ``-bad_outcome`` is the capital you would have to inject and
+    the ratio reads as a return on it. ``NaN`` when no capital is called for
+    (a non-negative outcome, so nothing to inject and no denominator) or when
+    either input is missing.
+    """
+    if not (np.isfinite(margin) and np.isfinite(bad_outcome)):
+        return np.nan
+    capital = -bad_outcome
+    return margin / capital if capital > 0 else np.nan
+
 
 #: Default ``Side`` level names for the :attr:`PnL.economic_df` row MultiIndex,
 #: keyed by the internal side codes (``margin`` covers every result-flavored
@@ -2027,6 +2054,156 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             index.append(label)
         return pd.DataFrame(recs, columns=list(_RATIO_COLS),
                             index=pd.Index(index, name='Step'))
+
+    def _step_result_rows(self):
+        """Map each walk step to its own result row: ``{step: (position, label)}``.
+
+        Reads the ledger plan rather than pattern matching the index, because
+        a step's own result and the running net *after* it both sit under
+        ``Margin`` and only the plan distinguishes them. The plan label
+        doubles as the :attr:`density_df` key, which is how the standalone
+        quantile is reached. A later result for the same step wins, so a tier
+        subtotal supersedes the groups it spans.
+        """
+        plan = getattr(self, '_plan', None)
+        index = self.economic_df.index
+        if plan is None or len(plan) != len(index):
+            return {}
+        out = {}
+        for i, (idx, (label, kind, _payload)) in enumerate(zip(index, plan)):
+            if kind in _RESULT_KINDS and isinstance(idx, tuple):
+                out[idx[0]] = (i, label)
+        return out
+
+    def _waterfall_frames(self):
+        """Build :attr:`walk_df` and :attr:`evaluation_df` in one pass.
+
+        The two frames read the same rows and differ only in what they report
+        of them, so they are computed together and split at the end rather
+        than walking the ledger twice.
+        """
+        ledger, ratios = self.economic_df, self.economic_ratios_df
+        steps = self._step_result_rows()
+        p = 1.0 / WATERFALL_RETURN_PERIOD
+        kappa = f'κ{int(round(p * 100)):02d}'
+        diversified_available = kappa in ledger.columns
+        densities = self.density_df
+
+        walk, evaluation, index = [], [], []
+        for step in ratios.index:
+            if step not in steps:
+                continue
+            pos, label = steps[step]
+            row = ledger.iloc[pos]
+            margin, sd = float(row['EX']), float(row['SD'])
+            gd = densities.get(label)
+            standalone = float(gd.q(p)) if gd is not None else np.nan
+            divers = float(row[kappa]) if diversified_available else np.nan
+            r = ratios.loc[step]
+            index.append(step)
+            walk.append([margin, standalone, divers])
+            evaluation.append([
+                float(r['P_share']), float(r['M_share']), float(r['CR']),
+                margin / sd if sd > 0 else np.nan,
+                _capital_ratio(margin, standalone),
+                _capital_ratio(margin, divers),
+            ])
+
+        idx = pd.Index(index, name='Step')
+        t = WATERFALL_RETURN_PERIOD
+        walk_df = pd.DataFrame(
+            walk, index=idx,
+            columns=['M', f'M @ 1-in-{t} standalone',
+                     f'M @ 1-in-{t} diversified'])
+        evaluation_df = pd.DataFrame(
+            evaluation, index=idx,
+            columns=['Premium spent', 'Margin spent', 'CR', 'M / SD',
+                     'M / capital standalone', 'M / capital diversified'])
+        return walk_df, evaluation_df
+
+    @property
+    def walk_df(self):
+        """The margin walk in currency: gross, each cession, the closing net.
+
+        One row per step that books a result of its own, in ledger order, so
+        the last row is the net position. Running nets are excluded: a running
+        net is the cumulative position after a step rather than the step
+        itself, and the walk already accumulates by being read down.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by ``'Step'``, with columns
+
+            ``M``
+                The step's own signed result, its expected value.
+            ``M @ 1-in-<t> standalone``
+                The step's result in **its own** 1-in-``t`` state, read off
+                that step's :class:`GridDistribution`. Tail measures do not
+                add, so this column does **not** foot down the walk.
+            ``M @ 1-in-<t> diversified``
+                The step's result conditional on the **whole book** landing at
+                its own 1-in-``t``, read off the ledger's kappa column, so this
+                one foots exactly. Blank on a ledger whose rows share no atoms,
+                where no conditioning is possible.
+
+            ``t`` is :data:`WATERFALL_RETURN_PERIOD`.
+
+        Notes
+        -----
+        The gap between the two 1-in-``t`` columns is the diversification
+        benefit, which is the reading the frame exists to support, and the
+        reason both are carried rather than one.
+
+        Nothing here is newly estimated. Every number is arithmetic over
+        quantities the P&L has already computed: the margin off
+        :attr:`economic_df`, the diversified state off that frame's kappa
+        column, the standalone state off each result row's own
+        :class:`GridDistribution`.
+
+        A single group P&L books one result, so the walk is one row and there
+        is nothing to walk. The ``economic_waterfall`` exhibit reports itself
+        unavailable in that case rather than drawing it.
+
+        See Also
+        --------
+        evaluation_df : the same walk read as ratios.
+        economic_df : the ledger the walk is taken from.
+        """
+        return self._waterfall_frames()[0]
+
+    @property
+    def evaluation_df(self):
+        """The margin walk read as ratios: what each step spends and returns.
+
+        The companion to :attr:`walk_df`, over the same rows in the same
+        order.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by ``'Step'``, with columns
+
+            ``Premium spent``, ``Margin spent``
+                The step's premium and margin against the **gross** block's,
+                which is the first block in every builder.
+            ``CR``
+                The step's combined ratio, ``(L + E + C) / P``.
+            ``M / SD``
+                Margin over its own standard deviation.
+            ``M / capital standalone``, ``M / capital diversified``
+                Margin over the capital a 1-in-``t`` outcome would call for,
+                on each of :attr:`walk_df`'s two readings of that state. Blank
+                where the step calls for no capital, which is what a purchased
+                layer does in the adverse state, and there the diversified
+                column is the more meaningful of the two.
+
+        See Also
+        --------
+        walk_df : the same walk in currency.
+        economic_ratios_df : the per block ratios these are drawn from.
+        """
+        return self._waterfall_frames()[1]
 
     @property
     def legs_df(self):

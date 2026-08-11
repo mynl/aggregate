@@ -12,12 +12,14 @@
       },
       "0.0",
       "31.30829289650644",
+      "31.30829289650644",
       "1.0",
       "6",
       {
        "raw": 6.0,
        "text": "6.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -36,12 +38,14 @@
       },
       "0.0",
       "18.0",
+      "18.0",
       "1.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -60,12 +64,14 @@
       },
       "0.0",
       "18.0",
+      "18.0",
       "1.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "freq 1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -84,12 +90,14 @@
       },
       "0.0",
       "22.772638660818956",
+      "22.772638660818956",
       "1.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "E[N]-adj 1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -108,12 +116,14 @@
       },
       "0.0",
       "32.0",
+      "32.0",
       "1.0",
       "5",
       {
        "raw": 6.0,
        "text": "6.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -130,7 +140,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "level_0"
+      "method"
      ],
      "role": "stub",
      "wrap": true
@@ -176,7 +186,7 @@
      "dtype": "string",
      "key": "c5",
      "name": [
-      "bs"
+      "W"
      ],
      "wrap": true
     },
@@ -184,6 +194,15 @@
      "align": "l",
      "dtype": "string",
      "key": "c6",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
      "name": [
       "log2"
      ],
@@ -197,11 +216,20 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "log2_need"
      ],
      "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
     },
     {
      "align": "r",
@@ -211,7 +239,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c8",
+     "key": "c10",
      "name": [
       "clipped"
      ],
@@ -220,7 +248,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c9",
+     "key": "c11",
      "name": [
       "note"
      ],
@@ -230,7 +258,7 @@
    "head": [
     [
      {
-      "text": "level_0"
+      "text": "method"
      },
      {
       "text": "applies"
@@ -245,6 +273,9 @@
       "text": "x_max"
      },
      {
+      "text": "W"
+     },
+     {
       "text": "bs"
      },
      {
@@ -252,6 +283,9 @@
      },
      {
       "text": "log2_need"
+     },
+     {
+      "text": "coverage"
      },
      {
       "text": "clipped"
@@ -406,6 +440,10 @@
        "text": "3.00"
       },
       {
+       "raw": 3.0,
+       "text": "3.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -417,6 +455,7 @@
        "raw": 2.0,
        "text": "2.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -437,6 +476,10 @@
        "text": "8.00"
       },
       {
+       "raw": 8.0,
+       "text": "8.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -448,6 +491,7 @@
        "raw": 4.0,
        "text": "4.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -471,6 +515,10 @@
        "text": "19.49"
       },
       {
+       "raw": 22.974538042539564,
+       "text": "22.97"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -482,6 +530,7 @@
        "raw": 5.0,
        "text": "5.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -502,6 +551,10 @@
        "text": "12.27"
       },
       {
+       "raw": 8.544003745317532,
+       "text": "8.54"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -513,6 +566,7 @@
        "raw": 4.0,
        "text": "4.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -533,6 +587,10 @@
        "text": "15.13"
       },
       {
+       "raw": 15.130494613066503,
+       "text": "15.13"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -544,6 +602,7 @@
        "raw": 5.0,
        "text": "5.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -564,6 +623,10 @@
        "text": "11.00"
       },
       {
+       "raw": 11.0,
+       "text": "11.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -575,6 +638,7 @@
        "raw": 4.0,
        "text": "4.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -595,6 +659,10 @@
        "text": "32.00"
       },
       {
+       "raw": 32.0,
+       "text": "32.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -606,6 +674,7 @@
        "raw": 6.0,
        "text": "6.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -622,7 +691,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "unit"
+      "source"
      ],
      "role": "stub",
      "wrap": true
@@ -659,11 +728,25 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },
      "key": "c3",
+     "name": [
+      "W"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
      "name": [
       "bs"
      ],
@@ -676,7 +759,7 @@
       "group": true,
       "kind": "int"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "log2"
      ],
@@ -690,11 +773,20 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "log2_need"
      ],
      "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
     },
     {
      "align": "r",
@@ -704,7 +796,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c6",
+     "key": "c8",
      "name": [
       "clipped"
      ],
@@ -713,7 +805,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c7",
+     "key": "c9",
      "name": [
       "note"
      ],
@@ -723,13 +815,16 @@
    "head": [
     [
      {
-      "text": "unit"
+      "text": "source"
      },
      {
       "text": "x_min"
      },
      {
       "text": "x_max"
+     },
+     {
+      "text": "W"
      },
      {
       "text": "bs"
@@ -739,6 +834,9 @@
      },
      {
       "text": "log2_need"
+     },
+     {
+      "text": "coverage"
      },
      {
       "text": "clipped"
@@ -766,12 +864,14 @@
       },
       "0.0",
       "181.95332741759927",
+      "181.95332741759927",
       "10.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -790,12 +890,14 @@
       },
       "0.0",
       "60.0",
+      "60.0",
       "1.0",
       "6",
       {
        "raw": 6.0,
        "text": "6.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -814,12 +916,14 @@
       },
       "0.0",
       "150.51730365071754",
+      "150.51730365071754",
       "10.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "freq 1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -838,12 +942,14 @@
       },
       "0.0",
       "87.89614924990504",
+      "87.89614924990504",
       "10.0",
       "4",
       {
        "raw": 4.0,
        "text": "4.000"
       },
+      "E[N]-adj 1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -862,12 +968,14 @@
       },
       "0.0",
       "64.0",
+      "64.0",
       "1.0",
       "6",
       {
        "raw": 7.0,
        "text": "7.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -884,7 +992,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "level_0"
+      "method"
      ],
      "role": "stub",
      "wrap": true
@@ -930,7 +1038,7 @@
      "dtype": "string",
      "key": "c5",
      "name": [
-      "bs"
+      "W"
      ],
      "wrap": true
     },
@@ -938,6 +1046,15 @@
      "align": "l",
      "dtype": "string",
      "key": "c6",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
      "name": [
       "log2"
      ],
@@ -951,11 +1068,20 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "log2_need"
      ],
      "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
     },
     {
      "align": "r",
@@ -965,7 +1091,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c8",
+     "key": "c10",
      "name": [
       "clipped"
      ],
@@ -974,7 +1100,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c9",
+     "key": "c11",
      "name": [
       "note"
      ],
@@ -984,7 +1110,7 @@
    "head": [
     [
      {
-      "text": "level_0"
+      "text": "method"
      },
      {
       "text": "applies"
@@ -999,6 +1125,9 @@
       "text": "x_max"
      },
      {
+      "text": "W"
+     },
+     {
       "text": "bs"
      },
      {
@@ -1006,6 +1135,9 @@
      },
      {
       "text": "log2_need"
+     },
+     {
+      "text": "coverage"
      },
      {
       "text": "clipped"
@@ -1035,6 +1167,10 @@
        "text": "60.00"
       },
       {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1046,6 +1182,7 @@
        "raw": 6.0,
        "text": "6.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -1066,6 +1203,10 @@
        "text": "10.00"
       },
       {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1077,6 +1218,7 @@
        "raw": 4.0,
        "text": "4.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -1100,6 +1242,10 @@
        "text": "188.80"
       },
       {
+       "raw": 221.41629035471732,
+       "text": "221.42"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1111,6 +1257,7 @@
        "raw": 8.0,
        "text": "8.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1131,6 +1278,10 @@
        "text": "67.91"
       },
       {
+       "raw": 60.8276253029822,
+       "text": "60.83"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1142,6 +1293,7 @@
        "raw": 6.0,
        "text": "6.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1162,6 +1314,10 @@
        "text": "95.40"
       },
       {
+       "raw": 95.39614924990504,
+       "text": "95.40"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1173,6 +1329,7 @@
        "raw": 7.0,
        "text": "7.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1193,6 +1350,10 @@
        "text": "70.00"
       },
       {
+       "raw": 70.0,
+       "text": "70.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1204,6 +1365,7 @@
        "raw": 7.0,
        "text": "7.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1224,6 +1386,10 @@
        "text": "256.00"
       },
       {
+       "raw": 256.0,
+       "text": "256.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1235,6 +1401,7 @@
        "raw": 9.0,
        "text": "9.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1251,7 +1418,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "unit"
+      "source"
      ],
      "role": "stub",
      "wrap": true
@@ -1288,11 +1455,25 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },
      "key": "c3",
+     "name": [
+      "W"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
      "name": [
       "bs"
      ],
@@ -1305,7 +1486,7 @@
       "group": true,
       "kind": "int"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "log2"
      ],
@@ -1319,11 +1500,20 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "log2_need"
      ],
      "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
     },
     {
      "align": "r",
@@ -1333,7 +1523,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c6",
+     "key": "c8",
      "name": [
       "clipped"
      ],
@@ -1342,7 +1532,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c7",
+     "key": "c9",
      "name": [
       "note"
      ],
@@ -1352,13 +1542,16 @@
    "head": [
     [
      {
-      "text": "unit"
+      "text": "source"
      },
      {
       "text": "x_min"
      },
      {
       "text": "x_max"
+     },
+     {
+      "text": "W"
      },
      {
       "text": "bs"
@@ -1368,6 +1561,9 @@
      },
      {
       "text": "log2_need"
+     },
+     {
+      "text": "coverage"
      },
      {
       "text": "clipped"
@@ -1395,12 +1591,14 @@
       },
       "0.0",
       "31.30829289650644",
+      "31.30829289650644",
       "1.0",
       "6",
       {
        "raw": 6.0,
        "text": "6.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1419,12 +1617,14 @@
       },
       "0.0",
       "18.0",
+      "18.0",
       "1.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -1443,12 +1643,14 @@
       },
       "0.0",
       "18.0",
+      "18.0",
       "1.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "freq 1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1467,12 +1669,14 @@
       },
       "0.0",
       "22.772638660818956",
+      "22.772638660818956",
       "1.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "E[N]-adj 1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1491,12 +1695,14 @@
       },
       "0.0",
       "32.0",
+      "32.0",
       "1.0",
       "5",
       {
        "raw": 6.0,
        "text": "6.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -1513,7 +1719,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "level_0"
+      "method"
      ],
      "role": "stub",
      "wrap": true
@@ -1559,7 +1765,7 @@
      "dtype": "string",
      "key": "c5",
      "name": [
-      "bs"
+      "W"
      ],
      "wrap": true
     },
@@ -1567,6 +1773,15 @@
      "align": "l",
      "dtype": "string",
      "key": "c6",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
      "name": [
       "log2"
      ],
@@ -1580,11 +1795,20 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "log2_need"
      ],
      "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
     },
     {
      "align": "r",
@@ -1594,7 +1818,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c8",
+     "key": "c10",
      "name": [
       "clipped"
      ],
@@ -1603,7 +1827,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c9",
+     "key": "c11",
      "name": [
       "note"
      ],
@@ -1613,7 +1837,7 @@
    "head": [
     [
      {
-      "text": "level_0"
+      "text": "method"
      },
      {
       "text": "applies"
@@ -1628,6 +1852,9 @@
       "text": "x_max"
      },
      {
+      "text": "W"
+     },
+     {
       "text": "bs"
      },
      {
@@ -1635,6 +1862,9 @@
      },
      {
       "text": "log2_need"
+     },
+     {
+      "text": "coverage"
      },
      {
       "text": "clipped"
@@ -1789,6 +2019,10 @@
        "text": "3.00"
       },
       {
+       "raw": 3.0,
+       "text": "3.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1800,6 +2034,7 @@
        "raw": 2.0,
        "text": "2.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -1820,6 +2055,10 @@
        "text": "8.00"
       },
       {
+       "raw": 8.0,
+       "text": "8.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1831,6 +2070,7 @@
        "raw": 4.0,
        "text": "4.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -1854,6 +2094,10 @@
        "text": "19.49"
       },
       {
+       "raw": 22.974538042539564,
+       "text": "22.97"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1865,6 +2109,7 @@
        "raw": 5.0,
        "text": "5.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1885,6 +2130,10 @@
        "text": "12.27"
       },
       {
+       "raw": 8.544003745317532,
+       "text": "8.54"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1896,6 +2145,7 @@
        "raw": 4.0,
        "text": "4.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1916,6 +2166,10 @@
        "text": "15.13"
       },
       {
+       "raw": 15.130494613066503,
+       "text": "15.13"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1927,6 +2181,7 @@
        "raw": 5.0,
        "text": "5.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1947,6 +2202,10 @@
        "text": "11.00"
       },
       {
+       "raw": 11.0,
+       "text": "11.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1958,6 +2217,7 @@
        "raw": 4.0,
        "text": "4.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -1978,6 +2238,10 @@
        "text": "32.00"
       },
       {
+       "raw": 32.0,
+       "text": "32.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -1989,6 +2253,7 @@
        "raw": 6.0,
        "text": "6.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -2005,7 +2270,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "unit"
+      "source"
      ],
      "role": "stub",
      "wrap": true
@@ -2042,11 +2307,25 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },
      "key": "c3",
+     "name": [
+      "W"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
      "name": [
       "bs"
      ],
@@ -2059,7 +2338,7 @@
       "group": true,
       "kind": "int"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "log2"
      ],
@@ -2073,11 +2352,20 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "log2_need"
      ],
      "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
     },
     {
      "align": "r",
@@ -2087,7 +2375,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c6",
+     "key": "c8",
      "name": [
       "clipped"
      ],
@@ -2096,7 +2384,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c7",
+     "key": "c9",
      "name": [
       "note"
      ],
@@ -2106,13 +2394,16 @@
    "head": [
     [
      {
-      "text": "unit"
+      "text": "source"
      },
      {
       "text": "x_min"
      },
      {
       "text": "x_max"
+     },
+     {
+      "text": "W"
      },
      {
       "text": "bs"
@@ -2122,6 +2413,9 @@
      },
      {
       "text": "log2_need"
+     },
+     {
+      "text": "coverage"
      },
      {
       "text": "clipped"
@@ -2149,12 +2443,14 @@
       },
       "0.0",
       "181.95332741759927",
+      "181.95332741759927",
       "10.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -2173,12 +2469,14 @@
       },
       "0.0",
       "60.0",
+      "60.0",
       "1.0",
       "6",
       {
        "raw": 6.0,
        "text": "6.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -2197,12 +2495,14 @@
       },
       "0.0",
       "150.51730365071754",
+      "150.51730365071754",
       "10.0",
       "5",
       {
        "raw": 5.0,
        "text": "5.000"
       },
+      "freq 1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -2221,12 +2521,14 @@
       },
       "0.0",
       "87.89614924990504",
+      "87.89614924990504",
       "10.0",
       "4",
       {
        "raw": 4.0,
        "text": "4.000"
       },
+      "E[N]-adj 1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -2245,12 +2547,14 @@
       },
       "0.0",
       "64.0",
+      "64.0",
       "1.0",
       "6",
       {
        "raw": 7.0,
        "text": "7.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -2267,7 +2571,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "level_0"
+      "method"
      ],
      "role": "stub",
      "wrap": true
@@ -2313,7 +2617,7 @@
      "dtype": "string",
      "key": "c5",
      "name": [
-      "bs"
+      "W"
      ],
      "wrap": true
     },
@@ -2321,6 +2625,15 @@
      "align": "l",
      "dtype": "string",
      "key": "c6",
+     "name": [
+      "bs"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
      "name": [
       "log2"
      ],
@@ -2334,11 +2647,20 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "log2_need"
      ],
      "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
     },
     {
      "align": "r",
@@ -2348,7 +2670,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c8",
+     "key": "c10",
      "name": [
       "clipped"
      ],
@@ -2357,7 +2679,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c9",
+     "key": "c11",
      "name": [
       "note"
      ],
@@ -2367,7 +2689,7 @@
    "head": [
     [
      {
-      "text": "level_0"
+      "text": "method"
      },
      {
       "text": "applies"
@@ -2382,6 +2704,9 @@
       "text": "x_max"
      },
      {
+      "text": "W"
+     },
+     {
       "text": "bs"
      },
      {
@@ -2389,6 +2714,9 @@
      },
      {
       "text": "log2_need"
+     },
+     {
+      "text": "coverage"
      },
      {
       "text": "clipped"
@@ -2418,6 +2746,10 @@
        "text": "60.00"
       },
       {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -2429,6 +2761,7 @@
        "raw": 6.0,
        "text": "6.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -2449,6 +2782,10 @@
        "text": "10.00"
       },
       {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -2460,6 +2797,7 @@
        "raw": 4.0,
        "text": "4.000"
       },
+      "exact",
       {
        "raw": null,
        "text": "\u2014"
@@ -2483,6 +2821,10 @@
        "text": "188.80"
       },
       {
+       "raw": 221.41629035471732,
+       "text": "221.42"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -2494,6 +2836,7 @@
        "raw": 8.0,
        "text": "8.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -2514,6 +2857,10 @@
        "text": "67.91"
       },
       {
+       "raw": 60.8276253029822,
+       "text": "60.83"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -2525,6 +2872,7 @@
        "raw": 6.0,
        "text": "6.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -2545,6 +2893,10 @@
        "text": "95.40"
       },
       {
+       "raw": 95.39614924990504,
+       "text": "95.40"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -2556,6 +2908,7 @@
        "raw": 7.0,
        "text": "7.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -2576,6 +2929,10 @@
        "text": "70.00"
       },
       {
+       "raw": 70.0,
+       "text": "70.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -2587,6 +2944,7 @@
        "raw": 7.0,
        "text": "7.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -2607,6 +2965,10 @@
        "text": "256.00"
       },
       {
+       "raw": 256.0,
+       "text": "256.00"
+      },
+      {
        "raw": 1.0,
        "text": "1.000"
       },
@@ -2618,6 +2980,7 @@
        "raw": 9.0,
        "text": "9.000"
       },
+      "1-1e-12",
       {
        "raw": null,
        "text": "\u2014"
@@ -2634,7 +2997,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "unit"
+      "source"
      ],
      "role": "stub",
      "wrap": true
@@ -2671,11 +3034,25 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },
      "key": "c3",
+     "name": [
+      "W"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
      "name": [
       "bs"
      ],
@@ -2688,7 +3065,7 @@
       "group": true,
       "kind": "int"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "log2"
      ],
@@ -2702,11 +3079,20 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "log2_need"
      ],
      "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
     },
     {
      "align": "r",
@@ -2716,7 +3102,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c6",
+     "key": "c8",
      "name": [
       "clipped"
      ],
@@ -2725,7 +3111,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c7",
+     "key": "c9",
      "name": [
       "note"
      ],
@@ -2735,13 +3121,16 @@
    "head": [
     [
      {
-      "text": "unit"
+      "text": "source"
      },
      {
       "text": "x_min"
      },
      {
       "text": "x_max"
+     },
+     {
+      "text": "W"
      },
      {
       "text": "bs"
@@ -2751,6 +3140,9 @@
      },
      {
       "text": "log2_need"
+     },
+     {
+      "text": "coverage"
      },
      {
       "text": "clipped"
@@ -10420,6 +10812,7 @@
    "body": [
     {
      "cells": [
+      "0",
       "Gross",
       "Consideration",
       "Premium",
@@ -10435,7 +10828,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "1",
       "Gross",
       "Obligation",
       "Loss",
@@ -10454,7 +10849,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "2",
       "occ 300 xs 200",
       "Consideration",
       "occ 300 xs 200 premium",
@@ -10473,7 +10870,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "3",
       "occ 300 xs 200",
       "Obligation",
       "occ 300 xs 200 recovery",
@@ -10489,7 +10888,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "4",
       "occ 100 xs 100",
       "Consideration",
       "occ 100 xs 100 premium",
@@ -10508,7 +10909,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "5",
       "occ 100 xs 100",
       "Obligation",
       "occ 100 xs 100 recovery",
@@ -10528,8 +10931,22 @@
    "columns": [
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
      "name": [
       "Step"
      ],
@@ -10538,7 +10955,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c1",
+     "key": "c2",
      "name": [
       "Side"
      ],
@@ -10547,7 +10964,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c2",
+     "key": "c3",
      "name": [
       "Label"
      ],
@@ -10556,7 +10973,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c3",
+     "key": "c4",
      "name": [
       "kind"
      ],
@@ -10570,7 +10987,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "EX"
      ],
@@ -10584,7 +11001,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SD"
      ],
@@ -10593,6 +11010,9 @@
    ],
    "head": [
     [
+     {
+      "text": "leg"
+     },
      {
       "text": "Step"
      },
@@ -10615,7 +11035,7 @@
    ],
    "ir_version": 1,
    "n_head_levels": 1,
-   "n_stub_levels": 0
+   "n_stub_levels": 1
   }
  ],
  "economic_ratios/insurer/PnL": [
@@ -10962,6 +11382,7 @@
    "body": [
     {
      "cells": [
+      "0",
       "EX.B",
       "Consideration",
       "Premium",
@@ -10977,7 +11398,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "1",
       "EX.B",
       "Obligation",
       "Loss",
@@ -11000,8 +11423,22 @@
    "columns": [
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
      "name": [
       "Step"
      ],
@@ -11010,7 +11447,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c1",
+     "key": "c2",
      "name": [
       "Side"
      ],
@@ -11019,7 +11456,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c2",
+     "key": "c3",
      "name": [
       "Label"
      ],
@@ -11028,7 +11465,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c3",
+     "key": "c4",
      "name": [
       "kind"
      ],
@@ -11042,7 +11479,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "EX"
      ],
@@ -11056,7 +11493,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SD"
      ],
@@ -11065,6 +11502,9 @@
    ],
    "head": [
     [
+     {
+      "text": "leg"
+     },
      {
       "text": "Step"
      },
@@ -11087,7 +11527,7 @@
    ],
    "ir_version": 1,
    "n_head_levels": 1,
-   "n_stub_levels": 0
+   "n_stub_levels": 1
   }
  ],
  "economic_ratios/insurer/Tower": [
@@ -11583,6 +12023,7 @@
    "body": [
     {
      "cells": [
+      "0",
       "Gross",
       "Consideration",
       "Premium",
@@ -11598,7 +12039,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "1",
       "Gross",
       "Obligation",
       "Loss",
@@ -11617,7 +12060,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "2",
       "occ 500 xs 500",
       "Consideration",
       "occ 500 xs 500 premium",
@@ -11636,7 +12081,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "3",
       "occ 500 xs 500",
       "Obligation",
       "occ 500 xs 500 recovery",
@@ -11656,8 +12103,22 @@
    "columns": [
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
      "name": [
       "Step"
      ],
@@ -11666,7 +12127,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c1",
+     "key": "c2",
      "name": [
       "Side"
      ],
@@ -11675,7 +12136,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c2",
+     "key": "c3",
      "name": [
       "Label"
      ],
@@ -11684,7 +12145,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c3",
+     "key": "c4",
      "name": [
       "kind"
      ],
@@ -11698,7 +12159,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "EX"
      ],
@@ -11712,7 +12173,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SD"
      ],
@@ -11721,6 +12182,9 @@
    ],
    "head": [
     [
+     {
+      "text": "leg"
+     },
      {
       "text": "Step"
      },
@@ -11743,7 +12207,7 @@
    ],
    "ir_version": 1,
    "n_head_levels": 1,
-   "n_stub_levels": 0
+   "n_stub_levels": 1
   }
  ],
  "economic_ratios/raw/Peel": [
@@ -12316,6 +12780,7 @@
    "body": [
     {
      "cells": [
+      "0",
       "Gross",
       "Consideration",
       "Premium",
@@ -12331,7 +12796,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "1",
       "Gross",
       "Obligation",
       "Loss",
@@ -12350,7 +12817,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "2",
       "occ 300 xs 200",
       "Consideration",
       "occ 300 xs 200 premium",
@@ -12369,7 +12838,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "3",
       "occ 300 xs 200",
       "Obligation",
       "occ 300 xs 200 recovery",
@@ -12385,7 +12856,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "4",
       "occ 100 xs 100",
       "Consideration",
       "occ 100 xs 100 premium",
@@ -12404,7 +12877,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "5",
       "occ 100 xs 100",
       "Obligation",
       "occ 100 xs 100 recovery",
@@ -12424,8 +12899,22 @@
    "columns": [
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
      "name": [
       "Step"
      ],
@@ -12434,7 +12923,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c1",
+     "key": "c2",
      "name": [
       "Side"
      ],
@@ -12443,7 +12932,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c2",
+     "key": "c3",
      "name": [
       "Label"
      ],
@@ -12452,7 +12941,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c3",
+     "key": "c4",
      "name": [
       "kind"
      ],
@@ -12466,7 +12955,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "EX"
      ],
@@ -12480,7 +12969,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SD"
      ],
@@ -12489,6 +12978,9 @@
    ],
    "head": [
     [
+     {
+      "text": "leg"
+     },
      {
       "text": "Step"
      },
@@ -12511,7 +13003,7 @@
    ],
    "ir_version": 1,
    "n_head_levels": 1,
-   "n_stub_levels": 0
+   "n_stub_levels": 1
   }
  ],
  "economic_ratios/raw/PnL": [
@@ -12825,6 +13317,7 @@
    "body": [
     {
      "cells": [
+      "0",
       "EX.B",
       "Consideration",
       "Premium",
@@ -12840,7 +13333,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "1",
       "EX.B",
       "Obligation",
       "Loss",
@@ -12863,8 +13358,22 @@
    "columns": [
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
      "name": [
       "Step"
      ],
@@ -12873,7 +13382,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c1",
+     "key": "c2",
      "name": [
       "Side"
      ],
@@ -12882,7 +13391,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c2",
+     "key": "c3",
      "name": [
       "Label"
      ],
@@ -12891,7 +13400,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c3",
+     "key": "c4",
      "name": [
       "kind"
      ],
@@ -12905,7 +13414,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "EX"
      ],
@@ -12919,7 +13428,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SD"
      ],
@@ -12928,6 +13437,9 @@
    ],
    "head": [
     [
+     {
+      "text": "leg"
+     },
      {
       "text": "Step"
      },
@@ -12950,7 +13462,7 @@
    ],
    "ir_version": 1,
    "n_head_levels": 1,
-   "n_stub_levels": 0
+   "n_stub_levels": 1
   }
  ],
  "economic_ratios/raw/Tower": [
@@ -13395,6 +13907,7 @@
    "body": [
     {
      "cells": [
+      "0",
       "Gross",
       "Consideration",
       "Premium",
@@ -13410,7 +13923,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "1",
       "Gross",
       "Obligation",
       "Loss",
@@ -13429,7 +13944,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "2",
       "occ 500 xs 500",
       "Consideration",
       "occ 500 xs 500 premium",
@@ -13448,7 +13965,9 @@
      ]
     },
     {
+     "break_depth": 0,
      "cells": [
+      "3",
       "occ 500 xs 500",
       "Obligation",
       "occ 500 xs 500 recovery",
@@ -13468,8 +13987,22 @@
    "columns": [
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c0",
+     "level": 0,
+     "name": [
+      "leg"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
      "name": [
       "Step"
      ],
@@ -13478,7 +14011,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c1",
+     "key": "c2",
      "name": [
       "Side"
      ],
@@ -13487,7 +14020,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c2",
+     "key": "c3",
      "name": [
       "Label"
      ],
@@ -13496,7 +14029,7 @@
     {
      "align": "l",
      "dtype": "string",
-     "key": "c3",
+     "key": "c4",
      "name": [
       "kind"
      ],
@@ -13510,7 +14043,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "EX"
      ],
@@ -13524,7 +14057,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SD"
      ],
@@ -13533,6 +14066,9 @@
    ],
    "head": [
     [
+     {
+      "text": "leg"
+     },
      {
       "text": "Step"
      },
@@ -13555,7 +14091,7 @@
    ],
    "ir_version": 1,
    "n_head_levels": 1,
-   "n_stub_levels": 0
+   "n_stub_levels": 1
   }
  ],
  "economic_waterfall/insurer/Peel": [
@@ -49930,7 +50466,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "level_0"
+      "unit"
      ],
      "role": "stub",
      "wrap": true
@@ -50020,7 +50556,7 @@
    "head": [
     [
      {
-      "text": "level_0"
+      "text": "unit"
      },
      {
       "text": "family"
@@ -50372,7 +50908,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "level_0"
+      "unit"
      ],
      "role": "stub",
      "wrap": true
@@ -50462,7 +50998,7 @@
    "head": [
     [
      {
-      "text": "level_0"
+      "text": "unit"
      },
      {
       "text": "family"
@@ -50787,7 +51323,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "level_0"
+      "unit"
      ],
      "role": "stub",
      "wrap": true
@@ -50877,7 +51413,7 @@
    "head": [
     [
      {
-      "text": "level_0"
+      "text": "unit"
      },
      {
       "text": "family"
@@ -51229,7 +51765,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "level_0"
+      "unit"
      ],
      "role": "stub",
      "wrap": true
@@ -51319,7 +51855,7 @@
    "head": [
     [
      {
-      "text": "level_0"
+      "text": "unit"
      },
      {
       "text": "family"

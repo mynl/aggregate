@@ -388,7 +388,9 @@
   `[Chart-Doc-Reader]` landed a252 (note item 6, `load_chart_doc`);
   `[Exhibit-Perspective-Contract]` landed a253 (the RAW invariant written and
   swept, `PnL.walk_df` / `PnL.evaluation_df` promoted out of the exhibit
-  layer per `[Waterfall-Frames-Are-Owed]`). Phase 7 struck,
+  layer per `[Waterfall-Frames-Are-Owed]`); `[BS-Window-Diagnostics]` landed
+  a254 (note item 2, `W` and `coverage` published, and four served frames
+  given honest index names). Phase 7 struck,
   its bug fixed at a250. Phases 8 to 10, the Pricing pane redesign keyed on
   result objects, wait on the design discussion, and with them the question of
   whether `REINSURER` gets implemented.

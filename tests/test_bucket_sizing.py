@@ -482,15 +482,51 @@ def test_bs_window_df_public_view():
         warnings.simplefilter('ignore')
         a = build('agg W 5000 claims sev lognorm 100 cv 2 poisson')
     df = a.bs_window_df
-    assert list(df.columns) == ['applies', 'selected', 'x_min', 'x_max', 'bs',
-                                'log2', 'log2_need', 'clipped', 'note']
+    assert list(df.columns) == ['applies', 'selected', 'x_min', 'x_max', 'W',
+                                'bs', 'log2', 'log2_need', 'coverage',
+                                'clipped', 'note']
     assert 'used' in df.index
     assert bool(df.loc['windowed', 'selected'])             # the reclaimed window
-    # private frame keeps the expert extras (coverage, W)
-    assert 'coverage' in a._bs_window_df.columns
     # before update there is no frame
     from aggregate import Aggregate
     assert Aggregate(**a.spec).bs_window_df is None
+
+
+def test_bs_window_df_carries_the_width_and_the_coverage():
+    """[BS-Window-Diagnostics] the two columns the leaf exists for.
+
+    Its question is "is this grid big enough", and the width and the coverage
+    are the answer: without them a reader has a list of candidate windows and
+    no way to compare them. They were curated onto the private frame until
+    a254.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg W2 5000 claims sev lognorm 100 cv 2 poisson')
+    df = a.bs_window_df
+    widths = df['W'].astype(float)
+    assert (widths[widths.notna()] > 0).all()
+    # W is the window, not the grid, on every row but the realized one
+    for row in df.index.drop('used'):
+        assert float(df.loc[row, 'W']) == pytest.approx(
+            float(df.loc[row, 'x_max']) - float(df.loc[row, 'x_min']))
+    # coverage is a string carrying precision a float cannot
+    assert isinstance(df.loc['used', 'coverage'], str)
+    assert '1e-' in df.loc['used', 'coverage']
+
+
+def test_bs_window_df_index_is_named():
+    """The stray ``level_0`` in a served table was an unnamed index."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg W3 100 claims sev lognorm 100 cv 2 poisson')
+        p = build('port PP3 agg PA 100 claims sev lognorm 100 cv 2 poisson '
+                  'agg PB 50 claims sev gamma 50 cv 1 poisson')
+    assert a.bs_window_df.index.name == 'method'
+    assert a._bs_window_df.index.name == 'method'
+    # a portfolio row is a unit, a combine candidate, or the realized grid,
+    # so 'unit' named only the first few of them
+    assert p.bs_window_df.index.name == 'source'
 
 
 def test_fmt_amount_and_fmt_window():
@@ -572,12 +608,12 @@ def test_portfolio_bs_window_df_and_description():
                   'agg B 50 claims sev gamma 50 cv 1 poisson')
     df = p.bs_window_df
     assert list(df.columns) == \
-        ['x_min', 'x_max', 'bs', 'log2', 'log2_need', 'clipped', 'note']
+        ['x_min', 'x_max', 'W', 'bs', 'log2', 'log2_need', 'coverage',
+         'clipped', 'note']
     assert 'used' in df.index
     assert {'A', 'B'}.issubset(set(df.index))                # one row per unit
     # the four inspectable combine candidate rows (MM / RMS / SBJ / sum)
     assert {'mm', 'rms', 'sbj', 'sum'}.issubset(set(df.index))
-    assert 'coverage' in p._bs_window_df.columns             # expert frame richer
     desc = p.bs_description
     assert 'portfolio grid' in desc and 'bs=' in desc and 'log2=' in desc
 

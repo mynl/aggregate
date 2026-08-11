@@ -1200,6 +1200,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             if 'max' in df.columns:
                 total['max'] = float(bwdf.loc['used', 'x_max'])
         df.loc['total'] = total
+        # Named for parity with Aggregate.tail_behavior_df, whose index is
+        # 'component'. Unnamed it reaches a served table headed ``level_0``.
+        df.index.name = 'unit'
         return df
 
     @property

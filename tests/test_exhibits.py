@@ -143,6 +143,23 @@ def test_every_raw_block_is_a_public_frame(objects):
     assert seen > 20                         # the sweep actually swept
 
 
+def test_no_served_block_carries_an_unnamed_index_level(objects):
+    """An unnamed index reaches a reader as a column headed ``level_0``.
+
+    Which names nothing, and is what the app's bucket window pane showed
+    until a254. The frames it caught then were ``bs_window_df`` on an
+    Aggregate, ``tail_behavior_df`` on a Portfolio (whose Aggregate twin was
+    named all along) and ``legs_df``.
+    """
+    for obj in objects.values():
+        for name, _ in available_exhibits(obj):
+            for perspective in (Perspective.RAW, Perspective.INSURER):
+                for block, df, _kw in exhibit_frames(obj, name, perspective):
+                    assert all(n is not None for n in df.index.names), (
+                        f'{type(obj).__name__}/{name}/{perspective.value}: '
+                        f'block {block!r} has an unnamed index level')
+
+
 def test_a_perspective_may_restructure_the_block_list(tower):
     """[Perspective-May-Restructure]: block lists differ between perspectives.
 

@@ -2235,8 +2235,12 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 else row.moments[1]
             recs.append([spec.label, _SIDE_DEFAULTS[side], label,
                          legs[li].kind, row.mean, _snap_noise(sd)])
+        # The index is positional and stays so, legs being ordered, but it is
+        # named: unnamed it reaches a served table headed ``level_0``, which
+        # tells a reader nothing about what the number counts.
         return pd.DataFrame(
-            recs, columns=['Step', 'Side', 'Label', 'kind', 'EX', 'SD'])
+            recs, columns=['Step', 'Side', 'Label', 'kind', 'EX', 'SD'],
+            index=pd.RangeIndex(len(recs), name='leg'))
 
     @property
     def density_df(self):

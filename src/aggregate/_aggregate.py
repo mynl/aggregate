@@ -727,20 +727,33 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         One row per sizing method that ran (``moment``, ``exact_discrete``,
         ``bounded_small``, ``windowed``, ``sbj``) plus the realized ``used``
-        grid, culled to the user-facing columns: whether the method ``applies``,
-        whether it was ``selected``, the method window (``x_min`` / ``x_max``),
-        the grid (``bs`` / ``log2``), the log2 the window ``needs`` at that ``bs``,
-        any estimated ``clipped`` far-tail mass, and a one-line ``note``.
+        grid, indexed by ``method``, culled to the user-facing columns: whether
+        the method ``applies``, whether it was ``selected``, the method window
+        (``x_min`` / ``x_max``) and its width ``W``, the grid (``bs`` /
+        ``log2``), the log2 the window ``log2_need``s at that ``bs``, what
+        fraction of the distribution the window holds (``coverage``), any
+        estimated ``clipped`` far-tail mass, and a one-line ``note``.
 
-        The complete decision journey (extra columns, coverage strings) stays on
-        the private :attr:`_bs_window_df` for experts. Returns ``None`` before
-        :meth:`update`. See :attr:`bs_description` / :attr:`bs_explanation` for the
-        narrative.
+        Returns ``None`` before :meth:`update`. See :attr:`bs_description` /
+        :attr:`bs_explanation` for the narrative.
+
+        Notes
+        -----
+        **``W`` and ``coverage`` are the point of the frame**, and were missing
+        from it until ``1.0.0a254``. The leaf exists to answer "is this grid big
+        enough", and the width and the coverage are the answer: without them a
+        reader has a list of candidate windows and no way to compare them. They
+        were curated out as expert material, which was the wrong call about
+        which columns carry the meaning.
+
+        ``coverage`` is a **string** (``'1-1e-12'``,
+        ``'E[N]-adj 1-1e-12'``), carrying precision a float cannot and saying
+        which of two things was held to that precision.
         """
         if self._bs_window_df is None:
             return None
-        cols = ['applies', 'selected', 'x_min', 'x_max', 'bs', 'log2',
-                'log2_need', 'clipped', 'note']
+        cols = ['applies', 'selected', 'x_min', 'x_max', 'W', 'bs', 'log2',
+                'log2_need', 'coverage', 'clipped', 'note']
         return self._bs_window_df.reindex(columns=cols).copy()
 
     @property

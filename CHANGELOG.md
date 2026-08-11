@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a254
+
+**[BS-Window-Diagnostics] the bucket window frame carries the two columns it exists for.** `bs_window_df` published the candidate windows and withheld `W`, the window's width, and `coverage`, the fraction of the distribution it holds. The leaf's whole question is "is this grid big enough", and those two are the answer, so a reader had a list of candidate windows and no way to compare them. Both were curated onto the private `_bs_window_df` as expert material, which was the wrong call about which columns carry the meaning. Ruling `[BS-Window-Widen]`: widen the published frame rather than register the exhibit against the private one, because if the curation dropped what answers the question then the curation was wrong.
+
+Published columns are now `applies`, `selected`, `x_min`, `x_max`, `W`, `bs`, `log2`, `log2_need`, `coverage`, `clipped`, `note` on an `Aggregate`, and the same list without the two method flags on a `Portfolio`. `coverage` stays the **string** it is (`'1-1e-12'`, `'E[N]-adj 1-1e-12'`), carrying a precision a float cannot and saying which of two things was held to it.
+
+**The stray `level_0` was an unnamed index, and it was not alone.** `pd.DataFrame(rows).T` leaves `index.name` as `None`, which reaches a served table as a column headed `level_0`. Named at construction so the private frame and the published one agree: `method` on an Aggregate. The sweep for the same bug across every served block found two more. `Portfolio.tail_behavior_df` was unnamed where its `Aggregate` twin has been `component` all along, and is now `unit`. `PnL.legs_df` had a bare positional index and is now named `leg`, the index staying positional because legs are ordered. `Portfolio.bs_window_df` had the opposite fault, an index named `unit` that then had five rows appended to it which are not units, four combine candidates and the realized grid; it is now `source`, which is what every row answers. A standing test asserts no served block carries an unnamed index level, under either perspective.
+
+**Closes round 6 item 2** (`dev/note-from-aggregate-api-round-6.md`), which is a live regression in the app's More / Window pane until it syncs. Exhibit snapshots re-captured: eighteen entries move, the eight `bs_window` ones gaining two columns and the ten others gaining a stub header.
+
+---
+
 ## 1.0.0a253
 
 **[Exhibit-Perspective-Contract] a RAW block is exactly one public frame, and the exhibit layer stops inventing frames.** The invariant is now written into the `aggregate.exhibits` docstring and onto `Perspective`, and swept in `tests/test_exhibits.py`: every RAW block of every exhibit available on every fixture names an attribute on the object and serves that frame, in the frame's own orientation, with no split and no dropped rows. `INSURER` is the only perspective that may restructure, and ruling `[Perspective-May-Restructure]` says it may change the **block list** and not merely each block's content, so `meta['blocks']` is a property of the (exhibit, perspective) pair. `economic_ratios` already exercises it, two blocks raw and three under insurer, and a client assuming parity would be wrong about that today.

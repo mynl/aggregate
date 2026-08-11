@@ -948,6 +948,10 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     ret_x0 = sel_x0
 
     df = pd.DataFrame(rows).T
+    # Named at construction, so the private frame and the published one agree.
+    # Without it the index reaches a served table as a column headed
+    # ``level_0``, which names nothing a reader recognizes.
+    df.index.name = 'method'
     # the winning method is flagged; the ``used`` row is the realized grid.
     df['selected'] = df.index == selected
     # The ``used`` row converts the selected method's window into the actual
@@ -992,17 +996,21 @@ def port_bs_window_df(port) -> 'pd.DataFrame':
     One row per unit (its selected window), then the four candidate combine
     rows (``mm`` Portfolio MM bulk / ``rms`` RMS-of-windows reference /
     ``sbj`` single-big-jump look-through / ``sum`` legacy linear bound), then
-    the realised shared ``used`` grid -- culled to the user-facing columns
-    (``x_min`` / ``x_max`` / ``bs`` / ``log2`` / ``log2_need`` / ``clipped`` /
-    ``note``, parity with :attr:`Aggregate.bs_window_df`). The full frame --
-    with the ``coverage`` string and window width ``W`` -- stays on the
-    private :attr:`_bs_window_df` for experts. Returns ``None`` before the
-    grid is sized. See :attr:`bs_description` / :attr:`bs_explanation`.
+    the realised shared ``used`` grid, indexed by ``source``, culled to the
+    user-facing columns (``x_min`` / ``x_max`` / ``W`` / ``bs`` / ``log2`` /
+    ``log2_need`` / ``coverage`` / ``clipped`` / ``note``, parity with
+    :attr:`Aggregate.bs_window_df`). Returns ``None`` before the grid is
+    sized. See :attr:`bs_description` / :attr:`bs_explanation`.
+
+    ``W`` and ``coverage`` joined the published frame at ``1.0.0a254``: the
+    width and the coverage are what let a reader compare two candidate
+    windows, which is the only thing this frame is for.
     """
     df = getattr(port, '_bs_window_df', None)
     if df is None:
         return None
-    cols = ['x_min', 'x_max', 'bs', 'log2', 'log2_need', 'clipped', 'note']
+    cols = ['x_min', 'x_max', 'W', 'bs', 'log2', 'log2_need', 'coverage',
+            'clipped', 'note']
     return df.reindex(columns=cols).copy()
 
 
@@ -1327,6 +1335,11 @@ def port_build_bs_window_df(port, rows, bs, log2, x_min, cand, resolution, W_ext
         return float(np.ceil(np.log2(w / b + 1.0)))
     df['log2_need'] = df.apply(_need, axis=1)
     df['clipped'] = np.nan
+    # ``unit`` came from the per unit rows and then five rows that are not
+    # units were appended under it: four combine candidates and the realized
+    # grid. ``source`` is what every row actually answers, namely where this
+    # window came from.
+    df.index.name = 'source'
     port._bs_window_df = df
 
 

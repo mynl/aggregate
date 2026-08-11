@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a251
+
+**[PnL-Consideration-Rounding] a sized P&L premium is a number someone would write down.** `pnl_program` sizes an uninherited premium as expected loss over the target loss ratio and wrote the quotient out at full precision, so the derivation dropped `1428.5840984231345 premium` into a program the reader is meant to read, keep and edit: sixteen digits derived from an input of "about 70 percent". `_pnl_consideration` now rounds where the number is produced. No decimals above 100, two at or below, which is the author's rule and has one joint in it on purpose: above 100 the cents are noise against the quote, at or below they are the number, and a rule with more joints stops being predictable from the outside.
+
+**Only a sized premium rounds.** An inherited one is a number the program already stated, and restating it differently would make the wrap disagree with the exposure clause it wrapped. Rounding at the source rather than in the writer keeps the value and its printed form the same fact: `decl_writer._fmt_num` drops the trailing zero of an integral float, so the program reads `1429 premium` and the spec carries 1429.
+
+**Closes round 6 item 5** (`dev/note-from-aggregate-api-round-6.md`), the last of round 5's asks. `aggregate_api` rounded this downstream in `post_pnl` as a string rewrite of DecL in a service, which is not where it belongs; that pass is idempotent, applying the rule to an already round number, so it can be deleted on the sync that picks this up. The rounded premium moves the realized loss ratio by at most half a currency unit's worth, which is the price of a program a reader can keep.
+
+The three derived P&L programs mirrored in `agg/decl-testers.agg` re-render (`80.00000000000009` to `80`, `14285.739238292414` to `14286`, `11238.555678761779` to `11239`), and `DP.OddPremium` joins the DP block as the case that must **not** round, an inherited premium stated to the cent.
+
+---
+
 ## 1.0.0a250
 
 **[Reins-Density-Fuzz] `reins_density_df` removes its FFT fuzz, like every other density frame. Bug fix.** `calibrate_distortions(reins_view=...)` raised a bare `AssertionError` with no message, and past that `reins_price_df` returned `NaN`. Measured over six program shapes and every view each carries: four of five shapes failed to calibrate on at least one view, `net` failed on three of five, and pricing lost four of the five calibrated families. All of it is fixed by one line.

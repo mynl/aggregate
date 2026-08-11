@@ -374,6 +374,20 @@
   insurer view (greater_tables formats are per column, the store mixes
   measures down a column, so the app's measure formats have no TableSpec
   home yet) and whether the PnL validation audit ever gets a failure gate.
+- **[Exhibit-Official-Channels]**: closes
+  `dev/note-from-aggregate-api-round-6.md`, the round in which the app stopped
+  building table documents out of frames it fetched, so every gap the library
+  left became a live regression on screen rather than something the app papered
+  over. Plan: `dev/plan-exhibit-official-channels.md`, which also installs the
+  invariant that a RAW block is exactly one public frame in its own
+  orientation and that INSURER is the only perspective that may restructure.
+  Scope boundary, author 2026-08-11: the framework is what these phases are
+  about, complete, used and working; whether a given exhibit reads the business
+  right is a separate conversation. **Progress:**
+  `[PnL-Consideration-Rounding]` landed a251 (note item 5). Phase 7 struck,
+  its bug fixed at a250. Phases 8 to 10, the Pricing pane redesign keyed on
+  result objects, wait on the design discussion, and with them the question of
+  whether `REINSURER` gets implemented.
 - **[Chart-IR]**: a minimal versioned chart IR in a new `aggregate/charts/`
   package (frozen dataclasses, no pydantic; ChartDoc/ChartSeries/ChartAxis/
   Panel/Mark), with the one generic mpl renderer at `plots/_chartdoc.py` and

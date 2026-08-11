@@ -23,7 +23,7 @@ import pytest
 
 from aggregate import build, Underwriter
 from aggregate._bucket_window import _fmt_bs
-from aggregate._program import _merge_hints, _merge_note
+from aggregate._program import _merge_hints, _merge_note, _round_consideration
 from aggregate.decl_writer import format_program
 
 
@@ -40,6 +40,9 @@ BOTH = (MOVES.replace('DP.Moves', 'DP.Both')
         + ' note{a stored note} hints{bs=1/32; padding=2}')
 # An engine that states its own premium, so the P&L inherits rather than sizes.
 PREMIUM = 'agg DP.Premium 1000 premium at 0.65 lr sev lognorm 100 cv 2 poisson'
+# The same, stated to the cent: an inherited premium is never re-rounded.
+ODD_PREMIUM = ('agg DP.OddPremium 1000.125 premium at 0.65 lr '
+               'sev lognorm 100 cv 2 poisson')
 # Already ceded on both tiers, to check a cession replaces its own tier only.
 CEDED = ('agg DP.Ceded 100 claims sev lognorm 100 cv 2 '
          'occurrence net of 250 xs 250 poisson aggregate net of 9000 xs 1000')
@@ -269,7 +272,47 @@ def test_pnl_program_sizes_the_premium_from_the_loss_ratio():
     """No premium to inherit, so it is expected loss over the stated ratio."""
     a = build(MOVES)
     p = build(a.pnl_program(loss_ratio=0.65, expense_ratio=0))
-    assert _booked_premium(p) == pytest.approx(a.est_m / 0.65)
+    assert _booked_premium(p) == pytest.approx(round(a.est_m / 0.65))
+    # the sized number is within half a unit of the quotient it came from
+    assert abs(_booked_premium(p) - a.est_m / 0.65) <= 0.5
+
+
+def test_pnl_program_rounds_a_sized_premium_to_whole_units_above_100():
+    """A program a reader keeps and edits does not carry sixteen digits."""
+    a = build(MOVES)
+    program = a.pnl_program(loss_ratio=0.65, expense_ratio=0)
+    premium = program.split('premium')[0].split()[-1]
+    assert premium == '15385'
+    assert '.' not in premium
+
+
+def test_pnl_program_keeps_two_decimals_at_or_below_100():
+    """Below the threshold the cents are the number, not noise."""
+    a = build(DISCRETE)
+    program = a.pnl_program(loss_ratio=0.65, expense_ratio=0)
+    premium = float(program.split('premium')[0].split()[-1])
+    assert premium == pytest.approx(round(a.est_m / 0.65, 2))
+    assert premium == round(premium, 2)
+
+
+def test_consideration_rounding_is_idempotent():
+    """Rounding an already round number changes nothing.
+
+    The api rounded this downstream while the library did not, so the two had
+    to agree on the day it landed here: applying the rule twice is applying it
+    once.
+    """
+    for value in (1428.5840984231345, 100.0, 100.004, 99.999, 0.126, 1e6 + 0.5):
+        once = _round_consideration(value)
+        assert _round_consideration(once) == once
+
+
+def test_pnl_program_does_not_round_an_inherited_premium():
+    """An inherited premium is a number the program already stated."""
+    a = build(ODD_PREMIUM)
+    assert 'inherit premium' in a.pnl_program(loss_ratio=0.65)
+    p = build(a.pnl_program(loss_ratio=0.65))
+    assert _booked_premium(p) == pytest.approx(1000.125)
 
 
 def test_pnl_program_zero_expense_ratio_omits_the_clause():
@@ -320,7 +363,7 @@ def test_pnl_program_on_a_portfolio_writes_the_units_out():
         assert unit.name in program
     fresh = Underwriter()                  # never heard of DP.Port
     face = fresh.build(program)
-    assert _booked_premium(face) == pytest.approx(p.est_m / 0.8)
+    assert _booked_premium(face) == pytest.approx(round(p.est_m / 0.8))
 
 
 def test_pnl_program_on_a_portfolio_drops_the_book_trailer():

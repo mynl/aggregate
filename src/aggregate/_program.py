@@ -244,6 +244,11 @@ _CESSION_PROBE = 'DerivedProgramCessionProbe'
 #: Suffix for the wrapping P&L's name in :func:`pnl_program`.
 _PNL_SUFFIX = '_PnL'
 
+#: Premium above which a sized consideration rounds to whole currency units.
+#: Above it the cents are noise against the quote; at or below it they are the
+#: number. See :func:`_round_consideration`.
+_CONSIDERATION_WHOLE_ABOVE = 100.0
+
 
 def _parse_program(program):
     """Parse a stored DecL statement back to its ``(kind, name, spec)`` triple.
@@ -605,7 +610,8 @@ def _pnl_consideration(ob, loss_ratio, caller):
     INHERIT_PREMIUM or float
         The sentinel when the engine carries a technical premium, so the
         program says ``inherit premium`` and the number is resolved at build;
-        otherwise expected loss divided by ``loss_ratio``.
+        otherwise expected loss divided by ``loss_ratio``, rounded by
+        :func:`_round_consideration`.
 
     Raises
     ------
@@ -617,7 +623,9 @@ def _pnl_consideration(ob, loss_ratio, caller):
     -----
     Expected loss is the **empirical** mean ``est_m``, read off the computed
     density rather than from the analytic moments, so the P&L's realized loss
-    ratio is exactly the one asked for.
+    ratio answers the one asked for rather than the analytic approximation to
+    it. The rounding then moves it by at most half a currency unit on the
+    premium, which is the price of a program a reader can keep.
     """
     from .parser import INHERIT_PREMIUM
     premium = getattr(ob, 'exp_premium', 0.0)
@@ -637,7 +645,46 @@ def _pnl_consideration(ob, loss_ratio, caller):
             f"{caller}: {getattr(ob, 'name', ob)!r} has no expected loss to "
             "size a premium from. Call update() first (build does it for you); "
             "the premium is the computed mean divided by loss_ratio.")
-    return e_loss / loss_ratio
+    return _round_consideration(e_loss / loss_ratio)
+
+
+def _round_consideration(premium):
+    """Round a sized premium to a number someone would write down.
+
+    Parameters
+    ----------
+    premium : float
+        Expected loss divided by the target loss ratio.
+
+    Returns
+    -------
+    float
+        Rounded to whole currency units above
+        :data:`_CONSIDERATION_WHOLE_ABOVE`, to two decimals at or below it.
+
+    Notes
+    -----
+    Only a **sized** premium is rounded. An inherited one is a number the
+    program already stated, and restating it differently would make
+    :func:`pnl_program` disagree with the exposure clause it wrapped.
+
+    The unrounded quotient put ``1428.5840984231345 premium`` into a program
+    the reader is meant to read, keep and edit: sixteen digits derived from an
+    input of "about 70 percent". Sizing is a convention, so the answer carries
+    a convention's worth of precision and no more.
+
+    **The threshold has one joint on purpose.** Above 100 the cents are noise
+    against a premium quoted in whole units; at or below it they are the
+    number. A rule with more joints in it stops being predictable from the
+    outside. Rounding here rather than in the writer also keeps the number and
+    its printed form the same fact: :func:`aggregate.decl_writer._fmt_num`
+    renders an integral float without its trailing zero, so the program reads
+    ``1429 premium``, and the spec carries the value the program states.
+    """
+    value = float(premium)
+    if value > _CONSIDERATION_WHOLE_ABOVE:
+        return float(round(value))
+    return round(value, 2)
 
 
 def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):

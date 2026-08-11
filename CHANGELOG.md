@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a252
+
+**[Chart-Doc-Reader] a served chart document has a way home.** The two registries were the same shape end to end except at one point: `greater_tables.TableDoc` is a pydantic model, so an exhibit block reconstructs from its own wire form and redraws without knowing an `Aggregate` ever existed, while `canonical_dict` went out and nothing read it back. The obvious guess failed, `ChartDoc(**canonical_dict(doc))` raising `AttributeError: 'dict' object has no attribute 'id'`, because panels, axes, series and marks arrive as plain dicts and `__post_init__` validates them as dataclasses. `load_chart_doc(d)` closes it, in `charts/ir.py` beside `canonical_dict` and exported from `aggregate.charts`.
+
+**The round trip is the contract**: `doc_hash(load_chart_doc(canonical_dict(doc))) == doc.hash`, checked over every document the registry emits, each through a genuine `json.loads(json.dumps(...))`. That covers all three payload shapes, explicit coordinates, the lattice form, and the nested `SurfaceData` a bivariate document carries. Reconstruction is equal to the original as a value, not merely equal in hash.
+
+**Why the library owns the reader rather than each client.** `canonical_dict` drops any field equal to its default, so a reader is a statement about what those defaults are: panel `read_axis` and `aspect` never reach the wire, axis `kind` never reaches it, and `invertible` appears only where it is true. A client writing its own is writing this build's default table down a second time, and a default that moves here then moves silently over there. `ir_version` is validated in `ChartDoc.__post_init__`, which makes the reader the one place a wire document's version is negotiated, and a hand rolled reader that passes the field through by accident is the one that accepts a version it cannot read. `SurfaceData` is the only nested payload, so a reader that forgets it fails on exactly the largest and least exercised documents. A member carrying a field this build does not know is refused by name rather than as a bare `TypeError` about a keyword argument.
+
+**Closes round 6 item 6** (`dev/note-from-aggregate-api-round-6.md`). Nothing changes app side when it lands, and nothing about what is emitted changes: `canonical_dict` was already complete and already deterministic, only the way back was missing. Urgency came from the 3D plan, whose documents are the largest chart payloads yet, and where a quiet coercion in a hand written reader, a tuple that came back a list, is not something anyone catches by looking at the picture.
+
+---
+
 ## 1.0.0a251
 
 **[PnL-Consideration-Rounding] a sized P&L premium is a number someone would write down.** `pnl_program` sizes an uninherited premium as expected loss over the target loss ratio and wrote the quotient out at full precision, so the derivation dropped `1428.5840984231345 premium` into a program the reader is meant to read, keep and edit: sixteen digits derived from an input of "about 70 percent". `_pnl_consideration` now rounds where the number is produced. No decimals above 100, two at or below, which is the author's rule and has one joint in it on purpose: above 100 the cents are noise against the quote, at or below they are the number, and a rule with more joints stops being predictable from the outside.

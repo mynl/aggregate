@@ -49,6 +49,8 @@ The document schema. ``CHART_IR_VERSION`` is how a consumer detects a schema cha
 
 :func:`~aggregate.charts.ir.canonical_dict` and :func:`~aggregate.charts.ir.canonical_json` give a deterministic serialization, and :func:`~aggregate.charts.ir.doc_hash` the first twelve hex characters of its sha256. The same document gives the same bytes and the same hash on any machine on any run, which is what lets a client cache on an ETag.
 
+:func:`~aggregate.charts.ir.load_chart_doc` is the way back, so a fetched document draws through :func:`~aggregate.plots.plot_chartdoc` like any other. The round trip is exact, ``doc_hash(load_chart_doc(canonical_dict(doc))) == doc.hash``, and it is the library's to own rather than each client's: the canonical form omits every field equal to its default, so a hand written reader is this build's default table written down a second time, and the reader is also the one place a wire document's ``ir_version`` is negotiated.
+
 A document also declares the **readings** each quantity admits, which is a fact about the quantity and not about the drawing: a log reading of a heavy tail is meaningful, a log reading of a distortion's unit square is not. :attr:`~aggregate.charts.ir.ChartAxis.scales` lists the scales an axis may be read on and :attr:`~aggregate.charts.ir.ChartAxis.full_range` the extent it may be zoomed out to, both alongside the default reading rather than replacing it; :attr:`~aggregate.charts.ir.ChartAxis.reciprocal_of` pairs a probability axis with its return-period reading, computed by the map in ``meta['return_period_map']`` (see :data:`~aggregate.charts.ir.RETURN_PERIOD_MAPS`); and :attr:`~aggregate.charts.ir.Panel.kinds` lists the forms a panel may take, so a joint density read flat or in relief is one document declaring two realizations rather than two charts to keep in step. A reader that ignores all four draws the default reading, which is correct and complete, which is why they landed without a version bump.
 
 Every human-facing string in a document is plain text, never markup in any renderer's language, and carries **both** forms: :attr:`~aggregate.charts.ir.ChartDoc.tex` is a total lookup from the plain string to its typeset form, a plain word mapping to itself. The analogy is alt text in HTML: you write both because they serve different consumers, and you do not make one consumer guess. matplotlib reads the typeset form, the browser reads the plain one, and neither derives one from the other. A missing entry is an emitter bug, so emitters build the map with :func:`~aggregate.charts.ir.complete_tex`, which fills the identities, and the contract is checked as a set difference against :func:`~aggregate.charts.ir.human_strings`. The plain form does not have to be ASCII: Unicode carries most actuarial labels honestly, and the dual distortion ``ǧ(s)`` is the working example.
@@ -66,6 +68,7 @@ Every human-facing string in a document is plain text, never markup in any rende
    ChartCapabilityError
    canonical_dict
    canonical_json
+   load_chart_doc
    complete_tex
    human_strings
    doc_hash

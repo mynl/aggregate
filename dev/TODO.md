@@ -384,7 +384,8 @@
   Scope boundary, author 2026-08-11: the framework is what these phases are
   about, complete, used and working; whether a given exhibit reads the business
   right is a separate conversation. **Progress:**
-  `[PnL-Consideration-Rounding]` landed a251 (note item 5). Phase 7 struck,
+  `[PnL-Consideration-Rounding]` landed a251 (note item 5);
+  `[Chart-Doc-Reader]` landed a252 (note item 6, `load_chart_doc`). Phase 7 struck,
   its bug fixed at a250. Phases 8 to 10, the Pricing pane redesign keyed on
   result objects, wait on the design discussion, and with them the question of
   whether `REINSURER` gets implemented.

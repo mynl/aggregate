@@ -52,7 +52,7 @@ from .ir import (
     CHART_IR_VERSION, SUPPORT_KINDS, ChartAxis, ChartCapabilityError,
     ChartDoc, ChartSeries, Mark, Panel, SurfaceData,
     canonical_dict, canonical_json, complete_tex, doc_hash, human_strings,
-    stamp,
+    load_chart_doc, stamp,
 )
 
 __all__ = [
@@ -60,7 +60,8 @@ __all__ = [
     'ChartCapabilityError', 'ChartDoc', 'ChartEntry', 'ChartSeries', 'Mark',
     'Panel', 'SurfaceData', 'available_charts', 'build_chart_doc',
     'canonical_dict', 'canonical_json', 'complete_tex', 'doc_hash',
-    'human_strings', 'primary_chart', 'register_chart', 'stamp',
+    'human_strings', 'load_chart_doc', 'primary_chart', 'register_chart',
+    'stamp',
 ]
 
 #: One registry entry: the emitter, its availability predicate, and the

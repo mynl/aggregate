@@ -17,7 +17,7 @@ from aggregate import charts
 from aggregate.charts import (
     CHART_IR_VERSION, ChartAxis, ChartDoc, ChartSeries, Mark, Panel,
     SurfaceData, available_charts, canonical_dict, canonical_json,
-    complete_tex, doc_hash, human_strings, stamp,
+    complete_tex, doc_hash, human_strings, load_chart_doc, stamp,
 )
 
 
@@ -592,6 +592,104 @@ def test_gaps_serialize_as_null():
     tail = [s for s in canonical_dict(doc)['series']
             if s['role'] == 'survival']
     assert tail[0]['y'][-1] is None
+
+
+# --------------------------------------------- [Chart-Doc-Reader] the way back
+
+def _through_the_wire(doc):
+    """The document as a consumer receives it: genuine JSON, genuine parse."""
+    return json.loads(json.dumps(canonical_dict(doc)))
+
+
+def test_load_chart_doc_round_trips_hash_for_hash():
+    """The contract, on both document shapes the schema supports."""
+    for doc in (stamp(small_xy_doc()), stamp(small_surface_doc())):
+        back = load_chart_doc(_through_the_wire(doc))
+        assert doc_hash(back) == doc.hash
+        assert back == doc
+
+
+def test_load_chart_doc_round_trips_every_emitted_document():
+    """Sweep the live emitters, including the nested bivariate payload.
+
+    The three shapes the registry produces are xy series with explicit
+    coordinates, xy series carrying a lattice, and a document whose series
+    holds a ``SurfaceData``. A reader that forgets the last one fails on
+    exactly the largest and least often exercised documents.
+    """
+    from aggregate import build
+    from aggregate.charts import CHARTS
+
+    objs = [
+        build('agg IR.Read 100 claims sev lognorm 50 cv 2 '
+              'occurrence net of 100 xs 100 poisson'),
+        build('''bivariate IR.ReadBv 25 claims
+                 agg A dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
+                 agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
+                 copula gumbel 0.4
+                 poisson'''),
+    ]
+    seen = []
+    for obj in objs:
+        for name in available_charts(obj):
+            doc = stamp(CHARTS[name][0](obj))
+            back = load_chart_doc(_through_the_wire(doc))
+            assert doc_hash(back) == doc.hash, name
+            assert back == doc, name
+            seen.append(name)
+    assert 'agg' in seen and 'reins' in seen and 'joint_surface' in seen
+
+
+def test_load_chart_doc_restores_the_fields_the_wire_drops():
+    """The reader is this build's default table, which is why it lives here.
+
+    ``canonical_dict`` omits any field equal to its default, so panel
+    ``read_axis`` and ``aspect``, axis ``kind`` and a false ``invertible``
+    never reach a consumer at all. A client writing its own reader is writing
+    those defaults down a second time.
+    """
+    doc = small_xy_doc()
+    wire = _through_the_wire(doc)
+    assert 'read_axis' not in wire['panels'][0]      # 'x', the default
+    assert 'kind' not in wire['axes'][0]             # 'value', the default
+    assert 'invertible' not in wire['panels'][0]
+    back = load_chart_doc(wire)
+    assert back.panels[0].read_axis == 'x'
+    assert back.axes[0].kind == 'value'
+    assert back.panels[0].invertible is False
+
+
+def test_load_chart_doc_rebuilds_the_nested_surface():
+    """``SurfaceData`` is the only nested payload, and it comes back typed."""
+    back = load_chart_doc(_through_the_wire(small_surface_doc()))
+    surf = back.series[0].surface
+    assert isinstance(surf, SurfaceData)
+    assert surf.z == ((0.1, 0.2), (0.3, 0.1), (0.2, 0.1))
+    assert isinstance(surf.x, tuple)
+
+
+def test_load_chart_doc_negotiates_the_version():
+    """The reader is the one place a wire document's version is checked."""
+    wire = _through_the_wire(small_xy_doc())
+    wire['ir_version'] = CHART_IR_VERSION + 1
+    with pytest.raises(ValueError, match='unsupported ir_version'):
+        load_chart_doc(wire)
+
+
+def test_load_chart_doc_refuses_a_field_it_does_not_know():
+    """A stray field is a document this build cannot honor, said plainly."""
+    wire = _through_the_wire(small_xy_doc())
+    wire['panels'][0]['gridlines'] = True
+    with pytest.raises(ValueError, match='Panel carries unknown field'):
+        load_chart_doc(wire)
+
+
+def test_load_chart_doc_carries_the_documents_own_validation():
+    """Structure is checked on the way in, not only on the way out."""
+    wire = _through_the_wire(small_xy_doc())
+    wire['panels'][0]['x_axis'] = 'nosuchaxis'
+    with pytest.raises(ValueError, match='references unknown axis'):
+        load_chart_doc(wire)
 
 
 # ---------------------------------------------------------------- capability

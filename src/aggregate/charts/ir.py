@@ -33,6 +33,13 @@ first 12 hex characters of the sha256 of the hashless canonical form, and
 :func:`stamp` writes the hash back without perturbing it. Same document,
 same bytes, same hash, on any machine, any run.
 
+**The wire goes both ways.** :func:`load_chart_doc` rebuilds a document from
+its canonical dict, so a consumer that fetched one can draw it through
+:func:`aggregate.plots.plot_chartdoc` without knowing what emitted it. The
+round trip is exact, ``doc_hash(load_chart_doc(canonical_dict(doc))) ==
+doc.hash``, and the reader is the one place a wire document's ``ir_version``
+is negotiated and this build's omitted defaults are restored.
+
 Vocabularies (panel kinds, axis units, series roles, mark roles) are
 documented strings, not enums, so version 1 can grow without schema churn.
 A reader must ignore roles it does not know; a writer must not invent a
@@ -69,7 +76,7 @@ __all__ = [
     'CHART_IR_VERSION', 'SUPPORT_KINDS', 'ChartAxis', 'ChartCapabilityError',
     'ChartDoc', 'ChartSeries', 'Mark', 'Panel', 'SurfaceData',
     'canonical_dict', 'canonical_json', 'complete_tex', 'doc_hash',
-    'human_strings', 'stamp',
+    'human_strings', 'load_chart_doc', 'stamp',
 ]
 
 #: The IR version. **When to bump it**, which is the question every
@@ -861,6 +868,110 @@ def canonical_dict(doc, *, include_hash=True):
     """
     skip = () if include_hash else ('hash', 'generator')
     return _canonical(doc, skip=skip)
+
+
+def _load_member(cls, data):
+    """One canonical dict to its dataclass, with a readable error on a stray field.
+
+    ``cls(**data)`` would report an unknown field as a bare ``TypeError``
+    naming a keyword argument, which reads as a caller mistake rather than as
+    what it is, a document this build cannot honor.
+    """
+    if not isinstance(data, dict):
+        raise TypeError(
+            f'{cls.__name__}: expected a dict, got {type(data).__name__}')
+    unknown = sorted(set(data) - {f.name for f in dataclasses.fields(cls)})
+    if unknown:
+        raise ValueError(
+            f'{cls.__name__} carries unknown field(s) {unknown}. The document '
+            f'declares an ir_version this build reads ({CHART_IR_VERSION}), '
+            'so it was written by a build that means something different by '
+            'that number.')
+    return cls(**data)
+
+
+def _load_series(data):
+    """One canonical series dict, rebuilding its nested surface if it has one."""
+    if isinstance(data, dict) and isinstance(data.get('surface'), dict):
+        data = {**data, 'surface': _load_member(SurfaceData, data['surface'])}
+    return _load_member(ChartSeries, data)
+
+
+def load_chart_doc(d):
+    """Rebuild a chart document from its canonical dict: the way back.
+
+    The inverse of :func:`canonical_dict`, so a consumer holding a fetched
+    document can hand it to :func:`aggregate.plots.plot_chartdoc`, which is
+    generic over any :class:`ChartDoc` and needs to know nothing about the
+    object that emitted it.
+
+    Parameters
+    ----------
+    d : dict
+        A canonical dict, or what ``json.loads`` makes of
+        :func:`canonical_json` output. Panels, axes, series and marks arrive
+        as plain dicts and are rebuilt as their dataclasses; tuples arrive as
+        lists and are frozen by each class's ``__post_init__``.
+
+    Returns
+    -------
+    ChartDoc
+        Equal in content to the document that was written, and equal in hash.
+
+    Raises
+    ------
+    ValueError
+        Through the dataclasses' own validation (an ``ir_version`` this build
+        does not read, a panel naming an axis the document does not carry, a
+        series carrying neither an x/y payload nor a surface), or when a
+        member carries a field this build does not know.
+
+    Notes
+    -----
+    **The round trip is the contract**, and it is exact::
+
+        doc_hash(load_chart_doc(canonical_dict(doc))) == doc.hash
+
+    **Why this belongs to the library rather than to each client.**
+    :func:`canonical_dict` drops any field equal to its default, so a reader
+    is a statement about what those defaults are: panel ``read_axis`` and
+    ``aspect`` never reach the wire, axis ``kind`` never reaches it, and
+    ``invertible`` appears only where it is true. A client writing its own
+    reader writes this build's default table down a second time, and a
+    default that moves here then moves silently over there.
+
+    ``ir_version`` is validated in :meth:`ChartDoc.__post_init__`, which makes
+    the reader the one place a wire document's version is negotiated. A
+    consumer assembling dataclasses by hand may pass the field through or may
+    not, and the one that does not is the one that accepts a version it cannot
+    read without noticing.
+
+    :class:`SurfaceData` is the only nested payload, so a reader that forgets
+    it fails on exactly the bivariate documents, which are both the largest
+    and the least often exercised.
+
+    **The hash is what makes this checkable at all.** The ``agg`` chart runs to
+    megabytes of canonical JSON, most of it explicit curve coordinates, and a
+    quiet coercion in a hand written reader, a tuple that came back a list or
+    a float that came back a string, is not something anyone catches by
+    looking at the picture.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+    """
+    if not isinstance(d, dict):
+        raise TypeError(
+            f'load_chart_doc: expected a canonical dict, got '
+            f'{type(d).__name__}')
+    rest = dict(d)
+    members = {
+        'panels': tuple(_load_member(Panel, p) for p in rest.pop('panels', ())),
+        'axes': tuple(_load_member(ChartAxis, a) for a in rest.pop('axes', ())),
+        'series': tuple(_load_series(s) for s in rest.pop('series', ())),
+        'marks': tuple(_load_member(Mark, m) for m in rest.pop('marks', ())),
+    }
+    return _load_member(ChartDoc, {**rest, **members})
 
 
 def canonical_json(doc, *, include_hash=True):

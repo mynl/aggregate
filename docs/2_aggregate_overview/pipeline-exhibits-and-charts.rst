@@ -146,6 +146,12 @@ What is published
      - 1: ``bs_window_df``
      - updated
      - none
+   * - ``sharpen``
+     - Grid probe
+     - Aggregate, Portfolio
+     - 1 raw, 2 insurer: ``score_grid``, ``sharpen_df``
+     - probed (``sharpen_df`` present)
+     - the score grid, which is ``score`` unstacked by ``d_log2``
    * - ``tail_behavior``
      - Tail behavior
      - Aggregate, Portfolio
@@ -156,9 +162,9 @@ What is published
 Read by class, which is the question a landing page actually asks:
 
 Aggregate
-    ``summary``, ``tail``, ``stats``, ``validation``, ``bs_window``, ``tail_behavior``, plus ``reins`` when it cedes. Six or seven.
+    ``summary``, ``tail``, ``stats``, ``validation``, ``bs_window``, ``tail_behavior``, plus ``reins`` when it cedes and ``sharpen`` once the grid probe has run. Six to eight.
 Portfolio
-    The same six or seven, per unit plus the total.
+    The same, per unit plus the total.
 PnL
     ``summary``, ``stats``, ``validation``, ``economic``, ``economic_ratios``, plus ``economic_waterfall`` on a walk.
 BivariateAggregate

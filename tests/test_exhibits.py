@@ -196,6 +196,63 @@ def test_registry_shape():
         assert isinstance(fn.title, str)
 
 
+# --- the sharpen exhibit ([Sharpen-Exhibit]) ---------------------------------
+
+@pytest.fixture(scope='module')
+def probed():
+    """A small object that has been through the grid probe.
+
+    Deliberately not one of the ``PROGRAMS`` fixtures and deliberately not
+    snapshotted: the audit carries a ``seconds`` column, so a captured
+    document would differ on every run and on every machine.
+    """
+    import warnings
+    a = build('agg EX.Probe 20 claims sev lognorm 100 cv 2 poisson')
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')     # the probe visits bad cells
+        a.sharpen()
+    return a
+
+
+def test_sharpen_is_absent_until_the_probe_has_run(dice, probed):
+    """The audit is what the exhibit shows, so no audit is no exhibit."""
+    assert dice.sharpen_df is None
+    assert 'sharpen' not in [n for n, _ in available_exhibits(dice)]
+    assert 'sharpen' in [n for n, _ in available_exhibits(probed)]
+    with pytest.raises(ValueError, match='not available'):
+        exhibit_frames(dice, 'sharpen')
+
+
+def test_sharpen_raw_is_the_audit_frame(probed):
+    blocks = exhibit_frames(probed, 'sharpen')
+    assert [b for b, _, _ in blocks] == ['sharpen_df']
+    pd.testing.assert_frame_equal(blocks[0][1], probed.sharpen_df)
+
+
+def test_sharpen_insurer_leads_with_the_score_grid(probed):
+    """[Sharpen-Grid-Is-A-Reading]: the grid is a reading, not a new frame.
+
+    ``score`` is a column on the audit, so the grid unstacks it rather than
+    coming from anywhere else. One block raw, two under insurer, which is the
+    smallest exercise of [Perspective-May-Restructure].
+    """
+    blocks = exhibit_frames(probed, 'sharpen', Perspective.INSURER)
+    assert [b for b, _, _ in blocks] == ['score_grid', 'sharpen_df']
+    grid = blocks[0][1]
+    pd.testing.assert_frame_equal(
+        grid, probed.sharpen_df['score'].unstack('d_log2'))
+    assert grid.index.name == 'd_bs'
+    assert grid.columns.name == 'd_log2'
+
+
+def test_sharpen_formats_the_errors_scientifically(probed):
+    """At a fixed .4f a good cell and a perfect cell both print 0.0000."""
+    _name, _df, kw = exhibit_frames(probed, 'sharpen')[0]
+    formats = kw['formatters']
+    assert formats['u_agg_mean'] == '.2e'
+    assert formats['score'] == '.5f'
+
+
 # --- frame stage ------------------------------------------------------------
 
 def test_frames_raw_aggregate(dice):

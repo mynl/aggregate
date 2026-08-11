@@ -55,7 +55,7 @@ Left lane is tables, right lane is charts, and they are deliberately symmetric. 
 
 **Core aggregate.** Unchanged by all of this. It computes distributions and serves frames. Neither translation layer is allowed to push presentation concerns back down into it.
 
-**Exhibits** (`src/aggregate/exhibits/`). One registered exhibit is a named business view: summary, tail, stats, validation, bs_window, tail_behavior, reins, economic, economic_ratios, dependency. Building one produces an **envelope**: a title, metadata, a content hash, and one or more **blocks**, each a greater_tables `TableDoc` carrying the frame plus its formats, row flags, captions and emphasis.
+**Exhibits** (`src/aggregate/exhibits/`). One registered exhibit is a named business view: summary, tail, stats, validation, bs_window, sharpen, tail_behavior, reins, economic, economic_ratios, economic_waterfall, dependency. Building one produces an **envelope**: a title, metadata, a content hash, and one or more **blocks**, each a greater_tables `TableDoc` carrying the frame plus its formats, row flags, captions and emphasis.
 
 **Perspective** multiplies the exhibits. It is the reader's seat: RAW is the library's own frames, INSURER is the business framing. INSURED and REINSURER are vocabulary today and implementations later. INSURER equals RAW unless an override is registered for that pair, so adding business framing is incremental and never a rewrite.
 

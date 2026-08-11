@@ -378,6 +378,18 @@ def _perspectives_tower(obj):
         else []
 
 
+def _perspectives_sharpen(obj):
+    """Perspectives for the sharpen exhibit: a probe has run and left an audit.
+
+    Unlike the other diagnostics this is not gated on ``update``: a probe
+    implies one. The audit is absent until :meth:`Aggregate.sharpen` is
+    called, and an object that has never been probed has nothing to show, so
+    the exhibit reports itself unavailable rather than serving an empty grid.
+    """
+    return list(_IMPLEMENTED_PERSPECTIVES) \
+        if getattr(obj, 'sharpen_df', None) is not None else []
+
+
 def available_exhibits(obj):
     """List the exhibits this object can serve, with their perspectives.
 

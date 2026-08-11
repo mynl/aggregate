@@ -390,7 +390,8 @@
   swept, `PnL.walk_df` / `PnL.evaluation_df` promoted out of the exhibit
   layer per `[Waterfall-Frames-Are-Owed]`); `[BS-Window-Diagnostics]` landed
   a254 (note item 2, `W` and `coverage` published, and four served frames
-  given honest index names). Phase 7 struck,
+  given honest index names); `[Sharpen-Exhibit]` landed a255 (note item 3,
+  the twelfth exhibit, RAW one block and INSURER two). Phase 7 struck,
   its bug fixed at a250. Phases 8 to 10, the Pricing pane redesign keyed on
   result objects, wait on the design discussion, and with them the question of
   whether `REINSURER` gets implemented.

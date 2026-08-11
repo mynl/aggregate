@@ -22,12 +22,13 @@ The governing rule is that **INSURER equals RAW unless an override is registered
 | `economic_waterfall` | Economic waterfall | PnL | 2: `walk_df`, `evaluation_df` | multi-step walk (`_tower`) | none |
 | `dependency` | Dependency | BivariateAggregate | 2: `dependency_df`, `axis_support_df` | updated | none |
 | `bs_window` | Grid sizing | Aggregate, Portfolio, BivariateAggregate | 1: `bs_window_df` | updated | none |
+| `sharpen` | Grid probe | Aggregate, Portfolio | RAW 1: `sharpen_df` | probed (`sharpen_df` present) | **restructures into 2 blocks**: `score_grid` (`score` unstacked by `d_log2`) then the full walk |
 | `tail_behavior` | Tail behavior | Aggregate, Portfolio | 1: `tail_behavior_df` | updated | none |
 
 Read by class, which is the question a landing page asks:
 
-* **Aggregate**: `summary`, `tail`, `stats`, `validation`, `bs_window`, `tail_behavior`, plus `reins` when it cedes. Six or seven.
-* **Portfolio**: the same six or seven, per unit plus the total.
+* **Aggregate**: `summary`, `tail`, `stats`, `validation`, `bs_window`, `tail_behavior`, plus `reins` when it cedes and `sharpen` once the grid probe has run. Six to eight.
+* **Portfolio**: the same, per unit plus the total.
 * **PnL**: `summary`, `stats`, `validation`, `economic`, `economic_ratios`, plus `economic_waterfall` on a walk.
 * **BivariateAggregate**: `summary`, `stats`, `validation`, `dependency`, `bs_window`.
 * **Distortion**: `summary`, `stats`, `validation`.

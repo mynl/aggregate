@@ -90,7 +90,7 @@ from ._core import (
     available_exhibits, build_exhibit, exhibit_frames, register_simple_exhibit,
     dependency, economic, economic_ratios, economic_waterfall, reins, stats,
     summary, tail, validation,
-    _perspectives_updated,
+    _perspectives_sharpen, _perspectives_updated,
 )
 
 # Per-class business translation. Imported for their registration side
@@ -104,7 +104,7 @@ __all__ = [
     'CAPITAL_ANCHOR_PERIODS', 'RAW_MOMENT_MEASURES',
     'summary', 'tail', 'stats', 'validation', 'reins',
     'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
-    'bs_window', 'tail_behavior',
+    'bs_window', 'sharpen', 'tail_behavior', 'SHARPEN_FORMATS',
 ]
 
 
@@ -209,6 +209,62 @@ bs_window = register_simple_exhibit(
             'applied, and the bucket size and log2 that follow from it. A '
             'clipped row is a window that did not fit and was cut to the '
             'grid, which is where aliasing comes from.')
+#: The probe's own audit reads in scientific notation, deliberately: the
+#: ``u_`` columns are relative errors against the analytic moments and run
+#: from about 1e-7 to a few percent, so at a fixed ``.4f`` a good cell and a
+#: perfect cell both print ``0.0000``, which is exactly the comparison the
+#: table exists to support. ``score`` is the number that decides, and gets the
+#: digits to separate two cells that are close.
+SHARPEN_FORMATS = {
+    'score': '.5f', 'extent': ',.0f', 'x_min': ',.0f', 'bs': ',.4g',
+    'u_sev_mean': '.2e', 'u_sev_cv': '.2e', 'u_sev_skew': '.2e',
+    'u_agg_mean': '.2e', 'u_agg_cv': '.2e', 'u_agg_skew': '.2e',
+    'aliasing': '.4f', 'deficit': '.2e', 'seconds': '.3f',
+}
+
+sharpen = register_simple_exhibit(
+    'sharpen', 'Grid probe', 'sharpen_df', _LOSS_FCC,
+    predicate=_perspectives_sharpen, formatters=SHARPEN_FORMATS,
+    caption='Every grid the last probe tried, one row per cell walked, with '
+            'its working: the realized bucket size and log2, the six '
+            'normalized moment errors that make up the score, the aliasing '
+            'ratio and the validation verdict. Steps are offsets from the '
+            'grid the object started on, and the line search makes the walk '
+            'ragged, so a cell it never reached is blank rather than bad.')
+
+
+@sharpen.insurer.register(Aggregate)
+@sharpen.insurer.register(Portfolio)
+def _sharpen_insurer(obj, blocks):
+    """Lead with the picture: the score grid, then the walk that produced it.
+
+    Ruling ``[Sharpen-Grid-Is-A-Reading]``: ``score`` is a **column** on
+    ``sharpen_df`` used for deciding, not a second fact, so the grid is a
+    reading of a published frame rather than a frame of its own. That is
+    exactly what an INSURER block is for, and this is the smallest exercise
+    of ``[Perspective-May-Restructure]``: one block raw, two here.
+
+    The unstack is the whole translation. A reader comparing grids wants the
+    two step axes on the two axes of a table, not twenty columns of working
+    with the deciding number buried among them.
+    """
+    (walk_name, walk, walk_kw), = blocks
+    grid = walk['score'].unstack('d_log2')
+    return [
+        ('score_grid', grid,
+         dict(formatters={c: '.5f' for c in grid.columns}, caption=(
+             'Every cell the probe walked, scored: steps in bucket size down '
+             'and steps in log2 across, from the grid the object started on. '
+             'Lower is better, and the blanks are where the line search '
+             'stopped rather than cells that failed.'))),
+        (walk_name, walk, dict(walk_kw, caption=(
+            'The same walk with its working, one row per grid tried. The six '
+            'u_ columns are relative errors against the analytic moments and '
+            'are what the score is built from; aliasing and the validation '
+            'verdict say whether a cell was sound as well as accurate.'))),
+    ]
+
+
 tail_behavior = register_simple_exhibit(
     'tail_behavior', 'Tail behavior', 'tail_behavior_df',
     [Aggregate, Portfolio], predicate=_perspectives_updated,

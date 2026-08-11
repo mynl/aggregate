@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a255
+
+**[Sharpen-Exhibit] the grid probe says what it scored and why.** The bucket probe left an audit that no exhibit served, so the one leaf that showed it wrote its own prose about the library's own search, which is the kind of second opinion this whole line of work is removing. `sharpen` is the twelfth registered exhibit, on `Aggregate` and `Portfolio`, available once `sharpen_df` is present. Not gated on `update`: a probe implies one.
+
+**One block raw, two under insurer**, which is the smallest exercise of `[Perspective-May-Restructure]` and deliberately so. RAW is `sharpen_df`, every grid tried with its working. INSURER leads with `score_grid`, steps in bucket size down and steps in log2 across, then the same walk. Ruling `[Sharpen-Grid-Is-A-Reading]`: `score` is a **column** on the audit used for deciding, not a second fact, so the grid is a reading of a published frame and no new frame is owed. The unstack is the whole translation, and it is the right one: a reader comparing grids wants the two step axes on the two axes of a table, not twenty columns of working with the deciding number buried among them.
+
+The formats come with it, in `exhibits.SHARPEN_FORMATS`. The six `u_` columns are relative errors against the analytic moments and run from about 1e-7 to a few percent, so they read in scientific notation: at a fixed `.4f` a good cell and a perfect cell both print `0.0000`, which is exactly the comparison the table exists to support.
+
+**Closes round 6 item 3** (`dev/note-from-aggregate-api-round-6.md`), and with it the last two entries in the app's `tables.FORMATS` that describe a library frame. Deliberately **not** snapshotted: the audit carries a `seconds` column, so a captured document would differ on every run.
+
+---
+
 ## 1.0.0a254
 
 **[BS-Window-Diagnostics] the bucket window frame carries the two columns it exists for.** `bs_window_df` published the candidate windows and withheld `W`, the window's width, and `coverage`, the fraction of the distribution it holds. The leaf's whole question is "is this grid big enough", and those two are the answer, so a reader had a list of candidate windows and no way to compare them. Both were curated onto the private `_bs_window_df` as expert material, which was the wrong call about which columns carry the meaning. Ruling `[BS-Window-Widen]`: widen the published frame rather than register the exhibit against the private one, because if the curation dropped what answers the question then the curation was wrong.

@@ -1,0 +1,35 @@
+---
+title: "How aggregate works"
+subtitle: "The five minute version"
+author: "Stephen J. Mildenhall"
+format:
+  html:
+    toc: false
+    number-sections: false
+    embed-resources: true
+    theme:
+      light: cosmo
+      dark: darkly
+    fig-align: center
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+---
+
+{{< include _style-block.md >}}
+
+The talk version: the cycle, the one line summary, and the core on one page. For the full trace of every frame, see `flow.qmd`.
+
+{{< include _suva-use-cycle.md >}}
+
+{{< include _one-line.md >}}
+
+{{< include _key-node-kinds.md >}}
+
+{{< include _core-whole.md >}}
+
+## References {.unnumbered}
+
+The SUVA-Use framing and the underlying FFT method are set out in @Mildenhall2024.
+
+::: {#refs}
+:::

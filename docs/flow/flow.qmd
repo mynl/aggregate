@@ -1,0 +1,81 @@
+---
+title: "Information flow"
+subtitle: "Where the numbers come from, along the SUVA-Use path"
+author: "Stephen J. Mildenhall"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-title: "Contents"
+    number-sections: true
+    embed-resources: true
+    theme:
+      light: cosmo
+      dark: darkly
+    fig-align: center
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+---
+
+{{< include _style-block.md >}}
+
+Working with `aggregate` follows five stages: **S**pecify, **U**pdate, **V**alidate, **A**djust, **U**se [@Mildenhall2024]. This page traces where the information goes at each one, and the shape it arrives in.
+
+One sentence covers the whole library: you write a declaration, one engine turns it into a small set of data frames, and every table, chart and price is a read off those frames.
+
+# Orientation
+
+{{< include _key-node-kinds.md >}}
+
+{{< include _suva-use-cycle.md >}}
+
+{{< include _one-line.md >}}
+
+# Specify
+
+{{< include _specify-decl-to-object.md >}}
+
+# Update
+
+{{< include _update-two-outputs.md >}}
+
+{{< include _update-grid-choice.md >}}
+
+# Validate
+
+{{< include _validate-derived-views.md >}}
+
+# Adjust
+
+{{< include _adjust-reinsurance.md >}}
+
+# Use
+
+{{< include _use-frames-consumers.md >}}
+
+{{< include _use-charts.md >}}
+
+{{< include _use-exhibits.md >}}
+
+{{< include _use-pricing-inputs.md >}}
+
+{{< include _use-pricing-calibration.md >}}
+
+{{< include _use-pricing-augmented.md >}}
+
+{{< include _use-pricing-readouts.md >}}
+
+{{< include _use-pricing-pentagon.md >}}
+
+{{< include _use-pricing-agg-vs-port.md >}}
+
+{{< include _use-pricing-whole.md >}}
+
+# Everything at once
+
+{{< include _core-whole.md >}}
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

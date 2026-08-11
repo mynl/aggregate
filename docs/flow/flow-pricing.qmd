@@ -1,0 +1,45 @@
+---
+title: "Pricing information flow"
+subtitle: "The Use stage, in detail"
+author: "Stephen J. Mildenhall"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-title: "Contents"
+    number-sections: true
+    embed-resources: true
+    theme:
+      light: cosmo
+      dark: darkly
+    fig-align: center
+bibliography: C:/s/TELOS/Biblio/uber-library.bib
+csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+---
+
+{{< include _style-block.md >}}
+
+Specify, Update, Validate and Adjust stop at `density_df`. This page is the Use stage for pricing, which is the second half of the library. The theory behind the distortions and the allocation is in @Mildenhall2022a, and the bounds machinery follows @Mildenhall2022.
+
+Pricing adds exactly one new frame, `augmented_df`, and everything priced is a read off it.
+
+{{< include _key-node-kinds.md >}}
+
+{{< include _use-pricing-inputs.md >}}
+
+{{< include _use-pricing-calibration.md >}}
+
+{{< include _use-pricing-augmented.md >}}
+
+{{< include _use-pricing-readouts.md >}}
+
+{{< include _use-pricing-pentagon.md >}}
+
+{{< include _use-pricing-agg-vs-port.md >}}
+
+{{< include _use-pricing-whole.md >}}
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

@@ -216,6 +216,11 @@ exclude_patterns = [
     # page (which made it an orphan, warned about, and shipped a stray
     # 4_agg_language_reference/ref_include.html).
     '4_agg_language_reference/ref_include.rst',
+    # ``docs/flow`` holds the information-flow diagram fragments. They are
+    # include targets and Quarto sources, never standalone Sphinx pages, so
+    # excluding them keeps them out of the toctree-orphan warnings the same
+    # way ``ref_include.rst`` is excluded. ``.. include::`` still reads them.
+    'flow/*.md',
     # ``docs/AGGREGATE-MONOGRAPH`` is a symlink to the Quarto monograph repo,
     # kept here for convenience. Its pages are Quarto sources rendered by
     # Quarto, not Sphinx sources: nothing in this tree links to them, so Sphinx

@@ -1,0 +1,6 @@
+# Quarto output. Each assembly renders to a self-contained ~7 MB HTML file with
+# mermaid inlined, so the outputs are large and fully regenerable:
+#   quarto render docs/flow/flow.qmd
+*.html
+*_files/
+.quarto/

@@ -81,3 +81,8 @@ docs/**/*.log
 docs/**/*.pdf
 docs/**/*.tex
 docs/cookbook/*.quarto_ipynb
+
+# Symlink to the canonical copy in aggregate_api. Ignored because git stores a
+# symlink as a blob holding the literal path, which is meaningless anywhere
+# else, the same trap the aggregate_api .venv junction fell into.
+dev/plan-3d-plot.md

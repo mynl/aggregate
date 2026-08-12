@@ -13,6 +13,7 @@ from scipy.optimize import NoConvergence  # noqa
 
 from .constants import (REINS_LABEL_GROSS, REINS_LABEL_NET,
                         REINS_LABEL_CEDED, REINS_LABEL_OUTPUT)
+from .pentagon import complete_pentagon
 from .moments import (MomentAggregator, MomentWrangler, xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
 from .utilities import ft, remove_fuzz
@@ -559,8 +560,11 @@ def reins_view_density(agg, view):
 
 # ----- pricing a cession with a distortion ---------------------------
 
-#: Columns of :func:`reins_price_df`, in reading order.
-REINS_PRICE_COLUMNS = ['a', 'el', 'bid', 'ask', 'margin']
+# The frame's columns are the canonical pentagon octet
+# (:data:`aggregate.pentagon.PENTAGON_STATS`) and nothing else. It carried its
+# own vocabulary (``el``, ``bid``, ``ask``, ``margin``) until 1.0.0a262, which
+# meant the same three quantities were spelled one way here and another way in
+# every other pricing readout, on tables that sit on the same screen.
 
 
 def _resolve_price_distortions(obj, distortion):
@@ -622,11 +626,24 @@ def reins_price_df(obj, distortion=None, *, p=None, a=None, views=None):
     Returns
     -------
     pandas.DataFrame
-        ``MultiIndex (distortion, view)`` rows, columns ``a`` / ``el`` /
-        ``bid`` / ``ask`` / ``margin``. ``el`` is the limited expected loss
-        ``E[X and a]``, ``ask`` and ``bid`` are the two sides of the distorted
-        quote, and ``margin = ask - el`` is what the risk measure charges over
-        the expected loss.
+        ``MultiIndex (distortion, view)`` rows, columns the canonical pentagon
+        octet :data:`~aggregate.pentagon.PENTAGON_STATS`
+        (``L, M, P, Q, a, LR, PQ, ROE``). ``L`` is the limited expected loss
+        ``E[X and a]``, ``P`` is the distorted quote, ``M = P - L`` is what the
+        risk measure charges over the expected loss, and ``Q = a - P`` is the
+        capital behind it.
+
+        Every other pricing readout in the library speaks this octet, and these
+        tables sit beside those on a screen, so the frame speaks it too. It
+        carried ``el`` / ``ask`` / ``margin`` until 1.0.0a262; those are ``L``,
+        ``P`` and ``M``. The **bid** side is gone: two adjacent columns whose
+        difference is a bid ask spread invited reading the spread as the
+        answer, and the answer is the ask.
+
+        On an **unlimited** quote (neither ``p`` nor ``a``) ``a`` is infinite
+        and ``Q``, ``PQ`` and ``ROE`` are blank. There is no capital behind an
+        unlimited position, and a 0% return on infinite capital is a reading
+        nobody wants.
 
     Raises
     ------
@@ -650,6 +667,17 @@ def reins_price_df(obj, distortion=None, *, p=None, a=None, views=None):
     Views are separate distributions, not a decomposition, so a gross price
     less a net price is a comparison of two programs rather than the price of
     the cession. The ``ceded`` row is the price of the cession.
+
+    **That difference is worth taking, and it is the buyer's reading.** Gross
+    less net is what the cedent gives up in the rate for the cover, the
+    allowance for reinsurance, and it is a real quantity that a cedent
+    computes deliberately. What it is not is the seller's price for the same
+    layer, which is the ``ceded`` row and which no differencing produces. The
+    two answer different questions from opposite sides of the same trade, and
+    the gap between them is the negotiation. Ruling
+    ``[Difference-Is-A-Perspective]`` (author, 2026-08-11): the difference
+    belongs to the insurer's view of a cession and the ``ceded`` row to a
+    future reinsurer's.
 
     **A distortion with a mass wants a finite asset level.** ``ccoc`` puts
     weight on the essential supremum, so at the default ``a = inf`` over an
@@ -680,7 +708,7 @@ def reins_price_df(obj, distortion=None, *, p=None, a=None, views=None):
     views = list(obj.reins_views) if views is None else list(views)
     dists = _resolve_price_distortions(obj, distortion)
 
-    rows, index = [], []
+    rows, index, levels = [], [], []
     for name, dist in dists.items():
         for view in views:
             density = obj._reins_view_density(view)
@@ -693,13 +721,24 @@ def reins_price_df(obj, distortion=None, *, p=None, a=None, views=None):
                 assets = float(obj.snap(a))
             else:
                 assets = np.inf
-            quote = dist.price(density, a=assets, kind='both')
-            rows.append([assets, quote.el, quote.bid, quote.ask,
-                         quote.ask - quote.el])
+            quote = dist.price(density, a=assets, kind='ask')
+            # the pentagon vocabulary: el is L, ask is P, and the margin the
+            # risk measure charges over the expected loss is M
+            rows.append([quote.el, quote.ask - quote.el, quote.ask,
+                         assets - quote.ask])
             index.append((name, view))
-    return pd.DataFrame(
-        rows, columns=REINS_PRICE_COLUMNS,
-        index=pd.MultiIndex.from_tuples(index, names=['distortion', 'view']))
+            levels.append(assets)
+    out = complete_pentagon(pd.DataFrame(
+        rows, columns=['L', 'M', 'P', 'Q'],
+        index=pd.MultiIndex.from_tuples(index, names=['distortion', 'view'])))
+    # An unlimited quote has no asset level, so it has no capital and no ratio
+    # against capital. ``a`` stays infinite, which is what was asked for; Q, PQ
+    # and ROE blank rather than reading a 0% return on infinite capital.
+    unlimited = ~np.isfinite(np.asarray(levels, dtype=float))
+    if unlimited.any():
+        out.loc[unlimited, ['Q', 'PQ', 'ROE']] = np.nan
+        out.loc[unlimited, 'a'] = np.inf
+    return out
 
 
 # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------

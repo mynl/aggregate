@@ -20,6 +20,26 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a262
+
+**[Reins-View-Pricing] the layered quote speaks the same octet as every other price in the library.** Phase L4 of `dev/plan-pricing-exhibits.md`.
+
+**Breaking: `reins_price_df` returns the canonical pentagon octet.** Its columns were `a, el, bid, ask, margin`; they are now `L, M, P, Q, a, LR, PQ, ROE` (`aggregate.pentagon.PENTAGON_STATS`). `el` is `L`, `ask` is `P`, `margin` is `M`, and `Q` and the three ratios are completed through `complete_pentagon`, the one implementation every frame emitter routes through. These tables sit on a screen beside the pentagon and the per unit allocation, and a number must not change name between two tables a reader compares.
+
+**`bid` is dropped** (author, 2026-08-12: too confusing). Two adjacent columns whose difference is a bid ask spread invited reading the spread as the answer, and the answer is the ask. It is no longer computed.
+
+**An unlimited quote has no capital, and now says so.** With neither `p` nor `a` the price is unlimited, which is the natural quote for a cession already bounded by its own terms. `a` reads infinite, which is what was asked for, and `Q`, `PQ` and `ROE` are blank rather than reading a 0% return on infinite capital.
+
+**`price_pentagon` and `price_pentagon_ex` gain `reins_view=`** on both `Aggregate` and `Portfolio`. Both legs of the anchoring triple come off the named view: its own quantile and its own limited expected loss, matching what `calibrate_distortions(reins_view=...)` already did. A preview line can now answer on the basis a reinsured reader chose rather than on whichever view the program happened to hold.
+
+**`calibrate_distortions` accepts `lr=` as the alternative target,** exactly one of `coc` or `lr`. The loss ratio is converted to a cost of capital through the pentagon at the resolved anchor, which is the only place the conversion can be made: it needs `L` and `a`, the two numbers only the distribution knows. A client that converts for itself is holding a copy of the library's accounting.
+
+**A loss ratio that leaves no capital is refused,** which a cost of capital target cannot do. `coc` puts the premium between the expected loss and the assets by construction; `lr` can put it above the assets, and then the implied cost of capital is negative and the calibration downstream chases a target above the essential supremum and reports shapes that did not converge. The `ValueError` names the implied premium, the assets and the expected loss.
+
+**One naming fix, on the buyer's side of a cession.** `reins_price_df` and `Portfolio._reins_view_density` both said that differencing two view prices is not the price of the cession, which is true and was the whole story. Per `[Difference-Is-A-Perspective]` they now also say what the difference **is**: the allowance for reinsurance in the rate, the cedent's own reading, computed deliberately. The `ceded` row is the seller's price for the same layer, and the gap between the two is the negotiation.
+
+---
+
 ## 1.0.0a261
 
 **[Evaluate-Asset-Anchor] the round trip closes: calibrate, price, evaluate at the same anchor recovers the calibration.** Phase L3 of `dev/plan-pricing-exhibits.md`, and the plan's own acceptance criterion.

@@ -147,7 +147,7 @@ def price(agg, p, g, kind='var'):
 
 
 def price_pentagon(agg, *, p=None, a=None, P=None, M=None, Q=None,
-                   LR=None, PQ=None, ROE=None):
+                   LR=None, PQ=None, ROE=None, reins_view=None):
     """Complete the pricing octet at a capital level given one target.
 
     Fix the capital level with exactly one of ``p`` (a VaR probability,
@@ -174,6 +174,15 @@ def price_pentagon(agg, *, p=None, a=None, P=None, M=None, Q=None,
     P, M, Q, LR, PQ, ROE : float, optional
         Exactly one pricing target -- premium, margin, capital, loss ratio,
         premium-to-capital, or cost of capital (``M/Q``).
+    reins_view : str, optional
+        Which of a cession's distributions to complete the octet on, one of
+        the object's :attr:`reins_views`. The default ``None`` is the
+        object's own. Both the asset level and the expected loss resolve on
+        the chosen view, so ``p=`` holds the threshold fixed across views
+        rather than the capital, matching
+        :func:`calibrate_distortions`. This is what lets a preview line
+        answer on the basis a reinsured reader chose rather than on
+        whichever view the program happened to hold.
 
     Returns
     -------
@@ -196,12 +205,21 @@ def price_pentagon(agg, *, p=None, a=None, P=None, M=None, Q=None,
             'price_pentagon: pass exactly one pricing target '
             f'(one of P, M, Q, LR, PQ, ROE); got {n_targets}.')
     pent = Pentagon(obj=agg)
-    pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=LR, pq=PQ, roe=ROE)
+    if reins_view is None:
+        pent.solve_obj(p=p, a=a, P=P, M=M, Q=Q, lr=LR, pq=PQ, roe=ROE)
+    else:
+        # the view is a different distribution, so both legs of the anchoring
+        # triple come off it: its quantile, and its own limited expected loss
+        density, gd = _reins_view_grid(agg, reins_view)
+        a_view = float(gd.q(p)) if a is None else float(gd.snap(a))
+        pent.solve(L=_limited_ev(density, agg.bs, a_view), a=a_view,
+                   P=P, M=M, Q=Q, lr=LR, pq=PQ, roe=ROE)
     return pent.as_frame(unit='total')
 
 
 def price_pentagon_ex(agg, *, p=None, a=None, L=None,
-                      M=None, P=None, Q=None, LR=None, PQ=None, ROE=None):
+                      M=None, P=None, Q=None, LR=None, PQ=None, ROE=None,
+                      reins_view=None):
     """Complete the pricing octet over the *full* pentagon vocabulary, free over
     the capital anchor.
 
@@ -236,6 +254,10 @@ def price_pentagon_ex(agg, *, p=None, a=None, L=None,
     M, P, Q, LR, PQ, ROE : float, optional
         Pentagon targets (margin, premium, capital, loss ratio,
         premium-to-capital, cost of capital).
+    reins_view : str, optional
+        Which of a cession's distributions the curve equation ``L = lev(a)``
+        is read from, one of the object's :attr:`reins_views`. The default
+        ``None`` is the object's own. See :func:`price_pentagon`.
 
     Returns
     -------
@@ -279,7 +301,8 @@ def price_pentagon_ex(agg, *, p=None, a=None, L=None,
     if p is not None and a is not None:
         raise ValueError('price_pentagon_ex: pass at most one of p= or a=.')
     guard_unbounded_anchor(agg, p, where='price_pentagon_ex')
-    gd = agg._grid_distribution()
+    gd = (agg._grid_distribution() if reins_view is None
+          else _reins_view_grid(agg, reins_view)[1])
 
     # 1. translate the probability spelling (p is not a pentagon variable).
     if p is not None:
@@ -594,6 +617,41 @@ def _calibration_frames(dists, coc, p_val, Fa, exa, P, a):
     return distortion_df, calibration_df
 
 
+def _reins_view_grid(obj, reins_view):
+    """The :class:`GridDistribution` over one named reinsurance view.
+
+    Every quantile in the library comes from that one kernel, so a view's
+    quantile surface is built rather than hand rolled. The single place a
+    named view becomes a distribution; :func:`_reins_view_source` unpacks it
+    into the three bound methods the classic calibration path reads.
+
+    Parameters
+    ----------
+    obj : Aggregate or Portfolio
+        Supplying ``_reins_view_density``.
+    reins_view : str
+        One of the object's :attr:`reins_views`.
+
+    Returns
+    -------
+    (density, GridDistribution)
+        The mass as a ``Series`` on the model grid, and the grid distribution
+        over it.
+
+    Raises
+    ------
+    ValueError
+        When the object cannot answer about ``reins_view``.
+    """
+    from ._grid_distribution import GridDistribution
+
+    density = obj._reins_view_density(reins_view)
+    gd = GridDistribution.from_series(
+        density, bs=obj.bs, name=f'{obj.name} {reins_view}',
+        is_loss_value=obj._is_loss_value)
+    return density, gd
+
+
 def _reins_view_source(obj, reins_view):
     """The density, and the ``q`` / ``cdf`` / ``snap`` trio, for one named view.
 
@@ -621,24 +679,60 @@ def _reins_view_source(obj, reins_view):
     ValueError
         When the object cannot answer about ``reins_view``.
     """
-    from ._grid_distribution import GridDistribution
-
-    density = obj._reins_view_density(reins_view)
-    gd = GridDistribution.from_series(
-        density, bs=obj.bs, name=f'{obj.name} {reins_view}',
-        is_loss_value=obj._is_loss_value)
+    density, gd = _reins_view_grid(obj, reins_view)
     return density, gd.q, gd.cdf, gd.snap
 
 
-def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
+def _coc_from_lr(L, a, lr):
+    """The cost of capital a loss ratio implies at a stated asset level.
+
+    ``{L, a, LR}`` is a soluble pentagon triple, so this is one call to the
+    engine rather than a second derivation of the same algebra. The library
+    owns the conversion because the pentagon is the library's; a client that
+    performs it has to hold ``L`` and ``a``, which are the two numbers only
+    the distribution knows.
+
+    Raises
+    ------
+    ValueError
+        When the loss ratio implies a premium at or above the asset level.
+        There is no capital behind such a position, the implied cost of
+        capital is negative or infinite, and the calibration downstream would
+        chase a target above the essential supremum and report shapes that did
+        not converge. A ``coc`` target cannot reach this state, since it puts
+        the premium between the expected loss and the assets by construction;
+        only a loss ratio can, and it does so quietly, which is why this
+        refuses rather than warns.
+    """
+    P = L / lr
+    if P >= a:
+        raise ValueError(
+            f'lr={lr:.4g} implies a premium of {P:,.6g} at assets '
+            f'{a:,.6g}, which leaves no capital behind the position (the '
+            f'expected loss at that level is {L:,.6g}). Ask for a higher '
+            f'loss ratio, or a higher asset level.')
+    pent = Pentagon()
+    pent.solve(L=L, a=a, lr=lr)
+    return float(pent.ROE)
+
+
+def calibrate_distortions(obj, coc=None, *, lr=None, p=None, a=None,
+                          kind='lower',
                           names=DEFAULT_CALIBRATION_DISTORTIONS,
                           reins_view=None):
-    """Calibrate the standard pricing distortion set to a cost-of-capital target
-    on a single distribution (an ``Aggregate`` or a ``Portfolio`` total).
+    """Calibrate the standard pricing distortion set to a pricing target on a
+    single distribution (an ``Aggregate`` or a ``Portfolio`` total).
 
     Resolves the asset level ``a`` (from ``p`` or given), the expected loss
     ``exa = E[min(X, a)]`` and the premium target ``P`` (from ``coc`` via the
     ROE -> LR -> P inversion), then calls :meth:`Distortion.calibrate_set` once.
+
+    **The target is a cost of capital or a loss ratio, exactly one.** A loss
+    ratio is converted to a cost of capital through the pentagon at the
+    resolved anchor, which is the only place the conversion can be made
+    correctly: it needs ``L`` and ``a``, and those are the two numbers only
+    the distribution knows. A client that converts for itself is holding a
+    copy of the library's accounting.
     Stores ``obj.distortions`` / ``obj.distortion_df`` / ``obj.calibration_df``
     (mirroring the legacy ``Portfolio`` behaviour) and returns a
     :class:`~aggregate.results.CalibrationResult` carrying the same three plus
@@ -694,6 +788,10 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
         raise ValueError(
             'calibrate_distortions requires exactly one of p= (probability) '
             'or a= (asset level).')
+    if (coc is None) == (lr is None):
+        raise ValueError(
+            'calibrate_distortions requires exactly one target: coc= (cost '
+            'of capital) or lr= (loss ratio).')
     guard_unbounded_anchor(obj, p, where='calibrate_distortions')
     # Which of the pair the caller fixed, recorded before the resolution below
     # overwrites both. The derived frames re-anchor on it, so a sweep over
@@ -724,6 +822,10 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
             exa = obj.density_df.loc[a, 'exa_total']
         else:
             exa = _limited_ev(density, obj.bs, a)
+        if lr is not None:
+            # {L, a, LR} is a soluble triple, so the loss ratio becomes a cost
+            # of capital here, where L and a are both known and resolved
+            coc = _coc_from_lr(exa, a, lr)
         # invert COC -> LR -> P (matches the legacy ROE -> LR -> P path).
         delta = coc / (1 + coc)
         nu = 1 - delta
@@ -760,6 +862,10 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
         Fa = float(cz.loc[a_z])
         exa_z = _limited_ev(dz, bs, a_z)
         S, ess_sup = _calibration_survival(dz, bs, a_z)
+        if lr is not None:
+            # in frame, like everything else here: a loss ratio is scale free
+            # but not shift free, and the target it implies is the in-frame one
+            coc = _coc_from_lr(exa_z, a_z, lr)
         # in-frame COC -> P inversion (shift-covariant: P, exa, a all carry +c).
         delta = coc / (1 + coc)
         nu = 1 - delta
@@ -785,6 +891,7 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
         distortion_df=distortion_df,
         calibration_df=calibration_df,
         coc=float(coc),
+        lr=None if lr is None else float(lr),
         p=float(p_val),
         a=a_out,
         anchor=anchor,

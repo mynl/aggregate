@@ -1716,6 +1716,13 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         ``gross = net (+) ceded`` than the unit-level views do. Pricing each
         is meaningful; differencing two prices is a comparison of two books,
         not a decomposition of one.
+
+        **The comparison is still worth making, and it is the buyer's
+        reading.** Gross less net is what the book gives up in the rate for
+        its cover, the allowance for reinsurance, which a cedent computes
+        deliberately. It is not the seller's price for the ceded program:
+        that is the ``ceded`` view, priced directly. Ruling
+        ``[Difference-Is-A-Perspective]`` (author, 2026-08-11).
         """
         column = _reinsurance.resolve_reins_view(
             view, self._reins_view_columns(), self.name)
@@ -3066,16 +3073,22 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _density.add_exa(self, df, unit_state)
 
-    def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower',
+    def calibrate_distortions(self, coc=None, *, lr=None, p=None, a=None,
+                              kind='lower',
                               names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS,
                               reins_view=None):
         """
-        Calibrate the standard pricing distortion set to a cost-of-capital target.
+        Calibrate the standard pricing distortion set to a pricing target.
 
         Parameters
         ----------
-        coc : float
-            Target cost of capital ``COC = (P - L) / Q``.
+        coc : float, optional
+            Target cost of capital ``COC = (P - L) / Q``. Exactly one of
+            ``coc`` or ``lr``.
+        lr : float, optional
+            Target loss ratio ``LR = L / P``, converted to a cost of capital
+            through the pentagon at the resolved anchor. Exactly one of
+            ``coc`` or ``lr``.
         p : float, optional
             Probability at which the calibration applies; converted to asset
             level via ``self.q(p, kind)``. Exactly one of ``p`` or ``a`` must
@@ -3133,8 +3146,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         :attr:`reins_density_df`), so a gross premium less a net premium is a
         comparison of two books rather than a decomposition of one.
         """
-        return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind,
-                                              names=names,
+        return _pricing.calibrate_distortions(self, coc, lr=lr, p=p, a=a,
+                                              kind=kind, names=names,
                                               reins_view=reins_view)
 
     def evaluate(self, P=None, *, unit='total', p=None, a=None, names=None,
@@ -3781,7 +3794,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return pd.concat({str(dist): exhibit}, names=['method'])
 
     def price_pentagon(self, *, p=None, a=None, P=None, M=None, Q=None,
-                       LR=None, PQ=None, ROE=None):
+                       LR=None, PQ=None, ROE=None, reins_view=None):
         """Complete the pricing octet at a capital level given one target.
 
         Fix the capital level with exactly one of ``p`` (a VaR probability,
@@ -3807,6 +3820,12 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         P, M, Q, LR, PQ, ROE : float, optional
             Exactly one pricing target -- premium, margin, capital, loss ratio,
             premium-to-capital, or cost of capital (``M/Q``).
+        reins_view : str, optional
+            Which of the book's reinsurance views to complete the octet on,
+            one of :attr:`reins_views`. The default ``None`` is the book's own
+            total, which already is its net view. Both the asset level and the
+            expected loss resolve on the chosen view, matching
+            :meth:`calibrate_distortions`.
 
         Returns
         -------
@@ -3820,7 +3839,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             pricing target is supplied.
         """
         return _pricing.price_pentagon(
-            self, p=p, a=a, P=P, M=M, Q=Q, LR=LR, PQ=PQ, ROE=ROE)
+            self, p=p, a=a, P=P, M=M, Q=Q, LR=LR, PQ=PQ, ROE=ROE,
+            reins_view=reins_view)
 
     def price_ccoc(self, ccoc, *, p):
         """
@@ -3857,7 +3877,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
 
     def price_pentagon_ex(self, *, p=None, a=None, L=None,
-                          M=None, P=None, Q=None, LR=None, PQ=None, ROE=None):
+                          M=None, P=None, Q=None, LR=None, PQ=None,
+                          ROE=None, reins_view=None):
         """Complete the pricing octet over the full pentagon vocabulary.
 
         The full-power front door over :meth:`price_pentagon`: free over the
@@ -3874,7 +3895,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             pentagon stats.
         """
         return _pricing.price_pentagon_ex(
-            self, p=p, a=a, L=L, M=M, P=P, Q=Q, LR=LR, PQ=PQ, ROE=ROE)
+            self, p=p, a=a, L=L, M=M, P=P, Q=Q, LR=LR, PQ=PQ, ROE=ROE,
+            reins_view=reins_view)
 
     def analyze_distortion(self, distortion, *, p=None, a=None, kind='lower'):
         """

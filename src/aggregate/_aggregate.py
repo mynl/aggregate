@@ -6417,7 +6417,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return _pricing.price(self, p, g, kind)
 
     def price_pentagon(self, *, p=None, a=None, P=None, M=None, Q=None,
-                       LR=None, PQ=None, ROE=None):
+                       LR=None, PQ=None, ROE=None, reins_view=None):
         """Complete the pricing octet at a capital level given one target.
 
         Fix the capital level with exactly one of ``p`` (a VaR probability,
@@ -6442,6 +6442,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         P, M, Q, LR, PQ, ROE : float, optional
             Exactly one pricing target -- premium, margin, capital, loss ratio,
             premium-to-capital, or cost of capital (``M/Q``).
+        reins_view : str, optional
+            Which of a cession's distributions to complete the octet on, one
+            of :attr:`reins_views`. The default ``None`` is the object's own.
+            Both the asset level and the expected loss resolve on the chosen
+            view, matching :meth:`calibrate_distortions`.
 
         Returns
         -------
@@ -6456,7 +6461,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         # Thin delegator to the shared single-distribution pricing concern.
         return _pricing.price_pentagon(
-            self, p=p, a=a, P=P, M=M, Q=Q, LR=LR, PQ=PQ, ROE=ROE)
+            self, p=p, a=a, P=P, M=M, Q=Q, LR=LR, PQ=PQ, ROE=ROE,
+            reins_view=reins_view)
 
     def price_ccoc(self, ccoc, *, p):
         """Price at a constant cost of capital ``ccoc`` and VaR level ``p``.
@@ -6488,7 +6494,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
 
     def price_pentagon_ex(self, *, p=None, a=None, L=None,
-                          M=None, P=None, Q=None, LR=None, PQ=None, ROE=None):
+                          M=None, P=None, Q=None, LR=None, PQ=None,
+                          ROE=None, reins_view=None):
         """Complete the pricing octet over the full pentagon vocabulary.
 
         The full-power front door over :meth:`price_pentagon`: free over the
@@ -6505,12 +6512,14 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             pentagon stats.
         """
         return _pricing.price_pentagon_ex(
-            self, p=p, a=a, L=L, M=M, P=P, Q=Q, LR=LR, PQ=PQ, ROE=ROE)
+            self, p=p, a=a, L=L, M=M, P=P, Q=Q, LR=LR, PQ=PQ, ROE=ROE,
+            reins_view=reins_view)
 
-    def calibrate_distortions(self, coc, *, p=None, a=None, kind='lower',
+    def calibrate_distortions(self, coc=None, *, lr=None, p=None, a=None,
+                              kind='lower',
                               names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS,
                               reins_view=None):
-        """Calibrate the standard pricing distortion set to a cost-of-capital target.
+        """Calibrate the standard pricing distortion set to a pricing target.
 
         The ``Aggregate`` counterpart of :meth:`Portfolio.calibrate_distortions`
         -- calibration to **this** distribution (the aggregate is its own
@@ -6521,8 +6530,13 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         Parameters
         ----------
-        coc : float
-            Target cost of capital ``COC = (P - L) / Q``.
+        coc : float, optional
+            Target cost of capital ``COC = (P - L) / Q``. Exactly one of
+            ``coc`` or ``lr``.
+        lr : float, optional
+            Target loss ratio ``LR = L / P``, converted to a cost of capital
+            through the pentagon at the resolved anchor. Exactly one of
+            ``coc`` or ``lr``.
         p : float, optional
             Probability at which the calibration applies; converted to an asset
             level via ``self.q(p, kind)``. Exactly one of ``p`` or ``a``.
@@ -6578,8 +6592,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             gross = a.calibrate_distortions(0.10, p=0.999, reins_view='gross')
             net = a.calibrate_distortions(0.10, p=0.999, reins_view='net')
         """
-        return _pricing.calibrate_distortions(self, coc, p=p, a=a, kind=kind,
-                                              names=names,
+        return _pricing.calibrate_distortions(self, coc, lr=lr, p=p, a=a,
+                                              kind=kind, names=names,
                                               reins_view=reins_view)
 
     def evaluate(self, P=None, *, p=None, a=None, names=None,

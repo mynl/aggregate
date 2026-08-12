@@ -269,7 +269,8 @@ def priced(occ):
 
 
 def test_price_df_shape(priced, occ):
-    assert list(priced.columns) == ['a', 'el', 'bid', 'ask', 'margin']
+    from aggregate.pentagon import PENTAGON_STATS
+    assert list(priced.columns) == PENTAGON_STATS
     assert priced.index.names == ['distortion', 'view']
     assert priced.index.get_level_values('view').unique().tolist() == \
         occ.reins_views
@@ -279,28 +280,30 @@ def test_price_df_ties_to_reins_stats(priced, occ):
     """The plan's acceptance test: the expected loss leg ties to the moments."""
     stats = occ.reins_stats_df
     ceded_mean = float(stats.loc[('agg', 'mean'), ('occ', 'Ceded')])
-    priced_el = priced.loc[('wang', 'ceded'), 'el']
+    priced_el = priced.loc[('wang', 'ceded'), 'L']
     assert priced_el == pytest.approx(ceded_mean, rel=1e-9)
 
 
-def test_price_df_margin_is_ask_less_el(priced):
-    assert np.allclose(priced['margin'], priced['ask'] - priced['el'])
+def test_price_df_margin_is_the_premium_less_the_loss(priced):
+    assert np.allclose(priced['M'], priced['P'] - priced['L'])
 
 
-def test_price_df_bid_below_el_below_ask(priced):
+def test_price_df_charges_over_the_expected_loss(priced):
     # ccoc at a=inf on an unbounded support prices the grid ceiling, so it is
     # excluded here; the documented reason it wants a finite asset level
     shaped = priced.drop('ccoc', level='distortion')
-    assert (shaped['bid'] <= shaped['el']).all()
-    assert (shaped['el'] <= shaped['ask']).all()
+    assert (shaped['L'] <= shaped['P']).all()
+    assert (shaped['M'] >= 0).all()
 
 
 def test_price_df_unlimited_el_is_the_mean(priced, occ):
     # ``forwards`` parks the grid deficit at the largest represented outcome,
     # so the priced el sits a touch above the raw first moment of the pmf
-    assert priced.loc[('wang', 'gross'), 'el'] == \
+    assert priced.loc[('wang', 'gross'), 'L'] == \
         pytest.approx(mean_of(occ._reins_view_density('gross')), rel=1e-6)
     assert np.isinf(priced.loc[('wang', 'gross'), 'a'])
+    # no asset level means no capital and no ratio against it
+    assert priced[['Q', 'PQ', 'ROE']].isna().all().all()
 
 
 def test_price_df_at_p_uses_each_view_own_assets(occ):
@@ -358,7 +361,7 @@ def test_portfolio_price_df(book):
     df = book.reins_price_df(p=0.999)
     assert df.index.get_level_values('view').unique().tolist() == \
         ['gross', 'ceded', 'net']
-    assert (df['margin'] > 0).all()
+    assert (df['M'] > 0).all()
 
 
 # ----------------------------------------------------------------------------
@@ -396,3 +399,74 @@ def test_every_view_prices_without_nan(both):
     df = both.reins_price_df(p=0.99)
     assert len(df) == len(both.distortions) * len(both.reins_views)
     assert df.notna().to_numpy().all()
+
+
+# ----------------------------------------------------------------------------
+# The pentagon vocabulary and the two conversions ([Reins-View-Pricing], a262)
+# ----------------------------------------------------------------------------
+
+def test_price_df_speaks_the_pentagon_octet(occ):
+    """Every other pricing readout speaks the octet, and these tables sit
+    beside those on a screen, so a number must not change name between them."""
+    from aggregate.pentagon import PENTAGON_STATS
+
+    occ.calibrate_distortions(0.10, p=0.999)
+    df = occ.reins_price_df(p=0.999)
+    assert list(df.columns) == PENTAGON_STATS
+    # the identities hold row by row
+    assert np.allclose(df['a'], df['P'] + df['Q'])
+    assert np.allclose(df['LR'], df['L'] / df['P'])
+    assert np.allclose(df['ROE'], df['M'] / df['Q'])
+
+
+def test_the_bid_side_is_gone(occ):
+    occ.calibrate_distortions(0.10, p=0.999)
+    assert 'bid' not in occ.reins_price_df(p=0.999).columns
+
+
+def test_price_pentagon_answers_on_a_named_view(occ):
+    """The preview line has to answer on the basis a reinsured reader chose,
+    not on whichever view the program happened to hold."""
+    own = occ.price_pentagon(p=0.99, ROE=0.15)
+    gross = occ.price_pentagon(p=0.99, ROE=0.15, reins_view='gross')
+    net = occ.price_pentagon(p=0.99, ROE=0.15, reins_view='net')
+    # the program is written net, so its own answer is its net answer
+    assert net.loc['total', 'P'] == pytest.approx(own.loc['total', 'P'])
+    # both legs of the anchor move with the view: more loss and more assets
+    assert gross.loc['total', 'L'] > net.loc['total', 'L']
+    assert gross.loc['total', 'a'] > net.loc['total', 'a']
+    assert gross.loc['total', 'ROE'] == pytest.approx(0.15)
+
+
+def test_price_pentagon_ex_answers_on_a_named_view(occ):
+    gross = occ.price_pentagon_ex(p=0.99, ROE=0.15, reins_view='gross')
+    plain = occ.price_pentagon(p=0.99, ROE=0.15, reins_view='gross')
+    for stat in ('L', 'M', 'P', 'Q', 'a'):
+        assert gross.loc['total', stat] == pytest.approx(
+            plain.loc['total', stat], rel=1e-9)
+
+
+def test_calibrate_accepts_a_loss_ratio_target(occ):
+    """The library owns the conversion: it needs L and a, and those are the
+    two numbers only the distribution knows."""
+    result = occ.calibrate_distortions(lr=0.9, p=0.99)
+    assert result.lr == pytest.approx(0.9)
+    assert result.calibration_df.loc['calibration', 'LR'] == pytest.approx(0.9)
+    # and the cost of capital it implies reproduces the same calibration
+    twin = occ.calibrate_distortions(result.coc, p=0.99)
+    assert twin.distortion_df['param'].to_numpy() == pytest.approx(
+        result.distortion_df['param'].to_numpy(), rel=1e-9)
+
+
+def test_exactly_one_pricing_target(occ):
+    with pytest.raises(ValueError, match='exactly one target'):
+        occ.calibrate_distortions(0.15, lr=0.9, p=0.99)
+    with pytest.raises(ValueError, match='exactly one target'):
+        occ.calibrate_distortions(p=0.99)
+
+
+def test_a_loss_ratio_that_leaves_no_capital_is_refused(occ):
+    """A coc target cannot reach this state; a loss ratio can, quietly, and
+    the calibration downstream would chase a target above the support."""
+    with pytest.raises(ValueError, match='leaves no capital'):
+        occ.calibrate_distortions(lr=0.5, p=0.99)

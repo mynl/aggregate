@@ -20,6 +20,28 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a264
+
+**[Bounds-Envelope-Jump] the maximum envelope jumps at the origin, and the grid now carries the jump instead of smearing it.** A display bug, reported from the app's Bounds leaf: the drawn upper edge of the envelope sat below the `ccoc` curve near `s = 0`, which is a visible contradiction, because `ccoc` is a member of the admissible set and the maximum envelope has to lie above every member of it.
+
+**Nothing was wrong with the arithmetic.** `cloud_df` was right, `min` and `max` over it were right at every grid point, and `max >= min` held everywhere it was evaluated. The defect was one missing sample point.
+
+`p_knots` includes `p = 1`, where `TVaR_1(min(X, a)) = a`, so the cloud legitimately contains brackets `(p_lo, 1)` whose distortion carries an **atom at zero**, exactly as `ccoc` does. Every such column steps from `0` to its weight the instant `s` leaves zero, so the maximum envelope is genuinely discontinuous at the origin, rising to the largest of those weights. The minimum envelope is continuous there, since brackets with `p_hi < 1` carry no atom. `s_grid` was a bare `linspace`, so the first cell held no point, and any consumer joining `(0, 0)` to the first grid value drew a ramp where the admissible set has a cliff. That understates the upper edge across the whole first cell by the full height of the jump. Sub-pixel in a three inch figure, which is why it never showed in a notebook, and the whole picture in a zoomable one.
+
+`Bounds.s_grid` now splices one point at `JUMP_EPS = 1e-12`, immediately right of zero, and is `n_s + 1` long. This is the discipline `Distortion._build_grid` already applies to a distortion's own grid, with the same constant and for the same reason ("ensure a knot at eps so trapz captures the jump"); the cloud is a set of biTVaRs, so it wants the same treatment. The band, `max_envelope` and the `charts.chart_envelope` document all read the grid, so one point fixes all three.
+
+The jump height is now exact and is **not** a tolerance: it equals the mass of the `ccoc` calibrated to the same premium and anchor, both being `M / (a - L)` by the pentagon identity. The `(p_lo = 0, p_hi = 1)` bracket *is* the CCoC distortion, and it is the admissible distortion that loads the first infinitesimal of probability hardest.
+
+**Bracket weights are clipped to `[0, 1]`,** folded in because the new knot surfaced it. A weight outside the interval is not a convex combination and so does not name a distortion. `p_star` is a root found to `xtol = 2**-17` and is itself spliced into `p_knots`, so brackets whose `p_lo` **is** `p_star` came out a few thousandths negative; unclipped they extrapolate away from `p_hi` rather than interpolating toward it, which dragged the minimum envelope below the curve at `p_lo`, and at the jump knot below zero. Clipping to zero leaves exactly the `TVaR_{p_lo}` curve, which prices to the premium to the same root tolerance. Envelope effect away from the origin is about `1e-6`.
+
+Shapes: `s_grid`, `tvar_hinges`, `cloud_df` and `min_envelope_hinges` all gain one row against `n_s`, and the docstrings and one shape pin say so.
+
+Tests: the jump knot exists and is sorted; the jump height equals the `ccoc` mass; weights and cloud values lie in `[0, 1]`; `max_envelope >= min_envelope` on 20,001 points, which used to fail inside the first cell because a linear interpolation was being compared against a fitted concave distortion. On the chart side, the band leaves the origin vertically, and **every calibrated distortion lies inside the band as a renderer draws it**, checked against the polyline rather than against the grid values, since that is the difference this release is about. That last test needed a fixture holding the calibration and the bounds at one asset level; `test_chart_bounds.py`'s existing fixture calibrates at `q(1)` and lets `Bounds` default, so the two disagree about `a` and its five curves are not the admissible set of its band.
+
+Not addressed, and unchanged: with no asset cap the minimum envelope collapses onto the risk neutral diagonal to within FFT noise, since for an unbounded risk there is always a bracket arbitrarily close to the identity. The band is then a tautology rather than a bound, and `ccoc` still sits outside it. That wants a ruling on whether `Bounds` refuses an unbounded anchor the way `[Unbounded-Anchor-Guard]` refuses `p = 1`, or labels it.
+
+---
+
 ## 1.0.0a263
 
 **[Pricing-Exhibits] the Pricing pane's three tables are library exhibits, dispatched on the calculation that produced them.** Phase L5 of `dev/plan-pricing-exhibits.md`, the last of the LIB half. It closes round 6 item 4 for the pricing leaves.

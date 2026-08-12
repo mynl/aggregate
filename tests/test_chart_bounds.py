@@ -15,7 +15,7 @@ import pytest
 matplotlib.use('Agg')
 
 from aggregate import build  # noqa: E402
-from aggregate.bounds import Bounds  # noqa: E402
+from aggregate.bounds import Bounds, JUMP_EPS  # noqa: E402
 from aggregate.charts import (  # noqa: E402
     available_charts, build_chart_doc, chart_envelope, human_strings,
     primary_chart,
@@ -42,6 +42,24 @@ def bare():
     """Bounds on an object with nothing calibrated: one panel, not two."""
     agg = build('agg CB.A 100 claims sev lognorm 50 cv 2 poisson')
     return Bounds(agg, premium=float(agg.tvar(0.5)))
+
+
+@pytest.fixture(scope='module')
+def bounds_at_a():
+    """The same book with the calibration and the bounds on **one** anchor.
+
+    The ``bounds`` fixture above calibrates at ``a = q(1)`` and then lets
+    ``Bounds`` default, so the two hold different asset levels and the five
+    calibrated curves are not the admissible set of that band. Fine for the
+    structural tests, useless for asking whether the band contains them, which
+    is what the drawn-band test below needs.
+    """
+    port = build(_PORT)
+    a = float(port.q(1))
+    prem = float(port.tvar(0.5))
+    coc = (prem - port.actual_m) / (a - prem)
+    port.calibrate_distortions(coc, a=a)
+    return port, Bounds(port, premium=prem, a=a)
 
 
 def series_on(doc, panel):
@@ -99,6 +117,54 @@ def test_a_panel_with_nothing_to_say_is_omitted(bare):
     doc = chart_envelope(bare)
     assert [p.id for p in doc.panels] == ['cloud']
     assert doc.meta['calibrated'] == ()
+
+
+def test_the_band_leaves_the_origin_vertically(bounds):
+    """``[Bounds-Envelope-Jump]`` the upper edge carries its jump as a jump.
+
+    Two points in the first cell, not one: ``(0, 0)`` and the jump height at
+    ``JUMP_EPS``. Without the second, every renderer joins ``(0, 0)`` to the
+    first uniform grid value with a straight line and draws a ramp where the
+    admissible set has a cliff, understating the upper edge across that whole
+    cell. Sub-pixel in a small figure, and the picture in a zoomable one.
+    """
+    band = series_on(chart_envelope(bounds), 'cloud')[0]
+    x = np.array(band.x)
+    hi = np.array(band.y2)
+    assert x[0] == 0.0 and x[1] == JUMP_EPS
+    assert hi[0] == 0.0
+    # the riser reaches the full jump immediately, and the jump is the heaviest
+    # weight the admissible set puts on the first infinitesimal of probability
+    assert hi[1] == pytest.approx(
+        bounds.weight_df.xs(1.0, level='p_upper')['weight'].max(), abs=1e-12)
+    assert hi[1] > 0.0
+
+
+def test_the_band_contains_every_calibrated_distortion_as_drawn(bounds_at_a):
+    """Not on the grid, but where a renderer puts the ink.
+
+    Each of the five is admissible, so all five must sit inside the envelope.
+    The check that matters is against the **polyline a renderer draws** rather
+    than against the grid values, because the defect this pins was invisible on
+    the grid and plain between two of its points: ``ccoc`` sat above the drawn
+    upper edge for the whole first cell.
+
+    The tolerance covers chording, not the jump. The drawn edge is a polyline
+    through the max of many piecewise-linear curves, whose kinks fall at
+    crossings that no fixed grid contains, so it cuts corners by a few parts in
+    ten thousand near a kink. The jump itself is now exact.
+    """
+    port, bd = bounds_at_a
+    s = bd.cloud_df.index.to_numpy(dtype=float)
+    hi = bd.cloud_df.max(axis=1).to_numpy(dtype=float)
+    lo = bd.cloud_df.min(axis=1).to_numpy(dtype=float)
+    grid = np.linspace(0, 1, 2001)
+    drawn_hi = np.interp(grid, s, hi)
+    drawn_lo = np.interp(grid, s, lo)
+    for name, dist in port.distortions.items():
+        g = np.asarray(dist.g(grid), dtype=float)
+        assert (g - drawn_hi).max() < 1e-3, f'{name} above the drawn band'
+        assert (drawn_lo - g).max() < 1e-3, f'{name} below the drawn band'
 
 
 def test_tex_is_total(bounds):

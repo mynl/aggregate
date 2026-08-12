@@ -61,17 +61,18 @@ Both parameterize the extreme consistent distortions as biTVaRs
 Naming convention used throughout
 ---------------------------------
 
-===============  ==============  ============================================
-Name             Shape           Meaning
-===============  ==============  ============================================
-``p_knots``      ``(n_p,)``      TVaR threshold values, the p axis
-``s_grid``       ``(n_s,)``      distortion evaluation points, the s axis
-``tvar_x_p``     ``(n_p,)``      ``tvar_x_p[i] = TVaR_{p_knots[i]}(min(X, a))``
-``tvar_hinges``  ``(n_p, n_s)``  ``min(1, s_grid[j] / (1 - p_knots[i]))``
-``cloud_df``     ``(n_s, K)``    each column is a convex combination of two
-                                 rows of ``tvar_hinges``; ``K`` = number of
-                                 ``(p_lo, p_hi)`` pairs straddling ``p_star``
-===============  ==============  ============================================
+===============  ================  ============================================
+Name             Shape             Meaning
+===============  ================  ============================================
+``p_knots``      ``(n_p,)``        TVaR threshold values, the p axis
+``s_grid``       ``(n_s + 1,)``    distortion evaluation points, the s axis; the
+                                   extra point is the jump knot at ``JUMP_EPS``
+``tvar_x_p``     ``(n_p,)``        ``tvar_x_p[i] = TVaR_{p_knots[i]}(min(X, a))``
+``tvar_hinges``  ``(n_p, n_s+1)``  ``min(1, s_grid[j] / (1 - p_knots[i]))``
+``cloud_df``     ``(n_s+1, K)``    each column is a convex combination of two
+                                   rows of ``tvar_hinges``; ``K`` = number of
+                                   ``(p_lo, p_hi)`` pairs straddling ``p_star``
+===============  ================  ============================================
 
 The "hinge family" is the set of TVaR distortions parameterised by p:
 ``TVaR_p(s) = min(1, s / (1 - p))``. p indexes the family; s is the
@@ -93,6 +94,12 @@ from ._grid_distribution import GridDistribution
 logger = logging.getLogger(__name__)
 
 __all__ = ['AllocationBounds', 'Bounds', 'PricingBounds']
+
+#: Where the ``s`` grid samples "just right of zero", so the jump the maximum
+#: envelope takes at the origin is carried as a jump rather than smeared across
+#: the first grid cell. The same value, for the same reason, as the ``eps`` in
+#: :meth:`aggregate.spectral.Distortion._build_grid`; see :attr:`Bounds.s_grid`.
+JUMP_EPS = 1e-12
 
 
 def _resolve_obj(obj, unit):
@@ -172,13 +179,13 @@ class Bounds(HelpMixin):
     p_star : float
         TVaR threshold where ``TVaR_{p_star}(min(X, a)) = premium``.
     p_knots : ndarray, shape (n_p,)
-    s_grid : ndarray, shape (n_s,)
+    s_grid : ndarray, shape (n_s + 1,)
     tvar_x_p : ndarray, shape (n_p,)
-    tvar_hinges : ndarray, shape (n_p, n_s)
+    tvar_hinges : ndarray, shape (n_p, n_s + 1)
     weight_df : DataFrame
         One row per bracketing ``(p_lo, p_hi)`` pair with columns
         ``t_lower, t_upper, weight``.
-    cloud_df : DataFrame, shape ``(n_s, K)``
+    cloud_df : DataFrame, shape ``(n_s + 1, K)``
         Columns are MultiIndex ``(p_lo, p_hi)``.
     min_envelope : :class:`Distortion`
         Pointwise minimum of the cloud. Min-of-concaves is concave, so this
@@ -186,7 +193,7 @@ class Bounds(HelpMixin):
     max_envelope : callable
         Pointwise maximum of the cloud, as an ``interp1d`` callable. NOT
         a Distortion (max of concaves is not concave in general).
-    min_envelope_hinges : DataFrame, shape ``(n_s, 4)``
+    min_envelope_hinges : DataFrame, shape ``(n_s + 1, 4)``
         Columns ``s, p_lo, p_hi, weight`` — at each ``s``, the BiTVaR
         bracket from :attr:`weight_df` that achieves the pointwise
         minimum, plus that bracket's convex-combo weight.
@@ -293,8 +300,41 @@ class Bounds(HelpMixin):
 
     @cached_property
     def s_grid(self):
-        """The distortion-evaluation grid, shape ``(n_s,)``."""
-        return np.linspace(0.0, 1.0, self.n_s)
+        """The distortion-evaluation grid, shape ``(n_s + 1,)``.
+
+        A uniform grid on ``[0, 1]`` with one extra point spliced in at
+        :data:`JUMP_EPS`, immediately right of zero.
+
+        Notes
+        -----
+        The extra point carries a **jump**, not a refinement. ``p_knots``
+        includes ``p = 1``, where ``TVaR_1(min(X, a)) = a``, so the cloud
+        legitimately contains brackets ``(p_lo, 1)`` whose distortion is
+        ``(1 - w) min(1, s / (1 - p_lo)) + w 1{s > 0}``: a biTVaR carrying an
+        atom at zero, exactly as ``ccoc`` does. Every such column steps from
+        ``0`` to its weight ``w`` the instant ``s`` leaves zero, so the
+        **maximum** envelope is discontinuous at the origin, rising to the
+        largest of those weights. The minimum envelope is continuous there,
+        since brackets with ``p_hi < 1`` carry no atom.
+
+        On a bare uniform grid the first cell holds no point, so a consumer
+        joining ``(0, 0)`` to the first grid value draws a ramp where there is
+        a cliff, and understates the upper edge across that whole cell by the
+        full height of the jump. That is invisible in a small figure, where the
+        cell is under a pixel, and plain in a zoomable one. It also puts the
+        drawn upper edge below ``ccoc`` near the origin, which is a visible
+        contradiction: ``ccoc`` is a member of the admissible set, so the
+        maximum envelope must lie above it everywhere.
+
+        This is the discipline :meth:`aggregate.spectral.Distortion._build_grid`
+        already applies to a distortion's own grid, for the same reason and with
+        the same constant: "ensure a knot at eps so trapz captures the jump".
+        The cloud is a set of biTVaRs, so it wants the same treatment. One
+        extra point, and the band, :attr:`max_envelope` and the
+        :func:`aggregate.charts.chart_envelope` document all inherit it.
+        """
+        return np.unique(np.concatenate([
+            np.linspace(0.0, 1.0, self.n_s), [JUMP_EPS]]))
 
     @cached_property
     def tvar_x_p(self):
@@ -327,6 +367,20 @@ class Bounds(HelpMixin):
 
         Index: MultiIndex ``(p_lo, p_hi)``.
         Columns: ``t_lower, t_upper, weight``.
+
+        Notes
+        -----
+        The weight is **clipped to** ``[0, 1]``, because a weight outside it is
+        not a convex combination and so does not name a distortion. Only one
+        bracket family can leave the interval, and only just: ``p_star`` is a
+        root found to ``xtol = 2**-17``, so ``tvar_x(p_star)`` overshoots the
+        premium by a hair, and the brackets whose ``p_lo`` **is** ``p_star``
+        (it is spliced into ``p_knots``) come out with ``w`` a few thousandths
+        below zero. Unclipped they extrapolate away from ``p_hi`` instead of
+        interpolating toward it, which drags the minimum envelope below the
+        curve at ``p_lo``, and at ``s = JUMP_EPS`` below zero. Clipping to zero
+        leaves exactly the ``TVaR_{p_lo}`` curve, which prices to the premium
+        to the same root tolerance, so the bracket says what it meant to say.
         """
         ps = self.p_knots
         tps = self.tvar_x_p
@@ -335,6 +389,7 @@ class Bounds(HelpMixin):
         pl, pu = np.meshgrid(ps[lhs], ps[rhs], indexing='ij')
         tl, tu = np.meshgrid(tps[lhs], tps[rhs], indexing='ij')
         w = (self.premium - tl) / np.where(tu == tl, 1.0, tu - tl)
+        w = np.clip(w, 0.0, 1.0)
         df = pd.DataFrame({
             'p_lower': pl.ravel(),
             'p_upper': pu.ravel(),
@@ -347,7 +402,7 @@ class Bounds(HelpMixin):
     @cached_property
     def cloud_df(self):
         """
-        The cloud of weighted-TVaR distortions, shape ``(n_s, K)``.
+        The cloud of weighted-TVaR distortions, shape ``(n_s + 1, K)``.
 
         ``cloud_df[s, (p_lo, p_hi)] = (1-w) min(1, s/(1-p_lo)) + w min(1, s/(1-p_hi))``
         where ``w`` is the bracket weight from :attr:`weight_df`.
@@ -418,7 +473,7 @@ class Bounds(HelpMixin):
         Returns
         -------
         DataFrame
-            shape ``(n_s, 4)`` with columns:
+            shape ``(n_s + 1, 4)`` with columns:
 
             ============  ==========================================
             ``s``         the evaluation point (== :attr:`s_grid`)

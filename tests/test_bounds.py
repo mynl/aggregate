@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 from aggregate import build, Bounds, Distortion
+from aggregate.bounds import JUMP_EPS
 
 
 PROGRAM = """
@@ -98,7 +99,8 @@ def test_min_envelope_hinges_records_active_pair(bdd_at_tvar50):
     """min_envelope_hinges records s, the (p_lo, p_hi) bracket and weight active at each s."""
     _, _, bd = bdd_at_tvar50
     hinges = bd.min_envelope_hinges
-    assert hinges.shape == (513, 4)
+    # n_s + 1: the uniform grid plus the jump knot ([Bounds-Envelope-Jump])
+    assert hinges.shape == (bd.n_s + 1, 4) == (514, 4)
     assert list(hinges.columns) == ['s', 'p_lo', 'p_hi', 'weight']
     np.testing.assert_array_equal(hinges['s'].values, bd.s_grid)
     rng = np.random.default_rng(0)
@@ -156,6 +158,68 @@ def test_aggregate_input():
     prem = float(agg.tvar(0.5))
     bd = Bounds(agg, premium=prem)
     assert abs(bd.p_star - 0.5) < 1e-6
+
+
+def test_s_grid_carries_the_jump_knot(bdd_at_tvar50):
+    """``[Bounds-Envelope-Jump]`` the grid samples just right of zero.
+
+    ``p_knots`` includes ``p = 1``, so the cloud contains biTVaRs with an atom
+    at zero and the **maximum** envelope is discontinuous at the origin. A bare
+    uniform grid holds no point in the first cell, so any consumer joining
+    ``(0, 0)`` to the first grid value draws a ramp where there is a cliff.
+    """
+    _, _, bd = bdd_at_tvar50
+    assert len(bd.s_grid) == bd.n_s + 1
+    assert bd.s_grid[0] == 0.0
+    assert bd.s_grid[1] == JUMP_EPS
+    assert np.all(np.diff(bd.s_grid) > 0)          # still sorted and unique
+
+
+def test_the_maximum_envelope_jumps_to_the_ccoc_mass(bdd_at_tvar50):
+    """The jump height is exactly the mass of the calibrated ``ccoc``.
+
+    Both are ``M / (a - L)`` by the pentagon identity, so this is an identity
+    and not a tolerance: the ``(p_lo = 0, p_hi = 1)`` bracket **is** the CCoC
+    distortion, and it is the admissible distortion that loads the first
+    infinitesimal of probability hardest. It is why the maximum envelope has to
+    lie above ``ccoc`` everywhere, and why a grid that smears the jump puts the
+    drawn upper edge below a curve it must contain.
+    """
+    port, prem, bd = bdd_at_tvar50
+    hi = bd.cloud_df.max(axis=1).to_numpy()
+    assert hi[0] == 0.0
+    # the anchor the fixture calibrated at, so the two agree about a
+    bd_at_a = Bounds(port, premium=prem, a=float(port.q(1)))
+    jump = float(bd_at_a.cloud_df.max(axis=1).to_numpy()[1])
+    assert abs(jump - float(port.distortions['ccoc'].mass)) < 1e-9
+
+
+def test_bracket_weights_are_convex(bdd_at_tvar50):
+    """A weight outside ``[0, 1]`` is not a convex combination.
+
+    ``p_star`` is a root found to ``xtol = 2**-17`` and is itself spliced into
+    ``p_knots``, so the brackets whose ``p_lo`` is ``p_star`` used to come out a
+    few thousandths negative and dragged the minimum envelope below zero at the
+    jump knot.
+    """
+    _, _, bd = bdd_at_tvar50
+    w = bd.weight_df['weight']
+    assert w.min() >= 0.0 and w.max() <= 1.0
+    cloud = bd.cloud_df.to_numpy()
+    assert cloud.min() >= 0.0 and cloud.max() <= 1.0
+
+
+def test_the_two_envelopes_do_not_cross(bdd_at_tvar50):
+    """``max_envelope`` above ``min_envelope`` off the grid as well as on it.
+
+    The two are built by different machinery, a linear interpolation against a
+    fitted concave distortion, so they can only be compared where both are
+    evaluated. Inside the first cell they used to cross, because the
+    interpolation ramped up from zero while the fit left the origin steeply.
+    """
+    _, _, bd = bdd_at_tvar50
+    s = np.linspace(0, 1, 20001)
+    assert (bd.max_envelope(s) - bd.min_envelope.g(s) >= -1e-9).all()
 
 
 def test_frames_emit_no_runtime_warning():

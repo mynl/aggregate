@@ -50,13 +50,18 @@ def peg():
     bs = BASELINE['meta']['bs']
     port = build_peg(update=True, calibrate=True, p=p, coc=coc,
                      log2=log2, bs=bs)
+    # The lock is a *lifted* lock: it was captured on the lifted surface,
+    # and it is the only end-to-end lifted regression left now that linear
+    # is the resolved default everywhere ([Allocation-Default-Linear]), so
+    # the sweep asks for lifted by name rather than inheriting a default.
     # ccoc (mass) on the unbounded PEG is refused by the lifted builder
     # (numerics-3 G6); analyze the no-mass quartet, which keeps the
-    # pre-change lifted regression lock intact. ccoc pricing coverage
-    # lives in the baseline corpus under allocation='linear'.
+    # captured cells reachable. ccoc pricing coverage lives in the baseline
+    # corpus under allocation='linear'.
     no_mass = {k: v for k, v in port.distortions.items()
                if not getattr(v, 'has_mass', False)}
-    ad = port.analyze_distortions(p=p, distortions=no_mass).pricing_df
+    ad = port.analyze_distortions(p=p, distortions=no_mass,
+                                  allocation='lifted').pricing_df
     return port, ad
 
 
@@ -91,7 +96,8 @@ def test_pricing(peg):
     for dname, by_column in BASELINE['pricing'].items():
         if dname == 'ccoc':
             # mass distortion on the unbounded PEG: the lifted builder
-            # refuses (numerics-3 G6); rows are no longer produced
+            # refuses (numerics-3 G6), and this fixture asks for lifted
+            # by name, so the rows are not produced
             continue
         assert dname in ad.index.get_level_values(0).unique(), \
             f'distortion {dname!r} missing from analyze_distortions output'

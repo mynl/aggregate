@@ -1381,7 +1381,11 @@ Two allocation surfaces, one builder (a57): ``allocation='lifted'``
 (risk-adjusted beta) or ``'linear'`` (objective alpha; the collapsed-tail default
 since a17 for robustness with mass distortions on unbounded books, where lifted
 *refuses* a mass distortion on an unbounded support rather than emitting an
-unstable frame). The diagnostic layer curves live in ``allocation_diagnostics``:
+unstable frame). Since a265 the whole pentagon surface honors
+``allocation_method``: ``apply_distortion``, ``pricing_at``, ``pentagon_at``,
+``analyze_distortion`` and ``analyze_distortions`` each take an ``allocation``
+keyword defaulting to ``None``, which reads the member, so lifted is reached by
+asking for it. The diagnostic layer curves live in ``allocation_diagnostics``:
 
 .. ipython:: python
 

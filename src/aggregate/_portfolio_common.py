@@ -88,7 +88,7 @@ def convex_points(s, gs):
 
 
 def build_augmented(port, dist, *, view='ask', S_calculation='forwards',
-                    allocation='lifted', allow_deficit=False):
+                    allocation=None, allow_deficit=False):
     r"""Construct an augmented_df from ``port.density_df`` under ``dist``.
 
     Pure builder: returns the frame without touching ``port`` (the
@@ -105,7 +105,9 @@ def build_augmented(port, dist, *, view='ask', S_calculation='forwards',
     with ``TAIL = exi_xgtag`` (beta, the distorted tail share) for
     ``allocation='lifted'`` and ``TAIL = exi_xgta`` (alpha, the
     objective tail share) for ``'linear'`` -- the *only* difference
-    between the two methods. The distorted atom weights ``gp`` come
+    between the two methods. ``allocation=None`` (the default) reads
+    ``port.allocation_method``, so the portfolio's own setting drives
+    every readout built here. The distorted atom weights ``gp`` come
     from the one Choquet helper
     (:func:`~aggregate.spectral.choquet_weights`); the effective
     ``g`` resolves ``view`` × the portfolio's value-type role
@@ -116,11 +118,13 @@ def build_augmented(port, dist, *, view='ask', S_calculation='forwards',
     * **Mass guard (G6).** The lifted tail split integrates ``gp``
       across tail states, so a distortion with a mass on an
       unbounded support puts essentially all tail weight on the last
-      represented bucket -- a different bounded problem, refused
-      here (not just in ``price``). The linear split and all total
-      columns depend on the tail only through ``g(S(a))`` and are
-      stable; with a mass on an unbounded support the linear frame
-      is built with the beta columns blanked.
+      represented bucket: a different bounded problem, refused
+      here (not just in ``price``). Reachable by explicit request
+      only, since the resolved default is linear. The linear split
+      and all total columns depend on the tail only through
+      ``g(S(a))`` and are stable; with a mass on an unbounded
+      support the linear frame is built with the beta columns
+      blanked.
     * **Signed support.** The total columns (``gS``, ``gp_total``,
       ``exag_total``) are exact on any signed window. The per-unit
       ``exag_*`` columns require the equal-priority share
@@ -131,6 +135,8 @@ def build_augmented(port, dist, *, view='ask', S_calculation='forwards',
       (FFT-noise cut, positional); the tail sums feeding beta are
       computed on the full law first.
     """
+    if allocation is None:
+        allocation = port.allocation_method
     if allocation not in ('lifted', 'linear'):
         raise ValueError(
             f"allocation must be 'lifted' or 'linear', not {allocation!r}")

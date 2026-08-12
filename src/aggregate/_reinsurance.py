@@ -687,7 +687,8 @@ def reins_price_df(obj, distortion=None, *, p=None, a=None, views=None):
     per-occurrence layer times an unbounded claim count still has no ceiling),
     so this bites on ordinary programs. Pass ``p=`` or ``a=`` for the mass
     families. The same fact makes :meth:`Portfolio.analyze_distortions` skip
-    them on an unbounded book.
+    them on an unbounded book when it is asked for ``allocation='lifted'``;
+    its resolved default, linear, prices them.
     """
     if p is not None and a is not None:
         raise ValueError(

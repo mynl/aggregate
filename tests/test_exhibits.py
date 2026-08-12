@@ -754,6 +754,28 @@ def test_pricing_allocate_insurer_splits_the_book_into_stat_slices(objects):
         assert kw['float_format']
 
 
+def test_pricing_allocate_serves_a_mass_family_on_an_unbounded_book():
+    """[Allocation-Default-Linear]: ccoc reaches every stat slice.
+
+    Built here rather than added to the fixtures on purpose: every book in
+    ``PROGRAMS`` is discrete and therefore bounded, and on a bounded book the
+    lifted split could always allocate a mass family. The symptom needed an
+    unbounded one, which is the ordinary case in the app. Mirrored in section
+    EX of ``decl-testers.agg`` as ``EX.UnbPort``.
+    """
+    port = build('port EX.UnbPort '
+                 'agg EX.UnbA 1 claim sev gamma 100 cv 0.5 fixed '
+                 'agg EX.UnbB 1 claim sev gamma 50 cv 0.8 fixed')
+    assert not port.bounded
+    result = port.calibrate_distortions(0.10, p=0.99)
+    blocks = exhibit_frames(result, 'pricing.allocate', Perspective.INSURER)
+    slices = [(n, f) for n, f, _ in blocks if n.startswith('stat_')]
+    assert [n for n, _ in slices] == ['stat_LR', 'stat_P', 'stat_PQ', 'stat_ROE']
+    for name, frame in slices:
+        assert 'ccoc' in frame.index, name
+        assert frame.loc['ccoc'].notna().all(), name
+
+
 def test_pricing_allocate_insurer_is_narrower_than_raw_on_a_cession(objects):
     """The first exhibit where RAW carries strictly more rows than INSURER.
 

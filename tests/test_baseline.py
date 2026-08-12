@@ -325,23 +325,25 @@ def _diff_portfolio_distortions(obj, case_name: str, entry: dict,
 
         # The lifted builder refuses a mass distortion on an unbounded
         # support (numerics-3 G6: the mass lands on the last represented
-        # bucket -- a different bounded problem). The captured lifted-style
+        # bucket, a different bounded problem). The captured lifted-style
         # augmented_df / pricing_at frames for that combination are
         # unreachable by design; linear price() readouts below still run.
+        # These two legs were captured on lifted and ask for it by name,
+        # linear being the resolved default ([Allocation-Default-Linear]).
         mass_unbounded = getattr(dist, 'has_mass', False) and not obj.bounded
         if mass_unbounded:
             with pytest.raises(ValueError):
-                obj.apply_distortion(dist)
+                obj.apply_distortion(dist, allocation='lifted')
         else:
             # augmented_df (lifted-form, the captured shape)
-            aug = obj.apply_distortion(dist)
+            aug = obj.apply_distortion(dist, allocation='lifted')
             aug_sub = _apply_filter(aug, C.AUGMENTED_COLUMNS)
             expected = _load_expected(entry["frames"][f"augmented__{label}"])
             divs.extend(_diff_frame(aug_sub, expected,
                                     case_name, f"augmented__{label}", rtol, atol))
 
             # pricing_at
-            pa = obj.pricing_at(dist, p=C.PRICING_P)
+            pa = obj.pricing_at(dist, p=C.PRICING_P, allocation='lifted')
             expected = _load_expected(entry["frames"][f"pricing_at__{label}"])
             divs.extend(_diff_frame(pa, expected,
                                     case_name, f"pricing_at__{label}", rtol, atol))

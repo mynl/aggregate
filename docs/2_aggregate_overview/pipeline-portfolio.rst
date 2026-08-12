@@ -39,8 +39,8 @@ The pipeline::
     apply_distortion            gS, gp_total, exag_* (cached per distortion)
         |
         v
-    price / pricing_at          pricing readouts (linear or lifted)
-    analyze_distortion(s)
+    price / pricing_at          pricing readouts (allocation_method, so
+    analyze_distortion(s)       linear unless asked for lifted by name)
 
 The switcheroo is a big idea, not a side path. A :class:`Portfolio` can be rebuilt around an empirical multivariate sample: rather than carrying the full joint sample everywhere, :meth:`create_from_sample` and :meth:`add_exa_sample` replace the density frame with one whose kappas :math:`\mathsf E[X_i \mid X = a]` are estimated directly from the sample. Everything about the sample's dependency structure that matters for allocation is the kappa, so once you have it, every downstream calculation runs unchanged on the sample-based object: allocation, distortion pricing, the whole augmented-frame machinery. That is the win. A high-dimensional sample collapses to a one-dimensional family of conditional means, and all manner of things simplify. The mechanics are in :ref:`portfolio sample`.
 
@@ -134,7 +134,9 @@ lifted
 
 Because one sweep serves both, linear costs essentially the same as lifted; there is no performance reason to prefer either.
 
-The difference matters at the right edge. A distortion with a mass at zero, such as constant cost of capital, on an unbounded support puts essentially all the lifted tail weight on the single last represented bucket, which is unstable and grid-dependent. The builder refuses that combination outright rather than returning an unstable answer, and the error points at ``linear``, or at certifying ``portfolio.bounded = True`` when the support really is bounded. The linear split, and every total column, depends on the tail only through :math:`g(S(a))` and is stable; with a mass on an unbounded support the linear frame is built with the beta columns blanked. See :ref:`portfolio defective unbounded`.
+:attr:`allocation_method` is the source of truth for the choice and the whole pentagon surface consults it: :meth:`apply_distortion` and :attr:`augmented_df`, :meth:`pricing_at`, :meth:`pentagon_at`, :meth:`price`, :meth:`analyze_distortion` and :meth:`analyze_distortions`, and therefore the pricing exhibits built on a calibration. Each takes an ``allocation`` keyword whose ``None`` default reads the member, so lifted is reached by asking for it, either once on the portfolio or per call.
+
+The difference matters at the right edge. A distortion with a mass at zero, such as constant cost of capital, on an unbounded support puts essentially all the lifted tail weight on the single last represented bucket, which is unstable and grid-dependent. The builder refuses that combination outright rather than returning an unstable answer, and the error points at ``linear``, or at certifying ``portfolio.bounded = True`` when the support really is bounded. Since linear is the resolved default, that refusal is reached only by an explicit lifted request. The linear split, and every total column, depends on the tail only through :math:`g(S(a))` and is stable; with a mass on an unbounded support the linear frame is built with the beta columns blanked. See :ref:`portfolio defective unbounded`.
 
 Readouts
 ~~~~~~~~
@@ -189,7 +191,7 @@ Defective, unbounded, and mass distortions
 
 A defective total (:math:`\sum p < 1`) is handled by not normalizing, by computing ``S`` forwards, and by letting ``S`` plateau at the deficit. :meth:`calibrate_distortion` already trims ``S`` at the first zero and records ``ess_sup``.
 
-Mass distortions, such as constant cost of capital, put weight on the survival function's jump. On a bounded support that is fine. On an unbounded support under the lifted allocation the mass lands on the last bucket, which is unstable, and the builder refuses the combination. The linear allocation avoids the problem by collapsing the tail with objective probabilities.
+Mass distortions, such as constant cost of capital, put weight on the survival function's jump. On a bounded support that is fine. On an unbounded support under the lifted allocation, by explicit request, the mass lands on the last bucket, which is unstable, and the builder refuses the combination. The linear allocation, which is the default, avoids the problem by collapsing the tail with objective probabilities, so a mass family allocates on an unbounded book like any other.
 
 Boundedness is read from the spec, not from the density. Inferring it from a bucketed density is ill-posed: ``agg 100 claims dsev[10000]`` is unbounded yet has positive mass only on multiples of 10,000, so a test on "tail probabilities are positive" fails against structural zeros. The spec answers it cleanly:
 

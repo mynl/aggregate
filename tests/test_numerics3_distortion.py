@@ -324,7 +324,7 @@ def test_mass_guard_in_builder():
     p.update(log2=13, bs=1/8, padding=1)
     assert not p.bounded
     with pytest.raises(ValueError, match='mass'):
-        p.apply_distortion(CCOC)               # lifted default
+        p.apply_distortion(CCOC, allocation='lifted')
     # linear stays available (the collapsed law is bounded by
     # construction); beta columns are blanked
     aug = p.apply_distortion(CCOC, allocation='linear')
@@ -332,12 +332,22 @@ def test_mass_guard_in_builder():
     assert np.isfinite(aug['exag_U'].to_numpy()).all()
     pr = p.price(0.99, CCOC, allocation='linear')
     assert np.isfinite(pr.price)
-    # analyze_distortions sweeps skip the unpriceable member with a warning
+    # analyze_distortions asked for lifted skips the unpriceable member
     with pytest.warns(UserWarning, match='mass'):
-        res = p.analyze_distortions(p=0.99,
+        res = p.analyze_distortions(p=0.99, allocation='lifted',
                                     distortions={'ccoc': CCOC, 'dual': DUAL})
     got = set(res.pricing_df.index.get_level_values(0).unique().dropna())
     assert 'dual' in got and 'ccoc' not in got
+    # the default path prices the same family: the resolved allocation is
+    # linear, so nothing is skipped and nothing warns
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        res = p.analyze_distortions(p=0.99,
+                                    distortions={'ccoc': CCOC, 'dual': DUAL})
+    assert not [w for w in caught if 'skipping' in str(w.message)]
+    got = set(res.pricing_df.index.get_level_values(0).unique().dropna())
+    assert {'ccoc', 'dual'} <= got
+    assert np.isfinite(res.pricing_df.loc[('ccoc', 'P'), 'total'])
     # Aggregate-side guard
     a = build('agg N3.UnbA 5 claims sev lognorm 10 cv 1 poisson',
               log2=12, bs=1/16, padding=1)
@@ -349,6 +359,32 @@ def test_mass_guard_in_builder():
     d.apply_distortion(CCOC)
     gp = d.density_df.gp_total.to_numpy()
     assert np.isclose(gp.sum(), 1.0, rtol=0, atol=1e-12)
+
+
+def test_allocation_method_drives_the_pentagon_surface():
+    """[Allocation-Default-Linear]: the member is the default, both ways.
+
+    ``allocation_method`` is the source of truth and the pentagon readouts
+    consult it, so setting it to lifted on an unbounded book puts the mass
+    family back in the skipped column and the frames back on beta. The
+    default direction is asserted in ``test_mass_guard_in_builder``.
+    """
+    p = build('port N3.Unb agg U 5 claims sev lognorm 10 cv 1 poisson',
+              update=False)
+    p.update(log2=13, bs=1/8, padding=1)
+    assert not p.bounded and p.allocation_method == 'linear'
+    default = p.pricing_at(DUAL, p=0.99)
+    p.allocation_method = 'lifted'
+    assert p.pricing_at(DUAL, p=0.99).equals(
+        p.pricing_at(DUAL, p=0.99, allocation='lifted'))
+    with pytest.warns(UserWarning, match='skipping ccoc'):
+        res = p.analyze_distortions(p=0.99,
+                                    distortions={'ccoc': CCOC, 'dual': DUAL})
+    got = set(res.pricing_df.index.get_level_values(0).unique().dropna())
+    assert 'dual' in got and 'ccoc' not in got
+    # ... and back: the setter clears the cache, so the frames really rebuild
+    p.allocation_method = 'linear'
+    assert p.pricing_at(DUAL, p=0.99).equals(default)
 
 
 def test_signed_total_pricing(signed_port):
@@ -373,11 +409,14 @@ def test_signed_total_pricing(signed_port):
 
 def test_cache_keys_coexist(dice_port):
     dice_port._augmented_dfs.clear()
-    a1 = dice_port.apply_distortion(DUAL)
+    a1 = dice_port.apply_distortion(DUAL)              # resolves to linear
     a2 = dice_port.apply_distortion(DUAL, view='bid')
-    a3 = dice_port.apply_distortion(DUAL, allocation='linear')
+    a3 = dice_port.apply_distortion(DUAL, allocation='lifted')
     a4 = dice_port.apply_distortion(DUAL, S_calculation='backwards')
     assert len(dice_port.augmented_dfs) == 4
+    # the key records the resolved method, so the sentinel and the name it
+    # resolves to are the same frame rather than two
+    assert a1 is dice_port.apply_distortion(DUAL, allocation='linear')
     assert a1 is dice_port.apply_distortion(DUAL)      # cache hit
     assert a1 is not a2 and a1 is not a3 and a1 is not a4
     # bid frame really is the dual
@@ -405,15 +444,17 @@ def test_line_capital_reconciles(bod):
         bod._augmented_dfs.clear()
 
 
-def test_pricing_at_matches_price_and_pentagon(bod):
-    pa = bod.pricing_at(DUAL, p=0.99)
-    pr = bod.price(0.99, DUAL, allocation='lifted')
+@pytest.mark.parametrize('allocation', ('linear', 'lifted'))
+def test_pricing_at_matches_price_and_pentagon(bod, allocation):
+    """The three readouts agree, on whichever surface they are asked for."""
+    pa = bod.pricing_at(DUAL, p=0.99, allocation=allocation)
+    pr = bod.price(0.99, DUAL, allocation=allocation)
     dfm = pr.df.droplevel(0)
     for ln in list(bod.unit_names) + ['total']:
         for c in 'LMPQ':
             assert np.isclose(pa.loc[ln, c], dfm.loc[ln, c],
                               rtol=1e-12, atol=1e-12)
-        peg = bod.pentagon_at(DUAL, p=0.99, unit=ln)
+        peg = bod.pentagon_at(DUAL, p=0.99, unit=ln, allocation=allocation)
         for c in 'LMPQ':
             assert np.isclose(getattr(peg, c), pa.loc[ln, c],
                               rtol=1e-12, atol=1e-12)
@@ -475,14 +516,17 @@ def test_precapture_lifted_surfaces_survive(case):
     for label, entry in PRE[case].items():
         dist = {'ccoc': CCOC, 'dual': DUAL, 'tvar': TVAR}[label]
         if 'pricing_at' in entry:
-            pa = port.pricing_at(dist, p=0.99)
+            # captured on the lifted surface, so asked for by name: linear
+            # is the resolved default since [Allocation-Default-Linear]
+            pa = port.pricing_at(dist, p=0.99, allocation='lifted')
             for ln, vals in entry['pricing_at'].items():
                 for c, v in vals.items():
                     assert np.isclose(pa.loc[ln, c], v, rtol=rel,
                                       atol=rel * port.q(0.99)), \
                         f'{case} {label} pricing_at {ln}.{c}'
             for ln, vals in entry['pentagon_at'].items():
-                peg = port.pentagon_at(dist, p=0.99, unit=ln)
+                peg = port.pentagon_at(dist, p=0.99, unit=ln,
+                                       allocation='lifted')
                 for c, v in vals.items():
                     assert np.isclose(getattr(peg, c), v, rtol=rel,
                                       atol=rel * port.q(0.99)), \

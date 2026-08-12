@@ -1209,11 +1209,15 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
     def allocation_method(self) -> str:
         """Natural-allocation method: ``'linear'`` (default) or ``'lifted'``.
 
-        Drives :meth:`price` (and downstream readouts) when no explicit
-        ``allocation=`` is passed. Set this once on the portfolio rather
-        than threading the argument through every call. The setter
-        invalidates the ``augmented_df`` cache because the lifted and
-        linear frames differ on the right edge.
+        Drives the whole pentagon surface when no explicit ``allocation=``
+        is passed: :meth:`apply_distortion` and :attr:`augmented_df`,
+        :meth:`pricing_at`, :meth:`pentagon_at`, :meth:`price`,
+        :meth:`analyze_distortion` and :meth:`analyze_distortions`, and
+        therefore the ``pricing.allocate`` exhibit built on a calibration.
+        Set this once on the portfolio rather than threading the argument
+        through every call. The setter invalidates the ``augmented_df``
+        cache because the lifted and linear frames differ on the right
+        edge.
         """
         return self._allocation_method
 
@@ -3310,7 +3314,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return float(P)
 
     def apply_distortion(self, distortion, *, view='ask', S_calculation='forwards',
-                         allocation='lifted', allow_deficit=False):
+                         allocation=None, allow_deficit=False):
         """
         Apply ``distortion`` and return the resulting augmented_df.
 
@@ -3335,11 +3339,13 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             Deficit-parking direction for the exact-discrete tail; see
             :func:`~aggregate.spectral.choquet_weights`. Equivalent on a
             clean (normalized) law.
-        allocation : {'lifted', 'linear'}
+        allocation : {'linear', 'lifted', None}, optional
             Tail-share choice for the per-unit ``exag_*`` columns: lifted
             uses the distorted tail share ``exi_xgtag_*`` (beta), linear
             the objective ``exi_xgta_*`` (alpha). Identical column schema;
-            the total columns do not depend on the choice.
+            the total columns do not depend on the choice. ``None``
+            (default) reads :attr:`allocation_method`, matching
+            :meth:`price`.
         allow_deficit : bool
             Explicit truncation policy for a materially defective total
             (``1 - sum(p_total)`` above the validation noise floor).
@@ -3355,9 +3361,17 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         The actual construction lives in ``_build_augmented``. The cache is
         invalidated whenever ``update`` is called (the underlying density
         changes).
+
+        This method is the cache gatekeeper, so ``allocation=None`` resolves
+        to :attr:`allocation_method` **here**: the key records the method the
+        frame was actually built under, never the sentinel, so setting
+        ``allocation_method`` and asking again cannot return the other
+        surface's frame (the setter clears the cache in any case).
         """
         if isinstance(distortion, str):
             distortion = self.distortions[distortion]
+        if allocation is None:
+            allocation = self._allocation_method
         # label is the label-or-pretty-or-kind resolver; it keys the cache
         # so distortions of the same kind but different shape (TVaR(0.9) vs
         # TVaR(0.99)) stay distinct -- the bare kind handle would collide.
@@ -3391,7 +3405,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return self._augmented_dfs
 
-    def pricing_at(self, distortion, *, p=None, a=None, allocation='lifted'):
+    def pricing_at(self, distortion, *, p=None, a=None, allocation=None):
         """Pentagon pricing readout per unit at probability ``p`` or asset ``a``.
 
         Warms the augmented_df cache for ``distortion`` and pulls the
@@ -3407,9 +3421,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         a : float, optional
             Asset level; snapped to the index. Exactly one of ``p`` or ``a``
             must be provided.
-        allocation : {'lifted', 'linear'}
+        allocation : {'linear', 'lifted', None}, optional
             Tail-share choice for the per-unit premium allocation; passed
-            through to :meth:`apply_distortion`.
+            through to :meth:`apply_distortion`. ``None`` (default) reads
+            :attr:`allocation_method`.
 
         Returns
         -------
@@ -3467,7 +3482,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return out
 
     def pentagon_at(self, distortion, *, p=None, a=None, unit='total',
-                    allocation='lifted'):
+                    allocation=None):
         """Single-unit pentagon as a :class:`~aggregate.pentagon.Pentagon` object.
 
         The object-flavored analogue of :meth:`pricing_at`: returns one fully
@@ -3488,9 +3503,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             Asset level; snapped to the index.
         unit : str, default 'total'
             Which unit to read (``'total'`` for the portfolio total).
-        allocation : {'lifted', 'linear'}
+        allocation : {'linear', 'lifted', None}, optional
             Tail-share choice for the per-unit premium allocation; passed
-            through to :meth:`apply_distortion`.
+            through to :meth:`apply_distortion`. ``None`` (default) reads
+            :attr:`allocation_method`.
 
         Returns
         -------
@@ -3535,13 +3551,17 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return peg
 
     def _build_augmented(self, dist, *, view='ask', S_calculation='forwards',
-                         allocation='lifted', allow_deficit=False):
+                         allocation=None, allow_deficit=False):
         r"""Construct an augmented_df from ``self.density_df`` under ``dist``.
 
         Thin wrapper over :func:`aggregate._portfolio_common.build_augmented`
         (the common exeqa numerics -- the apply-distortion / allocation engine,
         agnostic to FFT-vs-sample origin). ``apply_distortion`` writes the
         returned frame into ``self._augmented_dfs``.
+
+        ``allocation=None`` reads :attr:`allocation_method` in the builder.
+        ``apply_distortion`` always passes the value it keyed the cache on, so
+        the sentinel reaches here only on a direct call.
         """
         return _common.build_augmented(
             self, dist, view=view, S_calculation=S_calculation,
@@ -3898,7 +3918,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             self, p=p, a=a, L=L, M=M, P=P, Q=Q, LR=LR, PQ=PQ, ROE=ROE,
             reins_view=reins_view)
 
-    def analyze_distortion(self, distortion, *, p=None, a=None, kind='lower'):
+    def analyze_distortion(self, distortion, *, p=None, a=None, kind='lower',
+                           allocation=None):
         """
         Pricing readout for ``distortion`` at probability ``p`` or asset level ``a``.
 
@@ -3915,6 +3936,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             must be provided.
         kind : {'lower', 'upper'}
             Type of VaR (only relevant when ``p`` is provided).
+        allocation : {'linear', 'lifted', None}, optional
+            Tail-share choice for the per-unit premium allocation; passed
+            through to :meth:`pricing_at`. ``None`` (default) reads
+            :attr:`allocation_method`.
 
         Returns
         -------
@@ -3934,7 +3959,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             a_cal = self.q(p, kind)
         else:
             a_cal = self.snap(a)
-        pricing_df = self.pricing_at(distortion, a=a_cal)
+        pricing_df = self.pricing_at(distortion, a=a_cal, allocation=allocation)
         # one-row audit, same orientation as every other readout: descriptors
         # (dname/dshape) lead, the pentagon octet is the trailing [-8:].
         audit_df = pd.DataFrame(
@@ -3957,7 +3982,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         )
 
     def analyze_distortions(self, *, p=None, a=None, distortions=None,
-                            reins_view=None):
+                            reins_view=None, allocation=None):
         """
         Pricing readout for a set of distortions at probability ``p`` or asset ``a``.
 
@@ -3982,6 +4007,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             build. Accepting the keyword and refusing the two it cannot honour
             is the point: a caller sweeping :attr:`reins_views` gets an error
             rather than three identical net answers under three labels.
+        allocation : {'linear', 'lifted', None}, optional
+            Tail-share choice for the per-unit premium allocation; resolved
+            once and passed to every :meth:`pricing_at` call in the sweep.
+            ``None`` (default) reads :attr:`allocation_method`.
 
         Returns
         -------
@@ -3999,10 +4028,13 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         legacy ``analyze_distortions2``: rows are ``(distortion, stat)``,
         columns are unit names.
 
-        A mass distortion on an unbounded portfolio cannot build the
-        lifted frame (the mass lands on the last represented bucket); such
-        members of the sweep are skipped with a ``UserWarning`` -- price
-        them explicitly with ``price(..., allocation='linear')``.
+        Under the resolved default (linear) every family in the set is
+        priced, mass families included: the linear split reads the tail
+        only through ``g(S(a))`` and is stable on an unbounded support.
+        Under an explicit ``allocation='lifted'`` a mass distortion on an
+        unbounded portfolio cannot build its frame (the mass lands on the
+        last represented bucket), so those members of the sweep are skipped
+        with a ``UserWarning`` and the rest are priced.
 
         Raises
         ------
@@ -4035,23 +4067,31 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             a_cal = self.q(p)
         else:
             a_cal = self.snap(a)
+        # resolve once: the skip test, the sweep and the cache snapshot below
+        # all have to agree on which surface this exhibit was built from.
+        if allocation is None:
+            allocation = self._allocation_method
         per_dist = {}
         for name, d in distortions.items():
-            # a mass distortion on an unbounded support cannot build the
-            # lifted frame (numerics-3 G6); skip it from the sweep with a
-            # visible warning rather than failing the whole exhibit.
-            if getattr(d, 'has_mass', False) and not self.bounded:
+            # under an explicit lifted request, a mass distortion on an
+            # unbounded support cannot build its frame (numerics-3 G6); skip
+            # it with a visible warning rather than failing the whole
+            # exhibit. The resolved default is linear, which prices it.
+            if (allocation == 'lifted'
+                    and getattr(d, 'has_mass', False) and not self.bounded):
                 warnings.warn(
-                    f'analyze_distortions: skipping {name} -- mass '
-                    f'distortion on an unbounded portfolio (lifted frame '
-                    f'refused). Price it explicitly with '
-                    f"allocation='linear'.")
+                    f'analyze_distortions: skipping {name}: mass distortion '
+                    f'on an unbounded portfolio, and the lifted split reads '
+                    f'the truncation row rather than the book (numerics-3 '
+                    f"G6). Re-run with allocation='linear' (the default), or "
+                    f'certify `bounded = True` if the support is in fact '
+                    f'bounded.')
                 continue
             # pricing_at returns units × canonical pentagon columns; transpose
             # so stats are rows and units are columns. The transpose drops the
             # categorical column dtype, so work in plain string labels here and
             # reapply the canonical stat order/dtype after concat.
-            exhibit = self.pricing_at(d, a=a_cal).T
+            exhibit = self.pricing_at(d, a=a_cal, allocation=allocation).T
             exhibit.index = exhibit.index.astype(str)
             # 'a' row: P + Q per unit, rescaled so totals sum to a_cal.
             a_row = exhibit.loc['P'] + exhibit.loc['Q']
@@ -4061,8 +4101,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             per_dist[name] = exhibit.reindex(PENTAGON_STATS)
         if not per_dist:
             raise ValueError(
-                'analyze_distortions: nothing to price -- every requested '
-                'distortion is a mass distortion on an unbounded portfolio.')
+                'analyze_distortions: nothing to price: every requested '
+                'distortion is a mass distortion on an unbounded portfolio '
+                "and the request was for allocation='lifted'.")
         pricing_df = pd.concat(
             per_dist.values(),
             keys=per_dist.keys(),
@@ -4081,7 +4122,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             in self._augmented_dfs.items()
             for n in distortions
             if n_ == n and view_ == 'ask' and sc_ == 'forwards'
-            and alloc_ == 'lifted'
+            and alloc_ == allocation
         }
         return AnalyzeDistortionsResult(
             distortions=dict(distortions),

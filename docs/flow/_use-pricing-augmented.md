@@ -8,7 +8,7 @@ Pricing adds exactly one new frame, `augmented_df`, and everything priced is a r
 flowchart TD
     dens["density_df"]
     dist["a Distortion"]
-    opts["options:<br/>view ask or bid,<br/>allocation lifted or linear,<br/>S_calculation"]
+    opts["options:<br/>view ask or bid,<br/>allocation linear or lifted<br/>(default allocation_method),<br/>S_calculation"]
 
     apply(["apply_distortion<br/>one O(n) sweep"])
     cache[("augmented_dfs cache<br/>keyed by name, view, role,<br/>S_calculation, allocation")]
@@ -34,4 +34,4 @@ One sweep serves all asset levels. You do not build a new frame to price at a di
 
 The cache key includes the options, so `lifted` and `linear` coexist rather than overwrite. Any `update` clears the cache, because a new density invalidates every distorted read off it. That is the Adjust stage reaching forward: cede, and every price you had computed is gone, correctly.
 
-The two allocations differ in exactly one term, the tail share used to split the last layer: the distorted share for lifted, the objective share for linear. Everything else in the two frames is identical.
+The two allocations differ in exactly one term, the tail share used to split the last layer: the distorted share for lifted, the objective share for linear. Everything else in the two frames is identical. Which one you get when you pass nothing is `allocation_method`, `linear` out of the box, and it drives every readout off the frame rather than `price` alone.

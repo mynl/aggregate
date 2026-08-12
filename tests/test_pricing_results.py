@@ -17,6 +17,9 @@ Two properties are worth holding onto and both are asserted here.
 """
 from __future__ import annotations
 
+import warnings
+
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -110,6 +113,34 @@ def test_portfolio_calibration_allocates_across_units(book):
     assert 'total' in allocated.columns
     # cached: the second read is the same object, not a second sweep
     assert result.pricing_df is allocated
+
+
+def test_a_mass_family_allocates_on_an_unbounded_book(book):
+    """[Allocation-Default-Linear]: ccoc reaches the Allocate subtab.
+
+    The symptom this was drafted from: Calibrate at ``p < 1`` on an unbounded
+    book warned ``skipping ccoc`` and served an allocation with no ccoc row,
+    while Calibrate and Evaluate both carried it. The sweep priced through a
+    hardcoded lifted default while :attr:`allocation_method` said linear, and
+    lifted genuinely cannot split that tail. Reading the member fixes it.
+    """
+    assert not book.bounded
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        result = book.calibrate_distortions(0.10, p=0.99)
+        allocated = result.pricing_df
+    assert not [w for w in caught if 'skipping' in str(w.message)]
+    families = set(allocated.index.get_level_values('distortion')
+                   .unique().dropna())
+    assert 'ccoc' in families
+    ccoc = allocated.xs('ccoc', level='distortion')
+    # every cell, per unit and total: the frame is built, not blanked
+    assert np.isfinite(ccoc.to_numpy()).all()
+    # and the total column closes back on the shared calibration target,
+    # which is the round trip the app draws across its two subtabs
+    target = result.calibration_df.loc['calibration']
+    for stat in ('L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE'):
+        assert ccoc.loc[stat, 'total'] == pytest.approx(target[stat], rel=1e-6)
 
 
 def test_reinsured_aggregate_calibration_allocates_across_views(ceded):

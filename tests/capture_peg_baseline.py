@@ -23,8 +23,8 @@ Layout of the captured baseline:
   ``port.distortions``
 - ``audit``: minimal calibration inputs (``a_cal = port.q(p)``, ``p``)
   reproducible without parsing ``pricing``
-- ``pricing``: full ``analyze_distortions(p).pricing_df`` exhibit, nested
-  ``{distortion: {column: {stat: value}}}``
+- ``pricing``: full ``analyze_distortions(p, allocation='lifted').pricing_df``
+  exhibit, nested ``{distortion: {column: {stat: value}}}``
 """
 from __future__ import annotations
 
@@ -70,7 +70,10 @@ def extract_pricing(ad):
 def main() -> None:
     port = build_peg(update=True, calibrate=True, p=P_CAL, coc=COC_CAL,
                      log2=LOG2)
-    ad = port.analyze_distortions(p=P_CAL).pricing_df
+    # lifted by name, matching the fixture in test_portfolio_peg_regression:
+    # this baseline is the lifted lock, and linear is the resolved default
+    # everywhere since [Allocation-Default-Linear].
+    ad = port.analyze_distortions(p=P_CAL, allocation='lifted').pricing_df
 
     baseline = {
         'meta': {

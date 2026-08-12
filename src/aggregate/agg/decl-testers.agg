@@ -1011,6 +1011,7 @@ agg SH.Clean 100 claims sev gamma 100 cv 1 poisson                              
 # exhibit_frames (unit handle EX.UnitA serves as "Unit Alpha").
 agg EX.Dice dfreq [3] dsev [1:6]                                                                                  note{summary/tail exhibit fixture; exact discrete lattice};
 port EX.Port agg EX.UnitA as "Unit Alpha" 1 claim dsev [1 2 3] fixed agg EX.UnitB 2 claims dsev [2 4] fixed;
+port EX.UnbPort note{unbounded pricing.allocate fixture: the mass family reaches the stat slices on the linear default} agg EX.UnbA 1 claim sev gamma 100 cv 0.5 fixed agg EX.UnbB 1 claim sev gamma 50 cv 0.8 fixed;
 bv EX.BV dfreq [1 2] [.7 .3] dbvsev [[10 1 .4] [10 2 .1] [20 1 .2] [20 2 .1] [20 3 .2]]                           note{bivariate exhibit fixture: dependency + axis support blocks};
 pnl EX.B 1000 premium less agg EX.Be 850 loss sev lognorm 100 cv 1 poisson                                        note{pnl exhibit fixture: stats/validation via the generic path};
 dist EX.PH ph 0.5                                                                                                 note{distortion exhibit fixture: check-table emphasis path};

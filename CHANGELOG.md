@@ -20,6 +20,26 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a259
+
+**[Pricing-Result-Objects] a calibration is a receipt, and a receipt knows what it was written about.** Phase L1 of `dev/plan-pricing-exhibits.md`, the joint plan with `aggregate_api`. Review notes for the whole LIB half are in `dev/plan-pricing-exhibits-LIB.md`.
+
+**Breaking: `calibrate_distortions` returns a `CalibrationResult` and `evaluate` returns an `EvaluationResult`,** on `Aggregate`, `Portfolio` and (for `evaluate`) `PnL`. Both were bare `DataFrame`s. The frames are unchanged and are the first attribute of each result: `.distortion_df` and `.evaluation_df`. The stored attributes did not move either, so `obj.calibrate_distortions(...)` followed by `obj.distortion_df` reads exactly as before and only code that used the *return value* as a frame has to change.
+
+The reason for the break is that a frame cannot be dispatched on. The pricing exhibits (`pricing.calibrate`, `pricing.allocate`, `pricing.evaluate`) are `singledispatch` registrations like every other exhibit, and what they register on is the result: ruling `[Pricing-Keyed-On-Result]`. Without a type there would have to be a second channel through the exhibit machinery for calculations that are not stored on an object, and there is now none.
+
+**A result carries the position, not just the shapes.** A calibration knows its `coc`, its resolved `p` and `a`, which of the two the caller fixed (`anchor`), the `kind`, the `names` requested and the `reins_view` it was fitted on. An evaluation knows the `premium` it was measured against, the view, and (from phase L3) the asset anchor. A panel of breakeven shapes read without its premium is a table with nothing to hold it to.
+
+**The allocation of the target is a lazy public frame on the result.** `CalibrationResult.pricing_df` allocates across the units of a book (`analyze_distortions` at the calibration anchor with the result's own distortions) and `CalibrationResult.reins_price_df` allocates across the views of a cession; each is computed on first access and cached, and each raises `AttributeError` naming the reason when the source has nothing to spread the target over. This is what keeps the RAW exhibit invariant intact over an exhibit built on a calculation: a RAW block still names an attribute on the dispatched object that returns a real public frame, and that the frame is computed on demand is an efficiency question rather than a contract one.
+
+**Every result borrows its source's identity.** The five result classes (the two new ones and `AnalyzeDistortionResult`, `AnalyzeDistortionsResult`, `PricingResult`) gain `_source` and, through `SourcedMixin`, the four names an exhibit reads off a dispatched object: `name`, `label`, `_title_name` and `_relabel`. So a served pricing exhibit is titled `Calibrated distortions: BasicBook` rather than `Calibration: CalibrationResult`. A result with no source answers `None` and relabels to the identity rather than raising.
+
+`PricingResult` also gains the `_relabel` at construction that its two siblings already applied, so `Portfolio.price` returns a display copy with unit labels like `analyze_distortion` and `analyze_distortions` do.
+
+`qd` grew a branch for both results, printing the frames they carry rather than a dataclass repr.
+
+---
+
 ## 1.0.0a258
 
 **[Joint-Surface-Contract] the joint surface says what grid it is, what it is a reduction of, and what it left out.** The LIB half of `dev/plan-3d-plot.md`, sections 5.1, 5.2 and 5.4 to 5.6. Review notes, and the five places the code and the plan disagree, are in `dev/plan-3d-plot-LIB.md`.

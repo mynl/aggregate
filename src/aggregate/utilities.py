@@ -330,6 +330,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     from .distributions import Aggregate
     from .portfolio import Portfolio
     from ._pnl import PnL
+    from .results import CalibrationResult, EvaluationResult
     if ff is None:
         ff = lambda x: f'{x:.5g}'
     elif ff == 'basic':
@@ -354,6 +355,13 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             # range percentiles; the footing sheet is economic_df).
             print(repr(x))
             qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
+        elif isinstance(x, CalibrationResult):
+            # the receipt reads as the two frames it always was: the per
+            # family shapes, then the one target they share
+            qd(x.distortion_df, accuracy=accuracy, **kwargs)
+            qd(x.calibration_df, accuracy=accuracy, **kwargs)
+        elif isinstance(x, EvaluationResult):
+            qd(x.evaluation_df, accuracy=accuracy, **kwargs)
         elif isinstance(x, pd.DataFrame):
             # 100 line width matches rtd html format
             args = {'line_width': 100,

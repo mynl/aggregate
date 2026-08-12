@@ -176,7 +176,7 @@ def test_distortion_df_schema(peg):
     port, _ = peg
     p = BASELINE['meta']['p_calibration']
     coc = BASELINE['meta']['coc_calibration']
-    ddf = port.calibrate_distortions(coc=coc, p=p)
+    ddf = port.calibrate_distortions(coc=coc, p=p).distortion_df
 
     assert ddf.index.name == 'distortion'
     assert list(ddf.index) == ['ccoc', 'ph', 'wang', 'dual', 'tvar']

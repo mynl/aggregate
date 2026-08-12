@@ -174,8 +174,8 @@ def test_aggregate_calibrate_distortions_parity():
     port.update(log2=18, bs=1, add_exa=True)
 
     a = agg.q(0.99)
-    add = agg.calibrate_distortions(0.1, a=a)
-    pdf = port.calibrate_distortions(0.1, a=a)
+    add = agg.calibrate_distortions(0.1, a=a).distortion_df
+    pdf = port.calibrate_distortions(0.1, a=a).distortion_df
 
     assert list(add.index) == ['ccoc', 'ph', 'wang', 'dual', 'tvar']
     np.testing.assert_allclose(add['param'].values, pdf['param'].values,
@@ -245,7 +245,7 @@ def test_evaluate_on_an_irregular_margin_is_exact():
     p = PnL(name='irr', source=(vals, probs), role='sell',
             consideration=3.0, obligation=lambda x: x)
     assert p.result.bs is None                    # exact irregular grid
-    ev = p.evaluate().droplevel('Step')
+    ev = p.evaluate().evaluation_df.droplevel('Step')
     x, q = np.asarray(p.result.x), np.asarray(p.result.p)
     c = float(x.max())
     z, qz = (c - x)[::-1], q[::-1]
@@ -259,14 +259,18 @@ def test_evaluate_on_an_irregular_margin_is_exact():
 
 def test_aggregate_evaluate_defaults_to_exp_premium_and_raises_without():
     a = build('agg AEv 1000 premium at 0.7 lr sev gamma 100 cv 0.5 poisson')
-    ev = a.evaluate()
+    result = a.evaluate()
+    ev = result.evaluation_df
+    # the result knows the position it measured, not just the shapes
+    assert result.premium == pytest.approx(1000.0)
+    assert result.name == 'AEv' and result.reins_view is None
     assert list(ev.index.get_level_values('Step').unique()) == ['AEv']
     assert (ev.status == 'ok').all()
     # an aggregate is an obligation written, so it is read as booked
     assert (ev.role == 'sell').all()
     # the explicit premium reproduces the default
     assert ev.param.to_numpy() == pytest.approx(
-        a.evaluate(1000.0).param.to_numpy())
+        a.evaluate(1000.0).evaluation_df.param.to_numpy())
     bare = build('agg ANoP 100 claims sev gamma 10 cv 1 poisson')
     with pytest.raises(ValueError, match='no premium to evaluate against'):
         bare.evaluate()
@@ -277,8 +281,8 @@ def test_aggregate_and_pnl_evaluate_agree():
     a = build('agg AX 1000 premium at 0.7 lr sev gamma 100 cv 0.5 poisson')
     p = build('pnl PX 1000 prem less agg PX_e 1000 prem at 0.7 lr '
               'sev gamma 100 cv 0.5 poisson')
-    assert a.evaluate().param.to_numpy() == pytest.approx(
-        p.evaluate().param.to_numpy(), rel=1e-6)
+    assert a.evaluate().evaluation_df.param.to_numpy() == pytest.approx(
+        p.evaluate().evaluation_df.param.to_numpy(), rel=1e-6)
 
 
 def test_portfolio_evaluate_total_and_unit_profile():
@@ -286,8 +290,8 @@ def test_portfolio_evaluate_total_and_unit_profile():
     port = build('port PEv '
                  'agg PU1 1000 premium at 0.65 lr sev gamma 100 cv 0.5 poisson '
                  'agg PU2 500 premium at 0.75 lr sev gamma 50 cv 1.2 poisson')
-    total = port.evaluate().droplevel('Step')
-    profile = port.evaluate(unit=['PU1', 'PU2'])
+    total = port.evaluate().evaluation_df.droplevel('Step')
+    profile = port.evaluate(unit=['PU1', 'PU2']).evaluation_df
     assert list(profile.index.get_level_values('Step').unique()) == \
         ['PU1', 'PU2']
     assert (profile.role == 'sell').all()      # every unit is written, not bought

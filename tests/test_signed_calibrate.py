@@ -50,8 +50,8 @@ def test_shift_exactness_p_anchor():
     assert base.density_df.index.min() == 0.0       # classic path
     assert sign.density_df.index.min() < 0.0         # transformed path
 
-    db = base.calibrate_distortions(0.1, p=0.8)
-    ds = sign.calibrate_distortions(0.1, p=0.8)
+    db = base.calibrate_distortions(0.1, p=0.8).distortion_df
+    ds = sign.calibrate_distortions(0.1, p=0.8).distortion_df
     np.testing.assert_allclose(db['param'].values, ds['param'].values,
                                rtol=0, atol=1e-12)
     cb, cs = _cal(base), _cal(sign)
@@ -68,8 +68,8 @@ def test_shift_exactness_a_anchor():
     corresponds to signed a=0."""
     base = build('agg SC.Base0 dfreq [1] dsev [0 10 20] [.5 .3 .2]', **GRID)
     sign = build('agg SC.Signed dfreq [1] dsev [-10 0 10] [.5 .3 .2]', **GRID)
-    db = base.calibrate_distortions(0.1, a=10)
-    ds = sign.calibrate_distortions(0.1, a=0)
+    db = base.calibrate_distortions(0.1, a=10).distortion_df
+    ds = sign.calibrate_distortions(0.1, a=0).distortion_df
     np.testing.assert_allclose(db['param'].values, ds['param'].values,
                                rtol=0, atol=1e-12)
     assert _cal(base)['P'] - _cal(sign)['P'] == pytest.approx(10.0, abs=1e-9)
@@ -122,7 +122,8 @@ def test_per_kind_sweep_signed(names):
     the (in-frame) premium target when its g is integrated against the canonical
     survival."""
     sign = build('agg SC.Signed dfreq [1] dsev [-10 0 10] [.5 .3 .2]', **GRID)
-    df = sign.calibrate_distortions(0.1, p=0.85, names=names)
+    df = sign.calibrate_distortions(
+        0.1, p=0.85, names=names).distortion_df
     assert list(df.index) == list(names)
     assert (df['error'].abs() < 1e-3).all()
 
@@ -132,8 +133,10 @@ def test_signed_and_classic_share_ccoc_closed_form():
     twin, and equals the requested coc."""
     base = build('agg SC.Base0 dfreq [1] dsev [0 10 20] [.5 .3 .2]', **GRID)
     sign = build('agg SC.Signed dfreq [1] dsev [-10 0 10] [.5 .3 .2]', **GRID)
-    db = base.calibrate_distortions(0.1, p=0.8, names=('ccoc',))
-    ds = sign.calibrate_distortions(0.1, p=0.8, names=('ccoc',))
+    db = base.calibrate_distortions(
+        0.1, p=0.8, names=('ccoc',)).distortion_df
+    ds = sign.calibrate_distortions(
+        0.1, p=0.8, names=('ccoc',)).distortion_df
     assert db.loc['ccoc', 'param'] == pytest.approx(ds.loc['ccoc', 'param'],
                                                      abs=1e-9)
     assert db.loc['ccoc', 'param'] == pytest.approx(0.1, abs=1e-6)
@@ -149,7 +152,7 @@ def test_classic_path_unchanged():
     a = build('agg SC.Classic 50 claims sev lognorm 40 cv 1.5 poisson',
               log2=16, bs=1)
     assert a.density_df.index.min() == 0.0
-    df = a.calibrate_distortions(0.1, p=0.99)
+    df = a.calibrate_distortions(0.1, p=0.99).distortion_df
     assert list(df.index) == list(NAMES)
     assert _cal(a)['ROE'] == pytest.approx(0.1)
     assert (df['error'].abs() < 1e-3).all()

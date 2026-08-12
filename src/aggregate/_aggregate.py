@@ -65,6 +65,7 @@ from . import _validation
 from . import _reinsurance
 from ._aggregate_compute import discretize_severities, freq_sev_convolution
 from . import _pricing
+from .results import EvaluationResult
 
 logger = logging.getLogger(__name__)
 
@@ -6538,14 +6539,19 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         Returns
         -------
-        pandas.DataFrame
-            ``distortion_df`` (also stored on ``self.distortion_df``): one row
-            per distortion in ``[ccoc, ph, wang, dual, tvar]``. The shared
-            calibration target is stored once on ``self.calibration_df`` and the
-            calibrated objects on ``self.distortions`` keyed by name -- same
-            schema as :meth:`Portfolio.calibrate_distortions`. Both frames carry
-            ``attrs['reins_view']``, recording which distribution they were
-            fitted to.
+        CalibrationResult
+            Carrying ``distortion_df`` (one row per distortion in
+            ``[ccoc, ph, wang, dual, tvar]``), the shared one-row
+            ``calibration_df`` target, the ``distortions`` themselves, and the
+            inputs they were fitted at. The same three are stored on
+            ``self.distortion_df`` / ``self.calibration_df`` /
+            ``self.distortions`` as before, so nothing that read them moves;
+            both frames carry ``attrs['reins_view']``, recording which
+            distribution they were fitted to. Same schema as
+            :meth:`Portfolio.calibrate_distortions`.
+
+            The return type changed at 1.0.0a259: it was the bare
+            ``distortion_df``, which is now an attribute of the result.
 
         Notes
         -----
@@ -6606,14 +6612,20 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         Returns
         -------
-        pandas.DataFrame
-            Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)`` with
-            ``Step`` this aggregate's name, and columns ``role`` /
-            ``param_name`` / ``param`` / ``gini_p`` / ``error`` / ``status``.
-            ``role`` is always ``'sell'`` here: an aggregate is an obligation
-            written, so the position is held the way it is booked. The same
-            shape :meth:`PnL.evaluate` and :meth:`Portfolio.evaluate` return,
-            so panels concatenate.
+        EvaluationResult
+            Carrying ``evaluation_df``, the panel: tidy (long) form,
+            ``MultiIndex`` rows ``(Step, distortion)`` with ``Step`` this
+            aggregate's name, and columns ``role`` / ``param_name`` /
+            ``param`` / ``gini_p`` / ``error`` / ``status``. ``role`` is
+            always ``'sell'`` here: an aggregate is an obligation written, so
+            the position is held the way it is booked. The same shape
+            :meth:`PnL.evaluate` and :meth:`Portfolio.evaluate` return, so
+            panels concatenate. The result also carries the premium and the
+            view the panel was measured on.
+
+            The return type changed at 1.0.0a259: it was the bare panel, which
+            is now ``.evaluation_df``. A frame cannot be dispatched on, and the
+            evaluate exhibit dispatches on the result.
 
         Warns
         -----
@@ -6636,7 +6648,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         step = self.name if reins_view is None else f'{self.name} {reins_view}'
         panel = pd.concat([panel], keys=[step], names=['Step'])
         _pricing.warn_degenerate(panel, self.name)
-        return panel
+        return EvaluationResult(
+            evaluation_df=panel, premium=P, reins_view=reins_view,
+            names=tuple(names if names is not None
+                        else _pricing.EVAL_FAMILIES),
+            _source=self)
 
     def _resolve_evaluation_premium(self, P):
         """The consideration :meth:`evaluate` measures against: the argument,

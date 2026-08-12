@@ -160,23 +160,27 @@ def test_signed_support_refuses_a_view():
 # ----------------------------------------------------------------------------
 
 def test_calibration_default_is_unchanged(occ):
-    own = occ.calibrate_distortions(0.10, p=0.999)
-    net = occ.calibrate_distortions(0.10, p=0.999, reins_view='net')
+    own = occ.calibrate_distortions(0.10, p=0.999).distortion_df
+    net = occ.calibrate_distortions(
+        0.10, p=0.999, reins_view='net').distortion_df
     assert np.allclose(own['param'], net['param'])
 
 
 def test_calibration_on_gross_differs_from_net(occ):
     """The plan's acceptance test: different distributions, different shapes."""
-    net = occ.calibrate_distortions(0.10, p=0.999, reins_view='net')['param']
-    gross = occ.calibrate_distortions(0.10, p=0.999, reins_view='gross')['param']
+    net = occ.calibrate_distortions(
+        0.10, p=0.999, reins_view='net').distortion_df['param']
+    gross = occ.calibrate_distortions(
+        0.10, p=0.999, reins_view='gross').distortion_df['param']
     # ccoc is a cost of capital, identical by construction; the shaped
     # families must move
     assert not np.allclose(net.drop('ccoc'), gross.drop('ccoc'))
 
 
 def test_calibration_records_its_view(occ):
-    df = occ.calibrate_distortions(0.10, p=0.999, reins_view='gross')
-    assert df.attrs['reins_view'] == 'gross'
+    result = occ.calibrate_distortions(0.10, p=0.999, reins_view='gross')
+    assert result.reins_view == 'gross'
+    assert result.distortion_df.attrs['reins_view'] == 'gross'
     assert occ.calibration_df.attrs['reins_view'] == 'gross'
     occ.calibrate_distortions(0.10, p=0.999)
     assert occ.distortion_df.attrs['reins_view'] is None
@@ -192,8 +196,9 @@ def test_calibration_asset_level_follows_the_view(occ):
 
 
 def test_portfolio_calibration_on_gross(book):
-    own = book.calibrate_distortions(0.10, p=0.999)['param']
-    gross = book.calibrate_distortions(0.10, p=0.999, reins_view='gross')['param']
+    own = book.calibrate_distortions(0.10, p=0.999).distortion_df['param']
+    gross = book.calibrate_distortions(
+        0.10, p=0.999, reins_view='gross').distortion_df['param']
     assert not np.allclose(own.drop('ccoc'), gross.drop('ccoc'))
 
 
@@ -226,7 +231,7 @@ def test_analyze_refuses_an_unknown_view(book):
 # ----------------------------------------------------------------------------
 
 def test_evaluate_labels_the_step_with_its_view(occ):
-    panel = occ.evaluate(6000, reins_view='gross')
+    panel = occ.evaluate(6000, reins_view='gross').evaluation_df
     assert panel.index.get_level_values('Step').unique().tolist() == \
         ['RV.Occ gross']
 
@@ -234,15 +239,16 @@ def test_evaluate_labels_the_step_with_its_view(occ):
 def test_evaluate_views_concatenate(occ):
     import pandas as pd
 
-    both_panels = pd.concat([occ.evaluate(6000),
-                             occ.evaluate(6000, reins_view='gross')])
+    both_panels = pd.concat(
+        [occ.evaluate(6000).evaluation_df,
+         occ.evaluate(6000, reins_view='gross').evaluation_df])
     assert both_panels.index.get_level_values('Step').nunique() == 2
 
 
 def test_evaluate_gross_is_less_acceptable_than_net(occ):
     """Same premium, more loss: the gross position survives less stress."""
-    net = occ.evaluate(6000, reins_view='net')['gini_p']
-    gross = occ.evaluate(6000, reins_view='gross')['gini_p']
+    net = occ.evaluate(6000, reins_view='net').evaluation_df['gini_p']
+    gross = occ.evaluate(6000, reins_view='gross').evaluation_df['gini_p']
     assert (gross.to_numpy() < net.to_numpy()).all()
 
 

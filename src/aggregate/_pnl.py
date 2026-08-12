@@ -2390,11 +2390,17 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
         Returns
         -------
-        pandas.DataFrame
-            Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)`` and
-            columns ``role`` / ``param_name`` / ``param`` / ``gini_p`` /
-            ``error`` / ``status``. ``.unstack('distortion')`` gives the wide
-            comparison view.
+        EvaluationResult
+            Carrying ``evaluation_df``, the panel: tidy (long) form,
+            ``MultiIndex`` rows ``(Step, distortion)`` and columns ``role`` /
+            ``param_name`` / ``param`` / ``gini_p`` / ``error`` / ``status``.
+            ``.unstack('distortion')`` on it gives the wide comparison view.
+            ``premium`` on the result is ``None``: every ledger row carries
+            its own consideration and no single number stands for them.
+
+            The return type changed at 1.0.0a259: it was the bare panel, which
+            is now ``.evaluation_df``. A frame cannot be dispatched on, and the
+            evaluate exhibit dispatches on the result.
 
         Warns
         -----
@@ -2418,7 +2424,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         however many legs feed it, so an expense ledger evaluates like any
         other.
         """
-        from ._pricing import evaluate_margin, warn_degenerate
+        from ._pricing import EVAL_FAMILIES, evaluate_margin, warn_degenerate
+        from .results import EvaluationResult
         blocks, steps = [], []
         for label, kind, payload in self._plan:
             if kind not in self._MARGIN_KINDS:
@@ -2429,7 +2436,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             steps.append(label)
         panel = pd.concat(blocks, keys=steps, names=['Step'])
         warn_degenerate(panel, self.label)
-        return panel
+        return EvaluationResult(
+            evaluation_df=panel,
+            names=tuple(names if names is not None else EVAL_FAMILIES),
+            _source=self)
 
     # ------------------------------------------------------------------
     # Plot: the net result density + distribution

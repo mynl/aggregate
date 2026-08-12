@@ -299,7 +299,7 @@ def test_stitched_peel_evaluates_its_nets_and_flags_underpriced_layers():
     p = build(f'{OCC2} peel top-down')
     layers = ['occ 100 xs 100 result', 'occ 300 xs 200 result']
     with pytest.warns(DegenerateEvaluationWarning, match=r'E\[M\]'):
-        ev = p.evaluate()
+        ev = p.evaluate().evaluation_df
     assert (ev.loc[layers, 'role'] == 'buy').all()
     assert ev.loc[layers, 'status'].str.startswith('E[M]').all()
     assert 'total impact' not in ev.index.get_level_values('Step')

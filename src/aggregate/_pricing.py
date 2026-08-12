@@ -20,6 +20,7 @@ import pandas as pd
 from .spectral import Distortion, DISTORTION_DTYPE, VALIDATION_NOISE
 from .pentagon import complete_pentagon, Pentagon
 from .constants import DegenerateEvaluationWarning
+from .results import CalibrationResult, EvaluationResult
 
 # The standard pricing distortion set calibrated by ``calibrate_distortions``.
 DEFAULT_CALIBRATION_DISTORTIONS = ('ccoc', 'ph', 'wang', 'dual', 'tvar')
@@ -558,7 +559,17 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
     ``exa = E[min(X, a)]`` and the premium target ``P`` (from ``coc`` via the
     ROE -> LR -> P inversion), then calls :meth:`Distortion.calibrate_set` once.
     Stores ``obj.distortions`` / ``obj.distortion_df`` / ``obj.calibration_df``
-    (mirroring the legacy ``Portfolio`` behaviour) and returns ``distortion_df``.
+    (mirroring the legacy ``Portfolio`` behaviour) and returns a
+    :class:`~aggregate.results.CalibrationResult` carrying the same three plus
+    the inputs they were fitted at.
+
+    The return type changed at 1.0.0a259: it was the bare ``distortion_df``.
+    The stored attributes are unchanged, so ``calibrate_distortions(...)``
+    followed by ``obj.distortion_df`` reads exactly as it did; only code that
+    used the *return value* as a frame moves to ``.distortion_df`` on it. The
+    reason for the break is that a frame cannot be dispatched on, and the
+    pricing exhibits dispatch on the result
+    (``dev/plan-pricing-exhibits.md``, ``[Pricing-Keyed-On-Result]``).
 
     The expected loss is read from the object's ``exa_total`` column when it has
     one (a ``Portfolio``, byte-for-byte the legacy value) and otherwise computed
@@ -602,6 +613,10 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
         raise ValueError(
             'calibrate_distortions requires exactly one of p= (probability) '
             'or a= (asset level).')
+    # Which of the pair the caller fixed, recorded before the resolution below
+    # overwrites both. The derived frames re-anchor on it, so a sweep over
+    # views or units holds fixed what the caller held fixed.
+    anchor = 'p' if p is not None else 'a'
 
     transform = (not obj._is_loss_value
                  or float(obj.density_df.index.min()) < 0)
@@ -682,7 +697,20 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
     obj.distortions = dists
     obj.distortion_df = distortion_df
     obj.calibration_df = calibration_df
-    return distortion_df
+    a_out = float(calibration_df.loc['calibration', 'a'])
+    return CalibrationResult(
+        distortions=dists,
+        distortion_df=distortion_df,
+        calibration_df=calibration_df,
+        coc=float(coc),
+        p=float(p_val),
+        a=a_out,
+        anchor=anchor,
+        kind=kind,
+        names=tuple(names),
+        reins_view=reins_view,
+        _source=obj,
+    )
 
 
 # ---------------------------------------------------------------------------

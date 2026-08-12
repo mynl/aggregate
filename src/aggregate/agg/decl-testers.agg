@@ -1151,3 +1151,18 @@ agg RS.Clamped  10 claims sev 100 - lognorm 80 cv .2 poisson                    
 agg RS.Negate   10 claims sev -lognorm 10 cv 0.5 poisson                                                            note{fully reflected: everything clamps, severity is a point mass at 0};
 agg RS.Shift    10 claims sev -lognorm 2 cv 0.5 + 5 poisson                                                         note{tight bind (-X) + 5 == 5 - X, clamped at 0};
 agg RS.Splice   10 claims ssev lognorm 1.5 splice [0 10] poisson                                                    note{signed and spliced: raw moments follow the splice (fixed 1.0.0a230)}
+
+# ============================================================
+# PR. Pricing result objects (1.0.0a259)
+# ============================================================
+# Programs behind tests/test_pricing_results.py ([Pricing-Result-Objects]).
+# `calibrate_distortions` and `evaluate` return a result rather than a frame,
+# and a result carries the allocation of its target: across units for a book,
+# across views for a cession, and nowhere at all for a single distribution with
+# no cession, which is why the three shapes are all here. PR.Priced declares a
+# premium so `evaluate()` has a consideration to measure against without one
+# being passed.
+agg PR.Clean  250 claims sev lognorm 100 cv 1.5 poisson                                                             note{one distribution: the allocation story is the single calibration row};
+agg PR.Re     250 claims sev lognorm 100 cv 1.5 occurrence net of 276 xs 55 poisson                                 note{a cession: the target spreads over the views};
+agg PR.Priced 1000 premium at 0.7 lr sev gamma 100 cv 0.5 poisson                                                   note{a declared premium, so evaluate() needs no argument};
+port PR.Book agg PR.UnitA as "Unit Alpha" 1 claim sev gamma 100 cv 0.5 fixed agg PR.UnitB 1 claim sev gamma 50 cv 0.8 fixed

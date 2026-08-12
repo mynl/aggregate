@@ -31,7 +31,7 @@ DEFICIT_MATERIALITY = get_settings().validation.deficit_materiality
 
 __all__ = ['Portfolio', 'make_awkward']
 from .results import (AnalyzeDistortionResult, AnalyzeDistortionsResult,
-                      PricingResult)
+                      EvaluationResult, PricingResult)
 from .spectral import Distortion, DISTORTION_DTYPE
 from . import tail as _tail
 from .tail import TailClass
@@ -3094,16 +3094,21 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         Returns
         -------
-        pandas.DataFrame
-            The per-distortion calibration receipt, ``distortion_df`` (also
-            stored on ``self.distortion_df``): one row per distortion in
+        CalibrationResult
+            Carrying the per-distortion calibration receipt ``distortion_df``
+            (also stored on ``self.distortion_df``): one row per distortion in
             ``[ccoc, ph, wang, dual, tvar]``, index named ``distortion`` (an
             ordered categorical, canonical sort), columns
             ``[param_name, param, error, gini_p, area]``. ``param`` is the raw
             shape (``param_name`` says what it is per family); ``error`` is the
             premium miss; ``gini_p`` is the comparable normalised shape
             ``= 2∫g−1 = p_equiv`` (TVaR-equivalent level); ``area = (gini_p+1)/2
-            = ∫g``.
+            = ∫g``. The result also carries ``calibration_df``, the
+            ``distortions``, the inputs, and the lazily computed allocation of
+            the target across units (``pricing_df``).
+
+            The return type changed at 1.0.0a259: it was the bare
+            ``distortion_df``, which is now an attribute of the result.
 
         Notes
         -----
@@ -3166,13 +3171,18 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         Returns
         -------
-        pandas.DataFrame
-            Tidy (long) form, ``MultiIndex`` rows ``(Step, distortion)``, one
-            ``Step`` per evaluated unit, and columns ``role`` / ``param_name`` /
-            ``param`` / ``gini_p`` / ``error`` / ``status``. ``role`` is always
-            ``'sell'``: every unit is an obligation written. With a
-            ``reins_view`` each ``Step`` is suffixed by it, so panels for
-            several views concatenate without collapsing.
+        EvaluationResult
+            Carrying ``evaluation_df``, the panel: tidy (long) form,
+            ``MultiIndex`` rows ``(Step, distortion)``, one ``Step`` per
+            evaluated unit, and columns ``role`` / ``param_name`` / ``param`` /
+            ``gini_p`` / ``error`` / ``status``. ``role`` is always ``'sell'``:
+            every unit is an obligation written. With a ``reins_view`` each
+            ``Step`` is suffixed by it, so panels for several views concatenate
+            without collapsing.
+
+            The return type changed at 1.0.0a259: it was the bare panel, which
+            is now ``.evaluation_df``. A frame cannot be dispatched on, and the
+            evaluate exhibit dispatches on the result.
 
         Warns
         -----
@@ -3198,7 +3208,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                 raise ValueError(
                     f'{len(prems)} premiums for {len(units)} units.')
         suffix = '' if reins_view is None else f' {reins_view}'
-        blocks, steps = [], []
+        blocks, steps, resolved = [], [], []
         for name, prem in zip(units, prems):
             if name == 'total':
                 prem = self._resolve_evaluation_premium(prem)
@@ -3208,16 +3218,27 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                     s.index.to_numpy(dtype=float), s.to_numpy(dtype=float),
                     self.bs, prem, names=names)
                 steps.append(f'{self.name}{suffix}')
+                resolved.append(prem)
             else:
                 # a unit's marginal is its stand-alone law (units independent)
-                block = self[name].evaluate(prem, names=names,
-                                            reins_view=reins_view) \
-                    .droplevel('Step')
+                unit_result = self[name].evaluate(prem, names=names,
+                                                  reins_view=reins_view)
+                block = unit_result.evaluation_df.droplevel('Step')
                 steps.append(f'{name}{suffix}')
+                resolved.append(unit_result.premium)
             blocks.append(block)
         panel = pd.concat(blocks, keys=steps, names=['Step'])
         _pricing.warn_degenerate(panel, self.name)
-        return panel
+        return EvaluationResult(
+            evaluation_df=panel,
+            # one premium stands for the panel only when one position was
+            # measured; an acceptability profile has one per step and the
+            # panel's own rows are where they belong
+            premium=resolved[0] if len(resolved) == 1 else None,
+            reins_view=reins_view,
+            names=tuple(names if names is not None
+                        else _pricing.EVAL_FAMILIES),
+            _source=self)
 
     def _resolve_evaluation_premium(self, P):
         """The consideration :meth:`evaluate` measures the total against: the
@@ -3613,7 +3634,11 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             dfs[k] = df.sort_index()
 
         df = pd.concat(dfs.values(), keys=dfs.keys(), names=['distortion', 'unit'])
-        return PricingResult(df, last_price, price, a_reg, reg_p)
+        # Route the unit level through the label renamer, as its two siblings
+        # already do (analyze_distortion, analyze_distortions). The compute
+        # frames stay handle-keyed; this is the display copy.
+        return PricingResult(self._relabel(df), last_price, price, a_reg,
+                             reg_p, _source=self)
 
     def price_stand_alone(self, dist, p):
         """
@@ -3863,6 +3888,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             distortion=distortion,
             pricing_df=self._relabel(pricing_df),
             audit_df=self._relabel(audit_df),
+            _source=self,
         )
 
     def analyze_distortions(self, *, p=None, a=None, distortions=None,
@@ -3999,6 +4025,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             # ``augmented_dfs`` stay handle-keyed (compute view).
             pricing_df=self._relabel(pricing_df),
             augmented_dfs=augmented_dfs,
+            _source=self,
         )
 
 

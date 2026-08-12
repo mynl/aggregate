@@ -45,7 +45,10 @@ def bdd_at_tvar50():
     loss = port.actual_m
     margin = prem - loss
     coc = margin / capital
-    port.calibrate_distortions(coc, p=1)
+    # a=, not p=1: the Bounds methodology deliberately takes the top of the
+    # realized grid as the asset level, and on an unbounded book p=1 is
+    # refused because it hides that choice ([Unbounded-Anchor-Guard], a260)
+    port.calibrate_distortions(coc, a=a)
     bd = Bounds(port, premium=prem)
     return port, prem, bd
 

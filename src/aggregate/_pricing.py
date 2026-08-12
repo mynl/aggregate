@@ -26,6 +26,72 @@ from .results import CalibrationResult, EvaluationResult
 DEFAULT_CALIBRATION_DISTORTIONS = ('ccoc', 'ph', 'wang', 'dual', 'tvar')
 
 
+def guard_unbounded_anchor(obj, p, *, where):
+    """Refuse ``p = 1`` as an asset level on a risk with no bounded support.
+
+    Every pricing entry point that turns a probability into a capital level
+    calls this before resolving it. On a bounded risk ``p = 1`` is the maximum
+    loss and means exactly what it says. On an unbounded one there is no
+    maximum, the quantile resolves silently to the last grid point carrying
+    mass, and every number downstream moves with ``log2`` rather than with the
+    risk: double the grid and the answer changes.
+
+    Parameters
+    ----------
+    obj : Aggregate or Portfolio
+        The object whose support is in question. Anything that does not carry
+        the :attr:`~aggregate.Aggregate.bounded` property at all passes: the
+        guard has no basis to judge it.
+    p : float or None
+        The probability the caller passed. Only the exact value ``1`` is
+        refused.
+    where : str
+        The calling method's name, so the message says which call failed.
+
+    Raises
+    ------
+    ValueError
+        When ``p == 1`` and the object reports ``bounded`` False. The message
+        is written to be readable on the wire, since the app shows it to a
+        reader as a sentence rather than a stack trace.
+
+    Notes
+    -----
+    **Only the exact spelling ``p = 1`` is refused**, deliberately. A ``p``
+    below 1 that happens to resolve to the top of the grid is a statement
+    about that grid, and the honest answer to it is a wider one; ``p = 1`` is
+    the only value that cannot mean anything other than "the maximum", and on
+    an unbounded law there is no maximum to mean.
+
+    The test is the tail classification (:attr:`Aggregate.bounded`, backed by
+    ``tail.TailClass``), not the realized density. The density frame cannot
+    tell a bounded law from an unbounded one that ran out of grid, which is
+    the same confusion this guard exists to end. On a ``Portfolio``,
+    ``bounded`` is the worst-of over the units, which is the right test;
+    the ``total`` row of its ``tail_behavior_df`` shows realized grid extent
+    and must not be used for this.
+
+    Three ways past the guard, and each says something different. ``a=``
+    names the level, so ``a=obj.q(1)`` reproduces the old number with the
+    caller having asked for it. A ``p`` below 1 asks a question the
+    distribution can answer. ``obj.bounded = True`` certifies a support the
+    heuristic could not prove, which is the right move when the modeller
+    knows the cap.
+    """
+    if p != 1:
+        return
+    if getattr(obj, 'bounded', None) is not False:
+        return
+    name = getattr(obj, 'name', 'the object')
+    raise ValueError(
+        f'{where}: {name} is unbounded, so p=1 does not name an asset level. '
+        f'It resolves to the top of the FFT grid, which moves with log2 '
+        f'rather than with the risk, and every number priced off it moves '
+        f'with it. Pass a= to name the level ({name}.q(1) reproduces the old '
+        f'number), use a p below 1, or certify the support with '
+        f'{name}.bounded = True. tail_behavior_df says what the tail is.')
+
+
 def price(agg, p, g, kind='var'):
     """
     Price using regulatory and pricing g functions, mirroring Portfolio.price.
@@ -122,6 +188,7 @@ def price_pentagon(agg, *, p=None, a=None, P=None, M=None, Q=None,
     """
     if (p is None) == (a is None):
         raise ValueError('price_pentagon: pass exactly one of p= or a=')
+    guard_unbounded_anchor(agg, p, where='price_pentagon')
     targets = {'P': P, 'M': M, 'Q': Q, 'LR': LR, 'PQ': PQ, 'ROE': ROE}
     n_targets = sum(v is not None for v in targets.values())
     if n_targets != 1:
@@ -211,6 +278,7 @@ def price_pentagon_ex(agg, *, p=None, a=None, L=None,
     """
     if p is not None and a is not None:
         raise ValueError('price_pentagon_ex: pass at most one of p= or a=.')
+    guard_unbounded_anchor(agg, p, where='price_pentagon_ex')
     gd = agg._grid_distribution()
 
     # 1. translate the probability spelling (p is not a pentagon variable).
@@ -613,6 +681,7 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
         raise ValueError(
             'calibrate_distortions requires exactly one of p= (probability) '
             'or a= (asset level).')
+    guard_unbounded_anchor(obj, p, where='calibrate_distortions')
     # Which of the pair the caller fixed, recorded before the resolution below
     # overwrites both. The derived frames re-anchor on it, so a sweep over
     # views or units holds fixed what the caller held fixed.

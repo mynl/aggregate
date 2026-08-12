@@ -1166,3 +1166,18 @@ agg PR.Clean  250 claims sev lognorm 100 cv 1.5 poisson                         
 agg PR.Re     250 claims sev lognorm 100 cv 1.5 occurrence net of 276 xs 55 poisson                                 note{a cession: the target spreads over the views};
 agg PR.Priced 1000 premium at 0.7 lr sev gamma 100 cv 0.5 poisson                                                   note{a declared premium, so evaluate() needs no argument};
 port PR.Book agg PR.UnitA as "Unit Alpha" 1 claim sev gamma 100 cv 0.5 fixed agg PR.UnitB 1 claim sev gamma 50 cv 0.8 fixed
+
+# ============================================================
+# UA. The p = 1 asset anchor guard (1.0.0a260)
+# ============================================================
+# Programs behind tests/test_unbounded_anchor.py ([Unbounded-Anchor-Guard]).
+# The pair that matters is UA.Book against UA.Dice: a Poisson count has no
+# ceiling, so p=1 on it resolves to the top of the FFT grid and moves with
+# log2, while a dfreq/dsev law has a genuine maximum and p=1 means it.
+# UA.Limited is the trap the guard is really about: a bounded per-occurrence
+# layer under an unbounded count is still unbounded. UA.Port is the worst-of
+# rule, one Poisson unit beside a bounded one.
+agg UA.Book    250 claims sev lognorm 100 cv 1.5 poisson                                                            note{unbounded: p=1 is refused};
+agg UA.Limited 250 claims sev lognorm 100 cv 1.5 occurrence net of 900 xs 100 poisson                               note{a bounded layer under an unbounded count is still unbounded};
+agg UA.Dice    dfreq [3] dsev [1:6]                                                                                 note{bounded: p=1 is the maximum loss and means it};
+port UA.Port agg UA.PU1 250 claims sev lognorm 100 cv 1.5 poisson agg UA.PU2 dfreq [2] dsev [1 2 3]

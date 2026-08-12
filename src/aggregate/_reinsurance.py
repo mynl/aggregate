@@ -666,11 +666,15 @@ def reins_price_df(obj, distortion=None, *, p=None, a=None, views=None):
             'reins_price_df takes at most one of p= (probability) or '
             'a= (asset level); with neither the price is unlimited.')
     from ._grid_distribution import GridDistribution
+    from ._pricing import guard_unbounded_anchor
 
     if not obj.reins_views:
         raise ValueError(
             f'{obj.name} carries no reinsurance, so there is no cession to '
             f'price.')
+    # after the structural refusal, so an object with no cession is told that
+    # rather than told about its tail
+    guard_unbounded_anchor(obj, p, where='reins_price_df')
     # ``_reins_view_density`` is the one validator, so a bad name is refused
     # in the same words here as on the pricing keyword.
     views = list(obj.reins_views) if views is None else list(views)

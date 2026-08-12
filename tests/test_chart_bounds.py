@@ -31,7 +31,9 @@ def bounds():
     port = build(_PORT)
     prem = float(port.tvar(0.5))
     coc = (prem - port.actual_m) / (port.q(1) - prem)
-    port.calibrate_distortions(coc, p=1)
+    # a=, not p=1: the Bounds methodology takes the top of the realized grid
+    # as the asset level deliberately ([Unbounded-Anchor-Guard], a260)
+    port.calibrate_distortions(coc, a=port.q(1))
     return Bounds(port, premium=prem)
 
 

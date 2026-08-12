@@ -20,6 +20,24 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a260
+
+**[Unbounded-Anchor-Guard] `p = 1` is a statement about a maximum, and an unbounded risk has none.** Phase L2 of `dev/plan-pricing-exhibits.md`.
+
+`p = 1` used to resolve, silently, to the last grid point carrying mass. On a bounded law that is the maximum loss and is exactly right. On an unbounded one it is an artifact of `log2`: double the grid and the asset level, the premium, the capital and every ratio built on them all move, while the risk has not changed. There was no guard anywhere in the chain.
+
+`guard_unbounded_anchor` in `_pricing.py` now runs at every entry point that turns a probability into a capital level: `calibrate_distortions`, `price_pentagon`, `price_pentagon_ex` and `reins_price_df`, with `evaluate` joining them at a261. `p == 1` on an object reporting `bounded` False raises `ValueError` with a message written to be read on the wire, since the app shows it to a reader as a sentence.
+
+**The test is the tail classification, not the density.** `bounded` comes from `tail.TailClass`, which is why it can tell a bounded law from an unbounded one that ran out of grid; a density frame cannot, and that confusion is what the guard exists to end. On a `Portfolio` it is the worst-of over units, which is the right test there. The `total` row of a portfolio `tail_behavior_df` shows realized grid extent and is not it.
+
+**Only the exact spelling is refused.** A `p` below 1 that happens to land on the top bucket is a statement about that grid and the honest answer is a wider one. `p = 1` is the only value that cannot mean anything other than "the maximum".
+
+Three ways past the guard, each saying something different: `a=` names the level (`a=obj.q(1)` reproduces the old number, with the caller having asked for it), a `p` below 1 asks a question the distribution can answer, and `obj.bounded = True` certifies a support the heuristic could not prove.
+
+**Two existing callers moved, both deliberate and both in the Bounds fixtures.** The IME 2022 bounds work anchors on the top of the realized grid on purpose, and wrote it `p=1` on Poisson books. They now write `a=port.q(1)`, which is the same number with the choice made visible. Nothing in the library itself called `p=1`.
+
+---
+
 ## 1.0.0a259
 
 **[Pricing-Result-Objects] a calibration is a receipt, and a receipt knows what it was written about.** Phase L1 of `dev/plan-pricing-exhibits.md`, the joint plan with `aggregate_api`. Review notes for the whole LIB half are in `dev/plan-pricing-exhibits-LIB.md`.

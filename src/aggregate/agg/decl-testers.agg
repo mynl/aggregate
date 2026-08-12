@@ -1181,3 +1181,16 @@ agg UA.Book    250 claims sev lognorm 100 cv 1.5 poisson                        
 agg UA.Limited 250 claims sev lognorm 100 cv 1.5 occurrence net of 900 xs 100 poisson                               note{a bounded layer under an unbounded count is still unbounded};
 agg UA.Dice    dfreq [3] dsev [1:6]                                                                                 note{bounded: p=1 is the maximum loss and means it};
 port UA.Port agg UA.PU1 250 claims sev lognorm 100 cv 1.5 poisson agg UA.PU2 dfreq [2] dsev [1 2 3]
+
+# ============================================================
+# EA. The evaluation asset anchor (1.0.0a261)
+# ============================================================
+# The author's reference programs for the round trip, 2026-08-12: calibrate at
+# coc 0.15 and p 0.99, take the implied premium at the resolved asset level,
+# evaluate that premium at the same anchor, recover the calibrated parameters.
+# See tests/test_evaluate_anchor.py ([Evaluate-Asset-Anchor]). The trio is one
+# book, the same book reinsured, and a two unit portfolio, so the round trip is
+# asserted on the three shapes the Pricing pane serves.
+agg EA.BasicBook   250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson                                              note{the reference book: a per occurrence limit under an unbounded count};
+agg EA.BasicBookRe 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 occurrence net of 276 xs 55 poisson                  note{the same book reinsured};
+port EA.Basic agg EA.BasicA dfreq [1] sev gamma 100 cv 1 agg EA.BasicB dfreq [1] sev gamma 50 cv 0.8

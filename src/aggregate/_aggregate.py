@@ -6582,7 +6582,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                                               names=names,
                                               reins_view=reins_view)
 
-    def evaluate(self, P=None, *, names=None, reins_view=None):
+    def evaluate(self, P=None, *, p=None, a=None, names=None,
+                 reins_view=None):
         """Evaluate the position ``P - X``: the breakeven acceptability panel.
 
         Pricing asks what the obligation is worth; evaluation asks how much
@@ -6597,10 +6598,19 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             The premium held against this aggregate. Defaults to
             :attr:`exp_premium`, and raises when that is unset: a position has
             to have a consideration before it can be evaluated.
+        p : float, optional
+            Asset probability, resolved on the evaluated distribution
+            (``a = q(p)``). At most one of ``p`` or ``a``.
+        a : float, optional
+            Asset level, snapped to the grid. At most one of ``p`` or ``a``;
+            with neither, the position is measured against its whole
+            distribution, which is the unlimited reading.
         names : sequence of str, optional
             Distortion families. Defaults to
             :data:`~aggregate._pricing.EVAL_FAMILIES` (``ph`` / ``wang`` /
-            ``dual`` / ``tvar``).
+            ``dual`` / ``tvar``) unanchored, and to
+            :data:`~aggregate._pricing.EVAL_FAMILIES_ANCHORED`, which adds
+            ``ccoc``, when an anchor is given.
         reins_view : str, optional
             Which of a cession's distributions to evaluate, one of
             :attr:`reins_views`. The default ``None`` is this aggregate's own.
@@ -6634,25 +6644,60 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             stress) or the position cannot lose (acceptable at every stress).
             Both report ``NaN``.
 
+        Notes
+        -----
+        **Anchoring is what makes evaluation and calibration comparable.**
+        :meth:`calibrate_distortions` solves ``rho_g(min(X, a)) = P`` at the
+        asset level it resolved. Evaluating at the same anchor solves the same
+        equation, so the panel recovers that calibration's parameters family
+        for family, which is the round trip worth having. Unanchored, the
+        implicit asset level is the top of the FFT grid, and the two answers
+        differ by whatever the tail beyond ``a`` is worth.
+
         See Also
         --------
         aggregate._pricing.evaluate_margin : the solve and its math.
         calibrate_distortions : the pricing counterpart, given a CoC target.
         """
+        if p is not None and a is not None:
+            raise ValueError('evaluate: pass at most one of p= or a=.')
+        _pricing.guard_unbounded_anchor(self, p, where='evaluate')
         P = self._resolve_evaluation_premium(P)
         s = (self.density_df['p_total'] if reins_view is None
              else self._reins_view_density(reins_view))
+        assets, p_val = self._resolve_evaluation_assets(s, p, a)
         panel = _pricing.evaluate_constant_premium(
             s.index.to_numpy(dtype=float), s.to_numpy(dtype=float), self.bs, P,
-            names=names)
+            assets=assets, names=names)
         step = self.name if reins_view is None else f'{self.name} {reins_view}'
         panel = pd.concat([panel], keys=[step], names=['Step'])
         _pricing.warn_degenerate(panel, self.name)
+        default_names = (_pricing.EVAL_FAMILIES if assets is None
+                         else _pricing.EVAL_FAMILIES_ANCHORED)
         return EvaluationResult(
             evaluation_df=panel, premium=P, reins_view=reins_view,
-            names=tuple(names if names is not None
-                        else _pricing.EVAL_FAMILIES),
+            p=p_val, a=assets,
+            names=tuple(names if names is not None else default_names),
             _source=self)
+
+    def _resolve_evaluation_assets(self, density, p, a):
+        """``(a, p)`` for an evaluation anchor, resolved on the density served.
+
+        A cession makes several distributions available and the anchor belongs
+        to the one being evaluated, not to the object's own, so the quantile
+        comes off the density the caller's ``reins_view`` selected. Returns
+        ``(None, None)`` when neither was given, the unlimited reading.
+        """
+        if p is None and a is None:
+            return None, None
+        gd = GridDistribution.from_series(
+            density, bs=self.bs, name=self.name,
+            is_loss_value=self._is_loss_value)
+        if a is None:
+            assets = float(gd.q(p))
+            return assets, float(p)
+        assets = float(gd.snap(a))
+        return assets, float(gd.cdf(assets))
 
     def _resolve_evaluation_premium(self, P):
         """The consideration :meth:`evaluate` measures against: the argument,

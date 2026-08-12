@@ -555,6 +555,20 @@ def _calibration_datum(z, p, bs, assets):
     return S, bs, ess_sup
 
 
+def _param_name(dist):
+    """The family's natural parameter name, for a receipt column.
+
+    One helper serving both receipts. ``ccoc`` appears in the calibration
+    receipt and, once an anchor is supplied, in the acceptability panel too,
+    and a column reading ``r`` on one and ``param`` on the other would be two
+    names for one thing. Families that declare a ``param_name`` (``a``,
+    ``lam``, ``b``, ``p``) use it; the rest read ``r``, which is what
+    ``ccoc``'s shape is (a rate) and what the calibration receipt has always
+    said.
+    """
+    return getattr(dist, 'param_name', None) or 'r'
+
+
 def _calibration_frames(dists, coc, p_val, Fa, exa, P, a):
     """Build the ``(distortion_df, calibration_df)`` receipt for a calibrated set
     -- the per-distortion shapes/errors and the shared one-row pentagon target.
@@ -566,8 +580,7 @@ def _calibration_frames(dists, coc, p_val, Fa, exa, P, a):
         dist = dists[dname]
         # param_name is the family's natural parameter ('a', 'lam', 'b', 'p');
         # ccoc has none -> 'r'. gini_p = 2∫g - 1 (= p_equiv); area = ∫g.
-        param_name = getattr(dist, 'param_name', None) or 'r'
-        rows.append([param_name, dist.shape, dist.error, dist.gini_p,
+        rows.append([_param_name(dist), dist.shape, dist.error, dist.gini_p,
                      (dist.gini_p + 1) / 2])
     distortion_df = pd.DataFrame(
         rows,
@@ -790,11 +803,18 @@ def calibrate_distortions(obj, coc, *, p=None, a=None, kind='lower',
 # same layer integral; they differ in what is distorted and what the target is.
 # ---------------------------------------------------------------------------
 
-#: Distortion families the acceptability panel reports. ``ccoc`` is excluded:
-#: its shape is a cost of capital, a rate rather than a stress level, and its
-#: closed form needs an asset level that the acceptability question does not
-#: supply.
+#: Distortion families the **unanchored** acceptability panel reports.
+#: ``ccoc`` is excluded there: its shape is a cost of capital, a rate rather
+#: than a stress level, and its closed form needs an asset level, which a
+#: position measured against its whole distribution does not supply.
 EVAL_FAMILIES = ('ph', 'wang', 'dual', 'tvar')
+
+#: Distortion families the **anchored** panel reports. Once the caller names
+#: an asset level the reason for excluding ``ccoc`` is gone: the closed form
+#: has the number it was missing, and reporting it is what lets a reader
+#: compare the panel with a calibration made at the same anchor family for
+#: family. Ruled 2026-08-12 (``dev/plan-pricing-exhibits.md``, decision 3).
+EVAL_FAMILIES_ANCHORED = ('ccoc', *EVAL_FAMILIES)
 
 #: Sign applied to a position's margin before the solve, by the role it is held
 #: at. A ``buy`` position's margin is negative by construction (you pay for
@@ -905,7 +925,42 @@ def evaluate_margin(gd, *, role='sell', names=None):
         gd.bs, role=role, names=names)
 
 
-def evaluate_constant_premium(x, p, bs, premium, *, role='sell', names=None):
+def _cap_loss(x, p, assets):
+    """Push the mass above ``assets`` onto an atom at ``assets``.
+
+    The distribution of ``min(X, a)``, on the prefix of the same grid. The
+    tail is not dropped: it is placed where a position with ``a`` behind it
+    actually settles, which is the whole difference between limiting a
+    liability and ignoring it.
+
+    Parameters
+    ----------
+    x, p : ndarray
+        Loss outcomes (ascending) and their masses.
+    assets : float
+        The asset level, expected to sit on the grid (callers snap it).
+
+    Returns
+    -------
+    (x, p) : (ndarray, ndarray)
+        The capped grid. When ``assets`` is at or above the top of ``x`` the
+        arrays come back unchanged, since there is nothing above the cap.
+    """
+    keep = x <= assets
+    if keep.all():
+        return x, p
+    n = int(keep.sum())
+    if n == 0:
+        # a cap below every represented outcome: one atom carrying everything
+        return np.array([float(assets)]), np.array([float(p.sum())])
+    x_capped = x[:n].copy()
+    p_capped = p[:n].copy()
+    p_capped[-1] = float(p[n - 1:].sum())
+    return x_capped, p_capped
+
+
+def evaluate_constant_premium(x, p, bs, premium, *, assets=None, role='sell',
+                              names=None):
     """Acceptability panel for the margin ``premium - X``: the ordinary case.
 
     A constant consideration against a loss distribution ``X``, which is the
@@ -923,20 +978,57 @@ def evaluate_constant_premium(x, p, bs, premium, *, role='sell', names=None):
         Bucket size, or ``None`` for an irregular grid.
     premium : float
         The constant consideration held against ``X``.
+    assets : float, optional
+        The asset level behind the position. With one, the margin measured is
+        ``premium - min(X, a)`` and the panel answers about an obligation
+        with assets behind it. Without one (the default) the margin is
+        ``premium - X`` against the whole distribution, which is the
+        unlimited reading and the historical behavior.
     role : {'sell', 'buy'}, default 'sell'
         How the position is held; see :func:`evaluate_margin`. Writing the
         obligation as a loss already fixes the holder as the one who owes it,
         so ``sell`` is almost always right here.
     names : sequence of str, optional
-        Distortion families; defaults to :data:`EVAL_FAMILIES`.
+        Distortion families; defaults to :data:`EVAL_FAMILIES` unanchored and
+        :data:`EVAL_FAMILIES_ANCHORED` when ``assets`` is given.
 
     Returns
     -------
     pandas.DataFrame
         As :func:`evaluate_margin`.
+
+    Notes
+    -----
+    **The anchor is what closes the round trip against a calibration.**
+    ``calibrate_distortions`` solves ``rho_g(min(X, a)) = P`` at the asset
+    level it resolved: the layer integral runs over ``[0, a)`` and stops.
+    Evaluating ``premium - X`` unanchored integrates to the top of the FFT
+    grid instead, so the two solve different equations and their shapes do not
+    agree, by an amount that grows with the tail beyond ``a``. Capping the
+    loss makes the evaluation's equation the calibration's equation, and the
+    shapes agree to solver tolerance.
+
+    Without an anchor the top of the grid is the implicit asset level, which
+    is a grid artifact on an unbounded risk in exactly the way
+    :func:`guard_unbounded_anchor` describes. It stays the default because it
+    is the right reading of a position with no stated capital and because it
+    is what the method has always done; it is not the reading to compare with
+    a calibration.
+
+    The shift the solve applies is why the cap is exact rather than
+    approximate. Trimming the near-zero prefix of the loss grid and shifting
+    by it changes the target by the same amount it changes the integral, since
+    ``g(1) = 1`` over a prefix where the survival is 1; the same equivariance
+    makes the ``ccoc`` closed form shift invariant, which is what lets ``ccoc``
+    join the anchored panel and reproduce the cost of capital it was
+    calibrated to.
     """
     x = np.asarray(x, dtype=float)
     p = np.asarray(p, dtype=float)
+    if assets is not None:
+        x, p = _cap_loss(x, p, float(assets))
+    if names is None:
+        names = EVAL_FAMILIES if assets is None else EVAL_FAMILIES_ANCHORED
     # M = premium - X, re-sorted ascending (negating reverses the order).
     return _evaluate_margin_arrays((premium - x)[::-1], p[::-1], bs,
                                    role=role, names=names)
@@ -979,8 +1071,7 @@ def _evaluate_margin_arrays(x, p, bs, *, role='sell', names=None):
     rows = []
     for nm in names:
         d = dists[nm]
-        rows.append([role, getattr(d, 'param_name', None) or 'param',
-                     d.shape, d.gini_p, d.error, 'ok'])
+        rows.append([role, _param_name(d), d.shape, d.gini_p, d.error, 'ok'])
     return _eval_panel(rows, names)
 
 

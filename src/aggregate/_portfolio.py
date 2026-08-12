@@ -3137,7 +3137,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                                               names=names,
                                               reins_view=reins_view)
 
-    def evaluate(self, P=None, *, unit='total', names=None, reins_view=None):
+    def evaluate(self, P=None, *, unit='total', p=None, a=None, names=None,
+                 reins_view=None):
         """Evaluate the position ``P - X``: the breakeven acceptability panel.
 
         The ``Portfolio`` counterpart of :meth:`Aggregate.evaluate`, on the
@@ -3158,9 +3159,20 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             either. Units are independent by construction, so a unit's
             marginal in the book is its stand-alone distribution and the
             evaluation delegates to that :class:`Aggregate`.
+        p : float, optional
+            Asset probability. Forwarded to each evaluated position, so every
+            unit resolves **its own** asset level and the profile holds the
+            threshold fixed rather than the capital. At most one of ``p`` or
+            ``a``.
+        a : float, optional
+            A common asset level, snapped to the grid, applied to every
+            evaluated position. At most one of ``p`` or ``a``; with neither,
+            each position is measured against its whole distribution.
         names : sequence of str, optional
             Distortion families. Defaults to
-            :data:`~aggregate._pricing.EVAL_FAMILIES`.
+            :data:`~aggregate._pricing.EVAL_FAMILIES` unanchored, and to
+            :data:`~aggregate._pricing.EVAL_FAMILIES_ANCHORED`, which adds
+            ``ccoc``, when an anchor is given.
         reins_view : str, optional
             Which reinsurance view to evaluate, one of :attr:`reins_views`.
             Applies to the total and to each named unit alike: a unit's view
@@ -3193,6 +3205,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         --------
         aggregate._pricing.evaluate_margin : the solve and its math.
         """
+        if p is not None and a is not None:
+            raise ValueError('evaluate: pass at most one of p= or a=.')
+        _pricing.guard_unbounded_anchor(self, p, where='evaluate')
         units = [unit] if isinstance(unit, str) else list(unit)
         if P is None:
             prems = [None] * len(units)
@@ -3209,36 +3224,64 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                     f'{len(prems)} premiums for {len(units)} units.')
         suffix = '' if reins_view is None else f' {reins_view}'
         blocks, steps, resolved = [], [], []
+        anchors = []
         for name, prem in zip(units, prems):
             if name == 'total':
                 prem = self._resolve_evaluation_premium(prem)
                 s = (self.density_df['p_total'] if reins_view is None
                      else self._reins_view_density(reins_view))
+                assets, p_val = self._resolve_evaluation_assets(s, p, a)
                 block = _pricing.evaluate_constant_premium(
                     s.index.to_numpy(dtype=float), s.to_numpy(dtype=float),
-                    self.bs, prem, names=names)
+                    self.bs, prem, assets=assets, names=names)
                 steps.append(f'{self.name}{suffix}')
                 resolved.append(prem)
+                anchors.append((p_val, assets))
             else:
                 # a unit's marginal is its stand-alone law (units independent)
-                unit_result = self[name].evaluate(prem, names=names,
+                unit_result = self[name].evaluate(prem, p=p, a=a, names=names,
                                                   reins_view=reins_view)
                 block = unit_result.evaluation_df.droplevel('Step')
                 steps.append(f'{name}{suffix}')
                 resolved.append(unit_result.premium)
+                anchors.append((unit_result.p, unit_result.a))
             blocks.append(block)
         panel = pd.concat(blocks, keys=steps, names=['Step'])
         _pricing.warn_degenerate(panel, self.name)
         return EvaluationResult(
             evaluation_df=panel,
+            # like the premium: one anchor stands for the panel only when one
+            # position was measured. With p= across units each found its own.
+            p=anchors[0][0] if len(anchors) == 1 else None,
+            a=anchors[0][1] if len(anchors) == 1 else None,
             # one premium stands for the panel only when one position was
             # measured; an acceptability profile has one per step and the
             # panel's own rows are where they belong
             premium=resolved[0] if len(resolved) == 1 else None,
             reins_view=reins_view,
             names=tuple(names if names is not None
-                        else _pricing.EVAL_FAMILIES),
+                        else (_pricing.EVAL_FAMILIES
+                              if p is None and a is None
+                              else _pricing.EVAL_FAMILIES_ANCHORED)),
             _source=self)
+
+    def _resolve_evaluation_assets(self, density, p, a):
+        """``(a, p)`` for an evaluation anchor, resolved on the density served.
+
+        The ``Portfolio`` twin of :meth:`Aggregate._resolve_evaluation_assets`;
+        see there. The anchor comes off the distribution being evaluated, which
+        under a ``reins_view`` is not the book's own.
+        """
+        if p is None and a is None:
+            return None, None
+        gd = GridDistribution.from_series(
+            density, bs=self.bs, name=self.name,
+            is_loss_value=self._is_loss_value)
+        if a is None:
+            assets = float(gd.q(p))
+            return assets, float(p)
+        assets = float(gd.snap(a))
+        return assets, float(gd.cdf(assets))
 
     def _resolve_evaluation_premium(self, P):
         """The consideration :meth:`evaluate` measures the total against: the

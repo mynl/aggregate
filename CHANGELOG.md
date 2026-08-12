@@ -20,6 +20,26 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a261
+
+**[Evaluate-Asset-Anchor] the round trip closes: calibrate, price, evaluate at the same anchor recovers the calibration.** Phase L3 of `dev/plan-pricing-exhibits.md`, and the plan's own acceptance criterion.
+
+`Aggregate.evaluate` and `Portfolio.evaluate` accept at most one of `p=` or `a=`, resolved on the distribution being evaluated (so under a `reins_view` it is that view's quantile, not the object's own). With an anchor the position measured is `premium - min(X, a)`, an obligation with assets behind it. Without one, nothing changes: the position is measured against its whole distribution, which stays the default and is the unlimited reading.
+
+**Why it did not close before.** `calibrate_distortions` solves `rho_g(min(X, a)) = P`: its layer integral runs over `[0, a)` and stops there. `evaluate` integrated to the top of the FFT grid instead, so the two were solving different equations, and the distance between their answers was whatever the tail beyond `a` was worth. Capping the loss makes the two equations one equation, and the shapes now agree to solver tolerance on all three of the author's reference programs.
+
+The cap places the tail rather than dropping it: the mass above `a` moves to an atom at `a`, which is where a position with `a` behind it settles. Dropping it would renormalize and change every moment.
+
+**`ccoc` joins the acceptability panel when an anchor is supplied** (ruled 2026-08-12). It was excluded because its closed form needs an asset level the acceptability question did not supply, and with an anchor that reason is gone. The unanchored default keeps today's four, since the stated reason still holds there. `EVAL_FAMILIES_ANCHORED` is the new default set. `ccoc` recovers the cost of capital it was calibrated to exactly, because the closed form is shift invariant and so is the frame the solve runs in.
+
+**One naming fix, exposed by `ccoc` now appearing in both receipts.** A family with no declared `param_name` read `r` in the calibration receipt and `param` in the acceptability panel, which is two names for one thing. Both now go through `_param_name` and read `r`. The four families that declare a name (`a`, `lam`, `b`, `p`) are unaffected.
+
+The `p = 1` guard from a260 reaches `evaluate` in this phase, as the plan schedules it.
+
+`PnL.evaluate` is deliberately unchanged (decision 4): each ledger row is its own position and the right anchor semantics there deserve their own discussion.
+
+---
+
 ## 1.0.0a260
 
 **[Unbounded-Anchor-Guard] `p = 1` is a statement about a maximum, and an unbounded risk has none.** Phase L2 of `dev/plan-pricing-exhibits.md`.

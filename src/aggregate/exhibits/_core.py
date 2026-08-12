@@ -65,6 +65,7 @@ __all__ = [
     'available_exhibits', 'exhibit_frames', 'build_exhibit',
     'summary', 'tail', 'stats', 'validation', 'reins',
     'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
+    'pricing_calibrate', 'pricing_allocate', 'pricing_evaluate',
     'register_simple_exhibit',
 ]
 
@@ -762,6 +763,74 @@ dependency = _make_exhibit_function(
     """)
 
 
+pricing_calibrate = _make_exhibit_function(
+    'pricing.calibrate', 'Calibrated distortions',
+    """The per family calibration receipt. Source frame ``distortion_df``.
+
+    Registered on :class:`~aggregate.results.CalibrationResult`, the object
+    ``calibrate_distortions`` returns, rather than on the book it was computed
+    from: a calibration is a calculation and not stored state, and dispatching
+    on its result is what makes it an ordinary exhibit
+    (``[Pricing-Keyed-On-Result]``). Deliberately small, one block, identical
+    under both perspectives: what the fit produced, with no adjustment.
+
+    Parameters
+    ----------
+    obj : CalibrationResult
+    perspective : Perspective or str, default Perspective.RAW
+
+    Returns
+    -------
+    Exhibit
+    """)
+
+pricing_allocate = _make_exhibit_function(
+    'pricing.allocate', 'Allocated pricing',
+    """The calibrated target spread over whatever the source has to spread it
+    over. Also on :class:`~aggregate.results.CalibrationResult`.
+
+    The block list is a property of the (exhibit, perspective) pair **and** of
+    what the calibrated object was, which is the fullest exercise of
+    ``[Perspective-May-Restructure]`` in the package. A ``Portfolio`` spreads
+    across units, a reinsured ``Aggregate`` across the views of its cession,
+    and an ``Aggregate`` with neither has one distribution and therefore
+    nothing to spread, so its allocation story is the single calibration row.
+
+    On the reinsured Aggregate this is also the first exhibit where RAW
+    carries strictly **more** rows than INSURER: RAW serves every view the
+    object can price, including ``ceded``, and INSURER drops the ceded rows
+    because a ceded price is the seller's reading and this perspective is the
+    buyer's (``[Difference-Is-A-Perspective]``).
+
+    Parameters
+    ----------
+    obj : CalibrationResult
+    perspective : Perspective or str, default Perspective.RAW
+
+    Returns
+    -------
+    Exhibit
+    """)
+
+pricing_evaluate = _make_exhibit_function(
+    'pricing.evaluate', 'Breakeven acceptability',
+    """The Cherny and Madan breakeven panel. Source frame ``evaluation_df``.
+
+    Registered on :class:`~aggregate.results.EvaluationResult`. One block
+    under both perspectives; INSURER replaces the caption with the business
+    reading of ``gini_p`` and of the ``status`` column.
+
+    Parameters
+    ----------
+    obj : EvaluationResult
+    perspective : Perspective or str, default Perspective.RAW
+
+    Returns
+    -------
+    Exhibit
+    """)
+
+
 #: The exhibit registry: ``name -> (generic_fn, perspectives_fn)``.
 #: ``perspectives_fn(obj)`` is the per object availability predicate; an
 #: empty list means the exhibit is not available for that object.
@@ -775,6 +844,11 @@ EXHIBITS = {
     'economic_ratios': (economic_ratios, _perspectives_always),
     'economic_waterfall': (economic_waterfall, _perspectives_tower),
     'dependency': (dependency, _perspectives_updated),
+    # Keyed on result objects, not on a built object: a successful call is
+    # what produces one, so there is no partially available state to gate on.
+    'pricing.calibrate': (pricing_calibrate, _perspectives_always),
+    'pricing.allocate': (pricing_allocate, _perspectives_always),
+    'pricing.evaluate': (pricing_evaluate, _perspectives_always),
 }
 
 

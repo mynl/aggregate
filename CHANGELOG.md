@@ -20,6 +20,32 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a263
+
+**[Pricing-Exhibits] the Pricing pane's three tables are library exhibits, dispatched on the calculation that produced them.** Phase L5 of `dev/plan-pricing-exhibits.md`, the last of the LIB half. It closes round 6 item 4 for the pricing leaves.
+
+Three new exhibits, in a new class module `exhibits/_pricing.py`:
+
+- **`pricing.calibrate`** on `CalibrationResult`: one block, `distortion_df`, identical under both perspectives. The per family receipt with no adjustment, deliberately small.
+- **`pricing.allocate`** on `CalibrationResult`: the calibrated target spread over whatever the source has to spread it over. A `Portfolio` spreads across units (`calibration_df` then `pricing_df`), a reinsured `Aggregate` across the views of its cession (`reins_price_df`), and an `Aggregate` with neither has one distribution and nothing to spread, so its allocation story is the single calibration row.
+- **`pricing.evaluate`** on `EvaluationResult`: one block, `evaluation_df`, with the business reading of `gini_p` and of the `status` column under INSURER.
+
+**Registration needed no framework change.** Dispatch is plain `singledispatch` on `type(obj)`, so giving a calibration a type is the whole of what was required to make it an ordinary exhibit: ruling `[Pricing-Keyed-On-Result]`. `available_exhibits` on a **built** object is untouched, so a client's capability payload does not move because these exist.
+
+**The block list is a property of the source as well as the perspective,** which is the fullest exercise of `[Perspective-May-Restructure]` in the package. Two readings are worth calling out.
+
+On a book, INSURER replaces the tall raw `pricing_df` with four blocks, one statistic at a time, units across: `LR`, `P`, `PQ` and `ROE`. The raw frame stacks eight statistics for five distortions into one honest, unreadable table; a reader asking which distortion to use compares one statistic at a time.
+
+On a cession, INSURER is **narrower** than RAW, the first exhibit where that is true. RAW serves every view the object can price, `ceded` among them. INSURER drops the ceded rows, stars the calibrated basis in the index (`gross` reads `gross*`), and appends a `basis less view` difference row per distortion with its ratios recomputed on the differenced amounts. A ceded price is what the layer is worth to whoever writes it, a reinsurer's reading; the cedent's reading of the same cession is the difference between two of its own programs, which is the allowance for reinsurance in the rate. Ruling `[Difference-Is-A-Perspective]`.
+
+**Formats and captions moved upstream from the app.** `PENTAGON_FORMATS`, `CALIBRATION_FORMATS`, `DISTORTION_FORMATS`, `EVALUATION_FORMATS` and the stat slice formats and titles are now library constants beside `SHARPEN_FORMATS`. They are statements about what the library's own numbers mean and how they read.
+
+**The RAW invariant holds over a calculation,** which was the thing worth checking. A RAW block still names an attribute on the dispatched object that returns a real public frame; that the frame is computed on first access rather than stored is an efficiency question and not a contract one. The a253 invariant sweep extends over the result fixtures with no change of wording.
+
+Tests: the result fixtures join `tests/test_exhibits.py`'s shared object set, so they inherit the RAW invariant sweep, the caption sweep, the named index sweep and the committed `canonical_dict` snapshots (14 new keys, no existing snapshot moved). New alongside them, **the standing envelope contract is now asserted on this side of the wire**: every served block, over every object, exhibit and perspective, reconstructs through `gt.TableDoc.model_validate` to the same `hash`. An ETag that did not survive the round trip would make every cached table on the other end unverifiable.
+
+---
+
 ## 1.0.0a262
 
 **[Reins-View-Pricing] the layered quote speaks the same octet as every other price in the library.** Phase L4 of `dev/plan-pricing-exhibits.md`.

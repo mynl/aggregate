@@ -59,10 +59,31 @@ PROGRAMS = {
 }
 
 
+def pricing_results(objects):
+    """The pricing result fixtures. Mirrors tests/test_exhibits.py EXACTLY.
+
+    Built from the objects above rather than from new programs: a calibration
+    is a calculation over an object that already has an exhibit story, and
+    reusing them keeps the file talking about one book. The three calibrations
+    are the three shapes ``pricing.allocate`` serves, units, views and
+    neither.
+    """
+    return {
+        'CalibrationPortfolio':
+            objects['Portfolio'].calibrate_distortions(0.15, p=0.99),
+        'CalibrationReins':
+            objects['ReinsAggregate'].calibrate_distortions(0.15, p=0.99),
+        'CalibrationAggregate':
+            objects['Aggregate'].calibrate_distortions(0.15, p=0.99),
+        'Evaluation': objects['Aggregate'].evaluate(12.0, p=0.99),
+    }
+
+
 def main():
     snapshots = {}
-    for kind, program in PROGRAMS.items():
-        obj = build(program)
+    objects = {kind: build(program) for kind, program in PROGRAMS.items()}
+    objects.update(pricing_results(objects))
+    for kind, obj in objects.items():
         for name, perspectives in available_exhibits(obj):
             for perspective in perspectives:
                 e = build_exhibit(obj, name, perspective)

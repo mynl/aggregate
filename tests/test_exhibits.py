@@ -87,12 +87,41 @@ EXPECTED_EXHIBITS = {
                        *_DIAG],
     'Tower': _WALK_EXHIBITS,
     'Peel': _WALK_EXHIBITS,
+    # the pricing result fixtures ([Pricing-Exhibits]); a result serves the
+    # pricing leaves and nothing else, because nothing else is registered for
+    # its type
+    'CalibrationPortfolio': ['pricing.calibrate', 'pricing.allocate'],
+    'CalibrationReins': ['pricing.calibrate', 'pricing.allocate'],
+    'CalibrationAggregate': ['pricing.calibrate', 'pricing.allocate'],
+    'Evaluation': ['pricing.evaluate'],
 }
+
+
+def pricing_results(objects):
+    """The pricing result fixtures. Mirrors capture_exhibit_snapshots.py EXACTLY.
+
+    Built from the objects above rather than from new programs: a calibration
+    is a calculation over an object that already has an exhibit story, and
+    reusing them keeps the file talking about one book. The three calibrations
+    are the three shapes ``pricing.allocate`` serves, units, views and
+    neither.
+    """
+    return {
+        'CalibrationPortfolio':
+            objects['Portfolio'].calibrate_distortions(0.15, p=0.99),
+        'CalibrationReins':
+            objects['ReinsAggregate'].calibrate_distortions(0.15, p=0.99),
+        'CalibrationAggregate':
+            objects['Aggregate'].calibrate_distortions(0.15, p=0.99),
+        'Evaluation': objects['Aggregate'].evaluate(12.0, p=0.99),
+    }
 
 
 @pytest.fixture(scope='module')
 def objects():
-    return {kind: build(program) for kind, program in PROGRAMS.items()}
+    built = {kind: build(program) for kind, program in PROGRAMS.items()}
+    built.update(pricing_results(built))
+    return built
 
 
 @pytest.fixture(scope='module')
@@ -673,6 +702,138 @@ def test_waterfall_includes_tier_subtotals(peel):
     assert walk.index[-1] == 'All'
 
 
+# --- the pricing leaves ([Pricing-Exhibits]) --------------------------------
+
+def test_a_result_object_serves_the_pricing_leaves_and_nothing_else(objects):
+    """[Pricing-Keyed-On-Result]: dispatch is on the result, not on the book.
+
+    The corollary matters as much as the ruling: available_exhibits of the
+    **built** object is untouched, so a client's capability payload does not
+    move because the pricing leaves exist.
+    """
+    calibration = objects['CalibrationPortfolio']
+    assert [n for n, _ in available_exhibits(calibration)] == [
+        'pricing.calibrate', 'pricing.allocate']
+    assert 'pricing.calibrate' not in [
+        n for n, _ in available_exhibits(objects['Portfolio'])]
+
+
+def test_pricing_calibrate_is_the_receipt_unchanged(objects):
+    result = objects['CalibrationPortfolio']
+    for perspective in (Perspective.RAW, Perspective.INSURER):
+        blocks = exhibit_frames(result, 'pricing.calibrate', perspective)
+        assert [b for b, _, _ in blocks] == ['distortion_df']
+        # check_index_type: the serve step's relabel turns the ordered
+        # categorical distortion axis into plain strings, as it does on every
+        # relabeled exhibit. Row order survives, which is what the dtype was
+        # carrying.
+        pd.testing.assert_frame_equal(blocks[0][1], result.distortion_df,
+                                      check_index_type=False, check_categorical=False)
+
+
+def test_pricing_allocate_blocks_follow_the_source_shape(objects):
+    """Three sources, three raw block lists, one registered builder."""
+    raw = lambda key: [b for b, _, _ in
+                       exhibit_frames(objects[key], 'pricing.allocate')]
+    assert raw('CalibrationPortfolio') == ['calibration_df', 'pricing_df']
+    assert raw('CalibrationReins') == ['reins_price_df']
+    assert raw('CalibrationAggregate') == ['calibration_df']
+
+
+def test_pricing_allocate_insurer_splits_the_book_into_stat_slices(objects):
+    """One statistic at a time, units across: the comparison a reader makes."""
+    result = objects['CalibrationPortfolio']
+    blocks = exhibit_frames(result, 'pricing.allocate', Perspective.INSURER)
+    assert [b for b, _, _ in blocks] == [
+        'calibration_df', 'stat_LR', 'stat_P', 'stat_PQ', 'stat_ROE']
+    for name, frame, kw in blocks[1:]:
+        stat = name.removeprefix('stat_')
+        pd.testing.assert_frame_equal(
+            frame, result.pricing_df.xs(stat, level='stat'),
+            check_index_type=False, check_categorical=False)
+        assert kw['float_format']
+
+
+def test_pricing_allocate_insurer_is_narrower_than_raw_on_a_cession(objects):
+    """The first exhibit where RAW carries strictly more rows than INSURER.
+
+    A ceded price is what the layer is worth to whoever writes it, which is a
+    reinsurer's reading; this perspective is the cedent's, and the cedent's
+    reading of the same cession is the difference between two of its own
+    programs ([Difference-Is-A-Perspective]).
+    """
+    result = objects['CalibrationReins']
+    _n, raw, _kw = exhibit_frames(result, 'pricing.allocate')[0]
+    _n, insurer, kw = exhibit_frames(
+        result, 'pricing.allocate', Perspective.INSURER)[0]
+    assert 'ceded' in raw.index.get_level_values('view')
+    views = set(insurer.index.get_level_values('view'))
+    assert not any(v.startswith('ceded') for v in views)
+    assert 'net*' in views                      # the calibrated basis, starred
+    assert 'gross' in views
+    assert 'net less gross' in views            # the difference, appended
+    assert 'starred row is the calibrated one' in kw['caption']
+
+
+def test_the_difference_row_recomputes_its_ratios(objects):
+    """A loss ratio of a difference is not the difference of two loss ratios."""
+    result = objects['CalibrationReins']
+    _n, insurer, _kw = exhibit_frames(
+        result, 'pricing.allocate', Perspective.INSURER)[0]
+    for distortion in insurer.index.get_level_values('distortion').unique():
+        block = insurer.xs(distortion, level='distortion')
+        if 'net less gross' not in block.index:
+            continue
+        row = block.loc['net less gross']
+        for stat in ('L', 'M', 'P', 'Q'):
+            assert row[stat] == pytest.approx(
+                block.loc['net*', stat] - block.loc['gross', stat])
+        assert row['LR'] == pytest.approx(row['L'] / row['P'])
+        assert row['ROE'] == pytest.approx(row['M'] / row['Q'])
+
+
+def test_pricing_allocate_rows_read_view_then_difference(objects):
+    """Each family reads as one small table, not as two distant ones."""
+    result = objects['CalibrationReins']
+    _n, insurer, _kw = exhibit_frames(
+        result, 'pricing.allocate', Perspective.INSURER)[0]
+    first = insurer.index.get_level_values('distortion')[0]
+    head = [v for d, v in insurer.index if d == first]
+    assert head[-1].endswith('less gross')
+
+
+def test_pricing_evaluate_serves_the_panel(objects):
+    result = objects['Evaluation']
+    for perspective in (Perspective.RAW, Perspective.INSURER):
+        blocks = exhibit_frames(result, 'pricing.evaluate', perspective)
+        assert [b for b, _, _ in blocks] == ['evaluation_df']
+        pd.testing.assert_frame_equal(blocks[0][1], result.evaluation_df,
+                                      check_index_type=False, check_categorical=False)
+    _n, _f, kw = exhibit_frames(
+        result, 'pricing.evaluate', Perspective.INSURER)[0]
+    # the insurer caption states the anchor, the premium, and what a blank
+    # row means, which is the thing readers get wrong
+    assert f'{result.a:,.0f}' in kw['caption']
+    assert 'cannot lose' in kw['caption']
+    assert 'Cherny and Madan' in kw['caption']
+
+
+def test_a_pricing_exhibit_is_titled_after_its_source(objects):
+    """Calibrated distortions: EX.Port, not : CalibrationResult."""
+    e = build_exhibit(objects['CalibrationPortfolio'], 'pricing.calibrate')
+    assert e.title == 'Calibrated distortions: EX.Port'
+    assert e.meta['kind'] == 'CalibrationResult'
+    assert e.meta['object'] == 'EX.Port'
+
+
+def test_a_pricing_exhibit_carries_the_source_labels(objects):
+    """The unit axis is relabeled through the book, not left handle keyed."""
+    _n, frame, _kw = exhibit_frames(
+        objects['CalibrationPortfolio'], 'pricing.allocate',
+        Perspective.INSURER)[1]
+    assert 'Unit Alpha' in frame.columns
+
+
 # --- register_simple_exhibit ([Exhibits-Package-Split]) ---------------------
 
 def test_simple_exhibits_are_passthroughs(dice):
@@ -813,6 +974,27 @@ def test_payload_shape_and_determinism(dice):
                           'title']
     assert p1['perspective'] == 'insurer'
     assert json.dumps(p1, sort_keys=True) == json.dumps(p2, sort_keys=True)
+
+
+def test_every_served_block_reconstructs_hash_for_hash(objects):
+    """The standing envelope contract, asserted on this side of the wire.
+
+    A served block travels as its canonical_dict and is rebuilt by the
+    consumer through gt.TableDoc.model_validate. If the rebuilt document
+    hashed differently the ETag would be a lie and every cached table on the
+    other end would be serving a document nobody can verify. Swept over every
+    (object, exhibit, perspective), which is how the pricing leaves inherit it
+    rather than being asserted about separately.
+    """
+    seen = 0
+    for obj in objects.values():
+        for name, perspectives in available_exhibits(obj):
+            for perspective in perspectives:
+                for doc in build_exhibit(obj, name, perspective).ir_blocks:
+                    back = gt.TableDoc.model_validate(gt.canonical_dict(doc))
+                    assert back.hash == doc.hash, f'{name}/{perspective}'
+                    seen += 1
+    assert seen > 50
 
 
 # The committed snapshot file drives the case list, so a freshly captured

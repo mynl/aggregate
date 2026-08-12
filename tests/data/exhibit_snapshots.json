@@ -15830,6 +15830,5982 @@
    "n_stub_levels": 1
   }
  ],
+ "pricing.allocate/insurer/CalibrationAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "calibration",
+      {
+       "raw": 0.15,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.99,
+       "text": "0.99000"
+      },
+      {
+       "raw": 0.9953703703703702,
+       "text": "0.99537"
+      },
+      {
+       "raw": 10.49537037037037,
+       "text": "10.50"
+      },
+      {
+       "raw": 0.8484299516908216,
+       "text": "0.85"
+      },
+      {
+       "raw": 11.343800322061192,
+       "text": "11.34"
+      },
+      {
+       "raw": 5.656199677938808,
+       "text": "5.66"
+      },
+      {
+       "raw": 17.0,
+       "text": "17.00"
+      },
+      {
+       "raw": 0.9252076087728015,
+       "text": "92.5%"
+      },
+      {
+       "raw": 2.0055516014234875,
+       "text": "2.006"
+      },
+      {
+       "raw": 0.15000000000000005,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "coc"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "F(a)"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "coc"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "F(a)"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.allocate/insurer/CalibrationPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "calibration",
+      {
+       "raw": 0.15,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.99,
+       "text": "0.99000"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": 7.999999999999998,
+       "text": "8.00"
+      },
+      {
+       "raw": 0.39130434782608603,
+       "text": "0.39"
+      },
+      {
+       "raw": 8.391304347826084,
+       "text": "8.39"
+      },
+      {
+       "raw": 2.6086956521739157,
+       "text": "2.61"
+      },
+      {
+       "raw": 11.0,
+       "text": "11.00"
+      },
+      {
+       "raw": 0.9533678756476685,
+       "text": "95.3%"
+      },
+      {
+       "raw": 3.2166666666666623,
+       "text": "3.217"
+      },
+      {
+       "raw": 0.1499999999999995,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "coc"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "F(a)"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "coc"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "F(a)"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      {
+       "raw": 0.9387755102040817,
+       "text": "93.9%"
+      },
+      {
+       "raw": 0.9583333333333333,
+       "text": "95.8%"
+      },
+      {
+       "raw": 0.9533678756476683,
+       "text": "95.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      {
+       "raw": 0.9505092355805846,
+       "text": "95.1%"
+      },
+      {
+       "raw": 0.9543245607130157,
+       "text": "95.4%"
+      },
+      {
+       "raw": 0.9533678608137264,
+       "text": "95.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      {
+       "raw": 0.9527841020401453,
+       "text": "95.3%"
+      },
+      {
+       "raw": 0.9535626260337771,
+       "text": "95.4%"
+      },
+      {
+       "raw": 0.953367875784359,
+       "text": "95.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      {
+       "raw": 0.9536782911215095,
+       "text": "95.4%"
+      },
+      {
+       "raw": 0.953264450498801,
+       "text": "95.3%"
+      },
+      {
+       "raw": 0.9533678769790808,
+       "text": "95.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      {
+       "raw": 0.9543566967006557,
+       "text": "95.4%"
+      },
+      {
+       "raw": 0.953037479163076,
+       "text": "95.3%"
+      },
+      {
+       "raw": 0.9533669415101569,
+       "text": "95.3%"
+      }
+     ]
+    }
+   ],
+   "caption": "Loss ratio (LR) by distortion, per unit and in total, at the calibration asset level. The rows are the same book priced five ways; the spread between them is what the choice of risk measure is worth.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "Unit Alpha"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "EX.UnitB"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "total"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "Unit Alpha"
+     },
+     {
+      "text": "EX.UnitB"
+     },
+     {
+      "text": "total"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      {
+       "raw": 2.1304347826086953,
+       "text": "2.13"
+      },
+      {
+       "raw": 6.26086956521739,
+       "text": "6.26"
+      },
+      {
+       "raw": 8.391304347826086,
+       "text": "8.39"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      {
+       "raw": 2.104135262587292,
+       "text": "2.10"
+      },
+      {
+       "raw": 6.287169215803424,
+       "text": "6.29"
+      },
+      {
+       "raw": 8.391304478390715,
+       "text": "8.39"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      {
+       "raw": 2.0991114311390247,
+       "text": "2.10"
+      },
+      {
+       "raw": 6.292192915483945,
+       "text": "6.29"
+      },
+      {
+       "raw": 8.391304346622968,
+       "text": "8.39"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      {
+       "raw": 2.0971432595451382,
+       "text": "2.10"
+      },
+      {
+       "raw": 6.29416107656219,
+       "text": "6.29"
+      },
+      {
+       "raw": 8.391304336107329,
+       "text": "8.39"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      {
+       "raw": 2.0956525027951067,
+       "text": "2.10"
+      },
+      {
+       "raw": 6.295660067082553,
+       "text": "6.30"
+      },
+      {
+       "raw": 8.391312569877659,
+       "text": "8.39"
+      }
+     ]
+    }
+   ],
+   "caption": "Premium (P) by distortion, per unit and in total, at the calibration asset level. The rows are the same book priced five ways; the spread between them is what the choice of risk measure is worth.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Unit Alpha"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX.UnitB"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "total"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "Unit Alpha"
+     },
+     {
+      "text": "EX.UnitB"
+     },
+     {
+      "text": "total"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      {
+       "raw": 2.4499999999999917,
+       "text": "2.450"
+      },
+      {
+       "raw": 3.599999999999982,
+       "text": "3.600"
+      },
+      {
+       "raw": 3.216666666666665,
+       "text": "3.217"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      {
+       "raw": 3.0460898698248986,
+       "text": "3.046"
+      },
+      {
+       "raw": 3.2781022913199713,
+       "text": "3.278"
+      },
+      {
+       "raw": 3.216666877709892,
+       "text": "3.217"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      {
+       "raw": 3.136667232787801,
+       "text": "3.137"
+      },
+      {
+       "raw": 3.2442704711979484,
+       "text": "3.244"
+      },
+      {
+       "raw": 3.2166666647219593,
+       "text": "3.217"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      {
+       "raw": 3.1711351664804233,
+       "text": "3.171"
+      },
+      {
+       "raw": 3.232129014085823,
+       "text": "3.232"
+      },
+      {
+       "raw": 3.2166666477245958,
+       "text": "3.217"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      {
+       "raw": 3.1674515152164604,
+       "text": "3.167"
+      },
+      {
+       "raw": 3.2334079797485646,
+       "text": "3.233"
+      },
+      {
+       "raw": 3.216679956741359,
+       "text": "3.217"
+      }
+     ]
+    }
+   ],
+   "caption": "Premium / capital (PQ) by distortion, per unit and in total, at the calibration asset level. The rows are the same book priced five ways; the spread between them is what the choice of risk measure is worth.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Unit Alpha"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "EX.UnitB"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "total"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "Unit Alpha"
+     },
+     {
+      "text": "EX.UnitB"
+     },
+     {
+      "text": "total"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      {
+       "raw": 0.1499999999999994,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.14999999999999944,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.15000000000000027,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      {
+       "raw": 0.15075331614787177,
+       "text": "15.1%"
+      },
+      {
+       "raw": 0.14972876218370915,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.1500000575572439,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      {
+       "raw": 0.1481005599973288,
+       "text": "14.8%"
+      },
+      {
+       "raw": 0.15065540111859338,
+       "text": "15.1%"
+      },
+      {
+       "raw": 0.14999999946962592,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      {
+       "raw": 0.14689239999604958,
+       "text": "14.7%"
+      },
+      {
+       "raw": 0.1510553255320694,
+       "text": "15.1%"
+      },
+      {
+       "raw": 0.14999999483398135,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      {
+       "raw": 0.14457295019499244,
+       "text": "14.5%"
+      },
+      {
+       "raw": 0.15184898962321816,
+       "text": "15.2%"
+      },
+      {
+       "raw": 0.15000362456582586,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "Return on capital (ROE) by distortion, per unit and in total, at the calibration asset level. The rows are the same book priced five ways; the spread between them is what the choice of risk measure is worth.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "Unit Alpha"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "EX.UnitB"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "total"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "Unit Alpha"
+     },
+     {
+      "text": "EX.UnitB"
+     },
+     {
+      "text": "total"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.allocate/insurer/CalibrationReins": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ccoc"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.913043478260864,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826087,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.086956521739133,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846153846153848,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999977,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521739104,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652173907,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347826093,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846153847,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999992,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.1499999999999998,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.3043478260869534,
+       "text": "-1.30"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -11.30434782608696,
+       "text": "-11.30"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.69565217391304,
+       "text": "-8.70"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.8846153846153849,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000000012,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999972,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ph"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.186427251737253,
+       "text": "4.19"
+      },
+      {
+       "raw": 34.18642725173726,
+       "text": "34.19"
+      },
+      {
+       "raw": 25.813572748262743,
+       "text": "25.81"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8775412469717931,
+       "text": "87.8%"
+      },
+      {
+       "raw": 1.3243586071996953,
+       "text": "1.324"
+      },
+      {
+       "raw": 0.1621793035998475,
+       "text": "16.2%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.608695652184,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652183997,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347816003,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846149899,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000013336,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.150000000000667,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.5777315995532533,
+       "text": "-1.58"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -11.57773159955326,
+       "text": "-11.58"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.42226840044674,
+       "text": "-8.42"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.863727053439887,
+       "text": "86.4%"
+      },
+      {
+       "raw": 1.3746571646825154,
+       "text": "1.375"
+      },
+      {
+       "raw": 0.1873285823412569,
+       "text": "18.7%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "wang"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.30584788082631,
+       "text": "4.31"
+      },
+      {
+       "raw": 34.30584788082631,
+       "text": "34.31"
+      },
+      {
+       "raw": 25.694152119173687,
+       "text": "25.69"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8744864754317042,
+       "text": "87.4%"
+      },
+      {
+       "raw": 1.335161702231316,
+       "text": "1.335"
+      },
+      {
+       "raw": 0.16758085111565782,
+       "text": "16.8%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.608695652249974,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.60869565224997,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.39130434775003,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846124085,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000100587,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.1500000000050295,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.6971522285763356,
+       "text": "-1.70"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -11.697152228576343,
+       "text": "-11.70"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.302847771423657,
+       "text": "-8.30"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.85490893890992,
+       "text": "85.5%"
+      },
+      {
+       "raw": 1.408812078770737,
+       "text": "1.409"
+      },
+      {
+       "raw": 0.20440603938536758,
+       "text": "20.4%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "dual"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.417178586082063,
+       "text": "4.42"
+      },
+      {
+       "raw": 34.417178586082066,
+       "text": "34.42"
+      },
+      {
+       "raw": 25.582821413917934,
+       "text": "25.58"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8716577369921797,
+       "text": "87.2%"
+      },
+      {
+       "raw": 1.3453238026106822,
+       "text": "1.345"
+      },
+      {
+       "raw": 0.172661901305341,
+       "text": "17.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521632025,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.6086956521632,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.3913043478368,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846158037,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.299999999998583,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999929173,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.8084829339188602,
+       "text": "-1.81"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -11.808482933918867,
+       "text": "-11.81"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.191517066081133,
+       "text": "-8.19"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.8468488336698912,
+       "text": "84.7%"
+      },
+      {
+       "raw": 1.441550184008603,
+       "text": "1.442"
+      },
+      {
+       "raw": 0.22077509200430054,
+       "text": "22.1%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "tvar"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.71015131464328,
+       "text": "4.71"
+      },
+      {
+       "raw": 34.710151314643284,
+       "text": "34.71"
+      },
+      {
+       "raw": 25.289848685356716,
+       "text": "25.29"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8643004672625499,
+       "text": "86.4%"
+      },
+      {
+       "raw": 1.3724934358638965,
+       "text": "1.372"
+      },
+      {
+       "raw": 0.18624671793194808,
+       "text": "18.6%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6087011268370937,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.60870112683709,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.39129887316291,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846151704070916,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000007240244331,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000036201221675,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.1014501878061864,
+       "text": "-2.10"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -12.101450187806194,
+       "text": "-12.10"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -7.8985498121938065,
+       "text": "-7.90"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.8263472430830088,
+       "text": "82.6%"
+      },
+      {
+       "raw": 1.532110384253567,
+       "text": "1.532"
+      },
+      {
+       "raw": 0.2660551921267827,
+       "text": "26.6%"
+      }
+     ]
+    }
+   ],
+   "caption": "Distortions fitted to the net basis at the calibration anchor, then applied unchanged to the other whole program views. The starred row is the calibrated one. A \"less\" row is the difference between two programs: the implied allowance for reinsurance in the rate, and its loss ratio is the rate the cover is being bought at. It is not the price of the cession, which is what a reinsurer would charge for the same layer and is the ceded row of the raw view.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "pricing.allocate/raw/CalibrationAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "calibration",
+      {
+       "raw": 0.15,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.99,
+       "text": "0.99000"
+      },
+      {
+       "raw": 0.9953703703703702,
+       "text": "0.99537"
+      },
+      {
+       "raw": 10.49537037037037,
+       "text": "10.50"
+      },
+      {
+       "raw": 0.8484299516908216,
+       "text": "0.85"
+      },
+      {
+       "raw": 11.343800322061192,
+       "text": "11.34"
+      },
+      {
+       "raw": 5.656199677938808,
+       "text": "5.66"
+      },
+      {
+       "raw": 17.0,
+       "text": "17.00"
+      },
+      {
+       "raw": 0.9252076087728015,
+       "text": "92.5%"
+      },
+      {
+       "raw": 2.0055516014234875,
+       "text": "2.006"
+      },
+      {
+       "raw": 0.15000000000000005,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "coc"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "F(a)"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "coc"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "F(a)"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.allocate/raw/CalibrationPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "calibration",
+      {
+       "raw": 0.15,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.99,
+       "text": "0.99000"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": 7.999999999999998,
+       "text": "8.00"
+      },
+      {
+       "raw": 0.39130434782608603,
+       "text": "0.39"
+      },
+      {
+       "raw": 8.391304347826084,
+       "text": "8.39"
+      },
+      {
+       "raw": 2.6086956521739157,
+       "text": "2.61"
+      },
+      {
+       "raw": 11.0,
+       "text": "11.00"
+      },
+      {
+       "raw": 0.9533678756476685,
+       "text": "95.3%"
+      },
+      {
+       "raw": 3.2166666666666623,
+       "text": "3.217"
+      },
+      {
+       "raw": 0.1499999999999995,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "coc"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "F(a)"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "coc"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "F(a)"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "ccoc"
+      },
+      "L",
+      {
+       "raw": 1.9999999999999998,
+       "text": "2.000"
+      },
+      {
+       "raw": 5.999999999999998,
+       "text": "6.000"
+      },
+      {
+       "raw": 7.999999999999998,
+       "text": "8.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "M",
+      {
+       "raw": 0.13043478260869557,
+       "text": "0.130"
+      },
+      {
+       "raw": 0.2608695652173916,
+       "text": "0.261"
+      },
+      {
+       "raw": 0.3913043478260878,
+       "text": "0.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "P",
+      {
+       "raw": 2.1304347826086953,
+       "text": "2.130"
+      },
+      {
+       "raw": 6.26086956521739,
+       "text": "6.261"
+      },
+      {
+       "raw": 8.391304347826086,
+       "text": "8.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Q",
+      {
+       "raw": 0.8695652173913072,
+       "text": "0.870"
+      },
+      {
+       "raw": 1.739130434782617,
+       "text": "1.739"
+      },
+      {
+       "raw": 2.608695652173914,
+       "text": "2.609"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "a",
+      {
+       "raw": 3.0000000000000027,
+       "text": "3.000"
+      },
+      {
+       "raw": 8.000000000000007,
+       "text": "8.000"
+      },
+      {
+       "raw": 11.0,
+       "text": "11.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "LR",
+      {
+       "raw": 0.9387755102040817,
+       "text": "0.939"
+      },
+      {
+       "raw": 0.9583333333333333,
+       "text": "0.958"
+      },
+      {
+       "raw": 0.9533678756476683,
+       "text": "0.953"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "PQ",
+      {
+       "raw": 2.4499999999999917,
+       "text": "2.450"
+      },
+      {
+       "raw": 3.599999999999982,
+       "text": "3.600"
+      },
+      {
+       "raw": 3.216666666666665,
+       "text": "3.217"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ROE",
+      {
+       "raw": 0.1499999999999994,
+       "text": "0.150"
+      },
+      {
+       "raw": 0.14999999999999944,
+       "text": "0.150"
+      },
+      {
+       "raw": 0.15000000000000027,
+       "text": "0.150"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "ph"
+      },
+      "L",
+      {
+       "raw": 1.9999999999999998,
+       "text": "2.000"
+      },
+      {
+       "raw": 5.999999999999998,
+       "text": "6.000"
+      },
+      {
+       "raw": 7.999999999999998,
+       "text": "8.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "M",
+      {
+       "raw": 0.10413526258729244,
+       "text": "0.104"
+      },
+      {
+       "raw": 0.28716921580342536,
+       "text": "0.287"
+      },
+      {
+       "raw": 0.39130447839071714,
+       "text": "0.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "P",
+      {
+       "raw": 2.104135262587292,
+       "text": "2.104"
+      },
+      {
+       "raw": 6.287169215803424,
+       "text": "6.287"
+      },
+      {
+       "raw": 8.391304478390715,
+       "text": "8.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Q",
+      {
+       "raw": 0.6907659827870563,
+       "text": "0.691"
+      },
+      {
+       "raw": 1.9179295388222348,
+       "text": "1.918"
+      },
+      {
+       "raw": 2.6086955216092846,
+       "text": "2.609"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "a",
+      {
+       "raw": 2.7949012453743487,
+       "text": "2.795"
+      },
+      {
+       "raw": 8.20509875462566,
+       "text": "8.205"
+      },
+      {
+       "raw": 11.0,
+       "text": "11.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "LR",
+      {
+       "raw": 0.9505092355805846,
+       "text": "0.951"
+      },
+      {
+       "raw": 0.9543245607130157,
+       "text": "0.954"
+      },
+      {
+       "raw": 0.9533678608137264,
+       "text": "0.953"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "PQ",
+      {
+       "raw": 3.0460898698248986,
+       "text": "3.046"
+      },
+      {
+       "raw": 3.2781022913199713,
+       "text": "3.278"
+      },
+      {
+       "raw": 3.216666877709892,
+       "text": "3.217"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ROE",
+      {
+       "raw": 0.15075331614787177,
+       "text": "0.151"
+      },
+      {
+       "raw": 0.14972876218370915,
+       "text": "0.150"
+      },
+      {
+       "raw": 0.1500000575572439,
+       "text": "0.150"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "wang"
+      },
+      "L",
+      {
+       "raw": 1.9999999999999998,
+       "text": "2.000"
+      },
+      {
+       "raw": 5.999999999999998,
+       "text": "6.000"
+      },
+      {
+       "raw": 7.999999999999998,
+       "text": "8.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "M",
+      {
+       "raw": 0.09911143113902487,
+       "text": "0.099"
+      },
+      {
+       "raw": 0.29219291548394644,
+       "text": "0.292"
+      },
+      {
+       "raw": 0.3913043466229702,
+       "text": "0.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "P",
+      {
+       "raw": 2.0991114311390247,
+       "text": "2.099"
+      },
+      {
+       "raw": 6.292192915483945,
+       "text": "6.292"
+      },
+      {
+       "raw": 8.391304346622968,
+       "text": "8.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Q",
+      {
+       "raw": 0.6692171261257384,
+       "text": "0.669"
+      },
+      {
+       "raw": 1.9394785272513206,
+       "text": "1.939"
+      },
+      {
+       "raw": 2.6086956533770316,
+       "text": "2.609"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "a",
+      {
+       "raw": 2.768328557264763,
+       "text": "2.768"
+      },
+      {
+       "raw": 8.231671442735266,
+       "text": "8.232"
+      },
+      {
+       "raw": 11.0,
+       "text": "11.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "LR",
+      {
+       "raw": 0.9527841020401453,
+       "text": "0.953"
+      },
+      {
+       "raw": 0.9535626260337771,
+       "text": "0.954"
+      },
+      {
+       "raw": 0.953367875784359,
+       "text": "0.953"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "PQ",
+      {
+       "raw": 3.136667232787801,
+       "text": "3.137"
+      },
+      {
+       "raw": 3.2442704711979484,
+       "text": "3.244"
+      },
+      {
+       "raw": 3.2166666647219593,
+       "text": "3.217"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ROE",
+      {
+       "raw": 0.1481005599973288,
+       "text": "0.148"
+      },
+      {
+       "raw": 0.15065540111859338,
+       "text": "0.151"
+      },
+      {
+       "raw": 0.14999999946962592,
+       "text": "0.150"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "dual"
+      },
+      "L",
+      {
+       "raw": 1.9999999999999998,
+       "text": "2.000"
+      },
+      {
+       "raw": 5.999999999999998,
+       "text": "6.000"
+      },
+      {
+       "raw": 7.999999999999998,
+       "text": "8.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "M",
+      {
+       "raw": 0.09714325954513847,
+       "text": "0.097"
+      },
+      {
+       "raw": 0.29416107656219204,
+       "text": "0.294"
+      },
+      {
+       "raw": 0.3913043361073303,
+       "text": "0.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "P",
+      {
+       "raw": 2.0971432595451382,
+       "text": "2.097"
+      },
+      {
+       "raw": 6.29416107656219,
+       "text": "6.294"
+      },
+      {
+       "raw": 8.391304336107329,
+       "text": "8.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Q",
+      {
+       "raw": 0.6613225704512349,
+       "text": "0.661"
+      },
+      {
+       "raw": 1.9473730934414553,
+       "text": "1.947"
+      },
+      {
+       "raw": 2.6086956638926715,
+       "text": "2.609"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "a",
+      {
+       "raw": 2.758465829996373,
+       "text": "2.758"
+      },
+      {
+       "raw": 8.241534170003646,
+       "text": "8.242"
+      },
+      {
+       "raw": 11.0,
+       "text": "11.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "LR",
+      {
+       "raw": 0.9536782911215095,
+       "text": "0.954"
+      },
+      {
+       "raw": 0.953264450498801,
+       "text": "0.953"
+      },
+      {
+       "raw": 0.9533678769790808,
+       "text": "0.953"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "PQ",
+      {
+       "raw": 3.1711351664804233,
+       "text": "3.171"
+      },
+      {
+       "raw": 3.232129014085823,
+       "text": "3.232"
+      },
+      {
+       "raw": 3.2166666477245958,
+       "text": "3.217"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ROE",
+      {
+       "raw": 0.14689239999604958,
+       "text": "0.147"
+      },
+      {
+       "raw": 0.1510553255320694,
+       "text": "0.151"
+      },
+      {
+       "raw": 0.14999999483398135,
+       "text": "0.150"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "tvar"
+      },
+      "L",
+      {
+       "raw": 1.9999999999999998,
+       "text": "2.000"
+      },
+      {
+       "raw": 5.999999999999998,
+       "text": "6.000"
+      },
+      {
+       "raw": 7.999999999999998,
+       "text": "8.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "M",
+      {
+       "raw": 0.09565250279510695,
+       "text": "0.096"
+      },
+      {
+       "raw": 0.29566006708255443,
+       "text": "0.296"
+      },
+      {
+       "raw": 0.3913125698776607,
+       "text": "0.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "P",
+      {
+       "raw": 2.0956525027951067,
+       "text": "2.096"
+      },
+      {
+       "raw": 6.295660067082553,
+       "text": "6.296"
+      },
+      {
+       "raw": 8.391312569877659,
+       "text": "8.391"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Q",
+      {
+       "raw": 0.6616210201569233,
+       "text": "0.662"
+      },
+      {
+       "raw": 1.9470664099654118,
+       "text": "1.947"
+      },
+      {
+       "raw": 2.608687430122341,
+       "text": "2.609"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "a",
+      {
+       "raw": 2.7572735229520298,
+       "text": "2.757"
+      },
+      {
+       "raw": 8.242726477047965,
+       "text": "8.243"
+      },
+      {
+       "raw": 11.0,
+       "text": "11.000"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "LR",
+      {
+       "raw": 0.9543566967006557,
+       "text": "0.954"
+      },
+      {
+       "raw": 0.953037479163076,
+       "text": "0.953"
+      },
+      {
+       "raw": 0.9533669415101569,
+       "text": "0.953"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "PQ",
+      {
+       "raw": 3.1674515152164604,
+       "text": "3.167"
+      },
+      {
+       "raw": 3.2334079797485646,
+       "text": "3.233"
+      },
+      {
+       "raw": 3.216679956741359,
+       "text": "3.217"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ROE",
+      {
+       "raw": 0.14457295019499244,
+       "text": "0.145"
+      },
+      {
+       "raw": 0.15184898962321816,
+       "text": "0.152"
+      },
+      {
+       "raw": 0.15000362456582586,
+       "text": "0.150"
+      }
+     ]
+    }
+   ],
+   "caption": "The calibrated set allocated across the units of the book, at the calibration asset level: the eight pentagon statistics down the rows, units and the total across. Each distortion is a different answer to how the total premium should be shared out, computed from the same total.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "stat"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Unit Alpha"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX.UnitB"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "total"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "stat"
+     },
+     {
+      "text": "Unit Alpha"
+     },
+     {
+      "text": "EX.UnitB"
+     },
+     {
+      "text": "total"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "pricing.allocate/raw/CalibrationReins": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ccoc"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.913043478260864,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826087,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.086956521739133,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846153846153848,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999977,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.3043478260869534,
+       "text": "1.30"
+      },
+      {
+       "raw": 11.304347826086955,
+       "text": "11.30"
+      },
+      {
+       "raw": 8.695652173913045,
+       "text": "8.70"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8846153846153849,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999996,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999963,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521739104,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652173907,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347826093,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846153847,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999992,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.1499999999999998,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ph"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.186427251737253,
+       "text": "4.19"
+      },
+      {
+       "raw": 34.18642725173726,
+       "text": "34.19"
+      },
+      {
+       "raw": 25.813572748262743,
+       "text": "25.81"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8775412469717931,
+       "text": "87.8%"
+      },
+      {
+       "raw": 1.3243586071996953,
+       "text": "1.324"
+      },
+      {
+       "raw": 0.1621793035998475,
+       "text": "16.2%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.6794819280632254,
+       "text": "1.68"
+      },
+      {
+       "raw": 11.679481928063227,
+       "text": "11.68"
+      },
+      {
+       "raw": 8.320518071936773,
+       "text": "8.32"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8562023608232314,
+       "text": "85.6%"
+      },
+      {
+       "raw": 1.4036964798448646,
+       "text": "1.404"
+      },
+      {
+       "raw": 0.20184823992243203,
+       "text": "20.2%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.608695652184,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652183997,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347816003,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846149899,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000013336,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.150000000000667,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "wang"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.30584788082631,
+       "text": "4.31"
+      },
+      {
+       "raw": 34.30584788082631,
+       "text": "34.31"
+      },
+      {
+       "raw": 25.694152119173687,
+       "text": "25.69"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8744864754317042,
+       "text": "87.4%"
+      },
+      {
+       "raw": 1.335161702231316,
+       "text": "1.335"
+      },
+      {
+       "raw": 0.16758085111565782,
+       "text": "16.8%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.8384253218152153,
+       "text": "1.84"
+      },
+      {
+       "raw": 11.838425321815217,
+       "text": "11.84"
+      },
+      {
+       "raw": 8.161574678184783,
+       "text": "8.16"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8447069376340565,
+       "text": "84.5%"
+      },
+      {
+       "raw": 1.450507504815015,
+       "text": "1.451"
+      },
+      {
+       "raw": 0.2252537524075072,
+       "text": "22.5%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.608695652249974,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.60869565224997,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.39130434775003,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846124085,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000100587,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.1500000000050295,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "dual"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.417178586082063,
+       "text": "4.42"
+      },
+      {
+       "raw": 34.417178586082066,
+       "text": "34.42"
+      },
+      {
+       "raw": 25.582821413917934,
+       "text": "25.58"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8716577369921797,
+       "text": "87.2%"
+      },
+      {
+       "raw": 1.3453238026106822,
+       "text": "1.345"
+      },
+      {
+       "raw": 0.172661901305341,
+       "text": "17.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.985444457336186,
+       "text": "1.99"
+      },
+      {
+       "raw": 11.985444457336188,
+       "text": "11.99"
+      },
+      {
+       "raw": 8.014555542663812,
+       "text": "8.01"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8343453624599702,
+       "text": "83.4%"
+      },
+      {
+       "raw": 1.495459653817879,
+       "text": "1.495"
+      },
+      {
+       "raw": 0.24772982690893927,
+       "text": "24.8%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521632025,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.6086956521632,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.3913043478368,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846158037,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.299999999998583,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999929173,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "tvar"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.71015131464328,
+       "text": "4.71"
+      },
+      {
+       "raw": 34.710151314643284,
+       "text": "34.71"
+      },
+      {
+       "raw": 25.289848685356716,
+       "text": "25.29"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8643004672625499,
+       "text": "86.4%"
+      },
+      {
+       "raw": 1.3724934358638965,
+       "text": "1.372"
+      },
+      {
+       "raw": 0.18624671793194808,
+       "text": "18.6%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 2.6087011268370937,
+       "text": "2.61"
+      },
+      {
+       "raw": 12.608701126837095,
+       "text": "12.61"
+      },
+      {
+       "raw": 7.391298873162905,
+       "text": "7.39"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.7931031039125369,
+       "text": "79.3%"
+      },
+      {
+       "raw": 1.705884357161916,
+       "text": "1.706"
+      },
+      {
+       "raw": 0.3529421785809578,
+       "text": "35.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6087011268370937,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.60870112683709,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.39129887316291,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846151704070916,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000007240244331,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000036201221675,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "Every view of the cession priced with every calibrated family: gross, ceded and net are three separate distributions, so each is a price in its own right rather than a share of one. The ceded row is what the risk measure says the cession is worth to whoever writes it.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "pricing.calibrate/insurer/CalibrationAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      "r",
+      {
+       "raw": 0.15000000000000005,
+       "text": "0.1500"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      {
+       "raw": 0.13043478260869568,
+       "text": "0.1304"
+      },
+      {
+       "raw": 0.5652173913043479,
+       "text": "0.5652"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      "a",
+      {
+       "raw": 0.7286115693085878,
+       "text": "0.7286"
+      },
+      {
+       "raw": 2.2817845959366423e-06,
+       "text": "2.28e-06"
+      },
+      {
+       "raw": 0.15699792568203305,
+       "text": "0.1570"
+      },
+      {
+       "raw": 0.5784989628410165,
+       "text": "0.5785"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      "lam",
+      {
+       "raw": 0.2912072258361101,
+       "text": "0.2912"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.4029666317583178e-10,
+       "text": "-1.40e-10"
+      },
+      {
+       "raw": 0.16314238253448732,
+       "text": "0.1631"
+      },
+      {
+       "raw": 0.5815711912672437,
+       "text": "0.5816"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      "b",
+      {
+       "raw": 1.39844919498204,
+       "text": "1.3984"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.277754873603044e-09,
+       "text": "-2.28e-09"
+      },
+      {
+       "raw": 0.166127844532068,
+       "text": "0.1661"
+      },
+      {
+       "raw": 0.583063922266034,
+       "text": "0.5831"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      "p",
+      {
+       "raw": 0.15801784024357127,
+       "text": "0.1580"
+      },
+      {
+       "raw": 5.974815019627044e-06,
+       "text": "5.97e-06"
+      },
+      {
+       "raw": 0.15801784024357127,
+       "text": "0.1580"
+      },
+      {
+       "raw": 0.5790089201217856,
+       "text": "0.5790"
+      }
+     ]
+    }
+   ],
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "area"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "area"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.calibrate/insurer/CalibrationPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      "r",
+      {
+       "raw": 0.1499999999999995,
+       "text": "0.1500"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      {
+       "raw": 0.13043478260869526,
+       "text": "0.1304"
+      },
+      {
+       "raw": 0.5652173913043477,
+       "text": "0.5652"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      "a",
+      {
+       "raw": 0.760427055063799,
+       "text": "0.7604"
+      },
+      {
+       "raw": 1.3056463110672212e-07,
+       "text": "1.31e-07"
+      },
+      {
+       "raw": 0.1360879703859804,
+       "text": "0.1361"
+      },
+      {
+       "raw": 0.5680439851929902,
+       "text": "0.5680"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      "lam",
+      {
+       "raw": 0.24740199393895723,
+       "text": "0.2474"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.2031158291847532e-09,
+       "text": "-1.20e-09"
+      },
+      {
+       "raw": 0.1388729279413572,
+       "text": "0.1389"
+      },
+      {
+       "raw": 0.5694364639706786,
+       "text": "0.5694"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      "b",
+      {
+       "raw": 1.3261273779411582,
+       "text": "1.3261"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.1718755743572729e-08,
+       "text": "-1.17e-08"
+      },
+      {
+       "raw": 0.14020185697217136,
+       "text": "0.1402"
+      },
+      {
+       "raw": 0.5701009284860856,
+       "text": "0.5701"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      "p",
+      {
+       "raw": 0.1287908742770852,
+       "text": "0.1288"
+      },
+      {
+       "raw": 8.222051574691136e-06,
+       "text": "8.22e-06"
+      },
+      {
+       "raw": 0.1287908742770852,
+       "text": "0.1288"
+      },
+      {
+       "raw": 0.5643954371385426,
+       "text": "0.5644"
+      }
+     ]
+    }
+   ],
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "area"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "area"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.calibrate/insurer/CalibrationReins": [
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      "r",
+      {
+       "raw": 0.14999999999999986,
+       "text": "0.1500"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      {
+       "raw": 0.13043478260869554,
+       "text": "0.1304"
+      },
+      {
+       "raw": 0.5652173913043478,
+       "text": "0.5652"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      "a",
+      {
+       "raw": 0.7271667628440409,
+       "text": "0.7272"
+      },
+      {
+       "raw": 1.0089706847793423e-11,
+       "text": "1.01e-11"
+      },
+      {
+       "raw": 0.1579657755263296,
+       "text": "0.1580"
+      },
+      {
+       "raw": 0.5789828877631648,
+       "text": "0.5790"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      "lam",
+      {
+       "raw": 0.3107467358504626,
+       "text": "0.3107"
+      },
+      {
+       "raw": 7.606359986311872e-11,
+       "text": "7.61e-11"
+      },
+      {
+       "raw": 0.17391943657329678,
+       "text": "0.1739"
+      },
+      {
+       "raw": 0.5869597182866484,
+       "text": "0.5870"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      "b",
+      {
+       "raw": 1.4678242517352238,
+       "text": "1.4678"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.070432631422591e-11,
+       "text": "-1.07e-11"
+      },
+      {
+       "raw": 0.1895695171186839,
+       "text": "0.1896"
+      },
+      {
+       "raw": 0.594784758559342,
+       "text": "0.5948"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      "p",
+      {
+       "raw": 0.20689689608746317,
+       "text": "0.2069"
+      },
+      {
+       "raw": 5.474663183235862e-06,
+       "text": "5.47e-06"
+      },
+      {
+       "raw": 0.20689689608746317,
+       "text": "0.2069"
+      },
+      {
+       "raw": 0.6034484480437315,
+       "text": "0.6034"
+      }
+     ]
+    }
+   ],
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "area"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "area"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.calibrate/raw/CalibrationAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      "r",
+      {
+       "raw": 0.15000000000000005,
+       "text": "0.1500"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      {
+       "raw": 0.13043478260869568,
+       "text": "0.1304"
+      },
+      {
+       "raw": 0.5652173913043479,
+       "text": "0.5652"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      "a",
+      {
+       "raw": 0.7286115693085878,
+       "text": "0.7286"
+      },
+      {
+       "raw": 2.2817845959366423e-06,
+       "text": "2.28e-06"
+      },
+      {
+       "raw": 0.15699792568203305,
+       "text": "0.1570"
+      },
+      {
+       "raw": 0.5784989628410165,
+       "text": "0.5785"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      "lam",
+      {
+       "raw": 0.2912072258361101,
+       "text": "0.2912"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.4029666317583178e-10,
+       "text": "-1.40e-10"
+      },
+      {
+       "raw": 0.16314238253448732,
+       "text": "0.1631"
+      },
+      {
+       "raw": 0.5815711912672437,
+       "text": "0.5816"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      "b",
+      {
+       "raw": 1.39844919498204,
+       "text": "1.3984"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.277754873603044e-09,
+       "text": "-2.28e-09"
+      },
+      {
+       "raw": 0.166127844532068,
+       "text": "0.1661"
+      },
+      {
+       "raw": 0.583063922266034,
+       "text": "0.5831"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      "p",
+      {
+       "raw": 0.15801784024357127,
+       "text": "0.1580"
+      },
+      {
+       "raw": 5.974815019627044e-06,
+       "text": "5.97e-06"
+      },
+      {
+       "raw": 0.15801784024357127,
+       "text": "0.1580"
+      },
+      {
+       "raw": 0.5790089201217856,
+       "text": "0.5790"
+      }
+     ]
+    }
+   ],
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "area"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "area"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.calibrate/raw/CalibrationPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      "r",
+      {
+       "raw": 0.1499999999999995,
+       "text": "0.1500"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      {
+       "raw": 0.13043478260869526,
+       "text": "0.1304"
+      },
+      {
+       "raw": 0.5652173913043477,
+       "text": "0.5652"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      "a",
+      {
+       "raw": 0.760427055063799,
+       "text": "0.7604"
+      },
+      {
+       "raw": 1.3056463110672212e-07,
+       "text": "1.31e-07"
+      },
+      {
+       "raw": 0.1360879703859804,
+       "text": "0.1361"
+      },
+      {
+       "raw": 0.5680439851929902,
+       "text": "0.5680"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      "lam",
+      {
+       "raw": 0.24740199393895723,
+       "text": "0.2474"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.2031158291847532e-09,
+       "text": "-1.20e-09"
+      },
+      {
+       "raw": 0.1388729279413572,
+       "text": "0.1389"
+      },
+      {
+       "raw": 0.5694364639706786,
+       "text": "0.5694"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      "b",
+      {
+       "raw": 1.3261273779411582,
+       "text": "1.3261"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.1718755743572729e-08,
+       "text": "-1.17e-08"
+      },
+      {
+       "raw": 0.14020185697217136,
+       "text": "0.1402"
+      },
+      {
+       "raw": 0.5701009284860856,
+       "text": "0.5701"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      "p",
+      {
+       "raw": 0.1287908742770852,
+       "text": "0.1288"
+      },
+      {
+       "raw": 8.222051574691136e-06,
+       "text": "8.22e-06"
+      },
+      {
+       "raw": 0.1287908742770852,
+       "text": "0.1288"
+      },
+      {
+       "raw": 0.5643954371385426,
+       "text": "0.5644"
+      }
+     ]
+    }
+   ],
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "area"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "area"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.calibrate/raw/CalibrationReins": [
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      "r",
+      {
+       "raw": 0.14999999999999986,
+       "text": "0.1500"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      {
+       "raw": 0.13043478260869554,
+       "text": "0.1304"
+      },
+      {
+       "raw": 0.5652173913043478,
+       "text": "0.5652"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      "a",
+      {
+       "raw": 0.7271667628440409,
+       "text": "0.7272"
+      },
+      {
+       "raw": 1.0089706847793423e-11,
+       "text": "1.01e-11"
+      },
+      {
+       "raw": 0.1579657755263296,
+       "text": "0.1580"
+      },
+      {
+       "raw": 0.5789828877631648,
+       "text": "0.5790"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      "lam",
+      {
+       "raw": 0.3107467358504626,
+       "text": "0.3107"
+      },
+      {
+       "raw": 7.606359986311872e-11,
+       "text": "7.61e-11"
+      },
+      {
+       "raw": 0.17391943657329678,
+       "text": "0.1739"
+      },
+      {
+       "raw": 0.5869597182866484,
+       "text": "0.5870"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      "b",
+      {
+       "raw": 1.4678242517352238,
+       "text": "1.4678"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.070432631422591e-11,
+       "text": "-1.07e-11"
+      },
+      {
+       "raw": 0.1895695171186839,
+       "text": "0.1896"
+      },
+      {
+       "raw": 0.594784758559342,
+       "text": "0.5948"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      "p",
+      {
+       "raw": 0.20689689608746317,
+       "text": "0.2069"
+      },
+      {
+       "raw": 5.474663183235862e-06,
+       "text": "5.47e-06"
+      },
+      {
+       "raw": 0.20689689608746317,
+       "text": "0.2069"
+      },
+      {
+       "raw": 0.6034484480437315,
+       "text": "0.6034"
+      }
+     ]
+    }
+   ],
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "area"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "area"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.evaluate/insurer/Evaluation": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 5,
+       "text": "EX.Dice"
+      },
+      "ccoc",
+      "sell",
+      "r",
+      {
+       "raw": 0.30092592592592593,
+       "text": "0.3009"
+      },
+      {
+       "raw": 0.23131672597864766,
+       "text": "0.2313"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      "ok"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ph",
+      "sell",
+      "a",
+      {
+       "raw": 0.5731802494397704,
+       "text": "0.5732"
+      },
+      {
+       "raw": 0.2713101379910062,
+       "text": "0.2713"
+      },
+      {
+       "raw": 3.927326552854993e-08,
+       "text": "3.93e-08"
+      },
+      "ok"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wang",
+      "sell",
+      "lam",
+      {
+       "raw": 0.5199752032440235,
+       "text": "0.5200"
+      },
+      {
+       "raw": 0.286886647573648,
+       "text": "0.2869"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -3.977973506152921e-11,
+       "text": "-3.98e-11"
+      },
+      "ok"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "dual",
+      "sell",
+      "b",
+      {
+       "raw": 1.854249817860955,
+       "text": "1.8542"
+      },
+      {
+       "raw": 0.29929048694873905,
+       "text": "0.2993"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.4416379201520613e-10,
+       "text": "-1.44e-10"
+      },
+      "ok"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "tvar",
+      "sell",
+      "p",
+      {
+       "raw": 0.3071001999699008,
+       "text": "0.3071"
+      },
+      {
+       "raw": 0.3071001999699008,
+       "text": "0.3071"
+      },
+      {
+       "raw": 6.211018398261103e-06,
+       "text": "6.21e-06"
+      },
+      "ok"
+     ]
+    }
+   ],
+   "caption": "The breakeven stress, measured with assets of 17 behind it. gini_p is the family agnostic acceptability index, so it compares across families and, for a walk, down the steps: a layer whose figure sits above the net row over it is priced above the holder's own acceptability, and buying it lowers the net. The consideration is 12.00. A blank row is one of two opposite situations and the status column says which: a position that is unacceptable at any stress (its expected margin is not positive), or one that cannot lose and is therefore acceptable at every stress. Cherny and Madan (2009) is the reference.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "role"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c6",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "status"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "role"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "status"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "pricing.evaluate/raw/Evaluation": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 5,
+       "text": "EX.Dice"
+      },
+      "ccoc",
+      "sell",
+      "r",
+      {
+       "raw": 0.30092592592592593,
+       "text": "0.3009"
+      },
+      {
+       "raw": 0.23131672597864766,
+       "text": "0.2313"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      "ok"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ph",
+      "sell",
+      "a",
+      {
+       "raw": 0.5731802494397704,
+       "text": "0.5732"
+      },
+      {
+       "raw": 0.2713101379910062,
+       "text": "0.2713"
+      },
+      {
+       "raw": 3.927326552854993e-08,
+       "text": "3.93e-08"
+      },
+      "ok"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wang",
+      "sell",
+      "lam",
+      {
+       "raw": 0.5199752032440235,
+       "text": "0.5200"
+      },
+      {
+       "raw": 0.286886647573648,
+       "text": "0.2869"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -3.977973506152921e-11,
+       "text": "-3.98e-11"
+      },
+      "ok"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "dual",
+      "sell",
+      "b",
+      {
+       "raw": 1.854249817860955,
+       "text": "1.8542"
+      },
+      {
+       "raw": 0.29929048694873905,
+       "text": "0.2993"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.4416379201520613e-10,
+       "text": "-1.44e-10"
+      },
+      "ok"
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "tvar",
+      "sell",
+      "p",
+      {
+       "raw": 0.3071001999699008,
+       "text": "0.3071"
+      },
+      {
+       "raw": 0.3071001999699008,
+       "text": "0.3071"
+      },
+      {
+       "raw": 6.211018398261103e-06,
+       "text": "6.21e-06"
+      },
+      "ok"
+     ]
+    }
+   ],
+   "caption": "The distortion in each family whose risk adjusted margin is exactly zero: the most stress this position survives. One row block per position measured, so a walk reads down the steps and a book reads across its units.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "name": [
+      "role"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c6",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "status"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "role"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "status"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
  "reins/insurer/ReinsAggregate": [
   {
    "body": [

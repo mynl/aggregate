@@ -90,12 +90,20 @@ from ._core import (
     available_exhibits, build_exhibit, exhibit_frames, register_simple_exhibit,
     dependency, economic, economic_ratios, economic_waterfall, reins, stats,
     summary, tail, validation,
+    pricing_allocate, pricing_calibrate, pricing_evaluate,
     _perspectives_sharpen, _perspectives_updated,
 )
 
 # Per-class business translation. Imported for their registration side
 # effects, which is the whole point: importing the package wires the registry.
-from . import _aggregate, _portfolio, _pnl, _bivariate, _distortion  # noqa: F401
+# ``_pricing`` is the same idea over the result objects rather than over a
+# first class class: what a calibration dispatches on is its result.
+from . import (_aggregate, _portfolio, _pnl, _bivariate,  # noqa: F401
+               _distortion, _pricing)
+from ._pricing import (  # noqa: F401
+    CALIBRATION_FORMATS, DISTORTION_FORMATS, EVALUATION_FORMATS,
+    PENTAGON_FORMATS, STAT_SLICES, STAT_SLICE_FORMATS, STAT_SLICE_TITLES,
+)
 
 __all__ = [
     'Perspective', 'Exhibit', 'EXHIBITS',
@@ -105,6 +113,10 @@ __all__ = [
     'summary', 'tail', 'stats', 'validation', 'reins',
     'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
     'bs_window', 'sharpen', 'tail_behavior', 'SHARPEN_FORMATS',
+    'pricing_calibrate', 'pricing_allocate', 'pricing_evaluate',
+    'PENTAGON_FORMATS', 'CALIBRATION_FORMATS', 'DISTORTION_FORMATS',
+    'EVALUATION_FORMATS', 'STAT_SLICES', 'STAT_SLICE_FORMATS',
+    'STAT_SLICE_TITLES',
 ]
 
 

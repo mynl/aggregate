@@ -416,7 +416,11 @@ def _render_exposure(spec: dict) -> str:
     ``premium at lr`` and ``exposure at rate`` produce identical spec keys
     (``exp_premium``, ``exp_lr``, ``exp_el``), so both canonicalize to the
     ``premium at lr`` form. The ``loss`` form sets only ``exp_el``; the premium
-    form is detected first by the presence of ``exp_premium``.
+    *sizing* form is detected by ``exp_premium`` together with ``exp_lr``. An
+    ``exp_premium`` with no ``exp_lr`` is the informational suffix on a claims
+    or loss head ([FYI-Premium-Exposure-Head]) and renders after that head:
+    ``5 claims 20000 premium``. Its optional label rides on the ``premium``
+    site of ``label_map``.
 
     A claim count of exactly one renders ``1 claim``, the spelling the grammar
     also accepts and the one a reader expects. It is cosmetic to the parser
@@ -436,14 +440,19 @@ def _render_exposure(spec: dict) -> str:
         if 'exp_rate' in spec:
             s += f' at {_fmt_seq(spec["exp_rate"])} rate'
         return s
-    if 'exp_premium' in spec:
+    if 'exp_premium' in spec and 'exp_lr' in spec:
         return (f'{_fmt_seq(spec["exp_premium"])} premium{label} '
                 f'at {_fmt_seq(spec["exp_lr"])} lr')
+    # informational premium suffix on a claims / loss head (no exp_lr)
+    fyi = ''
+    if 'exp_premium' in spec:
+        plabel = _render_label(spec.get('label_map', {}).get('premium'))
+        fyi = f' {_fmt_seq(spec["exp_premium"])} premium{plabel}'
     if 'exp_el' in spec:
-        return f'{_fmt_seq(spec["exp_el"])} loss{label}'
+        return f'{_fmt_seq(spec["exp_el"])} loss{label}{fyi}'
     if 'exp_en' in spec:
         count = _fmt_seq(spec['exp_en'])
-        return f'{count} {"claim" if count == "1" else "claims"}{label}'
+        return f'{count} {"claim" if count == "1" else "claims"}{label}{fyi}'
     return ''
 
 

@@ -542,12 +542,13 @@ class UnderwritingTransformer(Transformer):
     # provenance now rides the structured ``_tweedie`` key instead, the clause
     # round-trips, and no body form rewrites the trailer.
     # Interior-label temp keys emitted by the sub-object fragments (exposure /
-    # layer / inline severity clause). They are gathered into one ``label_map``
+    # FYI premium / layer / inline severity clause). They are gathered into one ``label_map``
     # sub-dict here in the body assembly and stripped from the flat spec; the
     # ``Aggregate`` (via ``LabeledMixin``) reads ``label_map``. See
     # dev/plan-labels.md ([DecL-Labels-Everywhere], S1/S2/S3).
     _INTERIOR_LABEL_KEYS = {
         "_exposure_label": "exposure",
+        "_premium_label": "premium",
         "_layer_label": "layer",
         "_severity_label": "severity",
         "_wait_label": "wait",
@@ -2117,15 +2118,55 @@ class UnderwritingTransformer(Transformer):
         return out
 
     # ----- exposures -------------------------------------------------
+    @staticmethod
+    def _check_fyi_premium(numbers, fyi, head):
+        """Guard the informational-premium suffix ([FYI-Premium-Exposure-Head]).
+
+        An FYI premium is one booked number for the aggregate and must never
+        touch the law or the per-component reporting, so both the sizing amount
+        and the premium are required to be scalar. A vector premium against a
+        scalar head would broadcast into extra components (changing the
+        distribution); a scalar premium against a vector head would repeat per
+        component and misreport the total. Both are refused here rather than
+        surprising downstream.
+        """
+        if not fyi:
+            return
+        if not np.isscalar(numbers):
+            raise ValueError(
+                f'DecL: an FYI premium requires a scalar {head} amount, '
+                f'not a vector (the premium would repeat across the '
+                f'exposure components and misreport the total)')
+        if not np.isscalar(fyi["exp_premium"]):
+            raise ValueError(
+                'DecL: an FYI premium must be a scalar, not a vector '
+                '(a vector premium would broadcast into extra components '
+                'and change the distribution)')
+
+    def fyi_premium_some(self, c):
+        # ``<amount> premium [as <label>]`` after a claims / loss head: the
+        # booked (informational) premium. Scalar-only, enforced by
+        # ``_check_fyi_premium`` in the head that receives it.
+        numbers, _premium, as_label = c
+        return {"exp_premium": numbers,
+                "_premium_label": as_label.get("label")}
+
+    def fyi_premium_none(self, c):
+        return {}
+
     def exposures_claims(self, c):
-        numbers, _claims, as_label = c
+        numbers, _claims, as_label, fyi = c
+        self._check_fyi_premium(numbers, fyi, 'claims')
         return {"exp_en": numbers,
-                "_exposure_label": as_label.get("label")}
+                "_exposure_label": as_label.get("label"),
+                **fyi}
 
     def exposures_loss(self, c):
-        numbers, _loss, as_label = c
+        numbers, _loss, as_label, fyi = c
+        self._check_fyi_premium(numbers, fyi, 'loss')
         return {"exp_el": numbers,
-                "_exposure_label": as_label.get("label")}
+                "_exposure_label": as_label.get("label"),
+                **fyi}
 
     def exposures_premium_lr(self, c):
         prem, _premium, as_label, _at, lr, _lr = c

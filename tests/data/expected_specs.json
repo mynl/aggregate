@@ -1764,6 +1764,44 @@
       "hints": ""
     }
   },
+  "agg F.Expos04   10 claims 600 premium sev lognorm 50 cv 0.8 poisson    note{claims sizing with an informational (FYI) premium}": {
+    "kind": "agg",
+    "name": "F.Expos04",
+    "spec": {
+      "name": "F.Expos04",
+      "exp_en": 10.0,
+      "exp_premium": 600.0,
+      "sev_name": "lognorm",
+      "sev_mean": 50.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "claims sizing with an informational (FYI) premium",
+      "hints": ""
+    }
+  },
+  "agg F.Expos05  500 loss 650 premium   sev lognorm 50 cv 0.8 poisson    note{loss sizing with an informational (FYI) premium}": {
+    "kind": "agg",
+    "name": "F.Expos05",
+    "spec": {
+      "name": "F.Expos05",
+      "exp_el": 500.0,
+      "exp_premium": 650.0,
+      "sev_name": "lognorm",
+      "sev_mean": 50.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "loss sizing with an informational (FYI) premium",
+      "hints": ""
+    }
+  },
   "agg G.Mixed00  1  claim  50 xs 0 sev lognorm 10 cv  [0.2 0.4 0.6 0.8 1.0]  wts  [.2 .3 .3 .15 .05]              poisson            note{no shared mixing}": {
     "kind": "agg",
     "name": "G.Mixed00",

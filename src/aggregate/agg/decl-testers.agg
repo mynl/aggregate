@@ -1195,3 +1195,24 @@ port UA.Port agg UA.PU1 250 claims sev lognorm 100 cv 1.5 poisson agg UA.PU2 dfr
 agg EA.BasicBook   250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson                                              note{the reference book: a per occurrence limit under an unbounded count};
 agg EA.BasicBookRe 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 occurrence net of 276 xs 55 poisson                  note{the same book reinsured};
 port EA.Basic agg EA.BasicA dfreq [1] sev gamma 100 cv 1 agg EA.BasicB dfreq [1] sev gamma 50 cv 0.8
+
+# ============================================================
+# FYI. Informational premium on the claims / loss heads (1.0.0a266)
+# ============================================================
+# [FYI-Premium-Exposure-Head]: `<count> claims <P> premium` and `<EL> loss
+# <P> premium` carry a booked premium alongside the sizing head. The head
+# sizes the law exactly as before; the premium is informational only: it
+# books exp_premium, the loss ratio back-fills from the realized expected
+# loss, and `pnl ... inherit premium` reads it. No `and` joins the clause
+# (comma is whitespace, so the comma spelling below is the same program).
+# FYI.Layered pins the disambiguation that matters: after the suffix, a
+# layers clause must still parse (premium vs xs anchors). FYI.Engine pins
+# the pnl interplay: the engine's FYI premium feeds `inherit premium`, and
+# the `premium less` divider is untouched. See tests/test_fyi_premium.py.
+agg FYI.ClaimsPrem 5 claims 20000 premium sev lognorm 100 cv 2 poisson                                              note{claims head with an informational premium};
+agg FYI.LossPrem 500 loss 650 premium sev lognorm 100 cv 2 poisson                                                  note{loss head with an informational premium};
+agg FYI.Comma 5 claims, 20000 premium sev lognorm 100 cv 2 poisson                                                  note{comma-as-whitespace spelling};
+agg FYI.Labeled 5 claims as counts 20000 premium as booked sev lognorm 100 cv 2 poisson                             note{both the head and the premium carry as labels};
+agg FYI.Quoted 500 loss 650 premium as "Booked Premium" sev lognorm 100 cv 2 poisson                                note{quoted premium label};
+agg FYI.Layered 5 claims 20000 premium 1000 xs 100 sev lognorm 100 cv 2 poisson                                     note{a layer after the suffix: xs vs premium disambiguates};
+pnl FYI.Engine inherit premium less agg FYI.EngineE 5 claims 20000 premium sev lognorm 100 cv 2 poisson             note{inherit premium reads the engine FYI premium}

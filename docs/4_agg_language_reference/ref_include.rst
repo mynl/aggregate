@@ -570,10 +570,32 @@
     // sits right after the amount/keyword unit (before ``at ... lr/rate``), the
     // natural reading spot -- see dev/plan-labels.md S1. AS is disjoint from AT and
     // from what follows a bare exposures clause, so the placement is Earley-safe.
-    exposures: numbers CLAIMS as_label                    -> exposures_claims
-             | numbers LOSS as_label                      -> exposures_loss
+    exposures: numbers CLAIMS as_label fyi_premium        -> exposures_claims
+             | numbers LOSS as_label fyi_premium          -> exposures_loss
              | numbers PREMIUM as_label AT numbers LR      -> exposures_premium_lr
              | numbers EXPOSURE as_label AT numbers RATE   -> exposures_exposure_rate
+    
+    // The optional informational premium suffix on the claims / loss sizing heads
+    // ([FYI-Premium-Exposure-Head], 1.0.0a266): ``5 claims 20000 premium`` or
+    // ``500 loss 650 premium``. The head sizes the distribution exactly as before;
+    // the premium is booked as ``exp_premium`` and never touches the law (the loss
+    // ratio back-fills from the realized expected loss in ``Aggregate.__init__``,
+    // and ``pnl ... inherit premium`` reads it). The ``years at rate`` renewal head
+    // established the informational-premium concept; this is the same idea on the
+    // ordinary heads. No ``and`` joins the clause: ``and`` in DecL combines terms
+    // into one item (reinsurance layers, expense terms, reinstatement groups) and
+    // nothing is combined here, while comma-as-whitespace already gives the natural
+    // reading ``5 claims, 20000 premium``. Earley-safe: PREMIUM anchors the clause,
+    // and the only competitor after a claims/loss head that begins with numbers is
+    // a layers clause, whose own anchor is XS. The premium-and-lr sizing head is
+    // unaffected (its AT has nowhere to go after a suffix, so ``5 claims 20000
+    // premium at .65 lr`` is a parse error, deliberately). Both amounts must be
+    // scalar, validated in the transformer: a vector here would broadcast into the
+    // component structure and change the law or misreport per-component premium,
+    // which an informational clause must never do. Its optional ``as`` label lands
+    // on the ``premium`` site of ``label_map``.
+    fyi_premium: numbers PREMIUM as_label   -> fyi_premium_some
+               |                            -> fyi_premium_none
     
     // Renewal (Sparre-Andersen) exposure head: ``T years`` sets the horizon; the
     // claim count comes solely from the paired ``wait``/``dwait`` clause (strict

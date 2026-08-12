@@ -608,6 +608,36 @@ component, an exposure band), can carry a human display label with
 They live in one place per object (``label``) with classless interior sites
 pooled into ``label_map``, reached through the ``labels`` namespace.
 
+FYI premium on the ``claims`` / ``loss`` heads (a266)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A sizing head can carry the booked premium alongside it: ``5 claims 20000
+premium`` sizes the count from the claims clause and books 20,000 as
+informational premium; ``500 loss 650 premium`` sizes from the loss pick and
+implies the 76.9% loss ratio. The head wins, exactly as if the suffix were
+absent, and the premium never touches the law; the loss ratio back-fills from
+the realized expected loss, the same reconciliation the sizing head ``premium
+at lr`` has always run, in the other direction. This is the natural spelling
+for a book rated one way and modeled another: quote sheets carry claim counts
+or loss picks plus a premium, and previously the premium had nowhere to go
+short of converting the head to ``premium at lr`` by hand.
+
+No ``and`` joins the clause. In DecL ``and`` combines terms into one item
+(reinsurance layers, expense terms) and nothing is combined here; since comma
+is whitespace, ``5 claims, 20000 premium`` reads naturally. Both amounts must
+be scalars: a vector would broadcast into the component structure and change
+the law or misreport per-component premium, which an informational clause must
+never do. The suffix takes its own ``as`` label (the ``premium`` site of
+``label_map``), and ``pnl … inherit premium`` reads the booked premium from an
+engine that carries one. The Sparre-Andersen renewal head ``T years at r rate``
+established the informational-premium concept; this extends it to the ordinary
+heads.
+
+.. ipython:: python
+
+    fyi = build('agg Fyi 5 claims 20000 premium sev lognorm 1000 cv 2 poisson')
+    qd(fyi.stats_df.loc[('meta', ['prem', 'lr']), 'mixed'])
+
 Better parse errors (a16)
 -------------------------
 

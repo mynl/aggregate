@@ -136,7 +136,9 @@ agg E.TSev18 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2  ! poisson          not
 # ===================
 agg F.Expos01   10 claims         sev lognorm 50 cv 0.8 poisson    note{specify number of claims};
 agg F.Expos02  500 loss           sev lognorm 50 cv 0.8 poisson    note{specify expected loss, derive number of claims};
-agg F.Expos03 1000 prem at .5 lr  sev lognorm 50 cv 0.8 poisson    note{specify premium and loss ratio, derive number of claims}
+agg F.Expos03 1000 prem at .5 lr  sev lognorm 50 cv 0.8 poisson    note{specify premium and loss ratio, derive number of claims};
+agg F.Expos04   10 claims 600 premium sev lognorm 50 cv 0.8 poisson    note{claims sizing with an informational (FYI) premium};
+agg F.Expos05  500 loss 650 premium   sev lognorm 50 cv 0.8 poisson    note{loss sizing with an informational (FYI) premium}
 
 # Mixed and Spliced severities
 # ============================

@@ -1863,7 +1863,13 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         :param name:            name of the aggregate
         :param exp_el:          expected loss or vector
-        :param exp_premium:     premium volume or vector  (requires loss ratio)
+        :param exp_premium:     premium volume or vector. With ``exp_lr`` it sizes
+                                the expected loss (``exp_el = exp_premium * exp_lr``);
+                                alone, alongside a ``claims`` or ``loss`` sizing
+                                head, it is informational (the DecL FYI premium,
+                                ``5 claims 20000 premium``): the loss ratio
+                                back-fills from the realized expected loss and
+                                the law is untouched.
         :param exp_lr:          loss ratio or vector  (requires premium)
         :param exp_en:          expected claim count per segment (self.n = total claim count)
         :param exp_attachment:  occurrence attachment; None indicates no limit clause, which is treated different

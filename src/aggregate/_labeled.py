@@ -16,8 +16,8 @@ The idea: a DecL program is a **tree** of named things, and each node carries
 * an optional **label** -- the private ``_label`` slot (the human string, the
   DecL ``as`` clause), read through the resolved :attr:`label` property, plus
 * interior **labels** -- ``label_map`` for the sub-object sites (exposure,
-  layer, inline severity clause, cessions) that have no Python class of their
-  own and so cannot hold their own ``_label``.
+  FYI premium, layer, inline severity clause, cessions) that have no Python
+  class of their own and so cannot hold their own ``_label``.
 
 Resolution is a chain that is **never blank**::
 

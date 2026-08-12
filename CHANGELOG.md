@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a266
+
+**[FYI-Premium-Exposure-Head] the claims and loss sizing heads carry an informational premium: `5 claims 20000 premium`, `500 loss 650 premium`.** The head sizes the law exactly as it did without the suffix; the premium books `exp_premium` and the loss ratio back-fills from the realized expected loss, landing in the `('meta', 'prem')` and `('meta', 'lr')` rows of `stats_df`. This is the natural spelling for a book rated one way and modeled another: a quote sheet carries a claim count or a loss pick plus a premium, and previously the premium had nowhere to go short of hand-converting the head to `premium at lr`. Author request, 2026-08-12.
+
+**The engine already knew how.** `Aggregate.__init__` has always reconciled in this order: claim count trumps loss, then a premium with no loss ratio back-fills the ratio from the realized expected loss (`if _pr > 0: _lr = _el / _pr`). `Aggregate(name, exp_en=5, exp_premium=20000)` worked before this change; the DecL surface was the only missing piece. The Sparre-Andersen renewal head `T years at r rate` established the informational-premium concept (a premium that never sizes the count); this extends it to the ordinary heads. Two free synergies fall out: `pnl … inherit premium` reads an engine's FYI premium, and the `@` / `*` builtin scaling operators already scale `exp_premium`.
+
+**Grammar: a new optional `fyi_premium` suffix on the claims and loss alternatives of `exposures`, and no new keywords.** No `and` joins the clause, a considered decision: `and` in DecL combines terms into one item (reinsurance layers in one cession, expense terms in one group, reinstatement groups) and nothing is combined here, while comma-as-whitespace already gives the natural reading `5 claims, 20000 premium`. Earley-safe: PREMIUM anchors the clause and the only competitor after a claims or loss head that begins with numbers is a layers clause, whose own anchor is XS (pinned by the ambiguity sweep over the new corpus lines). The sizing head `premium at lr` is untouched, and combining the two readings (`5 claims 20000 premium at .65 lr`) is a deliberate parse error at the `at`. Zero new terminals means nothing is owed to `_TERMINAL_LABELS`, the Pygments or Sublime colorers, or the web app's `decl-keywords.json`.
+
+**The invariant: an informational clause never changes the law.** Both amounts must be scalar, validated in the transformer with specific messages: a vector premium against a scalar head would broadcast into extra components and change the distribution; a scalar premium against a vector head would repeat per component and misreport the total. `test_fyi_premium.py` pins the invariant directly (`agg_density` identical with and without the suffix) alongside the reconciliation, the layer-clause disambiguation, the comma spelling, `inherit premium`, both refusals, and the writer round-trip.
+
+**Surface details.** The suffix takes its own `as` label, landing on the new `premium` site of `label_map` (an open dict; `_INTERIOR_LABEL_KEYS` gains `_premium_label`). The writer renders the suffix after the head (`5 claims 20000 premium as booked`, byte-exact round-trip); the premium *sizing* form is now detected by `exp_premium` together with `exp_lr` rather than `exp_premium` alone. A bivariate reuses the shared `exposures` production and `BivariateAggregate` already accepts `exp_premium`, so the suffix rides through it without special-casing.
+
+**Docs and corpus.** `features.rst` gains an [FYI premium] subsection under New DecL elements; the grammar reference regenerated; the `Aggregate.__init__` docstring for `exp_premium` no longer claims a loss ratio is required. Corpus: `_test_suite.agg` F.Expos04 / F.Expos05 (spec snapshot recaptured, purely additive), `decl-testers.agg` section FYI (seven stress lines including the pnl-engine interplay).
+
+---
+
 ## 1.0.0a265
 
 **[Allocation-Default-Linear] the pentagon surface honors `allocation_method`, and `ccoc` allocates on an unbounded book at a finite anchor.** Reported from the app's Pricing pane: Calibrate at `p < 1` on an unbounded book warned `analyze_distortions: skipping ccoc` and served an Allocate subtab with no `ccoc` row, while Calibrate and Evaluate both carried it. `dev/done/plan-fix-unbounded-ccoc.md`.

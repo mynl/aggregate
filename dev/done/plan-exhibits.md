@@ -1,5 +1,15 @@
 # Plan [Exhibits-Module]: business exhibits, stats frames to greater_tables IR
 
+> **Status: DONE, moved to `dev/done/` 2026-08-12.** Library phases 1 to 8
+> shipped `a200` to `a207`; phase 9, the app consolidation, landed by app
+> `a71` (the purist settlement: twelve leaves on the exhibit route, empty
+> `ROW_FLAGS`, the page-level raw and insurer switch). One deliberate
+> divergence from phase 9 as written: the frame routes did not retire, they
+> stayed as the raw and CSV api path by the `[Exhibits-App-Cleanup]` decision
+> recorded in the app's `dev/TODO.md`. The waterfall gate closed (decision 11
+> below). The pricing deferral in this plan was lifted 2026-08-12 by
+> `dev/plan-pricing-exhibits.md`, whose LIB half landed `a259` to `a263`.
+
 > **Release status: additive side project, does NOT gate `1.0.0b1`.** `aggregate.exhibits` ships marked **provisional in the sense of PEP 411**: public and encouraged, but not part of the 1.0 API contract, and free to change in a minor release with no deprecation period. Dependencies point inward (exhibits import the core, the core does not import exhibits), so nothing here touches an existing class and nothing here can delay the release: **1.0 ships whether or not this plan is finished.** Anything incomplete, in particular the `INSURED` / `REINSURER` perspectives and any exhibit meta-language, is explicitly post-1.0. Live items sit in the *Provisional modules* section of `dev/TODO.md`, outside the beta gate. Status recorded in the module docstrings, `docs/3_reference/3_x_API_Stability.rst`, and the `CHANGELOG.md` preamble.
 
 > **Status: REVISED 2026-08-05 after the author's review of the executed phases.** Phases 1 to 4a are SHIPPED (`1.0.0a200`, `a201`, `a203`; app `1.0.0a39`). This revision folds in the review decisions: the PnL frame rename, the package split, the economic exhibits including the waterfall, and the app's envelope-only consolidation. Purely additive to the core (exhibits import from core, core never imports exhibits), provisional at 1.0. Companion plan: `dev/plan-chart-ir.md`, executing in parallel. Both derive from the author's design notes on the aggregate to aLL (aggregate_api) interface.
@@ -148,7 +158,7 @@ The page shape is app content and authored, never derived from the library (see 
 
 Each tab carries both plots and exhibits. `more` holds the diagnostics: stats, validation, tail behavior, grid sizing. **The page takes a single raw / insurer switch at the top**, so the perspective is page level state and every exhibit on the page changes together. That works uniformly because INSURER is total by the default rule: every exhibit answers at both perspectives, whether or not it registers an override.
 
-Note for planning: `price/evaluate` has no exhibits to serve at 1.0. Pricing exhibits are deferred (see below), so that tab carries plots only until the upstream asks land.
+Note for planning: `price/evaluate` has no exhibits to serve at 1.0. Pricing exhibits are deferred (see below), so that tab carries plots only until the upstream asks land. *Update 2026-08-12: the deferral is over; the Pricing pane becomes three leaves (Calibrate, Allocate, Evaluate) served by three exhibits keyed on result objects, per `dev/plan-pricing-exhibits.md`.*
 
 The house rule holds throughout: never hide, gray out. A chip whose capability is absent renders grayed and disabled with an explanatory title.
 
@@ -184,7 +194,7 @@ Related and already true: an **aggregate** cover needs no joint at all (it is a 
 
 ## Explicitly deferred
 
-INSURED and REINSURER implementations (the reinsurer semantics review is that work's opening gate: does the reinsurer see Ceded relabeled as its gross, does Net render at all, does cede and assume swap on a P&L); the retro perspective; pricing exhibits, which are parameterized by distortion calibration and computed in POST routes and so do not fit the parameter free GET envelope, parked until the app's upstream asks land (a `density=` or `basis=` kwarg on `calibrate_distortions`, and a public `GridDistribution` export); bounds and `bs_window` beyond the simple passthrough; an exhibit meta language, to be extracted post 1.0 only if a declarative pattern emerges with the hand written exhibits as its test cases; narrative describe and explain chips; Sphinx pages beyond docstrings.
+INSURED and REINSURER implementations (the reinsurer semantics review is that work's opening gate: does the reinsurer see Ceded relabeled as its gross, does Net render at all, does cede and assume swap on a P&L); the retro perspective; pricing exhibits, which are parameterized by distortion calibration and computed in POST routes and so do not fit the parameter free GET envelope, parked until the app's upstream asks land (a `density=` or `basis=` kwarg on `calibrate_distortions`, and a public `GridDistribution` export) *(update 2026-08-12: unparked; both named blockers landed as `reins_view=` at a223, fixed a250, and the public `GridDistribution`, and the design is `dev/plan-pricing-exhibits.md`, exhibits keyed on result objects per `[Pricing-Keyed-On-Result]`)*; bounds and `bs_window` beyond the simple passthrough; an exhibit meta language, to be extracted post 1.0 only if a declarative pattern emerges with the hand written exhibits as its test cases; narrative describe and explain chips; Sphinx pages beyond docstrings.
 
 ## Decisions taken, second round (author, 2026-08-05)
 

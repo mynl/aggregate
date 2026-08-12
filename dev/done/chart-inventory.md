@@ -1,6 +1,6 @@
 # [Chart-Inventory]: every drawing, semantic vs incidental
 
-> **Status: drafted 2026-08-05, pending author review of the semantic vs incidental split.** Pass one of `dev/plan-chart-ir.md`. One row per drawing. Every column except the last is a semantic candidate (goes in the IR); the **incidental** column is the renderer's business and never enters the IR. Items marked **[J*n*]** are judgment calls collected in the numbered section at the end, with a recommendation each; the author's picks close this pass.
+> **Status: CLOSED, moved to `dev/done/` 2026-08-12.** Drafted 2026-08-05; the author's sign off on the semantic vs incidental split closed the same day, and the conversions it fed landed through `dev/plan-chart-ir.md` (pass one at `a197`, the eight emitters by `a244`). Kept as the record of what was judged semantic and why. Pass one of `dev/plan-chart-ir.md`. One row per drawing. Every column except the last is a semantic candidate (goes in the IR); the **incidental** column is the renderer's business and never enters the IR. Items marked **[J*n*]** are judgment calls collected in the numbered section at the end, with a recommendation each; the author's picks close this pass.
 
 Sources inspected: the 8 app charts (`aggregate_api/web/src/charts/exhibits.js`, `surface.js`, `theme.js`, plus the server serializers), every `plots/` layer-2 compositor, `pedagogy.py` (with `plot_twelve` per panel), and `ft.py`. Line anchors are as of aggregate 1.0.0a196 and aggregate_api a45-era working trees.
 

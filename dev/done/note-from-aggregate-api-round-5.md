@@ -1,5 +1,14 @@
 # Four asks from `aggregate_api`, round 5 (2026-08-09)
 
+> **Moved to `dev/done/` 2026-08-12 with one ask still open.** Asks 1 and 3
+> landed (`a246`/`a247`, `a248`), ask 2 closed by ruling. **Ask 4 (the `agg`
+> chart's anchor marks: density panel gains mean, 1-in-100 and 1-in-200, and
+> 1-in-250 comes off both panels) remains open at `a263`**: the emitter still
+> has `LEE_ANCHORS = (100, 250)`. Tracked in the worktrees `dev-files.md`,
+> "Getting to 1.0". The constants are shared with the pnl and portfolio
+> emitters, so their anchors move in the same edit, a widening to confirm
+> with the author.
+
 From the app side, for review and dispatch by whoever is working in this tree.
 All four came out of `aggregate_api`'s `dev/plan-ui-round-5.md`, where the app
 side of each is written up. Each is small; two of them **block** app phases,

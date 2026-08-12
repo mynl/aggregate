@@ -6,12 +6,12 @@ access). Each public method that previously returned an ``Answer``, an inline
 
 Currently defined:
 
-- ``AnalyzeDistortionResult`` — single-distortion pricing readout.
-- ``AnalyzeDistortionsResult`` — multi-distortion exhibit.
-- ``PricingResult`` — :meth:`Portfolio.price`.
-- ``CalibrationResult`` — :meth:`Aggregate.calibrate_distortions` and its
+- ``AnalyzeDistortionResult``: single-distortion pricing readout.
+- ``AnalyzeDistortionsResult``: multi-distortion exhibit.
+- ``PricingResult``: :meth:`Portfolio.price`.
+- ``CalibrationResult``: :meth:`Aggregate.calibrate_distortions` and its
   ``Portfolio`` twin.
-- ``EvaluationResult`` — :meth:`Aggregate.evaluate` and its ``Portfolio`` and
+- ``EvaluationResult``: :meth:`Aggregate.evaluate` and its ``Portfolio`` and
   ``PnL`` twins.
 
 Every result carries ``_source``, the object it was computed from, and borrows

@@ -397,8 +397,35 @@
   **Note items 1, 2, 3, 5 and 6 are all closed**; only item 4, the computed
   pricing exhibits, is open. Phase 7 struck,
   its bug fixed at a250. Phases 8 to 10, the Pricing pane redesign keyed on
-  result objects, wait on the design discussion, and with them the question of
-  whether `REINSURER` gets implemented.
+  result objects, are superseded as of 2026-08-12: the design discussion
+  happened and `dev/plan-pricing-exhibits.md` (canonical copy in the API repo,
+  symlinked here) carries the pricing leaves end to end, five LIB phases
+  (result objects, an unbounded anchor guard, an asset anchor on `evaluate`,
+  the octet on `reins_price_df`, the three `pricing.*` exhibits) then three
+  API phases. The `REINSURER` question stays deferred (INSURER drops the
+  `ceded` rows; the seller's reading waits). Bounds registration remains with
+  the official channels plan as its only open work.
+  **All five LIB phases landed 2026-08-12, a259 to a263**:
+  `[Pricing-Result-Objects]` a259 (`CalibrationResult` / `EvaluationResult`,
+  breaking return types, lazy allocation frames, `SourcedMixin`);
+  `[Unbounded-Anchor-Guard]` a260 (`p=1` refused on an unbounded risk at five
+  entry points); `[Evaluate-Asset-Anchor]` a261 (the round trip closes, `ccoc`
+  joins the anchored panel); `[Reins-View-Pricing]` a262 (`reins_price_df`
+  adopts the pentagon octet and drops `bid`, `reins_view=` on both pentagon
+  front doors, `lr=` on `calibrate_distortions`); `[Pricing-Exhibits]` a263
+  (the three `pricing.*` exhibits, exhibit count 12 to 15). Review notes and
+  the nine places the code and the plan disagree are in
+  `dev/plan-pricing-exhibits-LIB.md`. **Owed:** `dev/FEATURES.csv` regen once
+  the in-flight refresh lands, and the three API phases.
+  **Follow up from the first app-side use of the pane:**
+  `[Allocation-Default-Linear]` a265, `dev/done/plan-fix-unbounded-ccoc.md`.
+  The pentagon surface hardcoded `allocation='lifted'` and never read
+  `allocation_method`, so Calibrate at `p < 1` on an unbounded book served an
+  Allocate subtab with no `ccoc` row. All six call sites now resolve `None` to
+  the member. Per unit capital splits move on any default-path readout, which
+  is the a17 intent arriving late. **Owed on the API side:** re-pin
+  `test_pricing_exhibits.py::test_a_skipped_distortion_is_a_warning_and_not_a_failure`
+  and rewrite `run_calibration`'s docstring Notes, both after the sync.
 - **[Chart-IR]**: a minimal versioned chart IR in a new `aggregate/charts/`
   package (frozen dataclasses, no pydantic; ChartDoc/ChartSeries/ChartAxis/
   Panel/Mark), with the one generic mpl renderer at `plots/_chartdoc.py` and
@@ -414,7 +441,10 @@
   emitters. Emitters read the numerics-2 accessors (`unit_density_df`,
   `allocation_diagnostics`), never legacy `density_df` `p_<unit>` columns.
   Approved 2026-08-04, panel scope added 2026-08-05.
-  Plan: `dev/plan-chart-ir.md`. **Progress:** inventory landed a197
+  Plan: `dev/done/plan-chart-ir.md`, **closed to done 2026-08-12**: the 1.0
+  scope landed (eight app emitters by a244, first-class `.plot()` through
+  `plot_chartdoc`); the bivariate tail rides in `dev/plan-3d-plot.md` and the
+  remaining conversions are post-1.0 by the plan's own charter. **Progress:** inventory landed a197
   (`dev/chart-inventory.md`, six judgment calls awaiting author picks);
   schema v1 landed a198 (`charts/ir.py` plus `tests/test_charts_ir.py`,
   field list awaiting sign off; the charts boundary assertion lives in

@@ -31,11 +31,10 @@ they belong on this side of the wire (``dev/plan-pricing-exhibits.md``).
 
 import pandas as pd
 
-from ..pentagon import PENTAGON_STATS, complete_pentagon
+from ..pentagon import complete_pentagon
 from ..results import CalibrationResult, EvaluationResult
 from ._core import (
-    pricing_allocate, pricing_calibrate, pricing_evaluate,
-    register_simple_exhibit,
+    pricing_allocate, pricing_evaluate, register_simple_exhibit,
 )
 
 __all__ = [

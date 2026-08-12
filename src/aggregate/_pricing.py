@@ -20,7 +20,7 @@ import pandas as pd
 from .spectral import Distortion, DISTORTION_DTYPE, VALIDATION_NOISE
 from .pentagon import complete_pentagon, Pentagon
 from .constants import DegenerateEvaluationWarning
-from .results import CalibrationResult, EvaluationResult
+from .results import CalibrationResult
 
 # The standard pricing distortion set calibrated by ``calibrate_distortions``.
 DEFAULT_CALIBRATION_DISTORTIONS = ('ccoc', 'ph', 'wang', 'dual', 'tvar')

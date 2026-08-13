@@ -2128,6 +2128,114 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             index=pd.Index(self.axis_xs[0], name=self.unit_names[0]),
             columns=pd.Index(self.axis_xs[1], name=self.unit_names[1]))
 
+    def exeqa_df(self, axis=0):
+        r"""The kappa curve: conditional means given one axis, over its whole grid.
+
+        The bivariate answer to Portfolio's ``exeqa_*`` columns. Portfolio
+        computes ``E[X_i | X = x]`` by the FFT trick, which assumes the units
+        are independent; the two axes here are **dependent** by construction
+        (a shared claim count, a comonotone per-claim cession), so that route
+        is unavailable and the conditional mean comes straight out of the
+        joint: one matrix vector product per direction.
+
+        Parameters
+        ----------
+        axis : {0, 1}, default 0
+            The **conditioning** axis. ``0`` conditions on the axis-0 variable
+            and reports the conditional mean of axis 1; ``1`` is the transpose.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by the conditioning axis grid (index named for that axis).
+            Columns:
+
+            ``p``
+                The conditioning marginal mass at each grid point.
+            ``F``, ``S``
+                Its CDF and survival function, read through
+                :class:`~aggregate.GridDistribution` so the probability
+                vocabulary is the library's one implementation. Under a grid
+                deficit ``S`` ends at the deficit rather than at zero, which
+                is the honest reading of a truncated law.
+            ``exeqa_<conditioning axis>``
+                The identity ``E[X | X = x] = x``, carried so that a
+                decomposition check is a column subtraction (Portfolio carries
+                ``exeqa_total`` for the same reason).
+            ``exeqa_<other axis>``
+                The kappa curve ``E[Y | X = x]``.
+
+            Both ``exeqa`` columns are ``NaN`` where the conditioning row
+            carries no mass, with ``p`` saying why: a conditional expectation
+            given a null event has no value, and a zero filled there would be
+            read as one. The joint is de-fuzzed at construction
+            (:func:`_clip_density_fuzz`), so ``p > 0`` is an exact test rather
+            than a threshold.
+
+        Raises
+        ------
+        ValueError
+            If the object has not been updated, if ``axis`` is not 0 or 1, or
+            if the joint is disk backed (a massive update): every row of the
+            store would have to be read. Probe a disk backed joint pointwise
+            with :meth:`MassiveBivariateDistribution.slice` instead.
+
+        Notes
+        -----
+        **The arithmetic.** With joint mass ``d[i, j]`` on grids ``x``, ``y``,
+        the conditioning marginal is ``p_i = sum_j d[i, j]`` and the numerator
+        is ``num_i = sum_j y_j d[i, j]``, so ``kappa_i = num_i / p_i``. As a
+        matrix vector product that is ``d @ y`` against ``d.sum(1)``, and the
+        transpose for ``axis=1``. Reads the joint through the existing
+        accessors and adds no state.
+
+        **What it is exact about, and what it is not.** The mass weighted mean
+        of the kappa column reproduces the other axis's marginal mean to
+        floating point, because both are the same sum of ``y_j d[i, j]`` taken
+        in a different order. Pointwise the curve carries the rebucketing
+        scatter: :func:`scatter_bivariate` splits each per-claim point
+        bilinearly over up to four cells, which preserves **both** marginal
+        means exactly but smears a conditional one, so ``kappa`` at a single
+        grid point is accurate to the scatter rather than to the bit. Where
+        the cession lands on the joint lattice (a share cession on a discrete
+        severity, say) there is no split and the curve is exact.
+
+        **A netceded joint is the motivating case.** With views
+        ``('gross', 'ceded')`` this is the conditional ceded loss given the
+        gross outcome, the input to
+        :meth:`natural_allocation`. The third view follows by subtraction on
+        the index, since ``ceded + net = gross`` holds pointwise.
+        """
+        self._require_density()
+        if self.density is None:
+            raise ValueError(
+                'the joint density is disk-backed (massive update); the kappa '
+                'curve would read every row of the store. Probe pointwise '
+                'with self.bivariate.slice(x=...) instead.')
+        axis = int(axis)
+        if axis not in (0, 1):
+            raise ValueError(f'axis must be 0 or 1, not {axis!r}')
+
+        d = self.density
+        grid = self.axis_xs[axis]
+        other = self.axis_xs[1 - axis]
+        if axis == 0:
+            p, num = d.sum(axis=1), d @ other
+        else:
+            p, num = d.sum(axis=0), other @ d
+
+        self_name = self.unit_names[axis]
+        other_name = self.unit_names[1 - axis]
+        gd = GridDistribution(grid, p, bs=self.bs[axis], name=self_name)
+        live = p > 0
+        kappa = np.full(len(grid), np.nan)
+        kappa[live] = num[live] / p[live]
+        return pd.DataFrame(
+            {'p': p, 'F': gd.cdf(grid), 'S': gd.sf(grid),
+             f'exeqa_{self_name}': np.where(live, grid, np.nan),
+             f'exeqa_{other_name}': kappa},
+            index=pd.Index(grid, name=self_name))
+
     @property
     def stats_df(self):
         """Per-component marginal moments (theoretical vs empirical).

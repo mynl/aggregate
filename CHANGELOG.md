@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a273
+
+**[Bivariate-Exeqa] the kappa curve comes off the joint.** `BivariateAggregate.exeqa_df(axis=0)` returns the conditional mean of one axis given the other, over the whole conditioning grid: index the conditioning axis, columns `p`, `F`, `S`, `exeqa_<conditioning axis>` (the identity) and `exeqa_<other axis>` (the curve). It is one matrix vector product per direction, `d @ y` against `d.sum(1)`, and it adds no state.
+
+**Why it could not come from the existing machinery.** Portfolio computes `exeqa_*` by the FFT trick, which assumes its units are independent. The two axes of a netceded joint are dependent by construction, sharing a claim count and a comonotone per-claim cession, so that route is unavailable and the answer has to come out of the joint the library already builds. This is the piece phase 1 of `dev/done/plan-natural-allocation-to-occurrence-net-ceded.md` identified as missing; nothing in `bivariate.py` computed a conditional mean before.
+
+**What it is exact about.** The mass weighted mean of the kappa column reproduces the other axis's marginal mean to floating point, both being the same sum taken in a different order. Pointwise the curve carries the rebucketing scatter: `scatter_bivariate` splits each per-claim point bilinearly over up to four cells, which preserves both marginal means exactly but smears a conditional one. Measured on an ordinary excess layer at `bs=4`, the smear is **under one bucket** everywhere. Where the cession lands on the joint lattice there is no split and the curve is exact, which is the shape of the first test.
+
+**Zero-mass rows are `NaN`, not zero,** in both `exeqa` columns, with `p` saying why: a conditional expectation given a null event has no value. The joint is de-fuzzed at construction, so `p > 0` is an exact test rather than a threshold. A disk-backed (massive) joint is refused rather than read row by row, and pointed at `MassiveBivariateDistribution.slice`.
+
+`F` and `S` are read through `GridDistribution`, so the probability vocabulary stays the library's one implementation; under a grid deficit `S` ends at the deficit rather than at zero.
+
+New file `tests/test_bivariate_exeqa.py`, in the fast tier: a lattice-aligned share cession pins signs, axis order and grid alignment at once (exact to 1e-12); the continuous version is within a bucket; the mass weighted tie to the marginal holds at 1e-12; the pointwise value agrees with the normalized row read as a `GridDistribution`; and the two-joint decomposition `E[C | G] + E[N | G] = g`, taken across the `(gross, ceded)` and `(gross, net)` pairs built on one pinned `bs`, closes to within a bucket.
+
+**A correction to the plan, recorded rather than quietly fixed.** Its phase 1 test 4 asked that `exeqa_self + exeqa_other` equal the index. Under axis conditioning that is vacuous, `exeqa_self` being the index by definition; the wording came from Portfolio, where conditioning is on the **total** and the units genuinely sum to it. The two-joint form above is the statement that carries the intended content, and it is the one that shows the scatter.
+
 ## 1.0.0a272
 
 **[Picks-Robustness] infeasible picks warn instead of failing silently, and the picks debug audit checks `quad`'s error relatively.** Two hardening changes in `_picks_work`, surfaced by writing the picks illustration note. A layer loss pick below the full limit losses implied by the layers above it forces a negative adjustment weight, the adjusted survival function then increases across the layer, and the returned severity carries negative probabilities; that used to happen with no signal at all. Now a warning names the offending layers at the moment a weight goes negative, and a catch-all warning fires whenever the final adjusted density is negative anywhere by any route (interactions with the cap at one and the bottom layer rebuild included). The density is still returned so the caller can inspect it.

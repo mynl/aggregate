@@ -2236,6 +2236,188 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
              f'exeqa_{other_name}': kappa},
             index=pd.Index(grid, name=self_name))
 
+    def natural_allocation(self, distortion, P=None):
+        r"""Allocate a gross distorted premium to the occurrence ceded and net.
+
+        The decomposition that :func:`aggregate._reinsurance.reins_price_df`
+        deliberately does not attempt. That function prices gross, ceded and
+        net as three separate distributions, and says so: views are not a
+        decomposition, and gross less net is the cedent's allowance rather
+        than the reinsurer's price ([Difference-Is-A-Perspective]). This is
+        the third question, the one neither row answers. Given a premium for
+        the **gross** book, how much of it does each half of an occurrence
+        program earn, on one consistent basis, adding up.
+
+        Parameters
+        ----------
+        distortion : Distortion
+            An **already calibrated** distortion. Calibration is the caller's
+            choice and ``_pricing``'s business; nothing is calibrated here.
+        P : float, optional
+            The gross premium to split. Defaults to ``rho_g`` of the joint's
+            own gross marginal. See the Notes on why a caller supplied ``P``
+            is the usual call.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Rows ``gross`` / ``ceded`` / ``net`` (index named ``view``, the
+            :func:`aggregate._reinsurance.reins_price_df` vocabulary), columns
+            the pentagon octet
+            :data:`~aggregate.pentagon.PENTAGON_STATS`. ``L`` is the component
+            mean off the joint, ``P`` the allocated premium, ``M = P - L`` the
+            margin and ``LR = L / P``. There is no asset level in an
+            unallocated-capital reading, so ``a`` is infinite and ``Q``,
+            ``PQ`` and ``ROE`` are blank, exactly as an unlimited quote from
+            ``reins_price_df``.
+
+            Three diagnostics ride in ``.attrs``: ``rho_joint``, the risk
+            measure read on the joint's own gross marginal; ``rho_fine``, the
+            same measure on the source aggregate's fine 1-D gross density;
+            and ``rho_gap``, the distance between them.
+
+        Raises
+        ------
+        ValueError
+            If the object is not a ``netceded`` joint, if neither axis is the
+            ``gross`` view, or if it has not been updated.
+
+        Notes
+        -----
+        **Why this needs the joint at all.** An occurrence program splits
+        ``G = C + N`` claim by claim, so at the aggregate level ``N`` is *not*
+        a comonotone function of ``G``: the random claim count decouples them.
+        (Under an *aggregate* program it would be, and the split would be a
+        1-D calculation.) The natural allocation of a Choquet premium
+        ``rho_g(G) = P`` to the components is
+
+        .. math::
+
+            A_C = E[C\,g'(S_G(G))], \quad A_N = E[N\,g'(S_G(G))],
+            \quad A_C + A_N = P,
+
+        and conditioning on ``G`` reduces each to the kappa curve
+        :meth:`exeqa_df` puts on the joint.
+
+        **The increment form, which is why no derivative is evaluated.** On
+        the lattice the weights are the distorted atom masses
+        ``Delta_gS_i = g(S(g_{i-1})) - g(S(g_i))`` off the joint's own gross
+        marginal, so
+
+        .. math::
+
+            A_C = \sum_i \kappa_C(g_i)\,\Delta_gS_i.
+
+        That is the Lebesgue-Stieltjes statement directly: the usual
+        conditions on ``g'(S)`` do not arise, atoms are handled exactly, and
+        ``A_C + A_N`` equals ``rho_g`` of the marginal to floating point by
+        construction, because ``kappa_C + kappa_N`` is the identity. The
+        weights come from the one Choquet helper
+        (:func:`~aggregate.spectral.choquet_weights`), the same convention
+        :meth:`~aggregate.spectral.Distortion.price` uses, so the gross row
+        **is** that function's answer on the same grid.
+
+        **The calibration grid mismatch, and why the answer is a fraction.**
+        A distortion is calibrated on the aggregate's fine 1-D gross density.
+        The joint's gross marginal is a coarser rebucketed cousin carrying its
+        own deficit, so ``rho_g`` of it does not hit the calibrated ``P`` to
+        the bit. Rather than absorb that silently, the method computes
+        allocation **fractions** on the joint's grid and applies them to the
+        caller's ``P``. The fractions are robust to discretization and
+        additivity stays exact whatever ``P`` is. Both readings are then taken
+        and reported, ``rho_joint`` on the joint's marginal and ``rho_fine``
+        on the fine 1-D density, with ``rho_gap`` their difference: a large
+        gap says the joint's grid is too coarse to be pricing on, which is a
+        judgment for the caller rather than a silent correction here.
+
+        **The reading is unlimited.** With no asset level, a distortion
+        carrying a mass at zero (``ccoc``) puts essentially all its weight on
+        the largest outcome the grid happens to represent, so the gross
+        premium moves with ``log2`` rather than with the risk. That bites on
+        ordinary programs, an aggregate cession being unbounded whenever the
+        claim count is. The fractions are far steadier than the level, being
+        ratios on one grid, but pass a mass family through
+        :meth:`~aggregate.spectral.Distortion.price` at a finite ``a`` and
+        hand the result in as ``P`` if the level matters.
+
+        **What the third view costs.** Whichever of ceded or net is on the
+        joint's second axis is read from the kappa curve; the remaining view
+        is ``g`` less that curve, taken on the index. It is a definition
+        rather than a second measurement, which is what makes the rows foot
+        exactly. The two builds therefore agree only to the rebucketing
+        scatter, not to the bit.
+        """
+        from .pentagon import complete_pentagon
+        from .spectral import choquet_weights
+
+        # Structural refusals first, so an object of the wrong shape is told
+        # that rather than told to call update(); the same ordering
+        # ``reins_price_df`` uses for its no-cession case.
+        if self.mode != 'netceded':
+            raise ValueError(
+                f'natural_allocation needs a netceded joint (one aggregate '
+                f'split into two of gross / ceded / net); {self.name} is in '
+                f'{self.mode!r} mode. Allocating a dependent two unit total '
+                f'conditions on the total rather than on an axis, which is '
+                f'the deferred [Bivariate-Total-Exeqa] work.')
+        if 'gross' not in self._views:
+            raise ValueError(
+                f'natural_allocation conditions on the gross outcome, and '
+                f'{self.name} carries views {self._views}. Rebuild with '
+                f"views=('gross', 'ceded') or ('gross', 'net'); a "
+                f'(net, ceded) joint has no gross axis to condition on.')
+        self._require_density()
+
+        axis = self._views.index('gross')
+        other_view = self._views[1 - axis]
+        df = self.exeqa_df(axis=axis)
+        g = df.index.to_numpy(dtype=float)
+        p = df['p'].to_numpy()
+        # NaN off the support would poison the dot products; those rows carry
+        # zero distorted weight anyway (p_k = 0 makes T_k = S_k, so gp_k = 0),
+        # so zero is the arithmetically inert fill rather than a claim about
+        # a conditional expectation that has no value.
+        kappa = np.nan_to_num(
+            df[f'exeqa_{self.unit_names[1 - axis]}'].to_numpy(), nan=0.0)
+
+        # gross, ceded and net are all losses (a netceded axis carries no
+        # affine), so the value-type role is fixed and ask-of-loss is g itself.
+        gfn, _, _ = distortion.effective_g('ask', is_loss_value=True)
+        gp = choquet_weights(g, p, gfn, allow_deficit=True).gp
+
+        rho_joint = float(g @ gp)
+        if rho_joint <= 0:
+            raise ValueError(
+                f'{self.name} prices at {rho_joint:g} on the gross basis, so '
+                f'there are no shares to compute. A zero risk aggregate has '
+                f'nothing to allocate.')
+        rho_fine = float(distortion.price(
+            self._nc_agg._reins_view_density('gross'), kind='ask').ask)
+        premium = rho_joint if P is None else float(P)
+        # fractions on the joint's grid, applied to the caller's premium
+        share_other = float(kappa @ gp) / rho_joint
+        loss_total = float(g @ p)
+        loss_other = float(kappa @ p)
+
+        amounts = {
+            'gross': (loss_total, premium),
+            other_view: (loss_other, share_other * premium),
+        }
+        third = 'net' if other_view == 'ceded' else 'ceded'
+        amounts[third] = (loss_total - loss_other,
+                          (1.0 - share_other) * premium)
+
+        rows = [amounts[v] for v in ('gross', 'ceded', 'net')]
+        out = complete_pentagon(pd.DataFrame(
+            [[el, ask - el, ask, np.nan] for el, ask in rows],
+            columns=['L', 'M', 'P', 'Q'],
+            index=pd.Index(['gross', 'ceded', 'net'], name='view')))
+        out['a'] = np.inf
+        out.attrs['rho_joint'] = rho_joint
+        out.attrs['rho_fine'] = rho_fine
+        out.attrs['rho_gap'] = rho_joint - rho_fine
+        return out
+
     @property
     def stats_df(self):
         """Per-component marginal moments (theoretical vs empirical).

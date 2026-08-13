@@ -757,6 +757,20 @@
 
 ### Numerics & pricing core
 
+- **[Bivariate-Total-Exeqa]** (phase 3 of
+  `dev/done/plan-natural-allocation-to-occurrence-net-ceded.md`, deferred at
+  execution `1.0.0a273`/`a274`, **author gate**) — the generic conditional
+  mean for any bivariate: `E[X | X + Y = s]` and `E[Y | X + Y = s]` on the
+  **total's** own grid, as against `exeqa_df`'s conditioning on an axis. It
+  serves copula-mode pairs (allocating a dependent two-unit total, which no
+  Portfolio machinery can do), it is the same quantity the 3D surface's total
+  cut and kappa dots read client side today, and it would make the two-joint
+  additivity check of `tests/test_bivariate_exeqa.py` a single-object one.
+  Where the two axes share a `bs` the anti-diagonal is lattice aligned and the
+  sums are exact; where they differ, route value-weighted mass and plain mass
+  through `_scatter_1d` onto the total grid and take the ratio. Deferred
+  because the netceded ask does not need it; recorded because it unifies three
+  consumers and should be designed once.
 - **[Massive-Kappa-Second-Sweep]** (from `[PnL-Punchups-01]`, `1.0.0a134`) — bring
   the kappa scenario percentiles to the massive one-sweep P&L route.
   Conditioning needs the joint per atom *and* the grand-result quantiles before

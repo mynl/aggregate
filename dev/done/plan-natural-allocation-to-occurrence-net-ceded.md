@@ -1,8 +1,16 @@
 # Plan [NetCeded-Natural-Allocation]: allocate a gross premium to occurrence ceded and net
 
-> **Status: DRAFT for author review, 2026-08-11.** Written up from the author's
-> specification in the oversight session of the same day; nothing is
-> implemented. Line anchors are as of `1.0.0a249`.
+> **Status: EXECUTED 2026-08-13.** Phase 1 [Bivariate-Exeqa] at `1.0.0a273`,
+> phase 2 [NetCeded-Natural-Allocation] at `1.0.0a274`. Phase 3
+> [Bivariate-Total-Exeqa] stays deferred behind its author gate and is now
+> tracked in `dev/TODO.md` under "Numerics & pricing core". The plan text below
+> is the design as approved; the execution notes at the foot record what the
+> code does where it differs, with reasons. Read them before working on either
+> method.
+>
+> Drafted 2026-08-11 from the author's specification in the oversight session
+> of the same day; line anchors in the audit table are as of `1.0.0a249` and
+> have all moved, though nothing structural changed.
 
 > **Release status: additive.** Two new methods on `BivariateAggregate`, which
 > is in the 1.0 stable list; nothing existing changes behavior. Does not gate
@@ -160,3 +168,98 @@ the CHANGELOG section as the real description, `dev/FEATURES.csv` regenerated
 to pick up the new members, and NumPy docstrings with the why in Notes. On
 landing, move this plan to `dev/done/` and tick the `dev/TODO.md` entry the
 author files for it.
+
+## Execution notes, 2026-08-13
+
+Everything above stands as designed. What follows is what the shipped code
+does where it departs from the text, and the two measurements that decide how
+the tests are written. Nine items.
+
+**1. One defect in the plan, corrected. Phase 1 test 4 as written is
+vacuous.** It asks that `exeqa_self + exeqa_other` equal the index. Under axis
+conditioning `exeqa_self` **is** the index by definition, so the statement
+reduces to `exeqa_other == 0`. The wording came across from Portfolio, where
+conditioning is on the **total** and the units genuinely sum to it. The
+statement that carries the intended content is taken across two joints:
+`E[C | G = g] + E[N | G = g] = g`, with the `(gross, ceded)` and
+`(gross, net)` pairs built at one pinned `bs` so their gross grids coincide.
+That is the version shipped, and it is the one that actually exposes the
+rebucketing scatter the plan wanted reported. Phase 3
+[Bivariate-Total-Exeqa] would make it a single-object check.
+
+**2. `slice` is on `MassiveBivariateDistribution` only,** not on the dense
+`BivariateDistribution` an in-core joint hands back, so phase 1 test 3 as
+written cannot run on the object under test. The shipped test takes the same
+route `slice` takes (read the row, normalize, hand it to a
+`GridDistribution`) against the in-core joint. Adding `slice` to the dense
+container would have closed the gap and was declined as out of scope. The
+audit table's "exists, insufficient" verdict is right about the capability
+and imprecise about where it lives.
+
+**3. Exactness measured, and the tests follow the measurement.** Phase 1 test
+1 claims a share cession gives `kappa_C(g) = g/2` **exactly**. True only when
+the cession lands on the joint lattice. On `dfreq [3] dsev [2:20:2]` with
+`50% po inf xs 0` at `bs=1` the bilinear scatter never splits and the error is
+`1.8e-15`; on the same cession with a continuous severity the scatter smears
+and the error is real. The smear is an **absolute** quantity of order `bs`, so
+both it and the two-joint check above are asserted in **buckets** (measured:
+0.67 and 0.19 of a bucket respectively). A relative tolerance looks terrible
+near the origin, which is the one place a bucket of error does not matter.
+
+**4. Column names are the real unit names, not the literal `exeqa_self`.**
+`exeqa_<conditioning axis>` and `exeqa_<other axis>`, so on a netceded joint
+they read `exeqa_Gross` / `exeqa_Ceded`. This mirrors Portfolio exactly, whose
+`exeqa_total` is a real unit name and not a keyword, and it means two frames
+from different conditioning directions can be joined without collision.
+
+**5. `natural_allocation` accepts any netceded joint carrying a gross axis,**
+not only `('gross', 'ceded')`. `('gross', 'net')` works (the kappa curve is
+then the net one and ceded follows by subtraction), and gross on axis 1 works.
+It costs one `index` call and makes `grossnet` a first-class input. Refused:
+`('net', 'ceded')`, which has no gross axis to condition on, and copula mode,
+which wants phase 3. Both refusals name what to do instead.
+
+**6. The returned frame is the pentagon octet, not a bespoke `L / P / M / LR`.**
+`reins_price_df` moved to `PENTAGON_STATS` at `a262`, after this plan was
+written, and these two tables sit beside each other on a screen. The frame
+goes through `complete_pentagon` with `Q = NaN`, so `a` is infinite and `Q`,
+`PQ` and `ROE` are blank: the same convention `reins_price_df` uses for an
+unlimited quote, and `L`, `M`, `P`, `LR` are populated exactly as planned.
+
+**7. `rho_gap` is the gap between the two `rho_g` readings, as the plan says,
+and it does not move with `P`.** The method always takes both readings:
+`rho_joint` on the joint's gross marginal and `rho_fine` on the source
+aggregate's fine 1-D gross density, with `rho_gap = rho_joint - rho_fine`. All
+three ride in `.attrs`. `P` still defaults to `rho_joint`, which is what makes
+the plan's phase 2 test 4 (the gross row ties to `Distortion.price` on the
+joint's marginal) true. Measured on the plan's own example at `bs=4`, the gap
+is 2e-3 relative under `ph 0.7` and smaller under the others.
+
+**8. Two behaviors documented rather than engineered away.** Under a grid
+deficit the identity distortion prices **above** the mean, by
+`deficit * top_value`, because `choquet_weights` runs forwards and parks
+unrepresented mass at the largest represented outcome. The plan's phase 2 test
+1 ("the identity distortion recovers the component means") is therefore run on
+a lattice discrete program with no deficit, and a second test pins the parked
+quantity on the deficit-carrying one so the difference is never mistaken for
+an allocation error. Separately, the reading is unlimited, so a mass
+distortion (`ccoc`) on an unbounded support charges the top grid bucket; the
+docstring says so and points at passing a finite-`a` price in as `P`. The
+fractions, being ratios on one grid, are far steadier than the level.
+
+**9. Structural refusals come before `_require_density`,** the ordering
+`reins_price_df` uses and states ("after the structural refusal, so an object
+with no cession is told that rather than told about its tail"). A caller
+holding the wrong kind of object is told so without first spending a 2-D FFT
+to find out.
+
+**Reuse, for the record.** Nothing here reimplements existing machinery:
+`choquet_weights` for the increments, `Distortion.effective_g` for the view
+and value-type resolution, `GridDistribution` for `F` / `S`,
+`complete_pentagon` for the octet, and `exeqa_df` itself for the curve.
+
+**Tests** are `tests/test_bivariate_exeqa.py` (10 cases) and
+`tests/test_natural_allocation.py` (20 cases), both in the **fast** tier: the
+programs are small and the joint grids pinned, which is where a correctness
+check belongs. The three existing bivariate suites are `slow` at module level
+and new work should not disappear into them.

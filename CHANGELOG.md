@@ -20,6 +20,24 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a271
+
+**[Chart-Marks-Mean-Only] the percentile lines come off every chart, and the mean stays.** A mark is a line the document asserts permanently, and after this exactly two readings earn one: the mean, on the mass panel of `agg`, `port` and `pnl`, and break even at zero, in both panels of `pnl`. Everything marked at a return period is gone. `agg` loses the full-weight 1-in-200 from its density panel and the faint 1-in-100 and 1-in-250 from its Lee panel, `port` loses the 1-in-200 from both of its panels, `pnl` loses the two faint Lee anchors. `CAPITAL_ANCHOR` and `LEE_ANCHORS` are deleted from `charts/_emit_aggregate.py` and the two emitters that imported them follow.
+
+**The reading arrived somewhere better, which is the whole argument.** A percentile is a point on a curve the chart already draws, and a reader who wants it hovers: the app's readout strip writes every series value at the hovered coordinate, and a return-period axis prints there as `1-in-N`. A permanent dashed vertical asserting the same number costs a label collision rule, a side rule, a faint weight and a place in every punch up round, and returns a number that pointing at the curve gives for free. The mean and break even stay because neither is a point a hover can reach: the mean is a property of the whole distribution rather than of any coordinate, and zero is where the sign of a signed outcome changes.
+
+**What it costs, recorded rather than discovered later.** The full-weight 1-in-200 goes with the rest, and on the `port` kappa panel that line had a reading attached: read up from capital and each unit's share there is its share of the loss. That reading is now a hover on the kappa curves. The `agg` Lee panel and the `port` kappa panel are left carrying no marks at all, and nothing replaces them. The change is purely subtractive: no emitter gains a mark anywhere.
+
+**`CHART_IR_VERSION` stays 2**, by the rule the constant documents. Emitting fewer instances of a record every reader already handles is not a field a reader must act on, not a changed meaning and not a removal. Every two-panel document's hash does move, so ETags keyed on `agg`, `port` and `pnl` invalidate once, and that case is named explicitly as not qualifying.
+
+**The mechanism is untouched.** `Mark`, `ChartDoc.marks` and `MARK_ROLES` are as they were, `'capital_anchor'` included: that tuple documents what a mark *may* say, not what the shipped emitters happen to say, and a future reader wanting an anchor should find the word already spelled. `Mark.faint` stays a field, set by no shipped emitter now, because removing a field is the one edit here that would have moved the IR version; its docstring loses the anchor example. The matplotlib compositor loops `doc.marks` generically and simply draws fewer lines, and the app draws what it is served, so the lines leave the browser with no app-side deletion at all. `tail_periods_df` keeps its `tail` exhibit caller and stays public, and `exhibits._core.CAPITAL_ANCHOR_PERIODS` is untouched: the tail **table** has room for both rows where a panel does not.
+
+**A negative guard, `tests/test_chart_marks.py`,** holds over every registered chart on a built `agg`, `port` and `pnl` at once: no mark carries `role='capital_anchor'`, no role outside `{'mean', 'break_even'}` appears, and the mean is marked once where it is drawn. A guard rather than three edited tests alone, because the anchors could otherwise come back one emitter at a time. The `agg` rendered baseline is regenerated on the pinned matplotlib 3.10.9; `distortion.png` is unaffected, that chart emitting no marks.
+
+**Supersedes round 5 ask 4** (author, 2026-08-10), which asked the density panel to carry mean, 1-in-100 and 1-in-200 with only 1-in-250 coming off. It was never executed, so there is nothing to unwind.
+
+Plan: `dev/done/plan-no-reference-lines.md`, canonical in the API repo. The app half is one tooltip and two stale comments, and lands there.
+
 ## 1.0.0a270
 
 **[Derived-Premium] `derive premium`, the fourth premium head: the engine premium grossed up for the expense clause.** `inherit premium` copies the engine's technical premium T, and the `less` clause then deducts expenses from it, so the expenses eat the risk load. `derive premium` reads T as a technical, risk loaded premium and books the unique gross premium whose own expenses leave exactly T behind: with fixed expense total F and premium expense ratio total r, `P = (T + F) / (1 - r)`. Multiple fixed terms add; multiple premium ratios add, combined ratio style; grouping and `as` labels change nothing. The expected underwriting result then carries the engine risk load and nothing else. This automates the hand written gross up the a268 paren arithmetic entry used as its motivating case, `(100_000/(1-.25)) premium`, and folds the fixed expense numerator in besides.

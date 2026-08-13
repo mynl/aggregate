@@ -33,16 +33,6 @@ from .ir import ChartAxis, ChartDoc, ChartSeries, Mark, Panel, complete_tex
 
 __all__ = ['chart_agg']
 
-#: The return period marked on the density panel, in full weight. The
-#: Solvency II standard, and the one number a reader looks for.
-CAPITAL_ANCHOR = 200
-
-#: The return periods marked faintly on the Lee panel, either side of the
-#: one above: the US capital-adequacy and rating standard, and the round
-#: number underneath it. Faint because they are a scale to read the panel
-#: against rather than an answer.
-LEE_ANCHORS = (100, 250)
-
 #: How far above the aggregate's own peak the severity companion may reach
 #: and still set the ordinate window. A severity peaks at its own small
 #: losses, and on a long-tailed book that peak is orders of magnitude above
@@ -215,16 +205,8 @@ def _agg(agg, xmax=None):
     ordinate_top = (max(peak, sev_peak)
                     if sev_peak <= COMPANION_HEADROOM * peak else peak)
 
-    anchors = agg.tail_periods_df(periods=[CAPITAL_ANCHOR, *LEE_ANCHORS])
     marks = [Mark(panel_id='density', orient='v', at=float(agg.est_m),
-                  label='mean', role='mean'),
-             Mark(panel_id='density', orient='v',
-                  at=float(anchors.loc[CAPITAL_ANCHOR, 'VaR']),
-                  label=f'1-in-{CAPITAL_ANCHOR}', role='capital_anchor')]
-    marks += [Mark(panel_id='lee', orient='v',
-                   at=float(anchors.loc[t, 'p']), label=f'1-in-{t}',
-                   role='capital_anchor', faint=True)
-              for t in LEE_ANCHORS]
+                  label='mean', role='mean')]
 
     return outcome_doc(
         'agg', str(agg.label),

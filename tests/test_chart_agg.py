@@ -21,9 +21,7 @@ from aggregate.charts import (  # noqa: E402
     available_charts, build_chart_doc, chart_agg, human_strings,
     primary_chart,
 )
-from aggregate.charts._emit_aggregate import (  # noqa: E402
-    CAPITAL_ANCHOR, COMPANION_HEADROOM, LEE_ANCHORS,
-)
+from aggregate.charts._emit_aggregate import COMPANION_HEADROOM  # noqa: E402
 
 _CONT = 'agg CA.Cont 100 claims sev lognorm 50 cv 2 poisson'
 _DICE = 'agg CA.Dice dfreq [3] dsev [1:6]'
@@ -165,16 +163,17 @@ def test_the_lee_curve_is_trimmed_at_the_saturating_top(dice):
 
 
 def test_marks_carry_their_reading(cont):
-    doc = chart_agg(cont)
-    marks = {(m.panel_id, m.label): m for m in doc.marks}
-    assert marks[('density', 'mean')].at == pytest.approx(cont.est_m)
-    anchor = marks[('density', f'1-in-{CAPITAL_ANCHOR}')]
-    assert anchor.at == pytest.approx(cont.q(1 - 1 / CAPITAL_ANCHOR))
-    assert anchor.role == 'capital_anchor' and not anchor.faint
-    for t in LEE_ANCHORS:
-        faint = marks[('lee', f'1-in-{t}')]
-        assert faint.at == pytest.approx(1 - 1 / t)
-        assert faint.faint
+    """The mean, and nothing else.
+
+    A percentile is a point on the drawn curve, so a reader who wants one
+    hovers and reads it off the strip; the mean is a property of the whole
+    distribution and is the one reading a hover cannot give.
+    """
+    (mark,) = chart_agg(cont).marks
+    assert (mark.panel_id, mark.label, mark.role) == ('density', 'mean',
+                                                      'mean')
+    assert mark.at == pytest.approx(cont.est_m)
+    assert not mark.faint
 
 
 def test_xmax_is_a_semantic_option(cont):

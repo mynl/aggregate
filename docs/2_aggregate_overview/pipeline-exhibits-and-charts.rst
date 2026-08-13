@@ -249,25 +249,25 @@ Panel by panel
      - ``outcome``, Loss, currency, linear or log, window ``q(0.001) or 0 .. q(0.999)`` padded 2%, full is the whole grid
      - ``mass``, Probability mass, density, linear or log, ``(0, peak)``, no zoom-out
      - Aggregate and Severity, role ``density``, atomic
-     - mean, 1-in-200, both full weight
+     - mean, full weight
      - log x, log y, full x
    * - ``agg`` / lee
      - ``p``, Non-exceeding probability, ``(0, 1)``, paired with ``return_period`` (log, ``1 .. 1e9``) and with ``survival``, Exceeding probability, linear or log, ``(0, 1)``
      - ``outcome``, shared with the density panel
      - Aggregate and Severity, role ``cdf``
-     - 1-in-100 and 1-in-250, faint
+     - none
      - log y, full y, reflect, return period, invert to "Distribution function"
    * - ``port`` / density
      - ``outcome``, Loss, currency, linear or log, window, full
      - ``mass``, linear or log, ``(0, top)``
      - one per unit (role ``unit``) then Total (role ``total``) last, so the book draws on top; each on its own native grid
-     - mean, 1-in-200
+     - mean
      - log x, log y, full x
    * - ``port`` / kappa
      - ``outcome``, shared
      - ``kappa``, ``E[Xi | X = x]``, currency, linear or log, window is the loss window, full to the last kept point
      - the same names again, role ``unit`` or ``total``, support continuous; the Total curve **is** the diagonal
-     - 1-in-200, faint
+     - none
      - log x, log y, full x, full y; ``aspect='equal'`` is semantic
    * - ``pnl`` / density
      - ``outcome``, P&L, currency, **linear only** (signed), window not anchored at 0, full
@@ -279,7 +279,7 @@ Panel by panel
      - ``p``, paired with ``return_period`` and ``survival``
      - ``outcome``, shared, linear only, full
      - the same series, role ``cdf``
-     - break even (horizontal), 1-in-100 and 1-in-250 faint
+     - break even (horizontal)
      - full y, reflect, return period, invert
    * - ``severity`` / density
      - ``loss``, currency, linear or log, ``0 .. isf(0.001)`` padded, full

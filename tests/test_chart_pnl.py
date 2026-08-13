@@ -18,7 +18,6 @@ from aggregate import build  # noqa: E402
 from aggregate.charts import (  # noqa: E402
     available_charts, chart_pnl, human_strings, primary_chart,
 )
-from aggregate.charts._emit_aggregate import LEE_ANCHORS  # noqa: E402
 
 _PNL = ('pnl CP.Book 1000 premium less agg CP.Loss 100 claims '
         'sev lognorm 5 cv 2 poisson')
@@ -63,12 +62,12 @@ def test_a_signed_axis_offers_no_log_reading(pnl):
 
 
 def test_the_adverse_tail_is_the_low_one(pnl):
-    """So the return period is 1 / p, not 1 / (1 - p)."""
-    doc = chart_pnl(pnl)
-    assert doc.meta['return_period_map'] == 'reciprocal'
-    marks = {m.label: m for m in doc.marks if m.role == 'capital_anchor'}
-    for t in LEE_ANCHORS:
-        assert marks[f'1-in-{t}'].at == pytest.approx(1 / t)
+    """So the return period is 1 / p, not 1 / (1 - p).
+
+    The declaration is the whole of it: what the map does to the drawn
+    probabilities is the reflect test below.
+    """
+    assert chart_pnl(pnl).meta['return_period_map'] == 'reciprocal'
 
 
 def test_reflecting_a_signed_chart_reads_the_upside_tail(pnl):
@@ -126,12 +125,6 @@ def test_the_readings_render(pnl):
     density, lee = rp.axes
     assert lee.get_xscale() == 'log'
     assert density.get_xscale() == 'linear'            # signed, so untouched
-    # the anchors travel with the reading: p = 1/T back to T
-    verticals = [ln.get_xdata()[0] for ln in lee.get_lines()
-                 if len(set(ln.get_xdata())) == 1 and np.isfinite(
-                     ln.get_xdata()[0])]
-    for t in LEE_ANCHORS:
-        assert any(v == pytest.approx(float(t)) for v in verticals)
     plt.close('all')
 
 

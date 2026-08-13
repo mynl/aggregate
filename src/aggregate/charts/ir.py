@@ -932,9 +932,10 @@ class Mark:
     role : str, optional
         One of :data:`MARK_ROLES` (open vocabulary).
     faint : bool
-        A de-emphasized mark (the paired capital anchors on the tail
-        panel) versus a full-weight one (the mean). Semantic emphasis, not
-        a color choice.
+        A de-emphasized mark, drawn as a scale to read the panel against
+        rather than as an answer, versus a full-weight one (the mean).
+        Semantic emphasis, not a color choice. No shipped emitter sets it
+        at present, and a reader must still honor it.
 
     .. versionadded:: 1.0
        Provisional, in the sense of PEP 411: not part of the 1.0 API

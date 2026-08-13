@@ -102,9 +102,9 @@ def _severity(sev, n=GRID_POINTS):
     probabilities, so the curve is the pair the grid was computed from
     rather than an accumulation of it.
 
-    No marks: a severity chart carries no mean line and no capital anchors,
-    because neither is a severity question (the app draws none either, and
-    the inventory records the omission as deliberate).
+    No marks: a severity chart carries no mean line, because the mean of a
+    severity is not what a severity chart is asked (the app draws none
+    either, and the inventory records the omission as deliberate).
     """
     loss = _quantile_grid(sev, n)
     if loss.size == 0:

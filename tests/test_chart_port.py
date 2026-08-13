@@ -24,7 +24,6 @@ from aggregate.charts import (  # noqa: E402
 from aggregate.charts._emit_portfolio import (  # noqa: E402
     KAPPA_FLOOR, KAPPA_LABEL, TOTAL_NAME,
 )
-from aggregate.charts._emit_aggregate import CAPITAL_ANCHOR  # noqa: E402
 
 _PORT = ('port CX.P agg A 50 claims sev lognorm 50 cv 1.5 poisson '
          'agg B 30 claims sev lognorm 40 cv 1.2 poisson')
@@ -119,13 +118,15 @@ def test_units_are_named_by_their_resolved_label(port):
     assert names == {'A', 'B', TOTAL_NAME}
 
 
-def test_the_capital_anchor_is_on_both_panels(port):
-    doc = chart_port(port)
-    anchors = [m for m in doc.marks if m.role == 'capital_anchor']
-    assert {m.panel_id for m in anchors} == {'density', 'kappa'}
-    assert all(m.at == pytest.approx(port.q(1 - 1 / CAPITAL_ANCHOR))
-               for m in anchors)
-    assert [m for m in doc.marks if m.role == 'mean']
+def test_the_mean_is_the_only_mark(port):
+    """The kappa panel carries none, and nothing replaces the anchor.
+
+    Reading each unit's share at capital is a hover on the kappa curves
+    now, not a line the document asserts.
+    """
+    (mark,) = chart_port(port).marks
+    assert (mark.panel_id, mark.role) == ('density', 'mean')
+    assert mark.at == pytest.approx(port.est_m)
 
 
 def test_tex_is_total(port):

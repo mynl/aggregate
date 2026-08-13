@@ -28,7 +28,7 @@ Pure numpy and pandas; no matplotlib.
 
 from .._pnl import PnL
 from . import register_chart, _emitter_base
-from ._emit_aggregate import CAPITAL_ANCHOR, LEE_ANCHORS, outcome_doc
+from ._emit_aggregate import outcome_doc
 from ._two_panel import loss_window
 from .ir import Mark
 
@@ -61,26 +61,20 @@ def _pnl(pnl):
 
     Notes
     -----
-    The marks are the reading. Break even at zero sits in both panels, the
-    mean beside it on the density panel, and the 1-in-100 and 1-in-250 sit
-    faintly on the Lee panel at the probabilities that name them, which for
-    a payoff are ``1 / T`` rather than ``1 - 1 / T``. Ask for the
-    return-period reading and they land on 100 and 250 exactly, because the
-    document says which map takes them there.
+    The marks are the reading. Break even at zero sits in both panels,
+    vertical where the outcome is on x and horizontal where it is on y,
+    with the mean beside it on the density panel. Neither is a point on
+    the curve a reader can hover for: zero is where the sign of the result
+    changes and the mean is a property of the whole distribution.
     """
     gd = pnl.result
     x, mass = gd.x, gd.p
-    anchors = pnl.tail_periods_df(periods=list(LEE_ANCHORS))
     marks = [Mark(panel_id='density', orient='v', at=0.0,
                   label='break even', role='break_even'),
              Mark(panel_id='lee', orient='h', at=0.0,
                   label='break even', role='break_even'),
              Mark(panel_id='density', orient='v', at=float(gd.mean()),
                   label='mean', role='mean')]
-    marks += [Mark(panel_id='lee', orient='v',
-                   at=float(anchors.loc[t, 'p']), label=f'1-in-{t}',
-                   role='capital_anchor', faint=True)
-              for t in LEE_ANCHORS]
     return outcome_doc(
         'pnl', str(pnl.label), (str(pnl.result_name), x, mass),
         window=loss_window(gd.q, float(x[0])),

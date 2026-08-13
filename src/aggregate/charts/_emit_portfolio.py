@@ -42,7 +42,7 @@ import numpy as np
 
 from .._portfolio import Portfolio
 from . import register_chart, _emitter_base
-from ._emit_aggregate import CAPITAL_ANCHOR, COMPANION_HEADROOM
+from ._emit_aggregate import COMPANION_HEADROOM
 from ._payload import collapse_empty_runs, lattice_payload
 from ._two_panel import loss_window
 from .ir import ChartAxis, ChartDoc, ChartSeries, Mark, Panel, complete_tex
@@ -153,7 +153,6 @@ def _port(port, xmax=None):
     tallest = max(peaks) if peaks else peak
     ordinate_top = (max(peak, tallest)
                     if tallest <= COMPANION_HEADROOM * peak else peak)
-    anchor = float(port.q(1 - 1 / CAPITAL_ANCHOR))
 
     return complete_tex(ChartDoc(
         name='port',
@@ -193,14 +192,6 @@ def _port(port, xmax=None):
         marks=(
             Mark(panel_id='density', orient='v', at=float(port.est_m),
                  label='mean', role='mean'),
-            Mark(panel_id='density', orient='v', at=anchor,
-                 label=f'1-in-{CAPITAL_ANCHOR}', role='capital_anchor'),
-            # On the kappa panel the same line is the natural allocation at
-            # capital: read up from it and each unit's share is its share of
-            # the total loss there.
-            Mark(panel_id='kappa', orient='v', at=anchor,
-                 label=f'1-in-{CAPITAL_ANCHOR}', role='capital_anchor',
-                 faint=True),
         ),
         meta={'ordinate': 'mass', 'kappa_floor': KAPPA_FLOOR,
               'return_period_map': 'complement'},

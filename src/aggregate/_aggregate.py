@@ -190,6 +190,16 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
 
     is true.
 
+    Infeasible picks (a target below the full-limit losses implied by the
+    layers above it) produce a negative adjustment weight and hence negative
+    adjusted probabilities. That is reported with a ``logger.warning`` naming
+    the offending layers, and a second catch-all warning fires whenever the
+    final adjusted density carries negative probabilities by any route. The
+    adjusted density is still returned so the caller can inspect it. In debug
+    mode the exact layer statistics check ``quad``'s error estimate relative
+    to the integral's value, not absolutely, since the estimate grows with
+    the integration range.
+
     :param attachments: array of layer attachment points, in ascending order (bottom to top). a[0]>0
     :param layer_loss_picks: Target means. If ``len(layer_loss_picks)==len(attachments)`` then the bottom layer, 0 to a[0],
       is added. Can be input as unconditional layer severity (i.e., :math:`\\mathbb{E}[(X-a)^+\\wedge y]`) or as the
@@ -263,6 +273,16 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
         layers.loc[i, 'ω'] = ω
         ω += layers.loc[i, 'p'] * layers.loc[i, 'w']
 
+    # a negative weight means the pick cannot be reached by scaling the
+    # in-layer part of the curve: the target is below the full-limit losses
+    # ω y implied by the layers above, the adjusted survival function
+    # increases across the layer, and the density goes negative
+    infeasible = layers.index[layers['w'] < 0].tolist()
+    if infeasible:
+        logger.warning(f'Infeasible picks: negative adjustment weight in layer(s) {infeasible}. '
+                       'The pick is below the full-limit losses implied by the layers above it, '
+                       'so the adjusted severity has negative probabilities. Revise the picks.')
+
     # adjusted S: bins -> layer number; add in offsets
     density['bin'] = pd.cut(density.x, np.hstack((0, layers.a.values)), include_lowest=True, right=True)
     # layer description returned by cut to layer number in layers
@@ -303,6 +323,14 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
 
     density['diff S'] = density['S'] - density['Sa']
 
+    # catch-all for any route to a negative density (the weight warning above
+    # names the cause when a single pick is at fault; interactions with the
+    # cap at 1 or the bottom-layer rebuild can also drive p_adj negative)
+    min_p_adj = density['p_adj'].min()
+    if min_p_adj < -1e-10:
+        logger.warning(f'Adjusted severity has negative probabilities (min {min_p_adj:.6g}): '
+                       'the layer loss picks are mutually infeasible. Revise the picks.')
+
     if debug is False:
         return density['p_adj'].values
 
@@ -314,8 +342,12 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
                              index=range(1, 1+len(attachments)), dtype=float)
         for i, x in enumerate(attachments):
             ix = quad(sf, 0, x)
-            # check error is small
-            assert ix[1] < 1e-6
+            # quad reports an absolute error estimate. Over a wide range the
+            # estimate can exceed any fixed absolute tolerance while the
+            # integral itself is large and accurate, so test the error
+            # relative to the value.
+            assert ix[1] < 1e-6 * max(ix[0], 1e-12), \
+                f'quad relative error {ix[1] / max(ix[0], 1e-12):.3g} too large integrating sf to {x}'
             sf_ = sf(x)
             exact.loc[i+1, :] = [x, ix[0], x * sf_ if x < np.inf else 0.0, sf_]
 

@@ -20,6 +20,14 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a272
+
+**[Picks-Robustness] infeasible picks warn instead of failing silently, and the picks debug audit checks `quad`'s error relatively.** Two hardening changes in `_picks_work`, surfaced by writing the picks illustration note. A layer loss pick below the full limit losses implied by the layers above it forces a negative adjustment weight, the adjusted survival function then increases across the layer, and the returned severity carries negative probabilities; that used to happen with no signal at all. Now a warning names the offending layers at the moment a weight goes negative, and a catch-all warning fires whenever the final adjusted density is negative anywhere by any route (interactions with the cap at one and the bottom layer rebuild included). The density is still returned so the caller can inspect it.
+
+**The debug path asserted `quad`'s absolute error estimate below a fixed `1e-6`.** The estimate grows with the integration range while the answer stays accurate, so `Aggregate.picks(..., debug=True)` raised `AssertionError` on ordinary curves (a lognormal mean 500 cv 2 integrated to 10,000, for instance). The check is now relative to the integral's value.
+
+New tests in `tests/test_picks.py`: feasible picks are hit exactly on the grid, the debug audit runs on the case that used to raise, and infeasible picks warn and still return the (negative) density.
+
 ## 1.0.0a271
 
 **[Chart-Marks-Mean-Only] the percentile lines come off every chart, and the mean stays.** A mark is a line the document asserts permanently, and after this exactly two readings earn one: the mean, on the mass panel of `agg`, `port` and `pnl`, and break even at zero, in both panels of `pnl`. Everything marked at a return period is gone. `agg` loses the full-weight 1-in-200 from its density panel and the faint 1-in-100 and 1-in-250 from its Lee panel, `port` loses the 1-in-200 from both of its panels, `pnl` loses the two faint Lee anchors. `CAPITAL_ANCHOR` and `LEE_ANCHORS` are deleted from `charts/_emit_aggregate.py` and the two emitters that imported them follow.

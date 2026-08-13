@@ -38,9 +38,9 @@ NOTED = CLEAN.replace('DP.Clean', 'DP.Noted') + ' note{a stored note}'
 HINTED = MOVES.replace('DP.Moves', 'DP.Hinted') + ' hints{bs=1/32; padding=2}'
 BOTH = (MOVES.replace('DP.Moves', 'DP.Both')
         + ' note{a stored note} hints{bs=1/32; padding=2}')
-# An engine that states its own premium, so the P&L inherits rather than sizes.
+# An engine that states its own premium, so the P&L derives rather than sizes.
 PREMIUM = 'agg DP.Premium 1000 premium at 0.65 lr sev lognorm 100 cv 2 poisson'
-# The same, stated to the cent: an inherited premium is never re-rounded.
+# The same, stated to the cent: a derived premium is never re-rounded.
 ODD_PREMIUM = ('agg DP.OddPremium 1000.125 premium at 0.65 lr '
                'sev lognorm 100 cv 2 poisson')
 # Already ceded on both tiers, to check a cession replaces its own tier only.
@@ -258,14 +258,19 @@ def test_sharpen_program_is_empty_without_a_program():
 
 # ----------------------------------------------------------- pnl_program
 
-def test_pnl_program_inherits_an_engine_premium():
-    """The engine states a premium, so the P&L copies it and loss_ratio is unused."""
+def test_pnl_program_derives_an_engine_premium():
+    """The engine states a premium, so the P&L grosses it up and loss_ratio is unused.
+
+    ``derive premium`` since 1.0.0a270: the engine's 1000 is technical, and the
+    default 0.25 premium expense clause grosses it to 1000 / 0.75, so premium
+    net of expenses returns the technical premium exactly.
+    """
     a = build(PREMIUM)
     program = a.pnl_program(loss_ratio=0.4)
-    assert 'inherit premium' in program
+    assert 'derive premium' in program
     p = build(program)
     assert p.name == 'DP.Premium_PnL'
-    assert _booked_premium(p) == pytest.approx(1000.0)
+    assert _booked_premium(p) == pytest.approx(1000.0 / 0.75)
 
 
 def test_pnl_program_sizes_the_premium_from_the_loss_ratio():
@@ -307,12 +312,19 @@ def test_consideration_rounding_is_idempotent():
         assert _round_consideration(once) == once
 
 
-def test_pnl_program_does_not_round_an_inherited_premium():
-    """An inherited premium is a number the program already stated."""
+def test_pnl_program_does_not_round_a_derived_premium():
+    """A derived premium starts from the number the program already stated.
+
+    With no expense clause the derivation is the identity, so the booked
+    premium is the stated 1000.125 to the cent; with the default 0.25 clause
+    it is that number grossed up, still unrounded.
+    """
     a = build(ODD_PREMIUM)
-    assert 'inherit premium' in a.pnl_program(loss_ratio=0.65)
-    p = build(a.pnl_program(loss_ratio=0.65))
+    assert 'derive premium' in a.pnl_program(loss_ratio=0.65)
+    p = build(a.pnl_program(loss_ratio=0.65, expense_ratio=0))
     assert _booked_premium(p) == pytest.approx(1000.125)
+    p = build(a.pnl_program(loss_ratio=0.65))
+    assert _booked_premium(p) == pytest.approx(1000.125 / 0.75)
 
 
 def test_pnl_program_zero_expense_ratio_omits_the_clause():

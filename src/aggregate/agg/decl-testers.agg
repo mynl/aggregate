@@ -1238,3 +1238,19 @@ agg PA.Freq 10 claims dsev [1] binomial (0.2 + 0.3)                             
 agg PA.Range dfreq [(1+0):(3*2)] dsev [1]                                                                           note{a computed range: the six dice outcomes};
 agg PA.Reins 5 claims 1000 xs 0 sev lognorm 100 cv 2 occurrence net of (100*2) xs (50 + 50) poisson                  note{a computed reinsurance layer};
 agg PA.Vector dfreq [1] dsev [1 -2]                                                                                 note{brackets are unchanged: a glued minus keeps the two element list}
+
+# ============================================================
+# DRV. Derived premium (1.0.0a270)
+# ============================================================
+# [Derived-Premium]: `derive premium` reads the engine's technical premium T
+# as risk loaded and grosses it up for the `less` clause expenses, P = (T +
+# fixed total) / (1 - premium ratio total), so premium net of expenses returns
+# exactly T. Fixed and premium bases only: a loss basis expense, an engine
+# without premium, and premium ratios totalling one or more are build errors.
+# An expense free head is legal and equals `inherit premium`. See
+# tests/test_pnl_derive_premium.py and dev/plan-derived-premium.md.
+pnl DRV.Worked derive premium less agg DRV.WorkedE 100 premium at 0.65 lr sev lognorm 50 cv 0.8 poisson less 10 fixed expense as "App Fee" 2 fixed expense as "Admin fee" 5% premium expense as "TLF" 15% premium expense as "Commission" 7% premium expense as "G&A"   note{the worked example: P = (100 + 12) / (1 - 0.27)};
+pnl DRV.NoExp derive premium less agg DRV.NoExpE 100 premium at 0.65 lr sev lognorm 50 cv 0.8 poisson                                     note{no expense clause: the derivation is the identity, P = T};
+pnl DRV.Multi derive premium as "Booked" less agg DRV.MultiE 100 premium at 0.65 lr sev lognorm 50 cv 0.8 poisson less 5% premium expense and 20% premium expense and 12 fixed expense   note{and joined terms accumulate, combined ratio style, with a labeled head};
+pnl DRV.Port derive premium less port DRV.PortB agg DRV.U1 50 premium at 0.5 lr sev lognorm 20 cv 0.6 poisson agg DRV.U2 50 premium at 0.5 lr sev lognorm 30 cv 0.9 poisson less 20% premium expenses   note{the accumulated portfolio premium grosses up, parallel to inherit};
+xpnl DRV.Walk derive premium less agg DRV.WalkE 100 premium at 0.65 lr sev lognorm 50 cv 0.8 occurrence net of 30 xs 30 deposit 5 poisson less 25% premium expenses   note{the walk shares the premium head, so it derives too}

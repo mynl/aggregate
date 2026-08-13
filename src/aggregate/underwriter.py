@@ -22,7 +22,8 @@ from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .spectral import Distortion
 from .constants import IgnoredDecLClauseWarning, ZeroPremiumCessionWarning
-from .parser import UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM
+from .parser import (UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM,
+                     DERIVE_PREMIUM)
 from .recipe import Recipe
 from .utilities import (qd, agg_help)
 
@@ -1183,6 +1184,12 @@ class Underwriter(HelpMixin):
             # build error if the agg engine carries no premium (decision 3).
             if consideration is INHERIT_PREMIUM:
                 consideration = self._inherit_agg_premium(name, spec)
+            # ``derive premium``: the inherited technical premium grossed up
+            # for the ``less`` clause expenses, resolved here so downstream
+            # economics (ceded premium rates) see the derived gross.
+            elif consideration is DERIVE_PREMIUM:
+                consideration = self._derive_agg_premium(name, spec,
+                                                         expense_spec)
             # Reinstatement schedule (stochastic ceded premium): pop before the
             # inner Aggregate is built (it is not a loss-structure key) and use it
             # below to attach a ReinstatementTerms.
@@ -1950,6 +1957,29 @@ class Underwriter(HelpMixin):
                 "'<amount> premium' instead.")
         return total
 
+    @staticmethod
+    def _derive_agg_premium(name, spec, expense_spec):
+        """Resolve ``derive premium`` for an agg engine: the grossed up premium.
+
+        Reads the technical premium T exactly as :meth:`_inherit_agg_premium`
+        does (the merged ``exp_premium``, a build error if the engine carries
+        none), then delegates the gross up to
+        :func:`aggregate._pnl_builders.derive_consideration`:
+        ``(T + fixed expenses) / (1 - premium expense ratios)``, so premium
+        net of expenses returns exactly T.
+        """
+        from ._pnl_builders import derive_consideration
+        prem = spec.get('exp_premium', None)
+        total = (float(np.sum(np.asarray(prem, dtype=float)))
+                 if prem is not None else 0.0)
+        if not total:
+            raise ValueError(
+                f"{name}: 'derive premium' but the wrapped engine has no "
+                "premium to gross up. It needs a 'premium at lr' exposure (or "
+                "a stored agg / port carrying premium); give an explicit "
+                "'<amount> premium' instead.")
+        return derive_consideration(expense_spec, total, name)
+
     def _build_pnl_from_port(self, name, port_spec, consideration, expense_spec,
                              consideration_label, loss_label, is_tower, program,
                              trailer_meta=None):
@@ -2022,7 +2052,8 @@ class Underwriter(HelpMixin):
                                     build_xpnl_walk, build_xpnl_peel,
                                     build_variable_pnl,
                                     build_reinstatement_pnl,
-                                    build_reinstatement_source)
+                                    build_reinstatement_source,
+                                    derive_consideration)
         kind = recipe['kind']
         if kind == 'port_plain':
             # ``inner`` is an updated Portfolio; wrap its net-net total loss as
@@ -2038,6 +2069,18 @@ class Underwriter(HelpMixin):
                         "no 'premium at lr' exposure). Give an explicit "
                         "'<amount> premium'.")
                 consideration = prem
+            elif consideration is DERIVE_PREMIUM:
+                # The port twin of ``_derive_agg_premium``: the accumulated
+                # portfolio premium grossed up for the ``less`` clause.
+                prem = float(getattr(inner, 'exp_premium', 0.0) or 0.0)
+                if not prem:
+                    raise ValueError(
+                        f"{inner.name}: 'derive premium' but the wrapped "
+                        "portfolio has no accumulated premium (its units carry "
+                        "no 'premium at lr' exposure). Give an explicit "
+                        "'<amount> premium'.")
+                consideration = derive_consideration(
+                    recipe.get('expense_spec'), prem, inner.name)
             dd = inner.density_df
             source = (dd.index.values, dd['p_total'].values)
             loss_label = recipe.get('loss_label') or inner.name

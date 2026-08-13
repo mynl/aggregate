@@ -923,7 +923,7 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
     way it is cosmetic --- discarded at build --- but must stay a valid
     identifier.
     """
-    from .parser import INHERIT_PREMIUM
+    from .parser import INHERIT_PREMIUM, DERIVE_PREMIUM
     retro = spec.get('retro_terms')
     consideration = spec.get('consideration')
     if retro is not None:
@@ -932,6 +932,10 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
         # ``inherit premium`` -- copy the engine's technical premium; the sentinel
         # never renders as a number.
         premium_head = 'inherit premium'
+    elif consideration is DERIVE_PREMIUM:
+        # ``derive premium``: the engine premium grossed up for the ``less``
+        # clause expenses; the sentinel never renders as a number.
+        premium_head = 'derive premium'
     else:
         premium_head = f'{_fmt_seq(consideration)} premium'
     premium_head += _render_label(spec.get('consideration_label'))

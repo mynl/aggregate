@@ -264,7 +264,7 @@ class AggLexer(RegexLexer):
             (words(
                 ('occurrence', 'aggregate', 'distortion', 'exposure', 'tweedie',
                  'premium', 'tower', 'picks', 'prem', 'pnl', 'xpnl', 'peel',
-                 'inherit',
+                 'inherit', 'derive',
                  'bivariate', 'bv', 'clash', 'copula',
                  'netceded', 'grossceded', 'grossnet',
                  'approximate', 'approx', 'ssev', 'splice',

@@ -1835,6 +1835,40 @@ The LAE row has the same CV and skew as the Loss row because it *is* the loss,
 scaled. The expense row has zero SD. That separation is the point: a single Total
 hides which legs carry risk and which merely carry cost.
 
+Derived premium (a270)
+~~~~~~~~~~~~~~~~~~~~~~
+
+``derive premium`` is the fourth premium head, the expense-aware sibling of
+``inherit premium``. The engine's technical premium T is read as risk loaded,
+and the head grosses it up for the ``less`` clause: with fixed expense total F
+and premium expense ratio total r, the derived premium is
+:math:`P = (T + F) / (1 - r)`, the unique premium whose own expenses leave
+exactly T behind. Multiple fixed terms add, multiple premium ratios add,
+combined ratio style, and grouping and labels change nothing. The expected
+underwriting result then carries the engine risk load and nothing else, which
+is the reading a technical premium asks for. Before a268's paren arithmetic
+the gross up had to be written by hand, ``(100_000/(1-.25)) premium``; now the
+head does it from the expenses the program already states.
+
+Three refusals, all build errors that name the fix: a **loss basis** expense
+(losses are not reliably known by inspection, so the gross up is undefined),
+an engine with **no premium** (nothing to derive from, the inherit error's
+twin), and premium ratios totalling **one or more** (no finite premium). An
+expense-free head is legal and equals ``inherit premium``. Port engines
+derive from their accumulated premium, exactly as they inherit.
+
+.. ipython:: python
+
+    drv = build('pnl Derived derive premium less agg Derived_e '
+                '100 premium at 65% lr sev lognorm 50 cv 0.8 poisson '
+                'less 12 fixed expense and 27% premium expense')
+    qd(drv.economic_df)
+
+The premium books :math:`(100 + 12)/0.73 = 153.42`; take its expenses back
+off and the 100 of technical premium remains. ``pnl_program`` writes this
+head since a270 whenever the engine carries premium, so a derived program's
+expected result is the risk load rather than the load short of expenses.
+
 ``pnl`` and ``xpnl``: the net view and the walk (a136)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

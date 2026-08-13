@@ -178,8 +178,12 @@ agg_source: AGG name as_label agg_body   -> agg_source_inline
 // account-level retrospective-rating clause ``retro <collar> premium``. The
 // trailing ``premium`` keeps the ``premium less`` divider. See
 // dev/plan-variable-rating.md and dev/plan-pnl-engine-source.md.
+// ``derive premium`` grosses the inherited premium up for the ``less`` clause
+// expenses, P = (T + fixed total) / (1 - premium ratio total); fixed and
+// premium bases only, resolved at build (dev/plan-derived-premium.md).
 pnl_premium: numbers PREMIUM as_label        -> pnl_premium_fixed
            | INHERIT PREMIUM as_label         -> pnl_premium_inherit
+           | DERIVE PREMIUM as_label          -> pnl_premium_derive
            | RETRO collar PREMIUM as_label   -> pnl_premium_retro
 
 // The optional second-``less`` expense clause (the hard anchor). Omit when no
@@ -765,6 +769,7 @@ PNL.2:        /pnl(?![a-zA-Z0-9._:~\-])/
 XPNL.2:       /xpnl(?![a-zA-Z0-9._:~\-])/
 PEEL.2:       /peel(?![a-zA-Z0-9._:~\-])/
 INHERIT.2:    /inherit(?![a-zA-Z0-9._:~\-])/
+DERIVE.2:     /derive(?![a-zA-Z0-9._:~\-])/
 PORT.2:       /port(?![a-zA-Z0-9._:~\-])/
 RATE.2:       /rate(?![a-zA-Z0-9._:~\-])/
 NET.2:        /net(?![a-zA-Z0-9._:~\-])/
@@ -840,7 +845,7 @@ NUMBER.2: /-?(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

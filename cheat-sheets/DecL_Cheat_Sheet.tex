@@ -269,9 +269,10 @@ A priced layer is \texttt{LAYER <PREMIUM*> <CEDE*> <REINSTATEMENTS*> <VARIABLE*>
 \node [mybox] (box){\begin{minipage}{0.3\textwidth}\raggedright
 \texttt{<AMOUNT> premium <LABEL*>} \\
 \texttt{inherit premium <LABEL*>} \\
+\texttt{derive premium <LABEL*>} \\
 \texttt{retro <COLLAR> premium <LABEL*>}
 
-\medskip\it The premium is the \rm consideration\it{} (what you book); the engine's own \texttt{premium at lr} is a separate \rm sizing\it{} input. \texttt{inherit} copies the engine's technical premium (a build error if it has none). \texttt{retro} is the account-level retrospective-rating clause, taking the same \texttt{basic ... lcm ... min ... max} collar as \texttt{swing}.
+\medskip\it The premium is the \rm consideration\it{} (what you book); the engine's own \texttt{premium at lr} is a separate \rm sizing\it{} input. \texttt{inherit} copies the engine's technical premium (a build error if it has none). \texttt{derive} grosses it up for the expense clause, $P = (T + \text{fixed}) / (1 - \text{premium ratios})$, so premium net of expenses returns exactly $T$; fixed and premium bases only. \texttt{retro} is the account-level retrospective-rating clause, taking the same \texttt{basic ... lcm ... min ... max} collar as \texttt{swing}.
 
 \medskip\rm\texttt{pnl P inherit premium as "gross written" less agg.Book}
 \end{minipage}};

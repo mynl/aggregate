@@ -57,7 +57,7 @@ from .parser_errors import format_error
 logger = logging.getLogger(__name__)
 
 __all__ = ['UnderwritingLexer', 'UnderwritingParser', 'grammar',
-           'INHERIT_PREMIUM']
+           'INHERIT_PREMIUM', 'DERIVE_PREMIUM']
 
 GRAMMAR_FILE = Path(__file__).parent / "decl.lark"
 
@@ -138,6 +138,28 @@ class _InheritPremium:
 
 #: Singleton :class:`_InheritPremium` sentinel (see :meth:`pnl_premium_inherit`).
 INHERIT_PREMIUM = _InheritPremium()
+
+
+class _DerivePremium:
+    """Sentinel for ``derive premium``: the engine premium grossed up for expenses.
+
+    A ``pnl``/``xpnl`` premium head of ``derive premium`` records this sentinel
+    as the consideration at parse time; the underwriter resolves it after the
+    engine is built. With engine premium T, fixed expense total F and premium
+    expense ratio total r from the ``less`` clause, the derived premium is
+    ``(T + F) / (1 - r)``, so premium net of expenses returns exactly T. The
+    engine having no premium, any loss basis expense, and r at or above one
+    are build errors.
+    """
+
+    __slots__ = ()
+
+    def __repr__(self):
+        return "DERIVE_PREMIUM"
+
+
+#: Singleton :class:`_DerivePremium` sentinel (see :meth:`pnl_premium_derive`).
+DERIVE_PREMIUM = _DerivePremium()
 
 
 # ======================================================================
@@ -684,7 +706,7 @@ class UnderwritingTransformer(Transformer):
         ----------
         spec : dict
             The pnl spec (mutated in place).
-        premium : float, list, or INHERIT_PREMIUM
+        premium : float, list, INHERIT_PREMIUM, or DERIVE_PREMIUM
             The stated premium, recorded as ``consideration``.
         """
         spec["consideration"] = premium
@@ -839,6 +861,23 @@ class UnderwritingTransformer(Transformer):
         """
         _inherit, _prem, as_label = c
         head = {'_premium': INHERIT_PREMIUM}
+        if 'label' in as_label:
+            head['_label'] = as_label['label']
+        return head
+
+    def pnl_premium_derive(self, c):
+        """``derive premium [as <label>]``: the engine premium grossed up for expenses.
+
+        Resolution is deferred to the factory exactly as ``inherit premium``:
+        the head carries the :data:`DERIVE_PREMIUM` sentinel, and the
+        underwriter reads the engine's technical premium T and the ``less``
+        clause, giving ``(T + fixed total) / (1 - premium ratio total)``.
+        Fixed and premium expense bases only; a loss basis expense, an engine
+        without premium, and premium ratios totalling one or more are build
+        errors.
+        """
+        _derive, _prem, as_label = c
+        head = {'_premium': DERIVE_PREMIUM}
         if 'label' in as_label:
             head['_label'] = as_label['label']
         return head

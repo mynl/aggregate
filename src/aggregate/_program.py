@@ -594,49 +594,54 @@ def sharpen_program(ob):
 
 
 def _pnl_consideration(ob, loss_ratio, caller):
-    """Resolve the P&L premium: inherit it, or size it from the loss ratio.
+    """Resolve the P&L premium: derive it, or size it from the loss ratio.
 
     Parameters
     ----------
     ob : Aggregate or Portfolio
         The engine.
     loss_ratio : float
-        Target loss ratio, used only when there is no premium to inherit.
+        Target loss ratio, used only when the engine has no premium.
     caller : str
         Name of the calling member, for the messages.
 
     Returns
     -------
-    INHERIT_PREMIUM or float
+    DERIVE_PREMIUM or float
         The sentinel when the engine carries a technical premium, so the
-        program says ``inherit premium`` and the number is resolved at build;
-        otherwise expected loss divided by ``loss_ratio``, rounded by
-        :func:`_round_consideration`.
+        program says ``derive premium`` and the gross up for the expense
+        clause is resolved at build; otherwise expected loss divided by
+        ``loss_ratio``, rounded by :func:`_round_consideration`.
 
     Raises
     ------
     ValueError
-        When there is no premium to inherit, and either ``loss_ratio`` is zero
+        When the engine has no premium, and either ``loss_ratio`` is zero
         or the object has not been updated so its expected loss is unknown.
 
     Notes
     -----
+    ``derive premium`` rather than ``inherit premium`` since 1.0.0a270: the
+    engine premium is read as technical, so the wrapping P&L grosses it up
+    for the expense clause the program writes, and premium net of expenses
+    returns the technical premium exactly.
+
     Expected loss is the **empirical** mean ``est_m``, read off the computed
     density rather than from the analytic moments, so the P&L's realized loss
     ratio answers the one asked for rather than the analytic approximation to
     it. The rounding then moves it by at most half a currency unit on the
     premium, which is the price of a program a reader can keep.
     """
-    from .parser import INHERIT_PREMIUM
+    from .parser import DERIVE_PREMIUM
     premium = getattr(ob, 'exp_premium', 0.0)
     total = (0.0 if premium is None
              else float(np.sum(np.asarray(premium, dtype=float))))
     if total:
-        return INHERIT_PREMIUM
+        return DERIVE_PREMIUM
     if not loss_ratio:
         raise ValueError(
             f"{caller}: {getattr(ob, 'name', ob)!r} carries no premium to "
-            "inherit (its exposure is stated as claims or loss), so the "
+            "derive from (its exposure is stated as claims or loss), so the "
             "premium has to be sized from loss_ratio, and loss_ratio is "
             f"{loss_ratio!r}. Give a positive loss ratio.")
     e_loss = float(getattr(ob, 'est_m', 0.0) or 0.0)
@@ -702,9 +707,9 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
     loss_ratio : float, default 0.70
         Sizes the premium as expected loss divided by this, and **only** when
         the engine has no premium of its own. An engine declared with a
-        ``premium at lr`` exposure always inherits its own, and this is then
-        unused. A convention rather than a fact, which is why it sits in the
-        signature where the docstring puts it in front of you.
+        ``premium at lr`` exposure always derives from its own, and this is
+        then unused. A convention rather than a fact, which is why it sits in
+        the signature where the docstring puts it in front of you.
     expense_ratio : float, default 0.25
         Gross expense as a fraction of premium. ``0`` omits the expense clause
         rather than writing a zero.
@@ -746,7 +751,7 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
     >>> a = build('agg PnlProgEx 1000 premium at 0.65 lr '
     ...           'sev lognorm 100 cv 1 poisson')
     >>> print(a.pnl_program())
-    pnl PnlProgEx_PnL inherit premium less
+    pnl PnlProgEx_PnL derive premium less
       agg PnlProgEx
         1000 premium at 0.65 lr
         sev lognorm 100 cv 1

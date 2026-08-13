@@ -197,6 +197,71 @@ def resolve_expense(agg, expense_spec, gross_premium):
     return float(total)
 
 
+def derive_consideration(expense_spec, technical, name):
+    """Gross the technical premium up for the ``less`` clause expenses.
+
+    Resolves a ``derive premium`` head: the wrapped engine's technical
+    premium T is read as a risk loaded premium, and the gross premium is the
+    unique P whose own expenses leave exactly T behind.
+
+    Parameters
+    ----------
+    expense_spec : list, tuple, or None
+        The DecL expense spec in any shape :func:`_normalize_expense_groups`
+        accepts. ``None`` or empty is legal and returns ``technical``, which
+        makes an expense-free ``derive premium`` identical to ``inherit
+        premium``.
+    technical : float
+        The engine's technical premium T, already summed if a vector.
+    name : str
+        The P&L name, for the error messages.
+
+    Returns
+    -------
+    float
+        ``(T + F) / (1 - r)`` where F is the sum of the fixed terms and r
+        the sum of the premium ratio terms, across all groups.
+
+    Raises
+    ------
+    ValueError
+        On a loss basis term (losses are not reliably known by inspection,
+        so the gross up is undefined), or when the premium ratios total one
+        or more (no finite premium grosses that up).
+
+    Notes
+    -----
+    This is the fixed point of :func:`resolve_expense` restricted to the
+    fixed and premium bases: with expenses ``E = r*P + F``, solving
+    ``P - E = T`` gives ``P = (T + F) / (1 - r)``, so the expected
+    underwriting result carries the engine risk load and nothing else.
+    Multiple fixed terms add; multiple premium terms add, combined ratio
+    style. Grouping and ``as`` labels are irrelevant to the sums.
+    """
+    fixed_total = 0.0
+    premium_rate = 0.0
+    for _label, terms in _normalize_expense_groups(expense_spec):
+        for basis, val in terms:
+            if basis == 'fixed':
+                fixed_total += float(val)
+            elif basis == 'premium':
+                premium_rate += float(val)
+            elif basis == 'loss':
+                raise ValueError(
+                    f"{name}: 'derive premium' cannot gross up a loss basis "
+                    "expense; losses are not reliably known by inspection. "
+                    "Use fixed or premium expenses, or 'inherit premium' "
+                    "with the loss expense left in place.")
+            else:
+                raise ValueError(f'unknown expense basis {basis!r}')
+    if premium_rate >= 1:
+        raise ValueError(
+            f"{name}: 'derive premium' premium expense ratios total "
+            f"{premium_rate:.4g}, at or above 1; no finite premium grosses "
+            "that up.")
+    return (float(technical) + fixed_total) / (1.0 - premium_rate)
+
+
 def _resolve_expense_split(agg, expense_spec, gross_premium):
     """Split a DecL ``expense`` spec into per-group ``(name, scalar, loss_rate)``.
 

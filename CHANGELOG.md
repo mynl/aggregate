@@ -20,6 +20,16 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a267
+
+**[BS-Window-Formats] the grid-sizing exhibit prints its window like an amount, not like a float's repr.** `bs_window_df` gained `W` and `coverage` at a254 (`[BS-Window-Widen]`, round 6 ask 2) and the widening carried no formats, so the exhibit's deciding columns printed as raw float text (`31.30829289650644` for a window edge), which is exactly the curation hazard that ruling warned about, one door down. The registration now carries `BS_WINDOW_FORMATS` (exported alongside `SHARPEN_FORMATS`): the window edges `x_min` / `x_max` and the width `W` print as amounts (`,.0f`, matching how `SHARPEN_FORMATS` treats the same loss-axis quantities), `bs` in significant digits (`,.4g`, since a bucket size can be dyadic-fractional), and `clipped` in scientific notation (`.2e`, an estimated far-tail mass where only the exponent separates a good row from a perfect one). `coverage` is a string upstream (`'1-1e-12'`) and needs nothing.
+
+**The caption now says what the frame shows**: each method's window is [x_min, x_max] with width W = x_max - x_min, and coverage is the fraction of the distribution the window holds. Raised in the app's testing notes (`aggregate_api/dev/api-punchlist.md`, the window formatting bullet); the app has drawn this leaf through the exhibit route since its a71, so it picks the polish up with no change on its side.
+
+**Test surface.** The exhibit snapshot regen moved exactly the ten `bs_window/*` entries (five kinds by two perspectives), verified key by key against the prior snapshot; `test_simple_exhibits_are_passthroughs` now expects the `formatters` kwarg on `bs_window` and caption-only on `tail_behavior`.
+
+---
+
 ## 1.0.0a266
 
 **[FYI-Premium-Exposure-Head] the claims and loss sizing heads carry an informational premium: `5 claims 20000 premium`, `500 loss 650 premium`.** The head sizes the law exactly as it did without the suffix; the premium books `exp_premium` and the loss ratio back-fills from the realized expected loss, landing in the `('meta', 'prem')` and `('meta', 'lr')` rows of `stats_df`. This is the natural spelling for a book rated one way and modeled another: a quote sheet carries a claim count or a loss pick plus a premium, and previously the premium had nowhere to go short of hand-converting the head to `premium at lr`. Author request, 2026-08-12.

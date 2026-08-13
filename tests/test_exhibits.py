@@ -859,16 +859,22 @@ def test_a_pricing_exhibit_carries_the_source_labels(objects):
 # --- register_simple_exhibit ([Exhibits-Package-Split]) ---------------------
 
 def test_simple_exhibits_are_passthroughs(dice):
-    """A manifest-declared exhibit serves one frame, raw and insurer alike."""
-    for name, attr in (('bs_window', 'bs_window_df'),
-                       ('tail_behavior', 'tail_behavior_df')):
+    """A manifest-declared exhibit serves one frame, raw and insurer alike.
+
+    ``bs_window`` carries formatters since the a267 `[BS-Window-Formats]`
+    polish (the window edges and ``W`` are amounts, ``clipped`` is a tail
+    mass); ``tail_behavior`` remains caption-only.
+    """
+    for name, attr, kw_keys in (
+            ('bs_window', 'bs_window_df', {'caption', 'formatters'}),
+            ('tail_behavior', 'tail_behavior_df', {'caption'})):
         blocks = exhibit_frames(dice, name)
         assert [b for b, _, _ in blocks] == [attr]
         raw_name, raw_df, raw_kw = blocks[0]
         ins_name, ins_df, ins_kw = exhibit_frames(dice, name, 'insurer')[0]
         # no override registered -> INSURER is RAW, by the default rule
         assert raw_kw == ins_kw
-        assert set(raw_kw) == {'caption'}
+        assert set(raw_kw) == kw_keys
         pd.testing.assert_frame_equal(raw_df, ins_df)
 
 

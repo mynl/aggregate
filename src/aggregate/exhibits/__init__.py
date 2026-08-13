@@ -113,6 +113,7 @@ __all__ = [
     'summary', 'tail', 'stats', 'validation', 'reins',
     'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
     'bs_window', 'sharpen', 'tail_behavior', 'SHARPEN_FORMATS',
+    'BS_WINDOW_FORMATS',
     'pricing_calibrate', 'pricing_allocate', 'pricing_evaluate',
     'PENTAGON_FORMATS', 'CALIBRATION_FORMATS', 'DISTORTION_FORMATS',
     'EVALUATION_FORMATS', 'STAT_SLICES', 'STAT_SLICE_FORMATS',
@@ -213,14 +214,29 @@ register_simple_exhibit(
             'a scenario.')
 
 #: Diagnostics, the app's "More" material. Both need the realized grid.
+#:
+#: The window edges and the width are amounts on the loss axis, formatted the
+#: way ``SHARPEN_FORMATS`` below formats the same quantities; ``bs`` can be
+#: dyadic-fractional, so it gets significant digits rather than a fixed
+#: decimal; ``clipped`` is an estimated far-tail mass, tiny when present at
+#: all, so only scientific notation separates a good row from a perfect one.
+#: ``coverage`` is a string upstream (``'1-1e-12'``) and needs nothing.
+BS_WINDOW_FORMATS = {
+    'x_min': ',.0f', 'x_max': ',.0f', 'W': ',.0f',
+    'bs': ',.4g', 'clipped': '.2e',
+}
+
 bs_window = register_simple_exhibit(
     'bs_window', 'Grid sizing', 'bs_window_df',
     [Aggregate, Portfolio, BivariateAggregate],
-    predicate=_perspectives_updated,
+    predicate=_perspectives_updated, formatters=BS_WINDOW_FORMATS,
     caption='How the grid was chosen: the candidate windows, which one '
-            'applied, and the bucket size and log2 that follow from it. A '
-            'clipped row is a window that did not fit and was cut to the '
-            'grid, which is where aliasing comes from.')
+            'applied, and the bucket size and log2 that follow from it. '
+            'Each method\'s window is [x_min, x_max] with width '
+            'W = x_max - x_min, and coverage is the fraction of the '
+            'distribution the window holds. A clipped row is a window that '
+            'did not fit and was cut to the grid, which is where aliasing '
+            'comes from.')
 #: The probe's own audit reads in scientific notation, deliberately: the
 #: ``u_`` columns are relative errors against the analytic moments and run
 #: from about 1e-7 to a few percent, so at a fixed ``.4f`` a good cell and a

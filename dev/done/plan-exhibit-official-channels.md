@@ -1,5 +1,16 @@
 # Plan: [Exhibit-Official-Channels]
 
+> **CLOSED and moved to done, 2026-08-13.** Phases 1 to 6 landed at a251 to
+> a256; phase 7 was struck (a250 fixed the cause); phases 8 to 10 were
+> superseded by `dev/done/plan-pricing-exhibits.md` and executed through it
+> (LIB a259 to a263, API a83 to a85). The Sharpen leaf cutover the phase 5
+> exhibit enabled landed app side at `aggregate_api` a94, emptying
+> `tables.FORMATS`. The one item this plan still owed, the **Bounds
+> registration** carried in phase 10 ("the bounds leaves stay with the
+> official channels plan"), is NOT done: it moves to the author's master list
+> in `dev-files.md` ("Getting to 1.0"), and the app's two Bounds leaves
+> remain the last pandas in its table pipeline until it lands.
+
 > **Scope boundary, author, 2026-08-11.** This plan is about the **framework**:
 > that the exhibit machinery is complete, that it is used, and that it works.
 > Whether a particular exhibit's reading of the business is the right one is the

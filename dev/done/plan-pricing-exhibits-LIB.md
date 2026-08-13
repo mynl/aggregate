@@ -5,6 +5,11 @@ Written by the LIB agent, 2026-08-12, against
 symlink). Companion to whatever the API agent writes for its half. Read
 section 4 first if you only want to know what the app has to code against.
 
+> **Moved to done 2026-08-13.** The three API phases this file left "untouched
+> and unblocked" have since landed at `aggregate_api` a83 (A1, routes), a84
+> (A2, the pane) and a85 (A3, the deletions), so the plan is executed end to
+> end and the canonical copy sits in the API repo's `dev/done/`.
+
 **Verdict on the plan: in order, and executed.** All five LIB phases are done,
 in five version bumps, `1.0.0a259` to `1.0.0a263`. The acceptance criteria the
 plan owns on this side all pass, including the one that was the point:

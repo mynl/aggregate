@@ -394,17 +394,14 @@
   the twelfth exhibit, RAW one block and INSURER two);
   `[Reins-Insurer-Orientation]` landed a256 (note item 1, the Aggregate
   layering analysis turned over and split into contract and consequence).
-  **Note items 1, 2, 3, 5 and 6 are all closed**; only item 4, the computed
-  pricing exhibits, is open. Phase 7 struck,
-  its bug fixed at a250. Phases 8 to 10, the Pricing pane redesign keyed on
-  result objects, are superseded as of 2026-08-12: the design discussion
-  happened and `dev/plan-pricing-exhibits.md` (canonical copy in the API repo,
-  symlinked here) carries the pricing leaves end to end, five LIB phases
-  (result objects, an unbounded anchor guard, an asset anchor on `evaluate`,
-  the octet on `reins_price_df`, the three `pricing.*` exhibits) then three
-  API phases. The `REINSURER` question stays deferred (INSURER drops the
-  `ceded` rows; the seller's reading waits). Bounds registration remains with
-  the official channels plan as its only open work.
+  **All six note items are closed**: item 4, the computed pricing exhibits,
+  closed through the pricing plan below; 1, 2, 3, 5 and 6 at a251 to a256 as
+  listed above. Phase 7 struck, its bug fixed at a250. Phases 8 to 10, the
+  Pricing pane redesign keyed on result objects, were superseded 2026-08-12
+  by `plan-pricing-exhibits.md` (canonical in the API repo's `dev/done/`,
+  pointer here in `dev/done/`), which carried the pricing leaves end to end.
+  The `REINSURER` question stays deferred (INSURER drops the
+  `ceded` rows; the seller's reading waits).
   **All five LIB phases landed 2026-08-12, a259 to a263**:
   `[Pricing-Result-Objects]` a259 (`CalibrationResult` / `EvaluationResult`,
   breaking return types, lazy allocation frames, `SourcedMixin`);
@@ -415,8 +412,14 @@
   front doors, `lr=` on `calibrate_distortions`); `[Pricing-Exhibits]` a263
   (the three `pricing.*` exhibits, exhibit count 12 to 15). Review notes and
   the nine places the code and the plan disagree are in
-  `dev/plan-pricing-exhibits-LIB.md`. **Owed:** `dev/FEATURES.csv` regen once
-  the in-flight refresh lands, and the three API phases.
+  `dev/done/plan-pricing-exhibits-LIB.md`. **The three API phases landed at
+  `aggregate_api` a83 to a85**, and the app's Sharpen leaf moved onto the a255
+  `sharpen` exhibit at a94, emptying its `tables.FORMATS`; `bs_window` gained
+  its column formats here at a267 (`[BS-Window-Formats]`). Both plans moved
+  to `dev/done/` 2026-08-13. **The one open remainder, the Bounds
+  registration** (phase 10's bounds half), moved to the author's master list
+  in `dev-files.md` ("Getting to 1.0"). **Owed:** `dev/FEATURES.csv` regen
+  once the in-flight refresh lands.
   **Follow up from the first app-side use of the pane:**
   `[Allocation-Default-Linear]` a265, `dev/done/plan-fix-unbounded-ccoc.md`.
   The pentagon surface hardcoded `allocation='lifted'` and never read

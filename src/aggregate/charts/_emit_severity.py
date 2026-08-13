@@ -147,6 +147,11 @@ def _severity(sev, n=GRID_POINTS):
                       scales=('linear', 'log')),
             ChartAxis(id='p', label='Non-exceeding probability',
                       unit='probability', suggested_range=(0.0, 1.0)),
+            # Named by no panel either: the reflected reading of 'p', the
+            # survival function, which is what a log axis is for here.
+            ChartAxis(id='survival', label='Exceeding probability',
+                      unit='probability', scales=('linear', 'log'),
+                      complement_of='p', suggested_range=(0.0, 1.0)),
             # Not named by any panel: the alternative reading of 'p'.
             ChartAxis(id='return_period', label='Return period',
                       unit='return_period', scale='log', reciprocal_of='p',

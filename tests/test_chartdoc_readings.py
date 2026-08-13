@@ -1,4 +1,4 @@
-"""The renderer's four switches, against documents that declare readings.
+"""The renderer's five switches, against documents that declare readings.
 
 ``[Chart-Declared-Readings]``. Which readings a quantity admits is a fact
 about the quantity, so the document declares them; which one is on screen
@@ -187,6 +187,180 @@ def test_a_panel_with_no_pairing_is_untouched():
     line, = ax.get_lines()
     np.testing.assert_allclose(line.get_xdata(), (1.0, 2.0))
     close(fig)
+
+
+# ------------------------------------------------------------- reflection
+
+def _reflected_doc(y=None, marks=(), meta=None, extra=(),
+                   survival_window=(0.0, 1.0)):
+    """A Lee panel whose probability axis declares its reflected reading."""
+    return one_panel(
+        ChartAxis(id='p', label='Non-exceeding probability',
+                  unit='probability', suggested_range=(0.0, 1.0)),
+        ChartAxis(id='loss', label='Loss', unit='currency',
+                  suggested_range=(0.0, 10.0)),
+        x=(0.25, 0.5, 0.75), y=y or (1.0, 2.0, 3.0),
+        marks=marks, meta=meta,
+        axes=(ChartAxis(id='survival', label='Exceeding probability',
+                        unit='probability', scales=('linear', 'log'),
+                        complement_of='p',
+                        suggested_range=survival_window),) + tuple(extra))
+
+
+def test_reflection_maps_the_declaring_axis_and_no_other():
+    ax, fig = drawn(_reflected_doc(), reflect=True)
+    line, = ax.get_lines()
+    np.testing.assert_allclose(line.get_xdata(), (0.75, 0.5, 0.25))
+    np.testing.assert_allclose(line.get_ydata(), (1.0, 2.0, 3.0))
+    close(fig)
+
+
+def test_the_reflected_axis_supplies_its_own_label_scales_and_window():
+    """The payoff of declaring it as a paired axis rather than as a flag.
+
+    S(x) is log readable where the non-exceeding probability is not, and
+    the reflected axis is the only place that can be said.
+    """
+    doc = _reflected_doc(survival_window=(0.001, 1.0))
+    ax, fig = drawn(doc, reflect=True, log=True)
+    assert ax.get_xlabel() == 'Exceeding probability'
+    assert ax.get_xscale() == 'log'
+    assert ax.get_xlim() == (0.001, 1.0)
+    close(fig)
+    plain, fig2 = drawn(doc, log=True)
+    assert plain.get_xscale() == 'linear'      # 'p' declares one reading
+    assert plain.get_xlabel() == 'Non-exceeding probability'
+    close(fig2)
+
+
+def test_a_document_that_declares_no_complement_is_untouched():
+    doc = one_panel(ChartAxis(id='loss', label='Loss'),
+                    ChartAxis(id='dens', label='Density'),
+                    x=(1.0, 2.0), y=(0.5, 0.25))
+    ax, fig = drawn(doc, reflect=True)
+    line, = ax.get_lines()
+    np.testing.assert_allclose(line.get_xdata(), (1.0, 2.0))
+    close(fig)
+
+
+def test_a_mark_reflects_with_the_axis_it_sits_on():
+    doc = _reflected_doc(marks=(Mark(panel_id='p', orient='v', at=0.99,
+                                     label='1-in-100',
+                                     role='capital_anchor'),))
+    ax, fig = drawn(doc, reflect=True)
+    vline, = [ln for ln in ax.get_lines() if len(set(ln.get_xdata())) == 1]
+    assert vline.get_xdata()[0] == pytest.approx(0.01)
+    close(fig)
+
+
+def test_reflection_rides_inversion():
+    """Reflect then invert is (x, S(x)), the survival function drawn up."""
+    doc = _reflected_doc()
+    doc = ChartDoc(name=doc.name, axes=doc.axes,
+                   panels=(Panel(id='p', kind='xy', x_axis='p',
+                                 y_axis='loss', invertible=True),),
+                   series=doc.series, marks=doc.marks, meta=doc.meta)
+    ax, fig = drawn(doc, reflect=True, invert=True)
+    line, = ax.get_lines()
+    np.testing.assert_allclose(line.get_xdata(), (1.0, 2.0, 3.0))
+    np.testing.assert_allclose(line.get_ydata(), (0.75, 0.5, 0.25))
+    assert ax.get_ylabel() == 'Exceeding probability'
+    close(fig)
+
+
+def _both_readings_doc(how):
+    """A panel declaring both paired readings on the same drawn axis."""
+    return _reflected_doc(
+        meta={'return_period_map': how},
+        extra=(ChartAxis(id='return_period', label='Return period',
+                         unit='return_period', scale='log',
+                         reciprocal_of='p'),))
+
+
+def test_on_a_loss_reflect_and_return_period_is_return_period():
+    """T = 1 / (1 - p) either way: the complement map already reflects."""
+    alone, fig1 = drawn(_both_readings_doc('complement'), return_period=True)
+    values = alone.get_lines()[0].get_xdata()
+    close(fig1)
+    both, fig2 = drawn(_both_readings_doc('complement'),
+                       reflect=True, return_period=True)
+    np.testing.assert_allclose(both.get_lines()[0].get_xdata(), values)
+    np.testing.assert_allclose(values, (4 / 3, 2.0, 4.0))
+    assert both.get_xlabel() == 'Return period'
+    close(fig2)
+
+
+def test_on_a_signed_outcome_reflect_reads_the_other_tail():
+    """A payoff is interrogated at T = 1 / p; reflected it is 1 / (1 - p).
+
+    The upside tail's return period, which is the picture no other
+    combination of switches reaches.
+    """
+    alone, fig1 = drawn(_both_readings_doc('reciprocal'), return_period=True)
+    np.testing.assert_allclose(alone.get_lines()[0].get_xdata(),
+                               (4.0, 2.0, 4 / 3))
+    close(fig1)
+    both, fig2 = drawn(_both_readings_doc('reciprocal'),
+                       reflect=True, return_period=True)
+    np.testing.assert_allclose(both.get_lines()[0].get_xdata(),
+                               (4 / 3, 2.0, 4.0))
+    close(fig2)
+
+
+def test_reflect_alone_caps_nothing_and_releases_no_window():
+    """Both are keyed on the return period, which is bounded by nothing.
+
+    A reflected probability axis is a bijection of [0, 1] onto itself, so
+    it needs no cap, and it re-slices nothing, so the companion axis keeps
+    the window its emitter computed.
+    """
+    doc = _reflected_doc()
+    plain, fig1 = drawn(doc)
+    y_limits = plain.get_ylim()
+    close(fig1)
+    ax, fig2 = drawn(doc, reflect=True)
+    assert ax.get_ylim() == y_limits           # the companion window stands
+    assert ax.get_xlim()[1] < 1.1              # its own window, never capped
+    close(fig2)
+
+
+def test_the_step_mirrors_with_the_curve():
+    """The ladder needs no reflected case, and it looks like it should.
+
+    A step drawstyle is defined on the order of the points given, not on
+    the direction of the axis, so the corner lands at the mirror of where
+    it landed. The drawn path is the assertion: every vertex of the
+    reflected path is a vertex of the original with its x reflected.
+    """
+    doc = _lee_with_complement()
+    plain, fig1 = drawn(doc)
+    line, = [ln for ln in plain.get_lines() if ln.get_label() == 's']
+    fig1.canvas.draw()
+    assert line.get_drawstyle() == 'steps-pre'
+    path = line.get_path().vertices.copy()
+    close(fig1)
+    ax, fig2 = drawn(doc, reflect=True)
+    line, = [ln for ln in ax.get_lines() if ln.get_label() == 's']
+    fig2.canvas.draw()
+    assert line.get_drawstyle() == 'steps-pre'
+    mirrored = line.get_path().vertices
+    np.testing.assert_allclose(mirrored[:, 0], 1.0 - path[:, 0])
+    np.testing.assert_allclose(mirrored[:, 1], path[:, 1])
+    close(fig2)
+
+
+def _lee_with_complement():
+    """``lee_doc`` plus the reflected reading of its probability axis."""
+    base = lee_doc()
+    return ChartDoc(
+        name=base.name,
+        axes=base.axes + (ChartAxis(id='survival',
+                                    label='Exceeding probability',
+                                    unit='probability',
+                                    scales=('linear', 'log'),
+                                    complement_of='p',
+                                    suggested_range=(0.0, 1.0)),),
+        panels=base.panels, series=base.series, marks=base.marks)
 
 
 # ------------------------------------------------------------- inversion

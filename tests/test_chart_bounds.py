@@ -80,6 +80,17 @@ def test_the_unit_square_offers_no_other_reading(bounds):
         assert axis.full_range is None
 
 
+def test_both_axes_offer_their_reflection(bounds):
+    """Reflected, the envelope of admissible prices is the dual envelope."""
+    axes = {a.id: a for a in chart_envelope(bounds).axes}
+    assert axes['s_complement'].complement_of == 's'
+    assert axes['g_complement'].complement_of == 'g'
+    # named by neither panel, which is what a paired reading means
+    drawn = {p.x_axis for p in chart_envelope(bounds).panels} | \
+        {p.y_axis for p in chart_envelope(bounds).panels}
+    assert not drawn & {'s_complement', 'g_complement'}
+
+
 def test_the_envelope_is_one_band_not_two_curves(bounds):
     """The series *is* the region between the extremes."""
     band = series_on(chart_envelope(bounds), 'cloud')[0]

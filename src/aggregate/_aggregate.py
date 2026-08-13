@@ -1430,8 +1430,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return _reinsurance.reins_price_df(self, distortion, p=p, a=a,
                                            views=views)
 
-    def reins_occ_plot(self, log=False, full_range=False, return_period=False,
-                       invert=False):
+    def reins_occ_plot(self, log=False, full_range=False, reflect=False,
+                       return_period=False, invert=False):
         """Plot the occurrence program: per claim, and in total.
 
         Parameters
@@ -1441,6 +1441,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             read on log either way, and offers no other reading.
         full_range : bool
             Show the whole grid rather than the cropped windows.
+        reflect : bool
+            Read the aggregate panel against the exceeding probability, so
+            the three curves are survival functions rather than quantile
+            functions of non-exceedance.
         return_period : bool
             Read the aggregate panel against return period rather than
             non-exceedance probability.
@@ -1470,7 +1474,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         from .plots import plot_chartdoc
         self.figure = plot_chartdoc(
             build_chart_doc(self, 'reins'), log=log, full_range=full_range,
-            return_period=return_period, invert=invert)
+            reflect=reflect, return_period=return_period, invert=invert)
         return self.figure
 
     def occ_bivariate(self, views=('net', 'ceded'), bs=None,
@@ -4605,7 +4609,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         find_u = _ruin_find_u(ruin, kind)
         return RuinFunction(ruin, find_u, mean, pmf_max[:n])
 
-    def plot(self, xmax=None, log=False, full_range=False,
+    def plot(self, xmax=None, log=False, full_range=False, reflect=False,
              return_period=False, invert=False):
         """Plot the aggregate and its severity: the mass, and the Lee diagram.
 
@@ -4620,6 +4624,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         full_range : bool
             Show the whole grid rather than the ``q(0.001)`` to ``q(0.999)``
             crop.
+        reflect : bool
+            Read the Lee panel against the exceeding probability rather
+            than the non-exceeding one, so the curve drawn is the survival
+            function. With ``invert`` it is ``S(x)`` the usual way round,
+            and that axis offers a log reading where the non-exceeding one
+            does not.
         return_period : bool
             Read the Lee panel against return period rather than
             non-exceedance probability, which spreads the rare tail so it
@@ -4652,8 +4662,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         from .plots import plot_chartdoc
         self.figure = plot_chartdoc(
             build_chart_doc(self, 'agg', xmax=xmax),
-            log=log, full_range=full_range, return_period=return_period,
-            invert=invert)
+            log=log, full_range=full_range, reflect=reflect,
+            return_period=return_period, invert=invert)
         return self.figure
 
     def _limits(self, stat='range', kind='linear', zero_mass='include'):

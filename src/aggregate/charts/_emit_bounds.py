@@ -161,6 +161,17 @@ def _envelope(bounds, n_resamples=0, n=CURVE_POINTS):
                       suggested_range=(0.0, 1.0)),
             ChartAxis(id='g', label='g(s)', unit='probability',
                       suggested_range=(0.0, 1.0)),
+            # Named by no panel: the reflected reading of each axis, the
+            # same declaration the distortion chart carries and for the
+            # same reason. Reflected, the envelope of admissible prices is
+            # the envelope of their duals, which is a real object. The
+            # labels are the literal coordinates because every series on
+            # the panel reflects, the band and the identity included.
+            ChartAxis(id='s_complement', label='1 - s', unit='probability',
+                      complement_of='s', suggested_range=(0.0, 1.0)),
+            ChartAxis(id='g_complement', label='1 - g(s)',
+                      unit='probability', complement_of='g',
+                      suggested_range=(0.0, 1.0)),
         ),
         panels=tuple(panels),
         series=tuple(series),

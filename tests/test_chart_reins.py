@@ -109,6 +109,14 @@ def test_the_aggregate_panel_carries_every_reading(occ):
     assert annual.inverse_title == 'Distribution function'
 
 
+def test_the_probability_axis_offers_its_reflection(occ):
+    """The survival function, and the log reading only it admits."""
+    ax = axes_of(chart_reins(occ))
+    assert ax['survival'].complement_of == 'p'
+    assert ax['survival'].scales == ('linear', 'log')
+    assert ax['p'].scales == ('linear',)
+
+
 def test_the_right_panel_is_a_quantile_curve(occ):
     """Non-exceeding probability against loss, trimmed to the support."""
     doc = chart_reins(occ)

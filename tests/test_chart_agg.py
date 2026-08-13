@@ -100,6 +100,17 @@ def test_the_probability_axis_offers_the_return_period(cont):
         {p.y_axis for p in doc.panels}
 
 
+def test_the_probability_axis_offers_its_reflection(cont):
+    """The survival function, and the log reading only it admits."""
+    doc = chart_agg(cont)
+    ax = axes_of(doc)
+    assert ax['survival'].complement_of == 'p'
+    assert ax['survival'].scales == ('linear', 'log')
+    assert ax['p'].scales == ('linear',)
+    assert 'survival' not in {p.x_axis for p in doc.panels} | \
+        {p.y_axis for p in doc.panels}
+
+
 def test_the_outcome_axis_offers_the_whole_grid(cont):
     ax = axes_of(chart_agg(cont))['outcome']
     assert ax.suggested_range[1] == pytest.approx(cont.q(0.999), rel=0.05)

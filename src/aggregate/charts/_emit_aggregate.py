@@ -134,6 +134,13 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
                       suggested_range=(0.0, float(ordinate_top))),
             ChartAxis(id='p', label='Non-exceeding probability',
                       unit='probability', suggested_range=(0.0, 1.0)),
+            # Named by no panel either: the reflected reading of 'p'. The
+            # survival function is the reading a log axis exists for, and
+            # the non-exceeding probability is not, so the two axes differ
+            # in the scales they offer and not only in their labels.
+            ChartAxis(id='survival', label='Exceeding probability',
+                      unit='probability', scales=('linear', 'log'),
+                      complement_of='p', suggested_range=(0.0, 1.0)),
             # Not named by any panel: the alternative reading of 'p'. Its
             # window runs from the certain event to the deepest survival
             # worth a panel, past which the curve is a line of float dust.

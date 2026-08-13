@@ -20,6 +20,30 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a269
+
+**[Chart-Reflected-Reading] a probability axis declares its reflection, and a Lee panel reads the survival function.** The chart IR offered five renderer switches, `log`, `full_range`, `return_period`, `invert` and `kind`, each following the one rule `[Chart-Declared-Readings]` set: the document declares which readings a quantity honestly admits, the switch acts wherever the declaration exists and nowhere else. One reading was missing. A Lee panel draws the quantile function against `p`, the non-exceeding probability, and inverted it draws `F(x)`. What nobody could ask for was `S(x) = 1 - F(x)`, the reading an actuary reaches for most often and the one a log axis was invented for. `reflect=True` is that reading, the map `v` to `1 - v` on every axis that declares it.
+
+**The declaration is a paired axis, `ChartAxis.complement_of`,** mirroring `reciprocal_of` in every respect: an undrawn axis sitting in `doc.axes`, carrying its own label, its own `scales` and its own window, named by no panel. A boolean plus a label field on the drawn axis was refused because it has nowhere to say that `S(x)` is log readable while `F(x)` is not, which is the main reason to want the reading at all. One boolean, not a `reflect_x` / `reflect_y` pair, which `invert` would make ambiguous.
+
+**Six documents gain one.** `agg` (and through it `pnl`), `severity` and `reins` gain a `survival` axis, Exceeding probability, `scales=('linear', 'log')`, paired to `p`. `distortion` and `envelope`, the two unit-square documents, gain `s_complement` and `g_complement`, labeled `1 - s` and `1 - g(s)`: the literal coordinates rather than the dual's name, because the reflected point is `(1 - s, 1 - g(s))` for every series on the panel where naming it the dual asserts an identity that holds only of the `g` curve. `port` gains nothing, having no probability axis at all. Reflecting both axes of a distortion draws the dual, so under `dual=True` the reflection exchanges which curve each legend entry traces: the picture is right and the names are stale, and `dual=False` reads clean.
+
+**The two probability readings compose with no special case,** because `complement(v) = reciprocal(1 - v)`. The 'complement' map *is* reflect-then-reciprocal, so an axis already read reflected takes the plain reciprocal whatever the document declares. On a loss that redraws the curve `return_period=True` draws by itself. On a signed `PnL`, whose map is 'reciprocal' because the adverse tail is the low one, `reflect=True, return_period=True` reads the *upside* tail's return period, which is a picture unreachable any other way.
+
+**Two renderer behaviors are now keyed on the return period specifically rather than on "a map is present",** which is the trap in the change and both sites carry a comment saying so. The `MAX_RETURN_PERIOD` cap exists because the quantile function saturates and `T` diverges, and a reflected probability axis is bounded in `[0, 1]`. The companion window release exists because a return-period reading re-slices the panel into the deep tail, and reflection is a bijection of `[0, 1]` onto itself that re-slices nothing.
+
+**The atomic ladder needed no reflected case,** and `_render_xy_panel` gains a Notes paragraph recording why, because it looks like a bug until someone works it out: matplotlib's step drawstyles are defined on the order of the points given, not on the direction of the axis, so a right-continuous step drawn over the reflected point sequence is exactly the mirror of the picture it drew before. The same reason `invert` needed no explicit switch.
+
+**Validation tightened for both pointers.** `ChartDoc.__post_init__` now loops over `reciprocal_of` and `complement_of` together, so the three existing checks (names an existing axis, is not itself drawn, points at something drawn) serve both and the message names which pointer failed. Two checks fall out: an axis carries at most one pointer, since two would name a chained reading and the readings compose instead; and at most one paired axis exists per (pointer, target), since a renderer takes the first match and a second would be silently unreachable. That second check tightens `reciprocal_of` too, which had the same latent looseness.
+
+**`CHART_IR_VERSION` stays 2**, by the rule the constant documents: a reader that ignores `complement_of` sees an extra axis in `doc.axes` that no panel names, which is exactly what `return_period` already looks like to it, and draws the default reading correctly and completely. `complement_of` is omitted at its default, so no existing document's hash moves for the field itself. **The six documents that gain an axis do move**, so their hashes and any ETag keyed on them invalidate once, which is correct and harmless.
+
+**Version skew, for the other consumer.** An older `aggregate` build calling `load_chart_doc` on a new document raises `ChartAxis carries unknown field(s) ['complement_of']`. That is the standing consequence of every additive field and the fix is the standing one: sync the library before serving.
+
+Entry points gaining `reflect=False`: `Aggregate.plot`, `Aggregate.reins_occ_plot`, `PnL.plot`, `Severity.plot`, `Distortion.plot` and `Bounds.plot_envelope`. The last two took no reading switches at all and gain this one only, because it is the only reading a unit square declares. `Portfolio.plot` is unchanged.
+
+Plan in `dev/done/plan-chart-reflect.md`; the app half is planned in the API repo and is not executed here.
+
 ## 1.0.0a268
 
 **[DecL-Paren-Arithmetic] `+`, `-` and `*` join the DecL expression sub-language, legal inside parentheses.** Every slot that takes a number has always accepted an expression (`/`, `**`, `^`, `exp`, parentheses), evaluated eagerly in the transformer. What was missing were the three operators that let a user write a computed exposure, a grossed-up premium, or a severity normalizer inline. The author's target program now builds:

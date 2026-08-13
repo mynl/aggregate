@@ -1672,7 +1672,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     # Plotting
     # ------------------------------------------------------------------
 
-    def plot(self, dual=True, ax=None):
+    def plot(self, dual=True, reflect=False, ax=None):
         """Plot the distortion: ``g`` on the unit square.
 
         Parameters
@@ -1680,6 +1680,13 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         dual : bool
             Also draw ``g_dual``. A semantic choice, not a style one: the
             pair says how the distortion prices a loss and its complement.
+        reflect : bool
+            Reflect both axes, ``(s, g(s))`` to ``(1 - s, 1 - g(s))``,
+            which draws the dual. The only reading the unit square
+            declares: neither a log reading of it nor a zoom out of it
+            exists. Note that under ``dual`` the reflection exchanges which
+            curve each legend entry traces, so the picture is right and the
+            names are stale; ``dual=False`` reads clean.
         ax : matplotlib.axes.Axes, optional
             Existing Axes; ``None`` makes a square figure.
 
@@ -1703,7 +1710,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         from .charts import build_chart_doc
         from .plots import plot_chartdoc
         return plot_chartdoc(build_chart_doc(self, 'distortion', dual=dual),
-                             ax=ax)
+                             reflect=reflect, ax=ax)
 
     # ------------------------------------------------------------------
     # Static factory shortcuts

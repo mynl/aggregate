@@ -71,6 +71,21 @@ def _distortion(dist, dual=True):
                           suggested_range=(0.0, 1.0)),
                 ChartAxis(id='g', label='g(s)', unit='probability',
                           suggested_range=(0.0, 1.0)),
+                # Named by no panel: the reflected reading of each axis.
+                # Reflecting both gives the dual distortion, so the labels
+                # are the literal coordinates rather than s and g-check:
+                # the reflected point is (1 - s, 1 - g(s)) for every series
+                # on the panel, where naming it the dual asserts an
+                # identity that holds only of the g curve. Nothing about
+                # the unit square is log readable in either reading, so no
+                # scales are offered, and both windows stay (0, 1), which
+                # is what keeps the square square under the reflection.
+                ChartAxis(id='s_complement', label='1 - s',
+                          unit='probability', complement_of='s',
+                          suggested_range=(0.0, 1.0)),
+                ChartAxis(id='g_complement', label='1 - g(s)',
+                          unit='probability', complement_of='g',
+                          suggested_range=(0.0, 1.0)),
             ),
             panels=(
                 Panel(id='square', kind='xy', x_axis='s', y_axis='g',

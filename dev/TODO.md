@@ -645,6 +645,29 @@
   `Bounds`, so they carry no `cloud_df` and the envelope chart does not
   serve them; `plot_hull_bounds` stays bespoke and would need its own
   emitter.
+  **`[Chart-Reflected-Reading]` landed a269**, outside the nine jobs: a
+  sixth declared reading, `ChartAxis.complement_of` and the renderer's
+  `reflect=True`, the map `v` to `1 - v`. The Lee panels of `agg`, `pnl`,
+  `severity` and `reins` gain a `survival` axis carrying the log reading
+  the non-exceeding probability cannot offer, and `distortion` and
+  `envelope` reflect both axes of the unit square to the dual.
+  `CHART_IR_VERSION` stays 2; the six documents that gain an axis move
+  their hashes. The two probability readings compose with no lookup
+  table, since `complement(v) = reciprocal(1 - v)`, which corrects the
+  plan's ruling 4 as drafted (author, 2026-08-13). Plan in
+  `dev/done/plan-chart-reflect.md`; the app half is planned in the API
+  repo (`aggregate_api/dev/plan-chart-reflect.md`) and is **not started**.
+  **The survival window was raised at review and ruled on** (author,
+  2026-08-13): the reflected axis declares `(0.0, 1.0)`, so a log reading
+  of it opens to `LOG_FLOOR` at 1e-15 rather than to `SURVIVAL_FLOOR` at
+  1e-9. Flooring it at 1e-9 trims too much and the reading can go
+  deeper, so `(0.0, 1.0)` stands and the renderer's decade floor is the
+  right answer. That leaves `charts/_two_panel.py:survival_window()`
+  exported, documented and called by nothing, which is now a deliberate
+  state rather than a gap. One follow-up the work surfaced, small and
+  not blocking: `_emit_portfolio.py` sets
+  `meta['return_period_map'] = 'complement'` on a document with no
+  probability axis, so it pairs with nothing and does nothing.
 
 ---
 

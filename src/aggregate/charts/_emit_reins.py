@@ -144,6 +144,11 @@ def _reins(agg):
                       unit='density', scale='log'),
             ChartAxis(id='p', label='Non-exceeding probability',
                       unit='probability', suggested_range=(0.0, 1.0)),
+            # Named by no panel: the reflected reading of 'p', the survival
+            # function, which is what a log axis is for here.
+            ChartAxis(id='survival', label='Exceeding probability',
+                      unit='probability', scales=('linear', 'log'),
+                      complement_of='p', suggested_range=(0.0, 1.0)),
             ChartAxis(id='annual', label='Aggregate loss', unit='currency',
                       scales=('linear', 'log'), suggested_range=annual,
                       full_range=(min(0.0, float(x[0])), max(tops))),

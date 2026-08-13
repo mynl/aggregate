@@ -124,7 +124,24 @@ AXIS_SCALES = ('linear', 'log')
 #: the high one and ``1 - p`` is the exceedance the reader is asking about.
 #: Carried in ``ChartDoc.meta['return_period_map']``, because it is one fact
 #: about the whole document rather than a property of either axis.
+#:
+#: The two compose with the reflected reading
+#: (:attr:`ChartAxis.complement_of`) without any special case, because
+#: ``complement(v) = reciprocal(1 - v)``: 'complement' *is* "reflect, then
+#: take the reciprocal". So an axis already read reflected takes
+#: 'reciprocal' whatever the document declares, and a renderer asked for
+#: both readings needs no lookup table. On a loss, whose map is
+#: 'complement', that draws the return-period curve it already drew. On a
+#: signed outcome, whose map is 'reciprocal' because the adverse tail is
+#: the low one, it reads the *upside* tail's return period, which is a
+#: picture unreachable any other way.
 RETURN_PERIOD_MAPS = ('reciprocal', 'complement')
+
+# The ``ChartAxis`` fields that declare a paired reading: an undrawn axis
+# naming the drawn one it is an alternative reading of. Private, because a
+# consumer reads the fields it knows by name; it exists so the validation
+# that is the same for every pointer is written once.
+_PAIRED_READINGS = ('reciprocal_of', 'complement_of')
 
 #: Axis units, the working vocabulary (open; documented additions only):
 #: 'currency' (a loss or outcome amount), 'probability', 'density'
@@ -590,6 +607,19 @@ class ChartAxis:
         it is an alternative reading of a drawn axis rather than a drawn
         axis of its own; both halves of that are checked in
         :meth:`ChartDoc.__post_init__`.
+    complement_of : str, optional
+        The id of the drawn probability axis this axis is the reflected
+        reading of. Its presence is the declaration that the reading is on
+        offer; the map is ``v`` to ``1 - v``, which needs no document-level
+        instruction because there is only one complement. A non-exceeding
+        probability reflected is the exceedance probability, so a quantile
+        function read against it is the survival function, which is the
+        reading a log axis exists for and the reason the pairing carries
+        its own ``scales`` rather than borrowing the drawn axis'. Like
+        ``reciprocal_of`` the paired axis sits in ``ChartDoc.axes`` and is
+        **not** named by any panel, and an axis carries at most one of the
+        two pointers: the two readings compose in the renderer, which is
+        not the same thing as a chain of declarations.
 
     .. versionadded:: 1.0
        Provisional, in the sense of PEP 411: not part of the 1.0 API
@@ -605,6 +635,7 @@ class ChartAxis:
     kind: str = 'value'
     unit: str = None
     reciprocal_of: str = None
+    complement_of: str = None
 
     def __post_init__(self):
         if self.scale not in AXIS_SCALES:
@@ -1008,13 +1039,30 @@ class ChartDoc:
                         f'panel {p.id!r} references unknown axis {ax!r}')
         drawn = {ax for p in self.panels
                  for ax in (p.x_axis, p.y_axis, p.z_axis) if ax is not None}
+        # Both pointer fields name the same shape of thing, an undrawn axis
+        # pointing at a drawn one, so the checks are written once over the
+        # pair rather than twice down the file.
+        seen_pairs = {}
         for a in self.axes:
-            if a.reciprocal_of is None:
+            declared = [p for p in _PAIRED_READINGS
+                        if getattr(a, p) is not None]
+            if not declared:
                 continue
-            if a.reciprocal_of not in axis_ids:
+            if len(declared) > 1:
+                # Two pointers on one axis names a chained reading, and the
+                # readings do not chain: they compose in the renderer, each
+                # off the drawn axis (see RETURN_PERIOD_MAPS).
                 raise ValueError(
-                    f'axis {a.id!r} reciprocal_of unknown axis '
-                    f'{a.reciprocal_of!r}')
+                    f'axis {a.id!r} declares both '
+                    f'{" and ".join(sorted(declared))}: an axis is one '
+                    'alternative reading of one drawn axis, and the '
+                    'readings compose in the renderer rather than by '
+                    'chaining declarations')
+            pointer = declared[0]
+            target = getattr(a, pointer)
+            if target not in axis_ids:
+                raise ValueError(
+                    f'axis {a.id!r} {pointer} unknown axis {target!r}')
             # A paired reading is an alternative to a drawn axis, so it
             # points at one and is not one itself. Both halves matter: a
             # pair drawn as its own panel axis would put the same curve on
@@ -1023,13 +1071,23 @@ class ChartDoc:
             if a.id in drawn:
                 raise ValueError(
                     f'axis {a.id!r} is the paired reading of '
-                    f'{a.reciprocal_of!r} and must not be named by a panel: '
+                    f'{target!r} and must not be named by a panel: '
                     'it is an alternative reading of a drawn axis, not a '
                     'drawn axis of its own')
-            if a.reciprocal_of not in drawn:
+            if target not in drawn:
                 raise ValueError(
                     f'axis {a.id!r} is the paired reading of '
-                    f'{a.reciprocal_of!r}, which no panel draws')
+                    f'{target!r}, which no panel draws')
+            # A renderer looks a pairing up and takes the first match, so a
+            # second one for the same axis and the same reading is a
+            # declaration nobody can ever reach.
+            if (pointer, target) in seen_pairs:
+                raise ValueError(
+                    f'axes {seen_pairs[(pointer, target)]!r} and {a.id!r} '
+                    f'both declare {pointer}={target!r}: a renderer reads '
+                    'the first, so the second is a reading nothing can '
+                    'reach')
+            seen_pairs[(pointer, target)] = a.id
         rp_map = self.meta.get('return_period_map')
         if rp_map is not None and rp_map not in RETURN_PERIOD_MAPS:
             raise ValueError(

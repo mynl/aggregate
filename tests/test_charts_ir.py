@@ -438,6 +438,62 @@ def test_a_paired_axis_points_at_something_drawn():
                  panels=(Panel(id='p', kind='xy', x_axis='a', y_axis='b'),))
 
 
+def test_a_reflected_reading_is_declared_the_same_way():
+    """``complement_of`` is ``reciprocal_of``'s twin: same shape, same checks."""
+    doc = small_xy_doc(axes=small_xy_doc().axes + (
+        ChartAxis(id='non_exceed', label='F(x)', unit='probability',
+                  complement_of='surv'),))
+    pair, = [a for a in doc.axes if a.id == 'non_exceed']
+    assert pair.complement_of == 'surv'
+    with pytest.raises(ValueError, match='complement_of unknown axis'):
+        small_xy_doc(axes=small_xy_doc().axes + (
+            ChartAxis(id='non_exceed', label='F(x)',
+                      complement_of='nothing'),))
+    with pytest.raises(ValueError, match='which no panel draws'):
+        small_xy_doc(axes=small_xy_doc().axes + (
+            ChartAxis(id='hidden', label='hidden'),
+            ChartAxis(id='non_exceed', label='F(x)',
+                      complement_of='hidden')))
+    with pytest.raises(ValueError, match='must not be named by a panel'):
+        small_xy_doc(
+            axes=small_xy_doc().axes + (
+                ChartAxis(id='non_exceed', label='F(x)',
+                          complement_of='surv'),),
+            panels=small_xy_doc().panels + (
+                Panel(id='third', kind='xy', x_axis='loss',
+                      y_axis='non_exceed'),))
+
+
+def test_one_axis_carries_one_pointer():
+    """Two pointers name a chain, and the readings compose instead."""
+    with pytest.raises(ValueError, match='complement_of and reciprocal_of'):
+        small_xy_doc(axes=small_xy_doc().axes + (
+            ChartAxis(id='both', label='both', reciprocal_of='surv',
+                      complement_of='surv'),))
+
+
+def test_one_paired_axis_per_reading_and_target():
+    """A renderer takes the first match, so a second is unreachable."""
+    with pytest.raises(ValueError, match='both declare'):
+        small_xy_doc(axes=small_xy_doc().axes + (
+            ChartAxis(id='rp2', label='return period again',
+                      reciprocal_of='surv'),))
+    with pytest.raises(ValueError, match='both declare'):
+        small_xy_doc(axes=small_xy_doc().axes + (
+            ChartAxis(id='c1', label='1 - S', complement_of='surv'),
+            ChartAxis(id='c2', label='1 - S again', complement_of='surv')))
+    # One of each on the same drawn axis is the composable case and stands.
+    assert small_xy_doc(axes=small_xy_doc().axes + (
+        ChartAxis(id='c1', label='1 - S', complement_of='surv'),))
+
+
+def test_complement_of_is_omitted_at_its_default():
+    """The neutral absence: no existing document's hash moves for the field."""
+    doc = small_xy_doc()
+    assert 'complement_of' not in canonical_dict(doc)['axes'][3]
+    assert canonical_dict(doc)['axes'][3]['reciprocal_of'] == 'surv'
+
+
 def test_return_period_map_vocabulary():
     for how in ('reciprocal', 'complement'):
         assert small_xy_doc(meta={'return_period_map': how})

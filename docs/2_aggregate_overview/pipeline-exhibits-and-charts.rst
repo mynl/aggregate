@@ -202,7 +202,9 @@ Declared readings
 
 Where an exhibit has a perspective, a chart has **declared readings**, and this is the idea that makes one generic renderer possible.
 
-An axis names every scale it may honestly be read on (``scales``) and whether a zoom-out exists (``full_range`` alongside ``suggested_range``). A probability axis may name a paired return-period axis (``reciprocal_of``), computed by the map in ``meta['return_period_map']``. A panel may declare itself ``invertible``, and may name what it is called inverted, since a Lee diagram with its axes exchanged is the distribution function and naming that is the library's job. A panel may offer more than one realization (``kinds``), so a joint density read flat or in relief is one document declaring two readings rather than two chart entries to keep in step by hand.
+An axis names every scale it may honestly be read on (``scales``) and whether a zoom-out exists (``full_range`` alongside ``suggested_range``). A probability axis may name a paired return-period axis (``reciprocal_of``), computed by the map in ``meta['return_period_map']``, and a paired reflected axis (``complement_of``), the map ``v`` to ``1 - v``: a non-exceeding probability reflected is the exceedance, so the quantile function drawn against it is the survival function, and reflecting both axes of a unit square gives the dual distortion. A paired axis carries its own label, scales and window, which is how the survival axis says it is log readable where the non-exceeding probability is not. A panel may declare itself ``invertible``, and may name what it is called inverted, since a Lee diagram with its axes exchanged is the distribution function and naming that is the library's job. A panel may offer more than one realization (``kinds``), so a joint density read flat or in relief is one document declaring two readings rather than two chart entries to keep in step by hand.
+
+The two paired readings compose without a special case, because ``complement(v) = reciprocal(1 - v)``: the 'complement' map *is* reflect-then-reciprocal, so an axis already read reflected takes the plain reciprocal. On a loss that redraws the return-period curve the switch draws by itself; on a signed result, whose map is the reciprocal because the adverse tail is the low one, it reads the upside tail's return period instead of the shortfall's.
 
 Which readings a quantity admits is a fact about the quantity and not about the drawing. A log reading of a heavy tail is meaningful; a log reading of a distortion's unit square is not. The renderer's switches therefore act on every axis or panel that declares the reading and on nothing else, so a document that declares nothing draws its one reading whatever it is asked for, and a caller never needs to know which chart it is holding.
 
@@ -212,19 +214,19 @@ Chart by chart
 Chart-level facts, one line each. Options are semantic arguments to the emitter, never renderer settings.
 
 ``agg``
-    On Aggregate, and its primary chart. Available when updated. Option ``xmax``. Entry point :meth:`Aggregate.plot` (``xmax``, ``log``, ``full_range``, ``return_period``, ``invert``).
+    On Aggregate, and its primary chart. Available when updated. Option ``xmax``. Entry point :meth:`Aggregate.plot` (``xmax``, ``log``, ``full_range``, ``reflect``, ``return_period``, ``invert``).
 ``port``
     On Portfolio, primary. Updated. Option ``xmax``. Entry point :meth:`Portfolio.plot` (``xmax``, ``log``, ``full_range``).
 ``pnl``
-    On PnL, primary. Needs a result. No options. Entry point :meth:`PnL.plot` (``log``, ``full_range``, ``return_period``, ``invert``).
+    On PnL, primary. Needs a result. No options. Entry point :meth:`PnL.plot` (``log``, ``full_range``, ``reflect``, ``return_period``, ``invert``).
 ``severity``
-    On Severity, primary. Always. Option ``n``, default 512 quantile-spaced points. Entry point :meth:`Severity.plot` (``n``, ``log``, ``full_range``, ``return_period``, ``invert``).
+    On Severity, primary. Always. Option ``n``, default 512 quantile-spaced points. Entry point :meth:`Severity.plot` (``n``, ``log``, ``full_range``, ``reflect``, ``return_period``, ``invert``).
 ``reins``
-    On Aggregate, primary for nothing, because it is a view of a book rather than the book's own picture. Needs an occurrence program. No options. Entry point :meth:`Aggregate.reins_occ_plot` (``log``, ``full_range``, ``return_period``, ``invert``).
+    On Aggregate, primary for nothing, because it is a view of a book rather than the book's own picture. Needs an occurrence program. No options. Entry point :meth:`Aggregate.reins_occ_plot` (``log``, ``full_range``, ``reflect``, ``return_period``, ``invert``).
 ``distortion``
-    On Distortion, primary. Always. Option ``dual``. Entry point :meth:`Distortion.plot` (``dual``, ``ax``).
+    On Distortion, primary. Always. Option ``dual``. Entry point :meth:`Distortion.plot` (``dual``, ``reflect``, ``ax``).
 ``envelope``
-    On Bounds, primary. Always. Options ``n_resamples`` (bracketing curves inside the band, each carrying its weight as ``ChartSeries.value``) and ``n`` (curve points, default 1001). Entry point ``Bounds.plot_envelope(n_resamples)``.
+    On Bounds, primary. Always. Options ``n_resamples`` (bracketing curves inside the band, each carrying its weight as ``ChartSeries.value``) and ``n`` (curve points, default 1001). Entry point ``Bounds.plot_envelope(n_resamples, reflect)``.
 ``joint_surface``
     On BivariateAggregate, primary. Needs the in-memory joint density. Options ``window`` (default 4: keep ``q(1e-4)`` to ``q(1 - 1e-4)`` of each marginal, measured on the fine lattice **before** the reduction; 0 keeps the whole grid), ``detail`` (default 128 cells per axis, a ceiling reached by a power-of-two block sum, mass preservingly) and ``encoding`` (default ``f32b64``; ``json`` for the plain arrays alone). The surface block carries both lattices as origin, step and count, the fine bucket size and block factor each was reduced from, the exact marginals, the fine-lattice means and the realized window. **No class method yet**: reach it through ``charts.build_chart_doc`` and :func:`~aggregate.plots.plot_chartdoc`.
 
@@ -250,11 +252,11 @@ Panel by panel
      - mean, 1-in-200, both full weight
      - log x, log y, full x
    * - ``agg`` / lee
-     - ``p``, Non-exceeding probability, ``(0, 1)``, paired with ``return_period`` (log, ``1 .. 1e9``)
+     - ``p``, Non-exceeding probability, ``(0, 1)``, paired with ``return_period`` (log, ``1 .. 1e9``) and with ``survival``, Exceeding probability, linear or log, ``(0, 1)``
      - ``outcome``, shared with the density panel
      - Aggregate and Severity, role ``cdf``
      - 1-in-100 and 1-in-250, faint
-     - log y, full y, return period, invert to "Distribution function"
+     - log y, full y, reflect, return period, invert to "Distribution function"
    * - ``port`` / density
      - ``outcome``, Loss, currency, linear or log, window, full
      - ``mass``, linear or log, ``(0, top)``
@@ -274,11 +276,11 @@ Panel by panel
      - break even at 0, mean
      - log y, full x
    * - ``pnl`` / lee
-     - ``p``, paired with ``return_period``
+     - ``p``, paired with ``return_period`` and ``survival``
      - ``outcome``, shared, linear only, full
      - the same series, role ``cdf``
      - break even (horizontal), 1-in-100 and 1-in-250 faint
-     - full y, return period, invert
+     - full y, reflect, return period, invert
    * - ``severity`` / density
      - ``loss``, currency, linear or log, ``0 .. isf(0.001)`` padded, full
      - ``pdf``, or Probability mass for a law with no density, linear or log, no window
@@ -286,11 +288,11 @@ Panel by panel
      - none, deliberately
      - log x, log y, full x
    * - ``severity`` / lee
-     - ``p``, paired with ``return_period``
+     - ``p``, paired with ``return_period`` and ``survival``
      - ``loss``, shared, linear or log, full
      - the same series, role ``cdf``
      - none
-     - log y, full y, return period, invert
+     - log y, full y, reflect, return period, invert
    * - ``reins`` / occurrence
      - ``claim``, Loss per claim, currency, **linear only**, window is the occurrence limit padded 2%, full is the grid
      - ``sev_density``, Occurrence density, **log only**, no window
@@ -298,29 +300,29 @@ Panel by panel
      - none
      - full x only
    * - ``reins`` / aggregate
-     - ``p``, paired with ``return_period``
+     - ``p``, paired with ``return_period`` and ``survival``
      - ``annual``, Aggregate loss, currency, linear or log, window from the gross curve, full
      - Gross, Ceded, Net again, as quantile curves
      - none
-     - log y, full y, return period, invert
+     - log y, full y, reflect, return period, invert
    * - ``distortion`` / square
-     - ``s``, probability, linear, ``(0, 1)``
-     - ``g(s)``, probability, linear, ``(0, 1)``
+     - ``s``, probability, linear, ``(0, 1)``, paired with ``s_complement``, ``1 - s``
+     - ``g(s)``, probability, linear, ``(0, 1)``, paired with ``g_complement``, ``1 - g(s)``
      - the distortion, the dual (optional), then identity
      - none
-     - none: the unit square **is** the window, and ``aspect='equal'`` is the whole point
+     - reflect, which draws the dual; nothing else, since the unit square **is** the window and ``aspect='equal'`` is the whole point
    * - ``envelope`` / cloud
-     - ``s``, ``(0, 1)``
-     - ``g(s)``, ``(0, 1)``
+     - ``s``, ``(0, 1)``, paired with ``s_complement``
+     - ``g(s)``, ``(0, 1)``, paired with ``g_complement``
      - Envelope (a ``y2`` band series, so the series is the region), ``n_resamples`` BiTVaR curves each carrying its weight, identity
      - none
-     - none; equal aspect
+     - reflect, which draws the envelope of the duals; equal aspect
    * - ``envelope`` / calibrated
      - ``s``, shared
      - ``g(s)``, shared
      - the band again, then CCoC, ``TVaR(p*)``, PH, Wang, Dual, then Avg extreme, then identity. **Panel omitted** where nothing is calibrated
      - none
-     - none; equal aspect
+     - reflect, which draws the envelope of the duals; equal aspect
    * - ``joint_surface`` / joint
      - ``x0``, resolved component label, currency
      - ``x1``, resolved component label, currency; z axis ``z``, density, linear or log
@@ -331,7 +333,7 @@ Panel by panel
 Rendering
 ~~~~~~~~~
 
-:func:`~aggregate.plots.plot_chartdoc` is the generic matplotlib renderer, and it draws any document the schema can express. Its five switches, ``log``, ``full_range``, ``return_period``, ``invert`` and ``kind``, select among the readings a document declares, each acting on every axis or panel that declares the reading and on no other. The class ``plot`` methods listed above are thin: they build the document and render it, so ``a.plot(log=True)`` and ``plot_chartdoc(build_chart_doc(a, 'agg'), log=True)`` are the same call.
+:func:`~aggregate.plots.plot_chartdoc` is the generic matplotlib renderer, and it draws any document the schema can express. Its six switches, ``log``, ``full_range``, ``reflect``, ``return_period``, ``invert`` and ``kind``, select among the readings a document declares, each acting on every axis or panel that declares the reading and on no other. The class ``plot`` methods listed above are thin: they build the document and render it, so ``a.plot(log=True)`` and ``plot_chartdoc(build_chart_doc(a, 'agg'), log=True)`` are the same call.
 
 The renderer chooses stems, steps or a plain line from each series' declared ``support`` plus the room each atom gets, which is why the IR carries the support and not the drawing. Asked strictly for a panel kind it cannot realize, it raises :class:`~aggregate.charts.ir.ChartCapabilityError` rather than approximating silently. matplotlib and a 3-D surface is the live case: the honest non-strict answer is a labeled 2-D projection, and the title says so.
 

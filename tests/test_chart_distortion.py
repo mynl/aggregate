@@ -37,6 +37,20 @@ def test_document_shape(dist):
     assert g.y[0] == pytest.approx(float(dist.density_df['g'].iloc[0]))
 
 
+def test_both_axes_offer_their_reflection(dist):
+    """Reflecting the unit square in both axes gives the dual.
+
+    The labels are the literal coordinates rather than the dual's name:
+    every series on the panel reflects, the identity diagonal included,
+    and only the g curve reflects *to* the dual.
+    """
+    axes = {a.id: a for a in chart_distortion(dist).axes}
+    assert axes['s_complement'].complement_of == 's'
+    assert axes['g_complement'].complement_of == 'g'
+    assert axes['s_complement'].label == '1 - s'
+    assert axes['g_complement'].label == '1 - g(s)'
+
+
 def test_dual_optional(dist):
     from aggregate.charts import human_strings
     doc = chart_distortion(dist, dual=False)

@@ -2444,8 +2444,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     # ------------------------------------------------------------------
     # Plot: the net result density + distribution
     # ------------------------------------------------------------------
-    def plot(self, log=False, full_range=False, return_period=False,
-             invert=False):
+    def plot(self, log=False, full_range=False, reflect=False,
+             return_period=False, invert=False):
         """Plot the grand result: its mass, and its quantile (Lee) diagram.
 
         Parameters
@@ -2457,6 +2457,12 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         full_range : bool
             Show the whole result grid rather than the ``q(0.001)`` to
             ``q(0.999)`` crop.
+        reflect : bool
+            Read the Lee panel against the exceeding probability rather
+            than the non-exceeding one, so the curve drawn is the survival
+            function. With ``return_period`` it is the *upside* tail that
+            is spread, ``T = 1 / (1 - p)``, which is a reading of a signed
+            result no other combination reaches.
         return_period : bool
             Read the Lee panel against return period. A P&L is
             interrogated from its shortfall, so ``T = 1 / p``.
@@ -2483,8 +2489,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         from .plots import plot_chartdoc
         self.figure = plot_chartdoc(
             build_chart_doc(self, 'pnl'),
-            log=log, full_range=full_range, return_period=return_period,
-            invert=invert)
+            log=log, full_range=full_range, reflect=reflect,
+            return_period=return_period, invert=invert)
         return self.figure
 
     # ------------------------------------------------------------------

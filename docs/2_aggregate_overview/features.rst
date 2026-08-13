@@ -959,6 +959,27 @@ worker:
     @savefig features_return_period.png scale=20
     simple.plot(return_period=True)
 
+Reflected (survival) readings (a269)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``reflect=True`` reads a probability axis as its complement, ``1 - v``. On the
+Lee panel that is the exceeding probability, so the curve drawn is the survival
+function, and with ``invert=True`` it is ``S(x)`` the usual way round. The
+reflected axis declares a log reading that the non-exceeding probability does
+not, which is the reading a log axis was invented for:
+
+.. ipython:: python
+
+    @savefig features_reflect.png scale=20
+    simple.plot(invert=True, reflect=True, log=True)
+
+The two probability readings compose. On a loss, whose return period is
+``1 / (1 - p)``, ``reflect=True, return_period=True`` draws the curve
+``return_period=True`` draws by itself. On a signed ``PnL``, whose return period
+is the shortfall's ``1 / p``, the pair reads the upside tail instead. On a
+distortion or a pricing envelope, whose axes are both probabilities, reflecting
+both gives the dual.
+
 ``help`` on every first-class class (a98, a101, a142, a150, a180)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

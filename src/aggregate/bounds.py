@@ -528,7 +528,7 @@ class Bounds(HelpMixin):
     # Plots
     # ------------------------------------------------------------------
 
-    def plot_envelope(self, n_resamples=0):
+    def plot_envelope(self, n_resamples=0, reflect=False):
         """Plot the envelope of admissible prices, and what sits inside it.
 
         Two equal-aspect unit squares. The first is the min/max envelope
@@ -544,6 +544,10 @@ class Bounds(HelpMixin):
             How many bracketing curves to draw inside the band. It says how
             densely to show the set of admissible prices; zero draws the
             band alone.
+        reflect : bool
+            Reflect both axes, ``(s, g(s))`` to ``(1 - s, 1 - g(s))``,
+            which draws the envelope of the dual distortions. The only
+            reading the unit square declares.
 
         Returns
         -------
@@ -569,7 +573,8 @@ class Bounds(HelpMixin):
         from .charts import build_chart_doc
         from .plots import plot_chartdoc
         self.figure = plot_chartdoc(
-            build_chart_doc(self, 'envelope', n_resamples=n_resamples))
+            build_chart_doc(self, 'envelope', n_resamples=n_resamples),
+            reflect=reflect)
         return self.figure
 
     def plot_weights(self, ax=None, *, levels=20, colorbar=True):

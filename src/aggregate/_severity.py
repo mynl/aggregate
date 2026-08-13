@@ -1805,8 +1805,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         #    four analytic specials, plus any histogram with a layer).
         return _numerical_moms(self)
 
-    def plot(self, n=None, log=False, full_range=False, return_period=False,
-             invert=False):
+    def plot(self, n=None, log=False, full_range=False, reflect=False,
+             return_period=False, invert=False):
         """Plot the severity: its density, and its quantile (Lee) diagram.
 
         Parameters
@@ -1820,6 +1820,12 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         full_range : bool
             Show the whole computed grid, out to the 1-in-100,000 loss,
             rather than the crop at the 0.1% exceedance.
+        reflect : bool
+            Read the Lee panel against the exceeding probability rather
+            than the non-exceeding one, so the curve drawn is the survival
+            function. With ``invert`` it is ``S(x)`` the usual way round,
+            and that axis offers a log reading where the non-exceeding one
+            does not.
         return_period : bool
             Read the Lee panel against return period rather than
             non-exceedance probability.
@@ -1854,8 +1860,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         options = {} if n is None else {'n': n}
         self.figure = plot_chartdoc(
             build_chart_doc(self, 'severity', **options),
-            log=log, full_range=full_range, return_period=return_period,
-            invert=invert)
+            log=log, full_range=full_range, reflect=reflect,
+            return_period=return_period, invert=invert)
         return self.figure
 
 

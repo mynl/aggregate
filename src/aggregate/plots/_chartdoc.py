@@ -351,10 +351,17 @@ def _value_color(series_list, value):
     return _house_ramp()(VALUE_RAMP_FLOOR + (1 - VALUE_RAMP_FLOOR) * at)
 
 
-def _paired_reading(doc, axis_id):
-    """The paired return-period axis for ``axis_id``, if the document has one."""
+def _paired_reading(doc, axis_id, attr='reciprocal_of'):
+    """The paired axis declaring ``attr`` of ``axis_id``, if there is one.
+
+    Two pointers name a paired reading, ``reciprocal_of`` (the return
+    period) and ``complement_of`` (the reflection), and both are read the
+    same way: an undrawn axis in ``doc.axes`` naming the drawn one it is an
+    alternative reading of. The default keeps the older caller reading as
+    it did.
+    """
     for a in doc.axes:
-        if a.reciprocal_of == axis_id:
+        if getattr(a, attr) == axis_id:
             return a
     return None
 
@@ -373,6 +380,28 @@ def _return_periods(values, how):
     with np.errstate(divide='ignore', invalid='ignore'):
         t = 1.0 / (1.0 - v) if how == 'complement' else 1.0 / v
     return np.where(np.isfinite(t) & (t > 0.0), t, np.nan)
+
+
+def _reading_map(reflected, period):
+    """The coordinate map for one axis, or ``None`` where it is the identity.
+
+    Both paired readings are changes of coordinate on the same curve, so
+    they compose into one callable applied wherever the document's numbers
+    are read: the reflection first, then the return period, which is the
+    order the two declarations are in. ``None`` for an axis asked for
+    neither, so the common case allocates nothing and the callers that
+    branch on "is there a map" keep reading as they did.
+    """
+    if not reflected and period is None:
+        return None
+
+    def apply(values):
+        v = np.asarray(values, dtype=float)
+        if reflected:
+            v = 1.0 - v
+        return v if period is None else _return_periods(v, period)
+
+    return apply
 
 
 def _legend_corner(drawn, window):
@@ -438,7 +467,7 @@ def _panel_window(window, values):
 
 
 def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
-                     return_period=False, invert=False):
+                     return_period=False, invert=False, reflect=False):
     """Render one 'xy' panel: role-styled curves, gaps broken, marks drawn.
 
     ``return_period`` swaps a drawn probability axis for the paired reading
@@ -446,35 +475,77 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     data: the same curve, interrogated at 1 in 200 rather than at 0.995.
     Panels the document offers no pairing for are untouched.
 
+    ``reflect`` is the other change of coordinates on a probability axis,
+    ``v`` to ``1 - v``, again where the document declares it
+    (:attr:`~aggregate.charts.ir.ChartAxis.complement_of`). A non-exceeding
+    probability becomes the exceedance, so the quantile function drawn
+    against it is the survival function, and the unit square of a
+    distortion reflected in both axes is its dual.
+
     ``invert`` exchanges the two axes of a panel that declares itself
     invertible, drawing the same pairs the other way round: a quantile
     function becomes the distribution function it inverts. Everything that
     follows reads the axes rather than the panel, so the exchange is the
     only thing that has to happen: the ladder picks a right-continuous step
     where it was picking a left-continuous one, the window and the labels
-    follow their axes, and a paired return-period reading rides along on
-    whichever axis it was attached to.
+    follow their axes, and a paired reading rides along on whichever axis
+    it was attached to.
+
+    Notes
+    -----
+    **The atomic ladder needs no reflected case, and it looks like it
+    should.** :func:`_draw_atomic` picks its step direction off the axis
+    units, and a reflected probability axis is still a probability, so the
+    same rung is chosen. Reflection reverses the direction the curve is
+    monotone in, so a right-continuous step ought to become
+    left-continuous, and it does, for free: matplotlib's step drawstyles
+    are defined on the **order of the points given**, not on the direction
+    of the axis. Points ``(x0, y0)`` and ``(x1, y1)`` with ``x0 < x1`` draw
+    their corner at ``(x1, y0)``; reflected, the same two points draw it at
+    ``(1 - x1, y0)``, which is that corner mirrored. The picture is the
+    mirror of the picture, which is what was asked for. This is the same
+    reason ``invert`` needed no explicit switch.
     """
     axes = {a.id: a for a in doc.axes}
     x_axis, y_axis = axes[panel.x_axis], axes[panel.y_axis]
-    x_map = y_map = None
+    x_reflected = y_reflected = False
+    x_period = y_period = None
+    if reflect:
+        pair = _paired_reading(doc, panel.x_axis, 'complement_of')
+        if pair is not None:
+            x_axis, x_reflected = pair, True
+        pair = _paired_reading(doc, panel.y_axis, 'complement_of')
+        if pair is not None:
+            y_axis, y_reflected = pair, True
     if return_period:
         how = doc.meta.get('return_period_map', 'reciprocal')
+        # Both readings on one axis: the return-period axis is the one
+        # shown, and what is left to do to an already reflected axis is
+        # the reciprocal, whatever the document's own map says. That is
+        # not a special case but the definition, since 'complement' *is*
+        # reflect-then-reciprocal (see RETURN_PERIOD_MAPS). On a loss it
+        # redraws the curve return period drew alone; on a signed outcome
+        # it reads the upside tail instead of the shortfall.
         pair = _paired_reading(doc, panel.x_axis)
         if pair is not None:
-            x_axis, x_map = pair, how
+            x_axis, x_period = pair, 'reciprocal' if x_reflected else how
         pair = _paired_reading(doc, panel.y_axis)
         if pair is not None:
-            y_axis, y_map = pair, how
+            y_axis, y_period = pair, 'reciprocal' if y_reflected else how
+    x_map = _reading_map(x_reflected, x_period)
+    y_map = _reading_map(y_reflected, y_period)
     inverted = bool(invert) and panel.invertible
     if inverted:
         x_axis, y_axis = y_axis, x_axis
         x_map, y_map = y_map, x_map
+        # The period travels with its axis too: the window rules below are
+        # keyed on it, and they read the axes after the exchange.
+        x_period, y_period = y_period, x_period
 
     def coords(values, mapping):
         out = np.array([np.nan if v is None else v for v in values],
                        dtype=float)
-        return _return_periods(out, mapping) if mapping else out
+        return out if mapping is None else mapping(out)
 
     drawn = []
     for s in series_list:
@@ -488,7 +559,12 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     all_x = np.concatenate([x for _, x, _, _ in drawn]) if drawn else np.array([])
     all_y = np.concatenate([y for _, _, y, _ in drawn]) if drawn else np.array([])
     x_window = _panel_window(_axis_window(x_axis, full), all_x)
-    if x_map and _axis_window(x_axis, full) is None:
+    if x_period and _axis_window(x_axis, full) is None:
+        # Keyed on the return period specifically, never on "a map is
+        # present": the cap exists because the quantile function saturates
+        # and T diverges, and a reflected probability axis is bounded in
+        # [0, 1] with nothing to cap.
+        #
         # Nothing declared a window for the return-period reading, and its
         # top is the saturating end of the quantile function, so the house
         # cap stands in: a billion-year event is past anyone's question.
@@ -538,20 +614,26 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
         # A mark names the axis it sits on, so exchanged axes exchange it too.
         orient = m.orient if not inverted else ('h' if m.orient == 'v' else 'v')
         at, mapping = m.at, (x_map if orient == 'v' else y_map)
-        if mapping:
-            at = float(_return_periods(np.array([at]), mapping)[0])
+        if mapping is not None:
+            at = float(mapping([at])[0])
             if not np.isfinite(at):
                 continue
         line = ax.axvline if orient == 'v' else ax.axhline
         line(at, lw=0.75 if not m.faint else 0.5, color='C7', ls='--',
              alpha=0.45 if m.faint else 1.0)
-    # A paired reading re-slices the panel: the deep tail a return-period
+    # A return-period reading re-slices the panel: the deep tail such an
     # axis exists to show sits far outside the window computed for the
     # probability reading, so the companion axis follows the data instead.
     # The compositor's quantile worker does the same by relim-and-autoscale.
+    #
+    # Keyed on the period and not on "a map is present", for the same
+    # reason the cap above is. Reflection is a bijection of [0, 1] onto
+    # itself, so it re-slices nothing and the companion window must stand;
+    # and the reflected axis carries its own window from the emitter,
+    # which is the whole point of declaring it as a paired axis.
     x_scale, y_scale = _axis_scale(x_axis, log), _axis_scale(y_axis, log)
-    y_window = None if x_map else _axis_window(y_axis, full)
-    x_only = None if y_map else x_window
+    y_window = None if x_period else _axis_window(y_axis, full)
+    x_only = None if y_period else x_window
     if panel.aspect == 'equal' and x_scale == y_scale:
         x_only = y_window = _square_window(x_only, y_window, all_x, all_y)
     _apply_axis(ax, 'x', x_axis, x_scale, x_only, _decade_floor(all_x))
@@ -580,7 +662,8 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
 
 
 def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
-                  return_period=False, invert=False, kind=None):
+                  reflect=False, return_period=False, invert=False,
+                  kind=None):
     """Render a chart document with matplotlib.
 
     Parameters
@@ -603,11 +686,24 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
         Read every axis that carries a ``full_range`` at its full extent
         instead of at the window it suggests. Axes carrying only a
         suggestion are untouched.
+    reflect : bool
+        Read every probability axis the document pairs with its complement
+        as that complement (:attr:`ChartAxis.complement_of`), the map ``v``
+        to ``1 - v``. A non-exceeding probability becomes the exceedance,
+        so a Lee panel draws the quantile against the exceedance and,
+        inverted, draws the survival function, which is the reading a log
+        axis exists for; the unit square of a distortion reflects in both
+        axes and gives the dual. Axes with no complement declared are
+        untouched.
     return_period : bool
         Draw a probability axis the document pairs with a return-period
         reading as that reading (:attr:`ChartAxis.reciprocal_of`), which
         spreads the rare tail so it can be read off directly. The
-        transform comes from ``meta['return_period_map']``.
+        transform comes from ``meta['return_period_map']``, except on an
+        axis already read reflected, where what is left to do to it is the
+        reciprocal by the definition of the two maps: on a loss that is
+        the same curve this switch draws by itself, and on a signed
+        outcome it is the upside tail rather than the shortfall.
     invert : bool
         Exchange the two axes of every panel that declares itself
         invertible, which draws the same pairs the other way round: a Lee
@@ -633,7 +729,7 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
 
     Notes
     -----
-    The four reading switches act on **every** axis or panel that declares
+    The five reading switches act on **every** axis or panel that declares
     the reading and on no other, which is the same surfacing rule the app
     applies to its control strip: declaring a reading on an axis asserts
     both that it is meaningful there and that it is reasonable for it to
@@ -709,8 +805,8 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
                            or f'{panel_title}, inverted')
         if realization == 'xy':
             _render_xy_panel(panel_ax, doc, panel, series, log=log,
-                             full=full_range, return_period=return_period,
-                             invert=invert)
+                             full=full_range, reflect=reflect,
+                             return_period=return_period, invert=invert)
         else:
             _render_grid_panel(panel_ax, doc, panel, series, log=log)
             if realization in _DEGRADED:

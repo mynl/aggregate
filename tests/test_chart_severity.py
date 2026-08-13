@@ -89,6 +89,14 @@ def test_the_probability_axis_offers_the_return_period(sev):
     assert doc.meta['return_period_map'] == 'complement'   # a severity is a loss
 
 
+def test_the_probability_axis_offers_its_reflection(sev):
+    """The survival function, and the log reading only it admits."""
+    ax = axes_of(chart_severity(sev))
+    assert ax['survival'].complement_of == 'p'
+    assert ax['survival'].scales == ('linear', 'log')
+    assert ax['p'].scales == ('linear',)
+
+
 def test_a_severity_is_continuous_unless_it_has_no_density(sev):
     assert {s.support for s in chart_severity(sev).series} == {'continuous'}
     assert {s.support for s in chart_severity(build(_DISCRETE)).series} == \

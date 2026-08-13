@@ -71,6 +71,37 @@ def test_the_adverse_tail_is_the_low_one(pnl):
         assert marks[f'1-in-{t}'].at == pytest.approx(1 / t)
 
 
+def test_reflecting_a_signed_chart_reads_the_upside_tail(pnl):
+    """The one picture the switches reach only together.
+
+    A payoff's return period is 1 / p, the shortfall. Reflected, the axis
+    is the exceedance and the reading is 1 / (1 - p), the upside, which is
+    the return period of doing *well*.
+    """
+    from aggregate.plots import plt
+    ax = axes_of(chart_pnl(pnl))
+    assert ax['survival'].complement_of == 'p'
+    shortfall = pnl.plot(return_period=True).axes[1]
+    upside = pnl.plot(reflect=True, return_period=True).axes[1]
+    assert upside.get_xlabel() == shortfall.get_xlabel() == 'Return period'
+    # Read against the document's own probabilities: recovering them from
+    # the shortfall reading would cancel away the tail this is about.
+    p = np.asarray(chart_pnl(pnl).series[1].x_values, dtype=float)
+    plain = np.asarray(
+        [ln for ln in shortfall.get_lines()
+         if len(ln.get_xdata()) > 5][0].get_xdata(), dtype=float)
+    drawn = np.asarray(
+        [ln for ln in upside.get_lines()
+         if len(ln.get_xdata()) > 5][0].get_xdata(), dtype=float)
+    # p reaches 1 exactly where the grid saturates, and the reading there
+    # is a gap rather than a number.
+    seen = p < 1.0
+    np.testing.assert_allclose(plain[seen], 1.0 / p[seen])
+    np.testing.assert_allclose(drawn[seen], 1.0 / (1.0 - p[seen]))
+    assert np.isnan(drawn[~seen]).all()
+    plt.close('all')
+
+
 def test_break_even_is_a_reading_in_both_panels(pnl):
     """Vertical where the outcome is on x, horizontal where it is on y."""
     marks = [m for m in chart_pnl(pnl).marks if m.role == 'break_even']

@@ -289,3 +289,37 @@ def test_format_html_spread_preserves_newlines():
 def test_format_bad_layout_raises():
     with pytest.raises(ValueError):
         format_program(_SMOKE, layout='zigzag')
+
+
+# ----------------------------------------------------------------------
+# [DecL-Paren-Arithmetic] (1.0.0a268): expressions collapse to their value
+# ----------------------------------------------------------------------
+# `+`, `-` and `*` inside parentheses evaluate at parse time exactly as `/`,
+# `**` and `exp` always have, so the writer never sees a formula. That is the
+# "canonical, not verbatim" contract stated in the ``decl_writer`` module
+# docstring, and it means `format_program` over user source replaces the
+# formula with its evaluated literal. Formula-preserving reformatting would be
+# a token-level text tool, not a spec change.
+
+_PAREN_MATH_PROGRAMS = [
+    'agg PaExposure (4 + 3*2) claims sev lognorm 100 cv 2 poisson',
+    'agg PaPremium 5 claims (100_000/(1-.25)) premium sev lognorm 100 cv 2 poisson',
+    'agg PaScale 10 claims sev (exp(-1 * .4**2/2)) * lognorm .4 poisson',
+    'agg PaLayer 5 claims (500*2) xs (0+0) sev lognorm 100 cv 2 poisson',
+    'agg PaReins 5 claims 1000 xs 0 sev lognorm 100 cv 2 '
+    'occurrence net of (100*2) xs (50 + 50) poisson',
+]
+
+
+@pytest.mark.parametrize('program', _PAREN_MATH_PROGRAMS)
+def test_paren_math_collapses_and_is_a_fixed_point(program):
+    """Paren arithmetic decompiles to evaluated literals, and settles at once."""
+    text1 = format_program(program)
+    assert '(' not in text1.split('note{')[0], f'formula survived: {text1!r}'
+    assert format_program(text1) == text1
+
+
+def test_paren_math_exposure_renders_its_value():
+    """The worked example from the plan: ``(4 + 3*2) claims`` reads ``10 claims``."""
+    text = format_program(_PAREN_MATH_PROGRAMS[0])
+    assert '10 claims' in text

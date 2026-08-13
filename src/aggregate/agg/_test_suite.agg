@@ -130,7 +130,9 @@ agg E.TSev14 10 claims inf xs 10 sev lognorm 10 cv 0.8 poisson;
 agg E.TSev15 5 claims 200 xs  0 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity};
 agg E.TSev16 5 claims 200 xs  0 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity};
 agg E.TSev17 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity};
-agg E.TSev18 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity}
+agg E.TSev18 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity};
+# computed scale: +, - and * are legal inside parentheses (1.0.0a268)
+agg E.TSev19 1 claim sev (exp(-1 * .4**2/2)) * lognorm .4 fixed              note{the lognormal mean normalizer exp(-sigma^2/2), written inline}
 
 # Specifying exposure
 # ===================
@@ -138,7 +140,8 @@ agg F.Expos01   10 claims         sev lognorm 50 cv 0.8 poisson    note{specify 
 agg F.Expos02  500 loss           sev lognorm 50 cv 0.8 poisson    note{specify expected loss, derive number of claims};
 agg F.Expos03 1000 prem at .5 lr  sev lognorm 50 cv 0.8 poisson    note{specify premium and loss ratio, derive number of claims};
 agg F.Expos04   10 claims 600 premium sev lognorm 50 cv 0.8 poisson    note{claims sizing with an informational (FYI) premium};
-agg F.Expos05  500 loss 650 premium   sev lognorm 50 cv 0.8 poisson    note{loss sizing with an informational (FYI) premium}
+agg F.Expos05  500 loss 650 premium   sev lognorm 50 cv 0.8 poisson    note{loss sizing with an informational (FYI) premium};
+agg F.Expos06 (4 + 3*2) claims (100_000/(1-.25)) premium sev lognorm 50 cv 0.8 poisson    note{a computed claim count and a grossed up premium, both inline}
 
 # Mixed and Spliced severities
 # ============================

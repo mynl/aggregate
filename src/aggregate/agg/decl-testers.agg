@@ -1216,3 +1216,25 @@ agg FYI.Labeled 5 claims as counts 20000 premium as booked sev lognorm 100 cv 2 
 agg FYI.Quoted 500 loss 650 premium as "Booked Premium" sev lognorm 100 cv 2 poisson                                note{quoted premium label};
 agg FYI.Layered 5 claims 20000 premium 1000 xs 100 sev lognorm 100 cv 2 poisson                                     note{a layer after the suffix: xs vs premium disambiguates};
 pnl FYI.Engine inherit premium less agg FYI.EngineE 5 claims 20000 premium sev lognorm 100 cv 2 poisson             note{inherit premium reads the engine FYI premium}
+
+# ============================================================
+# PA. Full arithmetic inside parentheses (1.0.0a268)
+# ============================================================
+# [DecL-Paren-Arithmetic]: `+`, `-` and `*` join `/`, `**`, `^` and `exp`,
+# legal only inside parentheses. The paren gate is load bearing: those three
+# operators already mean something in severity scaling and shifting and in the
+# builtin_agg algebra, and NUMBER absorbs a glued leading minus, so admitting
+# them into a bare expression would make `2 * 3 * agg.X` and `[1 -2]` ambiguous.
+# A paren holds exactly one expression, never a list, so `(1-.25)` has
+# subtraction as its only reading. Everything evaluates at parse time, so the
+# spec carries plain floats and the canonical text shows the evaluated literal:
+# PA.Head decompiles as `10 claims 133333.33333333334 premium`. The lines below
+# put paren math in each slot that takes a number. See
+# tests/test_paren_arithmetic.py.
+agg PA.Head (4 + 3*2) claims (100_000/(1-.25)) premium 1000 xs 0 sev (exp(-1 * .4**2/2)) * lognorm .4 poisson       note{the target program: computed count, computed FYI premium, computed scale};
+agg PA.Scale 10 claims sev (exp(-1 * .4**2/2)) * lognorm .4 poisson                                                 note{the lognormal mean normalizer exp(-sigma^2/2) written inline};
+agg PA.Layer 5 claims (500*2) xs (0+0) sev lognorm 100 cv 2 poisson                                                 note{a computed layer and attachment};
+agg PA.Freq 10 claims dsev [1] binomial (0.2 + 0.3)                                                                 note{a computed frequency parameter};
+agg PA.Range dfreq [(1+0):(3*2)] dsev [1]                                                                           note{a computed range: the six dice outcomes};
+agg PA.Reins 5 claims 1000 xs 0 sev lognorm 100 cv 2 occurrence net of (100*2) xs (50 + 50) poisson                  note{a computed reinsurance layer};
+agg PA.Vector dfreq [1] dsev [1 -2]                                                                                 note{brackets are unchanged: a glued minus keeps the two element list}

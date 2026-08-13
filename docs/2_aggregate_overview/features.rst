@@ -1726,9 +1726,15 @@ evaluates to its value and is never stored:
 
     print(build('3'), build('2 ** 3'), f'{build("exp(1)"):.6f}')
 
-Note that the top-level production accepts a subset of arithmetic: ``1 + 2`` and
-a trailing ``2 * 3`` still do not parse there, because ``*`` is the severity
-scale operator.
+Note that a *bare* expression accepts a subset of arithmetic: ``1 + 2`` and a
+trailing ``2 * 3`` still do not parse, because ``*`` is the severity scale
+operator and ``+`` the severity shift. Since 1.0.0a268 those operators are legal
+inside parentheses, where a single expression is the only reading, so
+``(1 + 2)`` and ``(2 * 3)`` both evaluate:
+
+.. ipython:: python
+
+    print(build('(1 + 2)'), build('(2 * 3)'), build('(4 + 3*2)'))
 
 Pedagogy helpers
 ----------------

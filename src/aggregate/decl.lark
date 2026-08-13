@@ -661,11 +661,16 @@ numberl: numberl expr   -> numberl_cons
 // ======================================================================
 // Expression atoms (the DecL math sub-language)
 // ----------------------------------------------------------------------
-// Precedence (tightest first):  ()  >  EXP  >  EXPONENT (** / ^)  >  /
-// EXPONENT is right-associative (2**3**4 == 2**(3**4));
-// DIVIDE is left-associative (1/2/3 == (1/2)/3).
-// `?term` and `?factor` are inlined when they have a single child, so
-// the transformer only sees the aliased nodes (atom_divide, atom_exp,
+// Precedence (tightest first):  ()  >  EXP  >  EXPONENT (** / ^)  >
+// TIMES / DIVIDE  >  PLUS / MINUS.
+// EXPONENT is right-associative (2**3**4 == 2**(3**4)); every other
+// operator is left-associative (1/2/3 == (1/2)/3).
+// A bare expression sees only `/`, `**`, `^`, `exp` and parentheses.
+// `+`, `-` and `*` are legal ONLY inside parentheses (the paren island,
+// `?sum` / `?product` below).
+// `?expr`, `?term`, `?factor`, `?sum` and `?product` are inlined when they
+// have a single child, so the transformer only sees the aliased nodes
+// (atom_add, atom_subtract, atom_multiply, atom_divide, atom_exp,
 // atom_exponent, atom_parens, atom_number).
 // ======================================================================
 
@@ -679,7 +684,22 @@ numberl: numberl expr   -> numberl_cons
        | atom
 
 atom: NUMBER                    -> atom_number
-    | "(" expr ")"              -> atom_parens
+    | "(" sum ")"               -> atom_parens
+
+// Full arithmetic, reachable ONLY through the parentheses above (the paren
+// island). Bare expressions stay on the term / factor ladder: admitting
+// these operators there would collide with severity shift and scale
+// arithmetic and with the builtin_agg algebra, and would destabilize vector
+// lexing, because NUMBER absorbs a glued leading minus. Inside parentheses
+// none of that exists: a paren holds exactly one expression, never a list,
+// so `(1-.25)` has subtraction as its only viable reading.
+?sum: sum PLUS product          -> atom_add
+    | sum MINUS product         -> atom_subtract
+    | product
+
+?product: product TIMES factor    -> atom_multiply
+        | product DIVIDE factor   -> atom_divide
+        | factor
 
 // ======================================================================
 // Terminals

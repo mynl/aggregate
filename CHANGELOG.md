@@ -20,6 +20,29 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a268
+
+**[DecL-Paren-Arithmetic] `+`, `-` and `*` join the DecL expression sub-language, legal inside parentheses.** Every slot that takes a number has always accepted an expression (`/`, `**`, `^`, `exp`, parentheses), evaluated eagerly in the transformer. What was missing were the three operators that let a user write a computed exposure, a grossed-up premium, or a severity normalizer inline. The author's target program now builds:
+
+```
+agg TEST (4 + 3*2) claims (100_000/(1-.25)) premium 1000 xs 0
+    sev (exp(-1 * .4**2/2)) * lognorm .4 poisson
+```
+
+Ten claims, a premium grossed up for a 25% expense ratio, and the lognormal mean normalizer `exp(-sigma^2/2)` that makes the severity mean 1. The exposure head takes it, so does the informational premium suffix (`[FYI-Premium-Exposure-Head]`, a266), and so do layers, frequency parameters, severity scales and shifts, reinsurance clauses, collars, and ranges (`dfreq [(1+0):(3*2)]`).
+
+**The parenthesis requirement is the design, not a limitation.** Outside parentheses those three characters already mean something: `*` is the severity scale operator and the portfolio homogeneous multiplier, `+` is the severity shift and the portfolio sum, `-` is severity negation, and `NUMBER` absorbs a glued leading minus so `[1 -2]` lexes as a two-element vector. Admitting the operators into bare expressions would make `2 * 3 * agg.X` genuinely ambiguous and would destabilize vector lexing. Inside parentheses none of that exists, because a parenthesis holds exactly one expression and never a list, so the only viable reading of `(1-.25)` is the subtraction. Grammar-wise this is a paren island: a new `sum` / `product` ladder reachable only from `atom`'s parenthesized alternative, with three one-line transformer methods beside the existing `atom_*` group. Precedence runs `()`, `exp`, `**` and `^`, `*` and `/`, `+` and `-`; `**` stays right-associative (`(2**3**2)` is 512), everything else left-associative.
+
+**Three behaviors are documented rather than changed.** A minus glued to a literal is part of that literal and binds tighter than `**`, so `(-.4**2)` is +0.16 where Python's `-.4**2` is -0.16; negate a computed value with `(-1 * x)` or `(0 - x)`, which is what the normalizer above does. Parentheses hold one expression, never a list, so `(1 -2)` is -1 while `[1 -2]` keeps its two-element reading and `[1 - 2]` stays a parse error. A percentage literal keeps its percent reading only when used literally, so `(50% + 1)` is 1.5 and a computed value in the `po` placement position reads as an absolute amount. A unary-minus production was considered and rejected: it would make `(-3)` lex two ways and make the value of `(-3**2)` depend on which lexing won, exactly what the ambiguity guard exists to keep out.
+
+**Round trip: expressions evaluate at parse time, so the canonical text shows the evaluated literal.** `spec_to_decl` and `format_program` are unchanged, because the writer only ever sees floats. `(4 + 3*2) claims` decompiles as `10 claims` and `(100_000/(1-.25)) premium` as `133333.33333333334 premium`. That is the long-standing canonical, not verbatim, contract, the same one that collapses `exp(.5)` to its float. The consequence worth naming: running `format_program` over user source replaces a formula with its value. Formula-preserving reformatting would be a token-level text tool, not a spec change.
+
+**Nothing existing moved.** No new terminals: `PLUS`, `MINUS`, `TIMES` and `EXP` were already in the grammar and already carried `_TERMINAL_LABELS` entries, so `test_grammar_sync` passes with zero edits to the Pygments lexer, `agg.sublime-syntax`, or the labels, and the web app's `decl-keywords.json` is owed nothing (`+ - * ( )` are punctuation to a highlighter). The spec snapshot regen moved only the two new corpus lines, every pre-existing program parsing byte for byte as before. The ambiguity sweep gained twenty paren-math programs, each asserted to have exactly one parse; a new `tests/test_paren_arithmetic.py` pins the evaluation ladder, the gate negatives (bare `4 + 3*2 claims`, `[1 - 2]`, `(1 2)`, `(1 +)` all still parse errors) and the unparser collapse. Corpus: `_test_suite.agg` sections E and F, `decl-testers.agg` section PA.
+
+**Docs edited, rebuild pending** (house rule keeps the Sphinx build outside the verification loop): a new Numeric Expressions section in `docs/4_dec_Language_Reference.rst` stating the operator set, the precedence ladder, the paren gate and the three documented behaviors; the grammar listing regenerated; and the stale note in `features.rst` that said `1 + 2` does not parse corrected to the paren form.
+
+---
+
 ## 1.0.0a267
 
 **[BS-Window-Formats] the grid-sizing exhibit prints its window like an amount, not like a float's repr.** `bs_window_df` gained `W` and `coverage` at a254 (`[BS-Window-Widen]`, round 6 ask 2) and the widening carried no formats, so the exhibit's deciding columns printed as raw float text (`31.30829289650644` for a window edge), which is exactly the curation hazard that ruling warned about, one door down. The registration now carries `BS_WINDOW_FORMATS` (exported alongside `SHARPEN_FORMATS`): the window edges `x_min` / `x_max` and the width `W` print as amounts (`,.0f`, matching how `SHARPEN_FORMATS` treats the same loss-axis quantities), `bs` in significant digits (`,.4g`, since a bucket size can be dyadic-fractional), and `clipped` in scientific notation (`.2e`, an estimated far-tail mass where only the exponent separates a good row from a perfect one). `coverage` is a string upstream (`'1-1e-12'`) and needs nothing.

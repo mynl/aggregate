@@ -123,3 +123,56 @@ def test_sweep_actually_covers_the_corpus():
     assert len(statements) > 500, f'only {len(statements)} statements swept'
     assert 'decl-testers.agg' in files
     assert '_test_suite.agg' in files
+
+
+# ----------------------------------------------------------------------
+# [DecL-Paren-Arithmetic] (1.0.0a268): the paren island must stay unambiguous
+# ----------------------------------------------------------------------
+#: Programs exercising ``+``, ``-`` and ``*`` inside parentheses, each of which
+#: must have exactly one parse.
+#:
+#: The paren gate exists precisely because these operators are ambiguous at
+#: bare expression level: ``PLUS`` / ``MINUS`` / ``TIMES`` already carry
+#: meaning in ``sev1`` / ``sev2`` and the ``builtin_agg`` algebra, and
+#: ``NUMBER`` absorbs a glued leading minus. Inside parentheses a single
+#: expression is the only derivation, so ``(1 -2)`` reads as subtraction while
+#: the vector ``[1 -2]`` keeps its two-element reading. The cases below cover
+#: the operator ladder, the glued-minus quirk, and embedded uses in a layer, a
+#: frequency parameter, a range, a reinsurance clause and a severity scale.
+PAREN_MATH_PROGRAMS = [
+    '(4 + 3*2)',
+    '(1-.25)',
+    '(1 -2)',
+    '(4 -3)',
+    '(2 - -3)',
+    '(-.4**2)',
+    '(0 - .4**2/2)',
+    '(2**3**2)',
+    '(2+3*4)',
+    '((2+3)*4)',
+    '(2**3)',
+    '(2*3)',
+    '(50% + 1)',
+    'exp(-1 * .4**2/2)',
+    'agg PA.Freq 10 claims dsev [1] binomial (0.2 + 0.3)',
+    'agg PA.Layer 5 claims (500*2) xs (0+0) sev lognorm 100 cv 2 poisson',
+    'agg PA.Range dfreq [(1+0):(3*2)] dsev [1]',
+    'agg PA.Scale 10 claims sev (exp(-1 * .4**2/2)) * lognorm .4 poisson',
+    'agg PA.Reins 5 claims 1000 xs 0 sev lognorm 100 cv 2 '
+    'occurrence net of (100*2) xs (50 + 50) poisson',
+    'agg PA.Head (4 + 3*2) claims (100_000/(1-.25)) premium 1000 xs 0 '
+    'sev (exp(-1 * .4**2/2)) * lognorm .4 poisson',
+]
+
+
+@pytest.mark.parametrize('program', PAREN_MATH_PROGRAMS)
+def test_paren_math_is_unambiguous(explicit_parser, program):
+    """Paren arithmetic adds no parse forest branches.
+
+    A failure means the sum / product ladder leaked out of the paren island and
+    started competing with severity or ``builtin_agg`` arithmetic, which is the
+    exact failure mode ``[Paren-Gate]`` was designed to prevent.
+    """
+    tree = explicit_parser.parse(program)
+    n = sum(1 for st in tree.iter_subtrees() if st.data == '_ambig')
+    assert n == 0, f'{program!r} has {n} ambiguous span(s)'

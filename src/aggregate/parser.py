@@ -2329,8 +2329,30 @@ class UnderwritingTransformer(Transformer):
         return [c[0]]
 
     # ----- expressions (DecL math sub-language) ----------------------
-    # ?expr / ?term / ?factor are inlined in the grammar — the
-    # transformer only sees the aliased nodes below.
+    # ?expr / ?term / ?factor / ?sum / ?product are inlined in the grammar,
+    # so the transformer only sees the aliased nodes below.
+    #
+    # `+`, `-` and `*` are legal only inside parentheses (the paren island,
+    # ?sum / ?product in decl.lark); a bare expression sees only `/`, `**`,
+    # `^`, `exp` and parentheses. Everything evaluates here at parse time,
+    # so the spec carries a plain float and the canonical decompiled text
+    # shows the evaluated literal.
+    #
+    # A _PercentNumber survives literal use only, by existing design: any
+    # arithmetic returns a plain float, so a computed value in the `po`
+    # placement position reads as an absolute amount, not a percentage.
+
+    def atom_add(self, c):
+        a, _, b = c
+        return a + b
+
+    def atom_subtract(self, c):
+        a, _, b = c
+        return a - b
+
+    def atom_multiply(self, c):
+        a, _, b = c
+        return a * b
 
     def atom_divide(self, c):
         a, _, b = c

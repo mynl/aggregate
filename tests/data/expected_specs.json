@@ -1708,6 +1708,23 @@
       "hints": ""
     }
   },
+  "agg E.TSev19 1 claim sev (exp(-1 * .4**2/2)) * lognorm .4 fixed              note{the lognormal mean normalizer exp(-sigma^2/2), written inline}": {
+    "kind": "agg",
+    "name": "E.TSev19",
+    "spec": {
+      "name": "E.TSev19",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_a": 0.4,
+      "sev_scale": 0.9231163463866358,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "the lognormal mean normalizer exp(-sigma^2/2), written inline",
+      "hints": ""
+    }
+  },
   "agg F.Expos01   10 claims         sev lognorm 50 cv 0.8 poisson    note{specify number of claims}": {
     "kind": "agg",
     "name": "F.Expos01",
@@ -1799,6 +1816,25 @@
       "sev_ub": "__inf__",
       "freq_name": "poisson",
       "note": "loss sizing with an informational (FYI) premium",
+      "hints": ""
+    }
+  },
+  "agg F.Expos06 (4 + 3*2) claims (100_000/(1-.25)) premium sev lognorm 50 cv 0.8 poisson    note{a computed claim count and a grossed up premium, both inline}": {
+    "kind": "agg",
+    "name": "F.Expos06",
+    "spec": {
+      "name": "F.Expos06",
+      "exp_en": 10.0,
+      "exp_premium": 133333.33333333334,
+      "sev_name": "lognorm",
+      "sev_mean": 50.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "a computed claim count and a grossed up premium, both inline",
       "hints": ""
     }
   },

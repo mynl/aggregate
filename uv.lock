@@ -12,7 +12,7 @@ resolution-markers = [
 
 [[package]]
 name = "aggregate"
-version = "1.0.0a264"
+version = "1.0.0a268"
 source = { editable = "." }
 dependencies = [
     { name = "greater-tables" },

@@ -7,7 +7,7 @@
    (the single source of truth). The railroad diagram is regenerated separately
    (see hacks/decl_railroad.py).
 
-.. updated 2026-06-08
+.. updated 2026-08-13
 
 
 This section describes how a DecL program is pre-processed, lexed, and parsed according to the grammar specification. It reports the results of interpreting the builtin test suite of programs.
@@ -69,6 +69,32 @@ names priority 3), which is what makes the lexing contextual.
    lexer) in 2026 replaced the SLY remapping trick with terminal priorities, and
    the grammar file is now the single source of truth for both terminals and
    rules.
+
+Numeric Expressions
+===================
+
+Every slot that takes a number accepts an arithmetic expression, evaluated at parse time: exposures, the informational premium, layers and attachments, frequency parameters, severity scales and shifts, reinsurance clauses, collars, and ranges.
+
+The operator set splits in two. A **bare** expression, one written without surrounding parentheses, admits division ``/``, exponentiation ``**`` or ``^``, the exponential ``exp(...)``, and parentheses. Addition ``+``, subtraction ``-`` and multiplication ``*`` are legal **only inside parentheses**::
+
+    agg TEST (4 + 3*2) claims (100_000/(1-.25)) premium 1000 xs 0
+        sev (exp(-1 * .4**2/2)) * lognorm .4 poisson
+
+Here ``(4 + 3*2)`` is a computed claim count of 10, ``(100_000/(1-.25))`` grosses a premium up for a 25% expense ratio, and ``(exp(-1 * .4**2/2))`` is the lognormal mean normalizer :math:`e^{-\sigma^2/2}` that makes the severity mean 1.
+
+The parenthesis requirement is a design decision, not an oversight. Outside parentheses those three characters already mean something else: ``*`` is the severity scale operator (``10 * lognorm 10 cv .09``) and the portfolio homogeneous multiplier (``2 * agg.MyLine``), ``+`` is the severity shift and the portfolio sum, and ``-`` is the severity negation. Admitting them into bare expressions would make ``2 * 3 * agg.X`` genuinely ambiguous. Inside parentheses none of that applies, because a parenthesis holds exactly one expression.
+
+Precedence runs, tightest first: parentheses, then ``exp``, then ``**`` and ``^``, then ``*`` and ``/``, then ``+`` and ``-``. Exponentiation is right-associative, so ``(2**3**2)`` is 512; everything else is left-associative, so ``(8/4/2)`` is 1.
+
+Three behaviors are worth knowing.
+
+**A minus sign glued to a number is part of that number, and so binds tighter than** ``**``. Writing ``(-.4**2)`` gives +0.16, because ``-.4`` lexes as a single numeric token and the square of a negative is positive. Python reads ``-.4**2`` as -0.16, because there the unary minus binds looser than the exponent. To negate a computed value in DecL, write ``(-1 * x)`` or ``(0 - x)``; the mean normalizer above uses the first form for exactly this reason.
+
+**Parentheses hold one expression, never a list.** ``(1 -2)`` is the subtraction -1. Brackets remain the list syntax and are unaffected: ``[1 -2]`` is still the two-element vector, and ``[1 - 2]`` is a parse error.
+
+**A percentage literal keeps its percent reading only when used literally.** Arithmetic returns a plain number, so ``(50% + 1)`` is 1.5, and a computed value in the ``po`` (part of) placement position reads as an absolute amount rather than a share.
+
+Expressions evaluate as the program parses, so the specification carries plain numbers and the formula is not retained. The canonical text that :func:`aggregate.decl_writer.spec_to_decl` and :func:`aggregate.decl_writer.format_program` produce therefore shows the evaluated literal: the program above decompiles with ``10 claims 133333.33333333334 premium``. This is the long-standing canonical, not verbatim, contract, the same one that collapses ``exp(.5)`` to its float.
 
 Dec Language Grammar Specification
 ===================================

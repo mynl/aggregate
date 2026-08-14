@@ -57,7 +57,7 @@ What "provisional" covers
 
 For :mod:`aggregate.charts`: the chart IR schema (:class:`~aggregate.charts.ir.ChartDoc` and every dataclass beside it), the field vocabularies, the canonical form and therefore the document hash, the registry, and the set of charts that exist. ``CHART_IR_VERSION`` is how a consumer detects a schema change: pin it and check it. Note that "frozen" on those dataclasses means instances are immutable, and version 1 being closed to additions is a rule about changing the schema in an orderly way. Neither is a promise across releases.
 
-For :mod:`aggregate.exhibits`: exhibit names, block structure, captions, row flags, the format constants, the :class:`~aggregate.exhibits.Perspective` vocabulary, and the shape of what :func:`~aggregate.exhibits.build_exhibit` returns.
+For :mod:`aggregate.exhibits`: exhibit names, block structure, captions, row flags, the format sheets (both their contents and the schema they are written in), the :class:`~aggregate.exhibits.Perspective` vocabulary, and the shape of what :func:`~aggregate.exhibits.build_exhibit` returns.
 
 Explicitly post-1.0, and not gating the release: conversion of the charts the app does not use, full convergence on matplotlib rendering the IR rather than drawing bespoke figures, the ``INSURED`` and ``REINSURER`` perspectives, and any exhibit meta-language.
 

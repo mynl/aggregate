@@ -62,6 +62,8 @@ The placement test for what belongs here: if deleting the web app would destroy 
 
 Two stages, and only the second costs anything. :func:`~aggregate.exhibits.exhibit_frames` is pure pandas and returns ``(block_name, frame, spec_kwargs)`` triples. :func:`~aggregate.exhibits.build_exhibit` converts those to IR, and is the only place greater_tables is imported, at the point of use.
 
+How each column reads comes from the **format sheets**, two YAML files shipped with the package and applied by :func:`~aggregate.exhibits.build_exhibit` after relabeling: ``formats-raw.yaml`` for the default reading of every named column and ``formats-insurer.yaml`` for the entries where the business reading differs. They are overridable from ``~/.aggregate`` and the working directory, nearest winning, the same rule a user ``.agg`` database follows. See :doc:`/3_reference/3_x_Exhibits`.
+
 Every served block carries **both** its formatted strings and its raw values, so a cell arrives as ``{'text': '17.50', 'raw': 17.5000001}``. The formatted string is this library's reading of a number and the raw value is the number, and a document that ships only the reading cannot be sorted numerically, downloaded at full precision, or drawn interactively at all. It costs about 1.5 times the payload, measured across every exhibit on an ``Aggregate`` and a ``PnL``, and it is a library default rather than a caller option because no consumer can put back what the document threw away. How many rows to ship **is** the caller's question, ``build_exhibit(..., max_rows=...)``, and a truncated block says so in its own notes.
 
 Perspective, and the INSURER default rule

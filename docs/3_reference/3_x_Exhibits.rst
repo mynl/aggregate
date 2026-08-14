@@ -30,6 +30,21 @@ Two stages
 
 Registration is open. App or user code may register a new type with ``summary.register(MyType)``, supplying a frames builder ``f(obj) -> [(block_name, DataFrame, spec_kwargs), ...]``.
 
+Format sheets
+-------------
+
+How a served column reads is declared in two YAML **format sheets** shipped with the package, not in the code that builds the block. ``formats-raw.yaml`` gives the default reading of every named column, keyed by column label; ``formats-insurer.yaml`` is an overlay holding only the entries where the business reading differs, so absent means same. A sheet's ``styles`` section names a reading once (``money``, ``ratio``, ``probability``, ``residual``) and every column that wears it points at the name; four style names are greater_tables' own semantic column tags (``ratio``, ``year``, ``date``, ``raw``), and a column pointing at one of those is stamped with the tag as well as the format.
+
+Because the sheet is keyed by label rather than by frame, it is also a registry of the column vocabulary: an entry asserts that a word means one thing across the package. Where one label really does mean two things, an ``exhibits`` section scopes an entry to a single exhibit, which is what keeps ``P`` reading as premium on the pricing tables and as the probability ladder on ``tail``.
+
+**Overriding follows the ``.agg`` rule.** The loader reads the shipped sheet, then the same file name in ``~/.aggregate``, then the working directory, nearest winning and merging per key, so a one-line local sheet changes one reading and inherits the rest::
+
+    # ./formats-raw.yaml
+    styles:
+      money: 'si'          # every amount in SI notation, this session
+
+Precedence, low to high: greater_tables' dtype and tag inference, the shipped raw sheet, the insurer overlay under that perspective, the user and working-directory sheets, then an explicit ``formatters`` entry in a frames builder, which always wins. Values may be format sugar, an int, a mapping of ``FormatSpec`` fields, or a style name, and never a callable: a callable never reaches the IR, so a sheet can only say things a client can re-render.
+
 .. currentmodule:: aggregate.exhibits
 
 .. autosummary::
@@ -52,6 +67,10 @@ Registration is open. App or user code may register a new type with ``summary.re
    EXHIBITS
    CAPITAL_ANCHOR_PERIODS
    RAW_MOMENT_MEASURES
+   format_sheet
+   FormatSheet
+   reload_format_sheets
+   sheet_paths
 
 .. automodule:: aggregate.exhibits
 
@@ -59,3 +78,5 @@ The machinery
 -------------
 
 .. automodule:: aggregate.exhibits._core
+
+.. automodule:: aggregate.exhibits._formats

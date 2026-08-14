@@ -18,8 +18,9 @@ dicts applied block by block, and they buy two things a dict could not:
 * a **registry of the column vocabulary**. An entry asserts that a column
   label means one thing across the package, which turns naming drift (two
   frames using one word for different units) into a test failure rather than
-  a quiet inconsistency. The sweep in ``tests/test_exhibit_formats.py`` is
-  what makes that bite.
+  a quiet inconsistency. The sweep that makes it bite is
+  ``test_every_served_column_has_a_declared_reading`` in
+  ``tests/test_exhibits.py``.
 
 Nothing here reaches the wire differently. Formats travel inside the served
 ``TableDoc`` per column exactly as before, so this is invisible to every
@@ -36,7 +37,9 @@ Resolution, low to high (``dev/plan-formats.md`` decision 3):
 
 Step 4 is the ``.agg`` rule (author, 2026-08-14): overriding a shipped sheet
 is the same act as overriding a shipped DecL database, so it is the same
-search path (:meth:`aggregate.Underwriter.search_path`) and needs no second
+three stops the :class:`~aggregate.Underwriter` resolves a database over
+(the working directory, :attr:`~aggregate.Underwriter.user_dir`, then the
+shipped :attr:`~aggregate.Underwriter.default_dir`), and it needs no second
 mechanism. A stop with no file contributes nothing.
 
 Notes

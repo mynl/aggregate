@@ -172,6 +172,24 @@
   decompiler: detect the dense shape and raise pointing at the parser spec.
   A real object-to-DecL decompiler needs a per-key inverse of the constructor's
   defaulting and is a separate, larger question — do not conflate them.
+- **[Windowed-Cdf-Nan]**, **needs the author's ruling**: diagnosed a289 and
+  deliberately left unfixed. On a windowed grid `cdf` returns `nan` below the
+  window instead of 0: on the `[Windowed-Grid-Breaks-Calibration]` repro,
+  `a.cdf(0)` and `a.cdf(10000)` are both `nan` where the distribution has no
+  mass below `x_min` by construction. `sf = 1 - cdf` inherits it; `q` is
+  unaffected. Cause: `Aggregate.cdf` (`_aggregate.py:6357`) and
+  `Portfolio.cdf` (`_portfolio.py:2073`) both build
+  `interp1d(..., kind='previous', bounds_error=False, fill_value='extrapolate')`,
+  and scipy's `previous` kind has no previous knot below the first, so it fills
+  `nan`. Confirmed in isolation on scipy 1.17.1. The one-line fix is
+  `fill_value=(0.0, 1.0)`, verified identical on every in-window point. **The
+  ruling needed is the upper fill**: `1.0` is exactly right mathematically but
+  today the above-grid value is the cumsum top (`1 - 5e-12` on the repro), so
+  `sf` above the grid goes from `5e-12` to exactly `0`, and anything dividing
+  by `sf` in the far tail sees that. `fill_value=(0.0, cum[-1])` preserves
+  current behavior above and fixes only below. Same root as
+  `dev/done/plan-windowed-grid-calibration.md`, different site and a much wider
+  blast radius, which is why it was not folded into that bump.
 ### Tests & example libraries
 
 - **[Unparser-Reference-Gaps]** (surfaced by `[Library-Canonical-Layout]`, a178)
@@ -374,6 +392,26 @@
   insurer view (greater_tables formats are per column, the store mixes
   measures down a column, so the app's measure formats have no TableSpec
   home yet) and whether the PnL validation audit ever gets a failure gate.
+- **[Format-Sheets]**: the column formats move out of seven module level
+  dicts and into two YAML sheets shipped as package data,
+  `aggregate/formats/formats-raw.yaml` (the default reading of every named
+  column) and `formats-insurer.yaml` (an overlay holding only the entries
+  that differ). Overridable from `~/.aggregate` and the working directory,
+  nearest winning, the same rule a user `.agg` database follows. The sheet
+  doubles as a **registry of the column vocabulary**: an entry asserts that
+  a label means one thing across the package, and the sweep makes naming
+  drift a test failure. Plan: `dev/plan-formats.md`, drafted and ruled
+  2026-08-14. **Progress:** `[Format-Sheet-Files]` landed a286 (the two
+  sheets, `exhibits/_formats.py`, the three stop search path, styles and
+  the four greater_tables tag styles, load time validation, `pyyaml>=6.0`
+  declared). `[Format-Sheet-Application]` landed a287 (wired into
+  `build_exhibit` post relabel, the seven dicts and both `ratio_cols` call
+  sites deleted, 124 exhibit snapshots regenerated). `[Format-Sheet-Enforcement]`
+  landed a288 (the served column sweep, two structural exemptions, and
+  `PENDING_VOCABULARY`, the 43 label punch list the sweep produced). **All
+  three phases done; execution record in the plan's section 9.** **Open with
+  the author:** the punch list, and the naming drift it caught (four
+  spellings of a mean, three of a standard deviation, three of a skewness).
 - **[Exhibit-Official-Channels]**: closes
   `dev/note-from-aggregate-api-round-6.md`, the round in which the app stopped
   building table documents out of frames it fetched, so every gap the library
@@ -770,7 +808,12 @@
   sums are exact; where they differ, route value-weighted mass and plain mass
   through `_scatter_1d` onto the total grid and take the ratio. Deferred
   because the netceded ask does not need it; recorded because it unifies three
-  consumers and should be designed once.
+  consumers and should be designed once. Still deferred after
+  `dev/notes-net-natural-allocation.md` and `dev/plan-pricing-natural-allocation.md`
+  (`a277` to `a285`): the kappa band conditions on an **axis**, which is the
+  easy case and the one the netceded question asks, so nothing there touches
+  this. What did land next to it is `JointBandsMixin._row_bands`, the row-wise
+  iterator this would fold over on the massive route.
 - **[Massive-Kappa-Second-Sweep]** (from `[PnL-Punchups-01]`, `1.0.0a134`) — bring
   the kappa scenario percentiles to the massive one-sweep P&L route.
   Conditioning needs the joint per atom *and* the grand-result quantiles before
@@ -780,7 +823,14 @@
   ([Decision-Kappa-Shared-Source-Rule]). Note the 2-D follow-up's
   [Gross-Anchored-Kappa-Insight] (G-slices are axis-aligned row averages,
   one-pass even on the massive route) may largely dissolve this for the
-  variable-feature exhibits.
+  variable-feature exhibits. **Half of that dissolution landed at `a278` to
+  `a279`**: `JointBandsMixin._row_bands` is the iterator, and
+  `exeqa_df(levels=...)` is a worked example of per-row conditional quantiles
+  over it, in core and on disk alike, which is the shape this item needs. What
+  remains here is the P&L side, which conditions on the grand result rather
+  than on an axis. The app surface waiting on it is the Pricing pane's greyed
+  `Massive joint` toggle (`aggregate_api`, plan-pricing-natural-allocation
+  phase B2).
 - **[Walk-Validation-DF]** (logged 2026-07-07) — joint-sourced walks (GC occ
   `xpnl`, the composed feature walks) have no attached exact-vs-realized audit;
   their only runtime guards are the joint's deficit bookkeeping and
@@ -964,3 +1014,73 @@
 > structurally weak) and the `dev`/`user` **display mode** `ReprMixin` (not worth
 > the effort — both views are already one attribute away). Reasoning:
 > `dev/done/plans-considered-and-rejected.md`.
+
+---
+
+## From the beta-gate review, folded in 2026-07-27
+
+> These are the surviving live items from `dev/REVIEW.md`, the condensed
+> objective review of the library taken on 2026-06-21 around `1.0.0a89`. That
+> page is now deleted and this section is the record. Its verdict in one line:
+> the engine and the pricing / allocation science are beta ready and genuinely
+> distinctive, and the gap to a *confident* beta is n-unit portfolio dependence
+> plus a finished experience layer (guides, examples, docstrings, API freeze).
+> The experience layer is already tracked above, in *Docs & packaging* and
+> *Docs*; the dependence item is the first entry here and was the review's own
+> number one priority.
+>
+> **Closed since the review, so do not reopen:** the `distributions.py` monolith
+> split (shipped `1.0.0a90` to `a95`, *Hygiene & tests* preamble),
+> `[ZT-ZM-Frequency-Fix]` (`a152`), the published API stability policy
+> (`docs/3_reference/3_x_API_Stability.rst` plus the `CHANGELOG.md` preamble),
+> and reinstatements, now full grammar and engine with corridor cessions
+> alongside them. The verbatim source the review page condensed,
+> `dev/beta-review-2026-06-21.md`, is recoverable from git history.
+
+- **[Portfolio-Shared-Mixing-Dependence]**: the one strategic item on this list,
+  and the review's most material functional limitation. Portfolio units combine
+  by **independent convolution** (`_portfolio_density`, the independent-sum FFT
+  combine), and the dependence that does exist is scattered across three places
+  that do not compose: the two-peril copula in `bivariate.py`, sample-only Iman
+  Conover, and allocation-only comonotonic. For a capital-allocation tool that
+  is the gap users will find first. Proposed clean fix: a **mixing variable
+  shared across units**, a common shock, composing with the existing PGF
+  machinery to give principled n-unit dependence without copulas. The author's
+  annotation on the review page: this is where Iman Conover and the switcheroo
+  come in. Design before code. Knock-on to record while designing:
+  `bivariate.py` is roughly 2k LOC serving exactly two perils, and its cost
+  against benefit is worth rereading once a shared-mixing story exists.
+- **[Deductible-Vocabulary]**: franchise / disappearing deductibles and an
+  annual aggregate deductible as first-class constructs. Corridor landed on the
+  reinsurance side (`corridor <share> po <width> xs <attachment>` in
+  `decl.lark`), so these two are what remains of the review's richer-deductibles
+  ask. Nothing in the grammar or the engine matches `franchise`, `disappearing`
+  or an aggregate deductible today.
+- **[Esscher-Exponential-Premium]**: the one classical premium principle the
+  distortion framework does not subsume. Today it exists only inside
+  `pedagogy.py`'s premium-principle comparison figure, not on the pricing
+  surface.
+- **[Distortion-Production-vs-Research]**: separate the production distortions
+  from the research zoo (CLL, CLin, LEP, LY) in the docs, and possibly in the
+  namespace, so a new user meets the handful they should reach for rather than
+  the whole catalogue.
+- **[Allocation-Bounds-Gold-Standard-Tests]**: extend the gold-standard testing
+  style past the engine into allocation and bounds. Closed-form checks wherever
+  an analytic allocation exists, plus `hypothesis` invariants: `q` monotone,
+  TVaR at least VaR, allocation sums to the total, net at most gross.
+- **[README-Scope-Statement]** (rider on `[README-Stable-Body]`): say what the
+  library is **not** on the front page. Loss development / IBNR / triangles,
+  stochastic reserving, credibility, GLM and experience rating, multi-year
+  dynamics, inflation and trend, and cat-model internals are all correctly out
+  of scope, and stating so is the best defense against unfair missing-feature
+  critiques. Name the seam too: cat-model output enters cleanly as empirical
+  `dsev` / histogram severities.
+- **[PIR-Reproduction-Documented]**: "the published PIR exhibits reproduce only
+  under `pip install aggregate==0.30.1` in an isolated environment" is tribal
+  knowledge, recorded in `CLAUDE.md` and nowhere a book reader looks. Readers
+  who try the current release and fail will distrust the library. Make it loud
+  in the README and the docs.
+- **[Two-Surfaces-Blessed-Path]** (rider on `[v1-Journey-Philosophy]`): there are
+  two expressive surfaces, DecL and the objects. Document the blessed path per
+  task, DecL to construct and objects to analyze, so users do not have to infer
+  it.

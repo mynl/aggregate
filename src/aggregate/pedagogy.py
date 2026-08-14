@@ -1476,8 +1476,8 @@ def plot_spectral_three_panel(port=None, dist=None, s=0.3, x=None,
     gFx = 1 - g(1 - Fx)
 
     idx = int(port.cdf(K) * len(S))
-    lev = np.trapz(S.iloc[:idx], x=xs.iloc[:idx]) + xs[0]
-    levg = np.trapz(np.array(gS)[:idx], x=xs.iloc[:idx]) + xs[0]
+    lev = np.trapezoid(S.iloc[:idx], x=xs.iloc[:idx]) + xs[0]
+    levg = np.trapezoid(np.array(gS)[:idx], x=xs.iloc[:idx]) + xs[0]
 
     dist_name = str(dist).replace('\n', ' ')
 

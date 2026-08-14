@@ -437,22 +437,37 @@ def test_tail_df_is_a_property_on_all_four_kinds(agg, port, pnl, biv):
             f'{type(obj).__name__}.tail_df is not a property'
         df = obj.tail_df
         assert isinstance(df, pd.DataFrame)
-        assert list(df.columns) == ['p', 'VaR', 'TVaR', 'xsVaR', 'VaR/Mean']
+        assert list(df.columns) == ['T', 'VaR', 'TVaR', 'xsVaR', 'VaR/Mean']
+
+
+def test_tail_df_ladder_is_symmetric_in_p(agg):
+    """Every rung contributes both of its probabilities, so the index runs
+    0.001 to 0.999 and T reads as the return period at that probability."""
+    df = agg.tail_df
+    p = df.index.to_numpy()
+    assert df.index.name == 'P'
+    assert p[0] == pytest.approx(0.001) and p[-1] == pytest.approx(0.999)
+    assert list(p) == sorted(p)
+    # the two halves mirror each other, the median rung appearing once
+    assert np.allclose(np.sort(1 - p), p)
+    assert df.loc[0.005, 'T'] == 200 and df.loc[0.995, 'T'] == 200
+    assert df['VaR'].is_monotonic_increasing
 
 
 def test_pnl_tail_df_reads_the_downside(pnl):
-    """A P&L is a payoff, so T maps to the lower tail: ``p = 1/T``."""
+    """A P&L is a payoff, so it is read off the lower half of the ladder: the
+    1 in 200 year is the one at ``P = 1/200`` that goes 200-to-1 against you."""
     df = pnl.tail_df
-    assert df.loc[200, 'p'] == pytest.approx(1 / 200)
-    # the ladder falls as T rises, the bad end being the small result
-    assert df['VaR'].is_monotonic_decreasing
+    assert df.loc[1 / 200, 'T'] == 200
+    # falling P is the bad end, the rare small result
+    assert df['VaR'].is_monotonic_increasing
 
 
 def test_bivariate_tail_df_is_per_axis_with_no_total(biv):
     """One block per axis, and no total: the axes are sized independently and
     routinely carry different bucket sizes, so the sum has no lattice."""
     df = biv.tail_df
-    assert df.index.names == ['axis', 'T']
+    assert df.index.names == ['axis', 'P']
     assert list(df.index.get_level_values('axis').unique()) == \
         list(biv.unit_names)
     assert 'total' not in df.index.get_level_values('axis')
@@ -469,13 +484,16 @@ def test_bivariate_keeps_both_frames_and_they_differ(biv):
     assert list(support.index) == list(biv.unit_names)
     assert {'support_min', 'support_max', 'right_heavy'} <= set(support.columns)
     assert set(support.columns).isdisjoint(tail.columns)
-    assert support.index.name == 'axis' and tail.index.names == ['axis', 'T']
+    assert support.index.name == 'axis' and tail.index.names == ['axis', 'P']
 
 
 def test_tail_periods_df_takes_a_custom_ladder(agg, port, pnl, biv):
     for obj in (agg, port, pnl, biv):
         df = obj.tail_periods_df([3, 7])
-        assert list(df.index.get_level_values(-1).unique()) == [3, 7]
+        # both rungs of both periods, so four rows per block
+        assert sorted(df['T'].unique()) == [3, 7]
+        assert list(df.index.get_level_values(-1).unique()) == \
+            pytest.approx([1 / 7, 1 / 3, 2 / 3, 6 / 7])
         # the property is the default ladder, not the custom one
         assert len(obj.tail_df) > len(df)
 

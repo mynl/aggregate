@@ -2976,7 +2976,7 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         Returns
         -------
         pandas.DataFrame
-            ``MultiIndex (axis, T)`` rows, columns ``p | VaR | TVaR | xsVaR |
+            ``MultiIndex (axis, P)`` rows, columns ``T | VaR | TVaR | xsVaR |
             VaR/Mean``, the same shape :attr:`Portfolio.tail_df` uses for its
             per-unit blocks.
 
@@ -3013,10 +3013,9 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
                                   bs=self.bs[i], name=name)
             mean = float(np.asarray(self.axis_xs[i], dtype=float)
                          @ np.asarray(marginal, dtype=float))
-            blocks.append(return_period_frame(gd.q, gd.tvar, mean, True,
-                                              periods))
+            blocks.append(return_period_frame(gd.q, gd.tvar, mean, periods))
             keys.append(name)
-        df = pd.concat(blocks, keys=keys, names=['axis', 'T'])
+        df = pd.concat(blocks, keys=keys, names=['axis', 'P'])
         return self._relabel(df)
 
     @property

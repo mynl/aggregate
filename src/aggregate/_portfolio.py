@@ -1570,8 +1570,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         ``unit`` index level: each unit's aggregate return-period table
         (:meth:`Aggregate.tail_periods_df`) stacked under its name, plus a ``total``
         block computed from the realised portfolio grid (:meth:`q` / :meth:`tvar`
-        / :meth:`est_m`). Columns ``p | VaR | TVaR | xsVaR | VaR/Mean``; the
-        numbers are exact (FFT grid, not simulated).
+        / :meth:`est_m`). Columns ``T | VaR | TVaR | xsVaR | VaR/Mean``, each
+        block indexed by the symmetric probability ladder ``P``; the numbers
+        are exact (FFT grid, not simulated).
 
         Per-unit *contribution* to the total tail (TVaR allocation) is
         allocation / pricing territory -- see :meth:`price` -- not here.
@@ -1584,7 +1585,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         Returns
         -------
         pandas.DataFrame or None
-            ``MultiIndex (unit, T)`` rows. ``None`` before :meth:`update`.
+            ``MultiIndex (unit, P)`` rows. ``None`` before :meth:`update`.
         """
         if self.density_df is None:
             return None
@@ -1594,11 +1595,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             if ut is not None:
                 blocks.append(ut)
                 keys.append(a.name)
-        total = return_period_frame(
-            self.q, self.tvar, self.est_m, self._is_loss_value, periods)
+        total = return_period_frame(self.q, self.tvar, self.est_m, periods)
         blocks.append(total)
         keys.append('total')
-        df = pd.concat(blocks, keys=keys, names=['unit', 'T'])
+        df = pd.concat(blocks, keys=keys, names=['unit', 'P'])
         df.attrs['mean'] = float(self.est_m)
         return df
 

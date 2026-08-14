@@ -117,50 +117,73 @@ def value_type_label(is_loss_value):
     return labels.loss if is_loss_value else labels.payoff
 
 
-def return_period_frame(q, tvar, mean, is_loss_value, periods=None):
-    """Build a return-period / exceedance table from quantile and TVaR functions.
+def return_period_frame(q, tvar, mean, periods=None):
+    """Build a symmetric return-period table from quantile and TVaR functions.
 
-    Shared by :meth:`Aggregate.tail_periods_df` and
-    :meth:`Portfolio.tail_periods_df` so the aggregate and portfolio-total
-    tables read one implementation.
+    Shared by :meth:`Aggregate.tail_periods_df`,
+    :meth:`Portfolio.tail_periods_df`, :meth:`PnL.tail_periods_df` and
+    :meth:`BivariateAggregate.tail_periods_df`, so every return-period table
+    in the library reads one implementation.
 
     Parameters
     ----------
     q, tvar : callable
         ``q(p)`` (VaR) and ``tvar(p)`` (TVaR) at a non-exceedance probability.
     mean : float
-        ``E[X]`` -- the leverage denominator and ``xsVaR`` reference.
-    is_loss_value : bool
-        Orientation passed to :func:`period_to_p` (loss -> upper tail, payoff
-        -> downside).
+        ``E[X]``, the leverage denominator and the ``xsVaR`` reference.
     periods : array_like of float, optional
         Return-period ladder. Defaults to :data:`DEFAULT_RETURN_PERIODS`.
 
     Returns
     -------
     pandas.DataFrame
-        Indexed by return period ``T``; columns ``p | VaR | TVaR | xsVaR |
-        VaR/Mean``; ``E[X]`` carried in ``.attrs['mean']``.
+        Indexed by non-exceedance probability ``P``; columns ``T | VaR | TVaR
+        | xsVaR | VaR/Mean``; ``E[X]`` carried in ``.attrs['mean']``.
+
+    Notes
+    -----
+    Every rung of the ladder contributes **both** of its probabilities, the
+    lower tail ``P = 1 / T`` and the upper tail ``P = 1 - 1 / T``, so the
+    index runs symmetrically from ``0.001`` to ``0.999`` on the default
+    ladder and one table serves both sign conventions: a loss is read off the
+    high ``P`` rows, a payoff off the low ones. The two rungs come from the
+    two branches of :func:`period_to_p`, taken together rather than chosen
+    between, which is why the frame needs no orientation argument.
+
+    ``T`` is the return period **as the row is read**: ``1 / P`` below the
+    median and ``1 / (1 - P)`` above it, which is the rung the row came from
+    and the interpretation that matters at that probability. It is a reading
+    rather than one formula in ``P``, so a 1-in-200 loss year and a 1-in-200
+    shortfall year both label as ``200``, on opposite sides of the table.
     """
     periods = DEFAULT_RETURN_PERIODS if periods is None else periods
-    T = np.atleast_1d(np.asarray(periods, dtype=float))
-    p = np.atleast_1d(period_to_p(T, is_loss_value))
+    T = np.unique(np.atleast_1d(np.asarray(periods, dtype=float)))
+    # Both rungs of every period, then sort into one ascending P ladder and
+    # drop the duplicate where the two meet at the median (T = 2).
+    p = np.concatenate([period_to_p(T, False), period_to_p(T, True)])
+    per = np.concatenate([T, T])
+    order = np.argsort(p, kind='stable')
+    p, per = p[order], per[order]
+    keep = np.ones(p.size, dtype=bool)
+    keep[1:] = p[1:] > p[:-1]
+    p, per = p[keep], per[keep]
     mean = float(mean)
     var = np.array([q(float(pi)) for pi in p], dtype=float)
     tv = np.array([tvar(float(pi)) for pi in p], dtype=float)
     leverage = (var / mean if abs(mean) > VALIDATION_NOISE
                 else np.full_like(var, np.nan))
     # Integer return periods read cleanly as ``200`` not ``200.0``.
-    idx = pd.Index([int(t) if float(t).is_integer() else t for t in T], name='T')
+    if np.all(np.mod(per, 1.0) == 0.0):
+        per = per.astype(int)
     df = pd.DataFrame(
         {
-            'p': p,
+            'T': per,
             'VaR': var,
             'TVaR': tv,
             'xsVaR': var - mean,
             'VaR/Mean': leverage,
         },
-        index=idx,
+        index=pd.Index(p, name='P'),
     )
     df.attrs['mean'] = mean
     return df
@@ -5188,19 +5211,23 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         1-in-1000 TVaR -- come from the FFT grid, **exact, not simulated** (no
         Monte-Carlo wobble).
 
-        **Index** the return period ``T`` (default ladder
-        :data:`DEFAULT_RETURN_PERIODS`; pass ``periods=`` to override). The
-        1-in-200 (99.5%, Solvency II) and 1-in-250 (99.6%, US capital-adequacy /
-        rating) rows are highlighted in the HTML rendering.
+        **Index** the non-exceedance probability ``P``, running symmetrically
+        from ``0.001`` to ``0.999`` on the default ladder
+        (:data:`DEFAULT_RETURN_PERIODS`; pass ``periods=`` to override): every
+        rung contributes both its lower-tail probability ``1 / T`` and its
+        upper-tail probability ``1 - 1 / T``. The 1-in-200 (99.5%, Solvency II)
+        and 1-in-250 (99.6%, US capital-adequacy / rating) rows are highlighted
+        in the HTML rendering, on both sides.
 
-        **Columns** ``p | VaR | TVaR | xsVaR | VaR/Mean``.
+        **Columns** ``T | VaR | TVaR | xsVaR | VaR/Mean``.
 
-        - ``p`` non-exceedance probability for the row.
-        - ``VaR = q(p)`` -- the quoted number.
-        - ``TVaR = tvar(p)`` -- the priced number; adjacent to ``VaR`` so the
+        - ``T`` the return period as the row reads: ``1 / P`` below the median,
+          ``1 / (1 - P)`` above it.
+        - ``VaR = q(P)``: the quoted number.
+        - ``TVaR = tvar(P)``: the priced number, adjacent to ``VaR`` so the
           VaR-to-TVaR gap (tail fatness) reads at a glance.
-        - ``xsVaR = VaR - E[X]`` -- capital, the excess of VaR over expected.
-        - ``VaR/Mean`` -- leverage.
+        - ``xsVaR = VaR - E[X]``: capital, the excess of VaR over expected.
+        - ``VaR/Mean``: leverage.
 
         Parameters
         ----------
@@ -5210,20 +5237,23 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         Returns
         -------
         pandas.DataFrame or None
-            Indexed by return period ``T``; ``E[X]`` carried in ``.attrs``.
-            ``None`` before :meth:`update` (the realised grid is not yet built).
+            Indexed by non-exceedance probability ``P``; ``E[X]`` carried in
+            ``.attrs``. ``None`` before :meth:`update` (the realised grid is
+            not yet built).
 
         Notes
         -----
-        Loss objects (``is_loss_value``) map ``T = 1 / (1 - p)`` (the upper
-        tail); payoff / P&L objects map ``T = 1 / p`` so the table reads off the
-        downside -- the shared :func:`period_to_p`. Downside *TVaR* for a signed
-        payoff position is refined in the P&L veneer (see ``dev/plan-pnl-*``).
+        The ladder is symmetric in ``P`` and carries no orientation of its
+        own: a loss object is read off the upper rows, where the bad outcome
+        is a rare large loss, and a payoff object off the lower rows, where it
+        is a rare small result. Both readings sit in one table, which is what
+        lets a signed position be read from either side. Downside *TVaR* for a
+        signed payoff position is refined in the P&L veneer (see
+        ``dev/plan-pnl-*``).
         """
         if self.agg_density is None:
             return None
-        return return_period_frame(
-            self.q, self.tvar, self.est_m, self._is_loss_value, periods)
+        return return_period_frame(self.q, self.tvar, self.est_m, periods)
 
     def _describe(self, force_reins_label=None, force_sd=False):
         """Build the ``validation_df`` frame, optionally forced into reins view.

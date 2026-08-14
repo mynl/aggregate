@@ -1500,16 +1500,18 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         Returns
         -------
         pandas.DataFrame
-            Indexed by return period ``T``; columns ``p | VaR | TVaR | xsVaR |
-            VaR/Mean``; ``E[result]`` carried in ``.attrs['mean']``.
+            Indexed by non-exceedance probability ``P``; columns ``T | VaR |
+            TVaR | xsVaR | VaR/Mean``; ``E[result]`` carried in
+            ``.attrs['mean']``.
 
         Notes
         -----
-        A P&L is a **payoff**, so ``T`` maps to the *lower* tail (``p = 1/T``,
-        not ``1 - 1/T``): the bad outcome is a rare small result, and a 1 in
-        200 year is one that goes 200-to-1 against you. The orientation is
-        read from the result's :attr:`GridDistribution.is_loss_value` rather
-        than assumed, so a ledger that is loss valued reports as one.
+        A P&L is a **payoff**, so it is read off the *lower* half of the
+        ladder: the bad outcome is a rare small result, and the 1 in 200 year
+        is the one at ``P = 1/200`` that goes 200-to-1 against you. The frame
+        itself is symmetric in ``P`` and states no orientation, so a ledger
+        that is loss valued is read off the upper half instead, from the same
+        table.
 
         ``xsVaR`` is ``VaR - E[result]``, which on the downside is negative:
         how far below expectation the 1 in T outcome falls. ``VaR/Mean``
@@ -1517,18 +1519,17 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
         **Read the ``TVaR`` column with care on a payoff.**
         :meth:`GridDistribution.tvar` is the upper tail measure
-        ``E[X | X > VaR(p)]`` at every ``p``, with no orientation flip, so at
-        the small ``p`` a payoff ladder uses it averages almost the whole
-        distribution and sits near the mean. It is the downside ``VaR`` on
-        that row and the *other* side's conditional mean, which is not the
+        ``E[X | X > VaR(P)]`` at every ``P``, with no orientation flip, so on
+        the small ``P`` rows a payoff is read from it averages almost the
+        whole distribution and sits near the mean. It is the downside ``VaR``
+        on that row and the *other* side's conditional mean, which is not the
         pairing a reader assumes. The matching measure would be the lower
-        ``E[X | X <= VaR(p)]``, which the library does not compute today. The
+        ``E[X | X <= VaR(P)]``, which the library does not compute today. The
         same applies to :attr:`Aggregate.tail_df` and
         :attr:`Portfolio.tail_df` on any payoff object and predates this
         method; it is recorded rather than silently changed here.
         """
-        return return_period_frame(self.q, self.tvar, self.est_m,
-                                   self.result.is_loss_value, periods)
+        return return_period_frame(self.q, self.tvar, self.est_m, periods)
 
     @property
     def tail_df(self):
@@ -1540,7 +1541,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         without a ``tail_df`` at all, so a consumer holding four kinds had to
         dispatch on kind to know whether the frame existed.
 
-        Read on the **downside**, because a P&L is a payoff: see
+        Read off the **lower** half, because a P&L is a payoff: see
         :meth:`tail_periods_df`, which this calls with the default ladder.
 
         Returns

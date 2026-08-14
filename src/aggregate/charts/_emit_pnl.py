@@ -14,7 +14,8 @@ the declaration doing exactly its job.
 The adverse tail is the **low** end, so the reader interrogates the
 shortfall: the return period is one over the probability on the axis rather
 than one over its complement, which is the ``reciprocal`` map, and the same
-branch :meth:`PnL.tail_periods_df` already takes.
+reading :meth:`PnL.tail_periods_df` is given off the lower half of its
+symmetric ladder.
 
 The break-even at zero is a **reading**, not decoration: it is the line the
 whole chart is asked about, so it is a mark in both panels, vertical where

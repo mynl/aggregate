@@ -20,6 +20,16 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a276
+
+**[Tail-Symmetric-Ladder] the return period table is indexed by probability and carries both tails.** `tail_df` and `tail_periods_df` on `Aggregate`, `Portfolio`, `PnL` and `BivariateAggregate` are now indexed by the non-exceedance probability `P`, which runs from `0.001` to `0.999` on the default ladder, with the return period `T` as the first column. Every rung contributes **both** of its probabilities, the lower tail `1 / T` and the upper `1 - 1 / T`, so the index is symmetric about the median and one table serves both sign conventions: a loss is read off the high rows, a payoff off the low ones.
+
+**What the old frame could not do.** It was indexed by `T` and picked one probability per rung from the object's `is_loss_value`, a loss taking `p = 1 - 1/T` and a payoff `p = 1/T`. That is one side of the distribution, chosen for the reader, and it left the other side unreported. A signed position has an adverse left tail and an informative right one at the same time, and the caller, not the frame, is the one who knows which question is being asked. The frame therefore now states no orientation at all, and `return_period_frame` loses its `is_loss_value` argument: the signature is `(q, tvar, mean, periods=None)`. Its two branches still come from `period_to_p`, taken together rather than chosen between.
+
+**The `T` column is a reading, not one formula in `P`.** It is `1 / P` below the median and `1 / (1 - P)` above it, which is the rung the row came from and the interpretation that matters at that probability. So a 1-in-200 loss year and a 1-in-200 shortfall year both label `200`, on opposite sides of the table. There is no monotone map from `P` to `T` here, and the convenience is deliberate.
+
+**Breaking, in the alpha sense.** `tail_df.loc[200]` becomes `tail_df.loc[0.995]` (or `.loc[0.005]` read as a payoff); the `p` column is gone, being the index; the `Portfolio` and `BivariateAggregate` MultiIndex level renames from `T` to `P`; and the default frame is 19 rows rather than 10. The 1-in-200 (99.5%, Solvency II) and 1-in-250 (99.6%, US capital adequacy) anchors are still emphasized in the `tail` exhibit, now matched on the `T` column instead of the index, so each anchor emphasizes its two rungs and the capital row is highlighted under either convention. Eight of the 116 exhibit snapshots move, all of them `tail`, and no other exhibit changes.
+
 ## 1.0.0a275
 
 **[BS-Window-Dtypes] the grid sizing frames carry their own dtypes.** Every column of `Aggregate.bs_window_df` was `object`: `applies`, `x_min`, `x_max`, `W`, `bs`, `log2`, `coverage`, `note`. The frame was built by transposing a method-per-column block (`pd.DataFrame(rows).T`), and because the rows mix bool, float, int and str, every column of that block was mixed and typed `object`; a transpose carries the dtype across wholesale rather than re-inferring per column. The tell was which columns worked: `selected`, `log2_need` and `clipped` are the three assigned *after* the transpose, and were the only three correctly typed.

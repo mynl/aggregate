@@ -317,18 +317,20 @@ def test_frames_insurer_portfolio_summary_flags(port):
 
 def test_frames_insurer_tail_emphasis(dice):
     block_name, df, kw = exhibit_frames(dice, 'tail', 'insurer')[0]
-    emphasized = {int(df.index[i]) for i, f in kw['row_flags'].items()
-                  if 'emphasis' in f}
+    rows = [i for i, f in kw['row_flags'].items() if 'emphasis' in f]
+    emphasized = {int(df['T'].iloc[i]) for i in rows}
     assert emphasized == {200, 250}
+    # the ladder is symmetric in P, so each anchor emphasizes both of its rungs
+    assert len(rows) == 4
 
 
 def test_frames_insurer_tail_portfolio_total(port):
     block_name, df, kw = exhibit_frames(port, 'tail', 'insurer')[0]
     flags = kw['row_flags']
-    for i, (unit, period) in enumerate(df.index):
+    for i, (unit, _) in enumerate(df.index):
         if unit == 'total':
             assert 'total' in flags[i]
-        if float(period) in (200.0, 250.0):
+        if float(df['T'].iloc[i]) in (200.0, 250.0):
             assert 'emphasis' in flags[i]
 
 

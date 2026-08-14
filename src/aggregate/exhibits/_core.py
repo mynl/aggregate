@@ -1005,17 +1005,25 @@ def _tail_flags(df):
 
     Emphasis on the :data:`CAPITAL_ANCHOR_PERIODS` rows (1 in 200 and
     1 in 250); the portfolio ``total`` block rows carry the total flag.
+
+    The return period is read from the ``T`` column, not the index, which is
+    the symmetric probability ladder ``P``. Each anchor therefore emphasizes
+    two rows, its lower tail rung and its upper, one of which is the capital
+    number under each sign convention.
     """
     flags = {}
+    periods = df['T'] if 'T' in df.columns else None
     for i, key in enumerate(df.index):
-        unit, period = (key[0], key[-1]) if isinstance(key, tuple) else (None, key)
+        unit = key[0] if isinstance(key, tuple) else None
         row = []
         if unit == 'total':
             row.append('total')
-        try:
-            anchor = float(period) in CAPITAL_ANCHOR_PERIODS
-        except (TypeError, ValueError):
-            anchor = False
+        anchor = False
+        if periods is not None:
+            try:
+                anchor = float(periods.iloc[i]) in CAPITAL_ANCHOR_PERIODS
+            except (TypeError, ValueError):
+                anchor = False
         if anchor:
             row.append('emphasis')
         if row:

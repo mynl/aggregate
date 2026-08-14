@@ -89,9 +89,10 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
         it exists, which is the declaration doing exactly its job.
     is_loss_value : bool
         True where the adverse tail is the high one. It picks the
-        return-period map, and it is the same fact ``tail_periods_df``
-        branches on: a loss is interrogated at ``T = 1 / (1 - p)``, a
-        payoff at its shortfall, ``T = 1 / p``.
+        return-period map: a loss is interrogated at ``T = 1 / (1 - p)``, a
+        payoff at its shortfall, ``T = 1 / p``. It is the same fact the
+        reader of ``tail_periods_df`` supplies by choosing which half of that
+        symmetric ladder to read.
 
     Returns
     -------

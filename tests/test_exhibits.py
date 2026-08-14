@@ -196,6 +196,155 @@ def test_no_served_block_carries_an_unnamed_index_level(objects):
                         f'block {block!r} has an unnamed index level')
 
 
+# --- the column vocabulary sweep ([Format-Sheet-Enforcement]) ---------------
+# The format sheets are a registry of the column vocabulary as much as a
+# format table: an entry asserts that a label means one thing across the
+# package. This sweep is what makes that bite. It walks every served block
+# under both perspectives and reports any **float data column** with no
+# declared reading, which is a new word entering the vocabulary unannounced.
+#
+# Float only, and deliberately: an int, bool, string or date column is typed
+# by the IR and reads correctly with no help, while a float is exactly the
+# column whose digit count cannot be inferred honestly.
+
+#: Labels the sweep does not ask about, with the reason each is exempt. These
+#: are not vocabulary: they are an axis flattened into column headers, so the
+#: label is a value and the reading belongs to the row.
+VOCABULARY_EXEMPTIONS = (
+    (r'^κ\d\d$',
+     'kappa scenario columns: a state axis flattened into headers'),
+    (r'^P\d\d$',
+     'the percentile ladder: a probability axis flattened into headers'),
+)
+
+#: Whole blocks the sweep skips, because their columns are an axis and their
+#: column axis is **not named**, so the frame cannot say so for itself. A
+#: named column axis needs no entry here: the sweep reads the name and draws
+#: the same conclusion. Naming these two would retire this table, which is the
+#: a254 fix ([BS-Window-Diagnostics] gave four frames honest index names)
+#: applied to the other axis, and is worth doing upstream rather than here.
+AXIS_BLOCKS = {
+    ('stats', 'stats_df'):
+        'the canonical moment store: measures run down the rows, and across '
+        'are computation views, unit names, or the two axes of a bivariate',
+    ('reins', 'reins_stats_df'):
+        'the layering store, in the same shape: views and units across',
+}
+
+#: Served today with no declared reading and no exemption: the open list this
+#: sweep exists to produce, for the author to rule on one label at a time (a
+#: sheet entry, an exemption with a reason, or a rename onto a word the sheet
+#: already carries). It is a ratchet in both directions. A **new** undeclared
+#: label fails the sweep, and a label that stops being served has to come out
+#: of this set, so the list cannot rot into a blanket exemption.
+#:
+#: Reading it as a punch list, the groups are: the moment vocabulary that
+#: drifted before the registry existed (``EX`` / ``SD`` / ``Sk`` beside the
+#: declared ``CV`` and ``Skew``, and ``mean`` / ``sd`` / ``skew`` / ``cv``
+#: again in lower case on the bivariate and tail behavior frames); the
+#: composed validation headers (``Est EX``, ``Gross Sk``, ``Change CV``,
+#: ``Subject EX``, which are a basis and a measure joined into one label);
+#: the waterfall's composed readings (``M / SD``, ``M @ 1-in-100
+#: diversified``); and a handful of one-off diagnostics (``Gate``, ``tau``,
+#: ``cov``, ``corr``, the bivariate support bounds).
+PENDING_VOCABULARY = frozenset({
+    'Change CV', 'Change EX', 'D_g_inv', 'EX', 'Err', 'Err CV',
+    'Err EX', 'Est', 'Est CV', 'Est EX', 'Est Sk', 'Gate', 'Gross CV',
+    'Gross EX', 'Gross Sk', 'M / SD', 'M / capital diversified',
+    'M / capital standalone', 'M @ 1-in-100 diversified',
+    'M @ 1-in-100 standalone', 'Mean', 'Median',
+    'Net CV', 'Net EX', 'Net Sk', 'Ref', 'SD', 'Sk', 'Subject CV',
+    'Subject EX', 'Subject Sk', 'closed_form', 'corr', 'cov',
+    'cv', 'max', 'mean', 'min', 'sd', 'skew', 'support_max',
+    'support_min', 'tau',
+})
+
+
+def _undeclared_float_columns(obj, name, perspective):
+    """Float data labels on one exhibit with no reading and no exemption."""
+    from aggregate.exhibits import format_sheet
+    known = set(format_sheet(perspective).labels(name))
+    out = {}
+    for block, df, _kw in exhibit_frames(obj, name, perspective):
+        if any(n is not None for n in df.columns.names):
+            # the columns are values of that axis (units, views, layers,
+            # probe steps), so they are data rather than vocabulary
+            continue
+        if (name, block) in AXIS_BLOCKS:
+            continue
+        for i, column in enumerate(df.columns):
+            label = column[-1] if isinstance(column, tuple) else column
+            if label in known or not pd.api.types.is_float_dtype(df.iloc[:, i]):
+                continue
+            if any(re.search(pattern, str(label))
+                   for pattern, _reason in VOCABULARY_EXEMPTIONS):
+                continue
+            out.setdefault(label, set()).add(f'{name}/{perspective.value}'
+                                             f'/{block}')
+    return out
+
+
+def test_every_served_column_has_a_declared_reading(objects, probed):
+    """A new word in the column vocabulary has to be declared, or excused.
+
+    The failure reads as "column ``foo`` is served with no declared reading",
+    and the fix is one of three: add a sheet entry, add an exemption with a
+    reason, or rename the column onto a word the sheet already carries. The
+    third is the one worth wanting, because a vocabulary that grows a synonym
+    for every frame is not a vocabulary.
+    """
+    served = {}
+    for obj in [*objects.values(), probed]:
+        for name, perspectives in available_exhibits(obj):
+            for perspective in perspectives:
+                for label, where in _undeclared_float_columns(
+                        obj, name, perspective).items():
+                    served.setdefault(label, set()).update(where)
+    undeclared = {label: sorted(where) for label, where in served.items()
+                  if label not in PENDING_VOCABULARY}
+    assert not undeclared, (
+        'served with no declared reading: '
+        + '; '.join(f'{label!r} on {", ".join(where)}'
+                    for label, where in sorted(undeclared.items(), key=str))
+        + '. Add an entry to src/aggregate/formats/formats-raw.yaml, an '
+          'exemption with a reason, or rename onto an existing word.')
+    stale = sorted(PENDING_VOCABULARY - set(served), key=str)
+    assert not stale, (
+        f'no longer served, delete from PENDING_VOCABULARY: {stale}')
+
+
+def test_the_sweep_actually_sweeps(objects, probed):
+    """A sweep that silently stopped looking would pass every assertion."""
+    seen = 0
+    for obj in [*objects.values(), probed]:
+        for name, perspectives in available_exhibits(obj):
+            for perspective in perspectives:
+                for _block, df, _kw in exhibit_frames(obj, name, perspective):
+                    seen += sum(pd.api.types.is_float_dtype(df.iloc[:, i])
+                                for i in range(df.shape[1]))
+    assert seen > 400, f'only {seen} float columns walked'
+
+
+def test_every_exemption_pattern_earns_its_place(objects):
+    """An exemption nothing matches is a rule with no case, so it comes out."""
+    labels = {column[-1] if isinstance(column, tuple) else column
+              for obj in objects.values()
+              for name, perspectives in available_exhibits(obj)
+              for perspective in perspectives
+              for _b, df, _kw in exhibit_frames(obj, name, perspective)
+              for column in df.columns}
+    for pattern, reason in VOCABULARY_EXEMPTIONS:
+        assert any(re.search(pattern, str(label)) for label in labels), \
+            f'exemption {pattern!r} ({reason}) matches nothing served'
+    blocks = {(name, block)
+              for obj in objects.values()
+              for name, perspectives in available_exhibits(obj)
+              for perspective in perspectives
+              for block, _df, _kw in exhibit_frames(obj, name, perspective)}
+    for key, reason in AXIS_BLOCKS.items():
+        assert key in blocks, f'{key} ({reason}) is not served any more'
+
+
 def test_a_perspective_may_restructure_the_block_list(tower):
     """[Perspective-May-Restructure]: block lists differ between perspectives.
 

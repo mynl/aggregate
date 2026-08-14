@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a288
+
+**[Format-Sheet-Enforcement] the vocabulary is swept.** The third and last phase of `[Format-Sheets]`. A sweep over every served block under both perspectives reports any **float data column** with no declared reading, which is a new word entering the column vocabulary unannounced. Tests only; no served exhibit changes.
+
+**Float only, deliberately.** An int, bool, string or date column is typed by the IR and reads correctly with no help. A float is exactly the column whose digit count cannot be inferred honestly, which is why the sheets exist and what the sweep is about.
+
+**Two structural exemptions, and they are the interesting part.** A block whose **column axis is named** is skipped: its labels are values of that axis (units, views, layers, probe steps), so the label is data and the reading belongs to the row rather than to the word. Two blocks are the same case without being able to say so, `stats_df` and `reins_stats_df`, whose columns are computation views, unit names, or the two axes of a bivariate, over an unnamed column axis. They are listed by name with a reason. Naming that axis would retire the list, which is the a254 fix applied to the other axis and is worth doing upstream rather than in a test.
+
+**The open list.** `PENDING_VOCABULARY` names the 43 labels served today with a reading nobody has declared, for the author to rule on one at a time: a sheet entry, an exemption with a reason, or a rename onto a word the sheet already carries. It is a ratchet in both directions, so a new undeclared label fails and a label that stops being served has to come out, and it cannot rot into a blanket exemption.
+
+**What the registry caught on its first pass**, which is the argument for having one: the moment vocabulary drifted before it existed. `EX`, `SD` and `Sk` are served beside the declared `CV` and `Skew`, and `mean`, `sd`, `skew` and `cv` appear again in lower case on the bivariate and tail behavior frames. Four spellings of a mean, three of a standard deviation and three of a skewness, none of them wrong in place and no two of them the same word. That is a naming question rather than a formatting one, which is what the sheet was supposed to surface.
+
 ## 1.0.0a287
 
 **[Format-Sheet-Application] the sheets are wired, the seven dicts are gone.** `build_exhibit` reads the format sheets and lays them under each block's own kwargs, and `MEASURE_FORMATS`, `BS_WINDOW_FORMATS`, `SHARPEN_FORMATS`, `PENTAGON_FORMATS`, `CALIBRATION_FORMATS`, `DISTORTION_FORMATS` and `EVALUATION_FORMATS` are deleted along with their exports. `STAT_SLICE_FORMATS`, `STAT_SLICES`, `STAT_SLICE_TITLES` and the `score_grid` literal stay: those are properties of a block's shape rather than of a column's meaning, which is the one deliberate exception.

@@ -59,6 +59,7 @@ from enum import Enum
 import pandas as pd
 
 from ..constants import Validation
+from ._formats import format_sheet
 
 __all__ = [
     'Perspective', 'Exhibit', 'EXHIBITS',
@@ -100,23 +101,6 @@ INCLUDE_RAW = True
 #: the raw values was not. No exhibit reaches it today; the longest block
 #: measured is 17 rows.
 MAX_ROWS = 200
-
-#: Per measure formats for the INSURER views, as greater_tables format sugar
-#: (author, 2026-08-05). Applies wherever a measure **is a column**: the
-#: summary card and the P&L ledger. It cannot apply to the canonical moment
-#: store, where measures run *down* a column, and that asymmetry is the open
-#: question recorded in ``dev/plan-exhibits.md``.
-#:
-#: ``Skew`` is asked for as ``.3g``, three significant figures, which
-#: greater_tables sugar does not express: its kinds are ``f`` / ``d`` / ``%``
-#: / ``e`` / ``s``, with no ``g``. ``.3f`` is the nearest available and reads
-#: the same for the skews actually seen (it differs only in trailing zeros on
-#: large values). Switch the constant the day greater_tables grows a ``g``
-#: kind; nothing else needs to change.
-MEASURE_FORMATS = {
-    'CV': '.1%',
-    'Skew': '.3f',
-}
 
 #: Validation failure flags that emphasize the ``Sev`` row of a
 #: Freq / Sev / Agg validation frame, and those that emphasize ``Agg``
@@ -510,6 +494,47 @@ def exhibit_frames(obj, name, perspective=Perspective.RAW):
     return blocks
 
 
+def _sheet_kwargs(obj, name, perspective):
+    """What the format sheets contribute to every block of one exhibit.
+
+    Applied here rather than in the frames builders, and **after** relabeling,
+    for a reason the old module level dicts got wrong: greater_tables keys
+    formats on the *displayed* column label, and ``exhibit_frames`` relabels
+    through the host's ``_relabel`` after the builder returns. A ``renamer``
+    that touched ``CV`` therefore detached its format silently. The sheet's
+    keys make the same trip the frame's columns made, so they cannot come
+    apart.
+
+    The translation is read off ``_relabel`` itself, applied to an empty frame
+    whose columns are the words the sheet knows, rather than off ``renamer``:
+    relabeling is gated on ``use_labels`` and taking the mapping from the same
+    callable the frames took it from is what keeps the two in step.
+
+    Parameters
+    ----------
+    obj : object
+        The exhibit's host; supplies the relabeling, if it has one.
+    name : str
+        Exhibit registry name, which selects any scoped section.
+    perspective : Perspective
+
+    Returns
+    -------
+    (dict, dict)
+        The ``formatters`` mapping and the ``{'<tag>_cols': [...]}`` selectors.
+    """
+    sheet = format_sheet(perspective)
+    relabel = getattr(obj, '_relabel', None)
+    rename = None
+    if relabel is not None:
+        labels = sheet.labels(name)
+        probe = pd.DataFrame(columns=pd.Index(labels, dtype=object))
+        mapping = dict(zip(labels, relabel(probe).columns))
+        if any(before != after for before, after in mapping.items()):
+            rename = lambda label: mapping.get(label, label)  # noqa: E731
+    return sheet.block(name, rename)
+
+
 def build_exhibit(obj, name, perspective=Perspective.RAW, *,
                   max_rows=MAX_ROWS):
     """Build an :class:`Exhibit`: frame stage, then greater_tables IR per block.
@@ -538,6 +563,16 @@ def build_exhibit(obj, name, perspective=Perspective.RAW, *,
 
     Notes
     -----
+    **Every served column takes its reading from the format sheets**
+    (:mod:`aggregate.exhibits._formats`), applied here and after relabeling.
+    Precedence, low to high: greater_tables' dtype and tag inference, then
+    ``formats-raw.yaml``, then ``formats-insurer.yaml`` under that
+    perspective, then the same file names in ``~/.aggregate`` and the working
+    directory, then a block's own ``formatters`` entry, which always wins. A
+    block that declares a tag selector (``ratio_cols`` and friends) keeps its
+    own and takes none from the sheet, since a selector can be a regex or
+    ``'all'`` and those do not merge with a list.
+
     **Every block carries its raw values** (:data:`INCLUDE_RAW`), so a cell
     arrives as ``{'text': '17.50', 'raw': 17.5000001}`` rather than as the
     string alone. It is a library default and not a caller option, because a
@@ -566,11 +601,14 @@ def build_exhibit(obj, name, perspective=Perspective.RAW, *,
     blocks = exhibit_frames(obj, name, perspective)
     gt = _import_greater_tables()
     fn, _ = EXHIBITS[name]
+    sheet_formats, sheet_tags = _sheet_kwargs(obj, name, perspective)
     ir_blocks = []
     captions = {}
     for block_name, df, kw in blocks:
-        ir_blocks.append(gt.build(df, gt.TableSpec(
-            **{'include_raw': INCLUDE_RAW, **kw, 'max_rows': max_rows})))
+        spec_kw = {'include_raw': INCLUDE_RAW, **sheet_tags, **kw,
+                   'formatters': {**sheet_formats, **kw.get('formatters', {})},
+                   'max_rows': max_rows}
+        ir_blocks.append(gt.build(df, gt.TableSpec(**spec_kw)))
         if kw.get('caption'):
             captions[block_name] = kw['caption']
     title_name = getattr(obj, '_title_name', type(obj).__name__)

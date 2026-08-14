@@ -281,12 +281,20 @@ def test_sharpen_insurer_leads_with_the_score_grid(probed):
     assert grid.columns.name == 'd_log2'
 
 
-def test_sharpen_formats_the_errors_scientifically(probed):
-    """At a fixed .4f a good cell and a perfect cell both print 0.0000."""
-    _name, _df, kw = exhibit_frames(probed, 'sharpen')[0]
-    formats = kw['formatters']
-    assert formats['u_agg_mean'] == '.2e'
-    assert formats['score'] == '.5f'
+def test_sharpen_errors_do_not_read_as_zero(probed):
+    """At a fixed .4f a good cell and a perfect cell both print 0.0000.
+
+    The readings come from the format sheets since a287, so this asks the
+    sheet rather than the block kwargs: RAW takes significant figures, which
+    go scientific where they have to. The insurer sheet deliberately takes
+    fixed decimals for this table (author, 2026-08-14), which is why the
+    assertion is about the raw perspective.
+    """
+    from aggregate.exhibits import format_sheet
+    columns = format_sheet('raw').columns
+    assert columns['u_agg_mean'] == '.2e'
+    assert columns['u_agg_cv'] == '.5g'
+    assert format(1e-7, columns['u_agg_cv']) == '1e-07'
 
 
 # --- frame stage ------------------------------------------------------------
@@ -298,9 +306,10 @@ def test_frames_raw_aggregate(dice):
     assert block_name == 'summary_df'
     assert list(df.index) == ['Freq', 'Sev', 'Agg']
     # RAW is the untouched frame, described but not interpreted (a226): a
-    # caption saying what it is and the column formats, no row emphasis, no
-    # dropped rows, no rearrangement
-    assert set(kw) == {'caption', 'formatters'}
+    # caption saying what it is, no row emphasis, no dropped rows, no
+    # rearrangement. Column readings come from the format sheets at build
+    # time since a287, so a passthrough's kwargs carry the caption alone.
+    assert set(kw) == {'caption'}
     assert 'count risk' in kw['caption']
 
 
@@ -538,7 +547,7 @@ def test_economic_raw(objects):
     # rather than reshaping it ([Exhibits-Economic-Insurer]).
     _, ins_df, ins_kw = exhibit_frames(pn, 'economic', 'insurer')[0]
     pd.testing.assert_frame_equal(df, ins_df)
-    assert set(ins_kw) == {'caption', 'row_flags', 'formatters'}
+    assert set(ins_kw) == {'caption', 'row_flags'}
 
 
 def test_economic_ratios_raw(objects):
@@ -594,13 +603,22 @@ def test_economic_insurer_caption_states_the_ladder_regime(tower):
 
 
 def test_measure_formats_where_measures_are_columns(dice, tower):
-    """CV and Skew take their declared formats on the card and the ledger."""
-    from aggregate.exhibits._core import MEASURE_FORMATS
-    assert MEASURE_FORMATS['CV'] == '.1%'
+    """CV and Skew take their declared readings on the card and the ledger.
+
+    The declaration is the format sheet since a287, and it reaches the block
+    at build time rather than through the frames builder, so the assertion
+    is on the built document. Read it as: a measure that *is* a column is
+    formatted; the canonical moment store, where measures run down a column,
+    still cannot be, which is the asymmetry recorded in plan-exhibits.
+    """
+    gt_ = pytest.importorskip('greater_tables')
     for obj, name in ((dice, 'summary'), (tower, 'economic')):
-        _, df, kw = exhibit_frames(obj, name, 'insurer')[0]
-        assert kw['formatters'] == MEASURE_FORMATS
+        _, df, _kw = exhibit_frames(obj, name, 'insurer')[0]
         assert {'CV', 'Skew'} <= set(df.columns)
+        doc = build_exhibit(obj, name, 'insurer').ir_blocks[0]
+        spec = {c.name[-1]: c.format for c in doc.columns}
+        assert spec['CV'] == gt_.FormatSpec(kind='pct', digits=1)
+        assert spec['Skew'] == gt_.FormatSpec(kind='dec', digits=3)
 
 
 def test_economic_ratios_insurer_splits_units(tower):
@@ -610,8 +628,12 @@ def test_economic_ratios_insurer_splits_units(tower):
     (_, amounts, amounts_kw), (_, ratios, ratios_kw), _ = blocks
     assert set(amounts.columns) == {'P', 'L', 'E', 'C', 'M'}
     assert set(ratios.columns).isdisjoint(amounts.columns)
-    # the ratio block declares its columns as ratios so they render as percents
-    assert ratios_kw['ratio_cols'] == list(ratios.columns)
+    # every ratio column points at the `ratio` style in the format sheets,
+    # which stamps greater_tables' own ratio tag, so the block declares no
+    # ratio_cols of its own ([Format-Sheets], a287)
+    assert 'ratio_cols' not in ratios_kw
+    doc = build_exhibit(tower, 'economic_ratios', 'insurer').ir_blocks[1]
+    assert {c.tag for c in doc.columns if c.role == 'data'} == {'ratio'}
     # M == P - L - E - C, the identity the caption claims
     import numpy as np
     np.testing.assert_allclose(
@@ -1029,12 +1051,12 @@ def test_a_pricing_exhibit_carries_the_source_labels(objects):
 def test_simple_exhibits_are_passthroughs(dice):
     """A manifest-declared exhibit serves one frame, raw and insurer alike.
 
-    ``bs_window`` carries formatters since the a267 `[BS-Window-Formats]`
-    polish (the window edges and ``W`` are amounts, ``clipped`` is a tail
-    mass); ``tail_behavior`` remains caption-only.
+    Both are caption-only since a287: ``bs_window``'s column readings (the
+    window edges, ``W``, ``bs``, ``clipped``) moved into the format sheets
+    with every other column's, so a passthrough's kwargs carry prose alone.
     """
     for name, attr, kw_keys in (
-            ('bs_window', 'bs_window_df', {'caption', 'formatters'}),
+            ('bs_window', 'bs_window_df', {'caption'}),
             ('tail_behavior', 'tail_behavior_df', {'caption'})):
         blocks = exhibit_frames(dice, name)
         assert [b for b, _, _ in blocks] == [attr]
@@ -1135,7 +1157,7 @@ def test_unavailable_predicate():
 def test_perspective_resolution(dice):
     for p in ('raw', 'RAW', Perspective.RAW):
         blocks = exhibit_frames(dice, 'summary', p)
-        assert set(blocks[0][2]) == {'caption', 'formatters'}
+        assert set(blocks[0][2]) == {'caption'}
     with pytest.raises(ValueError, match='unknown perspective'):
         exhibit_frames(dice, 'summary', 'bogus')
 

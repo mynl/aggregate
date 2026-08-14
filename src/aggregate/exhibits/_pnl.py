@@ -12,7 +12,7 @@ import pandas as pd
 
 from .._pnl import PnL, WATERFALL_RETURN_PERIOD
 from ._core import (
-    MEASURE_FORMATS, economic, economic_ratios, economic_waterfall, stats,
+    economic, economic_ratios, economic_waterfall, stats,
     _stats_insurer_moment_store,
 )
 
@@ -111,8 +111,7 @@ def _economic_insurer(obj, blocks):
             'headers: each cell is that row\'s own quantile, no conditioning '
             'happened, and the ladder columns do not foot.')
     return [(block_name, df,
-             dict(kw, caption=caption, row_flags=_ledger_row_flags(obj, df),
-                  formatters=MEASURE_FORMATS))]
+             dict(kw, caption=caption, row_flags=_ledger_row_flags(obj, df)))]
 
 
 @economic_ratios.register(PnL)
@@ -160,9 +159,12 @@ def _economic_ratios_insurer(obj, blocks):
                 'identity M = P - L - E - C holds exactly. Loss absorbs '
                 'cession recoveries and any unclassified obligation leg.'))))
     if ratios:
+        # no ratio_cols here: every one of these labels points at the `ratio`
+        # style in the format sheets, which stamps greater_tables' own ratio
+        # column tag as well as the reading ([Format-Sheets] decision 6)
         out.append((
             'ratios', ratios_df[ratios],
-            dict(ratios_kw, ratio_cols=list(ratios), row_flags=total_row,
+            dict(ratios_kw, row_flags=total_row,
                  caption=(
                 'LR, ER and CR are ratios of means, the convention of a rate '
                 'filing, re-derived from each block\'s own amounts and never '
@@ -218,7 +220,8 @@ def _economic_waterfall_frames(obj):
 
     return [
         ('walk_df', walk_df, dict(caption=walk_caption, row_flags=total_row)),
+        # 'Premium spent', 'Margin spent' and 'CR' carry the `ratio` style in
+        # the format sheets, which tags them as ratios wherever they appear
         ('evaluation_df', evaluation_df,
-         dict(caption=evaluation_caption, row_flags=total_row,
-              ratio_cols=['Premium spent', 'Margin spent', 'CR'])),
+         dict(caption=evaluation_caption, row_flags=total_row)),
     ]

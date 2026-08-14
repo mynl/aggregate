@@ -128,6 +128,15 @@ class FormatSheet:
     exhibits: dict
     sources: tuple
 
+    def labels(self, exhibit=None):
+        """Every column label this sheet has a reading for, one exhibit's view.
+
+        The global vocabulary plus that exhibit's scoped entries. Callers use
+        it to work out how a host's relabeling moves the sheet's own keys.
+        """
+        scoped, _tags = self.exhibits.get(exhibit, ({}, {}))
+        return list(dict.fromkeys([*self.columns, *scoped]))
+
     def block(self, exhibit=None, rename=None):
         """The greater_tables kwargs this sheet contributes to one block.
 

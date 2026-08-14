@@ -53,38 +53,17 @@ from ._core import (
 )
 
 __all__ = [
-    'PENTAGON_FORMATS', 'CALIBRATION_FORMATS', 'DISTORTION_FORMATS',
-    'EVALUATION_FORMATS', 'STAT_SLICES', 'STAT_SLICE_FORMATS',
-    'STAT_SLICE_TITLES',
+    'STAT_SLICES', 'STAT_SLICE_FORMATS', 'STAT_SLICE_TITLES',
 ]
 
-#: Money to two decimals and the three ratios in their own units. Two decimals
-#: rather than a magnitude aware choice: money is money at every scale, and a
-#: table whose decimal count moves with the book is harder to read across than
-#: one that is slightly over precise in places. ``PQ`` is a ratio and reads as
-#: one, to three places; ``LR`` and ``ROE`` are percentages.
-PENTAGON_FORMATS = {
-    **{stat: ',.2f' for stat in ('L', 'M', 'P', 'Q', 'a')},
-    'LR': '.1%', 'PQ': '.3f', 'ROE': '.1%',
-}
-
-#: The one row calibration target: its three input descriptors, then the octet.
-#: ``p`` and ``F(a)`` are probabilities out at the fifth place, where the
-#: difference between 0.99 and 0.99001 is the difference between what was asked
-#: for and what the grid could deliver.
-CALIBRATION_FORMATS = {'coc': '.1%', 'p': '.5f', 'F(a)': '.5f',
-                       **PENTAGON_FORMATS}
-
-#: The per family receipt. ``error`` is the premium miss, which is a residual
-#: and reads in scientific notation for the same reason the probe's errors do:
-#: at a fixed number of decimals a good fit and an exact fit both print zero,
-#: and that comparison is the column's whole purpose.
-DISTORTION_FORMATS = {'param': '.4f', 'error': '.2e', 'gini_p': '.4f',
-                      'area': '.4f'}
-
-#: The acceptability panel. ``gini_p`` is the index a reader compares across
-#: families and down a walk, so it gets the digits to separate two close rows.
-EVALUATION_FORMATS = {'param': '.4f', 'gini_p': '.4f', 'error': '.2e'}
+# The pricing vocabulary is read from the format sheets like every other
+# column's (``aggregate/formats/formats-raw.yaml``): the pentagon octet as
+# money, ``LR`` / ``ROE`` / ``coc`` as ratios, ``PQ`` as a multiple to three
+# places, ``p`` and ``F(a)`` as probabilities out at the fifth place where
+# what was asked for and what the grid could deliver part company, and
+# ``error`` as a residual, so a good fit and an exact fit do not both print
+# zero. The one thing that stays here is the stat slice below, because its
+# format is a property of the block's shape rather than of a column's meaning.
 
 #: The stats a portfolio allocation is read one slice at a time under INSURER,
 #: with the title each slice carries. Four of the eight: the amounts ``L``,
@@ -108,7 +87,7 @@ STAT_SLICE_FORMATS = {'LR': '.1%', 'P': ',.2f', 'PQ': '.3f', 'ROE': '.1%'}
 
 register_simple_exhibit(
     'pricing.calibrate', 'Calibrated distortions', 'distortion_df',
-    [CalibrationResult], formatters=DISTORTION_FORMATS,
+    [CalibrationResult],
     caption='One row per distortion family, each fitted to the same premium '
             'target: the family\'s own natural parameter, how far the fitted '
             'premium missed the target, and the two comparable readings of '
@@ -131,8 +110,7 @@ def _calibration_block(result):
     refusing the leaf.
     """
     return ('calibration_df', result.calibration_df,
-            {'formatters': CALIBRATION_FORMATS,
-             'caption': 'The shared calibration target: the cost of capital '
+            {'caption': 'The shared calibration target: the cost of capital '
                         'asked for, the asset level it was struck at and the '
                         'probability that level sits at, then the pentagon '
                         'the three of them determine. Every family in the '
@@ -154,8 +132,7 @@ def _stand_alone_raw(result):
         return [
             _calibration_block(result),
             ('stand_alone_df', result.stand_alone_df,
-             {'formatters': PENTAGON_FORMATS,
-              'caption': 'Each unit priced as its own distribution with the '
+             {'caption': 'Each unit priced as its own distribution with the '
                          'same fitted families, at the book\'s calibrated '
                          'asset level; the sum of those prices against the '
                          'book priced whole at the same level. The gap is '
@@ -167,8 +144,7 @@ def _stand_alone_raw(result):
     if getattr(result._source, 'reins_views', None):
         return [
             ('reins_price_df', result.reins_price_df,
-             {'formatters': PENTAGON_FORMATS,
-              'caption': 'Every view of the cession priced with every '
+             {'caption': 'Every view of the cession priced with every '
                          'calibrated family: gross, ceded and net are three '
                          'separate distributions, so each is a price in its '
                          'own right rather than a share of one. The ceded '
@@ -229,7 +205,7 @@ def _book_benefit(result, raw_block):
         'premium column by construction, both rows standing behind the same '
         'assets, so the reading is the premium and the margin.')
     return ('stand_alone_df', pd.concat(pieces),
-            dict(kw, caption=caption, formatters=PENTAGON_FORMATS))
+            dict(kw, caption=caption))
 
 
 # --- pricing.allocate -------------------------------------------------------
@@ -255,8 +231,7 @@ def _allocate_raw(result):
         ]
     return [
         ('natural_allocation_df', result.natural_allocation_df,
-         {'formatters': PENTAGON_FORMATS,
-          'caption': _allocation_caption(result)}),
+         {'caption': _allocation_caption(result)}),
     ]
 
 
@@ -421,14 +396,14 @@ def _reins_insurer(result, raw_block):
         f'It is not the price of the cession, which is what a reinsurer would '
         f'charge for the same layer and is the ceded row of the raw view.')
     return [('reins_price_df', _star_the_basis(kept, basis),
-             dict(kw, caption=caption, formatters=PENTAGON_FORMATS))]
+             dict(kw, caption=caption))]
 
 
 # --- pricing.evaluate -------------------------------------------------------
 
 register_simple_exhibit(
     'pricing.evaluate', 'Breakeven acceptability', 'evaluation_df',
-    [EvaluationResult], formatters=EVALUATION_FORMATS,
+    [EvaluationResult],
     caption='The distortion in each family whose risk adjusted margin is '
             'exactly zero: the most stress this position survives. One row '
             'block per position measured, so a walk reads down the steps and '

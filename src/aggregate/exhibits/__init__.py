@@ -86,7 +86,7 @@ from ..spectral import Distortion
 
 from ._core import (
     CAPITAL_ANCHOR_PERIODS, EXHIBITS, Exhibit, INCLUDE_RAW, MAX_ROWS,
-    MEASURE_FORMATS, Perspective, RAW_MOMENT_MEASURES,
+    Perspective, RAW_MOMENT_MEASURES,
     available_exhibits, build_exhibit, exhibit_frames, register_simple_exhibit,
     dependency, economic, economic_ratios, economic_waterfall, reins, stats,
     summary, tail, validation,
@@ -105,8 +105,7 @@ from ._formats import (
 from . import (_aggregate, _portfolio, _pnl, _bivariate,  # noqa: F401
                _distortion, _pricing)
 from ._pricing import (  # noqa: F401
-    CALIBRATION_FORMATS, DISTORTION_FORMATS, EVALUATION_FORMATS,
-    PENTAGON_FORMATS, STAT_SLICES, STAT_SLICE_FORMATS, STAT_SLICE_TITLES,
+    STAT_SLICES, STAT_SLICE_FORMATS, STAT_SLICE_TITLES,
 )
 
 __all__ = [
@@ -117,13 +116,10 @@ __all__ = [
     'CAPITAL_ANCHOR_PERIODS', 'RAW_MOMENT_MEASURES',
     'summary', 'tail', 'stats', 'validation', 'reins',
     'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
-    'bs_window', 'sharpen', 'tail_behavior', 'SHARPEN_FORMATS',
-    'BS_WINDOW_FORMATS',
+    'bs_window', 'sharpen', 'tail_behavior',
     'pricing_calibrate', 'pricing_stand_alone', 'pricing_allocate',
     'pricing_evaluate',
-    'PENTAGON_FORMATS', 'CALIBRATION_FORMATS', 'DISTORTION_FORMATS',
-    'EVALUATION_FORMATS', 'STAT_SLICES', 'STAT_SLICE_FORMATS',
-    'STAT_SLICE_TITLES',
+    'STAT_SLICES', 'STAT_SLICE_FORMATS', 'STAT_SLICE_TITLES',
 ]
 
 
@@ -151,7 +147,6 @@ _LOSS_FCC = [Aggregate, Portfolio]
 # ---- summary ---------------------------------------------------------------
 register_simple_exhibit(
     'summary', 'Summary', 'summary_df', _LOSS_FCC,
-    formatters=MEASURE_FORMATS,
     caption='Headline moments and key percentiles by component: count risk '
             '(Freq), single claim severity (Sev) and total loss (Agg), one '
             'block per unit on a portfolio. Percentiles are exact grid '
@@ -160,7 +155,6 @@ register_simple_exhibit(
             'ever materialized.')
 register_simple_exhibit(
     'summary', 'Summary', 'summary_df', [PnL],
-    formatters=MEASURE_FORMATS,
     caption='The ledger in three rows: what was received (Consideration), '
             'what is owed (Obligation) and what is left (Margin), each with '
             'its moments and key percentiles.')
@@ -219,25 +213,20 @@ register_simple_exhibit(
             'lands at that percentile. Read down for the ledger, across for '
             'a scenario.')
 
-#: Diagnostics, the app's "More" material. Both need the realized grid.
-#:
-#: The window edges and the width are amounts on the loss axis, formatted the
-#: way ``SHARPEN_FORMATS`` below formats the same quantities; ``bs`` can be
-#: dyadic-fractional, so it gets significant digits rather than a fixed
-#: decimal; ``clipped`` is an estimated far-tail mass, tiny when present at
-#: all, so only scientific notation separates a good row from a perfect one.
-#: ``coverage`` is a string upstream (``'1-1e-12'``) and needs nothing, and the
-#: two ``log2`` columns are integers upstream, so the IR types them and formats
-#: them without help.
-BS_WINDOW_FORMATS = {
-    'x_min': ',.0f', 'x_max': ',.0f', 'W': ',.0f',
-    'bs': ',.4g', 'clipped': '.2e',
-}
-
+# Diagnostics, the app's "More" material. Both need the realized grid.
+#
+# Their column readings live in the format sheets like every other column's
+# (``aggregate/formats/formats-raw.yaml``): the window edges and the width are
+# amounts on the loss axis, ``bs`` is dyadic-fractional so it takes
+# significant digits rather than a fixed decimal count, and ``clipped`` is an
+# estimated far-tail mass, tiny when present at all, so only scientific
+# notation separates a good row from a perfect one. ``coverage`` is a string
+# upstream (``'1-1e-12'``) and needs nothing, and the two ``log2`` columns are
+# integers upstream, so the IR types them and formats them without help.
 bs_window = register_simple_exhibit(
     'bs_window', 'Grid sizing', 'bs_window_df',
     [Aggregate, Portfolio, BivariateAggregate],
-    predicate=_perspectives_updated, formatters=BS_WINDOW_FORMATS,
+    predicate=_perspectives_updated,
     caption='How the grid was chosen: the candidate windows, which one '
             'applied, and the bucket size and log2 that follow from it. '
             'Each method\'s window is [x_min, x_max] with width '
@@ -245,22 +234,15 @@ bs_window = register_simple_exhibit(
             'distribution the window holds. A clipped row is a window that '
             'did not fit and was cut to the grid, which is where aliasing '
             'comes from.')
-#: The probe's own audit reads in scientific notation, deliberately: the
-#: ``u_`` columns are relative errors against the analytic moments and run
-#: from about 1e-7 to a few percent, so at a fixed ``.4f`` a good cell and a
-#: perfect cell both print ``0.0000``, which is exactly the comparison the
-#: table exists to support. ``score`` is the number that decides, and gets the
-#: digits to separate two cells that are close.
-SHARPEN_FORMATS = {
-    'score': '.5f', 'extent': ',.0f', 'x_min': ',.0f', 'bs': ',.4g',
-    'u_sev_mean': '.2e', 'u_sev_cv': '.2e', 'u_sev_skew': '.2e',
-    'u_agg_mean': '.2e', 'u_agg_cv': '.2e', 'u_agg_skew': '.2e',
-    'aliasing': '.4f', 'deficit': '.2e', 'seconds': '.3f',
-}
-
+# The probe's own audit reads in significant figures under RAW, deliberately:
+# the ``u_`` columns are relative errors against the analytic moments and run
+# from about 1e-7 to a few percent, so at a fixed decimal count a good cell
+# and a perfect cell both print zero, which is exactly the comparison the
+# table exists to support. The insurer sheet takes the fixed decimals anyway,
+# which is that view's standing preference and the author's ruling.
 sharpen = register_simple_exhibit(
     'sharpen', 'Grid probe', 'sharpen_df', _LOSS_FCC,
-    predicate=_perspectives_sharpen, formatters=SHARPEN_FORMATS,
+    predicate=_perspectives_sharpen,
     caption='Every grid the last probe tried, one row per cell walked, with '
             'its working: the realized bucket size and log2, the six '
             'normalized moment errors that make up the score, the aliasing '

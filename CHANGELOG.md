@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a287
+
+**[Format-Sheet-Application] the sheets are wired, the seven dicts are gone.** `build_exhibit` reads the format sheets and lays them under each block's own kwargs, and `MEASURE_FORMATS`, `BS_WINDOW_FORMATS`, `SHARPEN_FORMATS`, `PENTAGON_FORMATS`, `CALIBRATION_FORMATS`, `DISTORTION_FORMATS` and `EVALUATION_FORMATS` are deleted along with their exports. `STAT_SLICE_FORMATS`, `STAT_SLICES`, `STAT_SLICE_TITLES` and the `score_grid` literal stay: those are properties of a block's shape rather than of a column's meaning, which is the one deliberate exception.
+
+**Applied after relabeling, which fixes a latent bug.** greater_tables keys formats on the *displayed* column label, and `exhibit_frames` relabels every frame through the host's `_relabel` after the builder returns. The old dicts were attached by the builder, keyed on pre-relabel names, so a `renamer` that touched a formatted column silently detached its format. The sheet's keys now make the same trip the frame's columns made, read off `_relabel` itself rather than off `renamer`, so the `use_labels` gate cannot come apart from it either.
+
+**Precedence**, low to high: greater_tables' dtype and tag inference, `formats-raw.yaml`, `formats-insurer.yaml` under that perspective, the same file names in `~/.aggregate` and the working directory, then a block's own `formatters` entry, which always wins. A block that declares a tag selector keeps its own and takes none from the sheet, since a selector may be a regex or `'all'` and those do not merge with a list.
+
+**The two `ratio_cols` call sites are gone.** The eight ratio columns of `economic_ratios_df` and the three of `evaluation_df` point at the `ratio` style, which stamps greater_tables' ratio tag wherever those labels appear. A ratio is now tagged on every block that serves one rather than on the two that remembered to say so.
+
+**Readings that changed, and they did change.** This is the version where the drafted vocabulary meets the served exhibits, so the committed exhibit snapshots move (124 of them, regenerated). What moved, in one list: every ratio column gains the `ratio` tag and its `.1%` reading, including `CV` on the reins and validation frames and the whole `economic_ratios` ratio block, which were reading as inferred decimals; the pentagon amounts and the VaR ladder read as `,.7g` under RAW and `,.2f` under INSURER, where the ladder had been inference; `Skew` reads `.3g` under RAW, three significant figures, which greater_tables 6 parses and 5.x could not, so the `_core` comment saying the `g` kind does not exist comes out; `error`, `param`, `gini_p` and `area` read `.5g` under RAW and `.5f` under INSURER, replacing `.2e` and the inferred SI notation `error` picked up on `stats_df`; `x_min`, `x_max` and `W` gain a decimal; `bs` goes to six significant figures; `T` reads `,.1f`; `VaR/Mean` reads `.3f`, matching `PQ`, both being multiples.
+
+**The `P` collision is real and is handled by the scoped section.** `P` is premium as a data column in twenty served blocks and the probability ladder as `tail_df`'s index in ten, so the tail exhibit carries `P: probability` in the sheet's `exhibits:` section. Without it the ladder would read as an amount, and under the insurer money format the 1 in 1000 and the 1 in 10000 rungs would both print `1.00`.
+
+Nothing is owed on the app side: `aggregate_api`'s own `tables.FORMATS` has been empty since its a94, and it never imported these names.
+
 ## 1.0.0a286
 
 **[Format-Sheet-Files] the column formats become a file.** Two YAML **format sheets** ship as package data in the new `aggregate/formats/`, the sibling of `aggregate/agg/` and for the same reason. `formats-raw.yaml` holds the library's default reading of every named column, keyed by column label; `formats-insurer.yaml` is an **overlay** holding only the entries where the business reading differs. Absent means same. Two full sheets would drift apart, a delta cannot.

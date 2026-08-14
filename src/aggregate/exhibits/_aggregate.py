@@ -10,7 +10,6 @@ is edited.
 from .._aggregate import Aggregate
 from ._core import (
     reins, stats, summary, tail, validation,
-    MEASURE_FORMATS,
     _moment_validation_emphasis, _reins_frames,
     _stats_insurer_moment_store, _summary_flags, _tail_flags,
 )
@@ -27,8 +26,7 @@ def _summary_insurer_aggregate(obj, blocks):
                'blank by design: frequency enters through its PGF and no '
                'count distribution is materialized.')
     return [(block_name, df,
-             dict(kw, caption=caption, row_flags=_summary_flags(df),
-                  formatters=MEASURE_FORMATS))]
+             dict(kw, caption=caption, row_flags=_summary_flags(df)))]
 
 
 @tail.insurer.register(Aggregate)

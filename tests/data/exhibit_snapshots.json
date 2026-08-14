@@ -17421,6 +17421,772 @@
    "n_stub_levels": 1
   }
  ],
+ "pricing.allocate/insurer/CalibrationReinsGross": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ccoc"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.304347826086964,
+       "text": "1.30"
+      },
+      {
+       "raw": 11.304347826086964,
+       "text": "11.30"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.884615384615384,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521739175,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652173918,
+       "text": "22.61"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153845,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ph"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.5237318613115072,
+       "text": "1.52"
+      },
+      {
+       "raw": 11.523731861311507,
+       "text": "11.52"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8677744432402914,
+       "text": "86.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.3893116169493744,
+       "text": "2.39"
+      },
+      {
+       "raw": 22.389311616949374,
+       "text": "22.39"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8932833819177989,
+       "text": "89.3%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "wang"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.608498826406068,
+       "text": "1.61"
+      },
+      {
+       "raw": 11.608498826406068,
+       "text": "11.61"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8614378266768494,
+       "text": "86.1%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.304544651854812,
+       "text": "2.30"
+      },
+      {
+       "raw": 22.304544651854812,
+       "text": "22.30"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8966782470646326,
+       "text": "89.7%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "dual"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.685192261675951,
+       "text": "1.69"
+      },
+      {
+       "raw": 11.685192261675951,
+       "text": "11.69"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8557839508381139,
+       "text": "85.6%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.2278512165849307,
+       "text": "2.23"
+      },
+      {
+       "raw": 22.22785121658493,
+       "text": "22.23"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8997720834606515,
+       "text": "90.0%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "tvar"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.9565226859751235,
+       "text": "1.96"
+      },
+      {
+       "raw": 11.956522685975123,
+       "text": "11.96"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8363635701314643,
+       "text": "83.6%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 1.9565207922857546,
+       "text": "1.96"
+      },
+      {
+       "raw": 21.956520792285755,
+       "text": "21.96"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.910891128389833,
+       "text": "91.1%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    }
+   ],
+   "caption": "The calibrated gross premium split across the occurrence program on one consistent basis. Each family's distorted view of the gross distribution sets the weights; the kappa curve off the joint says what ceded and net each earn under them; ceded plus net foot to gross exactly. This is neither view priced on its own, which is the stand-alone table, nor the difference of two such prices: it is one price decomposed, so the ceded row here is the cedent's allocated cost of the program rather than a reinsurer's quote for it. The reading is unlimited, so there is no capital column. The split is computed on the joint on the exact lattice, 2**6 by 2**5 cells, carrying a deficit of 1.1e-16. The joint's gross price differs from the fine 1-D reading by at most 0.00 across the families (rho_gap), which is reported rather than absorbed: the fractions are computed on the joint's grid and applied to the calibrated premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
  "pricing.allocate/raw/CalibrationPortfolio": [
   {
    "body": [
@@ -18505,6 +19271,772 @@
      },
      {
       "text": "total"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "pricing.allocate/raw/CalibrationReinsGross": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ccoc"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.304347826086964,
+       "text": "1.30"
+      },
+      {
+       "raw": 11.304347826086964,
+       "text": "11.30"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.884615384615384,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521739175,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652173918,
+       "text": "22.61"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153845,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ph"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.5237318613115072,
+       "text": "1.52"
+      },
+      {
+       "raw": 11.523731861311507,
+       "text": "11.52"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8677744432402914,
+       "text": "86.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.3893116169493744,
+       "text": "2.39"
+      },
+      {
+       "raw": 22.389311616949374,
+       "text": "22.39"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8932833819177989,
+       "text": "89.3%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "wang"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.608498826406068,
+       "text": "1.61"
+      },
+      {
+       "raw": 11.608498826406068,
+       "text": "11.61"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8614378266768494,
+       "text": "86.1%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.304544651854812,
+       "text": "2.30"
+      },
+      {
+       "raw": 22.304544651854812,
+       "text": "22.30"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8966782470646326,
+       "text": "89.7%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "dual"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.685192261675951,
+       "text": "1.69"
+      },
+      {
+       "raw": 11.685192261675951,
+       "text": "11.69"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8557839508381139,
+       "text": "85.6%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.2278512165849307,
+       "text": "2.23"
+      },
+      {
+       "raw": 22.22785121658493,
+       "text": "22.23"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8997720834606515,
+       "text": "90.0%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "tvar"
+      },
+      "gross",
+      {
+       "raw": 30.0,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434782608816,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826088,
+       "text": "33.91"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8846153846153842,
+       "text": "88.5%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.9565226859751235,
+       "text": "1.96"
+      },
+      {
+       "raw": 11.956522685975123,
+       "text": "11.96"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.8363635701314643,
+       "text": "83.6%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 1.9565207922857546,
+       "text": "1.96"
+      },
+      {
+       "raw": 21.956520792285755,
+       "text": "21.96"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.910891128389833,
+       "text": "91.1%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    }
+   ],
+   "caption": "The calibrated gross premium split across the occurrence program on one consistent basis. Each family's distorted view of the gross distribution sets the weights; the kappa curve off the joint says what ceded and net each earn under them; ceded plus net foot to gross exactly. This is neither view priced on its own, which is the stand-alone table, nor the difference of two such prices: it is one price decomposed, so the ceded row here is the cedent's allocated cost of the program rather than a reinsurer's quote for it. The reading is unlimited, so there is no capital column. The split is computed on the joint on the exact lattice, 2**6 by 2**5 cells, carrying a deficit of 1.1e-16. The joint's gross price differs from the fine 1-D reading by at most 0.00 across the families (rho_gap), which is reported rather than absorbed: the fractions are computed on the joint's grid and applied to the calibrated premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
      }
     ]
    ],

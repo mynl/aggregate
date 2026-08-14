@@ -392,16 +392,14 @@ def _perspectives_allocation(obj):
     An aggregate with no cession has one distribution and nothing to split,
     which is not a degenerate allocation but the absence of one; its story is
     the stand-alone leaf.
-
-    The occurrence arm is described here and not yet honored: the frame it
-    would serve arrives with the natural allocation exhibit, and a predicate
-    that says available before a builder can answer is worse than one that
-    waits.
     """
     source = getattr(obj, '_source', None)
     if source is None:
         return []
     if getattr(source, 'agg_list', None) is not None:
+        return list(_IMPLEMENTED_PERSPECTIVES)
+    if getattr(source, 'occ_reins', None) is not None \
+            and getattr(obj, 'reins_view', None) == 'gross':
         return list(_IMPLEMENTED_PERSPECTIVES)
     return []
 

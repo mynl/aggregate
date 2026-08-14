@@ -242,16 +242,60 @@ def _allocate_raw(result):
     says there are parts to split across, so there is no "nothing to allocate"
     branch here: that case does not serve this leaf at all.
     """
+    if getattr(result._source, 'agg_list', None) is not None:
+        return [
+            _calibration_block(result),
+            ('pricing_df', result.pricing_df,
+             {'caption': 'The calibrated set allocated across the units of '
+                         'the book, at the calibration asset level: the '
+                         'eight pentagon statistics down the rows, units and '
+                         'the total across. Each distortion is a different '
+                         'answer to how the total premium should be shared '
+                         'out, computed from the same total.'}),
+        ]
     return [
-        _calibration_block(result),
-        ('pricing_df', result.pricing_df,
-         {'caption': 'The calibrated set allocated across the units of '
-                     'the book, at the calibration asset level: the '
-                     'eight pentagon statistics down the rows, units and '
-                     'the total across. Each distortion is a different '
-                     'answer to how the total premium should be shared '
-                     'out, computed from the same total.'}),
+        ('natural_allocation_df', result.natural_allocation_df,
+         {'formatters': PENTAGON_FORMATS,
+          'caption': _allocation_caption(result)}),
     ]
+
+
+def _allocation_caption(result):
+    """What the occurrence allocation is, and what it is not.
+
+    Three things a reader has to know and cannot read off the numbers: that
+    this is one premium decomposed rather than two prices compared, which
+    machinery produced the split, and how far the joint's grid sat from the
+    one the fit was struck on.
+    """
+    frame = result.natural_allocation_df
+    gaps = frame.attrs.get('rho_gap') or {}
+    sizing = frame.attrs.get('joint_sizing') or {}
+    worst = max((abs(v) for v in gaps.values() if v == v), default=None)
+    grid = ''
+    if sizing:
+        exact = ('on the exact lattice' if sizing.get('exact_lattice')
+                 else f'at bs = {sizing["bs"]:,.6g}')
+        grid = (f' The split is computed on the joint {exact}, '
+                f'2**{sizing["log2"][0]} by 2**{sizing["log2"][1]} cells, '
+                f'carrying a deficit of {sizing["deficit"]:.1e}.')
+    gap = ''
+    if worst is not None:
+        gap = (f' The joint\'s gross price differs from the fine 1-D reading '
+               f'by at most {worst:,.2f} across the families (rho_gap), which '
+               f'is reported rather than absorbed: the fractions are computed '
+               f'on the joint\'s grid and applied to the calibrated premium.')
+    return (
+        'The calibrated gross premium split across the occurrence program on '
+        'one consistent basis. Each family\'s distorted view of the gross '
+        'distribution sets the weights; the kappa curve off the joint says '
+        'what ceded and net each earn under them; ceded plus net foot to '
+        'gross exactly. This is neither view priced on its own, which is the '
+        'stand-alone table, nor the difference of two such prices: it is one '
+        'price decomposed, so the ceded row here is the cedent\'s allocated '
+        'cost of the program rather than a reinsurer\'s quote for it. The '
+        'reading is unlimited, so there is no capital column.'
+        + grid + gap)
 
 
 def _star_the_basis(frame, basis):
@@ -300,8 +344,19 @@ def _allocate_insurer(result, blocks):
 
     On a book, the four ratio and price slices a reader actually compares,
     one block each, units across.
+
+    On an occurrence program, **nothing changes**. The allocation is already
+    the cedent's one basis reading: the ceded row is what the cession costs
+    the cedent out of its own premium rather than what a reinsurer would
+    charge, so there is nothing to drop and nothing to star, and there are no
+    difference rows because the whole table is a decomposition already. RAW
+    and INSURER are identical here, which is the default rule doing its job
+    rather than an omission (plan decision 8; revisit only if a REINSURER
+    perspective ever arrives, which would read the ceded row differently).
     """
-    return [blocks[0], *_stat_slices(blocks[1][1])]
+    if getattr(result._source, 'agg_list', None) is not None:
+        return [blocks[0], *_stat_slices(blocks[1][1])]
+    return blocks
 
 
 def _stat_slices(pricing_df):

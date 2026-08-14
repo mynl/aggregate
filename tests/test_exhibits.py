@@ -93,7 +93,8 @@ EXPECTED_EXHIBITS = {
     'CalibrationPortfolio': ['pricing.calibrate', 'pricing.stand_alone',
                              'pricing.allocate'],
     'CalibrationReins': ['pricing.calibrate', 'pricing.stand_alone'],
-    'CalibrationReinsGross': ['pricing.calibrate', 'pricing.stand_alone'],
+    'CalibrationReinsGross': ['pricing.calibrate', 'pricing.stand_alone',
+                              'pricing.allocate'],
     'CalibrationAggregate': ['pricing.calibrate', 'pricing.stand_alone'],
     'Evaluation': ['pricing.evaluate'],
 }
@@ -759,6 +760,7 @@ def test_allocate_needs_parts_to_split_across(objects):
     """
     served = lambda key: [n for n, _ in available_exhibits(objects[key])]
     assert 'pricing.allocate' in served('CalibrationPortfolio')
+    assert 'pricing.allocate' in served('CalibrationReinsGross')
     assert 'pricing.allocate' not in served('CalibrationAggregate')
     assert 'pricing.allocate' not in served('CalibrationReins')
     for key in ('CalibrationAggregate', 'CalibrationReins'):
@@ -920,6 +922,74 @@ def test_the_benefit_row_reads_beside_its_family(objects):
     first = insurer.index.get_level_values('distortion')[0]
     head = [u for d, u in insurer.index if d == first]
     assert head[-1] == 'sum of parts less total'
+
+
+def test_the_occurrence_allocation_foots_and_holds_its_gross(objects):
+    """One premium decomposed: the rows add up and the gross row is constant."""
+    result = objects['CalibrationReinsGross']
+    blocks = exhibit_frames(result, 'pricing.allocate')
+    assert [b for b, _, _ in blocks] == ['natural_allocation_df']
+    _n, frame, kw = blocks[0]
+    for family in frame.index.get_level_values('distortion').unique():
+        block = frame.xs(family, level='distortion')
+        assert block.loc['ceded', 'P'] + block.loc['net', 'P'] == pytest.approx(
+            block.loc['gross', 'P'], rel=1e-12)
+    assert frame.xs('gross', level='view')['P'].nunique() == 1
+    assert 'foot to gross exactly' in kw['caption']
+    assert 'one price decomposed' in kw['caption']
+
+
+def test_the_allocation_caption_carries_the_grid_it_was_priced_on(objects):
+    """A priced exhibit should not be readable without its grid."""
+    _n, _frame, kw = exhibit_frames(
+        objects['CalibrationReinsGross'], 'pricing.allocate')[0]
+    assert 'rho_gap' in kw['caption']
+    assert 'deficit' in kw['caption']
+    assert 'cells' in kw['caption']
+
+
+def test_raw_equals_insurer_on_the_occurrence_allocation(objects):
+    """The allocation is already the cedent's one basis reading.
+
+    Nothing to drop, nothing to star, and no difference rows, because the
+    whole table is a decomposition. The ceded row here is the cedent's
+    allocated cost of the program rather than a reinsurer's quote for it,
+    which is what makes this different from the stand-alone table's ceded row.
+    """
+    result = objects['CalibrationReinsGross']
+    raw = exhibit_frames(result, 'pricing.allocate')
+    insurer = exhibit_frames(result, 'pricing.allocate', Perspective.INSURER)
+    assert [b for b, _, _ in raw] == [b for b, _, _ in insurer]
+    pd.testing.assert_frame_equal(raw[0][1], insurer[0][1])
+
+
+def test_the_two_leaves_answer_differently_on_one_cession(objects):
+    """The reading the pane exists for: net alone is not net's share of gross.
+
+    Stand-alone prices net as its own distribution; allocate gives net its
+    share of the one gross premium. Two numbers, two questions, two tabs.
+
+    Not every family separates on every program, and this fixture shows why.
+    ``ccoc`` puts its mass on the essential supremum, and on a program whose
+    worst gross year is also its worst ceded year (two claims of 30 against a
+    10 xs 10 layer) the largest cession and the cession at the largest gross
+    outcome are the same number, so the two readings coincide exactly. That is
+    a fact about this cession rather than about the two questions.
+    """
+    result = objects['CalibrationReinsGross']
+    _n, alone, _kw = exhibit_frames(result, 'pricing.stand_alone')[0]
+    _n, split, _kw = exhibit_frames(result, 'pricing.allocate')[0]
+    separated = 0
+    for family in split.index.get_level_values('distortion').unique():
+        priced = alone.loc[(family, 'net'), 'P']
+        allocated = split.loc[(family, 'net'), 'P']
+        if priced != pytest.approx(allocated, rel=1e-6):
+            separated += 1
+    assert separated >= 3
+    # and the ceded rows are different animals: one is a reinsurer's quote for
+    # the layer, the other the cedent's allocated cost of it
+    assert alone.loc[('ph', 'ceded'), 'P'] != pytest.approx(
+        split.loc[('ph', 'ceded'), 'P'], rel=1e-6)
 
 
 def test_pricing_evaluate_serves_the_panel(objects):

@@ -20,6 +20,16 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a284
+
+**[Natural-Allocation-Exhibit] the occurrence branch of `pricing.allocate`.** `pricing.allocate` on a gross-calibrated `Aggregate` calibration serves `natural_allocation_df`: gross, ceded and net for every family, footing exactly, gross constant at the calibrated premium. The predicate widens to match, so `available_exhibits` on a gross-calibrated occurrence result now lists `pricing.calibrate`, `pricing.stand_alone` and `pricing.allocate`, and a **net**-calibrated one still lists the first two only.
+
+**RAW equals INSURER here**, which is the default rule doing its job rather than an omission (plan decision 8). The allocation is already the cedent's one-basis reading: the ceded row is what the cession costs the cedent out of its own premium rather than what a reinsurer would charge for the layer, so there is nothing to drop and nothing to star, and there are no difference rows because the whole table is a decomposition. Contrast the stand-alone leaf, where INSURER is a real restructure. Revisit only if a `REINSURER` perspective ever arrives, which would read the ceded row differently.
+
+**The caption carries the grid the split was priced on**: the joint's bucket size or the fact that the exact lattice was taken, its cell count, its deficit, and the worst `rho_gap` across the families. A priced exhibit should not be readable without the grid behind it.
+
+Two things worth recording, both surfaced by the fixtures and both true of the mathematics rather than of the code. On a program whose worst gross year is also its worst ceded year, `ccoc`'s stand-alone net price and its allocated net share **coincide exactly**, because the mass sits on the essential supremum and the two suprema are the same outcome. And the concave families separate the two readings by a few tenths of a percent on the reference cession, which is the size of the effect the two leaves exist to show.
+
 ## 1.0.0a283
 
 **[Calibration-Natural-Allocation-Frame] the calibrated gross premium, split across an occurrence program.** `CalibrationResult.natural_allocation_df`: `(distortion, view)` rows over gross, ceded and net, the pentagon octet across, ceded plus net footing to gross exactly.

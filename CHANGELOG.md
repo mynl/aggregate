@@ -20,6 +20,24 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a286
+
+**[Format-Sheet-Files] the column formats become a file.** Two YAML **format sheets** ship as package data in the new `aggregate/formats/`, the sibling of `aggregate/agg/` and for the same reason. `formats-raw.yaml` holds the library's default reading of every named column, keyed by column label; `formats-insurer.yaml` is an **overlay** holding only the entries where the business reading differs. Absent means same. Two full sheets would drift apart, a delta cannot.
+
+Nothing is wired yet, so no served exhibit changes in this version: this is the vocabulary and the loader, and `[Format-Sheet-Application]` is the version that applies them and deletes the seven module level dicts they replace.
+
+**A sheet is also a registry of the column vocabulary.** An entry asserts that a column label means one thing across the package, which is a statement the old dicts could not make: the same fact, a CV reads as a percentage, was declared wherever someone remembered to declare it. The enforcement sweep arrives with `[Format-Sheet-Enforcement]`; the file is what makes it possible.
+
+**Overrides are the `.agg` rule, not a new mechanism.** The loader looks for the same two file names in the shipped directory, then `~/.aggregate`, then the working directory, nearest winning, merging per key rather than per file, so a one line local sheet changes one reading and inherits the rest. Overriding a shipped sheet is the same act as overriding a shipped DecL database, so it is the same search path.
+
+**Styles.** A sheet's `styles:` section names a reading once (`money`, `ratio`, `probability`, `residual`) and every column that wears it points at the name, so the house ratio precision is one line rather than fourteen. Styles merge across the layers **before** column entries resolve against them, which is what lets the insurer overlay redefine `money` in a single line and move `L`, `M`, `P`, `Q`, `a`, `E`, `C` and the whole VaR ladder with it. Four style names are special because greater_tables owns them as semantic column tags (`ratio`, `year`, `date`, `raw`): a column pointing at one of those is stamped with the tag as well as the format, so a consumer learns the column's kind and not only its reading. That is what retires the two hand written `ratio_cols` call sites next version.
+
+**Scoped entries ship from day one**, and the collision they exist for was already there: `P` is premium as a data column in twenty served blocks and the **probability ladder** as `tail_df`'s index in ten. `exhibits: {tail: {P: probability}}` keeps the ladder reading as a probability; without it the insurer money format would print the 1 in 1000 and the 1 in 10000 rungs both as `1.00`.
+
+**Wire safe by construction.** Every value goes through greater_tables' `parse_sugar` at load, so a bad string raises once, naming the file and the key, rather than per cell. A value can be sugar, an int, a mapping of `FormatSpec` fields (the only way to reach `scale`, `prefix`, `suffix`, `negative: paren`) or a style name, and it can never be a callable. That is the feature: a callable never reaches the IR, so a sheet can only say things a client can re-render.
+
+`pyyaml>=6.0` is now a declared dependency. greater_tables already required it, so this costs nothing to resolve; it is declared because this package imports it, and a transitive dependency that vanished when greater_tables changed its YAML library would break the sheets a long way from the cause. Parsing is `yaml.safe_load` only.
+
 ## 1.0.0a285
 
 **[Kappa-Chart-Surfaces] one chart name, three sources.** `kappa` now draws for a `Portfolio` and for an `Aggregate` carrying an occurrence program, alongside the `BivariateAggregate` it launched on. The question is the same one in all three cases, what each part contributes given the whole, so it is one name.

@@ -1,0 +1,123 @@
+# formats-raw.yaml: the library's default reading of every named column.
+#
+# The RAW perspective serves the underlying frame with no business
+# translation, and this sheet is the one thing it does add: the units a
+# frame cannot carry itself. A CV is a percentage, a bucket size is dyadic,
+# a residual has to read apart from an exact zero, and none of that is in
+# the dtype.
+#
+# Keyed by **column label**, globally: an entry says what that word means
+# wherever it appears on a served block, which is what makes this file a
+# registry of the column vocabulary as well as a format table. Case is
+# significant, so `p` (a probability) and `P` (premium) are two words.
+# The `exhibits:` section at the foot scopes an entry to one exhibit, for
+# the case where one label really does mean two things.
+#
+# Values: a style name from the `styles:` section, greater_tables format
+# sugar (`',.2f'`, `'.3g'`, `'si'`), an int (decimal places), or a mapping
+# of FormatSpec fields, which is the only way to reach `scale`, `prefix`,
+# `suffix`, `negative: paren`, `null` or `zero`. A value can never be a
+# callable, which is the point: a callable never reaches the IR, so a
+# reading declared here is one every consumer can re-render.
+#
+# **Always quote a sugar string.** Several of them open with characters
+# YAML reserves, `,.2f` among them, so a bare scalar is a parse error or,
+# worse, something else.
+#
+# `formats-insurer.yaml` overlays this file for the INSURER perspective and
+# holds only the entries that differ. Both are overridable by a file of the
+# same name in `~/.aggregate` and then in the working directory, nearest
+# winning, exactly as a user `.agg` database overrides a shipped one.
+
+# The named vocabulary. A style is defined once and pointed at from every
+# column that wears it, so changing the house ratio precision is one line
+# here rather than fourteen below. Four names are special: `ratio`, `year`,
+# `date` and `raw` are greater_tables' own semantic column tags, so a
+# column pointing at one of them is stamped with that tag as well as that
+# format, and a consumer learns the column's kind rather than only its
+# reading.
+styles:
+  money: ',.7g'        # seven significant figures: RAW reads amounts the
+                       # way it reads everything else, and INSURER is where
+                       # money reads as money to the cent
+  ratio: '.1%'         # also stamps the greater_tables ratio column tag
+  probability: '.5f'   # the fifth place is where asked-for and
+                       # grid-deliverable part company
+  residual: '.2e'      # a good fit and an exact fit must read apart
+
+columns:
+  # --- moments, wherever a measure is a column (the summary card, the
+  # --- P&L ledger)
+  CV: ratio
+  Skew: '.3g'          # three significant figures over a wide dynamic range
+
+  # --- the pentagon octet (L, P, M, a, Q, lr, pq, coc) and its neighbours
+  L: money
+  M: money
+  P: money
+  Q: money
+  a: money
+  E: money             # the amounts block of economic_ratios_df carries
+  C: money             # expense and commission beside premium, loss and
+                       # margin, and a column carries one unit
+  LR: ratio
+  PQ: '.3f'            # a ratio, and reads as one
+  ROE: ratio
+  coc: ratio
+  p: probability       # distinct from premium `P` by case
+  'F(a)': '.5g'
+
+  # --- the calibration and acceptability receipts
+  param: '.5g'
+  error: '.5g'         # a residual: `g` goes scientific where it has to, so
+                       # a good fit and an exact fit do not both print zero
+  gini_p: '.5g'
+  area: '.5g'
+
+  # --- grid sizing (bs_window_df) and the grid probe (sharpen_df)
+  x_min: ',.1f'
+  x_max: ',.1f'
+  W: ',.1f'
+  bs: ',.6g'           # dyadic fractional, so significant digits rather
+                       # than a fixed decimal count
+  clipped: residual    # an estimated far tail mass, tiny when present
+  score: '.5g'
+  extent: ',.5g'
+  u_sev_mean: residual
+  u_sev_cv: '.5g'      # the six u_ columns are relative errors against the
+  u_sev_skew: '.5g'    # analytic moments, running from about 1e-7 to a few
+  u_agg_mean: residual # percent; at a fixed decimal count a good cell and a
+  u_agg_cv: '.5g'      # perfect cell both print zero, which is exactly the
+  u_agg_skew: '.5g'    # comparison the probe audit exists to support
+  aliasing: '.5g'
+  deficit: '.5g'
+  seconds: '.3f'
+
+  # --- the return period ladder (tail_df)
+  T: ',.1f'            # a return period; the ladder values are round
+  VaR: money
+  TVaR: money
+  xsVaR: money
+  'VaR/Mean': '.3f'    # leverage, a multiple, read to the same places as PQ
+
+  # --- P&L ratios (economic_ratios_df) and the waterfall (evaluation_df)
+  ER: ratio
+  CR: ratio
+  E_LR: ratio          # the E_ columns are means of ratios, against the
+  E_ER: ratio          # ratios of means above them
+  E_CR: ratio
+  P_share: ratio
+  M_share: ratio
+  'Premium spent': ratio
+  'Margin spent': ratio
+
+# Scoped exceptions, exhibit then column: the escape hatch for one label
+# meaning two things. An entry here wins over the global entry above, for
+# that exhibit only.
+exhibits:
+  # The tail ladder is indexed by `P`, the symmetric probability ladder,
+  # which is not the premium the global entry means. Without this the
+  # capital anchors would read as amounts, and under INSURER's money format
+  # the 1 in 1000 and the 1 in 10000 rungs would both print 1.00.
+  tail:
+    P: probability

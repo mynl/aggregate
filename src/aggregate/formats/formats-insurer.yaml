@@ -1,0 +1,51 @@
+# formats-insurer.yaml: how the INSURER perspective differs from RAW.
+#
+# An **overlay**, holding only the entries where the business reading is
+# not the raw one. Absent means same. Two full sheets would drift apart;
+# a delta cannot, which is why this file is short and why it should stay
+# short: an entry here that agrees with `formats-raw.yaml` is not a
+# statement, it is a copy waiting to go stale.
+#
+# The shape of the difference is one idea repeated. RAW reads in
+# significant figures, `g`, which is at home with a wide dynamic range and
+# turns scientific when a number is small. INSURER reads in fixed decimals,
+# `f`, because a business table is read down a column and a moving decimal
+# point makes that harder. Money is the same idea in reverse: an amount is
+# an amount to the cent, at every scale.
+#
+# Same conventions as the raw sheet: quote every sugar string, values may
+# name a style, and a style redefined here is redefined for every column
+# that points at it.
+
+styles:
+  # Money is money at every scale in the business view: two decimals,
+  # grouped, whatever the size of the book. This one line carries L, M, P,
+  # Q, a, E, C and the VaR ladder, all of which point at `money`.
+  money: ',.2f'
+
+columns:
+  # A skewness is order one, so fixed decimals cost nothing here.
+  Skew: '.3f'
+
+  # The calibration and acceptability receipts, read in fixed decimals.
+  # `error` reads a premium miss, so this view rounds a very close fit to
+  # zero deliberately: the question the business view asks is whether the
+  # fit landed, and the raw view is where the size of the miss is read.
+  'F(a)': '.5f'
+  param: '.5f'
+  error: '.5f'
+  gini_p: '.5f'
+  area: '.5f'
+
+  # Grid sizing and the probe audit. The same trade as above: the probe's
+  # errors are relative and can be very small, and this view rounds them
+  # rather than switching notation mid column.
+  bs: ',.6f'
+  score: '.5f'
+  extent: ',.5f'
+  u_sev_skew: '.4f'
+  u_agg_skew: '.4f'
+  aliasing: '.4f'
+  deficit: '.4f'
+
+exhibits: {}

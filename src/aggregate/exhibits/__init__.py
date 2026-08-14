@@ -94,6 +94,9 @@ from ._core import (
     pricing_stand_alone,
     _perspectives_sharpen, _perspectives_updated,
 )
+from ._formats import (
+    FormatSheet, format_sheet, reload_format_sheets, sheet_paths,
+)
 
 # Per-class business translation. Imported for their registration side
 # effects, which is the whole point: importing the package wires the registry.
@@ -110,6 +113,7 @@ __all__ = [
     'Perspective', 'Exhibit', 'EXHIBITS',
     'available_exhibits', 'exhibit_frames', 'build_exhibit',
     'register_simple_exhibit',
+    'FormatSheet', 'format_sheet', 'reload_format_sheets', 'sheet_paths',
     'CAPITAL_ANCHOR_PERIODS', 'RAW_MOMENT_MEASURES',
     'summary', 'tail', 'stats', 'validation', 'reins',
     'economic', 'economic_ratios', 'economic_waterfall', 'dependency',

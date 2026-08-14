@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a285"
+version = "1.0.0a286"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -37,6 +37,13 @@ dependencies = [
     "numpy>=2.0",
     "pandas>=2.2",
     "Pygments",
+    # The exhibit format sheets (aggregate/formats/*.yaml) are parsed with
+    # yaml.safe_load. greater_tables already requires pyyaml, so this costs
+    # nothing to resolve, and it is declared here anyway because this package
+    # imports it: a transitive dependency that vanishes when greater_tables
+    # changes its own YAML library would break the sheets with a confusing
+    # error a long way from the cause.
+    "pyyaml>=6.0",
     "scipy>=1.11",
     # made optional in 0.27
     # "numba",
@@ -115,7 +122,8 @@ package-dir = {"" = "src"}
 packages = ["aggregate"]
 
 [tool.setuptools.package-data]
-aggregate = ["*.lark", "agg/*.agg", "data/*.mplstyle", "data/*.toml"]
+aggregate = ["*.lark", "agg/*.agg", "data/*.mplstyle", "data/*.toml",
+             "formats/*.yaml"]
 
 [tool.ruff]
 # Linting only for now -- no whole-repo reformat (that would be a huge diff and

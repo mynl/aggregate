@@ -373,6 +373,18 @@ def _calibration_survival(density, bs, assets):
     bs-grid). Faithful extraction of the default (``S_calc='cumsum'``) path of
     the former ``Portfolio.calibrate_distortion``; ``S`` is strictly positive
     and weakly decreasing.
+
+    Notes
+    -----
+    **0-based is a contract on the caller, not an assumption about the grid.**
+    ``S`` is returned over the window it is handed, so on a windowed density
+    (first bucket at ``x0 > 0``) the layer integral
+    ``∫₀^a g(S(x)) dx`` that :meth:`Distortion.calibrate_set` runs would be
+    short by the rectangle ``[0, x0)``, where ``S == 1`` and therefore
+    ``g(S) == 1`` for every distortion. Callers slide the density onto the
+    0-based frame and pass ``assets`` in that frame; both branches of
+    :func:`calibrate_distortions` do. ``ess_sup`` is read off the index, so it
+    comes back in whatever frame the caller passed.
     """
     Splus = (1 - density.loc[0:assets].cumsum()).values
     last_non_zero = np.argwhere(Splus)
@@ -396,6 +408,15 @@ def _limited_ev(density, bs, assets):
     bs-grid -- the ``add_exa`` / ``exa_total`` convention. Used for the expected
     loss when the object has no ``exa_total`` column (an ``Aggregate``); matches
     a one-unit ``Portfolio``'s ``exa_total`` to floating-point dust.
+
+    Notes
+    -----
+    **0-based is a contract on the caller** (see
+    :func:`_calibration_survival`). On a windowed density starting at
+    ``x0 > 0`` the sum omits the region ``[0, x0)``, over which ``S == 1``, so
+    the result is short by exactly ``x0``. Callers pass a 0-based frame and add
+    ``x0`` back to bring the answer out of it. ``add_exa``'s cached
+    ``exa_total`` is window aware and needs no such correction.
     """
     S = 1.0 - density.cumsum()
     return float(bs * S[S.index < assets].sum())
@@ -748,7 +769,28 @@ def calibrate_distortions(obj, coc=None, *, lr=None, p=None, a=None,
 
     The expected loss is read from the object's ``exa_total`` column when it has
     one (a ``Portfolio``, byte-for-byte the legacy value) and otherwise computed
-    on the full grid via :func:`_limited_ev` (an ``Aggregate``).
+    on the grid via :func:`_limited_ev` (an ``Aggregate``).
+
+    Windowed grids
+    --------------
+    A grid produced by :mod:`._bucket_window` starts at ``x0 > 0`` rather than
+    at the origin, deliberately, so that ``q`` / ``F`` / plots are defined on
+    the window. The layer integral is not: ``∫₀^a g(S(x)) dx`` needs the
+    region ``[0, x0)``, where ``S == 1`` and so ``g(S) == 1``, contributing
+    exactly ``x0``. Since a distortion risk measure is translation
+    equivariant, the fix is a slide rather than a pad: calibrate on the
+    0-based frame ``Z = X - x0`` against the target ``P - x0``, and bring the
+    receipt back out. Padding ``S`` with ``x0 / bs`` leading ones would give
+    the same answer, but that count is unbounded while the shift is O(1).
+
+    ``L``, ``P`` and ``a`` slide together; ``M``, ``Q`` and ``coc`` are shift
+    invariant, so the margin and the cost of capital are the same numbers on
+    either frame. A grid that already starts at 0 takes ``x0 = 0`` and is
+    byte-for-byte unchanged. Added at 1.0.0a289, before which a windowed
+    calibration was wrong: quietly on an ``Aggregate``, where the understated
+    expected loss and the understated integral partly masked each other, and
+    loudly on a ``Portfolio``, whose cached ``exa_total`` is window aware, so
+    only the integral was short and the families diverged.
 
     Reinsurance views
     -----------------
@@ -783,6 +825,14 @@ def calibrate_distortions(obj, coc=None, *, lr=None, p=None, a=None,
     A ``reins_view`` is refused on that path: the canonical-frame bookkeeping is
     written against the object's own support, and a cession of a signed outcome
     has no settled meaning to hold it to.
+
+    ``lr=`` resolves **in frame here and out of frame on the classic path**,
+    deliberately (author ruling, 1.0.0a289). A loss ratio is scale free but not
+    shift free, so the frame has to be chosen rather than inherited: a
+    canonical shift ``c`` stands for genuinely negative outcomes, and the
+    in-frame premium is the one that means anything, while a window is an
+    artifact of the grid, so the reader means the loss ratio on the premium
+    they are shown.
     """
     if (p is None) == (a is None):
         raise ValueError(
@@ -805,7 +855,7 @@ def calibrate_distortions(obj, coc=None, *, lr=None, p=None, a=None,
             f'{obj.name} has a signed or payoff support, where a cession has '
             f'no settled meaning: drop reins_view={reins_view!r}.')
     if not transform:
-        # ---- classic non-negative loss frame (c = 0): legacy path verbatim ---
+        # ---- classic non-negative loss frame: shift by the window offset -----
         if reins_view is None:
             density = obj.density_df['p_total']
             q_, cdf_, snap_ = obj.q, obj.cdf, obj.snap
@@ -817,23 +867,45 @@ def calibrate_distortions(obj, coc=None, *, lr=None, p=None, a=None,
         else:
             a = snap_(a)
             p_val = cdf_(a)
+        # The grid may be windowed: its first bucket sits at ``x0 >= 0``, and
+        # the region ``[0, x0)`` carries ``S == 1`` identically. Slide onto the
+        # 0-based frame the layer integral is written for, then un-shift the
+        # receipt, exactly as the signed branch below does with a positive
+        # ``c``. Never pad ``S`` with ``x0 / bs`` leading ones: that count is
+        # unbounded (a Po(1e9) at bs=1 windows a billion buckets off the
+        # origin), while the shift is O(1). Read after the ``reins_view``
+        # selection, since the views share the object's grid.
+        x0 = float(density.index[0])
+        if x0:
+            density = pd.Series(density.to_numpy(),
+                                index=density.index - x0)
+        a_z = a - x0
         if reins_view is None and 'exa_total' in obj.density_df.columns:
-            # the object's own cached limited expected value, byte-for-byte
+            # the object's own cached limited expected value, byte-for-byte.
+            # ``add_exa`` knows about the window, so this one is out of frame
             exa = obj.density_df.loc[a, 'exa_total']
         else:
-            exa = _limited_ev(density, obj.bs, a)
+            # in frame, brought out: ``_limited_ev`` integrates S over the
+            # window only, missing the [0, x0) rectangle, whose area is x0
+            exa = _limited_ev(density, obj.bs, a_z) + x0
         if lr is not None:
             # {L, a, LR} is a soluble triple, so the loss ratio becomes a cost
-            # of capital here, where L and a are both known and resolved
+            # of capital here, where L and a are both known and resolved.
+            # Out of frame, unlike the signed branch: a window is an artifact
+            # of the grid, not of the risk, so a reader who writes ``lr=``
+            # means the loss ratio on the premium they are shown (author
+            # ruling, 1.0.0a289)
             coc = _coc_from_lr(exa, a, lr)
         # invert COC -> LR -> P (matches the legacy ROE -> LR -> P path).
+        # Shift-covariant: nu + delta == 1, so P - x0 is the in-frame target
         delta = coc / (1 + coc)
         nu = 1 - delta
         P = nu * exa + delta * a
-        S, ess_sup = _calibration_survival(density, obj.bs, a)
+        S, ess_sup = _calibration_survival(density, obj.bs, a_z)
         dists = Distortion.calibrate_set(
-            S=S, dx=obj.bs, premium_target=P, ess_sup=ess_sup, assets=a,
-            el=exa, names=names)
+            S=S, dx=obj.bs, premium_target=P - x0, ess_sup=ess_sup,
+            assets=a_z, el=exa - x0, names=names)
+        # report out of frame, as the signed branch does below
         distortion_df, calibration_df = _calibration_frames(
             dists, coc, p_val, cdf_(a), exa, P, a)
     else:

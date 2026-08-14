@@ -45,6 +45,7 @@ they belong on this side of the wire (``dev/plan-pricing-exhibits.md``).
 import pandas as pd
 
 from ..pentagon import complete_pentagon
+from .._pricing import STAND_ALONE_SUM, STAND_ALONE_TOTAL
 from ..results import CalibrationResult, EvaluationResult
 from ._core import (
     pricing_allocate, pricing_evaluate, pricing_stand_alone,
@@ -149,6 +150,20 @@ def _stand_alone_raw(result):
     and serves that frame whole, in its own orientation, so the invariant reads
     the same over a result as over an object.
     """
+    if getattr(result._source, 'agg_list', None) is not None:
+        return [
+            _calibration_block(result),
+            ('stand_alone_df', result.stand_alone_df,
+             {'formatters': PENTAGON_FORMATS,
+              'caption': 'Each unit priced as its own distribution with the '
+                         'same fitted families, at the book\'s calibrated '
+                         'asset level; the sum of those prices against the '
+                         'book priced whole at the same level. The gap is '
+                         'what pooling is worth under that family. These are '
+                         'separate prices rather than shares of one, so they '
+                         'do not foot, which is the difference between this '
+                         'table and the allocation.'}),
+        ]
     if getattr(result._source, 'reins_views', None):
         return [
             ('reins_price_df', result.reins_price_df,
@@ -165,10 +180,56 @@ def _stand_alone_raw(result):
 
 @pricing_stand_alone.insurer.register(CalibrationResult)
 def _stand_alone_insurer(result, blocks):
-    """The buyer's reading: the whole program views, starred, differenced."""
+    """The buyer's reading of stand-alone prices.
+
+    On a book, the diversification benefit appended per family. On a cession,
+    the whole program views only, the calibrated one starred, and the
+    differences appended.
+    """
+    if getattr(result._source, 'agg_list', None) is not None:
+        return [blocks[0], _book_benefit(result, blocks[1])]
     if getattr(result._source, 'reins_views', None):
         return _reins_insurer(result, blocks[0])
     return blocks
+
+
+def _book_benefit(result, raw_block):
+    """Append ``sum of parts less total`` per family: what pooling is worth.
+
+    The buyer's restructure of a frame whose rows are all measurements. The
+    sum and the total ride in RAW because both are facts (one is arithmetic on
+    measurements, the other is a measurement); the difference between them is
+    the reading, and a reading belongs to a perspective
+    (``[Difference-Is-A-Perspective]``).
+
+    Interleaved family by family rather than appended at the foot, the
+    ``_reins_insurer`` pattern: the comparison a reader is making should sit
+    next to the numbers it is made from.
+    """
+    _name, frame, kw = raw_block
+    names = frame.index.names
+    pieces = []
+    for distortion in frame.index.get_level_values('distortion').unique():
+        block = frame.xs(distortion, level='distortion', drop_level=False)
+        pieces.append(block)
+        difference = _difference_rows(
+            block.droplevel('distortion'), STAND_ALONE_SUM,
+            [STAND_ALONE_TOTAL], distortion, names)
+        if difference is not None:
+            pieces.append(difference)
+    caption = (
+        'Each unit priced as its own distribution with the same fitted '
+        'families, at the book\'s calibrated asset level, then the sum of '
+        'those prices against the book priced whole at that level. The '
+        '"less" row is the diversification benefit: what the book saves by '
+        'being one book rather than two, under that family. It is positive '
+        'for every concave family, because a sum of parts capped at the '
+        'book\'s assets is at least the book capped there and the risk '
+        'measure is sub-additive. Its capital column is the mirror of its '
+        'premium column by construction, both rows standing behind the same '
+        'assets, so the reading is the premium and the margin.')
+    return ('stand_alone_df', pd.concat(pieces),
+            dict(kw, caption=caption, formatters=PENTAGON_FORMATS))
 
 
 # --- pricing.allocate -------------------------------------------------------

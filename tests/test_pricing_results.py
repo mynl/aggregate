@@ -176,6 +176,106 @@ def test_the_allocation_frames_are_public_frames_of_the_result(book, ceded):
         assert isinstance(getattr(result, attr), pd.DataFrame)
 
 
+# --- stand_alone_df ([Portfolio-Standalone-Frame], 1.0.0a282) ---------------
+
+def test_stand_alone_prices_every_unit_at_the_books_asset_level(book):
+    """The anchor is the total's, once: nothing re-anchors per unit."""
+    result = book.calibrate_distortions(0.15, p=0.99)
+    df = result.stand_alone_df
+    assert df.index.names == ['distortion', 'unit']
+    assert df['a'].nunique() == 1
+    assert df['a'].iloc[0] == pytest.approx(result.a)
+    # every row is a pentagon at that level, the derived rows included
+    assert (df['P'] + df['Q']).to_numpy() == pytest.approx(
+        df['a'].to_numpy())
+
+
+def test_stand_alone_rows_are_the_units_then_the_two_derived(book):
+    result = book.calibrate_distortions(0.15, p=0.99)
+    df = result.stand_alone_df
+    for family in df.index.get_level_values('distortion').unique():
+        rows = list(df.xs(family, level='distortion').index)
+        assert rows == [*book.unit_names, 'sum of parts', 'total']
+
+
+def test_a_unit_row_is_that_unit_priced_alone(book):
+    """Tied to ``Distortion.price`` called directly, which is what it claims."""
+    result = book.calibrate_distortions(0.15, p=0.99)
+    df = result.stand_alone_df
+    for family, dist in result.distortions.items():
+        for unit in book.agg_list:
+            quote = dist.price(unit.density_df['p_total'], a=result.a,
+                               kind='ask')
+            row = df.loc[(family, unit.name)]
+            assert row['L'] == pytest.approx(quote.el)
+            assert row['P'] == pytest.approx(quote.ask)
+            assert row['M'] == pytest.approx(quote.ask - quote.el)
+
+
+def test_the_total_row_is_the_families_fitted_premium(book):
+    """Which is the calibration target plus that family's own miss."""
+    result = book.calibrate_distortions(0.15, p=0.99)
+    df = result.stand_alone_df
+    target = float(result.calibration_df.loc['calibration', 'P'])
+    for family in result.distortions:
+        fitted = target + float(result.distortion_df.loc[family, 'error'])
+        assert df.loc[(family, 'total'), 'P'] == pytest.approx(fitted)
+
+
+def test_sum_of_parts_is_at_or_above_the_total(book):
+    """Sub-additivity, which is what makes the comparison the point of the frame.
+
+    ``min(X, a) <= sum_i min(X_i, a)`` pointwise, so monotonicity and the
+    sub-additivity of a concave distortion compose. The gap is what pooling is
+    worth under that family.
+    """
+    result = book.calibrate_distortions(0.15, p=0.99)
+    df = result.stand_alone_df
+    for family in result.distortions:
+        block = df.xs(family, level='distortion')
+        assert block.loc['sum of parts', 'P'] >= block.loc['total', 'P'] - 1e-9
+        assert block.loc['sum of parts', 'L'] >= block.loc['total', 'L'] - 1e-9
+
+
+def test_sum_of_parts_adds_the_amounts_and_holds_the_asset_level(book):
+    """Author's ruling, 2026-08-14: the sum row is a pentagon at the same ``a``.
+
+    Summing the capital column instead would put the row at ``n`` times the
+    asset level, which is a different reading and not the one the comparison
+    against ``total`` needs.
+    """
+    result = book.calibrate_distortions(0.15, p=0.99)
+    df = result.stand_alone_df
+    units = book.unit_names
+    for family in result.distortions:
+        block = df.xs(family, level='distortion')
+        for stat in ('L', 'M', 'P'):
+            assert block.loc['sum of parts', stat] == pytest.approx(
+                sum(block.loc[u, stat] for u in units))
+        assert block.loc['sum of parts', 'Q'] == pytest.approx(
+            result.a - block.loc['sum of parts', 'P'])
+
+
+def test_a_and_p_calibrations_agree_at_the_same_level(book):
+    """No per unit anchoring rule, so there is no corner where they differ."""
+    by_p = book.calibrate_distortions(0.15, p=0.99)
+    by_a = book.calibrate_distortions(0.15, a=by_p.a)
+    pd.testing.assert_frame_equal(by_p.stand_alone_df, by_a.stand_alone_df)
+
+
+def test_stand_alone_is_cached(book):
+    result = book.calibrate_distortions(0.15, p=0.99)
+    assert result.stand_alone_df is result.stand_alone_df
+
+
+def test_stand_alone_needs_units(clean, ceded):
+    """An aggregate has one part, which is the whole; there is nothing to sum."""
+    for obj in (clean, ceded):
+        result = obj.calibrate_distortions(0.15, p=0.99)
+        with pytest.raises(AttributeError, match='no units to price'):
+            result.stand_alone_df
+
+
 # --- EvaluationResult -------------------------------------------------------
 
 def test_aggregate_evaluate_returns_a_result():

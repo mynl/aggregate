@@ -1204,3 +1204,105 @@ def warn_degenerate(panel, where=''):
     warnings.warn(
         f'no breakeven acceptability level{f" for {where}" if where else ""}, '
         f'reporting NaN ({detail}).', DegenerateEvaluationWarning, stacklevel=3)
+
+
+# ---------------------------------------------------------------------------
+# Stand-alone pricing: every part priced as its own distribution.
+#
+# The counterpart to allocation, and the other half of the pair the pricing
+# pane exists to put on screen. Allocation splits one premium across the
+# parts, so its rows foot. This prices each part alone with the same fitted
+# families, so its rows do not foot, and the gap between their sum and the
+# whole is what pooling is worth ([Standalone-Prices-The-Parts,
+# Allocate-Splits-The-Whole], author, 2026-08-14).
+# ---------------------------------------------------------------------------
+
+#: The two derived rows of a stand-alone frame, in reading order: the parts
+#: added up, then the whole they are parts of.
+STAND_ALONE_SUM = 'sum of parts'
+STAND_ALONE_TOTAL = 'total'
+
+
+def stand_alone_price_df(port, distortions, a):
+    """Price every unit of a book alone, at one asset level, with one set.
+
+    Parameters
+    ----------
+    port : Portfolio
+        An updated book.
+    distortions : dict[str, Distortion]
+        Already calibrated; nothing is fitted here.
+    a : float
+        The asset level every row prices at, resolved on the book's total.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ``(distortion, unit)`` rows, the canonical pentagon octet across. Each
+        family's block runs over the units, then :data:`STAND_ALONE_SUM` and
+        :data:`STAND_ALONE_TOTAL`.
+
+    Raises
+    ------
+    ValueError
+        When a unit's own grid cannot represent the book's asset level, which
+        would make its row a price at a different level under the same label.
+
+    Notes
+    -----
+    **The anchor is the total's, once** (author, 2026-08-14). A portfolio
+    calibration resolves its anchor on the portfolio total, and that one asset
+    level is the level of the whole exercise: every row prices ``min(X, a)``
+    at the same ``a``, so the ``a`` column is constant down the frame and a
+    ``p`` calibration and an ``a`` calibration that resolve to the same level
+    produce the same frame. Nothing re-anchors per unit.
+
+    This is deliberately **not** the ``reins_price_df`` rule, where ``p=``
+    lets each view find its own capital. Views of one program are alternative
+    wholes and it is right to ask what each needs; units are parts of one
+    whole whose anchor is the book's. The per unit ``q_i(p)`` alternative was
+    considered and rejected on that ground: the ``p`` belongs to the
+    calibration on the total. The unlimited alternative was rejected too,
+    since a mass at zero family such as ``ccoc`` priced unlimited charges the
+    top grid bucket and tracks ``log2``, and an unlimited sum has no tie to
+    the calibrated premium.
+
+    **The derived rows.** ``sum of parts`` adds the amounts ``L``, ``M`` and
+    ``P`` and takes ``Q = a - sum(P)``, so it is a pentagon at the same asset
+    level as every other row rather than at ``n`` times it (author, 2026-08-14).
+    ``total`` is the book priced whole at that level, which is the family's
+    fitted premium, target plus its ``error``. The comparison between them is
+    well posed because both price at one level under one distortion, and
+    sub-additivity of a concave distortion puts the sum at or above the total:
+    ``min(X, a) <= sum_i min(X_i, a)`` pointwise, so monotonicity and
+    sub-additivity compose.
+    """
+    a = float(a)
+    rows, index = [], []
+    for name, dist in distortions.items():
+        amounts = []
+        for unit in port.agg_list:
+            density = unit.density_df['p_total']
+            a_unit = float(unit.snap(a))
+            if abs(a_unit - a) > 0.5 * float(unit.bs):
+                raise ValueError(
+                    f'unit {unit.name!r} is on a grid that cannot represent '
+                    f'the book\'s asset level {a:,.6g} (nearest is '
+                    f'{a_unit:,.6g} at bs={unit.bs:g}), so its stand-alone '
+                    f'price would be struck at a different level under the '
+                    f'same label.')
+            quote = dist.price(density, a=a_unit, kind='ask')
+            amounts.append((quote.el, quote.ask))
+            rows.append([quote.el, quote.ask - quote.el, quote.ask,
+                         a - quote.ask])
+            index.append((name, unit.name))
+        loss = sum(el for el, _ in amounts)
+        premium = sum(ask for _, ask in amounts)
+        rows.append([loss, premium - loss, premium, a - premium])
+        index.append((name, STAND_ALONE_SUM))
+        whole = dist.price(port.density_df['p_total'], a=a, kind='ask')
+        rows.append([whole.el, whole.ask - whole.el, whole.ask, a - whole.ask])
+        index.append((name, STAND_ALONE_TOTAL))
+    return complete_pentagon(pd.DataFrame(
+        rows, columns=['L', 'M', 'P', 'Q'],
+        index=pd.MultiIndex.from_tuples(index, names=['distortion', 'unit'])))

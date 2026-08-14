@@ -302,6 +302,46 @@ class CalibrationResult(SourcedMixin):
         return self._frames['pricing_df']
 
     @property
+    def stand_alone_df(self):
+        """Every unit of a ``Portfolio`` priced alone, against the book whole.
+
+        ``(distortion, unit)`` rows over the units, then ``sum of parts`` and
+        ``total``; the canonical pentagon octet across. Every row prices at the
+        calibration's own asset level, so the ``a`` column is constant.
+        Computed on first access and cached.
+
+        The counterpart to :attr:`pricing_df`, and the other half of the pair
+        the pricing pane exists to put on screen. That frame splits one premium
+        across the units, so its rows foot. This prices each unit as its own
+        distribution with the same fitted families, so its rows do not, and the
+        gap between ``sum of parts`` and ``total`` is what pooling is worth
+        under that family (``[Standalone-Prices-The-Parts,
+        Allocate-Splits-The-Whole]``).
+
+        A calibration struck on a cession view reads here as that set applied
+        to each unit's own distribution, exactly as :attr:`pricing_df` reads as
+        it applied to the net book: a deliberate reading, not a mixed basis by
+        accident.
+
+        Raises
+        ------
+        AttributeError
+            When the source is not a ``Portfolio``. There are no parts to price
+            separately when there are no units.
+        """
+        if 'stand_alone_df' not in self._frames:
+            if getattr(self._source, 'agg_list', None) is None:
+                raise AttributeError(
+                    f'{type(self._source).__name__} has no units to price '
+                    'separately, so a calibration on it carries no '
+                    'stand_alone_df; the stand-alone story is '
+                    'calibration_df, or reins_price_df on a cession.')
+            from ._pricing import stand_alone_price_df
+            self._frames['stand_alone_df'] = stand_alone_price_df(
+                self._source, self.distortions, self.a)
+        return self._frames['stand_alone_df']
+
+    @property
     def reins_price_df(self):
         """The calibrated set applied to every view of a cession.
 

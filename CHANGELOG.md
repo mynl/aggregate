@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a282
+
+**[Portfolio-Standalone-Frame] every unit of a book priced alone, against the book priced whole.** `CalibrationResult.stand_alone_df`, and the `Portfolio` branch of `pricing.stand_alone` that serves it. The counterpart to `pricing_df`: that frame splits one premium across the units so its rows foot, and this one prices each unit as its own distribution with the same fitted families so they do not. The gap between `sum of parts` and `total` is what pooling is worth under that family.
+
+**The anchor is the total's, once** (author, 2026-08-14). A portfolio calibration resolves its anchor on the portfolio total, and that one asset level is the level of the whole exercise: every row prices `min(X, a)` at the same `a`, the `a` column is constant down the frame, and a `p` calibration and an `a` calibration that resolve to the same level produce the same frame. Nothing re-anchors per unit. This is deliberately not the `reins_price_df` rule, where `p=` lets each view find its own capital: views of one program are alternative wholes and it is right to ask what each needs, while units are parts of one whole whose anchor is the book's. The per-unit `q_i(p)` alternative was considered and rejected on that ground; the unlimited alternative was rejected too, since a mass-at-zero family priced unlimited charges the top grid bucket and tracks `log2`.
+
+**The derived rows** (author's ruling, 2026-08-14). `sum of parts` adds `L`, `M` and `P` and takes `Q = a - sum(P)`, so it is a pentagon at the same asset level as every other row rather than at `n` times it. `total` is the book priced whole there, which ties exactly to the family's fitted premium, target plus its `error`. Sub-additivity puts the sum at or above the total for every concave family: `min(X, a) <= sum_i min(X_i, a)` pointwise, so monotonicity and sub-additivity compose.
+
+**INSURER appends `sum of parts less total` per family**, amounts differenced and ratios re-derived through `complete_pentagon`, interleaved beside its family rather than pooled at the foot. Sum and total are both facts and ride in RAW; what the gap between them means belongs to a perspective (`[Difference-Is-A-Perspective]`, one book up from the cession case). Its capital column is the mirror of its premium column by construction, both rows standing behind the same assets, so the reading is the premium and the margin.
+
+Worth knowing, and now pinned by a test: **`ccoc` books no diversification benefit at all on a bounded book.** A mass-at-zero family charges the essential supremum, and on a bounded book both the supremum and the mean are additive across independent units, so its margin is exactly additive and its benefit row is a real zero rather than a missing number.
+
 ## 1.0.0a281
 
 **[Standalone-Rename] stand-alone prices the parts; allocate splits the whole.** Ruling `[Standalone-Prices-The-Parts, Allocate-Splits-The-Whole]` (author, 2026-08-14). The pricing pane's second leaf was doing two different jobs under one name, and only one of them was an allocation.

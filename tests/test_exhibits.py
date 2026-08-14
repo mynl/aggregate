@@ -745,7 +745,7 @@ def test_pricing_stand_alone_blocks_follow_the_source_shape(objects):
                        exhibit_frames(objects[key], 'pricing.stand_alone')]
     assert raw('CalibrationReins') == ['reins_price_df']
     assert raw('CalibrationAggregate') == ['calibration_df']
-    assert raw('CalibrationPortfolio') == ['calibration_df']
+    assert raw('CalibrationPortfolio') == ['calibration_df', 'stand_alone_df']
 
 
 def test_allocate_needs_parts_to_split_across(objects):
@@ -848,6 +848,78 @@ def test_pricing_stand_alone_rows_read_view_then_difference(objects):
     first = insurer.index.get_level_values('distortion')[0]
     head = [v for d, v in insurer.index if d == first]
     assert head[-1].endswith('less gross')
+
+
+def test_stand_alone_on_a_book_sets_the_parts_against_the_whole(objects):
+    """The frame the leaf exists for: separate prices, and what they add to."""
+    result = objects['CalibrationPortfolio']
+    _n, frame, kw = exhibit_frames(result, 'pricing.stand_alone')[1]
+    pd.testing.assert_frame_equal(frame, result._relabel(result.stand_alone_df),
+                                  check_index_type=False,
+                                  check_categorical=False)
+    assert 'what pooling is worth' in kw['caption']
+    assert 'do not foot' in kw['caption']
+
+
+def test_the_diversification_benefit_is_the_insurer_reading(objects):
+    """Sum and total are facts and ride in RAW; their difference is a reading.
+
+    ``[Difference-Is-A-Perspective]``, one book up from the cession case: the
+    sum is arithmetic on measurements and the total is a measurement, so both
+    are raw; what the gap between them means belongs to a perspective.
+    """
+    result = objects['CalibrationPortfolio']
+    _n, raw, _kw = exhibit_frames(result, 'pricing.stand_alone')[1]
+    _n, insurer, kw = exhibit_frames(
+        result, 'pricing.stand_alone', Perspective.INSURER)[1]
+    units = set(raw.index.get_level_values('unit'))
+    assert 'sum of parts less total' not in units
+    assert 'sum of parts less total' in set(
+        insurer.index.get_level_values('unit'))
+    assert len(insurer) > len(raw)
+    assert 'diversification benefit' in kw['caption']
+
+
+def test_the_benefit_row_recomputes_its_ratios(objects):
+    """A loss ratio of a difference is not the difference of two loss ratios.
+
+    ``ccoc`` on this book is a real zero rather than a missing number, and
+    worth knowing: a mass at zero family charges the essential supremum, and
+    on a bounded book both the supremum and the mean are additive across
+    independent units, so its margin is exactly additive and it books no
+    diversification benefit at all. The ratios of an all zero row are ``NaN``,
+    which is what ``0 / 0`` should say.
+    """
+    result = objects['CalibrationPortfolio']
+    _n, insurer, _kw = exhibit_frames(
+        result, 'pricing.stand_alone', Perspective.INSURER)[1]
+    seen = 0
+    for family in insurer.index.get_level_values('distortion').unique():
+        block = insurer.xs(family, level='distortion')
+        row = block.loc['sum of parts less total']
+        for stat in ('L', 'M', 'P', 'Q'):
+            assert row[stat] == pytest.approx(
+                block.loc['sum of parts', stat] - block.loc['total', stat])
+        # the two rows stand behind the same assets, so the difference has none
+        assert row['a'] == pytest.approx(0.0)
+        assert row['P'] >= -1e-12                 # concave: pooling never costs
+        if row['P'] == 0:
+            assert pd.isna(row['PQ'])
+            continue
+        assert row['LR'] == pytest.approx(row['L'] / row['P'])
+        assert row['ROE'] == pytest.approx(row['M'] / row['Q'])
+        seen += 1
+    assert seen                                   # at least one live benefit
+
+
+def test_the_benefit_row_reads_beside_its_family(objects):
+    """Each family reads as one small table, not as two distant ones."""
+    result = objects['CalibrationPortfolio']
+    _n, insurer, _kw = exhibit_frames(
+        result, 'pricing.stand_alone', Perspective.INSURER)[1]
+    first = insurer.index.get_level_values('distortion')[0]
+    head = [u for d, u in insurer.index if d == first]
+    assert head[-1] == 'sum of parts less total'
 
 
 def test_pricing_evaluate_serves_the_panel(objects):

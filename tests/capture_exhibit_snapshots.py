@@ -65,14 +65,18 @@ def pricing_results(objects):
     Built from the objects above rather than from new programs: a calibration
     is a calculation over an object that already has an exhibit story, and
     reusing them keeps the file talking about one book. The three calibrations
-    are the three shapes ``pricing.allocate`` serves, units, views and
-    neither.
+    are the three shapes ``pricing.stand_alone`` serves, units, views and
+    neither; the fourth is the same cession struck on **gross**, which is the
+    only basis with a premium to allocate across an occurrence program.
     """
     return {
         'CalibrationPortfolio':
             objects['Portfolio'].calibrate_distortions(0.15, p=0.99),
         'CalibrationReins':
             objects['ReinsAggregate'].calibrate_distortions(0.15, p=0.99),
+        'CalibrationReinsGross':
+            objects['ReinsAggregate'].calibrate_distortions(
+                0.15, p=0.99, reins_view='gross'),
         'CalibrationAggregate':
             objects['Aggregate'].calibrate_distortions(0.15, p=0.99),
         'Evaluation': objects['Aggregate'].evaluate(12.0, p=0.99),

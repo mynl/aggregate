@@ -16498,266 +16498,6 @@
    "n_stub_levels": 1
   }
  ],
- "pricing.allocate/insurer/CalibrationAggregate": [
-  {
-   "body": [
-    {
-     "cells": [
-      "calibration",
-      {
-       "raw": 0.15,
-       "text": "15.0%"
-      },
-      {
-       "raw": 0.99,
-       "text": "0.99000"
-      },
-      {
-       "raw": 0.9953703703703702,
-       "text": "0.99537"
-      },
-      {
-       "raw": 10.49537037037037,
-       "text": "10.50"
-      },
-      {
-       "raw": 0.8484299516908216,
-       "text": "0.85"
-      },
-      {
-       "raw": 11.343800322061192,
-       "text": "11.34"
-      },
-      {
-       "raw": 5.656199677938808,
-       "text": "5.66"
-      },
-      {
-       "raw": 17.0,
-       "text": "17.00"
-      },
-      {
-       "raw": 0.9252076087728015,
-       "text": "92.5%"
-      },
-      {
-       "raw": 2.0055516014234875,
-       "text": "2.006"
-      },
-      {
-       "raw": 0.15000000000000005,
-       "text": "15.0%"
-      }
-     ]
-    }
-   ],
-   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "unit"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c1",
-     "name": [
-      "coc"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "kind": "dec"
-     },
-     "key": "c2",
-     "name": [
-      "p"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "kind": "dec"
-     },
-     "key": "c3",
-     "name": [
-      "F(a)"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c4",
-     "name": [
-      "L"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
-      "M"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "P"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c7",
-     "name": [
-      "Q"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c8",
-     "name": [
-      "a"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c9",
-     "name": [
-      "LR"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 3,
-      "kind": "dec"
-     },
-     "key": "c10",
-     "name": [
-      "PQ"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c11",
-     "name": [
-      "ROE"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "unit"
-     },
-     {
-      "text": "coc"
-     },
-     {
-      "text": "p"
-     },
-     {
-      "text": "F(a)"
-     },
-     {
-      "text": "L"
-     },
-     {
-      "text": "M"
-     },
-     {
-      "text": "P"
-     },
-     {
-      "text": "Q"
-     },
-     {
-      "text": "a"
-     },
-     {
-      "text": "LR"
-     },
-     {
-      "text": "PQ"
-     },
-     {
-      "text": "ROE"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  }
- ],
  "pricing.allocate/insurer/CalibrationPortfolio": [
   {
    "body": [
@@ -17673,1107 +17413,6 @@
      },
      {
       "text": "total"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  }
- ],
- "pricing.allocate/insurer/CalibrationReins": [
-  {
-   "body": [
-    {
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "ccoc"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 3.913043478260864,
-       "text": "3.91"
-      },
-      {
-       "raw": 33.91304347826087,
-       "text": "33.91"
-      },
-      {
-       "raw": 26.086956521739133,
-       "text": "26.09"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8846153846153848,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.2999999999999998,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.14999999999999977,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net*",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.6086956521739104,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.608695652173907,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.391304347826093,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846153846153847,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.2999999999999992,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.1499999999999998,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net less gross",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -10.000000000000007,
-       "text": "-10.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.3043478260869534,
-       "text": "-1.30"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -11.30434782608696,
-       "text": "-11.30"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -8.69565217391304,
-       "text": "-8.70"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -20.0,
-       "text": "-20.00"
-      },
-      {
-       "raw": 0.8846153846153849,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.3000000000000012,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.14999999999999972,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "ph"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 4.186427251737253,
-       "text": "4.19"
-      },
-      {
-       "raw": 34.18642725173726,
-       "text": "34.19"
-      },
-      {
-       "raw": 25.813572748262743,
-       "text": "25.81"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8775412469717931,
-       "text": "87.8%"
-      },
-      {
-       "raw": 1.3243586071996953,
-       "text": "1.324"
-      },
-      {
-       "raw": 0.1621793035998475,
-       "text": "16.2%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net*",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.608695652184,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.608695652183997,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.391304347816003,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846153846149899,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.3000000000013336,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.150000000000667,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net less gross",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -10.000000000000007,
-       "text": "-10.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.5777315995532533,
-       "text": "-1.58"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -11.57773159955326,
-       "text": "-11.58"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -8.42226840044674,
-       "text": "-8.42"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -20.0,
-       "text": "-20.00"
-      },
-      {
-       "raw": 0.863727053439887,
-       "text": "86.4%"
-      },
-      {
-       "raw": 1.3746571646825154,
-       "text": "1.375"
-      },
-      {
-       "raw": 0.1873285823412569,
-       "text": "18.7%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "wang"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 4.30584788082631,
-       "text": "4.31"
-      },
-      {
-       "raw": 34.30584788082631,
-       "text": "34.31"
-      },
-      {
-       "raw": 25.694152119173687,
-       "text": "25.69"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8744864754317042,
-       "text": "87.4%"
-      },
-      {
-       "raw": 1.335161702231316,
-       "text": "1.335"
-      },
-      {
-       "raw": 0.16758085111565782,
-       "text": "16.8%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net*",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.608695652249974,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.60869565224997,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.39130434775003,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846153846124085,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.3000000000100587,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.1500000000050295,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net less gross",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -10.000000000000007,
-       "text": "-10.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.6971522285763356,
-       "text": "-1.70"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -11.697152228576343,
-       "text": "-11.70"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -8.302847771423657,
-       "text": "-8.30"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -20.0,
-       "text": "-20.00"
-      },
-      {
-       "raw": 0.85490893890992,
-       "text": "85.5%"
-      },
-      {
-       "raw": 1.408812078770737,
-       "text": "1.409"
-      },
-      {
-       "raw": 0.20440603938536758,
-       "text": "20.4%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "dual"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 4.417178586082063,
-       "text": "4.42"
-      },
-      {
-       "raw": 34.417178586082066,
-       "text": "34.42"
-      },
-      {
-       "raw": 25.582821413917934,
-       "text": "25.58"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8716577369921797,
-       "text": "87.2%"
-      },
-      {
-       "raw": 1.3453238026106822,
-       "text": "1.345"
-      },
-      {
-       "raw": 0.172661901305341,
-       "text": "17.3%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net*",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.6086956521632025,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.6086956521632,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.3913043478368,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846153846158037,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.299999999998583,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.14999999999929173,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net less gross",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -10.000000000000007,
-       "text": "-10.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.8084829339188602,
-       "text": "-1.81"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -11.808482933918867,
-       "text": "-11.81"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -8.191517066081133,
-       "text": "-8.19"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -20.0,
-       "text": "-20.00"
-      },
-      {
-       "raw": 0.8468488336698912,
-       "text": "84.7%"
-      },
-      {
-       "raw": 1.441550184008603,
-       "text": "1.442"
-      },
-      {
-       "raw": 0.22077509200430054,
-       "text": "22.1%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "tvar"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 4.71015131464328,
-       "text": "4.71"
-      },
-      {
-       "raw": 34.710151314643284,
-       "text": "34.71"
-      },
-      {
-       "raw": 25.289848685356716,
-       "text": "25.29"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8643004672625499,
-       "text": "86.4%"
-      },
-      {
-       "raw": 1.3724934358638965,
-       "text": "1.372"
-      },
-      {
-       "raw": 0.18624671793194808,
-       "text": "18.6%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net*",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.6087011268370937,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.60870112683709,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.39129887316291,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846151704070916,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.3000007240244331,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.15000036201221675,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net less gross",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -10.000000000000007,
-       "text": "-10.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -2.1014501878061864,
-       "text": "-2.10"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -12.101450187806194,
-       "text": "-12.10"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -7.8985498121938065,
-       "text": "-7.90"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -20.0,
-       "text": "-20.00"
-      },
-      {
-       "raw": 0.8263472430830088,
-       "text": "82.6%"
-      },
-      {
-       "raw": 1.532110384253567,
-       "text": "1.532"
-      },
-      {
-       "raw": 0.2660551921267827,
-       "text": "26.6%"
-      }
-     ]
-    }
-   ],
-   "caption": "Distortions fitted to the net basis at the calibration anchor, then applied unchanged to the other whole program views. The starred row is the calibrated one. A \"less\" row is the difference between two programs: the implied allowance for reinsurance in the rate, and its loss ratio is the rate the cover is being bought at. It is not the price of the cession, which is what a reinsurer would charge for the same layer and is the ceded row of the raw view.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "distortion"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c1",
-     "level": 1,
-     "name": [
-      "view"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c2",
-     "name": [
-      "L"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c3",
-     "name": [
-      "M"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c4",
-     "name": [
-      "P"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
-      "Q"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "a"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "LR"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 3,
-      "kind": "dec"
-     },
-     "key": "c8",
-     "name": [
-      "PQ"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c9",
-     "name": [
-      "ROE"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "distortion"
-     },
-     {
-      "text": "view"
-     },
-     {
-      "text": "L"
-     },
-     {
-      "text": "M"
-     },
-     {
-      "text": "P"
-     },
-     {
-      "text": "Q"
-     },
-     {
-      "text": "a"
-     },
-     {
-      "text": "LR"
-     },
-     {
-      "text": "PQ"
-     },
-     {
-      "text": "ROE"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 2
-  }
- ],
- "pricing.allocate/raw/CalibrationAggregate": [
-  {
-   "body": [
-    {
-     "cells": [
-      "calibration",
-      {
-       "raw": 0.15,
-       "text": "15.0%"
-      },
-      {
-       "raw": 0.99,
-       "text": "0.99000"
-      },
-      {
-       "raw": 0.9953703703703702,
-       "text": "0.99537"
-      },
-      {
-       "raw": 10.49537037037037,
-       "text": "10.50"
-      },
-      {
-       "raw": 0.8484299516908216,
-       "text": "0.85"
-      },
-      {
-       "raw": 11.343800322061192,
-       "text": "11.34"
-      },
-      {
-       "raw": 5.656199677938808,
-       "text": "5.66"
-      },
-      {
-       "raw": 17.0,
-       "text": "17.00"
-      },
-      {
-       "raw": 0.9252076087728015,
-       "text": "92.5%"
-      },
-      {
-       "raw": 2.0055516014234875,
-       "text": "2.006"
-      },
-      {
-       "raw": 0.15000000000000005,
-       "text": "15.0%"
-      }
-     ]
-    }
-   ],
-   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "unit"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c1",
-     "name": [
-      "coc"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "kind": "dec"
-     },
-     "key": "c2",
-     "name": [
-      "p"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "kind": "dec"
-     },
-     "key": "c3",
-     "name": [
-      "F(a)"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c4",
-     "name": [
-      "L"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
-      "M"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "P"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c7",
-     "name": [
-      "Q"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c8",
-     "name": [
-      "a"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c9",
-     "name": [
-      "LR"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 3,
-      "kind": "dec"
-     },
-     "key": "c10",
-     "name": [
-      "PQ"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c11",
-     "name": [
-      "ROE"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "unit"
-     },
-     {
-      "text": "coc"
-     },
-     {
-      "text": "p"
-     },
-     {
-      "text": "F(a)"
-     },
-     {
-      "text": "L"
-     },
-     {
-      "text": "M"
-     },
-     {
-      "text": "P"
-     },
-     {
-      "text": "Q"
-     },
-     {
-      "text": "a"
-     },
-     {
-      "text": "LR"
-     },
-     {
-      "text": "PQ"
-     },
-     {
-      "text": "ROE"
      }
     ]
    ],
@@ -19874,772 +18513,6 @@
    "n_stub_levels": 2
   }
  ],
- "pricing.allocate/raw/CalibrationReins": [
-  {
-   "body": [
-    {
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "ccoc"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 3.913043478260864,
-       "text": "3.91"
-      },
-      {
-       "raw": 33.91304347826087,
-       "text": "33.91"
-      },
-      {
-       "raw": 26.086956521739133,
-       "text": "26.09"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8846153846153848,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.2999999999999998,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.14999999999999977,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "ceded",
-      {
-       "raw": 10.000000000000002,
-       "text": "10.00"
-      },
-      {
-       "raw": 1.3043478260869534,
-       "text": "1.30"
-      },
-      {
-       "raw": 11.304347826086955,
-       "text": "11.30"
-      },
-      {
-       "raw": 8.695652173913045,
-       "text": "8.70"
-      },
-      {
-       "raw": 20.0,
-       "text": "20.00"
-      },
-      {
-       "raw": 0.8846153846153849,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.2999999999999996,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.14999999999999963,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.6086956521739104,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.608695652173907,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.391304347826093,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846153846153847,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.2999999999999992,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.1499999999999998,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "ph"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 4.186427251737253,
-       "text": "4.19"
-      },
-      {
-       "raw": 34.18642725173726,
-       "text": "34.19"
-      },
-      {
-       "raw": 25.813572748262743,
-       "text": "25.81"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8775412469717931,
-       "text": "87.8%"
-      },
-      {
-       "raw": 1.3243586071996953,
-       "text": "1.324"
-      },
-      {
-       "raw": 0.1621793035998475,
-       "text": "16.2%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "ceded",
-      {
-       "raw": 10.000000000000002,
-       "text": "10.00"
-      },
-      {
-       "raw": 1.6794819280632254,
-       "text": "1.68"
-      },
-      {
-       "raw": 11.679481928063227,
-       "text": "11.68"
-      },
-      {
-       "raw": 8.320518071936773,
-       "text": "8.32"
-      },
-      {
-       "raw": 20.0,
-       "text": "20.00"
-      },
-      {
-       "raw": 0.8562023608232314,
-       "text": "85.6%"
-      },
-      {
-       "raw": 1.4036964798448646,
-       "text": "1.404"
-      },
-      {
-       "raw": 0.20184823992243203,
-       "text": "20.2%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.608695652184,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.608695652183997,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.391304347816003,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846153846149899,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.3000000000013336,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.150000000000667,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "wang"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 4.30584788082631,
-       "text": "4.31"
-      },
-      {
-       "raw": 34.30584788082631,
-       "text": "34.31"
-      },
-      {
-       "raw": 25.694152119173687,
-       "text": "25.69"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8744864754317042,
-       "text": "87.4%"
-      },
-      {
-       "raw": 1.335161702231316,
-       "text": "1.335"
-      },
-      {
-       "raw": 0.16758085111565782,
-       "text": "16.8%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "ceded",
-      {
-       "raw": 10.000000000000002,
-       "text": "10.00"
-      },
-      {
-       "raw": 1.8384253218152153,
-       "text": "1.84"
-      },
-      {
-       "raw": 11.838425321815217,
-       "text": "11.84"
-      },
-      {
-       "raw": 8.161574678184783,
-       "text": "8.16"
-      },
-      {
-       "raw": 20.0,
-       "text": "20.00"
-      },
-      {
-       "raw": 0.8447069376340565,
-       "text": "84.5%"
-      },
-      {
-       "raw": 1.450507504815015,
-       "text": "1.451"
-      },
-      {
-       "raw": 0.2252537524075072,
-       "text": "22.5%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.608695652249974,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.60869565224997,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.39130434775003,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846153846124085,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.3000000000100587,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.1500000000050295,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "dual"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 4.417178586082063,
-       "text": "4.42"
-      },
-      {
-       "raw": 34.417178586082066,
-       "text": "34.42"
-      },
-      {
-       "raw": 25.582821413917934,
-       "text": "25.58"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8716577369921797,
-       "text": "87.2%"
-      },
-      {
-       "raw": 1.3453238026106822,
-       "text": "1.345"
-      },
-      {
-       "raw": 0.172661901305341,
-       "text": "17.3%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "ceded",
-      {
-       "raw": 10.000000000000002,
-       "text": "10.00"
-      },
-      {
-       "raw": 1.985444457336186,
-       "text": "1.99"
-      },
-      {
-       "raw": 11.985444457336188,
-       "text": "11.99"
-      },
-      {
-       "raw": 8.014555542663812,
-       "text": "8.01"
-      },
-      {
-       "raw": 20.0,
-       "text": "20.00"
-      },
-      {
-       "raw": 0.8343453624599702,
-       "text": "83.4%"
-      },
-      {
-       "raw": 1.495459653817879,
-       "text": "1.495"
-      },
-      {
-       "raw": 0.24772982690893927,
-       "text": "24.8%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.6086956521632025,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.6086956521632,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.3913043478368,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846153846158037,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.299999999998583,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.14999999999929173,
-       "text": "15.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 3,
-       "text": "tvar"
-      },
-      "gross",
-      {
-       "raw": 30.000000000000004,
-       "text": "30.00"
-      },
-      {
-       "raw": 4.71015131464328,
-       "text": "4.71"
-      },
-      {
-       "raw": 34.710151314643284,
-       "text": "34.71"
-      },
-      {
-       "raw": 25.289848685356716,
-       "text": "25.29"
-      },
-      {
-       "raw": 60.0,
-       "text": "60.00"
-      },
-      {
-       "raw": 0.8643004672625499,
-       "text": "86.4%"
-      },
-      {
-       "raw": 1.3724934358638965,
-       "text": "1.372"
-      },
-      {
-       "raw": 0.18624671793194808,
-       "text": "18.6%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "ceded",
-      {
-       "raw": 10.000000000000002,
-       "text": "10.00"
-      },
-      {
-       "raw": 2.6087011268370937,
-       "text": "2.61"
-      },
-      {
-       "raw": 12.608701126837095,
-       "text": "12.61"
-      },
-      {
-       "raw": 7.391298873162905,
-       "text": "7.39"
-      },
-      {
-       "raw": 20.0,
-       "text": "20.00"
-      },
-      {
-       "raw": 0.7931031039125369,
-       "text": "79.3%"
-      },
-      {
-       "raw": 1.705884357161916,
-       "text": "1.706"
-      },
-      {
-       "raw": 0.3529421785809578,
-       "text": "35.3%"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "net",
-      {
-       "raw": 19.999999999999996,
-       "text": "20.00"
-      },
-      {
-       "raw": 2.6087011268370937,
-       "text": "2.61"
-      },
-      {
-       "raw": 22.60870112683709,
-       "text": "22.61"
-      },
-      {
-       "raw": 17.39129887316291,
-       "text": "17.39"
-      },
-      {
-       "raw": 40.0,
-       "text": "40.00"
-      },
-      {
-       "raw": 0.8846151704070916,
-       "text": "88.5%"
-      },
-      {
-       "raw": 1.3000007240244331,
-       "text": "1.300"
-      },
-      {
-       "raw": 0.15000036201221675,
-       "text": "15.0%"
-      }
-     ]
-    }
-   ],
-   "caption": "Every view of the cession priced with every calibrated family: gross, ceded and net are three separate distributions, so each is a price in its own right rather than a share of one. The ceded row is what the risk measure says the cession is worth to whoever writes it.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "distortion"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c1",
-     "level": 1,
-     "name": [
-      "view"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c2",
-     "name": [
-      "L"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c3",
-     "name": [
-      "M"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c4",
-     "name": [
-      "P"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
-      "Q"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "a"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "LR"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 3,
-      "kind": "dec"
-     },
-     "key": "c8",
-     "name": [
-      "PQ"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c9",
-     "name": [
-      "ROE"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "distortion"
-     },
-     {
-      "text": "view"
-     },
-     {
-      "text": "L"
-     },
-     {
-      "text": "M"
-     },
-     {
-      "text": "P"
-     },
-     {
-      "text": "Q"
-     },
-     {
-      "text": "a"
-     },
-     {
-      "text": "LR"
-     },
-     {
-      "text": "PQ"
-     },
-     {
-      "text": "ROE"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 2
-  }
- ],
  "pricing.calibrate/insurer/CalibrationAggregate": [
   {
    "body": [
@@ -21209,6 +19082,229 @@
       {
        "raw": 0.6034484480437315,
        "text": "0.6034"
+      }
+     ]
+    }
+   ],
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "area"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "area"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.calibrate/insurer/CalibrationReinsGross": [
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      "r",
+      {
+       "raw": 0.15000000000000013,
+       "text": "0.1500"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      {
+       "raw": 0.13043478260869576,
+       "text": "0.1304"
+      },
+      {
+       "raw": 0.5652173913043479,
+       "text": "0.5652"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      "a",
+      {
+       "raw": 0.7421981414379042,
+       "text": "0.7422"
+      },
+      {
+       "raw": 6.148993996646368e-06,
+       "text": "6.15e-06"
+      },
+      {
+       "raw": 0.14797505084543475,
+       "text": "0.1480"
+      },
+      {
+       "raw": 0.5739875254227174,
+       "text": "0.5740"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      "lam",
+      {
+       "raw": 0.2827475755265905,
+       "text": "0.2827"
+      },
+      {
+       "raw": 3.4940939031002927e-10,
+       "text": "3.49e-10"
+      },
+      {
+       "raw": 0.15846680609087915,
+       "text": "0.1585"
+      },
+      {
+       "raw": 0.5792334030454396,
+       "text": "0.5792"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      "b",
+      {
+       "raw": 1.4047658388398976,
+       "text": "1.4048"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -7.08034519902867e-10,
+       "text": "-7.08e-10"
+      },
+      {
+       "raw": 0.16831819227570363,
+       "text": "0.1683"
+      },
+      {
+       "raw": 0.5841590961378518,
+       "text": "0.5842"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      "p",
+      {
+       "raw": 0.16363658824981492,
+       "text": "0.1636"
+      },
+      {
+       "raw": 6.422078186574254e-06,
+       "text": "6.42e-06"
+      },
+      {
+       "raw": 0.16363658824981492,
+       "text": "0.1636"
+      },
+      {
+       "raw": 0.5818182941249075,
+       "text": "0.5818"
       }
      ]
     }
@@ -21990,6 +20086,229 @@
    "n_stub_levels": 1
   }
  ],
+ "pricing.calibrate/raw/CalibrationReinsGross": [
+  {
+   "body": [
+    {
+     "cells": [
+      "ccoc",
+      "r",
+      {
+       "raw": 0.15000000000000013,
+       "text": "0.1500"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00e+00"
+      },
+      {
+       "raw": 0.13043478260869576,
+       "text": "0.1304"
+      },
+      {
+       "raw": 0.5652173913043479,
+       "text": "0.5652"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "ph",
+      "a",
+      {
+       "raw": 0.7421981414379042,
+       "text": "0.7422"
+      },
+      {
+       "raw": 6.148993996646368e-06,
+       "text": "6.15e-06"
+      },
+      {
+       "raw": 0.14797505084543475,
+       "text": "0.1480"
+      },
+      {
+       "raw": 0.5739875254227174,
+       "text": "0.5740"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "wang",
+      "lam",
+      {
+       "raw": 0.2827475755265905,
+       "text": "0.2827"
+      },
+      {
+       "raw": 3.4940939031002927e-10,
+       "text": "3.49e-10"
+      },
+      {
+       "raw": 0.15846680609087915,
+       "text": "0.1585"
+      },
+      {
+       "raw": 0.5792334030454396,
+       "text": "0.5792"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "dual",
+      "b",
+      {
+       "raw": 1.4047658388398976,
+       "text": "1.4048"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -7.08034519902867e-10,
+       "text": "-7.08e-10"
+      },
+      {
+       "raw": 0.16831819227570363,
+       "text": "0.1683"
+      },
+      {
+       "raw": 0.5841590961378518,
+       "text": "0.5842"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "tvar",
+      "p",
+      {
+       "raw": 0.16363658824981492,
+       "text": "0.1636"
+      },
+      {
+       "raw": 6.422078186574254e-06,
+       "text": "6.42e-06"
+      },
+      {
+       "raw": 0.16363658824981492,
+       "text": "0.1636"
+      },
+      {
+       "raw": 0.5818182941249075,
+       "text": "0.5818"
+      }
+     ]
+    }
+   ],
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "object",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "param_name"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "param"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c3",
+     "name": [
+      "error"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "gini_p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 4,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "area"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "param_name"
+     },
+     {
+      "text": "param"
+     },
+     {
+      "text": "error"
+     },
+     {
+      "text": "gini_p"
+     },
+     {
+      "text": "area"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
  "pricing.evaluate/insurer/Evaluation": [
   {
    "body": [
@@ -22466,6 +20785,4185 @@
      },
      {
       "text": "status"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "pricing.stand_alone/insurer/CalibrationAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "calibration",
+      {
+       "raw": 0.15,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.99,
+       "text": "0.99000"
+      },
+      {
+       "raw": 0.9953703703703702,
+       "text": "0.99537"
+      },
+      {
+       "raw": 10.49537037037037,
+       "text": "10.50"
+      },
+      {
+       "raw": 0.8484299516908216,
+       "text": "0.85"
+      },
+      {
+       "raw": 11.343800322061192,
+       "text": "11.34"
+      },
+      {
+       "raw": 5.656199677938808,
+       "text": "5.66"
+      },
+      {
+       "raw": 17.0,
+       "text": "17.00"
+      },
+      {
+       "raw": 0.9252076087728015,
+       "text": "92.5%"
+      },
+      {
+       "raw": 2.0055516014234875,
+       "text": "2.006"
+      },
+      {
+       "raw": 0.15000000000000005,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "coc"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "F(a)"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "coc"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "F(a)"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.stand_alone/insurer/CalibrationPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "calibration",
+      {
+       "raw": 0.15,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.99,
+       "text": "0.99000"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": 7.999999999999998,
+       "text": "8.00"
+      },
+      {
+       "raw": 0.39130434782608603,
+       "text": "0.39"
+      },
+      {
+       "raw": 8.391304347826084,
+       "text": "8.39"
+      },
+      {
+       "raw": 2.6086956521739157,
+       "text": "2.61"
+      },
+      {
+       "raw": 11.0,
+       "text": "11.00"
+      },
+      {
+       "raw": 0.9533678756476685,
+       "text": "95.3%"
+      },
+      {
+       "raw": 3.2166666666666623,
+       "text": "3.217"
+      },
+      {
+       "raw": 0.1499999999999995,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "coc"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "F(a)"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "coc"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "F(a)"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.stand_alone/insurer/CalibrationReins": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ccoc"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.913043478260864,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826087,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.086956521739133,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846153846153848,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999977,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521739104,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652173907,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347826093,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846153847,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999992,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.1499999999999998,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.3043478260869534,
+       "text": "-1.30"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -11.30434782608696,
+       "text": "-11.30"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.69565217391304,
+       "text": "-8.70"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.8846153846153849,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000000012,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999972,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ph"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.186427251737253,
+       "text": "4.19"
+      },
+      {
+       "raw": 34.18642725173726,
+       "text": "34.19"
+      },
+      {
+       "raw": 25.813572748262743,
+       "text": "25.81"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8775412469717931,
+       "text": "87.8%"
+      },
+      {
+       "raw": 1.3243586071996953,
+       "text": "1.324"
+      },
+      {
+       "raw": 0.1621793035998475,
+       "text": "16.2%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.608695652184,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652183997,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347816003,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846149899,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000013336,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.150000000000667,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.5777315995532533,
+       "text": "-1.58"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -11.57773159955326,
+       "text": "-11.58"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.42226840044674,
+       "text": "-8.42"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.863727053439887,
+       "text": "86.4%"
+      },
+      {
+       "raw": 1.3746571646825154,
+       "text": "1.375"
+      },
+      {
+       "raw": 0.1873285823412569,
+       "text": "18.7%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "wang"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.30584788082631,
+       "text": "4.31"
+      },
+      {
+       "raw": 34.30584788082631,
+       "text": "34.31"
+      },
+      {
+       "raw": 25.694152119173687,
+       "text": "25.69"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8744864754317042,
+       "text": "87.4%"
+      },
+      {
+       "raw": 1.335161702231316,
+       "text": "1.335"
+      },
+      {
+       "raw": 0.16758085111565782,
+       "text": "16.8%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.608695652249974,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.60869565224997,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.39130434775003,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846124085,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000100587,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.1500000000050295,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.6971522285763356,
+       "text": "-1.70"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -11.697152228576343,
+       "text": "-11.70"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.302847771423657,
+       "text": "-8.30"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.85490893890992,
+       "text": "85.5%"
+      },
+      {
+       "raw": 1.408812078770737,
+       "text": "1.409"
+      },
+      {
+       "raw": 0.20440603938536758,
+       "text": "20.4%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "dual"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.417178586082063,
+       "text": "4.42"
+      },
+      {
+       "raw": 34.417178586082066,
+       "text": "34.42"
+      },
+      {
+       "raw": 25.582821413917934,
+       "text": "25.58"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8716577369921797,
+       "text": "87.2%"
+      },
+      {
+       "raw": 1.3453238026106822,
+       "text": "1.345"
+      },
+      {
+       "raw": 0.172661901305341,
+       "text": "17.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521632025,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.6086956521632,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.3913043478368,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846158037,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.299999999998583,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999929173,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.8084829339188602,
+       "text": "-1.81"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -11.808482933918867,
+       "text": "-11.81"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.191517066081133,
+       "text": "-8.19"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.8468488336698912,
+       "text": "84.7%"
+      },
+      {
+       "raw": 1.441550184008603,
+       "text": "1.442"
+      },
+      {
+       "raw": 0.22077509200430054,
+       "text": "22.1%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "tvar"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.71015131464328,
+       "text": "4.71"
+      },
+      {
+       "raw": 34.710151314643284,
+       "text": "34.71"
+      },
+      {
+       "raw": 25.289848685356716,
+       "text": "25.29"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8643004672625499,
+       "text": "86.4%"
+      },
+      {
+       "raw": 1.3724934358638965,
+       "text": "1.372"
+      },
+      {
+       "raw": 0.18624671793194808,
+       "text": "18.6%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net*",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6087011268370937,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.60870112683709,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.39129887316291,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846151704070916,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000007240244331,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000036201221675,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net less gross",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -10.000000000000007,
+       "text": "-10.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.1014501878061864,
+       "text": "-2.10"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -12.101450187806194,
+       "text": "-12.10"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -7.8985498121938065,
+       "text": "-7.90"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -20.0,
+       "text": "-20.00"
+      },
+      {
+       "raw": 0.8263472430830088,
+       "text": "82.6%"
+      },
+      {
+       "raw": 1.532110384253567,
+       "text": "1.532"
+      },
+      {
+       "raw": 0.2660551921267827,
+       "text": "26.6%"
+      }
+     ]
+    }
+   ],
+   "caption": "Distortions fitted to the net basis at the calibration anchor, then applied unchanged to the other whole program views. The starred row is the calibrated one. A \"less\" row is the difference between two programs: the implied allowance for reinsurance in the rate, and its loss ratio is the rate the cover is being bought at. It is not the price of the cession, which is what a reinsurer would charge for the same layer and is the ceded row of the raw view.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "pricing.stand_alone/insurer/CalibrationReinsGross": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ccoc"
+      },
+      "gross*",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.913043478260871,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.913043478260875,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.086956521739125,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846153846153846,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000000005,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000000000000008,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521739175,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652173914,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347826086,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846153845,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000000000000027,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "gross less net",
+      {
+       "raw": 10.000000000000007,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.3043478260869534,
+       "text": "1.30"
+      },
+      {
+       "raw": 11.30434782608696,
+       "text": "11.30"
+      },
+      {
+       "raw": 8.69565217391304,
+       "text": "8.70"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8846153846153849,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000000012,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999972,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ph"
+      },
+      "gross*",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130496272548676,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304962725487,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.08695037274513,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846152242200575,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000005421364322,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.150000271068216,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.4363463376696863,
+       "text": "2.44"
+      },
+      {
+       "raw": 22.436346337669683,
+       "text": "22.44"
+      },
+      {
+       "raw": 17.563653662330317,
+       "text": "17.56"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8914107359102778,
+       "text": "89.1%"
+      },
+      {
+       "raw": 1.2774304691392362,
+       "text": "1.277"
+      },
+      {
+       "raw": 0.13871523456961835,
+       "text": "13.9%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "gross less net",
+      {
+       "raw": 10.000000000000007,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.4767032895851813,
+       "text": "1.48"
+      },
+      {
+       "raw": 11.476703289585188,
+       "text": "11.48"
+      },
+      {
+       "raw": 8.523296710414812,
+       "text": "8.52"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8713303592221251,
+       "text": "87.1%"
+      },
+      {
+       "raw": 1.346509886903449,
+       "text": "1.347"
+      },
+      {
+       "raw": 0.17325494345172376,
+       "text": "17.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "wang"
+      },
+      "gross*",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434786102946,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.9130434786103,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.086956521389702,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.88461538460627,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000308078,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000000001540384,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.367749910532325,
+       "text": "2.37"
+      },
+      {
+       "raw": 22.36774991053232,
+       "text": "22.37"
+      },
+      {
+       "raw": 17.63225008946768,
+       "text": "17.63"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8941444749694103,
+       "text": "89.4%"
+      },
+      {
+       "raw": 1.2685703637956742,
+       "text": "1.269"
+      },
+      {
+       "raw": 0.13428518189783728,
+       "text": "13.4%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "gross less net",
+      {
+       "raw": 10.000000000000007,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.5452935680779696,
+       "text": "1.55"
+      },
+      {
+       "raw": 11.545293568077977,
+       "text": "11.55"
+      },
+      {
+       "raw": 8.454706431922023,
+       "text": "8.45"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8661538089987931,
+       "text": "86.6%"
+      },
+      {
+       "raw": 1.3655463570546902,
+       "text": "1.366"
+      },
+      {
+       "raw": 0.18277317852734423,
+       "text": "18.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "dual"
+      },
+      "gross*",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434775528364,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347755284,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.08695652244716,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846153846338536,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999375753,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999996878757,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.303886168744736,
+       "text": "2.30"
+      },
+      {
+       "raw": 22.303886168744732,
+       "text": "22.30"
+      },
+      {
+       "raw": 17.696113831255268,
+       "text": "17.70"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8967047199167804,
+       "text": "89.7%"
+      },
+      {
+       "raw": 1.2603832898809182,
+       "text": "1.260"
+      },
+      {
+       "raw": 0.13019164494045926,
+       "text": "13.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "gross less net",
+      {
+       "raw": 10.000000000000007,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.6091573088081006,
+       "text": "1.61"
+      },
+      {
+       "raw": 11.609157308808108,
+       "text": "11.61"
+      },
+      {
+       "raw": 8.390842691191892,
+       "text": "8.39"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8613889651071228,
+       "text": "86.1%"
+      },
+      {
+       "raw": 1.3835508227313775,
+       "text": "1.384"
+      },
+      {
+       "raw": 0.19177541136568788,
+       "text": "19.2%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "tvar"
+      },
+      "gross*",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130499003390575,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304990033906,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.08695009966094,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846152170967102,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000005662133667,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000028310668317,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 1.956524950169534,
+       "text": "1.96"
+      },
+      {
+       "raw": 21.95652495016953,
+       "text": "21.96"
+      },
+      {
+       "raw": 18.04347504983047,
+       "text": "18.04"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.9108909558953486,
+       "text": "91.1%"
+      },
+      {
+       "raw": 1.2168678643959898,
+       "text": "1.217"
+      },
+      {
+       "raw": 0.10843393219799514,
+       "text": "10.8%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "gross less net",
+      {
+       "raw": 10.000000000000007,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.9565249501695234,
+       "text": "1.96"
+      },
+      {
+       "raw": 11.95652495016953,
+       "text": "11.96"
+      },
+      {
+       "raw": 8.04347504983047,
+       "text": "8.04"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8363634117501857,
+       "text": "83.6%"
+      },
+      {
+       "raw": 1.4864874791178144,
+       "text": "1.486"
+      },
+      {
+       "raw": 0.24324373955890627,
+       "text": "24.3%"
+      }
+     ]
+    }
+   ],
+   "caption": "Distortions fitted to the gross basis at the calibration anchor, then applied unchanged to the other whole program views. The starred row is the calibrated one. A \"less\" row is the difference between two programs: the implied allowance for reinsurance in the rate, and its loss ratio is the rate the cover is being bought at. It is not the price of the cession, which is what a reinsurer would charge for the same layer and is the ceded row of the raw view.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "pricing.stand_alone/raw/CalibrationAggregate": [
+  {
+   "body": [
+    {
+     "cells": [
+      "calibration",
+      {
+       "raw": 0.15,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.99,
+       "text": "0.99000"
+      },
+      {
+       "raw": 0.9953703703703702,
+       "text": "0.99537"
+      },
+      {
+       "raw": 10.49537037037037,
+       "text": "10.50"
+      },
+      {
+       "raw": 0.8484299516908216,
+       "text": "0.85"
+      },
+      {
+       "raw": 11.343800322061192,
+       "text": "11.34"
+      },
+      {
+       "raw": 5.656199677938808,
+       "text": "5.66"
+      },
+      {
+       "raw": 17.0,
+       "text": "17.00"
+      },
+      {
+       "raw": 0.9252076087728015,
+       "text": "92.5%"
+      },
+      {
+       "raw": 2.0055516014234875,
+       "text": "2.006"
+      },
+      {
+       "raw": 0.15000000000000005,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "coc"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "F(a)"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "coc"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "F(a)"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.stand_alone/raw/CalibrationPortfolio": [
+  {
+   "body": [
+    {
+     "cells": [
+      "calibration",
+      {
+       "raw": 0.15,
+       "text": "15.0%"
+      },
+      {
+       "raw": 0.99,
+       "text": "0.99000"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": 7.999999999999998,
+       "text": "8.00"
+      },
+      {
+       "raw": 0.39130434782608603,
+       "text": "0.39"
+      },
+      {
+       "raw": 8.391304347826084,
+       "text": "8.39"
+      },
+      {
+       "raw": 2.6086956521739157,
+       "text": "2.61"
+      },
+      {
+       "raw": 11.0,
+       "text": "11.00"
+      },
+      {
+       "raw": 0.9533678756476685,
+       "text": "95.3%"
+      },
+      {
+       "raw": 3.2166666666666623,
+       "text": "3.217"
+      },
+      {
+       "raw": 0.1499999999999995,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "The shared calibration target: the cost of capital asked for, the asset level it was struck at and the probability that level sits at, then the pentagon the three of them determine. Every family in the set was fitted to this one premium.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "unit"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "coc"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "p"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "F(a)"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "unit"
+     },
+     {
+      "text": "coc"
+     },
+     {
+      "text": "p"
+     },
+     {
+      "text": "F(a)"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "pricing.stand_alone/raw/CalibrationReins": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ccoc"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.913043478260864,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347826087,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.086956521739133,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846153846153848,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999977,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.3043478260869534,
+       "text": "1.30"
+      },
+      {
+       "raw": 11.304347826086955,
+       "text": "11.30"
+      },
+      {
+       "raw": 8.695652173913045,
+       "text": "8.70"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8846153846153849,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999996,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999963,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521739104,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652173907,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347826093,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846153847,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999999992,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.1499999999999998,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ph"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.186427251737253,
+       "text": "4.19"
+      },
+      {
+       "raw": 34.18642725173726,
+       "text": "34.19"
+      },
+      {
+       "raw": 25.813572748262743,
+       "text": "25.81"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8775412469717931,
+       "text": "87.8%"
+      },
+      {
+       "raw": 1.3243586071996953,
+       "text": "1.324"
+      },
+      {
+       "raw": 0.1621793035998475,
+       "text": "16.2%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.6794819280632254,
+       "text": "1.68"
+      },
+      {
+       "raw": 11.679481928063227,
+       "text": "11.68"
+      },
+      {
+       "raw": 8.320518071936773,
+       "text": "8.32"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8562023608232314,
+       "text": "85.6%"
+      },
+      {
+       "raw": 1.4036964798448646,
+       "text": "1.404"
+      },
+      {
+       "raw": 0.20184823992243203,
+       "text": "20.2%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.608695652184,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652183997,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347816003,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846149899,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000013336,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.150000000000667,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "wang"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.30584788082631,
+       "text": "4.31"
+      },
+      {
+       "raw": 34.30584788082631,
+       "text": "34.31"
+      },
+      {
+       "raw": 25.694152119173687,
+       "text": "25.69"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8744864754317042,
+       "text": "87.4%"
+      },
+      {
+       "raw": 1.335161702231316,
+       "text": "1.335"
+      },
+      {
+       "raw": 0.16758085111565782,
+       "text": "16.8%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.8384253218152153,
+       "text": "1.84"
+      },
+      {
+       "raw": 11.838425321815217,
+       "text": "11.84"
+      },
+      {
+       "raw": 8.161574678184783,
+       "text": "8.16"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8447069376340565,
+       "text": "84.5%"
+      },
+      {
+       "raw": 1.450507504815015,
+       "text": "1.451"
+      },
+      {
+       "raw": 0.2252537524075072,
+       "text": "22.5%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.608695652249974,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.60869565224997,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.39130434775003,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846124085,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000100587,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.1500000000050295,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "dual"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.417178586082063,
+       "text": "4.42"
+      },
+      {
+       "raw": 34.417178586082066,
+       "text": "34.42"
+      },
+      {
+       "raw": 25.582821413917934,
+       "text": "25.58"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8716577369921797,
+       "text": "87.2%"
+      },
+      {
+       "raw": 1.3453238026106822,
+       "text": "1.345"
+      },
+      {
+       "raw": 0.172661901305341,
+       "text": "17.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.985444457336186,
+       "text": "1.99"
+      },
+      {
+       "raw": 11.985444457336188,
+       "text": "11.99"
+      },
+      {
+       "raw": 8.014555542663812,
+       "text": "8.01"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8343453624599702,
+       "text": "83.4%"
+      },
+      {
+       "raw": 1.495459653817879,
+       "text": "1.495"
+      },
+      {
+       "raw": 0.24772982690893927,
+       "text": "24.8%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521632025,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.6086956521632,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.3913043478368,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846158037,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.299999999998583,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999929173,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "tvar"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 4.71015131464328,
+       "text": "4.71"
+      },
+      {
+       "raw": 34.710151314643284,
+       "text": "34.71"
+      },
+      {
+       "raw": 25.289848685356716,
+       "text": "25.29"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8643004672625499,
+       "text": "86.4%"
+      },
+      {
+       "raw": 1.3724934358638965,
+       "text": "1.372"
+      },
+      {
+       "raw": 0.18624671793194808,
+       "text": "18.6%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 2.6087011268370937,
+       "text": "2.61"
+      },
+      {
+       "raw": 12.608701126837095,
+       "text": "12.61"
+      },
+      {
+       "raw": 7.391298873162905,
+       "text": "7.39"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.7931031039125369,
+       "text": "79.3%"
+      },
+      {
+       "raw": 1.705884357161916,
+       "text": "1.706"
+      },
+      {
+       "raw": 0.3529421785809578,
+       "text": "35.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6087011268370937,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.60870112683709,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.39129887316291,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846151704070916,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000007240244331,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000036201221675,
+       "text": "15.0%"
+      }
+     ]
+    }
+   ],
+   "caption": "Every view of the cession priced with every calibrated family: gross, ceded and net are three separate distributions, so each is a price in its own right rather than a share of one. The ceded row is what the risk measure says the cession is worth to whoever writes it.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  }
+ ],
+ "pricing.stand_alone/raw/CalibrationReinsGross": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ccoc"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.913043478260871,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.913043478260875,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.086956521739125,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846153846153846,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000000005,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000000000000008,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.3043478260869552,
+       "text": "1.30"
+      },
+      {
+       "raw": 11.304347826086957,
+       "text": "11.30"
+      },
+      {
+       "raw": 8.695652173913043,
+       "text": "8.70"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8846153846153847,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999999999986,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.6086956521739175,
+       "text": "2.61"
+      },
+      {
+       "raw": 22.608695652173914,
+       "text": "22.61"
+      },
+      {
+       "raw": 17.391304347826086,
+       "text": "17.39"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8846153846153845,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000000000000027,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ph"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130496272548676,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304962725487,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.08695037274513,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846152242200575,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000005421364322,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.150000271068216,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.5731931842068505,
+       "text": "1.57"
+      },
+      {
+       "raw": 11.573193184206852,
+       "text": "11.57"
+      },
+      {
+       "raw": 8.426806815793148,
+       "text": "8.43"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.864065763081387,
+       "text": "86.4%"
+      },
+      {
+       "raw": 1.3733782483914176,
+       "text": "1.373"
+      },
+      {
+       "raw": 0.18668912419570857,
+       "text": "18.7%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.4363463376696863,
+       "text": "2.44"
+      },
+      {
+       "raw": 22.436346337669683,
+       "text": "22.44"
+      },
+      {
+       "raw": 17.563653662330317,
+       "text": "17.56"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8914107359102778,
+       "text": "89.1%"
+      },
+      {
+       "raw": 1.2774304691392362,
+       "text": "1.277"
+      },
+      {
+       "raw": 0.13871523456961835,
+       "text": "13.9%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "wang"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434786102946,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.9130434786103,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.086956521389702,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.88461538460627,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000000000308078,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000000001540384,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.674720658727681,
+       "text": "1.67"
+      },
+      {
+       "raw": 11.674720658727683,
+       "text": "11.67"
+      },
+      {
+       "raw": 8.325279341272317,
+       "text": "8.33"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.856551543485907,
+       "text": "85.7%"
+      },
+      {
+       "raw": 1.402321793678515,
+       "text": "1.402"
+      },
+      {
+       "raw": 0.20116089683925736,
+       "text": "20.1%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.367749910532325,
+       "text": "2.37"
+      },
+      {
+       "raw": 22.36774991053232,
+       "text": "22.37"
+      },
+      {
+       "raw": 17.63225008946768,
+       "text": "17.63"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8941444749694103,
+       "text": "89.4%"
+      },
+      {
+       "raw": 1.2685703637956742,
+       "text": "1.269"
+      },
+      {
+       "raw": 0.13428518189783728,
+       "text": "13.4%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "dual"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130434775528364,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304347755284,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.08695652244716,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846153846338536,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.2999999999375753,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.14999999996878757,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.7655972945104317,
+       "text": "1.77"
+      },
+      {
+       "raw": 11.765597294510433,
+       "text": "11.77"
+      },
+      {
+       "raw": 8.234402705489567,
+       "text": "8.23"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8499356003511849,
+       "text": "85.0%"
+      },
+      {
+       "raw": 1.4288343326549662,
+       "text": "1.429"
+      },
+      {
+       "raw": 0.21441716632748292,
+       "text": "21.4%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 2.303886168744736,
+       "text": "2.30"
+      },
+      {
+       "raw": 22.303886168744732,
+       "text": "22.30"
+      },
+      {
+       "raw": 17.696113831255268,
+       "text": "17.70"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.8967047199167804,
+       "text": "89.7%"
+      },
+      {
+       "raw": 1.2603832898809182,
+       "text": "1.260"
+      },
+      {
+       "raw": 0.13019164494045926,
+       "text": "13.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "tvar"
+      },
+      "gross",
+      {
+       "raw": 30.000000000000004,
+       "text": "30.00"
+      },
+      {
+       "raw": 3.9130499003390575,
+       "text": "3.91"
+      },
+      {
+       "raw": 33.91304990033906,
+       "text": "33.91"
+      },
+      {
+       "raw": 26.08695009966094,
+       "text": "26.09"
+      },
+      {
+       "raw": 60.0,
+       "text": "60.00"
+      },
+      {
+       "raw": 0.8846152170967102,
+       "text": "88.5%"
+      },
+      {
+       "raw": 1.3000005662133667,
+       "text": "1.300"
+      },
+      {
+       "raw": 0.15000028310668317,
+       "text": "15.0%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ceded",
+      {
+       "raw": 10.000000000000002,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.9565249501695305,
+       "text": "1.96"
+      },
+      {
+       "raw": 11.956524950169532,
+       "text": "11.96"
+      },
+      {
+       "raw": 8.043475049830468,
+       "text": "8.04"
+      },
+      {
+       "raw": 20.0,
+       "text": "20.00"
+      },
+      {
+       "raw": 0.8363634117501851,
+       "text": "83.6%"
+      },
+      {
+       "raw": 1.4864874791178149,
+       "text": "1.486"
+      },
+      {
+       "raw": 0.2432437395589072,
+       "text": "24.3%"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "net",
+      {
+       "raw": 19.999999999999996,
+       "text": "20.00"
+      },
+      {
+       "raw": 1.956524950169534,
+       "text": "1.96"
+      },
+      {
+       "raw": 21.95652495016953,
+       "text": "21.96"
+      },
+      {
+       "raw": 18.04347504983047,
+       "text": "18.04"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 0.9108909558953486,
+       "text": "91.1%"
+      },
+      {
+       "raw": 1.2168678643959898,
+       "text": "1.217"
+      },
+      {
+       "raw": 0.10843393219799514,
+       "text": "10.8%"
+      }
+     ]
+    }
+   ],
+   "caption": "Every view of the cession priced with every calibrated family: gross, ceded and net are three separate distributions, so each is a price in its own right rather than a share of one. The ceded row is what the risk measure says the cession is worth to whoever writes it.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "distortion"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "L"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "M"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "P"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Q"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "a"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "LR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "PQ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "ROE"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "distortion"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "L"
+     },
+     {
+      "text": "M"
+     },
+     {
+      "text": "P"
+     },
+     {
+      "text": "Q"
+     },
+     {
+      "text": "a"
+     },
+     {
+      "text": "LR"
+     },
+     {
+      "text": "PQ"
+     },
+     {
+      "text": "ROE"
      }
     ]
    ],

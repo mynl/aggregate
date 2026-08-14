@@ -1,13 +1,26 @@
 """Exhibit treatments for the pricing result objects.
 
-The three leaves of the Pricing pane, ``pricing.calibrate`` /
-``pricing.allocate`` / ``pricing.evaluate``, registered on
+The leaves of the Pricing pane, ``pricing.calibrate`` /
+``pricing.stand_alone`` / ``pricing.allocate`` / ``pricing.evaluate``,
+registered on
 :class:`~aggregate.results.CalibrationResult` and
 :class:`~aggregate.results.EvaluationResult` rather than on the objects those
 were computed from. Ruling ``[Pricing-Keyed-On-Result]`` (author, 2026-08-11):
 a calibration is a **calculation**, not stored state, and giving it a type is
 what lets it dispatch through the same ``singledispatch`` registry as every
 other exhibit with no framework change at all.
+
+**Stand-alone prices the parts; allocate splits the whole.** Ruling
+``[Standalone-Prices-The-Parts, Allocate-Splits-The-Whole]`` (author,
+2026-08-14). The two are different questions and both are worth asking, so
+they are two leaves rather than one table with a footnote. Sum the
+stand-alone parts and compare with the whole and you have read the
+diversification story; decompose the whole into the parts and you have read
+the allocation. A ``Portfolio``'s ``pricing_df`` was an allocation all along
+(``analyze_distortions`` documents its ``allocation=`` parameter as the tail
+share choice for the per unit premium split) and stays put; the aggregate
+side of the old ``pricing.allocate`` was stand-alone pricing under the wrong
+name and moves.
 
 Two things follow, and both are contracts rather than conveniences.
 
@@ -34,7 +47,8 @@ import pandas as pd
 from ..pentagon import complete_pentagon
 from ..results import CalibrationResult, EvaluationResult
 from ._core import (
-    pricing_allocate, pricing_evaluate, register_simple_exhibit,
+    pricing_allocate, pricing_evaluate, pricing_stand_alone,
+    register_simple_exhibit,
 )
 
 __all__ = [
@@ -103,17 +117,17 @@ register_simple_exhibit(
             'the integral of g.')
 
 
-# --- pricing.allocate -------------------------------------------------------
+# --- shared ------------------------------------------------------------------
 
 def _calibration_block(result):
     """The one row target, as its own block.
 
-    Leads the allocation on the two sources that have units or views to spread
-    over, and **is** the allocation on the one that has neither. An aggregate
-    with no cession holds one distribution, so the calibration row is already
-    the whole story and there is nothing further to allocate; saying so with
-    the same block the other shapes lead with is better than serving an empty
-    table or refusing the leaf.
+    Leads the leaf on the sources that have parts to price or spread over, and
+    **is** the stand-alone story on the one that has neither. An aggregate with
+    no cession holds one distribution, so the calibration row is already the
+    whole story: it has one part, which is the whole. Saying so with the same
+    block the other shapes lead with is better than serving an empty table or
+    refusing the leaf.
     """
     return ('calibration_df', result.calibration_df,
             {'formatters': CALIBRATION_FORMATS,
@@ -124,27 +138,17 @@ def _calibration_block(result):
                         'set was fitted to this one premium.'})
 
 
-@pricing_allocate.register(CalibrationResult)
-def _allocate_raw(result):
+# --- pricing.stand_alone -----------------------------------------------------
+
+@pricing_stand_alone.register(CalibrationResult)
+def _stand_alone_raw(result):
     """RAW blocks, by what the calibration was made on.
 
-    Three shapes, one registered builder: dispatching on ``type(_source)``
-    here is ordinary Python and does not need a second registry. Each block
-    still names a public attribute of the result and serves that frame whole,
-    in its own orientation, so the invariant reads the same over a result as
-    over an object.
+    Dispatching on ``type(_source)`` here is ordinary Python and does not need
+    a second registry. Each block still names a public attribute of the result
+    and serves that frame whole, in its own orientation, so the invariant reads
+    the same over a result as over an object.
     """
-    if getattr(result._source, 'agg_list', None) is not None:
-        return [
-            _calibration_block(result),
-            ('pricing_df', result.pricing_df,
-             {'caption': 'The calibrated set allocated across the units of '
-                         'the book, at the calibration asset level: the '
-                         'eight pentagon statistics down the rows, units and '
-                         'the total across. Each distortion is a different '
-                         'answer to how the total premium should be shared '
-                         'out, computed from the same total.'}),
-        ]
     if getattr(result._source, 'reins_views', None):
         return [
             ('reins_price_df', result.reins_price_df,
@@ -157,6 +161,36 @@ def _allocate_raw(result):
                          'worth to whoever writes it.'}),
         ]
     return [_calibration_block(result)]
+
+
+@pricing_stand_alone.insurer.register(CalibrationResult)
+def _stand_alone_insurer(result, blocks):
+    """The buyer's reading: the whole program views, starred, differenced."""
+    if getattr(result._source, 'reins_views', None):
+        return _reins_insurer(result, blocks[0])
+    return blocks
+
+
+# --- pricing.allocate -------------------------------------------------------
+
+@pricing_allocate.register(CalibrationResult)
+def _allocate_raw(result):
+    """RAW blocks for the decomposition of one premium.
+
+    Reached only where :func:`~aggregate.exhibits._core._perspectives_allocation`
+    says there are parts to split across, so there is no "nothing to allocate"
+    branch here: that case does not serve this leaf at all.
+    """
+    return [
+        _calibration_block(result),
+        ('pricing_df', result.pricing_df,
+         {'caption': 'The calibrated set allocated across the units of '
+                     'the book, at the calibration asset level: the '
+                     'eight pentagon statistics down the rows, units and '
+                     'the total across. Each distortion is a different '
+                     'answer to how the total premium should be shared '
+                     'out, computed from the same total.'}),
+    ]
 
 
 def _star_the_basis(frame, basis):
@@ -204,15 +238,9 @@ def _allocate_insurer(result, blocks):
     """The buyer's reading of an allocation.
 
     On a book, the four ratio and price slices a reader actually compares,
-    one block each, units across. On a cession, the whole program views only,
-    the calibrated one starred, and the differences appended.
+    one block each, units across.
     """
-    source = result._source
-    if getattr(source, 'agg_list', None) is not None:
-        return [blocks[0], *_stat_slices(blocks[1][1])]
-    if getattr(source, 'reins_views', None):
-        return _reins_insurer(result, blocks[0])
-    return blocks
+    return [blocks[0], *_stat_slices(blocks[1][1])]
 
 
 def _stat_slices(pricing_df):

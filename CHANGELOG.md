@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a281
+
+**[Standalone-Rename] stand-alone prices the parts; allocate splits the whole.** Ruling `[Standalone-Prices-The-Parts, Allocate-Splits-The-Whole]` (author, 2026-08-14). The pricing pane's second leaf was doing two different jobs under one name, and only one of them was an allocation.
+
+A `Portfolio`'s `pricing_df` is a genuine allocation: `analyze_distortions` documents its `allocation=` parameter as the tail-share choice for the per-unit premium split, the rows foot to the total, and it was correctly named all along. The aggregate side was not. `reins_price_df` prices gross, ceded and net as three **separate distributions**, each a price in its own right rather than a share of one, and says so in its own Notes. That is stand-alone pricing, and it now says so.
+
+**The split.** `pricing.allocate` keeps the `Portfolio` branch **unchanged**: a book reader sees no difference at all, and the served blocks are byte-identical (112 of the 116 snapshots are unmoved; the four that move are the aggregate-side blocks, and they move content for content). A new `pricing.stand_alone` carries the two `Aggregate` branches, the reinsured one serving `reins_price_df` with its INSURER restructure (ceded dropped, the calibrated view starred, the `less` difference rows appended, `[Difference-Is-A-Perspective]` intact) and the plain one serving the single calibration row, which is the degenerate case of one part that is the whole.
+
+**`pricing.allocate` gains a predicate**, `_perspectives_allocation`, and is the one pricing leaf with a structural gate: a calibration must have parts to split its target across. A `Portfolio` always does. An `Aggregate` does where an occurrence program exists **and** the fit was struck on gross, since a set calibrated on net has no gross premium to allocate; that arm lands with the frame that serves it. An aggregate with no cession has one distribution, which is not a degenerate allocation but the absence of one, and its story is the stand-alone leaf.
+
+**Wire-visible, with exactly one consumer.** The old key's aggregate meaning is gone rather than aliased: an alias would let a client keep asking the wrong question and get a plausible answer. `available_exhibits` on an aggregate calibration now reports `pricing.calibrate` and `pricing.stand_alone`. Plan: `dev/plan-pricing-natural-allocation.md`, phase N1.
+
 ## 1.0.0a280
 
 **[Chart-Kappa-Band] the conditional cession, drawn as a curve with a band.** A new registered chart, `kappa`, on a `netceded` `BivariateAggregate` carrying a gross axis. Two panels over one gross outcome axis, and it is the picture the band columns were built for.

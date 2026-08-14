@@ -90,9 +90,11 @@ EXPECTED_EXHIBITS = {
     # the pricing result fixtures ([Pricing-Exhibits]); a result serves the
     # pricing leaves and nothing else, because nothing else is registered for
     # its type
-    'CalibrationPortfolio': ['pricing.calibrate', 'pricing.allocate'],
-    'CalibrationReins': ['pricing.calibrate', 'pricing.allocate'],
-    'CalibrationAggregate': ['pricing.calibrate', 'pricing.allocate'],
+    'CalibrationPortfolio': ['pricing.calibrate', 'pricing.stand_alone',
+                             'pricing.allocate'],
+    'CalibrationReins': ['pricing.calibrate', 'pricing.stand_alone'],
+    'CalibrationReinsGross': ['pricing.calibrate', 'pricing.stand_alone'],
+    'CalibrationAggregate': ['pricing.calibrate', 'pricing.stand_alone'],
     'Evaluation': ['pricing.evaluate'],
 }
 
@@ -103,14 +105,18 @@ def pricing_results(objects):
     Built from the objects above rather than from new programs: a calibration
     is a calculation over an object that already has an exhibit story, and
     reusing them keeps the file talking about one book. The three calibrations
-    are the three shapes ``pricing.allocate`` serves, units, views and
-    neither.
+    are the three shapes ``pricing.stand_alone`` serves, units, views and
+    neither; the fourth is the same cession struck on **gross**, which is the
+    only basis with a premium to allocate across an occurrence program.
     """
     return {
         'CalibrationPortfolio':
             objects['Portfolio'].calibrate_distortions(0.15, p=0.99),
         'CalibrationReins':
             objects['ReinsAggregate'].calibrate_distortions(0.15, p=0.99),
+        'CalibrationReinsGross':
+            objects['ReinsAggregate'].calibrate_distortions(
+                0.15, p=0.99, reins_view='gross'),
         'CalibrationAggregate':
             objects['Aggregate'].calibrate_distortions(0.15, p=0.99),
         'Evaluation': objects['Aggregate'].evaluate(12.0, p=0.99),
@@ -715,7 +721,7 @@ def test_a_result_object_serves_the_pricing_leaves_and_nothing_else(objects):
     """
     calibration = objects['CalibrationPortfolio']
     assert [n for n, _ in available_exhibits(calibration)] == [
-        'pricing.calibrate', 'pricing.allocate']
+        'pricing.calibrate', 'pricing.stand_alone', 'pricing.allocate']
     assert 'pricing.calibrate' not in [
         n for n, _ in available_exhibits(objects['Portfolio'])]
 
@@ -733,13 +739,31 @@ def test_pricing_calibrate_is_the_receipt_unchanged(objects):
                                       check_index_type=False, check_categorical=False)
 
 
-def test_pricing_allocate_blocks_follow_the_source_shape(objects):
+def test_pricing_stand_alone_blocks_follow_the_source_shape(objects):
     """Three sources, three raw block lists, one registered builder."""
     raw = lambda key: [b for b, _, _ in
-                       exhibit_frames(objects[key], 'pricing.allocate')]
-    assert raw('CalibrationPortfolio') == ['calibration_df', 'pricing_df']
+                       exhibit_frames(objects[key], 'pricing.stand_alone')]
     assert raw('CalibrationReins') == ['reins_price_df']
     assert raw('CalibrationAggregate') == ['calibration_df']
+    assert raw('CalibrationPortfolio') == ['calibration_df']
+
+
+def test_allocate_needs_parts_to_split_across(objects):
+    """The one pricing leaf with a structural gate.
+
+    A book always has units. An aggregate has the halves of an occurrence
+    program, but only where one exists and only where the fit was struck on
+    gross: a set calibrated on net has no gross premium to allocate. An
+    aggregate with no cession has one distribution, which is not a degenerate
+    allocation but the absence of one.
+    """
+    served = lambda key: [n for n, _ in available_exhibits(objects[key])]
+    assert 'pricing.allocate' in served('CalibrationPortfolio')
+    assert 'pricing.allocate' not in served('CalibrationAggregate')
+    assert 'pricing.allocate' not in served('CalibrationReins')
+    for key in ('CalibrationAggregate', 'CalibrationReins'):
+        with pytest.raises(ValueError, match='not available'):
+            exhibit_frames(objects[key], 'pricing.allocate')
 
 
 def test_pricing_allocate_insurer_splits_the_book_into_stat_slices(objects):
@@ -778,7 +802,7 @@ def test_pricing_allocate_serves_a_mass_family_on_an_unbounded_book():
         assert frame.loc['ccoc'].notna().all(), name
 
 
-def test_pricing_allocate_insurer_is_narrower_than_raw_on_a_cession(objects):
+def test_pricing_stand_alone_insurer_is_narrower_than_raw_on_a_cession(objects):
     """The first exhibit where RAW carries strictly more rows than INSURER.
 
     A ceded price is what the layer is worth to whoever writes it, which is a
@@ -787,9 +811,9 @@ def test_pricing_allocate_insurer_is_narrower_than_raw_on_a_cession(objects):
     programs ([Difference-Is-A-Perspective]).
     """
     result = objects['CalibrationReins']
-    _n, raw, _kw = exhibit_frames(result, 'pricing.allocate')[0]
+    _n, raw, _kw = exhibit_frames(result, 'pricing.stand_alone')[0]
     _n, insurer, kw = exhibit_frames(
-        result, 'pricing.allocate', Perspective.INSURER)[0]
+        result, 'pricing.stand_alone', Perspective.INSURER)[0]
     assert 'ceded' in raw.index.get_level_values('view')
     views = set(insurer.index.get_level_values('view'))
     assert not any(v.startswith('ceded') for v in views)
@@ -803,7 +827,7 @@ def test_the_difference_row_recomputes_its_ratios(objects):
     """A loss ratio of a difference is not the difference of two loss ratios."""
     result = objects['CalibrationReins']
     _n, insurer, _kw = exhibit_frames(
-        result, 'pricing.allocate', Perspective.INSURER)[0]
+        result, 'pricing.stand_alone', Perspective.INSURER)[0]
     for distortion in insurer.index.get_level_values('distortion').unique():
         block = insurer.xs(distortion, level='distortion')
         if 'net less gross' not in block.index:
@@ -816,11 +840,11 @@ def test_the_difference_row_recomputes_its_ratios(objects):
         assert row['ROE'] == pytest.approx(row['M'] / row['Q'])
 
 
-def test_pricing_allocate_rows_read_view_then_difference(objects):
+def test_pricing_stand_alone_rows_read_view_then_difference(objects):
     """Each family reads as one small table, not as two distant ones."""
     result = objects['CalibrationReins']
     _n, insurer, _kw = exhibit_frames(
-        result, 'pricing.allocate', Perspective.INSURER)[0]
+        result, 'pricing.stand_alone', Perspective.INSURER)[0]
     first = insurer.index.get_level_values('distortion')[0]
     head = [v for d, v in insurer.index if d == first]
     assert head[-1].endswith('less gross')

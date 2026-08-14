@@ -65,8 +65,8 @@ __all__ = [
     'available_exhibits', 'exhibit_frames', 'build_exhibit',
     'summary', 'tail', 'stats', 'validation', 'reins',
     'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
-    'pricing_calibrate', 'pricing_allocate', 'pricing_evaluate',
-    'register_simple_exhibit',
+    'pricing_calibrate', 'pricing_stand_alone', 'pricing_allocate',
+    'pricing_evaluate', 'register_simple_exhibit',
 ]
 
 
@@ -377,6 +377,33 @@ def _perspectives_tower(obj):
     """
     return list(_IMPLEMENTED_PERSPECTIVES) if getattr(obj, '_tower', False) \
         else []
+
+
+def _perspectives_allocation(obj):
+    """Perspectives for ``pricing.allocate``: is there one premium to split?
+
+    Two shapes qualify, and the second has a basis condition the first does
+    not. A ``Portfolio`` calibration always splits its target across the units
+    of the book. An ``Aggregate`` calibration splits across the halves of an
+    occurrence program, which needs the program to exist **and** the fit to
+    have been struck on gross: a set calibrated on net has no gross premium to
+    allocate, so the gate is structural rather than a preference.
+
+    An aggregate with no cession has one distribution and nothing to split,
+    which is not a degenerate allocation but the absence of one; its story is
+    the stand-alone leaf.
+
+    The occurrence arm is described here and not yet honored: the frame it
+    would serve arrives with the natural allocation exhibit, and a predicate
+    that says available before a builder can answer is worse than one that
+    waits.
+    """
+    source = getattr(obj, '_source', None)
+    if source is None:
+        return []
+    if getattr(source, 'agg_list', None) is not None:
+        return list(_IMPLEMENTED_PERSPECTIVES)
+    return []
 
 
 def _perspectives_sharpen(obj):
@@ -784,23 +811,56 @@ pricing_calibrate = _make_exhibit_function(
     Exhibit
     """)
 
-pricing_allocate = _make_exhibit_function(
-    'pricing.allocate', 'Allocated pricing',
-    """The calibrated target spread over whatever the source has to spread it
-    over. Also on :class:`~aggregate.results.CalibrationResult`.
+pricing_stand_alone = _make_exhibit_function(
+    'pricing.stand_alone', 'Stand-alone pricing',
+    """The calibrated families applied to each part **as a price in its own
+    right**. Also on :class:`~aggregate.results.CalibrationResult`.
+
+    Stand-alone prices the parts alone; ``pricing.allocate`` splits the whole
+    across them. That is the distinction the two leaves exist to keep apart
+    (``[Standalone-Prices-The-Parts, Allocate-Splits-The-Whole]``, author,
+    2026-08-14), and it is a real one: net priced as its own distribution, net
+    as its share of the gross premium, and net calibrated directly are three
+    different numbers.
 
     The block list is a property of the (exhibit, perspective) pair **and** of
     what the calibrated object was, which is the fullest exercise of
-    ``[Perspective-May-Restructure]`` in the package. A ``Portfolio`` spreads
-    across units, a reinsured ``Aggregate`` across the views of its cession,
-    and an ``Aggregate`` with neither has one distribution and therefore
-    nothing to spread, so its allocation story is the single calibration row.
+    ``[Perspective-May-Restructure]`` in the package. A reinsured
+    ``Aggregate`` prices every view of its cession, a ``Portfolio`` prices
+    every unit against the book priced whole, and an ``Aggregate`` with
+    neither has one part, which is the whole, so its stand-alone story is the
+    single calibration row.
 
     On the reinsured Aggregate this is also the first exhibit where RAW
     carries strictly **more** rows than INSURER: RAW serves every view the
     object can price, including ``ceded``, and INSURER drops the ceded rows
     because a ceded price is the seller's reading and this perspective is the
     buyer's (``[Difference-Is-A-Perspective]``).
+
+    Parameters
+    ----------
+    obj : CalibrationResult
+    perspective : Perspective or str, default Perspective.RAW
+
+    Returns
+    -------
+    Exhibit
+    """)
+
+pricing_allocate = _make_exhibit_function(
+    'pricing.allocate', 'Allocated pricing',
+    """One calibrated premium split across the parts, adding up. Also on
+    :class:`~aggregate.results.CalibrationResult`.
+
+    The additive decomposition, whatever the parts are: the units of a book,
+    or the two halves of an occurrence program. Available only where there is
+    something to split it over, which is why this exhibit carries a predicate
+    while its stand-alone sibling does not
+    (:func:`_perspectives_allocation`).
+
+    Not to be read as a comparison of prices. Every row here is a share of one
+    number, so the rows foot; the stand-alone leaf's rows are separate prices
+    and do not.
 
     Parameters
     ----------
@@ -847,7 +907,10 @@ EXHIBITS = {
     # Keyed on result objects, not on a built object: a successful call is
     # what produces one, so there is no partially available state to gate on.
     'pricing.calibrate': (pricing_calibrate, _perspectives_always),
-    'pricing.allocate': (pricing_allocate, _perspectives_always),
+    'pricing.stand_alone': (pricing_stand_alone, _perspectives_always),
+    # the one pricing leaf with a structural gate: not every calibration has
+    # parts to split its target across
+    'pricing.allocate': (pricing_allocate, _perspectives_allocation),
     'pricing.evaluate': (pricing_evaluate, _perspectives_always),
 }
 

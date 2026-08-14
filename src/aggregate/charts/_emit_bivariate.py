@@ -36,6 +36,7 @@ Pure numpy; no matplotlib (the plots boundary), no ECharts vocabulary.
 
 import numpy as np
 
+from .._aggregate import Aggregate
 from .._grid_distribution import GridDistribution
 from ..bivariate import BivariateAggregate
 from . import register_chart, _emitter_base
@@ -619,11 +620,39 @@ def _kappa_band(bv, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
     ))
 
 
-register_chart(
-    'kappa', chart_kappa,
-    # Accepts a massive joint, unlike joint_surface: the band is a row-wise
-    # fold and surviving the disk route is the point of it.
-    predicate=lambda bv: (getattr(bv, 'mode', None) == 'netceded'
-                          and 'gross' in getattr(bv, '_views', ())
-                          and (bv.density is not None
-                               or getattr(bv, '_massive', None) is not None)))
+@chart_kappa.register(Aggregate)
+def _kappa_from_aggregate(agg, **options):
+    """The band chart for an occurrence program, off the joint it implies.
+
+    A thin delegate. The curves are a property of the cession rather than of a
+    calibration, so this is a chart on the built object and not a fourth
+    pricing call; what it needs is the joint, and
+    :meth:`~aggregate.distributions.Aggregate.occ_joint` holds one, so drawing
+    after an allocation costs a lookup rather than a second 2-D FFT.
+    """
+    return _kappa_band(agg.occ_joint(views=('gross', 'ceded')), **options)
+
+
+def _kappa_available(obj):
+    """Availability for the three sources the ``kappa`` name serves.
+
+    Duck-typed rather than by ``isinstance``, so this module stays free of an
+    import of every class the chart draws for, and the type dispatch on the
+    emitter is what actually decides which of the three a caller reaches.
+
+    Order matters only in that each test is asked of the shape that can answer
+    it: a book has units, a joint has a mode, and an aggregate has a program.
+    """
+    if getattr(obj, 'agg_list', None) is not None:
+        return getattr(obj, 'density_df', None) is not None
+    if getattr(obj, 'mode', None) == 'netceded':
+        # accepts a massive joint, unlike joint_surface: the band is a
+        # row-wise fold and surviving the disk route is the point of it
+        return ('gross' in getattr(obj, '_views', ())
+                and (obj.density is not None
+                     or getattr(obj, '_massive', None) is not None))
+    return (getattr(obj, 'occ_reins', None) is not None
+            and getattr(obj, 'agg_density', None) is not None)
+
+
+register_chart('kappa', chart_kappa, predicate=_kappa_available)

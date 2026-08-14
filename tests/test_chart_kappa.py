@@ -271,3 +271,95 @@ def test_a_disk_backed_joint_is_accepted(tmp_path):
     in_core = build_chart_doc(agg.occ_bivariate(views=('gross', 'ceded')),
                               'kappa')
     assert [s.name for s in on_disk.series] == [s.name for s in in_core.series]
+
+
+# --- the other two surfaces ([Kappa-Chart-Surfaces], 1.0.0a285) -------------
+
+PORT = ('port CK.P agg A 50 claims sev lognorm 50 cv 1.5 poisson '
+        'agg B 30 claims sev lognorm 40 cv 1.2 poisson')
+
+
+@pytest.fixture(scope='module')
+def port():
+    return build(PORT)
+
+
+def test_one_name_across_three_sources(port, joint):
+    """The question is the same one: what does each part contribute, given the
+    whole. Three shapes answer it, so one name serves them."""
+    assert 'kappa' in available_charts(port)
+    assert 'kappa' in available_charts(joint)
+    assert 'kappa' in available_charts(build(LAYER))
+
+
+def test_a_plain_aggregate_has_no_parts_to_condition_on():
+    """No cession, no split, nothing to draw."""
+    plain = build('agg CK.Plain 10 claims sev lognorm 50 cv 1.5 poisson')
+    assert 'kappa' not in available_charts(plain)
+
+
+def test_the_book_panel_is_the_overview_panel_served_alone(port):
+    """Built by the same function, so the two documents cannot drift."""
+    alone = build_chart_doc(port, 'kappa')
+    overview = build_chart_doc(port, 'port')
+    assert [p.id for p in alone.panels] == ['kappa']
+    assert alone.panels[0].aspect == 'equal'
+    mine = [s for s in alone.series if s.panel_id == 'kappa']
+    theirs = [s for s in overview.series if s.panel_id == 'kappa']
+    assert [s.name for s in mine] == [s.name for s in theirs]
+    for a, b in zip(mine, theirs):
+        assert a.y_values == b.y_values
+        assert a.x_lattice == b.x_lattice
+        assert a.role == b.role
+
+
+def test_the_book_panel_carries_no_band(port):
+    """Unit kappas come off the independence trick, not off a stored joint.
+
+    A conditional band there would be new machinery with no session behind
+    it, so the honest picture is the mean curves.
+    """
+    doc = build_chart_doc(port, 'kappa')
+    assert not [s for s in doc.series if s.y2 is not None]
+
+
+def test_the_book_curves_sum_to_the_diagonal(port):
+    """The identity the panel is read against.
+
+    To kappa's own error rather than to the bit: the curves must sum to the
+    total by construction, so the residual of that identity **is** the error,
+    and the floor the panel drops points at is set from it (parts per
+    thousand at the floor, parts per hundred past it).
+    """
+    doc = build_chart_doc(port, 'kappa')
+    units = [np.asarray(s.y_values, dtype=float)
+             for s in doc.series if s.role == 'unit']
+    total = np.asarray(
+        next(s for s in doc.series if s.role == 'total').y_values, dtype=float)
+    residual = np.abs(sum(units) - total) / np.where(total > 0, total, np.nan)
+    assert np.nanmax(residual) < 1e-3
+
+
+def test_the_book_keeps_its_own_primary_picture(port):
+    """Kappa is a reading of a book, not the book's own picture."""
+    from aggregate.charts import primary_chart
+
+    assert primary_chart(port) == 'port'
+
+
+def test_the_aggregate_delegate_draws_the_band(joint):
+    """An occurrence program answers off the joint it implies."""
+    agg = build(LAYER)
+    direct = build_chart_doc(joint, 'kappa')
+    delegated = build_chart_doc(agg, 'kappa')
+    assert [s.name for s in delegated.series] == [s.name for s in direct.series]
+    assert delegated.hash == direct.hash
+
+
+def test_the_delegate_reads_the_held_joint(joint):
+    """Decision 6 end to end: drawing after an allocation costs a lookup."""
+    agg = build(LAYER)
+    build_chart_doc(agg, 'kappa')
+    first = agg.occ_joint(views=('gross', 'ceded'))
+    build_chart_doc(agg, 'kappa')
+    assert agg.occ_joint(views=('gross', 'ceded')) is first

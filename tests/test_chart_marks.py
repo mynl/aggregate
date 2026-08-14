@@ -20,7 +20,9 @@ import pytest
 matplotlib.use('Agg')
 
 from aggregate import build  # noqa: E402
-from aggregate.charts import available_charts, build_chart_doc  # noqa: E402
+from aggregate.charts import (  # noqa: E402
+    available_charts, build_chart_doc, primary_chart,
+)
 
 #: Every drawable kind that carries marks at all, one program each.
 _PROGRAMS = [
@@ -46,8 +48,13 @@ def test_no_emitter_marks_a_percentile(obj):
 
 
 def test_the_mean_is_marked_once_where_it_is_drawn(obj):
-    """The subtraction left the mean alone: exactly one, on the mass panel."""
-    doc = build_chart_doc(obj, available_charts(obj)[0])
+    """The subtraction left the mean alone: exactly one, on the mass panel.
+
+    Asked of the object's **own** picture, which is what ``primary_chart``
+    answers. Reading the first available chart instead was the same thing
+    until a book gained a second one at a285, and then it was not.
+    """
+    doc = build_chart_doc(obj, primary_chart(obj))
     means = [m for m in doc.marks if m.role == 'mean']
     assert [(m.panel_id, m.orient, m.faint) for m in means] == [
         ('density', 'v', False)]

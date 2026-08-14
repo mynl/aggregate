@@ -136,7 +136,8 @@ def test_tex_is_total(port):
 
 
 def test_capability(port):
-    assert available_charts(port) == ['port']
+    # kappa joined at a285: the overview's right hand panel, served alone
+    assert available_charts(port) == ['kappa', 'port']
     assert primary_chart(port) == 'port'
 
 

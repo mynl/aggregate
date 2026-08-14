@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a285
+
+**[Kappa-Chart-Surfaces] one chart name, three sources.** `kappa` now draws for a `Portfolio` and for an `Aggregate` carrying an occurrence program, alongside the `BivariateAggregate` it launched on. The question is the same one in all three cases, what each part contributes given the whole, so it is one name.
+
+**On a `Portfolio`**: the kappa panel the `port` overview already draws on its right hand side, served alone, in an equal-aspect single-panel document. The panel builder is **extracted and shared** rather than duplicated, so the two documents cannot drift; `chart_port` is otherwise unchanged. No band here, unlike the occurrence version: a book's unit kappas come off the independence trick in `density_df` rather than off a stored joint, so a conditional band would be new machinery with no session behind it, and the honest picture is the mean curves.
+
+**On an `Aggregate`**: a thin delegate that reads `occ_joint` and emits the band chart. The curves are a property of the cession rather than of a calibration, which is why this is a chart on the built object and not a fourth pricing call; and because the joint is held, drawing after an allocation costs a lookup rather than a second 2-D FFT.
+
+The predicate is duck-typed over the three shapes (a book has units, a joint has a mode, an aggregate has a program), so the chart module needs no import of every class it draws for.
+
+**One consequence worth stating**: `available_charts` on a `Portfolio` now returns two names rather than one, `['kappa', 'port']` in registration order. `primary_chart` still answers `'port'`, which is the function that exists to say which one to draw when nothing else was asked for, and a caller reading the first available chart as "the object's own picture" should read that instead.
+
 ## 1.0.0a284
 
 **[Natural-Allocation-Exhibit] the occurrence branch of `pricing.allocate`.** `pricing.allocate` on a gross-calibrated `Aggregate` calibration serves `natural_allocation_df`: gross, ceded and net for every family, footing exactly, gross constant at the calibrated premium. The predicate widens to match, so `available_exhibits` on a gross-calibrated occurrence result now lists `pricing.calibrate`, `pricing.stand_alone` and `pricing.allocate`, and a **net**-calibrated one still lists the first two only.

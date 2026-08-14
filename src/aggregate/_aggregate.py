@@ -1541,7 +1541,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return self.figure
 
     def occ_bivariate(self, views=('net', 'ceded'), bs=None,
-                      log2_x=None, log2_y=None):
+                      log2_x=None, log2_y=None, total_log2=None,
+                      store_dir=None, row_chunk=512, col_chunk=512,
+                      keep_transform=False):
         """Joint law of two of the occurrence {gross, ceded, net} aggregates via 2D FFT.
 
         Computes the *joint* distribution of two aggregate occurrence views --
@@ -1563,13 +1565,33 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             ``('gross', 'ceded')`` matches ``grossceded`` and ``('gross', 'net')``
             matches ``grossnet``.
         bs : float, optional
-            Bucket-size override (a single common ``bs`` for both axes). Default:
-            one common ``bs`` sized from the budget (coarser than the gross
-            bucket -- the gross grid is far finer than a 2-D grid affords).
+            Bucket-size override (a single common ``bs`` for both axes).
+            Default: the **exact common lattice** when the budget affords it,
+            so every per-claim point of the comonotone curve is a cell center
+            and the scatter never fires; otherwise one common ``bs`` sized from
+            the budget (coarser than the gross bucket, since the gross grid is
+            far finer than a 2-D grid affords). Which one was taken reads off
+            :attr:`~aggregate.bivariate.BivariateAggregate.bs_explanation`.
         log2_x, log2_y : int, optional
             Axis-0 / axis-1 log2 grid lengths (grid has ``1 << log2`` points).
             Default: measured from the two views' occurrence aggregate margins
-            via :func:`~aggregate.utilities.balanced_window`.
+            via :func:`~aggregate.utilities.balanced_window`, each axis
+            independently, since the two windows of a cession are structurally
+            asymmetric (ceded is capped by the cover, gross is not).
+        total_log2 : int, optional
+            Total 2-D cell budget, ``2**total_log2`` cells. ``None`` uses the
+            :attr:`BivariateSettings.total_log2` default (20). Raise it for a
+            fine joint, and pair it with ``store_dir`` past the point where the
+            joint fits in memory: the two are coupled, since without the first
+            no grid is large enough to want the second.
+        store_dir : str, optional
+            Backing directory for a **massive (disk-backed) build**: the joint
+            streams to ``density.zarr`` there and never materializes in RAM.
+            Requires the ``massive`` extra.
+        row_chunk, col_chunk : int, optional
+            Massive-path band and tile sizes (ignored in core).
+        keep_transform : bool, optional
+            Massive path: keep the staging stores after the build.
 
         Returns
         -------
@@ -1584,8 +1606,13 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         Raises
         ------
         ValueError
-            If the object carries no occurrence reinsurance, or has not been
-            updated (no severity densities present).
+            If the object carries no occurrence reinsurance, has not been
+            updated (no severity densities present), or carries a pinned grid
+            that cannot be honored inside ``total_log2``. A pinned pair that
+            overflows used to clip the wider axis, which is not a tail loss:
+            ``occ_bivariate(views=('gross', 'ceded'), bs=0.5)`` on an
+            unbounded severity clipped the gross axis to 512 buckets and
+            answered off a joint with a deficit of 0.535.
 
         Notes
         -----
@@ -1614,10 +1641,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         mv = BivariateAggregate(
             self.name, mode='netceded', nc_agg=self, nc_views=views,
-            nc_kwargs=dict(bs=bs, log2_x=log2_x, log2_y=log2_y))
+            nc_kwargs=dict(bs=bs, log2_x=log2_x, log2_y=log2_y,
+                           total_log2=total_log2))
         # build eagerly so preconditions (occ reins present, object updated)
         # raise here, and the returned object is ready to query.
-        mv.update()
+        mv.update(store_dir=store_dir, row_chunk=row_chunk,
+                  col_chunk=col_chunk, keep_transform=keep_transform)
         return mv
 
     # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------

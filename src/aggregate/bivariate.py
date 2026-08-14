@@ -875,18 +875,20 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
         0 is ``views[0]`` and axis 1 is ``views[1]``.
     bs : float, optional
         Bucket-size override (a single common ``bs`` for both axes). Default
-        (``None``) sizes **one common ``bs`` from the budget** -- the comonotone
-        curve is sampled at the gross grid and the linear scatter rebuckets it
-        onto the common grid, so the ``bs`` is chosen to fit ``2**total_log2``
-        (``~ sqrt(hi0*hi1)/2**(total_log2/2)``), *not* pinned to the (often far
-        finer) gross ``bs`` (§5.2).
+        (``None``) takes the **exact common lattice** when the budget affords
+        it (:func:`_netceded_exact_bs`, so the comonotone scatter never fires
+        and the kappa curve is exact), and otherwise sizes one common ``bs``
+        from the budget (``~ sqrt(hi0*hi1)/2**(total_log2/2)``), which is
+        coarser than the gross ``bs`` and reports the loss of exactness
+        through :attr:`BivariateAggregate.bs_explanation`.
     log2_x, log2_y : int, optional
         Axis-0 / axis-1 log2 grid-length overrides; measured from the realized
         occ margins of the two views via :func:`balanced_window` if omitted.
     total_log2 : int, optional
-        Total 2-D cell budget. The common ``bs`` is coarsened until the two
-        windows fit; if a caller pins ``bs``/``log2`` and they still overflow,
-        the wider axis is **clipped** (a reported deficit). ``None`` uses the
+        Total 2-D cell budget. With nothing pinned the common ``bs`` is
+        coarsened until the two windows fit; a pinned ``bs`` / ``log2`` pair
+        that still overflows **raises**, since clipping an axis to fit drops
+        most of the joint rather than a tail. ``None`` uses the
         :attr:`BivariateSettings.total_log2` default.
 
     Returns
@@ -901,14 +903,17 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
         The bivariate per-claim severity ``S`` (the comonotone scatter).
     deficit : float
         Tail mass lost beyond the grid.
-    clipped : bool
-        ``True`` if the pinned-``bs`` windows exceeded the budget and an axis was
-        clipped.
+    sizing : NetcededSizing
+        The realized grid decision: the common ``bs``, the two axis lengths,
+        the exact lattice that was available and whether it was taken. Carried
+        the last slot of the tuple, where ``clipped`` sat until 1.0.0a277; a
+        netceded joint no longer clips, it raises.
 
     Raises
     ------
     ValueError
-        If ``agg`` carries no occurrence reinsurance, or has not been updated.
+        If ``agg`` carries no occurrence reinsurance, has not been updated, or
+        carries a pinned grid that cannot be honored inside the budget.
 
     Notes
     -----
@@ -918,15 +923,16 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
     """
     import scipy.fft as _sfft
 
-    x0, x1, mass, bs, n0, n1, clipped = _netceded_sizing(
+    sizing = _netceded_sizing(
         agg, views, bs=bs, log2_x=log2_x, log2_y=log2_y,
         total_log2=total_log2)
-    bs_x = bs_y = bs
+    bs_x = bs_y = sizing.bs
+    n0, n1 = sizing.n0, sizing.n1
     grid_x = bs_x * np.arange(n0)
     grid_y = bs_y * np.arange(n1)
 
-    sev2 = scatter_bivariate(x0, x1, mass, bs_x, bs_y, n0, n1,
-                             scheme=agg.reins_bucket)
+    sev2 = scatter_bivariate(sizing.x0, sizing.x1, sizing.mass,
+                             bs_x, bs_y, n0, n1, scheme=agg.reins_bucket)
 
     if agg.n == 0:
         density = np.zeros((n0, n1))
@@ -943,7 +949,100 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
 
     _clip_density_fuzz(density, f'netceded joint {agg.name!r}')
     deficit = float(1.0 - density.sum())
-    return density, grid_x, grid_y, bs_x, bs_y, sev2, deficit, clipped
+    return density, grid_x, grid_y, bs_x, bs_y, sev2, deficit, sizing
+
+
+class NetcededSizing(NamedTuple):
+    """The realized netceded grid decision, and the severity inputs on it.
+
+    Attributes
+    ----------
+    x0, x1 : ndarray
+        The two views' image points sampled on the gross grid.
+    mass : ndarray
+        Gross severity mass aligned with ``x0`` / ``x1``.
+    bs : float
+        The common per-axis bucket size actually used.
+    n0, n1 : int
+        Axis grid lengths.
+    bs_exact : float or None
+        The largest bucket size placing the gross grid and both view images on
+        one lattice, or ``None`` when no affordable one exists (a share
+        cession's images generally sit at no usable common lattice at all).
+    exact : bool
+        Whether :attr:`bs` **is** that lattice, so the comonotone scatter never
+        splits a per-claim point and the kappa curve is exact rather than
+        accurate to the smear.
+    """
+
+    x0: object
+    x1: object
+    mass: object
+    bs: float
+    n0: int
+    n1: int
+    bs_exact: float
+    exact: bool
+
+
+def _netceded_axis_log2(hi, bs):
+    """Axis log2 covering a window of width ``hi`` at bucket size ``bs``."""
+    return max(int(np.ceil(np.log2(hi / bs + 1.0))), _MIN_AXIS_LOG2)
+
+
+def _netceded_exact_bs(x0, x1, gross_bs, hi0, hi1, total_log2):
+    """The exact common lattice for a netceded joint, or ``None`` if unaffordable.
+
+    The largest bucket size placing every sampled view image, and the gross
+    grid itself, on one lattice: the gcd of the atoms, which is what
+    :func:`_lattice_bs` computes for discrete mode and what this reuses rather
+    than reimplements.
+
+    Parameters
+    ----------
+    x0, x1 : ndarray
+        The two views' image points.
+    gross_bs : float
+        The source aggregate's own bucket size, folded in so the gross axis
+        lands on the lattice as well as the images do.
+    hi0, hi1 : float
+        The two measured window widths, used only for the affordability test.
+    total_log2 : int
+        The 2-D cell budget.
+
+    Returns
+    -------
+    float or None
+        The exact lattice, or ``None`` when the grid it implies does not fit
+        the budget.
+
+    Notes
+    -----
+    Exactness is a property of excess of loss layers on an aligned lattice,
+    not a general one: a **share** cession multiplies by a non-integer factor,
+    and its images typically share no usable lattice at any bucket size a grid
+    could carry. So the rule is prefer the exact lattice when it is affordable,
+    report when it is not, never pretend.
+
+    The fold runs over the sorted unique atoms and exits as soon as the running
+    gcd is too fine to fit, which is the common case and makes the test cheap:
+    a gcd only decreases, so once the budget is blown it stays blown, and the
+    exact value of an unaffordable lattice is of no interest.
+    """
+    atoms = np.unique(np.abs(np.concatenate(
+        [np.asarray(x0, dtype=float).ravel(),
+         np.asarray(x1, dtype=float).ravel(),
+         np.array([float(gross_bs)])])))
+    atoms = atoms[atoms > 0]
+    if len(atoms) == 0:
+        return None
+    g = float(atoms[0])
+    for v in atoms[1:]:
+        g = _float_gcd(g, float(v))
+        if (_netceded_axis_log2(hi0, g)
+                + _netceded_axis_log2(hi1, g)) > total_log2:
+            return None
+    return g
 
 
 def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
@@ -960,16 +1059,18 @@ def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
 
     Returns
     -------
-    x0, x1 : ndarray
-        The two views' image points sampled on the gross grid.
-    mass : ndarray
-        Gross severity mass aligned with ``x0`` / ``x1``.
-    bs : float
-        The common per-axis bucket size.
-    n0, n1 : int
-        Axis grid lengths.
-    clipped : bool
-        ``True`` if a pinned ``bs`` forced a window clip (warned).
+    NetcededSizing
+
+    Raises
+    ------
+    ValueError
+        When a caller-pinned ``bs`` / ``log2_x`` / ``log2_y`` cannot be honored
+        inside ``total_log2``. Clipping an axis to fit was the behavior until
+        1.0.0a277 and it is not a tail loss: with both axes pinned equal and
+        over budget the rule cut axis 0 to :data:`_MIN_AXIS_LOG2`, 16 buckets,
+        and the object then answered questions off a joint carrying half its
+        mass. The caller has stated numbers that cannot all be honored, so this
+        says which and stops.
     """
     if agg.occ_reins is None:
         raise ValueError(
@@ -995,48 +1096,72 @@ def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
     hi0 = _netceded_window_hi(rd[_VIEW_AGG_COL[views[0]]].to_numpy(), agg.xs, prob)
     hi1 = _netceded_window_hi(rd[_VIEW_AGG_COL[views[1]]].to_numpy(), agg.xs, prob)
 
-    def _cov(hi, bs):
-        return max(int(np.ceil(np.log2(hi / bs + 1.0))), _MIN_AXIS_LOG2)
+    # The images do not depend on the grid, so they are sampled before it is
+    # chosen: the exact lattice is measured off them.
+    x0 = np.asarray(_view_image_fn(agg, views[0])(agg.xs), dtype=float)
+    x1 = np.asarray(_view_image_fn(agg, views[1])(agg.xs), dtype=float)
+    mass = np.asarray(agg.sev_density_gross, dtype=float)
 
-    pinned = bool(bs or (log2_x and log2_y))
+    bs_pinned = bool(bs)
+    bs_exact = _netceded_exact_bs(x0, x1, agg.bs, hi0, hi1, total_log2)
+    exact = False
     if bs:
         bs = float(bs)
+        exact = bs_exact is not None and abs(bs - bs_exact) <= 1e-12 * bs
+    elif bs_exact is not None:
+        # Nothing is lost at this bucket size and the budget can pay for it:
+        # every per-claim point is a cell center, the bilinear scatter never
+        # fires, and the kappa curve is exact rather than accurate to the smear.
+        bs, exact = bs_exact, True
     else:
         # finest common bs that fits 2**total_log2: n0*n1 ~ (hi0*hi1)/bs**2,
         # so bs ~ sqrt(hi0*hi1) / 2**(total_log2/2). round_bucket up, then fit.
         floor_bs = max((hi0 * hi1) ** 0.5 / (2.0 ** (0.5 * total_log2)), 1e-12)
         bs = float(round_bucket(floor_bs))
-    log2_0 = int(log2_x) if log2_x else _cov(hi0, bs)
-    log2_1 = int(log2_y) if log2_y else _cov(hi1, bs)
-    if not pinned:
+    log2_0 = (int(log2_x) if log2_x
+              else _netceded_axis_log2(hi0, bs))
+    log2_1 = (int(log2_y) if log2_y
+              else _netceded_axis_log2(hi1, bs))
+    if not (bs_pinned or (log2_x and log2_y)):
         guard = 0
         while log2_0 + log2_1 > total_log2 and guard < 8:
             bs = float(round_bucket(bs * 2))
-            log2_0, log2_1 = _cov(hi0, bs), _cov(hi1, bs)
+            exact = False
+            log2_0 = int(log2_x) if log2_x else _netceded_axis_log2(hi0, bs)
+            log2_1 = int(log2_y) if log2_y else _netceded_axis_log2(hi1, bs)
             guard += 1
-    clipped = log2_0 + log2_1 > total_log2
-    if clipped:
-        # bs pinned by the caller and still over budget -> clip the wider axis.
-        if log2_0 >= log2_1:
-            log2_0 = max(total_log2 - log2_1, _MIN_AXIS_LOG2)
-        else:
-            log2_1 = max(total_log2 - log2_0, _MIN_AXIS_LOG2)
-        # A budget test, not a deficit test, so the trigger is unchanged; it
-        # goes through warn_once for cadence only.
-        warn_once(
-            f'{agg.name}: netceded ({views[0]}, {views[1]}) windows need more '
-            f'than the budget 2**{total_log2} at the pinned bs={bs:g}; the wider '
-            f'axis is clipped (a tail deficit). Raise update(log2=...) or relax '
-            f'the bs pin.',
-            DefectiveDistributionWarning,
-            key='defective-construction', stacklevel=3)
+    if log2_0 + log2_1 > total_log2:
+        pins = ', '.join(
+            f'{k}={v:g}' for k, v in
+            (('bs', bs if bs_pinned else None), ('log2_x', log2_x),
+             ('log2_y', log2_y)) if v)
+        raise ValueError(
+            f'{agg.name}: the netceded ({views[0]}, {views[1]}) windows need '
+            f'2**{log2_0 + log2_1} cells at bs={bs:g} (axis 0 log2 {log2_0}, '
+            f'axis 1 log2 {log2_1}), over the budget 2**{total_log2}, and the '
+            f'pinned {pins} leaves nothing to coarsen. Clipping an axis to fit '
+            f'drops most of the joint rather than a tail, so this refuses '
+            f'rather than answering off it: pass '
+            f'total_log2={log2_0 + log2_1} (with store_dir= at that size), or '
+            f'relax the pin.')
     n0 = 1 << log2_0
     n1 = 1 << log2_1
+    return NetcededSizing(x0=x0, x1=x1, mass=mass, bs=bs, n0=n0, n1=n1,
+                          bs_exact=bs_exact, exact=exact)
 
-    x0 = np.asarray(_view_image_fn(agg, views[0])(agg.xs), dtype=float)
-    x1 = np.asarray(_view_image_fn(agg, views[1])(agg.xs), dtype=float)
-    mass = np.asarray(agg.sev_density_gross, dtype=float)
-    return x0, x1, mass, bs, n0, n1, clipped
+
+def _float_gcd(a, b):
+    """Greatest common divisor of two positive floats, by float Euclid.
+
+    Stops when the remainder is rounding noise relative to the larger of the
+    pair and 1, which is what makes it usable on measured lattice values rather
+    than on integers. Shared by :func:`_lattice_bs` (discrete mode) and
+    :func:`_netceded_exact_bs` (the netceded exact lattice), which want the
+    same quantity and should not each carry a copy of the loop.
+    """
+    while b > 1e-9 * max(a, 1.0):
+        a, b = b, a - np.floor(a / b) * b
+    return a
 
 
 def _lattice_bs(xs):
@@ -1063,16 +1188,9 @@ def _lattice_bs(xs):
     vals = vals[vals > 0]
     if len(vals) == 0:
         return 1.0
-
-    def _fgcd(a, b):
-        # float Euclid: stop when the remainder is rounding noise relative to a.
-        while b > 1e-9 * max(a, 1.0):
-            a, b = b, a - np.floor(a / b) * b
-        return a
-
     g = vals[0]
     for v in vals[1:]:
-        g = _fgcd(g, v)
+        g = _float_gcd(g, v)
     return float(g)
 
 
@@ -1269,7 +1387,10 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self._views = tuple(nc_views) if nc_views else ('net', 'ceded')
         self.unit_names = [v.capitalize() for v in self._views]
         self._affine = [(False, 0.0), (False, 0.0)]
-        self._nc_kwargs = dict(nc_kwargs or {})
+        self._nc_kwargs = {k: v for k, v in (nc_kwargs or {}).items()
+                           if v is not None}
+        #: The realized grid decision, set by the update (:class:`NetcededSizing`).
+        self._nc_sizing = None
         if nc_agg is not None:
             self._nc_agg = nc_agg
             self._nc_built_here = False
@@ -1676,7 +1797,11 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         :meth:`aggregate.distributions.Aggregate._fft_aggregate` uses, so its
         negative tail no longer wraps. In ``netceded`` mode the joint is built
         from the single reinsured aggregate's comonotone scatter
-        (:func:`build_netceded_joint`) instead.
+        (:func:`build_netceded_joint`) instead, and ``log2`` / ``bs`` size
+        whichever grid this object owns: the inner aggregate's on the DecL
+        prefix route, the joint's on the
+        :meth:`aggregate.distributions.Aggregate.occ_bivariate` route (see
+        :meth:`_netceded_sizing_kwargs`).
         """
         # massive default padding 0 (measured window + deficit guard);
         # in-core default 1, both overridable.
@@ -1751,6 +1876,46 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self.update_work()
         return self
 
+    def _netceded_sizing_kwargs(self, log2, bs):
+        """Joint sizing keywords for this update, ``_nc_kwargs`` under overrides.
+
+        ``log2`` and ``bs`` mean different things on the two netceded routes,
+        and the difference is which grid the caller owns.
+
+        On the DecL prefix route (``netceded agg ...``) this object built the
+        inner aggregate, so ``build(..., log2=16, bs=1)`` is sizing **that**
+        aggregate's 1-D grid, as it does for every other DecL form; the joint
+        is sized from the constructor's ``nc_kwargs``. On the
+        :meth:`aggregate.distributions.Aggregate.occ_bivariate` route the inner
+        aggregate arrives already updated and its grid is not this object's to
+        change, so the same two keywords size the **joint**: a scalar ``log2``
+        is the 2-D cell budget, a ``(log2_x, log2_y)`` pair pins the axes, and
+        ``bs`` is the common bucket size.
+
+        That second reading is what makes ``update(log2=...)`` on a netceded
+        joint do something. It was a no-op through 1.0.0a276 (``_nc_kwargs``
+        was read whatever the caller passed), while the over-budget warning
+        recommended it by name.
+        """
+        kw = dict(self._nc_kwargs)
+        if self._nc_built_here:
+            return kw
+        if isinstance(log2, (tuple, list)):
+            if len(log2) != 2:
+                raise ValueError(
+                    f'a netceded log2 pair is (log2_x, log2_y); got {log2!r}.')
+            kw['log2_x'] = int(log2[0]) or None
+            kw['log2_y'] = int(log2[1]) or None
+        elif log2:
+            kw['total_log2'] = int(log2)
+        if bs:
+            if isinstance(bs, (tuple, list)):
+                raise ValueError(
+                    'a netceded joint carries one common bs on both axes '
+                    f'(the comonotone curve couples them); got {bs!r}.')
+            kw['bs'] = float(bs)
+        return kw
+
     def _update_netceded(self, log2=0, bs=0, store_dir=None,
                          row_chunk=512, col_chunk=512, keep_transform=False):
         """Build the joint (ceded, net) density of the single reinsured agg.
@@ -1763,6 +1928,9 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ``store_dir`` the comonotone scatter goes to a scipy.sparse matrix and
         the compound streams through the out-of-core kernel instead
         (``dev/plan-bv.md`` §4.4) -- the joint never materialises in RAM.
+
+        ``log2`` and ``bs`` size the inner aggregate or the joint according to
+        which route built this object; see :meth:`_netceded_sizing_kwargs`.
         """
         a = self._nc_agg
         if self._nc_built_here and a.sev_density_gross is None:
@@ -1772,12 +1940,17 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             if bs:
                 kw['bs'] = bs
             a.update(**kw)
+        nc = self._netceded_sizing_kwargs(log2, bs)
+        # a netceded joint refuses an unhonorable pin rather than clipping one
+        self._clipped = False
         if store_dir is not None:
             from ._aggregate_compute_massive import (
                 massive_bivariate_convolution, PyramidBuilder)
-            x0, x1, mass, bs_c, n0, n1, clipped = _netceded_sizing(
-                a, self._views, **self._nc_kwargs)
-            sev2 = scatter_bivariate_sparse(x0, x1, mass, bs_c, bs_c, n0, n1,
+            sizing = _netceded_sizing(a, self._views, **nc)
+            self._nc_sizing = sizing
+            bs_c, n0, n1 = sizing.bs, sizing.n0, sizing.n1
+            sev2 = scatter_bivariate_sparse(sizing.x0, sizing.x1, sizing.mass,
+                                            bs_c, bs_c, n0, n1,
                                             scheme=a.reins_bucket)
             gx = bs_c * np.arange(n0)
             gy = bs_c * np.arange(n1)
@@ -1799,19 +1972,18 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             self._S = sev2
             self._sev_xs = [gx, gy]   # severity panel = comonotone view scatter
             self.deficit = float(res.deficit)
-            self._clipped = clipped
             self._marg_theory = self._netceded_theory(a, self._views)
             self._finish_massive(res)
             return self
-        density, gx, gy, bs_x, bs_y, sev2, deficit, clipped = build_netceded_joint(
-            a, views=self._views, **self._nc_kwargs)
+        density, gx, gy, bs_x, bs_y, sev2, deficit, sizing = build_netceded_joint(
+            a, views=self._views, **nc)
         self.density = density
         self.axis_xs = [gx, gy]
         self.bs = [bs_x, bs_y]
         self._S = sev2
         self._sev_xs = [gx, gy]   # severity panel = comonotone view scatter
         self.deficit = deficit
-        self._clipped = clipped
+        self._nc_sizing = sizing
         self._marg_theory = self._netceded_theory(a, self._views)
         return self
 
@@ -2909,6 +3081,32 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
                        f'{self._bs_str(i)}, log2 = {log2}, window '
                        f'[{float(xs[0]):,.6g}, {float(xs[-1]):,.6g}].')
         out.append(f'The joint grid is {cells:,d} cells.')
+        sizing = getattr(self, '_nc_sizing', None)
+        if sizing is not None:
+            # Whether the comonotone curve lands on the lattice is the one
+            # thing a netceded reader cannot see from the numbers above, and it
+            # is what separates an exact kappa curve from an accurate one.
+            if sizing.exact:
+                out.append(
+                    'Every per-claim view image is a grid point at this '
+                    'bucket size, so the comonotone scatter never splits and '
+                    'the conditional (kappa) curve is exact.')
+            elif sizing.bs_exact is None:
+                out.append(
+                    'No common lattice for the view images fits the budget, '
+                    'so the scatter splits each per-claim point and the '
+                    'conditional (kappa) curve is accurate to that smear '
+                    'rather than exact. Both marginal means are preserved '
+                    'either way. Raise total_log2 to buy exactness, or accept '
+                    'that a share cession usually has no usable lattice at '
+                    'any size.')
+            else:
+                out.append(
+                    f'The budget affords the exact lattice, bs = '
+                    f'{sizing.bs_exact:g}, and the pinned bs = {sizing.bs:g} '
+                    f'is not it, so the scatter splits each per-claim point '
+                    f'and the conditional (kappa) curve is accurate to that '
+                    f'smear rather than exact.')
         if getattr(self, '_clipped', False):
             out.append('The window was clipped to stay inside the memory '
                        'budget -- pass a larger budget or an explicit per-axis '

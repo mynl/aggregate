@@ -287,12 +287,22 @@ def test_netceded_marginals_match_occ_views():
         rs.loc[('agg', 'mean'), ('occ', 'Ceded')], rel=2e-3)
 
 
-def test_netceded_clip_warns_when_pinned_over_budget():
-    """Pinning bs/log2 past the budget clips the wider axis and warns."""
+def test_netceded_refuses_a_pin_it_cannot_honor():
+    """Pinning bs/log2 past the budget raises rather than clipping an axis.
+
+    It warned and clipped the wider axis through 1.0.0a276, which is not a
+    tail loss: with both axes pinned equal the rule cut axis 0 to the 16 bucket
+    floor and the object then answered questions off a joint carrying half its
+    mass ([Budget-Clip-Destroys-Axis]). The caller stated numbers that cannot
+    all be honored, so the sizing says which and stops.
+    """
     a = _build(OCC)
-    with pytest.warns(DefectiveDistributionWarning, match='clipped'):
-        b = a.occ_bivariate(bs=a.bs, log2_x=14, log2_y=14)   # 14+14 > budget 20
-    assert b._clipped
+    with pytest.raises(ValueError, match='over the budget'):
+        a.occ_bivariate(bs=a.bs, log2_x=14, log2_y=14)      # 14+14 > budget 20
+    # and the escape it names works
+    b = a.occ_bivariate(bs=a.bs, log2_x=14, log2_y=14, total_log2=28)
+    assert not b._clipped
+    assert [len(x) for x in b.axis_xs] == [1 << 14, 1 << 14]
 
 
 # ----------------------------------------------------------------------------

@@ -342,6 +342,39 @@ class CalibrationResult(SourcedMixin):
         return self._frames['stand_alone_df']
 
     @property
+    def natural_allocation_df(self):
+        """The calibrated gross premium split across an occurrence program.
+
+        ``(distortion, view)`` rows over ``gross`` / ``ceded`` / ``net``, the
+        canonical pentagon octet across; ceded plus net foot to gross exactly
+        and the gross row is constant down the table at the calibrated premium.
+        Computed on first access and cached.
+
+        The third question about a cession, and the one neither row of
+        :attr:`reins_price_df` answers. That frame prices gross, ceded and net
+        as three separate distributions, so each is a price in its own right;
+        the difference between two of them is the cedent's allowance for
+        reinsurance (``[Difference-Is-A-Perspective]``). This is neither: it is
+        **one** premium decomposed, on one consistent basis, adding up.
+
+        Needs the joint law of gross and ceded, which is built once and held on
+        the aggregate (``Aggregate.occ_joint``), so a chart of the same
+        conditional machinery costs a lookup rather than a second 2-D FFT.
+
+        Raises
+        ------
+        ValueError
+            When the source carries no occurrence program, or when the
+            calibration was struck on a basis other than gross: a set fitted to
+            net has no gross premium to split, so the gate is structural rather
+            than a preference.
+        """
+        if 'natural_allocation_df' not in self._frames:
+            from ._pricing import natural_allocation_df
+            self._frames['natural_allocation_df'] = natural_allocation_df(self)
+        return self._frames['natural_allocation_df']
+
+    @property
     def reins_price_df(self):
         """The calibrated set applied to every view of a cession.
 

@@ -20,6 +20,20 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a283
+
+**[Calibration-Natural-Allocation-Frame] the calibrated gross premium, split across an occurrence program.** `CalibrationResult.natural_allocation_df`: `(distortion, view)` rows over gross, ceded and net, the pentagon octet across, ceded plus net footing to gross exactly.
+
+The third question about a cession, and the one neither row of `reins_price_df` answers. That frame prices the three views as separate distributions, so each is a price in its own right, and the difference between two of them is the cedent's allowance for reinsurance (`[Difference-Is-A-Perspective]`). This is neither: **one** premium decomposed, on one consistent basis, adding up. Each family's distorted view of the gross distribution sets the weights and the kappa curve off the joint says what ceded and net each earn under them.
+
+**`P` is the shared calibrated premium**, not each family's own fitted one (author's decision, plan §9.1). There is one gross premium in the market; the families differ in the fractions they imply, and the gross row reading constant down the table is the visible statement of that.
+
+**The fractions come off the joint and the level does not.** A distortion is calibrated on the aggregate's fine 1-D gross density while the joint's gross marginal is a coarser rebucketed cousin, so the two do not price to the bit. `natural_allocation` computes shares on the joint's grid and applies them to the stated premium; both readings and their difference ride in `.attrs` as `rho_gap`, per family, alongside the joint's realized sizing (`bs`, per-axis `log2`, whether the exact lattice was taken, the deficit). A priced exhibit should not be readable without the grid it was priced on. On the reference program the concave families gap by under 0.06% of the premium and `ccoc` by 8%, which is the a274 pathology surfacing rather than hiding: a mass-at-zero family read unlimited charges the top grid bucket.
+
+**Two structural guards**, each naming what to do. No occurrence program: there are no halves to split across. A calibration struck on any basis but gross: there is no gross premium here to allocate, so recalibrate with `reins_view='gross'`. The reading is unlimited (`a` infinite, `Q`, `PQ` and `ROE` blank), exactly as on an unlimited `reins_price_df` quote.
+
+**`Aggregate.occ_joint(views=('gross', 'ceded'), **sizing)`**, `occ_bivariate` behind a memo keyed on the sizing (author agreed, plan decision 6). Two surfaces want the same joint of one object, this frame and the kappa chart, and a 2-D FFT is not something to pay for twice because two callers asked the same question. Cleared by `update_work`, so a re-updated object never answers off a joint built on its old grid; a `store_dir` build is not held, since a disk-backed joint owns a directory whose lifetime is the caller's.
+
 ## 1.0.0a282
 
 **[Portfolio-Standalone-Frame] every unit of a book priced alone, against the book priced whole.** `CalibrationResult.stand_alone_df`, and the `Portfolio` branch of `pricing.stand_alone` that serves it. The counterpart to `pricing_df`: that frame splits one premium across the units so its rows foot, and this one prices each unit as its own distribution with the same fitted families so they do not. The gap between `sum of parts` and `total` is what pooling is worth under that family.

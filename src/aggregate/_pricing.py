@@ -1306,3 +1306,94 @@ def stand_alone_price_df(port, distortions, a):
     return complete_pentagon(pd.DataFrame(
         rows, columns=['L', 'M', 'P', 'Q'],
         index=pd.MultiIndex.from_tuples(index, names=['distortion', 'unit'])))
+
+
+# ---------------------------------------------------------------------------
+# The natural allocation: one gross premium split across an occurrence program.
+#
+# The third question, the one neither row of ``reins_price_df`` answers. That
+# frame prices the views as separate distributions and their difference is the
+# cedent's allowance ([Difference-Is-A-Perspective]); this splits **one**
+# premium so that ceded and net foot to gross exactly.
+# ---------------------------------------------------------------------------
+
+def natural_allocation_df(result):
+    """Split a calibrated gross premium across an occurrence program.
+
+    Parameters
+    ----------
+    result : CalibrationResult
+        Calibrated on the ``gross`` view of an aggregate carrying an
+        occurrence program.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ``(distortion, view)`` rows over ``gross`` / ``ceded`` / ``net``, the
+        canonical pentagon octet across. ``.attrs`` carries ``rho_gap`` per
+        family and the joint's realized sizing.
+
+    Raises
+    ------
+    ValueError
+        When the source carries no occurrence program, or when the calibration
+        was struck on a basis other than gross.
+
+    Notes
+    -----
+    **One market premium splits.** ``P`` is the shared calibrated target off
+    ``calibration_df``, not each family's own fitted premium (target plus its
+    ``error``): there is one gross premium in the market and the families
+    differ in the **fractions** they imply, which is exactly what the gross
+    row reading constant down the table says.
+
+    **The fractions come off the joint and the level does not.** A distortion
+    is calibrated on the aggregate's fine 1-D gross density, while the joint's
+    gross marginal is a coarser rebucketed cousin carrying its own deficit, so
+    the two do not price to the bit. Rather than absorb that,
+    :meth:`~aggregate.bivariate.BivariateAggregate.natural_allocation` computes
+    shares on the joint's grid and applies them to the stated premium; the two
+    readings and their difference (``rho_joint``, ``rho_fine``, ``rho_gap``)
+    are reported per family rather than reconciled silently. A large gap says
+    the joint's grid is too coarse to be pricing on, which is a judgment for
+    the reader.
+
+    **The reading is unlimited.** There is no asset level in an unallocated
+    capital reading, so ``a`` is infinite and ``Q``, ``PQ`` and ``ROE`` are
+    blank, exactly as on an unlimited ``reins_price_df`` quote. Allocating the
+    anchor capital across the program halves is its own question and is not
+    this one.
+    """
+    source = result._source
+    if getattr(source, 'occ_reins', None) is None:
+        raise ValueError(
+            f'{getattr(source, "name", "the source")} carries no occurrence '
+            'program, so a calibrated premium has no ceded and net halves to '
+            'split across. An aggregate cover cedes a deterministic function '
+            'of the aggregate and needs no joint.')
+    if result.reins_view != 'gross':
+        basis = 'the object\'s own' if result.reins_view is None \
+            else repr(result.reins_view)
+        raise ValueError(
+            f'the natural allocation splits a **gross** premium across the '
+            f'program, and this set was calibrated on {basis}. There is no '
+            f'gross premium here to allocate: recalibrate with '
+            f"reins_view='gross'.")
+    joint = source.occ_joint(views=('gross', 'ceded'))
+    premium = float(result.calibration_df.loc['calibration', 'P'])
+    blocks, keys, gaps = [], [], {}
+    for name, dist in result.distortions.items():
+        one = joint.natural_allocation(dist, P=premium)
+        gaps[name] = one.attrs.get('rho_gap')
+        blocks.append(one)
+        keys.append(name)
+    out = pd.concat(blocks, keys=keys, names=['distortion', 'view'])
+    sizing = getattr(joint, '_nc_sizing', None)
+    out.attrs['rho_gap'] = gaps
+    out.attrs['joint_sizing'] = {
+        'bs': float(joint.bs[0]),
+        'log2': [int(np.log2(len(x))) for x in joint.axis_xs],
+        'exact_lattice': None if sizing is None else bool(sizing.exact),
+        'deficit': float(joint.deficit),
+    }
+    return out

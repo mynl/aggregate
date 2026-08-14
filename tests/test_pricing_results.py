@@ -276,6 +276,126 @@ def test_stand_alone_needs_units(clean, ceded):
             result.stand_alone_df
 
 
+# --- natural_allocation_df ([Calibration-Natural-Allocation-Frame], a283) ---
+
+@pytest.fixture(scope='module')
+def gross_calibration(ceded):
+    return ceded.calibrate_distortions(0.15, p=0.99, reins_view='gross')
+
+
+def test_ceded_and_net_foot_to_gross(gross_calibration):
+    """One premium decomposed, so the rows add up. That is the whole point."""
+    df = gross_calibration.natural_allocation_df
+    assert df.index.names == ['distortion', 'view']
+    for family in gross_calibration.distortions:
+        block = df.xs(family, level='distortion')
+        assert list(block.index) == ['gross', 'ceded', 'net']
+        assert block.loc['ceded', 'P'] + block.loc['net', 'P'] == pytest.approx(
+            block.loc['gross', 'P'], rel=1e-12)
+        assert block.loc['ceded', 'L'] + block.loc['net', 'L'] == pytest.approx(
+            block.loc['gross', 'L'], rel=1e-12)
+
+
+def test_the_gross_row_is_the_one_calibrated_premium(gross_calibration):
+    """Constant down the table: one market premium, five sets of fractions.
+
+    Each family's own fitted premium (target plus its ``error``) would be the
+    other choice and is the wrong one here: the families differ in how they
+    split a premium, not in what it is.
+    """
+    df = gross_calibration.natural_allocation_df
+    target = float(
+        gross_calibration.calibration_df.loc['calibration', 'P'])
+    gross = df.xs('gross', level='view')['P']
+    assert gross.nunique() == 1
+    assert float(gross.iloc[0]) == pytest.approx(target, rel=1e-12)
+
+
+def test_the_reading_is_unlimited(gross_calibration):
+    """No asset level, so no capital and no ratio against it."""
+    df = gross_calibration.natural_allocation_df
+    assert (df['a'] == np.inf).all()
+    for stat in ('Q', 'PQ', 'ROE'):
+        assert df[stat].isna().all()
+
+
+def test_the_grid_gap_is_reported_not_absorbed(gross_calibration):
+    """``rho_gap`` per family, in attrs, because it is a judgment for the reader.
+
+    The joint's gross marginal is a coarser rebucketed cousin of the fine 1-D
+    density the fit was struck on, so the two do not price to the bit. The
+    fractions come off the joint and the level does not, and the distance
+    between the two readings travels with the frame.
+    """
+    df = gross_calibration.natural_allocation_df
+    gaps = df.attrs['rho_gap']
+    assert set(gaps) == set(gross_calibration.distortions)
+    assert all(np.isfinite(v) for v in gaps.values())
+    target = float(
+        gross_calibration.calibration_df.loc['calibration', 'P'])
+    # small for the concave families on this program
+    for family in ('ph', 'wang', 'dual', 'tvar'):
+        assert abs(gaps[family]) < 0.01 * target
+    # and large for ccoc, which is the a274 pathology showing up rather than
+    # hiding: a mass at zero family read unlimited charges the top grid bucket
+    assert abs(gaps['ccoc']) > 10 * abs(gaps['ph'])
+
+
+def test_the_realized_sizing_travels_with_the_frame(gross_calibration):
+    """A priced exhibit must not be readable without the grid it was priced on."""
+    sizing = gross_calibration.natural_allocation_df.attrs['joint_sizing']
+    assert sizing['bs'] > 0
+    assert len(sizing['log2']) == 2
+    assert sizing['deficit'] < 1e-5
+    assert isinstance(sizing['exact_lattice'], bool)
+
+
+def test_allocation_needs_a_gross_basis(ceded):
+    """A set fitted to net has no gross premium to split. Structural, not taste."""
+    on_net = ceded.calibrate_distortions(0.15, p=0.99)
+    with pytest.raises(ValueError, match='calibrated on'):
+        on_net.natural_allocation_df
+    on_ceded = ceded.calibrate_distortions(0.15, p=0.99, reins_view='ceded')
+    with pytest.raises(ValueError, match='gross'):
+        on_ceded.natural_allocation_df
+
+
+def test_allocation_needs_an_occurrence_program(clean):
+    result = clean.calibrate_distortions(0.15, p=0.99)
+    with pytest.raises(ValueError, match='no occurrence program'):
+        result.natural_allocation_df
+
+
+def test_the_allocation_frame_is_cached(gross_calibration):
+    assert (gross_calibration.natural_allocation_df
+            is gross_calibration.natural_allocation_df)
+
+
+def test_the_joint_is_built_once_and_held(ceded):
+    """Decision 6: the frame and the chart read one joint, not two.
+
+    A 2-D FFT is not something to pay for twice because two surfaces asked the
+    same question of one object.
+    """
+    assert ceded.occ_joint() is ceded.occ_joint()
+    assert ceded.occ_joint(views=('gross', 'net')) is not ceded.occ_joint()
+    assert ceded.occ_joint(total_log2=18) is not ceded.occ_joint()
+
+
+def test_the_held_joint_does_not_survive_an_update():
+    """A re-update is an honest rebuild; a stale hit would price on the old grid.
+
+    Re-run at the same grid rather than at a new one, because
+    ``update(log2=...)`` on a reinsured aggregate raises for an unrelated
+    reason (the cession is re-applied against a severity density from the
+    previous grid). Identity is what is being checked here either way.
+    """
+    a = build(CEDED)
+    first = a.occ_joint()
+    a.update()
+    assert a.occ_joint() is not first
+
+
 # --- EvaluationResult -------------------------------------------------------
 
 def test_aggregate_evaluate_returns_a_result():

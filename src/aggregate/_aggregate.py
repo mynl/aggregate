@@ -1649,6 +1649,45 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                   col_chunk=col_chunk, keep_transform=keep_transform)
         return mv
 
+    def occ_joint(self, views=('gross', 'ceded'), **sizing):
+        """The occurrence joint, built once per sizing and held.
+
+        :meth:`occ_bivariate` behind a memo. Two surfaces want the same joint
+        of one object, the natural allocation frame and the kappa chart, and a
+        2-D FFT is not something to pay for twice because two callers asked
+        the same question (``dev/plan-pricing-natural-allocation.md``,
+        decision 6, agreed by the author 2026-08-14).
+
+        Parameters
+        ----------
+        views : (str, str), default ``('gross', 'ceded')``
+            The axis view pair. The default is the pair the allocation and the
+            kappa band both condition on, which is why it differs from
+            :meth:`occ_bivariate`'s.
+        **sizing
+            Passed to :meth:`occ_bivariate`, and part of the memo key, so a
+            resize is an honest rebuild rather than a stale hit.
+
+        Returns
+        -------
+        BivariateAggregate
+
+        Notes
+        -----
+        The cache is cleared by :meth:`update_work`, so a re-updated object
+        never answers off a joint built on its old grid. A ``store_dir`` build
+        is **not** held: a disk backed joint owns a directory whose lifetime is
+        the caller's, and holding a reference to one would quietly keep it
+        alive past the point the caller expected to be done with it.
+        """
+        if sizing.get('store_dir') is not None:
+            return self.occ_bivariate(views=views, **sizing)
+        key = (tuple(views), tuple(sorted(
+            (k, v) for k, v in sizing.items() if v is not None)))
+        if key not in self._occ_joints:
+            self._occ_joints[key] = self.occ_bivariate(views=views, **sizing)
+        return self._occ_joints[key]
+
     # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------
 
     @staticmethod
@@ -2368,6 +2407,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self._reins_stats_df = None
         self._reins_view_stats_cache = None
         self._reins_describe = None
+        #: Occurrence joints built through :meth:`occ_joint`, keyed by the
+        #: sizing that produced them; cleared on every ``update``.
+        self._occ_joints = {}
         # rebucketing scheme for reins net/ceded distributions; set the backing
         # field directly (the setter clears the caches just initialised above)
         self._reins_bucket = reins_bucket if reins_bucket is not None else get_settings().discretization.reins_bucket
@@ -3624,6 +3666,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self._reins_stats_df = None
         self._reins_view_stats_cache = None
         self._reins_describe = None
+        self._occ_joints = {}
         self._dist = None
         self._sev_dist = None
         self._valid = None

@@ -2300,7 +2300,22 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             index=pd.Index(self.axis_xs[0], name=self.unit_names[0]),
             columns=pd.Index(self.axis_xs[1], name=self.unit_names[1]))
 
-    def exeqa_df(self, axis=0):
+    @staticmethod
+    def _quantile_column(level, other_name):
+        """Column name for one conditional quantile: ``q99_Ceded``.
+
+        Follows the existing ``exeqa_<axis>`` naming, which already carries the
+        axis name, so a band frame reads as one family. The level is written as
+        a percentage, zero padded to two digits where it is a whole one
+        (``q01``, ``q99``) and with its decimals otherwise (``q0.5``), so two
+        nearby levels cannot collide on one column.
+        """
+        pp = f'{level * 100:g}'
+        if '.' not in pp and 'e' not in pp:
+            pp = pp.zfill(2)
+        return f'q{pp}_{other_name}'
+
+    def exeqa_df(self, axis=0, levels=None, cdf_range=None):
         r"""The kappa curve: conditional means given one axis, over its whole grid.
 
         The bivariate answer to Portfolio's ``exeqa_*`` columns. Portfolio
@@ -2315,6 +2330,22 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         axis : {0, 1}, default 0
             The **conditioning** axis. ``0`` conditions on the axis-0 variable
             and reports the conditional mean of axis 1; ``1`` is the transpose.
+        levels : sequence of float, optional
+            Probability levels in ``[0, 1]``. Each one adds a
+            ``q<pp>_<other axis>`` column holding the conditional **quantile**
+            of the other axis given the conditioning one, which is what turns
+            the kappa curve into a curve with a band. ``None`` (the default)
+            keeps today's columns exactly, so this is additive.
+        cdf_range : (float, float), optional
+            Crop to the rows between these two probabilities of the
+            conditioning marginal, and compute the quantile columns only
+            there. The quantiles are the expensive part of the sweep (one
+            :class:`~aggregate._grid_distribution.GridDistribution` per live
+            row: 42 s over a 65,536 row grid, against 0.8 s to build the joint
+            it reads), and a plotted range is a few thousand rows rather than
+            sixty five thousand. Cropping rather than blanking, so a ``NaN``
+            keeps meaning "no mass here" and never "not measured here".
+            ``F`` and ``S`` are the whole distribution's, not the crop's.
 
         Returns
         -------
@@ -2337,7 +2368,11 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             ``exeqa_<other axis>``
                 The kappa curve ``E[Y | X = x]``.
 
-            Both ``exeqa`` columns are ``NaN`` where the conditioning row
+            ``q<pp>_<other axis>``
+                One per requested level: the conditional quantile of the other
+                axis. Absent when ``levels`` is ``None``.
+
+            Every conditional column is ``NaN`` where the conditioning row
             carries no mass, with ``p`` saying why: a conditional expectation
             given a null event has no value, and a zero filled there would be
             read as one. The joint is de-fuzzed at construction
@@ -2348,9 +2383,7 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ------
         ValueError
             If the object has not been updated, if ``axis`` is not 0 or 1, or
-            if the joint is disk backed (a massive update): every row of the
-            store would have to be read. Probe a disk backed joint pointwise
-            with :meth:`MassiveBivariateDistribution.slice` instead.
+            if a level is outside ``[0, 1]``.
 
         Notes
         -----
@@ -2360,6 +2393,30 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         matrix vector product that is ``d @ y`` against ``d.sum(1)``, and the
         transpose for ``axis=1``. Reads the joint through the existing
         accessors and adds no state.
+
+        **It is a row-wise fold, so where the density lives does not matter.**
+        The sweep runs over :meth:`JointBandsMixin._row_bands`, which yields
+        one band in core and the store's own row chunk on the massive route, so
+        a disk backed joint answers this at bounded memory rather than refusing
+        it. That refusal stood until 1.0.0a279 and took
+        :meth:`natural_allocation` down with it, which was the one hole in an
+        otherwise first class massive surface.
+
+        **Why the quantiles route through GridDistribution.** One per live row,
+        on that row's own normalized mass, so the probability vocabulary stays
+        the library's single implementation and a lattice law's atoms are
+        handled the way every other quantile in the package handles them. The
+        cost is real (it is the per row construction, not the disk) and it is
+        paid only when ``levels`` is asked for. Quantiles commute with the
+        monotone map ``c -> c / g`` at fixed ``g``, so a **share** band is the
+        value band divided by the index and needs no separate pass.
+
+        **What a band says that no mean can.** The gross outcome does not
+        determine the cession: the same 500 can arrive as one claim of 500,
+        ceding 50, or as five claims of 100, ceding 250. The kappa curve
+        averages that away by construction and the allocation inherits the
+        averaging, which is correct as pricing and silent as description. Two
+        percentiles off each row put the spread back.
 
         **What it is exact about, and what it is not.** The mass weighted mean
         of the kappa column reproduces the other axis's marginal mean to
@@ -2379,34 +2436,80 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         the index, since ``ceded + net = gross`` holds pointwise.
         """
         self._require_density()
-        if self.density is None:
-            raise ValueError(
-                'the joint density is disk-backed (massive update); the kappa '
-                'curve would read every row of the store. Probe pointwise '
-                'with self.bivariate.slice(x=...) instead.')
         axis = int(axis)
         if axis not in (0, 1):
             raise ValueError(f'axis must be 0 or 1, not {axis!r}')
+        levels = () if levels is None else tuple(float(v) for v in levels)
+        for level in levels:
+            if not 0.0 <= level <= 1.0:
+                raise ValueError(
+                    f'a probability level lies in [0, 1]; got {level!r}.')
 
-        d = self.density
         grid = self.axis_xs[axis]
         other = self.axis_xs[1 - axis]
-        if axis == 0:
-            p, num = d.sum(axis=1), d @ other
-        else:
-            p, num = d.sum(axis=0), other @ d
-
         self_name = self.unit_names[axis]
         other_name = self.unit_names[1 - axis]
+        other_bs = self.bs[1 - axis]
+
+        n = len(grid)
+        lo_row, hi_row = self._cdf_row_window(axis, cdf_range)
+        p = np.zeros(n)
+        num = np.zeros(n)
+        bands = np.full((len(levels), n), np.nan)
+        for r0, r1, block in self.bivariate._row_bands(axis=axis):
+            p[r0:r1] = block.sum(axis=1)
+            num[r0:r1] = block @ other
+            if not levels:
+                continue
+            for i in range(max(r0, lo_row), min(r1, hi_row)):
+                mass = p[i]
+                if mass <= 0:
+                    continue
+                # the row's own conditional law, normalized: the quantile of a
+                # conditional distribution, not a quantile of the joint
+                row = GridDistribution(other, block[i - r0] / mass, bs=other_bs)
+                for k, level in enumerate(levels):
+                    bands[k, i] = row.q(level)
+
         gd = GridDistribution(grid, p, bs=self.bs[axis], name=self_name)
         live = p > 0
-        kappa = np.full(len(grid), np.nan)
+        kappa = np.full(n, np.nan)
         kappa[live] = num[live] / p[live]
-        return pd.DataFrame(
-            {'p': p, 'F': gd.cdf(grid), 'S': gd.sf(grid),
-             f'exeqa_{self_name}': np.where(live, grid, np.nan),
-             f'exeqa_{other_name}': kappa},
-            index=pd.Index(grid, name=self_name))
+        out = {'p': p, 'F': gd.cdf(grid), 'S': gd.sf(grid),
+               f'exeqa_{self_name}': np.where(live, grid, np.nan),
+               f'exeqa_{other_name}': kappa}
+        for k, level in enumerate(levels):
+            out[self._quantile_column(level, other_name)] = bands[k]
+        df = pd.DataFrame(out, index=pd.Index(grid, name=self_name))
+        return df if cdf_range is None else df.iloc[lo_row:hi_row]
+
+    def _cdf_row_window(self, axis, cdf_range):
+        """Half open row range for a probability window on the conditioning axis.
+
+        Read off the conditioning marginal, which costs no joint read on
+        either route (the massive container carries its marginals as pass-3
+        accumulators), so the expensive per row work in :meth:`exeqa_df` can be
+        confined before the sweep rather than measured and then discarded.
+
+        A probability window means the same thing on every grid, which a raw
+        mass floor does not: the largest row mass on a fine joint measured in
+        the notes is 8.9e-04, so a ``p > 1e-4`` threshold discards most of the
+        picture there while keeping nearly all of it on a coarse one.
+        """
+        n = len(self.axis_xs[axis])
+        if cdf_range is None:
+            return 0, n
+        lo, hi = (float(v) for v in cdf_range)
+        if not 0.0 <= lo < hi <= 1.0:
+            raise ValueError(
+                f'cdf_range is an increasing probability pair inside [0, 1]; '
+                f'got {cdf_range!r}.')
+        marginal = np.asarray(self.marginals[axis], dtype=float)
+        gd = GridDistribution(self.axis_xs[axis], marginal, bs=self.bs[axis])
+        xs = np.asarray(self.axis_xs[axis], dtype=float)
+        lo_row = int(np.clip(np.searchsorted(xs, gd.q(lo)), 0, n - 1))
+        hi_row = int(np.clip(np.searchsorted(xs, gd.q(hi)), 0, n - 1)) + 1
+        return lo_row, max(hi_row, lo_row + 1)
 
     def natural_allocation(self, distortion, P=None):
         r"""Allocate a gross distorted premium to the occurrence ceded and net.
@@ -2518,6 +2621,13 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         rather than a second measurement, which is what makes the rows foot
         exactly. The two builds therefore agree only to the rebucketing
         scatter, not to the bit.
+
+        **On disk as well as in core.** This reads the joint only through
+        :meth:`exeqa_df`, which is a row-wise fold over
+        :meth:`JointBandsMixin._row_bands`, so a massive (disk backed) joint
+        allocates at bounded memory. It refused until 1.0.0a279, inheriting the
+        refusal from the kappa curve rather than from anything about the
+        allocation.
         """
         from .pentagon import complete_pentagon
         from .spectral import choquet_weights

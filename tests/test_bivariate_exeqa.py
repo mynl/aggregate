@@ -193,3 +193,197 @@ def test_requires_update():
     with pytest.raises(ValueError, match='not updated'):
         biv.exeqa_df()
 
+
+# ---------------------------------------------------------------------------
+# the conditional band ([Kappa-Band-Columns], 1.0.0a279)
+# ---------------------------------------------------------------------------
+
+def test_levels_are_additive(layer_gc):
+    """No levels is today's frame, byte for byte."""
+    import pandas as pd
+
+    pd.testing.assert_frame_equal(layer_gc.exeqa_df(axis=0),
+                                  layer_gc.exeqa_df(axis=0, levels=None))
+    assert list(layer_gc.exeqa_df(axis=0, levels=()).columns) == [
+        'p', 'F', 'S', 'exeqa_Gross', 'exeqa_Ceded']
+
+
+def test_band_columns_are_named_for_the_other_axis(layer_gc):
+    """The naming follows ``exeqa_<axis>``, which already carries the name."""
+    df = layer_gc.exeqa_df(axis=0, levels=(0.01, 0.5, 0.99))
+    assert list(df.columns)[-3:] == ['q01_Ceded', 'q50_Ceded', 'q99_Ceded']
+    # a fractional level keeps its decimals, so two near levels cannot collide
+    fine = layer_gc.exeqa_df(axis=0, levels=(0.001, 0.005))
+    assert list(fine.columns)[-2:] == ['q0.1_Ceded', 'q0.5_Ceded']
+
+
+def test_band_edges_are_monotone_in_the_level(layer_gc):
+    """A higher level is a higher quantile, on every row. Always."""
+    df = layer_gc.exeqa_df(axis=0, levels=(0.01, 0.5, 0.99))
+    live = df['p'].to_numpy() > 0
+    lo = df['q01_Ceded'].to_numpy()[live]
+    mid = df['q50_Ceded'].to_numpy()[live]
+    hi = df['q99_Ceded'].to_numpy()[live]
+    assert (lo <= mid).all()
+    assert (mid <= hi).all()
+    # and it is a band, not a repeat of the mean: an occurrence layer's
+    # cession is genuinely uncertain given the gross outcome
+    assert (hi - lo).max() > layer_gc.bs[1]
+
+
+def test_kappa_lies_inside_the_conditional_support(layer_gc):
+    """The mean of each row's law lies between that law's extreme quantiles.
+
+    The bracket that is a theorem, and it is a real check because the two
+    sides come from different code: the mean is a matrix vector product over
+    the band, the quantiles are per row ``GridDistribution`` calls.
+
+    A **percentile** band is not guaranteed to contain the mean, and on this
+    joint it does not everywhere: at a small gross outcome the conditional
+    cession is a spike at zero carrying a vanishing chance of a full limit
+    recovery, so ``q99`` is 0 while the mean is 5e-06, and the mean sits above
+    the band. That is a true statement about a very skewed conditional law and
+    exactly the kind of thing a mean alone never says, which is the whole
+    argument for drawing the band.
+    """
+    df = layer_gc.exeqa_df(axis=0, levels=(0.0, 1.0))
+    live = df['p'].to_numpy() > 0
+    lo = df['q00_Ceded'].to_numpy()[live]
+    hi = df['q100_Ceded'].to_numpy()[live]
+    mean = df['exeqa_Ceded'].to_numpy()[live]
+    assert (lo <= mean + 1e-9).all()
+    assert (hi >= mean - 1e-9).all()
+    assert (hi > lo).any()
+
+
+def test_band_is_the_row_quantile(layer_gc):
+    """Each edge is a quantile of that row's own normalized conditional law."""
+    from aggregate._grid_distribution import GridDistribution
+
+    df = layer_gc.exeqa_df(axis=0, levels=(0.25, 0.75))
+    y = layer_gc.axis_xs[1]
+    rows = np.flatnonzero(df['p'].to_numpy() > 0)[::97]
+    assert len(rows) > 5
+    for i in rows:
+        row = layer_gc.density[i, :]
+        gd = GridDistribution(y, row / row.sum(), bs=layer_gc.bs[1])
+        assert df['q25_Ceded'].iloc[i] == pytest.approx(gd.q(0.25))
+        assert df['q75_Ceded'].iloc[i] == pytest.approx(gd.q(0.75))
+
+
+def test_a_deterministic_cession_has_no_band(qs_aligned):
+    """A lattice-aligned share is a function of the gross, so the band closes.
+
+    The band measures what the kappa curve averages away, and a share cession
+    averages nothing away: given the gross outcome the cession is known.
+    """
+    df = qs_aligned.exeqa_df(axis=0, levels=(0.01, 0.99))
+    live = df['p'].to_numpy() > 0
+    width = (df['q99_Ceded'].to_numpy()[live]
+             - df['q01_Ceded'].to_numpy()[live])
+    assert np.abs(width).max() < 1e-12
+
+
+def test_band_is_nan_off_the_support(qs_aligned):
+    """A quantile given a null event has no value, exactly as the mean does.
+
+    On the discrete program, where the gross lattice has genuine gaps; a
+    continuous joint carries floating point dust on every row and has none.
+    """
+    df = qs_aligned.exeqa_df(axis=0, levels=(0.5,))
+    dead = df['p'].to_numpy() <= 0
+    assert dead.any()
+    assert np.isnan(df['q50_Ceded'].to_numpy()[dead]).all()
+    assert np.isnan(df['exeqa_Ceded'].to_numpy()[dead]).all()
+
+
+def test_bad_level_refused(layer_gc):
+    with pytest.raises(ValueError, match=r'lies in \[0, 1\]'):
+        layer_gc.exeqa_df(axis=0, levels=(0.5, 1.5))
+
+
+# --- the plotted window -----------------------------------------------------
+
+def test_cdf_range_crops_rather_than_blanks(layer_gc):
+    """Cropping keeps ``NaN`` meaning "no mass", never "not measured"."""
+    full = layer_gc.exeqa_df(axis=0, levels=(0.01, 0.99))
+    win = layer_gc.exeqa_df(axis=0, levels=(0.01, 0.99),
+                            cdf_range=(1e-3, 0.999))
+    assert len(win) < len(full)
+    assert win.index[0] >= full.index[0]
+    assert not np.isnan(win['q01_Ceded'].to_numpy()[
+        win['p'].to_numpy() > 0]).any()
+
+
+def test_cdf_range_keeps_the_whole_distribution_probabilities(layer_gc):
+    """``F`` and ``S`` describe the law, not the crop, so they still tie out."""
+    win = layer_gc.exeqa_df(axis=0, cdf_range=(1e-3, 0.999))
+    full = layer_gc.exeqa_df(axis=0)
+    assert win['F'].to_numpy() == pytest.approx(
+        full.loc[win.index, 'F'].to_numpy())
+    assert win['F'].iloc[0] >= 1e-3
+    assert (win['F'] + win['S']).to_numpy() == pytest.approx(1.0)
+
+
+def test_cdf_range_agrees_with_the_uncropped_sweep(layer_gc):
+    """A window is a cheaper route to the same numbers, not different ones."""
+    full = layer_gc.exeqa_df(axis=0, levels=(0.05, 0.95))
+    win = layer_gc.exeqa_df(axis=0, levels=(0.05, 0.95),
+                            cdf_range=(0.01, 0.99))
+    common = win.index
+    for col in ('exeqa_Ceded', 'q05_Ceded', 'q95_Ceded'):
+        assert win[col].to_numpy() == pytest.approx(
+            full.loc[common, col].to_numpy(), nan_ok=True)
+
+
+def test_bad_cdf_range_refused(layer_gc):
+    with pytest.raises(ValueError, match='increasing probability pair'):
+        layer_gc.exeqa_df(axis=0, cdf_range=(0.9, 0.1))
+    with pytest.raises(ValueError, match='increasing probability pair'):
+        layer_gc.exeqa_df(axis=0, cdf_range=(-0.1, 0.9))
+
+
+# --- the disk route ---------------------------------------------------------
+
+@pytest.mark.slow
+def test_massive_kappa_matches_in_core(tmp_path):
+    """The refusal is gone, and what replaced it is the same numbers.
+
+    ``exeqa_df`` refused a disk-backed joint through 1.0.0a278 and took
+    ``natural_allocation`` down with it, which was the one hole in an
+    otherwise first class massive surface.
+    """
+    pytest.importorskip('zarr')
+    from aggregate import build as _build
+
+    agg = _build(QS_ALIGNED)
+    core = agg.occ_bivariate(views=('gross', 'ceded'), bs=1)
+    disk = agg.occ_bivariate(views=('gross', 'ceded'), bs=1,
+                             store_dir=str(tmp_path / 'kb'))
+    a = core.exeqa_df(axis=0, levels=(0.01, 0.99))
+    b = disk.exeqa_df(axis=0, levels=(0.01, 0.99))
+    assert list(a.columns) == list(b.columns)
+    for col in a.columns:
+        assert b[col].to_numpy() == pytest.approx(a[col].to_numpy(),
+                                                  abs=1e-12, nan_ok=True)
+
+
+@pytest.mark.slow
+def test_massive_natural_allocation(tmp_path):
+    """The allocation rides the same fold, so it survives the disk route."""
+    pytest.importorskip('zarr')
+    from aggregate import build as _build
+
+    agg = _build(QS_ALIGNED)
+    dist = _build('dist KB.PH ph 0.5')
+    core = agg.occ_bivariate(views=('gross', 'ceded'), bs=1)
+    disk = agg.occ_bivariate(views=('gross', 'ceded'), bs=1,
+                             store_dir=str(tmp_path / 'kb'))
+    want = core.natural_allocation(dist, P=100.0)
+    got = disk.natural_allocation(dist, P=100.0)
+    # the two routes carry different default padding (1 in core, 0 on disk,
+    # its documented default), so they agree to the aliasing rather than to
+    # the bit; the additivity below is exact on either.
+    assert got['P'].to_numpy() == pytest.approx(want['P'].to_numpy(), rel=1e-6)
+    assert (got.loc['ceded', 'P'] + got.loc['net', 'P']
+            == pytest.approx(got.loc['gross', 'P'], abs=1e-12))

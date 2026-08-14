@@ -20,6 +20,20 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a279
+
+**[Kappa-Band-Columns] the kappa curve gains a band, and stops refusing a disk-backed joint.** `BivariateAggregate.exeqa_df(axis=0, levels=None, cdf_range=None)`. Both new keywords are additive: with neither, the frame is exactly what it was.
+
+**Why a mean is the wrong summary here.** The kappa curve is the conditional mean cession given the gross outcome, and `natural_allocation` prices with it. But the gross outcome does not determine the cession: the same 500 can arrive as one claim of 500, ceding 50, or as five claims of 100, ceding 250. The curve averages that away by construction and the allocation inherits the averaging, which is correct as pricing and silent as description. Measured on `agg Demo 10 claims sev lognorm 50 cv 1.5 occurrence net of 50 xs 50 poisson`, at a gross outcome of 500 the mean cession is 103.6 while the 1st and 99th percentiles are 48.0 and 172.5, so the realized share of that outcome ceded runs from under a tenth to over a third. At `g = 200` the band runs from 0.0 to 67.0, meaning a year of that size can cede nothing at all.
+
+**`levels`** adds one `q<pp>_<other axis>` column per probability (`q01_Ceded`, `q99_Ceded`, and `q0.5_Ceded` for a fractional level, so two near levels cannot collide on one name). Each is a quantile of that row's own normalized conditional law, routed through `GridDistribution` so the probability vocabulary stays the library's single implementation and a lattice law's atoms are handled the way every other quantile in the package handles them. A row with no mass yields `NaN`, matching the existing treatment of a conditional mean given a null event.
+
+Worth knowing, and recorded in the tests: a percentile band is **not** guaranteed to contain the mean. In the far left tail the conditional cession is a spike at zero carrying a vanishing chance of a full limit recovery, so `q99` is 0 while the mean is not. That is a true statement about a very skewed conditional law, and the argument for drawing the band rather than the curve alone.
+
+**`cdf_range`** crops to a probability window on the conditioning marginal and computes the quantile columns only there. The quantiles are the expensive part (42 s over a 65,536 row grid, against 0.8 s to build the joint they read), and a plotted range is a few thousand rows rather than sixty five thousand: on that grid a `(1e-3, 0.999)` window is 6,823 rows and 5.1 s. It crops rather than blanks, so a `NaN` keeps meaning "no mass here" and never "not measured here"; `F` and `S` stay the whole distribution's. A probability window also means the same thing on every grid, which a raw mass floor does not.
+
+**The massive refusal is gone**, from `exeqa_df` and therefore from `natural_allocation`, which only ever inherited it. The sweep runs over `_row_bands`, so a disk-backed joint answers at bounded memory. That was the one hole in an otherwise first class massive surface: everything else (`summary_df`, `stats_df`, `marginals`, `moments`, `corr`, `pushforward`, `plot`) already worked on disk.
+
 ## 1.0.0a278
 
 **[Joint-Row-Bands] one band iterator, and one conditional probe, either side of the disk boundary.** `JointBandsMixin` on both `BivariateDistribution` and `MassiveBivariateDistribution`. Everything the kappa band needs is a row-wise fold of the joint (`d @ y` against `d.sum(1)`, and a quantile per row), and a fold should not have to know whether the density is a numpy array or a zarr store. This is the small phase that makes the next one small.

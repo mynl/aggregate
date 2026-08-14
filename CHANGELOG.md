@@ -20,6 +20,16 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a278
+
+**[Joint-Row-Bands] one band iterator, and one conditional probe, either side of the disk boundary.** `JointBandsMixin` on both `BivariateDistribution` and `MassiveBivariateDistribution`. Everything the kappa band needs is a row-wise fold of the joint (`d @ y` against `d.sum(1)`, and a quantile per row), and a fold should not have to know whether the density is a numpy array or a zarr store. This is the small phase that makes the next one small.
+
+**`_row_bands(axis=0, band_rows=None)`** yields `(r0, r1, block)` over the joint. In core it yields exactly **one** band covering the whole grid, so a consumer written against it costs nothing there: no copy, no chunk arithmetic, one pass either way. On the massive route the default band is the store's own row chunk, which is the read size the chunking was chosen for, and peak memory is `band_rows * n_other * 8` bytes regardless of grid size. `axis=1` yields bands of the **transpose**, so a consumer always folds along rows and the transpose is not a special case for the caller.
+
+**`slice(x=)` / `slice(y=)` reaches the in-core container.** The analyst's probe for one conditional law existed only on the massive container, which is backwards: the in-core case does it in two lines, and that is exactly why it should be the same two lines under the same name on both. The massive implementation is deleted rather than copied; both now read the mixin, addressing axes through the role accessors (`axis0` / `axis1` / `bs0` / `bs1` / `axis_names`) rather than the positional `.ceded` / `.net` names, which lie for a `('gross', 'ceded')` joint. `BivariateDistribution` gains `bs0` / `bs1` role properties to complete that surface.
+
+No behavior changes: `slice` on a massive joint answers exactly as it did.
+
 ## 1.0.0a277
 
 **[Sizing-And-Passthrough] the netceded joint sizes itself honestly, and says what it chose.** Three defects reported together in `dev/notes-net-natural-allocation.md` §7, fixed together because they are one story: a caller could not reach the grid they wanted, and the grid they got instead answered anyway. The measured case is `a.occ_bivariate(views=('gross', 'ceded'), bs=0.5)` on an unbounded lognormal, which returned a 512 x 2,048 joint carrying a **deficit of 0.535** and a correlation of **-0.2225** for a comonotone pair, after a single warning.

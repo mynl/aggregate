@@ -3385,7 +3385,117 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return self.bivariate._repr_html_()
 
 
-class BivariateDistribution(object):
+class JointBandsMixin:
+    """Row-wise reads of a joint density, wherever the density lives.
+
+    The one place that knows whether a joint is a numpy array or a zarr store,
+    so every row-wise consumer above it stops caring. Both containers already
+    address their axes by role (``axis0`` / ``axis1`` / ``bs0`` / ``bs1`` /
+    ``axis_names``, the positional ``.ceded`` / ``.net`` names lie for a
+    ``('gross', 'ceded')`` joint), which is what makes one implementation
+    possible: this mixin reads those and ``density`` and nothing else.
+
+    Mixin, not a base class, and it defines no ``__init__``: the two containers
+    are independently constructed and share no state beyond the surface named
+    above (``CLAUDE.md``, naming conventions).
+    """
+
+    #: Rows per band on the massive route when the store cannot say. Never
+    #: reached in practice: a zarr array carries its own chunking, which is the
+    #: read size the store was written for.
+    _DEFAULT_BAND_ROWS = 512
+
+    def _row_bands(self, axis=0, band_rows=None):
+        """Yield ``(r0, r1, block)`` row bands of the joint, in core or on disk.
+
+        Parameters
+        ----------
+        axis : {0, 1}, default 0
+            The conditioning axis. ``1`` yields bands of the **transpose**, so
+            a consumer always folds along rows and the transpose is not a
+            special case for the caller.
+        band_rows : int, optional
+            Rows per band. Defaults to the whole grid in core (one band) and to
+            the store's own row chunk on the massive route, which is the read
+            size the chunking was chosen for.
+
+        Yields
+        ------
+        (int, int, ndarray)
+            Half open row range and the dense float64 block for it.
+
+        Notes
+        -----
+        The in core case yields exactly one band, so a consumer written against
+        this iterator costs nothing there: no copy, no chunk arithmetic, one
+        pass either way. On the massive route the band is the unit of disk
+        read, and peak memory is ``band_rows * n_other * 8`` bytes regardless
+        of grid size.
+        """
+        axis = int(axis)
+        if axis not in (0, 1):
+            raise ValueError(f'axis must be 0 or 1, not {axis!r}')
+        dens = self.density
+        n_rows = dens.shape[axis]
+        in_core = isinstance(dens, np.ndarray)
+        if band_rows is None:
+            chunks = getattr(dens, 'chunks', None)
+            band_rows = (n_rows if in_core
+                         else (chunks[axis] if chunks
+                               else self._DEFAULT_BAND_ROWS))
+        band_rows = max(int(band_rows), 1)
+        for r0 in range(0, n_rows, band_rows):
+            r1 = min(r0 + band_rows, n_rows)
+            block = (dens[r0:r1, :] if axis == 0 else dens[:, r0:r1])
+            block = np.asarray(block, dtype=float)
+            yield r0, r1, (block if axis == 0 else block.T)
+
+    def slice(self, x=None, y=None):
+        """Conditional distribution along one axis: ``P(Y | X ~ x)`` or ``P(X | Y ~ y)``.
+
+        The analyst's probe: one row (or column) of the joint, instant at any
+        grid size and on either route.
+
+        Parameters
+        ----------
+        x, y : float, optional
+            Exactly one must be given: the conditioning value, snapped to the
+            nearest bucket.
+
+        Returns
+        -------
+        GridDistribution
+            The normalized conditional law on the other axis.
+
+        Raises
+        ------
+        ValueError
+            When neither or both values are given, or when the conditioning
+            slice carries no mass.
+        """
+        if (x is None) == (y is None):
+            raise ValueError('give exactly one of x= or y=.')
+        axis = 0 if x is not None else 1
+        value = x if x is not None else y
+        grids = (self.axis0, self.axis1)
+        steps = (self.bs0, self.bs1)
+        own, other = grids[axis], grids[1 - axis]
+        idx = int(np.clip(round((value - own[0]) / steps[axis]),
+                          0, len(own) - 1))
+        row = np.asarray(self.density[idx, :] if axis == 0
+                         else self.density[:, idx], dtype=float).ravel()
+        name = (f'{self.axis_names[1 - axis]} | '
+                f'{self.axis_names[axis]}={own[idx]:g}')
+        tot = row.sum()
+        if tot <= 0:
+            raise ValueError(
+                f'no mass on the conditioning slice ({name}); pick a value '
+                'inside the support (see .marginal()).')
+        return GridDistribution(other, row / tot, bs=steps[1 - axis],
+                                name=name)
+
+
+class BivariateDistribution(JointBandsMixin):
     """Joint distribution of two aggregate quantities on a 2D grid.
 
     A lightweight container for a 2D density (e.g. the joint occurrence ceded
@@ -3443,6 +3553,16 @@ class BivariateDistribution(object):
     def axis_names(self):
         """``(name0, name1)`` axis roles from ``meta`` (default ceded/net)."""
         return self.meta.get('axis_names', ('ceded (C)', 'net (N)'))
+
+    @property
+    def bs0(self):
+        """Axis-0 bucket size (positionally ``.bs_ceded``)."""
+        return self.bs_ceded
+
+    @property
+    def bs1(self):
+        """Axis-1 bucket size (positionally ``.bs_net``)."""
+        return self.bs_net
 
     def pushforward(self, function, *, bs=None, log2=None, window=None,
                     scheme='linear', name=None, is_loss_value=True,
@@ -3731,7 +3851,7 @@ class BivariateDistribution(object):
                 f'<caption>BivariateDistribution</caption>{body}</table>')
 
 
-class MassiveBivariateDistribution(object):
+class MassiveBivariateDistribution(JointBandsMixin):
     """Disk-backed joint distribution of two aggregate quantities.
 
     The massive sibling of :class:`BivariateDistribution`
@@ -3908,45 +4028,9 @@ class MassiveBivariateDistribution(object):
     # ------------------------------------------------------------------
     # streamed probes
     # ------------------------------------------------------------------
-    def slice(self, x=None, y=None):
-        """Conditional distribution along one axis: ``P(Y | X ~ x)`` or ``P(X | Y ~ y)``.
-
-        The analyst's probe: one row (or column) of tiles read from the
-        store -- instant at any grid size.
-
-        Parameters
-        ----------
-        x, y : float, optional
-            Exactly one must be given: the conditioning value, snapped to the
-            nearest bucket.
-
-        Returns
-        -------
-        GridDistribution
-            The normalised conditional law on the other axis.
-        """
-        if (x is None) == (y is None):
-            raise ValueError('give exactly one of x= or y=.')
-        if x is not None:
-            idx = int(np.clip(round((x - self.xs0[0]) / self.bs0),
-                              0, len(self.xs0) - 1))
-            row = np.asarray(self.density[idx, :]).ravel()
-            grid, bs = self.xs1, self.bs1
-            name = (f'{self.axis_names[1]} | '
-                    f'{self.axis_names[0]}={self.xs0[idx]:g}')
-        else:
-            idx = int(np.clip(round((y - self.xs1[0]) / self.bs1),
-                              0, len(self.xs1) - 1))
-            row = np.asarray(self.density[:, idx]).ravel()
-            grid, bs = self.xs0, self.bs0
-            name = (f'{self.axis_names[0]} | '
-                    f'{self.axis_names[1]}={self.xs1[idx]:g}')
-        tot = row.sum()
-        if tot <= 0:
-            raise ValueError(
-                f'no mass on the conditioning slice ({name}); pick a value '
-                'inside the support (see .marginal()).')
-        return GridDistribution(grid, row / tot, bs=bs, name=name)
+    # ``slice`` and ``_row_bands`` live on JointBandsMixin: a conditional law
+    # is two lines either side of the disk boundary, and it should be the same
+    # two lines under the same name on both containers.
 
     def pushforward(self, functions, bs, *, bs_total=None, total_key='total',
                     windows=None, scheme='linear', is_loss_value=True):

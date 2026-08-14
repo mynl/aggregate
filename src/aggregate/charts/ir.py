@@ -156,10 +156,13 @@ AXIS_UNITS = ('currency', 'probability', 'density', 'return_period',
 #: cover's subject when an occurrence program sits underneath), 'total',
 #: 'unit' (one member of a portfolio family), 'joint' (a z grid),
 #: 'iso_total' (a level set of x + y over a joint grid: every point on it
-#: is one total loss, so it is the line the portfolio reader traces).
+#: is one total loss, so it is the line the portfolio reader traces),
+#: 'ceiling' (a deterministic bound on a curve, not a reading of the law:
+#: the most a program could cede at a given outcome, which the realized
+#: conditional band is read against).
 SERIES_ROLES = ('density', 'survival', 'cdf', 'identity', 'distortion',
                 'gross', 'ceded', 'net', 'subject', 'total', 'unit', 'joint',
-                'iso_total')
+                'iso_total', 'ceiling')
 
 #: Mark roles: 'mean', 'break_even' (the zero of a signed outcome axis),
 #: 'capital_anchor' (a return-period quantile such as 1-in-200).

@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a280
+
+**[Chart-Kappa-Band] the conditional cession, drawn as a curve with a band.** A new registered chart, `kappa`, on a `netceded` `BivariateAggregate` carrying a gross axis. Two panels over one gross outcome axis, and it is the picture the band columns were built for.
+
+**Left, the cession.** `E[ceded | gross]` and `E[net | gross]` with their percentile bands, over the identity. The net band is the ceded band reflected in the diagonal, `[g - q99, g - q01]`, because `N = G - C` pointwise: two shaded regions of equal width, one hugging zero and one hugging the diagonal, which is the conservation statement in one picture. Equal aspect is semantic there, as on the portfolio kappa panel, since both axes are losses and the reading is each curve's slope against 45 degrees. Bands ride as `y2` series, so a band **is** the region between two edges rather than two curves a reader has to associate.
+
+**Right, the share**, the same reading divided by the outcome (quantiles commute with `c -> c / g` at fixed `g`, so the share band is the value band divided by the index and costs no second pass), against the **deterministic ceiling**: for a single layer `limit xs attach` at placement `share`, the most that could be ceded with a gross total of `g` comes from splitting it into claims of exactly `attach + limit`, so the ceiling is a comb with teeth every `attach + limit` and a maximum share of `share * limit / (attach + limit)`. Drawn next to the upper band edge it says how much of the theoretically available cession the program actually delivers, and the answer is typically nowhere near: getting several claims to land exactly at the top of the layer is a lot to ask. Only for a single layer; a tower has no such simple envelope, so the panel has one fewer curve rather than a wrong one.
+
+**Three decisions the emitter makes rather than the caller.** The plotted range is a probability window on the gross marginal (`1e-3` to `0.999`) and not a mass floor, because a raw threshold like `p > 1e-4` means different things at different bucket sizes while a CDF range means the same thing on every grid. There is no smoothing: the band edges step by whole buckets because they are quantiles of a lattice law, and the structure that a rolling mean would tidy away is the comb of the ceiling, which is mechanism rather than noise. And the legend says **percentile band**, never "confidence interval": nothing here is an estimate with sampling error, the joint is the law.
+
+The predicate accepts a **disk-backed** joint, unlike `joint_surface`, which needs the array in memory. Surviving the massive route is the point of a row-wise band. `SERIES_ROLES` gains `'ceiling'` (a deterministic bound on a curve, not a reading of the law).
+
 ## 1.0.0a279
 
 **[Kappa-Band-Columns] the kappa curve gains a band, and stops refusing a disk-backed joint.** `BivariateAggregate.exeqa_df(axis=0, levels=None, cdf_range=None)`. Both new keywords are additive: with neither, the frame is exactly what it was.

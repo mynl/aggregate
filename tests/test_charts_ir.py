@@ -293,6 +293,11 @@ def test_tex_is_total_over_every_emitted_document():
         build('distortion IR.TexD ph 0.7'),
         build('pnl IR.TexPnL 1000 premium less agg IR.TexPnLe 100 claims '
               'sev lognorm 5 cv 2 poisson'),
+        # a netceded joint, for the two charts that read one: the density
+        # surface and the kappa band
+        build('agg IR.TexBv 10 claims 500 xs 0 sev lognorm 50 cv 1.5 '
+              'occurrence net of 50 xs 50 poisson').occ_bivariate(
+                  views=('gross', 'ceded')),
     ]
     swept = set()
     for obj in objs:
@@ -301,10 +306,9 @@ def test_tex_is_total_over_every_emitted_document():
             missing = set(human_strings(doc)) - set(doc.tex)
             assert not missing, f'{name} on {type(obj).__name__}: {missing}'
             swept.add(name)
-    # Every registered chart but two, swept where their objects are built:
-    # the bivariate in tests/test_chart_surface_pilot.py (a joint grid) and
-    # the envelope in tests/test_chart_bounds.py (a calibrated Bounds).
-    assert swept == set(CHARTS) - {'joint_surface', 'envelope'}
+    # Every registered chart but one: the envelope needs a calibrated Bounds
+    # and is swept in tests/test_chart_bounds.py.
+    assert swept == set(CHARTS) - {'envelope'}
 
 
 def test_xy_lengths_must_agree():

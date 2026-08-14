@@ -1,4 +1,4 @@
-"""Bivariate chart emitters: the joint density surface.
+"""Bivariate chart emitters: the joint density surface, and the kappa band.
 
 ``chart_joint_surface`` pulls the joint matrix off a
 :class:`~aggregate.bivariate.BivariateAggregate`, windows it on the fine
@@ -23,6 +23,14 @@ conditional mean read off a windowed joint is wrong by several percent, and
 wrong with a sign that flips as the cut moves, which bends the shape of the
 very curve the picture exists to show.
 
+``chart_kappa`` draws the other half of what a joint knows: the conditional
+cession given the gross outcome, as a curve **with a band**. A mean is the
+wrong summary for the question a cedent actually asks about an occurrence
+program, which is not "what do I cede on average when the year comes in at
+500" but "having come in at 500, how much of that could I have been ceding,
+and how much am I actually ceding". The gross outcome does not determine the
+cession, and the band is where that story is.
+
 Pure numpy; no matplotlib (the plots boundary), no ECharts vocabulary.
 """
 
@@ -31,10 +39,11 @@ import numpy as np
 from .._grid_distribution import GridDistribution
 from ..bivariate import BivariateAggregate
 from . import register_chart, _emitter_base
+from ._payload import lattice_payload
 from .ir import (ChartAxis, ChartDoc, ChartSeries, Panel, SurfaceData,
                  complete_tex, encode_z_block)
 
-__all__ = ['chart_joint_surface']
+__all__ = ['chart_joint_surface', 'chart_kappa']
 
 #: Default target cells per axis after reduction, migrated from the app's
 #: ``CELLS = 128`` (surface.js:27): 128 x 128 is 16,384 vertices, WebGL-cheap
@@ -373,3 +382,248 @@ register_chart(
     'joint_surface', chart_joint_surface,
     predicate=lambda bv: getattr(bv, 'density', None) is not None,
     primary=BivariateAggregate)
+
+
+# --- the kappa band ---------------------------------------------------------
+
+#: The probability window on the conditioning marginal that the curves are
+#: drawn over. A window, not a mass floor: a raw threshold like ``p > 1e-4``
+#: means different things at different bucket sizes (on a fine measured joint
+#: the largest row mass is 8.9e-04, so that threshold discards most of the
+#: picture, while on a coarse one it keeps nearly all of it), and a CDF range
+#: means the same thing on every grid.
+KAPPA_CDF_RANGE = (1e-3, 0.999)
+
+#: The band's two edges. A **percentile** band: nothing here is an estimate
+#: with sampling error, the joint is the law, so the legend says percentile
+#: and never "confidence interval".
+KAPPA_LEVELS = (0.01, 0.99)
+
+chart_kappa = _emitter_base('kappa')
+
+
+def _kappa_ceiling(agg, g):
+    """The most a single occurrence layer could cede at each gross total.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        The reinsured aggregate behind the joint.
+    g : ndarray
+        Gross outcomes.
+
+    Returns
+    -------
+    ndarray or None
+        The ceiling at each ``g``, or ``None`` when the program is not a
+        single finite layer.
+
+    Notes
+    -----
+    For one layer ``limit xs attach`` at placement ``share``, the largest
+    cession achievable with a gross total of ``g`` comes from splitting ``g``
+    into claims of exactly ``attach + limit``, each ceding the full limit, plus
+    whatever a remainder above the attachment cedes. So the ceiling is a comb
+    with teeth every ``attach + limit`` and a maximum share of
+    ``share * limit / (attach + limit)`` at each tooth.
+
+    Drawn next to the upper band edge it says how much of the theoretically
+    available cession the program actually delivers, and the answer is
+    typically "nowhere near": getting several claims to land exactly at the top
+    of the layer is a lot to ask. Measured on the notes' demo, the ceiling
+    peaks at 0.5 while the realized 99th percentile share peaks at 0.400.
+
+    Only for a single layer. A tower has no such simple envelope, since the
+    optimal split of ``g`` across its layers is a different problem at every
+    ``g``, so this answers ``None`` and the panel simply has one fewer curve.
+    """
+    program = getattr(agg, 'occ_reins', None)
+    if not program or len(program) != 1:
+        return None
+    share, limit, attach = (float(v) for v in program[0])
+    if not np.isfinite(limit) or limit <= 0:
+        return None
+    tooth = attach + limit
+    g = np.asarray(g, dtype=float)
+    whole = np.floor(g / tooth)
+    remainder = g - whole * tooth
+    return share * (whole * limit + np.maximum(remainder - attach, 0.0))
+
+
+def _kappa_frame(bv, levels, cdf_range):
+    """The band frame plus the axis roles, for a netceded joint.
+
+    Refuses a joint with no gross axis in the same words
+    :meth:`~aggregate.bivariate.BivariateAggregate.natural_allocation` uses:
+    the curves condition on the gross outcome, and a ``(net, ceded)`` joint has
+    no gross axis to condition on.
+    """
+    if bv.mode != 'netceded':
+        raise ValueError(
+            f'chart kappa reads a netceded joint (one aggregate split into two '
+            f'of gross / ceded / net); {bv.name} is in {bv.mode!r} mode.')
+    views = tuple(bv._views)
+    if 'gross' not in views:
+        raise ValueError(
+            f'chart kappa conditions on the gross outcome, and {bv.name} '
+            f"carries views {views}. Rebuild with views=('gross', 'ceded') "
+            f"or ('gross', 'net').")
+    axis = views.index('gross')
+    return bv.exeqa_df(axis=axis, levels=levels, cdf_range=cdf_range), axis
+
+
+@chart_kappa.register(BivariateAggregate)
+def _kappa_band(bv, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
+                ceiling=True):
+    """Emit the two-panel kappa band chart for a netceded joint.
+
+    Parameters
+    ----------
+    bv : BivariateAggregate
+        An updated ``netceded`` joint carrying a gross axis. A disk-backed
+        (massive) joint is accepted: the band is a row-wise fold, which is the
+        whole point of it.
+    levels : (float, float), default :data:`KAPPA_LEVELS`
+        The band's lower and upper probability.
+    cdf_range : (float, float), default :data:`KAPPA_CDF_RANGE`
+        The probability window on the gross marginal the curves are drawn over.
+    ceiling : bool, default True
+        Draw the deterministic ceiling on the share panel where the program is
+        a single layer (:func:`_kappa_ceiling`).
+
+    Returns
+    -------
+    ChartDoc
+        Two 'xy' panels over one shared gross axis. **cession** carries the two
+        kappa curves, their bands and the identity; **share** carries the same
+        reading divided by the outcome, with the ceiling.
+
+    Notes
+    -----
+    **The left panel is the conservation statement.** ``kappa_N = g -
+    kappa_C`` pointwise, so the net band is the ceded band reflected in the
+    identity, ``[g - q99, g - q01]``: two shaded regions of equal width, one
+    hugging zero and one hugging the diagonal. Equal aspect is semantic there,
+    as on the portfolio kappa panel, because both axes are losses and the
+    reading is each curve's slope against 45 degrees.
+
+    **The bands are ``y2`` series**, so a band *is* the region between two
+    edges rather than two curves a reader has to associate.
+
+    **No smoothing.** A rolling mean over a few tens of buckets would tidy the
+    edges, which step by whole buckets because they are quantiles of a lattice
+    law, but the visible structure below the mean is real: it is the comb of
+    the ceiling, the k claims landing at the top of the layer. Smoothing it
+    away removes the mechanism rather than noise. It is also a display choice,
+    and this document carries meaning rather than drawing instructions.
+    """
+    levels = tuple(sorted(float(v) for v in levels))
+    if len(levels) != 2:
+        raise ValueError(
+            f'the kappa band has two edges, a lower and an upper level; got '
+            f'{levels!r}.')
+    df, axis = _kappa_frame(bv, levels, cdf_range)
+    other_name = bv.unit_names[1 - axis]
+    other_view = bv._views[1 - axis]
+
+    g = df.index.to_numpy(dtype=float)
+    kappa = df[f'exeqa_{other_name}'].to_numpy(dtype=float)
+    lo = df[bv._quantile_column(levels[0], other_name)].to_numpy(dtype=float)
+    hi = df[bv._quantile_column(levels[1], other_name)].to_numpy(dtype=float)
+
+    # The named axis carries one of ceded / net and the other view is g less
+    # it, exactly as the allocation reads the third view: a definition on the
+    # index rather than a second measurement, which is what makes the two
+    # bands mirror images and the two curves sum to the diagonal.
+    third_view = 'net' if other_view == 'ceded' else 'ceded'
+    third = g - kappa
+    third_lo, third_hi = g - hi, g - lo
+
+    step = float(bv.bs[axis])
+    x = lattice_payload(g, step)
+    band_label = (f'{levels[0]:.0%} to {levels[1]:.0%} percentile band'
+                  .replace('%%', '%'))
+    series = [
+        ChartSeries(name=f'E[{other_view} | gross]', role=other_view,
+                    panel_id='cession', support='continuous',
+                    y=tuple(float(v) for v in kappa), **x),
+        ChartSeries(name=f'{other_view} {band_label}', role=other_view,
+                    panel_id='cession', support='continuous',
+                    y=tuple(float(v) for v in lo),
+                    y2=tuple(float(v) for v in hi), **x),
+        ChartSeries(name=f'E[{third_view} | gross]', role=third_view,
+                    panel_id='cession', support='continuous',
+                    y=tuple(float(v) for v in third), **x),
+        ChartSeries(name=f'{third_view} {band_label}', role=third_view,
+                    panel_id='cession', support='continuous',
+                    y=tuple(float(v) for v in third_lo),
+                    y2=tuple(float(v) for v in third_hi), **x),
+        ChartSeries(name='gross', role='identity', panel_id='cession',
+                    support='continuous',
+                    y=tuple(float(v) for v in g), **x),
+    ]
+
+    # Shares. Quantiles commute with the monotone map c -> c / g at fixed g,
+    # so the share band is the value band divided by the index: no second pass
+    # over the joint, and no approximation either.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        share = np.where(g > 0, kappa / g, np.nan)
+        share_lo = np.where(g > 0, lo / g, np.nan)
+        share_hi = np.where(g > 0, hi / g, np.nan)
+    series += [
+        ChartSeries(name=f'{other_view} share', role=other_view,
+                    panel_id='share', support='continuous',
+                    y=tuple(float(v) for v in share), **x),
+        ChartSeries(name=f'{other_view} {band_label}', role=other_view,
+                    panel_id='share', support='continuous',
+                    y=tuple(float(v) for v in share_lo),
+                    y2=tuple(float(v) for v in share_hi), **x),
+    ]
+    top = _kappa_ceiling(bv._nc_agg, g) if ceiling else None
+    if top is not None:
+        with np.errstate(divide='ignore', invalid='ignore'):
+            top_share = np.where(g > 0, top / g, np.nan)
+        series.append(ChartSeries(
+            name='most the program could cede', role='ceiling',
+            panel_id='share', support='continuous',
+            y=tuple(float(v) for v in top_share), **x))
+
+    window = (float(g[0]), float(g[-1]))
+    return complete_tex(ChartDoc(
+        name='kappa',
+        title=f'Conditional cession: {bv.label}',
+        axes=(
+            ChartAxis(id='outcome', label='Gross outcome', unit='currency',
+                      scales=('linear', 'log'), suggested_range=window),
+            # Both axes of the left panel are losses on one scale, which is
+            # what makes the identity line readable as 45 degrees.
+            ChartAxis(id='cession', label='Conditional cession',
+                      unit='currency', scales=('linear', 'log'),
+                      suggested_range=(0.0, float(g[-1]))),
+            ChartAxis(id='share', label='Share of the outcome ceded',
+                      unit='ratio', suggested_range=(0.0, 1.0)),
+        ),
+        panels=(
+            Panel(id='cession', kind='xy', x_axis='outcome',
+                  y_axis='cession', aspect='equal',
+                  title='Cession given the gross outcome'),
+            Panel(id='share', kind='xy', x_axis='outcome', y_axis='share',
+                  title='The same reading as a share'),
+        ),
+        series=tuple(series),
+        # Lists, not tuples: meta travels as JSON and comes back as JSON, so
+        # a tuple here would not survive load_chart_doc hash for hash.
+        meta={'levels': [float(v) for v in levels],
+              'cdf_range': [float(v) for v in cdf_range],
+              'band': 'percentile'},
+    ))
+
+
+register_chart(
+    'kappa', chart_kappa,
+    # Accepts a massive joint, unlike joint_surface: the band is a row-wise
+    # fold and surviving the disk route is the point of it.
+    predicate=lambda bv: (getattr(bv, 'mode', None) == 'netceded'
+                          and 'gross' in getattr(bv, '_views', ())
+                          and (bv.density is not None
+                               or getattr(bv, '_massive', None) is not None)))

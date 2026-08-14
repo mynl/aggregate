@@ -220,7 +220,9 @@ register_simple_exhibit(
 #: dyadic-fractional, so it gets significant digits rather than a fixed
 #: decimal; ``clipped`` is an estimated far-tail mass, tiny when present at
 #: all, so only scientific notation separates a good row from a perfect one.
-#: ``coverage`` is a string upstream (``'1-1e-12'``) and needs nothing.
+#: ``coverage`` is a string upstream (``'1-1e-12'``) and needs nothing, and the
+#: two ``log2`` columns are integers upstream, so the IR types them and formats
+#: them without help.
 BS_WINDOW_FORMATS = {
     'x_min': ',.0f', 'x_max': ',.0f', 'W': ',.0f',
     'bs': ',.4g', 'clipped': '.2e',

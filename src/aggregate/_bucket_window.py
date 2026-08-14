@@ -947,7 +947,17 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
 
     ret_x0 = sel_x0
 
-    df = pd.DataFrame(rows).T
+    # ``from_dict(orient='index')``, NOT ``pd.DataFrame(rows).T``. The rows mix
+    # bool, float, int and str, so the transposed form puts *methods* in the
+    # columns, makes every column mixed, and lands the whole block as
+    # ``object``; the transpose then carries that dtype across wholesale,
+    # because pandas does not re-infer per column on a transpose. Every
+    # published column read ``object``, which cost the served table its right
+    # alignment and its raw values (a string column carries none, so an
+    # interactive grid cannot sort or filter it). Index-oriented construction
+    # infers per column instead, which is what the Portfolio sizer has always
+    # done (``port_build_bs_window_df`` builds from a list of row dicts).
+    df = pd.DataFrame.from_dict(rows, orient='index')
     # Named at construction, so the private frame and the published one agree.
     # Without it the index reaches a served table as a column headed
     # ``level_0``, which names nothing a reader recognizes.
@@ -979,6 +989,15 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     df['clipped'] = np.nan
     if agg._bs_clip is not None:
         df.loc['used', 'clipped'] = float(agg._bs_clip.get('clipped_mass', np.nan))
+    # The two log2 columns are exponents, so they read as integers. Both can be
+    # genuinely absent (a non-applies ``sbj`` row records no grid; ``_need``
+    # returns NaN on a degenerate window), hence the nullable ``Int64`` rather
+    # than a plain ``int64``: without it inference would give ``int64`` on most
+    # books and ``float64`` on the ones with an n/a row, and the published
+    # dtype would depend on the book. A float log2 also renders as ``16.00``,
+    # which is not what an exponent looks like.
+    df['log2'] = df['log2'].astype('Int64')
+    df['log2_need'] = df['log2_need'].astype('Int64')
     agg._bs_window_df = df
 
     return sel_bs, sel_l2, ret_x0
@@ -1004,7 +1023,9 @@ def port_bs_window_df(port) -> 'pd.DataFrame':
 
     ``W`` and ``coverage`` joined the published frame at ``1.0.0a254``: the
     width and the coverage are what let a reader compare two candidate
-    windows, which is the only thing this frame is for.
+    windows, which is the only thing this frame is for. The two exponent
+    columns are nullable ``Int64`` since ``1.0.0a275``, parity with
+    :attr:`Aggregate.bs_window_df`.
     """
     df = getattr(port, '_bs_window_df', None)
     if df is None:
@@ -1335,6 +1356,12 @@ def port_build_bs_window_df(port, rows, bs, log2, x_min, cand, resolution, W_ext
         return float(np.ceil(np.log2(w / b + 1.0)))
     df['log2_need'] = df.apply(_need, axis=1)
     df['clipped'] = np.nan
+    # Nullable ``Int64`` for the two exponent columns, parity with the
+    # Aggregate frame: this one already infers cleanly (it is built from a
+    # list of row dicts, never transposed), but ``log2_need`` is NaN on a
+    # degenerate window, so it needs the nullable form all the same.
+    df['log2'] = df['log2'].astype('Int64')
+    df['log2_need'] = df['log2_need'].astype('Int64')
     # ``unit`` came from the per unit rows and then five rows that are not
     # units were appended under it: four combine candidates and the realized
     # grid. ``source`` is what every row actually answers, namely where this

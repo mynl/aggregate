@@ -5,19 +5,37 @@
     {
      "cells": [
       "moment",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "31",
-      "31",
-      "1",
-      "6",
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 31.30829289650644,
+       "text": "31"
+      },
+      {
+       "raw": 31.30829289650644,
+       "text": "31"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 6,
+       "text": "6"
+      },
+      {
+       "raw": 6,
+       "text": "6"
       },
       "1-1e-12",
       {
@@ -31,19 +49,37 @@
      "break_depth": 0,
      "cells": [
       "exact_discrete",
-      "True",
       {
        "raw": true,
        "text": "True"
       },
-      "0",
-      "18",
-      "18",
-      "1",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 18.0,
+       "text": "18"
+      },
+      {
+       "raw": 18.0,
+       "text": "18"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "exact",
       {
@@ -57,19 +93,37 @@
      "break_depth": 0,
      "cells": [
       "bounded_small",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "18",
-      "18",
-      "1",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 18.0,
+       "text": "18"
+      },
+      {
+       "raw": 18.0,
+       "text": "18"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "freq 1-1e-12",
       {
@@ -83,19 +137,37 @@
      "break_depth": 0,
      "cells": [
       "sbj",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "23",
-      "23",
-      "1",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 22.772638660818956,
+       "text": "23"
+      },
+      {
+       "raw": 22.772638660818956,
+       "text": "23"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "E[N]-adj 1-1e-12",
       {
@@ -109,19 +181,37 @@
      "break_depth": 0,
      "cells": [
       "used",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "32",
-      "32",
-      "1",
-      "5",
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 32.0,
+       "text": "32"
+      },
+      {
+       "raw": 32.0,
+       "text": "32"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 6,
+       "text": "6"
       },
       "exact",
       {
@@ -147,12 +237,12 @@
     },
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "bool",
      "key": "c1",
      "name": [
       "applies"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "l",
@@ -164,8 +254,8 @@
      "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -175,11 +265,11 @@
      "name": [
       "x_min"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -189,11 +279,11 @@
      "name": [
       "x_max"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -203,11 +293,11 @@
      "name": [
       "W"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 4,
       "group": true,
@@ -217,24 +307,27 @@
      "name": [
       "bs"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c7",
      "name": [
       "log2"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "r",
-     "dtype": "float",
+     "dtype": "int",
      "format": {
-      "digits": 3,
       "group": true,
-      "kind": "dec"
+      "kind": "int"
      },
      "key": "c8",
      "name": [
@@ -326,11 +419,26 @@
      "cells": [
       "X",
       "agg",
-      "10",
-      "4",
-      "0",
-      "150",
-      "0.00e+00"
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      {
+       "raw": 4,
+       "text": "4"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 150.0,
+       "text": "150"
+      },
+      {
+       "raw": false,
+       "text": "0.00e+00"
+      }
      ]
     },
     {
@@ -338,11 +446,26 @@
      "cells": [
       "Y",
       "agg",
-      "1",
-      "4",
-      "0",
-      "15",
-      "0.00e+00"
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 4,
+       "text": "4"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 15.0,
+       "text": "15"
+      },
+      {
+       "raw": false,
+       "text": "0.00e+00"
+      }
      ]
     }
    ],
@@ -369,8 +492,8 @@
      "wrap": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 4,
       "group": true,
@@ -380,20 +503,24 @@
      "name": [
       "bs"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c3",
      "name": [
       "log2"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -403,11 +530,11 @@
      "name": [
       "x_min"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -417,11 +544,11 @@
      "name": [
       "x_max"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "bool",
      "format": {
       "digits": 2,
       "kind": "sci"
@@ -430,7 +557,7 @@
      "name": [
       "clipped"
      ],
-     "wrap": true
+     "raw": true
     }
    ],
    "head": [
@@ -490,8 +617,8 @@
        "text": "2"
       },
       {
-       "raw": 2.0,
-       "text": "2.000"
+       "raw": 2,
+       "text": "2"
       },
       "exact",
       {
@@ -526,8 +653,8 @@
        "text": "4"
       },
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 4,
+       "text": "4"
       },
       "exact",
       {
@@ -565,8 +692,8 @@
        "text": "5"
       },
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 5,
+       "text": "5"
       },
       "1-1e-12",
       {
@@ -601,8 +728,8 @@
        "text": "5"
       },
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 4,
+       "text": "4"
       },
       "1-1e-12",
       {
@@ -637,8 +764,8 @@
        "text": "5"
       },
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 5,
+       "text": "5"
       },
       "1-1e-12",
       {
@@ -673,8 +800,8 @@
        "text": "5"
       },
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 4,
+       "text": "4"
       },
       "1-1e-12",
       {
@@ -709,8 +836,8 @@
        "text": "5"
       },
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 6,
+       "text": "6"
       },
       "1-1e-12",
       {
@@ -805,11 +932,10 @@
     },
     {
      "align": "r",
-     "dtype": "float",
+     "dtype": "int",
      "format": {
-      "digits": 3,
       "group": true,
-      "kind": "dec"
+      "kind": "int"
      },
      "key": "c6",
      "name": [
@@ -894,19 +1020,37 @@
     {
      "cells": [
       "moment",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "182",
-      "182",
-      "10",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 181.95332741759927,
+       "text": "182"
+      },
+      {
+       "raw": 181.95332741759927,
+       "text": "182"
+      },
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "1-1e-12",
       {
@@ -920,19 +1064,37 @@
      "break_depth": 0,
      "cells": [
       "exact_discrete",
-      "True",
       {
        "raw": true,
        "text": "True"
       },
-      "0",
-      "60",
-      "60",
-      "1",
-      "6",
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 60.0,
+       "text": "60"
+      },
+      {
+       "raw": 60.0,
+       "text": "60"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 6,
+       "text": "6"
+      },
+      {
+       "raw": 6,
+       "text": "6"
       },
       "exact",
       {
@@ -946,19 +1108,37 @@
      "break_depth": 0,
      "cells": [
       "bounded_small",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "151",
-      "151",
-      "10",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 150.51730365071754,
+       "text": "151"
+      },
+      {
+       "raw": 150.51730365071754,
+       "text": "151"
+      },
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "freq 1-1e-12",
       {
@@ -972,19 +1152,37 @@
      "break_depth": 0,
      "cells": [
       "sbj",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "88",
-      "88",
-      "10",
-      "4",
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 87.89614924990504,
+       "text": "88"
+      },
+      {
+       "raw": 87.89614924990504,
+       "text": "88"
+      },
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      {
+       "raw": 4,
+       "text": "4"
+      },
+      {
+       "raw": 4,
+       "text": "4"
       },
       "E[N]-adj 1-1e-12",
       {
@@ -998,19 +1196,37 @@
      "break_depth": 0,
      "cells": [
       "used",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "64",
-      "64",
-      "1",
-      "6",
       {
-       "raw": 7.0,
-       "text": "7.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 64.0,
+       "text": "64"
+      },
+      {
+       "raw": 64.0,
+       "text": "64"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 6,
+       "text": "6"
+      },
+      {
+       "raw": 7,
+       "text": "7"
       },
       "exact",
       {
@@ -1036,12 +1252,12 @@
     },
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "bool",
      "key": "c1",
      "name": [
       "applies"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "l",
@@ -1053,8 +1269,8 @@
      "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -1064,11 +1280,11 @@
      "name": [
       "x_min"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -1078,11 +1294,11 @@
      "name": [
       "x_max"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -1092,11 +1308,11 @@
      "name": [
       "W"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 4,
       "group": true,
@@ -1106,24 +1322,27 @@
      "name": [
       "bs"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c7",
      "name": [
       "log2"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "r",
-     "dtype": "float",
+     "dtype": "int",
      "format": {
-      "digits": 3,
       "group": true,
-      "kind": "dec"
+      "kind": "int"
      },
      "key": "c8",
      "name": [
@@ -1235,8 +1454,8 @@
        "text": "6"
       },
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 6,
+       "text": "6"
       },
       "exact",
       {
@@ -1271,8 +1490,8 @@
        "text": "4"
       },
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 4,
+       "text": "4"
       },
       "exact",
       {
@@ -1310,8 +1529,8 @@
        "text": "8"
       },
       {
-       "raw": 8.0,
-       "text": "8.000"
+       "raw": 8,
+       "text": "8"
       },
       "1-1e-12",
       {
@@ -1346,8 +1565,8 @@
        "text": "8"
       },
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 6,
+       "text": "6"
       },
       "1-1e-12",
       {
@@ -1382,8 +1601,8 @@
        "text": "8"
       },
       {
-       "raw": 7.0,
-       "text": "7.000"
+       "raw": 7,
+       "text": "7"
       },
       "1-1e-12",
       {
@@ -1418,8 +1637,8 @@
        "text": "8"
       },
       {
-       "raw": 7.0,
-       "text": "7.000"
+       "raw": 7,
+       "text": "7"
       },
       "1-1e-12",
       {
@@ -1454,8 +1673,8 @@
        "text": "8"
       },
       {
-       "raw": 9.0,
-       "text": "9.000"
+       "raw": 9,
+       "text": "9"
       },
       "1-1e-12",
       {
@@ -1550,11 +1769,10 @@
     },
     {
      "align": "r",
-     "dtype": "float",
+     "dtype": "int",
      "format": {
-      "digits": 3,
       "group": true,
-      "kind": "dec"
+      "kind": "int"
      },
      "key": "c6",
      "name": [
@@ -1639,19 +1857,37 @@
     {
      "cells": [
       "moment",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "31",
-      "31",
-      "1",
-      "6",
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 31.30829289650644,
+       "text": "31"
+      },
+      {
+       "raw": 31.30829289650644,
+       "text": "31"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 6,
+       "text": "6"
+      },
+      {
+       "raw": 6,
+       "text": "6"
       },
       "1-1e-12",
       {
@@ -1665,19 +1901,37 @@
      "break_depth": 0,
      "cells": [
       "exact_discrete",
-      "True",
       {
        "raw": true,
        "text": "True"
       },
-      "0",
-      "18",
-      "18",
-      "1",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 18.0,
+       "text": "18"
+      },
+      {
+       "raw": 18.0,
+       "text": "18"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "exact",
       {
@@ -1691,19 +1945,37 @@
      "break_depth": 0,
      "cells": [
       "bounded_small",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "18",
-      "18",
-      "1",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 18.0,
+       "text": "18"
+      },
+      {
+       "raw": 18.0,
+       "text": "18"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "freq 1-1e-12",
       {
@@ -1717,19 +1989,37 @@
      "break_depth": 0,
      "cells": [
       "sbj",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "23",
-      "23",
-      "1",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 22.772638660818956,
+       "text": "23"
+      },
+      {
+       "raw": 22.772638660818956,
+       "text": "23"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "E[N]-adj 1-1e-12",
       {
@@ -1743,19 +2033,37 @@
      "break_depth": 0,
      "cells": [
       "used",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "32",
-      "32",
-      "1",
-      "5",
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 32.0,
+       "text": "32"
+      },
+      {
+       "raw": 32.0,
+       "text": "32"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 6,
+       "text": "6"
       },
       "exact",
       {
@@ -1781,12 +2089,12 @@
     },
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "bool",
      "key": "c1",
      "name": [
       "applies"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "l",
@@ -1798,8 +2106,8 @@
      "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -1809,11 +2117,11 @@
      "name": [
       "x_min"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -1823,11 +2131,11 @@
      "name": [
       "x_max"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -1837,11 +2145,11 @@
      "name": [
       "W"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 4,
       "group": true,
@@ -1851,24 +2159,27 @@
      "name": [
       "bs"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c7",
      "name": [
       "log2"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "r",
-     "dtype": "float",
+     "dtype": "int",
      "format": {
-      "digits": 3,
       "group": true,
-      "kind": "dec"
+      "kind": "int"
      },
      "key": "c8",
      "name": [
@@ -1960,11 +2271,26 @@
      "cells": [
       "X",
       "agg",
-      "10",
-      "4",
-      "0",
-      "150",
-      "0.00e+00"
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      {
+       "raw": 4,
+       "text": "4"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 150.0,
+       "text": "150"
+      },
+      {
+       "raw": false,
+       "text": "0.00e+00"
+      }
      ]
     },
     {
@@ -1972,11 +2298,26 @@
      "cells": [
       "Y",
       "agg",
-      "1",
-      "4",
-      "0",
-      "15",
-      "0.00e+00"
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 4,
+       "text": "4"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 15.0,
+       "text": "15"
+      },
+      {
+       "raw": false,
+       "text": "0.00e+00"
+      }
      ]
     }
    ],
@@ -2003,8 +2344,8 @@
      "wrap": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 4,
       "group": true,
@@ -2014,20 +2355,24 @@
      "name": [
       "bs"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c3",
      "name": [
       "log2"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -2037,11 +2382,11 @@
      "name": [
       "x_min"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -2051,11 +2396,11 @@
      "name": [
       "x_max"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "bool",
      "format": {
       "digits": 2,
       "kind": "sci"
@@ -2064,7 +2409,7 @@
      "name": [
       "clipped"
      ],
-     "wrap": true
+     "raw": true
     }
    ],
    "head": [
@@ -2124,8 +2469,8 @@
        "text": "2"
       },
       {
-       "raw": 2.0,
-       "text": "2.000"
+       "raw": 2,
+       "text": "2"
       },
       "exact",
       {
@@ -2160,8 +2505,8 @@
        "text": "4"
       },
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 4,
+       "text": "4"
       },
       "exact",
       {
@@ -2199,8 +2544,8 @@
        "text": "5"
       },
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 5,
+       "text": "5"
       },
       "1-1e-12",
       {
@@ -2235,8 +2580,8 @@
        "text": "5"
       },
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 4,
+       "text": "4"
       },
       "1-1e-12",
       {
@@ -2271,8 +2616,8 @@
        "text": "5"
       },
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 5,
+       "text": "5"
       },
       "1-1e-12",
       {
@@ -2307,8 +2652,8 @@
        "text": "5"
       },
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 4,
+       "text": "4"
       },
       "1-1e-12",
       {
@@ -2343,8 +2688,8 @@
        "text": "5"
       },
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 6,
+       "text": "6"
       },
       "1-1e-12",
       {
@@ -2439,11 +2784,10 @@
     },
     {
      "align": "r",
-     "dtype": "float",
+     "dtype": "int",
      "format": {
-      "digits": 3,
       "group": true,
-      "kind": "dec"
+      "kind": "int"
      },
      "key": "c6",
      "name": [
@@ -2528,19 +2872,37 @@
     {
      "cells": [
       "moment",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "182",
-      "182",
-      "10",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 181.95332741759927,
+       "text": "182"
+      },
+      {
+       "raw": 181.95332741759927,
+       "text": "182"
+      },
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "1-1e-12",
       {
@@ -2554,19 +2916,37 @@
      "break_depth": 0,
      "cells": [
       "exact_discrete",
-      "True",
       {
        "raw": true,
        "text": "True"
       },
-      "0",
-      "60",
-      "60",
-      "1",
-      "6",
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 60.0,
+       "text": "60"
+      },
+      {
+       "raw": 60.0,
+       "text": "60"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 6,
+       "text": "6"
+      },
+      {
+       "raw": 6,
+       "text": "6"
       },
       "exact",
       {
@@ -2580,19 +2960,37 @@
      "break_depth": 0,
      "cells": [
       "bounded_small",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "151",
-      "151",
-      "10",
-      "5",
       {
-       "raw": 5.0,
-       "text": "5.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 150.51730365071754,
+       "text": "151"
+      },
+      {
+       "raw": 150.51730365071754,
+       "text": "151"
+      },
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      {
+       "raw": 5,
+       "text": "5"
+      },
+      {
+       "raw": 5,
+       "text": "5"
       },
       "freq 1-1e-12",
       {
@@ -2606,19 +3004,37 @@
      "break_depth": 0,
      "cells": [
       "sbj",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "88",
-      "88",
-      "10",
-      "4",
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 87.89614924990504,
+       "text": "88"
+      },
+      {
+       "raw": 87.89614924990504,
+       "text": "88"
+      },
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      {
+       "raw": 4,
+       "text": "4"
+      },
+      {
+       "raw": 4,
+       "text": "4"
       },
       "E[N]-adj 1-1e-12",
       {
@@ -2632,19 +3048,37 @@
      "break_depth": 0,
      "cells": [
       "used",
-      "True",
+      {
+       "raw": true,
+       "text": "True"
+      },
       {
        "raw": false,
        "text": "False"
       },
-      "0",
-      "64",
-      "64",
-      "1",
-      "6",
       {
-       "raw": 7.0,
-       "text": "7.000"
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 64.0,
+       "text": "64"
+      },
+      {
+       "raw": 64.0,
+       "text": "64"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 6,
+       "text": "6"
+      },
+      {
+       "raw": 7,
+       "text": "7"
       },
       "exact",
       {
@@ -2670,12 +3104,12 @@
     },
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "bool",
      "key": "c1",
      "name": [
       "applies"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "l",
@@ -2687,8 +3121,8 @@
      "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -2698,11 +3132,11 @@
      "name": [
       "x_min"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -2712,11 +3146,11 @@
      "name": [
       "x_max"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 0,
       "group": true,
@@ -2726,11 +3160,11 @@
      "name": [
       "W"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
      "format": {
       "digits": 4,
       "group": true,
@@ -2740,24 +3174,27 @@
      "name": [
       "bs"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
      "key": "c7",
      "name": [
       "log2"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "r",
-     "dtype": "float",
+     "dtype": "int",
      "format": {
-      "digits": 3,
       "group": true,
-      "kind": "dec"
+      "kind": "int"
      },
      "key": "c8",
      "name": [
@@ -2869,8 +3306,8 @@
        "text": "6"
       },
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 6,
+       "text": "6"
       },
       "exact",
       {
@@ -2905,8 +3342,8 @@
        "text": "4"
       },
       {
-       "raw": 4.0,
-       "text": "4.000"
+       "raw": 4,
+       "text": "4"
       },
       "exact",
       {
@@ -2944,8 +3381,8 @@
        "text": "8"
       },
       {
-       "raw": 8.0,
-       "text": "8.000"
+       "raw": 8,
+       "text": "8"
       },
       "1-1e-12",
       {
@@ -2980,8 +3417,8 @@
        "text": "8"
       },
       {
-       "raw": 6.0,
-       "text": "6.000"
+       "raw": 6,
+       "text": "6"
       },
       "1-1e-12",
       {
@@ -3016,8 +3453,8 @@
        "text": "8"
       },
       {
-       "raw": 7.0,
-       "text": "7.000"
+       "raw": 7,
+       "text": "7"
       },
       "1-1e-12",
       {
@@ -3052,8 +3489,8 @@
        "text": "8"
       },
       {
-       "raw": 7.0,
-       "text": "7.000"
+       "raw": 7,
+       "text": "7"
       },
       "1-1e-12",
       {
@@ -3088,8 +3525,8 @@
        "text": "8"
       },
       {
-       "raw": 9.0,
-       "text": "9.000"
+       "raw": 9,
+       "text": "9"
       },
       "1-1e-12",
       {
@@ -3184,11 +3621,10 @@
     },
     {
      "align": "r",
-     "dtype": "float",
+     "dtype": "int",
      "format": {
-      "digits": 3,
       "group": true,
-      "kind": "dec"
+      "kind": "int"
      },
      "key": "c6",
      "name": [
@@ -3387,24 +3823,60 @@
     {
      "cells": [
       "X",
-      "10.0",
-      "40.0",
-      "19.499999999999996",
-      "8.930285549745882",
-      "0.7297909280734887",
-      "False"
+      {
+       "raw": 10.0,
+       "text": "10.000"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 19.499999999999996,
+       "text": "19.50"
+      },
+      {
+       "raw": 8.930285549745882,
+       "text": "8.930"
+      },
+      {
+       "raw": 0.7297909280734887,
+       "text": "0.72979"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      }
      ]
     },
     {
      "break_depth": 0,
      "cells": [
       "Y",
-      "1.0",
-      "6.0",
-      "2.0799999999999996",
-      "1.1702991070662239",
-      "0.9675216470639391",
-      "False"
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 6.0,
+       "text": "6.00"
+      },
+      {
+       "raw": 2.0799999999999996,
+       "text": "2.08"
+      },
+      {
+       "raw": 1.1702991070662239,
+       "text": "1.170"
+      },
+      {
+       "raw": 0.9675216470639391,
+       "text": "0.96752"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      }
      ]
     }
    ],
@@ -3422,58 +3894,83 @@
      "wrap": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c1",
      "name": [
       "support_min"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c2",
      "name": [
       "support_max"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c3",
      "name": [
       "mean"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c4",
      "name": [
       "sd"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c5",
      "name": [
       "skew"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "bool",
      "key": "c6",
      "name": [
       "right_heavy"
      ],
-     "wrap": true
+     "raw": true
     }
    ],
    "head": [
@@ -3626,24 +4123,60 @@
     {
      "cells": [
       "X",
-      "10.0",
-      "40.0",
-      "19.499999999999996",
-      "8.930285549745882",
-      "0.7297909280734887",
-      "False"
+      {
+       "raw": 10.0,
+       "text": "10.000"
+      },
+      {
+       "raw": 40.0,
+       "text": "40.00"
+      },
+      {
+       "raw": 19.499999999999996,
+       "text": "19.50"
+      },
+      {
+       "raw": 8.930285549745882,
+       "text": "8.930"
+      },
+      {
+       "raw": 0.7297909280734887,
+       "text": "0.72979"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      }
      ]
     },
     {
      "break_depth": 0,
      "cells": [
       "Y",
-      "1.0",
-      "6.0",
-      "2.0799999999999996",
-      "1.1702991070662239",
-      "0.9675216470639391",
-      "False"
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 6.0,
+       "text": "6.00"
+      },
+      {
+       "raw": 2.0799999999999996,
+       "text": "2.08"
+      },
+      {
+       "raw": 1.1702991070662239,
+       "text": "1.170"
+      },
+      {
+       "raw": 0.9675216470639391,
+       "text": "0.96752"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      }
      ]
     }
    ],
@@ -3661,58 +4194,83 @@
      "wrap": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c1",
      "name": [
       "support_min"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c2",
      "name": [
       "support_max"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c3",
      "name": [
       "mean"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c4",
      "name": [
       "sd"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
      "key": "c5",
      "name": [
       "skew"
      ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "l",
-     "dtype": "string",
+     "dtype": "bool",
      "key": "c6",
      "name": [
       "right_heavy"
      ],
-     "wrap": true
+     "raw": true
     }
    ],
    "head": [

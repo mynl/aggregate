@@ -782,6 +782,14 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ``coverage`` is a **string** (``'1-1e-12'``,
         ``'E[N]-adj 1-1e-12'``), carrying precision a float cannot and saying
         which of two things was held to that precision.
+
+        **Every column carries its own dtype**, which it did not until
+        ``1.0.0a275``: ``applies`` / ``selected`` bool, the window and grid
+        columns float, ``log2`` / ``log2_need`` nullable ``Int64`` (an exponent
+        reads as an integer, and a method that never ran records none),
+        ``coverage`` / ``note`` string. The frame used to be built by
+        transposing a method-per-column block, which typed the lot ``object``
+        and cost a served table its right alignment and its raw values.
         """
         if self._bs_window_df is None:
             return None

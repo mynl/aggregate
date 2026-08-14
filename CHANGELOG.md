@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a275
+
+**[BS-Window-Dtypes] the grid sizing frames carry their own dtypes.** Every column of `Aggregate.bs_window_df` was `object`: `applies`, `x_min`, `x_max`, `W`, `bs`, `log2`, `coverage`, `note`. The frame was built by transposing a method-per-column block (`pd.DataFrame(rows).T`), and because the rows mix bool, float, int and str, every column of that block was mixed and typed `object`; a transpose carries the dtype across wholesale rather than re-inferring per column. The tell was which columns worked: `selected`, `log2_need` and `clipped` are the three assigned *after* the transpose, and were the only three correctly typed.
+
+It showed in the served table. `bs_window` is a passthrough exhibit, so an object column reaches the IR as `dtype='string'`, left aligned, wrapped, and carrying **no raw values**, which is what an interactive grid sorts and filters on. `log2` had no `BS_WINDOW_FORMATS` entry, having never needed one as an integer, so it rendered with no format at all.
+
+The sizer now builds index-oriented (`pd.DataFrame.from_dict(rows, orient='index')`), which infers per column. That is what the Portfolio sizer has always done, building from a list of row dicts and never transposing, which is why its frame was already correct. `applies` is bool, the window and grid columns are float, `coverage` and `note` are string.
+
+Both `log2` columns, aggregate and portfolio, are now nullable `Int64`. An exponent reads as an integer, and both `log2` and `log2_need` can be genuinely absent (a non-applies `sbj` row records no grid, and `log2_need` is NaN on a degenerate window), so plain `int64` will not hold them; without the cast the published dtype would depend on the book. `log2_need` consequently reads `6` rather than `6.000`.
+
+`BivariateAggregate.bs_window_df` and `axis_support_df` had the identical transpose and are fixed the same way. The first feeds the same exhibit, so fixing only the aggregate would have left that leaf broken; the second was rendering unformatted float repr (`19.499999999999996`) because a string column bypasses formatting, and now reads `19.50`.
+
+Twelve of the 116 exhibit snapshots move, all in `bs_window` and `dependency`, all of them column dtype, alignment and raw values plus the two text improvements above. Captions, notes, heads, feet and level counts are untouched, and no keys are added or removed. Every consumer already wrapped these cells in `float()` / `int()` / `bool()`, so nothing downstream changes. Plan and the deliberate snapshot read in `dev/done/plan-bs-window-dtypes.md`.
+
+Known and not fixed here: the bivariate `clipped` column is a bool flag while the aggregate `clipped` is an estimated mass, and `BS_WINDOW_FORMATS` carries one `'.2e'` for the name, so the bivariate flag renders `0.00e+00` where it should read `False`. Pre-existing, unchanged by this work, and fixing it means renaming one of the two columns or scoping the format per class.
+
 ## 1.0.0a274
 
 **[NetCeded-Natural-Allocation] a gross premium splits across an occurrence program.** `BivariateAggregate.natural_allocation(distortion, P=None)` allocates a gross distorted premium to the occurrence ceded and net components of a netceded joint. Rows `gross` / `ceded` / `net`, columns the pentagon octet, ceded plus net footing to gross exactly.

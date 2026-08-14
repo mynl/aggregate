@@ -2866,7 +2866,12 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 'x_min': float(xs[0]), 'x_max': float(xs[-1]),
                 'clipped': bool(getattr(self, '_clipped', False)),
             }
-        df = pd.DataFrame(rows).T
+        # ``from_dict(orient='index')``, not ``pd.DataFrame(rows).T``: the rows
+        # mix str, float, int and bool, and the transposed form types the whole
+        # block ``object``, which costs the served table its alignment and its
+        # raw values. Same fix as the aggregate sizer.
+        df = pd.DataFrame.from_dict(rows, orient='index')
+        df['log2'] = df['log2'].astype('Int64')
         df.index.name = 'axis'
         return self._relabel(df)
 
@@ -2948,7 +2953,10 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 'mean': mt, 'sd': sdt, 'skew': skt,
                 'right_heavy': bool(np.isfinite(skt) and skt > 1.0),
             }
-        df = pd.DataFrame(rows).T
+        # Index-oriented construction, so the five float columns stay float and
+        # ``right_heavy`` stays bool; the transposed form typed all six
+        # ``object``. Same fix as :attr:`bs_window_df`.
+        df = pd.DataFrame.from_dict(rows, orient='index')
         df.index.name = 'axis'
         return self._relabel(df)
 

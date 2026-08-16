@@ -5832,5 +5832,135 @@
       "note": "Broadcast vector layer: mixture of differently layered waits.",
       "hints": ""
     }
+  },
+  "agg Z.SplitLimit.Policy 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt ! hints{log2=16; bs=1/32} note{US personal auto split limit, the per-policy law: 100 per claimant, at least one claim per policy.}": {
+    "kind": "agg",
+    "name": "Z.SplitLimit.Policy",
+    "spec": {
+      "name": "Z.SplitLimit.Policy",
+      "exp_en": 1.5,
+      "exp_attachment": 0.0,
+      "exp_limit": 100.0,
+      "sev_name": "gamma",
+      "sev_mean": 50.0,
+      "sev_cv": 2.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "freq_zm": true,
+      "freq_p0": 0.0,
+      "freq_pin_mean": true,
+      "note": "US personal auto split limit, the per-policy law: 100 per claimant, at least one claim per policy.",
+      "hints": "log2=16; bs=1/32"
+    }
+  },
+  "agg Z.SplitLimit.Book   5000 claims 300 xs 0 sev agg.Z.SplitLimit.Policy ! mixed gamma .2 note{5000 policies; the 300 policy aggregate is an ordinary occurrence limit on the reference. The severity ! keeps the layer unconditional.}": {
+    "kind": "agg",
+    "name": "Z.SplitLimit.Book",
+    "spec": {
+      "name": "Z.SplitLimit.Book",
+      "exp_en": 5000.0,
+      "exp_attachment": 0.0,
+      "exp_limit": 300.0,
+      "sev_ref": "agg.Z.SplitLimit.Policy",
+      "sev_conditional": false,
+      "freq_name": "gamma",
+      "freq_a": 0.2,
+      "note": "5000 policies; the 300 policy aggregate is an ordinary occurrence limit on the reference. The severity ! keeps the layer unconditional.",
+      "hints": ""
+    }
+  },
+  "port Z.Ref.Book hints{log2=16; bs=1/32} agg Z.Ref.Unit 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt !": {
+    "kind": "port",
+    "name": "Z.Ref.Book",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "Z.Ref.Unit",
+          {
+            "name": "Z.Ref.Unit",
+            "exp_en": 1.5,
+            "exp_attachment": 0.0,
+            "exp_limit": 100.0,
+            "sev_name": "gamma",
+            "sev_mean": 50.0,
+            "sev_cv": 2.0,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "poisson",
+            "freq_zm": true,
+            "freq_p0": 0.0,
+            "freq_pin_mean": true,
+            "note": "",
+            "hints": ""
+          }
+        ]
+      ],
+      "note": "",
+      "hints": "log2=16; bs=1/32"
+    }
+  },
+  "agg Z.Ref.FromPort      10 claims sev port.Z.Ref.Book poisson note{A portfolio total serving as a severity.}": {
+    "kind": "agg",
+    "name": "Z.Ref.FromPort",
+    "spec": {
+      "name": "Z.Ref.FromPort",
+      "exp_en": 10.0,
+      "sev_ref": "port.Z.Ref.Book",
+      "freq_name": "poisson",
+      "note": "A portfolio total serving as a severity.",
+      "hints": ""
+    }
+  },
+  "agg Z.Ref.Signed        dfreq  [1]  ssev 100 - lognorm 50 cv .5 hints{log2=12; bs=1/16} note{A signed source for the ssev reference form.}": {
+    "kind": "agg",
+    "name": "Z.Ref.Signed",
+    "spec": {
+      "name": "Z.Ref.Signed",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0
+      ],
+      "freq_b": [
+        1.0
+      ],
+      "exp_en": -1,
+      "sev_name": "lognorm",
+      "sev_mean": 50.0,
+      "sev_cv": 0.5,
+      "sev_scale": 1.0,
+      "sev_loc": 100.0,
+      "sev_reflect": true,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "sev_signed": true,
+      "note": "A signed source for the ssev reference form.",
+      "hints": "log2=12; bs=1/16"
+    }
+  },
+  "agg Z.Ref.UsesSigned    dfreq  [1]  ssev agg.Z.Ref.Signed note{ssev over a signed reference keeps the negative atoms.}": {
+    "kind": "agg",
+    "name": "Z.Ref.UsesSigned",
+    "spec": {
+      "name": "Z.Ref.UsesSigned",
+      "freq_name": "empirical",
+      "freq_a": [
+        1.0
+      ],
+      "freq_b": [
+        1.0
+      ],
+      "exp_en": -1,
+      "sev_ref": "agg.Z.Ref.Signed",
+      "sev_signed": true,
+      "note": "ssev over a signed reference keeps the negative atoms.",
+      "hints": ""
+    }
   }
 }

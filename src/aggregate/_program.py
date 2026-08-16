@@ -361,6 +361,68 @@ def _merge_hints(hints, updates):
     return '; '.join(out)
 
 
+def with_hints(ob, **extra):
+    """The object's program with its realized grid pinned into a ``hints{...}``.
+
+    The worker behind :meth:`aggregate.distributions.Aggregate.with_hints` and
+    :meth:`aggregate.portfolio.Portfolio.with_hints`. See either for the user
+    story; the mechanics are here so both read from one implementation.
+
+    Parameters
+    ----------
+    ob : Aggregate or Portfolio
+        An **updated** object carrying a DecL program.
+    **extra
+        Further ``hints{}`` settings, any member of
+        :data:`aggregate.underwriter._HINT_KEYS`, merged over the three the
+        object supplies.
+
+    Returns
+    -------
+    str
+        One line of DecL, ready to hand back to ``build``.
+
+    Raises
+    ------
+    ValueError
+        If the object has not been updated (there is no grid to pin), carries
+        no DecL program, or is passed a hint key the language does not have.
+
+    Notes
+    -----
+    The clause is **merged**, not appended: a spec holds one ``hints``, so the
+    three keys are replaced where the author already wrote them and appended
+    where they did not, and every other setting survives in place
+    (:func:`_merge_hints`). Pinning the grid therefore does not discard a
+    declared ``padding`` or ``sev_calc``.
+    """
+    from ._bucket_window import _fmt_bs
+    from .underwriter import _HINT_KEYS
+
+    who = getattr(ob, 'name', ob)
+    bad = sorted(set(extra) - _HINT_KEYS)
+    if bad:
+        raise ValueError(
+            f"with_hints: {', '.join(bad)} is not a hints key; DecL knows "
+            f"{', '.join(sorted(_HINT_KEYS))}.")
+    bs = getattr(ob, 'bs', 0) or 0
+    log2 = getattr(ob, 'log2', 0) or 0
+    if not bs or not log2:
+        raise ValueError(
+            f'with_hints: {who} has not been updated, so there is no grid to '
+            'pin. Build or update it at the resolution you want first -- that '
+            'is the whole point of the method.')
+    kind, name, spec = _require_program(ob, 'with_hints')
+    spec = dict(spec)
+    updates = {'log2': str(int(log2)), 'bs': _fmt_bs(bs),
+               'normalize': str(bool(getattr(ob, 'normalize', True)))}
+    for k, v in extra.items():
+        updates[k] = _fmt_bs(v) if k == 'bs' else str(v)
+    spec['hints'] = _merge_hints(spec.get('hints', ''), updates)
+    return _format_program((kind, name, spec), fmt='text', layout='terse',
+                           trailer=True)
+
+
 def _merge_note(note, addition, replace_prefix=None):
     """Append a sentence to an existing ``note{...}`` body.
 

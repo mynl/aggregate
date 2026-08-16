@@ -967,7 +967,124 @@ def _base_rung(severity) -> TailClass:
     return _heaviest((left, right))
 
 
-def severity_support(severity) -> tuple[float, float]:
+def _cession_cap(layers) -> float:
+    """Upper bound on the total ceded under a list of ``(share, limit, attach)``.
+
+    ``inf`` as soon as one layer is unlimited. Overlapping layers make the sum
+    an over-estimate rather than a bound violation, which is the safe
+    direction for a support claim.
+    """
+    total = 0.0
+    for (s, y, _a) in layers:
+        if not np.isfinite(y):
+            return np.inf
+        total += float(s) * float(y)
+    return total
+
+
+def _retention_cap(layers) -> float:
+    """Upper bound on the retention under a list of ``(share, limit, attach)``.
+
+    A net view is bounded above only when some layer cedes **everything**
+    above its attachment: ``share >= 1`` and an unlimited width. Finite layers,
+    or partial unlimited cessions, leave the subject's own upper end in place
+    (the retained tail is the same law, merely scaled). Same rule as
+    :func:`occ_net_severity_row`, applied to a support rather than to a rung.
+    """
+    cap = np.inf
+    for (s, y, a) in layers:
+        if not np.isfinite(y) and float(s) >= 1.0:
+            cap = min(cap, float(a))
+    return cap
+
+
+def _cover_max(layers, kind: str, subject_max: float) -> float:
+    """Upper support end of a reinsurance cover's OUTPUT view."""
+    if layers is None or not len(layers):
+        return subject_max
+    if kind == 'ceded to':
+        return _cession_cap(layers)
+    return min(subject_max, _retention_cap(layers))
+
+
+def output_support_max(obj) -> float:
+    """Theoretical upper end of the distribution ``obj`` outputs (``inf`` if none).
+
+    The tail descriptor a reference severity carries. Duck-typed over
+    ``Aggregate`` and ``Portfolio`` (importing either here would cycle), and
+    **spec-only** -- it reads the count support, the severity components'
+    structural support and the reinsurance structure, never a computed density.
+    That is the point: the materialized reference severity is a finite set of
+    atoms and always looks bounded, but ``agg UB dfreq [1] sev gamma 100 cv 1``
+    is not, and the outer must be able to say so.
+
+    Parameters
+    ----------
+    obj : Aggregate or Portfolio
+        The referenced source.
+
+    Returns
+    -------
+    float
+        The largest attainable value of the law the object outputs, or
+        ``np.inf``.
+
+    Notes
+    -----
+    The derivation, in order (``dev/plan-agg-port-as-sev.md`` section 4.6):
+
+    1. **Severity side, per component.** A component that itself carries a
+       ``reference_support_max`` uses that and its ``support_atoms`` are never
+       consulted; that is what makes the descriptor transitive through a depth
+       2 chain, since every materialized reference has a finite largest atom
+       and reading it would break the chain at the first link.
+    2. **Occurrence covers first.** A ``ceded to`` occurrence view bounds each
+       claim at the cession; a ``net of`` view bounds it only under a full
+       unlimited top layer.
+    3. **The subject aggregate**, from the count and per-claim extents via
+       :func:`_agg_support`: unbounded when a claim can be unbounded and the
+       count can reach 1, and also when the count is unbounded and the severity
+       has mass above zero. A bounded severity under a Poisson frequency is
+       still an unbounded aggregate.
+    4. **The aggregate cover**, the same transformation applied to the
+       aggregate rather than to the claim. A finite cession cannot bound an
+       unbounded subject, which is why a ``net of`` view stays unbounded.
+
+    A ``Portfolio`` is the independent sum of its units, so its upper end is
+    the sum of theirs and is infinite as soon as one of them is.
+    """
+    agg_list = getattr(obj, 'agg_list', None)
+    if agg_list is not None:
+        total = 0.0
+        for unit in agg_list:
+            hi = output_support_max(unit)
+            if not np.isfinite(hi):
+                return np.inf
+            total += hi
+        return float(total)
+
+    sevs = list(getattr(obj, 'sevs', None) or [])
+    if not sevs:
+        return np.inf
+    s_lo = min(severity_support(s, reference=True)[0] for s in sevs)
+    s_hi = max(severity_support(s, reference=True)[1] for s in sevs)
+
+    occ = getattr(obj, 'occ_reins', None)
+    if occ:
+        s_hi = _cover_max(occ, getattr(obj, 'occ_kind', ''), s_hi)
+        if getattr(obj, 'occ_kind', '') == 'ceded to':
+            s_lo = min(s_lo, 0.0)
+
+    n_lo, n_hi, _zt = obj._frequency_count_support()
+    _lo, hi = _agg_support(n_lo, n_hi, s_lo, s_hi)
+
+    aggr = getattr(obj, 'agg_reins', None)
+    if aggr:
+        hi = _cover_max(aggr, getattr(obj, 'agg_kind', ''), hi)
+    return float(hi)
+
+
+def severity_support(severity, reference: bool = False) -> tuple[float, float]:
     """Spec-only claim-space support ``(min, max)`` of one severity component.
 
     The support of the *layered loss* that feeds the FFT -- after splice,
@@ -979,6 +1096,13 @@ def severity_support(severity) -> tuple[float, float]:
     ----------
     severity : object
         A single ``aggregate.Severity`` (duck-typed).
+    reference : bool, default False
+        Whether to honor a materialized reference severity's
+        ``reference_support_max`` in place of its largest atom. ``False``, the
+        default, is the **numeric** reading: the grid is sized on the atoms
+        that are actually convolved, so the sizer must never see the
+        descriptor. ``True`` is the **reporting** reading, and the one
+        ``tail_behavior_df`` takes.
 
     Returns
     -------
@@ -991,7 +1115,15 @@ def severity_support(severity) -> tuple[float, float]:
     """
     atoms = getattr(severity, 'support_atoms', None)
     if atoms is not None and len(atoms):
-        return float(atoms[0]), float(atoms[-1])
+        hi = float(atoms[-1])
+        if reference:
+            # Descriptor precedence is absolute: never fall back to the largest
+            # atom for a component that has one, or a depth 2 chain reports
+            # bounded at the first materialized link.
+            ref_max = getattr(severity, 'reference_support_max', None)
+            if ref_max is not None:
+                hi = float(ref_max)
+        return float(atoms[0]), hi
 
     signed = bool(getattr(severity, 'signed', False))
     try:
@@ -1085,7 +1217,7 @@ def _sev_family_label(severity) -> str:
     return str(kind) if kind else ''
 
 
-def severity_tail_row(severity, component: str) -> TailRow:
+def severity_tail_row(severity, component: str, reference: bool = False) -> TailRow:
     """Build the :class:`TailRow` for one severity mix component.
 
     Parameters
@@ -1094,6 +1226,9 @@ def severity_tail_row(severity, component: str) -> TailRow:
         A single ``aggregate.Severity`` (duck-typed).
     component : str
         The row label (e.g. ``'comp0'``).
+    reference : bool, default False
+        Report a materialized reference severity's theoretical tail rather than
+        its atoms; see :func:`severity_support`.
 
     Returns
     -------
@@ -1109,20 +1244,29 @@ def severity_tail_row(severity, component: str) -> TailRow:
     b = getattr(severity, 'sev_b', np.nan)
     left_base, right_base, _, alpha = _family_sides(name, a, b)
     base = _heaviest((left_base, right_base))
-    lo, hi = severity_support(severity)
+    lo, hi = severity_support(severity, reference=reference)
     left = _side_class(np.isfinite(lo), left_base)
     right = _side_class(np.isfinite(hi), right_base)
     if right == TailClass.POWER_LAW:
         note = _power_note(alpha)
     else:
         note = _severity_capped_note(severity, base, right)
+    ref_id = getattr(severity, 'reference_id', '')
+    if reference and ref_id:
+        # Say where the tail came from. The frame and ``bounded`` genuinely
+        # disagree here -- one reports the reference's law, the other the
+        # materialized atoms the grid was sized on -- and a reader who is told
+        # which is which can use both.
+        said = 'unbounded' if not np.isfinite(hi) else f'bounded at {hi:,.6g}'
+        note = (f'{note}; ' if note else '') + \
+            f'{ref_id} is theoretically {said}; sized on its atoms'
     return TailRow(
         component=component, family=_sev_family_label(severity),
         min=lo, max=hi, left_tail=left, right_tail=right, note=note,
     )
 
 
-def combined_severity_row(sevs) -> TailRow:
+def combined_severity_row(sevs, reference: bool = False) -> TailRow:
     """Build the combined *effective severity* row (the exposure-weighted blend).
 
     The support is the component union; each side's tail class is the heaviest
@@ -1134,13 +1278,17 @@ def combined_severity_row(sevs) -> TailRow:
     ----------
     sevs : sequence
         The severity components (``Aggregate.sevs``); must be non-empty.
+    reference : bool, default False
+        Report a materialized reference severity's theoretical tail rather than
+        its atoms; see :func:`severity_support`.
 
     Returns
     -------
     TailRow
         Labelled ``'severity'``.
     """
-    rows = [severity_tail_row(s, f'comp{i}') for i, s in enumerate(sevs)]
+    rows = [severity_tail_row(s, f'comp{i}', reference=reference)
+            for i, s in enumerate(sevs)]
     _, _, alpha = _combine_severities(sevs)
     lo = min(r.min for r in rows)
     hi = max(r.max for r in rows)
@@ -1298,7 +1446,7 @@ def _agg_support(n_lo: float, n_hi: float,
 def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
                     freq_max: float = np.inf, freq_zero_truncated: bool = False,
                     actual_m: float = np.nan, actual_sd: float = np.nan,
-                    occ_reins=None) -> list[TailRow]:
+                    occ_reins=None, reference: bool = False) -> list[TailRow]:
     """Assemble the layered tail report as an ordered list of :class:`TailRow`.
 
     Rows, bottom-up: frequency; one per severity mix component (``comp0`` ...);
@@ -1327,6 +1475,11 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
         an informational ``severity (net occ)`` overlay row is appended after the
         combined gross severity (the sizer works on gross -- this row only
         annotates the retained tail; see :func:`occ_net_severity_row`).
+    reference : bool, default False
+        Report a materialized reference severity's theoretical tail rather than
+        its atoms. The **reporting** reading; the sizer asks for ``False`` so
+        the grid follows the atoms it actually convolves. See
+        :func:`severity_support` and :func:`output_support_max`.
 
     Returns
     -------
@@ -1336,10 +1489,11 @@ def build_tail_rows(frequency, sevs, *, freq_min: float = 0.0,
     rows = [frequency_tail_row(frequency, n_min=freq_min, n_max=freq_max,
                                zero_truncated=freq_zero_truncated)]
     sev_list = list(sevs) if sevs is not None else []
-    rows.extend(severity_tail_row(s, f'comp{i}') for i, s in enumerate(sev_list))
+    rows.extend(severity_tail_row(s, f'comp{i}', reference=reference)
+                for i, s in enumerate(sev_list))
 
     if sev_list:
-        comb = combined_severity_row(sev_list)
+        comb = combined_severity_row(sev_list, reference=reference)
         if len(sev_list) > 1:
             rows.append(comb)
         if occ_reins is not None and len(occ_reins):

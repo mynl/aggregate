@@ -21,6 +21,7 @@
 # N. Proxies for US Lines
 # O. Novelties (the logo mixed distribution)
 # Y. Renewal frequencies (Sparre-Andersen wait clause)
+# Z. Aggregate and portfolio references as severities
 #    (P..X are reserved by decl-testers.agg)
 
 
@@ -306,4 +307,23 @@ agg Y.Renewal.Layer     10 years sev lognorm 100 cv 1 wait 2 xs 0.25 expon note{
 agg Y.Renewal.LayerCl   10 years sev lognorm 100 cv 1 wait 2 xs 0.25 expon ! note{Unconditional layered wait min((W-a)+, 2); P(W<=a) clusters at 0.}
 
 agg Y.Renewal.LayerMix  5 years sev gamma 10 cv .3 wait [1 2] xs [0 0.5] expon wts [.6 .4] note{Broadcast vector layer: mixture of differently layered waits.}
+
+# Z. Aggregate and portfolio references as severities
+# ===================================================
+# An agg or port already in the recipe base serving as the severity of another
+# aggregate: DecL's one deferred reference, resolved at build time rather than
+# inlined at parse time. A referenced declaration must pin its own grid with
+# hints{log2=...; bs=...}. Definitions precede uses, as for every dotted
+# reference. See [Agg-As-Severity].
+agg Z.SplitLimit.Policy 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt ! hints{log2=16; bs=1/32} note{US personal auto split limit, the per-policy law: 100 per claimant, at least one claim per policy.}
+
+agg Z.SplitLimit.Book   5000 claims 300 xs 0 sev agg.Z.SplitLimit.Policy ! mixed gamma .2 note{5000 policies; the 300 policy aggregate is an ordinary occurrence limit on the reference. The severity ! keeps the layer unconditional.}
+
+port Z.Ref.Book hints{log2=16; bs=1/32} agg Z.Ref.Unit 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt !
+
+agg Z.Ref.FromPort      10 claims sev port.Z.Ref.Book poisson note{A portfolio total serving as a severity.}
+
+agg Z.Ref.Signed        dfreq [1] ssev 100 - lognorm 50 cv .5 hints{log2=12; bs=1/16} note{A signed source for the ssev reference form.}
+
+agg Z.Ref.UsesSigned    dfreq [1] ssev agg.Z.Ref.Signed note{ssev over a signed reference keeps the negative atoms.}
 

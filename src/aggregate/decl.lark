@@ -464,10 +464,34 @@ slide_anchor: expr AT expr   -> slide_anchor
 // ``as_label`` (optional ``as "..."``) names the inline severity clause;
 // appended as the last child (dev/plan-labels.md S3). AS is disjoint from what
 // follows a sev_clause (occ_reins / freq / agg_reins), so it is Earley-safe.
-sev_clause: SEV sev as_label          -> sev_clause_sev
-          | SSEV sev as_label         -> sev_clause_ssev
-          | dsev as_label             -> sev_clause_dsev
-          | BUILTIN_SEV as_label      -> sev_clause_builtin
+sev_clause: SEV sev as_label            -> sev_clause_sev
+          | SSEV sev as_label           -> sev_clause_ssev
+          | dsev as_label               -> sev_clause_dsev
+          | BUILTIN_SEV as_label        -> sev_clause_builtin
+          | SEV sev_ref_leaf as_label   -> sev_clause_ref
+          | SSEV sev_ref_leaf as_label  -> sev_clause_ref_signed
+
+// An aggregate or portfolio already in the recipe base, serving as the
+// severity of this aggregate: ``sev agg.SL``, ``ssev port.PBook``. Unlike every
+// other dotted reference in DecL this one is NOT inlined at parse time -- the
+// severity is the inner's *computed output*, which exists only after an update
+// -- so the parse records the reference and the underwriter resolves it at
+// build time. See dev/plan-agg-port-as-sev.md.
+//
+// It is a terminal LEAF: no picks, weights, scaling, shifting or splicing. What
+// those would mean on a compound output is undecided, and the keyword is
+// required so the alternatives stay token-disjoint from ``SEV sev`` (``sev``
+// can never derive BUILTIN_AGG / BUILTIN_PORT, since the ID lookahead excludes
+// both prefixes) and cannot interact with the bare ``builtin_agg`` rename form
+// of ``agg_body``.
+//
+// The trailing ``!`` is the SEVERITY-side one: an unconditional layer, as on
+// ``sev`` and ``dsev``. It is unrelated to the FREQUENCY-side ``!`` that
+// modifies ``zt`` / ``zm`` to hold the requested mean, and one program may
+// legitimately carry both, in different clauses of different statements.
+sev_ref_leaf: BUILTIN_AGG      -> sev_ref_agg
+            | BUILTIN_PORT     -> sev_ref_port
+            | sev_ref_leaf "!" -> sev_ref_uncond
 
 sev: sev "!"                 -> sev_unconditional
    | sev picks               -> sev_picks

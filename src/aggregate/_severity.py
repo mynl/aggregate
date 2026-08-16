@@ -1051,6 +1051,26 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
     # and ``moms()`` can branch without inspecting ``sev_name`` as a string.
     _is_histogram: bool = False
 
+    # ---- reference-severity provenance (``sev agg.NAME`` / ``sev port.NAME``)
+    # Stamped by ``Underwriter._factory`` on the materialized severity of an
+    # aggregate whose severity clause was a reference; ``None`` / ``''`` on
+    # every other severity, which is what every reader tests. All three are
+    # written once at resolution and never again.
+    #
+    #: The dotted id as written (``'agg.SL'``), for messages and reports.
+    reference_id: str = ''
+    #: The referenced source's own THEORETICAL upper support end (``np.inf``
+    #: when unbounded), which is not the largest materialized atom. Reporting
+    #: only: ``tail_behavior_df`` and the tail narrative read it so an
+    #: unbounded inner is described as unbounded, while every number -- bucket
+    #: selection, moments, the FFT -- rides the finite atoms. See
+    #: ``dev/plan-agg-port-as-sev.md`` section 4.6.
+    reference_support_max: float = None
+    #: The referenced source's own bucket size, known exactly on the resolution
+    #: path (never inferred from ``np.diff`` of the atoms). Read by the
+    #: commensurability step at the end of bucket selection.
+    reference_bs: float = None
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         # Only register classes that declared ``sev_kind`` on themselves —

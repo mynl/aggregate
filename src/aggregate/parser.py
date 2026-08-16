@@ -1737,6 +1737,51 @@ class UnderwritingTransformer(Transformer):
         b["_severity_label"] = as_label.get("label")
         return b
 
+    # ----- severity reference (agg.NAME / port.NAME) ------------------
+    # DecL's first DEFERRED reference. Every other dotted reference is
+    # resolved and inlined right here, by ``safe_lookup``; this one cannot be,
+    # because the severity is the inner's *computed output* (``xs`` /
+    # ``agg_density``), which exists only after an update. So the parse records
+    # a symbolic ``sev_ref`` and ``Underwriter._resolve_sev_ref`` resolves it at
+    # build time. The precedent for a symbolic marker the unparser renders back
+    # is ``_engine_port_spec`` / ``_engine_port`` on a ``pnl``.
+    #
+    # The existence check still happens now, so an unknown name fails at parse
+    # time where the user can see it; the spec copy it returns is discarded.
+
+    def _sev_ref_spec(self, token):
+        """Symbolic spec for one ``agg.NAME`` / ``port.NAME`` severity reference."""
+        ref = str(token)
+        # kind-checked existence check; the returned spec copy is deliberately
+        # thrown away (resolution is deferred to build time)
+        self.safe_lookup(ref)
+        return {"sev_ref": ref}
+
+    def sev_ref_agg(self, c):
+        return self._sev_ref_spec(c[0])
+
+    def sev_ref_port(self, c):
+        return self._sev_ref_spec(c[0])
+
+    def sev_ref_uncond(self, c):
+        # the SEVERITY-side ``!``: keep the layer unconditional, so a zero atom
+        # in the referenced law survives an outer layers clause. Nothing to do
+        # with the frequency-side ``!`` on zt / zm.
+        ref = c[0]
+        ref["sev_conditional"] = False
+        return ref
+
+    def sev_clause_ref(self, c):
+        _sev, ref, as_label = c
+        ref["_severity_label"] = as_label.get("label")
+        return ref
+
+    def sev_clause_ref_signed(self, c):
+        _ssev, ref, as_label = c
+        ref["sev_signed"] = True
+        ref["_severity_label"] = as_label.get("label")
+        return ref
+
     def sev_unconditional(self, c):
         sev = c[0]
         sev["sev_conditional"] = False
@@ -2285,9 +2330,29 @@ class UnderwritingTransformer(Transformer):
         bid["exp_premium"] = _check_vectorizable(bid.get("exp_premium", 0)) * expr
         return bid
 
+    @staticmethod
+    def _refuse_sev_ref_algebra(bid, operation):
+        """Refuse severity algebra on an aggregate whose severity is a reference.
+
+        The homogeneous and shift forms rewrite ``sev_mean`` / ``sev_scale`` /
+        ``sev_loc``, none of which a deferred ``agg.NAME`` reference has: the
+        severity is another object's output law, and what scaling or shifting
+        that law would mean is undecided. Silently scaling only the exposure
+        keys would be worse than refusing. ``@`` (inhomogeneous) is frequency
+        only and stays legal.
+        """
+        if "sev_ref" in bid:
+            raise ValueError(
+                f"DecL: {bid.get('name', 'the aggregate')} takes its severity "
+                f"from the reference '{bid['sev_ref']}', which cannot be "
+                f"{operation}: a reference is another object's output law, not "
+                "a parameterized family. Scale or shift the referenced "
+                "declaration itself, or use '@' to scale the exposure.")
+
     def builtin_agg_homog(self, c):
         expr, _times, bagg = c
         bid = bagg
+        self._refuse_sev_ref_algebra(bid, 'scaled')
         bid["name"] += "_homog_scaled"
         if "sev_mean" in bid:
             bid["sev_mean"] = _check_vectorizable(bid["sev_mean"]) * expr
@@ -2304,6 +2369,7 @@ class UnderwritingTransformer(Transformer):
     def builtin_agg_plus(self, c):
         bagg, _plus, expr = c
         bid = bagg
+        self._refuse_sev_ref_algebra(bid, 'shifted')
         bid["name"] += "_shifted"
         if "sev_loc" in bid:
             bid["sev_loc"] += expr
@@ -2314,6 +2380,7 @@ class UnderwritingTransformer(Transformer):
     def builtin_agg_minus(self, c):
         bagg, _minus, expr = c
         bid = bagg
+        self._refuse_sev_ref_algebra(bid, 'shifted')
         bid["name"] += "_shifted"
         if "sev_loc" in bid:
             bid["sev_loc"] -= expr

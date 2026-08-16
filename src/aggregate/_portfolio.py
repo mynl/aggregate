@@ -2153,6 +2153,33 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return self._grid_distribution().tvar_threshold(p, kind)
 
+    def with_hints(self, **extra):
+        """This portfolio's program with its realized grid pinned into ``hints{}``.
+
+        The mirror of :meth:`aggregate.distributions.Aggregate.with_hints`, and
+        the certification path for a ``sev port.NAME`` reference: get the
+        portfolio right interactively, then ``build(p.with_hints())``
+        re-registers the declaration with its resolution pinned.
+
+        Parameters
+        ----------
+        **extra
+            Further ``hints{}`` settings, merged over ``log2``, ``bs`` and
+            ``normalize``, which come from the object's current state.
+
+        Returns
+        -------
+        str
+            One line of DecL, ready to hand back to ``build``.
+
+        Raises
+        ------
+        ValueError
+            If the object has not been updated, carries no DecL program, or is
+            given a hint key DecL does not have.
+        """
+        return _program.with_hints(self, **extra)
+
     def as_severity(self, limit=np.inf, attachment=0, conditional=False):
         """Use this portfolio's total loss distribution as a severity.
 

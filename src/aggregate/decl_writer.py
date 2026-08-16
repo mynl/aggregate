@@ -297,6 +297,20 @@ def _render_sev_clause(spec: dict) -> str:
     # Interior ``severity`` label rides in ``label_map`` (dev/plan-labels.md S3),
     # appended after the whole clause.
     label = _render_label(spec.get('label_map', {}).get('severity'))
+    # A deferred ``agg.NAME`` / ``port.NAME`` reference renders back AS a
+    # reference, from the ``sev_ref`` the parser recorded. This is the first
+    # dotted reference in DecL that round-trips as one -- ``sev.NAME`` and
+    # ``agg.NAME`` in an exposure head are inlined at parse time and come back
+    # as whatever they resolved to, which is what ``[Unparser-Reference-Gaps]``
+    # in dev/TODO.md is about. The discriminator is unambiguous: a recipe-base
+    # spec carrying ``sev_ref`` has no ``sev_name`` and no ``sev_xs``, since the
+    # underwriter only adds those on the resolved copy it hands to
+    # ``Aggregate``, never to the stored recipe.
+    ref = spec.get('sev_ref')
+    if ref:
+        kw = 'ssev' if spec.get('sev_signed') else 'sev'
+        bang = ' !' if spec.get('sev_conditional') is False else ''
+        return f'{kw} {ref}{bang}{label}'
     if _is_dsev(spec):
         return _render_dsev(spec) + label
     # The keyword follows ``sev_signed`` alone. Reflection is orthogonal: both

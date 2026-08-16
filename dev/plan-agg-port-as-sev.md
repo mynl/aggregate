@@ -858,3 +858,150 @@ boundedness helper (section 4.6 step 2), the `d` carrier attribute on the
 materialized severity and the snap function in `_bucket_window.py` (section
 4.7), and the warning categories for the signed clamp, the deficit, and the
 incommensurable pin (sections 4.2, 4.5, and 4.7).
+
+---
+
+## 13. Execution notes (written as the phases landed)
+
+Read this before working on anything the plan touches: it records where the
+implementation diverged from the design above, and what executing it turned up
+that the design did not anticipate. Section numbers refer to the plan.
+
+### Phase A `[SeverityMeta-Afresh]`, 1.0.0a290
+
+1. **`SeverityMeta` became a subclass of `SeverityDHistogram`.** Section 4.9
+   item 3 says "routes through the `SeverityDHistogram` machinery"; subclassing
+   is the cleanest form of that. `_build` fills `sev_xs` / `sev_ps` from
+   `_dhistogram_from_object` and delegates, exactly as `SeverityFixed` does, so
+   the exact moments, `support_atoms`, `_DiscreteRV` and the negative atom auto
+   sign all come for free and cannot drift from the plain `dsev` path.
+2. **The author's `IndexError` was diagnosed at `_severity.py:1025`**, not in
+   the known broken branch. `Severity.__init__` passed
+   `name=sev_name if isinstance(sev_name, str) else ''` to
+   `ss.rv_continuous.__init__`, and scipy indexes `name[0]` to pick the article
+   for its generated docstring. Every object valued `sev_name` (the `meta` and
+   `copy` paths both) hit it before any severity logic ran. The empty string is
+   now the class name.
+3. **`long_name` was made readable for an object valued `sev_name`.** Not in
+   the plan; `info` printed a whole `Portfolio` report into its one line
+   "severity distribution" row.
+4. **`sev_a` / `sev_b` are accepted when they restate the source's current
+   grid** and raise only when they contradict it. Section 4.9 item 2 says
+   "retired"; a hard raise would have broken `Portfolio.as_severity`'s own call
+   shape for no gain, and that call now simply does not pass them.
+5. **Deficit floor**: `REFERENCE_DEFICIT_MATERIALITY = 1e-6` per section 4.5,
+   named as a module constant in `_severity.py` so the choice is visible. It is
+   deliberately 100 times tighter than the house `DEFICIT_MATERIALITY`, because
+   a severity deficit is multiplied by the outer frequency.
+6. **Warning categories** (section 12's open list): plain `UserWarning` for the
+   signed clamp, `DefectiveDistributionWarning` for the deficit (it *is* a
+   defective distribution, so the house category fits), plain `UserWarning` for
+   the conditioning warning of note 12 below. No new warning class was added;
+   none of the three earns one.
+
+### Phase B `[Agg-As-Severity]`, 1.0.0a291
+
+7. **Names chosen** (section 12's open list). On `Severity`, class level
+   defaults so every reader can test them: `reference_id` (the dotted id, `''`),
+   `reference_support_max` (the theoretical upper end, `None`), `reference_bs`
+   (the source's own bs, `None`). In `tail.py`, `output_support_max` plus the
+   private `_cession_cap` / `_retention_cap` / `_cover_max`. On `Underwriter`,
+   `_resolve_sev_ref`, `_sev_ref_hygiene_message`, `_warn_sev_ref_conditioned`,
+   `_sev_ref_stack`; module level, `_carries_sev_ref` and `_stamp_sev_ref`.
+8. **The tail descriptor needed a switch, not an attribute read.** Section 4.6
+   says reporting only, and wiring `reference_support_max` into
+   `tail.severity_support` unconditionally would NOT have been: the sizer reads
+   the same rows through `Aggregate._loss_tail_classes`, and an unbounded
+   descriptor turns the aggregate's right tail thick, which fires the single big
+   jump floor and changes the grid. So `severity_support`, `severity_tail_row`,
+   `combined_severity_row` and `build_tail_rows` take a `reference=` flag,
+   `Aggregate._tail_rows` defaults it to `True`, and `_loss_tail_classes` passes
+   `False`. That is the plan's intent implemented exactly: reporting reads the
+   reference's law, numerics ride the atoms.
+9. **`Aggregate.bounded` and `Severity.bounded` were left alone**, per section
+   4.6's "consumers pinned for v1: `tail_behavior_df` only". They derive from
+   `tail._severity_bounded`, which the sizer also reads through
+   `Aggregate._bounded_severity_window`, so widening them would have leaked into
+   numerics by the same route as note 8. **The consequence is a visible
+   disagreement**: for `agg X dfreq [2] sev agg.Unbounded`, `tail_behavior_df`
+   reports an infinite max while `X.bounded` is `True`. The aggregate row's note
+   names the source and says it was sized on its atoms, so the two readings are
+   legible side by side, but the author may want `bounded` widened later. Doing
+   it properly means threading `reference=` through `classify_severity` and
+   `aggregate_tail_info` as well, and deciding what `_bounded_severity_window`
+   should then believe.
+10. **Frequency boundedness (section 4.6 step 2) reuses
+    `Aggregate._frequency_count_support`** rather than a new lookup helper. One
+    divergence follows: that method returns `(0, inf)` for a **binomial** count,
+    where the plan calls binomial bounded. The reading is conservative
+    (unbounded), it is what the source's own `tail_behavior_df` already says, and
+    keeping the two consistent matters more than the extra precision. Fixing it
+    means widening `_frequency_count_support`, which moves existing tail output.
+11. **A limit profile over a reference takes `max(exp_limit)`.** The descriptor
+    survives only under an infinite outer limit (step 5), and a vector
+    `exp_limit` is reduced with `np.max`, so a profile mixing a finite and an
+    infinite limit reports unbounded for every component. Not a case the plan
+    considers; the alternative is per component stamping, which the materialized
+    `SeverityDHistogram` cannot support because `_build` overwrites `limit` with
+    the largest atom.
+
+### What executing it turned up (none of this is in the plan)
+
+12. **The headline program of sections 1 and 5 needed a severity side `!`.**
+    The plan reasons that a zero truncated inner has no mass at zero so no `!`
+    is needed. True of the theoretical law, false of the materialized `dsev`:
+    any severity with positive density at the origin discretizes mass into the
+    first bucket, and `gamma 50 cv 2` is shape 0.25, so about 10% of one claim
+    lands below `bs / 2` and the per policy aggregate materializes with about 7%
+    at its zero atom. The default conditional layers clause rescales that away,
+    lifting the severity mean from 44.31 to 47.52 and the outer answer by 6%.
+    **The behavior is unchanged** (it is exactly what a hand written `dsev` with
+    a zero atom gets), the docs now write the headline with `!`, and the
+    resolver warns where the reading cannot have been intended, namely when the
+    source's claim count is never zero. A plain Poisson inner really does have
+    `P(S = 0) > 0` and section 5's conditioning idiom is a legitimate model, so
+    that stays silent. **Open for the author**: whether a reference severity
+    should default to unconditional under a layers clause. That is a language
+    semantics change, so it was not taken here; tracked as
+    `[Reference-Severity-Zero-Atom-Default]` in `dev/TODO.md`.
+13. **`hints{}` leaked between the statements of one program**, a pre existing
+    `build_many` bug sitting directly in this feature's path. The update loop
+    rebound `log2` / `bs` / `bucket_sizing_p` / `kwargs` in place, so the hints
+    of statement 1 became the caller defaults for statement 2: a first statement
+    carrying `hints{log2=16; bs=1/32}` built every later statement on that grid.
+    Since the hygiene rule guarantees a referenced inner carries hints, and
+    finding 10 of section 3 promises the single program define then use flow
+    works, this had to be fixed for the plan's own test to mean anything. The
+    loop now holds the caller's arguments fixed and copies `kwargs` per output.
+14. **`interpret_file` could not validate a file that declares a name and then
+    uses it.** It parsed statement by statement without registering anything, so
+    the new corpus lines made it raise `KeyError` out of `_safe_lookup` and abort
+    the whole run, which is the opposite of what a per statement error collector
+    should do. It now parses against a scratch underwriter seeded from the
+    caller's recipes and registers each statement as it goes; `LookupError`
+    joins the caught set so an unresolvable reference is an error row. It also
+    no longer mutates the calling underwriter, which the old hand seeded
+    `sev One` did.
+15. **`test_decl_unparser` parsed against `_test_suite.agg` alone** while its
+    corpus is three files, so a reference defined in `decl-testers.agg` could not
+    resolve from `decl-testers.agg`. It now preloads the whole corpus, lazily
+    (the parse costs about 11 seconds and an import time preload pays it in
+    every xdist worker) and tolerantly (section X of `decl-testers.agg` is
+    intentional parse errors, so `databases=` cannot be used). Verified
+    beforehand that the three files have no `(kind, name)` collisions, so
+    nothing shadows anything.
+16. **The two split limit representations agree on the severity's moments to
+    1e-13 and on the aggregate mean to about 4e-4.** The residual is the
+    discretization path, not the semantics: an unlimited reference takes the
+    mean preserving linear scatter and reproduces the severity mean exactly,
+    while an outer layers clause puts it on the survival difference path, which
+    carries a positional bias that shrinks with the grid. This is ordinary
+    `dsev` behavior and it is the numeric argument behind section 5's preference
+    for the occurrence limit form. The test pins the moments exactly and the
+    aggregate to 1e-3.
+17. **Two pre existing failures, unrelated to this work**, found by the gates
+    and confirmed at `c53db28` by stashing: `test_massive_pnl_one_sweep_ledger`
+    fails with `TypeError: Index must be a MultiIndex` (a `slow` test, so the
+    everyday suite never runs it), and
+    `docs/2_aggregate_overview/features.rst` has one `ipython` block that does
+    not execute (`book_pnl.economic_df`). Neither is touched here.

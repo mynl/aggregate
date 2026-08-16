@@ -26,6 +26,7 @@ from .parser import (UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM,
                      DERIVE_PREMIUM)
 from .recipe import Recipe
 from .utilities import (qd, agg_help)
+from . import _validation
 
 logger = logging.getLogger(__name__)
 
@@ -319,6 +320,46 @@ def _resolve_hints(spec, log2, bs, bucket_sizing_p, kwargs):
     return log2, bs, bucket_sizing_p, kwargs
 
 
+def _carries_sev_ref(spec):
+    """Whether ``spec`` holds an unresolved ``sev_ref`` anywhere inside it.
+
+    A bivariate or clash body nests its components as ``('agg', name, spec)``
+    tuples under ``units``, so a reference written there is not visible at the
+    top level. Used only to refuse it with a clear message.
+    """
+    if isinstance(spec, dict):
+        return 'sev_ref' in spec or any(_carries_sev_ref(v) for v in spec.values())
+    if isinstance(spec, (list, tuple)):
+        return any(_carries_sev_ref(v) for v in spec)
+    return False
+
+
+def _stamp_sev_ref(obj, meta):
+    """Record a resolved severity reference on the object's severity components.
+
+    Provenance, not construction input. The resolver hands ``Aggregate`` a plain
+    ``dhistogram``, which is exactly what it should convolve; these three
+    attributes say where those atoms came from, so the tail report can name the
+    source and describe its *theoretical* tail, and the commensurability step
+    can read its bucket size exactly rather than inferring one from the atoms.
+
+    Written after construction rather than passed through ``Aggregate.__init__``
+    on purpose: they are not constructor arguments, and a spec that no longer
+    carries the reference (``Aggregate(**a.spec)``, the frozen resolved object)
+    honestly has no reference to report.
+
+    Skips a component whose kind is not ``dhistogram``, which is what an
+    ``approximate`` clause leaves behind: the method-of-moments surrogate is a
+    fitted continuous severity, not the reference, and must not claim to be.
+    """
+    for sev in (getattr(obj, 'sevs', None) or []):
+        if getattr(sev, 'sev_kind', '') != 'dhistogram':
+            continue
+        sev.reference_id = meta['reference_id']
+        sev.reference_support_max = meta['reference_support_max']
+        sev.reference_bs = meta['reference_bs']
+
+
 def _row_stats(a, summary_cols):
     """
     Return a list of summary statistics for ``a`` aligned with ``summary_cols``.
@@ -483,6 +524,11 @@ class Underwriter(HelpMixin):
         # Recipe base: a flat dict {(kind, name): Recipe}. The DataFrame view
         # is built on demand by the `recipes` property.
         self._recipes: dict[tuple, Recipe] = {}
+        # Severity-reference resolution stack, ``[(kind, name), ...]``: the
+        # cycle guard for ``sev agg.NAME``. Resolution recurses through
+        # ``_factory``, so depth N falls out with no extra code and this is
+        # what bounds it. See :meth:`_resolve_sev_ref`.
+        self._sev_ref_stack: list[tuple] = []
         # `databases` (public) reports the resolved file Paths actually loaded;
         # `_loaded` is the honest "configured request has been read" flag.
         self.databases: list = []
@@ -1100,6 +1146,30 @@ class Underwriter(HelpMixin):
 
         kind, name, spec, program = parsed.kind, parsed.name, parsed.spec, parsed.program
 
+        # ---- deferred severity reference (``sev agg.NAME`` / ``sev port.NAME``)
+        # The only DecL reference the parser cannot inline, because the severity
+        # is the referenced object's *computed output*. Resolve it here, at the
+        # top of construction: ``Aggregate.__init__`` builds its ``Severity``
+        # components immediately, so the arrays have to be in the spec before it
+        # is called. ``pnl`` / ``xpnl`` are included because the parser merges an
+        # agg engine's spec into theirs, so an engine written with
+        # ``sev agg.X`` carries ``sev_ref`` on the P&L spec.
+        # ``kind`` is tested first: an ``expr``'s spec is the evaluated number,
+        # not a dict, so ``'sev_ref' in spec`` would be a TypeError on it.
+        sev_ref_meta = None
+        if kind in ('agg', 'pnl', 'xpnl') and 'sev_ref' in spec:
+            spec, sev_ref_meta = self._resolve_sev_ref(name, spec)
+        elif kind not in ('agg', 'pnl', 'xpnl', 'port') and _carries_sev_ref(spec):
+            # A bivariate / clash body parses the shared ``sev_clause``, so a
+            # reference reaches here syntactically. It is not resolved (the
+            # joint grid is a different problem), and a silent miss would build
+            # a bivariate whose severity spec is a bare string. Refuse instead.
+            raise ValueError(
+                f"{name}: a severity reference (sev agg.NAME / sev port.NAME) "
+                f"is not supported in a '{kind}' body. Declare the compound as "
+                "its own agg and reference that agg by name from an ordinary "
+                "aggregate.")
+
         if kind == 'agg':
             # A pure aggregate ignores what it cannot use and says so: the
             # reinsurance-economics / feature clauses parse everywhere (the
@@ -1419,8 +1489,218 @@ class Underwriter(HelpMixin):
         else:
             raise ValueError(f'Cannot build {kind} objects')
 
+        if sev_ref_meta is not None:
+            _stamp_sev_ref(obj, sev_ref_meta)
+
         parsed.object = obj
         return parsed
+
+    def _resolve_sev_ref(self, name, spec):
+        """Resolve a deferred ``sev agg.NAME`` / ``sev port.NAME`` into atoms.
+
+        The build-time half of the reference-severity feature. Rebuilds the
+        referenced declaration from the current recipe base, updates it on its
+        own declared grid, and replaces the symbolic ``sev_ref`` key with the
+        ``dhistogram`` the outer aggregate actually convolves.
+
+        Parameters
+        ----------
+        name : str
+            The *outer* declaration's name, for messages.
+        spec : dict
+            The outer's parsed spec, carrying ``sev_ref``. **Never mutated**:
+            it is the stored recipe's own dict (see the comment in
+            :meth:`_factory`), so a new dict is returned instead.
+
+        Returns
+        -------
+        (dict, dict)
+            The resolved spec, and the provenance
+            :func:`_stamp_sev_ref` writes onto the built severity.
+
+        Raises
+        ------
+        ValueError
+            On a reference cycle, a referenced entry that has been removed
+            since parsing, or an inner that does not pin its own grid.
+
+        Notes
+        -----
+        **The query is nullary.** Nothing flows in from the outer -- not its
+        ``log2``, not its ``bs``, not its ``normalize``. The inner recomputes
+        itself exactly as declared and is then read for the distribution it
+        outputs, which is why it must declare a grid (below) and why the outer's
+        update arguments cannot change what the severity is.
+
+        **The hygiene rule.** A referenced inner must carry explicit ``log2``
+        and ``bs`` hints. With them the materialized severity is pinned by the
+        recipe base alone, independent of ambient defaults, and reproduces the
+        object the user certified; without them it would silently follow
+        whatever the session happened to be configured for. The error names
+        :meth:`~aggregate.distributions.Aggregate.with_hints` and carries
+        ready-to-paste text computed from the inner's own bucket window.
+
+        **Every build re-resolves.** There is no built-object cache in the
+        recipe base, so the inner is rebuilt each time. With the hints
+        mandatory that is exactly reproducible, correct under last-write-wins
+        redefinition, and holds no hidden state; the cost is one inner FFT per
+        outer build. Caching is the ``[Agg-As-Severity-Result-Cache]`` follow
+        up, to be taken up only if profiling ever hurts.
+        """
+        from ._severity import _dhistogram_from_object
+        from . import tail as _tail
+
+        ref = spec['sev_ref']
+        rkind, *rest = ref.split('.')
+        rname = '.'.join(rest)
+        key = (rkind, rname)
+
+        if key in self._sev_ref_stack:
+            chain = ' -> '.join(f'{k}.{n}' for k, n in self._sev_ref_stack)
+            raise ValueError(
+                f'{name}: severity reference cycle: {chain} -> {ref}. An '
+                'aggregate cannot be its own severity, however many steps '
+                'around.')
+        try:
+            rec = replace(self[key])
+        except LookupError:
+            raise ValueError(
+                f"{name}: severity reference '{ref}' is not in the recipe base. "
+                'It parsed, so it was there when the program was read; it has '
+                'been removed or renamed since.') from None
+
+        hints = _parse_hints(rec.spec.get('hints', '') or '')
+        if 'log2' not in hints or 'bs' not in hints:
+            raise ValueError(self._sev_ref_hygiene_message(name, ref, rec, hints))
+
+        self._sev_ref_stack.append(key)
+        try:
+            rec = self._factory(rec)
+            inner = rec.object
+            kw = {}
+            log2, bs, bucket_sizing_p, kw = _resolve_hints(
+                rec.spec, 0, 0, BUCKET_SIZING_P, kw)
+            if isinstance(inner, Portfolio):
+                inner.update(log2=int(log2), bs=bs,
+                             bucket_sizing_p=bucket_sizing_p,
+                             remove_fuzz=True, force_severity=True,
+                             debug=self.debug, **kw)
+            else:
+                inner.update(log2=int(log2), bs=bs,
+                             bucket_sizing_p=bucket_sizing_p,
+                             force_severity=True, debug=self.debug, **kw)
+        finally:
+            self._sev_ref_stack.pop()
+
+        xs, ps = _dhistogram_from_object(
+            inner, normalize=bool(kw.get('normalize', True)),
+            signed=bool(spec.get('sev_signed', False)), source=ref)
+
+        out = {k: v for k, v in spec.items() if k != 'sev_ref'}
+        out['sev_name'] = 'dhistogram'
+        out['sev_xs'] = xs
+        out['sev_ps'] = ps
+        self._warn_sev_ref_conditioned(name, ref, spec, xs, ps, inner)
+
+        # The theoretical tail survives only under an infinite outer limit: a
+        # finite layers clause on the reference caps the reported severity at
+        # that limit whatever the source's own law does (section 4.6 step 5).
+        limit = spec.get('exp_limit', np.inf)
+        limit = float(np.max(np.atleast_1d(np.asarray(limit, dtype=float))))
+        support_max = (None if np.isfinite(limit)
+                       else float(_tail.output_support_max(inner)))
+        logger.info(
+            '%s: resolved severity reference %s at log2=%s, bs=%s -> %d atoms, '
+            'mean %.6g, theoretical max %s', name, ref, inner.log2, inner.bs,
+            len(xs), float(np.sum(xs * ps)), support_max)
+        return out, {'reference_id': ref,
+                     'reference_support_max': support_max,
+                     'reference_bs': float(inner.bs)}
+
+    @staticmethod
+    def _warn_sev_ref_conditioned(name, ref, spec, xs, ps, inner):
+        """Warn when conditioning a reference drops mass the source cannot have.
+
+        A layers clause conditions on exceeding the attachment unless the
+        severity carries ``!``, exactly as for ``dsev``. Two different things
+        can be sitting at the zero atom of a materialized reference, and only
+        one of them is a trap:
+
+        * **A real one.** A plain Poisson inner has ``P(S = 0) = e**-lambda``,
+          about 22% at 1.5. Conditioning it away is a documented, deliberate
+          alternative model, "5,000 loss-bearing policies" rather than "5,000
+          policies". Silent.
+        * **A manufactured one.** A zero-truncated inner has ``P(S = 0) = 0``
+          exactly, and still materializes with mass in its first bucket,
+          because a severity with positive density at the origin discretizes
+          some there: ``gamma 50 cv 2`` is shape 0.25 and puts about 10% of one
+          claim below ``bs / 2``, which is about 7% of the per-policy
+          aggregate. Nobody means to condition on that, and doing so lifts the
+          severity mean by the same proportion, moving the split-limit answer
+          by 6%. **Warn.**
+
+        The discriminator is whether the source's claim count can be zero.
+        A portfolio total is zero only when every unit is, so it takes the
+        same test unit by unit.
+
+        Silent below :data:`aggregate._validation.DEFICIT_MATERIALITY`, where
+        the conditioning cannot move an answer either way.
+        """
+        if spec.get('exp_attachment') is None:
+            return                      # no layers clause: the zero atom is kept
+        if spec.get('sev_conditional') is False:
+            return                      # ``!``: the layer is unconditional already
+        units = getattr(inner, 'agg_list', None) or [inner]
+        try:
+            if not all(u._frequency_count_support()[0] >= 1 for u in units):
+                return                  # a genuine zero atom; conditioning is a choice
+        except AttributeError:          # pragma: no cover - defensive
+            return
+        attach = np.max(np.atleast_1d(np.asarray(
+            spec.get('exp_attachment', 0), dtype=float)))
+        dropped = float(ps[xs <= attach].sum())
+        if dropped <= _validation.DEFICIT_MATERIALITY:
+            return
+        warnings.warn(
+            f'{name}: the layers clause conditions on exceeding '
+            f'{attach:,.6g} and drops {dropped:.4g} of {ref}, which cannot be '
+            f'mass {ref} really has there: its claim count is never zero, so '
+            'that is discretization (a severity with positive density at the '
+            'origin puts some of every claim in the first bucket). '
+            'Conditioning rescales it away and lifts the severity mean by the '
+            'same proportion. Write the layer unconditional with a trailing '
+            '"!", which is almost certainly what you meant.',
+            UserWarning, stacklevel=3)
+
+    @staticmethod
+    def _sev_ref_hygiene_message(name, ref, rec, hints):
+        """The hygiene error: what is missing, how to fix it, and with what values.
+
+        Runs the referenced declaration's *own* bucket sizer (no FFT, spec-only)
+        to fill in real numbers, so the suggestion can be pasted rather than
+        guessed at. Falls back to a placeholder when the sizer cannot answer,
+        which is a worse message but never a second failure on the error path.
+        """
+        log2 = hints.get('log2')
+        bs = hints.get('bs')
+        try:
+            from ._bucket_window import bs_window, _fmt_bs
+            obj = rec.object if rec.object is not None else Aggregate(**rec.spec)
+            got_bs, got_log2, _x0 = bs_window(obj, 16, 0, None, BUCKET_SIZING_P)
+            suggestion = (f'hints{{log2={int(got_log2)}; '
+                          f'bs={_fmt_bs(got_bs)}}}')
+        except Exception:                       # noqa: BLE001 error path only
+            suggestion = 'hints{log2=<log2>; bs=<bs>}'
+        missing = ' and '.join(k for k, v in (('log2', log2), ('bs', bs))
+                               if v is None)
+        return (
+            f"{name}: the severity reference '{ref}' needs {ref} to pin its own "
+            f'grid, and it declares no {missing}. A reference stands for the '
+            'distribution that declaration outputs, so the declaration has to '
+            'say at what resolution, or the severity changes with the ambient '
+            'defaults instead of with the model. Update the source at the '
+            'resolution you want and re-register it with its grid pinned, '
+            f'`build(x.with_hints())`, or add the clause by hand: {suggestion}')
 
     def add_recipe(self, kind, name, spec, program, source='session'):
         """
@@ -1830,6 +2110,14 @@ class Underwriter(HelpMixin):
         :param kwargs: passed to each ``update`` call. ``force_severity=True``
             is always applied.
         :return: list of :class:`~aggregate.recipe.Recipe`, one per top-level output.
+
+        .. note::
+
+           Each output resolves its ``hints{}`` against the **caller's**
+           arguments, never against what a previous statement resolved to. Up
+           to 1.0.0a291 the loop rebound ``log2`` / ``bs`` / ``kwargs`` in
+           place, so a ``hints{log2=16; bs=1/32}`` on the first statement of a
+           program silently became the grid of every statement after it.
         """
         rv = self._build_work(program, update=False, force_severity=True)
 
@@ -1845,6 +2133,14 @@ class Underwriter(HelpMixin):
 
         # in this loop bs_ and log2_ are the values actually used for each
         # update; they do not overwrite the input default values
+        #
+        # The caller's arguments, held FIXED for the whole loop. Each output
+        # resolves its own ``hints{}`` against these, so one statement's grid
+        # cannot become the next statement's default -- which is what used to
+        # happen, silently, when the loop rebound them in place. ``kwargs`` is
+        # copied per object as well: ``_resolve_hints`` fills it by
+        # ``setdefault``, so the other hint keys leaked the same way.
+        log2_in, bs_in, bsp_in = log2, bs, bucket_sizing_p
         from .bivariate import BivariateAggregate
 
         # The closed set of objects _factory can produce. Severity, Distortion
@@ -1876,21 +2172,21 @@ class Underwriter(HelpMixin):
                 # per-axis auto-sizing lives in BivariateAggregate.update;
                 # pass log2/bs through (0 => auto), drop agg-only kwargs.
                 d = answer.spec
-                log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
-                    d, log2, bs, bucket_sizing_p, kwargs)
+                log2, bs, bucket_sizing_p, kw = _resolve_hints(
+                    d, log2_in, bs_in, bsp_in, dict(kwargs))
                 # BivariateAggregate has no sharpen (the probe is quadratic in
                 # the joint grid), so drop the kwarg rather than raise on it.
-                kwargs.pop('sharpen', None)
+                kw.pop('sharpen', None)
                 log2_ = 0 if log2 == 0 else log2
                 logger.info('(%s, %s): bivariate update(log2=%s, bs=%s)',
                             answer.kind, answer.name, log2_, bs)
-                obj.update(log2=log2_, bs=bs, **kwargs)
+                obj.update(log2=log2_, bs=bs, **kw)
             elif isinstance(obj, Aggregate):
                 # pnl / xpnl ride here: their deferred engine is an Aggregate
                 # until _snapshot_pnl runs below.
                 d = answer.spec
-                log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
-                    d, log2, bs, bucket_sizing_p, kwargs)
+                log2, bs, bucket_sizing_p, kw = _resolve_hints(
+                    d, log2_in, bs_in, bsp_in, dict(kwargs))
                 # ``log2`` is a CAP; bucket + window selection is delegated to
                 # Aggregate.update / _bs_window (the single source of truth:
                 # exact-discrete, bounded, moment, and signed/P&L windows).
@@ -1903,14 +2199,14 @@ class Underwriter(HelpMixin):
                 try:
                     obj.update(
                         log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
-                        debug=self.debug, force_severity=True, **kwargs)
+                        debug=self.debug, force_severity=True, **kw)
                 except (ZeroDivisionError, AttributeError) as e:
                     logger.error(e)
             else:
                 # Portfolio
                 d = answer.spec
-                log2, bs, bucket_sizing_p, kwargs = _resolve_hints(
-                    d, log2, bs, bucket_sizing_p, kwargs)
+                log2, bs, bucket_sizing_p, kw = _resolve_hints(
+                    d, log2_in, bs_in, bsp_in, dict(kwargs))
                 if log2 == -1:
                     log2_ = 13
                 elif log2 == 0:
@@ -1924,7 +2220,7 @@ class Underwriter(HelpMixin):
                 logger.info('(%s, %s): bs=%s and log2=%s', answer.kind, answer.name, bs, log2_)
                 obj.update(log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
                            remove_fuzz=True, force_severity=True,
-                           debug=self.debug, **kwargs)
+                           debug=self.debug, **kw)
 
         # snapshot any deferred P&L: the inner Aggregate is now updated, so build
         # the eager PnL / marginal-stack / analysis value object from its recipe.
@@ -2356,8 +2652,25 @@ class Underwriter(HelpMixin):
             raise ValueError(f'File suffix must be .csv or .agg, not {filename.suffix}')
         if where != '':
             df = df.loc[df.index.astype(str).str.match(where)]
-        # ensure the canonical One severity is present for any sev.One references
-        self.build_many('sev One dsev [1]', update=False)
+        # Parse against a SCRATCH underwriter seeded from this one, registering
+        # each statement as it parses. Two reasons, and the first is a fix:
+        #
+        # * a file may declare a name and use it further down (every dotted
+        #   reference works that way, and a ``sev agg.NAME`` severity reference
+        #   makes it routine), so the parse has to see what came before it, the
+        #   way ``_interpret_program`` does. Without this, a valid file reports a
+        #   phantom error on every internal reference.
+        # * validating a file should not quietly add its contents to this
+        #   underwriter's recipe base. Seeding a scratch copy keeps cross-file
+        #   references resolvable without that side effect -- which the old
+        #   hand-seeding of ``sev One`` had.
+        if not self._loaded:
+            self.load()
+        scratch = Underwriter(name=f'{self.name}-interpret', debug=self.debug)
+        scratch._recipes = dict(self._recipes)
+        scratch._loaded = True
+        # the canonical One severity, for any sev.One references
+        scratch.build_many('sev One dsev [1]', update=False)
 
         # Rows are collected as a list rather than a dict keyed on the name:
         # two entries may legitimately share a name (``decl-testers.agg`` reuses
@@ -2384,8 +2697,12 @@ class Underwriter(HelpMixin):
             line = statements[0]
             err = 0
             try:
-                kind, name, spec = self.parser.parse(self.lexer.tokenize(line))
-            except (ValueError, TypeError) as e:
+                kind, name, spec = scratch.parser.parse(scratch.lexer.tokenize(line))
+            # ``LookupError`` covers an unresolvable dotted reference, which
+            # ``_safe_lookup`` raises through ``__getitem__``. It is exactly the
+            # kind of thing this method exists to REPORT, one row at a time, so
+            # letting it abort the whole file was wrong.
+            except (ValueError, TypeError, LookupError) as e:
                 err = 1
                 kind = line.split()[0]
                 report = getattr(e, 'report', None)
@@ -2395,9 +2712,13 @@ class Underwriter(HelpMixin):
                     spec = line[0:i] + '>>>' + line[i:]
                     name = 'parse error'
                 else:
-                    # Non-parse error (e.g. transformer-level ValueError).
+                    # Non-parse error (e.g. transformer-level ValueError, or an
+                    # unknown reference).
                     spec = str(e)
                     name = 'other error'
+            else:
+                if kind != 'expr':
+                    scratch.add_recipe(kind, name, spec, line)
             rows.append([kind, err, name, spec, line])
 
         df_out = pd.DataFrame(rows, index=index,

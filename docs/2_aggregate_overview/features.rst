@@ -638,6 +638,142 @@ heads.
     fyi = build('agg Fyi 5 claims 20000 premium sev lognorm 1000 cv 2 poisson')
     qd(fyi.stats_df.loc[('meta', ['prem', 'lr']), 'mixed'])
 
+.. _feat agg as severity:
+
+An aggregate as a severity: ``sev agg.NAME`` (a291)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An ``agg`` or ``port`` already in the recipe base can serve as the severity of
+another aggregate: ``sev agg.NAME``, ``sev port.NAME``, with ``ssev`` and the
+unconditional ``!`` available as on any other severity clause. The motivating
+case is a US personal auto split limit, a 100/300 policy: 100 per claimant, 300
+in the aggregate. The inner aggregate is one policy's claims; the outer
+compounds policies.
+
+.. ipython:: python
+
+    sl_policy = build('agg SplitPolicy 1.5 claims 100 xs 0 sev gamma 50 cv 2 '
+                      'poisson zt ! hints{log2=16; bs=1/32}')
+    qd(sl_policy)
+
+``SplitPolicy`` is one policy's loss: the 100 per-claimant limit is its layers
+clause, and the zero-truncated Poisson puts at least one claim on every policy
+(the frequency-side ``!`` holds the requested mean at 1.5 rather than treating
+1.5 as the untruncated parameter). The book is 5,000 of them, with the 300
+policy aggregate applied as an ordinary occurrence limit on the reference:
+
+.. ipython:: python
+
+    sl_book = build('agg SplitBook 5000 claims 300 xs 0 sev agg.SplitPolicy ! '
+                    'mixed gamma .2')
+    qd(sl_book)
+
+**A reference is a certified, fully formed** ``dsev``. The inner's output pmf
+becomes a discrete severity, exactly as though you had transcribed
+``dsev [xs] [ps]`` by hand: exact discrete moments, exact layer moments, and the
+mean-preserving linear rebucket onto the consuming grid. There is no blending,
+no smoothing, and no continuous reading. Its moments are reported as the
+consuming aggregate's theoretical severity moments, because that is what the
+referenced object outputs.
+
+The reference is resolved at **build** time, not parse time, which makes it
+unlike every other dotted name in DecL. ``sev.NAME`` and ``agg.NAME`` in an
+exposure head are looked up and inlined by the parser; a severity reference
+cannot be, because the severity is the inner's *computed output*, which exists
+only after an update. So the program parses with the reference in it and the
+underwriter resolves it on the way to constructing the object. Two consequences
+follow. The inner may exist only as a recipe and never have been built, which is
+the usual case for a library entry. And every build re-resolves, so redefining
+the inner and rebuilding picks the change up.
+
+**Referenced declarations must pin their own grid.** Because the severity *is*
+whatever the inner computes, the inner has to say at what resolution, or the
+severity would drift with ambient defaults instead of with the model. A
+reference to a declaration carrying no ``hints{log2=…; bs=…}`` is an error that
+names the fix and computes the numbers for you. ``with_hints`` is the supported
+way to get them: build the inner until you are happy with it, then re-register
+it with its resolution pinned.
+
+.. ipython:: python
+
+    candidate = build('agg LoosePolicy 1.5 claims 100 xs 0 sev gamma 50 cv 2 '
+                      'poisson zt !')
+    print(candidate.with_hints())
+
+**The two** ``!``\ **s are different and both legal in one program.** On the
+frequency clause, ``!`` modifies ``zt`` / ``zm`` so the requested mean is the
+realized one. On a severity clause, ``!`` makes the layer unconditional, which
+keeps mass at or below the attachment instead of conditioning it away. The
+split-limit program above carries both.
+
+The severity-side one matters more on a reference than it does elsewhere, and in
+a way that is easy to get wrong. A layers clause conditions on exceeding the
+attachment by default, and a materialized reference nearly always has something
+in its first bucket: any severity with positive density at the origin
+discretizes some of every claim there, so a ``gamma 50 cv 2`` (shape 0.25) puts
+about 10% of one claim below ``bs / 2``, and the zero-truncated per-policy
+aggregate above materializes with about 7% at its zero atom even though
+``P(S = 0) = 0`` exactly. Writing ``300 xs 0 sev agg.SplitPolicy`` without the
+``!`` conditions that away and lifts the severity mean by the same proportion.
+The library warns when this happens on a source whose claim count is never zero,
+because there the mass is certainly discretization and nobody can have meant to
+condition on it:
+
+.. ipython:: python
+    :okwarning:
+
+    sl_cond = build('agg SplitCond 5000 claims 300 xs 0 '
+                    'sev agg.SplitPolicy poisson')
+    sl_cond.sevs[0].moms()[0], sl_book.sevs[0].moms()[0]
+
+When the inner does have a genuine zero atom the choice is real and the library
+stays quiet, because both readings are legitimate models. With a plain Poisson
+inner, about 22% of policies pay nothing:
+
+.. csv-table:: Three ways to write the same book, and which pairs coincide
+   :header-rows: 1
+   :widths: 40 60
+
+   "Program", "Reading"
+   "``300 xs 0 sev agg.Plain !``", "5,000 **policies**, ~22% of which pay nothing. Equals the aggregate-reinsurance benchmark."
+   "``300 xs 0 sev agg.Plain``", "5,000 **loss-bearing policies**: the zero atom is conditioned away."
+   "``300 xs 0 sev agg.PlainZt``", "The same law as the line above. Conditioning a per-policy aggregate on being positive is zero-truncating its frequency, for an almost surely positive severity."
+
+**Express the inner and the outer as simply as possible.** The preference order
+for a given structure is: no limits, then exposure (occurrence) limits, then
+aggregate reinsurance, then occurrence reinsurance, then both. The reinsurance
+machinery is substantial and worth avoiding when a plain limit reaches the same
+law, which is why the split limit above uses an occurrence limit rather than an
+``aggregate ceded to 300 xs 0`` on the inner. The two agree on the severity's
+moments to machine precision; the reinsurance one costs a cession structure, a
+set of reinsurance frames and a second rebucketing to say the same thing.
+
+**Tail reporting is the one place a reference is not read as a** ``dsev``.
+A materialized reference is a finite set of atoms and therefore looks bounded,
+but the object behind it may not be. ``tail_behavior_df`` reports the source's
+theoretical tail and says so in the note, while every number, bucket selection
+included, rides the finite atoms actually convolved:
+
+.. ipython:: python
+
+    build('agg Unbounded dfreq [1] sev gamma 100 cv 1 hints{log2=12; bs=1/16}')
+    ub_ref = build('agg UsesUnbounded dfreq [1] sev agg.Unbounded')
+    qd(ub_ref.tail_behavior_df[['min', 'max', 'right_tail', 'bounded']])
+
+Accuracy: the rebucket preserves the materialized severity mean exactly, so an
+unlimited reference reproduces the inner's mean to machine precision; a
+*layered* reference falls to the survival-difference path, exactly as a layered
+``dsev`` does, which carries a small positional bias that shrinks with the grid.
+The residual error is the inner's own discretization plus the outer's scatter.
+Raise the inner's ``hints{log2=…}`` for a thick tail, or when validation flags
+fire; a materialized reference that has lost mass says so.
+
+Scope: references are leaves. They take no picks, weights, scaling, shifting or
+splicing (what those would mean on a compound output is undecided), and the
+``sev`` / ``ssev`` keyword is required. Depth is unlimited, with a cycle guard
+that names the chain. ``Aggregate.as_severity`` and ``Portfolio.as_severity``
+are the programmatic equivalents.
+
 Better parse errors (a16)
 -------------------------
 

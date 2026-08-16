@@ -42,11 +42,45 @@ _CORPUS_FILES = ['_test_suite.agg', '_test_suite2.agg', 'decl-testers.agg']
 # round-tripping through the ``_tweedie`` provenance key.
 _FIDELITY_EXEMPT: set[str] = set()
 
-# The corpus is the _test_suite family, whose programs reference builtins it
-# defines (e.g. ``sev.One``). Parse against an underwriter that loads it, NOT
-# the module-level ``build`` singleton -- ``build`` now defaults to the curated
-# ``examples`` library, which does not carry those builtins.
-_uw = Underwriter(databases='_test_suite')
+# The corpus programs reference builtins the corpus itself defines (``sev.One``
+# from ``_test_suite.agg``, the ``agg.ASV.*`` severity references in
+# ``decl-testers.agg``), so parse against an underwriter that carries the WHOLE
+# corpus, not the module-level ``build`` singleton -- ``build`` defaults to the
+# curated ``library``, which has none of them.
+#
+# Preloaded line by line rather than through ``databases=`` because
+# ``decl-testers.agg`` deliberately does not load clean: its section X is
+# intentional parse-error fixtures. Failures are swallowed here exactly as in
+# ``conftest.underwriter``, so they surface as the individual test failures they
+# are meant to be. File order is definition-before-use, and the three files have
+# no ``(kind, name)`` collisions between them, so nothing shadows anything.
+# Preloaded LAZILY, on first use: parsing the corpus costs about 11 seconds, and
+# an import-time preload pays that in every xdist worker whether or not the
+# worker got any of these tests. ``Underwriter(databases=…)`` is lazy for the
+# same reason, but cannot be used here: ``decl-testers.agg`` deliberately does
+# not load clean (its section X is intentional parse-error fixtures) and
+# ``load`` aborts on the first error. Failures are swallowed exactly as in
+# ``conftest.underwriter``, so they surface as the individual test failures they
+# are meant to be. File order is definition-before-use, and the three files have
+# no ``(kind, name)`` collisions between them, so nothing shadows anything.
+_uw = Underwriter()
+_uw_ready = False
+
+
+def _corpus_underwriter():
+    global _uw_ready
+    if not _uw_ready:
+        for fn in _CORPUS_FILES:
+            path = _AGG_DIR / fn
+            for line in UnderwritingLexer.preprocess(path.read_text(encoding='utf-8')):
+                try:
+                    kind, name, spec = _uw.parser.parse(_uw.lexer.tokenize(line))
+                except Exception:
+                    continue
+                if kind != 'expr':
+                    _uw.add_recipe(kind, name, spec, line)
+        _uw_ready = True
+    return _uw
 
 
 def _corpus_lines():
@@ -142,7 +176,7 @@ def _parse_one(text):
     """Parse a single canonical statement (rendered text) to ``(kind, name, spec)``."""
     statements = _split_statements(text)
     assert len(statements) == 1, f'expected one statement, got {len(statements)}'
-    return _uw.parser.parse(statements[0])
+    return _corpus_underwriter().parser.parse(statements[0])
 
 
 # ----------------------------------------------------------------------
@@ -158,7 +192,7 @@ def test_corpus_nonempty():
 def test_roundtrip(program):
     """Each corpus program is idempotent under the unparser, and faithful
     unless it is a known-lossy construct."""
-    kind0, name0, spec0 = _uw.parser.parse(program)
+    kind0, name0, spec0 = _corpus_underwriter().parser.parse(program)
     if kind0 == 'expr':
         pytest.skip('bare expression, not an unparsable object')
 

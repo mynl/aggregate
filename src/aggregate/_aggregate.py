@@ -1053,18 +1053,31 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _tail.tail_frame(self._tail_rows())
 
-    def _tail_rows(self):
+    def _tail_rows(self, reference=True):
         """The layered tail report as a list of :class:`~aggregate.tail.TailRow`.
 
         Single source for :attr:`tail_behavior_df`, :attr:`tail_description`,
         and :attr:`tail_explanation`. Spec-only -- valid before :meth:`update`.
+
+        Parameters
+        ----------
+        reference : bool, default True
+            Whether a severity that came from a ``sev agg.NAME`` reference
+            reports the **referenced object's theoretical** tail (the default,
+            and what every reporting surface wants) or the tail of the finite
+            atoms it materialized to. The bucket sizer asks for ``False``
+            through :meth:`_loss_tail_classes`, because the grid is chosen for
+            the law that is actually convolved: a certified reference is a
+            fully formed ``dsev``, and the outer sizes from it exactly as it
+            would from a hand-written one. So the two readings differ on
+            purpose. See ``dev/plan-agg-port-as-sev.md`` section 4.6.
         """
         freq_min, freq_max, freq_zt = self._frequency_count_support()
         return _tail.build_tail_rows(
             self.frequency, self.sevs,
             freq_min=freq_min, freq_max=freq_max, freq_zero_truncated=freq_zt,
             actual_m=self.actual_m, actual_sd=self.actual_sd,
-            occ_reins=self.occ_reins,
+            occ_reins=self.occ_reins, reference=reference,
         )
 
     def _frequency_count_support(self):
@@ -5002,6 +5015,50 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # The two coincide for every unmodified frequency.
         return self._count_program(spec, self.base_mean, name)
 
+    def with_hints(self, **extra):
+        """This aggregate's program with its realized grid pinned into ``hints{}``.
+
+        The certification helper for the reference-severity feature. A
+        ``sev agg.NAME`` reference requires the referenced declaration to carry
+        explicit ``log2`` and ``bs`` hints, so that the severity it stands for
+        is pinned by the recipe base rather than by whatever ambient defaults
+        happened to be in force. This is how a declaration acquires them: get
+        the inner right interactively, then ``build(inner.with_hints())``
+        re-registers it with its resolution pinned, turning a candidate inner
+        into a certified one.
+
+        Parameters
+        ----------
+        **extra
+            Further ``hints{}`` settings (any key the language allows, e.g.
+            ``padding=2``, ``normalize=False``), merged over ``log2``, ``bs``
+            and ``normalize``, which come from the object's current state.
+
+        Returns
+        -------
+        str
+            One line of DecL, ready to hand back to ``build``.
+
+        Raises
+        ------
+        ValueError
+            If the object has not been updated, carries no DecL program, or is
+            given a hint key DecL does not have.
+
+        Examples
+        --------
+        >>> from aggregate import build
+        >>> a = build('agg WH.Doc 10 claims sev lognorm 50 cv 1 poisson')
+        >>> 'hints{' in a.with_hints()
+        True
+
+        Notes
+        -----
+        The existing trailer survives: the clause is merged key by key, so a
+        declared ``padding`` stays and only the grid moves.
+        """
+        return _program.with_hints(self, **extra)
+
     def as_severity(self, limit=np.inf, attachment=0, conditional=False):
         """Use this aggregate's output loss distribution as a severity.
 
@@ -5699,8 +5756,18 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         (left_tail, right_tail) : tuple of aggregate.tail.TailClass
             The loss-space aggregate decay rungs. Spec-only (valid before
             :meth:`update`); fed to :func:`aggregate.tail.is_thick`.
+
+        Notes
+        -----
+        ``reference=False``: the grid is sized on the law that is actually
+        convolved. A ``sev agg.NAME`` reference materializes to a certified
+        finite set of atoms, and the outer sizes from it exactly as it would
+        from a hand-written ``dsev``, legitimately treating it as bounded --
+        the referenced object's own theoretical tail already drove the
+        referenced object's own window choice. The reporting surfaces take the
+        other reading; see :meth:`_tail_rows`.
         """
-        agg = self._tail_rows()[-1]
+        agg = self._tail_rows(reference=False)[-1]
         return agg.left_tail, agg.right_tail
 
     def _single_big_jump_window(self, p_star):

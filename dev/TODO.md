@@ -207,6 +207,15 @@
      reference on the spec (a `sev_ref` key, say) and rendering from that. This
      is the one worth doing: named-severity reuse is a documented feature that
      would otherwise appear nowhere in the shipped library.
+     **The pattern now exists and the key is taken.** `a291`
+     (`[Agg-As-Severity]`, `dev/done/plan-agg-port-as-sev.md`) added
+     `sev agg.NAME` / `sev port.NAME` carrying exactly this `sev_ref` key, the
+     verbatim dotted id, and `decl_writer._render_sev_clause` renders it back as
+     a reference from day one. Those are the first dotted references in DecL
+     that round-trip as references. `sev.NAME` can join them by recording
+     `sev_ref` alongside the inlined spec, since that reference *is* resolved at
+     parse time and the writer branch would need to prefer it over the inlined
+     keys rather than being their only source.
   2. **Distortion combinator** (1) — `minimum` / `mixture` drop their child
      distortion names, so `format_program` raises rather than rendering.
   3. **`ssev <c> - <dist>`** (3) — renders in the general affine form
@@ -712,6 +721,31 @@
 ## After the cut — `beta`
 
 ### Reporting
+
+- **[Agg-As-Severity-Result-Cache]** (from `dev/done/plan-agg-port-as-sev.md`
+  §11) — every build of an aggregate whose severity is a `sev agg.NAME`
+  reference rebuilds and re-updates the referenced object, so a program that
+  both defines and uses an inner builds it twice, and iterating on an outer pays
+  the inner's FFT each time. The cost is milliseconds to tens of milliseconds at
+  typical resolutions, and the mandatory `hints{log2=…; bs=…}` make the rebuild
+  exactly reproducible, so correctness does not depend on caching. Cache a built
+  inner on its stored recipe **only if profiling shows it matters**; the reason
+  it was not done at a291 is that a cache introduces staleness questions
+  (redefinition, hint edits) that the fresh re-resolution simply does not have.
+- **[Reference-Severity-Zero-Atom-Default]** (surfaced executing
+  `plan-agg-port-as-sev.md`, a291) — a layers clause on a severity conditions on
+  exceeding the attachment by default, and the plan's headline split-limit
+  program relies on the intuition that a zero-truncated inner has no zero atom.
+  It does not hold for the *materialized* reference: any severity with positive
+  density at the origin discretizes mass into the first bucket, so
+  `gamma 50 cv 2` (shape 0.25) leaves about 7% at the zero atom of a
+  zero-truncated per-policy aggregate and the default conditioning moves the
+  outer answer by 6%. a291 warns (only when the source's claim count is never
+  zero, so the mass is certainly discretization) and the docs now write the
+  headline with `!`. **The author's call is whether that is enough**, or whether
+  a reference severity should default to unconditional under a layers clause.
+  Changing the default is a language-semantics decision, so it was not taken
+  unilaterally; the warning is the conservative half.
 
 - ~~**[Layer-Peeling-Shorthand]**~~ **DONE `1.0.0a183`**
   (`dev/done/plan-layer-peeling.md`; the placeholder was

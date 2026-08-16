@@ -6,12 +6,27 @@
 # a residual has to read apart from an exact zero, and none of that is in
 # the dtype.
 #
+# To view output run:
+#
+# from aggregate import build, exhibits
+# import greater_tables as gt
+# from IPython.display import HTML, display
+#
+# e = exhibits.validation(a, 'insurer')
+# for doc in e.ir_blocks:
+#     display(HTML(gt.render_html(doc)))
+#
+# print(gt.render_text(e.ir_blocks[0]))   # same document, as text
+# e.to_payload()                          # the literal wire JSON
+#
 # Keyed by **column label**, globally: an entry says what that word means
 # wherever it appears on a served block, which is what makes this file a
 # registry of the column vocabulary as well as a format table. Case is
 # significant, so `p` (a probability) and `P` (premium) are two words.
-# The `exhibits:` section at the foot scopes an entry to one exhibit, for
-# the case where one label really does mean two things.
+# The `patterns:` section says how a whole family reads, by regex, for the
+# labels no list can enumerate. The `exhibits:` section at the foot scopes
+# either kind of entry to one exhibit, for the case where one label really
+# does mean two things.
 #
 # Values: a style name from the `styles:` section, greater_tables format
 # sugar (`',.2f'`, `'.3g'`, `'si'`), an int (decimal places), or a mapping
@@ -111,13 +126,49 @@ columns:
   'Premium spent': ratio
   'Margin spent': ratio
 
-# Scoped exceptions, exhibit then column: the escape hatch for one label
-# meaning two things. An entry here wins over the global entry above, for
-# that exhibit only.
+  # --- missing from round 1
+  Mean: money
+  Median: money
+  SD: money
+  EX: money
+  'Est EX': money
+  P01: money
+  P99: money
+  Err: '.5g'
+  'Err EX': '.5g'
+  'Err CV': '.5g'
+  abs_err: '.5g'
+  rel_err: '.5g'
+  Gate: '.5g'
+  'Est CV': ratio
+  Sk: '.3g'
+  'Est Sk': '.3g'
+
+# Regex entries, for a family of labels rather than one word. Keys are
+# regular expressions matched **whole** (`re.fullmatch`) against the
+# displayed column label, tried in the order written, first match winning, so
+# a narrow pattern belongs above a broad one. An exact entry above always
+# beats a pattern: a pattern is a rule about a family, an entry is a
+# statement about one word, and the word is the more specific of the two.
+patterns:
+  # The analytic mixture components of the moment store, `e0.m0`, `e0.m1`,
+  # ... one per mixture component, so how many there are is a property of the
+  # program and no list of exact entries can cover them. They hold every
+  # moment from `ex1` to `ex3` down one column, twelve orders of magnitude
+  # apart, so significant figures with a suffix is the only uniform reading:
+  # `si` says it once, where inference would answer it column by column and
+  # differ between books.
+  'e[0-9]+\.m[0-9]+': 'si'
+
+# Scoped exceptions, exhibit then section: the escape hatch for one label
+# meaning two things. A scoped section is a sheet in miniature, carrying
+# `columns:` and `patterns:` with the same meaning they have above, and both
+# win over their global counterparts for that exhibit only.
 exhibits:
   # The tail ladder is indexed by `P`, the symmetric probability ladder,
   # which is not the premium the global entry means. Without this the
   # capital anchors would read as amounts, and under INSURER's money format
   # the 1 in 1000 and the 1 in 10000 rungs would both print 1.00.
   tail:
-    P: probability
+    columns:
+      P: probability

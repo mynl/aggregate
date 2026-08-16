@@ -99,6 +99,90 @@ def test_the_scoped_section_wins_for_one_exhibit():
     assert format_sheet('insurer').block('tail')[0]['P'] == '.5f'
 
 
+# --- patterns ----------------------------------------------------------------
+
+def test_the_shipped_pattern_covers_the_mixture_components():
+    """`e0.m0`, `e0.m1`, ... one per component, so no list can enumerate them."""
+    sheet = format_sheet('raw')
+    labels = ['e0.m0', 'e0.m1', 'e12.m7', 'mixed', 'error']
+    formatters, _selectors = sheet.block('stats', None, labels)
+    assert formatters['e0.m0'] == formatters['e12.m7'] == 'si'
+    assert 'mixed' not in formatters, 'a plain word is not the pattern'
+    assert formatters['error'] == '.5g', 'an exact entry is untouched'
+    assert sheet.declares('e0.m1') and not sheet.declares('e0m1')
+
+
+def test_a_pattern_expands_only_against_the_labels_it_is_given():
+    """Nothing reaches greater_tables that its exact lookup would not match."""
+    sheet = format_sheet('raw')
+    assert 'e0.m0' not in sheet.block('stats')[0]
+    assert 'e0.m0' in sheet.block('stats', None, ['e0.m0'])[0]
+
+
+def test_an_exact_entry_beats_a_pattern(tmp_path, monkeypatch):
+    (tmp_path / 'formats-raw.yaml').write_text(
+        "columns:\n  ex2: '.2e'\n"
+        "patterns:\n  'ex[0-9]+': 'si'\n", encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+    formatters, _ = format_sheet('raw').block(None, None, ['ex1', 'ex2'])
+    assert formatters['ex1'] == 'si'
+    assert formatters['ex2'] == '.2e'
+
+
+def test_the_first_matching_pattern_wins(tmp_path, monkeypatch):
+    """File order is the tie break, so a narrow pattern goes above a broad one."""
+    (tmp_path / 'formats-raw.yaml').write_text(
+        "patterns:\n  'Err .*': '.5g'\n  '.* CV': ratio\n", encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+    formatters, selectors = format_sheet('raw').block(
+        None, None, ['Err CV', 'Est CV'])
+    assert formatters['Err CV'] == '.5g'
+    assert formatters['Est CV'] == '.1%'
+    # the tag follows the winning pattern, so only the ratio one is stamped
+    assert 'Est CV' in selectors['ratio_cols']
+    assert 'Err CV' not in selectors['ratio_cols']
+
+
+def test_a_pattern_matches_whole_not_partially(tmp_path, monkeypatch):
+    (tmp_path / 'formats-raw.yaml').write_text(
+        "patterns:\n  'CV': '.3f'\n", encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+    formatters, _ = format_sheet('raw').block(None, None, ['CV', 'Est CV'])
+    assert formatters['Est CV'] == '.1%', 'the exact entry, not the pattern'
+    assert formatters['CV'] == '.1%', 'and an exact entry still beats it'
+
+
+def test_a_scoped_pattern_is_that_exhibit_s_default(tmp_path, monkeypatch):
+    """`.*` scoped to one exhibit: everything else here reads like this."""
+    (tmp_path / 'formats-raw.yaml').write_text(
+        "exhibits:\n  stats:\n    patterns:\n      '.*': 'si'\n",
+        encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+    sheet = format_sheet('raw')
+    stats, _ = sheet.block('stats', None, ['empirical', 'total', 'error'])
+    assert stats['empirical'] == stats['total'] == 'si'
+    assert stats['error'] == '.5g', 'an exact entry still wins'
+    other, _ = sheet.block('summary', None, ['empirical'])
+    assert 'empirical' not in other, 'scoped means scoped'
+
+
+def test_a_bad_pattern_names_the_file_and_the_key(tmp_path, monkeypatch):
+    (tmp_path / 'formats-raw.yaml').write_text(
+        "patterns:\n  'e[0-9': 'si'\n", encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValueError, match='not a regular expression'):
+        format_sheet('raw')
+
+
+def test_the_old_flat_scoped_shape_says_what_to_do(tmp_path, monkeypatch):
+    """The a295 shape change, caught with a message that names the fix."""
+    (tmp_path / 'formats-raw.yaml').write_text(
+        "exhibits:\n  tail:\n    P: probability\n", encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValueError, match='sits under `columns:`'):
+        format_sheet('raw')
+
+
 def test_block_translates_keys_through_a_renamer():
     """greater_tables keys on the displayed label, so the sheet must follow."""
     sheet = format_sheet('raw')
@@ -149,7 +233,8 @@ def test_a_local_style_redefinition_reaches_the_shipped_columns(
 
 def test_a_local_sheet_may_scope_an_exhibit(tmp_path, monkeypatch):
     (tmp_path / 'formats-raw.yaml').write_text(
-        "exhibits:\n  summary:\n    CV: '.4f'\n", encoding='utf-8')
+        "exhibits:\n  summary:\n    columns:\n      CV: '.4f'\n",
+        encoding='utf-8')
     monkeypatch.chdir(tmp_path)
     sheet = format_sheet('raw')
     assert sheet.block('summary')[0]['CV'] == '.4f'

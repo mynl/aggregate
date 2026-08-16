@@ -494,7 +494,20 @@ def exhibit_frames(obj, name, perspective=Perspective.RAW):
     return blocks
 
 
-def _sheet_kwargs(obj, name, perspective):
+def _block_labels(df):
+    """Every label a format could key on: data columns, then index names.
+
+    A tuple column contributes its leaf, which is what greater_tables falls
+    back to when the full label does not match. Index names are included
+    because a stub column takes a format like any other, which is how the
+    ``tail`` ladder's ``P`` index is scoped away from premium.
+    """
+    labels = [c[-1] if isinstance(c, tuple) else c for c in df.columns]
+    labels += [n for n in (df.index.names or ()) if n is not None]
+    return list(dict.fromkeys(labels))
+
+
+def _sheet_reader(obj, name, perspective):
     """What the format sheets contribute to every block of one exhibit.
 
     Applied here rather than in the frames builders, and **after** relabeling,
@@ -520,8 +533,11 @@ def _sheet_kwargs(obj, name, perspective):
 
     Returns
     -------
-    (dict, dict)
-        The ``formatters`` mapping and the ``{'<tag>_cols': [...]}`` selectors.
+    callable
+        ``read(df) -> (formatters, tag selectors)`` for one block. Per block
+        rather than per exhibit because a pattern entry is expanded against
+        the block's own column labels, which the sheet cannot know in
+        advance; the relabeling is resolved once and closed over.
     """
     sheet = format_sheet(perspective)
     relabel = getattr(obj, '_relabel', None)
@@ -532,7 +548,11 @@ def _sheet_kwargs(obj, name, perspective):
         mapping = dict(zip(labels, relabel(probe).columns))
         if any(before != after for before, after in mapping.items()):
             rename = lambda label: mapping.get(label, label)  # noqa: E731
-    return sheet.block(name, rename)
+
+    def read(df):
+        return sheet.block(name, rename, _block_labels(df))
+
+    return read
 
 
 def build_exhibit(obj, name, perspective=Perspective.RAW, *,
@@ -565,10 +585,12 @@ def build_exhibit(obj, name, perspective=Perspective.RAW, *,
     -----
     **Every served column takes its reading from the format sheets**
     (:mod:`aggregate.exhibits._formats`), applied here and after relabeling.
-    Precedence, low to high: greater_tables' dtype and tag inference, then
-    ``formats-raw.yaml``, then ``formats-insurer.yaml`` under that
-    perspective, then the same file names in ``~/.aggregate`` and the working
-    directory, then a block's own ``formatters`` entry, which always wins. A
+    Precedence, low to high: greater_tables' dtype and tag inference, then a
+    sheet ``patterns:`` entry matching the label, then a sheet ``columns:``
+    entry naming it exactly, with ``formats-insurer.yaml`` over
+    ``formats-raw.yaml`` under that perspective and the same file names in
+    ``~/.aggregate`` and the working directory over both, then a block's own
+    ``formatters`` entry, which always wins. A
     block that declares a tag selector (``ratio_cols`` and friends) keeps its
     own and takes none from the sheet, since a selector can be a regex or
     ``'all'`` and those do not merge with a list.
@@ -601,10 +623,11 @@ def build_exhibit(obj, name, perspective=Perspective.RAW, *,
     blocks = exhibit_frames(obj, name, perspective)
     gt = _import_greater_tables()
     fn, _ = EXHIBITS[name]
-    sheet_formats, sheet_tags = _sheet_kwargs(obj, name, perspective)
+    read_sheet = _sheet_reader(obj, name, perspective)
     ir_blocks = []
     captions = {}
     for block_name, df, kw in blocks:
+        sheet_formats, sheet_tags = read_sheet(df)
         spec_kw = {'include_raw': INCLUDE_RAW, **sheet_tags, **kw,
                    'formatters': {**sheet_formats, **kw.get('formatters', {})},
                    'max_rows': max_rows}

@@ -418,9 +418,20 @@
   sites deleted, 124 exhibit snapshots regenerated). `[Format-Sheet-Enforcement]`
   landed a288 (the served column sweep, two structural exemptions, and
   `PENDING_VOCABULARY`, the 43 label punch list the sweep produced). **All
-  three phases done; execution record in the plan's section 9.** **Open with
-  the author:** the punch list, and the naming drift it caught (four
-  spellings of a mean, three of a standard deviation, three of a skewness).
+  three phases done; execution record in the plan's section 9.**
+  **Follow up, `[Format-Sheet-Patterns]` a295**: a `patterns:` section keyed
+  on a regex (whole match, file order, expanded in the loader against the
+  block's own labels so greater_tables still sees exact words only), the
+  scoped `exhibits:` section restructured to carry `columns:` and
+  `patterns:`, and the shipped `e[0-9]+\.m[0-9]+` entry for the moment
+  store's mixture components. A scoped `'.*'` is a per-exhibit default,
+  which retires the idea that the sheets need a `float_format` section. The
+  summary and validation half of the punch list is closed in the same
+  version, so the pending list is down to 31.
+  **Open with the author:** the rest of the punch list, and the naming drift
+  it caught (four spellings of a mean, three of a standard deviation, three
+  of a skewness). Declined 2026-08-16: bounding the SI ladder to a window,
+  which would need new `FormatSpec` fields plus csv-grid work.
 - **[Exhibit-Official-Channels]**: closes
   `dev/note-from-aggregate-api-round-6.md`, the round in which the app stopped
   building table documents out of frames it fetched, so every gap the library

@@ -1,5 +1,18 @@
 # formats-insurer.yaml: how the INSURER perspective differs from RAW.
 #
+# To view output run:
+#
+# from aggregate import build, exhibits
+# import greater_tables as gt
+# from IPython.display import HTML, display
+#
+# e = exhibits.validation(a, 'insurer')
+# for doc in e.ir_blocks:
+#     display(HTML(gt.render_html(doc)))
+#
+# print(gt.render_text(e.ir_blocks[0]))   # same document, as text
+# e.to_payload()                          # the literal wire JSON
+#
 # An **overlay**, holding only the entries where the business reading is
 # not the raw one. Absent means same. Two full sheets would drift apart;
 # a delta cannot, which is why this file is short and why it should stay

@@ -248,12 +248,11 @@ AXIS_BLOCKS = {
 #: diversified``); and a handful of one-off diagnostics (``Gate``, ``tau``,
 #: ``cov``, ``corr``, the bivariate support bounds).
 PENDING_VOCABULARY = frozenset({
-    'Change CV', 'Change EX', 'D_g_inv', 'EX', 'Err', 'Err CV',
-    'Err EX', 'Est', 'Est CV', 'Est EX', 'Est Sk', 'Gate', 'Gross CV',
+    'Change CV', 'Change EX', 'D_g_inv', 'Est', 'Gross CV',
     'Gross EX', 'Gross Sk', 'M / SD', 'M / capital diversified',
     'M / capital standalone', 'M @ 1-in-100 diversified',
-    'M @ 1-in-100 standalone', 'Mean', 'Median',
-    'Net CV', 'Net EX', 'Net Sk', 'Ref', 'SD', 'Sk', 'Subject CV',
+    'M @ 1-in-100 standalone',
+    'Net CV', 'Net EX', 'Net Sk', 'Ref', 'Subject CV',
     'Subject EX', 'Subject Sk', 'closed_form', 'corr', 'cov',
     'cv', 'max', 'mean', 'min', 'sd', 'skew', 'support_max',
     'support_min', 'tau',
@@ -261,9 +260,14 @@ PENDING_VOCABULARY = frozenset({
 
 
 def _undeclared_float_columns(obj, name, perspective):
-    """Float data labels on one exhibit with no reading and no exemption."""
+    """Float data labels on one exhibit with no reading and no exemption.
+
+    Declared means ``FormatSheet.declares``, so a pattern match counts: a rule
+    about a family is a declaration, and a stronger one than the same reading
+    written out for each member.
+    """
     from aggregate.exhibits import format_sheet
-    known = set(format_sheet(perspective).labels(name))
+    sheet = format_sheet(perspective)
     out = {}
     for block, df, _kw in exhibit_frames(obj, name, perspective):
         if any(n is not None for n in df.columns.names):
@@ -274,7 +278,8 @@ def _undeclared_float_columns(obj, name, perspective):
             continue
         for i, column in enumerate(df.columns):
             label = column[-1] if isinstance(column, tuple) else column
-            if label in known or not pd.api.types.is_float_dtype(df.iloc[:, i]):
+            if sheet.declares(label, name) \
+                    or not pd.api.types.is_float_dtype(df.iloc[:, i]):
                 continue
             if any(re.search(pattern, str(label))
                    for pattern, _reason in VOCABULARY_EXEMPTIONS):

@@ -20,6 +20,31 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a295
+
+**[Format-Sheet-Patterns] a format sheet can say how a family reads.** A new `patterns:` section keys on a regular expression instead of a label, matched **whole** against the displayed column label, tried in the order written with the first match winning. It answers the labels no list can enumerate: the moment store's analytic mixture components are `e0.m0`, `e0.m1`, `e0.m2`, one per component, so how many exist is a property of the program rather than of the vocabulary. The shipped sheet declares them `si`, which is a reading they used to get from inference on a wide book and not on a narrow one.
+
+**greater_tables is untouched, and could not do this anyway.** Its format lookup is by exact label. The expansion happens in the loader, against the block's own columns at the moment the `formatters` mapping is built, so GT still only ever receives words it will match. Nothing moves in the IR, no schema version changes, and no consumer needs to learn anything.
+
+**Precedence, high to low**: a scoped exact entry, a global exact entry, a scoped pattern, a global pattern, then GT's inference. Exact beats pattern because a pattern is a rule about a family while an entry is a statement about one word, and the word is the more specific of the two. A pattern also carries a style, so `'.* CV': ratio` stamps the ratio tag on everything it matches.
+
+**BREAKING, in the provisional sense, and small: the scoped `exhibits:` section is now structured.** It carries `columns:` and `patterns:` rather than column entries directly, so a scoped section is a sheet in miniature and learning one teaches the other:
+
+```yaml
+exhibits:
+  tail:
+    columns:
+      P: probability
+```
+
+The old flat shape raises at load naming the file, the exhibit and the fix. Only the shipped sheet used it.
+
+**A scoped `'.*'` is a per-exhibit default**, which is worth stating because it was the one thing the sheets could not express before and the reason a `float_format` section looked necessary: `exhibits: {stats: {patterns: {'.*': 'si'}}}` says everything in that exhibit with no entry of its own reads in SI, exact entries still winning. Not shipped, since `stats_df`'s remaining columns are unit names and the author's call, but available.
+
+**Sheet entries added, and the readings that move with them.** The round one gap the a288 sweep reported is closed for `summary` and `validation`: `Mean`, `Median`, `SD`, `EX`, `Est EX`, `P01` and `P99` read as money; `Err`, `Err EX`, `Err CV`, `abs_err`, `rel_err` and `Gate` read `.5g` like `error`; `Est CV` joins `CV` as a ratio and `Sk` / `Est Sk` join `Skew`. Those columns were reaching for engineering notation on any realistic book, since a relative error spans more than the `1e6` ratio that trips GT's inference and a loss column sits outside its `[1e-3, 1e6]` magnitude window. Sixteen labels leave inference, twelve leave `PENDING_VOCABULARY`, and the committed exhibit snapshots move with them.
+
+**Not done, deliberately**: bounding the SI ladder to a window (suffixes from `m` to `T`, exponent form outside) would need new `FormatSpec` fields in greater_tables plus matching work in its JS bridge and in csv-grid, whose ladder runs `n` to `T` and clamps rather than falling back. The author's ruling is to keep the whole ladder and learn the prefixes.
+
 ## 1.0.0a294
 
 **[Reference-Severity-Reports-Its-Source] a reference to an unbounded aggregate reports unbounded, everywhere.** Author ruling, 2026-08-16, closing the one question `dev/done/plan-agg-port-as-sev.md` left open. Section 4.6 pinned the tail descriptor's consumers at `tail_behavior_df`, which left `bounded` reading the materialized atoms: `agg X dfreq [2] sev agg.Unbounded` showed an infinite max in the frame and `X.bounded == True` beside it. `_severity_bounded`, `classify_severity`, `_combine_severities` and `aggregate_tail_info` now take the same `reference=` flag `build_tail_rows` already had, and every reporting surface passes it: `Aggregate.bounded`, `Aggregate.tail_class`, `Severity.bounded`, `Severity.tail_class`, `Severity.tail_description` / `tail_explanation`, and the `info` blocks that read them.

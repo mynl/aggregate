@@ -44,6 +44,20 @@ mechanism. A stop with no file contributes nothing.
 
 Notes
 -----
+**Patterns.** A sheet's ``patterns:`` section keys on a regular expression
+rather than a label, matched whole against the displayed column label, and
+says how a **family** reads: ``e[0-9]+\\.m[0-9]+`` is the analytic mixture
+components of the moment store, one per component, so their number is a
+property of the program and no list of exact entries can cover them. It also
+collapses a cross product, since anything spelled ``<basis> CV`` is a CV.
+Nothing of this reaches greater_tables, which looks formats up by exact
+label: the expansion happens here, against the block's own columns, and GT
+only ever sees the words it will match. Precedence, high to low: a scoped
+exact entry, a global exact entry, a scoped pattern, a global pattern. Among
+patterns the first match in file order wins, so a narrow pattern belongs
+above a broad one, and ``'.*'`` scoped to one exhibit is how that exhibit
+says "everything else here reads like this".
+
 **Styles.** A sheet's ``styles:`` section names a reading once (``ratio:
 '.1%'``) and every column that wears it points at the name, so the house
 ratio precision is one line rather than fourteen. Styles merge across the
@@ -68,6 +82,7 @@ string raises **once**, naming the file and the key, rather than per cell.
 from __future__ import annotations
 
 import functools
+import re
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
@@ -97,7 +112,12 @@ TAG_STYLES = ('ratio', 'year', 'date', 'raw')
 #: The only top level keys a sheet may carry. Anything else is a typo that
 #: would otherwise be silently ignored, which is the failure mode a config
 #: file cannot afford.
-SECTIONS = ('styles', 'columns', 'exhibits')
+SECTIONS = ('styles', 'columns', 'patterns', 'exhibits')
+
+#: The keys a scoped (per exhibit) section may carry, the same two kinds of
+#: entry as the top level. The structure is uniform on purpose: a scoped
+#: section is a sheet in miniature, so learning one teaches the other.
+SCOPED_SECTIONS = ('columns', 'patterns')
 
 
 @dataclass(frozen=True)
@@ -128,19 +148,36 @@ class FormatSheet:
     perspective: str
     columns: dict
     tags: dict
+    patterns: tuple
     exhibits: dict
     sources: tuple
 
     def labels(self, exhibit=None):
-        """Every column label this sheet has a reading for, one exhibit's view.
+        """Every column label this sheet names **exactly**, one exhibit's view.
 
         The global vocabulary plus that exhibit's scoped entries. Callers use
-        it to work out how a host's relabeling moves the sheet's own keys.
+        it to work out how a host's relabeling moves the sheet's own keys, so
+        patterns are deliberately absent: a pattern is matched against the
+        displayed label after relabeling and has no key to move.
         """
-        scoped, _tags = self.exhibits.get(exhibit, ({}, {}))
+        scoped, _tags, _patterns = self.exhibits.get(exhibit, ({}, {}, ()))
         return list(dict.fromkeys([*self.columns, *scoped]))
 
-    def block(self, exhibit=None, rename=None):
+    def declares(self, label, exhibit=None):
+        """True when this sheet has a reading for ``label``, exact or by pattern.
+
+        What the vocabulary sweep asks. An exact entry and a pattern match are
+        equally a declaration: the pattern says how a family of labels reads,
+        which is a stronger statement than the same reading written out N
+        times, not a weaker one.
+        """
+        scoped, _tags, scoped_patterns = self.exhibits.get(exhibit, ({}, {}, ()))
+        if label in scoped or label in self.columns:
+            return True
+        return any(regex.fullmatch(str(label))
+                   for regex, _value, _tag in (*scoped_patterns, *self.patterns))
+
+    def block(self, exhibit=None, rename=None, labels=()):
         """The greater_tables kwargs this sheet contributes to one block.
 
         Parameters
@@ -149,12 +186,16 @@ class FormatSheet:
             Exhibit registry name; its scoped section (if any) is laid over
             the global entries, replacing both the format and the tag.
         rename : callable, optional
-            ``label -> displayed label``, applied to the keys. The sheets are
-            written in the library's own words and greater_tables keys on the
-            **displayed** label, so a served frame that went through a
-            ``renamer`` needs its sheet keys to travel with it. Without this
-            a renamer touching ``CV`` would silently detach its format, which
-            is what the module level dicts did.
+            ``label -> displayed label``, applied to the **exact** keys. The
+            sheets are written in the library's own words and greater_tables
+            keys on the displayed label, so a served frame that went through a
+            ``renamer`` needs its sheet keys to travel with it. Without this a
+            renamer touching ``CV`` would silently detach its format, which is
+            what the module level dicts did.
+        labels : iterable, optional
+            The block's own column labels, which is what patterns are matched
+            against. They arrive already relabeled, so a pattern needs no
+            ``rename`` trip: it is written against what a reader sees.
 
         Returns
         -------
@@ -163,22 +204,45 @@ class FormatSheet:
             each tag the sheet stamps. Labels the frame does not carry are
             harmless in both: greater_tables looks formats up by label and
             resolves a selector list against the columns it actually has.
+
+        Notes
+        -----
+        Precedence inside the sheet, high to low: a scoped exact entry, a
+        global exact entry, a scoped pattern, a global pattern. Exact beats
+        pattern because a pattern is a rule about a family and an exact entry
+        is a statement about one word, and the word is the more specific of
+        the two. Among patterns the first match in file order wins, so a
+        narrow pattern belongs above a broad one.
         """
-        columns = dict(self.columns)
-        tags = dict(self.tags)
-        scoped_columns, scoped_tags = self.exhibits.get(exhibit, ({}, {}))
+        scoped_columns, scoped_tags, scoped_patterns = self.exhibits.get(
+            exhibit, ({}, {}, ()))
+        columns, tags = {}, {}
+        ordered = (*scoped_patterns, *self.patterns)
+        for label in labels:
+            for regex, value, tag in ordered:
+                if regex.fullmatch(str(label)):
+                    columns[label] = value
+                    if tag is not None:
+                        tags[label] = tag
+                    break
+        exact = dict(self.columns)
+        exact_tags = dict(self.tags)
         for label in scoped_columns:
-            tags.pop(label, None)
-        columns.update(scoped_columns)
-        tags.update(scoped_tags)
+            exact_tags.pop(label, None)
+        exact.update(scoped_columns)
+        exact_tags.update(scoped_tags)
         if rename is not None:
-            columns = {rename(label): value for label, value in columns.items()}
-            tags = {rename(label): tag for label, tag in tags.items()}
+            exact = {rename(label): value for label, value in exact.items()}
+            exact_tags = {rename(label): tag for label, tag in exact_tags.items()}
+        for label in exact:
+            tags.pop(label, None)      # an exact entry replaces a pattern's tag
+        columns.update(exact)
+        tags.update(exact_tags)
         selectors = {}
         for label, tag in tags.items():
             selectors.setdefault(f'{tag}_cols', []).append(label)
-        return columns, {tag: sorted(labels, key=str)
-                         for tag, labels in selectors.items()}
+        return columns, {tag: sorted(labels_, key=str)
+                         for tag, labels_ in selectors.items()}
 
 
 def sheet_paths(kind):
@@ -224,6 +288,18 @@ def _read(path):
         raise ValueError(
             f'{path}: unknown section(s) {", ".join(map(repr, unknown))}; '
             f'a format sheet carries {", ".join(SECTIONS)}')
+    for exhibit, entries in (data.get('exhibits') or {}).items():
+        if not isinstance(entries, dict):
+            raise ValueError(
+                f'{path}: exhibit {exhibit!r} is a mapping of '
+                f'{", ".join(SCOPED_SECTIONS)}; got {type(entries).__name__}')
+        unknown = sorted(set(entries) - set(SCOPED_SECTIONS))
+        if unknown:
+            raise ValueError(
+                f'{path}: exhibit {exhibit!r} carries '
+                f'{", ".join(map(repr, unknown))}; a scoped section holds '
+                f'{", ".join(SCOPED_SECTIONS)}, so a column entry sits under '
+                '`columns:` rather than directly under the exhibit name')
     return data
 
 
@@ -234,7 +310,7 @@ def _declaration(kind):
     holding one line changes that one reading and inherits the rest. The
     ``exhibits`` section merges one level deeper, per exhibit.
     """
-    merged = {'styles': {}, 'columns': {}, 'exhibits': {}}
+    merged = {'styles': {}, 'columns': {}, 'patterns': {}, 'exhibits': {}}
     sources = []
     for path in sheet_paths(kind):
         if not path.is_file():
@@ -243,8 +319,12 @@ def _declaration(kind):
         sources.append(path)
         merged['styles'].update(data.get('styles') or {})
         merged['columns'].update(data.get('columns') or {})
+        merged['patterns'].update(data.get('patterns') or {})
         for exhibit, entries in (data.get('exhibits') or {}).items():
-            merged['exhibits'].setdefault(exhibit, {}).update(entries or {})
+            scoped = merged['exhibits'].setdefault(
+                exhibit, {'columns': {}, 'patterns': {}})
+            scoped['columns'].update(entries.get('columns') or {})
+            scoped['patterns'].update(entries.get('patterns') or {})
     return merged, sources
 
 
@@ -279,21 +359,48 @@ def _resolve(declaration, sources):
     for name, value in styles.items():
         _validate(value, f'styles.{name}', sources)
 
-    def resolve(entries, where):
+    def dereference(key, value, where):
+        """A style name becomes its format, and a tag style stamps its tag."""
+        tag = None
+        if isinstance(value, str) and value in styles:
+            tag = value if value in TAG_STYLES else None
+            value = styles[value]
+        _validate(value, f'{where}{key}', sources)
+        return value, tag
+
+    def resolve_columns(entries, where):
         columns, tags = {}, {}
         for label, value in entries.items():
-            if isinstance(value, str) and value in styles:
-                if value in TAG_STYLES:
-                    tags[label] = value
-                value = styles[value]
-            _validate(value, f'{where}{label}', sources)
+            value, tag = dereference(label, value, where)
+            if tag is not None:
+                tags[label] = tag
             columns[label] = value
         return columns, tags
 
-    columns, tags = resolve(declaration['columns'], '')
-    exhibits = {name: resolve(entries, f'exhibits.{name}.')
-                for name, entries in declaration['exhibits'].items()}
-    return columns, tags, exhibits
+    def resolve_patterns(entries, where):
+        out = []
+        for pattern, value in entries.items():
+            value, tag = dereference(pattern, value, where)
+            try:
+                regex = re.compile(pattern)
+            except re.error as exc:
+                where_files = ', '.join(str(p) for p in sources)
+                raise ValueError(
+                    f'{where_files}: pattern {where}{pattern!r} is not a '
+                    f'regular expression: {exc}') from None
+            out.append((regex, value, tag))
+        return tuple(out)
+
+    columns, tags = resolve_columns(declaration['columns'], '')
+    patterns = resolve_patterns(declaration['patterns'], 'patterns.')
+    exhibits = {}
+    for name, entries in declaration['exhibits'].items():
+        where = f'exhibits.{name}.'
+        scoped_columns, scoped_tags = resolve_columns(entries['columns'], where)
+        exhibits[name] = (scoped_columns, scoped_tags,
+                          resolve_patterns(entries['patterns'],
+                                           f'{where}patterns.'))
+    return columns, tags, patterns, exhibits
 
 
 @functools.lru_cache(maxsize=None)
@@ -309,12 +416,17 @@ def _sheet(perspective, cwd):
         overlay, overlay_sources = _declaration('insurer')
         declaration['styles'].update(overlay['styles'])
         declaration['columns'].update(overlay['columns'])
+        declaration['patterns'].update(overlay['patterns'])
         for exhibit, entries in overlay['exhibits'].items():
-            declaration['exhibits'].setdefault(exhibit, {}).update(entries)
+            scoped = declaration['exhibits'].setdefault(
+                exhibit, {'columns': {}, 'patterns': {}})
+            scoped['columns'].update(entries['columns'])
+            scoped['patterns'].update(entries['patterns'])
         sources = sources + overlay_sources
-    columns, tags, exhibits = _resolve(declaration, sources)
+    columns, tags, patterns, exhibits = _resolve(declaration, sources)
     return FormatSheet(perspective=perspective, columns=columns, tags=tags,
-                       exhibits=exhibits, sources=tuple(sources))
+                       patterns=patterns, exhibits=exhibits,
+                       sources=tuple(sources))
 
 
 def format_sheet(perspective='raw'):

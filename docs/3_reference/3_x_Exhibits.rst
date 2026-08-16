@@ -35,7 +35,14 @@ Format sheets
 
 How a served column reads is declared in two YAML **format sheets** shipped with the package, not in the code that builds the block. ``formats-raw.yaml`` gives the default reading of every named column, keyed by column label; ``formats-insurer.yaml`` is an overlay holding only the entries where the business reading differs, so absent means same. A sheet's ``styles`` section names a reading once (``money``, ``ratio``, ``probability``, ``residual``) and every column that wears it points at the name; four style names are greater_tables' own semantic column tags (``ratio``, ``year``, ``date``, ``raw``), and a column pointing at one of those is stamped with the tag as well as the format.
 
-Because the sheet is keyed by label rather than by frame, it is also a registry of the column vocabulary: an entry asserts that a word means one thing across the package. Where one label really does mean two things, an ``exhibits`` section scopes an entry to a single exhibit, which is what keeps ``P`` reading as premium on the pricing tables and as the probability ladder on ``tail``.
+Because the sheet is keyed by label rather than by frame, it is also a registry of the column vocabulary: an entry asserts that a word means one thing across the package. Where one label really does mean two things, an ``exhibits`` section scopes an entry to a single exhibit, which is what keeps ``P`` reading as premium on the pricing tables and as the probability ladder on ``tail``. A scoped section carries ``columns`` and ``patterns`` sub-sections, the same two kinds of entry the top level has.
+
+A ``patterns`` section keys on a regular expression instead of a label, matched whole against the displayed label and tried in the order written, and says how a **family** reads. It covers what no list can enumerate, the moment store's ``e0.m0``, ``e0.m1``, ... one per mixture component, and it collapses a cross product, since anything spelled ``<basis> CV`` is a CV. An exact entry always beats a pattern. Scoped to one exhibit, ``'.*'`` is that exhibit's default reading::
+
+    exhibits:
+      stats:
+        patterns:
+          '.*': 'si'        # everything here with no entry of its own
 
 **Overriding follows the ``.agg`` rule.** The loader reads the shipped sheet, then the same file name in ``~/.aggregate``, then the working directory, nearest winning and merging per key, so a one-line local sheet changes one reading and inherits the rest::
 

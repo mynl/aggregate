@@ -706,18 +706,18 @@ realized one. On a severity clause, ``!`` makes the layer unconditional, which
 keeps mass at or below the attachment instead of conditioning it away. The
 split-limit program above carries both.
 
-The severity-side one matters more on a reference than it does elsewhere, and in
-a way that is easy to get wrong. A layers clause conditions on exceeding the
-attachment by default, and a materialized reference nearly always has something
-in its first bucket: any severity with positive density at the origin
-discretizes some of every claim there, so a ``gamma 50 cv 2`` (shape 0.25) puts
-about 10% of one claim below ``bs / 2``, and the zero-truncated per-policy
-aggregate above materializes with about 7% at its zero atom even though
-``P(S = 0) = 0`` exactly. Writing ``300 xs 0 sev agg.SplitPolicy`` without the
-``!`` conditions that away and lifts the severity mean by the same proportion.
-The library warns when this happens on a source whose claim count is never zero,
-because there the mass is certainly discretization and nobody can have meant to
-condition on it:
+The severity-side one is worth understanding on a reference, because the mass it
+governs is invisible from the declaration. A layers clause conditions on
+exceeding the attachment by default, exactly as for ``dsev``, and a materialized
+reference nearly always has something in its first bucket: any severity with
+positive density at the origin discretizes some of every claim there, so a
+``gamma 50 cv 2`` (shape 0.25) puts about 10% of one claim below ``bs / 2``, and
+the zero-truncated per-policy aggregate above materializes with about 7% at its
+zero atom even though ``P(S = 0) = 0`` exactly. Conditioning rescales that away
+and lifts the severity mean by the same proportion. **The default is unchanged
+and the choice is yours**; the library reports the number when the source's
+claim count is never zero, because there it is discretization rather than
+anything the declaration shows you:
 
 .. ipython:: python
     :okwarning:
@@ -750,15 +750,19 @@ set of reinsurance frames and a second rebucketing to say the same thing.
 
 **Tail reporting is the one place a reference is not read as a** ``dsev``.
 A materialized reference is a finite set of atoms and therefore looks bounded,
-but the object behind it may not be. ``tail_behavior_df`` reports the source's
-theoretical tail and says so in the note, while every number, bucket selection
-included, rides the finite atoms actually convolved:
+but the object behind it may not be, and a reference to an unbounded aggregate
+reports unbounded. That holds on every surface: ``tail_behavior_df`` (whose note
+names the source), the tail narrative, ``bounded``, and with it the ``p = 1``
+pricing guard, which refuses to read an asset level off the top of a grid that
+moves with ``log2``. Every *number*, bucket selection included, rides the finite
+atoms actually convolved:
 
 .. ipython:: python
 
     build('agg Unbounded dfreq [1] sev gamma 100 cv 1 hints{log2=12; bs=1/16}')
     ub_ref = build('agg UsesUnbounded dfreq [1] sev agg.Unbounded')
     qd(ub_ref.tail_behavior_df[['min', 'max', 'right_tail', 'bounded']])
+    ub_ref.bounded, ub_ref.bs        # unbounded, but sized on the finite atoms
 
 Accuracy: the rebucket preserves the materialized severity mean exactly, so an
 unlimited reference reproduces the inner's mean to machine precision; a

@@ -732,20 +732,17 @@
   inner on its stored recipe **only if profiling shows it matters**; the reason
   it was not done at a291 is that a cache introduces staleness questions
   (redefinition, hint edits) that the fresh re-resolution simply does not have.
-- **[Reference-Severity-Zero-Atom-Default]** (surfaced executing
-  `dev/done/plan-agg-port-as-sev.md`, a291) — a layers clause on a severity conditions on
-  exceeding the attachment by default, and the plan's headline split-limit
-  program relies on the intuition that a zero-truncated inner has no zero atom.
-  It does not hold for the *materialized* reference: any severity with positive
-  density at the origin discretizes mass into the first bucket, so
-  `gamma 50 cv 2` (shape 0.25) leaves about 7% at the zero atom of a
-  zero-truncated per-policy aggregate and the default conditioning moves the
-  outer answer by 6%. a291 warns (only when the source's claim count is never
-  zero, so the mass is certainly discretization) and the docs now write the
-  headline with `!`. **The author's call is whether that is enough**, or whether
-  a reference severity should default to unconditional under a layers clause.
-  Changing the default is a language-semantics decision, so it was not taken
-  unilaterally; the warning is the conservative half.
+- ~~**[Reference-Severity-Zero-Atom-Default]**~~ **CLOSED by author ruling
+  `1.0.0a294`, no change to the default** — a layers clause on a reference
+  severity conditions on exceeding the attachment, exactly as on a
+  hand-written `dsev`, and stays that way. The observation behind the item was
+  that a zero-truncated inner has no zero atom in theory but does in the
+  materialized `dsev` (any severity with positive density at the origin
+  discretizes mass into the first bucket, so `gamma 50 cv 2` leaves about 7%
+  there), so the default conditioning moves the split-limit answer by 6%. The
+  ruling: that mass is what it is, there is no reason to reach for `!`, and it
+  is the user's call. The a291 warning kept its number and lost its
+  recommendation.
 
 - ~~**[Layer-Peeling-Shorthand]**~~ **DONE `1.0.0a183`**
   (`dev/done/plan-layer-peeling.md`; the placeholder was

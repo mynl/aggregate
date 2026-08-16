@@ -439,6 +439,36 @@ def test_the_descriptor_does_not_reach_the_bucket_sizer():
     left, right = a._loss_tail_classes()
     from aggregate import tail as _tail
     assert not _tail.is_thick(right)
+    # the bounded-severity window still applies, i.e. the sizer still sees the
+    # finite atoms it is going to convolve
+    assert bool(a.bs_window_df.loc['bounded_small', 'applies'])
+
+
+def test_bounded_follows_the_referenced_object_not_its_atoms():
+    # author ruling: a reference to an unbounded aggregate reports unbounded,
+    # on every surface, however finite the atoms it materialized to
+    build(f'agg AAS.UB5 dfreq [1] sev gamma 100 cv 1 {HINTS}')
+    a = build('agg AAS.UsesUB5 dfreq [1] sev agg.AAS.UB5')
+    assert a.bounded is False
+    assert a.sevs[0].bounded is False
+    assert not np.isfinite(_agg_max(a))          # and the frame agrees
+
+
+def test_a_bounded_reference_still_reports_bounded():
+    build(f'agg AAS.Bnd2 dfreq [2] dsev [1 2 3] {HINTS}')
+    a = build('agg AAS.UsesBnd2 dfreq [1] sev agg.AAS.Bnd2')
+    assert a.bounded is True
+    assert a.sevs[0].bounded is True
+    assert np.isfinite(_agg_max(a))
+
+
+def test_both_routes_into_a_reference_report_the_same_boundedness():
+    from aggregate.distributions import Severity
+    src = build('agg AAS.UB6 dfreq [1] sev gamma 100 cv 1')
+    programmatic = Severity(src)
+    build(f'agg AAS.UB7 dfreq [1] sev gamma 100 cv 1 {HINTS}')
+    declarative = build('agg AAS.UsesUB7 dfreq [1] sev agg.AAS.UB7').sevs[0]
+    assert programmatic.bounded is declarative.bounded is False
 
 
 # ----------------------------------------------------------------------

@@ -5856,7 +5856,7 @@
       "hints": "log2=16; bs=1/32"
     }
   },
-  "agg Z.SplitLimit.Book   5000 claims 300 xs 0 sev agg.Z.SplitLimit.Policy ! mixed gamma .2 note{5000 policies; the 300 policy aggregate is an ordinary occurrence limit on the reference. The severity ! keeps the layer unconditional.}": {
+  "agg Z.SplitLimit.Book   5000 claims 300 xs 0 sev agg.Z.SplitLimit.Policy mixed gamma .2 note{5000 policies; the 300 policy aggregate is an ordinary occurrence limit on the reference. The layers clause conditions by default, as everywhere else; a trailing ! after the reference keeps it unconditional.}": {
     "kind": "agg",
     "name": "Z.SplitLimit.Book",
     "spec": {
@@ -5865,10 +5865,9 @@
       "exp_attachment": 0.0,
       "exp_limit": 300.0,
       "sev_ref": "agg.Z.SplitLimit.Policy",
-      "sev_conditional": false,
       "freq_name": "gamma",
       "freq_a": 0.2,
-      "note": "5000 policies; the 300 policy aggregate is an ordinary occurrence limit on the reference. The severity ! keeps the layer unconditional.",
+      "note": "5000 policies; the 300 policy aggregate is an ordinary occurrence limit on the reference. The layers clause conditions by default, as everywhere else; a trailing ! after the reference keeps it unconditional.",
       "hints": ""
     }
   },

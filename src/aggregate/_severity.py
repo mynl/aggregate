@@ -1430,7 +1430,7 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         first (so ``bounded`` is spec-only), then scipy family. See
         :func:`aggregate.tail.classify_severity`.
         """
-        return _tail.classify_severity(self)[0]
+        return _tail.classify_severity(self, reference=True)[0]
 
     @property
     def bounded(self) -> bool:
@@ -1459,7 +1459,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         something the interval does not (a149: this absorbed the old
         ``support_description``). The verbose form is :attr:`tail_explanation`.
         """
-        base = _tail.describe_row(_tail.severity_tail_row(self, 'severity'))
+        base = _tail.describe_row(
+            _tail.severity_tail_row(self, 'severity', reference=True))
         extra = self._support_phrase()
         return base if extra in ('', 'unlimited') else f'{base}; {extra}'
 
@@ -1479,12 +1480,12 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         (the power-law tail index and the first moment that fails to exist, or
         the guarantee that every moment is finite on a bounded support).
         """
-        row = _tail.severity_tail_row(self, 'severity')
+        row = _tail.severity_tail_row(self, 'severity', reference=True)
         out = [_tail.explain_rows([row])]
         extra = self._support_phrase()
         if extra:
             out.append(f'Declared support: {extra}.')
-        rung, _, alpha = _tail.classify_severity(self)
+        rung, _, alpha = _tail.classify_severity(self, reference=True)
         if self.bounded:
             out.append('Support is bounded, so every moment is finite.')
         elif rung == TailClass.POWER_LAW and alpha is not None:
@@ -2451,6 +2452,15 @@ class SeverityMeta(SeverityDHistogram):
         self.sev_xs, self.sev_ps = _dhistogram_from_object(
             source, normalize=True, signed=self.signed,
             source=getattr(source, 'name', ''))
+        # The same provenance the DecL resolver stamps on its ``dhistogram``, so
+        # the two routes into a reference severity report identically: the
+        # source's theoretical support (which is what ``bounded`` and
+        # ``tail_behavior_df`` answer for) and its grid (which keeps the
+        # consuming aggregate's buckets commensurable with the atoms).
+        self.reference_id = (f'{type(source).__name__} '
+                             f'{getattr(source, "name", "")}').strip()
+        self.reference_support_max = float(_tail.output_support_max(source))
+        self.reference_bs = float(getattr(source, 'bs', 0)) or None
         super()._build()
 
 

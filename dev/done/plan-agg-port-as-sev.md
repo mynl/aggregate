@@ -920,18 +920,21 @@ that the design did not anticipate. Section numbers refer to the plan.
    `Aggregate._tail_rows` defaults it to `True`, and `_loss_tail_classes` passes
    `False`. That is the plan's intent implemented exactly: reporting reads the
    reference's law, numerics ride the atoms.
-9. **`Aggregate.bounded` and `Severity.bounded` were left alone**, per section
-   4.6's "consumers pinned for v1: `tail_behavior_df` only". They derive from
-   `tail._severity_bounded`, which the sizer also reads through
-   `Aggregate._bounded_severity_window`, so widening them would have leaked into
-   numerics by the same route as note 8. **The consequence is a visible
-   disagreement**: for `agg X dfreq [2] sev agg.Unbounded`, `tail_behavior_df`
-   reports an infinite max while `X.bounded` is `True`. The aggregate row's note
-   names the source and says it was sized on its atoms, so the two readings are
-   legible side by side, but the author may want `bounded` widened later. Doing
-   it properly means threading `reference=` through `classify_severity` and
-   `aggregate_tail_info` as well, and deciding what `_bounded_severity_window`
-   should then believe.
+9. **`Aggregate.bounded` and `Severity.bounded` were left alone at a291**, per
+   section 4.6's "consumers pinned for v1: `tail_behavior_df` only", which left
+   `tail_behavior_df` reporting an infinite max for
+   `agg X dfreq [2] sev agg.Unbounded` while `X.bounded` said `True`.
+   **Closed at a294 by author ruling** (2026-08-16): a reference to an
+   unbounded aggregate reports unbounded on every surface. `_severity_bounded`,
+   `classify_severity`, `_combine_severities` and `aggregate_tail_info` take
+   the same `reference=` flag as note 8, the reporting surfaces pass it, and
+   `_bounded_severity_window` calls `_severity_bounded` without it so the sizer
+   keeps the atoms reading of ruling 17. The `p = 1` pricing guard comes along,
+   which is the practical point: it used to let a reference through on the
+   finiteness of its atoms. `SeverityMeta` stamps the same three
+   `reference_*` attributes as the DecL resolver, so the programmatic and
+   declarative routes now answer identically and the special-case `meta` branch
+   of `_severity_bounded` folded into the histogram one.
 10. **Frequency boundedness (section 4.6 step 2) reuses
     `Aggregate._frequency_count_support`** rather than a new lookup helper. One
     divergence follows: that method returns `(0, inf)` for a **binomial** count,
@@ -1010,10 +1013,13 @@ that the design did not anticipate. Section numbers refer to the plan.
     resolver warns where the reading cannot have been intended, namely when the
     source's claim count is never zero. A plain Poisson inner really does have
     `P(S = 0) > 0` and section 5's conditioning idiom is a legitimate model, so
-    that stays silent. **Open for the author**: whether a reference severity
-    should default to unconditional under a layers clause. That is a language
-    semantics change, so it was not taken here; tracked as
-    `[Reference-Severity-Zero-Atom-Default]` in `dev/TODO.md`.
+    that stays silent. **Ruled by the author, 2026-08-16, at a294**: the
+    incidental mass at zero "is what it is", there is no reason to reach for
+    `!`, it is the user's call, and **the default is not to change**. The
+    warning's recommendation was dropped (it had said the user "almost
+    certainly" meant `!`); it now reports the number and names the option
+    without preferring either, and the docs and the corpus write the book in
+    its plain conditioning form, which is the plan's own headline.
 13. **`hints{}` leaked between the statements of one program**, a pre existing
     `build_many` bug sitting directly in this feature's path. The update loop
     rebound `log2` / `bs` / `bucket_sizing_p` / `kwargs` in place, so the hints

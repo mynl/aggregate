@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a294
+
+**[Reference-Severity-Reports-Its-Source] a reference to an unbounded aggregate reports unbounded, everywhere.** Author ruling, 2026-08-16, closing the one question `dev/done/plan-agg-port-as-sev.md` left open. Section 4.6 pinned the tail descriptor's consumers at `tail_behavior_df`, which left `bounded` reading the materialized atoms: `agg X dfreq [2] sev agg.Unbounded` showed an infinite max in the frame and `X.bounded == True` beside it. `_severity_bounded`, `classify_severity`, `_combine_severities` and `aggregate_tail_info` now take the same `reference=` flag `build_tail_rows` already had, and every reporting surface passes it: `Aggregate.bounded`, `Aggregate.tail_class`, `Severity.bounded`, `Severity.tail_class`, `Severity.tail_description` / `tail_explanation`, and the `info` blocks that read them.
+
+**With it goes the `p = 1` pricing guard**, which is the point of having the two agree. `_pricing` refuses `p = 1` on an unbounded law because it resolves to the top of a grid that moves with `log2` rather than with the risk; a reference whose source is unbounded is exactly that case, and it used to slip through on the finiteness of its atoms.
+
+**The bucket sizer keeps the other reading, unchanged.** `Aggregate._bounded_severity_window` now calls `tail._severity_bounded` directly, without the flag, because the grid is chosen for the atoms actually convolved. That is the plan's ruling 17: the source's own theoretical tail already drove the *source's* window choice, the certified `dsev` encodes it, and the consuming aggregate sizes from it as it would from a hand-written one. So `bounded_small` still applies to a reference severity and no grid moves.
+
+**Both routes into a reference now report identically.** `SeverityMeta` (the `Severity(agg)` / `as_severity` path) stamps the same `reference_id` / `reference_support_max` / `reference_bs` the DecL resolver stamps, so the programmatic and declarative halves answer the same question the same way, and the special-case `meta` branch in `_severity_bounded` folds into the histogram one. A `copy` severity keeps its own branch.
+
+**Also: the conditioning notice drops its recommendation.** Author ruling, same date: the incidental mass at a materialized reference's zero atom "is what it is", there is no reason to reach for `!`, and **the default conditioning behavior is unchanged** for a reference exactly as for a hand-written `dsev`. The a291 warning said the user had "almost certainly" meant `!`, which overstepped. It now reports the number and names the option without recommending either, and the docs and the corpus write the split-limit book in its plain conditioning form.
+
 ## 1.0.0a293
 
 **[Agg-As-Severity-Port-Units] a portfolio unit can take its severity from a reference.** Phase C, the last of `dev/done/plan-agg-port-as-sev.md`, and the smallest: the `port` branch of `_factory` resolves any unit spec carrying `sev_ref` before `Portfolio` builds its `Aggregate`s, because the unit specs go straight into `Aggregate(**unit)`, which cannot see the key. The provenance stamp is applied per unit afterwards, where the `Aggregate` objects exist.

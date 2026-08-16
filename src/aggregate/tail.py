@@ -408,7 +408,7 @@ _SEV_LEFT_CLASS: dict[str, TailClass] = {
 }
 
 
-def _severity_bounded(severity) -> bool:
+def _severity_bounded(severity, reference: bool = False) -> bool:
     """Structural (spec-only) bounded-support test for a single severity.
 
     This is the BOUNDED determination, lifted out of the legacy
@@ -419,18 +419,34 @@ def _severity_bounded(severity) -> bool:
     ----------
     severity : object
         A single ``aggregate.Severity`` (duck-typed).
+    reference : bool, default False
+        Whether a severity materialized from a ``sev agg.NAME`` reference
+        answers for the **referenced object's** support rather than for its own
+        atoms. ``True`` is the reporting reading, and the one every ``bounded``
+        surface takes: a reference to an unbounded aggregate is not bounded,
+        however finite the atoms it materialized to. ``False`` is the numeric
+        reading, which the bucket sizer takes through
+        :meth:`~aggregate.distributions.Aggregate._bounded_severity_window`,
+        because the grid is chosen for the atoms actually convolved.
 
     Returns
     -------
     bool
         ``True`` for fixed / histogram atoms, finite-support scipy families,
-        a finite layer ``limit`` or splice ``sev_ub``, or a wrapped meta/copy
+        a finite layer ``limit`` or splice ``sev_ub``, or a wrapped copy
         object that is itself bounded.
     """
     kind = getattr(severity, 'sev_kind', '')
-    if kind in ('fixed', 'dhistogram', 'chistogram'):
+    if kind in ('fixed', 'dhistogram', 'chistogram', 'meta'):
+        # A materialized reference (``meta``, or the ``dhistogram`` the DecL
+        # resolver builds) is a finite atom set, so it is bounded as a set of
+        # numbers and unbounded as a statement about the object it stands for.
+        if reference:
+            ref_max = getattr(severity, 'reference_support_max', None)
+            if ref_max is not None:
+                return bool(np.isfinite(ref_max))
         return True
-    if kind in ('meta', 'copy'):
+    if kind == 'copy':
         inner = getattr(severity, 'sev_name', None)
         return bool(getattr(inner, 'bounded', False))
     if np.isfinite(getattr(severity, 'limit', np.inf)):
@@ -535,7 +551,8 @@ def _family_sides(name, a, b) -> tuple[TailClass, TailClass, Optional[bool], Opt
     return left, right, lc, alpha
 
 
-def classify_severity(severity) -> tuple[TailClass, Optional[bool], Optional[float]]:
+def classify_severity(severity, reference: bool = False
+                      ) -> tuple[TailClass, Optional[bool], Optional[float]]:
     """Classify a single severity component's overall tail.
 
     Parameters
@@ -543,6 +560,9 @@ def classify_severity(severity) -> tuple[TailClass, Optional[bool], Optional[flo
     severity : object
         A single ``aggregate.Severity`` (duck-typed). Reads ``sev_kind``,
         ``sev_name``, ``sev_a``, ``sev_b``, ``limit``, ``sev_ub``, ``fz``.
+    reference : bool, default False
+        Answer for the referenced object rather than for the materialized
+        atoms; see :func:`_severity_bounded`.
 
     Returns
     -------
@@ -561,10 +581,13 @@ def classify_severity(severity) -> tuple[TailClass, Optional[bool], Optional[flo
     heaviest tail. See :func:`_family_right_class` for the family table and
     ``dev`` ``integrated.md`` for the reconciled SciPy survey behind it.
     """
-    if _severity_bounded(severity):
+    if _severity_bounded(severity, reference=reference):
         return TailClass.BOUNDED, None, None
     name = getattr(severity, 'sev_name', None)
     if not isinstance(name, str):
+        # An object-valued name is a reference whose source is unbounded: the
+        # family table has nothing to say about it, and UNKNOWN is the
+        # conservative rung, which is the right answer here.
         return TailClass.UNKNOWN, None, None
     a = getattr(severity, 'sev_a', np.nan)
     b = getattr(severity, 'sev_b', np.nan)
@@ -572,13 +595,16 @@ def classify_severity(severity) -> tuple[TailClass, Optional[bool], Optional[flo
     return _heaviest((left, right)), lc, alpha
 
 
-def _combine_severities(sevs):
+def _combine_severities(sevs, reference: bool = False):
     """Combine a list of severity components: thickest rung, all-log-concave.
 
     Parameters
     ----------
     sevs : iterable
         Severity components (``Aggregate.sevs``).
+    reference : bool, default False
+        Answer for a referenced object rather than for its materialized atoms;
+        see :func:`_severity_bounded`.
 
     Returns
     -------
@@ -593,7 +619,7 @@ def _combine_severities(sevs):
     alpha: Optional[float] = None
     any_unknown = False
     for s in sevs:
-        c, c_lc, c_alpha = classify_severity(s)
+        c, c_lc, c_alpha = classify_severity(s, reference=reference)
         if c == TailClass.UNKNOWN:
             any_unknown = True
             continue
@@ -634,7 +660,7 @@ def combine(freq_cls: TailClass, sev_cls: TailClass) -> TailClass:
 # Aggregate-level builder.
 # ----------------------------------------------------------------------------
 
-def aggregate_tail_info(frequency, sevs) -> TailInfo:
+def aggregate_tail_info(frequency, sevs, reference: bool = False) -> TailInfo:
     """Build the full :class:`TailInfo` for an aggregate from its spec.
 
     Parameters
@@ -643,6 +669,9 @@ def aggregate_tail_info(frequency, sevs) -> TailInfo:
         The aggregate's ``Frequency`` (read for ``freq_name``).
     sevs : iterable
         The severity components (``Aggregate.sevs``).
+    reference : bool, default False
+        Answer for a referenced object rather than for its materialized atoms;
+        see :func:`_severity_bounded`.
 
     Returns
     -------
@@ -656,8 +685,8 @@ def aggregate_tail_info(frequency, sevs) -> TailInfo:
     Spec-only: touches no computed density, so it is valid before ``update()``.
     """
     freq_cls, freq_lc = classify_frequency(frequency)
-    sev_cls, sev_lc, alpha = _combine_severities(sevs) if sevs is not None and len(sevs) \
-        else (TailClass.UNKNOWN, None, None)
+    sev_cls, sev_lc, alpha = _combine_severities(sevs, reference=reference) \
+        if sevs is not None and len(sevs) else (TailClass.UNKNOWN, None, None)
     agg_cls = combine(freq_cls, sev_cls)
 
     flags: dict = {}

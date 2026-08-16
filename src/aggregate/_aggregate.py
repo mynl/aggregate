@@ -713,7 +713,13 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 freq=TailClass.BOUNDED, sev=TailClass.BOUNDED, agg=TailClass.BOUNDED,
                 freq_lc=None, sev_lc=None, agg_lc=None, alpha=None,
                 driver='certified', flags={'certified': True})
-        return _tail.aggregate_tail_info(self.frequency, self.sevs)
+        # ``reference=True``: a severity that came from a ``sev agg.NAME``
+        # reference answers for the object it stands for, so a reference to an
+        # unbounded aggregate is not bounded however finite its atoms are. This
+        # is the reporting reading, and it is what ``bounded`` and the ``p=1``
+        # pricing guard want. The bucket sizer takes the other one, through
+        # ``_bounded_severity_window``.
+        return _tail.aggregate_tail_info(self.frequency, self.sevs, reference=True)
 
     @property
     def tail_class(self):
@@ -6009,7 +6015,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         if self.sevs is None or len(self.sevs) == 0:
             return None
-        if not all(getattr(s, 'bounded', False) for s in self.sevs):
+        # ``_severity_bounded`` rather than the public ``bounded``, and without
+        # ``reference=``: the grid is sized on the atoms actually convolved, so
+        # a materialized ``sev agg.NAME`` reference counts as the bounded thing
+        # it is here, even though every ``bounded`` surface reports the
+        # referenced object's support instead. See ``_tail_info``.
+        if not all(_tail._severity_bounded(s) for s in self.sevs):
             return None
         s_his, s_los = [], []
         for s in self.sevs:

@@ -317,7 +317,7 @@ agg Y.Renewal.LayerMix  5 years sev gamma 10 cv .3 wait [1 2] xs [0 0.5] expon w
 # reference. See [Agg-As-Severity].
 agg Z.SplitLimit.Policy 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt ! hints{log2=16; bs=1/32} note{US personal auto split limit, the per-policy law: 100 per claimant, at least one claim per policy.}
 
-agg Z.SplitLimit.Book   5000 claims 300 xs 0 sev agg.Z.SplitLimit.Policy ! mixed gamma .2 note{5000 policies; the 300 policy aggregate is an ordinary occurrence limit on the reference. The severity ! keeps the layer unconditional.}
+agg Z.SplitLimit.Book   5000 claims 300 xs 0 sev agg.Z.SplitLimit.Policy mixed gamma .2 note{5000 policies; the 300 policy aggregate is an ordinary occurrence limit on the reference. The layers clause conditions by default, as everywhere else; a trailing ! after the reference keeps it unconditional.}
 
 port Z.Ref.Book hints{log2=16; bs=1/32} agg Z.Ref.Unit 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt !
 

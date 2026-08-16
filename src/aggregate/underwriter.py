@@ -1632,32 +1632,32 @@ class Underwriter(HelpMixin):
 
     @staticmethod
     def _warn_sev_ref_conditioned(name, ref, spec, xs, ps, inner):
-        """Warn when conditioning a reference drops mass the source cannot have.
+        """Report how much a conditioning layers clause drops from a reference.
 
         A layers clause conditions on exceeding the attachment unless the
-        severity carries ``!``, exactly as for ``dsev``. Two different things
-        can be sitting at the zero atom of a materialized reference, and only
-        one of them is a trap:
+        severity carries ``!``, exactly as for ``dsev``, and **that default is
+        unchanged for a reference** (author ruling, 2026-08-16). This is a
+        notice, not a recommendation: the mass at the zero atom of a
+        materialized reference is what it is, and which reading the modeller
+        wants is their call.
 
-        * **A real one.** A plain Poisson inner has ``P(S = 0) = e**-lambda``,
-          about 22% at 1.5. Conditioning it away is a documented, deliberate
-          alternative model, "5,000 loss-bearing policies" rather than "5,000
-          policies". Silent.
-        * **A manufactured one.** A zero-truncated inner has ``P(S = 0) = 0``
-          exactly, and still materializes with mass in its first bucket,
-          because a severity with positive density at the origin discretizes
-          some there: ``gamma 50 cv 2`` is shape 0.25 and puts about 10% of one
-          claim below ``bs / 2``, which is about 7% of the per-policy
-          aggregate. Nobody means to condition on that, and doing so lifts the
-          severity mean by the same proportion, moving the split-limit answer
-          by 6%. **Warn.**
+        What makes a reference worth a notice is that the number is invisible
+        from the declaration. On a hand-written ``dsev`` the atoms are on the
+        page. Here they come from another object, and the intuition that a
+        zero-truncated source has nothing at zero is a statement about the
+        theoretical law rather than the materialized one: any severity with
+        positive density at the origin discretizes some of every claim into the
+        first bucket, so ``gamma 50 cv 2`` (shape 0.25) leaves about 7% at the
+        zero atom of a zero-truncated per-policy aggregate. Conditioning
+        rescales that away and lifts the severity mean by the same proportion.
 
-        The discriminator is whether the source's claim count can be zero.
-        A portfolio total is zero only when every unit is, so it takes the
-        same test unit by unit.
-
-        Silent below :data:`aggregate._validation.DEFICIT_MATERIALITY`, where
-        the conditioning cannot move an answer either way.
+        Silent when the source's claim count **can** be zero, because then the
+        zero atom is a genuine ``P(S = 0)`` the modeller can see in the
+        declaration and conditioning it away is the documented alternative
+        model. A portfolio total is zero only when every unit is, so it takes
+        the same test unit by unit. Silent below
+        :data:`aggregate._validation.DEFICIT_MATERIALITY`, where the
+        conditioning cannot move an answer either way.
         """
         if spec.get('exp_attachment') is None:
             return                      # no layers clause: the zero atom is kept
@@ -1666,7 +1666,7 @@ class Underwriter(HelpMixin):
         units = getattr(inner, 'agg_list', None) or [inner]
         try:
             if not all(u._frequency_count_support()[0] >= 1 for u in units):
-                return                  # a genuine zero atom; conditioning is a choice
+                return                  # a genuine zero atom, visible in the source
         except AttributeError:          # pragma: no cover - defensive
             return
         attach = np.max(np.atleast_1d(np.asarray(
@@ -1676,13 +1676,13 @@ class Underwriter(HelpMixin):
             return
         warnings.warn(
             f'{name}: the layers clause conditions on exceeding '
-            f'{attach:,.6g} and drops {dropped:.4g} of {ref}, which cannot be '
-            f'mass {ref} really has there: its claim count is never zero, so '
-            'that is discretization (a severity with positive density at the '
-            'origin puts some of every claim in the first bucket). '
-            'Conditioning rescales it away and lifts the severity mean by the '
-            'same proportion. Write the layer unconditional with a trailing '
-            '"!", which is almost certainly what you meant.',
+            f'{attach:,.6g}, which drops {dropped:.4g} of {ref} and rescales '
+            f'the rest, lifting the severity mean by the same proportion. '
+            f"{ref} never has a zero claim count, so that mass is "
+            'discretization: a severity with positive density at the origin '
+            'puts some of every claim in the first bucket. Conditioning is the '
+            'default and is left as declared; a trailing "!" keeps the layer '
+            'unconditional if you want the mass.',
             UserWarning, stacklevel=3)
 
     @staticmethod

@@ -158,7 +158,7 @@ patterns:
   # apart, so significant figures with a suffix is the only uniform reading:
   # `si` says it once, where inference would answer it column by column and
   # differ between books.
-  'e[0-9]+\.m[0-9]+': 'si'
+  'e[0-9]+\.m[0-9]+': ',.7g'
 
 # Scoped exceptions, exhibit then section: the escape hatch for one label
 # meaning two things. A scoped section is a sheet in miniature, carrying
@@ -172,3 +172,18 @@ exhibits:
   tail:
     columns:
       P: probability
+
+  # The moment store is the one exhibit whose columns cannot be declared one
+  # by one: they are computation views (`mixed`, `empirical`, `after_occ`)
+  # and **unit names**, which are the user's words, not the library's. So
+  # this exhibit states its default reading instead, and every column with no
+  # entry of its own takes it. `error` keeps `.5g` because an exact entry
+  # still wins.
+  #
+  # A scoped pattern is tried before a global one, so the mixture components
+  # are repeated here above the catch-all: without that line the `.*` would
+  # shadow the global `e[0-9]+\.m[0-9]+` rule inside this exhibit.
+  stats:
+    patterns:
+      'e[0-9]+\.m[0-9]+': ',.7g'
+      '.*': ',.7g'

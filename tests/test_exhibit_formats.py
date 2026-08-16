@@ -102,14 +102,34 @@ def test_the_scoped_section_wins_for_one_exhibit():
 # --- patterns ----------------------------------------------------------------
 
 def test_the_shipped_pattern_covers_the_mixture_components():
-    """`e0.m0`, `e0.m1`, ... one per component, so no list can enumerate them."""
+    """`e0.m0`, `e0.m1`, ... one per component, so no list can enumerate them.
+
+    Asserted as shape rather than as a literal reading: which format the
+    family wears is the author's to edit in the sheet, that the whole family
+    wears **one** of them is the mechanism.
+    """
     sheet = format_sheet('raw')
-    labels = ['e0.m0', 'e0.m1', 'e12.m7', 'mixed', 'error']
+    labels = ['e0.m0', 'e0.m1', 'e12.m7', 'error']
     formatters, _selectors = sheet.block('stats', None, labels)
-    assert formatters['e0.m0'] == formatters['e12.m7'] == 'si'
-    assert 'mixed' not in formatters, 'a plain word is not the pattern'
+    assert formatters['e0.m0'] == formatters['e0.m1'] == formatters['e12.m7']
     assert formatters['error'] == '.5g', 'an exact entry is untouched'
+    # outside a scoped section only the global pattern applies, and it is
+    # anchored: a label that merely looks similar is not declared
     assert sheet.declares('e0.m1') and not sheet.declares('e0m1')
+
+
+def test_the_stats_exhibit_declares_a_default_reading():
+    """Its columns are computation views and unit names, so no list can name
+    them; the exhibit states one reading for everything without an entry."""
+    sheet = format_sheet('raw')
+    formatters, _selectors = sheet.block(
+        'stats', None, ['mixed', 'empirical', 'Unit Alpha', 'error'])
+    fallthrough = {formatters['mixed'], formatters['empirical'],
+                   formatters['Unit Alpha']}
+    assert len(fallthrough) == 1, 'one reading for everything that falls through'
+    assert formatters['error'] == '.5g', 'an exact entry still wins'
+    assert sheet.declares('Unit Alpha', 'stats')
+    assert not sheet.declares('Unit Alpha'), 'and only inside that exhibit'
 
 
 def test_a_pattern_expands_only_against_the_labels_it_is_given():

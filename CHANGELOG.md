@@ -20,6 +20,14 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a296
+
+**[Moment-Store-Default-Reading] the one exhibit that cannot name its columns states a reading instead.** `stats` gains a scoped catch-all, `exhibits: {stats: {patterns: {'.*': ',.7g'}}}`, so every column of the moment store with no entry of its own reads the same way. It is the case the a295 mechanism was built for: those columns are computation views (`mixed`, `empirical`, `after_occ`) and **unit names**, which are the user's words rather than the library's, so no list of exact entries can cover them and inference was answering column by column, differing between books and reaching for SI suffixes on the wide ones. `error` keeps `.5g`, because an exact entry still beats a pattern.
+
+**The mixture components are repeated inside the scoped section**, above the catch-all. A scoped pattern is tried before a global one, so without that line `'.*'` would shadow the global `e[0-9]+\.m[0-9]+` rule inside this exhibit. Worth knowing generally: scoping a broad pattern to an exhibit hides the narrow global ones there.
+
+The moment store now reads `2e+10`, `1.25e+17` and `6.092922e+10` where it read `20.000G`, `125.000P` and `60.929G`, uniformly across views, units and the analytic components. Exhibit snapshots regenerated. Two format sheet tests now assert the shape rather than the literal reading, since which format a family wears is the author's to edit in the sheet while the mechanism is what the tests are for.
+
 ## 1.0.0a295
 
 **[Format-Sheet-Patterns] a format sheet can say how a family reads.** A new `patterns:` section keys on a regular expression instead of a label, matched **whole** against the displayed column label, tried in the order written with the first match winning. It answers the labels no list can enumerate: the moment store's analytic mixture components are `e0.m0`, `e0.m1`, `e0.m2`, one per component, so how many exist is a property of the program rather than of the vocabulary. The shipped sheet declares them `si`, which is a reading they used to get from inference on a wide book and not on a narrow one.

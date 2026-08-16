@@ -3557,8 +3557,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                x_min='auto', x_max=None, window_convention=None, sharpen=False,
                **kwargs):
         """
-        Convenience function, delegates to update_work. Avoids having to pass xs. Also
-        aliased as easy_update for backward compatibility.
+        Convenience function, delegates to update_work. Avoids having to pass xs.
 
         :param log2:
         :param bs:
@@ -5002,6 +5001,56 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # realized ``n`` back in would apply the modification a second time.
         # The two coincide for every unmodified frequency.
         return self._count_program(spec, self.base_mean, name)
+
+    def as_severity(self, limit=np.inf, attachment=0, conditional=False):
+        """Use this aggregate's output loss distribution as a severity.
+
+        The programmatic twin of the DecL ``sev agg.NAME`` reference, and the
+        mirror of :meth:`aggregate.portfolio.Portfolio.as_severity`. The
+        motivating shape is a compound-of-a-compound: a per-policy aggregate
+        becomes the per-policy severity of a book of policies, which is how a
+        US personal-auto split limit (100 per claimant, 300 per policy) is
+        written.
+
+        Parameters
+        ----------
+        limit : float, default ``np.inf``
+            Layer width applied to the resulting severity.
+        attachment : float, default 0
+            Layer attachment applied to the resulting severity.
+        conditional : bool, default False
+            Whether layered moments divide out ``P(X > attachment)``.
+
+        Returns
+        -------
+        SeverityMeta
+            A discrete severity whose atoms are :attr:`agg_density` on
+            :attr:`xs`. Under reinsurance that is the **output view** (ceded or
+            net), which is the whole point: the object's answer to "what do you
+            output" already has the cession baked in.
+
+        Raises
+        ------
+        ValueError
+            If the aggregate has not been updated. The conversion reads the
+            distribution the object outputs, and it does not have one yet.
+
+        Notes
+        -----
+        Nothing is recomputed and nothing on ``self`` is touched. See
+        :class:`aggregate.distributions.SeverityMeta` for what the resulting
+        severity is (a fully formed discrete severity with exact moments) and
+        the DecL reference documentation for the declarative route, which adds
+        a hygiene rule this programmatic path cannot enforce: the source must
+        already be at the resolution you meant.
+        """
+        if self.agg_density is None:
+            raise ValueError(
+                f'{self.name}: update the aggregate before converting it to a '
+                'severity -- the conversion reads the distribution it outputs, '
+                'and there is not one yet.')
+        return Severity(sev_name=self, exp_attachment=attachment,
+                        exp_limit=limit, sev_conditional=conditional)
 
     def create_frequency(self):
         """Materialize this object's claim-count distribution as an ``Aggregate``.

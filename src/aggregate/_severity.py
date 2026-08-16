@@ -331,6 +331,134 @@ def validate_discrete_distribution(xs, ps, allow_negative=False):
     return xs, ps
 
 
+# Deficit floor for a materialized reference severity. Tighter than the
+# house ``DEFICIT_MATERIALITY`` (1e-4) on purpose: this deficit is a
+# *severity* deficit, and the outer frequency multiplies it. A per-claim
+# 1e-6 of missing mass over 5,000 claims costs the outer aggregate half a
+# percent, which is economically material even though the same number on an
+# aggregate would be dust. The remedy is always the same, raise the inner's
+# ``hints{log2=...}``, so the floor is set where the advice starts to pay.
+REFERENCE_DEFICIT_MATERIALITY = 1e-6
+
+
+def _dhistogram_from_object(obj, normalize=True, signed=False, source=''):
+    """Materialize an ``Aggregate`` / ``Portfolio`` output law as ``(xs, ps)`` atoms.
+
+    The single implementation behind both routes into a reference severity:
+    :class:`SeverityMeta` (the programmatic ``Severity(agg)`` /
+    ``Aggregate.as_severity()`` path) and
+    :meth:`aggregate.underwriter.Underwriter._resolve_sev_ref` (the DecL
+    ``sev agg.NAME`` path). Both answer the same *nullary* query -- "what
+    distribution does this object output?" -- so both must answer it the same
+    way.
+
+    Parameters
+    ----------
+    obj : Aggregate or Portfolio
+        A source that has been updated. Its **output view** is taken: for an
+        ``Aggregate`` under reinsurance that is the ceded or net law, already
+        the right array (see :func:`aggregate._reinsurance.apply_agg_reins`).
+    normalize : bool, default True
+        Whether to renormalize the materialized probabilities. This is the
+        *inner's* choice (resolved from its own ``hints{}``), never the
+        caller's: the object knows how it wanted to be computed.
+    signed : bool, default False
+        Whether the consuming context keeps negative atoms (``ssev``). When
+        ``False`` and the source has mass below zero, that mass is moved onto
+        the zero atom (the clamp-at-0 convention that separates
+        ``sev 100 - lognorm`` from ``ssev 100 - lognorm``) and a warning fires:
+        the combination usually means a P&L-shaped source is being consumed in
+        a loss context.
+    source : str, default ''
+        Identifier for messages (``'agg.SL'``, or the object's name).
+
+    Returns
+    -------
+    (xs, ps) : tuple of np.ndarray
+        Distinct ascending atoms and their probabilities, ready for
+        ``sev_name='dhistogram'``.
+
+    Raises
+    ------
+    ValueError
+        If ``obj`` is not an ``Aggregate`` or ``Portfolio``, or has never
+        computed itself. A nullary query cannot be answered by an object with
+        no density.
+
+    Notes
+    -----
+    Three cleanups, in order, and each one is load bearing:
+
+    1. **Negative fuzz.** An FFT leaves probabilities a few ulp below zero.
+       :func:`validate_discrete_distribution` neither checks nor repairs
+       probabilities (it only makes the *support* distinct and ascending), so
+       the clip happens here or not at all.
+    2. **Zero drop.** The source grid is ``2**log2`` buckets and most of them
+       carry no mass; dropping them typically shrinks 65,536 atoms to a few
+       thousand, which is what makes the exact discrete moment sums and the
+       rebucket onto the outer grid cheap.
+    3. **Deficit.** Whatever mass the source's own window failed to capture
+       shows up here. Renormalizing (the default) spreads it back over the
+       atoms; ``hints{normalize=False}`` on the source keeps it, and the outer
+       compound is then faithfully defective. Either way a deficit above
+       :data:`REFERENCE_DEFICIT_MATERIALITY` warns, because it means the
+       source's window is too small, not that the reference is wrong.
+    """
+    # Local imports to avoid _severity <-> portfolio / _aggregate cycles.
+    from .portfolio import Portfolio
+    from ._aggregate import Aggregate
+    from .constants import DefectiveDistributionWarning
+
+    label = source or getattr(obj, 'name', '') or repr(obj)
+    if isinstance(obj, Aggregate):
+        xs, ps = obj.xs, obj.agg_density
+    elif isinstance(obj, Portfolio):
+        df = obj.density_df
+        xs, ps = (None, None) if df is None else (df.loss.values, df.p_total.values)
+    else:
+        raise ValueError(
+            f'{type(obj).__name__} passed as a reference severity; only '
+            'Aggregate and Portfolio objects output a distribution.')
+    if xs is None or ps is None:
+        raise ValueError(
+            f'{label}: cannot be used as a severity before it has computed '
+            'itself -- the reference asks the object what distribution it '
+            'outputs, and it does not have one yet. Call update() (or build '
+            'it) first.')
+
+    xs = np.asarray(xs, dtype=float)
+    ps = np.maximum(np.asarray(ps, dtype=float), 0.0)
+
+    if not signed and np.any(xs < 0):
+        clamped = float(ps[xs < 0].sum())
+        warnings.warn(
+            f'{label}: a signed source is being used as an unsigned severity; '
+            f'{clamped:.6g} of probability at negative outcomes is clamped '
+            'onto the zero atom. Write ssev to keep the negative support -- a '
+            'signed source in a loss context usually means the value '
+            'conventions do not match.',
+            UserWarning, stacklevel=3)
+
+    keep = ps > 0
+    xs, ps = xs[keep], ps[keep]
+    # allow_negative=signed: unsigned clamps the negative atoms onto 0 and sums
+    # the duplicates, which is exactly the convention warned about above.
+    xs, ps = validate_discrete_distribution(xs, ps, allow_negative=bool(signed))
+
+    total = float(ps.sum())
+    deficit = 1.0 - total
+    if deficit > REFERENCE_DEFICIT_MATERIALITY:
+        warn_once(
+            f'{label}: the reference severity is missing {deficit:.3e} of its '
+            'probability -- the source window does not hold the whole law. '
+            'Raise the source declaration to a larger hints{log2=...}.',
+            DefectiveDistributionWarning,
+            key=f'sev-ref-deficit-{label}', stacklevel=3)
+    if normalize and total > 0:
+        ps = ps / total
+    return xs, ps
+
+
 def make_conditional_cdf(lb, ub, plb, pub):
     """
     Decorator to create a conditional CDF from a CDF.
@@ -1022,7 +1150,15 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             (``fz.cdf(sev_ub) - fz.cdf(sev_lb) <= 1e-15``); conditioning on
             a measure-zero set is mathematically undefined.
         """
-        super().__init__(self, name=sev_name if isinstance(sev_name, str) else '')
+        # scipy indexes ``name[0]`` to pick the article for its generated
+        # docstring, so an EMPTY name is an ``IndexError`` there, not a
+        # cosmetic gap. Every non-string ``sev_name`` -- the meta and copy
+        # paths, which take an object -- used to hand it exactly that, which
+        # is why ``Portfolio.as_severity()`` raised ``IndexError: string index
+        # out of range`` before it reached any severity logic at all. Fall back
+        # to the class name, which is non-empty by construction.
+        super().__init__(self, name=(sev_name if isinstance(sev_name, str)
+                                     else type(sev_name).__name__))
 
         # ---- spec inputs / placeholder state -----------------------------
         self.program = ''  # may be set externally
@@ -1054,7 +1190,13 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         # Object-level display label + interior label_map. Presentation only;
         # ``name`` stays the identity handle. See dev/plan-labels.md.
         self._init_labels(label=label, label_map=label_map)
-        self.long_name = sev_name
+        # The family label the ``info`` block reads out. For an object-valued
+        # ``sev_name`` (the meta / copy paths) that is a readable identifier,
+        # not the object: splatting a whole Portfolio report into a one-line
+        # 'severity distribution' row tells the reader nothing they came for.
+        self.long_name = (
+            sev_name if isinstance(sev_name, str)
+            else f'{type(sev_name).__name__} {getattr(sev_name, "name", "")}'.strip())
         self.note = note
         self.hints = hints
         #: Tag slugs from the DecL ``tags{...}`` trailer ('()' when none).
@@ -2230,65 +2372,66 @@ class SeverityFixed(SeverityDHistogram):
         super()._build()
 
 
-class SeverityMeta(Severity):
+class SeverityMeta(SeverityDHistogram):
     """Severity built from the output distribution of an Aggregate or Portfolio.
+
+    The programmatic half of the reference-severity feature: what
+    ``Severity(some_aggregate)``, :meth:`aggregate.distributions.Aggregate.as_severity`
+    and :meth:`aggregate.portfolio.Portfolio.as_severity` construct. The DecL
+    half (``sev agg.NAME``) resolves in the underwriter and lands as a plain
+    ``dhistogram``; both go through :func:`_dhistogram_from_object`, so the two
+    routes cannot drift.
 
     Notes
     -----
-    Reuses an existing aggregate-level distribution as a severity. The
-    ``sev_a`` and ``sev_b`` spec slots are repurposed here as ``log2`` and
-    ``bs`` — if the source has not yet been computed at those resolutions
-    (or has been computed at different ones) it is updated in place. This
-    side effect is preserved verbatim from the pre-refactor behaviour;
-    flagged for review in Stage 2.
+    **A fully formed dsev, not a hybrid.** The source's output pmf becomes the
+    atoms of a discrete severity, exactly as though the user had transcribed
+    ``dsev [xs] [ps]`` by hand: exact first three moments summed from the
+    atoms, ``support_atoms`` for lattice detection, an honest
+    :class:`_DiscreteRV` with exact ``layer_moments``, and the mean-preserving
+    linear rebucket onto the consuming grid. This replaces the pre-1.0
+    ``rv_histogram`` construction, which pinned the mass at zero in a
+    ``bs * 1e-7`` sliver and read the rest as continuous-uniform: a continuous
+    object mimicking a step function, with no exact discrete moments and no
+    lattice.
 
-    The result is a hybrid discrete/continuous histogram: a tiny bucket
-    pins the probability mass at zero, while the rest of the support is
-    treated as a continuous histogram with bucket size ``bs``.
+    **The query is nullary.** Nothing is passed in and nothing is recomputed:
+    the source is asked what distribution it outputs, and it answers from its
+    current computed state. A source that has never computed itself raises. The
+    pre-1.0 code instead repurposed the ``sev_a`` / ``sev_b`` spec slots as
+    ``log2`` / ``bs`` and **updated the source in place** to match; that side
+    effect is gone (it was flagged for review at the refactor, and this is the
+    review outcome), and so is the call to the long-removed ``easy_update``
+    that carried it. Pass ``sev_a`` / ``sev_b`` only if they agree with the
+    source's current grid; update the source at the resolution you want, then
+    convert.
     """
     sev_kind = 'meta'
-    # Built as ``ss.rv_histogram`` over the source's density, so behaves
-    # like the other histogram kinds for moments / fast-paths.
-    _is_histogram = True
 
     def _build(self):
-        # Local imports to avoid distributions <-> portfolio / _aggregate cycles.
-        from .portfolio import Portfolio
-        from ._aggregate import Aggregate
-
         source = self.sev_name
-        log2 = self.sev_a
-        bs = self.sev_b
-
-        if isinstance(source, Aggregate):
-            if log2 and (log2 != source.log2 or (bs != source.bs and bs != 0)):
-                source.easy_update(log2, bs)
-            xs = source.xs
-            ps = source.agg_density
-        elif isinstance(source, Portfolio):
-            if log2 and (log2 != source.log2 or (bs != source.bs and bs != 0)):
-                source.update(log2, bs, add_exa=False)
-            xs = source.density_df.loss.values
-            ps = source.density_df.p_total.values
-        else:
-            raise ValueError(
-                f'Object {source} passed as a proto-severity type but only '
-                f'Aggregate, Portfolio and Severity objects allowed')
-
-        # Construct a hybrid discrete/continuous histogram. A tiny bucket
-        # holds the mass at zero; the rest is continuous-uniform between
-        # bucket midpoints offset by bs/2.
-        b1size = 1e-7
-        xss = np.hstack((-bs * b1size, 0, xs[1:] - bs / 2, xs[-1] + bs / 2))
-        pss = np.hstack((ps[0] / b1size, 0, ps[1:]))
-        # density=True is explicit, not a change: it is what scipy assumes
-        # when ``density`` is left None. The bins here are bs*1e-7, then
-        # bs/2, then bs, so they are NEVER constant and every meta severity
-        # tripped scipy's "Bin widths are not constant" RuntimeWarning.
-        self.fz = ss.rv_histogram((pss, xss), density=True)
-        self.sev1 = np.sum(xs * ps)
-        self.sev2 = np.sum(xs ** 2 * ps)
-        self.sev3 = np.sum(xs ** 3 * ps)
+        # ``sev_a`` / ``sev_b`` no longer mean log2 / bs. Accept them silently
+        # when they merely restate the source's current grid (the old
+        # ``as_severity`` call shape) and refuse when they contradict it,
+        # rather than honouring a request this path can no longer serve.
+        for slot, value, attr in (('sev_a', self.sev_a, 'log2'),
+                                  ('sev_b', self.sev_b, 'bs')):
+            if value is None or (isinstance(value, float) and np.isnan(value)):
+                continue
+            if not value:
+                continue
+            current = getattr(source, attr, None)
+            if current is not None and not np.isclose(float(value), float(current)):
+                raise ValueError(
+                    f'{getattr(source, "name", source)}: {slot} was the '
+                    f'pre-1.0 spelling of {attr} on a reference severity and '
+                    f'no longer re-grids the source ({slot}={value}, source '
+                    f'{attr}={current}). Update the source at the resolution '
+                    'you want, then convert it.')
+        self.sev_xs, self.sev_ps = _dhistogram_from_object(
+            source, normalize=True, signed=self.signed,
+            source=getattr(source, 'name', ''))
+        super()._build()
 
 
 class SeverityCopy(Severity):

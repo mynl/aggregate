@@ -2154,20 +2154,48 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return self._grid_distribution().tvar_threshold(p, kind)
 
     def as_severity(self, limit=np.inf, attachment=0, conditional=False):
-        """
-        Convert portfolio into a severity without recomputing.
+        """Use this portfolio's total loss distribution as a severity.
 
-        Throws an error if self not updated.
+        The programmatic twin of the DecL ``sev port.NAME`` reference, and the
+        mirror of :meth:`aggregate.distributions.Aggregate.as_severity`.
 
-        :param limit:
-        :param attachment:
-        :param conditional:
-        :return:
+        Parameters
+        ----------
+        limit : float, default ``np.inf``
+            Layer width applied to the resulting severity.
+        attachment : float, default 0
+            Layer attachment applied to the resulting severity.
+        conditional : bool, default False
+            Whether layered moments divide out ``P(X > attachment)``.
+
+        Returns
+        -------
+        SeverityMeta
+            A discrete severity whose atoms are ``density_df.p_total`` on
+            ``density_df.loss``.
+
+        Raises
+        ------
+        ValueError
+            If the portfolio has not been updated. The conversion asks the
+            object what distribution it outputs, and an un-updated portfolio
+            does not have one.
+
+        Notes
+        -----
+        Nothing is recomputed and nothing on ``self`` is touched: the answer is
+        read from the current computed state. Before 1.0 this passed ``log2``
+        and ``bs`` through the repurposed ``sev_a`` / ``sev_b`` slots, which
+        could silently re-grid the source; those slots no longer mean that (see
+        :class:`aggregate.distributions.SeverityMeta`), so they are not passed.
         """
         if self.density_df is None:
-            raise ValueError('Must update prior to converting to severity')
-        return Severity(sev_name=self, sev_a=self.log2, sev_b=self.bs,
-                        exp_attachment=attachment, exp_limit=limit, sev_conditional=conditional)
+            raise ValueError(
+                f'{self.name}: update the portfolio before converting it to a '
+                'severity -- the conversion reads the distribution it outputs, '
+                'and there is not one yet.')
+        return Severity(sev_name=self, exp_attachment=attachment,
+                        exp_limit=limit, sev_conditional=conditional)
 
     def approximate(self, approx_type='slognorm', output='scipy'):
         """

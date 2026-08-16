@@ -12,7 +12,7 @@ resolution-markers = [
 
 [[package]]
 name = "aggregate"
-version = "1.0.0a285"
+version = "1.0.0a289"
 source = { editable = "." }
 dependencies = [
     { name = "greater-tables" },
@@ -22,6 +22,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "pygments" },
+    { name = "pyyaml" },
     { name = "scipy" },
 ]
 
@@ -90,6 +91,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7" },
     { name = "pytest-testmon", marker = "extra == 'dev'", specifier = ">=2" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "sphinx", marker = "extra == 'dev'", specifier = ">=8.1,<9" },

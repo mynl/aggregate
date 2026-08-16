@@ -2346,6 +2346,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self._sharpen_df = None     # last sharpen() probe, one row per cell
         self._sharpen_state = None  # last sharpen() decision, for the narrative
         self._bs_clip = None        # structured far-tail clip report (item 6) or None
+        self._bs_snap = None        # reference-lattice bs snap report, or None
         self._bs_raw = None         # pre-dyadic-round bs (unset for the multi-method agg sizer)
         # F1 opt-in: when True the severity keeps its negative support (the
         # layering clamp ``x<0 -> 0`` is bypassed). Default False preserves the

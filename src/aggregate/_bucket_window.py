@@ -4,6 +4,7 @@ Extracted from ``distributions.py`` / ``_aggregate.py`` (Phase 1b, shared concer
 """
 
 import logging
+import math
 import time
 import warnings
 
@@ -384,6 +385,16 @@ def bs_explain(agg, *, color: bool = False) -> str:
             f'rounds to {_fmt_bs(bs)} producing a final window width of '
             f'{fmt_amount(W)}.')
 
+    snap = getattr(agg, '_bs_snap', None)
+    if snap is not None:
+        parts.append(
+            f'The severity comes from {snap["ref"]}, whose atoms sit on a '
+            f'{_fmt_bs(snap["d"])} lattice, so the chosen bs '
+            f'{_fmt_bs(snap["bs_before"])} was snapped to '
+            f'{_fmt_bs(snap["bs_after"])} (= {_fmt_bs(snap["d"])} x '
+            f'2^{snap["m"]}) to keep the two grids commensurable, which puts '
+            'every inner atom on a bucket edge instead of between two.')
+
     # natural support bounds + concentration from the aggregate tail row
     try:
         trow = agg.tail_behavior_df.loc['aggregate']
@@ -424,6 +435,107 @@ def bs_explain(agg, *, color: bool = False) -> str:
 # Phase B1). Sits beside its estimate_agg_window/_estimate_agg_percentile
 # leaves; the Aggregate method delegates here.
 # ====================================================================
+
+def _integer_ratio(a, b, rel_tol=1e-9):
+    """Whether ``a / b`` is a positive integer, to a stated relative tolerance."""
+    if not (b and np.isfinite(a) and np.isfinite(b)):
+        return False
+    r = a / b
+    return r >= 1.0 and math.isclose(r, round(r), rel_tol=rel_tol)
+
+
+def snap_bs_to_reference(agg, b0, pinned):
+    """Keep the grid commensurable with a reference severity's own lattice.
+
+    The final query at the end of bucket selection, not an optimization woven
+    through the sizer: the winning candidate is already chosen, and this asks
+    one question about it. A severity built from a ``sev agg.NAME`` reference
+    carries the referenced object's bucket size ``d`` (``reference_bs``, set
+    exactly on the resolution path, never inferred from ``np.diff`` of the
+    atoms). If the outer grid and ``d`` are incommensurable, every inner atom
+    lands between two outer buckets and the mean-preserving scatter spreads
+    each of them, for no reason: ``d`` was a free choice and a nearby
+    commensurable value costs nothing.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        The aggregate being sized; read for ``sevs`` only.
+    b0 : float
+        The selected bucket size.
+    pinned : bool
+        Whether ``b0`` came from an explicit ``bs`` (a call argument or a
+        ``hints{bs=…}``) rather than from the estimator.
+
+    Returns
+    -------
+    (float or None, str)
+        The bucket size to use instead of ``b0``, or ``None`` to leave it
+        alone, and a note fragment for the winning row.
+
+    Notes
+    -----
+    The decision table, in order:
+
+    * **no component exposes a** ``d``: unchanged, and this is the
+      overwhelmingly common path, so it costs one generator expression;
+    * ``d / b0`` **an integer** (the outer grid is finer, so inner atoms land
+      exactly on grid points): no change. This also covers an exact discrete
+      winner at ``bs = 1`` over an integer-lattice reference;
+    * ``b0 / d`` **an integer**: already commensurable, no change. Deliberately
+      not forced to a power of two, since the estimator or the user landed on
+      an exact multiple and there is nothing to fix;
+    * **auto-sized otherwise**: snap to ``d * 2**m`` with
+      ``m = max(0, ceil(log2(b0 / d)))``, never below ``d`` (the severity *is*
+      the reference's output, so an estimate finer than ``d`` snaps to ``d``
+      itself). ``d * 2**m`` is exact in binary floating point, so the snapped
+      grid carries no representation fuzz. The caller re-runs ``_size`` with
+      it, so origin, span and the log2 need all come from the one kernel;
+    * **pinned otherwise**: left alone (no back doors) with a warning naming
+      both values and the nearest commensurable bucket on each side.
+
+    Origins are multiples of the outer ``bs``, hence of ``d``, so inner atoms
+    stay on the ``d`` sublattice; a signed reference is covered by the existing
+    origin flooring in ``_size``.
+
+    The v1 grammar admits at most one reference per aggregate, so at most one
+    ``d`` reaches a sizing. More than one is future-proofing for portfolio unit
+    sizing: the largest wins, and it warns.
+    """
+    ds = sorted({float(s.reference_bs)
+                 for s in (agg.sevs if agg.sevs is not None else [])
+                 if getattr(s, 'reference_bs', None)})
+    if not ds:
+        return None, ''
+    d = ds[-1]
+    ref = next((getattr(s, 'reference_id', '') or '?'
+                for s in agg.sevs
+                if getattr(s, 'reference_bs', None) == d), '?')
+    if len(ds) > 1:
+        warn_once(
+            f'{agg.name}: severity references sit on {len(ds)} different '
+            f'lattices ({", ".join(_fmt_bs(x) for x in ds)}); snapping to the '
+            f'coarsest, {_fmt_bs(d)}. The finer ones stay off the grid.',
+            UserWarning, key=f'sev-ref-lattices-{agg.name}', stacklevel=3)
+    if _integer_ratio(d, b0) or _integer_ratio(b0, d):
+        return None, ''
+    if pinned:
+        lo, hi = d * np.floor(b0 / d), d * np.ceil(b0 / d)
+        warn_once(
+            f'{agg.name}: the pinned bs {_fmt_bs(b0)} is incommensurable with '
+            f'{ref}, whose atoms sit on a {_fmt_bs(d)} lattice, so every one '
+            f'of them straddles two buckets. The nearest commensurable buckets '
+            f'are {_fmt_bs(lo)} and {_fmt_bs(hi)}. The pin is honored as '
+            'written.',
+            UserWarning, key=f'sev-ref-pinned-{agg.name}', stacklevel=3)
+        return None, ''
+    m = max(0, int(np.ceil(np.log2(b0 / d))))
+    snapped = d * 2.0 ** m
+    agg._bs_snap = dict(ref=ref, d=float(d), bs_before=float(b0),
+                        bs_after=float(snapped), m=m)
+    return snapped, (f'; bs {_fmt_bs(b0)} snapped to {_fmt_bs(snapped)} '
+                     f'(= {_fmt_bs(d)} x 2^{m}) to match {ref}')
+
 
 def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                window_convention=None):
@@ -484,6 +596,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     """
     N0 = 1 << log2
     agg._bs_clip = None    # cleared each sizing; set only if the tail clips
+    agg._bs_snap = None    # ditto; set only if a reference lattice moved bs
     m = agg.actual_m
     try:
         ex2 = float(agg.stats_df['mixed'][('agg', 'ex2')])
@@ -898,6 +1011,28 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                         f'capture it.',
                         DefectiveDistributionWarning,
                         key='defective-construction', stacklevel=3)
+
+    # ---- commensurable grids (reference severities) ------------------
+    # The final query of section 4.7 of dev/done/plan-agg-port-as-sev.md: the
+    # winner is chosen and any floor applied, so ask once whether the grid sits
+    # on the reference's lattice, and re-derive through ``_size`` if it does
+    # not. The window is the winner's own current ``[x_min, x_max]``, which is
+    # the floored one when the single-big-jump floor fired, so the snap cannot
+    # undo it. Snapping only coarsens, so the re-derived ``log2`` need can only
+    # fall, and ``_size``'s coarsen-to-fit fallback (which would leave the
+    # lattice) is unreachable from here.
+    snapped, snap_note = snap_bs_to_reference(
+        agg, float(rows[selected]['bs']), bs_in > 0)
+    if snapped is not None:
+        _sel = rows[selected]
+        _forig = (selected == 'windowed')
+        _gcap = (log2 + WINDOW_LOG2_GROWTH) if _forig else None
+        _x0, _bs, _l2 = _size(float(_sel['x_min']), float(_sel['x_max']),
+                              snapped, _forig, _gcap)
+        rows[selected] = {**_sel, 'x_min': float(_x0), 'bs': float(_bs),
+                          'log2': int(_l2),
+                          'W': float(float(_sel['x_max']) - _x0),
+                          'note': _sel['note'] + snap_note}
 
     # ---- realized grid (the ``used`` row) ---------------------------
     sel_bs = float(rows[selected]['bs'])

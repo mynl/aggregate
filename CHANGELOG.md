@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a292
+
+**[Agg-As-Severity-Commensurable-Grids] the outer grid learns about the reference's lattice.** Phase B2 of `dev/done/plan-agg-port-as-sev.md`, in its own bump so the `_bucket_window.py` diff stays readable. A severity built from a `sev agg.NAME` reference carries the referenced object's own bucket size `d` on `reference_bs`, set exactly on the resolution path and never inferred from `np.diff` of the atoms. `snap_bs_to_reference` asks one question at the end of bucket selection: is the chosen grid commensurable with `d`? If not, and the bucket was estimated rather than pinned, it snaps to `d * 2**m` and the winning row is re-derived through `_size`, so origin, span and the log2 need all still come from the one kernel. Nothing else in the sizer changes: no new candidate row, no change to `_size`, no change to the priority logic.
+
+**The common case costs one generator expression and does nothing**, which is the design. An aggregate with no reference severity exposes no `d` and returns immediately. More than that: **a dyadic `d` is already commensurable with every bucket the estimator can pick**, since `round_bucket` returns a power of two below 1 and an integer at or above it, so the usual `hints{bs=1/32}` reaches the snap and finds nothing to do. What actually triggers it is a lattice that is not a power of two, `hints{bs=1/3}`, where an estimate of `1/512` snaps up to `1/3` itself: the aggregate of a lattice-valued severity lives on that lattice, so the coarser grid is the *exact* one, which is the same argument `_severity_lattice` already makes for integer atoms, generalized to a non-integer step.
+
+**The decision table**, in order, with integer tests at a relative tolerance of `1e-9`: no `d`, unchanged; `d / b0` an integer (the outer grid is finer, so inner atoms land on grid points), unchanged; `b0 / d` an integer, unchanged, and deliberately not forced to a power of two, since the estimator or the user landed on an exact multiple and there is nothing to fix; otherwise auto-sized, snap to `d * 2**m` with `m = max(0, ceil(log2(b0 / d)))`, never below `d`; otherwise pinned, honored as written with a warning naming both values and the nearest commensurable bucket on each side. No back doors around an explicit `bs`.
+
+**Reported, not silent.** The winning row's `note` in `bs_window_df` gains the before and after, and `bs_explanation` gains a sentence naming the source, its lattice, the two bucket sizes and the reason. The structured record is `Aggregate._bs_snap`, the sibling of `_bs_clip`, cleared at the top of every sizing.
+
+The v1 grammar admits at most one reference per aggregate, so at most one `d` reaches a sizing; the function nonetheless takes a set, snaps to the coarsest and warns if it ever sees more, which is future-proofing for portfolio unit sizing. Origins are multiples of the outer `bs`, hence of `d`, so inner atoms stay on the `d` sublattice, and a signed reference is covered by the existing origin flooring. Eight new tests in `tests/test_agg_as_severity.py`.
+
 ## 1.0.0a291
 
 **[Agg-As-Severity] an aggregate can be a severity, in DecL.** Phase B of `dev/done/plan-agg-port-as-sev.md`. `sev agg.NAME` and `sev port.NAME`, with the `ssev` and unconditional `!` forms and an optional `as` label, let a declaration already in the recipe base serve as the severity of another aggregate. The motivating shape is a US personal auto split limit, a 100/300 policy:

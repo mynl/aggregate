@@ -482,3 +482,93 @@ def test_pnl_engine_over_a_reference_severity():
     p = build('pnl AAS.PnL 300000 premium less '
               'agg AAS.PnLEngine 5000 claims sev agg.AAS.SL poisson')
     assert p is not None
+
+
+# ----------------------------------------------------------------------
+# [Agg-As-Severity-Commensurable-Grids] (a292): the outer grid and the
+# reference's own lattice must never be incommensurable
+# ----------------------------------------------------------------------
+#: A reference whose lattice is NOT a power of two, which is what it takes to
+#: reach the snap at all: every bucket the estimator can pick under 1 is a power
+#: of two and every one at or above 1 is an integer, so a dyadic ``d`` is
+#: commensurable with all of them already.
+ODD = 'agg AAS.Odd 2 claims sev gamma 3 cv .5 poisson hints{log2=12; bs=1/3}'
+
+
+def _commensurable(b0, d):
+    r = max(b0, d) / min(b0, d)
+    return np.isclose(r, round(r), rtol=1e-9)
+
+
+def test_a_dyadic_reference_lattice_needs_no_snap():
+    # bs=1/32 divides every bucket the estimator can choose, so the property
+    # holds without the snap firing at all. Assert the property, not the path.
+    a = build('agg AAS.Comm 500 claims sev agg.AAS.SL poisson')
+    assert _commensurable(a.bs, 1 / 32)
+    assert a._bs_snap is None
+
+
+def test_an_estimate_below_the_lattice_snaps_up_to_it():
+    build(ODD)
+    a = build('agg AAS.OddOut dfreq [2] sev agg.AAS.Odd')
+    assert a.bs == pytest.approx(1 / 3, rel=1e-12)
+    assert a._bs_snap is not None
+    assert a._bs_snap['bs_before'] < 1 / 3
+    assert a._bs_snap['m'] == 0                 # never below d
+    assert a._bs_snap['ref'] == 'agg.AAS.Odd'
+
+
+def test_the_snap_is_named_in_the_bs_explanation():
+    build(ODD)
+    a = build('agg AAS.OddOut2 dfreq [2] sev agg.AAS.Odd')
+    text = a.bs_explanation
+    assert 'agg.AAS.Odd' in text
+    assert '1/3' in text                        # the lattice and the new bs
+    assert 'commensurable' in text
+
+
+def test_the_snapped_grid_still_covers_its_window():
+    # the snap re-derives origin and log2 through the one sizing kernel, so the
+    # realized grid must still cover the winning method's window
+    build(ODD)
+    a = build('agg AAS.OddOut3 dfreq [2] sev agg.AAS.Odd')
+    df = a.bs_window_df
+    won = df[df['selected'].astype(bool)].iloc[0]
+    top = float(won['x_min']) + (1 << int(won['log2'])) * float(won['bs'])
+    assert top >= float(won['x_max'])
+    assert float(df.loc['used', 'bs']) == pytest.approx(a.bs, rel=1e-12)
+
+
+def test_an_integer_lattice_reference_keeps_the_exact_discrete_window():
+    build('agg AAS.D1 dfreq [1] dsev [1 2 3] hints{log2=8; bs=1}')
+    a = build('agg AAS.D2 dfreq [2] sev agg.AAS.D1')
+    assert a.bs == 1                            # b0 / d == 1, already commensurable
+    assert a._bs_snap is None
+    assert bool(a.bs_window_df.loc['exact_discrete', 'selected'])
+
+
+def test_an_exact_integer_multiple_is_left_alone():
+    # no forced power of two when the estimator already landed on a multiple
+    build('agg AAS.Ten 5 claims dsev [10 20 30] poisson hints{log2=10; bs=10}')
+    a = build('agg AAS.TenOut dfreq [2] sev agg.AAS.Ten')
+    assert _commensurable(a.bs, 10)
+    assert a._bs_snap is None
+
+
+def test_a_pinned_incommensurable_bs_warns_and_is_honored():
+    build(ODD)
+    with pytest.warns(UserWarning, match='incommensurable') as rec:
+        a = build('agg AAS.OddPin dfreq [2] sev agg.AAS.Odd', bs=0.5)
+    assert a.bs == 0.5                          # the pin is honored, no back door
+    assert a._bs_snap is None
+    msg = ' '.join(str(w.message) for w in rec)
+    assert '1/3' in msg and '0.666667' in msg   # the adjacent multiples of d
+
+
+def test_a_pinned_commensurable_bs_is_silent():
+    build(ODD)
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter('always')
+        a = build('agg AAS.OddPinOk dfreq [2] sev agg.AAS.Odd', bs=2 / 3)
+    assert a.bs == pytest.approx(2 / 3, rel=1e-12)
+    assert not [w for w in rec if 'incommensurable' in str(w.message)]

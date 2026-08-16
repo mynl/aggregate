@@ -945,6 +945,40 @@ that the design did not anticipate. Section numbers refer to the plan.
     `SeverityDHistogram` cannot support because `_build` overwrites `limit` with
     the largest atom.
 
+### Phase B2 `[Agg-As-Severity-Commensurable-Grids]`, 1.0.0a292
+
+18. **Names chosen**: `snap_bs_to_reference` (the module function),
+    `_integer_ratio` (the tolerance test), `Aggregate._bs_snap` (the structured
+    record, sibling of `_bs_clip`). The carrier is `Severity.reference_bs` from
+    phase B.
+19. **`_size` is re-invoked from the call site, not from the new function**,
+    because `_size` is a closure over `bs_window`'s locals. The function decides
+    the snapped bucket and the call site applies it, which is what section 4.7's
+    "never duplicate window arithmetic at the call site" asks for: the call site
+    passes the winner's current `(x_min, x_max)` and does no arithmetic of its
+    own. That window is the **floored** one when the single big jump floor
+    fired, so the snap cannot undo the floor. Snapping only coarsens, so the
+    re-derived log2 need can only fall, and `_size`'s coarsen-to-fit fallback,
+    which would leave the lattice, is unreachable from here.
+20. **A dyadic `d` never reaches the snap in practice, and that is correct.**
+    `round_bucket` returns a power of two below 1 and an integer at or above it,
+    so every bucket the estimator can pick is already an integer multiple of
+    `1/32`. Section 4.7's first test as written ("auto sized outer bs equals
+    `(1/32) * 2**m` ... and `bs_explanation` names the snap") therefore asks for
+    two things that cannot both happen: the property holds, via the `b0 / d`
+    integer row, without the snap firing. The test asserts the property and
+    that no snap fired; a second test drives the snap with a genuinely
+    non-dyadic lattice, `hints{bs=1/3}`, which is the only shape that reaches
+    it.
+21. **Rows 2 and 4 of the decision table conflict for `b0 = d / 2`** ("`d / b0`
+    an integer, no change" against "never below `d`"). Table order settles it:
+    row 2 wins, and its reasoning is the better one, since a finer outer grid
+    holds the inner atoms exactly. "Never below `d`" then bites only for a
+    non-dyadic lattice, which is where it was tested.
+22. **Multiplicity warns rather than raising**, per section 4.7, and cannot fire
+    under the v1 grammar (one reference per aggregate). It is live code for
+    phase C.
+
 ### What executing it turned up (none of this is in the plan)
 
 12. **The headline program of sections 1 and 5 needed a severity side `!`.**

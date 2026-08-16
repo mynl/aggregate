@@ -1,10 +1,12 @@
 # [Agg-As-Severity] Plan: agg and port references as severities in DecL
 
-Status: DRAFT for author review, revised 2026-08-16 (fourth round: granular
+Status: EXECUTED, phases A to C landed 1.0.0a290 to 1.0.0a293. Section 13 carries
+the execution notes: read it before working on anything this plan touches.
+Originally DRAFT for author review, revised 2026-08-16 (fourth round: granular
 implementation guidance for the tail descriptor, section 4.6, and the
 commensurability step, section 4.7, which now lands as its own bump, phase
-B2). Planning only; nothing has been implemented. File and line references
-verified against the working tree at 1.0.0a289.
+B2). File and line references were verified against the working tree at
+1.0.0a289.
 
 ## 1. Motivation
 
@@ -978,6 +980,20 @@ that the design did not anticipate. Section numbers refer to the plan.
 22. **Multiplicity warns rather than raising**, per section 4.7, and cannot fire
     under the v1 grammar (one reference per aggregate). It is live code for
     phase C.
+
+### Phase C `[Agg-As-Severity-Port-Units]`, 1.0.0a293
+
+23. **Resolution happens on the unit spec list, the stamp after construction.**
+    The unit specs go straight into `Aggregate(**unit)` inside `Portfolio`, so
+    the resolver has to run on the list before it is handed over; the
+    `Severity` objects only exist afterwards, so `_stamp_sev_ref` runs on
+    `obj.agg_list[i]` once the portfolio is built. Everything else is phase B
+    unchanged, because it is the same `_resolve_sev_ref`: hygiene per unit, one
+    cycle guard across units, a transitive descriptor, and the unparser
+    rendering the unit back as a reference.
+24. **Section 4.7's multiplicity guard stays unreachable.** Two units may
+    reference sources on different lattices, but each unit is sized on its own,
+    so each sizing still sees one `d`. The warning stays as written.
 
 ### What executing it turned up (none of this is in the plan)
 

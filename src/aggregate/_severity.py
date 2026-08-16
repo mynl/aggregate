@@ -1064,7 +1064,7 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
     #: only: ``tail_behavior_df`` and the tail narrative read it so an
     #: unbounded inner is described as unbounded, while every number -- bucket
     #: selection, moments, the FFT -- rides the finite atoms. See
-    #: ``dev/plan-agg-port-as-sev.md`` section 4.6.
+    #: ``dev/done/plan-agg-port-as-sev.md`` section 4.6.
     reference_support_max: float = None
     #: The referenced source's own bucket size, known exactly on the resolution
     #: path (never inferred from ``np.diff`` of the atoms). Read by the

@@ -1031,7 +1031,7 @@ def output_support_max(obj) -> float:
 
     Notes
     -----
-    The derivation, in order (``dev/plan-agg-port-as-sev.md`` section 4.6):
+    The derivation, in order (``dev/done/plan-agg-port-as-sev.md`` section 4.6):
 
     1. **Severity side, per component.** A component that itself carries a
        ``reference_support_max`` uses that and its ``support_atoms`` are never

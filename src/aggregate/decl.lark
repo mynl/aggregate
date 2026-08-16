@@ -476,7 +476,7 @@ sev_clause: SEV sev as_label            -> sev_clause_sev
 // other dotted reference in DecL this one is NOT inlined at parse time -- the
 // severity is the inner's *computed output*, which exists only after an update
 // -- so the parse records the reference and the underwriter resolves it at
-// build time. See dev/plan-agg-port-as-sev.md.
+// build time. See dev/done/plan-agg-port-as-sev.md.
 //
 // It is a terminal LEAF: no picks, weights, scaling, shifting or splicing. What
 // those would mean on a compound output is undecided, and the keyword is

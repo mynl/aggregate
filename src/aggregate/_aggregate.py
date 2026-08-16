@@ -1070,7 +1070,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             the law that is actually convolved: a certified reference is a
             fully formed ``dsev``, and the outer sizes from it exactly as it
             would from a hand-written one. So the two readings differ on
-            purpose. See ``dev/plan-agg-port-as-sev.md`` section 4.6.
+            purpose. See ``dev/done/plan-agg-port-as-sev.md`` section 4.6.
         """
         freq_min, freq_max, freq_zt = self._frequency_count_support()
         return _tail.build_tail_rows(

@@ -327,3 +327,5 @@ agg Z.Ref.Signed        dfreq [1] ssev 100 - lognorm 50 cv .5 hints{log2=12; bs=
 
 agg Z.Ref.UsesSigned    dfreq [1] ssev agg.Z.Ref.Signed note{ssev over a signed reference keeps the negative atoms.}
 
+port Z.Ref.Units agg Z.Ref.UnitA 500 claims sev agg.Z.SplitLimit.Policy poisson agg Z.Ref.UnitB 10 claims sev lognorm 50 cv 1 poisson
+

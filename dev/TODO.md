@@ -733,7 +733,7 @@
   it was not done at a291 is that a cache introduces staleness questions
   (redefinition, hint edits) that the fresh re-resolution simply does not have.
 - **[Reference-Severity-Zero-Atom-Default]** (surfaced executing
-  `plan-agg-port-as-sev.md`, a291) — a layers clause on a severity conditions on
+  `dev/done/plan-agg-port-as-sev.md`, a291) — a layers clause on a severity conditions on
   exceeding the attachment by default, and the plan's headline split-limit
   program relies on the intuition that a zero-truncated inner has no zero atom.
   It does not hold for the *materialized* reference: any severity with positive

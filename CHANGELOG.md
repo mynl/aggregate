@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a293
+
+**[Agg-As-Severity-Port-Units] a portfolio unit can take its severity from a reference.** Phase C, the last of `dev/done/plan-agg-port-as-sev.md`, and the smallest: the `port` branch of `_factory` resolves any unit spec carrying `sev_ref` before `Portfolio` builds its `Aggregate`s, because the unit specs go straight into `Aggregate(**unit)`, which cannot see the key. The provenance stamp is applied per unit afterwards, where the `Aggregate` objects exist.
+
+```
+port Book
+    agg Auto  500 claims sev agg.SplitPolicy poisson
+    agg Prop   10 claims sev lognorm 50 cv 1 poisson
+```
+
+Everything else follows from phase B unchanged, because it is the same resolver: the hygiene rule applies per unit, the cycle guard spans units, the tail descriptor is transitive through a unit, and `format_program` renders the unit back as a reference. A unit carrying no reference is untouched.
+
+The plan's section 4.7 note about more than one lattice reaching a sizing becomes reachable here in principle, since two units may reference sources on different grids. It does not fire in practice: each unit is sized on its own, so each sees one `d`. The multiplicity warning stays as the guard it was written to be.
+
+A corpus line in `_test_suite.agg` section Z; `expected_specs.json` recaptured, additions only. Four new tests.
+
 ## 1.0.0a292
 
 **[Agg-As-Severity-Commensurable-Grids] the outer grid learns about the reference's lattice.** Phase B2 of `dev/done/plan-agg-port-as-sev.md`, in its own bump so the `_bucket_window.py` diff stays readable. A severity built from a `sev agg.NAME` reference carries the referenced object's own bucket size `d` on `reference_bs`, set exactly on the resolution path and never inferred from `np.diff` of the atoms. `snap_bs_to_reference` asks one question at the end of bucket selection: is the chosen grid commensurable with `d`? If not, and the bucket was estimated rather than pinned, it snaps to `d * 2**m` and the winning row is re-derived through `_size`, so origin, span and the log2 need all still come from the one kernel. Nothing else in the sizer changes: no new candidate row, no change to `_size`, no change to the priority logic.
@@ -69,7 +85,7 @@ New tests in `tests/test_agg_as_severity.py`, 45 cases: exactness against a hand
 
 ## 1.0.0a290
 
-**[SeverityMeta-Afresh] a compound distribution can be a severity again, and this time it is a dsev.** Phase A of `dev/plan-agg-port-as-sev.md`. `SeverityMeta`, the class behind `Severity(some_aggregate)` and `Portfolio.as_severity()`, is rebuilt on the `SeverityDHistogram` foundation instead of the pre-1.0 `rv_histogram` hybrid. It is now a `SeverityDHistogram` subclass: the source's output pmf becomes the atoms of a discrete severity, exactly as though the user had transcribed `dsev [xs] [ps]` by hand. Exact first three moments summed off the atoms, `support_atoms` for lattice detection, an honest `_DiscreteRV` with exact `layer_moments`, and the mean-preserving linear rebucket onto the consuming grid. The old construction pinned the mass at zero in a `bs * 1e-7` sliver and read the rest as continuous-uniform, so it had none of those.
+**[SeverityMeta-Afresh] a compound distribution can be a severity again, and this time it is a dsev.** Phase A of `dev/done/plan-agg-port-as-sev.md`. `SeverityMeta`, the class behind `Severity(some_aggregate)` and `Portfolio.as_severity()`, is rebuilt on the `SeverityDHistogram` foundation instead of the pre-1.0 `rv_histogram` hybrid. It is now a `SeverityDHistogram` subclass: the source's output pmf becomes the atoms of a discrete severity, exactly as though the user had transcribed `dsev [xs] [ps]` by hand. Exact first three moments summed off the atoms, `support_atoms` for lattice detection, an honest `_DiscreteRV` with exact `layer_moments`, and the mean-preserving linear rebucket onto the consuming grid. The old construction pinned the mass at zero in a `bs * 1e-7` sliver and read the rest as continuous-uniform, so it had none of those.
 
 **It was broken in practice, not merely dated.** `Portfolio.as_severity()` raised `IndexError: string index out of range` from inside scipy, before any severity logic ran. `Severity.__init__` passed `name=''` for every object-valued `sev_name`, and scipy indexes `name[0]` to pick the article for its generated docstring. The empty string is now the class name, which is non-empty by construction. The `meta` and `copy` paths both went through that line, so both were unreachable. **This changes `Portfolio.as_severity` numerics** (hybrid histogram to exact atoms); no test covered the old behavior, and it could not be called.
 

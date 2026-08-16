@@ -5962,5 +5962,45 @@
       "note": "ssev over a signed reference keeps the negative atoms.",
       "hints": ""
     }
+  },
+  "port Z.Ref.Units agg Z.Ref.UnitA 500 claims sev agg.Z.SplitLimit.Policy poisson agg Z.Ref.UnitB 10 claims sev lognorm 50 cv 1 poisson": {
+    "kind": "port",
+    "name": "Z.Ref.Units",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "Z.Ref.UnitA",
+          {
+            "name": "Z.Ref.UnitA",
+            "exp_en": 500.0,
+            "sev_ref": "agg.Z.SplitLimit.Policy",
+            "freq_name": "poisson",
+            "note": "",
+            "hints": ""
+          }
+        ],
+        [
+          "agg",
+          "Z.Ref.UnitB",
+          {
+            "name": "Z.Ref.UnitB",
+            "exp_en": 10.0,
+            "sev_name": "lognorm",
+            "sev_mean": 50.0,
+            "sev_cv": 1.0,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "poisson",
+            "note": "",
+            "hints": ""
+          }
+        ]
+      ],
+      "note": "",
+      "hints": ""
+    }
   }
 }

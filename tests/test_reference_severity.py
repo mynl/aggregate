@@ -11,7 +11,7 @@ The DecL half of the feature (``sev agg.NAME``) is tested in
 ``aggregate._severity._dhistogram_from_object``, so the exactness claims here
 carry over.
 
-See ``dev/plan-agg-port-as-sev.md`` phase A.
+See ``dev/done/plan-agg-port-as-sev.md`` phase A.
 """
 
 import logging

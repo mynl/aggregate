@@ -8,13 +8,14 @@ claimant on the inner, 300 per policy on the outer.
 The reference is **resolved at build time**, which is what makes it DecL's
 first deferred reference: the severity is the inner's *computed output*, which
 exists only after an update. Everything else about it follows the fully formed
-``dsev`` model of ``dev/plan-agg-port-as-sev.md`` section 2.
+``dsev`` model of ``dev/done/plan-agg-port-as-sev.md`` section 2.
 
 The programmatic half (``Severity(agg)`` / ``as_severity``) is tested in
 ``tests/test_reference_severity.py``; both share
 ``aggregate._severity._dhistogram_from_object``.
 
-Programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` section Z.
+Programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` section ASV, and
+the shipped-corpus form is ``_test_suite.agg`` section Z.
 """
 
 import logging
@@ -572,3 +573,47 @@ def test_a_pinned_commensurable_bs_is_silent():
         a = build('agg AAS.OddPinOk dfreq [2] sev agg.AAS.Odd', bs=2 / 3)
     assert a.bs == pytest.approx(2 / 3, rel=1e-12)
     assert not [w for w in rec if 'incommensurable' in str(w.message)]
+
+
+# ----------------------------------------------------------------------
+# [Agg-As-Severity-Port-Units] (a293): a portfolio unit may take its
+# severity from a reference
+# ----------------------------------------------------------------------
+def test_a_portfolio_unit_resolves_a_reference_severity():
+    p = build("""port AAS.UnitBook
+    agg AAS.UnitA 500 claims sev agg.AAS.SL poisson
+    agg AAS.UnitB 10 claims sev lognorm 50 cv 1 poisson""")
+    unit = p.agg_list[0]
+    assert unit.sevs[0].sev_kind == 'dhistogram'
+    assert unit.sevs[0].sev1 == pytest.approx(
+        build('agg AAS.SL 1.5 claims 100 xs 0 sev gamma 50 cv 2 '
+              f'poisson zt ! {HINTS}').est_m, rel=1e-9)
+    assert p.est_m > 0
+
+
+def test_a_portfolio_unit_carries_the_reference_provenance():
+    p = build("""port AAS.UnitBook2
+    agg AAS.UnitC 500 claims sev agg.AAS.SL poisson
+    agg AAS.UnitD 10 claims sev lognorm 50 cv 1 poisson""")
+    sev = p.agg_list[0].sevs[0]
+    assert sev.reference_id == 'agg.AAS.SL'
+    assert sev.reference_bs == pytest.approx(1 / 32)
+    # the unit's own tail report reads the source's theoretical tail
+    assert not np.isfinite(p.agg_list[0].tail_behavior_df.loc['aggregate', 'max'])
+    # and the unit that carries no reference is untouched
+    assert p.agg_list[1].sevs[0].reference_id == ''
+
+
+def test_a_portfolio_unit_reference_round_trips():
+    p = build("""port AAS.UnitBook3
+    agg AAS.UnitE 500 claims sev agg.AAS.SL poisson
+    agg AAS.UnitF 10 claims sev lognorm 50 cv 1 poisson""")
+    assert 'sev agg.AAS.SL' in p.format_program(layout='terse')
+
+
+def test_an_unhinted_reference_in_a_portfolio_unit_raises():
+    build('agg AAS.LooseP 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson')
+    with pytest.raises(ValueError, match='with_hints'):
+        build("""port AAS.UnitBad
+    agg AAS.UnitG 500 claims sev agg.AAS.LooseP poisson
+    agg AAS.UnitH 10 claims sev lognorm 50 cv 1 poisson""")

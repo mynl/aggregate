@@ -1457,6 +1457,17 @@ class Underwriter(HelpMixin):
                     f"{', '.join(pnl_units)}. Build a standalone PnL, or declare "
                     "the unit as a plain agg.")
             agg_list = [k for i, j, k in spec['spec']]
+            # A unit may take its severity from a reference. Resolve each unit's
+            # spec before ``Portfolio`` builds its ``Aggregate``s: the unit specs
+            # go straight into ``Aggregate(**unit)``, which cannot see
+            # ``sev_ref``, so this is the same hook the ``agg`` branch has, one
+            # level down. The stamp is applied per unit once the portfolio is
+            # built, since that is where the ``Aggregate`` objects appear.
+            unit_meta = {}
+            for i, unit in enumerate(agg_list):
+                if 'sev_ref' in unit:
+                    agg_list[i], unit_meta[i] = self._resolve_sev_ref(
+                        f"{name}.{unit.get('name', i)}", unit)
             # The whole trailer, not just the note: a172 [FCC-Contract-Gaps].
             # ``tags`` / ``doc`` / ``hints`` were parsed into the port spec and
             # dropped here, so a portfolio's own trailer was write-only. The
@@ -1468,6 +1479,8 @@ class Underwriter(HelpMixin):
                             tags=spec.get('tags', ()),
                             doc=spec.get('doc', ''),
                             hints=spec.get('hints', ''))
+            for i, meta in unit_meta.items():
+                _stamp_sev_ref(obj.agg_list[i], meta)
             obj.program = program
         elif kind == 'sev':
             if 'sev_wt' in spec and spec['sev_wt'] != 1:

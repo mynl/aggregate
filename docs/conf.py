@@ -233,7 +233,6 @@ exclude_patterns = [
     # Developer notes that live under docs/ but are not documentation pages.
     # Sphinx picked them up as sources, then warned that nothing links to them.
     'README.md',
-    'cookbook/plan.md',
 ]
 
 # List of patterns, relative to source directory, that match files and

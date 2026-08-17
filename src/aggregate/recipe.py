@@ -374,11 +374,8 @@ class Recipe:
         Solution built -- that is what makes a recipe self-testing rather than
         merely self-describing.
 
-        This is the **pytest** consumer of a doc (``tests/test_library_recipes.py``);
-        the cookbook consumer is :mod:`aggregate.cookbook`, which emits the
-        same code as native Quarto cells. Both read the same doc, which is what
-        makes "the page and the test run the same program" true by construction
-        rather than by discipline.
+        This is the **pytest** consumer of a doc
+        (``tests/test_library_recipes.py``).
 
         Parameters
         ----------

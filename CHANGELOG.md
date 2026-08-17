@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a298
+
+**[Cookbook-Removal] the Quarto cookbook leaves the repository.** Phase B of `dev/plan-decommission-docs.md`, the plan that retires the `doc{{{...}}}` clause and the cookbook together. The author's ruling: right idea, wrong place. Long-form write-ups belong in the presentations and monograph staging ground, not in a DecL trailer and not in a generated book inside the library.
+
+**Deleted.** `docs/cookbook/` entire, source tree and build artifacts; `src/aggregate/cookbook.py`, the 336 line renderer; `dev/generate_cookbook.py`, its thin caller; `tests/test_cookbook_generate.py`. Nothing imported `aggregate.cookbook` except those two, so this phase is self contained. `docs/conf.py` loses the `cookbook/plan.md` exclude pattern and `docs/3_reference/3_x_Underwriter.rst` loses its Cookbook section and `automodule` directive.
+
+**Kept, in the place that defines it.** The six `[Check-*]` archetypes are the `check:` tag namespace in `library.agg`, so their definitions move from `docs/cookbook/plan.md` into the `library.agg` header beside the vocabulary they describe: reconciliation, scaling-sweep, independent-oracle, limiting-case, round-trip, cross-object, each with the example it was defined by. The tag pool is unchanged; only its documentation moved.
+
+**Where the material went.** The seven documented entries became notes in `aggregate-presentations`, written before anything was deleted: `ph-distortion`, `three-dice` (widened to exact discrete aggregates), `limit-profile`, `occurrence-xol` and `split-limit` as new pages, with `LayerPicks` folded into the existing `picks-mix-exp` and `NeymanInnerOuter` into `compound-frequencies`, since both notes already covered that ground at greater length. Every one renders clean.
+
+**Not in this phase.** The `doc{{{...}}}` clause still parses and the seven doc bodies are still in `library.agg`; phases C, D and E take the tests, the bodies and the grammar in that order, so coverage never dips and the shipped library never stops parsing.
+
 ## 1.0.0a297
 
 **[Library-Tidy-Round-One] three new recipes, and the shipped library loses 28 duplicate programs and gains a reading order.** `library.agg` goes from 196 statements to 168. Nothing here changes library code: the entries, their notes and their filing are the deliverable, and the one source edit is a docstring typo.

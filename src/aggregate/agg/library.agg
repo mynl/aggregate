@@ -95,9 +95,29 @@
 #   role:X    where it stands -- hero (landing page) intro (teaching order)
 #             reference (a lookup table entry) paper (reproduces a published
 #             result).
-#   check:X   which invariant the doc's Check asserts -- reconciliation
-#             scaling-sweep independent-oracle limiting-case round-trip
-#             cross-object.
+#   check:X   which invariant the entry is worth checking against. Six
+#             archetypes, and the slug is the label without the [Check-]:
+#
+#               reconciliation      things add up: net + ceded = gross;
+#                                   walks foot down the sheet; allocations
+#                                   sum to the total.
+#               scaling-sweep       vary one knob, watch the output move as
+#                                   predicted (sweep a share 25/50/75/100%
+#                                   and see ceded premium trace a line).
+#               independent-oracle  est_* (FFT) against theoretic moments, a
+#                                   closed form, or a hand convolution.
+#               limiting-case       sanity bounds: TVaR >= VaR; premium >=
+#                                   expected loss; a distortion has g(0)=0,
+#                                   g(1)=1 and is concave; zero placement
+#                                   gives back gross.
+#               round-trip          format_program(build(x)) round-trips;
+#                                   two equivalent spellings agree.
+#               cross-object        an aggregate priced alone equals its
+#                                   allocation in a one-unit portfolio;
+#                                   bivariate marginals recover the
+#                                   univariates.
+#
+#             tests/test_library_entries.py is where the checks live.
 #   slow      the ONE bare tag, deliberately: it names a pytest marker
 #             (tests/test_library_recipes.py maps it to @pytest.mark.slow),
 #             not a property of the subject.

@@ -299,10 +299,13 @@
   carries the surface it should (`valid`, `validation_explanation`, `summary_df`,
   `stats_df`, `plot`), and that its check passes. This is what turns "the
   interface is fixed" from an assertion into a test.
-- **[Cookbook-Feature-Coverage]** (from `plan-for-v1.md` §1) — `cookbook.agg`
-  covers every feature being frozen, and `decl-testers.agg` still fails exactly
-  where it is meant to fail. The two files are for **testing**; `examples.agg` is
-  for **showing** — keep the split.
+- **[Cookbook-Feature-Coverage]** — **WITHDRAWN a298** (`dev/plan-decommission-docs.md`).
+  It was written against a three file split (`cookbook.agg`, `examples.agg`,
+  `actuarial-severity-curves.agg`) that the `library.agg` merge already
+  retired, and the cookbook it names is gone. The live part of the intent,
+  that every entry in the shipped library actually builds, is
+  `[Agg-Library-Build-Check]` above, which lands as phase C of the same plan.
+  `decl-testers.agg` keeps its own job and is unaffected.
 - **[Showcase-Examples-Tune]** (from `plan-for-v1.md` §1) — **mostly done
   a157–a159.** `tags{...}` exists and every one of `library.agg`'s 186 entries
   carries tags, so the letter prefixes are retired and `discover(tags=...)`
@@ -320,19 +323,13 @@
   `[Recipe-Is-The-Entry]` (one `Recipe` class, `knowledge` → `recipes`
   throughout) in **a164**; `[Cookbook-Generate]` (the recipe-page generator,
   native Quarto cells, `_setup.recipe()` retired) in **a165**.
-  **Remaining: phase 5** — convert the hand-written five-beat stub pages to
-  generated recipes, page by page with author reaction. The mechanism is done;
-  what is left is writing the `doc{{{}}}` for the entries each page teaches and
-  pruning that page's `{{< include >}}`. Start from
-  `build.recipes.query('doc')` (7 entries, 5 pages) against `[Cookbook-Pages]`
-  in `docs/cookbook/plan.md`.
-  **There is no phase 6 backlog.** A `note{}` is the norm and is all `discover`
-  and the object dropdown need; a `doc{{{}}}` is for the cookbook-worthy few,
-  so `build.recipes.query('not doc')` is a **directory**, not a worklist. What
-  *is* worth hunting is `build.recipes.query('doc and n_asserts == 0')` — a
-  recipe that describes without testing. When writing one, use `<<decl>>`
-  rather than retyping the program, and plain ` ```python ` fences — both
-  documented in the `library.agg` header — then re-run the generator.
+  **Phase 5 is WITHDRAWN a298** (`dev/plan-decommission-docs.md`). It was the
+  conversion of the stub pages to generated recipes, and the cookbook it
+  generated into is gone. The seven doc bodies became notes in
+  `aggregate-presentations`; the invariants they asserted become explicit
+  pytest at phase C of the same plan. What survives of `[Recipe-Library]` is
+  the `Recipe` record itself, `note{}` / `tags{}` / `hints{}`, `recipe()` /
+  `recipes`, and `discover(tags=)`, none of which this plan touches.
 - **[Rationalize-Tests]** (#51) — needed vs no-longer-needed; untangle and re-wire
   how the suite *consumes* the single test library (the `conftest`
   parametrization of every `test_suite.agg` line, the SLY snapshot regression)

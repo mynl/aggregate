@@ -294,11 +294,15 @@
      grammar ambiguity. `dev/done/reflow_library.py` refuses any rendering more
      ambiguous than its source, so this cannot regress silently.
 - **[Agg-Library-Build-Check]** (from `plan-for-v1.md` §1 — *"the one change that
-  makes step 1.2 real"*) — `tests/test_agg_libraries.py` today only checks each
-  example **parses**. Extend it to check the example **builds**, that the result
-  carries the surface it should (`valid`, `validation_explanation`, `summary_df`,
-  `stats_df`, `plot`), and that its check passes. This is what turns "the
-  interface is fixed" from an assertion into a test.
+  makes step 1.2 real"*) — **DONE a299**, `tests/test_library_entries.py`
+  (phase C of `dev/plan-decommission-docs.md`). Every one of the 168 entries
+  builds as its own case, `agg` and `port` carrying `valid`,
+  `validation_explanation`, `summary_df` and `stats_df`. Two baselines make a
+  new failure a finding: `CANNOT_BUILD` (six entries that deliberately refuse,
+  pinned by exception type) and `VALIDATION_BASELINE` (26 entries that do not
+  clear validation, pinned by exact flags and grouped by cause), both asserted
+  in **both** directions so an entry that starts passing is a finding too. Six
+  entries over a second are `slow`; the fast set runs in about 20 s.
 - **[Cookbook-Feature-Coverage]** — **WITHDRAWN a298** (`dev/plan-decommission-docs.md`).
   It was written against a three file split (`cookbook.agg`, `examples.agg`,
   `actuarial-severity-curves.agg`) that the `library.agg` merge already

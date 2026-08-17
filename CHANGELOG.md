@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a299
+
+**[Library-Entries-Build-Check] every shipped entry builds, and its stated invariants are ordinary pytest.** Phase C of `dev/plan-decommission-docs.md`, and it closes `[Agg-Library-Build-Check]` in `dev/TODO.md`. New `tests/test_library_entries.py`, 177 cases. Before this the shipped library had one assertion against it, that the file loaded; nothing in it was ever built.
+
+**Every entry builds, as its own case.** All 168 entries, with `agg` and `port` additionally asserting they carry `valid`, `validation_explanation`, `summary_df` and `stats_df`. Six entries that cost more than a second are `slow` marked (`BivariateNormal` alone is twelve seconds); the fast set runs in about 20 seconds.
+
+**Two baselines, each asserted in both directions.** `CANNOT_BUILD` names the six entries that deliberately refuse and the exception each raises: `DefectivePareto` (infinite variance, so no bucket size can be estimated), `ISOMixedExponential` and `MixedExponentialSev` (a mixture severity has no standalone meaning), and `BivariatePnLAxis`, `NumericsPayPair` and `PnLBook` (joint and book-level P&L are deferred). `VALIDATION_BASELINE` names the 26 that build but do not clear validation, pinned by exact flags and grouped by cause: heavy-tail reference curves whose higher moments no practical grid reproduces, the two failure demonstrations, `LayerPicks` where picking is the decision to leave the declared moments, the signed-window aliasing group, and the deliberately coarse or thick entries. Checking both directions matters: a list of known failures nobody checks for staleness stops being a baseline and becomes a comment, so an entry that starts **passing** fails the suite too, as does a name that no longer exists.
+
+**The seven invariants, transcribed.** `ThreeDice` is exact rather than accurate, the PH distortion is a concave probability map, `LayerPicks` reproduces every pick with nothing moving above the tower, `LimitProfile` derives its claim count, `OccurrenceXOL` cedes without changing the count, `NeymanInnerOuter` matches the `neymana` keyword to `1e-13` including the atom at zero, and the 100/300 split limit prices its per accident limit at four thousandths of one percent. Unchanged in substance, one test function each.
+
+**One correction.** The `OccurrenceXOL` frequency check passed vacuously as written: it compared `reins_summary_df['EX']` across views, but that column carries the theoretic **gross** value in all three, so it compared a number to itself. The real content is in `Est EX`, where the gross frequency is `NaN` (a gross count is an input, not an estimate) and ceded and net both come back as the declared count. The transcribed test asserts that form.
+
 ## 1.0.0a298
 
 **[Cookbook-Removal] the Quarto cookbook leaves the repository.** Phase B of `dev/plan-decommission-docs.md`, the plan that retires the `doc{{{...}}}` clause and the cookbook together. The author's ruling: right idea, wrong place. Long-form write-ups belong in the presentations and monograph staging ground, not in a DecL trailer and not in a generated book inside the library.

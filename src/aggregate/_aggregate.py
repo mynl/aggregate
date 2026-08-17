@@ -2007,7 +2007,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                  value_type='loss',
                  approximate='exact',
                  label=None, label_map=None,
-                 note='', hints='', tags=(), doc='', _tweedie=None):
+                 note='', hints='', tags=(), _tweedie=None):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
         It allows for very flexible creation of Aggregate distributions. Severity
@@ -2288,9 +2288,6 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         #: Tag slugs from the DecL ``tags{...}`` trailer, for grouping and
         #: selection (``Underwriter.discover(tags=...)``). Empty tuple if none.
         self.tags = tuple(tags)
-        #: Long-form markdown recipe from the DecL ``doc{{{...}}}`` trailer.
-        #: '' when none. See ``aggregate.recipe`` and dev/plan-meta-data.md.
-        self.doc = doc
         # Exposure premium / loss ratio, retained for the P&L path: a ``pnl``
         # wrapping this engine reads ``exp_premium`` as the *technical* premium
         # (``inherit premium``), and a Portfolio accumulates it across units. 0.0

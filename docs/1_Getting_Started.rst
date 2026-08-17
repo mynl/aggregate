@@ -147,7 +147,7 @@ It is easy to check some of these calculations. The probability of the minimum o
 
     a.pmf(1), 1/15, a.pmf(15), 1/5/3**5, 5*3**5
 
-Creating an object automatically stores its specification as a **recipe**, with name ``Eg1``. Use :attr:`build.recipes` to view them. Each row carries the entry's program and spec plus its documentation — a one-line ``note``, its ``tags``, and whether it has a full cookbook ``doc``; here we show only the first few columns.
+Creating an object automatically stores its specification as a **recipe**, with name ``Eg1``. Use :attr:`build.recipes` to view them. Each row carries the entry's program and spec plus how it describes itself, a one-line ``note`` and its ``tags``; here we show only the first few columns.
 
 .. ipython:: python
     :okwarning:

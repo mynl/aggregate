@@ -259,9 +259,9 @@ def _parse_hints(txt):
 _NOTE_SETTINGS_RE = re.compile(r'\b(?:log2|bs|padding|normalize|bucket_sizing_p)\s*=')
 
 #: The DecL trailer keys, in render order. ``note``/``hints`` are always on a
-#: spec; ``tags``/``doc`` only when written (the captured spec snapshot compares
-#: key sets exactly, so they cannot be unconditional). See dev/plan-meta-data.md.
-TRAILER_KEYS = ('note', 'tags', 'hints', 'doc')
+#: spec; ``tags`` only when written (the captured spec snapshot compares
+#: key sets exactly, so it cannot be unconditional). See dev/plan-meta-data.md.
+TRAILER_KEYS = ('note', 'tags', 'hints')
 
 
 def _trailer_meta(spec):
@@ -438,8 +438,8 @@ class Underwriter(HelpMixin):
     ``'port'``, ``'bvagg'``, ``'pnl'``, ``'xpnl'``, ``'distortion'``, or
     ``'expr'``) and a *name*. Parsing produces a
     :class:`~aggregate.recipe.Recipe` holding the kind, name, dict spec, source
-    program, provenance, its documentation (``note`` / ``tags`` / ``hints`` /
-    ``doc``, derived from the spec), and, once :meth:`_factory` runs, the
+    program, provenance, its metadata (``note`` / ``tags`` / ``hints``,
+    derived from the spec), and, once :meth:`_factory` runs, the
     constructed object. ``'expr'`` is the odd one out: a bare expression is an
     answer rather than a declaration, so it evaluates to its value and is never
     stored in the recipe base.
@@ -1469,7 +1469,7 @@ class Underwriter(HelpMixin):
                     agg_list[i], unit_meta[i] = self._resolve_sev_ref(
                         f"{name}.{unit.get('name', i)}", unit)
             # The whole trailer, not just the note: a172 [FCC-Contract-Gaps].
-            # ``tags`` / ``doc`` / ``hints`` were parsed into the port spec and
+            # ``tags`` / ``hints`` were parsed into the port spec and
             # dropped here, so a portfolio's own trailer was write-only. The
             # hints still *took effect* (``_resolve_hints`` reads the spec), but
             # the object could not report how it had been asked to build.
@@ -1477,7 +1477,6 @@ class Underwriter(HelpMixin):
                             label=spec.get('label'),
                             note=spec.get('note', ''),
                             tags=spec.get('tags', ()),
-                            doc=spec.get('doc', ''),
                             hints=spec.get('hints', ''))
             for i, meta in unit_meta.items():
                 _stamp_sev_ref(obj.agg_list[i], meta)
@@ -1748,33 +1747,23 @@ class Underwriter(HelpMixin):
     #: :attr:`recipes` columns, in display order: identity and audit flags
     #: first, the wide ``program`` / ``spec`` payload last so the frame stays
     #: readable at a terminal.
-    _RECIPE_COLUMNS = ('note', 'tags', 'doc', 'problem', 'solution',
-                       'discussion', 'check', 'n_asserts', 'source',
-                       'program', 'spec')
+    _RECIPE_COLUMNS = ('note', 'tags', 'source', 'program', 'spec')
 
     def _recipes_frame(self):
         """Build the ``(kind, name)``-indexed DataFrame view of the dict store.
 
         Columns are :data:`_RECIPE_COLUMNS`, sorted by index. Built on demand so
-        the store itself stays a plain dict. Only entries that actually carry a
-        ``doc{{{...}}}`` are parsed -- the section flags of an undocumented
-        entry are known to be ``False`` without looking.
+        the store itself stays a plain dict.
         """
         if not self._recipes:
             empty = pd.MultiIndex.from_arrays([[], []], names=['kind', 'name'])
             return pd.DataFrame(columns=list(self._RECIPE_COLUMNS), index=empty)
         rows = []
         for (kind, name), r in self._recipes.items():
-            documented = bool(r.doc)
-            present = set(r.sections) if documented else set()
             rows.append({
                 'kind': kind, 'name': name,
                 'note': bool(r.note),
                 'tags': r.tags,
-                'doc': documented,
-                **{s: (s in present) for s in ('problem', 'solution',
-                                               'discussion', 'check')},
-                'n_asserts': r.n_asserts if documented else 0,
                 'source': self._format_source(r.source),
                 'program': r.program,
                 'spec': r.spec,
@@ -1787,10 +1776,9 @@ class Underwriter(HelpMixin):
         """The recipe base as a ``(kind, name)``-indexed DataFrame (lazy-loaded).
 
         One row per entry. Reads the configured databases on first access (the
-        lazy path), then builds the frame on demand from the dict store. This is
-        both the directory ("what do I know about?") and the *audit* half of the
-        notes-driven describe / test / audit surface -- it answers "which
-        entries carry a recipe, and which of those actually assert anything?"
+        lazy path), then builds the frame on demand from the dict store. It is
+        the directory of the recipe base: what do I know about, where did it
+        come from, and how is it described.
 
         Columns
         -------
@@ -1798,37 +1786,24 @@ class Underwriter(HelpMixin):
             Has a one-line ``note{...}`` abstract.
         tags : tuple of str
             The entry's ``tags{...}`` slugs.
-        doc : bool
-            Has a ``doc{{{...}}}`` body. Most entries do not, by design: a doc
-            is for the cookbook-worthy few, a note is the norm.
-        problem, solution, discussion, check : bool
-            Which canonical sections the doc provides.
-        n_asserts : int
-            ``assert`` statements in the Check block. **Zero with
-            ``check=True`` means the invariant is stated but not tested** --
-            the case worth hunting.
         source : str
             Which ``.agg`` file the entry came from (``'session'`` for an
             in-session build).
         program : str
             The DecL statement as the parser received it: one line, comments
-            stripped, any ``doc{{{...}}}`` body base64-encoded.
+            stripped.
         spec : dict
             The parsed constructor kwargs.
 
         Examples
         --------
-        The flags without the wide payload::
+        The description without the wide payload::
 
-            build.recipes.iloc[:, :9]
+            build.recipes.iloc[:, :3]
 
-        Entries carrying a cookbook recipe::
+        Entries with no note, which is the gap worth filling::
 
-            build.recipes.query('doc')
-
-        Documented but unchecked::
-
-            build.recipes.query('doc and n_asserts == 0')
+            build.recipes.query('not note')
 
         See Also
         --------

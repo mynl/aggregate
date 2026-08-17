@@ -1005,6 +1005,14 @@
   stays a release-time command rather than going into `addopts`. Reproduce by
   running the whole suite under the flag repeatedly; capture the traceback
   (`--tb=long -rf` to a file) the first time it fires.
+  **Second instance, a301:** `tests/test_reins_bivariate.py::test_netceded_refuses_a_pin_it_cannot_honor`
+  failed once under a plain `pytest -m 'slow or not slow'` (no
+  `-W error::RuntimeWarning`), then passed alone and passed on an immediate
+  re-run of the same full gate. Same profile as the original: a bivariate
+  suite, memory-heavy, load-dependent, unreproducible in isolation. Two
+  different tests in two different bivariate modules now points at the shared
+  cause rather than at either test, which strengthens the worker-load
+  hypothesis and widens the symptom past the RuntimeWarning flag.
 - **[Colorizer-Style-Choice]** — `decl_writer._colorize` hard-codes
   `style='friendly'` for html, ansi and latex alike. A `style=` axis on
   `format_program`, and a dark-background default for the terminal path, is a
@@ -1028,13 +1036,16 @@
 
 ## Post-v1.0 ideas
 
-- **[Recipe-Doc-Signing]** — optionally authenticate a `doc{{{...}}}` body with a
-  trailing `<!-- hash: ... -->` computed over the body and salted from a private
-  environment variable, so `Recipe.run()` can refuse an unsigned or tampered
-  recipe. Deliberately *not* done for v1.0: running a recipe from a `.agg` file
-  executes the code in it, and the shipped answer is a documented warning —
-  treat a third-party `.agg` like a third-party Python file. See
-  `dev/done/plan-meta-data.md` *Resolved questions* 2.
+- **[Recipe-Doc-Signing]** — **MOOT a301** (`dev/done/plan-decommission-docs.md`).
+  It proposed authenticating a `doc{{{...}}}` body with a trailing
+  `<!-- hash: ... -->` so `Recipe.run()` could refuse an unsigned or tampered
+  recipe. Nothing in the library executes code out of a `.agg` file any more:
+  the clause, `Recipe.run` and the whole doc half of `Recipe` are gone, so a
+  `.agg` file is data again and there is no payload to sign. Recorded rather
+  than deleted because the underlying question, whether a recipe base from
+  elsewhere can be trusted, is worth remembering if executable content is ever
+  proposed again. The answer then was a documented warning; the answer now is
+  that there is nothing to execute.
 - **[Multi-Resolution-Portfolio-Combine]** (#20) — compute each unit on its own
   `bs`, decimate onto the shared grid before the Fourier product (the real fix
   for the coarse shared-`bs` deficit). Deficit accepted / surfaced for now.

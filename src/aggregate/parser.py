@@ -40,7 +40,6 @@ REPL debugging session::
 
 from __future__ import annotations
 
-import base64
 import logging
 import re
 from pathlib import Path
@@ -62,58 +61,23 @@ __all__ = ['UnderwritingLexer', 'UnderwritingParser', 'grammar',
 GRAMMAR_FILE = Path(__file__).parent / "decl.lark"
 
 # ----------------------------------------------------------------------
-# doc{{{ ... }}} -- the long-form markdown recipe clause
-# ----------------------------------------------------------------------
-# A doc body carries markdown: ``#`` headings, blank lines, fenced ```python
-# blocks, braces inside code. None of that can survive DecL preprocessing --
-# step 1 strips anything after a ``#``, step 4/5 split statements on blank
-# lines, and a bare ``}`` would close a note-style clause at the first
-# occurrence.
-#
-# So the body never reaches the lexer as text. Step 0 of
-# ``UnderwritingLexer.preprocess`` lifts it out and substitutes URL-safe
-# base64, whose alphabet (``A-Za-z0-9-_=``) contains no ``#``, ``//``, ``}``,
-# ``[``, ``]``, ``;`` or whitespace -- so the substituted token is inert
-# through every later step. ``UnderwritingParser.DOC`` decodes it again, and
-# ``decl_writer`` re-emits the decoded body between real fences, so
-# ``format_program`` output re-parses (step 0 simply re-encodes it).
-#
-# The opening fence must end its line and the closing fence must be alone on
-# its line. That anchor is what makes an inline ``}}}`` inside Python -- e.g.
-# ``{'a': {'b': {'c': 1}}}`` -- harmless; only a line that *is* ``}}}`` closes
-# the block. The single forbidden body content is such a line.
-_DOC_FENCE_RE = re.compile(r"doc\{\{\{[ \t]*\r?\n(.*?)\r?\n[ \t]*\}\}\}", re.S)
-
-
-def _encode_doc(body: str) -> str:
-    """Encode a doc body as URL-safe base64 (inert through preprocessing)."""
-    return base64.urlsafe_b64encode(body.encode("utf-8")).decode("ascii")
-
-
-def _decode_doc(payload: str) -> str:
-    """Inverse of :func:`_encode_doc`; tolerates an empty payload."""
-    if not payload:
-        return ""
-    return base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8")
-
-
-# ----------------------------------------------------------------------
 # note{...} / tags{...} / hints{...} -- the single-line trailer clauses
 # ----------------------------------------------------------------------
-# Free text, for the same reason a doc body is: a note is prose written by a
-# human, so it may legitimately contain ``#`` (``5# of limit``), ``//``, or
+# Free text: a note is prose written by a human, so it may legitimately
+# contain ``#`` (``5# of limit``), ``//``, or
 # square brackets (``E[loss] = 85``). Left in place, the preprocessing steps
 # treat all three as DecL punctuation: step 2 truncates the note at the ``#``
 # or ``//``, and step 3's bracket collapse pads ``[`` and ``]`` with spaces, so
 # ``E[loss]=85`` was silently stored as ``E [loss] =85``.
 #
-# The fix is the doc clause's, one size down. Step 0b lifts each body out and
+# The fix: step 0b lifts each body out and
 # substitutes an indexed placeholder whose alphabet (``A-Za-z0-9_``) is inert
 # through every later step; the bodies are put back verbatim at the end, once
-# the text has been split into statements. An **index**, not base64, because
-# the substitution is undone inside ``preprocess`` rather than by the parser:
-# a real note body could imitate a base64 payload, but nothing can imitate a
-# placeholder that is only ever written by the same call that reads it.
+# the text has been split into statements. An **index**, not an encoding,
+# because the substitution is undone inside ``preprocess`` rather than by the
+# parser: a real note body could imitate an encoded payload, but nothing can
+# imitate a placeholder that is only ever written by the same call that reads
+# it.
 #
 # The terminals (``decl.lark``: ``/note\\{[^}]*\\}/`` and friends) admit any
 # character but ``}``, newlines included. The lift deliberately does NOT match
@@ -210,20 +174,17 @@ class UnderwritingLexer:
         stay in the same statement. The corollary is that a comment cannot
         separate two statements — use a blank line or a ``;`` for that.
 
-        The preprocessor performs eight steps:
+        The preprocessor performs seven steps:
 
-        **Step 0**
-            ``doc{{{ ... }}}`` bodies are lifted out and replaced by URL-safe
-            base64, whose alphabet is inert through every later step. Done
-            **first**, so a doc body may contain ``#`` headings, blank lines,
-            fenced code and braces, none of which would survive steps 1 to 6.
-            The closing fence must be alone on its line.
         **Step 0b**
-            ``note{...}`` / ``tags{...}`` / ``hints{...}`` bodies are lifted the
-            same way, behind an indexed placeholder, and restored in step 7.
-            They are free text too, so a ``#``, a ``//`` or a ``[`` in a note is
-            prose, not DecL. Done **after** the doc lift, so a ``note{...}``
-            written inside a doc body is already base64 and is left alone.
+            ``note{...}`` / ``tags{...}`` / ``hints{...}`` bodies are lifted out
+            behind an indexed placeholder, and restored in step 7. They are free
+            text, so a ``#``, a ``//`` or a ``[`` in a note is prose, not DecL.
+            Kept its historical name: a step 0 lifted ``doc{{{ ... }}}`` bodies
+            here until 1.0.0a301, when the clause was retired
+            (``dev/done/plan-decommission-docs.md``). Renumbering the rest to
+            close the gap would have churned every cross reference to steps 1
+            through 7 for nothing.
         **Step 1**
             Full-line comments (optional indent, then ``#`` / ``//``) are removed
             **entirely, including their newline**, so they leave no blank-line
@@ -258,14 +219,6 @@ class UnderwritingLexer:
         list[str]
             Non-empty, whitespace-normalised DecL statements ready for parsing.
         """
-        # 0. Lift every doc{{{...}}} body out and substitute URL-safe base64.
-        # MUST run first: the body is markdown, so it legitimately contains
-        # ``#``, blank lines, ``}`` and ``[``/``]``, every one of which the
-        # steps below would mangle. After substitution the token is pure
-        # ``[A-Za-z0-9_=-]`` and passes through them byte-for-byte.
-        program = _DOC_FENCE_RE.sub(
-            lambda m: f"doc{{{{{{{_encode_doc(m.group(1))}}}}}}}", program)
-
         # 0b. Lift every single-line note/tags/hints body behind an indexed
         # placeholder. Same reasoning as step 0, smaller scope: the body is
         # prose, so a ``#``, ``//`` or ``[`` in it must not be read as DecL
@@ -428,16 +381,6 @@ class UnderwritingTransformer(Transformer):
             if slug:
                 seen.setdefault(slug, None)
         return tuple(seen)
-
-    def DOC(self, tok):
-        """Decode the base64 placeholder left by ``preprocess`` step 0.
-
-        The token that reaches the lexer is ``doc{{{<urlsafe-base64>}}}``; the
-        real markdown body was lifted out before comment stripping so that ``#``
-        headings, blank lines and fenced code could survive. See
-        :meth:`UnderwritingLexer.preprocess`.
-        """
-        return _decode_doc(str(tok)[6:-3])
 
     def ID(self, tok):
         return str(tok)
@@ -780,9 +723,9 @@ class UnderwritingTransformer(Transformer):
                 spec["_engine_port"] = ename
         else:
             for k, v in espec.items():
-                # ``tags``/``doc`` join the existing skip list: the pnl owns its
-                # own metadata, and an engine's recipe is not the pnl's recipe.
-                if k in ("name", "note", "hints", "label", "tags", "doc"):
+                # ``tags`` joins the existing skip list: the pnl owns its
+                # own metadata, and an engine's tags are not the pnl's tags.
+                if k in ("name", "note", "hints", "label", "tags"):
                     continue
                 spec[k] = v
             # The engine's own note and label are inner-Aggregate presentation;
@@ -1136,8 +1079,8 @@ class UnderwritingTransformer(Transformer):
             "note": spec.get("note", ""),
             "hints": spec.get("hints", ""),
         }
-        # tags/doc are conditional keys: lift only when present.
-        for key in ("tags", "doc"):
+        # tags is a conditional key: lift only when present.
+        for key in ("tags",):
             if spec.get(key):
                 out[key] = spec[key]
         return ("bvagg", name, out)
@@ -2164,16 +2107,16 @@ class UnderwritingTransformer(Transformer):
         attach = breaks[:-1]
         return [limits, attach]
 
-    # ----- trailer (optional note / tags / hints / doc) ---------------
+    # ----- trailer (optional note / tags / hints) ---------------------
     # Each item method returns a ``(key, value)`` pair; ``trailer`` folds them
     # into one dict that call sites splat with ``**trailer``.
     #
     # ``note`` and ``hints`` are ALWAYS present (possibly empty) because every
     # spec has carried them since 1.0.0a25 and the captured spec snapshot
-    # compares key sets exactly (tests/test_decl_parser.py). ``tags`` and ``doc``
-    # are added ONLY when written -- adding them unconditionally would put
-    # ``Extra={'tags','doc'}`` into every spec and fail all 163 snapshot cases.
-    # Hosts therefore read them with ``spec.get(...)``.
+    # compares key sets exactly (tests/test_decl_parser.py). ``tags`` is added
+    # ONLY when written -- adding it unconditionally would put
+    # ``Extra={'tags'}`` into every spec and fail all 163 snapshot cases.
+    # Hosts therefore read it with ``spec.get(...)``.
     #
     # ``hints`` is left as a raw ``key=value;`` string here; it is parsed and
     # type-coerced in ``aggregate.underwriter`` (caller-wins merge).
@@ -2186,9 +2129,6 @@ class UnderwritingTransformer(Transformer):
     def trailer_item_hints(self, c):
         return ("hints", c[0])
 
-    def trailer_item_doc(self, c):
-        return ("doc", c[0])
-
     def trailer(self, c):
         out = {"note": "", "hints": ""}
         seen = set()
@@ -2196,7 +2136,7 @@ class UnderwritingTransformer(Transformer):
             if key in seen:
                 raise ValueError(
                     f"repeated {key}{{...}} clause: at most one of each of "
-                    f"note, tags, hints, doc is allowed per statement.")
+                    f"note, tags, hints is allowed per statement.")
             seen.add(key)
             out[key] = value
         return out

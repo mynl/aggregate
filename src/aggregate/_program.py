@@ -106,11 +106,7 @@ class ProgramMixin:
     #:   statement may span as many physical lines as its author likes;
     #: * comments are gone, including full lines between clauses;
     #: * runs of whitespace survive in places as double spaces (the bracket
-    #:   collapse step), so ``dfreq [3]`` can come back as ``dfreq  [3]``;
-    #: * a ``doc{{{...}}}`` body is **URL-safe base64**, not markdown. That is
-    #:   deliberate, not corruption: encoding it first (step 0) is what lets a
-    #:   doc carry ``#`` headings, blank lines and fenced code through the
-    #:   later steps. Read it back decoded via ``.doc``.
+    #:   collapse step), so ``dfreq [3]`` can come back as ``dfreq  [3]``.
     #:
     #: Nobody keeps the keystrokes. For the file as written, read the ``.agg``.
     #:
@@ -149,11 +145,11 @@ class ProgramMixin:
             indented line, the trailer clauses included; ``terse`` is the
             single-line-per-statement form.
         trailer : bool or iterable of str, default False
-            Emit the ``note{...}`` / ``tags{...}`` / ``hints{...}`` /
-            ``doc{{{...}}}`` trailer. The default ``False`` gives the bare
+            Emit the ``note{...}`` / ``tags{...}`` / ``hints{...}`` trailer.
+            The default ``False`` gives the bare
             declaration: formatting a program is almost always about the math
             and the insurance, not the metadata around it. ``True`` emits all
-            four; an iterable names the ones to keep. Applies through the whole
+            three; an iterable names the ones to keep. Applies through the whole
             tree, so a portfolio's units and a bivariate's components follow.
 
         Returns
@@ -168,10 +164,6 @@ class ProgramMixin:
         semantic ``!`` markers (unconditional severity, the zero-modified mean
         pin, defective ``dwait``) are clause syntax rather than trailer and are
         never suppressed.
-
-        A ``doc{{{...}}}`` is emitted as readable markdown here even though
-        :attr:`program` stores it base64-encoded: the writer renders from the
-        spec, which holds the decoded body.
 
         Examples
         --------
@@ -209,7 +201,7 @@ class ProgramMixin:
         ``sev.X`` reference resolved inline. What you see is the parse, which
         is not always what the author thought they wrote.
 
-        For the metadata, read ``.note`` / ``.tags`` / ``.doc`` directly, or
+        For the metadata, read ``.note`` / ``.tags`` directly, or
         pass ``trailer=True`` to :meth:`format_program`, which also exposes the
         layout and markup axes. Neither property is the source file; for that,
         read the ``.agg``. An object built programmatically, and an inline
@@ -586,7 +578,7 @@ def pin_sharpen(ob):
     Sets :attr:`ProgramMixin.program`, ``note`` and ``hints`` together, so the
     three never disagree. ``program`` is stamped the way ``build`` stamps it,
     through :meth:`aggregate.parser.UnderwritingLexer.preprocess`, so it stays
-    one line with any ``doc{{{...}}}`` body base64 encoded.
+    one line.
 
     A no-op for an object built programmatically, which has no text to merge
     into, and for one whose program cannot be re-parsed (a reference resolvable

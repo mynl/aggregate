@@ -129,8 +129,12 @@ def test_grammar_reserved_words_extraction_sane():
 
 
 def test_grammar_brace_clause_extraction_sane():
-    """The grammar has exactly four trailer clauses today."""
-    assert grammar_brace_clauses() == ["doc", "hints", "note", "tags"]
+    """The grammar has exactly three trailer clauses today.
+
+    A fourth, ``doc{{{...}}}``, was retired at 1.0.0a301
+    (``dev/done/plan-decommission-docs.md``).
+    """
+    assert grammar_brace_clauses() == ["hints", "note", "tags"]
 
 
 def test_grammar_operator_extraction_sane():
@@ -292,11 +296,14 @@ def test_a_stray_backslash_is_still_an_error():
 def test_markdown_lexer_is_not_imported_by_aggregate():
     """``import aggregate`` must not pull in ``pygments.lexers.markup``.
 
-    That module costs roughly 110 ms to import and is needed only to color a
-    ``doc{{{...}}}`` body, so ``decl_pygments`` defers it into the fence
-    callback. ``decl_pygments`` is star-imported by ``aggregate/__init__.py``,
-    so a module-level import would put the cost on every user. Run in a
-    subprocess because pytest's own imports pollute ``sys.modules``.
+    That module costs roughly 110 ms to import. It was needed only to color a
+    ``doc{{{...}}}`` body, and both the clause and the deferred import went at
+    1.0.0a301 (``dev/done/plan-decommission-docs.md``); nothing in
+    ``decl_pygments`` reaches for it now. Kept because the cost is what
+    matters, not the mechanism: ``decl_pygments`` is star-imported by
+    ``aggregate/__init__.py``, so any module-level Markdown import added later
+    would put 110 ms on every user. Run in a subprocess because pytest's own
+    imports pollute ``sys.modules``.
     """
     result = subprocess.run(
         [sys.executable, "-c",
@@ -304,17 +311,9 @@ def test_markdown_lexer_is_not_imported_by_aggregate():
         capture_output=True, text=True, check=True,
     )
     assert result.stdout.strip() == "False", (
-        "importing aggregate pulled in pygments.lexers.markup; keep the "
-        "Markdown import inside the doc-fence callback"
+        "importing aggregate pulled in pygments.lexers.markup; it costs "
+        "roughly 110 ms and nothing in decl_pygments needs it"
     )
-
-
-def test_doc_fence_body_is_lexed_as_markdown():
-    """A ``doc{{{...}}}`` body highlights as markdown, not as DecL."""
-    source = 'doc{{{\n# Heading\nUse `build()` here.\n}}}'
-    tokens = _significant(source)
-    assert (Token.Generic.Heading, '# Heading') in tokens
-    assert (Token.Literal.String.Backtick, '`build()`') in tokens
 
 
 def sublime_reserved_words() -> set[str]:

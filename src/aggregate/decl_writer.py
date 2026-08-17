@@ -621,38 +621,24 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
 # ======================================================================
 
 #: The trailer items, in render order.
-TRAILER_ITEMS = ('note', 'tags', 'hints', 'doc')
+TRAILER_ITEMS = ('note', 'tags', 'hints')
 
 
 def _render_trailer(spec: dict, trailer=True) -> list:
     """Render the trailer as **one fragment per clause**, in render order.
 
     Returns a list, not a joined string, so each of ``note`` / ``tags`` /
-    ``hints`` / ``doc`` becomes its own child of the enclosing
+    ``hints`` becomes its own child of the enclosing
     :class:`_Block`. That is what puts them on separate lines, each at its
     statement's indentation level, in the ``spread`` layout; ``terse``
     space-joins them back, so the single-line form is unchanged.
 
-    ``trailer`` is ``True`` (all four), ``False`` (none), or an iterable naming
+    ``trailer`` is ``True`` (all three), ``False`` (none), or an iterable naming
     the items to keep, e.g. ``('hints',)`` renders the declaration with only
-    the clause that changes how it *builds*. That is what
-    :attr:`aggregate.recipe.Recipe.decl` uses to expand a ``<<decl>>``
-    placeholder: inside a recipe the note, tags and doc are the surrounding
-    page, so repeating them in the program would be redundant, and repeating
-    the doc would make it quote itself.
+    the clause that changes how it *builds*.
 
     Suppressing anything means the result no longer re-parses to the same spec.
     That is the caller's choice, made explicitly at the call site.
-
-    Notes
-    -----
-    ``doc{{{...}}}`` is emitted last and spans lines: its opening fence ends a
-    line and its closing fence sits alone on one, which is exactly the shape
-    step 0 of :meth:`aggregate.parser.UnderwritingLexer.preprocess` looks for.
-    That is what makes the round trip work: the writer emits a raw markdown
-    body, and re-parsing re-encodes it. Only the fragment's *first* line is
-    indented by the layout walker, so the markdown body keeps its own column
-    positions and its fenced code blocks survive.
     """
     if trailer is True:
         wanted = TRAILER_ITEMS
@@ -672,9 +658,6 @@ def _render_trailer(spec: dict, trailer=True) -> list:
         parts.append(f'tags{{{", ".join(spec["tags"])}}}')
     if 'hints' in wanted and spec.get('hints'):
         parts.append(f'hints{{{spec["hints"]}}}')
-    if 'doc' in wanted and spec.get('doc'):
-        # Newline-delimited: the closing fence MUST be alone on its line.
-        parts.append(f'doc{{{{{{\n{spec["doc"]}\n}}}}}}')
     return parts
 
 
@@ -876,8 +859,8 @@ def _render_agg(name: str, spec: dict, trailer: bool = True) -> _Block:
     exactly what must *not* be rendered.
 
     ``trailer=False`` drops the ``note{...}`` / ``tags{...}`` / ``hints{...}``
-    / ``doc{{{...}}}`` tail; each surviving clause is its own child, so spread
-    puts it on its own line.
+    tail; each surviving clause is its own child, so spread puts it on its own
+    line.
     """
     tweedie = _render_tweedie(spec)
     if tweedie:
@@ -1186,7 +1169,7 @@ def _spec_to_node(spec: dict, kind: str = 'agg', name: str | None = None,
     clause nesting worth spreading, so their whole declaration is the head and
     only the trailer clauses are children.
 
-    ``trailer=False`` drops the whole ``note`` / ``tags`` / ``hints`` / ``doc``
+    ``trailer=False`` drops the whole ``note`` / ``tags`` / ``hints``
     trailer throughout the tree, including on a portfolio's units and a
     bivariate's components.
 
@@ -1317,7 +1300,7 @@ def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
     spec_or_text : dict, tuple or str
         A raw spec ``dict`` (rendered as ``kind='agg'`` unless it is a tuple), a
         ``(kind, name, spec)`` tuple, or a DecL program string (which is parsed
-        first --- so doc snippets that pass ``obj.program`` keep working). An
+        first --- so snippets that pass ``obj.program`` keep working). An
         empty / whitespace-only string returns ``''``.
     fmt : {'text', 'html', 'ansi', 'latex'}, default 'text'
         Output *markup*. ``text`` is plain; the others colorize via Pygments.
@@ -1332,12 +1315,12 @@ def format_program(spec_or_text, *, fmt: str = 'text', layout: str = 'spread',
         preprocessor collapses intra-statement newlines and indentation to a
         single space.
     trailer : bool or iterable of str, default False
-        Emit the ``note{...}`` / ``tags{...}`` / ``hints{...}`` /
-        ``doc{{{...}}}`` trailer. ``False`` (the default) gives the bare
+        Emit the ``note{...}`` / ``tags{...}`` / ``hints{...}`` trailer.
+        ``False`` (the default) gives the bare
         declaration, which is what you almost always want when formatting: the
         math and the insurance, not the metadata around it. ``True`` emits all
-        four; an iterable names the ones to keep, e.g. ``('hints',)`` for the
-        clauses that actually change how the object builds.
+        three; an iterable names the ones to keep, e.g. ``('hints',)`` for the
+        clause that actually changes how the object builds.
 
         In ``spread`` each surviving clause takes its own line at the
         statement's indentation level; in ``terse`` they space-join onto the

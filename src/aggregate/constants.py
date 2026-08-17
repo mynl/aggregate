@@ -145,10 +145,15 @@ FIRST_CLASS_CLASSES = ('Aggregate', 'Portfolio', 'BivariateAggregate',
 NEAR_FIRST_CLASS = ('Severity',)
 
 #: Every member a first-class class must carry. Grouped: the discovery front
-#: door and the fixed-layout text card; the four DecL trailer values; the
+#: door and the fixed-layout text card; the three DecL trailer values; the
 #: declaration round-trip; the DataFrame quartet; the plot.
+#:
+#: A fourth trailer value, ``doc``, was required here until 1.0.0a301, when
+#: the ``doc{{{...}}}`` clause that filled it was retired
+#: (``dev/done/plan-decommission-docs.md``). Nothing can set it any more, so
+#: requiring it would have meant four permanently empty public attributes.
 FCC_REQUIRED = ('info', 'help',
-                'note', 'hints', 'tags', 'doc',
+                'note', 'hints', 'tags',
                 'program', 'pprogram',
                 'summary_df', 'validation_df', 'stats_df', 'density_df',
                 'plot')

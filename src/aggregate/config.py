@@ -97,7 +97,8 @@ class BuildSettings:
     databases : tuple of str
         Database name(s) loaded on construction. ``"library"`` is the shipped
         default -- the one DecL library, which replaced the overlapping
-        ``examples`` / ``cookbook`` / ``actuarial-severity-curves`` trio at
+        ``examples`` / ``cookbook`` / ``actuarial-severity-curves`` trio of
+        ``.agg`` files at
         1.0.0a159. ``"_test_suite"`` keeps the historical ``build`` recipe
         base; ``"default"`` would load every bundled file, ``"all"`` bundled
         plus user.

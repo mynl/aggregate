@@ -837,8 +837,9 @@ a file from its own specs grew another space every pass. All four are now free:
 
 A single-line body is lifted behind a placeholder before the comment and bracket
 steps and restored verbatim afterward. What a note still cannot hold is a ``}``
-(the terminal ends at the first one) and a line break. That is what
-``doc{{{ }}}`` is for.
+(the terminal ends at the first one) and a line break. At the time the escape
+hatch for both was ``doc{{{ }}}``; since a301 there is none, and a note is one
+line of prose about the entry.
 
 The colorizer is derived from the grammar (a175)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1847,8 +1848,8 @@ lookup downstream failed:
 ``agg/decl-testers.agg``. Both counts are now zero, and neither file ever had
 anything wrong with it: the function split raw text on **newlines** and parsed
 each physical line, a model that predates multi-line statements and the
-``doc{{{ }}}`` trailer. A doc body is markdown, so every line of it became a
-bogus statement and every one failed. The production path has always split on
+``doc{{{ }}}`` trailer the library then carried. A doc body is markdown, so
+every line of it became a bogus statement and every one failed. The production path has always split on
 statements, which is why the same files load without complaint.
 
 .. ipython:: python
@@ -2466,6 +2467,18 @@ Python code because it is extracted and base64-encoded *before* the comment
 stripper runs. ``distortion`` gained a trailer at the same time, so distortions
 are first-class in describe, test and audit like everything else.
 
+.. note::
+
+   **``doc{{{ }}}`` was withdrawn at a301, before 1.0.** The trailer is back to
+   three clauses, ``note{}`` / ``tags{}`` / ``hints{}``, each of which states a
+   fact about the entry. A long-form write-up is a document rather than a fact
+   about an entry, and the DecL stability promise would have frozen the clause
+   for the life of the major version, so it was a pre-1.0 decision or a 2.0
+   one. The write-ups became standalone notes; the invariants they asserted
+   became ordinary asserts in ``tests/test_library_entries.py``, which also
+   checks that every shipped entry builds. ``tags{}`` and the distortion
+   trailer are unaffected. This section stands as history.
+
 One library (a159, a161)
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2479,13 +2492,14 @@ base grew from 36 entries to 186.
 
 .. ipython:: python
 
-    print(f'{len(build.recipes)} entries; {build.recipes.doc.sum()} carry a full recipe')
-    print(build.recipes.query('doc').index.tolist())
+    print(f'{len(build.recipes)} entries; {build.recipes.note.sum()} carry a note')
+    print(build.recipes.query('not note').index.tolist())
 
-``build.recipes`` is the audit frame: what is documented, what is demonstrated,
-what is checked. ``build.recipe(name)`` returns the entry itself. At a164 the two
-objects that described one entry collapsed into one ``Recipe`` class, and
-``knowledge`` was retired in favor of ``recipes``.
+``build.recipes`` is the directory frame: what is here, where it came from, and
+how it describes itself. ``build.recipe(name)`` returns the entry itself. At
+a164 the two objects that described one entry collapsed into one ``Recipe``
+class, and ``knowledge`` was retired in favor of ``recipes``. The frame carried
+per-section documentation flags until a301; see the note below.
 
 .. ipython:: python
 
@@ -2507,10 +2521,17 @@ Cookbook pages are **generated** from ``library.agg`` into native Quarto cells b
 it are the same source and cannot drift. ``<<decl>>`` (a163) substitutes the
 entry's own program, so a recipe never retypes the code it documents.
 
-.. warning::
+.. note::
 
-    Running a recipe executes the code in the ``.agg`` file. Treat a third-party
-    ``.agg`` like a third-party Python file.
+   **Withdrawn at a301, with the ``doc{{{ }}}`` clause it rendered.** The
+   cookbook tree, ``aggregate.cookbook``, ``<<decl>>`` and
+   ``tests/test_library_recipes.py`` are all gone. Executing prose was the
+   wrong mechanism: the Python inside a doc body was invisible to ruff, to
+   editors and to tracebacks, which reported ``<recipe LimitProfile:check>``
+   and no line in any real file. What replaced it is ordinary pytest, and the
+   one thing worth keeping from ``<<decl>>`` is available directly as
+   ``print(build.recipe('LayerPicks').decl)``, which reads the live entry and
+   so cannot go stale. This section stands as history.
 
 Under the hood
 --------------

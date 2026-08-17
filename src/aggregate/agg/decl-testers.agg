@@ -21,9 +21,9 @@
 #
 # DecL syntax reminders honoured here:
 #   * ``port`` definitions are single-line (sub-agg clauses inlined).
-#   * the trailer clauses ``note{...}`` / ``tags{...}`` / ``hints{...}`` /
-#     ``doc{{{...}}}`` are legal on every statement, ``dist`` /
-#     ``distortion`` included (since 1.0.0a157).
+#   * the trailer clauses ``note{...}`` / ``tags{...}`` / ``hints{...}`` are
+#     legal on every statement, ``dist`` / ``distortion`` included (since
+#     1.0.0a157).
 
 # Contents
 #
@@ -358,8 +358,8 @@ agg HINT.Dup     1 claim sev gamma 50 cv 0.1 fixed hints{bs=1; bs=2}
 
 # `format_program` / `obj.format_program` render these WITHOUT the trailer:
 # that is the default since 1.0.0a166 (formatting a program is about the math
-# and the insurance, not the metadata around it). One flag governs all four
-# clauses -- note{}, tags{}, hints{}, doc{{{}}} -- since they are one grammar
+# and the insurance, not the metadata around it). One flag governs all three
+# clauses -- note{}, tags{}, hints{} -- since they are one grammar
 # construct; `trailer=True` brings them all back and an iterable such as
 # `trailer=('hints',)` keeps only what it names. The suppressed form is NOT
 # round-trip safe: it re-parses to the same spec with the trailer blanked.
@@ -849,56 +849,21 @@ clash AE.Trailer.Clash 8 5 2 claims sev lognorm 50 cv 1.2 sev lognorm 60 cv 1.5 
 port AE.Trailer.Port note{on the portfolio} agg AE.Trailer.PortUnit 5 claims sev lognorm 10 cv 1 poisson note{on the last unit}
 
 # ============================================================
-# AF. tags{...} and doc{{{...}}} ([Recipe-Library])
-#     (tests/test_doc_clause.py)
+# AF. tags{...} ([Recipe-Library])
+#     (tests/test_trailer_clauses.py)
 # ============================================================
 # tags{} is a comma- and/or space-separated slug list, decomposed to a tuple.
-# doc{{{...}}} is a long-form markdown recipe. Its body is lifted out by step 0
-# of the lexer preprocessor and carried as URL-safe base64, so it may contain
-# everything a note{} cannot: blank lines (which would split the statement),
-# fenced code, and braces. The ONLY forbidden content is a line consisting
-# solely of `}}}` -- the closing fence must be alone on its line, which is what
-# makes an inline `}}}` inside Python (e.g. a nested dict) harmless. Since
-# 1.0.0a177 a note{} body is lifted too (step 0b), so the gap between the two
-# is narrower: see section AG.
+# A fourth trailer clause, doc{{{...}}}, carried a long-form markdown recipe
+# beside it until 1.0.0a301, when it was retired
+# (dev/done/plan-decommission-docs.md): a trailer states facts about an entry,
+# and a book is not a fact about an entry. Since 1.0.0a177 a note{} body is
+# lifted behind a placeholder (step 0b), so free text in a note is no longer
+# the constraint it once was: see section AG.
 agg AF.Tags.Spaces 5 claims sev lognorm 10 cv 1 poisson                                       tags{severity frequency aggregate}                note{space-separated tag list};
 agg AF.Tags.Commas 5 claims sev lognorm 10 cv 1 poisson                                       tags{severity, frequency, aggregate}              note{comma-separated tag list};
 agg AF.Tags.Mixed  5 claims sev lognorm 10 cv 1 poisson                                       tags{severity,frequency  aggregate, check:round-trip}  note{mixed separators and a namespaced tag};
 dist AF.Tags.Dist ph 0.7                                                                      tags{distortion, hero}                            note{distortions carry a trailer since 1.0.0a157};
 
-agg AF.Doc.Full 10 claims sev lognorm 50 cv 1 poisson
-    note{one-line abstract; the doc carries the recipe}
-    tags{aggregate, intro, check:independent-oracle}
-    doc{{{
-## Problem
-
-You want the full markdown surface inside a DecL statement: headings, blank
-lines, fenced code, braces, and punctuation that DecL otherwise reserves.
-
-## Solution
-
-Self-contained: this entry lives in `decl-testers.agg`, which is not the default
-knowledge base, so the Solution declares its own program rather than looking
-itself up by name.
-
-```python
-a = build('agg DocFullDemo 10 claims sev lognorm 50 cv 1 poisson')
-nested = {'a': {'b': {'c': 1}}}   # inline }}} survives; the fence must be alone
-qd(a.summary_df)
-```
-
-## Discussion
-
-The body never reaches the lexer as text -- see `UnderwritingLexer.preprocess`
-step 0. A `#` here would be eaten by the comment stripper without it.
-
-## Check
-
-```python
-assert abs(a.actual_m - 500) < 1e-9      # E[N] x E[X] = 10 x 50
-assert abs(a.est_m - a.actual_m) < 1e-5  # FFT estimate vs theoretic
-```
-}}}
 
 # ============================================================
 # AG. note/tags/hints bodies are free text (1.0.0a177)
@@ -912,8 +877,9 @@ assert abs(a.est_m - a.actual_m) < 1e-5  # FFT estimate vs theoretic
 # statement into a parse error several clauses upstream, and brackets were
 # silently padded: `E[loss]=85` was stored as `E [loss] =85`, and the padding
 # grew by one space every time the file was regenerated from its own specs.
-# Still forbidden in a note, and still what doc{{{...}}} is for: a `}` (the
-# terminal ends at the first one) and a line break.
+# Two things stay forbidden in a note, and there is no longer a longer form to
+# escape to: a `}` (the terminal ends at the first one) and a line break. A
+# note is one line of prose about the entry.
 agg AG.Note.Brackets  5 claims sev lognorm 10 cv 1 poisson                                     note{E[loss]=85, margin 15};
 agg AG.Note.Hash      5 claims sev lognorm 10 cv 1 poisson                                     note{layer is 5# of limit};
 agg AG.Note.Slashes   5 claims sev lognorm 10 cv 1 poisson                                     note{net // ceded, a ratio not a comment};

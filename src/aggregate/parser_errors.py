@@ -165,7 +165,6 @@ _TERMINAL_LABELS: dict[str, str] = {
     "NOTE": "a note clause (note{...})",
     "HINTS": "a hints clause (hints{...})",
     "TAGS": "a tags clause (tags{...})",
-    "DOC": "a doc clause (doc{{{...}}}, closing fence on its own line)",
 }
 
 

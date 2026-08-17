@@ -10,11 +10,10 @@ objects.
 
 A **recipe** is one entry, whole: its kind and name, its parsed spec, the DecL
 source it came from, where it was read from, and, once it has been built, the
-object. It also carries the entry's own documentation, taken from its DecL
-trailer: a one-line ``note{...}``, ``tags{...}`` for grouping, and, for the
-cookbook-worthy few, a ``doc{{{...}}}`` holding a Problem / Solution /
-Discussion / Check write-up that :meth:`~aggregate.recipe.Recipe.run` can
-execute. :meth:`~aggregate.underwriter.Underwriter.recipe` returns one by name;
+object. It also carries how the entry describes itself, taken from its DecL
+trailer: a one-line ``note{...}``, ``tags{...}`` for grouping, and
+``hints{...}`` for build settings.
+:meth:`~aggregate.underwriter.Underwriter.recipe` returns one by name;
 :attr:`~aggregate.underwriter.Underwriter.recipes` is the frame over all of
 them; :meth:`~aggregate.underwriter.Underwriter.discover` filters by name, kind
 or tag.

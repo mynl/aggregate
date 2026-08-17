@@ -220,7 +220,7 @@ The following tables show all \texttt{\m methods}, and fields or properties (use
 
 [2]: Also exported as \texttt{from aggregate import build}. The module-level \texttt{build} pre-loads \texttt{build.databases} (\texttt{test\_suite}) whereas a bare \texttt{Underwriter()} starts empty. \texttt{build} returns one object, \texttt{build\_many} a list.
 
-[3]: A \texttt{Recipe} is one declaration record: \texttt{kind}, \texttt{name}, \texttt{spec}, \texttt{program}, \texttt{source}, the trailer (\texttt{note}, \texttt{tags}, \texttt{hints}, \texttt{doc}), the canonical \texttt{decl} re-rendering, and the cookbook sections (\texttt{problem}, \texttt{solution}, \texttt{discussion}, \texttt{check}). Lookup is pure: \texttt{Recipe.object} is \texttt{None} until \texttt{build} runs.
+[3]: A \texttt{Recipe} is one declaration record: \texttt{kind}, \texttt{name}, \texttt{spec}, \texttt{program}, \texttt{source}, the trailer (\texttt{note}, \texttt{tags}, \texttt{hints}), and the canonical \texttt{decl} re-rendering. Lookup is pure: \texttt{Recipe.object} is \texttt{None} until \texttt{build} runs.
 
 [4]: \texttt{aggregate/agg/test\_suite.agg} (categories A--O) is exercised by \texttt{uv run pytest}, not by an \texttt{Underwriter} method.
 

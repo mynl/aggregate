@@ -20,6 +20,26 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a301
+
+**[Doc-Clause-Out-Of-The-Grammar] BREAKING: the DecL `doc{{{...}}}` trailer clause is removed.** Phases E and F of `dev/done/plan-decommission-docs.md`, and the reason the whole plan had a deadline. `decl.lark` is in the stable tier: from 1.0 a documented name keeps its meaning, and a breaking change waits for a major release with a deprecation period ahead of it. Keeping `doc` would have promised, for the life of the major version, a declaration language with a clause whose job is to hold a book. This was a pre-1.0 decision or a 2.0 decision, and the author took it now.
+
+**A program carrying `doc{{{...}}}` no longer parses.** The trailer is three order-free clauses, `note{...}` / `tags{...}` / `hints{...}`, each stating a fact about the entry. The error names the three that remain. Nothing in the shipped library or in `decl-testers.agg` used the clause after a300, so no bundled program changed meaning.
+
+**Removed, end to end.** `decl.lark` loses the `DOC` terminal and `trailer_item_doc`. `parser.py` loses `_DOC_FENCE_RE`, `_encode_doc`, `_decode_doc`, preprocess step 0, the `DOC` token callback and the `base64` import that existed only for them; step 0b keeps its name, since renumbering seven cross-referenced steps to close a gap buys nothing. `decl_writer.py` loses `doc` from `TRAILER_ITEMS` and its emit branch. `decl_pygments.py` loses `_doc_fence`, both `doc{{{` patterns and the deferred Markdown import. `parser_errors.py` loses the `"DOC"` label. `underwriter.py` loses `doc` from `TRAILER_KEYS` and the seven doc-derived columns from `recipes`, which is now `note`, `tags`, `source`, `program`, `spec`. `recipe.py` goes from 466 lines to 150: the record, its three trailer properties and `decl` survive; `parse_doc`, `SECTIONS`, `DECL_PLACEHOLDER`, the four section properties, `solution_code`, `check_code`, `markdown`, `namespace`, `n_asserts`, `is_runnable` and `run` are gone.
+
+**BREAKING, stable tier: `Aggregate`, `Portfolio`, `Severity` and `BivariateAggregate` lose the `doc` constructor keyword and the `doc` attribute.** This was missing from the plan as drafted and was added by author ruling on review. Nothing can set the attribute once the clause is gone, so keeping it would have shipped four permanently empty public attributes on frozen classes. `doc` also leaves `FCC_REQUIRED` in `constants.py`, so the first-class-class contract is `info`, `help`, `note`, `hints`, `tags`, `program`, `pprogram`, the DataFrame quartet and `plot`.
+
+**`Recipe.decl` is untouched**, which is the only part of this surface a downstream consumer reads.
+
+**Tests.** `tests/test_doc_clause.py` deleted, 331 lines. `tests/test_recipe.py` rewritten around the record: identity, copy semantics, the derived trailer, `decl` (canonical, hints-only, `''` when the entry cannot be unparsed, cache dropped by `dataclasses.replace`), and the frame. `tests/test_grammar_sync.py` asserts three brace clauses and drops the doc-fence markdown lexing case; its Markdown-import guard stays, because the 110 ms cost is what matters and a future module-level import would still land on every user.
+
+**Regenerated.** `docs/4_agg_language_reference/ref_include.rst`. The captured spec snapshot did **not** move: it is taken from `test_suite.agg`, which never carried a doc, so `tests/data/expected_specs.json` is byte-identical.
+
+**Prose (phase F, riding this commit).** `docs/2_aggregate_overview/underwriter.rst` loses the trailer table's fourth row and the whole doc write-up including the two `ipython` blocks that called `r.sections` / `r.problem` / `r.solution_code` / `r.check_code` / `r.run()`, replaced by the `Recipe` record and `decl`. Also `docs/1_Getting_Started.rst`, `docs/3_reference/3_x_Underwriter.rst`, `cheat-sheets/Underwriter_Cheat_Sheet.tex`, `src/aggregate/config.py`, and `docs/2_aggregate_overview/features.rst`, where the a157 and a165 sections stand as history under a note recording the withdrawal, and the one executable block that read the retired columns is repaired.
+
+**`[Recipe-Doc-Signing]` is moot** and marked so rather than deleted: it proposed signing a doc body so `Recipe.run` could refuse a tampered one, and there is now nothing to execute in a `.agg` file.
+
 ## 1.0.0a300
 
 **[Doc-Bodies-Out-Of-The-Library] the seven long-form write-ups leave `library.agg`.** Phase D of `dev/plan-decommission-docs.md`. The file loses 311 lines and keeps every entry: `ThreeDice`, `PHDistortion`, `LayerPicks`, `LimitProfile`, `OccurrenceXOL`, `NeymanInnerOuter` and `SplitLimitPolicy` are unchanged as declarations and keep their `note{}`, `tags{}` and `hints{}`. Only the `doc{{{...}}}` bodies go. The material is not lost: it became notes in `aggregate-presentations` at phase A, and the invariants it asserted became `tests/test_library_entries.py` at a299, which is why this phase comes third rather than first.

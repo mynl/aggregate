@@ -26,16 +26,13 @@ characters in the grammar's ``ID`` terminal, so ``\\b`` is the wrong boundary:
 it splits ``loss-ratio`` into ``loss``, ``-``, ``ratio``. Every keyword rule
 here uses :data:`_KW`, the grammar's own negative lookahead, instead.
 
-Second, comments and the ``doc`` fence never reach the Lark lexer in source
-form. ``UnderwritingLexer.preprocess`` strips ``#`` and ``//`` comments and
-base64-encodes ``doc{{{...}}}`` bodies before parsing. This lexer runs on the
-text a reader sees, so it handles both comment markers and both doc forms: the
-multi-line fence carrying readable markdown (what a ``.agg`` file holds, and
-what ``format_program(trailer=True)`` emits) and the encoded single-line form
-(what ``.program`` stores).
+Second, comments never reach the Lark lexer in source form:
+``UnderwritingLexer.preprocess`` strips ``#`` and ``//`` before parsing. This
+lexer runs on the text a reader sees, so it handles both comment markers
+itself.
 """
 
-from pygments.lexer import RegexLexer, bygroups, default, include, words
+from pygments.lexer import RegexLexer, default, include, words
 from pygments.token import (Comment, Generic, Keyword, Name, Number, Operator,
                             Punctuation, String, Text)
 
@@ -50,38 +47,6 @@ _KW = r'(?![a-zA-Z0-9._:~\-])'
 
 #: An identifier, mirroring the tail of the grammar's ``ID`` terminal.
 _ID = r'[a-zA-Z][\._:~a-zA-Z0-9\-]*'
-
-
-def _doc_fence(lexer, match):
-    """Tokenize a ``doc{{{ ... }}}`` fence, highlighting the body as markdown.
-
-    A doc body is long-form prose: headings, blank lines, inline code and
-    fenced code blocks. Delegating it to Pygments' Markdown lexer reads far
-    better than one flat comment, and it costs nothing at import time because
-    ``pygments.lexers.markup`` is imported here rather than at module scope. It
-    takes roughly 110 ms to load, and ``import aggregate`` pulls this module in
-    eagerly, so the import stays inside the callback and fires only when a
-    program actually carries a doc body.
-
-    Parameters
-    ----------
-    lexer : RegexLexer
-        The lexer instance, unused. Part of the Pygments callback signature.
-    match : re.Match
-        Groups are the opening fence, the body, and the closing fence.
-
-    Yields
-    ------
-    tuple of (int, TokenType, str)
-        Absolute index, token type, value. The nested lexer numbers its tokens
-        from zero, so each index is offset by the body's start.
-    """
-    from pygments.lexers.markup import MarkdownLexer
-
-    yield match.start(1), Comment.Preproc, match.group(1)
-    for index, token, value in MarkdownLexer().get_tokens_unprocessed(match.group(2)):
-        yield match.start(2) + index, token, value
-    yield match.start(3), Comment.Preproc, match.group(3)
 
 
 class AggLexer(RegexLexer):
@@ -104,16 +69,6 @@ class AggLexer(RegexLexer):
 
         'root': [
             (r'\n', Text),
-
-            # `doc{{{...}}}`, both forms. The fenced form spans lines, so the
-            # body class is [\s\S] rather than `.`: RegexLexer runs under
-            # re.MULTILINE only, where `.` stops at a newline. Non-greedy so
-            # the first closing fence wins, matching parser._DOC_FENCE_RE.
-            # These come first: the body may open with a `#` heading, which the
-            # comment rule below would otherwise eat.
-            (r'(doc\{\{\{[ \t]*\n)([\s\S]*?)(\n[ \t]*\}\}\})', _doc_fence),
-            (r'(doc\{\{\{)([A-Za-z0-9_=-]*)(\}\}\})',
-             bygroups(Comment.Preproc, Comment, Comment.Preproc)),
 
             # Both comment markers. `//` before the operators, which own `/`.
             (r'//.*$', Comment.Single),

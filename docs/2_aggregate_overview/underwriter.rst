@@ -139,28 +139,23 @@ Everything ``build`` knows lives in one flat store keyed ``(kind, name)``, fed b
 .. ipython:: python
     :okwarning:
 
-    qd(build.recipes.iloc[:5, :9], justify='left', max_colwidth=60)
+    qd(build.recipes.iloc[:5, :3], justify='left', max_colwidth=60)
 
-The columns divide into identity, documentation flags, and the payload:
+The columns divide into identity, description, and the payload:
 
-``note``, ``tags``, ``doc``
-    What documentation the entry carries. ``note`` and ``doc`` are booleans; ``tags`` is the tuple of slugs.
-``problem``, ``solution``, ``discussion``, ``check``
-    Which sections its ``doc`` provides, if any.
-``n_asserts``
-    How many ``assert`` statements its Check block runs. Zero with ``check=True`` means an invariant is stated but not tested, which is the case worth hunting.
+``note``, ``tags``
+    How the entry describes itself. ``note`` is a boolean; ``tags`` is the tuple of slugs.
 ``source``
     Which ``.agg`` file it came from, or ``'session'``.
 ``program``, ``spec``
-    The DecL statement and the parsed constructor kwargs. Wide, so they sit last; ``.iloc[:, :9]`` is the readable slice.
+    The DecL statement and the parsed constructor kwargs. Wide, so they sit last; ``.iloc[:, :3]`` is the readable slice.
 
-Two audit questions it exists to answer:
+The question it exists to answer:
 
 .. ipython:: python
     :okwarning:
 
-    len(build.recipes.query('doc'))                    # has a full write-up
-    len(build.recipes.query('doc and n_asserts == 0'))  # described, not tested
+    len(build.recipes.query('not note'))   # entries with nothing said about them
 
 .. _uw discover:
 
@@ -199,59 +194,39 @@ Pass ``describe=True`` or ``plot=True`` to build every match and show it, and ``
 Recipes: describe, test, audit
 ------------------------------
 
-A DecL statement can carry four **trailer** clauses. They are order-free and at most one of each.
+A DecL statement can carry three **trailer** clauses. They are order-free and at most one of each.
 
 .. code-block:: text
 
     note{...}       one line. What this is.
     tags{...}       comma or space separated slugs. Grouping and selection.
     hints{...}      key=value; build settings, e.g. hints{log2=18; bs=1/64}
-    doc{{{ ... }}}  the long-form write-up. Closing fence alone on its line.
 
-Most entries carry a ``note`` and nothing more. That is the norm and it is all :meth:`discover` and an object picker need. A ``doc`` is for the cookbook-worthy few, so ``build.recipes.query('not doc')`` is a directory of the library, not a backlog.
+Each states a fact about the entry, and a ``note`` is the norm: it is all :meth:`discover` and an object picker need. There is no second tier to fill in, so ``build.recipes`` is a directory of the library rather than a backlog.
 
-A ``doc`` is markdown on the *Python Cookbook* (Beazley and Jones) rhythm, plus a check:
-
-``## Problem``
-    What you are trying to do, and why you would.
-``## Solution``
-    The code that does it, self-contained so a reader can copy it out.
-``## Discussion``
-    Why it works and what to watch for.
-``## Check``
-    Pure ``assert`` statements. The invariant, made visible.
-
-:meth:`build.recipe` returns that parsed into a :class:`~aggregate.recipe.Recipe`:
+:meth:`build.recipe` returns the entry as a :class:`~aggregate.recipe.Recipe`, the record the recipe base stores:
 
 .. ipython:: python
     :okwarning:
 
     r = build.recipe('LimitProfile')
     r
-    r.sections, r.n_asserts
-    print(r.problem)
-    print(r.solution_code)
+    r.note, r.tags, r.hints
+    print(r.decl)
 
-Two features make a recipe more than a docstring. The first is that the Solution never retypes the program. It writes ``<<decl>>``, and the entry's own declaration is substituted in, rendered canonically from the spec and carrying only ``hints``, which change how the object builds. Two copies of one program in a single statement would drift the first time either was edited.
+:attr:`~aggregate.recipe.Recipe.decl` is the useful one. It is the declaration re-rendered canonically from the spec, carrying ``hints`` and nothing else, since hints change how the object builds and the rest of the trailer is about the entry rather than part of it. Printing it is how a document elsewhere quotes a library program without retyping it, and because it reads the live entry it cannot go stale.
 
-The second is that the Check runs in the Solution's namespace, so it can assert against whatever the Solution built. That is what makes a recipe self-testing rather than merely self-describing:
+.. note::
 
-.. ipython:: python
-    :okwarning:
-
-    print(r.check_code)
-    ns = r.run()               # Solution, then Check, one namespace
-    ns['a'].actual_m
-
-``run()`` executes the code in the doc. For the shipped library that is the same trust level as the rest of the package, but treat a ``.agg`` file from elsewhere exactly as you would a Python file from elsewhere: read it first.
-
-One source, three consumers, which is the point of the design:
-
-* ``tests/test_library_recipes.py`` runs every documented entry, so the library's own stated invariants are part of the test suite.
-* the Quarto cookbook is generated from the same text into native cells.
-* :attr:`build.recipes` audits it.
-
-Because the page and the test read one source, they cannot drift apart.
+   A fourth clause, ``doc{{{ ... }}}``, carried a long-form Problem / Solution /
+   Discussion / Check write-up here until 1.0.0a301, executed by a pytest
+   harness and rendered into a Quarto cookbook. It was retired before 1.0: a
+   trailer states facts about an entry and a book is not one of them, and the
+   DecL stability promise would have frozen the arrangement for the life of the
+   major version. The write-ups became standalone notes, and the invariants
+   they asserted became ordinary asserts in
+   ``tests/test_library_entries.py``, which also checks that every shipped
+   entry builds.
 
 .. _uw program:
 
@@ -402,7 +377,7 @@ Every declaration has a **kind** and a **name**, and exists in up to four forms.
 
 Names in the shipped ``library.agg`` are globally unique across kinds, enforced at load, so ``build('X')`` and ``build.recipe('X')`` always mean the same entry and no ``kind=`` is ever needed. The store itself allows ``sev Pareto`` and ``agg Pareto`` to coexist; the shipped library gives that up on purpose.
 
-For parser debugging, :meth:`interpret_file` runs every statement in a ``.agg`` file through the parser without constructing anything, returning per-statement error information. It splits the file the way :meth:`load` does, so a statement laid out over several lines, or carrying a ``doc{{{...}}}`` body, is one row.
+For parser debugging, :meth:`interpret_file` runs every statement in a ``.agg`` file through the parser without constructing anything, returning per-statement error information. It splits the file the way :meth:`load` does, so a statement laid out over several lines is one row.
 
 Configuration
 ~~~~~~~~~~~~~

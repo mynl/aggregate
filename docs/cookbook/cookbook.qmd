@@ -28,6 +28,8 @@ version
 <!-- AUTO GENERATED INCLUDES -->
 
 {{< include _recipes_01_distortions.qmd >}}
+{{< include _recipes_02_severity.qmd >}}
+{{< include _recipes_03_frequency.qmd >}}
 {{< include _recipes_04_aggregate.qmd >}}
 {{< include _recipes_05_reinsurance.qmd >}}
 

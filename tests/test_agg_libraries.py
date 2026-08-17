@@ -151,7 +151,7 @@ def test_library_is_the_default_recipe_base():
 #: one of these gaps looks like.
 UNPARSER_EXEMPT = {
     # named object reference
-    'BernoulliFrequency', 'BinomialSimple', 'FixedFrequency',
+    'BernoulliFrequency', 'FixedFrequency',
     'GeometricFrequency', 'NegativeBinomialFrequency', 'NegativeBinomialMixed',
     'PoissonSimple', 'BasicMixedSev', 'InverseGaussianMixed',
     # named ENGINE reference: `xpnl USHurr ... less agg.USXOLTower`. Since

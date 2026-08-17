@@ -1,0 +1,126 @@
+<!-- GENERATED from a DecL library by aggregate.cookbook (do not hand-edit). -->
+<!-- Edit the entry's doc{{{...}}} in the .agg file and re-run the generator. -->
+
+```{python}
+#| echo: false
+from _setup import *
+```
+
+## Layer picks {#sec-recipe-severity-layer-picks}
+
+A severity curve implies an expected loss for every layer of a tower, and those are rarely the numbers you end up pricing. Underwriting judgment, a competitor's filing, or a benchmark study says one layer should be cheaper and the one above it dearer. You want a single severity distribution that reproduces the selected layer losses exactly, so that limits profiles, reinsurance and the aggregate are all computed from one consistent curve rather than from a curve plus a spreadsheet of overrides.
+
+The `picks` clause follows the severity: first the layer tops, then the loss selected for each layer.
+
+```{python}
+a = build('''agg LayerPicks
+  1 claim
+  sev [2764 24548 275654 1917469 10000000] * expon wts [0.824796 0.159065 0.014444 0.001624 7.1e-05] picks [100000 250000 500000 1000000] [6700 1700 1600 1000]
+  fixed
+  hints{bs=125; log2=20}''')
+```
+
+The unadjusted curve is the same program with the `picks` clause removed, written here through the library's own severity entry:
+
+```{python}
+import numpy as np
+gross = build('agg Gross 1 claim sev.ISOMixedExponential fixed', bs=125, log2=20)
+```
+
+`density_df['lev']` is the limited expected value, so the loss to the layer from `lo` to `hi` is `lev(hi) - lev(lo)` and the whole exhibit is a few lines:
+
+```{python}
+TOWER = np.array([0., 100e3, 250e3, 500e3, 1e6])
+PICKS = np.array([6700., 1700., 1600., 1000.])
+
+def layer_losses(obj):
+    """Expected loss to each tower layer, read off the limited expected value."""
+    lev = obj.density_df['lev']
+    return np.array([lev.loc[hi] - lev.loc[lo]
+                     for lo, hi in zip(TOWER[:-1], TOWER[1:])])
+
+exhibit = pd.DataFrame(
+    {'curve': layer_losses(gross), 'pick': PICKS, 'achieved': layer_losses(a)},
+    index=pd.Index([f'{hi - lo:,.0f} xs {lo:,.0f}'
+                    for lo, hi in zip(TOWER[:-1], TOWER[1:])], name='layer'))
+exhibit['adjustment'] = exhibit['pick'] / exhibit['curve']
+exhibit['error'] = exhibit['achieved'] - exhibit['pick']
+qd(exhibit)
+```
+
+`picks` reweights the discretized severity layer by layer. Reading the tower from the top down, it scales the probability inside each layer until the expected loss that layer contributes equals the pick, and it leaves the distribution above the top of the tower untouched. The numbers in the first bracket are layer **tops**, not widths: `[100000 250000 500000 1000000]` means 100k xs 0, then 150k xs 100k, then 250k xs 250k, then 500k xs 500k.
+
+With `1 claim ... fixed` the aggregate equals the severity, so the picks can be read straight off the aggregate and there is no frequency to reason about. In a rating exercise the same severity carries a real claim count and every layer loss scales with it, which is why the picks are stated per claim.
+
+The mean moves, by design. The adjusted mean is the sum of the picks plus the expected loss above the top of the tower, which is unchanged: 11,000 plus about 2,597 here, against a curve mean of 13,990.
+
+Picks have to be achievable. The expected loss in a layer is bounded below by what the losses piercing the layers above it already force through it, so a pick under that floor cannot be reached by any reweighting. The build logs a warning and the adjusted density carries negative probabilities: revise the picks, not the tolerance.
+
+The bucket size must divide every layer top, or a boundary falls inside a bucket and the layer loss is read off the wrong place. That is what `hints{bs=125}` is protecting: 125 divides 100,000, 250,000, 500,000 and 1,000,000.
+
+**A picked aggregate reports a failed validation, and that is expected.** Validation compares the FFT estimate against the analytic moments of the declared severity, and picking is precisely a decision to move away from them: here the estimate is 13,597 against an analytic 13,990. Build the same program without the `picks` clause to validate the curve, as the Solution does, and read the picked object's accuracy off the layer table instead.
+
+::: {.callout-note collapse="true" title="The check"}
+
+```{python}
+# every pick is reproduced, to floating point
+assert np.abs(layer_losses(a) / PICKS - 1).max() < 1e-8
+# the adjusted mean is the picks plus the untouched loss above the tower
+tail = gross.est_sev_m - layer_losses(gross).sum()
+assert abs(a.est_sev_m / (PICKS.sum() + tail) - 1) < 1e-6
+# and above the top of the tower nothing moved
+xs = np.asarray(a.xs)
+above = (xs > 1e6) & (xs < 2e7)
+assert np.abs(a.sf(xs[above]) / gross.sf(xs[above]) - 1).max() < 1e-6
+```
+
+:::
+
+## Split limit policy {#sec-recipe-severity-split-limit-policy}
+
+A US personal auto policy written 100/300 pays at most 100 to any one claimant and at most 300 for any one accident. Two limits apply at two different levels, and neither is a layer on the other: the 100 sits inside the accident, the 300 sits on the accident total. You want the aggregate loss for a book of such policies.
+
+Build the policy from the inside out. The inner aggregate is one accident: a zero truncated Poisson number of claimants, 1.25 of them on average, each subject to the 100 per claimant limit.
+
+```{python}
+inner = build('SplitLimitClaimant')
+qd(inner)
+```
+
+The outer treats that per accident loss as its severity and applies the 300 as an ordinary occurrence limit.
+
+```{python}
+a = build('''agg SplitLimitPolicy
+  100 claims
+  300 xs 0
+  sev agg.SplitLimitClaimant !
+  poisson
+  hints{bs=1/4; log2=17}''')
+qd(a)
+```
+
+The two limits never interact in the program text. The per claimant limit is a layers clause inside the inner, applied claimant by claimant; the per accident limit is a layers clause on the outer, applied to the inner's whole output. Reinsurance clauses would reach the same law and would be much harder to read: prefer no limits, then exposure limits, then aggregate reinsurance, then occurrence reinsurance, in that order.
+
+`poisson zt !` carries two decisions. `zt` truncates the zero, so every draw of the inner has at least one claimant, which is what makes it an accident rather than a policy year. The `!` holds the requested mean at 1.25; without it the 1.25 would be the untruncated Poisson parameter and truncation would lift the mean to 1.75.
+
+The trailing `!` on `sev agg.SplitLimitClaimant` is a different `!`, on the severity side, and it says the outer's `300 xs 0` layer is unconditional. A zero truncated inner has no mass at zero in theory, but any severity with positive density at the origin discretizes a wisp of every claim into the first bucket, about 1.6 in 10,000 at this resolution. Those are small losses, not zero losses. Without the `!` the default conditional reading would drop them and rescale the rest, lifting the severity mean by the same proportion, and the library says so in a warning. Keep the mass.
+
+Both declarations pin `bs` and `log2`, and they pin the **same** `bs`. The inner must pin its resolution because it is materialized into a discrete severity before the outer ever runs, so its output must not depend on the outer's settings. Matching the two is a separate point and it is worth knowing: a layered reference is rebucketed by differencing its survival function, which is exact when the grids agree and loses a few parts in ten thousand when they do not.
+
+The result is worth stating plainly. With 1.25 claimants per accident and each one capped at 100, an accident needs three claimants before the 300 can bind at all, and P(loss to one policy exceeds 300) is about 7 in 100,000. The 300 is worth 0.0019 of expected loss per policy against a per policy mean of 43.92, four thousandths of one percent. In a 100/300 policy the per claimant limit does essentially all the work, and the model shows that rather than asserting it.
+
+::: {.callout-note collapse="true" title="The check"}
+
+```{python}
+# the frequency ! held the requested mean at 1.25 claimants, against the
+# 1.75 that truncating a Poisson(1.25) would otherwise give
+assert abs(inner.n - 1.25) < 1e-12
+# the outer mean is 100 policies times the per accident loss capped at 300
+capped = inner.density_df['lev'].loc[300.0]
+assert abs(a.est_m / (100 * capped) - 1) < 1e-9
+# the 300 per accident limit binds, but is worth under a hundredth of a percent
+saving = inner.est_m - capped
+assert 0 < saving < 1e-4 * inner.est_m
+```
+
+:::

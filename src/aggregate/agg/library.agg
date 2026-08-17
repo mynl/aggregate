@@ -127,7 +127,7 @@
 # `decl_writer.format_program(..., layout='spread')` and refuses to write
 # unless every statement still parses to the same spec.
 #
-# Fourteen entries are exempt, and stay hand-written. The unparser cannot
+# Thirteen entries are exempt, and stay hand-written. The unparser cannot
 # invert a named object reference (`sev.UnitSeverity` is resolved and inlined at
 # parse time, and since a216 an engine reference like `less agg.USXOLTower`
 # writes its whole body out), or the `minimum` distortion combinator (the child
@@ -136,18 +136,160 @@
 # laid out in the same style by hand; tests/test_agg_libraries.py holds the
 # list and checks the rest.
 #
+# A `sev agg.NAME` reference is NOT in that set: since a293 the writer renders
+# it, because the spec records the reference instead of inlining the object.
+#
+# SECTION ORDER runs starter examples, distortions, severity, frequency,
+# aggregates, aggregates with reinsurance, an aggregate as a severity,
+# bivariate, profit and loss, numerics, portfolios, papers. It is teaching
+# order, and in three places it is also load bearing, because a builtin
+# reference resolves by SEQUENTIAL LOAD and the target has to be declared
+# first:
+#
+#   sev.UnitSeverity      leads the severity section, ahead of the frequency
+#                         and aggregate entries that use it
+#   dist.PHDistortion     and dist.DualDistortion lead the distortion section,
+#                         ahead of MinimumDistortion
+#   agg.USXOLTower        sits in the reinsurance section, ahead of the xpnl
+#                         USHurr that wraps it, and each inner of the
+#                         aggregate-as-severity section precedes its outer
+#
+# Everything else is grouping, and grouping is what tags{} is really for: the
+# sections make the FILE readable, `discover` is how a program finds things.
+#
 # DecL is whitespace-insensitive, so a statement may be laid out however reads
 # best. Only two things separate statements: a blank line, or a `;` at the end
 # of a line. A comment never does.
 # ======================================================================
 
 # ----------------------------------------------------------------------
-# Shared building blocks -- referenced by name from entries below.
-# Builtin references resolve by sequential load, so these come first.
+# Starter examples
+# Dice, coins and the plain compound distributions. Everything here is
+# exact or nearly so, which is what makes it the place to start.
 # ----------------------------------------------------------------------
-distortion DualDistortion dual 2.5
-  note{Dual-power distortion; the second leaf for the minimum below.}
-  tags{topic:distortion};
+
+agg DiceOneDie
+  dfreq [1]
+  dsev [1 2 3 4 5 6]
+  note{The roll of a single dice as severity.}
+  tags{topic:aggregate, role:intro};
+
+agg DiceTwoDice
+  dfreq [2]
+  dsev [1 2 3 4 5 6]
+  note{Sum of the rolls of two dice.}
+  tags{topic:aggregate};
+
+agg ThreeDice
+  dfreq [3]
+  dsev [1 2 3 4 5 6]
+  note{Sum of three dice -- exact discrete aggregate; zero validation error.}
+  tags{topic:aggregate, role:intro, check:independent-oracle}
+  doc{{{
+## Problem
+
+You want to see what `aggregate` computes on something you can check in your head. Three dice: a fixed frequency of 3, a severity uniform on 1..6.
+
+## Solution
+
+```python
+a = build('''<<decl>>''')
+qd(a.summary_df)
+```
+
+## Discussion
+
+Everything here is discrete and lands exactly on the grid, so this is the one case where the FFT is not an approximation at all -- the aggregate PMF is the exact three-fold convolution of the die. That is why it is the first recipe: it separates "is the method right" from "is the discretization fine", which every later recipe has to hold apart.
+
+`dfreq [3]` is an explicit outcome list with a single outcome, so N = 3 with probability one. `dsev [1:6]` is the inclusive range 1, 2, ..., 6 with equal weights.
+
+## Check
+
+```python
+# E[A] = 3 x 3.5 = 10.5, and the estimate is EXACT, not merely close
+assert abs(a.actual_m - 10.5) < 1e-12
+assert abs(a.est_m - 10.5) < 1e-9
+# support runs 3..18; each extreme has probability (1/6)^3
+assert abs(a.density_df.loc[3, 'p_total'] - (1 / 6) ** 3) < 1e-12
+assert abs(a.density_df.loc[18, 'p_total'] - (1 / 6) ** 3) < 1e-12
+```
+}}};
+
+agg DiceFiveDice
+  dfreq [5]
+  dsev [1 2 3 4 5 6]
+  note{Sum of the rolls of five dice.}
+  tags{topic:aggregate};
+
+agg DiceOneRoll
+  dfreq [1 2 3 4 5 6]
+  dsev [1]
+  note{The roll of a single dice as frequency.}
+  tags{topic:aggregate};
+
+agg DiceOfDice
+  dfreq [1 2 3 4 5 6]
+  dsev [1 2 3 4 5 6]
+  note{Roll a die for the claim count, then sum that many die rolls. Six-surface consistency target; Choquet hand checks.}
+  tags{topic:aggregate, topic:numerics};
+
+agg BasicFixedOne
+  dfreq [12]
+  dsev [0 1]
+  note{toss of 12 coins}
+  tags{topic:aggregate};
+
+agg BasicFixedTwo
+  dfreq [12]
+  dsev [-1 1]
+  note{12 step random walk}
+  tags{topic:aggregate};
+
+agg BasicDfreq
+  dfreq [1 2 3]
+  dsev [1 2 10]
+  note{1, 2 or 3 claims, all equally likely; severity 1, 2 or 10, all equally likely.}
+  tags{topic:aggregate};
+
+agg BasicDfreqWeighted
+  dfreq [1 2 3] [0.5 0.25 0.25]
+  dsev [1 2 10] [0.4 0.4 0.2]
+  note{1, 2 or 3 claims; severity 1, 2 or 10; both clauses carry explicit probabilities.}
+  tags{topic:frequency};
+
+agg DiscreteSimple
+  dfreq [1 2 3] [0.5 0.3 0.2]
+  dsev [2 4 6 8 10]
+  note{Explicit [outcomes] [probs] frequency; severity on the stepped grid 2, 4, 6, 8, 10.}
+  tags{topic:aggregate, role:intro};
+
+agg DiscreteBook
+  dfreq [1 2 3 4 5 6 7 20]
+  dsev [-10 -5 -2 -1 0 1 2 3] [0.0625 0.0625 0.125 0.125 0.125 0.25 0.125 0.125]
+  note{Discrete example with signed severity; empirical distributions can be used directly!}
+  tags{topic:aggregate};
+
+agg BasicBook
+  250 claims
+  1000 xs 0
+  sev lognorm 100 cv 1.5
+  poisson
+  note{Plain Poisson / lognormal aggregate -- the workhorse compound distribution.}
+  tags{topic:aggregate, role:intro};
+
+agg BasicLognormal
+  15 claims
+  10000 xs 0
+  sev lognorm 1500 cv 1
+  poisson
+  note{A plain Poisson / lognormal aggregate.}
+  tags{topic:aggregate, role:intro};
+
+# ----------------------------------------------------------------------
+# Distortions (risk measures)
+# PHDistortion and DualDistortion come first: MinimumDistortion refers to
+# them by name, and builtin references resolve by sequential load.
+# ----------------------------------------------------------------------
 
 distortion PHDistortion ph 0.7
   note{Proportional-hazard distortion (universally understood).}
@@ -195,331 +337,129 @@ assert np.all(gs >= s - 1e-12)
 ```
 }}};
 
+distortion PHDistortionSimple ph 0.65
+  tags{topic:distortion};
+
+distortion DualDistortion dual 2.5
+  note{Dual-power distortion; the second leaf for the minimum below.}
+  tags{topic:distortion};
+
+distortion WangDistortion wang 0.3
+  note{Wang transform, g(s) = Phi(Phi inverse (s) + lambda), lambda = 0.3.}
+  tags{topic:distortion};
+
+distortion TVaRDistortion tvar 0.4
+  tags{topic:distortion};
+
+distortion CCoCDistortion ccoc 0.25
+  tags{topic:distortion};
+
+distortion MinimumDistortion minimum dist.PHDistortion dist.DualDistortion
+  tags{topic:distortion};
+
+# ----------------------------------------------------------------------
+# Severity: the clause forms
+# UnitSeverity leads the section because the frequency and aggregate
+# entries below refer to it by name.
+# ----------------------------------------------------------------------
+
 sev UnitSeverity dsev [1]
   tags{topic:severity};
 
-# ----------------------------------------------------------------------
-# Showcase -- realistic books
-# ----------------------------------------------------------------------
-agg GrossCatXOL as "Gross US Hurricane"
-  1.74 claims
-  sev lognorm 8.501 cv 14.624
-  poisson
-  note{ILW model on US Cat, amounts in billions.}
-  tags{topic:severity}
-  hints{bs=2;log2=16;normalize=False;};
-
-agg USXOLTower as "US Hurricane Reinsurance"
-  1.74 claims
-  sev lognorm 8.501 cv 14.624
-  occurrence net of
-    90% po 100 xs 100 deposit 4 and
-    95% po 200 xs 200 deposit 3.75 as "Occ re"
-  poisson
-  aggregate net of
-    50% po 20 xs 100 deposit 3 as "Agg re"
-  note{ILW model of US Cat. Amounts in billions. From St John's RMI3388 course. Industry estimates, as of 2019: 100 year PML USD132.5B and 250 year USD300.3B.}
-  tags{role:hero, topic:reinsurance}
-  hints{bs=2;log2=16;normalize=False;};
-
-xpnl USHurr as "US Hurricane"
-  20 premium as "Gross Premium"
-  less agg.USXOLTower
-  tags{role:hero, topic:reinsurance}
-  note{ILW model of US Cat. Amounts in billions.}
-  hints{bs=2;log2=16;normalize=False;};
-
-bivariate CopulaWindFlood
-  25 claims
-  agg Wind
-    dfreq [0 1] [0.3 0.7]
-    sev lognorm 40 cv 1.2
-  agg Flood
-    dfreq [0 1]
-    sev lognorm 60 cv 1.5
-  copula gumbel 0.4
-  poisson
-  note{Gumbel-copula dependence between Wind and Flood.}
-  tags{role:hero, topic:bivariate};
-
-agg ExposureRating
-  [100 200 1000 50] premium at [0.9 0.85 0.9 0.8] lr
-  [250 500 1000 2000] xs 0
-  sev lognorm 120 cv 12
-  occurrence ceded to
-    750 xs 750
-  mixed gamma 0.2
-  note{Exposure rating on a small portfolio with limits profile, amounts in 000s.}
-  tags{role:hero, topic:aggregate};
-
-agg LimitProfile
-  [10000 20000 5000] premium at [0.8 0.7 0.5] lr
-  [1000 2000 5000] xs 0
-  sev lognorm 50 cv 1.5
-  poisson
-  note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.}
-  tags{role:hero, topic:aggregate, check:reconciliation}
-  doc{{{
-## Problem
-
-You have the shape every pricing actuary already has: a table of premium by limit band, each band with its own expected loss ratio. You want one aggregate distribution for the whole book, with the bands correctly weighted -- not three separate models you then have to add up by hand.
-
-## Solution
-
-```python
-a = build('''<<decl>>''')
-qd(a.summary_df)
-```
-
-## Discussion
-
-The three vectors line up positionally: 10000 of premium at an 80% loss ratio written at a 1000 limit, 20000 at 70% at a 2000 limit, 5000 at 50% at a 5000 limit. One severity curve is written across all three bands, and the *limit* is what differs -- so the severity is the same lognormal capped at three different points.
-
-The claim count is an **output**, not an input. `aggregate` knows the expected loss in each band (premium x loss ratio) and the expected severity in that band (the lognormal limited at that band's limit), so it derives the implied count per band and adds them. That is the whole point of the exposure clause: you give it what you actually have -- premium and a loss ratio -- and it solves for the count rather than making you do it.
-
-Read `a.n` back to see the implied total count, and `a.sev_m` for the exposure-weighted average severity across the bands.
-
-## Check
-
-```python
-# the aggregate mean IS the premium-weighted expected loss, exactly:
-# 10000x0.8 + 20000x0.7 + 5000x0.5 = 24500
-assert abs(a.actual_m - 24500.0) < 1e-9
-# and the FFT estimate agrees to grid accuracy
-assert abs(a.est_m / a.actual_m - 1) < 1e-6
-# E[A] = E[N] x E[X] still holds across the blended profile
-assert abs(a.n * a.sev_m - a.actual_m) < 1e-6
-```
-}}};
-
-port PropertyCasualty
-  note{Portfolio of property and casualty risks, amounts in 000s.}
-  tags{role:hero, topic:portfolio}
-  agg Casualty
-    5000 premium at 0.9 lr
-    5000 xs 0
-    sev lognorm 200 cv 8
-    mixed gamma 0.45
-  agg Property
-    4000 premium at 0.85 lr
-    10000 xs 0
-    sev lognorm 250 cv 12
-    mixed gamma 0.15;
-
-agg TweedieBook
-  25 claims
-  sev gamma 1 cv 0.05
-  poisson
-  note{Tweedie - Poisson sum of gammas. Extreme case, severity has low CV.}
-  tags{role:hero, topic:aggregate};
-
-port TwoLineBook
-  note{Two-unit book: thin property + mixed-frequency casualty. Capital and price downstream.}
-  tags{role:hero, topic:portfolio}
-  agg Property
-    80 claims
-    500 xs 0
-    sev lognorm 50 cv 1.2
-    poisson
-  agg Casualty
-    20 claims
-    2000 xs 0
-    sev lognorm 250 cv 2
-    mixed gamma 0.4;
-
-# ----------------------------------------------------------------------
-# Frequency
-# ----------------------------------------------------------------------
-agg BasicPoissonSev
-  dfreq [1 2 3] [0.5 0.25 0.25]
-  dsev [1 2 10] [0.4 0.4 0.2]
-  note{1, 2 or 3 claims; severity 1, 2 or 10 each with specified probabilities }
-  tags{topic:frequency};
-
-agg BernoulliFrequency
-  .8 claims
-  sev.UnitSeverity
-  bernoulli
-  note{Bernoulli claim count}
-  tags{topic:frequency};
-
-agg BinomialFrequency
-  10 claims
-  dsev [1]
-  binomial 0.5
-  note{Bounded claim count -- binomial (here n = 20, p = 0.5).}
-  tags{topic:frequency};
-
-agg BinomialSimple
-  10 claims
-  sev.UnitSeverity
-  binomial 0.5
-  note{binomial n=10, p=1/2 claim count}
-  tags{topic:frequency};
-
-agg FixedFrequency
-  10 claims
-  sev.UnitSeverity
-  fixed
-  note{fixed claim count}
-  tags{topic:frequency};
-
-agg GeometricFrequency
-  10 claims
-  sev.UnitSeverity
-  geometric
-  note{geometric claim count}
-  tags{topic:frequency};
-
-agg MixedGammaFrequency
-  100 claims
-  1000 xs 0
-  sev lognorm 100 cv 1.5
-  mixed gamma 0.4
-  note{Same severity, over-dispersed counts (gamma-mixed Poisson = negative binomial).}
-  tags{topic:frequency};
-
-agg MixedSeverityAndFrequency
-  [5 10 8 2] claims
-  [1 5 10 20] xs 0
-  sev lognorm 10 cv 1.2
-  mixed gamma 0.2
-  note{Limit profile, single severity.}
-  tags{topic:severity, topic:frequency};
-
-agg NegativeBinomialFrequency
-  10 claims
-  sev.UnitSeverity
-  negbin 3
-  note{negative binomial; shape parameter 3 equals variance multiplier}
-  tags{topic:frequency};
-
-agg NegativeBinomialMixed
-  10 claims
-  sev.UnitSeverity
-  mixed gamma 0.65
-  note{negative binomial as gamma mixed Poisson, shape parameter equals cv of mixing distribution}
-  tags{topic:frequency};
-
-agg PoissonFrequency
-  100 claims
-  1000 xs 0
-  sev lognorm 100 cv 1.5
-  poisson
-  note{Poisson frequency -- the no-contagion baseline.}
-  tags{topic:frequency, role:intro};
-
-agg PoissonSimple
-  10 claims
-  sev.UnitSeverity
-  poisson
-  note{Poisson claim count}
-  tags{topic:frequency};
-
-agg ZMPoissonFrequency
-  4 claims
-  dsev [1]
-  poisson zm 0.5
-  note{Zero-modified Poisson -- inflate the no-claim probability to 0.5. The 4 is the UN-MODIFIED base mean; reweighting leaves E[N] = 2.0373. Append ! to pin E[N] = 4 instead.}
-  tags{topic:frequency};
-
-agg ZMPoissonSimple
-  4 claims
-  dsev [1]
-  poisson zm 0.5
-  note{zero modified Poisson}
-  tags{topic:frequency};
-
-agg ZTPoissonFrequency
-  4 claims
-  dsev [1]
-  poisson zt
-  note{Zero-truncated Poisson -- at least one claim, so E[N] = 4/(1-exp(-4)) = 4.0746.}
-  tags{topic:frequency};
-
-agg ZTPoissonSimple
-  4 claims
-  dsev [1]
-  poisson zt
-  note{zero truncated Poisson with mean 4}
-  tags{topic:frequency};
-
-# ----------------------------------------------------------------------
-# Severity
-# ----------------------------------------------------------------------
 sev MixedExponentialSev [10 50 200] * expon wts [0.6 0.3 0.1]
   note{Mixed exponential (ISO/Verisk style). Can't stand alone as a Sev -- fold it into an agg.}
   tags{topic:severity};
 
-agg MixedSeverityProfile
-  [1000 2000 500] premium at [0.8 0.7 0.5] lr
-  sev lognorm 10 cv [0.35 0.5] wts [0.625 0.375]
-  mixed gamma 0.5
-  note{Mixed exposure, severity, and frequency -- shared mixing shows up in stats_df.}
-  tags{topic:severity};
+sev ISOMixedExponential [2764 24548 275654 1917469 10000000] * expon wts [0.824796 0.159065 0.014444 0.001624 7.1e-05]
+  note{ISO style mixed exponential commercial auto severity, five exponential components on the 2008 cost level, untrended; mean 13,990. Parameters from Mildenhall, aggregate: Frequency-Severity Distributions Made Easy, Actuarial Review 50(3), pages 31 to 34, 2023, https://ar.casact.org/aggregate-frequency-severity-distributions-made-easy/.}
+  tags{topic:severity, role:reference, role:paper};
 
 sev ParetoSev 1000 * pareto 1.8 + -1000
   note{Single-parameter Pareto large-loss curve (scale 1000, shape 1.8), shifted to ground-up.}
   tags{topic:severity};
 
-agg SevAttached
-  5 claims
-  200 xs 0
-  sev 123.43 * lognorm 2 !
-  poisson
-  note{unconditional severity}
-  tags{topic:severity};
-
-agg SevBlend
-  [1000 2000 500] premium at [0.8 0.7 0.5] lr
-  sev lognorm 10 cv [0.35 0.5] wts [0.625 0.375]
-  mixed gamma 0.5
-  note{limit profile and mixed severity}
-  tags{topic:severity}
-  hints{log2=17;};
-
-agg SevExponential
+agg LayerPicks
   1 claim
-  sev 10 * pareto 2.6 + -10
+  sev [2764 24548 275654 1917469 10000000] * expon wts [0.824796 0.159065 0.014444 0.001624 7.1e-05] picks [100000 250000 500000 1000000] [6700 1700 1600 1000]
   fixed
-  note{Standard Pareto, support >= 0}
-  tags{topic:severity};
+  note{Layer loss picks: the ISO mixed exponential reweighted so that four layers to 1M carry selected expected losses instead of the ones the curve implies.}
+  tags{topic:severity, check:reconciliation}
+  hints{bs=125; log2=20}
+  doc{{{
+## Problem
 
-agg SevGammaCV
+A severity curve implies an expected loss for every layer of a tower, and those are rarely the numbers you end up pricing. Underwriting judgment, a competitor's filing, or a benchmark study says one layer should be cheaper and the one above it dearer. You want a single severity distribution that reproduces the selected layer losses exactly, so that limits profiles, reinsurance and the aggregate are all computed from one consistent curve rather than from a curve plus a spreadsheet of overrides.
+
+## Solution
+
+The `picks` clause follows the severity: first the layer tops, then the loss selected for each layer.
+
+```python
+a = build('''<<decl>>''')
+```
+
+The unadjusted curve is the same program with the `picks` clause removed, written here through the library's own severity entry:
+
+```python
+import numpy as np
+gross = build('agg Gross 1 claim sev.ISOMixedExponential fixed', bs=125, log2=20)
+```
+
+`density_df['lev']` is the limited expected value, so the loss to the layer from `lo` to `hi` is `lev(hi) - lev(lo)` and the whole exhibit is a few lines:
+
+```python
+TOWER = np.array([0., 100e3, 250e3, 500e3, 1e6])
+PICKS = np.array([6700., 1700., 1600., 1000.])
+
+def layer_losses(obj):
+    """Expected loss to each tower layer, read off the limited expected value."""
+    lev = obj.density_df['lev']
+    return np.array([lev.loc[hi] - lev.loc[lo]
+                     for lo, hi in zip(TOWER[:-1], TOWER[1:])])
+
+exhibit = pd.DataFrame(
+    {'curve': layer_losses(gross), 'pick': PICKS, 'achieved': layer_losses(a)},
+    index=pd.Index([f'{hi - lo:,.0f} xs {lo:,.0f}'
+                    for lo, hi in zip(TOWER[:-1], TOWER[1:])], name='layer'))
+exhibit['adjustment'] = exhibit['pick'] / exhibit['curve']
+exhibit['error'] = exhibit['achieved'] - exhibit['pick']
+qd(exhibit)
+```
+
+## Discussion
+
+`picks` reweights the discretized severity layer by layer. Reading the tower from the top down, it scales the probability inside each layer until the expected loss that layer contributes equals the pick, and it leaves the distribution above the top of the tower untouched. The numbers in the first bracket are layer **tops**, not widths: `[100000 250000 500000 1000000]` means 100k xs 0, then 150k xs 100k, then 250k xs 250k, then 500k xs 500k.
+
+With `1 claim ... fixed` the aggregate equals the severity, so the picks can be read straight off the aggregate and there is no frequency to reason about. In a rating exercise the same severity carries a real claim count and every layer loss scales with it, which is why the picks are stated per claim.
+
+The mean moves, by design. The adjusted mean is the sum of the picks plus the expected loss above the top of the tower, which is unchanged: 11,000 plus about 2,597 here, against a curve mean of 13,990.
+
+Picks have to be achievable. The expected loss in a layer is bounded below by what the losses piercing the layers above it already force through it, so a pick under that floor cannot be reached by any reweighting. The build logs a warning and the adjusted density carries negative probabilities: revise the picks, not the tolerance.
+
+The bucket size must divide every layer top, or a boundary falls inside a bucket and the layer loss is read off the wrong place. That is what `hints{bs=125}` is protecting: 125 divides 100,000, 250,000, 500,000 and 1,000,000.
+
+**A picked aggregate reports a failed validation, and that is expected.** Validation compares the FFT estimate against the analytic moments of the declared severity, and picking is precisely a decision to move away from them: here the estimate is 13,597 against an analytic 13,990. Build the same program without the `picks` clause to validate the curve, as the Solution does, and read the picked object's accuracy off the layer table instead.
+
+## Check
+
+```python
+# every pick is reproduced, to floating point
+assert np.abs(layer_losses(a) / PICKS - 1).max() < 1e-8
+# the adjusted mean is the picks plus the untouched loss above the tower
+tail = gross.est_sev_m - layer_losses(gross).sum()
+assert abs(a.est_sev_m / (PICKS.sum() + tail) - 1) < 1e-6
+# and above the top of the tower nothing moved
+xs = np.asarray(a.xs)
+above = (xs > 1e6) & (xs < 2e7)
+assert np.abs(a.sf(xs[above]) / gross.sf(xs[above]) - 1).max() < 1e-6
+```
+}}};
+
+agg SevZeroParameter
   1 claim
-  sev 100 * invgamma 4.07
+  sev 100 * expon
   fixed
-  note{remember must set scale or mean}
-  tags{topic:severity};
-
-agg SevLayered
-  5 claims
-  200 xs 0
-  sev 123.43 * lognorm 2
-  poisson
-  note{conditional severity}
-  tags{topic:severity};
-
-agg SevLayeredUnconditional
-  5 claims
-  200 xs 10
-  sev 123.43 * lognorm 2 !
-  poisson
-  note{unconditional severity}
-  tags{topic:severity};
-
-agg SevLognormCV
-  1 claim
-  sev lognorm 50 cv 0.3
-  fixed
-  note{lognormal by mean and cv}
-  tags{topic:severity};
-
-agg SevMixture
-  8 claims
-  sev 100 * [lognorm expon] [0.5 1] wts [0.6 0.4]
-  mixed gamma 0.3
-  note{mixture of severities}
+  note{scaled exponential}
   tags{topic:severity};
 
 agg SevOneParameter
@@ -536,10 +476,18 @@ agg SevOneParameterScaled
   note{gamma by mean and cv}
   tags{topic:severity};
 
-agg SevPareto
+agg SevTwoParameter
   1 claim
-  sev 100 * weibull_min 1.5
+  sev 50 * beta 3 2 + 10
   fixed
+  note{50*beta(3,2) + 10}
+  tags{topic:severity};
+
+agg SevLognormCV
+  1 claim
+  sev lognorm 50 cv 0.3
+  fixed
+  note{lognormal by mean and cv}
   tags{topic:severity};
 
 agg SevReversed
@@ -563,6 +511,13 @@ agg SevShifted
   note{signed severity, scaled and shifted normal}
   tags{topic:severity};
 
+agg SevMixture
+  8 claims
+  sev 100 * [lognorm expon] [0.5 1] wts [0.6 0.4]
+  mixed gamma 0.3
+  note{mixture of severities}
+  tags{topic:severity};
+
 agg SevSpliced
   1 claim
   sev lognorm 10 cv 0.5 splice [5] [20]
@@ -570,1139 +525,42 @@ agg SevSpliced
   note{lognormal conditional on 5 <= X <= 20}
   tags{topic:severity};
 
-agg SevTwoParameter
-  1 claim
-  sev 50 * beta 3 2 + 10
-  fixed
-  note{50*beta(3,2) + 10}
-  tags{topic:severity};
-
-agg SevUnconditional
+agg SevLayered
   5 claims
-  200 xs 10
+  200 xs 0
   sev 123.43 * lognorm 2
   poisson
   note{conditional severity}
   tags{topic:severity};
 
-agg SevWeibull
-  1 claim
-  sev invgauss 10 cv 0.5
-  fixed
+agg SevLayeredConditional
+  5 claims
+  200 xs 10
+  sev 123.43 * lognorm 2
+  poisson
+  note{Conditional severity: the layer conditions on the loss exceeding the 10 attachment, the default reading.}
   tags{topic:severity};
 
-agg SevZeroParameter
-  1 claim
-  sev 100 * expon
-  fixed
-  note{scaled exponential}
+agg SevLayeredUnconditional
+  5 claims
+  200 xs 10
+  sev 123.43 * lognorm 2 !
+  poisson
+  note{Unconditional severity: the trailing ! keeps the losses below the 10 attachment in the count, so the layer mean is lower than the conditional reading.}
+  tags{topic:severity};
+
+agg MixedSeverityProfile
+  [1000 2000 500] premium at [0.8 0.7 0.5] lr
+  sev lognorm 10 cv [0.35 0.5] wts [0.625 0.375]
+  mixed gamma 0.5
+  note{Mixed exposure, severity, and frequency -- shared mixing shows up in stats_df.}
   tags{topic:severity};
 
 # ----------------------------------------------------------------------
-# Aggregates
+# Severity: the curve reference
+# The named families first, in alphabetical order for lookup, then the
+# published parameterizations under their citekeys.
 # ----------------------------------------------------------------------
-agg BasicBook
-  250 claims
-  1000 xs 0
-  sev lognorm 100 cv 1.5
-  poisson
-  note{Plain Poisson / lognormal aggregate -- the workhorse compound distribution.}
-  tags{topic:aggregate, role:intro};
-
-agg BasicDfreq
-  dfreq [1 2 3]
-  dsev [1 2 10]
-  note{1, 2 or 3 claims using range notation, sev 1, 2, 10 all equally likely}
-  tags{topic:aggregate};
-
-agg BasicFixedOne
-  dfreq [12]
-  dsev [0 1]
-  note{toss of 12 coins}
-  tags{topic:aggregate};
-
-agg BasicFixedTwo
-  dfreq [12]
-  dsev [-1 1]
-  note{12 step random walk}
-  tags{topic:aggregate};
-
-agg BasicLognormal
-  15 claims
-  10000 xs 0
-  sev lognorm 1500 cv 1
-  poisson
-  note{A plain Poisson / lognormal aggregate.}
-  tags{topic:aggregate, role:intro};
-
-agg BasicMixedSev
-  dfreq [0 1 2] [.5 .3 .2]
-  sev.UnitSeverity
-  note{Using a built in severity}
-  tags{topic:aggregate};
-
-agg DiceOfDice
-  dfreq [1 2 3 4 5 6]
-  dsev [1 2 3 4 5 6]
-  note{Roll a die for the claim count, then sum that many die rolls.}
-  tags{topic:aggregate};
-
-agg DiceOneDie
-  dfreq [1]
-  dsev [1 2 3 4 5 6]
-  note{The roll of a single dice as severity.}
-  tags{topic:aggregate, role:intro};
-
-agg DiceOneRoll
-  dfreq [1 2 3 4 5 6]
-  dsev [1]
-  note{The roll of a single dice as frequency.}
-  tags{topic:aggregate};
-
-agg DiceThreeDice
-  dfreq [5]
-  dsev [1 2 3 4 5 6]
-  note{Sum of the rolls of five dice.}
-  tags{topic:aggregate};
-
-agg DiceTwoDice
-  dfreq [2]
-  dsev [1 2 3 4 5 6]
-  note{Sum of the rolls of two dice.}
-  tags{topic:aggregate};
-
-agg DiscreteBook
-  dfreq [1 2 3 4 5 6 7 20]
-  dsev [-10 -5 -2 -1 0 1 2 3] [0.0625 0.0625 0.125 0.125 0.125 0.25 0.125 0.125]
-  note{Discrete example with signed severity; empirical distributions can be used directly!}
-  tags{topic:aggregate};
-
-agg DiscreteSimple
-  dfreq [1 2 3] [0.5 0.3 0.2]
-  dsev [2 4 6 8 10]
-  note{Explicit [outcomes] [probs] frequency; severity on the stepped grid 2, 4, 6, 8, 10.}
-  tags{topic:aggregate, role:intro};
-
-agg ExactGamma
-  5000 claims
-  sev lognorm 100 cv 2
-  poisson
-  note{Exact computation}
-  tags{topic:aggregate};
-
-agg ExposureByClaimCount
-  10 claims
-  sev lognorm 50 cv 0.8
-  poisson
-  note{specify number of claims}
-  tags{topic:aggregate};
-
-agg ExposureByLoss
-  500 loss
-  sev lognorm 50 cv 0.8
-  poisson
-  note{State expected loss; the claim count is derived.}
-  tags{topic:aggregate};
-
-agg ExposureByLossVector
-  1000 premium at 0.5 lr
-  sev lognorm 50 cv 0.8
-  poisson
-  note{specify premium and loss ratio, derive number of claims}
-  tags{topic:aggregate};
-
-agg ExposureByPremium
-  500 loss
-  sev lognorm 50 cv 0.8
-  poisson
-  note{specify expected loss, derive number of claims}
-  tags{topic:aggregate};
-
-agg InverseGaussianMixed
-  10 claims
-  sev.UnitSeverity
-  mixed ig .65
-  note{inverse Gaussian mixing distribution}
-  tags{topic:aggregate};
-
-agg LimitProfileSimple
-  [5 10 8 2] claims
-  [1 5 10 20] xs 0
-  sev lognorm 10 cv 1.2
-  mixed gamma 0.2
-  note{limit profile, single severity}
-  tags{topic:aggregate};
-
-agg PremiumMinusLoss
-  5000 claims
-  ssev 100 - lognorm 80 cv .2
-  poisson
-  note{High-frequency premium-minus-loss payoff -- near-Gaussian on a signed window.}
-  tags{topic:aggregate};
-
-agg ThreeDice
-  dfreq [3]
-  dsev [1 2 3 4 5 6]
-  note{Sum of three dice -- exact discrete aggregate; zero validation error.}
-  tags{topic:aggregate, role:intro, check:independent-oracle}
-  doc{{{
-## Problem
-
-You want to see what `aggregate` computes on something you can check in your head. Three dice: a fixed frequency of 3, a severity uniform on 1..6.
-
-## Solution
-
-```python
-a = build('''<<decl>>''')
-qd(a.summary_df)
-```
-
-## Discussion
-
-Everything here is discrete and lands exactly on the grid, so this is the one case where the FFT is not an approximation at all -- the aggregate PMF is the exact three-fold convolution of the die. That is why it is the first recipe: it separates "is the method right" from "is the discretization fine", which every later recipe has to hold apart.
-
-`dfreq [3]` is an explicit outcome list with a single outcome, so N = 3 with probability one. `dsev [1:6]` is the inclusive range 1, 2, ..., 6 with equal weights.
-
-## Check
-
-```python
-# E[A] = 3 x 3.5 = 10.5, and the estimate is EXACT, not merely close
-assert abs(a.actual_m - 10.5) < 1e-12
-assert abs(a.est_m - 10.5) < 1e-9
-# support runs 3..18; each extreme has probability (1/6)^3
-assert abs(a.density_df.loc[3, 'p_total'] - (1 / 6) ** 3) < 1e-12
-assert abs(a.density_df.loc[18, 'p_total'] - (1 / 6) ** 3) < 1e-12
-```
-}}};
-
-agg ThreeDiceSum
-  dfreq [3]
-  dsev [1 2 3 4 5 6]
-  note{Sum of the rolls of three dice.}
-  tags{topic:aggregate};
-
-agg TweedieCompound
-  tweedie 1.005 1 0.1
-  note{Tweedie by power p, mean, and dispersion (variance = dispersion * mean**p).}
-  tags{topic:aggregate};
-
-agg TweedieDirect
-  10.050251256281404 claims
-  sev gamma 0.0995 cv 0.07088812050083283
-  poisson
-  note{Tweedie defined by claim count, gamma mean and cv}
-  tags{topic:aggregate};
-
-agg TweedieDispersion
-  tweedie 1.005 1 0.1
-  note{Tweedie defined using p, mean, and dispersion, variance = dispersion xs mean**p}
-  tags{topic:aggregate};
-
-agg TweedieFromMoments
-  10.050251256281404 claims
-  sev 0.0005 * gamma 199
-  poisson
-  note{Tweedie defined by claim count, gamma scale and shape}
-  tags{topic:aggregate};
-
-agg TweedieSimple
-  tweedie 1.005 1 0.1
-  note{Tweedie via p, mean, dispersion; variance = dispersion * mean**p.}
-  tags{topic:aggregate};
-
-# ----------------------------------------------------------------------
-# Reinsurance
-# ----------------------------------------------------------------------
-agg AggregateStopLoss
-  100 claims
-  1000 xs 0
-  sev lognorm 100 cv 1.5
-  poisson
-  aggregate net of
-    5000 xs 30000
-  note{Aggregate stop-loss -- net of an annual 5000-xs-30000 layer.}
-  tags{topic:reinsurance};
-
-agg BasicXOL
-  15 claims
-  10000 xs 0
-  sev lognorm 1500 cv 1
-  occurrence net of
-    50% po 2500 xs 2500 and
-    90% po 5000 xs 5000
-  mixed gamma 0.25
-  note{Occurrence excess-of-loss program, net view.}
-  tags{topic:reinsurance};
-
-agg CededLayer
-  1250 premium at 0.8 lr
-  1000 xs 0
-  sev lognorm 80 cv 1.675
-  occurrence ceded to
-    125 xs 0 and
-    50% po 125 xs 125 and
-    20% po 250 xs 250 and
-    5% po 500 xs 500
-  poisson
-  note{Layered occurrence reinsurance tower, ceded view.}
-  tags{topic:reinsurance};
-
-agg OccurrenceXOL
-  15 claims
-  10000 xs 0
-  sev lognorm 1500 cv 1
-  occurrence net of
-    50% po 2500 xs 2500 and
-    90% po 5000 xs 5000
-  mixed gamma 0.25
-  note{Occurrence excess-of-loss program, net view.}
-  tags{topic:reinsurance, check:reconciliation}
-  doc{{{
-## Problem
-
-You have a two-layer per-occurrence excess program with partial placements, and you want the *net* aggregate -- with gross and ceded still visible, so you can see where the cession went instead of taking the net on faith.
-
-## Solution
-
-```python
-a = build('''<<decl>>''')
-qd(a.reins_summary_df)
-```
-
-## Discussion
-
-`occurrence net of ...` applies the program claim by claim, before the frequency convolution -- which is what "per occurrence" means and why it cannot be done by adjusting the aggregate afterwards.
-
-`50% po 2500 xs 2500` cedes half of the 2500-excess-2500 layer, `90% po 5000 xs 5000` nine tenths of the layer above it; `and` chains them into one program.
-
-Note the program above is the **canonical** form. A partial placement is written `po` (*part of*), and the leading quantity says which reading you mean: a percentage is the share directly, a bare number is an absolute amount and the share is that amount over the limit. Both normalize to the `<pct>% po <limit> xs <attach>` spelling you see here, because the spec stores only the resolved fraction. That is why what you wrote and what the library shows back can differ without anything having changed.
-
-`reins_summary_df` is the exhibit that matters here: three stages (gross, ceded, net) x three components (freq, sev, agg), with theoretic `EX` next to the FFT `Est EX`. The frequency row is identical across the three views -- occurrence cover changes what each claim costs, never how many there are.
-
-## Check
-
-```python
-# net + ceded = gross, on both severity and aggregate, to grid accuracy
-est = a.reins_summary_df['Est EX'].xs('occ')
-for component in ('sev', 'agg'):
-    gross = est[('gross', component)]
-    net = est[('net', component)]
-    ceded = est[('ceded', component)]
-    assert abs(net + ceded - gross) < 1e-6 * gross
-# occurrence cover leaves the claim COUNT alone. Read this off the theoretic
-# EX column: the gross frequency has no separate FFT estimate (Est EX is NaN
-# there -- there is nothing to estimate, the count is an input).
-ex = a.reins_summary_df['EX'].xs('occ')
-assert abs(ex[('net', 'freq')] - ex[('gross', 'freq')]) < 1e-9
-assert abs(ex[('ceded', 'freq')] - ex[('gross', 'freq')]) < 1e-9
-```
-}}};
-
-agg ReinsuranceAggregateLayer
-  5 claims
-  120 xs 0
-  sev 120 * uniform
-  poisson
-  aggregate net of
-    100 xs 240
-  note{aggregate reinsurance}
-  tags{topic:reinsurance};
-
-agg ReinsuranceLayered
-  1250 premium at 0.8 lr
-  1000 xs 0
-  sev lognorm 80 cv 1.675
-  occurrence ceded to
-    125 xs 0 and
-    50% po 125 xs 125 and
-    20% po 250 xs 250 and
-    5% po 500 xs 500
-  poisson
-  note{Layered occurrence reinsurance, ceded view.}
-  tags{topic:reinsurance};
-
-agg ReinsuranceOccurrenceTower
-  5 claims
-  120 xs 0
-  sev 120 * uniform
-  occurrence net of
-    50% po 25 xs 25 and
-    90% po 50 xs 50
-  poisson
-  note{occurrence reinsurance; note over the top exposure}
-  tags{topic:reinsurance};
-
-agg ReinsuranceOccurrenceWithAggLimit
-  5 claims
-  120 xs 0
-  sev 120 * uniform
-  occurrence ceded to
-    60 xs 60
-  poisson
-  aggregate ceded to
-    180 xs 0
-  note{occurrence with an aggregate limit}
-  tags{topic:reinsurance};
-
-# ----------------------------------------------------------------------
-# Profit and loss (signed support)
-# ----------------------------------------------------------------------
-port PnLBook
-  tags{topic:portfolio, topic:pnl}
-  pnl Cat
-    2000 premium
-    less
-      agg Cat_e
-        2000 premium at 0.55 lr
-        sev lognorm 500 cv 3
-        poisson
-  pnl Prop
-    5000 premium
-    less
-      agg Prop_e
-        5000 premium at 0.65 lr
-        sev lognorm 100 cv 2
-        poisson;
-
-pnl PnLClaims
-  100 premium
-  less
-    agg PnLprem.Claims_e
-      10 claims
-      sev lognorm 8 cv 1.5
-      poisson
-  note{claims form: premium independent of the loss model}
-  tags{topic:pnl};
-
-pnl PnLLoss
-  100 premium
-  less
-    agg PnLprem.Loss_e
-      85 loss
-      sev lognorm 8 cv 1.5
-      poisson
-  note{expected-loss form: E[loss]=85, margin 15}
-  tags{topic:pnl};
-
-pnl PnLLossRatio
-  1000 premium
-  less
-    agg PnLprem.LR_e
-      1000 premium at 0.7 lr
-      sev lognorm 100 cv 2
-      poisson
-  note{loss ratio form: E[loss]=700, margin 300}
-  tags{topic:pnl};
-
-pnl PnLMixed
-  [100 200 100] premium
-  less
-    agg E.PnLMix_e
-      [100 200 100] premium at 0.8 lr
-      [1000 2000 5000] xs 0
-      sev lognorm 500 cv 2
-      poisson
-  note{Vector premium: shift 400, mean 80 = sum premium_i (1 - lr).}
-  tags{topic:pnl};
-
-# does not build - not supported yet
-# port PnLPortfolio tags{topic:portfolio, topic:pnl}  note{Portfolio of two profit-and-loss units.}
-#    pnl Cat 2000 prem less agg Cat_e 2000 prem at 55% lr sev lognorm 500 cv 3 poisson
-#    pnl Prop 5000 prem less agg Prop_e 5000 prem at 65% lr sev lognorm 100 cv 2 poisson;
-
-pnl PnLSignedAsymmetric
-  10 premium
-  less
-    agg PnLsigned.Asym_e
-      dfreq [2]
-      dsev [-2 1 3] [0.5 0.3 0.2]
-  note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2}
-  tags{topic:pnl};
-
-pnl PnLSignedDsev
-  5 premium
-  less
-    agg PnLsigned.Dsev_e
-      dfreq [3]
-      dsev [-1 1]
-  note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3}
-  tags{topic:pnl};
-
-pnl PnLSignedSsev 100 premium less
-  agg PnLsigned.Ssev_e
-    5 claims
-    ssev 20 - lognorm 10 cv 0.5
-    poisson
-  note{continuous signed severity: E[loss]=50, margin 50}
-  tags{topic:pnl};
-
-pnl PnLSimple
-  1000 premium
-  less
-    agg E.PNL_e
-      1000 premium at 0.9 lr
-      1000 xs 0
-      sev lognorm 120 cv 1
-      mixed gamma 0.25
-  note{Single profit-and-loss line.}
-  tags{topic:pnl};
-
-pnl PnLVector
-  [100 200 100] premium
-  less
-    agg PnLprem.Vec_e
-      [100 200 100] premium at 0.8 lr
-      [1000 2000 5000] xs 0
-      sev lognorm 500 cv 2
-      poisson
-  note{vector premium: shift 400, mean 80 = sum premium_i (1-lr)}
-  tags{topic:pnl};
-
-agg SignedFixed
-  dfreq [3]
-  dsev [-2 5]
-  note{fixed-3; closed form support (-6,1,8,15)}
-  tags{topic:pnl};
-
-port SignedGotcha
-  tags{topic:portfolio, topic:pnl}
-  agg A
-    50 claims
-    sev 10 * norm + 5 splice [0] [40]
-    poisson
-  agg B
-    50 claims
-    sev 10 * norm + -5 splice [0] [35]
-    poisson;
-
-agg SignedLump
-  1000000 claims
-  dsev [-1 10] [0.9375 0.0625]
-  poisson
-  note{near-Gaussian lump at a negative mean ~ -312500; auto window}
-  tags{topic:pnl};
-
-agg SignedNormal
-  100 claims
-  ssev 50 * norm + 10
-  poisson
-  note{continuous signed (ssev) P&L severity; never clamps}
-  tags{topic:pnl};
-
-port SignedPortfolioMixed
-  tags{topic:portfolio, topic:pnl}
-  agg Loss
-    30 claims
-    sev lognorm 20 cv 0.8
-    poisson
-  agg PnL
-    50 claims
-    ssev 10 * norm
-    poisson;
-
-port SignedPortfolioPair
-  tags{topic:portfolio, topic:pnl}
-  agg A
-    50 claims
-    ssev 10 * norm + 5
-    poisson
-  agg B
-    50 claims
-    ssev 10 * norm + -5
-    poisson;
-
-agg SignedPremiumMinusLoss
-  5 claims
-  ssev 100 - lognorm 80 cv .2
-  poisson
-  note{premium minus loss: constant - dist reflects the severity (sev mean 20)}
-  tags{topic:pnl};
-
-agg SignedSeverity
-  dfreq [3]
-  dsev [-2 5]
-  note{Signed severity -- negative outcomes allowed (closed-form support).}
-  tags{topic:severity, topic:pnl};
-
-agg SignedSeveritySimple
-  dfreq [3]
-  dsev [-2 5]
-  note{Signed severity -- negative outcomes allowed.}
-  tags{topic:severity, topic:pnl};
-
-agg SignedStandardDeviation
-  dfreq [3]
-  dsev [-1 1]
-  note{zero-mean signed; sev SD 1, agg SD sqrt(3) -- derived from ex2, not mean*cv}
-  tags{topic:pnl};
-
-agg SignedSymmetric
-  20 claims
-  dsev [-1 1]
-  poisson
-  note{symmetric P&L; mean 0}
-  tags{topic:pnl};
-
-# ----------------------------------------------------------------------
-# Portfolios
-# ----------------------------------------------------------------------
-port BasicPortfolio
-  note{Two-unit portfolio.}
-  tags{topic:portfolio}
-  agg A
-    50 claims
-    1000 xs 0
-    sev lognorm 100 cv 1.2
-    mixed gamma 0.4
-  agg B
-    65 claims
-    2000 xs 0
-    sev lognorm 150 cv 1.6
-    mixed gamma 0.2;
-
-port SevVersusSsev
-  tags{topic:portfolio, topic:severity}
-  agg A
-    50 claims
-    ssev 10 * norm + 5
-    poisson
-  agg B
-    50 claims
-    ssev 10 * norm + -5
-    poisson;
-
-port SharedMixPortfolio
-  note{Shared frequency mixer = common shock; correlated units on one grid.}
-  tags{topic:portfolio}
-  agg A
-    100 claims
-    sev lognorm 50 cv 1.5
-    mixed gamma 0.4
-  agg B
-    120 claims
-    sev lognorm 60 cv 1.5
-    mixed gamma 0.4;
-
-port ThickThickPortfolio
-  note{Two unbounded heavy-tailed units -- little diversification, tail-driven.}
-  tags{topic:portfolio}
-  agg A
-    100 claims
-    sev lognorm 50 cv 3
-    poisson
-  agg B
-    100 claims
-    sev lognorm 80 cv 3.5
-    poisson;
-
-port ThickThinPortfolio
-  note{Thin attritional + bounded-but-thick cat -- the rich diversification case.}
-  tags{topic:portfolio}
-  agg NonCat
-    200 claims
-    100 xs 0
-    sev gamma 8 cv 0.3
-    poisson
-  agg Cat
-    2 claims
-    5000 xs 0
-    sev lognorm 500 cv 4
-    poisson;
-
-port ThinThinPortfolio
-  note{Two thin, concentrated units -- nearly Gaussian total.}
-  tags{topic:portfolio}
-  agg A
-    1 claim
-    sev gamma 50 cv 0.1
-    fixed
-  agg B
-    1 claim
-    sev gamma 50 cv 0.15
-    fixed;
-
-# ----------------------------------------------------------------------
-# Bivariate and dependent risks
-# ----------------------------------------------------------------------
-bivariate BivariateCatPair
-  25 claims
-  agg Wind
-    dfreq [0 1] [0.3 0.7]
-    sev lognorm 40 cv 0.65 splice [0] [250]
-  agg Flood
-    dfreq [0 1]
-    sev lognorm 60 cv 0.95 splice [0] [300]
-  copula independent
-  mixed gamma 0.2
-  note{Common-shock bivariate (bv): Wind and Flood share frequency mixing.}
-  tags{topic:bivariate};
-
-bivariate BivariateClaytonMixed
-  25 claims
-  agg Wind
-    dfreq [0 1] [0.3 0.7]
-    sev lognorm 40 cv 1.2
-  agg Flood
-    dfreq [0 1]
-    sev lognorm 60 cv 1.5
-  copula clayton 0.3
-  mixed gamma 0.2
-  tags{topic:bivariate};
-
-bivariate BivariateGumbel
-  25 claims
-  agg Wind
-    dfreq [0 1] [0.3 0.7]
-    sev lognorm 40 cv 1.2
-  agg Flood
-    dfreq [0 1]
-    sev lognorm 60 cv 1.5
-  copula gumbel 0.4
-  poisson
-  tags{topic:bivariate};
-
-bivariate BivariateGumbelPair
-  25 claims
-  agg Wind
-    dfreq [0 1] [0.3 0.7]
-    sev lognorm 40 cv 1.2
-  agg Flood
-    dfreq [0 1]
-    sev lognorm 60 cv 1.5
-  copula gumbel 0.4
-  poisson
-  note{Gumbel-copula dependence between Wind and Flood.}
-  tags{topic:bivariate};
-
-bivariate BivariateIndependent
-  25 claims
-  agg A
-    dfreq [0 1]
-    sev lognorm 50 cv 1.5
-  agg B
-    dfreq [0 1]
-    sev gamma 50 cv 1
-  copula independent
-  poisson
-  tags{topic:bivariate};
-
-netceded
-  agg BivariateNetCeded
-    8 claims
-    sev 300 * beta 2 3
-    occurrence net of
-      1.1666666666666665% po 60 xs 40
-    poisson
-    tags{topic:bivariate, topic:reinsurance};
-
-netceded
-  agg BivariateNetCededPair
-    15 claims
-    10000 xs 0
-    sev lognorm 1500 cv 1
-    occurrence net of
-      50% po 2500 xs 2500 and
-      90% po 5000 xs 5000
-    mixed gamma 0.25
-    note{Gross / ceded / net joint view of a reinsured book.}
-    tags{topic:bivariate, topic:reinsurance};
-
-bivariate BivariateNormal
-  25 claims
-  agg A
-    dfreq [0 1]
-    sev lognorm 50 cv 1.5
-  agg B
-    dfreq [0 1]
-    sev gamma 50 cv 1
-  copula normal 0.5
-  poisson
-  tags{topic:bivariate};
-
-bivariate BivariatePnLAxis
-  25 claims
-  agg A
-    dfreq [0 1] [0.3 0.7]
-    sev lognorm 40 cv 1.2
-  pnl B
-    900 premium
-    less
-      agg B_e
-        dfreq [0 1]
-        sev lognorm 60 cv 1.5
-  copula gumbel 0.4
-  poisson
-  tags{topic:bivariate};
-
-netceded
-  agg NetCededJoint
-    15 claims
-    10000 xs 0
-    sev lognorm 1500 cv 1
-    occurrence net of
-      50% po 2500 xs 2500 and
-      90% po 5000 xs 5000
-    mixed gamma 0.25
-    note{Joint gross / ceded / net view of the reinsured book.}
-    tags{topic:bivariate, topic:reinsurance};
-
-netceded
-  agg NetCededShowcase
-    8 claims
-    sev 300 * beta 2 3
-    occurrence net of
-      1.1666666666666665% po 60 xs 40
-    poisson
-    note{Bivariate distribution of net and ceded for XOL reinsurance program.}
-    tags{topic:bivariate, topic:reinsurance};
-
-# ----------------------------------------------------------------------
-# Distortions (risk measures)
-# ----------------------------------------------------------------------
-distortion CCoCDistortion ccoc 0.25
-  tags{topic:distortion};
-
-distortion DualDistortionSimple dual 2.5
-  tags{topic:distortion};
-
-distortion MinimumDistortion minimum dist.PHDistortion dist.DualDistortion
-  tags{topic:distortion};
-
-distortion PHDistortionSimple ph 0.65
-  tags{topic:distortion};
-
-distortion TVaRDistortion tvar 0.4
-  tags{topic:distortion};
-
-distortion WangDistortion ph 0.7
-  tags{topic:distortion};
-
-# ----------------------------------------------------------------------
-# Numerical character
-# ----------------------------------------------------------------------
-agg ApproximateAggReins
-  100 claims
-  sev lognorm 100 cv 2
-  poisson
-  aggregate net of
-    100 xs 0
-  approximate sgamma
-  tags{topic:numerics};
-
-agg ApproximateGamma
-  5000 claims
-  sev lognorm 100 cv 2
-  poisson
-  approximate sgamma
-  note{Shifted-gamma moment approximation.}
-  tags{topic:numerics};
-
-agg ApproximateLeftReflect
-  1 claim
-  sev 100 * beta 5 1.3
-  fixed
-  approximate sgamma
-  tags{topic:numerics};
-
-pnl ApproximatePnL
-  600000 premium
-  less
-    agg APX.PnL_e
-      5000 claims
-      sev lognorm 100 cv 2
-      poisson
-      approximate sgamma
-  tags{topic:pnl, topic:numerics};
-
-agg ApproximateRightSgamma
-  5000 claims
-  sev lognorm 100 cv 2
-  poisson
-  approximate sgamma
-  tags{topic:numerics};
-
-agg ApproximateRightSlognorm
-  5000 claims
-  sev lognorm 100 cv 2
-  poisson
-  approximate slognorm
-  tags{topic:numerics};
-
-agg HeavyTailValidation
-  10 claims
-  sev 100 * pareto 1.3 + -100
-  poisson
-  note{Infinite-variance Pareto -- the validator refuses to guess.}
-  tags{topic:numerics}
-  hints{bs=0.25; log2=16};
-
-agg NumericsDice
-  dfreq [1 2 3 4 5 6]
-  dsev [1 2 3 4 5 6]
-  note{six-surface consistency target; Choquet hand checks}
-  tags{topic:numerics};
-
-port NumericsOneDice
-  note{one-line port: line == total}
-  tags{topic:portfolio, topic:numerics}
-  agg D
-    dfreq [1 2 3 4 5 6]
-    dsev [1 2 3 4 5 6];
-
-port NumericsPayPair
-  note{homogeneous payoff book prices through the dual}
-  tags{topic:portfolio, topic:numerics}
-  pnl P1
-    10 premium
-    less
-      agg P1_e
-        dfreq [1]
-        dsev [2 5]
-  pnl P2
-    8 premium
-    less
-      agg P2_e
-        dfreq [1]
-        dsev [1 3];
-
-port NumericsSignedDiscrete
-  note{signed totals price via dot(kappa, gp); shares NaN}
-  tags{topic:portfolio, topic:pnl, topic:numerics}
-  agg A
-    dfreq [1 2]
-    dsev [-3 -1 2] [0.5 0.3 0.2]
-  agg B
-    dfreq [1]
-    dsev [-2 1 4]
-  agg C
-    dfreq [2]
-    dsev [1 3];
-
-port NumericsUnbounded
-  note{mass-on-unbounded refused in the lifted builder (G6)}
-  tags{topic:portfolio, topic:numerics}
-  agg U
-    5 claims
-    sev lognorm 10 cv 1
-    poisson;
-
-agg WindowContinuous
-  100000 claims
-  sev lognorm 100 cv 0.5
-  poisson
-  tags{topic:numerics};
-
-agg WindowDiscrete
-  10000000 claims
-  dsev [1 2]
-  poisson
-  tags{topic:numerics};
-
-agg WindowedGrid
-  10000000 claims
-  dsev [1 2]
-  poisson
-  note{Concentrated high-mean book -- resolved on a non-zero output window.}
-  tags{topic:numerics};
-
-agg WindowedSimple
-  10000 claims
-  dsev [-1 1]
-  poisson
-  note{Windowed / discrete severity at high frequency.}
-  tags{topic:numerics};
-
-# ----------------------------------------------------------------------
-# Book and paper reproductions
-# ----------------------------------------------------------------------
-port BodoffOne
-  note{Bodoff Thought Experiment No. 1}
-  tags{topic:portfolio, role:paper}
-  agg wind1
-    1 claim
-    sev dhistogram xps [0 99] [0.8 0.2]
-    fixed
-  agg quake1
-    1 claim
-    sev dhistogram xps [0 100] [0.95 0.05]
-    fixed;
-
-port BodoffOneNet
-  note{Bodoff Thought Experiment No. 1}
-  tags{topic:portfolio, role:paper}
-  agg wind1
-    1 claim
-    dsev [0 99] [0.8 0.2]
-    fixed
-  agg quake1
-    1 claim
-    dsev [0 100] [0.95 0.05]
-    fixed;
-
-port BodoffThree
-  note{Bodoff Thought Experiment No. 3}
-  tags{topic:portfolio, role:paper}
-  agg wind3
-    1 claim
-    sev dhistogram xps [0 5] [0.8 0.2]
-    fixed
-  agg quake3
-    1 claim
-    sev dhistogram xps [0 100] [0.95 0.05]
-    fixed;
-
-port BodoffThreeNet
-  note{Bodoff Thought Experiment No. 3}
-  tags{topic:portfolio, role:paper}
-  agg wind3
-    1 claim
-    sev dhistogram xps [0 5] [0.8 0.2]
-    fixed
-  agg quake3
-    1 claim
-    sev dhistogram xps [0 100] [0.95 0.05]
-    fixed;
-
-port BodoffTwo
-  note{Bodoff Thought Experiment No. 2}
-  tags{topic:portfolio, role:paper}
-  agg wind2
-    1 claim
-    sev dhistogram xps [0 50] [0.8 0.2]
-    fixed
-  agg quake2
-    1 claim
-    sev dhistogram xps [0 100] [0.95 0.05]
-    fixed;
-
-port BodoffTwoNet
-  note{Bodoff Thought Experiment No. 2}
-  tags{topic:portfolio, role:paper}
-  agg wind2
-    1 claim
-    dsev [0 50] [0.8 0.2]
-    fixed
-  agg quake2
-    1 claim
-    dsev [0 100] [0.95 0.05]
-    fixed;
-
-port BodoffWindQuake
-  note{Bodoff thought-experiment -- discrete two-peril allocation.}
-  tags{role:hero, topic:portfolio, role:paper}
-  agg Wind
-    1 claim
-    dsev [0 99] [0.8 0.2]
-    fixed
-  agg Quake
-    1 claim
-    dsev [0 100] [0.95 0.05]
-    fixed;
-
-agg DefectivePareto
-  1 claim
-  sev 1000 * pareto 1.5 + -1000
-  fixed
-  note{defective; no finite 2nd moment}
-  tags{role:paper}
-  hints{normalize=False};
-
-port NumericsBodoff
-  note{bounded discrete; linear vs lifted; mass distortion exact}
-  tags{topic:portfolio, role:paper, topic:numerics}
-  agg wind
-    1 claim
-    sev dhistogram xps [0 99] [0.8 0.2]
-    fixed
-  agg quake
-    1 claim
-    sev dhistogram xps [0 100] [0.95 0.05]
-    fixed;
-
-port BodoffFour
-  note{Bodoff Thought Experiment No. 4; exponential severity requires sharpen}
-  tags{topic:portfolio, role:paper, topic:numerics}
-  agg a
-    0.25 claims
-    sev 4 * expon
-    poisson
-  agg b
-    0.05 claims
-    sev 20 * expon
-    poisson
-  agg c
-    0.05 claims
-    sev 100 * expon
-    poisson;
-
-port PIRCatNonCatGross
-  note{PIR Cat-Noncat gross case study.}
-  tags{topic:portfolio, role:paper}
-  hints{bs=1/64; log2=16; padding=1}
-  agg CNC.NonCat
-    1 claim
-    sev gamma 80 cv 0.15
-    fixed
-  agg CNC.Cat
-    1 claim
-    sev lognorm 20 cv 1
-    fixed;
-
-port PIRCatNonCatNet
-  note{PIR Cat-Noncat net case study.}
-  tags{topic:portfolio, role:paper}
-  hints{bs=1/64; log2=16; padding=1}
-  agg CNC.Net.NonCat
-    1 claim
-    sev gamma 80 cv 0.15
-    fixed
-  agg CNC.Net.Cat
-    1 claim
-    sev lognorm 20 cv 1
-    fixed
-    aggregate net of
-      79.64 xs 41.11;
-
-port PIRDiscrete
-  note{PIR Discrete case study.}
-  tags{topic:portfolio, role:paper}
-  hints{bs=1; log2=8; padding=1}
-  agg Discrete.X1
-    1 claim
-    dsev [0 8 10] [0.5 0.25 0.25]
-    fixed
-  agg Discrete.X2
-    1 claim
-    dsev [0 1 90] [0.5 0.25 0.25]
-    fixed;
-
-port PIRTame
-  note{PIR Tame case study. For reinsurance see text.}
-  tags{topic:portfolio, role:paper}
-  hints{bs=1/64; log2=16; padding=1}
-  agg Tame.A
-    1 claim
-    sev gamma 50 cv 0.1
-    fixed
-  agg Tame.B
-    1 claim
-    sev gamma 50 cv 0.15
-    fixed;
-
-# ----------------------------------------------------------------------
-# Severity curve reference
-# ----------------------------------------------------------------------
-sev Berens1997.Lognorm lognorm 150000 cv 0.25
-  note{Berens1997}
-  tags{topic:severity, role:reference, role:paper};
-
-sev Berens1997.Pareto 50000 * pareto 1.5
-  note{Berens1997}
-  tags{topic:severity, role:reference, role:paper};
-
-sev Bodoff2017.Pareto 50000 * lomax 1.5
-  note{Bodoff2017}
-  tags{topic:severity, role:reference, role:paper};
 
 agg CurveBeta
   1 claim
@@ -1830,6 +688,18 @@ agg CurveWeibull
   note{Weibull (weibull_min), shape c = 1.5: increasing hazard.}
   tags{topic:severity, role:reference};
 
+sev Berens1997.Lognorm lognorm 150000 cv 0.25
+  note{Berens1997}
+  tags{topic:severity, role:reference, role:paper};
+
+sev Berens1997.Pareto 50000 * pareto 1.5
+  note{Berens1997}
+  tags{topic:severity, role:reference, role:paper};
+
+sev Bodoff2017.Pareto 50000 * lomax 1.5
+  note{Bodoff2017}
+  tags{topic:severity, role:reference, role:paper};
+
 sev Jin2016.Gamma gamma 6 cv 0.5774
   note{Jin2016}
   tags{topic:severity, role:reference, role:paper};
@@ -1861,4 +731,1186 @@ sev Mata2005.Lognorm 11048 * lognorm 2.29
 sev Venter1983.Piecewise chistogram xps [0 1000 5000 6000 7000 8000 9000 10000 12500 15000 17500 20000 25000 35000 50000 75000 100000 125000 150000 175000 200000 225000 250000 300000] [0.38935 0.38935 0.00568 0.00543 0.00517 0.00495 0.00473 0.01098 0.00989 0.00896 0.00815 0.01426 0.02237 0.02353 0.02459 0.01517 0.01021 0.00732 0.00547 0.00423 0.00337 0.00274 0.0241]
   note{Venter1983. Piecewise linear claim size CDF to the 250,000 policy limit; the top bin carries the limit mass, so use only inside a 250000 xs 0 layer.}
   tags{topic:severity, role:reference, role:paper};
+
+# ----------------------------------------------------------------------
+# Frequency
+# One law per entry, most on the unit severity so only the count varies.
+# ----------------------------------------------------------------------
+
+agg FixedFrequency
+  10 claims
+  sev.UnitSeverity
+  fixed
+  note{fixed claim count}
+  tags{topic:frequency};
+
+agg BernoulliFrequency
+  .8 claims
+  sev.UnitSeverity
+  bernoulli
+  note{Bernoulli claim count}
+  tags{topic:frequency};
+
+agg BinomialFrequency
+  10 claims
+  dsev [1]
+  binomial 0.5
+  note{Bounded claim count -- binomial (here n = 20, p = 0.5).}
+  tags{topic:frequency};
+
+agg PoissonSimple
+  10 claims
+  sev.UnitSeverity
+  poisson
+  note{Poisson claim count}
+  tags{topic:frequency};
+
+agg PoissonFrequency
+  100 claims
+  1000 xs 0
+  sev lognorm 100 cv 1.5
+  poisson
+  note{Poisson frequency -- the no-contagion baseline.}
+  tags{topic:frequency, role:intro};
+
+agg GeometricFrequency
+  10 claims
+  sev.UnitSeverity
+  geometric
+  note{geometric claim count}
+  tags{topic:frequency};
+
+agg NegativeBinomialFrequency
+  10 claims
+  sev.UnitSeverity
+  negbin 3
+  note{negative binomial; shape parameter 3 equals variance multiplier}
+  tags{topic:frequency};
+
+agg NegativeBinomialMixed
+  10 claims
+  sev.UnitSeverity
+  mixed gamma 0.65
+  note{negative binomial as gamma mixed Poisson, shape parameter equals cv of mixing distribution}
+  tags{topic:frequency};
+
+agg MixedGammaFrequency
+  100 claims
+  1000 xs 0
+  sev lognorm 100 cv 1.5
+  mixed gamma 0.4
+  note{Same severity, over-dispersed counts (gamma-mixed Poisson = negative binomial).}
+  tags{topic:frequency};
+
+agg InverseGaussianMixed
+  10 claims
+  sev.UnitSeverity
+  mixed ig .65
+  note{inverse Gaussian mixing distribution}
+  tags{topic:frequency};
+
+agg ZTPoissonFrequency
+  4 claims
+  dsev [1]
+  poisson zt
+  note{Zero-truncated Poisson -- at least one claim, so E[N] = 4/(1-exp(-4)) = 4.0746.}
+  tags{topic:frequency};
+
+agg ZMPoissonFrequency
+  4 claims
+  dsev [1]
+  poisson zm 0.5
+  note{Zero-modified Poisson -- inflate the no-claim probability to 0.5. The 4 is the UN-MODIFIED base mean; reweighting leaves E[N] = 2.0373. Append ! to pin E[N] = 4 instead.}
+  tags{topic:frequency};
+
+agg NeymanAFrequency
+  10 claims
+  dsev [1]
+  neymana 4
+  note{Neyman Type A claim count: a Poisson number of clusters, each contributing a Poisson number of claims. The parameter is the mean cluster size, so 10 claims in clusters of 4 means 2.5 clusters on average.}
+  tags{topic:frequency};
+
+# ----------------------------------------------------------------------
+# Aggregates
+# How exposure is stated, how a limits profile blends, and the Tweedie
+# family three ways.
+# ----------------------------------------------------------------------
+
+agg BasicMixedSev
+  dfreq [0 1 2] [.5 .3 .2]
+  sev.UnitSeverity
+  note{Using a built in severity}
+  tags{topic:aggregate};
+
+agg ExposureByClaimCount
+  10 claims
+  sev lognorm 50 cv 0.8
+  poisson
+  note{specify number of claims}
+  tags{topic:aggregate};
+
+agg ExposureByLoss
+  500 loss
+  sev lognorm 50 cv 0.8
+  poisson
+  note{State expected loss; the claim count is derived.}
+  tags{topic:aggregate};
+
+agg ExposureByPremium
+  1000 premium at 0.5 lr
+  sev lognorm 50 cv 0.8
+  poisson
+  note{State premium and a loss ratio; the claim count is derived.}
+  tags{topic:aggregate};
+
+agg ExposureRating
+  [100 200 1000 50] premium at [0.9 0.85 0.9 0.8] lr
+  [250 500 1000 2000] xs 0
+  sev lognorm 120 cv 12
+  occurrence ceded to
+    750 xs 750
+  mixed gamma 0.2
+  note{Exposure rating on a small portfolio with limits profile, amounts in 000s.}
+  tags{role:hero, topic:aggregate};
+
+agg LimitProfile
+  [10000 20000 5000] premium at [0.8 0.7 0.5] lr
+  [1000 2000 5000] xs 0
+  sev lognorm 50 cv 1.5
+  poisson
+  note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.}
+  tags{role:hero, topic:aggregate, check:reconciliation}
+  doc{{{
+## Problem
+
+You have the shape every pricing actuary already has: a table of premium by limit band, each band with its own expected loss ratio. You want one aggregate distribution for the whole book, with the bands correctly weighted -- not three separate models you then have to add up by hand.
+
+## Solution
+
+```python
+a = build('''<<decl>>''')
+qd(a.summary_df)
+```
+
+## Discussion
+
+The three vectors line up positionally: 10000 of premium at an 80% loss ratio written at a 1000 limit, 20000 at 70% at a 2000 limit, 5000 at 50% at a 5000 limit. One severity curve is written across all three bands, and the *limit* is what differs -- so the severity is the same lognormal capped at three different points.
+
+The claim count is an **output**, not an input. `aggregate` knows the expected loss in each band (premium x loss ratio) and the expected severity in that band (the lognormal limited at that band's limit), so it derives the implied count per band and adds them. That is the whole point of the exposure clause: you give it what you actually have -- premium and a loss ratio -- and it solves for the count rather than making you do it.
+
+Read `a.n` back to see the implied total count, and `a.sev_m` for the exposure-weighted average severity across the bands.
+
+## Check
+
+```python
+# the aggregate mean IS the premium-weighted expected loss, exactly:
+# 10000x0.8 + 20000x0.7 + 5000x0.5 = 24500
+assert abs(a.actual_m - 24500.0) < 1e-9
+# and the FFT estimate agrees to grid accuracy
+assert abs(a.est_m / a.actual_m - 1) < 1e-6
+# E[A] = E[N] x E[X] still holds across the blended profile
+assert abs(a.n * a.sev_m - a.actual_m) < 1e-6
+```
+}}};
+
+agg LimitProfileSimple
+  [5 10 8 2] claims
+  [1 5 10 20] xs 0
+  sev lognorm 10 cv 1.2
+  mixed gamma 0.2
+  note{Limit profile stated by claim count rather than premium, one severity curve across all four bands.}
+  tags{topic:aggregate, topic:severity, topic:frequency};
+
+agg ExactGamma
+  5000 claims
+  sev lognorm 100 cv 2
+  poisson
+  note{Exact computation}
+  tags{topic:aggregate};
+
+agg TweedieBook
+  25 claims
+  sev gamma 1 cv 0.05
+  poisson
+  note{Tweedie - Poisson sum of gammas. Extreme case, severity has low CV.}
+  tags{role:hero, topic:aggregate};
+
+agg TweedieDirect
+  10.050251256281404 claims
+  sev gamma 0.0995 cv 0.07088812050083283
+  poisson
+  note{Tweedie defined by claim count, gamma mean and cv}
+  tags{topic:aggregate};
+
+agg TweedieFromMoments
+  10.050251256281404 claims
+  sev 0.0005 * gamma 199
+  poisson
+  note{Tweedie defined by claim count, gamma scale and shape}
+  tags{topic:aggregate};
+
+agg TweedieDispersion
+  tweedie 1.005 1 0.1
+  note{Tweedie by power p, mean, and dispersion; variance = dispersion * mean**p.}
+  tags{topic:aggregate};
+
+agg PremiumMinusLoss
+  5000 claims
+  ssev 100 - lognorm 80 cv .2
+  poisson
+  note{High-frequency premium-minus-loss payoff -- near-Gaussian on a signed window.}
+  tags{topic:aggregate};
+
+# ----------------------------------------------------------------------
+# Aggregates with reinsurance
+# GrossCatXOL is the gross view of the USXOLTower program that follows it.
+# ----------------------------------------------------------------------
+
+agg GrossCatXOL as "Gross US Hurricane"
+  1.74 claims
+  sev lognorm 8.501 cv 14.624
+  poisson
+  note{ILW model on US Cat, amounts in billions. Gross of the USXOLTower program.}
+  tags{topic:aggregate}
+  hints{bs=2;log2=16;normalize=False;};
+
+agg USXOLTower as "US Hurricane Reinsurance"
+  1.74 claims
+  sev lognorm 8.501 cv 14.624
+  occurrence net of
+    90% po 100 xs 100 deposit 4 and
+    95% po 200 xs 200 deposit 3.75 as "Occ re"
+  poisson
+  aggregate net of
+    50% po 20 xs 100 deposit 3 as "Agg re"
+  note{ILW model of US Cat. Amounts in billions. From St John's RMI3388 course. Industry estimates, as of 2019: 100 year PML USD132.5B and 250 year USD300.3B.}
+  tags{role:hero, topic:reinsurance}
+  hints{bs=2;log2=16;normalize=False;};
+
+agg AggregateStopLoss
+  100 claims
+  1000 xs 0
+  sev lognorm 100 cv 1.5
+  poisson
+  aggregate net of
+    5000 xs 30000
+  note{Aggregate stop-loss -- net of an annual 5000-xs-30000 layer.}
+  tags{topic:reinsurance};
+
+agg OccurrenceXOL
+  15 claims
+  10000 xs 0
+  sev lognorm 1500 cv 1
+  occurrence net of
+    50% po 2500 xs 2500 and
+    90% po 5000 xs 5000
+  mixed gamma 0.25
+  note{Occurrence excess-of-loss program, net view.}
+  tags{topic:reinsurance, check:reconciliation}
+  doc{{{
+## Problem
+
+You have a two-layer per-occurrence excess program with partial placements, and you want the *net* aggregate -- with gross and ceded still visible, so you can see where the cession went instead of taking the net on faith.
+
+## Solution
+
+```python
+a = build('''<<decl>>''')
+qd(a.reins_summary_df)
+```
+
+## Discussion
+
+`occurrence net of ...` applies the program claim by claim, before the frequency convolution -- which is what "per occurrence" means and why it cannot be done by adjusting the aggregate afterwards.
+
+`50% po 2500 xs 2500` cedes half of the 2500-excess-2500 layer, `90% po 5000 xs 5000` nine tenths of the layer above it; `and` chains them into one program.
+
+Note the program above is the **canonical** form. A partial placement is written `po` (*part of*), and the leading quantity says which reading you mean: a percentage is the share directly, a bare number is an absolute amount and the share is that amount over the limit. Both normalize to the `<pct>% po <limit> xs <attach>` spelling you see here, because the spec stores only the resolved fraction. That is why what you wrote and what the library shows back can differ without anything having changed.
+
+`reins_summary_df` is the exhibit that matters here: three stages (gross, ceded, net) x three components (freq, sev, agg), with theoretic `EX` next to the FFT `Est EX`. The frequency row is identical across the three views -- occurrence cover changes what each claim costs, never how many there are.
+
+## Check
+
+```python
+# net + ceded = gross, on both severity and aggregate, to grid accuracy
+est = a.reins_summary_df['Est EX'].xs('occ')
+for component in ('sev', 'agg'):
+    gross = est[('gross', component)]
+    net = est[('net', component)]
+    ceded = est[('ceded', component)]
+    assert abs(net + ceded - gross) < 1e-6 * gross
+# occurrence cover leaves the claim COUNT alone. Read this off the theoretic
+# EX column: the gross frequency has no separate FFT estimate (Est EX is NaN
+# there -- there is nothing to estimate, the count is an input).
+ex = a.reins_summary_df['EX'].xs('occ')
+assert abs(ex[('net', 'freq')] - ex[('gross', 'freq')]) < 1e-9
+assert abs(ex[('ceded', 'freq')] - ex[('gross', 'freq')]) < 1e-9
+```
+}}};
+
+agg ReinsuranceOccurrenceTower
+  5 claims
+  120 xs 0
+  sev 120 * uniform
+  occurrence net of
+    50% po 25 xs 25 and
+    90% po 50 xs 50
+  poisson
+  note{occurrence reinsurance; note over the top exposure}
+  tags{topic:reinsurance};
+
+agg ReinsuranceOccurrenceWithAggLimit
+  5 claims
+  120 xs 0
+  sev 120 * uniform
+  occurrence ceded to
+    60 xs 60
+  poisson
+  aggregate ceded to
+    180 xs 0
+  note{occurrence with an aggregate limit}
+  tags{topic:reinsurance};
+
+agg ReinsuranceAggregateLayer
+  5 claims
+  120 xs 0
+  sev 120 * uniform
+  poisson
+  aggregate net of
+    100 xs 240
+  note{aggregate reinsurance}
+  tags{topic:reinsurance};
+
+agg ReinsuranceLayered
+  1250 premium at 0.8 lr
+  1000 xs 0
+  sev lognorm 80 cv 1.675
+  occurrence ceded to
+    125 xs 0 and
+    50% po 125 xs 125 and
+    20% po 250 xs 250 and
+    5% po 500 xs 500
+  poisson
+  note{Layered occurrence reinsurance tower, ceded view.}
+  tags{topic:reinsurance};
+
+# ----------------------------------------------------------------------
+# Fancy aggregates: one aggregate as the severity of another
+# Each pair is inner then outer, and the inner must come first: the outer
+# records `sev agg.NAME` at parse time and the underwriter resolves it
+# when the outer is built.
+# ----------------------------------------------------------------------
+
+agg NeymanCluster
+  4 claims
+  dsev [1]
+  poisson
+  note{One cluster of a Neyman Type A: a Poisson(4) count on a unit severity. The inner half of the construction NeymanInnerOuter assembles.}
+  tags{topic:frequency}
+  hints{bs=1; log2=8};
+
+agg NeymanInnerOuter
+  2.5 claims
+  sev agg.NeymanCluster
+  poisson
+  note{Neyman Type A assembled by hand: a Poisson(2.5) number of NeymanCluster draws, overall mean 10. The same distribution the neymana keyword produces.}
+  tags{topic:frequency, check:cross-object}
+  hints{bs=1; log2=10}
+  doc{{{
+## Problem
+
+`neymana` is one of the built in frequency laws: a Poisson number of clusters, each contributing a Poisson number of claims. You want to see what it is actually doing, and you want the same two level shape available when the inner or the outer piece is something the frequency vocabulary does not name.
+
+## Solution
+
+An aggregate can serve as the severity of another aggregate. The inner one, `NeymanCluster`, is a single cluster: a Poisson(4) count on a unit severity. The outer draws a Poisson(2.5) number of clusters and adds them up.
+
+```python
+a = build('''<<decl>>''')
+qd(a)
+```
+
+The keyword states the same law in one line. The overall mean is the product, 2.5 x 4 = 10, and the parameter is the mean cluster size.
+
+```python
+builtin = build('agg NeymanBuiltIn 10 claims dsev [1] neymana 4', bs=1, log2=10)
+qd(builtin)
+```
+
+Compare the two probability mass functions directly.
+
+```python
+both = pd.concat([a.density_df.p_total, builtin.density_df.p_total], axis=1)
+both.columns = ['inner outer', 'neymana']
+both['difference'] = both['inner outer'] - both['neymana']
+qd(both.head(12))
+```
+
+## Discussion
+
+The inner is referred to by **name**. The outer parses with `agg.NeymanCluster` recorded and the underwriter resolves it at build time, so nothing is spliced textually and the inner is a fully formed object before the outer ever sees it. Its output probability mass function then becomes a discrete severity for the outer, exactly as though it had been transcribed as `dsev [outcomes] [probabilities]` by hand. That is why the inner has to pin `bs` and `log2` in its own `hints`: the severity it hands over must not depend on the settings the outer happens to be built with.
+
+The inner keeps its mass at zero, because a Poisson cluster can be empty and the outer has no layers clause to condition it away. That is load bearing. Neyman A is a Poisson stopped sum of Poissons counting the empty clusters too, and both constructions report the same P(N = 0) = exp(2.5 (exp(-4) - 1)) = 0.0859.
+
+The general fact is that a two level count is a stopped sum, so this construction reaches any of them, not only Neyman A. Pascal is a Poisson stopped sum of negative binomials and is reached the same way, with `negbin` on the inner. The keyword exists because the two level Poisson case is common enough to be worth a closed form probability generating function; the inner outer route is what to reach for when there is no keyword.
+
+## Check
+
+```python
+# the two constructions agree to floating point across the whole support
+both = pd.concat([a.density_df.p_total, builtin.density_df.p_total], axis=1)
+assert (both.iloc[:, 0] - both.iloc[:, 1]).abs().max() < 1e-13
+# including the atom at zero, which is what keeping the empty clusters means
+assert abs(a.density_df.p_total.iloc[0] - np.exp(2.5 * (np.exp(-4) - 1))) < 1e-9
+# and on the moments the keyword computes analytically
+assert abs(a.est_m - 10.0) < 1e-9
+assert abs(a.est_m - builtin.est_m) < 1e-9
+assert abs(a.est_cv - builtin.est_cv) < 1e-9
+```
+}}};
+
+agg SplitLimitClaimant
+  1.25 claims
+  100 xs 0
+  sev lognorm 50 cv 2
+  poisson zt !
+  note{Claimants in one US auto 100/300 split limit accident: at least one claimant, 1.25 on average, each capped at the 100 per claimant limit.}
+  tags{topic:frequency, topic:severity}
+  hints{bs=1/4; log2=13};
+
+agg SplitLimitPolicy
+  100 claims
+  300 xs 0
+  sev agg.SplitLimitClaimant !
+  poisson
+  note{100 US auto policies written 100/300: the per accident loss of SplitLimitClaimant is the severity, capped at the 300 per accident limit.}
+  tags{topic:aggregate, topic:severity, check:reconciliation}
+  hints{bs=1/4; log2=17}
+  doc{{{
+## Problem
+
+A US personal auto policy written 100/300 pays at most 100 to any one claimant and at most 300 for any one accident. Two limits apply at two different levels, and neither is a layer on the other: the 100 sits inside the accident, the 300 sits on the accident total. You want the aggregate loss for a book of such policies.
+
+## Solution
+
+Build the policy from the inside out. The inner aggregate is one accident: a zero truncated Poisson number of claimants, 1.25 of them on average, each subject to the 100 per claimant limit.
+
+```python
+inner = build('SplitLimitClaimant')
+qd(inner)
+```
+
+The outer treats that per accident loss as its severity and applies the 300 as an ordinary occurrence limit.
+
+```python
+a = build('''<<decl>>''')
+qd(a)
+```
+
+## Discussion
+
+The two limits never interact in the program text. The per claimant limit is a layers clause inside the inner, applied claimant by claimant; the per accident limit is a layers clause on the outer, applied to the inner's whole output. Reinsurance clauses would reach the same law and would be much harder to read: prefer no limits, then exposure limits, then aggregate reinsurance, then occurrence reinsurance, in that order.
+
+`poisson zt !` carries two decisions. `zt` truncates the zero, so every draw of the inner has at least one claimant, which is what makes it an accident rather than a policy year. The `!` holds the requested mean at 1.25; without it the 1.25 would be the untruncated Poisson parameter and truncation would lift the mean to 1.75.
+
+The trailing `!` on `sev agg.SplitLimitClaimant` is a different `!`, on the severity side, and it says the outer's `300 xs 0` layer is unconditional. A zero truncated inner has no mass at zero in theory, but any severity with positive density at the origin discretizes a wisp of every claim into the first bucket, about 1.6 in 10,000 at this resolution. Those are small losses, not zero losses. Without the `!` the default conditional reading would drop them and rescale the rest, lifting the severity mean by the same proportion, and the library says so in a warning. Keep the mass.
+
+Both declarations pin `bs` and `log2`, and they pin the **same** `bs`. The inner must pin its resolution because it is materialized into a discrete severity before the outer ever runs, so its output must not depend on the outer's settings. Matching the two is a separate point and it is worth knowing: a layered reference is rebucketed by differencing its survival function, which is exact when the grids agree and loses a few parts in ten thousand when they do not.
+
+The result is worth stating plainly. With 1.25 claimants per accident and each one capped at 100, an accident needs three claimants before the 300 can bind at all, and P(loss to one policy exceeds 300) is about 7 in 100,000. The 300 is worth 0.0019 of expected loss per policy against a per policy mean of 43.92, four thousandths of one percent. In a 100/300 policy the per claimant limit does essentially all the work, and the model shows that rather than asserting it.
+
+## Check
+
+```python
+# the frequency ! held the requested mean at 1.25 claimants, against the
+# 1.75 that truncating a Poisson(1.25) would otherwise give
+assert abs(inner.n - 1.25) < 1e-12
+# the outer mean is 100 policies times the per accident loss capped at 300
+capped = inner.density_df['lev'].loc[300.0]
+assert abs(a.est_m / (100 * capped) - 1) < 1e-9
+# the 300 per accident limit binds, but is worth under a hundredth of a percent
+saving = inner.est_m - capped
+assert 0 < saving < 1e-4 * inner.est_m
+```
+}}};
+
+# ----------------------------------------------------------------------
+# Bivariate and dependent risks
+# By copula first, then the common-shock and net / ceded joint views.
+# ----------------------------------------------------------------------
+
+bivariate BivariateIndependent
+  25 claims
+  agg A
+    dfreq [0 1]
+    sev lognorm 50 cv 1.5
+  agg B
+    dfreq [0 1]
+    sev gamma 50 cv 1
+  copula independent
+  poisson
+  tags{topic:bivariate};
+
+bivariate BivariateNormal
+  25 claims
+  agg A
+    dfreq [0 1]
+    sev lognorm 50 cv 1.5
+  agg B
+    dfreq [0 1]
+    sev gamma 50 cv 1
+  copula normal 0.5
+  poisson
+  tags{topic:bivariate};
+
+bivariate BivariateClaytonMixed
+  25 claims
+  agg Wind
+    dfreq [0 1] [0.3 0.7]
+    sev lognorm 40 cv 1.2
+  agg Flood
+    dfreq [0 1]
+    sev lognorm 60 cv 1.5
+  copula clayton 0.3
+  mixed gamma 0.2
+  tags{topic:bivariate};
+
+bivariate BivariateGumbel
+  25 claims
+  agg Wind
+    dfreq [0 1] [0.3 0.7]
+    sev lognorm 40 cv 1.2
+  agg Flood
+    dfreq [0 1]
+    sev lognorm 60 cv 1.5
+  copula gumbel 0.4
+  poisson
+  note{Gumbel-copula dependence between Wind and Flood.}
+  tags{role:hero, topic:bivariate};
+
+bivariate BivariateCatPair
+  25 claims
+  agg Wind
+    dfreq [0 1] [0.3 0.7]
+    sev lognorm 40 cv 0.65 splice [0] [250]
+  agg Flood
+    dfreq [0 1]
+    sev lognorm 60 cv 0.95 splice [0] [300]
+  copula independent
+  mixed gamma 0.2
+  note{Common-shock bivariate (bv): Wind and Flood share frequency mixing.}
+  tags{topic:bivariate};
+
+bivariate BivariatePnLAxis
+  25 claims
+  agg A
+    dfreq [0 1] [0.3 0.7]
+    sev lognorm 40 cv 1.2
+  pnl B
+    900 premium
+    less
+      agg B_e
+        dfreq [0 1]
+        sev lognorm 60 cv 1.5
+  copula gumbel 0.4
+  poisson
+  tags{topic:bivariate};
+
+netceded
+  agg BivariateNetCeded
+    8 claims
+    sev 300 * beta 2 3
+    occurrence net of
+      1.1666666666666665% po 60 xs 40
+    poisson
+    note{Bivariate distribution of net and ceded for an XOL reinsurance program.}
+    tags{topic:bivariate, topic:reinsurance};
+
+netceded
+  agg BivariateNetCededPair
+    15 claims
+    10000 xs 0
+    sev lognorm 1500 cv 1
+    occurrence net of
+      50% po 2500 xs 2500 and
+      90% po 5000 xs 5000
+    mixed gamma 0.25
+    note{Gross / ceded / net joint view of a reinsured book.}
+    tags{topic:bivariate, topic:reinsurance};
+
+# ----------------------------------------------------------------------
+# Profit and loss (signed support)
+# USHurr refers to agg.USXOLTower, declared in the reinsurance section.
+# ----------------------------------------------------------------------
+
+xpnl USHurr as "US Hurricane"
+  20 premium as "Gross Premium"
+  less agg.USXOLTower
+  tags{role:hero, topic:reinsurance}
+  note{ILW model of US Cat. Amounts in billions.}
+  hints{bs=2;log2=16;normalize=False;};
+
+pnl PnLSimple
+  1000 premium
+  less
+    agg E.PNL_e
+      1000 premium at 0.9 lr
+      1000 xs 0
+      sev lognorm 120 cv 1
+      mixed gamma 0.25
+  note{Single profit-and-loss line.}
+  tags{topic:pnl};
+
+pnl PnLClaims
+  100 premium
+  less
+    agg PnLprem.Claims_e
+      10 claims
+      sev lognorm 8 cv 1.5
+      poisson
+  note{claims form: premium independent of the loss model}
+  tags{topic:pnl};
+
+pnl PnLLoss
+  100 premium
+  less
+    agg PnLprem.Loss_e
+      85 loss
+      sev lognorm 8 cv 1.5
+      poisson
+  note{expected-loss form: E[loss]=85, margin 15}
+  tags{topic:pnl};
+
+pnl PnLLossRatio
+  1000 premium
+  less
+    agg PnLprem.LR_e
+      1000 premium at 0.7 lr
+      sev lognorm 100 cv 2
+      poisson
+  note{loss ratio form: E[loss]=700, margin 300}
+  tags{topic:pnl};
+
+pnl PnLVector
+  [100 200 100] premium
+  less
+    agg PnLprem.Vec_e
+      [100 200 100] premium at 0.8 lr
+      [1000 2000 5000] xs 0
+      sev lognorm 500 cv 2
+      poisson
+  note{Vector premium: shift 400, mean 80 = sum premium_i (1 - lr).}
+  tags{topic:pnl};
+
+pnl PnLSignedDsev
+  5 premium
+  less
+    agg PnLsigned.Dsev_e
+      dfreq [3]
+      dsev [-1 1]
+  note{signed loss: PnL in (2,4,6,8), mean 5, sd sqrt3}
+  tags{topic:pnl};
+
+pnl PnLSignedAsymmetric
+  10 premium
+  less
+    agg PnLsigned.Asym_e
+      dfreq [2]
+      dsev [-2 1 3] [0.5 0.3 0.2]
+  note{non-symmetric signed dsev: mean = 10 - 2 E[X] = 10.2}
+  tags{topic:pnl};
+
+pnl PnLSignedSsev 100 premium less
+  agg PnLsigned.Ssev_e
+    5 claims
+    ssev 20 - lognorm 10 cv 0.5
+    poisson
+  note{continuous signed severity: E[loss]=50, margin 50}
+  tags{topic:pnl};
+
+port PnLBook
+  tags{topic:portfolio, topic:pnl}
+  pnl Cat
+    2000 premium
+    less
+      agg Cat_e
+        2000 premium at 0.55 lr
+        sev lognorm 500 cv 3
+        poisson
+  pnl Prop
+    5000 premium
+    less
+      agg Prop_e
+        5000 premium at 0.65 lr
+        sev lognorm 100 cv 2
+        poisson;
+
+agg SignedSeverity
+  dfreq [3]
+  dsev [-2 5]
+  note{Signed severity, negative outcomes allowed; three fixed draws give the closed-form support -6, 1, 8, 15.}
+  tags{topic:severity, topic:pnl};
+
+agg SignedStandardDeviation
+  dfreq [3]
+  dsev [-1 1]
+  note{zero-mean signed; sev SD 1, agg SD sqrt(3) -- derived from ex2, not mean*cv}
+  tags{topic:pnl};
+
+agg SignedSymmetric
+  20 claims
+  dsev [-1 1]
+  poisson
+  note{symmetric P&L; mean 0}
+  tags{topic:pnl};
+
+agg SignedNormal
+  100 claims
+  ssev 50 * norm + 10
+  poisson
+  note{continuous signed (ssev) P&L severity; never clamps}
+  tags{topic:pnl};
+
+agg SignedLump
+  1000000 claims
+  dsev [-1 10] [0.9375 0.0625]
+  poisson
+  note{near-Gaussian lump at a negative mean ~ -312500; auto window}
+  tags{topic:pnl};
+
+agg SignedPremiumMinusLoss
+  5 claims
+  ssev 100 - lognorm 80 cv .2
+  poisson
+  note{premium minus loss: constant - dist reflects the severity (sev mean 20)}
+  tags{topic:pnl};
+
+port SignedGotcha
+  note{The sev side of the sev / ssev contrast: a spliced sev clamps the normal to a non-negative window, so the two units are bounded below where SignedPortfolioPair is not.}
+  tags{topic:portfolio, topic:pnl}
+  agg A
+    50 claims
+    sev 10 * norm + 5 splice [0] [40]
+    poisson
+  agg B
+    50 claims
+    sev 10 * norm + -5 splice [0] [35]
+    poisson;
+
+port SignedPortfolioPair
+  note{The ssev side of the sev / ssev contrast: two signed normal units, offset either way, on one signed window.}
+  tags{topic:portfolio, topic:pnl}
+  agg A
+    50 claims
+    ssev 10 * norm + 5
+    poisson
+  agg B
+    50 claims
+    ssev 10 * norm + -5
+    poisson;
+
+port SignedPortfolioMixed
+  tags{topic:portfolio, topic:pnl}
+  agg Loss
+    30 claims
+    sev lognorm 20 cv 0.8
+    poisson
+  agg PnL
+    50 claims
+    ssev 10 * norm
+    poisson;
+
+# ----------------------------------------------------------------------
+# Numerical character
+# Moment approximations, window and grid behavior, and the small books the
+# pricing surfaces are hand checked against.
+# ----------------------------------------------------------------------
+
+agg ApproximateGamma
+  5000 claims
+  sev lognorm 100 cv 2
+  poisson
+  approximate sgamma
+  note{Shifted-gamma moment approximation.}
+  tags{topic:numerics};
+
+agg ApproximateRightSlognorm
+  5000 claims
+  sev lognorm 100 cv 2
+  poisson
+  approximate slognorm
+  tags{topic:numerics};
+
+agg ApproximateLeftReflect
+  1 claim
+  sev 100 * beta 5 1.3
+  fixed
+  approximate sgamma
+  tags{topic:numerics};
+
+agg ApproximateAggReins
+  100 claims
+  sev lognorm 100 cv 2
+  poisson
+  aggregate net of
+    100 xs 0
+  approximate sgamma
+  tags{topic:numerics};
+
+pnl ApproximatePnL
+  600000 premium
+  less
+    agg APX.PnL_e
+      5000 claims
+      sev lognorm 100 cv 2
+      poisson
+      approximate sgamma
+  tags{topic:pnl, topic:numerics};
+
+agg HeavyTailValidation
+  10 claims
+  sev 100 * pareto 1.3 + -100
+  poisson
+  note{Infinite-variance Pareto -- the validator refuses to guess.}
+  tags{topic:numerics}
+  hints{bs=0.25; log2=16};
+
+agg WindowContinuous
+  100000 claims
+  sev lognorm 100 cv 0.5
+  poisson
+  tags{topic:numerics};
+
+agg WindowedGrid
+  10000000 claims
+  dsev [1 2]
+  poisson
+  note{Concentrated high-mean book -- resolved on a non-zero output window.}
+  tags{topic:numerics};
+
+agg WindowedSimple
+  10000 claims
+  dsev [-1 1]
+  poisson
+  note{Windowed / discrete severity at high frequency.}
+  tags{topic:numerics};
+
+port NumericsOneDice
+  note{one-line port: line == total}
+  tags{topic:portfolio, topic:numerics}
+  agg D
+    dfreq [1 2 3 4 5 6]
+    dsev [1 2 3 4 5 6];
+
+port NumericsPayPair
+  note{homogeneous payoff book prices through the dual}
+  tags{topic:portfolio, topic:numerics}
+  pnl P1
+    10 premium
+    less
+      agg P1_e
+        dfreq [1]
+        dsev [2 5]
+  pnl P2
+    8 premium
+    less
+      agg P2_e
+        dfreq [1]
+        dsev [1 3];
+
+port NumericsSignedDiscrete
+  note{signed totals price via dot(kappa, gp); shares NaN}
+  tags{topic:portfolio, topic:pnl, topic:numerics}
+  agg A
+    dfreq [1 2]
+    dsev [-3 -1 2] [0.5 0.3 0.2]
+  agg B
+    dfreq [1]
+    dsev [-2 1 4]
+  agg C
+    dfreq [2]
+    dsev [1 3];
+
+port NumericsUnbounded
+  note{mass-on-unbounded refused in the lifted builder}
+  tags{topic:portfolio, topic:numerics}
+  agg U
+    5 claims
+    sev lognorm 10 cv 1
+    poisson;
+
+# ----------------------------------------------------------------------
+# Portfolios
+# Two units at a time, from the plain pair to the diversification archetypes.
+# ----------------------------------------------------------------------
+
+port BasicPortfolio
+  note{Two-unit portfolio.}
+  tags{topic:portfolio}
+  agg A
+    50 claims
+    1000 xs 0
+    sev lognorm 100 cv 1.2
+    mixed gamma 0.4
+  agg B
+    65 claims
+    2000 xs 0
+    sev lognorm 150 cv 1.6
+    mixed gamma 0.2;
+
+port TwoLineBook
+  note{Two-unit book: thin property + mixed-frequency casualty. Capital and price downstream.}
+  tags{role:hero, topic:portfolio}
+  agg Property
+    80 claims
+    500 xs 0
+    sev lognorm 50 cv 1.2
+    poisson
+  agg Casualty
+    20 claims
+    2000 xs 0
+    sev lognorm 250 cv 2
+    mixed gamma 0.4;
+
+port PropertyCasualty
+  note{Portfolio of property and casualty risks, amounts in 000s.}
+  tags{role:hero, topic:portfolio}
+  agg Casualty
+    5000 premium at 0.9 lr
+    5000 xs 0
+    sev lognorm 200 cv 8
+    mixed gamma 0.45
+  agg Property
+    4000 premium at 0.85 lr
+    10000 xs 0
+    sev lognorm 250 cv 12
+    mixed gamma 0.15;
+
+port SharedMixPortfolio
+  note{Shared frequency mixer = common shock; correlated units on one grid.}
+  tags{topic:portfolio}
+  agg A
+    100 claims
+    sev lognorm 50 cv 1.5
+    mixed gamma 0.4
+  agg B
+    120 claims
+    sev lognorm 60 cv 1.5
+    mixed gamma 0.4;
+
+port ThinThinPortfolio
+  note{Two thin, concentrated units -- nearly Gaussian total.}
+  tags{topic:portfolio}
+  agg A
+    1 claim
+    sev gamma 50 cv 0.1
+    fixed
+  agg B
+    1 claim
+    sev gamma 50 cv 0.15
+    fixed;
+
+port ThickThinPortfolio
+  note{Thin attritional + bounded-but-thick cat -- the rich diversification case.}
+  tags{topic:portfolio}
+  agg NonCat
+    200 claims
+    100 xs 0
+    sev gamma 8 cv 0.3
+    poisson
+  agg Cat
+    2 claims
+    5000 xs 0
+    sev lognorm 500 cv 4
+    poisson;
+
+port ThickThickPortfolio
+  note{Two unbounded heavy-tailed units -- little diversification, tail-driven.}
+  tags{topic:portfolio}
+  agg A
+    100 claims
+    sev lognorm 50 cv 3
+    poisson
+  agg B
+    100 claims
+    sev lognorm 80 cv 3.5
+    poisson;
+
+# ----------------------------------------------------------------------
+# Book and paper reproductions
+# ----------------------------------------------------------------------
+
+port BodoffOne
+  note{Bodoff Thought Experiment No. 1}
+  tags{topic:portfolio, role:paper}
+  agg wind1
+    1 claim
+    sev dhistogram xps [0 99] [0.8 0.2]
+    fixed
+  agg quake1
+    1 claim
+    sev dhistogram xps [0 100] [0.95 0.05]
+    fixed;
+
+port BodoffOneNet
+  note{Bodoff Thought Experiment No. 1}
+  tags{topic:portfolio, role:paper}
+  agg wind1
+    1 claim
+    dsev [0 99] [0.8 0.2]
+    fixed
+  agg quake1
+    1 claim
+    dsev [0 100] [0.95 0.05]
+    fixed;
+
+port BodoffTwo
+  note{Bodoff Thought Experiment No. 2}
+  tags{topic:portfolio, role:paper}
+  agg wind2
+    1 claim
+    sev dhistogram xps [0 50] [0.8 0.2]
+    fixed
+  agg quake2
+    1 claim
+    sev dhistogram xps [0 100] [0.95 0.05]
+    fixed;
+
+port BodoffTwoNet
+  note{Bodoff Thought Experiment No. 2}
+  tags{topic:portfolio, role:paper}
+  agg wind2
+    1 claim
+    dsev [0 50] [0.8 0.2]
+    fixed
+  agg quake2
+    1 claim
+    dsev [0 100] [0.95 0.05]
+    fixed;
+
+port BodoffThree
+  note{Bodoff Thought Experiment No. 3}
+  tags{topic:portfolio, role:paper}
+  agg wind3
+    1 claim
+    sev dhistogram xps [0 5] [0.8 0.2]
+    fixed
+  agg quake3
+    1 claim
+    sev dhistogram xps [0 100] [0.95 0.05]
+    fixed;
+
+port BodoffThreeNet
+  note{Bodoff Thought Experiment No. 3}
+  tags{topic:portfolio, role:paper}
+  agg wind3
+    1 claim
+    dsev [0 5] [0.8 0.2]
+    fixed
+  agg quake3
+    1 claim
+    dsev [0 100] [0.95 0.05]
+    fixed;
+
+port BodoffFour
+  note{Bodoff Thought Experiment No. 4; exponential severity requires sharpen}
+  tags{topic:portfolio, role:paper, topic:numerics}
+  agg a
+    0.25 claims
+    sev 4 * expon
+    poisson
+  agg b
+    0.05 claims
+    sev 20 * expon
+    poisson
+  agg c
+    0.05 claims
+    sev 100 * expon
+    poisson;
+
+port BodoffWindQuake
+  note{Bodoff thought-experiment -- discrete two-peril allocation.}
+  tags{role:hero, topic:portfolio, role:paper}
+  agg Wind
+    1 claim
+    dsev [0 99] [0.8 0.2]
+    fixed
+  agg Quake
+    1 claim
+    dsev [0 100] [0.95 0.05]
+    fixed;
+
+port NumericsBodoff
+  note{bounded discrete; linear vs lifted; mass distortion exact}
+  tags{topic:portfolio, role:paper, topic:numerics}
+  agg wind
+    1 claim
+    sev dhistogram xps [0 99] [0.8 0.2]
+    fixed
+  agg quake
+    1 claim
+    sev dhistogram xps [0 100] [0.95 0.05]
+    fixed;
+
+port PIRTame
+  note{PIR Tame case study. For reinsurance see text.}
+  tags{topic:portfolio, role:paper}
+  hints{bs=1/64; log2=16; padding=1}
+  agg Tame.A
+    1 claim
+    sev gamma 50 cv 0.1
+    fixed
+  agg Tame.B
+    1 claim
+    sev gamma 50 cv 0.15
+    fixed;
+
+port PIRCatNonCatGross
+  note{PIR Cat-Noncat gross case study.}
+  tags{topic:portfolio, role:paper}
+  hints{bs=1/64; log2=16; padding=1}
+  agg CNC.NonCat
+    1 claim
+    sev gamma 80 cv 0.15
+    fixed
+  agg CNC.Cat
+    1 claim
+    sev lognorm 20 cv 1
+    fixed;
+
+port PIRCatNonCatNet
+  note{PIR Cat-Noncat net case study.}
+  tags{topic:portfolio, role:paper}
+  hints{bs=1/64; log2=16; padding=1}
+  agg CNC.Net.NonCat
+    1 claim
+    sev gamma 80 cv 0.15
+    fixed
+  agg CNC.Net.Cat
+    1 claim
+    sev lognorm 20 cv 1
+    fixed
+    aggregate net of
+      79.64 xs 41.11;
+
+port PIRDiscrete
+  note{PIR Discrete case study.}
+  tags{topic:portfolio, role:paper}
+  hints{bs=1; log2=8; padding=1}
+  agg Discrete.X1
+    1 claim
+    dsev [0 8 10] [0.5 0.25 0.25]
+    fixed
+  agg Discrete.X2
+    1 claim
+    dsev [0 1 90] [0.5 0.25 0.25]
+    fixed;
+
+agg DefectivePareto
+  1 claim
+  sev 1000 * pareto 1.5 + -1000
+  fixed
+  note{defective; no finite 2nd moment}
+  tags{role:paper}
+  hints{normalize=False};
 

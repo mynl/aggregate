@@ -192,6 +192,75 @@
   blast radius, which is why it was not folded into that bump.
 ### Tests & example libraries
 
+- **[Library-Round-Two]** (from the a297 tidy) — round one deleted 28 exact
+  duplicate programs, fixed the flatly wrong labels and re-sectioned the file.
+  What it deliberately left, because each needs an author call rather than a
+  rule:
+  1. **The Bodoff family is four deep on one experiment.** `sev dhistogram xps
+     [...]` and `dsev [...]` build byte-identical objects, so `BodoffOne`,
+     `BodoffOneNet`, `BodoffWindQuake` and `NumericsBodoff` are one law under
+     four names, differing only in unit names and spelling; `BodoffTwo` and
+     `BodoffTwoNet` likewise. **What does the `Net` suffix mean?** Nothing in
+     any of those programs is net of anything. a297 repaired `BodoffThreeNet`,
+     which had been pasted as a byte-for-byte copy of `BodoffThree`, to use
+     `dsev` like its siblings; whether the siblings should exist at all is the
+     open question.
+  2. **`PIRTame` and `ThinThinPortfolio` are the same program**, differing in
+     unit names and in `PIRTame`'s `hints`. Two purposes, one law.
+  3. **The Tweedie names read backwards.** `TweedieDirect` is claim count plus
+     gamma **mean and cv**, `TweedieFromMoments` is claim count plus gamma
+     **scale and shape**. Moments are the first pair.
+  4. **`ExactGamma` has no gamma in it.** It is the exact counterpart of
+     `ApproximateGamma`, which is what the name is reaching for, and
+     `ApproximateRightSlognorm` keeps a `Right` that no longer contrasts with
+     anything.
+  5. **`Simple` is a filing word**, not a description: `PoissonSimple`,
+     `DiscreteSimple`, `LimitProfileSimple`, `PHDistortionSimple`,
+     `WindowedSimple`. Same for `Pair` on `BivariateCatPair` /
+     `BivariateNetCededPair` / `SignedPortfolioPair`, where
+     `BivariateNetCeded` and `BivariateNetCededPair` are near-identical names
+     over substantially different programs.
+  6. **Range notation cannot appear in the library.** `format_program` expands
+     `dsev [1:6]` to `dsev [1 2 3 4 5 6]`, so no entry can demonstrate the
+     range spelling, and `ThreeDice`'s own doc describes `dsev [1:6]` beside a
+     `<<decl>>` that renders the expansion. Either record the range on the spec
+     (the `_tweedie` pattern again) or stop naming it in prose.
+  7. **The `sev` clause-form names are muddled**: `SevScaled` is scaled *and*
+     shifted, `SevShifted` is the signed one, `SevOneParameterScaled` has no
+     scale factor, `SevReversed` is a lognormal by scale and shape.
+  8. **Inner engine names in the P&L block follow no rule**: `PnLprem.Vec_e`,
+     `PnLsigned.Asym_e`, `E.PNL_e`, `APX.PnL_e`.
+  9. **Sixteen entries carry tags but no `note{}`.** A note is the norm and is
+     the SPA dropdown blurb, so each is a small gap: `ApproximateAggReins`,
+     `ApproximateLeftReflect`, `ApproximatePnL`, `ApproximateRightSlognorm`,
+     `BivariateClaytonMixed`, `BivariateIndependent`, `BivariateNormal`,
+     `BivariatePnLAxis`, `CCoCDistortion`, `MinimumDistortion`,
+     `PHDistortionSimple`, `PnLBook`, `SignedPortfolioMixed`, `TVaRDistortion`,
+     `UnitSeverity`, `WindowContinuous`. Regenerate the list with
+     `build.recipes.query('not note')`.
+- **[Aliasing-Test-Misfires-On-A-Reference-Severity]** (found writing
+  `SplitLimitPolicy`, a297) — `valid_aggregate`'s aliasing test asks whether the
+  aggregate mean relative error exceeds `ALIASING_RATIO` times the **severity**
+  mean relative error. A `sev agg.NAME` reference on a matched grid is exact, so
+  that severity error collapses to `1e-13`, the ratio loses all headroom, and an
+  aggregate accurate to `1.5e-11` is reported as `fails agg mean error >> sev,
+  possible aliasing; try larger bs`. Raising `log2` makes it worse, since the
+  aggregate error grows with the point count while the severity error does not.
+  The `VALIDATION_NOISE` silencer at `1e-12` is the only thing standing between
+  a correct model and a wrong verdict, and `SplitLimitPolicy` only lands under
+  it because `bs=1/4` keeps the grid small. Either exempt a reference severity
+  from the ratio test or floor the denominator.
+- **[Recipe-Run-Clobbers-The-Trailer]** (found running the a297 recipes) — a
+  recipe's Solution builds itself from `<<decl>>`, which by design carries
+  `hints{}` and nothing else. `build(...)` then **re-registers** the entry in
+  the shared session recipe base, so the library's `note{}` and `tags{}` are
+  replaced by nothing. Reproduce with
+  `pytest "tests/test_library_recipes.py::test_recipe_runs[agg:LimitProfile]"
+  "tests/test_agg_libraries.py::test_library_is_the_default_recipe_base" -n0`:
+  the second test fails on `'role:hero' in a.tags`. Pre-existing, and invisible
+  under `-n auto` only because the two files land on different workers. Either
+  a session build should not overwrite a library entry, or the recipe harness
+  should run against a private underwriter.
 - **[Unparser-Reference-Gaps]** (surfaced by `[Library-Canonical-Layout]`, a178)
   — `decl_writer` cannot render three constructs back to what was written, so 13
   `library.agg` entries are exempt from the canonical layout and hand-written.
@@ -201,7 +270,7 @@
   its clause back, and no longer overwrites the author's `note{}`. The pattern
   it established, record what was declared and render from that, is what item 1
   wants.
-  1. **Named object reference** (9 entries) — `sev.UnitSeverity` is resolved and
+  1. **Named object reference** (8 entries) — `sev.UnitSeverity` is resolved and
      inlined at parse time, and nothing on the spec records that a reference was
      written, so it renders as `dsev [1]`. Fixing it means carrying the
      reference on the spec (a `sev_ref` key, say) and rendering from that. This
@@ -255,7 +324,7 @@
   generated recipes, page by page with author reaction. The mechanism is done;
   what is left is writing the `doc{{{}}}` for the entries each page teaches and
   pruning that page's `{{< include >}}`. Start from
-  `build.recipes.query('doc')` (4 entries, 3 pages) against `[Cookbook-Pages]`
+  `build.recipes.query('doc')` (7 entries, 5 pages) against `[Cookbook-Pages]`
   in `docs/cookbook/plan.md`.
   **There is no phase 6 backlog.** A `note{}` is the norm and is all `discover`
   and the object dropdown need; a `doc{{{}}}` is for the cookbook-worthy few,

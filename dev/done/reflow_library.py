@@ -34,7 +34,10 @@ form when the writer cannot invert it:
   rendering raises.
 
 The ``tweedie`` clause was a third case until 1.0.0a231, when it gained the
-``_tweedie`` provenance key and started inverting like everything else.
+``_tweedie`` provenance key and started inverting like everything else. A
+``sev agg.NAME`` severity reference looks like the first case and is not: since
+1.0.0a293 the spec records the reference rather than the object, so the writer
+renders it and those statements are laid out by machine like any other.
 
 A statement is also held back when the canonical form is **more ambiguous** than
 the source. The writer renders ``ssev 100 - lognorm 80 cv .2`` in the general
@@ -81,6 +84,16 @@ def _repo_root() -> Path:
 
 
 LIBRARY = _repo_root() / 'src' / 'aggregate' / 'agg' / 'library.agg'
+
+#: A severity reference, ``sev agg.NAME`` / ``ssev port.NAME`` (with an optional
+#: trailing ``!``). Stripped from the statement *before* the search below,
+#: because it is the one dotted reference the writer CAN render: since
+#: 1.0.0a293 the spec records the reference instead of inlining the object.
+#: Removing it here rather than complicating the pattern keeps the bare
+#: ``agg.`` / ``port.`` alternative catching an ENGINE reference
+#: (``less agg.USXOLTower``), which still cannot be inverted.
+SEV_REFERENCE = re.compile(
+    r'\bs?sev\s+(?:agg|port)\.[A-Za-z][\w.:~\-]*\s*!?')
 
 #: Constructs :mod:`aggregate.decl_writer` cannot render back to what was
 #: written. Matched against the *source* statement, because the spec no longer
@@ -204,7 +217,7 @@ def main(check=False):
         parsed = uw.parser.parse(uw.lexer.tokenize(statement))
 
         rendered = None
-        if not NON_INVERTIBLE.search(statement):
+        if not NON_INVERTIBLE.search(SEV_REFERENCE.sub('', statement)):
             try:
                 candidate = format_program(parsed, fmt='text', layout='spread',
                                            trailer=True)

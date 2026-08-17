@@ -87,7 +87,7 @@ class Frequency(HelpMixin):
     - ``poisson``: Poisson(n)
     - ``geometric``: geometric(1/(n + 1)), supported on 0, 1, 2, ...
     - ``logarithmci``: logarithmic(theta), supported on 1, 2, ...; theta solved numerically
-    - ``negymana``: Po(n/freq_a) stopped sum of Po(freq_a) freq_a = "eggs per cluster"
+    - ``neymana``: Po(n/freq_a) stopped sum of Po(freq_a) freq_a = "eggs per cluster"
     - ``negbin``: freq_a is the variance multiplier, ratio of variance to mean
     - ``pascal``:
     - ``pascal``: (generalized) pascal-poisson distribution, a poisson stopped sum of negative binomial;

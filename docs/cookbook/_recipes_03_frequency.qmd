@@ -1,0 +1,60 @@
+<!-- GENERATED from a DecL library by aggregate.cookbook (do not hand-edit). -->
+<!-- Edit the entry's doc{{{...}}} in the .agg file and re-run the generator. -->
+
+```{python}
+#| echo: false
+from _setup import *
+```
+
+## Neyman inner outer {#sec-recipe-frequency-neyman-inner-outer}
+
+`neymana` is one of the built in frequency laws: a Poisson number of clusters, each contributing a Poisson number of claims. You want to see what it is actually doing, and you want the same two level shape available when the inner or the outer piece is something the frequency vocabulary does not name.
+
+An aggregate can serve as the severity of another aggregate. The inner one, `NeymanCluster`, is a single cluster: a Poisson(4) count on a unit severity. The outer draws a Poisson(2.5) number of clusters and adds them up.
+
+```{python}
+a = build('''agg NeymanInnerOuter
+  2.5 claims
+  sev agg.NeymanCluster
+  poisson
+  hints{bs=1; log2=10}''')
+qd(a)
+```
+
+The keyword states the same law in one line. The overall mean is the product, 2.5 x 4 = 10, and the parameter is the mean cluster size.
+
+```{python}
+builtin = build('agg NeymanBuiltIn 10 claims dsev [1] neymana 4', bs=1, log2=10)
+qd(builtin)
+```
+
+Compare the two probability mass functions directly.
+
+```{python}
+both = pd.concat([a.density_df.p_total, builtin.density_df.p_total], axis=1)
+both.columns = ['inner outer', 'neymana']
+both['difference'] = both['inner outer'] - both['neymana']
+qd(both.head(12))
+```
+
+The inner is referred to by **name**. The outer parses with `agg.NeymanCluster` recorded and the underwriter resolves it at build time, so nothing is spliced textually and the inner is a fully formed object before the outer ever sees it. Its output probability mass function then becomes a discrete severity for the outer, exactly as though it had been transcribed as `dsev [outcomes] [probabilities]` by hand. That is why the inner has to pin `bs` and `log2` in its own `hints`: the severity it hands over must not depend on the settings the outer happens to be built with.
+
+The inner keeps its mass at zero, because a Poisson cluster can be empty and the outer has no layers clause to condition it away. That is load bearing. Neyman A is a Poisson stopped sum of Poissons counting the empty clusters too, and both constructions report the same P(N = 0) = exp(2.5 (exp(-4) - 1)) = 0.0859.
+
+The general fact is that a two level count is a stopped sum, so this construction reaches any of them, not only Neyman A. Pascal is a Poisson stopped sum of negative binomials and is reached the same way, with `negbin` on the inner. The keyword exists because the two level Poisson case is common enough to be worth a closed form probability generating function; the inner outer route is what to reach for when there is no keyword.
+
+::: {.callout-note collapse="true" title="The check"}
+
+```{python}
+# the two constructions agree to floating point across the whole support
+both = pd.concat([a.density_df.p_total, builtin.density_df.p_total], axis=1)
+assert (both.iloc[:, 0] - both.iloc[:, 1]).abs().max() < 1e-13
+# including the atom at zero, which is what keeping the empty clusters means
+assert abs(a.density_df.p_total.iloc[0] - np.exp(2.5 * (np.exp(-4) - 1))) < 1e-9
+# and on the moments the keyword computes analytically
+assert abs(a.est_m - 10.0) < 1e-9
+assert abs(a.est_m - builtin.est_m) < 1e-9
+assert abs(a.est_cv - builtin.est_cv) < 1e-9
+```
+
+:::

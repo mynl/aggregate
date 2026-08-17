@@ -250,17 +250,20 @@
   a correct model and a wrong verdict, and `SplitLimitPolicy` only lands under
   it because `bs=1/4` keeps the grid small. Either exempt a reference severity
   from the ratio test or floor the denominator.
-- **[Recipe-Run-Clobbers-The-Trailer]** (found running the a297 recipes) — a
-  recipe's Solution builds itself from `<<decl>>`, which by design carries
-  `hints{}` and nothing else. `build(...)` then **re-registers** the entry in
-  the shared session recipe base, so the library's `note{}` and `tags{}` are
-  replaced by nothing. Reproduce with
-  `pytest "tests/test_library_recipes.py::test_recipe_runs[agg:LimitProfile]"
-  "tests/test_agg_libraries.py::test_library_is_the_default_recipe_base" -n0`:
-  the second test fails on `'role:hero' in a.tags`. Pre-existing, and invisible
-  under `-n auto` only because the two files land on different workers. Either
-  a session build should not overwrite a library entry, or the recipe harness
-  should run against a private underwriter.
+- **[Session-Build-Clobbers-The-Trailer]** (was `[Recipe-Run-Clobbers-The-Trailer]`,
+  found running the a297 recipes; **rewritten for the general case a300**) — a
+  session `build(...)` **re-registers** its entry in the shared recipe base, so
+  building a program that carries less trailer than the library entry of the
+  same name silently replaces that entry's `note{}` and `tags{}` with nothing.
+  The concrete trigger that found it is gone: it was a recipe's Solution
+  rebuilding itself from `<<decl>>`, which by design carries `hints{}` and
+  nothing else, and `dev/plan-decommission-docs.md` removed the whole recipe-run
+  path at a300. **The overwrite behavior itself survives**, and a user who
+  builds `agg LimitProfile ...` of their own in a session still loses the
+  shipped entry's trailer for the rest of it. Author ruled 2026-08-17 to keep
+  this open on those terms. Either a session build should not silently
+  overwrite a **library** entry (warn, or namespace the session base), or the
+  overwrite should merge the trailer rather than replace it.
 - **[Unparser-Reference-Gaps]** (surfaced by `[Library-Canonical-Layout]`, a178)
   — `decl_writer` cannot render three constructs back to what was written, so 13
   `library.agg` entries are exempt from the canonical layout and hand-written.

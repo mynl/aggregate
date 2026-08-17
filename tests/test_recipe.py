@@ -241,19 +241,39 @@ def lib():
     return u
 
 
-def test_decl_placeholder_expands_to_the_entrys_own_program(lib):
+#: A synthetic documented entry. Written here rather than read out of
+#: ``library.agg``, which carries no ``doc{{{...}}}`` since 1.0.0a300: the
+#: shipped library documents itself through notes in the presentations
+#: repository, so the clause's own machinery needs its own fixture. Exact
+#: discrete so ``run`` can assert on the moments to floating point.
+_DOCUMENTED = (
+    'agg DocDemo dfreq [3] dsev [1 2 3 4 5 6] '
+    'note{three dice} tags{topic:aggregate} hints{log2=12}'
+    "\n    doc{{{\n## Solution\n\n```python\na = build('''<<decl>>''')\n```\n"
+    '\n## Check\n\n```python\nassert abs(a.actual_m - 10.5) < 1e-12\n```\n}}}')
+
+
+@pytest.fixture
+def documented():
+    """An Underwriter carrying one synthetic documented entry."""
+    uw = Underwriter()
+    uw._interpret_program(_DOCUMENTED)
+    return uw
+
+
+def test_decl_placeholder_expands_to_the_entrys_own_program(documented):
     """``<<decl>>`` saves a recipe from retyping the program it documents.
 
     Two copies of the same declaration inside one statement would drift the
     first time either was edited -- the maintenance trap this removes.
     """
-    r = lib.recipe('LimitProfile')
+    r = documented.recipe('DocDemo')
     assert '<<decl>>' not in r.solution_code
-    assert 'agg LimitProfile' in r.solution_code
+    assert 'agg DocDemo' in r.solution_code
     assert "build('''" in r.solution_code
 
 
-def test_expanded_decl_carries_hints_and_nothing_else(lib):
+def test_expanded_decl_carries_hints_and_nothing_else(documented):
     """``Recipe.decl`` is the program, not the metadata around it.
 
     ``hints`` survives because it changes how the object *builds*: a
@@ -265,7 +285,7 @@ def test_expanded_decl_carries_hints_and_nothing_else(lib):
 
     Contrast ``.program``, the verbatim source line, which carries the lot.
     """
-    r = lib.recipe('LimitProfile')
+    r = documented.recipe('DocDemo')
     assert 'doc{{{' in r.program          # the source line has one ...
     for clause in ('doc{{{', 'note{', 'tags{'):
         assert clause not in r.decl       # ... the expansion has none of it
@@ -288,12 +308,11 @@ def test_expanded_decl_keeps_hints_because_they_change_the_build(lib):
     assert 'note{' not in r.decl and 'tags{' not in r.decl
 
 
-def test_expanded_decl_actually_rebuilds_the_entry(lib):
+def test_expanded_decl_actually_rebuilds_the_entry(documented):
     """The substituted program is real DecL that reproduces the object."""
-    from aggregate import build
-    r = lib.recipe('ThreeDice')
+    r = documented.recipe('DocDemo')
     ns = r.run()
-    assert abs(ns['a'].actual_m - build('ThreeDice').actual_m) < 1e-12
+    assert abs(ns['a'].actual_m - 10.5) < 1e-12
 
 
 def test_placeholder_is_left_alone_without_a_program():

@@ -10,9 +10,8 @@
 # cookbook.agg (the feature walkthrough) and actuarial-severity-curves.agg
 # (the severity reference), which were three files with overlapping
 # purpose, three different naming conventions, and no machine-readable
-# grouping. It is the default `build` recipe base, the source the Quarto
-# cookbook renders from, and the source the aggregate_api (aLL) SPA reads
-# for its Examples dropdown.
+# grouping. It is the default `build` recipe base and the source the
+# aggregate_api (aLL) SPA reads for its Examples dropdown.
 #
 # NAMES are descriptive and GLOBALLY UNIQUE across kinds, so `build('X')`
 # and `build.recipe('X')` always mean the same entry and no `kind=`
@@ -29,57 +28,21 @@
 #   tags{...}       comma- and/or space-separated slugs; grouping and
 #                   selection (build.discover(tags=...)).
 #   hints{...}      key=value; build settings, caller-wins.
-#   doc{{{...}}}    the long-form recipe: Problem / Solution / Discussion
-#                   / Check, markdown with fenced python. Rendered by the
-#                   cookbook and RUN by tests/test_library_recipes.py, so
-#                   an entry documents and tests itself. Closing fence
-#                   must be alone on its line.
 #
-# WRITING A doc: two conventions that matter.
+# A trailer holds FACTS ABOUT THE ENTRY, and nothing longer. Long-form
+# write-ups are not facts about an entry, they are documents, and they live
+# in the presentations repository (C:/s/AI/notes/aggregate-presentations),
+# which is the staging ground for material that ends up in the monograph.
+# The `doc{{{...}}}` clause that used to carry them here was retired before
+# 1.0: it mixed a book into a declaration language, and the DecL stable-tier
+# promise would have frozen that mistake for the life of the major version.
+# See dev/done/plan-decommission-docs.md.
 #
-#   <<decl>>   NEVER retype the program in the Solution. Write
+# A note that wants a library program should PRINT it rather than retype it:
 #
-#                  ```python
-#                  a = build('''<<decl>>''')
-#                  ```
+#     print(build.recipe('LayerPicks').decl)
 #
-#              and the entry's own declaration is substituted in, rendered
-#              canonically from the spec. Two copies of one program inside a
-#              single statement would drift the first time either was edited;
-#              removing that trap is the whole point.
-#
-#              The substitution carries `hints{...}` and NOTHING else, because
-#              hints change how the object BUILDS: a copy-pasteable program
-#              without them would not reproduce the recipe. The note is the
-#              recipe's Problem, the tags are the page it sits on, and the doc
-#              is the page itself, so repeating any of them inside the program
-#              would be redundant. Dropping the doc is also the recursion
-#              guard: a doc must not quote itself.
-#
-#              Being canonical, the substituted form can differ cosmetically
-#              from what is typed above (e.g. `50 po 200 xs A` renders
-#              `25% po 200 xs A`). That is normalization, not a change.
-#
-#   ```python  Plain fences, NOT ```{python}. A doc body is DATA: it is stored
-#              in the .agg file, executed by aggregate.recipe.Recipe.run (the
-#              pytest harness), and rendered to a book by aggregate.cookbook,
-#              which rewrites each plain fence into a ```{python} Quarto cell
-#              on the way out. Writing ```{python} here would put Quarto
-#              source syntax into data and render as a literal label.
-#
-#              The code inside the fence is passed through untouched, which is
-#              what makes the page and the test run byte-identical programs.
-#              So a fence may open with a Quarto cell option:
-#
-#                  ```python
-#                  #| fig-cap: "The distortion, above the diagonal."
-#                  g.plot()
-#                  ```
-#
-#              Quarto honors it; Recipe.run sees a comment. Plain fences also
-#              keep the block copy-pasteable and syntax-highlighted anywhere
-#              markdown is read. A fence tagged anything else (```text) is
-#              prose and is NOT executed: use it to show output.
+# which reads the live library and so cannot go stale.
 #
 # TAG VOCABULARY -- namespaced, and it never restates the object's TYPE.
 #
@@ -118,9 +81,8 @@
 #                                   univariates.
 #
 #             tests/test_library_entries.py is where the checks live.
-#   slow      the ONE bare tag, deliberately: it names a pytest marker
-#             (tests/test_library_recipes.py maps it to @pytest.mark.slow),
-#             not a property of the subject.
+#   slow      the ONE bare tag, deliberately: it names a pytest marker, not a
+#             property of the subject.
 #
 # Enforced by tests/test_agg_libraries.py -- a bare, un-namespaced tag fails.
 #
@@ -132,12 +94,10 @@
 # a trailer written after the last unit binds to that unit, because the
 # portfolio's trailer slot closes before the units are read.
 #
-# HOW MUCH DOCUMENTATION: every entry carries a note{...} -- that is the
-# norm, and it is all `discover` and the object dropdown need. A
-# doc{{{...}}} is for the cookbook-worthy few: the entries the cookbook
-# actually teaches from, where a Problem / Solution / Discussion / Check
-# write-up earns its keep. So build.recipes.query('not doc') is a
-# DIRECTORY of the library, not a backlog.
+# HOW MUCH DOCUMENTATION: every entry carries a note{...}, and that is the
+# whole norm. It is all `discover` and the object dropdown need, and there
+# is no second tier to fill in: `build.recipes` is a DIRECTORY of the
+# library, never a backlog.
 #
 # LAYOUT: the canonical `spread` form, one clause per line at a two-space
 # indent, each statement closed by `;` and separated by a blank line. It is
@@ -204,36 +164,7 @@ agg ThreeDice
   dfreq [3]
   dsev [1 2 3 4 5 6]
   note{Sum of three dice -- exact discrete aggregate; zero validation error.}
-  tags{topic:aggregate, role:intro, check:independent-oracle}
-  doc{{{
-## Problem
-
-You want to see what `aggregate` computes on something you can check in your head. Three dice: a fixed frequency of 3, a severity uniform on 1..6.
-
-## Solution
-
-```python
-a = build('''<<decl>>''')
-qd(a.summary_df)
-```
-
-## Discussion
-
-Everything here is discrete and lands exactly on the grid, so this is the one case where the FFT is not an approximation at all -- the aggregate PMF is the exact three-fold convolution of the die. That is why it is the first recipe: it separates "is the method right" from "is the discretization fine", which every later recipe has to hold apart.
-
-`dfreq [3]` is an explicit outcome list with a single outcome, so N = 3 with probability one. `dsev [1:6]` is the inclusive range 1, 2, ..., 6 with equal weights.
-
-## Check
-
-```python
-# E[A] = 3 x 3.5 = 10.5, and the estimate is EXACT, not merely close
-assert abs(a.actual_m - 10.5) < 1e-12
-assert abs(a.est_m - 10.5) < 1e-9
-# support runs 3..18; each extreme has probability (1/6)^3
-assert abs(a.density_df.loc[3, 'p_total'] - (1 / 6) ** 3) < 1e-12
-assert abs(a.density_df.loc[18, 'p_total'] - (1 / 6) ** 3) < 1e-12
-```
-}}};
+  tags{topic:aggregate, role:intro, check:independent-oracle};
 
 agg DiceFiveDice
   dfreq [5]
@@ -313,49 +244,7 @@ agg BasicLognormal
 
 distortion PHDistortion ph 0.7
   note{Proportional-hazard distortion (universally understood).}
-  tags{topic:distortion, role:intro, check:limiting-case}
-  doc{{{
-## Problem
-
-You want to load expected loss into a price in a way that charges more for the tail than for the body, and you want the loading to be a *property of the measure* rather than a judgment applied case by case.
-
-## Solution
-
-```python
-import numpy as np
-g = build('''<<decl>>''')
-s = np.linspace(0, 1, 11)
-qd(pd.DataFrame({'s': s, 'g(s)': g.g(s)}).set_index('s'))
-```
-
-The curve is the clearer statement of the same thing -- it bows above the diagonal everywhere, which *is* the loading:
-
-```python
-#| fig-cap: "PH distortion, rho = 0.7. Above the diagonal is the load."
-g.plot()
-```
-
-## Discussion
-
-The proportional-hazard distortion is `g(s) = s**rho` with `rho = 0.7 < 1`. Applied to the survival function, it stretches small exceedance probabilities upward -- a 1-in-100 event is priced as though it were more likely than it is -- and leaves certainty alone.
-
-Concavity is what makes it a coherent risk measure: the premium it produces is subadditive, so combining two books never costs more than pricing them apart. `rho = 1` is the identity (pure expected loss, no load); smaller `rho` loads more heavily.
-
-## Check
-
-```python
-# a distortion is a probability-to-probability map: g(0)=0, g(1)=1
-assert abs(g.g(0.0)) < 1e-12
-assert abs(g.g(1.0) - 1.0) < 1e-12
-# increasing, and CONCAVE (the coherence property)
-s = np.linspace(0, 1, 201)
-gs = g.g(s)
-assert np.all(np.diff(gs) >= -1e-12)
-assert np.all(np.diff(gs, 2) <= 1e-9)
-# a load, never a discount: g(s) >= s everywhere
-assert np.all(gs >= s - 1e-12)
-```
-}}};
+  tags{topic:distortion, role:intro, check:limiting-case};
 
 distortion PHDistortionSimple ph 0.65
   tags{topic:distortion};
@@ -404,76 +293,7 @@ agg LayerPicks
   fixed
   note{Layer loss picks: the ISO mixed exponential reweighted so that four layers to 1M carry selected expected losses instead of the ones the curve implies.}
   tags{topic:severity, check:reconciliation}
-  hints{bs=125; log2=20}
-  doc{{{
-## Problem
-
-A severity curve implies an expected loss for every layer of a tower, and those are rarely the numbers you end up pricing. Underwriting judgment, a competitor's filing, or a benchmark study says one layer should be cheaper and the one above it dearer. You want a single severity distribution that reproduces the selected layer losses exactly, so that limits profiles, reinsurance and the aggregate are all computed from one consistent curve rather than from a curve plus a spreadsheet of overrides.
-
-## Solution
-
-The `picks` clause follows the severity: first the layer tops, then the loss selected for each layer.
-
-```python
-a = build('''<<decl>>''')
-```
-
-The unadjusted curve is the same program with the `picks` clause removed, written here through the library's own severity entry:
-
-```python
-import numpy as np
-gross = build('agg Gross 1 claim sev.ISOMixedExponential fixed', bs=125, log2=20)
-```
-
-`density_df['lev']` is the limited expected value, so the loss to the layer from `lo` to `hi` is `lev(hi) - lev(lo)` and the whole exhibit is a few lines:
-
-```python
-TOWER = np.array([0., 100e3, 250e3, 500e3, 1e6])
-PICKS = np.array([6700., 1700., 1600., 1000.])
-
-def layer_losses(obj):
-    """Expected loss to each tower layer, read off the limited expected value."""
-    lev = obj.density_df['lev']
-    return np.array([lev.loc[hi] - lev.loc[lo]
-                     for lo, hi in zip(TOWER[:-1], TOWER[1:])])
-
-exhibit = pd.DataFrame(
-    {'curve': layer_losses(gross), 'pick': PICKS, 'achieved': layer_losses(a)},
-    index=pd.Index([f'{hi - lo:,.0f} xs {lo:,.0f}'
-                    for lo, hi in zip(TOWER[:-1], TOWER[1:])], name='layer'))
-exhibit['adjustment'] = exhibit['pick'] / exhibit['curve']
-exhibit['error'] = exhibit['achieved'] - exhibit['pick']
-qd(exhibit)
-```
-
-## Discussion
-
-`picks` reweights the discretized severity layer by layer. Reading the tower from the top down, it scales the probability inside each layer until the expected loss that layer contributes equals the pick, and it leaves the distribution above the top of the tower untouched. The numbers in the first bracket are layer **tops**, not widths: `[100000 250000 500000 1000000]` means 100k xs 0, then 150k xs 100k, then 250k xs 250k, then 500k xs 500k.
-
-With `1 claim ... fixed` the aggregate equals the severity, so the picks can be read straight off the aggregate and there is no frequency to reason about. In a rating exercise the same severity carries a real claim count and every layer loss scales with it, which is why the picks are stated per claim.
-
-The mean moves, by design. The adjusted mean is the sum of the picks plus the expected loss above the top of the tower, which is unchanged: 11,000 plus about 2,597 here, against a curve mean of 13,990.
-
-Picks have to be achievable. The expected loss in a layer is bounded below by what the losses piercing the layers above it already force through it, so a pick under that floor cannot be reached by any reweighting. The build logs a warning and the adjusted density carries negative probabilities: revise the picks, not the tolerance.
-
-The bucket size must divide every layer top, or a boundary falls inside a bucket and the layer loss is read off the wrong place. That is what `hints{bs=125}` is protecting: 125 divides 100,000, 250,000, 500,000 and 1,000,000.
-
-**A picked aggregate reports a failed validation, and that is expected.** Validation compares the FFT estimate against the analytic moments of the declared severity, and picking is precisely a decision to move away from them: here the estimate is 13,597 against an analytic 13,990. Build the same program without the `picks` clause to validate the curve, as the Solution does, and read the picked object's accuracy off the layer table instead.
-
-## Check
-
-```python
-# every pick is reproduced, to floating point
-assert np.abs(layer_losses(a) / PICKS - 1).max() < 1e-8
-# the adjusted mean is the picks plus the untouched loss above the tower
-tail = gross.est_sev_m - layer_losses(gross).sum()
-assert abs(a.est_sev_m / (PICKS.sum() + tail) - 1) < 1e-6
-# and above the top of the tower nothing moved
-xs = np.asarray(a.xs)
-above = (xs > 1e6) & (xs < 2e7)
-assert np.abs(a.sf(xs[above]) / gross.sf(xs[above]) - 1).max() < 1e-6
-```
-}}};
+  hints{bs=125; log2=20};
 
 agg SevZeroParameter
   1 claim
@@ -899,39 +719,7 @@ agg LimitProfile
   sev lognorm 50 cv 1.5
   poisson
   note{Premium x limit x loss-ratio profile -- implied claim counts computed per band.}
-  tags{role:hero, topic:aggregate, check:reconciliation}
-  doc{{{
-## Problem
-
-You have the shape every pricing actuary already has: a table of premium by limit band, each band with its own expected loss ratio. You want one aggregate distribution for the whole book, with the bands correctly weighted -- not three separate models you then have to add up by hand.
-
-## Solution
-
-```python
-a = build('''<<decl>>''')
-qd(a.summary_df)
-```
-
-## Discussion
-
-The three vectors line up positionally: 10000 of premium at an 80% loss ratio written at a 1000 limit, 20000 at 70% at a 2000 limit, 5000 at 50% at a 5000 limit. One severity curve is written across all three bands, and the *limit* is what differs -- so the severity is the same lognormal capped at three different points.
-
-The claim count is an **output**, not an input. `aggregate` knows the expected loss in each band (premium x loss ratio) and the expected severity in that band (the lognormal limited at that band's limit), so it derives the implied count per band and adds them. That is the whole point of the exposure clause: you give it what you actually have -- premium and a loss ratio -- and it solves for the count rather than making you do it.
-
-Read `a.n` back to see the implied total count, and `a.sev_m` for the exposure-weighted average severity across the bands.
-
-## Check
-
-```python
-# the aggregate mean IS the premium-weighted expected loss, exactly:
-# 10000x0.8 + 20000x0.7 + 5000x0.5 = 24500
-assert abs(a.actual_m - 24500.0) < 1e-9
-# and the FFT estimate agrees to grid accuracy
-assert abs(a.est_m / a.actual_m - 1) < 1e-6
-# E[A] = E[N] x E[X] still holds across the blended profile
-assert abs(a.n * a.sev_m - a.actual_m) < 1e-6
-```
-}}};
+  tags{role:hero, topic:aggregate, check:reconciliation};
 
 agg LimitProfileSimple
   [5 10 8 2] claims
@@ -1026,47 +814,7 @@ agg OccurrenceXOL
     90% po 5000 xs 5000
   mixed gamma 0.25
   note{Occurrence excess-of-loss program, net view.}
-  tags{topic:reinsurance, check:reconciliation}
-  doc{{{
-## Problem
-
-You have a two-layer per-occurrence excess program with partial placements, and you want the *net* aggregate -- with gross and ceded still visible, so you can see where the cession went instead of taking the net on faith.
-
-## Solution
-
-```python
-a = build('''<<decl>>''')
-qd(a.reins_summary_df)
-```
-
-## Discussion
-
-`occurrence net of ...` applies the program claim by claim, before the frequency convolution -- which is what "per occurrence" means and why it cannot be done by adjusting the aggregate afterwards.
-
-`50% po 2500 xs 2500` cedes half of the 2500-excess-2500 layer, `90% po 5000 xs 5000` nine tenths of the layer above it; `and` chains them into one program.
-
-Note the program above is the **canonical** form. A partial placement is written `po` (*part of*), and the leading quantity says which reading you mean: a percentage is the share directly, a bare number is an absolute amount and the share is that amount over the limit. Both normalize to the `<pct>% po <limit> xs <attach>` spelling you see here, because the spec stores only the resolved fraction. That is why what you wrote and what the library shows back can differ without anything having changed.
-
-`reins_summary_df` is the exhibit that matters here: three stages (gross, ceded, net) x three components (freq, sev, agg), with theoretic `EX` next to the FFT `Est EX`. The frequency row is identical across the three views -- occurrence cover changes what each claim costs, never how many there are.
-
-## Check
-
-```python
-# net + ceded = gross, on both severity and aggregate, to grid accuracy
-est = a.reins_summary_df['Est EX'].xs('occ')
-for component in ('sev', 'agg'):
-    gross = est[('gross', component)]
-    net = est[('net', component)]
-    ceded = est[('ceded', component)]
-    assert abs(net + ceded - gross) < 1e-6 * gross
-# occurrence cover leaves the claim COUNT alone. Read this off the theoretic
-# EX column: the gross frequency has no separate FFT estimate (Est EX is NaN
-# there -- there is nothing to estimate, the count is an input).
-ex = a.reins_summary_df['EX'].xs('occ')
-assert abs(ex[('net', 'freq')] - ex[('gross', 'freq')]) < 1e-9
-assert abs(ex[('ceded', 'freq')] - ex[('gross', 'freq')]) < 1e-9
-```
-}}};
+  tags{topic:reinsurance, check:reconciliation};
 
 agg ReinsuranceOccurrenceTower
   5 claims
@@ -1135,59 +883,7 @@ agg NeymanInnerOuter
   poisson
   note{Neyman Type A assembled by hand: a Poisson(2.5) number of NeymanCluster draws, overall mean 10. The same distribution the neymana keyword produces.}
   tags{topic:frequency, check:cross-object}
-  hints{bs=1; log2=10}
-  doc{{{
-## Problem
-
-`neymana` is one of the built in frequency laws: a Poisson number of clusters, each contributing a Poisson number of claims. You want to see what it is actually doing, and you want the same two level shape available when the inner or the outer piece is something the frequency vocabulary does not name.
-
-## Solution
-
-An aggregate can serve as the severity of another aggregate. The inner one, `NeymanCluster`, is a single cluster: a Poisson(4) count on a unit severity. The outer draws a Poisson(2.5) number of clusters and adds them up.
-
-```python
-a = build('''<<decl>>''')
-qd(a)
-```
-
-The keyword states the same law in one line. The overall mean is the product, 2.5 x 4 = 10, and the parameter is the mean cluster size.
-
-```python
-builtin = build('agg NeymanBuiltIn 10 claims dsev [1] neymana 4', bs=1, log2=10)
-qd(builtin)
-```
-
-Compare the two probability mass functions directly.
-
-```python
-both = pd.concat([a.density_df.p_total, builtin.density_df.p_total], axis=1)
-both.columns = ['inner outer', 'neymana']
-both['difference'] = both['inner outer'] - both['neymana']
-qd(both.head(12))
-```
-
-## Discussion
-
-The inner is referred to by **name**. The outer parses with `agg.NeymanCluster` recorded and the underwriter resolves it at build time, so nothing is spliced textually and the inner is a fully formed object before the outer ever sees it. Its output probability mass function then becomes a discrete severity for the outer, exactly as though it had been transcribed as `dsev [outcomes] [probabilities]` by hand. That is why the inner has to pin `bs` and `log2` in its own `hints`: the severity it hands over must not depend on the settings the outer happens to be built with.
-
-The inner keeps its mass at zero, because a Poisson cluster can be empty and the outer has no layers clause to condition it away. That is load bearing. Neyman A is a Poisson stopped sum of Poissons counting the empty clusters too, and both constructions report the same P(N = 0) = exp(2.5 (exp(-4) - 1)) = 0.0859.
-
-The general fact is that a two level count is a stopped sum, so this construction reaches any of them, not only Neyman A. Pascal is a Poisson stopped sum of negative binomials and is reached the same way, with `negbin` on the inner. The keyword exists because the two level Poisson case is common enough to be worth a closed form probability generating function; the inner outer route is what to reach for when there is no keyword.
-
-## Check
-
-```python
-# the two constructions agree to floating point across the whole support
-both = pd.concat([a.density_df.p_total, builtin.density_df.p_total], axis=1)
-assert (both.iloc[:, 0] - both.iloc[:, 1]).abs().max() < 1e-13
-# including the atom at zero, which is what keeping the empty clusters means
-assert abs(a.density_df.p_total.iloc[0] - np.exp(2.5 * (np.exp(-4) - 1))) < 1e-9
-# and on the moments the keyword computes analytically
-assert abs(a.est_m - 10.0) < 1e-9
-assert abs(a.est_m - builtin.est_m) < 1e-9
-assert abs(a.est_cv - builtin.est_cv) < 1e-9
-```
-}}};
+  hints{bs=1; log2=10};
 
 agg SplitLimitClaimant
   1.25 claims
@@ -1205,54 +901,7 @@ agg SplitLimitPolicy
   poisson
   note{100 US auto policies written 100/300: the per accident loss of SplitLimitClaimant is the severity, capped at the 300 per accident limit.}
   tags{topic:aggregate, topic:severity, check:reconciliation}
-  hints{bs=1/4; log2=17}
-  doc{{{
-## Problem
-
-A US personal auto policy written 100/300 pays at most 100 to any one claimant and at most 300 for any one accident. Two limits apply at two different levels, and neither is a layer on the other: the 100 sits inside the accident, the 300 sits on the accident total. You want the aggregate loss for a book of such policies.
-
-## Solution
-
-Build the policy from the inside out. The inner aggregate is one accident: a zero truncated Poisson number of claimants, 1.25 of them on average, each subject to the 100 per claimant limit.
-
-```python
-inner = build('SplitLimitClaimant')
-qd(inner)
-```
-
-The outer treats that per accident loss as its severity and applies the 300 as an ordinary occurrence limit.
-
-```python
-a = build('''<<decl>>''')
-qd(a)
-```
-
-## Discussion
-
-The two limits never interact in the program text. The per claimant limit is a layers clause inside the inner, applied claimant by claimant; the per accident limit is a layers clause on the outer, applied to the inner's whole output. Reinsurance clauses would reach the same law and would be much harder to read: prefer no limits, then exposure limits, then aggregate reinsurance, then occurrence reinsurance, in that order.
-
-`poisson zt !` carries two decisions. `zt` truncates the zero, so every draw of the inner has at least one claimant, which is what makes it an accident rather than a policy year. The `!` holds the requested mean at 1.25; without it the 1.25 would be the untruncated Poisson parameter and truncation would lift the mean to 1.75.
-
-The trailing `!` on `sev agg.SplitLimitClaimant` is a different `!`, on the severity side, and it says the outer's `300 xs 0` layer is unconditional. A zero truncated inner has no mass at zero in theory, but any severity with positive density at the origin discretizes a wisp of every claim into the first bucket, about 1.6 in 10,000 at this resolution. Those are small losses, not zero losses. Without the `!` the default conditional reading would drop them and rescale the rest, lifting the severity mean by the same proportion, and the library says so in a warning. Keep the mass.
-
-Both declarations pin `bs` and `log2`, and they pin the **same** `bs`. The inner must pin its resolution because it is materialized into a discrete severity before the outer ever runs, so its output must not depend on the outer's settings. Matching the two is a separate point and it is worth knowing: a layered reference is rebucketed by differencing its survival function, which is exact when the grids agree and loses a few parts in ten thousand when they do not.
-
-The result is worth stating plainly. With 1.25 claimants per accident and each one capped at 100, an accident needs three claimants before the 300 can bind at all, and P(loss to one policy exceeds 300) is about 7 in 100,000. The 300 is worth 0.0019 of expected loss per policy against a per policy mean of 43.92, four thousandths of one percent. In a 100/300 policy the per claimant limit does essentially all the work, and the model shows that rather than asserting it.
-
-## Check
-
-```python
-# the frequency ! held the requested mean at 1.25 claimants, against the
-# 1.75 that truncating a Poisson(1.25) would otherwise give
-assert abs(inner.n - 1.25) < 1e-12
-# the outer mean is 100 policies times the per accident loss capped at 300
-capped = inner.density_df['lev'].loc[300.0]
-assert abs(a.est_m / (100 * capped) - 1) < 1e-9
-# the 300 per accident limit binds, but is worth under a hundredth of a percent
-saving = inner.est_m - capped
-assert 0 < saving < 1e-4 * inner.est_m
-```
-}}};
+  hints{bs=1/4; log2=17};
 
 # ----------------------------------------------------------------------
 # Bivariate and dependent risks

@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a300
+
+**[Doc-Bodies-Out-Of-The-Library] the seven long-form write-ups leave `library.agg`.** Phase D of `dev/plan-decommission-docs.md`. The file loses 311 lines and keeps every entry: `ThreeDice`, `PHDistortion`, `LayerPicks`, `LimitProfile`, `OccurrenceXOL`, `NeymanInnerOuter` and `SplitLimitPolicy` are unchanged as declarations and keep their `note{}`, `tags{}` and `hints{}`. Only the `doc{{{...}}}` bodies go. The material is not lost: it became notes in `aggregate-presentations` at phase A, and the invariants it asserted became `tests/test_library_entries.py` at a299, which is why this phase comes third rather than first.
+
+**The header says what a trailer is for.** The `WRITING A doc` section, the `<<decl>>` convention, the plain-fence convention and the `HOW MUCH DOCUMENTATION` paragraph are replaced by the rule they were working around: a trailer holds facts about an entry, and a document is not a fact about an entry. A note that wants a library program prints it, `print(build.recipe('LayerPicks').decl)`, which reads the live library and cannot go stale. The six `[Check-*]` archetypes that arrived in the header at a298 stay.
+
+**`tests/test_library_recipes.py` deleted**, 107 lines. It ran each doc's Solution and Check through `Recipe.run`; a299 replaced it with ordinary asserts that a traceback can point at.
+
+**`tests/test_recipe.py` keeps testing the clause, against its own fixture.** Three tests read `<<decl>>` expansion out of `library.agg`, which no longer has a doc to read. They now build a synthetic `DocDemo` entry, following the pattern the neighboring hints test already used. This matters because **phase D is a stable resting place**: the grammar still accepts `doc`, the machinery still works and is still covered, and nothing in the shipped library uses it. Phase E is the breaking change and it is separate.
+
+**`[Recipe-Run-Clobbers-The-Trailer]` becomes `[Session-Build-Clobbers-The-Trailer]`** in `dev/TODO.md`. Its trigger is gone with the recipe-run path, but the underlying behavior is not: a session `build` still silently replaces a library entry's trailer with whatever the session program carries. Author ruled to keep it open on the general terms.
+
 ## 1.0.0a299
 
 **[Library-Entries-Build-Check] every shipped entry builds, and its stated invariants are ordinary pytest.** Phase C of `dev/plan-decommission-docs.md`, and it closes `[Agg-Library-Build-Check]` in `dev/TODO.md`. New `tests/test_library_entries.py`, 177 cases. Before this the shipped library had one assertion against it, that the file loaded; nothing in it was ever built.

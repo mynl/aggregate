@@ -917,9 +917,11 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
 
     Notes
     -----
-    Mirrors :meth:`Aggregate._fft_aggregate` (zero-risk and fixed-count-1
-    shortcuts) with the 1D transforms replaced by 2D, valid because
-    ``freq_pgf(n, z)`` is elementwise in ``z`` (handled with ravel/reshape).
+    Mirrors :meth:`Aggregate._fft_aggregate` (zero-risk and one-claim
+    shortcuts, the latter through the shared
+    :attr:`Aggregate.one_claim` predicate) with the 1D transforms replaced by
+    2D, valid because ``freq_pgf(n, z)`` is elementwise in ``z`` (handled with
+    ravel/reshape).
     """
     import scipy.fft as _sfft
 
@@ -937,7 +939,7 @@ def build_netceded_joint(agg, views=('net', 'ceded'), bs=None,
     if agg.n == 0:
         density = np.zeros((n0, n1))
         density[0, 0] = 1.0
-    elif np.sum(agg.en) == 1 and agg.frequency.freq_name == 'fixed':
+    elif agg.one_claim:
         density = sev2.copy()
     else:
         pad = agg.padding

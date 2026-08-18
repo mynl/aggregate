@@ -148,12 +148,14 @@
   it the identity layering; it can now be declared with plain `sev`, where the
   layer is a real layer. The half-applied layer remains for genuinely signed
   severities, and is still silent.
-- **[Dfreq-One-Claim-Shortcut]**: `dfreq [1]` should take the same exact
-  severity-copy path as `1 claim ... fixed` (today it runs the identity FFT
-  round trip and picks up machine-epsilon dust; the gate is duplicated in
-  `bivariate.py`). One shared `Aggregate.one_claim` predicate feeding both
-  gates. Small, self-contained, parked for a good window (author, 2026-08-18).
-  Plan: `dev/plan-dfreq-one-claim-shortcut.md`.
+- ~~**[Dfreq-One-Claim-Shortcut]**~~ **DONE `1.0.0a303`**
+  (`dev/done/plan-dfreq-one-claim-shortcut.md`): `dfreq [1]` takes the same
+  exact severity-copy path as `1 claim ... fixed`. New read-only
+  `Aggregate.one_claim` property (support test, never the mean) feeds both
+  gates: `freq_sev_convolution`, whose `en` / `freq_name` parameters became a
+  caller-computed `one_claim` boolean, and the `bivariate.py` netceded joint.
+  Baseline regenerated for the one case that moves, `Base.DfreqOne`, at 1e-11
+  relative; the other nine are byte identical.
 - **[Validation-Calc-Review]** (#49) — audit the validation algorithm against the
   published *Aggregate* paper and make the docs match the actual algo. The
   "all switches → config" sub-goal is done (`eps`/`noise`, `aliasing_ratio`,

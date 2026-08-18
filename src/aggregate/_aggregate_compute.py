@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def freq_sev_convolution(sev_density, freq_pgf, n, *, N, bs, i0=0, x_min=0.0,
-                         en=None, freq_name='', padding=1):
+                         one_claim=False, padding=1):
     """Aggregate density by FFT convolution: ``iFFT(freq_pgf(n, FFT(sev)))``.
 
     The single source of truth for the FFT-PGF-iFFT core (Mildenhall 2024,
@@ -52,11 +52,11 @@ def freq_sev_convolution(sev_density, freq_pgf, n, *, N, bs, i0=0, x_min=0.0,
         the default non-negative grid.
     x_min : float, optional
         Output-window origin; ``0.0`` on the default zero-based grid.
-    en : array-like, optional
-        Expected claim counts; only consulted for the fixed-frequency,
-        single-claim shortcut. ``None`` skips the shortcut.
-    freq_name : str, optional
-        Frequency kind; the fixed-1 shortcut fires only for ``'fixed'``.
+    one_claim : bool, optional
+        Whether the claim count is identically 1, in which case the aggregate
+        *is* the severity and the identity round trip is skipped. The caller
+        decides (:attr:`aggregate.distributions.Aggregate.one_claim`); this
+        function never sniffs frequency semantics of its own. Default ``False``.
     padding : int, optional
         FFT padding factor passed to :func:`~aggregate.utilities.ft` /
         :func:`~aggregate.utilities.ift`. Default 1.
@@ -74,7 +74,10 @@ def freq_sev_convolution(sev_density, freq_pgf, n, *, N, bs, i0=0, x_min=0.0,
 
     - **Default (``i0 == 0`` and window origin ``x_min == 0``).** The original
       ``ft`` / ``freq_pgf`` / ``ift`` path, byte-for-byte identical to prior
-      releases.
+      releases. With ``one_claim`` the aggregate equals the severity, so the
+      round trip is an identity computed numerically and the severity is
+      copied instead; ``ftagg_density`` is still evaluated, since
+      ``Portfolio`` consumes it.
     - **Signed / windowed.** Negatives live at the top of the padded length-``M
       = N << padding`` FFT buffer (period ``M*bs``); the severity is laid in with
       physical 0 at index 0 (``i0`` negative buckets wrapped to the top). After
@@ -93,7 +96,7 @@ def freq_sev_convolution(sev_density, freq_pgf, n, *, N, bs, i0=0, x_min=0.0,
             return out, ft(out, padding)
         z = ft(sev_density, padding)
         ftagg = freq_pgf(n, z)
-        if en is not None and np.sum(en) == 1 and freq_name == 'fixed':
+        if one_claim:
             return sev_density.copy(), ftagg
         return np.real(ift(ftagg, padding)), ftagg
 

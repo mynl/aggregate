@@ -20,6 +20,28 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a303
+
+**[Dfreq-One-Claim-Shortcut] `dfreq [1]` takes the same exact path as `1 claim ... fixed`.** `dev/plan-dfreq-one-claim-shortcut.md`, all four phases. With exactly one claim the aggregate **is** the (post occurrence reinsurance) severity, so the FFT round trip is an identity executed numerically. The convolution has always known that, but it recognized only one spelling of the fact: the gate read `sum(en) == 1 and freq_name == 'fixed'`, so `1 claim ... fixed` returned the discretized severity bit for bit while `dfreq [1]`, which builds an empirical frequency, ran `ift(freq_pgf(ft(sev)))` and came back carrying machine epsilon dust (measured 2.8e-17 per bucket, which compounds to about 1e-11 relative on the third moment). Two ways of saying the same thing, two different answers. Now both copy.
+
+**`Aggregate.one_claim`, a new read-only property, is the single predicate.** True when the claim count is identically one, however the count was spelled: a `FrequencyFixed` whose component counts sum to one (a limit profile splitting that single claim over several components still qualifies, because `sev_density` is then the corresponding severity mixture), or a `FrequencyEmpirical` carrying all its mass on the outcome one. `FrequencyRenewal` is an empirical frequency post build, so a renewal count that degenerates to one claim qualifies too, at no extra cost.
+
+**The empirical test is on the support, never on the mean.** `dfreq [0 2] [.5 .5]` has mean one and is emphatically not one claim; it keeps the convolution. Zero probability atoms are ignored, since `validate_discrete_distribution` makes the outcomes distinct and ascending but never drops a zero mass, so a declared but impossible outcome such as `dfreq [0 1] [0 1]` does not defeat the test.
+
+**The kernel stops sniffing frequency semantics.** `_aggregate_compute.freq_sev_convolution` traded its `en` and `freq_name` parameters for a single `one_claim=False` boolean that the caller computes. It is a pure internal function reached from `Aggregate._fft_aggregate` and the direct kernel tests, so nothing public moved, and the change is the point: deciding what the frequency means is the object's job, and the kernel's job is the transform.
+
+**One predicate, two gates, so they cannot drift.** `bivariate.netceded_joint_density` carried its own copy of the old inline test for the 2-D netceded joint. It now reads `agg.one_claim`, which is also how the 2-D path picked up the `dfreq [1]` case for free.
+
+**`ftagg_density` is still computed on the shortcut path.** A `Portfolio` multiplies unit transforms to combine them under the independence copula, so the transform is needed even when the density is a copy. Only the inverse transform is skipped.
+
+**The signed and windowed branch is unchanged.** It has no one-claim shortcut for either spelling, and keeps that parity; adding one there is a separate question about relabeling an array that was never convolved.
+
+**Baseline moved by exactly one case.** `tests/baseline/` regenerated: `Base.DfreqOne` (`agg Base.DfreqOne dfreq [1] sev lognorm 100 cv 0.5`) moves in `density_df`, `stats_df` and `describe` at a maximum relative 1.0e-11, concentrated in the tail rows and the third moment, which is the dust coming out. The other nine cases are byte identical parquet, which is the regression bar the plan set: the FFT path itself was not touched, the shortcut only widened.
+
+**Tests.** `tests/test_aggregate_compute.py` gains eight cases: four spellings of one claim (`1 claim ... fixed` and `dfreq [1]`, over both a discrete and a continuous severity) asserting `np.array_equal(agg_density, sev_density)`, three negative controls (a fixed count of two, the mean one `dfreq [0 2] [.5 .5]`, and a Poisson mean of one) asserting the predicate is False and the density is not the severity, and the zero probability atom case. The two byte-for-byte kernel tests migrate to the new signature.
+
+**Docs.** `docs/2_aggregate_overview/pipeline-aggregate.rst` described the old asymmetry as behavior, including the sentence saying `dfreq [1]` carries sub-eps FFT fuzz that the shortcut path does not. It now describes the shared gate and records when the two spellings converged.
+
 ## 1.0.0a302
 
 **[Session-Isolation] one recipe base, many users: `Underwriter.fork()`, `Underwriter.preview()`, and `RecipeNotFound`.** The library half of `dev/plan-session-isolation.md`, phases L1 to L4, executed while the application executed its own. Everything here stands on its own product merit, which was the author's condition for it landing in the library at all: a scratch base for a notebook, an honest report of what a program depends on, and a named exception for a name that is gone.

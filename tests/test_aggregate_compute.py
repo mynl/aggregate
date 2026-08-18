@@ -75,8 +75,7 @@ def test_kernel_reproduces_update_byte_for_byte():
     a.update()
     agg, _ = freq_sev_convolution(
         a.sev_density, a.frequency.freq_pgf, a.n, N=len(a.xs), bs=a.bs,
-        i0=a.i0, x_min=a.x_min, en=a.en, freq_name=a.frequency.freq_name,
-        padding=1)
+        i0=a.i0, x_min=a.x_min, one_claim=a.one_claim, padding=1)
     np.testing.assert_array_equal(agg, a.agg_density)
 
 
@@ -86,6 +85,53 @@ def test_kernel_reproduces_poisson_update():
     a.update(log2=16, bs=1)
     agg, _ = freq_sev_convolution(
         a.sev_density, a.frequency.freq_pgf, a.n, N=len(a.xs), bs=a.bs,
-        i0=a.i0, x_min=a.x_min, en=a.en, freq_name=a.frequency.freq_name,
-        padding=1)
+        i0=a.i0, x_min=a.x_min, one_claim=a.one_claim, padding=1)
     np.testing.assert_array_equal(agg, a.agg_density)
+
+
+# ----------------------------------------------------------------------
+# [Dfreq-One-Claim-Shortcut]: the two spellings of "exactly one claim"
+# ----------------------------------------------------------------------
+
+ONE_CLAIM_PROGRAMS = [
+    'agg OneFixed 1 claim dsev [1:6] fixed',
+    'agg OneDfreq dfreq [1] dsev [1:6]',
+    'agg OneFixedCts 1 claim sev lognorm 50 cv 2 fixed',
+    'agg OneDfreqCts dfreq [1] sev lognorm 50 cv 2',
+]
+
+
+@pytest.mark.parametrize('program', ONE_CLAIM_PROGRAMS)
+def test_one_claim_aggregate_is_the_severity(program):
+    """One claim, however spelled: the aggregate IS the severity, exactly.
+
+    ``dfreq [1]`` used to run the identity FFT round trip and land within
+    machine epsilon rather than on the nose; both spellings now take the
+    severity-copy shortcut, so equality is byte for byte.
+    """
+    a = build(program)
+    assert a.one_claim is True
+    np.testing.assert_array_equal(a.agg_density, a.sev_density)
+
+
+@pytest.mark.parametrize('program', [
+    'agg TwoFixed 2 claims dsev [1:6] fixed',       # mean 2
+    'agg MeanOne dfreq [0 2] [.5 .5] dsev [1:6]',   # mean 1, support {0, 2}
+    'agg PoisOne 1 claim dsev [1:6] poisson',       # mean 1, random count
+])
+def test_not_one_claim_keeps_the_convolution(program):
+    """Negative controls: a mean of one is not a count of one.
+
+    ``dfreq [0 2] [.5 .5]`` is the case the predicate must test on the
+    support rather than the mean.
+    """
+    a = build(program)
+    assert a.one_claim is False
+    assert not np.array_equal(a.agg_density, a.sev_density)
+
+
+def test_one_claim_zero_probability_atom_ignored():
+    """A declared but impossible outcome does not defeat the support test."""
+    a = build('agg OneWithHole dfreq [0 1] [0 1] dsev [1:6]')
+    assert a.one_claim is True
+    np.testing.assert_array_equal(a.agg_density, a.sev_density)

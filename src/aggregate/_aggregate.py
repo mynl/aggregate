@@ -49,7 +49,7 @@ from . import tail as _tail
 from .tail import TailClass
 
 from ._fits import (_approximate_sev_kwargs, approximate_from_mcvsk)
-from ._frequency import Frequency, FrequencyRenewal
+from ._frequency import Frequency, FrequencyEmpirical, FrequencyRenewal
 from ._renewal import ruin_cepstral
 from ._severity import Severity
 # Phase 1b shared concerns (leaf/near-leaf; never import back into _aggregate).
@@ -3250,6 +3250,55 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
     # ``_freq_sev_convolution`` below.
     # ================================================================
 
+    @property
+    def one_claim(self):
+        """Whether the claim count is identically one.
+
+        Returns
+        -------
+        bool
+            ``True`` iff ``N = 1`` with probability one, however the frequency
+            happens to be spelled.
+
+        Notes
+        -----
+        This is the *convolution* gate for the exact severity copy shortcut.
+        With exactly one claim the aggregate **is** the (post occurrence
+        reinsurance) severity, so ``iFFT(P_N(FFT(sev)))`` is an identity
+        executed numerically: it returns the severity plus machine epsilon
+        dust. Copying the array instead is exact and cheaper. See
+        :func:`aggregate._aggregate_compute.freq_sev_convolution` (1-D) and
+        :func:`aggregate.bivariate.netceded_joint_density` (2-D), which share
+        this predicate so the two never drift apart.
+
+        Two spellings reach the same law and both answer ``True``:
+
+        - ``1 claim ... fixed``: a
+          :class:`~aggregate._frequency.FrequencyFixed` whose component claim
+          counts sum to one. A limit profile splitting that single claim over
+          several components still qualifies, because ``sev_density`` is then
+          the corresponding severity mixture.
+        - ``dfreq [1]``: a :class:`~aggregate._frequency.FrequencyEmpirical`
+          carrying all its mass on the outcome one.
+          :class:`~aggregate._frequency.FrequencyRenewal` is an empirical
+          frequency post build, so a renewal count that degenerates to one
+          claim qualifies too.
+
+        The empirical test is on the **support**, never on the mean:
+        ``dfreq [0 2] [.5 .5]`` has mean one and is emphatically not one
+        claim. Zero probability atoms are ignored, since
+        :func:`~aggregate._severity.validate_discrete_distribution` makes the
+        outcomes distinct and ascending but never drops a zero mass.
+        """
+        freq = self.frequency
+        if freq.freq_name == 'fixed':
+            return bool(self.en is not None and np.sum(self.en) == 1)
+        if isinstance(freq, FrequencyEmpirical):
+            atoms = np.asarray(freq.freq_a, dtype=float)
+            probs = np.asarray(freq.freq_b, dtype=float)
+            return bool(np.array_equal(atoms[probs > 0], np.array([1.0])))
+        return False
+
     def _signed_severity(self):
         """Whether the aggregate has signed (negative-support) severity.
 
@@ -3950,7 +3999,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         by ``update_work`` for the subject (gross) aggregate when occ-reins
         is present, and by ``reins_density_df`` to compute gross/ceded/net
         aggregates from the corresponding severities. The zero-risk and
-        fixed-1 shortcuts live here so every caller sees them consistently.
+        one-claim shortcuts live here so every caller sees them consistently.
 
         Parameters
         ----------
@@ -3992,7 +4041,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return freq_sev_convolution(
             sev_density, self.frequency.freq_pgf, self.base_mean,
             N=len(self.xs), bs=self.bs, i0=self.i0, x_min=self.x_min,
-            en=self.en, freq_name=self.frequency.freq_name, padding=padding)
+            one_claim=self.one_claim, padding=padding)
 
     def _write_stage_moments(self, col, sev_mom, agg_mom, copy_freq_from=None):
         """Write a moment tuple into a single ``stats_df`` column.
@@ -4027,7 +4076,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         Thin wrapper that routes the (post-occ-reins) ``sev_density`` through
         ``_fft_aggregate`` and writes ``self.agg_density`` /
-        ``self.ftagg_density``. The FFT core, zero-risk and fixed-1 shortcuts
+        ``self.ftagg_density``. The FFT core, zero-risk and one-claim shortcuts
         all live in ``_fft_aggregate``.
 
         Parameters

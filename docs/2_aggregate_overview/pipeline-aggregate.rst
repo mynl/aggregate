@@ -161,7 +161,7 @@ The FFT core
     self.ftagg_density = self.frequency.freq_pgf(self.n, z)        # apply the PGF
     self.agg_density   = real(ift(self.ftagg_density, padding))    # back to a PMF
 
-There are two shortcuts. A zero-risk aggregate (``n == 0``) is unit mass at 0, and the FFT runs only to give ``ftagg_density`` the right shape, which is needed if the aggregate lives in a :class:`Portfolio`. A fixed frequency of 1 (``sum(en) == 1`` with ``freq == 'fixed'``) means the aggregate is the severity, so the inverse FFT is skipped entirely. That is the ``agg A 1 claim ... fixed`` path; the general ``dfreq[1]`` path does the full round trip and so carries sub-eps FFT fuzz that the shortcut path does not.
+There are two shortcuts. A zero-risk aggregate (``n == 0``) is unit mass at 0, and the FFT runs only to give ``ftagg_density`` the right shape, which is needed if the aggregate lives in a :class:`Portfolio`. A claim count identically 1 means the aggregate *is* the severity, so the inverse FFT is skipped and the severity array is copied. The gate is the :attr:`~aggregate.distributions.Aggregate.one_claim` property, and both spellings satisfy it: ``agg A 1 claim ... fixed`` and ``agg A dfreq [1] ...``. Before 1.0.0a303 only the fixed spelling shortcut, so ``dfreq [1]`` ran the identity round trip and carried sub-eps FFT fuzz; the two now agree byte for byte. The test is on the count *support*, so ``dfreq [0 2] [.5 .5]``, whose mean is 1, still convolves.
 
 ``padding`` doubles (1) or quadruples (2) the working vector to mitigate FFT aliasing and wrap-around. ``ftagg_density`` is retained because :class:`Portfolio` multiplies unit transforms to combine them under the independence copula.
 
@@ -220,8 +220,8 @@ Leave no mass at the top bucket.
     Discretize to ``xs[-1] + bs`` and normalize, rather than extending to infinity. A clean tail beats a guaranteed unit sum.
 Protect the severity.
     ``p_sev`` is attached after ``remove_fuzz`` so exact severity work is not zeroed.
-Take the fixed-1 shortcut.
-    A frequency identically 1 means the aggregate is the severity, so skipping the inverse FFT buys both speed and accuracy.
+Take the one-claim shortcut.
+    A frequency identically 1 means the aggregate is the severity, so skipping the inverse FFT buys both speed and accuracy. Gate it on the count support, not on how the count was spelled.
 Leave moment matching unimplemented.
     On purpose. Embrechts says it is not worth it.
 

@@ -132,7 +132,7 @@ def _economic_ratios_frames(obj):
 #: The ratio frame splits into pure blocks under INSURER, per the reporting
 #: guideline that a column carries one unit: currency amounts, then the
 #: dimensionless ratios, then the itemized legs.
-_AMOUNT_COLS = ('P', 'L', 'E', 'C', 'M')
+_AMOUNT_COLS = ('P', 'L', 'E', 'M')
 _RATIO_COLS = ('LR', 'ER', 'CR', 'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
 
 
@@ -154,10 +154,12 @@ def _economic_ratios_insurer(obj, blocks):
         out.append((
             'amounts', ratios_df[amounts],
             dict(ratios_kw, row_flags=total_row, caption=(
-                'Premium, loss, expense and commission per block, signed in '
-                'the gross direction so they add across blocks and the margin '
-                'identity M = P - L - E - C holds exactly. Loss absorbs '
-                'cession recoveries and any unclassified obligation leg.'))))
+                'Premium, loss and expense per block, signed in the gross '
+                'direction so they add across blocks and the margin identity '
+                'M = P - L - E holds exactly. Loss absorbs cession recoveries '
+                'and any unclassified obligation leg; expense absorbs ceding '
+                'commission, a contra expense. The legs block below itemizes '
+                'both.'))))
     if ratios:
         # no ratio_cols here: every one of these labels points at the `ratio`
         # style in the format sheets, which stamps greater_tables' own ratio

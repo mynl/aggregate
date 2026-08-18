@@ -314,7 +314,7 @@ def test_the_retired_scale_surface_is_gone():
 
 
 def test_ratio_df_amounts_foot_to_the_margin():
-    """``M == P - L - E - C`` holds by construction, on every block."""
+    """``M == P - L - E`` holds by construction, on every block."""
     p = PnL(name='p', source=(_VALS, _PROBS), role='sell',
             consideration=[Leg('premium', 20.0, kind='premium')],
             obligation=[Leg('loss', lambda x: x, kind='loss'),
@@ -325,7 +325,7 @@ def test_ratio_df_amounts_foot_to_the_margin():
     assert row['P'] == pytest.approx(20.0)
     assert row['E'] == pytest.approx(2.0)
     assert row['M'] == pytest.approx(
-        row['P'] - row['L'] - row['E'] - row['C'], abs=TOL)
+        row['P'] - row['L'] - row['E'], abs=TOL)
     # 1 - CR == M / P, the other reading of the same identity
     assert 1.0 - row['CR'] == pytest.approx(row['M'] / row['P'], abs=TOL)
 
@@ -341,7 +341,7 @@ def test_ratio_df_unclassified_obligation_folds_into_loss():
             consideration={'premium': 20.0},
             obligation={'loss': lambda x: x, 'expense': 2.0})
     row = p.economic_ratios_df.loc['u']
-    assert row['E'] == 0.0 and row['C'] == 0.0
+    assert row['E'] == 0.0
     obl = -p.economic_df.loc[('Obligation', 'Total'), 'EX']
     assert row['L'] == pytest.approx(obl, abs=TOL)   # loss AND expense
     assert row['M'] == pytest.approx(row['P'] - row['L'], abs=TOL)
@@ -351,7 +351,7 @@ def test_ratio_df_ratios_are_re_derived_not_averaged():
     """The pricing_df rule: amounts add, ratios come off the summed amounts."""
     r = _classified_two_group().economic_ratios_df
     assert list(r.index) == ['base', 'cover', 'All']
-    for col in ('P', 'L', 'E', 'C', 'M'):
+    for col in ('P', 'L', 'E', 'M'):
         assert r.loc['All', col] == pytest.approx(
             r.loc['base', col] + r.loc['cover', col], abs=TOL)
     assert r.loc['All', 'LR'] == pytest.approx(

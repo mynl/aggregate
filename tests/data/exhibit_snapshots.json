@@ -10866,10 +10866,6 @@
        "text": "0.00"
       },
       {
-       "raw": 0.0,
-       "text": "0.00"
-      },
-      {
        "raw": 299.99379188155297,
        "text": "299.99"
       }
@@ -10892,10 +10888,6 @@
        ],
        "raw": -123.89265190491155,
        "text": "-123.89"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
       },
       {
        "raw": 0.0,
@@ -10930,10 +10922,6 @@
        "text": "0.00"
       },
       {
-       "raw": 0.0,
-       "text": "0.00"
-      },
-      {
        "raw": 63.76031042534639,
        "text": "63.76"
       }
@@ -10962,10 +10950,6 @@
        "text": "0.00"
       },
       {
-       "raw": 0.0,
-       "text": "0.00"
-      },
-      {
        "raw": 147.65296233025794,
        "text": "147.65"
       }
@@ -10988,10 +10972,6 @@
        "text": "0.00"
       },
       {
-       "raw": 0.0,
-       "text": "0.00"
-      },
-      {
        "raw": 447.6467542118109,
        "text": "447.65"
       }
@@ -11001,7 +10981,7 @@
      ]
     }
    ],
-   "caption": "Premium, loss, expense and commission per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E - C holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg.",
+   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. The legs block below itemizes both.",
    "columns": [
     {
      "align": "l",
@@ -11066,20 +11046,6 @@
      },
      "key": "c4",
      "name": [
-      "C"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
       "M"
      ],
      "raw": true
@@ -11098,9 +11064,6 @@
      },
      {
       "text": "E"
-     },
-     {
-      "text": "C"
      },
      {
       "text": "M"
@@ -11725,17 +11688,13 @@
        "text": "0.00"
       },
       {
-       "raw": 0.0,
-       "text": "0.00"
-      },
-      {
        "raw": 150.00000722020332,
        "text": "150.00"
       }
      ]
     }
    ],
-   "caption": "Premium, loss, expense and commission per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E - C holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg.",
+   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. The legs block below itemizes both.",
    "columns": [
     {
      "align": "l",
@@ -11800,20 +11759,6 @@
      },
      "key": "c4",
      "name": [
-      "C"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
       "M"
      ],
      "raw": true
@@ -11832,9 +11777,6 @@
      },
      {
       "text": "E"
-     },
-     {
-      "text": "C"
      },
      {
       "text": "M"
@@ -12217,10 +12159,6 @@
        "text": "0.00"
       },
       {
-       "raw": 0.0,
-       "text": "0.00"
-      },
-      {
        "raw": 299.99385505947566,
        "text": "299.99"
       }
@@ -12243,10 +12181,6 @@
        ],
        "raw": -51.11309650691787,
        "text": "-51.11"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
       },
       {
        "raw": 0.0,
@@ -12278,10 +12212,6 @@
        "text": "0.00"
       },
       {
-       "raw": 0.0,
-       "text": "0.00"
-      },
-      {
        "raw": 251.10695156639355,
        "text": "251.11"
       }
@@ -12291,7 +12221,7 @@
      ]
     }
    ],
-   "caption": "Premium, loss, expense and commission per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E - C holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg.",
+   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. The legs block below itemizes both.",
    "columns": [
     {
      "align": "l",
@@ -12356,20 +12286,6 @@
      },
      "key": "c4",
      "name": [
-      "C"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
       "M"
      ],
      "raw": true
@@ -12388,9 +12304,6 @@
      },
      {
       "text": "E"
-     },
-     {
-      "text": "C"
      },
      {
       "text": "M"
@@ -12897,10 +12810,6 @@
        "text": "0"
       },
       {
-       "raw": 0.0,
-       "text": "0"
-      },
-      {
        "raw": 299.99379188155297,
        "text": "299.9938"
       },
@@ -12955,10 +12864,6 @@
        ],
        "raw": -123.89265190491155,
        "text": "-123.8927"
-      },
-      {
-       "raw": 0.0,
-       "text": "0"
       },
       {
        "raw": 0.0,
@@ -13028,10 +12933,6 @@
        "text": "0"
       },
       {
-       "raw": 0.0,
-       "text": "0"
-      },
-      {
        "raw": 63.76031042534639,
        "text": "63.76031"
       },
@@ -13095,10 +12996,6 @@
        "text": "0"
       },
       {
-       "raw": 0.0,
-       "text": "0"
-      },
-      {
        "raw": 147.65296233025794,
        "text": "147.653"
       },
@@ -13150,10 +13047,6 @@
       {
        "raw": 452.3532457881891,
        "text": "452.3532"
-      },
-      {
-       "raw": 0.0,
-       "text": "0"
       },
       {
        "raw": 0.0,
@@ -13263,20 +13156,6 @@
      },
      "key": "c4",
      "name": [
-      "C"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c5",
-     "name": [
       "M"
      ],
      "raw": true
@@ -13288,7 +13167,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c5",
      "name": [
       "LR"
      ],
@@ -13302,7 +13181,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c6",
      "name": [
       "ER"
      ],
@@ -13316,7 +13195,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c7",
      "name": [
       "CR"
      ],
@@ -13330,7 +13209,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c9",
+     "key": "c8",
      "name": [
       "E_LR"
      ],
@@ -13344,7 +13223,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c10",
+     "key": "c9",
      "name": [
       "E_ER"
      ],
@@ -13358,7 +13237,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c11",
+     "key": "c10",
      "name": [
       "E_CR"
      ],
@@ -13372,7 +13251,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c12",
+     "key": "c11",
      "name": [
       "P_share"
      ],
@@ -13386,7 +13265,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c13",
+     "key": "c12",
      "name": [
       "M_share"
      ],
@@ -13407,9 +13286,6 @@
      },
      {
       "text": "E"
-     },
-     {
-      "text": "C"
      },
      {
       "text": "M"
@@ -13693,10 +13569,6 @@
        "text": "0"
       },
       {
-       "raw": 0.0,
-       "text": "0"
-      },
-      {
        "raw": 150.00000722020332,
        "text": "150"
       },
@@ -13800,20 +13672,6 @@
      },
      "key": "c4",
      "name": [
-      "C"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c5",
-     "name": [
       "M"
      ],
      "raw": true
@@ -13825,7 +13683,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c5",
      "name": [
       "LR"
      ],
@@ -13839,7 +13697,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c6",
      "name": [
       "ER"
      ],
@@ -13853,7 +13711,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c7",
      "name": [
       "CR"
      ],
@@ -13867,7 +13725,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c9",
+     "key": "c8",
      "name": [
       "E_LR"
      ],
@@ -13881,7 +13739,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c10",
+     "key": "c9",
      "name": [
       "E_ER"
      ],
@@ -13895,7 +13753,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c11",
+     "key": "c10",
      "name": [
       "E_CR"
      ],
@@ -13909,7 +13767,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c12",
+     "key": "c11",
      "name": [
       "P_share"
      ],
@@ -13923,7 +13781,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c13",
+     "key": "c12",
      "name": [
       "M_share"
      ],
@@ -13944,9 +13802,6 @@
      },
      {
       "text": "E"
-     },
-     {
-      "text": "C"
      },
      {
       "text": "M"
@@ -14152,10 +14007,6 @@
        "text": "0"
       },
       {
-       "raw": 0.0,
-       "text": "0"
-      },
-      {
        "raw": 299.99385505947566,
        "text": "299.9939"
       },
@@ -14210,10 +14061,6 @@
        ],
        "raw": -51.11309650691787,
        "text": "-51.1131"
-      },
-      {
-       "raw": 0.0,
-       "text": "0"
       },
       {
        "raw": 0.0,
@@ -14277,10 +14124,6 @@
       {
        "raw": 648.8930484336065,
        "text": "648.893"
-      },
-      {
-       "raw": 0.0,
-       "text": "0"
       },
       {
        "raw": 0.0,
@@ -14390,20 +14233,6 @@
      },
      "key": "c4",
      "name": [
-      "C"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c5",
-     "name": [
       "M"
      ],
      "raw": true
@@ -14415,7 +14244,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c5",
      "name": [
       "LR"
      ],
@@ -14429,7 +14258,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c6",
      "name": [
       "ER"
      ],
@@ -14443,7 +14272,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c7",
      "name": [
       "CR"
      ],
@@ -14457,7 +14286,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c9",
+     "key": "c8",
      "name": [
       "E_LR"
      ],
@@ -14471,7 +14300,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c10",
+     "key": "c9",
      "name": [
       "E_ER"
      ],
@@ -14485,7 +14314,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c11",
+     "key": "c10",
      "name": [
       "E_CR"
      ],
@@ -14499,7 +14328,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c12",
+     "key": "c11",
      "name": [
       "P_share"
      ],
@@ -14513,7 +14342,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c13",
+     "key": "c12",
      "name": [
       "M_share"
      ],
@@ -14534,9 +14363,6 @@
      },
      {
       "text": "E"
-     },
-     {
-      "text": "C"
      },
      {
       "text": "M"

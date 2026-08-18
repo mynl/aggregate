@@ -73,8 +73,9 @@ columns:
   Q: money
   a: money
   E: money             # the amounts block of economic_ratios_df carries
-  C: money             # expense and commission beside premium, loss and
-                       # margin, and a column carries one unit
+                       # expense beside premium, loss and margin, and a column
+                       # carries one unit. Ceding commission folds into E as a
+                       # contra expense, so there is no separate C column.
   LR: ratio
   PQ: '.3f'            # a ratio, and reads as one
   ROE: ratio

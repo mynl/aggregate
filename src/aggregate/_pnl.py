@@ -131,8 +131,10 @@ PNL_IS_LOSS_VALUE = False
 #: ledger itself never reads: :attr:`PnL.economic_ratios_df` uses it to split a group's
 #: obligation into loss and expense (there is no other way to tell ``'Loss'``
 #: from ``'LAE'`` but the label text), and :attr:`PnL.legs_df` reports it.
-#: ``'premium'`` and ``'commission'`` are consideration-side flows on a ``sell``
-#: and ``buy`` group respectively; ``'recovery'`` is what a cession pays back.
+#: ``'premium'`` is the consideration-side flow on a ``sell`` group;
+#: ``'recovery'`` is what a cession pays back, and ``'commission'`` what it
+#: credits, both declared on the **obligation** side of the ``buy`` group so
+#: they enter the amounts negated, as contras.
 LEG_KINDS = ('premium', 'loss', 'expense', 'recovery', 'commission')
 
 
@@ -748,21 +750,29 @@ def _stat_names(scenario=False):
 _CARD_COLS = ['EX', 'SD', 'CV', 'Skew', 'P01', 'Median', 'P99']
 
 
-#: The four signed amounts :attr:`PnL.economic_ratios_df` accumulates per block, and which
+#: The three signed amounts :attr:`PnL.economic_ratios_df` accumulates per block, and which
 #: :data:`LEG_KINDS` feeds each. An unclassified leg falls back on its side:
 #: consideration to ``P``, obligation to ``L`` (the residual), so a ledger that
 #: declares no expense legs reports ``E = 0`` rather than guessing.
-_RATIO_AMOUNTS = ('P', 'L', 'E', 'C')
+#:
+#: Two kinds are **contras**, and both fold into the amount they offset:
+#: ``'recovery'`` into ``L``, and ``'commission'`` into ``E``, the statutory
+#: netting of ceding commission received against acquisition expense
+#: ([Cede-Contra-Expense], ``1.0.0a304``). A separate ``C`` amount stood here
+#: from ``1.0.0a185`` and was errant: it made loss and expense answer the same
+#: question two different ways. :attr:`PnL.legs_df` keeps every commission leg
+#: itemized under its own :attr:`Leg.kind`, which is where a split is recovered.
+_RATIO_AMOUNTS = ('P', 'L', 'E')
 _RATIO_BUCKET = {'premium': 'P', 'loss': 'L', 'recovery': 'L',
-                 'expense': 'E', 'commission': 'C'}
+                 'expense': 'E', 'commission': 'E'}
 
 #: Fixed column order of :attr:`PnL.economic_ratios_df`: the amounts, the block's signed
 #: result, the three ratios of means, their three mean-of-ratio twins, then the
 #: two shares of the gross block. ``L``, ``M``, ``P`` and ``LR`` keep the
 #: :data:`aggregate.pentagon.PENTAGON_STATS` spelling so a P&L ratio frame
-#: concatenates and diffs against a pricing frame; ``E`` / ``C`` / ``ER`` / ``CR``
+#: concatenates and diffs against a pricing frame; ``E`` / ``ER`` / ``CR``
 #: extend it, and ``Q`` / ``a`` / ``PQ`` / ``ROE`` have no meaning on a ledger.
-_RATIO_COLS = ('P', 'L', 'E', 'C', 'M', 'LR', 'ER', 'CR',
+_RATIO_COLS = ('P', 'L', 'E', 'M', 'LR', 'ER', 'CR',
                'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
 
 #: Return period the margin walk evaluates capital at, for :attr:`PnL.walk_df`
@@ -1899,14 +1909,18 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return out
 
     def _block_amounts(self, gis):
-        """Signed ``P / L / E / C`` and the per-atom vectors, over a group span.
+        """Signed ``P / L / E`` and the per-atom vectors, over a group span.
 
-        The four amounts carry the sign of their contribution **in the gross
+        The three amounts carry the sign of their contribution **in the gross
         direction**: consideration enters as booked, obligations negated. A
         cession's ceded premium and recovery are therefore both negative, so
         every ratio built from them comes out with its conventional sign, the
-        amounts add across blocks, and ``M == P - L - E - C`` holds identically
+        amounts add across blocks, and ``M == P - L - E`` holds identically
         (it *is* the signed row sum).
+
+        ``L`` absorbs cession recoveries and ``E`` absorbs ceding commission,
+        each a contra against the amount it offsets, so a cession block's
+        commission enters negative and reads as a credit.
 
         Returns ``(amounts, vectors, m, fixed_p)``. ``vectors`` is ``None`` when
         the ledger has no shared atoms (the stitched and massive routes).
@@ -1959,9 +1973,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
         Renamed from ``economic_ratios_df`` at 1.0.0a204 ([PnL-Economic-Frames]), which
         joins :attr:`economic_df` in naming the accounting family. It is
-        **not** a view of that frame: splitting expense from commission needs
-        :attr:`Leg.kind`, and the ``E_`` columns need the per-atom vectors,
-        neither of which survives into the ledger sheet.
+        **not** a view of that frame: telling an expense leg from a loss leg
+        needs :attr:`Leg.kind`, and the ``E_`` columns need the per-atom
+        vectors, neither of which survives into the ledger sheet.
 
         One row per block: each group, each tier subtotal, and ``'All'`` on a
         multi-group ledger. Deliberately unformatted and absent from ``qd`` /
@@ -1975,19 +1989,26 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         pandas.DataFrame
             Indexed by ``'Step'``, with columns
 
-            ``P``, ``L``, ``E``, ``C``
-                Premium, loss, expense and commission, signed in the **gross
-                direction** (see :meth:`_block_amounts`), so they add across
-                blocks and ``M == P - L - E - C`` identically. ``L`` absorbs
-                cession recoveries and any unclassified obligation leg; ``E``
-                and ``C`` need :attr:`Leg.kind`.
+            ``P``, ``L``, ``E``
+                Premium, loss and expense, signed in the **gross direction**
+                (see :meth:`_block_amounts`), so they add across blocks and
+                ``M == P - L - E`` identically. Each carries its contra: ``L``
+                absorbs cession recoveries and any unclassified obligation leg,
+                ``E`` absorbs ceding commission, the statutory netting against
+                acquisition expense ([Cede-Contra-Expense], ``1.0.0a304``).
+                ``E`` needs :attr:`Leg.kind`; on a cession block it therefore
+                reads as the commission credit, and on ``All`` as the expense
+                ratio net of commission. Use :attr:`legs_df` to recover the
+                itemized commission.
             ``M``
                 The block's signed result.
             ``LR``, ``ER``, ``CR``
-                ``L / P``, ``E / P`` and ``(L + E + C) / P``: **ratios of
-                means**, the convention of ``pricing_df`` and of a rate filing.
+                ``L / P``, ``E / P`` and ``(L + E) / P``: **ratios of means**,
+                the convention of ``pricing_df`` and of a rate filing.
                 Re-derived from this row's amounts, never averaged from the
-                blocks below it. ``CR`` satisfies ``1 - CR == M / P``.
+                blocks below it. ``CR`` satisfies ``1 - CR == M / P``, and is
+                numerically unaffected by the commission fold, which only moves
+                where the same money sits.
             ``E_LR``, ``E_ER``, ``E_CR``
                 The same three as **means of ratios**, ``E[L / P]`` and so on.
                 These part company with the plain ratios exactly when premium
@@ -2019,12 +2040,12 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         pairs = (('LR', 'E_LR'), ('ER', 'E_ER'), ('CR', 'E_CR'))
         for label, gis in self._blocks():
             a, v, m, fixed_p = self._block_amounts(gis)
-            p, ell, e, c = a['P'], a['L'], a['E'], a['C']
+            p, ell, e = a['P'], a['L'], a['E']
             if first is None:
                 first = (p, m)
             live = abs(p) > VALIDATION_NOISE
-            row = {'P': p, 'L': ell, 'E': e, 'C': c, 'M': m}
-            for name, num in (('LR', ell), ('ER', e), ('CR', ell + e + c)):
+            row = {'P': p, 'L': ell, 'E': e, 'M': m}
+            for name, num in (('LR', ell), ('ER', e), ('CR', ell + e)):
                 # ``or 0.0`` normalizes the signed zero a zero numerator over a
                 # negative (cession) premium would otherwise leave on the sheet
                 row[name] = (num / p or 0.0) if live else float('nan')
@@ -2043,7 +2064,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                     row[name] = float('nan')
             else:
                 for name, num in (('E_LR', v['L']), ('E_ER', v['E']),
-                                  ('E_CR', v['L'] + v['E'] + v['C'])):
+                                  ('E_CR', v['L'] + v['E'])):
                     row[name] = self._mean_of_ratio(num, v['P'], probs)
             row['P_share'] = (p / first[0]
                               if abs(first[0]) > VALIDATION_NOISE

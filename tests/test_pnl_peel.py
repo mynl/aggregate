@@ -683,7 +683,7 @@ def test_ratio_df_amounts_add_across_the_peeled_blocks():
     r = p.economic_ratios_df
     for tier, prefix in (('All occurrence', 'occ '), ('All aggregate', 'agg ')):
         layers = [s for s in r.index if s.startswith(prefix)]
-        for col in ('P', 'L', 'E', 'C', 'M'):
+        for col in ('P', 'L', 'E', 'M'):
             assert r.loc[tier, col] == pytest.approx(
                 sum(r.loc[s, col] for s in layers), abs=FOOTS)
         # the tier LR comes off the tier's own amounts
@@ -697,8 +697,45 @@ def test_ratio_df_margin_identity_holds_on_every_peeled_block():
     for step in r.index:
         row = r.loc[step]
         assert row['M'] == pytest.approx(
-            row['P'] - row['L'] - row['E'] - row['C'], rel=FOOTS_ACROSS,
+            row['P'] - row['L'] - row['E'], rel=FOOTS_ACROSS,
             abs=FOOTS)
+
+
+def test_ratio_df_commission_folds_into_expense_as_a_contra():
+    """[Cede-Contra-Expense]: ``cede`` books into ``E``, not a separate ``C``.
+
+    ``TWO_EACH`` cedes 20% on ``occ 100 xs 100`` and nowhere else, and declares
+    no gross expense, so the fold is visible in isolation: that block's ``E``
+    is minus its commission and its ``ER`` reads as the cede rate, ``All``
+    carries the same credit as its net-of-commission expense ratio, and every
+    other block still reports ``E == 0``.
+    """
+    p = build(f'{TWO_EACH} peel top-down')
+    r = p.economic_ratios_df
+    assert 'C' not in r.columns
+
+    legs = p.legs_df
+    comm = legs[legs['kind'] == 'commission']
+    assert len(comm) == 1                       # one ceded layer carries it
+    ceded = comm['Step'].iloc[0]
+    amount = float(comm['EX'].iloc[0])
+
+    # the contra: booked on the obligation side, so it enters E negated
+    assert r.loc[ceded, 'E'] == pytest.approx(-amount, abs=FOOTS)
+    # ...and reads back as the cede rate, sign conventional (both negative)
+    assert r.loc[ceded, 'ER'] == pytest.approx(0.2, abs=FOOTS)
+    # no other layer declares one
+    others = [s for s in r.index if s not in (ceded, 'All occurrence', 'All')]
+    assert all(r.loc[s, 'E'] == 0.0 for s in others)
+    # All: the statutory expense ratio, net of the commission received
+    assert r.loc['All', 'E'] == pytest.approx(-amount, abs=FOOTS)
+    assert r.loc['All', 'ER'] == pytest.approx(
+        -amount / r.loc['All', 'P'], abs=FOOTS)
+    # CR is invariant under the fold: it summed (L + E + C) / P before and
+    # sums (L + E) / P now, over the same money
+    assert r.loc[ceded, 'CR'] == pytest.approx(
+        (r.loc[ceded, 'L'] + r.loc[ceded, 'E']) / r.loc[ceded, 'P'], abs=FOOTS)
+    assert r.loc[ceded, 'CR'] == pytest.approx(2.262672, abs=1e-5)
 
 
 def test_ratio_df_gross_shares_are_one_and_cessions_are_negative():

@@ -134,6 +134,16 @@
   discrete and continuous branches. **Its own task** (author, 2026-07-29): it is
   independent of the reporting cluster above, so do not scope it with them.
   Plan: `dev/plan-plotting-punchups.md`.
+- ~~**[Cede-Contra-Expense]**~~ **DONE `1.0.0a304`**
+  (`dev/done/plan-cede-expenses.md`): ceding commission folds into `E` as
+  contra expense (author ruling 2026-08-18), the same treatment recoveries
+  already get in `L`, and the ratio frame's separate `C` column is gone.
+  `CR` and `E_CR` are numerically invariant, `ER` becomes net of commission,
+  `legs_df` keeps the itemization. API side was a no op, as scoped. The
+  exhibit snapshot and `features.rst` were the two surfaces the plan did not
+  name: the first regenerated, the second deliberately left for the next
+  `dev/task-features.md` run.
+
 ### Correctness & bugs
 
 - **[Signed-Bounded-Window]** — robustness: kill the `int(inf)` `OverflowError`

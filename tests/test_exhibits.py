@@ -780,7 +780,7 @@ def test_economic_ratios_insurer_splits_units(tower):
     blocks = exhibit_frames(tower, 'economic_ratios', 'insurer')
     assert [b for b, _, _ in blocks] == ['amounts', 'ratios', 'legs']
     (_, amounts, amounts_kw), (_, ratios, ratios_kw), _ = blocks
-    assert set(amounts.columns) == {'P', 'L', 'E', 'C', 'M'}
+    assert set(amounts.columns) == {'P', 'L', 'E', 'M'}
     assert set(ratios.columns).isdisjoint(amounts.columns)
     # every ratio column points at the `ratio` style in the format sheets,
     # which stamps greater_tables' own ratio tag, so the block declares no
@@ -788,11 +788,11 @@ def test_economic_ratios_insurer_splits_units(tower):
     assert 'ratio_cols' not in ratios_kw
     doc = build_exhibit(tower, 'economic_ratios', 'insurer').ir_blocks[1]
     assert {c.tag for c in doc.columns if c.role == 'data'} == {'ratio'}
-    # M == P - L - E - C, the identity the caption claims
+    # M == P - L - E, the identity the caption claims
     import numpy as np
     np.testing.assert_allclose(
         amounts['M'],
-        amounts['P'] - amounts['L'] - amounts['E'] - amounts['C'], atol=1e-9)
+        amounts['P'] - amounts['L'] - amounts['E'], atol=1e-9)
 
 
 # --- economic_waterfall ([Exhibits-Waterfall]) ------------------------------

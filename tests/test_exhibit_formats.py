@@ -72,7 +72,7 @@ def test_the_insurer_sheet_is_a_delta():
 def test_redefining_a_style_moves_every_column_that_points_at_it():
     """One line in the overlay carries the whole money vocabulary."""
     insurer = format_sheet('insurer').columns
-    for label in ('L', 'M', 'P', 'Q', 'a', 'E', 'C', 'VaR', 'TVaR', 'xsVaR'):
+    for label in ('L', 'M', 'P', 'Q', 'a', 'E', 'VaR', 'TVaR', 'xsVaR'):
         assert insurer[label] == ',.2f', label
     assert format_sheet('raw').columns['VaR'] == ',.7g'
 

@@ -148,6 +148,12 @@
   it the identity layering; it can now be declared with plain `sev`, where the
   layer is a real layer. The half-applied layer remains for genuinely signed
   severities, and is still silent.
+- **[Dfreq-One-Claim-Shortcut]**: `dfreq [1]` should take the same exact
+  severity-copy path as `1 claim ... fixed` (today it runs the identity FFT
+  round trip and picks up machine-epsilon dust; the gate is duplicated in
+  `bivariate.py`). One shared `Aggregate.one_claim` predicate feeding both
+  gates. Small, self-contained, parked for a good window (author, 2026-08-18).
+  Plan: `dev/plan-dfreq-one-claim-shortcut.md`.
 - **[Validation-Calc-Review]** (#49) — audit the validation algorithm against the
   published *Aggregate* paper and make the docs match the actual algo. The
   "all switches → config" sub-goal is done (`eps`/`noise`, `aliasing_ratio`,
@@ -264,6 +270,15 @@
   this open on those terms. Either a session build should not silently
   overwrite a **library** entry (warn, or namespace the session base), or the
   overwrite should merge the trailer rather than replace it.
+  **The "namespace the session base" arm is now available**, a302
+  (`[Session-Isolation]`, `dev/plan-session-isolation.md` phase L1):
+  `Underwriter.fork()` gives each caller a private recipe base over the shared
+  parsed entries, so a build in a fork rebinds the fork's key and leaves the
+  library entry it shadows untouched. That is how a multi-user host contains
+  this bug, and `tests/test_session_isolation.py` pins the containment. It does
+  **not** close the item: a single-process user, the Jupyter case, still
+  overwrites the trailer in the one base they have, and the other two arms
+  (warn, or merge the trailer) are still the open question there.
 - **[Unparser-Reference-Gaps]** (surfaced by `[Library-Canonical-Layout]`, a178)
   — `decl_writer` cannot render three constructs back to what was written, so 13
   `library.agg` entries are exempt from the canonical layout and hand-written.
@@ -288,6 +303,15 @@
      `sev_ref` alongside the inlined spec, since that reference *is* resolved at
      parse time and the writer branch would need to prefer it over the inlined
      keys rather than being their only source.
+     **Author ruled 2026-08-18: declined.** "It **is** different and is ok to
+     keep it so. If a user wants the other treatment they wrap it in a
+     `dfreq[1]` agg." So `sev.NAME` keeps inlining, reference semantics are
+     spelled `agg Wrapper dfreq[1] sev sev.NAME` then `sev agg.Wrapper`, and
+     the 8 exempt entries stay exempt. Ruling 6 of
+     `dev/plan-session-isolation.md`, where it was asked because a cache keyed
+     on program identity would have depended on the answer; the design that
+     shipped at a302 does not, because it qualifies on what the parse
+     *resolved*, never on how the writer renders.
   2. **Distortion combinator** (1) — `minimum` / `mixture` drop their child
      distortion names, so `format_program` raises rather than rendering.
   3. **`ssev <c> - <dist>`** (3) — renders in the general affine form

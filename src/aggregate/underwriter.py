@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import copy as _shallow_copy, deepcopy
 from dataclasses import replace
 from datetime import datetime
 from difflib import get_close_matches
@@ -7,6 +7,7 @@ import logging
 import numbers
 from pathlib import Path
 import re
+from typing import NamedTuple
 import warnings
 
 import numpy as np
@@ -30,7 +31,8 @@ from . import _validation
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['Underwriter', 'build', 'build_many', 'CannotBuild']
+__all__ = ['Underwriter', 'build', 'build_many', 'CannotBuild',
+           'RecipeNotFound', 'ResolvedReference', 'ProgramPreview']
 
 # Sentinel for Underwriter.__init__ arguments that should fall back to the
 # configured defaults (aggregate.config [build]). Distinct from None, which for
@@ -320,18 +322,42 @@ def _resolve_hints(spec, log2, bs, bucket_sizing_p, kwargs):
     return log2, bs, bucket_sizing_p, kwargs
 
 
+def _collect_sev_refs(spec, found=None):
+    """Every unresolved ``sev_ref`` target anywhere inside ``spec``.
+
+    A bivariate or clash body nests its components as ``('agg', name, spec)``
+    tuples under ``units``, and a portfolio nests one spec per unit, so a
+    reference written there is not visible at the top level: the walk has to
+    be recursive.
+
+    Returns
+    -------
+    list of str
+        The dotted targets (``'agg.NAME'``, ``'port.NAME'``) in encounter
+        order, with duplicates kept. The caller dedupes if it cares.
+    """
+    if found is None:
+        found = []
+    if isinstance(spec, dict):
+        ref = spec.get('sev_ref')
+        if ref is not None:
+            found.append(ref)
+        for v in spec.values():
+            _collect_sev_refs(v, found)
+    elif isinstance(spec, (list, tuple)):
+        for v in spec:
+            _collect_sev_refs(v, found)
+    return found
+
+
 def _carries_sev_ref(spec):
     """Whether ``spec`` holds an unresolved ``sev_ref`` anywhere inside it.
 
-    A bivariate or clash body nests its components as ``('agg', name, spec)``
-    tuples under ``units``, so a reference written there is not visible at the
-    top level. Used only to refuse it with a clear message.
+    Used only to refuse a reference written where it cannot be resolved, with
+    a clear message. One walker backs both this and
+    :func:`_collect_sev_refs`.
     """
-    if isinstance(spec, dict):
-        return 'sev_ref' in spec or any(_carries_sev_ref(v) for v in spec.values())
-    if isinstance(spec, (list, tuple)):
-        return any(_carries_sev_ref(v) for v in spec)
-    return False
+    return bool(_collect_sev_refs(spec))
 
 
 def _stamp_sev_ref(obj, meta):
@@ -417,6 +443,109 @@ class CannotBuild(ValueError):
     Subclass of :class:`ValueError` so existing broad ``except ValueError``
     callers continue to catch it.
     """
+
+
+class ResolvedReference(NamedTuple):
+    """One name a program resolved, and where that name came from.
+
+    An element of :attr:`ProgramPreview.resolved`.
+
+    Attributes
+    ----------
+    kind : str
+        The entry kind: ``'agg'``, ``'sev'``, ``'port'``, ...
+    name : str
+        The entry name.
+    source : pathlib.Path or str
+        The referent's provenance **as the previewing underwriter records
+        it**: the ``.agg`` file it was read from, or ``'session'`` for an
+        entry built in this session. This is the field a multi-user host
+        reads, because a program leaning only on file-sourced entries means
+        the same thing to everyone, while one touching a session entry means
+        something private.
+    """
+
+    kind: str
+    name: str
+    source: object
+
+
+class ProgramPreview(NamedTuple):
+    """What a program would resolve to, reported without building it.
+
+    The return value of :meth:`Underwriter.preview`.
+
+    Attributes
+    ----------
+    route : str
+        ``'name'`` if the program text was itself the name of an entry (the
+        bare-name lookup :meth:`Underwriter.build` tries first), ``'program'``
+        if it was parsed as DecL. The distinction matters to a caller that
+        registers the preview's statements: on the ``'name'`` route there is
+        nothing new to register, and registering anyway would re-file a
+        library entry as a session entry.
+    statements : tuple of Recipe
+        One per top-level declaration, in program order, with ``object``
+        ``None``. On the ``'name'`` route, the single entry that was found.
+        An ``'expr'`` statement appears here and is never registered, matching
+        ``Underwriter._interpret_program``.
+    resolved : tuple of ResolvedReference
+        Every entry the program leans on, deduplicated, in the order the
+        parse met them: the dotted references it inlined, the deferred
+        ``sev agg.NAME`` referents and everything *they* reference in turn,
+        and, on the ``'name'`` route, the named entry itself.
+    """
+
+    route: str
+    statements: tuple
+    resolved: tuple
+
+
+class RecipeNotFound(KeyError):
+    """Raised when a name is not in the recipe base.
+
+    The named form of the lookup miss. Raised by :meth:`Underwriter.recipe`,
+    the one place lookup is implemented, so it reaches every caller of the
+    subscript form ``uw[name]``, of ``Underwriter._safe_lookup`` (the parser's
+    dotted-reference callback), and of the bare-name branch of
+    :meth:`Underwriter.build`. ``Underwriter._resolve_sev_ref`` raises it too,
+    for a deferred ``sev agg.NAME`` whose referent has gone since the program
+    was parsed.
+
+    Attributes
+    ----------
+    message : str
+        The human-readable text. Also what ``str(exc)`` returns: plain
+        :class:`KeyError` renders ``repr(args[0])``, which wraps a sentence of
+        diagnosis in quotes and escapes the quotes inside it.
+    kind : str or None
+        The entry kind asked for, when the caller named one.
+    name : str
+        The entry name asked for.
+
+    Notes
+    -----
+    Subclass of :class:`KeyError` so every existing ``except KeyError`` and
+    ``except LookupError`` site keeps its behavior: the bare-name fallback in
+    ``Underwriter._build_work``, the per-statement error row in
+    :meth:`Underwriter.interpret_file`, and the parser's own reporting. What
+    the named type adds is the ability to tell "that name is gone" apart from
+    every other lookup failure. A multi-user host needs exactly that: a
+    session whose recipe base has been evicted asks for a name it built
+    itself, and the answer is "rebuild it", not "no such thing".
+
+    An **ambiguous** name (the same name under two kinds) stays a plain
+    :class:`KeyError`. The entry is there; the question was not answerable.
+    """
+
+    def __init__(self, message, kind=None, name=''):
+        super().__init__(message)
+        self.message = message
+        self.kind = kind
+        self.name = name
+
+    def __str__(self):
+        return self.message
 
 
 class Underwriter(HelpMixin):
@@ -819,6 +948,91 @@ class Underwriter(HelpMixin):
         self._loaded = False
         return self.load()
 
+    def fork(self, name=None):
+        """Return an isolated copy sharing this underwriter's parsed recipes.
+
+        The recipe base is read and parsed **once**, and each caller who needs
+        a base of their own takes a fork of it: a copy whose recipe dict is a
+        fresh dict over the same :class:`~aggregate.recipe.Recipe` objects.
+        Declarations built in the fork land in the fork and are invisible to
+        the parent and to every sibling; entries the parent already held are
+        visible to all of them.
+
+        A fork costs microseconds (a dict copy and four attribute stores)
+        against the seconds a fresh :meth:`load` costs, so it is the way to
+        give a notebook a scratch base, to validate a file without polluting
+        the base that validates it (:meth:`interpret_file` is written on it),
+        or to give each user of a multi-user host their own namespace.
+
+        Parameters
+        ----------
+        name : str, optional
+            The fork's :attr:`name`. Defaults to the parent's name with
+            ``'-fork'`` appended, so a :func:`repr` says which is which.
+
+        Returns
+        -------
+        Underwriter
+            The fork, already loaded.
+
+        Examples
+        --------
+        Two users, one library, no collision::
+
+            a, b = build.fork('a'), build.fork('b')
+            a.build('agg Mine 10 claims sev lognorm 100 cv 2 poisson')
+            'Mine' in [n for _, n in b._recipes]   # False
+
+        Notes
+        -----
+        **The parent is loaded first.** A fork of an unloaded underwriter
+        would inherit an empty dict and then read the databases again on its
+        own first access, once per fork, which is exactly the cost this method
+        exists to avoid. So :meth:`load` runs here if it has not run yet.
+
+        **Shallow is right for the recipe dict.** :meth:`add_recipe` always
+        rebinds a key to a brand-new :class:`~aggregate.recipe.Recipe`, and
+        :meth:`recipe` hands out :func:`~dataclasses.replace` copies, so a
+        shared entry is never mutated in place. Overwriting a name in the fork
+        rebinds the fork's key and leaves the parent's entry alone: that is
+        the last-write-wins rule of :meth:`add_recipe` doing its ordinary job
+        inside a private dict.
+
+        **The parser must be reset, and that is the substance of this
+        method.** :attr:`parser` builds ``UnderwritingParser(self._safe_lookup,
+        ...)`` and holds the bound method, so a plain copy would keep the
+        *parent's* callback: the fork would parse against the parent's base
+        while registering into its own. Split brain, silent, and in exactly
+        the direction a fork exists to prevent. The reset is nearly free
+        (the Lark grammar is a module singleton and the parser wrapper is two
+        attribute stores). ``_lexer`` is stateless and reset for symmetry, and
+        ``_sev_ref_stack``, the ``sev agg.NAME`` cycle guard, is per-instance
+        mutable state that must not be shared.
+
+        **A fork is a snapshot, not a subscription.** Entries the parent gains
+        afterwards do not appear in it. In particular
+        :func:`aggregate.config.reload_settings` mutates the module-level
+        ``build`` in place, so forks taken before a reload keep the base they
+        were taken from; and the module alias ``build_many`` stays bound to the
+        singleton's method, never to a fork's.
+        """
+        if not self._loaded:
+            self.load()
+        forked = _shallow_copy(self)
+        forked.name = f'{self.name}-fork' if name is None else name
+        forked._recipes = dict(self._recipes)
+        # Per-instance mutable state, none of it shareable. See Notes.
+        forked._parser = None
+        forked._lexer = None
+        forked._sev_ref_stack = []
+        forked.databases = list(self.databases)
+        # ``_request`` aliases the caller's list when one was passed to
+        # __init__; a fork gets its own so a later load() on either side
+        # cannot rewrite the other's request.
+        if isinstance(self._request, list):
+            forked._request = list(self._request)
+        return forked
+
     def resolve_databases(self, request=None):
         """
         Preview the files a request *would* load, without reading them (dry run).
@@ -887,8 +1101,10 @@ class Underwriter(HelpMixin):
 
         Raises
         ------
+        RecipeNotFound
+            No such entry (a :class:`KeyError` subclass).
         KeyError
-            No such entry, or the name is ambiguous across kinds.
+            The name is ambiguous across kinds.
 
         See Also
         --------
@@ -1533,8 +1749,12 @@ class Underwriter(HelpMixin):
         Raises
         ------
         ValueError
-            On a reference cycle, a referenced entry that has been removed
-            since parsing, or an inner that does not pin its own grid.
+            On a reference cycle, or an inner that does not pin its own grid.
+        RecipeNotFound
+            The referenced entry has been removed since parsing. A
+            :class:`KeyError` subclass, so it is *not* caught by a broad
+            ``except ValueError`` around a build; a host that has to tell an
+            expired name from a bad program wants it that way.
 
         Notes
         -----
@@ -1576,10 +1796,10 @@ class Underwriter(HelpMixin):
         try:
             rec = replace(self[key])
         except LookupError:
-            raise ValueError(
+            raise RecipeNotFound(
                 f"{name}: severity reference '{ref}' is not in the recipe base. "
                 'It parsed, so it was there when the program was read; it has '
-                'been removed or renamed since.') from None
+                'been removed or renamed since.', kind=rkind, name=rname) from None
 
         hints = _parse_hints(rec.spec.get('hints', '') or '')
         if 'log2' not in hints or 'bs' not in hints:
@@ -1759,7 +1979,11 @@ class Underwriter(HelpMixin):
             empty = pd.MultiIndex.from_arrays([[], []], names=['kind', 'name'])
             return pd.DataFrame(columns=list(self._RECIPE_COLUMNS), index=empty)
         rows = []
-        for (kind, name), r in self._recipes.items():
+        # ``list(...)`` first: a fork can be registering a build on one thread
+        # while another reads this frame (the multi-user host's `.agg` export),
+        # and iterating the live dict would raise "dictionary changed size
+        # during iteration". The snapshot is one pass over a few hundred keys.
+        for (kind, name), r in list(self._recipes.items()):
             rows.append({
                 'kind': kind, 'name': name,
                 'note': bool(r.note),
@@ -1854,8 +2078,11 @@ class Underwriter(HelpMixin):
 
         Raises
         ------
+        RecipeNotFound
+            No such entry. A :class:`KeyError` subclass, so a broad
+            ``except KeyError`` still catches it.
         KeyError
-            No such entry, or the name is ambiguous across kinds.
+            The name is ambiguous across kinds.
 
         See Also
         --------
@@ -1872,10 +2099,12 @@ class Underwriter(HelpMixin):
             try:
                 return replace(self._recipes[(kind, name)])
             except KeyError:
-                raise KeyError(f'no recipe named {name!r} of kind {kind!r}') from None
+                raise RecipeNotFound(
+                    f'no recipe named {name!r} of kind {kind!r}',
+                    kind=kind, name=name) from None
         hits = [k for (k, n) in self._recipes if n == name]
         if not hits:
-            raise KeyError(f'no recipe named {name!r}')
+            raise RecipeNotFound(f'no recipe named {name!r}', name=name)
         if len(hits) > 1:
             kinds = ', '.join(sorted(hits))
             raise KeyError(
@@ -2075,6 +2304,139 @@ class Underwriter(HelpMixin):
             raise ValueError(f'Error: type of {name} is  {parsed.kind}, not expected {kind}')
         # don't want to pass back the original; changes would be reflected in the recipe base
         return deepcopy(parsed.spec)
+
+    def preview(self, program):
+        """Report what ``program`` resolves to, without building anything.
+
+        Answers two questions a caller may need before it commits to a build:
+        what declarations does this text make, and what does it lean on. It
+        parses, and it registers nothing in this underwriter.
+
+        Parameters
+        ----------
+        program : str
+            A DecL program, or the name of an entry in the recipe base. Both
+            are tried, in the order :meth:`build` tries them.
+
+        Returns
+        -------
+        ProgramPreview
+            ``route``, the parsed ``statements``, and every entry the program
+            ``resolved``, each with the provenance this underwriter records
+            for it.
+
+        Raises
+        ------
+        ValueError
+            On a parse error, with the structured
+            :class:`~aggregate.parser_errors.ErrorReport` attached as
+            ``err.report``, exactly as :meth:`build` reports it.
+        RecipeNotFound
+            A dotted reference names an entry this underwriter does not hold.
+
+        Examples
+        --------
+        What does this program stand on::
+
+            build.preview('agg X 10 claims sev sev.Cat poisson').resolved
+            # (ResolvedReference(kind='sev', name='Cat', source='library'),)
+
+        Notes
+        -----
+        **Why the resolved list is complete.** Every reference form funnels
+        through ``_safe_lookup``: the dotted forms are resolved there and
+        inlined into the spec, and the one deferred form, ``sev agg.NAME``,
+        still calls it as an existence check before recording its symbolic
+        ``sev_ref``. Recording what that one callback saw therefore catches
+        every reference form the language has, including any added later, with
+        no text scanning and no spec walking. The bare name is the one shape
+        that never reaches the parser, so it is checked first and reported the
+        same way: a bare name **is** a reference.
+
+        **The deferred chain is followed.** An inlined reference brings the
+        referent's spec with it, so what the program stands on is in hand
+        already. A ``sev agg.NAME`` does not: it is resolved at build time,
+        and the entry it names may itself reference a third. So the deferred
+        targets are walked to exhaustion, with a per-call cycle guard. Without
+        the walk, a program two steps from a redefined entry would be reported
+        as leaning on nothing but the library, which is the one way this
+        report can be wrong in the direction that matters.
+
+        **A program's own declarations are not references to it.** A
+        multi-statement program may declare a name and use it further down, the
+        way ``_interpret_program`` allows. The parse therefore runs against a
+        :meth:`fork`, so those internal references resolve; provenance is read
+        from **this** underwriter, so a name the program declares itself is
+        reported only if this underwriter also holds it. That is the honest
+        answer: what the program depends on is what it did not bring.
+
+        **It holds no state.** No registration, no instance attribute written,
+        a private parser and a private cycle guard. Two threads may preview at
+        once. The dict copy the fork takes is not itself synchronized, so a
+        host that registers builds concurrently owns that lock.
+        """
+        resolved = []
+        seen = set()
+
+        def record(kind, name):
+            """Note a reference and return the entry, or ``None`` if unheld."""
+            entry = self._recipes.get((kind, name))
+            if entry is not None and (kind, name) not in seen:
+                seen.add((kind, name))
+                resolved.append(ResolvedReference(kind, name, entry.source))
+            return entry
+
+        def follow(specs):
+            """Walk the deferred ``sev agg.NAME`` chain to exhaustion."""
+            pending = list(specs)
+            expanded = set()
+            while pending:
+                for ref in _collect_sev_refs(pending.pop()):
+                    rkind, *rest = ref.split('.')
+                    key = (rkind, '.'.join(rest))
+                    if key in expanded:
+                        # The per-call guard. Never ``self._sev_ref_stack``:
+                        # this runs outside any build and possibly beside one.
+                        continue
+                    expanded.add(key)
+                    entry = record(*key)
+                    if entry is not None:
+                        pending.append(entry.spec)
+
+        # The bare-name branch, first and in _build_work's order, so preview
+        # and build cannot disagree about what a one-word program means.
+        try:
+            entry = self[program]
+        except (LookupError, TypeError):
+            pass
+        else:
+            record(entry.kind, entry.name)
+            follow([entry.spec])
+            return ProgramPreview('name', (entry,), tuple(resolved))
+
+        scratch = self.fork(name=f'{self.name}-preview')
+
+        def recording_lookup(buildinid):
+            """The parser's lookup callback, with a note taken on the way."""
+            spec = scratch._safe_lookup(buildinid)
+            rkind, *rest = buildinid.split('.')
+            record(rkind, '.'.join(rest))
+            return spec
+
+        parser = UnderwritingParser(recording_lookup, self.debug)
+        statements = []
+        for line in self.lexer.preprocess(program):
+            kind, name, spec = parser.parse(self.lexer.tokenize(line))
+            statements.append(Recipe(kind=kind, name=name, spec=spec,
+                                     program=line))
+            if kind != 'expr':
+                # Into the fork only, so a later statement can reference this
+                # one. Provenance still comes from ``self``, so declaring a
+                # name here does not make the program look dependent on it.
+                scratch.add_recipe(kind, name, spec, line)
+        follow([s.spec for s in statements]
+               + [self._recipes[k].spec for k in seen])
+        return ProgramPreview('program', tuple(statements), tuple(resolved))
 
     def build_many(self, program, update=None, log2=0, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
         """
@@ -2649,14 +3011,13 @@ class Underwriter(HelpMixin):
         #   way ``_interpret_program`` does. Without this, a valid file reports a
         #   phantom error on every internal reference.
         # * validating a file should not quietly add its contents to this
-        #   underwriter's recipe base. Seeding a scratch copy keeps cross-file
-        #   references resolvable without that side effect -- which the old
-        #   hand-seeding of ``sev One`` had.
-        if not self._loaded:
-            self.load()
-        scratch = Underwriter(name=f'{self.name}-interpret', debug=self.debug)
-        scratch._recipes = dict(self._recipes)
-        scratch._loaded = True
+        #   underwriter's recipe base. A fork keeps cross-file references
+        #   resolvable without that side effect, which the old hand-seeding of
+        #   ``sev One`` had.
+        #
+        # ``fork()`` is that scratch copy, generalized: this method hand-rolled
+        # it until 1.0.0a302.
+        scratch = self.fork(name=f'{self.name}-interpret')
         # the canonical One severity, for any sev.One references
         scratch.build_many('sev One dsev [1]', update=False)
 

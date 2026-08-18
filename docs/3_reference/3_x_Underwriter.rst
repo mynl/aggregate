@@ -18,6 +18,14 @@ trailer: a one-line ``note{...}``, ``tags{...}`` for grouping, and
 them; :meth:`~aggregate.underwriter.Underwriter.discover` filters by name, kind
 or tag.
 
+One recipe base can serve many callers.
+:meth:`~aggregate.underwriter.Underwriter.fork` returns an isolated copy
+sharing the parsed entries, so a notebook gets a scratch base and a multi-user
+host gets one namespace per user for the cost of a dict copy;
+:meth:`~aggregate.underwriter.Underwriter.preview` reports what a program would
+declare and what it leans on, with the provenance of each referent, without
+building anything.
+
 The module-level :func:`~aggregate.underwriter.build` is the primary public
 API: it wraps a default :class:`Underwriter` instance, so ``build('agg ...')``
 parses a one-line program and returns a single updated object.
@@ -31,6 +39,9 @@ parses a one-line program and returns a single updated object.
    build
    build_many
    CannotBuild
+   RecipeNotFound
+   ProgramPreview
+   ResolvedReference
 
 Recipe
 ------

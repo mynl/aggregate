@@ -1,0 +1,1 @@
+T:/worktrees/aggregate_api/dev/done/plan-session-isolation.md

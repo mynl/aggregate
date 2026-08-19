@@ -623,28 +623,42 @@ def _ledger_groups(bs=0.0):
 def test_massive_pnl_one_sweep_ledger(tmp_path):
     """A zarr-backed joint evaluates the whole ledger in one band sweep:
     same row template as the in-memory route, mean(result) == sum of the
-    signed leg means to VALIDATION_NOISE, and every leg audited."""
+    signed leg means to VALIDATION_NOISE, and every leg audited.
+
+    Reads :attr:`PnL.economic_df`, the ledger sheet. It answered to
+    ``stats_df`` when this test was written; ``1.0.0a204``
+    ([PnL-Economic-Frames]) gave that name its cross-class meaning, the
+    wrapped engine's moment store, and the sheet took its own. A P&L over a
+    hand-built joint has no engine at all, so ``stats_df`` here is the empty
+    frame asserted below, and every row assertion this test makes belongs on
+    ``economic_df``.
+    """
     from aggregate import PnL
     from aggregate.moments import VALIDATION_NOISE
     massive, incore = _tiny_massive(tmp_path)
     pm = PnL(name='massive', source=massive, groups=_ledger_groups(bs=1.0))
     pi = PnL(name='incore', source=incore, groups=_ledger_groups())
+    # no engine behind a hand-built joint, so there are no engine moments to
+    # report; the guard keeps this test from passing vacuously off an empty
+    # frame, which is how it read from a204 until this repair
+    assert pm.stats_df.empty and pi.stats_df.empty
     # identical row template (the shared _ledger_plan) on sheet and card
-    assert list(pm.stats_df.index) == list(pi.stats_df.index)
+    assert list(pm.economic_df.index) == list(pi.economic_df.index)
     assert list(pm.summary_df.index) == list(pi.summary_df.index)
+    assert pm.economic_df.index.names == ['Step', 'Side', 'Label']
     # the sweep's exact means match the in-core exact means, row by row
-    for row in pm.stats_df.index:
-        assert pm.stats_df.loc[row, 'EX'] == pytest.approx(
-            pi.stats_df.loc[row, 'EX'], abs=1e-12), row
+    for row in pm.economic_df.index:
+        assert pm.economic_df.loc[row, 'EX'] == pytest.approx(
+            pi.economic_df.loc[row, 'EX'], abs=1e-12), row
     # mean(result) == sum of signed leg means -- the derived row is pushed as
     # its own signed-sum function, never a sum of bucketed legs
-    leg_means = sum(pm.stats_df.xs(r, level='Label')['EX'].iloc[0]
+    leg_means = sum(pm.economic_df.xs(r, level='Label')['EX'].iloc[0]
                     for r in ('premium', 'loss', 'ceded premium', 'recovery'))
     assert abs(pm.est_m - leg_means) < 10 * VALIDATION_NOISE
     # [Massive-Kappa-Second-Sweep]: the massive ladder stays MARGINAL (each
     # cell the row's own quantile), unlike the in-core scenario columns
     loss_gd = pm.density_df['loss']
-    assert pm.stats_df.xs('loss', level='Label')['P50'].iloc[0] == \
+    assert pm.economic_df.xs('loss', level='Label')['P50'].iloc[0] == \
         pytest.approx(float(loss_gd.q(0.5)))
     # the massive card carries full marginal percentiles (grand rows reused
     # from the sweep's own ledger rows -- no NaN holes)

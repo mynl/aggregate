@@ -283,7 +283,7 @@
   overwrite a **library** entry (warn, or namespace the session base), or the
   overwrite should merge the trailer rather than replace it.
   **The "namespace the session base" arm is now available**, a302
-  (`[Session-Isolation]`, `dev/plan-session-isolation.md` phase L1):
+  (`[Session-Isolation]`, `dev/done/plan-session-isolation.md` phase L1):
   `Underwriter.fork()` gives each caller a private recipe base over the shared
   parsed entries, so a build in a fork rebinds the fork's key and leaves the
   library entry it shadows untouched. That is how a multi-user host contains
@@ -320,7 +320,7 @@
      `dfreq[1]` agg." So `sev.NAME` keeps inlining, reference semantics are
      spelled `agg Wrapper dfreq[1] sev sev.NAME` then `sev agg.Wrapper`, and
      the 8 exempt entries stay exempt. Ruling 6 of
-     `dev/plan-session-isolation.md`, where it was asked because a cache keyed
+     `dev/done/plan-session-isolation.md`, where it was asked because a cache keyed
      on program identity would have depended on the answer; the design that
      shipped at a302 does not, because it qualifies on what the parse
      *resolved*, never on how the writer renders.

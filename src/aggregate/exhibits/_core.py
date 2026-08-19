@@ -763,6 +763,11 @@ economic = _make_exhibit_function(
     sign presentation) lands in [Exhibits-Economic-Insurer], where this
     exhibit is also renamed to ``economic`` to mirror its frame.
 
+    INSURER additionally **abbreviates** the sheet to ``EX``, ``SD``, ``CV``
+    and the adverse tail state (``κ01``, or ``P01`` on a marginal ladder),
+    four columns rather than thirteen ([Ledger-Insurer-Abbreviated]). The
+    dropped moment and ladder rungs are one perspective away, on RAW.
+
     Parameters
     ----------
     obj : object

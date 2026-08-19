@@ -10,7 +10,9 @@ case; the ledger has its own exhibit under its own name.
 import numpy as np
 import pandas as pd
 
-from .._pnl import PnL, WATERFALL_RETURN_PERIOD
+from .._pnl import (
+    PERCENTILE_LADDER, PnL, WATERFALL_RETURN_PERIOD, _kappa_label, _pct_label,
+)
 from ._core import (
     economic, economic_ratios, economic_waterfall, stats,
     _stats_insurer_moment_store,
@@ -78,38 +80,74 @@ def _ledger_row_flags(obj, df):
     return flags
 
 
+#: The moment columns the abbreviated insurer ledger keeps
+#: ([Ledger-Insurer-Abbreviated]). ``Skew`` comes off: the reading a ledger
+#: is scanned for is level, spread and one tail, and a third moment on every
+#: line is width the reader pays for and rarely spends.
+LEDGER_MOMENTS = ('EX', 'SD', 'CV')
+
+#: The single ladder point the abbreviated insurer ledger keeps: the **first**
+#: rung, which is the adverse one. P&Ls are in payoff sign convention, left
+#: tail bad, so ``κ01`` is the bad state and ``κ99`` is the benign one; an
+#: abbreviation ending at the top of the ladder would report the good news and
+#: read as the bad. The full ladder stays one perspective away, on RAW.
+LEDGER_TAIL_Q = PERCENTILE_LADDER[0]
+
+
+def _ledger_columns(df, scenario):
+    """The abbreviated insurer ledger's columns, in sheet order.
+
+    Returns the labels actually present, so a ledger built by some future
+    route that names its ladder differently loses a column rather than
+    raising on a reindex: this is presentation code, and the same declining
+    rule :func:`_ledger_row_flags` follows.
+    """
+    tail = (_kappa_label if scenario else _pct_label)(LEDGER_TAIL_Q)
+    return [c for c in (*LEDGER_MOMENTS, tail) if c in df.columns]
+
+
 @economic.insurer.register(PnL)
 def _economic_insurer(obj, blocks):
-    """The ledger with its footing rules and the kappa semantics said aloud.
+    """The abbreviated ledger, with its footing rules and the kappa semantics
+    said aloud.
 
-    The one thing a reader must not get wrong about this sheet is what the
-    ladder columns mean: they are **scenario states**, not per row quantiles,
-    so they foot down the sheet, and ``κ01`` is the adverse state under the
-    payoff convention. When the ledger has no shared atoms the headers fall
-    back to plain ``P`` and no conditioning happened, which changes how the
-    columns read entirely, so the caption says which regime is in force.
+    RAW is the whole sheet, every moment and the full percentile ladder.
+    INSURER is the reading version ([Ledger-Insurer-Abbreviated]): ``EX``,
+    ``SD``, ``CV`` and the adverse tail state, four columns wide, because
+    thirteen columns of ladder is a frame to slice rather than a sheet to
+    read, and the app has the RAW toggle for that.
+
+    The one thing a reader must not get wrong about the tail column is what it
+    means: it is a **scenario state**, not a per row quantile, so it foots down
+    the sheet, and ``κ01`` is the adverse state under the payoff convention.
+    When the ledger has no shared atoms the header falls back to plain ``P``
+    and no conditioning happened, which changes how the column reads entirely,
+    so the caption says which regime is in force.
     """
     block_name, df, kw = blocks[0]
     scenario = any(str(c).startswith('κ') for c in df.columns)
+    df = df[_ledger_columns(df, scenario)]
     caption = (
         'The ledger in currency units: declared legs, side totals and '
         'results, in ledger order. Signed as booked, so every column adds '
-        'down the sheet. EX, SD, CV and Skew are marginal row properties.')
+        'down the sheet. EX, SD and CV are marginal row properties.')
     if scenario:
         caption += (
-            ' The kappa columns are scenario states, not per row quantiles: '
-            'column kappa-q is the state in which the grand result lands at '
-            'its q quantile, and each cell is the conditional mean of that '
-            'row in that state, so every kappa column foots exactly. '
-            'Direction is uniform in the outcome, so kappa-01 is the adverse '
-            'state (payoff convention, left tail bad) and a loss sensitive '
-            'premium correctly reads high there.')
+            ' The kappa column holds scenario states, not per row quantiles: '
+            'kappa-01 is the state in which the grand result lands at its 1% '
+            'quantile, and each cell is the conditional mean of that row in '
+            'that state, so the column foots exactly. Direction is uniform in '
+            'the outcome, so kappa-01 is the adverse state (payoff '
+            'convention, left tail bad) and a loss sensitive premium '
+            'correctly reads high there. Skew and the rest of the percentile '
+            'ladder are on the raw view.')
     else:
         caption += (
             ' This ledger shares no atoms across its rows (a one sweep or '
-            'stitched route), so the ladder is marginal under plain P '
-            'headers: each cell is that row\'s own quantile, no conditioning '
-            'happened, and the ladder columns do not foot.')
+            'stitched route), so the ladder is marginal under a plain P '
+            'header: P01 is that row\'s own 1% quantile, no conditioning '
+            'happened, and the column does not foot. Skew and the rest of the '
+            'percentile ladder are on the raw view.')
     return [(block_name, df,
              dict(kw, caption=caption, row_flags=_ledger_row_flags(obj, df)))]
 

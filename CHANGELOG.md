@@ -20,6 +20,24 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a305
+
+**[Ledger-Insurer-Abbreviated] the Economics ledger's INSURER view narrows from thirteen columns to four: `EX`, `SD`, `CV` and the adverse tail state.** Author request, 2026-08-19. The ledger sheet is the one exhibit a reader scans line by line, and `Skew` plus a nine rung percentile ladder made it a frame to slice rather than a sheet to read. The four that stay are the reading a ledger is opened for: level, spread, spread relative to level, and one tail.
+
+**The tail rung is the bottom of the ladder, not the top.** A P&L is in payoff sign convention, left tail bad, so `κ01` is the adverse state and `κ99` is the benign one. The request named the top rung; the sheet says otherwise, and on the Tower fixture the bottom line reads `EX = 251` against `κ01 = -1380` and `κ99 = +860`. An abbreviation ending at `κ99` would have put the good news in the slot the eye reads as the bad. Ruled to `κ01` by the author on that basis. Ledgers with no shared atoms keep their marginal ladder and take `P01` under the same rule.
+
+**RAW is untouched, and is the escape hatch.** `PnL.economic_df` still carries every moment and the full `PERCENTILE_LADDER`, and `exhibits.economic(pnl)` still serves all thirteen columns. Only the INSURER translation narrows, so the app's Raw toggle reaches the whole sheet in one click. This is the two perspective split working as designed rather than a capability being removed.
+
+**Where it lives.** One hook, `exhibits._pnl._economic_insurer`, plus `_ledger_columns` and the two module constants naming the choice, `LEDGER_MOMENTS` and `LEDGER_TAIL_Q`. Column selection is by label and declines rather than raises on a label it cannot find, matching the rule `_ledger_row_flags` already follows. The captions are rewritten: they no longer promise `Skew`, they speak of one tail column rather than a ladder, and both regimes now close by saying where the dropped columns went.
+
+**Formats and row flags are unaffected.** The format sheets key on the displayed label and ignore labels a block does not carry, so the survivors keep their readings; row flags are positional over rows, which the narrowing does not touch.
+
+**The API side is a no op.** Under the purist ruling the app draws what it is served: the Economics, Ledger leaf loads the exhibit envelope and the narrower block flows through. No client-side reference to these columns exists, so there is no round-note ask and no API phase.
+
+**Tests.** Three exhibit snapshots move, `economic/insurer` for the PnL, Tower and Peel fixtures, and only those three of the 124. `test_economic_raw` now asserts INSURER is a value-identical column subset of RAW rather than the whole frame; `test_measure_formats_where_measures_are_columns` names per case which measures its block still carries, since the ledger no longer has `Skew` to check. New: `test_economic_insurer_is_abbreviated` (the exact four columns in both ladder regimes, and that the tail column really is the adverse one, read off the `total` row flag rather than the last row, which on a walk is `Impact`) and `test_economic_raw_keeps_the_whole_sheet`.
+
+**One stale line corrected while passing through.** The exhibit table in `docs/2_aggregate_overview/pipeline-exhibits-and-charts.rst` still listed the ratios amounts block as `(P, L, E, C, M)`; `C` went at `1.0.0a304`.
+
 ## 1.0.0a304
 
 **[Cede-Contra-Expense] BREAKING, stable tier: ceding commission folds into the expense column and the `C` column of `PnL.economic_ratios_df` is removed.** `dev/plan-cede-expenses.md`, all five phases, on the author's 2026-08-18 ruling. `PnL` is a stable-tier class, so this is an alpha-series break of the kind the preamble reserves the alpha line for; the exhibit half rides the provisional `aggregate.exhibits` tier and needs no such notice. Ceding commission received is a **contra expense**, netted against acquisition expense exactly the way a cession recovery is netted against loss. The ratio frame had it both ways: `_RATIO_BUCKET` sent `'recovery'` into `L` and gave `'commission'` its own `C`, so loss and expense answered the same question two different ways.

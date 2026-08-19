@@ -501,6 +501,13 @@
   in two blocks, tower gated, capital as `M / -M_100`, the diversified column
   footing where the standalone one cannot). **Its author gate is still open**,
   along with the CV-on-the-ledger question; both are in the plan's open list.
+  `[Ledger-Insurer-Abbreviated]` landed `a305`: the INSURER ledger narrows to
+  `EX`, `SD`, `CV` and the adverse tail state (`κ01`, or `P01` on a marginal
+  ladder), four columns rather than thirteen, with RAW keeping the whole
+  sheet. That makes punch list item 1, CV blanking on `Margin` rows per
+  decision 13, load bearing rather than cosmetic: `CV` is now one column in
+  four, and every result row of a ledger is a margin row, so the sheet's
+  worst cells are a quarter of what a reader sees.
   Next: the app consolidation (`[Exhibits-App-Consolidation]`), which is the
   SPA reading envelopes and the migrated app knowledge finally being deleted.
   `[Exhibits-PnL-Translation]` raw stage landed `a203` (pnl_ledger and

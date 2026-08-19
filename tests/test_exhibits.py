@@ -698,9 +698,12 @@ def test_economic_raw(objects):
     assert list(df.index.names) in (['Side', 'Label'],
                                     ['Step', 'Side', 'Label'])
     # RAW stays the untouched passthrough; INSURER translates the same frame
-    # rather than reshaping it ([Exhibits-Economic-Insurer]).
+    # rather than reshaping it ([Exhibits-Economic-Insurer]), and since
+    # [Ledger-Insurer-Abbreviated] it also narrows it. Same rows, same values,
+    # a subset of the columns.
     _, ins_df, ins_kw = exhibit_frames(pn, 'economic', 'insurer')[0]
-    pd.testing.assert_frame_equal(df, ins_df)
+    pd.testing.assert_frame_equal(df[ins_df.columns], ins_df)
+    assert len(ins_df.columns) < len(df.columns)
     assert set(ins_kw) == {'caption', 'row_flags'}
 
 
@@ -756,6 +759,40 @@ def test_economic_insurer_caption_states_the_ladder_regime(tower):
     assert 'adverse state' in caption
 
 
+# --- the abbreviated insurer ledger ([Ledger-Insurer-Abbreviated]) ----------
+
+def test_economic_insurer_is_abbreviated(tower, peel):
+    """Four columns: the two moments, the CV, and the **adverse** tail state.
+
+    The tail rung is the bottom of the ladder, not the top. A P&L is in
+    payoff sign convention, left tail bad, so ``κ01`` is the state a reader
+    is scanning the sheet for and ``κ99`` is the benign one; an abbreviation
+    ending at ``κ99`` would report the good news in the slot the eye reads as
+    the bad. ``peel`` is stitched, so it takes the same rung under the plain
+    ``P`` header of a marginal ladder.
+    """
+    _, tower_df, _ = exhibit_frames(tower, 'economic', 'insurer')[0]
+    assert list(tower_df.columns) == ['EX', 'SD', 'CV', 'κ01']
+    _, peel_df, _ = exhibit_frames(peel, 'economic', 'insurer')[0]
+    assert list(peel_df.columns) == ['EX', 'SD', 'CV', 'P01']
+    # the adverse state really is the adverse one: the bottom line, the row
+    # the ledger plan flags ``total``, loses in it rather than making its
+    # mean. Read off the flag rather than off ``iloc[-1]``: the last row of a
+    # walk is ``Impact``, a difference between two positions, whose adverse
+    # column is the cession paying and so is correctly *positive*.
+    _, _, kw = exhibit_frames(tower, 'economic', 'insurer')[0]
+    bottom = next(i for i, f in kw['row_flags'].items() if 'total' in f)
+    assert tower_df['κ01'].iloc[bottom] < 0 < tower_df['EX'].iloc[bottom]
+
+
+def test_economic_raw_keeps_the_whole_sheet(tower):
+    """RAW is the escape hatch the abbreviation leans on: nothing is lost."""
+    from aggregate._pnl import PERCENTILE_LADDER
+    _, df, _ = exhibit_frames(tower, 'economic')[0]
+    assert list(df.columns)[:4] == ['EX', 'SD', 'CV', 'Skew']
+    assert len(df.columns) == 4 + len(PERCENTILE_LADDER)
+
+
 def test_measure_formats_where_measures_are_columns(dice, tower):
     """CV and Skew take their declared readings on the card and the ledger.
 
@@ -764,15 +801,24 @@ def test_measure_formats_where_measures_are_columns(dice, tower):
     is on the built document. Read it as: a measure that *is* a column is
     formatted; the canonical moment store, where measures run down a column,
     still cannot be, which is the asymmetry recorded in plan-exhibits.
+
+    Each case names the measures its block still carries as columns: the card
+    has both, and the ledger has ``CV`` alone since the insurer ledger
+    dropped ``Skew`` at [Ledger-Insurer-Abbreviated]. Both stay on INSURER,
+    whose sheet is the one declaring these fixed decimal readings (raw reads
+    ``Skew`` as ``.3g``, significant figures, which is a different claim).
     """
     gt_ = pytest.importorskip('greater_tables')
-    for obj, name in ((dice, 'summary'), (tower, 'economic')):
+    expected = {'CV': gt_.FormatSpec(kind='pct', digits=1),
+                'Skew': gt_.FormatSpec(kind='dec', digits=3)}
+    for obj, name, measures in ((dice, 'summary', ('CV', 'Skew')),
+                                (tower, 'economic', ('CV',))):
         _, df, _kw = exhibit_frames(obj, name, 'insurer')[0]
-        assert {'CV', 'Skew'} <= set(df.columns)
+        assert set(measures) <= set(df.columns)
         doc = build_exhibit(obj, name, 'insurer').ir_blocks[0]
         spec = {c.name[-1]: c.format for c in doc.columns}
-        assert spec['CV'] == gt_.FormatSpec(kind='pct', digits=1)
-        assert spec['Skew'] == gt_.FormatSpec(kind='dec', digits=3)
+        for measure in measures:
+            assert spec[measure] == expected[measure]
 
 
 def test_economic_ratios_insurer_splits_units(tower):

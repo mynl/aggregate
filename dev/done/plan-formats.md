@@ -1,10 +1,14 @@
 # plan-formats: the format sheets `[Format-Sheets]`
 
-Status: DRAFT, 2026-08-14. The author's rulings on the open questions
-(same day) are recorded in section 8 and folded into the design below.
-Remaining before execution: the author edits the section 4 tables (two
-precision choices are flagged inline). Then phases 2 to 4 are execution
-ready.
+Status: **DONE, moved to `dev/done/` 2026-08-20.** Drafted 2026-08-14 with
+the author's rulings of the same day in section 8. All three code phases
+landed at a286 to a288, with the `[Format-Sheet-Patterns]` follow up at
+a295; the execution record, the rulings taken during execution and the
+divergences from the drafted tables are in section 9. The shipped sheets
+under `src/aggregate/formats/` are the source of truth for the values now,
+not the section 4 tables. What is left is not plan work: the
+`PENDING_VOCABULARY` punch list (31 labels after a295) and the naming drift
+the registry caught, both tracked in `dev/TODO.md`.
 
 ## 1 What this is
 

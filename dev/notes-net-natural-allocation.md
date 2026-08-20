@@ -1,6 +1,6 @@
 # Notes [NetCeded-Kappa-Band]: the conditional band around the kappa curve, in core or on disk
 
-> **Status: NOTES, 2026-08-14, not a plan and nothing implemented.** Written from a working session that built the netceded joint at full granularity, on disk, and drew the chart the author wants. Every number below was measured in that session against LIB `1.0.0a275`; line anchors are the same version. The follow-on work has an obvious shape but the phases here are a proposal, not an approved plan. Companion documents: `dev/done/plan-natural-allocation-to-occurrence-net-ceded.md` (the plan that shipped `a273` `exeqa_df` and `a274` `natural_allocation`), `dev/plan-pricing-natural-allocation.md` (the app-facing four subtabs, symlinked from the API repo), and `dev/done/plan-bv.md` (the massive route).
+> **Status: NOTES, 2026-08-14, not a plan and nothing implemented.** Written from a working session that built the netceded joint at full granularity, on disk, and drew the chart the author wants. Every number below was measured in that session against LIB `1.0.0a275`; line anchors are the same version. The follow-on work has an obvious shape but the phases here are a proposal, not an approved plan. Companion documents: `dev/done/plan-natural-allocation-to-occurrence-net-ceded.md` (the plan that shipped `a273` `exeqa_df` and `a274` `natural_allocation`), `dev/done/plan-pricing-natural-allocation.md` (the app-facing four subtabs, symlinked from the API repo), and `dev/done/plan-bv.md` (the massive route).
 
 ## 1. The rationale
 

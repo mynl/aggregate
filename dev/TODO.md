@@ -525,7 +525,7 @@
   nearest winning, the same rule a user `.agg` database follows. The sheet
   doubles as a **registry of the column vocabulary**: an entry asserts that
   a label means one thing across the package, and the sweep makes naming
-  drift a test failure. Plan: `dev/plan-formats.md`, drafted and ruled
+  drift a test failure. Plan: `dev/done/plan-formats.md`, drafted and ruled
   2026-08-14. **Progress:** `[Format-Sheet-Files]` landed a286 (the two
   sheets, `exhibits/_formats.py`, the three stop search path, styles and
   the four greater_tables tag styles, load time validation, `pyyaml>=6.0`
@@ -967,7 +967,7 @@
   through `_scatter_1d` onto the total grid and take the ratio. Deferred
   because the netceded ask does not need it; recorded because it unifies three
   consumers and should be designed once. Still deferred after
-  `dev/notes-net-natural-allocation.md` and `dev/plan-pricing-natural-allocation.md`
+  `dev/notes-net-natural-allocation.md` and `dev/done/plan-pricing-natural-allocation.md`
   (`a277` to `a285`): the kappa band conditions on an **axis**, which is the
   easy case and the one the netceded question asks, so nothing there touches
   this. What did land next to it is `JointBandsMixin._row_bands`, the row-wise

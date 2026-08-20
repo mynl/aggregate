@@ -1097,18 +1097,22 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _program.sharpen_program(self)
 
-    def pnl_program(self, loss_ratio=0.70, expense_ratio=0.25) -> str:
+    def pnl_program(self, loss_ratio=0.70, expense_ratio=0.25, *,
+                    net_combined_ratio=None, occ_combined_ratio=None,
+                    agg_combined_ratio=None) -> str:
         """The program that wraps this portfolio in a P&L.
 
-        Returns ``pnl NAME_PnL <premium> less port.NAME less <expense>``. The
-        grammar has no inline portfolio engine, so unlike the aggregate form
-        this text **references** the portfolio rather than carrying it, and
-        resolves against the underwriter's knowledge base, where ``build`` put
-        it. The premium is ``inherit premium`` when the units accumulate one,
-        and otherwise expected loss over ``loss_ratio``; ``expense_ratio=0``
-        omits the expense clause.
+        Returns ``pnl NAME_PnL <premium> less port NAME <units> less
+        <expense>``, with the units written out inline, so the text is
+        self-contained and builds anywhere. The premium is ``inherit premium``
+        when the units accumulate one, and otherwise expected loss over
+        ``loss_ratio``; ``expense_ratio=0`` omits the expense clause.
 
-        Delegated to :func:`aggregate._program.pnl_program`.
+        Delegated to :func:`aggregate._program.pnl_program`, where the reason
+        the units are inlined rather than referenced as ``port.NAME`` (a
+        reference resolves only against the underwriter holding the name, so
+        the text would build in the session that wrote it and nowhere else) is
+        documented in full.
 
         Parameters
         ----------
@@ -1116,6 +1120,13 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             Sizes the premium, and only when there is none to inherit.
         expense_ratio : float, default 0.25
             Gross expense as a fraction of premium.
+        net_combined_ratio, occ_combined_ratio, agg_combined_ratio
+            Accepted so the signature matches
+            :meth:`aggregate.distributions.Aggregate.pnl_program`, but the
+            combined-ratio ladder prices the cessions of a **single aggregate
+            engine**: a unit's cession would have to be quoted against the
+            whole book's premium, which wants its own ruling. Passing
+            ``net_combined_ratio`` raises.
 
         Returns
         -------
@@ -1130,7 +1141,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             build(p.pnl_program(loss_ratio=0.65))
         """
         return _program.pnl_program(self, loss_ratio=loss_ratio,
-                                    expense_ratio=expense_ratio)
+                                    expense_ratio=expense_ratio,
+                                    net_combined_ratio=net_combined_ratio,
+                                    occ_combined_ratio=occ_combined_ratio,
+                                    agg_combined_ratio=agg_combined_ratio)
 
     @property
     def tail_behavior_df(self) -> 'pd.DataFrame':

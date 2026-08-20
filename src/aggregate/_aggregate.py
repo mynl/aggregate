@@ -956,7 +956,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _program.sharpen_program(self)
 
-    def pnl_program(self, loss_ratio=0.70, expense_ratio=0.25) -> str:
+    def pnl_program(self, loss_ratio=0.70, expense_ratio=0.25, *,
+                    net_combined_ratio=None, occ_combined_ratio=None,
+                    agg_combined_ratio=None) -> str:
         """The program that wraps this aggregate in a P&L.
 
         Returns ``pnl NAME_PnL <premium> less <engine> less <expense>``, with
@@ -965,16 +967,30 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         exposure states one, and otherwise expected loss over ``loss_ratio``;
         ``expense_ratio=0`` omits the expense clause.
 
+        ``net_combined_ratio`` additionally **prices the reinsurance**, which
+        is what silences the ``ZeroPremiumCessionWarning`` an unpriced cession
+        raises: the net book and each cover are priced separately and added,
+        then grossed up once for expenses.
+
         Delegated to :func:`aggregate._program.pnl_program`, where the premium
         rule and the trailer's move up to the wrapping ``pnl`` are documented
-        in full.
+        in full, and to :func:`aggregate._program._pnl_technical` for the
+        ladder's algebra.
 
         Parameters
         ----------
         loss_ratio : float, default 0.70
-            Sizes the premium, and only when there is none to inherit.
+            Sizes the premium, and only when there is none to inherit and
+            ``net_combined_ratio`` is ``None``.
         expense_ratio : float, default 0.25
             Gross expense as a fraction of premium.
+        net_combined_ratio : float, optional
+            Expected net loss over net technical premium. ``None``, the
+            default, leaves the function exactly as it was and any cession
+            unpriced; a number engages the ladder.
+        occ_combined_ratio, agg_combined_ratio : float or sequence, optional
+            Each tier's combined ratio, defaulting to ``net_combined_ratio``.
+            A sequence gives one value per layer, in declaration order.
 
         Returns
         -------
@@ -987,9 +1003,16 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
             a = build('agg X 100 claims sev lognorm 100 cv 2 poisson')
             build(a.pnl_program(loss_ratio=0.65))
+
+            r = build('agg Y 10 claims sev lognorm 100 cv 2 '
+                      'occurrence net of 100 xs 100 poisson')
+            build(r.pnl_program(net_combined_ratio=0.9))
         """
         return _program.pnl_program(self, loss_ratio=loss_ratio,
-                                    expense_ratio=expense_ratio)
+                                    expense_ratio=expense_ratio,
+                                    net_combined_ratio=net_combined_ratio,
+                                    occ_combined_ratio=occ_combined_ratio,
+                                    agg_combined_ratio=agg_combined_ratio)
 
     def reins_program(self, cession) -> str:
         """The program that rebuilds this aggregate with ``cession`` added.

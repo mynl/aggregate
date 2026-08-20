@@ -746,7 +746,284 @@ def _round_consideration(premium):
     return round(value, 2)
 
 
-def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
+def _pnl_layer_ratios(value, fallback, n_layers, tier, caller):
+    """Resolve one tier's combined-ratio argument to one value per layer.
+
+    Parameters
+    ----------
+    value : None, float, or sequence of float
+        The tier's argument. ``None`` defers to ``fallback``; a scalar applies
+        to every layer; a sequence gives one value per layer, index aligned
+        with the cession list as declared.
+    fallback : float
+        The net combined ratio, used when ``value`` is ``None``.
+    n_layers : int
+        Number of layers on the tier.
+    tier : str
+        ``'occurrence'`` or ``'aggregate'``, for the messages.
+    caller : str
+        Name of the calling member, for the messages.
+
+    Returns
+    -------
+    list of float
+        One combined ratio per layer.
+
+    Raises
+    ------
+    ValueError
+        When a sequence's length does not match the layer count, or when any
+        resolved ratio is not a positive finite number.
+
+    Notes
+    -----
+    The sequence form is the point of the exercise: it is how market rates
+    arrive, one number per layer read off a quote sheet rather than off a
+    convention. Layers are always declared bottom up (``_validate_reins_layers``
+    refuses any other order), so "index aligned with the cession list" is
+    unambiguously ascending attachment.
+
+    A string is not accepted as a sequence, even though it is one: a caller
+    passing ``'0.9'`` means the scalar, and iterating it into per-character
+    ratios would fail somewhere far from the mistake.
+
+    ``fallback`` is validated by the caller before it gets here, so a ratio
+    this function rejects is always one the caller passed for the tier, and
+    the message can say so.
+    """
+    if value is None:
+        value = fallback
+    if isinstance(value, str) or not hasattr(value, '__len__'):
+        ratios = [float(value)] * n_layers
+    else:
+        ratios = [float(v) for v in value]
+        if len(ratios) != n_layers:
+            raise ValueError(
+                f'{caller}: {len(ratios)} {tier} combined ratios given for '
+                f'{n_layers} {tier} layer{"" if n_layers == 1 else "s"}. Give '
+                'one ratio per layer, in the order the layers are declared '
+                '(ascending attachment), or one scalar for the whole tier.')
+    for i, c in enumerate(ratios):
+        if not np.isfinite(c) or c <= 0:
+            raise ValueError(
+                f'{caller}: the {tier} combined ratio for layer {i + 1} is '
+                f'{c!r}. A combined ratio is expected loss over premium, so it '
+                'has to be a positive finite number.')
+    return ratios
+
+
+def _pnl_layer_premium(basis, val, share, limit, name, tier, index, caller):
+    """The currency premium a layer's existing clause already resolves to.
+
+    Mirrors :meth:`aggregate.underwriter.Underwriter._resolve_reins_economics`
+    for the two bases that resolve without reference to the P&L premium.
+
+    Parameters
+    ----------
+    basis, val : str, float
+        The clause, as the spec carries it: ``('deposit', amount)`` or
+        ``('rol', rate_on_line)``.
+    share, limit : float
+        The layer's placement fraction and its 100 percent limit.
+    name : str
+        The engine name, for the message.
+    tier : str
+        ``'occurrence'`` or ``'aggregate'``, for the message.
+    index : int
+        Zero-based layer index, reported one-based.
+    caller : str
+        Name of the calling member, for the message.
+
+    Returns
+    -------
+    float
+        ``share x amount`` or ``share x rol x limit``.
+
+    Raises
+    ------
+    ValueError
+        On a ``rate`` clause, which resolves as ``share x rate x P`` against
+        the very premium the ladder is computing.
+
+    Notes
+    -----
+    **Why ``rate`` is refused rather than solved.** The ladder builds the
+    booked premium bottom up, so every layer's cost has to be known before ``P``
+    exists. A ``deposit`` is a currency amount and a ``rol`` is quoted against
+    the layer limit, so both are known; a ``rate`` is quoted against ``P``
+    itself, which closes a loop. The loop does have a closed-form solution,
+    ``P = A / (1 - ER - sum_j share_j x rate_j)``, but adopting it would put
+    back exactly the self-reference the deposit form was chosen to remove, and
+    it fails outright once the rates and the expense ratio reach one. Refusing
+    keeps one rule: a stated cost is a stated cost, and the ladder never has to
+    ask what the answer is before computing it.
+    """
+    if basis == 'deposit':
+        return float(share) * float(val)
+    if basis == 'rol':
+        return float(share) * float(val) * float(limit)
+    if basis == 'rate':
+        raise ValueError(
+            f"{caller}: {name!r} prices {tier} layer {index + 1} as "
+            f"'rate {val:g}', a rate against the P&L premium, and the premium "
+            'is what the combined-ratio ladder is computing. Restate that '
+            "layer as a deposit ('deposit <amount>') or a rate on line "
+            "('rol <rate>'), both of which are known before the premium is, "
+            'or drop the clause and let the ladder price the layer.')
+    raise ValueError(                                       # pragma: no cover
+        f'{caller}: unknown ceded-premium basis {basis!r}.')
+
+
+def _pnl_technical(ob, spec, expense_ratio, net_combined_ratio,
+                   occ_combined_ratio, agg_combined_ratio, caller):
+    """The technical premium ladder: price each cover, then gross up once.
+
+    Parameters
+    ----------
+    ob : Aggregate
+        The engine, updated, so :attr:`Aggregate.reins_stats_df` and
+        :attr:`Aggregate.est_m` answer.
+    spec : dict
+        The engine's **re-parsed** spec, as :func:`_require_program` returns it.
+        Read rather than mutated. It is the re-parsed spec and not ``ob.spec``
+        on purpose: a ceded-premium clause on a bare ``agg`` is stripped from
+        the built object with an ``IgnoredDecLClauseWarning`` (a plain
+        aggregate has no premium context) but survives in the program text, so
+        only this copy knows the layer was already priced.
+    expense_ratio : float
+        Gross expense as a fraction of premium, the ``ER`` of the gross up.
+    net_combined_ratio : float
+        Expected net loss over net technical premium. Also the default for
+        both tiers.
+    occ_combined_ratio, agg_combined_ratio : None, float, or sequence
+        Per tier, resolved by :func:`_pnl_layer_ratios`.
+    caller : str
+        Name of the calling member, for the messages.
+
+    Returns
+    -------
+    (float or DERIVE_PREMIUM, list, list)
+        The booked premium and the per layer ceded-premium spec entries for
+        the occurrence and aggregate tiers, each ``('deposit', amount)`` for a
+        layer the ladder priced and the layer's existing entry where it had
+        one. Both lists are empty when the tier carries no cession.
+
+    Raises
+    ------
+    ValueError
+        When a ratio is unusable (see :func:`_pnl_layer_ratios`), when a layer
+        already carries a ``rate`` clause (see :func:`_pnl_layer_premium`), or
+        when the engine has no expected loss to price from.
+
+    Notes
+    -----
+    **The construction.** With ``E_net`` the net expected loss, ``E_j`` layer
+    ``j``'s expected ceded loss, ``c_net`` and ``c_j`` the combined ratios::
+
+        T_net = E_net / c_net        net technical premium
+        Q_j   = E_j   / c_j          layer premium
+        TP    = T_net + sum_j Q_j    technical premium
+        P     = TP / (1 - ER)        booked premium
+
+    **The identity this is built for.** The P&L books ``P``, pays ``ER x P`` of
+    expense, pays ``sum_j Q_j`` of ceded premium and carries the net loss, so
+    the underwriting margin is ``TP - sum_j Q_j - E_net = T_net - E_net``,
+    exactly the net margin ``(1 - c_net) x T_net``. It does **not** move when a
+    reinsurance ratio moves: raising a layer's price raises the booked premium
+    by exactly the extra cost and leaves the book's own result alone, which is
+    what a reader turning these knobs should see.
+
+    **The share algebra**, the one part an implementation is likely to get
+    wrong. The frame's ``E_j`` is **share adjusted**, the ceded loss of the
+    fraction actually placed, while a DecL premium clause is quoted at **100
+    percent placement** and scaled down by ``share`` at resolution. The deposit
+    written is therefore ``d_j = Q_j / s_j``, which the resolver turns back into
+    ``s_j x d_j = Q_j`` exactly. Writing ``Q_j`` itself would price a half
+    placed layer at half of what it should be. The quotient is also the number
+    a reader would read off a quote sheet, since it is share invariant:
+    ``d_j = lol_j x y_j / c_j`` in the frame's terms, and ``lol`` is not share
+    adjusted either.
+
+    **Rounding order.** Each deposit rounds through
+    :func:`_round_consideration` **before** ``TP`` is formed, and ``P`` rounds
+    last, so the emitted program is internally consistent to within the
+    rounding of ``P`` alone and the residual on the margin identity is exactly
+    ``P x (1 - ER) - sum_j s_j d_j - E_net``, predictable rather than merely
+    small.
+
+    A layer that already carries a ``deposit`` or ``rol`` clause is left
+    untouched, so the ladder never overwrites terms the author wrote, and its
+    resolved premium still enters ``TP`` at the amount it will resolve to.
+    """
+    from .parser import DERIVE_PREMIUM
+    from ._pnl_builders import derive_consideration
+    # Checked here rather than left to the per-tier resolution: it is also the
+    # divisor for the net technical premium, so an engine with no cession at
+    # all would otherwise reach the division unguarded.
+    if not np.isfinite(net_combined_ratio) or net_combined_ratio <= 0:
+        raise ValueError(
+            f'{caller}: net_combined_ratio is {net_combined_ratio!r}. A '
+            'combined ratio is expected loss over premium, so it has to be a '
+            'positive finite number; pass None to size the premium from '
+            'loss_ratio instead.')
+    stats = ob.reins_stats_df
+    expense_spec = ([(None, [('premium', float(expense_ratio))])]
+                    if expense_ratio else None)
+    name = getattr(ob, 'name', ob)
+    ceded_total = 0.0
+    priced = {}
+    for tier, key, arg in (('occurrence', 'occ', occ_combined_ratio),
+                           ('aggregate', 'agg', agg_combined_ratio)):
+        layers = spec.get(f'{key}_reins') or []
+        existing = spec.get(f'{key}_reins_premium')
+        ratios = _pnl_layer_ratios(arg, net_combined_ratio, len(layers),
+                                   tier, caller)
+        entries = []
+        for j, (share, limit, _attach) in enumerate(layers):
+            clause = existing[j] if existing is not None else None
+            if clause is not None:
+                ceded_total += _pnl_layer_premium(
+                    *clause, share, limit, name, tier, j, caller)
+                entries.append(clause)
+                continue
+            ceded_loss = float(
+                stats.loc[('agg', 'mean'), (key, f'layer.{j + 1}')])
+            deposit = _round_consideration(ceded_loss / ratios[j] / share)
+            ceded_total += share * deposit
+            entries.append(('deposit', deposit))
+        priced[key] = entries
+    premium = getattr(ob, 'exp_premium', 0.0)
+    stated = (0.0 if premium is None
+              else float(np.sum(np.asarray(premium, dtype=float))))
+    if stated:
+        # The engine states its own technical premium, so it wins over the
+        # convention exactly as it does today and ``net_combined_ratio`` is
+        # unused. With no cover to pay for, the total is what the ``derive
+        # premium`` sentinel already resolves to at build, so the program keeps
+        # saying ``derive premium`` and the linkage to the engine's exposure
+        # clause survives. Ceded premium is a cost the sentinel cannot know, so
+        # once there is any, the number is written out.
+        if not ceded_total:
+            return DERIVE_PREMIUM, priced['occ'], priced['agg']
+        technical = stated + ceded_total
+    else:
+        net_loss = float(getattr(ob, 'est_m', 0.0) or 0.0)
+        if not np.isfinite(net_loss) or net_loss <= 0:
+            raise ValueError(
+                f"{caller}: {name!r} has no expected loss to size a premium "
+                'from. Call update() first (build does it for you); the net '
+                'technical premium is the computed net mean divided by '
+                'net_combined_ratio.')
+        technical = net_loss / net_combined_ratio + ceded_total
+    return (_round_consideration(
+                derive_consideration(expense_spec, technical, str(name))),
+            priced['occ'], priced['agg'])
+
+
+def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25, *,
+                net_combined_ratio=None,
+                occ_combined_ratio=None,
+                agg_combined_ratio=None):
     """The program that wraps ``ob`` in a P&L.
 
     Writing this out by hand means knowing that the trailer belongs to the
@@ -767,6 +1044,21 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
     expense_ratio : float, default 0.25
         Gross expense as a fraction of premium. ``0`` omits the expense clause
         rather than writing a zero.
+    net_combined_ratio : float, optional
+        Expected **net** loss over net technical premium. ``None``, the
+        default, is the function as it has always behaved: the premium is sized
+        from ``loss_ratio`` and any cession books at zero ceded premium. A
+        number engages the technical premium ladder of :func:`_pnl_technical`,
+        which prices every cession as well, and ``loss_ratio`` is then unused.
+        It is both the switch and a value because a caller who wants the ladder
+        always wants the cessions priced, so a separate flag would only ever be
+        redundant with this one.
+    occ_combined_ratio, agg_combined_ratio : float or sequence, optional
+        Each tier's combined ratio, expected ceded loss over ceded premium.
+        ``None``, the default, means ``net_combined_ratio``, so one number
+        prices the whole tower; a scalar applies to every layer on the tier; a
+        sequence gives one value per layer, in declaration order, which is
+        ascending attachment. Ignored when ``net_combined_ratio`` is ``None``.
 
     Returns
     -------
@@ -778,10 +1070,25 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
     ValueError
         When ``ob`` carries no DecL program, when its program is already a P&L,
         or when the premium cannot be resolved (see
-        :func:`_pnl_consideration`).
+        :func:`_pnl_consideration`). Under the ladder, also for a portfolio
+        engine, an unusable combined ratio, a per tier sequence of the wrong
+        length, or a layer already priced with a ``rate`` clause.
 
     Notes
     -----
+    **The ladder, and why it builds upward.** ``net_combined_ratio`` prices the
+    net book and each cover separately and adds them, rather than sizing one
+    premium off a loss ratio and hoping the reinsurance fits inside it. The
+    consequence worth knowing is that the underwriting margin is
+    ``(1 - net_combined_ratio)`` of the net technical premium **whatever the
+    reinsurance costs**: raising a layer's price raises the booked premium by
+    exactly that layer's extra cost and leaves the book's own result alone.
+    Every layer premium is written as a ``deposit``, a currency amount, which
+    is the one form that resolves without reference to the premium being
+    computed. See :func:`_pnl_technical` for the algebra and
+    dev/done/plan-pnl-reinsurance-pricing.md for the reasoning.
+
+
     **Self-contained either way, which is the load-bearing choice.** An
     aggregate engine is the object's own body verbatim; a portfolio engine is
     its units written out, ``less port PNAME <units>``. Both are stripped of
@@ -822,7 +1129,23 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
             f"pnl_program: cannot wrap a {kind!r} declaration in a P&L; the "
             "engine must be an aggregate or a portfolio.")
     pnl_name = f'{name}{_PNL_SUFFIX}'
-    consideration = _pnl_consideration(ob, loss_ratio, 'pnl_program')
+    if net_combined_ratio is None:
+        consideration = _pnl_consideration(ob, loss_ratio, 'pnl_program')
+        occ_priced = agg_priced = []
+    elif kind == 'port':
+        # A unit's cession would have to be quoted against the whole book's
+        # premium, which reads oddly and wants its own ruling; the library does
+        # not warn about unpriced unit cessions today, so nothing is left half
+        # done by refusing here.
+        raise ValueError(
+            f"pnl_program: {name!r} is a portfolio, and the combined-ratio "
+            'ladder prices the cessions of a single aggregate engine. Wrap the '
+            'portfolio without net_combined_ratio, or run the ladder on each '
+            'unit.')
+    else:
+        consideration, occ_priced, agg_priced = _pnl_technical(
+            ob, spec, expense_ratio, net_combined_ratio,
+            occ_combined_ratio, agg_combined_ratio, 'pnl_program')
     if kind == 'port':
         # The units written out, never a ``port.NAME`` reference: the reference
         # resolves only against the underwriter holding the name, so the text
@@ -840,6 +1163,12 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25):
         # the aggregate's own label names the P&L's loss leg; the P&L itself
         # starts unlabeled.
         out['engine_label'] = out.pop('label', None)
+        # The writer reads the ceded-premium clauses off lists parallel to the
+        # cession lists, so a priced tier replaces the whole list: an entry the
+        # ladder wrote, or the layer's own clause where it had one.
+        for key, entries in (('occ', occ_priced), ('agg', agg_priced)):
+            if entries:
+                out[f'{key}_reins_premium'] = entries
     out['consideration'] = consideration
     if expense_ratio:
         out['expense_spec'] = [(None, [('premium', float(expense_ratio))])]

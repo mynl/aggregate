@@ -24,6 +24,7 @@ import pytest
 from aggregate import build, Underwriter
 from aggregate._bucket_window import _fmt_bs
 from aggregate._program import _merge_hints, _merge_note, _round_consideration
+from aggregate.constants import ZeroPremiumCessionWarning
 from aggregate.decl_writer import format_program
 
 
@@ -576,3 +577,334 @@ def test_merge_note_joins_rather_than_duplicating(note, addition, expected):
 def test_merge_note_replaces_a_namespaced_record(note, addition, expected):
     """A generated verdict is replaceable; the author's own prose never matches."""
     assert _merge_note(note, addition, replace_prefix='gen: ') == expected
+
+
+# ------------------------------------- pnl_program: the combined-ratio ladder
+#
+# [PnL-Reinsurance-Pricing], dev/done/plan-pnl-reinsurance-pricing.md. An unpriced
+# cession books at zero and warns; ``net_combined_ratio`` prices the net book
+# and every cover separately, adds them, and grosses the total up once, so the
+# emitted program is complete enough to build silently. The contract these
+# assert is the margin identity: the underwriting result is the *net* result,
+# and it does not move when a reinsurance price moves.
+
+# The plan's worked example, section 3. Both tiers, both placed 100 percent.
+TOWER = ('agg DP.Tower 10 claims sev lognorm 100 cv 2 '
+         'occurrence net of 100 xs 100 poisson '
+         'aggregate net of 500 xs 1000')
+# The same layer at half and at full placement, for the share invariance.
+# Not ``DP.Half``: the sharpen pin test above already declares a different
+# program under that name, and both would register into the shared knowledge
+# base with the later build winning.
+HALF = ('agg DP.HalfPlaced 10 claims sev lognorm 100 cv 2 '
+        'occurrence net of 50% po 100 xs 100 poisson')
+FULL = HALF.replace('DP.HalfPlaced', 'DP.FullPlaced').replace('50% po ', '')
+# Two occurrence layers, for the per-layer sequence form.
+TWO = ('agg DP.Two 10 claims sev lognorm 100 cv 2 '
+       'occurrence net of 100 xs 100 and 1000 xs 1000 poisson')
+# A layer the author already priced, on each of the three bases. ``rate`` is
+# the one the ladder refuses: it resolves against the premium being computed.
+PRICED_DEPOSIT = TWO.replace('DP.Two', 'DP.Deposit').replace(
+    '100 xs 100 and', '100 xs 100 deposit 200 and')
+PRICED_ROL = TWO.replace('DP.Two', 'DP.Rol').replace(
+    '100 xs 100 and', '100 xs 100 rol 1.5 and')
+PRICED_RATE = TWO.replace('DP.Two', 'DP.Rate').replace(
+    '100 xs 100 and', '100 xs 100 rate 0.13 and')
+
+_EXPENSE_RATIO = 0.25
+
+
+def _ceded_premium(face):
+    """Total resolved ceded premium, and the per-layer figures behind it.
+
+    Empty rather than absent when the engine carries no cession, so the
+    identity below reads the same either way.
+    """
+    econ = face.engine._pnl_recipe.get('econ') or {}
+    return (float(econ.get('ceded', 0.0)),
+            list(econ.get('pc_occ_by_layer') or []),
+            list(econ.get('pc_agg_by_layer') or []))
+
+
+def _gross_premium(face):
+    """The premium the P&L books, before the ceded premium leaves it.
+
+    :func:`_booked_premium` reads the consideration leg, which is already
+    **net** of the ceded premium, so the ladder's ``P`` is that plus the cost
+    of the covers.
+    """
+    ceded, _, _ = _ceded_premium(face)
+    return _booked_premium(face) + ceded
+
+
+def _margin(face):
+    """The P&L's expected underwriting result."""
+    return float(face.economic_df.loc[('Margin', 'Total'), 'EX'])
+
+
+def _booked_loss(face):
+    """The net loss the P&L actually books, sign flipped to a positive cost.
+
+    Not the same float as the engine's ``est_m``, which is what the ladder
+    priced off: the P&L means its own grid distribution over the net density.
+    They agree to about 2e-10 relative, which is grid arithmetic and nothing
+    to do with the pricing, so the identity is asserted against the number the
+    P&L booked and the two are compared separately.
+    """
+    legs = face.legs_df
+    return -float(legs.loc[legs['kind'] == 'loss', 'EX'].iloc[0])
+
+
+def _deposits(program):
+    """Every ceded-premium amount the program states, in order."""
+    return [float(line.split('deposit')[1].split()[0])
+            for line in program.splitlines() if 'deposit' in line]
+
+
+def _identity(face):
+    """``P x (1 - ER) - ceded - E_net``, what the margin must equal exactly.
+
+    The ladder's whole point: what is left after expenses and the cost of the
+    covers is the net book's own result, and nothing else.
+    """
+    ceded, _, _ = _ceded_premium(face)
+    return (_gross_premium(face) * (1 - _EXPENSE_RATIO) - ceded
+            - _booked_loss(face))
+
+
+@pytest.mark.parametrize('program', [MOVES, PREMIUM, CEDED])
+def test_pnl_ladder_default_is_inert(program):
+    """``net_combined_ratio=None`` is the function exactly as it was.
+
+    The tier arguments are read only through the net one, so passing them
+    without it cannot move the text. That is what makes the ladder additive:
+    no existing caller's output changes and nothing needs a deprecation.
+    """
+    a = build(program)
+    today = a.pnl_program()
+    assert today == a.pnl_program(occ_combined_ratio=0.5,
+                                  agg_combined_ratio=0.5)
+    assert 'deposit' not in today
+
+
+def test_pnl_ladder_reproduces_the_worked_example():
+    """The plan's section 3, text and numbers, to the digit.
+
+    ``E_net`` 742.198761 over 0.9 is 824.665290; the layers cost 196.444937
+    and 90.010738, which round to the deposits written; the total 1110.675290
+    grosses to 1480.900387 and books at 1481.
+    """
+    a = build(TOWER)
+    assert a.pnl_program(net_combined_ratio=0.9) == (
+        'pnl DP.Tower_PnL\n'
+        '  1481 premium\n'
+        '  less\n'
+        '    agg DP.Tower\n'
+        '      10 claims\n'
+        '      sev lognorm 100 cv 2\n'
+        '      occurrence net of\n'
+        '        100 xs 100 deposit 196\n'
+        '      poisson\n'
+        '      aggregate net of\n'
+        '        500 xs 1000 deposit 90.01\n'
+        '  less\n'
+        '    0.25 premium expenses')
+
+
+def test_pnl_ladder_rounds_every_deposit_like_a_consideration():
+    """A deposit is currency, so it rounds by the one currency rule.
+
+    Whole units above 100, cents at or below it. The two layers land either
+    side of that joint, which is why both appear here.
+    """
+    a = build(TOWER)
+    occ, agg = _deposits(a.pnl_program(net_combined_ratio=0.9))
+    assert occ == _round_consideration(176.800443 / 0.9) == 196.0
+    assert agg == _round_consideration(81.009664 / 0.9) == 90.01
+
+
+@pytest.mark.parametrize('program, stated', [(TOWER, None), (PREMIUM, 1000.0)])
+def test_pnl_ladder_margin_is_the_net_result(program, stated):
+    """The identity, exactly, for a sized premium and for a stated one.
+
+    Rounding ``P`` is the only inexactness left, because every deposit is
+    rounded before the technical premium is formed, so the residual is not
+    merely small: it is the closed form the identity predicts.
+
+    ``stated`` is the engine's own technical premium where it declares one. It
+    wins over the convention, so ``net_combined_ratio`` sizes nothing and the
+    result is the engine's own risk load.
+    """
+    a = build(program)
+    face = build(a.pnl_program(net_combined_ratio=0.9))
+    assert _margin(face) == pytest.approx(_identity(face), rel=1e-12)
+    # the loss the P&L books is the loss the ladder priced off, up to the grid
+    net_loss = float(face.engine.est_m)
+    assert _booked_loss(face) == pytest.approx(net_loss, rel=1e-9)
+    # and the result lands where the ideal, unrounded, ladder says it should
+    net_technical = net_loss / 0.9 if stated is None else stated
+    assert _margin(face) == pytest.approx(
+        net_technical - net_loss, abs=0.5 * (1 - _EXPENSE_RATIO))
+
+
+def test_pnl_ladder_margin_does_not_move_with_a_reinsurance_price():
+    """Raising a layer's price raises the booked premium by exactly its cost.
+
+    This is the property the plan's first construction got wrong and the
+    reason the premium is built upward. A reader turning the reinsurance knob
+    should see the cost pass through, not eat the book's own result.
+    """
+    a = build(TOWER)
+    cheap = build(a.pnl_program(net_combined_ratio=0.9,
+                                occ_combined_ratio=0.9))
+    dear = build(a.pnl_program(net_combined_ratio=0.9,
+                               occ_combined_ratio=0.6))
+    cheap_ceded, _, _ = _ceded_premium(cheap)
+    dear_ceded, _, _ = _ceded_premium(dear)
+    assert dear_ceded > cheap_ceded
+    # the whole of the extra cost is passed through, grossed up for expenses
+    assert (_gross_premium(dear) - _gross_premium(cheap)) == pytest.approx(
+        (dear_ceded - cheap_ceded) / (1 - _EXPENSE_RATIO), abs=1.0)
+    # so the underwriting result is untouched, up to the rounding of P
+    assert _margin(dear) == pytest.approx(
+        _margin(cheap), abs=0.5 * (1 - _EXPENSE_RATIO))
+
+
+def test_pnl_ladder_prices_each_layer_at_its_own_ratio():
+    """A sequence is one ratio per layer, in declaration order.
+
+    The sequence form is the point of the exercise: it is how market rates
+    arrive, read off a quote sheet rather than off a convention.
+    """
+    a = build(TWO)
+    stats = a.reins_stats_df
+    means = [float(stats.loc[('agg', 'mean'), ('occ', f'layer.{i}')])
+             for i in (1, 2)]
+    written = _deposits(a.pnl_program(net_combined_ratio=0.9,
+                                      occ_combined_ratio=[0.8, 0.6]))
+    assert written == [_round_consideration(means[0] / 0.8),
+                       _round_consideration(means[1] / 0.6)]
+    # and the scalar form is the same thing said once
+    assert _deposits(a.pnl_program(net_combined_ratio=0.9,
+                                   occ_combined_ratio=0.8))[0] == written[0]
+
+
+@pytest.mark.parametrize('ratios', [[0.8], [0.8, 0.7, 0.6]])
+def test_pnl_ladder_refuses_a_ratio_sequence_of_the_wrong_length(ratios):
+    """Recycling or truncating would misprice a layer without saying so."""
+    a = build(TWO)
+    with pytest.raises(ValueError, match='occurrence combined ratios given'):
+        a.pnl_program(net_combined_ratio=0.9, occ_combined_ratio=ratios)
+
+
+@pytest.mark.parametrize('ratio', [0, -0.5, float('nan')])
+def test_pnl_ladder_refuses_an_unusable_net_ratio(ratio):
+    """It is the divisor for the net technical premium, so it is checked first.
+
+    An engine with no cession at all reaches that division without passing
+    through the per-layer resolution, so the guard cannot live there.
+    """
+    a = build(MOVES)
+    with pytest.raises(ValueError, match='net_combined_ratio'):
+        a.pnl_program(net_combined_ratio=ratio)
+
+
+def test_pnl_ladder_deposit_is_quoted_at_full_placement():
+    """A half placed layer writes the same deposit as the whole line.
+
+    The frame's ceded loss is share adjusted and a DecL premium clause is
+    quoted at 100 percent placement, so the deposit is the quotient of the two
+    and is share invariant. This is the one place an implementation is likely
+    to go wrong: writing the placed premium would charge the share twice.
+    """
+    half, full = build(HALF), build(FULL)
+    written = _deposits(half.pnl_program(net_combined_ratio=0.9))
+    assert written == _deposits(full.pnl_program(net_combined_ratio=0.9))
+    # and it resolves back to exactly the share of what is written
+    face = build(half.pnl_program(net_combined_ratio=0.9))
+    _, occ_layers, _ = _ceded_premium(face)
+    assert occ_layers == [pytest.approx(0.5 * written[0])]
+    assert _margin(face) == pytest.approx(_identity(face), rel=1e-12)
+
+
+@pytest.mark.parametrize('program, resolved', [
+    (PRICED_DEPOSIT, 200.0),            # share 1 x deposit 200
+    (PRICED_ROL, 150.0),                # share 1 x rol 1.5 x limit 100
+])
+def test_pnl_ladder_keeps_a_layer_the_author_already_priced(program, resolved):
+    """An existing deposit or rol clause survives, and still enters the total.
+
+    The ladder never overwrites terms the author wrote. Both bases resolve
+    without reference to the premium being computed, so the cost is known in
+    time to be paid for.
+    """
+    a = build(program)
+    face = build(a.pnl_program(net_combined_ratio=0.9))
+    _, occ_layers, _ = _ceded_premium(face)
+    assert occ_layers[0] == pytest.approx(resolved)
+    # the second layer was the ladder's to price, and it did
+    assert occ_layers[1] == pytest.approx(
+        _round_consideration(
+            float(a.reins_stats_df.loc[('agg', 'mean'), ('occ', 'layer.2')])
+            / 0.9))
+    # the kept layer is paid for, so the identity still holds
+    assert _margin(face) == pytest.approx(_identity(face), rel=1e-12)
+
+
+def test_pnl_ladder_refuses_a_layer_already_priced_as_a_rate():
+    """A rate resolves against the premium the ladder is computing.
+
+    The loop does have a closed-form solution, but adopting it would put back
+    the self-reference the deposit form was chosen to remove. The message
+    names the layer and the two bases that are known in time.
+    """
+    a = build(PRICED_RATE)
+    with pytest.raises(ValueError, match='rate against the P&L premium'):
+        a.pnl_program(net_combined_ratio=0.9)
+    # without the ladder it is none of the function's business, as before
+    assert 'rate 0.13' in a.pnl_program()
+
+
+def test_pnl_ladder_refuses_a_portfolio_engine():
+    """A unit's cession would be quoted against the whole book's premium.
+
+    That reads oddly and wants its own ruling, and the library does not warn
+    about an unpriced unit cession today, so nothing is left half done.
+    """
+    p = build(PORT)
+    with pytest.raises(ValueError, match='ladder prices the cessions'):
+        p.pnl_program(net_combined_ratio=0.9)
+    assert 'deposit' not in p.pnl_program()
+
+
+def test_pnl_ladder_silences_the_zero_premium_warning():
+    """The origin of the whole exercise: a priced program builds quietly.
+
+    An unpriced cession books at zero and says "price the cover to silence
+    this". This is what pricing it looks like.
+    """
+    a = build(TOWER)
+    for program, expected in ((a.pnl_program(), 1),
+                              (a.pnl_program(net_combined_ratio=0.9), 0)):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            build(program)
+        assert len([w for w in caught
+                    if w.category is ZeroPremiumCessionWarning]) == expected
+
+
+def test_pnl_ladder_keeps_derive_premium_with_no_cover_to_pay_for():
+    """A stated premium and nothing ceded is what the sentinel already resolves to.
+
+    So the program keeps saying ``derive premium`` and the linkage to the
+    engine's own exposure clause survives. Ceded premium is a cost the
+    sentinel cannot know, so once there is any, the number is written out.
+    """
+    assert 'derive premium' in build(PREMIUM).pnl_program(
+        net_combined_ratio=0.9)
+    ceded_engine = build(
+        PREMIUM.replace('DP.Premium', 'DP.PremiumCeded')
+        .replace('poisson', 'occurrence net of 250 xs 250 poisson'))
+    priced = ceded_engine.pnl_program(net_combined_ratio=0.9)
+    assert 'derive premium' not in priced
+    assert 'deposit' in priced

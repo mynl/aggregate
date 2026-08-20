@@ -1028,6 +1028,21 @@ agg DP.Labeled as "Motor book" 100 claims sev lognorm 100 cv 2 poisson          
 port DP.Port note{a stored note} agg DP.PortA 50 claims sev lognorm 100 cv 2 poisson agg DP.PortB 20 claims sev lognorm 200 cv 1 poisson;
 pnl DP.Wrapped 1000 premium less agg DP.WrappedE 100 claims sev lognorm 100 cv 2 poisson                          note{already a P&L: pnl_program refuses to wrap it twice};
 
+# [PnL-Reinsurance-Pricing] (1.0.0a306): engines whose cessions pnl_program
+# prices when handed a net_combined_ratio. Tower is the plan's worked example,
+# both tiers at full placement; Half and Full are the same layer at two
+# placements, for the share invariance; Two carries two layers, for the
+# per-layer ratio sequence. The last three arrive already priced, one on each
+# of the three bases, and Rate is the one the ladder refuses: a rate resolves
+# against the very premium the ladder is computing.
+agg DP.Tower 10 claims sev lognorm 100 cv 2 occurrence net of 100 xs 100 poisson aggregate net of 500 xs 1000;
+agg DP.HalfPlaced 10 claims sev lognorm 100 cv 2 occurrence net of 50% po 100 xs 100 poisson;
+agg DP.FullPlaced 10 claims sev lognorm 100 cv 2 occurrence net of 100 xs 100 poisson;
+agg DP.Two 10 claims sev lognorm 100 cv 2 occurrence net of 100 xs 100 and 1000 xs 1000 poisson;
+agg DP.Deposit 10 claims sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 200 and 1000 xs 1000 poisson;
+agg DP.Rol 10 claims sev lognorm 100 cv 2 occurrence net of 100 xs 100 rol 1.5 and 1000 xs 1000 poisson;
+agg DP.Rate 10 claims sev lognorm 100 cv 2 occurrence net of 100 xs 100 rate 0.13 and 1000 xs 1000 poisson;
+
 # sharpen_program: the grid moved, the grid was confirmed, and the two merges
 agg DP.Moves 100 claims sev lognorm 100 cv 2 poisson hints{log2=16; bs=8};
 agg DP.Clean 100 claims sev gamma 100 cv 1 poisson note{sharpen: grid confirmed, no change};
@@ -1045,6 +1060,23 @@ pnl DP.Discrete_PnL 80 premium less agg DP.Discrete dfreq [1 2 3] dsev [10 20 30
 pnl DP.Labeled_PnL 14286 premium less agg DP.Labeled as "Motor book" 100 claims sev lognorm 100 cv 2 poisson less 0.25 premium expenses;
 pnl DP.Port_PnL 11239 premium less port DP.Port agg DP.PortA 50 claims sev lognorm 100 cv 2 poisson agg DP.PortB 20 claims sev lognorm 200 cv 1 poisson less 0.25 premium expenses;
 pnl DP.InlineLabeled as "Book P&L" 1500 premium less port DP.InlineE as "Motor book" agg DP.IA 50 claims sev lognorm 100 cv 2 poisson agg DP.IB 20 claims sev lognorm 200 cv 1 poisson;
+
+# pnl_program with net_combined_ratio, the combined-ratio ladder
+# ([PnL-Reinsurance-Pricing], 1.0.0a306): the net book and every cover are
+# priced separately and added, then grossed up once for expenses, so the
+# wrapping P&L states a ceded premium and builds without the zero-premium
+# warning. Each cover is written as a deposit, the one premium form that does
+# not reference the premium being computed. Deposits are quoted at 100 percent
+# placement and scaled by the share at resolution, which is why DP.HalfPlaced
+# writes the same 196 as DP.FullPlaced and pays half of it. DP.Two is from a
+# per-layer sequence, 0.80 on the working layer and 0.60 on the excess one;
+# DP.Deposit keeps the 200 its author wrote and the ladder prices only the
+# layer that had no clause. The premiums drift with the FFT and are mirrored
+# for shape, not value.
+pnl DP.Tower_PnL 1481 premium less agg DP.Tower 10 claims sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 196 poisson aggregate net of 500 xs 1000 deposit 90.01 less 0.25 premium expenses;
+pnl DP.HalfPlaced_PnL 1481 premium less agg DP.HalfPlaced 10 claims sev lognorm 100 cv 2 occurrence net of 50% po 100 xs 100 deposit 196 poisson less 0.25 premium expenses;
+pnl DP.Two_PnL 1538 premium less agg DP.Two 10 claims sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 221 and 1000 xs 1000 deposit 54.34 poisson less 0.25 premium expenses;
+pnl DP.Deposit_PnL 1486 premium less agg DP.Deposit 10 claims sev lognorm 100 cv 2 occurrence net of 100 xs 100 deposit 200 and 1000 xs 1000 deposit 36.23 poisson less 0.25 premium expenses;
 
 # reins_program: the occurrence slot, the aggregate slot, both at once, and a
 # cession that replaces its own tier and leaves the other alone

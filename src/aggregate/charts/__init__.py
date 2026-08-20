@@ -86,6 +86,10 @@ CHARTS = {}
 def register_chart(name, emitter, predicate=None, primary=None):
     """Register a chart emitter under ``name``.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     name : str
@@ -102,10 +106,6 @@ def register_chart(name, emitter, predicate=None, primary=None):
         :func:`primary_chart`). Most charts are primary for nothing:
         reinsurance is a view of a book and severity is a component of an
         aggregate, and neither is the object's own picture.
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     if name in CHARTS:
         raise ValueError(f'chart {name!r} is already registered')
@@ -132,6 +132,10 @@ def available_charts(obj):
     Derived from the singledispatch registries (an MRO hit counts) plus
     each chart's predicate, mirroring the exhibits capability mechanics.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     obj : object
@@ -141,10 +145,6 @@ def available_charts(obj):
     -------
     list of str
         Registry names, in registration order.
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     return [name for name, entry in CHARTS.items() if _serves(entry, obj)]
 
@@ -159,6 +159,10 @@ def primary_chart(obj):
     own picture is its aggregate chart, its severity is a component of it,
     and its reinsurance is a view of it.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     obj : object
@@ -169,10 +173,6 @@ def primary_chart(obj):
         None when no registered chart claims ``obj``, including when the
         chart that would claim it is unavailable (an object that has not
         been updated has no picture yet).
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     for name, entry in CHARTS.items():
         if entry.primary and isinstance(obj, entry.primary) \
@@ -191,6 +191,10 @@ def build_chart_doc(obj, name, **options):
     than a method on each class, exactly as on the exhibits side, which
     keeps it reachable for a class that owns no chart of its own and adds
     nothing to any instance namespace.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
 
     Parameters
     ----------
@@ -218,10 +222,6 @@ def build_chart_doc(obj, name, **options):
     ValueError
         When the chart exists for the type but not for this object (a
         reinsurance chart on a book that cedes nothing).
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     try:
         entry = CHARTS[name]

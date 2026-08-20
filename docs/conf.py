@@ -230,9 +230,11 @@ exclude_patterns = [
     # FileNotFoundError on a path it had just globbed. Excluded here; delete
     # this line to pull the monograph back into the Sphinx build.
     'AGGREGATE-MONOGRAPH/**',
-    # Developer notes that live under docs/ but are not documentation pages.
-    # Sphinx picked them up as sources, then warned that nothing links to them.
+    # Developer notes and standalone handouts that live under docs/ but are
+    # not documentation pages. Sphinx picked them up as sources, then warned
+    # that nothing links to them.
     'README.md',
+    'sell-sheet.md',
 ]
 
 # List of patterns, relative to source directory, that match files and

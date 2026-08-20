@@ -32,7 +32,7 @@ Two faces
 Both are built through :func:`~aggregate.build`::
 
     from aggregate import build
-    p = build('pnl MyBook 1000 premium agg.MyAgg')
+    p = build('pnl MyBook 1000 premium less agg.MyAgg')
 
 Reading the sheets
 ------------------

@@ -943,8 +943,8 @@ loss/payoff book at construction** (no coherent sign convention):
     try:
         build('''port Mixed
             agg A 10 claims sev lognorm 100 cv 1 poisson
-            pnl B 1000 premium - 10 claim sev lognorm 80 cv 0.5 poisson''')
-    except ValueError as e:
+            pnl B 1000 premium less agg B_e 10 claims sev lognorm 80 cv 0.5 poisson''')
+    except NotImplementedError as e:
         print(e)
 
 Exact discrete moments (a26)

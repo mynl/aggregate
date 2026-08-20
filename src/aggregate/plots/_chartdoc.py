@@ -676,8 +676,9 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
         canvas helpers. Single-panel documents only, since a shared axis
         is a property of the figure and not of one axes.
     strict : bool
-        Raise :class:`ChartCapabilityError` for any panel this renderer
-        can only degrade, instead of drawing the declared degradation.
+        Raise :class:`~aggregate.charts.ir.ChartCapabilityError` for any
+        panel this renderer can only degrade, instead of drawing the
+        declared degradation.
     log : bool
         Read every axis that declares a log scale on log. An axis that
         declares one reading is untouched, so a document with nothing to
@@ -722,7 +723,7 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
 
     Raises
     ------
-    ChartCapabilityError
+    ~aggregate.charts.ir.ChartCapabilityError
         For a requested kind a panel does not declare, under ``strict``
         for degraded kinds, and always for kinds with no realization here
         yet.

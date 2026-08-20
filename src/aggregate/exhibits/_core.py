@@ -273,6 +273,16 @@ def _make_exhibit_function(name, title, doc):
       rule: INSURER equals RAW unless an override is registered).
 
     ``f.title`` carries the static display title.
+
+    Notes
+    -----
+    Only ``register`` is aliased onto ``fn``, never ``dispatch``. A plain
+    function carrying both of those attributes off a ``functools`` object is
+    read as a ``functools.singledispatch`` by introspecting tools (Sphinx
+    autodoc tests exactly that pair), which then reach for a ``registry``
+    attribute that a two registry wrapper cannot meaningfully supply, since it
+    has two. Reach a registry through the one it belongs to, ``fn.frames`` or
+    ``fn.insurer``.
     """
 
     @functools.singledispatch
@@ -294,7 +304,6 @@ def _make_exhibit_function(name, title, doc):
     fn.frames = frames
     fn.insurer = insurer
     fn.register = frames.register
-    fn.dispatch = frames.dispatch
     return fn
 
 
@@ -408,6 +417,10 @@ def available_exhibits(obj):
     cannot go stale as registrations are added. Needs no greater_tables
     import.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     obj : object
@@ -419,10 +432,6 @@ def available_exhibits(obj):
         ``(name, perspectives)`` pairs in registry order; an exhibit whose
         predicate fails (for example ``reins`` without reinsurance, ``tail``
         before ``update``) is omitted.
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     out = []
     for name, (fn, perspectives_fn) in EXHIBITS.items():
@@ -442,6 +451,10 @@ def exhibit_frames(obj, name, perspective=Perspective.RAW):
     relabels every frame through the host's ``LabeledMixin._relabel`` so
     ``use_labels`` and ``renamer`` are honored.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     obj : object
@@ -459,10 +472,6 @@ def exhibit_frames(obj, name, perspective=Perspective.RAW):
         ``(block_name, frame, spec_kwargs)`` triples; ``spec_kwargs`` are
         greater_tables ``TableSpec`` keyword arguments (caption, row_flags,
         formatters, ...), plain data so this stage stays GT free.
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     try:
         fn, perspectives_fn = EXHIBITS[name]

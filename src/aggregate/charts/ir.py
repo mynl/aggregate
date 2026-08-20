@@ -562,6 +562,10 @@ class SurfaceData:
 class ChartAxis:
     """One axis: a labeled, scaled reading of a quantity.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     id : str
@@ -623,10 +627,6 @@ class ChartAxis:
         **not** named by any panel, and an axis carries at most one of the
         two pointers: the two readings compose in the renderer, which is
         not the same thing as a chain of declarations.
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     id: str
@@ -922,6 +922,10 @@ class ChartSeries:
 class Mark:
     """One meaningful annotation: a reference line a reader acts on.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     panel_id : str
@@ -939,10 +943,6 @@ class Mark:
         rather than as an answer, versus a full-weight one (the mean).
         Semantic emphasis, not a color choice. No shipped emitter sets it
         at present, and a reader must still honor it.
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     panel_id: str
@@ -960,6 +960,10 @@ class Mark:
 @dataclass(frozen=True)
 class ChartDoc:
     r"""The chart document: the versioned IR a chart emitter returns.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
 
     Parameters
     ----------
@@ -1001,10 +1005,6 @@ class ChartDoc:
     hash : str, optional
         The 12-hex content hash, stamped by :func:`stamp`, excluded from
         the hashed form so stamping does not perturb the digest.
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
 
     name: str
@@ -1209,6 +1209,10 @@ def _canonical(obj, skip=()):
 def canonical_dict(doc, *, include_hash=True):
     """Return the canonical plain-dict form of a chart document.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     doc : ChartDoc
@@ -1222,10 +1226,6 @@ def canonical_dict(doc, *, include_hash=True):
     dict
         Deterministic field presence, NFC strings, tuples as lists. Key
         ordering is left to the JSON writer (sorted there).
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     skip = () if include_hash else ('hash', 'generator')
     return _canonical(doc, skip=skip)
@@ -1350,6 +1350,10 @@ def canonical_json(doc, *, include_hash=True):
     Sorted keys, compact separators, NFC strings, no NaN or Infinity: a
     value that is not JSON-representable is an emitter bug, surfaced here.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     doc : ChartDoc
@@ -1359,10 +1363,6 @@ def canonical_json(doc, *, include_hash=True):
     Returns
     -------
     bytes
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     data = canonical_dict(doc, include_hash=include_hash)
     text = json.dumps(data, sort_keys=True, separators=(',', ':'),
@@ -1390,6 +1390,10 @@ def human_strings(doc):
     cover. Deduplicated, because the map is keyed by string value: one
     entry covers a name and an axis label that read alike.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     doc : ChartDoc
@@ -1397,10 +1401,6 @@ def human_strings(doc):
     Returns
     -------
     tuple of str
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     out = []
     for text in ([doc.title] + [p.title for p in doc.panels]
@@ -1424,6 +1424,10 @@ def complete_tex(doc, typeset=None):
     and either way a renderer would go on drawing the plain form while the
     map claimed otherwise.
 
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
     Parameters
     ----------
     doc : ChartDoc
@@ -1441,10 +1445,6 @@ def complete_tex(doc, typeset=None):
     ------
     ValueError
         For a ``typeset`` key the document does not expose.
-
-    .. versionadded:: 1.0
-       Provisional, in the sense of PEP 411: not part of the 1.0 API
-       contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
     forms = dict(doc.tex)
     forms.update(typeset or {})

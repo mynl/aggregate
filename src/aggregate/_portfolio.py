@@ -19,13 +19,13 @@ from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
                             estimate_agg_window, value_type_label)
 
 # Resolved once per session from config (see aggregate.config). VALIDATION_NOISE
-# is the absolute dust floor used throughout validation; ALIASING_RATIO is the
-# agg-vs-sev mean-error multiple for the ALIASING flag; EXEQA_NOISE_FLOOR is the
+# is the absolute dust floor used throughout validation; ALIASING_EPS is the
+# convolution-residual threshold for the ALIASING flag; EXEQA_NOISE_FLOOR is the
 # exeqa_err floor below which a bucket's conditional decomposition is reliable;
 # DEFICIT_MATERIALITY is the economic floor on the pmf deficit, above which a
 # realized law is missing enough mass to change an answer.
 VALIDATION_NOISE = get_settings().validation.noise
-ALIASING_RATIO = get_settings().validation.aliasing_ratio
+ALIASING_EPS = get_settings().validation.aliasing_eps
 EXEQA_NOISE_FLOOR = get_settings().validation.exeqa_noise_floor
 DEFICIT_MATERIALITY = get_settings().validation.deficit_materiality
 

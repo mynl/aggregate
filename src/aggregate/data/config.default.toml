@@ -114,10 +114,13 @@
 # is essentially exact, so keep this tight: sensible band 1e-12 .. 1e-14.
 # noise = 1e-12
 
-# aliasing_ratio: the ALIASING flag fires when the aggregate-mean relative error
-# exceeds this multiple of the severity-mean relative error (FFT wrap-around
-# inflates the former). Integer; 10 is the practical threshold. Raise to relax.
-# aliasing_ratio = 10
+# aliasing_eps: the ALIASING flag fires when the convolution residual
+# |E[A] - E[N] E[X]| / (E[N] E[X]), all read off the DISCRETIZED law, exceeds
+# this, and the pmf deficit is dust. Severity discretization cancels in that
+# comparison, so what is left is the FFT step's own error; a deficit means mass
+# was dropped rather than wrapped, which DEFECTIVE owns. One order of magnitude
+# inside eps. Replaced aliasing_ratio at 1.0.0a311.
+# aliasing_eps = 1e-5
 
 # exeqa_noise_floor: floor on the per-bucket exeqa error (sum exeqa_i - loss)
 # below which a bucket's conditional (per-unit) decomposition is treated as

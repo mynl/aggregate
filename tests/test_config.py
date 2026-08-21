@@ -42,7 +42,7 @@ def test_defaults_no_file_no_env():
     assert s.discretization.window_nines == 12
     assert s.validation.eps == pytest.approx(1e-4)
     assert s.validation.noise == pytest.approx(1e-12)
-    assert s.validation.aliasing_ratio == 10
+    assert s.validation.aliasing_eps == pytest.approx(1e-5)
     assert s.validation.exeqa_noise_floor == pytest.approx(1e-4)
     assert s.validation.deficit_materiality == pytest.approx(1e-4)
     assert s.discretization.window_log2_growth == 4
@@ -103,12 +103,12 @@ def test_phase2_floors_and_knobs_override(tmp_path):
     """One override per section touched in Phase 2 flows through load_settings."""
     cfg = tmp_path / 'config.toml'
     cfg.write_text(
-        '[validation]\naliasing_ratio = 20\n'
+        '[validation]\naliasing_eps = 2e-5\n'
         '[discretization]\nwindow_slack_thick = 0.6\n'
         '[bivariate]\nmin_axis_log2 = 5\n')
     s = config.load_settings(path=cfg, env={})
-    assert s.validation.aliasing_ratio == 20
-    assert s.sources['validation.aliasing_ratio'] == 'config'
+    assert s.validation.aliasing_eps == pytest.approx(2e-5)
+    assert s.sources['validation.aliasing_eps'] == 'config'
     assert s.discretization.window_slack_thick == pytest.approx(0.6)
     assert s.sources['discretization.window_slack_thick'] == 'config'
     assert s.bivariate.min_axis_log2 == 5
@@ -118,8 +118,8 @@ def test_phase2_floors_and_knobs_override(tmp_path):
 def test_dropped_floors_gone_from_constants():
     """The migrated/dropped numerics floors no longer live in aggregate.constants."""
     from aggregate import constants
-    for name in ('FT_NOISE_FLOOR', 'ALIASING_RATIO', 'EXEQA_NOISE_FLOOR',
-                 'DEFICIT_MATERIALITY'):
+    for name in ('FT_NOISE_FLOOR', 'ALIASING_RATIO', 'ALIASING_EPS',
+                 'EXEQA_NOISE_FLOOR', 'DEFICIT_MATERIALITY'):
         assert not hasattr(constants, name), f'{name} should be gone from constants'
 
 
@@ -127,7 +127,7 @@ def test_module_captures_track_settings():
     """The module-level UPPERCASE captures read the resolved config values."""
     from aggregate import distributions, portfolio, spectral, tail, bivariate
     s = config.get_settings()
-    assert distributions.ALIASING_RATIO == s.validation.aliasing_ratio
+    assert distributions.ALIASING_EPS == s.validation.aliasing_eps
     assert portfolio.EXEQA_NOISE_FLOOR == s.validation.exeqa_noise_floor
     assert spectral.DEFICIT_MATERIALITY == s.validation.deficit_materiality
     assert distributions.WINDOW_SLACK_THICK == s.discretization.window_slack_thick

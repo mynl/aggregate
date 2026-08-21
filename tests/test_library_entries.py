@@ -112,11 +112,15 @@ VALIDATION_BASELINE = {
     'LayerPicks': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
     # --- Signed severity on a wrapped window ----------------------------
     # A signed window aliases at the ends; the numerics section exists to
-    # show that behavior rather than to hide it.
-    'SignedPremiumMinusLoss': 'ALIASING',
-    'SignedPortfolioMixed': 'ALIASING',
+    # show that behavior rather than to hide it. ``SignedPortfolioPair`` is
+    # the real thing and the only ALIASING in the shipped library: it loses
+    # 94% of the total mean with a pmf deficit of 1.2e-13, which is mass
+    # conserved and relocated, the definition of wrap. Its three former
+    # companions left this list at 1.0.0a311, when the flag stopped being a
+    # ratio of two mean errors and started measuring the convolution step
+    # (``dev/done/plan-validation-punchup.md``); their residuals are 2.5e-10,
+    # 1.1e-12 and 3.5e-7, and they were never aliasing.
     'SignedPortfolioPair': 'ALIASING',
-    'ThinThinPortfolio': 'ALIASING',
     'WindowContinuous': 'SEV_CV',
     'WindowedGrid': 'AGG_SKEW',
     # --- Deliberately coarse or deliberately thick ----------------------

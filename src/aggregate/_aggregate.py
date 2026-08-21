@@ -60,7 +60,7 @@ from ._bucket_window import (
 )
 from . import _bucket_window
 from ._validation import (VALIDATION_NOISE, DEFICIT_MATERIALITY,
-                          ALIASING_RATIO, explain_validation)
+                          ALIASING_EPS, explain_validation)
 from . import _validation
 from . import _reinsurance
 from ._aggregate_compute import discretize_severities, freq_sev_convolution
@@ -4135,9 +4135,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         * severity mean < eps
         * severity cv < 10 * eps
         * severity skew < 100 * eps (skewness is more difficult to estimate)
-        * aggregate mean < eps and < ``ALIASING_RATIO`` * severity mean
-          relative error (larger values indicate possible aliasing — i.e.
-          that ``bs`` is too small).
+        * aggregate mean < eps.
+        * the convolution residual < ``ALIASING_EPS``
+          (:func:`aggregate._validation.convolution_residual`, the ``ALIASING``
+          test), whenever the pmf deficit is dust.
         * aggregate cv < 10 * eps
         * aggregate skew < 100 * esp
 
@@ -4156,10 +4157,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ``10*eps`` (CV) / ``100*eps`` (skew, harder to estimate) measures
         agreement.
 
-        The ALIASING test silences itself when the agg-mean relative error
-        is itself below ``VALIDATION_NOISE`` (genuine numerical dust, not
-        aliasing) -- this replaces the old ``eps ** 3`` floor that was fitted
-        to the default ``eps`` value.
+        The ALIASING test measures the convolution step directly rather than
+        comparing two mean errors, and fires only when the pmf deficit is
+        arithmetic dust. Wrap conserves mass while moving the mean; truncation
+        drops mass, which DEFECTIVE and AGG_MEAN already own. See
+        :func:`aggregate._validation.convolution_residual` and
+        ``dev/done/plan-validation-punchup.md``.
 
         Run with logger level 20 (info) for more information on failures.
 

@@ -223,12 +223,17 @@ class ValidationSettings:
         not a coverage target -- the 12-nines coverage lives in
         ``discretization.window_nines`` (the two coincidentally both involve
         12). Sensible band 1e-12 .. 1e-14.
-    aliasing_ratio : int
-        The ``ALIASING`` validation flag fires when the relative error on the
-        aggregate mean exceeds ``aliasing_ratio`` times the relative error on the
-        severity mean: FFT wrap-around inflates the agg-mean error far above the
-        sev-mean error, while a clean discretisation keeps them comparable
-        (formerly ``ALIASING_RATIO``).
+    aliasing_eps : float
+        Relative-error threshold on the convolution residual, the one number
+        the ``ALIASING`` flag measures: ``|E[A] - E[N] * E[X]| / (E[N] * E[X])``
+        with all three read off the **discretized** law, so severity
+        discretization error cancels and what is left is the error the FFT step
+        itself introduced. One order of magnitude inside ``eps``, which is the
+        band where a convolution error is real but has not yet failed the mean
+        outright. Replaces ``aliasing_ratio`` at ``1.0.0a311``: that was a bare
+        ratio with a dust floor on the numerator only, so any severity that
+        discretized essentially exactly put near zero in the denominator and the
+        ratio exploded on nothing.
     exeqa_noise_floor : float
         Floor on the per-bucket ``exeqa_err`` (``Sum exeqa_i - loss``) below which
         a bucket's conditional decomposition is treated as numerically resolved;
@@ -256,7 +261,7 @@ class ValidationSettings:
 
     eps: float = 1e-4
     noise: float = 1e-12
-    aliasing_ratio: int = 10
+    aliasing_eps: float = 1e-5
     exeqa_noise_floor: float = 1e-4
     deficit_materiality: float = 1e-4
 

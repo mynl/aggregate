@@ -200,7 +200,7 @@ Validation
 The ``valid`` property returns a :class:`Validation` flag. It short-circuits to ``REINSURANCE`` (cannot validate) or ``NOT_UPDATED`` (the empirical aggregate mean is NaN). Otherwise it:
 
 * flags ``SEV_MEAN`` or ``AGG_MEAN`` when the relative error in :math:`\mathsf E[X]` exceeds ``eps``, where ``eps`` is ``validation_eps``, by default 1e-4;
-* flags ``ALIASING`` when the aggregate-mean error is both non-trivial (greater than :math:`\epsilon^3`) and more than ``ALIASING_RATIO`` times the severity-mean error, the signature of FFT wrap-around or too small a ``bs``;
+* flags ``ALIASING`` when the convolution residual :math:`|\mathsf E[A] - \mathsf E[N]\mathsf E[X]| / \mathsf E[N]\mathsf E[X]`, with the severity and aggregate means both read off the discretized law, exceeds ``ALIASING_EPS`` and the pmf deficit is arithmetic dust. Severity discretization cancels in that comparison, so what is left is the error the FFT step itself introduced; the deficit gate separates wrap, which conserves mass while moving the mean, from truncation, which drops mass and is what ``DEFECTIVE`` reports;
 * flags CV and skewness through ``np.isclose`` at ``rtol`` of 10 ``eps`` and 100 ``eps`` respectively, with ``atol=VALIDATION_NOISE``, and only when the theoretical value itself exceeds ``VALIDATION_NOISE``. A theoretically zero skewness or CV, from a symmetric or deterministic severity, is skipped, because the FFT's estimate of a zero higher moment is grid-dependent noise with no meaningful relative error.
 
 A pass means "not unreasonable", a failure to reject the null, rather than "correct". Type-1 error, rejecting a good model, is preferred to type-2.

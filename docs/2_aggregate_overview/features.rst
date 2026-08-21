@@ -2583,7 +2583,7 @@ refer to ``CHANGELOG.md`` sections.
 - **a83** config phase 2: the last hard-coded numerics floors and stranded
   sizing knobs moved into ``aggregate.config`` (**breaking**:
   ``aggregate.constants`` no longer exposes ``FT_NOISE_FLOOR``,
-  ``ALIASING_RATIO``, ``EXEQA_NOISE_FLOOR``, ``DEFICIT_MATERIALITY``).
+  ``ALIASING_EPS``, ``EXEQA_NOISE_FLOOR``, ``DEFICIT_MATERIALITY``).
 - **a88** DecL syntax colorer and error labels resynced with the grammar.
 - **a90 to a91** ``GridDistribution``, the shared discrete-grid distribution
   value type, adopted by :class:`Aggregate`, :class:`Portfolio` and

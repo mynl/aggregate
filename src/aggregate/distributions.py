@@ -28,7 +28,7 @@ from ._bucket_window import (  # noqa: F401
     estimate_agg_window, bs_describe, bs_explain,
 )
 from ._validation import (  # noqa: F401
-    VALIDATION_NOISE, ALIASING_RATIO, explain_validation,
+    VALIDATION_NOISE, ALIASING_EPS, convolution_residual, explain_validation,
 )
 from ._reinsurance import make_ceder_netter, _validate_reins_layers  # noqa: F401
 from ._aggregate import (  # noqa: F401

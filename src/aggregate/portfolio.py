@@ -26,7 +26,7 @@ from ._portfolio_sample import *    # noqa: F401,F403
 # Names accessed by qualified path / attribute (not part of the public ``*``
 # surface). Explicit so the facade exposes the historical attribute set.
 from ._portfolio import (  # noqa: F401
-    VALIDATION_NOISE, ALIASING_RATIO, EXEQA_NOISE_FLOOR,
+    VALIDATION_NOISE, ALIASING_EPS, EXEQA_NOISE_FLOOR,
 )
 from ._portfolio_common import check01, make_array, convex_points  # noqa: F401
 from ._portfolio_sample import make_comonotonic_allocations_work  # noqa: F401

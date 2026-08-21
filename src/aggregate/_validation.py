@@ -29,9 +29,54 @@ VALIDATION_NOISE = get_settings().validation.noise
 DEFICIT_MATERIALITY = get_settings().validation.deficit_materiality
 
 
-# ALIASING_RATIO: the ALIASING flag fires when the agg-mean relative error
-# exceeds this multiple of the sev-mean relative error (FFT wrap-around).
-ALIASING_RATIO = get_settings().validation.aliasing_ratio
+# ALIASING_EPS: relative-error threshold on the convolution residual, which is
+# what the ALIASING flag measures. See ``convolution_residual``.
+ALIASING_EPS = get_settings().validation.aliasing_eps
+
+
+def convolution_residual(en, sev_mean, agg_mean):
+    """Relative error the convolution step alone introduced.
+
+    Parameters
+    ----------
+    en : float
+        Realized frequency mean, ``E[N]``, off the analytic frequency moments.
+    sev_mean : float
+        Empirical (discretized) severity mean, ``E[X]``.
+    agg_mean : float
+        Empirical (discretized) aggregate mean, ``E[A]``.
+
+    Returns
+    -------
+    float
+        ``|E[A] - E[N] * E[X]| / |E[N] * E[X]|``, or ``nan`` when the predictor
+        is zero (a mean zero aggregate) or any input is not finite.
+
+    Notes
+    -----
+    ``E[N] * E[X]`` is what the aggregate mean must be if the convolution is
+    exact, and the severity term is the **discretized** severity's own mean, so
+    severity discretization error cancels exactly rather than sitting in a
+    denominator. What is left is the error the FFT step itself introduced,
+    which is what the ``ALIASING`` flag claims to be about.
+
+    This replaced a bare ratio of the two mean errors at ``1.0.0a311``. That
+    ratio was floored on the numerator only, at the arithmetic dust floor
+    ``VALIDATION_NOISE``, so any severity that discretizes essentially exactly
+    (a discrete law, an integer lattice, a reinsurance layer landing on bucket
+    edges, a ``sev agg.NAME`` reference) put near zero in the denominator and
+    the ratio exploded on nothing. Measured over the 257 program corpus it had
+    six firings and six false positives. See
+    ``dev/done/plan-validation-punchup.md``.
+
+    Absolute values throughout, so a signed aggregate works.
+    """
+    if not (np.isfinite(en) and np.isfinite(sev_mean) and np.isfinite(agg_mean)):
+        return np.nan
+    predicted = en * sev_mean
+    if predicted == 0.0:
+        return np.nan
+    return abs(agg_mean - predicted) / abs(predicted)
 
 
 def pmf_deficit(ob):
@@ -101,7 +146,8 @@ def explain_validation(rv, deficit=None):
     if rv & Validation.AGG_MEAN:
         parts.append('agg mean')
     if rv & Validation.ALIASING:
-        parts.append('agg mean error >> sev, possible aliasing; try larger bs')
+        parts.append('agg mean lost in the convolution, possible FFT wrap; '
+                     'raise log2')
     if not (rv & Validation.SEV_MEAN) and (rv & Validation.SEV_CV):
         parts.append('sev cv')
     if not (rv & Validation.AGG_MEAN) and (rv & Validation.AGG_CV):
@@ -137,9 +183,9 @@ def valid_aggregate(agg):
     * severity mean < eps
     * severity cv < 10 * eps
     * severity skew < 100 * eps (skewness is more difficult to estimate)
-    * aggregate mean < eps and < ``ALIASING_RATIO`` * severity mean
-      relative error (larger values indicate possible aliasing — i.e.
-      that ``bs`` is too small).
+    * aggregate mean < eps.
+    * the convolution residual < ``ALIASING_EPS`` (:func:`convolution_residual`,
+      the ``ALIASING`` test), whenever the pmf deficit is dust.
     * aggregate cv < 10 * eps
     * aggregate skew < 100 * esp
 
@@ -158,10 +204,11 @@ def valid_aggregate(agg):
     ``10*eps`` (CV) / ``100*eps`` (skew, harder to estimate) measures
     agreement.
 
-    The ALIASING test silences itself when the agg-mean relative error
-    is itself below ``VALIDATION_NOISE`` (genuine numerical dust, not
-    aliasing) -- this replaces the old ``eps ** 3`` floor that was fitted
-    to the default ``eps`` value.
+    The ALIASING test measures the convolution step directly rather than
+    comparing two mean errors, and fires only when the pmf deficit is
+    arithmetic dust. Wrap conserves mass while moving the mean; truncation
+    drops mass, which DEFECTIVE and AGG_MEAN already own. See
+    :func:`convolution_residual` and ``dev/done/plan-validation-punchup.md``.
 
     Run with logger level 20 (info) for more information on failures.
 
@@ -196,14 +243,30 @@ def valid_aggregate(agg):
         logger.info('FAIL: Agg mean error > eps')
         rv |= Validation.AGG_MEAN
 
-    # Aliasing fingerprint: the agg-mean error sits well above the sev-
-    # mean error (the FFT amplifies sev-discretisation error during
-    # convolution when ``bs`` is too small). Silenced under the
-    # ``VALIDATION_NOISE`` floor where the agg error is genuine dust.
-    if (agg_err_mean > VALIDATION_NOISE
-            and sev_err_mean > 0
-            and agg_err_mean > ALIASING_RATIO * sev_err_mean):
-        logger.info('FAIL: Agg mean error > %d * sev error', ALIASING_RATIO)
+    # Aliasing: FFT wrap-around, measured directly. ``convolution_residual``
+    # compares the realized aggregate mean against ``E[N]`` times the
+    # DISCRETIZED severity mean, so severity discretization cancels and the
+    # residual is the convolution step's own error.
+    #
+    # Gated on a dust-level deficit, which is what separates the two ways a
+    # grid loses the mean. Wrap CONSERVES mass (it relocates it), so a genuine
+    # wrap carries a deficit of exactly zero while the mean moves; truncation
+    # DROPS mass, so it always carries a measurable deficit, and DEFECTIVE and
+    # AGG_MEAN own that case. Measured on the corpus the gate has to be the
+    # dust floor rather than DEFICIT_MATERIALITY: five programs lose the mean
+    # to truncation with deficits between 1.5e-5 and 9.6e-5, all under
+    # materiality, and calling those wrap would be the old false positive
+    # wearing new clothes (author ruling 2026-08-21).
+    residual = convolution_residual(
+        float(agg.stats_df['mixed'][('freq', 'mean')]),
+        float(agg.stats_df['gross_empirical'][('sev', 'mean')]),
+        float(agg.stats_df['gross_empirical'][('agg', 'mean')]))
+    if not np.isfinite(getattr(agg, '_deficit', np.nan)):
+        agg._deficit = pmf_deficit(agg)
+    if (np.isfinite(residual) and residual > ALIASING_EPS
+            and abs(agg._deficit) <= VALIDATION_NOISE):
+        logger.info('FAIL: convolution residual %.3e > %.3e with no deficit',
+                    residual, ALIASING_EPS)
         rv |= Validation.ALIASING
 
     # CV and skew: compare subject empirical vs theoretical directly
@@ -235,12 +298,10 @@ def valid_aggregate(agg):
             rv |= flag
 
     # Defective: the realized law does not sum to 1, so mass ran off the top
-    # of the grid. ``update_work`` records it; recompute only if this object
-    # reached here by some other route. Recorded at every size, flagged only
-    # above DEFICIT_MATERIALITY, where the missing mass is enough to separate
-    # the two pricing routes.
-    if not np.isfinite(getattr(agg, '_deficit', np.nan)):
-        agg._deficit = pmf_deficit(agg)
+    # of the grid. Recorded at every size (by ``update_work``, or by the
+    # aliasing gate above where this object reached here by some other route),
+    # flagged only above DEFICIT_MATERIALITY, where the missing mass is enough
+    # to separate the two pricing routes.
     if np.isfinite(agg._deficit) and agg._deficit > DEFICIT_MATERIALITY:
         logger.info('FAIL: pmf deficit %.3e > materiality', agg._deficit)
         rv |= Validation.DEFECTIVE
@@ -345,12 +406,22 @@ def valid_portfolio(port):
         logger.info('FAIL: Portfolio Agg mean error > eps')
         rv |= Validation.AGG_MEAN
 
-    # Aliasing fingerprint: agg error >> sev error. Silenced under
-    # ``VALIDATION_NOISE`` where both are dust.
-    if (agg_err_mean > VALIDATION_NOISE
-            and sev_err_mean > 0
-            and agg_err_mean > ALIASING_RATIO * sev_err_mean):
-        logger.info('FAIL: Portfolio Agg mean error > %d * sev error', ALIASING_RATIO)
+    # Aliasing: the same direct measurement as ``valid_aggregate``, with the
+    # portfolio's predictor. The portfolio step is the convolution of the
+    # units, and every unit's own FFT was validated above (this code is only
+    # reached when they all passed), so what the total's mean must be is the
+    # sum of the units' realized aggregate means. ``empirical`` rather than
+    # ``gross_empirical`` on the units is not a choice: a unit carrying
+    # reinsurance sets REINSURANCE, which trips the early return above, so the
+    # two columns coincide for every unit that reaches here.
+    predicted = sum(float(a.stats_df['empirical'][('agg', 'mean')])
+                    for a in port.agg_list)
+    residual = convolution_residual(
+        1.0, predicted, float(port.stats_df['empirical'][('agg', 'mean')]))
+    if (np.isfinite(residual) and residual > ALIASING_EPS
+            and abs(port._deficit) <= VALIDATION_NOISE):
+        logger.info('FAIL: Portfolio convolution residual %.3e > %.3e with '
+                    'no deficit', residual, ALIASING_EPS)
         rv |= Validation.ALIASING
 
     # CV and skew: tested only when the theoretical value is meaningfully
@@ -573,10 +644,12 @@ def validation_explanation(obj):
                    f'the two pricing routes disagree by exactly this amount '
                    f'and neither is wrong. Raise log2, or widen the grid.')
     if rv & Validation.ALIASING:
-        out.append('The aggregate mean error is far larger than the severity '
-                   'error, which is the signature of FFT wrap-around: mass is '
-                   'coming off the top of the grid and landing back at the '
-                   'bottom. Try a larger bs, or a larger log2 at the same bs.')
+        out.append('The aggregate mean is not E[N] times the discretized '
+                   'severity mean, and no mass is missing, which is the '
+                   'signature of FFT wrap-around: mass is coming off the top '
+                   'of the grid and landing back at the bottom rather than '
+                   'being dropped. Try a larger bs, or a larger log2 at the '
+                   'same bs.')
     if rv & Validation.REINSURANCE:
         out.append('The reported view is net or ceded, and a cession has no '
                    'independent analytic moments, so it cannot be validated '

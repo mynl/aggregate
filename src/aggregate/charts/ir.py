@@ -457,8 +457,14 @@ class SurfaceData:
         at 508" and "the first display cell covers ``[0, 512)``".
     window : dict, optional
         ``{'p': depth, 'x': (lo, hi), 'y': (lo, hi), 'kept': fraction}``:
-        the depth that was asked for, the resulting outer edges in data
-        coordinates, and the share of the grid's mass inside them.
+        the depth that was asked for, the **drawing range** in data
+        coordinates, and the share of the grid's mass inside it. A
+        sub-rectangle of the lattice, not the lattice: an emitter may serve
+        grid beyond it, so that a consumer forming a conditional divides by
+        the whole mass rather than the visible mass. This field is then the
+        only thing telling a renderer which part of the mesh is the subject,
+        and one that ignores it draws a heavy tail at full width with the
+        subject a sliver at the origin.
     marginals : dict, optional
         ``{'x': (...), 'y': (...)}``, each of length ``nx`` / ``ny``: the
         **exact** marginals on the display lattice, from the emitting object

@@ -98,6 +98,53 @@ def _axis_scale(axis, log):
     return 'log' if (log and 'log' in axis.scales) else axis.scale
 
 
+def _surface_window(surf, x, y, z):
+    """The part of a surface mesh its document calls the subject.
+
+    A surface carries the whole reduced lattice and names a drawing range
+    inside it through ``window`` (see :class:`~aggregate.charts.ir.SurfaceData`),
+    so a heavy tail is served without being drawn. Two things here read it,
+    and both matter:
+
+    the **limits**, because a Lomax on a lattice wide enough to hold its
+    tail is mostly empty, and drawing it at full width puts every visible
+    mass in a sliver at the origin, which is the picture the window exists
+    to prevent;
+
+    and the **color normalization**, which is the less obvious half. The log
+    floor is one decade under the smallest mass present, so taken over the
+    whole mesh it is set by the far tail: five to six decades under the
+    field the reader is looking at on the reference surfaces, which
+    compresses that field into the top of the ramp and flattens exactly the
+    structure the log reading exists to show.
+
+    Returns
+    -------
+    (xlim, ylim, z_window) : tuple, tuple, ndarray
+        Each limit is ``None`` where the document declares no window on that
+        axis, which leaves the caller's own extent in force, and
+        ``z_window`` is then ``z`` entire.
+    """
+    window = getattr(surf, 'window', None) or {}
+    found = []
+    for coords, key in ((x, 'x'), (y, 'y')):
+        box = window.get(key)
+        if box is None or len(box) < 2:
+            found.append((None, None))
+            continue
+        lo, hi = float(min(box)), float(max(box))
+        inside = (coords >= lo) & (coords <= hi)
+        # A window naming nothing on the mesh is a document to draw whole
+        # rather than an empty picture to draw.
+        found.append(((lo, hi), inside) if inside.any() else (None, None))
+    (xlim, in_x), (ylim, in_y) = found
+    if in_y is not None:
+        z = z[in_y, :]
+    if in_x is not None:
+        z = z[:, in_x]
+    return xlim, ylim, z
+
+
 def _axis_window(axis, full):
     """The window this axis is drawn in: its suggestion, or its full extent.
 
@@ -245,17 +292,21 @@ def _render_grid_panel(ax, doc, panel, series_list, log=False):
     z = np.asarray(surf.z, dtype=float)
     axes = {a.id: a for a in doc.axes}
     log_z = _axis_scale(axes[panel.z_axis], log) == 'log'
+    # The mesh is drawn whole and the color scale is read off the window:
+    # what is served beyond it is there to be panned to and to compute on,
+    # not to set the scale for the part that is the subject.
+    win_x, win_y, zw = _surface_window(surf, x, y, z)
     if log_z:
         # One decade under the smallest mass actually present (ignoring
         # float dust), the app's floor-not-holes rule: a zero cell sits on
         # the floor rather than punching a hole in the field.
-        pos = z[z > LOG_FLOOR]
+        pos = zw[zw > LOG_FLOOR]
         floor = (10.0 ** np.floor(np.log10(pos.min()))
                  if pos.size else LOG_FLOOR)
-        norm = mpl.colors.LogNorm(vmin=floor, vmax=max(z.max(), floor * 10),
+        norm = mpl.colors.LogNorm(vmin=floor, vmax=max(zw.max(), floor * 10),
                                   clip=True)
     else:
-        norm = mpl.colors.Normalize(vmin=0.0, vmax=z.max() or 1.0)
+        norm = mpl.colors.Normalize(vmin=0.0, vmax=zw.max() or 1.0)
     mesh = ax.pcolormesh(x, y, z, shading='nearest', cmap=_house_ramp(),
                          norm=norm)
     if np.count_nonzero(z > 0) > 1 and z.max() > z.min():
@@ -263,7 +314,8 @@ def _render_grid_panel(ax, doc, panel, series_list, log=False):
     zlabel = _typeset(doc, axes[panel.z_axis].label)
     ax.figure.colorbar(mesh, ax=ax, shrink=0.85,
                        label=f'log {zlabel}' if log_z else zlabel)
-    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    xlim = win_x if win_x is not None else ax.get_xlim()
+    ylim = win_y if win_y is not None else ax.get_ylim()
     for s in series_list:
         if s.surface is not None:
             continue
@@ -273,7 +325,9 @@ def _render_grid_panel(ax, doc, panel, series_list, log=False):
                       dtype=float)
         ax.plot(xs, ys, color='k', lw=0.35, alpha=0.5)
     # An overlay states a relationship, not an extent: a family of iso-total
-    # diagonals reaching past the mesh must not widen the window the grid set.
+    # diagonals reaching past the mesh must not widen the window the document
+    # set, and neither must the served tail beyond it. Panning out afterward
+    # is the reader's business, and the mass is there to be found.
     ax.set(xlim=xlim, ylim=ylim,
            xlabel=_typeset(doc, axes[panel.x_axis].label),
            ylabel=_typeset(doc, axes[panel.y_axis].label))

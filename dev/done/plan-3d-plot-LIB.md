@@ -1,10 +1,11 @@
 # plan-3d-plot-LIB: the two library edits the joint surface is waiting on
 
-Status: **READY TO EXECUTE, written 2026-08-21**, anchors read against
-`1.0.0a306`. Both items were ruled by the author on 2026-08-12 and neither is
-built. Nothing in `aggregate_api` or its SPA changes when they land, verified
-the same day this was written, so this is library work end to end and no round
-note is owed.
+Status: **EXECUTED 2026-08-21 at `1.0.0a307` and `1.0.0a308`**, written the
+same day against `1.0.0a306`. Both items were ruled by the author on
+2026-08-12. Nothing in `aggregate_api` or its SPA changed when they landed, as
+predicted, so this was library work end to end and no round note is owed. The
+sections below are as drafted; **section 9 records the nine places execution
+departed from them** and is the part to read against the diff.
 
 The three-party plan is `aggregate_api/dev/done/plan-3d-plot.md`, symlinked
 here as `dev/done/plan-3d-plot.md`. It moved to `done/` when the app half
@@ -349,3 +350,99 @@ Read against `1.0.0a306` and `aggregate_api` `1.0.0a114`.
   `web/src/charts/surface-grid.js` decoding `surface.window` as
   `quantileWindow`, and `web/src/charts/chartdoc-to-echarts.js` `axisWindow`
   reading `suggested_range`.
+
+## 9 Execution notes, 2026-08-21, a307 and a308
+
+**Both sections landed as written**, one bump each in the order section 6
+fixed, section 5 riding with the second on the conservative renderer-only
+route. What follows is where execution departed from this document, so a
+reader of the diff is not left to infer it.
+
+### Nine divergences
+
+1. **The plan's bias numbers are the default window, not the whole grid**
+   (section 3). The -0.2649, +0.2350 and -0.0150 measurements reproduce
+   exactly at `window=4`, where `Indep`'s y block is two atoms. They do not
+   describe the whole-grid case, where that axis blocks 128 to 1: there the
+   representative point reads **+0.4504** display buckets and the low edge
+   **-0.0457**, because a Lomax puts each block's mass hard against its low
+   end and flatters the low edge. The convention is still right, and the
+   reason is a bound rather than a measurement: a block's conditional mean
+   lies in `[a, a + (k - 1) * bs]`, so filing at the middle of that span
+   holds the error under `dx / 2` whatever the density does, which the low
+   edge cannot claim, its bound being a whole bucket and one-sided. Both the
+   docstring and the CHANGELOG say it that way.
+
+2. **Section 3's test list is two short.** `test_window_zero_is_the_whole_grid`
+   asserts the origin against the fine lattice, and
+   `test_window_is_taken_before_the_reduction` asserts `s.y0 == 0.0`. Both
+   break on the coordinate shift and neither is named in section 3. Both take
+   the `(k - 1) * bs / 2` offset form.
+
+3. **Section 4's test list is five short**, all of them the same cause:
+   `detail` stopped bounding the emitted axis and now bounds the window.
+   `test_detail_is_honored_as_a_ceiling`, `test_no_axis_falls_under_the_cell_floor`,
+   `test_emitter_document_shape`, `test_emitter_orientation` and
+   `test_build_chart_doc_passes_the_semantic_options` all asserted
+   `nx <= detail`. A module-level `window_cells(s)` helper reads the count
+   that is actually capped, `(window span) / step` per axis, and every one of
+   the five goes through it. `test_emitter_document_shape` also asserted
+   `sum(z) == kept * density.sum()`, which is exactly the equality section
+   4's acceptance list inverts.
+
+4. **The `window` box is computed from the fine lattice, not from the
+   display one.** Section 4 says to take it from `lo_x`, `hi_x`, `lo_y`,
+   `hi_y` "in the convention section 3 leaves in force" without writing the
+   expression. It is `(xs[lo] - bs / 2, xs[hi - 1] + bs / 2)`: the outer
+   edges of the outer **fine** cells of the crop. Because `_align` leaves the
+   crop on whole blocks, those are display cell edges too, which the suite
+   now asserts rather than assumes.
+
+5. **The color normalization reads the window, which section 5 does not
+   name.** It scopes the renderer fix to `xlim` and `ylim`. But the log floor
+   is one decade under the smallest mass present, so over the whole mesh it
+   is set by the far tail: measured, **five decades** deeper on `Indep` and
+   six on `IndepSigned`, which compresses the drawn field into the top of the
+   ramp. Same cause as the limits and the same fix, so it rides along;
+   `_surface_window` returns the windowed `z` as well as the box.
+
+6. **The renderer function is `_render_grid_panel`**, not `_z_grid_panel` as
+   sections 5 and 8 call it. Same function, from line 230.
+
+7. **Padding is a named helper**, `_pad_to_blocks`, rather than inline
+   widening, and it is applied to the marginals as well as to the joint,
+   which section 4 point 4 needs but does not say: `_reduce(marg_x, kx)` on
+   a ragged axis would raise where the padded form does not.
+
+8. **Two renderer cases are new**, `test_renderer_draws_the_window_not_the_whole_mesh`
+   and `test_renderer_color_scale_reads_the_window`. Section 5 specifies the
+   behavior and names no test for it, and it is the one part of this work
+   with no acceptance line of its own.
+
+9. **The gate was red both times, and not for this work.** Six failures at
+   a307 and the same family at a308, five in `tests/test_library_entries.py`
+   from the author's uncommitted `library.agg` (the `ISOMixedExponential` to
+   `CommAutoMixedExponential` rename, the `LayerPicks` split, a missing `;`
+   on the new entry) and one, `test_bivariate.py::test_mv_explain_flags_clipped_book`,
+   an order-dependent warning-suppression flake that passes alone. Proven
+   rather than assumed: a detached worktree at HEAD with these two chart
+   files copied in runs `test_library_entries.py` and the pilot green
+   together, 228 passed.
+
+### What the app is owed
+
+Nothing but a re-capture. Verified against `aggregate_api` at the time of
+writing: `surface-grid.js` already maps `edge: 'mid'` and `windowRange` in
+`surface-geometry.js` already reads `window` as a sub-rectangle with outward
+rounding. The chore is `dev/fixtures/charts.json` and a re-run of
+`smoke-charts.mjs`, both because the document hash moved.
+
+### Left open, deliberately
+
+The **document-level route** of section 5, putting the window box on
+`ChartAxis.suggested_range`. It is the house principle (the meaning belongs
+in the document where every renderer sees it) and it is not app-neutral:
+`chartdoc-to-echarts.js` `axisWindow` reads `suggested_range`, so the flat
+heatmap reading would start honoring it, which is probably an improvement and
+is still a behavior change the app did not ask for. It wants the author's
+word and the round note that would then be owed.

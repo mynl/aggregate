@@ -621,7 +621,8 @@
   Plan: `dev/done/plan-chart-ir.md`, **closed to done 2026-08-12**: the 1.0
   scope landed (eight app emitters by a244, first-class `.plot()` through
   `plot_chartdoc`); the bivariate tail rides in `dev/done/plan-3d-plot.md`,
-  whose two remaining LIB edits are `dev/plan-3d-plot-LIB.md`, and the
+  whose two LIB edits landed a307 and a308 as
+  `dev/done/plan-3d-plot-LIB.md`, and the
   remaining conversions are post-1.0 by the plan's own charter. **Progress:** inventory landed a197
   (`dev/chart-inventory.md`, six judgment calls awaiting author picks);
   schema v1 landed a198 (`charts/ir.py` plus `tests/test_charts_ir.py`,
@@ -794,21 +795,29 @@
   author wanted are now written down: `dev/done/plan-3d-plot.md` (a symlink
   to the canonical copy in `aggregate_api/dev/done/`, moved there 2026-08-21
   when the app half finished), a three-party plan over LIB, API and the SPA.
-  **The live LIB half is `dev/plan-3d-plot-LIB.md`**, written 2026-08-21:
-  two edits the app is waiting on, both ruled by the author 2026-08-12,
-  `[Joint-Surface-Representative-Point]` (`edge = "mid"`, the canonical
-  plan's 5.1.2) and `[Joint-Surface-Whole-Grid]` (emit the whole reduced
-  grid with `window` as the drawing range, its 5.8), plus one finding of
-  its own: `plots/_chartdoc.py` `_render_grid_panel` reads neither `window`
-  nor `edge`, so the second edit needs a renderer fix beside it or the
-  library's own picture becomes a sliver at the origin. Two bumps, in that
-  order, and the reasoning for both sits in the canonical plan.
-  **The first landed a307**: a display cell is filed under its
-  representative point, the mean of the fine coordinates it covers, which
-  bounds the display mean's error at half a bucket whatever the density
-  does inside the block and makes `edge = "mid"` literally true. The grid
-  itself is unchanged, verified byte for byte against a306.
-  `[Joint-Surface-Whole-Grid]` is open.
+  **The LIB half is DONE at a307 and a308**, planned in
+  `dev/done/plan-3d-plot-LIB.md` (written 2026-08-21, retired with its two
+  bumps), both edits ruled by the author 2026-08-12.
+  a307 `[Joint-Surface-Representative-Point]`: a display cell is filed
+  under the mean of the fine coordinates it covers, which bounds the
+  display mean's error at half a bucket whatever the density does inside
+  the block and makes `edge = "mid"` literally true. The grid itself is
+  unchanged, verified byte for byte against a306.
+  a308 `[Joint-Surface-Whole-Grid]`: the whole reduced lattice is served
+  and `window` becomes the drawing range inside it, so a consumer's
+  conditional divides by the mass rather than by what is on screen (worth
+  4.9 to 7.8 percent on kappa, sign changing along the total). `detail`
+  now bounds the cells **across the window**, not the axis, which is the
+  one thing to know when reading such a document. It carried the plan's
+  own finding: `plots/_chartdoc.py` read neither `window` nor `edge`, so
+  `_surface_window` now sets the limits **and** the color normalization
+  from the box, the latter being the half nobody had noticed (the log
+  floor was otherwise set by the far tail, five decades under the drawn
+  field). Renderer-only route, so nothing app side moves and no round note
+  is owed; the app's chore is a re-capture of `dev/fixtures/charts.json`
+  and a re-run of `smoke-charts.mjs`. The document-level alternative,
+  putting the box on `ChartAxis.suggested_range`, stays unbuilt: it would
+  change the app's flat heatmap reading too and wants the author's word.
   **The first two bumps are done**, and the review notes and the five points
   where the code and the plan disagree are in the canonical plan's section
   5.0, not in a file of their own as this entry used to claim.

@@ -219,6 +219,33 @@ def _reduce(values, k, axis=0):
     return values.reshape(shape).sum(axis=axis + 1)
 
 
+def _pad_to_blocks(values, k, axis=0):
+    """Zero-extend an axis up to a whole number of blocks of ``k``.
+
+    Notes
+    -----
+    A ragged last block is the one case where the reduction has to choose
+    between two bad answers: drop it, and mass leaves the grid silently, or
+    keep it short, and the step is no longer uniform, which every
+    interpolation downstream divides by. Padding takes neither. The pad sits
+    beyond the axis' own support, so it carries no mass and the block sums
+    are exact; the spacing stays uniform; and the emitted axis simply runs a
+    little past the lattice, which is what a display grid coarser than the
+    thing it displays does anyway.
+
+    Belt and braces on today's objects, whose axes are FFT grids and so
+    powers of two, blocked by powers of two. It is cheaper written now than
+    diagnosed later on the first axis that is not.
+    """
+    n = values.shape[axis]
+    extra = -n % k
+    if extra == 0:
+        return values
+    width = [(0, 0)] * values.ndim
+    width[axis] = (0, extra)
+    return np.pad(values, width)
+
+
 chart_joint_surface = _emitter_base('joint_surface')
 
 
@@ -233,14 +260,19 @@ def _joint_surface(bv, window=DEFAULT_WINDOW, detail=DEFAULT_DETAIL,
         An updated bivariate (in-memory joint density; the disk-backed
         massive pyramid stays bespoke, per the plan's scope).
     window : float, default :data:`DEFAULT_WINDOW`
-        Keep ``q(10 ** -window)`` to ``q(1 - 10 ** -window)`` of each
-        marginal, measured on the fine lattice before the reduction. ``0``
-        keeps the whole grid.
+        The **drawing** range: ``q(10 ** -window)`` to
+        ``q(1 - 10 ** -window)`` of each marginal, measured on the fine
+        lattice before the reduction and reported in ``window``. It selects
+        the block factor and says which part of the grid is the subject; it
+        does **not** crop what is served. ``0`` asks for the whole grid,
+        which is what a consumer receives either way.
     detail : int, default :data:`DEFAULT_DETAIL`
-        Target cells per axis after the reduction, honored as a ceiling
+        Target cells per axis **across the window**, honored as a ceiling
         except that :data:`MIN_CELLS` outranks it (see :func:`_axis_plan`;
         the overshoot is at most ``2 * MIN_CELLS - 1`` cells and only at a
-        target near the floor).
+        target near the floor). The emitted axis runs the whole lattice at
+        that step and so is longer, by the ratio of the lattice to the
+        window.
     encoding : str, default 'f32b64'
         One of :data:`ENCODINGS`; how ``z`` is carried in the encoded block.
         ``'json'`` emits no block, leaving the plain arrays as the payload.
@@ -256,6 +288,21 @@ def _joint_surface(bv, window=DEFAULT_WINDOW, detail=DEFAULT_DETAIL,
 
     Notes
     -----
+    **The whole grid travels; the window is only where to look.** The
+    emitter reduces the entire fine lattice and reports the quantile window
+    as a sub-rectangle of the result, rather than cropping to it. The
+    difference is not presentational. Every conditional a consumer forms off
+    a cropped grid is normalized by the **visible** mass, which is a
+    different object whose mean moves whenever the window does: measured on
+    the prototype, at a useful depth a third of a cut at constant total is
+    off screen and the conditional expectation comes out 4.9 to 7.8 percent
+    wrong, with the error changing sign along the total, so it bends the
+    shape of the curve the chart exists to show. Serving the whole grid
+    costs payload, which the author ruled the acceptable side of that trade
+    on 2026-08-12: ``detail`` is the lever if it bites, and the knob to add
+    if it bites hard is a stated ``context`` beyond the window rather than a
+    crop the emitter takes silently.
+
     **Values are display-cell masses, not ordinates**, everywhere in the
     document: ``z``, the encoded block, and both marginals. Mass is exact, is
     what the block reduction preserves, and lets a consumer form either
@@ -326,22 +373,27 @@ def _joint_surface(bv, window=DEFAULT_WINDOW, detail=DEFAULT_DETAIL,
     lo_x, hi_x, kx = _axis_plan(xs, marg_x, bs_x, window, detail)
     lo_y, hi_y, ky = _axis_plan(ys, marg_y, bs_y, window, detail)
 
-    z = _reduce(_reduce(density[lo_x:hi_x, lo_y:hi_y], kx, axis=0), ky, axis=1)
+    # The window chose `k`; the reduction is applied to the whole lattice.
+    # Blocking anchors at index 0, so a law supported from the origin is
+    # drawn from the origin whatever the window did.
+    padded = _pad_to_blocks(_pad_to_blocks(density, kx, axis=0), ky, axis=1)
+    z = _reduce(_reduce(padded, kx, axis=0), ky, axis=1)
     # The representative point: a block covering k atoms is filed under their
     # mean, not under either end of the span they sit in.
-    display_x = xs[lo_x:hi_x:kx] + (kx - 1) * bs_x / 2
-    display_y = ys[lo_y:hi_y:ky] + (ky - 1) * bs_y / 2
+    display_x = xs[::kx] + (kx - 1) * bs_x / 2
+    display_y = ys[::ky] + (ky - 1) * bs_y / 2
     dx, dy = bs_x * kx, bs_y * ky
     nx, ny = len(display_x), len(display_y)
 
     total = float(density.sum())
-    kept = float(z.sum() / total) if total > 0 else 0.0
-    # The marginals are the object's own, reduced over this axis' crop alone:
-    # the row sums of the cropped joint would be the marginals of a truncated
-    # distribution, which is a different curve and the one a reader would be
-    # misled by.
-    display_marg_x = _reduce(marg_x[lo_x:hi_x], kx)
-    display_marg_y = _reduce(marg_y[lo_y:hi_y], ky)
+    inside = float(density[lo_x:hi_x, lo_y:hi_y].sum())
+    kept = float(inside / total) if total > 0 else 0.0
+    # The marginals are the object's own, on the whole lattice like the grid
+    # they label: the row sums of the joint inside the window would be the
+    # marginals of a truncated distribution, which is a different curve and
+    # the one a reader would be misled by.
+    display_marg_x = _reduce(_pad_to_blocks(marg_x, kx), kx)
+    display_marg_y = _reduce(_pad_to_blocks(marg_y, ky), ky)
 
     names = list(bv.unit_names)
     if bv.use_labels:
@@ -362,12 +414,14 @@ def _joint_surface(bv, window=DEFAULT_WINDOW, detail=DEFAULT_DETAIL,
         edge='mid',
         bs=(bs_x, bs_y),
         k=(kx, ky),
+        # The drawing range inside the lattice, not the lattice: the outer
+        # edges of the outermost cells the quantile window covers. The crop
+        # is aligned to whole blocks, so those are display cell edges as
+        # well as fine ones.
         window={
             'p': float(window),
-            'x': (float(display_x[0] - dx / 2),
-                  float(display_x[0] + (nx - 1) * dx + dx / 2)),
-            'y': (float(display_y[0] - dy / 2),
-                  float(display_y[0] + (ny - 1) * dy + dy / 2)),
+            'x': (float(xs[lo_x] - bs_x / 2), float(xs[hi_x - 1] + bs_x / 2)),
+            'y': (float(ys[lo_y] - bs_y / 2), float(ys[hi_y - 1] + bs_y / 2)),
             'kept': kept,
         },
         marginals={

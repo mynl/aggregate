@@ -18,6 +18,7 @@ only thing that can fail a snap-to-zero rule.
 import numpy as np
 import matplotlib
 import pytest
+from matplotlib.collections import QuadMesh
 
 # The renderer cases draw to memory, never to a screen; without this they
 # inherit whatever interactive backend is active and fail intermittently on
@@ -75,6 +76,17 @@ def signed():
 
 def surface_of(doc):
     return doc.series[0].surface
+
+
+def window_cells(s):
+    """Display cells across the window, which is what ``detail`` bounds.
+
+    The emitted axis is the whole lattice at the step the window chose, so
+    ``nx`` and ``ny`` stopped being the count ``detail`` caps when the grid
+    and the window came apart. The count it caps is this one.
+    """
+    return (round((s.window['x'][1] - s.window['x'][0]) / s.dx),
+            round((s.window['y'][1] - s.window['y'][0]) / s.dy))
 
 
 # ------------------------------------------------------------- reduction
@@ -188,34 +200,54 @@ def test_window_is_taken_before_the_reduction(indep):
     """The measurement that settles the order of the two steps.
 
     On ``Indep``'s y axis the same ``q(1e-4)`` window is 232 fine cells wide
-    taken first, and a handful of 512-wide display cells taken last. Reducing
-    232 fine cells to a 128 target leaves 116, which is more than an order of
-    magnitude more resolution than cropping the emitted grid could reach, and
-    it starts at 0 rather than at 508.
+    taken first, and a handful of 512-wide display cells taken last. The
+    order shows in the **step**, which is what the window buys: two fine
+    buckets rather than 128 of them, more than an order of magnitude of
+    resolution that cropping an already reduced grid cannot recover. The
+    axis is now the whole lattice at that step, so its length no longer
+    reports the window; the box does, and spans about 116 cells of it.
     """
     s = surface_of(chart_joint_surface(indep, window=4, detail=128))
-    assert s.ny == 116
-    assert s.y0 == (s.k[1] - 1) * s.bs[1] / 2      # the first block, from 0
     assert s.dy == 8.0        # two fine buckets of 4, not 128 of them
+    assert s.y0 == (s.k[1] - 1) * s.bs[1] / 2      # the first block, from 0
+    span = (s.window['y'][1] - s.window['y'][0]) / s.dy
+    assert 115 <= span <= 117
+    # and the axis runs well past it, being the whole lattice
+    assert s.ny == len(indep.axis_xs[1]) // s.k[1] == 8192
     # what the old route could have reached: the whole axis reduced to 128
     # cells first, then cropped to the same data window
     whole = surface_of(chart_joint_surface(indep, window=0, detail=128))
+    assert whole.dy == 512.0
     inside = [v for v in whole.y if v <= s.window['y'][1]]
     assert len(inside) < 10
 
 
 def test_window_reports_the_mass_it_kept(indep):
+    """``kept`` is a statement about the box, and ``z`` is now more than it."""
     s = surface_of(chart_joint_surface(indep, window=4))
     z = np.asarray(s.z)
     assert s.window['p'] == 4.0
-    assert abs(s.window['kept'] - z.sum() / indep.density.sum()) < 1e-9
+    # the whole placed mass is on the grid, which is the point of section 5.8
+    assert abs(z.sum() - (1 - s.deficit)) < 1e-12
+    # and `kept` is the share of it inside the box, computed independently
+    xs = np.asarray(indep.axis_xs[0], dtype=float)
+    ys = np.asarray(indep.axis_xs[1], dtype=float)
+    box = np.ix_((xs >= s.window['x'][0]) & (xs <= s.window['x'][1]),
+                 (ys >= s.window['y'][0]) & (ys <= s.window['y'][1]))
+    crop = np.asarray(indep.density)[box].sum()
+    assert abs(s.window['kept'] - crop / indep.density.sum()) < 1e-9
     assert 0.9996 < s.window['kept'] < 1.0
-    # the box the document reports is the outer edge of the outer cells, half
-    # a step outside the outer coordinates, which is what 'mid' makes it
-    assert s.window['x'] == (s.x0 - s.dx / 2,
-                             s.x0 + (s.nx - 1) * s.dx + s.dx / 2)
-    assert s.window['y'] == (s.y0 - s.dy / 2,
-                             s.y0 + (s.ny - 1) * s.dy + s.dy / 2)
+    assert s.window['kept'] < z.sum() / indep.density.sum()
+    # the box is a strict sub-rectangle of the mesh, and it lands on display
+    # cell edges: the crop is aligned to whole blocks, so the two lattices
+    # agree about where it ends
+    for box_, o0, step, n in ((s.window['x'], s.x0, s.dx, s.nx),
+                              (s.window['y'], s.y0, s.dy, s.ny)):
+        low, high = o0 - step / 2, o0 + (n - 1) * step + step / 2
+        assert low <= box_[0] < box_[1] <= high
+        for edge in box_:
+            cells = (edge - low) / step
+            assert abs(cells - round(cells)) < 1e-9
 
 
 def test_deeper_windows_keep_more_mass(indep):
@@ -226,6 +258,11 @@ def test_deeper_windows_keep_more_mass(indep):
 
 
 def test_window_zero_is_the_whole_grid(indep):
+    """Every depth emits the whole lattice, so what ``window=0`` changes is
+    the box and the step, and this is the one place the two knobs are
+    visibly independent: ``k`` comes from the crop, so a deeper window buys a
+    finer ``dy`` on the same axis.
+    """
     s = surface_of(chart_joint_surface(indep, window=0))
     assert s.x0 - (s.k[0] - 1) * s.bs[0] / 2 == float(indep.axis_xs[0][0])
     assert s.y0 - (s.k[1] - 1) * s.bs[1] / 2 == float(indep.axis_xs[1][0])
@@ -233,24 +270,32 @@ def test_window_zero_is_the_whole_grid(indep):
     assert s.ny * s.k[1] == len(indep.axis_xs[1])
     assert abs(s.window['kept'] - 1.0) < 1e-12
 
+    deep = surface_of(chart_joint_surface(indep, window=4))
+    assert deep.dy < s.dy                       # the step: the window's doing
+    assert deep.ny > s.ny                       # same lattice, finer blocks
+    assert deep.ny * deep.k[1] == s.ny * s.k[1] == len(indep.axis_xs[1])
+    assert deep.window['y'][1] < s.window['y'][1]    # the box: also its doing
+    assert deep.window['kept'] < s.window['kept']
+
 
 def test_low_edge_snaps_to_zero_on_positive_support(indep):
     """``Indep``'s y is a Lomax from the origin: the window must open there.
 
-    The snap puts the first *fine* cell at the origin; the coordinate then
-    names that block's representative point, half a fine span above it.
+    The snap is a property of the **window**, so it is the box that has to
+    open at zero. The emitted axis starts at the lattice either way, its own
+    first block filed at that block's representative point.
     """
     s = surface_of(chart_joint_surface(indep, window=4))
+    assert s.window['y'][0] == -s.bs[1] / 2      # the first fine cell, from 0
     assert s.y0 == (s.k[1] - 1) * s.bs[1] / 2
     # x is a gamma whose fine lattice was measured up from 48, so there is no
     # zero on it to reach and nothing to snap to
-    assert s.x0 > 0.0 and float(indep.axis_xs[0][0]) > 0.0
+    assert s.window['x'][0] > 0.0 and float(indep.axis_xs[0][0]) > 0.0
 
 
 def test_low_edge_does_not_snap_on_signed_support(signed):
     """A genuinely negative lower bound is not a window artifact."""
     s = surface_of(chart_joint_surface(signed, window=4))
-    assert s.x0 < 0.0 and s.y0 < 0.0
     assert s.window['x'][0] < 0.0 and s.window['y'][0] < 0.0
 
 
@@ -260,6 +305,7 @@ def test_no_axis_falls_under_the_cell_floor(indep, signed, depth):
     is what keeps a grid there that a consumer can still interpolate on."""
     for bv_ in (indep, signed):
         s = surface_of(chart_joint_surface(bv_, window=depth))
+        assert all(c >= MIN_CELLS for c in window_cells(s))
         assert s.nx >= MIN_CELLS and s.ny >= MIN_CELLS
         assert s.nx == len(s.x) and s.ny == len(s.y)
 
@@ -276,10 +322,10 @@ def test_detail_is_honored_as_a_ceiling(indep, signed):
     for detail in (16, 64, 128, 512):
         for bv_ in (indep, signed):
             s = surface_of(chart_joint_surface(bv_, window=4, detail=detail))
-            assert s.nx <= detail and s.ny <= detail
+            assert all(c <= detail for c in window_cells(s))
     for bv_ in (indep, signed):
         s = surface_of(chart_joint_surface(bv_, window=4, detail=MIN_CELLS))
-        assert s.nx < 2 * MIN_CELLS and s.ny < 2 * MIN_CELLS
+        assert all(c < 2 * MIN_CELLS for c in window_cells(s))
 
 
 def test_the_crop_is_a_whole_number_of_blocks(indep, signed):
@@ -403,12 +449,14 @@ def test_emitter_document_shape(bv):
     assert z_axis.scale == 'linear' and z_axis.scales == ('linear', 'log')
     assert 'z_log_ok' not in doc.meta
     surf = doc.series[0].surface
-    assert surf.nx <= DEFAULT_DETAIL and surf.ny <= DEFAULT_DETAIL
-    # mass preservation over the window: display cells sum to the kept share
+    assert all(c <= DEFAULT_DETAIL for c in window_cells(surf))
+    # mass preservation over the whole grid: the display cells carry the
+    # joint's whole placed mass, not the window's share of it, which is what
+    # lets a consumer normalize a conditional by the mass rather than by
+    # what happens to be on screen
     total = sum(v for row in surf.z for v in row)
-    assert np.isclose(total,
-                      surf.window['kept'] * float(bv.density.sum()),
-                      atol=1e-12)
+    assert np.isclose(total, float(bv.density.sum()), atol=1e-12)
+    assert total > surf.window['kept'] * float(bv.density.sum())
     # axes labeled from the component units (unlabeled: the handles)
     labels = {a.id: a.label for a in doc.axes}
     assert labels['x0'] == 'A' and labels['x1'] == 'B'
@@ -426,7 +474,7 @@ def test_emitter_orientation(bv):
     # z[r][c] sits at (x[c], y[r]): row count is len(y), col count len(x).
     doc = chart_joint_surface(bv, detail=32)
     surf = doc.series[0].surface
-    assert surf.nx <= 32 and surf.ny <= 32
+    assert all(c <= 32 for c in window_cells(surf))
     assert len(surf.z) == len(surf.y) == surf.ny
     assert len(surf.z[0]) == len(surf.x) == surf.nx
     # and the encoded block is flat in the same order
@@ -467,7 +515,7 @@ def test_build_chart_doc_passes_the_semantic_options(bv):
                           encoding='u16log12b64')
     s = doc.series[0].surface
     assert s.window['p'] == 2.0
-    assert s.nx <= 16 and s.ny <= 16
+    assert all(c <= 16 for c in window_cells(s))
     assert s.z_block.dtype == 'u16log12b64'
 
 
@@ -491,6 +539,63 @@ def test_renderer_log_z(bv):
     doc = chart_joint_surface(bv, detail=32)
     fig = plot_chartdoc(doc, log=True)
     plt.close(fig)
+
+
+def test_renderer_draws_the_window_not_the_whole_mesh(indep):
+    """The library's own renderer has to read ``window``, or the grid wins.
+
+    ``Indep`` is a Lomax on a lattice wide enough to hold its tail, so once
+    the document carries the whole grid the mesh is mostly empty and drawing
+    it at full width leaves every visible mass in a sliver at the origin.
+    The mesh is still drawn whole, so the reader can pan out to it.
+    """
+    from aggregate.plots import plot_chartdoc, plt
+    doc = chart_joint_surface(indep, window=4)
+    s = surface_of(doc)
+    fig = plot_chartdoc(doc)
+    try:
+        ax = fig.axes[0]
+        assert ax.get_xlim() == tuple(s.window['x'])
+        assert ax.get_ylim() == tuple(s.window['y'])
+        # and the window really is the smaller thing: the y axis runs two
+        # orders of magnitude past what is drawn
+        drawn = s.window['y'][1] - s.window['y'][0]
+        assert drawn < 0.05 * (s.ny * s.dy)
+        mesh, = [c for c in ax.collections if isinstance(c, QuadMesh)]
+        assert mesh.get_array().size == s.nx * s.ny
+    finally:
+        plt.close(fig)
+
+
+def test_renderer_color_scale_reads_the_window(indep):
+    """The half of the window fix that is not the limits.
+
+    The log floor is one decade under the smallest mass present, so taken
+    over the whole mesh it is set by the far tail: five decades under the
+    field the reader is looking at, which compresses that field into the top
+    of the ramp. Read over the window it tracks what is drawn.
+    """
+    from aggregate.plots import plot_chartdoc, plt
+    doc = chart_joint_surface(indep, window=4)
+    s = surface_of(doc)
+    fig = plot_chartdoc(doc, log=True)
+    try:
+        mesh, = [c for c in fig.axes[0].collections
+                 if isinstance(c, QuadMesh)]
+        z = np.asarray(s.z)          # row-major over y, so rows then columns
+        in_y = ((np.asarray(s.y) >= s.window['y'][0])
+                & (np.asarray(s.y) <= s.window['y'][1]))
+        in_x = ((np.asarray(s.x) >= s.window['x'][0])
+                & (np.asarray(s.x) <= s.window['x'][1]))
+
+        def floor_of(v):
+            return 10.0 ** np.floor(np.log10(v[v > 0].min()))
+
+        assert mesh.norm.vmin == pytest.approx(floor_of(z[in_y][:, in_x]))
+        # and the tail really would have dragged it down, by five decades
+        assert floor_of(z) <= mesh.norm.vmin / 1e4
+    finally:
+        plt.close(fig)
 
 
 def test_renderer_strict_raises(bv):

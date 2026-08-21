@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a310
+
+**[US-Spelling-Bucket-Window] `_bucket_window.py` normalized to US spelling, which moves one served string and two private state keys.** House rule is US spelling everywhere, normalizing a whole file when it is touched rather than sweeping the repo. a309 touched this file and left its 44 British spellings alone; this is that pass, taken on its own so the bug fix stayed readable.
+
+**One string a consumer can see.** The Portfolio sizer's realized-grid row read `realised portfolio grid (resolution=..., extent=...)` while the Aggregate sizer's read `realized grid (...)`, so the two halves of the same reporting surface disagreed with each other. The Portfolio spelling moves. It reaches the `bs_window` exhibit's `used` row, `bs_window_df`, and `bs_description` / `bs_explanation`. `tests/data/exhibit_snapshots.json` is regenerated, with exactly those four strings changing and nothing else. Nothing app side is owed: the note travels as served content.
+
+**Two private state keys renamed**, `_sharpen_state['centre_score']` and `['centre_defective']`, to `center_score` and `center_defective`, along with the `sharpen_df` note `centre (current grid)`. `_sharpen_state` is private, is read in this repo only by `_program.py` (which reads neither key) and one test assertion, and is not part of any exhibit or chart payload.
+
+The rest is prose: `honoured`, `realised`, `discretises`, `neighbouring`, `colour`, `centre` and their inflections, in docstrings and comments. `tests/test_sharpen.py` was normalized in the same pass, having been touched for the key rename, which renames `test_explicit_centre_is_honoured` to `test_explicit_center_is_honored`. `tests/data/bucket_baseline_windows.csv` is deliberately left alone: it is a one-time reference artifact from `dev/done/plan-bucket-combine.md`, read by no test, and it records what the code said when it was captured.
+
+---
+
 ## 1.0.0a309
 
 **[Signed-Bounded-Window] a layer clause on a signed severity was half applied, and the bucket sizer called `int(inf)` on the window that lie produced.** Executed from `dev/done/plan-signed-bounded-window-overflow.md`, rewritten and confirmed with the author on 2026-08-21. The reproduction, `build('agg NT 50 claims 25000 xs 0 ssev -lognorm 200 cv 10 + 180 mixed ig .4', bs=5)`, raised `OverflowError: cannot convert float infinity to integer` out of `_bucket_window._size`. Three fixes, at three layers, in root-cause order.

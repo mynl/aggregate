@@ -1,4 +1,4 @@
-"""Tests for [Sharpen-Grid-Probe]: the ``(bs, log2)`` neighbourhood probe.
+"""Tests for [Sharpen-Grid-Probe]: the ``(bs, log2)`` neighborhood probe.
 
 ``bs_window`` / ``port_best_window`` *choose* a grid from the analytic moments
 before any FFT runs. ``sharpen`` *audits* that choice afterwards. These cover
@@ -133,7 +133,7 @@ def test_probe_returns_self_for_chaining():
 # ---------------------------------------------------------- the line search
 
 def test_each_log2_row_searches_the_bucket_line():
-    """Each row holds the centre bucket plus a contiguous walk out from it."""
+    """Each row holds the center bucket plus a contiguous walk out from it."""
     a = build(GOOD)
     a.sharpen(good_enough=0, execute=False)
     df = a.sharpen_df
@@ -145,7 +145,7 @@ def test_each_log2_row_searches_the_bucket_line():
 
 
 def test_search_stops_at_the_first_cell_that_does_not_improve():
-    """Walking out from the centre, every step but the last strictly improved."""
+    """Walking out from the center, every step but the last strictly improved."""
     a = build(GOOD)
     a.sharpen(good_enough=0, execute=False)
     df = a.sharpen_df
@@ -298,7 +298,7 @@ def test_probe_gate_does_not_wave_through_a_defective_grid():
     assert 1.0 - float(a.density_df.p_total.sum()) > 1e-12   # the grid is not
     a.sharpen()
     assert a._sharpen_state['ran']
-    assert a._sharpen_state['centre_defective']
+    assert a._sharpen_state['center_defective']
     assert 1.0 - float(a.density_df.p_total.sum()) < 1e-12
     assert 'loses mass off its top end' in a.sharpen_explanation
 
@@ -385,7 +385,7 @@ def test_starved_grid_moves_and_improves():
 
 
 def test_repeated_sharpen_walks_to_a_valid_grid_and_converges():
-    """Re-running re-centres the probe, so the descent continues, then stops."""
+    """Re-running re-centers the probe, so the descent continues, then stops."""
     a = build(GOOD)
     a.update(log2=STARVED_LOG2, bs=STARVED_BS)
     assert not a.valid.passes
@@ -457,13 +457,13 @@ def test_locked_settings_survive_an_executed_move():
     assert a.padding == 2
 
 
-def test_explicit_centre_is_honoured():
+def test_explicit_center_is_honored():
     """Passing ``bs`` / ``log2`` probes around that cell, not the current one."""
     a = build(GOOD)
     a.sharpen(bs=STARVED_BS, log2=STARVED_LOG2, good_enough=0, execute=False)
-    centre = a.sharpen_df.loc[(0, 0)]
-    assert centre.bs == pytest.approx(STARVED_BS)
-    assert int(centre.log2) == STARVED_LOG2
+    center = a.sharpen_df.loc[(0, 0)]
+    assert center.bs == pytest.approx(STARVED_BS)
+    assert int(center.log2) == STARVED_LOG2
 
 
 # --------------------------------------------------------------- robustness

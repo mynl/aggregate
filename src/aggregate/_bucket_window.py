@@ -57,7 +57,7 @@ WINDOW_NINES_TRIM = get_settings().discretization.window_nines_trim
 
 # WINDOW_PAD_SKEW: padding-balance skew Delta. After a windowed band is placed,
 # the power-of-2 slack is split with fraction f = 0.5 -/+ Delta below the band
-# (loss -> 0.5 - Delta, more room above/right; payoff -> 0.5 + Delta). 0 centres
+# (loss -> 0.5 - Delta, more room above/right; payoff -> 0.5 + Delta). 0 centers
 # the band; the legacy placement was f = 0 (all slack above the band).
 WINDOW_PAD_SKEW = get_settings().discretization.window_pad_skew
 
@@ -178,8 +178,8 @@ def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P, p_lo=None, p_hi=None):
     -------
     (x_lo, x_hi, W) : tuple of float
         Lower edge, upper edge, and width ``W = x_hi - x_lo``. The window is
-        **not** forced to be centred on the mean -- for a skewed aggregate the
-        two quantiles place it off-centre.
+        **not** forced to be centered on the mean -- for a skewed aggregate the
+        two quantiles place it off-center.
 
     Notes
     -----
@@ -266,7 +266,7 @@ def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P, p_lo=None, p_hi=None):
 
 # ---------------------------------------------------------------------------
 # Bucket-grid narrative ([bs-reporting]) -- the short / verbose explanation of
-# the grid choice. Plain by default; ``color=True`` emphasises a far-tail clip
+# the grid choice. Plain by default; ``color=True`` emphasizes a far-tail clip
 # (lost mass) in bold red, mirroring the tail narrative's ANSI option. The
 # ``bs_description`` / ``bs_explanation`` Aggregate properties delegate here.
 # ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ def bs_describe(agg, *, color: bool = False) -> str:
     agg : Aggregate
         A *sized* aggregate (``update`` has run, so ``_bs_window_df`` exists).
     color : bool
-        Emit ANSI colour (a far-tail clip is bold red). Default plain.
+        Emit ANSI color (a far-tail clip is bold red). Default plain.
 
     Returns
     -------
@@ -327,7 +327,7 @@ def bs_explain(agg, *, color: bool = False) -> str:
     The aggregate mirror of :attr:`Portfolio.bs_explanation`, simpler (no unit
     rows): the aggregate tail one-liner and log2; the winning method and its
     **window width** against the candidate methods that applied; any natural
-    support bounds and the concentration; the realised ``x_min`` / ``x_max``;
+    support bounds and the concentration; the realized ``x_min`` / ``x_max``;
     and a closing "increase log2" suggestion when a far-tail clip occurred.
 
     Parameters
@@ -335,7 +335,7 @@ def bs_explain(agg, *, color: bool = False) -> str:
     agg : Aggregate
         A *sized* aggregate.
     color : bool
-        Emit ANSI colour (a far-tail clip is bold red). Default plain.
+        Emit ANSI color (a far-tail clip is bold red). Default plain.
 
     Returns
     -------
@@ -343,7 +343,7 @@ def bs_explain(agg, *, color: bool = False) -> str:
 
     Notes
     -----
-    "Window width" (the realised ``W = x_max - x_min`` and the per-method
+    "Window width" (the realized ``W = x_max - x_min`` and the per-method
     candidates) replaces the older "span" wording. The raw-to-dyadic ``bs``
     sentence the portfolio narrative carries is omitted here: the per-method
     aggregate sizer rounds each candidate independently, so there is no single
@@ -589,7 +589,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     log2 : int
         Bucket-count cap, ``2**log2`` buckets.
     bs_in : float
-        ``0`` to estimate the bucket; ``>0`` to force it (honoured, D4).
+        ``0`` to estimate the bucket; ``>0`` to force it (honored, D4).
     x_min_in : float or None
         ``None`` lets the selected method choose the origin; a number forces
         it (snapped to ``bs``, D4).
@@ -673,7 +673,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
         resolution ``round_bucket(W / 2**cap)``. ``log2`` is shrunk to just
         cover the window (<= cap) when bs is free, keeping the realized grid
         sensible; if the user pinned bs they control the grid so the cap
-        ``log2`` is honoured; if the window needs more than the cap, bs is
+        ``log2`` is honored; if the window needs more than the cap, bs is
         coarsened to fit.
 
         ``force_origin`` makes the origin follow ``x_lo`` (snapped down to a
@@ -874,7 +874,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
             # Thin-left-gated upper floor (item 3, the asymmetric window). A
             # thick right tail (subexponential severity) reaches past the
             # moment window; floor the windowed upper edge by the single-big-
-            # jump reach so the grid -- and with it the severity discretisation
+            # jump reach so the grid -- and with it the severity discretization
             # extent ``N*bs`` -- grows enough to (a) capture that tail and
             # (b) let a single heavy occurrence fit the window (the
             # severity-fit guard below then passes where the un-floored
@@ -895,7 +895,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                      f' / hi 1-1e-{WINDOW_NINES if is_loss else WINDOW_NINES_TRIM}',
                      'two-sided window, benign FFT wrap',
                      force_origin=True, grow_cap=log2 + WINDOW_LOG2_GROWTH)
-            # Severity-fit guard: the severity discretises on [0, N*bs]; a
+            # Severity-fit guard: the severity discretizes on [0, N*bs]; a
             # single occurrence must fit the windowed extent or its mass
             # overflows (the fixed-1 / approximate trap). Record the row
             # either way (inspectable) but mark it inapplicable -> not
@@ -1008,7 +1008,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
             rows[selected] = floored
 
         if signed and _tail.is_thick(loss_left) and sbj_lo < win_lo:
-            # SIGNED -- correctness, non-negotiable. The severity discretises
+            # SIGNED -- correctness, non-negotiable. The severity discretizes
             # on the same N-bucket grid; if its full negative reach does not
             # fit, the FFT *wraps* and corrupts the whole law (the LNS 47%
             # mass-loss / aliasing failure). So the grid MUST cover
@@ -1112,7 +1112,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     #     goes to the *thick* side (the tail that needs room): ``f = 1/4``
     #     for a thick right tail, ``f = 3/4`` for a thick left tail. The
     #     loss/payoff convention does NOT enter here -- the tail shape does.
-    #   - symmetric tails (both thick or both thin) -> centre the band, with
+    #   - symmetric tails (both thick or both thin) -> center the band, with
     #     the loss/payoff convention demoted to a tie-breaker
     #     (``f = 0.5 -/+ window_pad_skew``: a loss leaves more room on the
     #     priced right, a payoff mirrors).
@@ -1213,7 +1213,7 @@ def port_bs_window_df(port) -> 'pd.DataFrame':
     One row per unit (its selected window), then the four candidate combine
     rows (``mm`` Portfolio MM bulk / ``rms`` RMS-of-windows reference /
     ``sbj`` single-big-jump look-through / ``sum`` legacy linear bound), then
-    the realised shared ``used`` grid, indexed by ``source``, culled to the
+    the realized shared ``used`` grid, indexed by ``source``, culled to the
     user-facing columns (``x_min`` / ``x_max`` / ``W`` / ``bs`` / ``log2`` /
     ``log2_need`` / ``coverage`` / ``clipped`` / ``note``, parity with
     :attr:`Aggregate.bs_window_df`). Returns ``None`` before the grid is
@@ -1324,7 +1324,7 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     ``W_ext / N`` is rounded by ``round_bucket`` a *single* time at the top
     (no per-unit + combine double-round); the resolution floor stays the
     finest per-unit *lattice* value. ``bs = round_bucket(max(min_k bs_k,
-    W_ext / N))`` (a pinned ``bs_in > 0`` is honoured verbatim, D4).
+    W_ext / N))`` (a pinned ``bs_in > 0`` is honored verbatim, D4).
 
     Origin and ``log2``:
 
@@ -1340,7 +1340,7 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
       :meth:`Aggregate._bs_window` uses, so a merely-grazing book reverts to
       the 0-based grid.
     - **signed** (P&L): the origin is the windowed low edge ``x_lo`` floored;
-      ``update`` recomputes the realised origin from the units' post-snap
+      ``update`` recomputes the realized origin from the units' post-snap
       ``x_min``. ``log2`` stays at the cap and the span is floored at the
       conservative ``max_k W_k / N`` so no per-unit marginal wraps.
 
@@ -1349,7 +1349,7 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     log2 : int
         Bucket-count cap, ``2**log2`` buckets.
     bs_in : float
-        ``0`` to estimate the bucket; ``>0`` to force it (honoured).
+        ``0`` to estimate the bucket; ``>0`` to force it (honored).
     bucket_sizing_p : float
         Tail probability for the per-unit moment / bounded windows.
 
@@ -1500,7 +1500,7 @@ def port_build_bs_window_df(port, rows, bs, log2, x_min, cand, resolution, W_ext
     Portfolio MM bulk, the live span), ``rms`` (the RMS-of-windows
     normal-approx reference), ``sbj`` (the single-big-jump look-through),
     and ``sum`` (the legacy linear-sum no-wrap bound) -- so the combine's
-    journey is inspectable; finally the ``used`` row is the realised shared
+    journey is inspectable; finally the ``used`` row is the realized shared
     portfolio grid ``[x_min, x_min + 2**log2 * bs)``. The ``mm <= rms <=
     sum`` ordering and the ``mm - rms`` skewness/diversification gap can be
     read straight off the frame.
@@ -1511,9 +1511,9 @@ def port_build_bs_window_df(port, rows, bs, log2, x_min, cand, resolution, W_ext
         Per-unit window rows (``unit``/``x_min``/``x_max``/``W``/``bs``/
         ``log2``/``coverage``/``note``).
     bs, log2 : float, int
-        The realised shared grid bucket size and log2.
+        The realized shared grid bucket size and log2.
     x_min : float
-        The realised portfolio-grid origin.
+        The realized portfolio-grid origin.
     cand : dict
         ``{'mm': (lo, hi), 'rms': (lo, hi), 'sbj': (lo, hi),
         'sum': (lo, hi)}`` -- the candidate window edges.
@@ -1541,12 +1541,12 @@ def port_build_bs_window_df(port, rows, bs, log2, x_min, cand, resolution, W_ext
     df.loc['used'] = dict(
         x_min=float(x_min), x_max=float(x_min + N * bs),
         W=float(N * bs), bs=float(bs), log2=int(log2), coverage=cov,
-        note=f'realised portfolio grid (resolution={resolution:g}, '
+        note=f'realized portfolio grid (resolution={resolution:g}, '
              f'extent={W_ext:g})')
 
     # ---- journey columns (parity with Aggregate.bs_window_df) ---------
     # ``log2_need`` is the log2 a row's window needs at the shared ``bs``;
-    # ``clipped`` (the realised far-tail deficit) is patched by ``update``.
+    # ``clipped`` (the realized far-tail deficit) is patched by ``update``.
     def _need(r):
         w, b = float(r['x_max']) - float(r['x_min']), float(r['bs'])
         if not (np.isfinite(w) and np.isfinite(b) and b > 0 and w > 0):
@@ -1582,7 +1582,7 @@ def port_bs_window(port, log2, bs_in, bucket_sizing_p=BUCKET_SIZING_P):
     log2 : int
         Bucket-count cap, ``2**log2`` buckets.
     bs_in : float
-        ``0`` to estimate the bucket; ``>0`` to force it (honoured).
+        ``0`` to estimate the bucket; ``>0`` to force it (honored).
     bucket_sizing_p : float
         Tail probability for the per-unit moment windows.
 
@@ -1595,11 +1595,11 @@ def port_bs_window(port, log2, bs_in, bucket_sizing_p=BUCKET_SIZING_P):
 
 
 # ====================================================================
-# [Sharpen-Grid-Probe] -- probing the neighbourhood of the chosen grid.
+# [Sharpen-Grid-Probe] -- probing the neighborhood of the chosen grid.
 #
 # ``bs_window`` / ``port_best_window`` above CHOOSE a grid from the analytic
 # moments, before any FFT runs. ``sharpen`` below AUDITS that choice after the
-# fact: it re-updates the object on neighbouring (bs, log2) cells, scores each
+# fact: it re-updates the object on neighboring (bs, log2) cells, scores each
 # with ``_validation.validation_score``, and moves only when the win is large.
 # See ``dev/done/plan-sharpen.md``.
 # ====================================================================
@@ -1764,7 +1764,7 @@ def _pick_cell(df):
     **Thrifty.** Cells within :data:`SHARPEN_FALLBACK_SLACK` of the best score
     count as tied, and ties break on ``log2`` first, so a free memory saving is
     taken when the score is genuinely a wash, then on ``|d_bs|``, so a
-    competitive centre wins over an equally good move and the grid is not
+    competitive center wins over an equally good move and the grid is not
     churned for nothing.
 
     Returns ``None`` when every cell failed.
@@ -1781,11 +1781,11 @@ def _pick_cell(df):
 
 def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
             power=2, good_enough=0.5, execute=True):
-    """Probe the grid neighbourhood and move to a better ``(bs, log2)``.
+    """Probe the grid neighborhood and move to a better ``(bs, log2)``.
 
     ``bs_window`` and ``port_best_window`` *choose* a grid from the analytic
     moments before any FFT runs. This *audits* that choice after the fact: it
-    re-updates ``ob`` on neighbouring cells, scores each with
+    re-updates ``ob`` on neighboring cells, scores each with
     :func:`~aggregate._validation.validation_score`, and takes the best grid that
     does not cost more than the one you already have. Results land on
     ``ob._sharpen_df``.
@@ -1794,9 +1794,9 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
     ----------
     ob : Aggregate or Portfolio
         The object to sharpen; updated in place. If it has never been updated it
-        is updated once first, to establish the centre cell.
+        is updated once first, to establish the center cell.
     bs, log2 : float, int, optional
-        Centre of the probe. Default the object's current grid.
+        Center of the probe. Default the object's current grid.
     log2_cap : int, default 20
         ``log2`` is never grown to more than this.
     bs_limit : float, default 16
@@ -1868,14 +1868,14 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
     if log2_cap is None:
         log2_cap = 20
     k_max = _bs_steps(bs_limit)
-    # Establish the centre. An object that has never been updated has no
+    # Establish the center. An object that has never been updated has no
     # empirical moments to score, so update it once at the auto-sized grid.
     if not getattr(ob, 'bs', 0):
         ob.update(log2=(log2 or 16), bs=(bs or 0), sharpen=False)
     bs0 = float(bs) if bs else float(ob.bs)
     log20 = int(log2) if log2 else int(ob.log2)
-    # An explicit centre that is not where the object sits: move there first, so
-    # the centre row describes a real state.
+    # An explicit center that is not where the object sits: move there first, so
+    # the center row describes a real state.
     if float(ob.bs) != bs0 or int(ob.log2) != log20:
         ob.update(log2=log20, bs=bs0, sharpen=False)
     locked = _sharpen_locked(ob)
@@ -1970,33 +1970,33 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
                     _note(rows[last],
                           'stopped: bs_limit reached, still improving')
 
-    # The centre is already computed: score it in place, for free.
-    centre_score = _record(0, 0, 0.0, note='centre (current grid)')
+    # The center is already computed: score it in place, for free.
+    center_score = _record(0, 0, 0.0, note='center (current grid)')
 
     # Probe gate. A grid that already clears the target is left alone and nothing
     # is run. good_enough=0 never clears, which is how a probe is forced.
     # Soundness is part of the gate: a grid whose moments are fine but whose mass
     # runs off the end is not a grid to wave through, and no moment score will
     # ever say so, so the deficit has to be asked about separately.
-    centre_defective = bool(rows[0]['defective'])
-    if (np.isfinite(centre_score) and centre_score <= good_enough
-            and not centre_defective):
+    center_defective = bool(rows[0]['defective'])
+    if (np.isfinite(center_score) and center_score <= good_enough
+            and not center_defective):
         rows[0]['selected'] = True
-        rows[0]['note'] = ('centre (current grid); at or under target and '
+        rows[0]['note'] = ('center (current grid); at or under target and '
                            'sound, probe not run')
         ob._sharpen_df = _sharpen_frame(rows)
         ob._sharpen_state = {'ran': False, 'moved': False, 'power': power,
                              'good_enough': good_enough, 'execute': execute,
-                             'centre_score': centre_score, 'bs0': bs0,
+                             'center_score': center_score, 'bs0': bs0,
                              'log20': log20, 'bs_exact': bs_exact,
                              'lattice': lattice, 'grew': False,
-                             'centre_defective': False, 'passed_over': 0}
+                             'center_defective': False, 'passed_over': 0}
         _program.pin_sharpen(ob)
         return ob
 
     # Thrifty rows first: the current grid size and, when there is room below,
     # the smaller one. Neither costs more than the caller is already paying.
-    _search_row(0, centre_score)
+    _search_row(0, center_score)
     if log20 - 1 >= SHARPEN_LOG2_FLOOR:
         _search_row(-1, _cell(0, -1))
 
@@ -2047,7 +2047,7 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
     passed_over = int(((df['score'] < df.loc[pick, 'score'])
                        & df['defective'].astype(bool)).sum())
 
-    # Final update: the winner when executing, otherwise back to the centre.
+    # Final update: the winner when executing, otherwise back to the center.
     # x_min is pinned on the restore so a signed grid returns on its own origin.
     if execute and moved:
         _sharpen_update(ob, float(df.loc[pick, 'bs']),
@@ -2064,10 +2064,10 @@ def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
     ob._sharpen_df = _sharpen_frame(df)
     ob._sharpen_state = {'ran': True, 'moved': moved and execute,
                          'power': power, 'good_enough': good_enough,
-                         'execute': execute, 'centre_score': centre_score,
+                         'execute': execute, 'center_score': center_score,
                          'bs0': bs0, 'log20': log20, 'reason': reason,
                          'bs_exact': bs_exact, 'lattice': lattice, 'grew': grew,
-                         'centre_defective': centre_defective,
+                         'center_defective': center_defective,
                          'passed_over': passed_over}
     # The probe's outcome goes onto the object's own program and trailer, so
     # `program` means the program that BUILDS this object rather than merely the
@@ -2200,14 +2200,14 @@ def sharpen_describe(ob) -> str:
     target = st['good_enough']
     if not st['ran']:
         return (f'Sharpen: not run, the grid already scores '
-                f'{_sharpen_fmt(st["centre_score"])} against a target of '
+                f'{_sharpen_fmt(st["center_score"])} against a target of '
                 f'{target:g}.')
     win = df[df['selected']].iloc[0]
     secs = float(df['seconds'].sum())
     pinned = ' (discrete: bucket pinned, grid size only)' if st['bs_exact'] else ''
     head = (f'Sharpen: {len(df)} cells in {secs:.2f}s{pinned}, best score '
             f'{_sharpen_fmt(win["score"])} vs '
-            f'{_sharpen_fmt(st["centre_score"])} at the centre, target '
+            f'{_sharpen_fmt(st["center_score"])} at the center, target '
             f'{target:g}.')
     if st.get('passed_over'):
         n = st['passed_over']
@@ -2232,7 +2232,7 @@ def sharpen_explain(ob) -> str:
     st = getattr(ob, '_sharpen_state', None)
     if df is None or st is None:
         return ('The grid has not been sharpened. Call sharpen() to probe the '
-                'neighbouring (bs, log2) cells and score each one.')
+                'neighboring (bs, log2) cells and score each one.')
     out = [
         'The sharpen score measures how well the realized grid reproduces the '
         'analytic moments: severity and aggregate mean, CV and skewness, each '
@@ -2242,7 +2242,7 @@ def sharpen_explain(ob) -> str:
         f'The target here is {st["good_enough"]:g}.']
     if not st['ran']:
         out.append(
-            f'The current grid scores {_sharpen_fmt(st["centre_score"])}, at or '
+            f'The current grid scores {_sharpen_fmt(st["center_score"])}, at or '
             'under the target, and holds all of its mass, so no probe was run '
             'and nothing was changed. Pass good_enough=0 to force the probe '
             'regardless.')
@@ -2276,7 +2276,7 @@ def sharpen_explain(ob) -> str:
             'aggregate mean error runs far above the severity error and the fix '
             'is a wider grid, or resolution-limited, where the severity moments '
             'themselves are poorly reproduced and the fix is a finer bucket.')
-    if st.get('centre_defective'):
+    if st.get('center_defective'):
         out.append(
             'The probe ran even though the score was at or under the target, '
             'because the current grid loses mass off its top end: '
@@ -2314,15 +2314,15 @@ def sharpen_explain(ob) -> str:
         out.append(
             f'{verb} bs {_fmt_bs(win["bs"])} at log2 {int(win["log2"])}, '
             f'scoring {_sharpen_fmt(win["score"])} against '
-            f'{_sharpen_fmt(st["centre_score"])} before.')
+            f'{_sharpen_fmt(st["center_score"])} before.')
         if st['execute']:
-            out.append('Re-running sharpen re-centres the probe on the new grid '
+            out.append('Re-running sharpen re-centers the probe on the new grid '
                        'and continues from there, should more be available.')
         else:
             out.append('execute=False, so the original grid was restored and '
                        'nothing about the object changed.')
     else:
-        out.append('No neighbour was enough better to justify moving, so the '
+        out.append('No neighbor was enough better to justify moving, so the '
                    'grid was kept.')
     if _sharpen_is_port(ob):
         out.append(

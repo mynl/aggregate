@@ -266,20 +266,39 @@ def _joint_surface(bv, window=DEFAULT_WINDOW, detail=DEFAULT_DETAIL,
     conditional lay flat on the floor at every cut while the marginal stood
     up beside it.
 
-    **The coordinate is the block's first fine coordinate**, its low edge,
-    which is the convention the fine lattice is already in, and the document
-    says so through ``edge``. The previous convention filed a block covering
-    ``[a, a + k * bs)`` under ``a + (k - 1) * bs``, its *last* fine
-    coordinate, which reported a distribution supported on ``[0, inf)`` as
-    starting at ``(k - 1) * bs`` and biased every mean taken against those
-    coordinates up by close to a whole display bucket, 0.95 of one on the
-    worst of the four test surfaces.
+    **The coordinate is the block's representative point**, the mean of the
+    fine coordinates it covers: a block holding atoms at ``a, a + bs, ...,
+    a + (k - 1) * bs`` is filed under ``a + (k - 1) * bs / 2``, and the
+    document says so through ``edge='mid'``. Two conventions preceded it,
+    both wrong in the same direction and by different amounts. The first
+    filed the block under ``a + (k - 1) * bs``, its *last* fine coordinate,
+    which reported a distribution supported on ``[0, inf)`` as starting at
+    ``(k - 1) * bs`` and biased every mean taken against those coordinates
+    up by close to a whole display bucket, 0.95 of one on the worst of the
+    four test surfaces. The second filed it under ``a``, its low edge, which
+    fixed the support but left the mean a half bucket low and invited a
+    consumer to recover the middle by adding ``dx / 2`` when the truth wants
+    ``(k - 1) * bs / 2``.
 
-    A residual bias in the other direction is intrinsic and is not a defect:
-    a display cell holds ``k`` atoms and labeling it with any single
-    coordinate loses their spread, so a mean taken against the display
-    lattice sits up to one display bucket low. That is what ``moments`` is
-    for. The exact means travel with the document, off the fine lattice, and
+    The residual is then second order and of **either** sign: it is the
+    deviation of the within-block mass from uniform, not a convention, so it
+    vanishes as the density flattens across a block rather than shrinking
+    toward a fixed side. Measured on ``Indep``'s y axis at the default
+    window, where a block is two atoms, it is -0.015 display buckets against
+    -0.265 for the low edge and +0.235 for a cell midpoint.
+
+    **What the choice buys is the bound, not that measurement.** A block's
+    conditional mean lies somewhere in ``[a, a + (k - 1) * bs]``, so filing
+    the block at the middle of that span holds the error under ``dx / 2``
+    whatever the density does inside it, and no other single coordinate
+    does: the low edge is one-sided and its bound is a whole bucket, reached
+    by a block whose mass sits at the far end. Being a bound rather than a
+    tendency, it does not promise to win every case. Reduce the whole of
+    ``Indep``'s y axis 128 to 1 and a Lomax puts each block's mass hard
+    against its low end, where this convention reads 0.45 buckets high and
+    the low edge, flattered by the shape, reads 0.05 low. Both are inside
+    the bound only one of them has. Either way this is what ``moments`` is
+    for: the exact means travel with the document, off the fine lattice, and
     a consumer that needs a mean reads them rather than integrating the
     picture.
     """
@@ -308,8 +327,10 @@ def _joint_surface(bv, window=DEFAULT_WINDOW, detail=DEFAULT_DETAIL,
     lo_y, hi_y, ky = _axis_plan(ys, marg_y, bs_y, window, detail)
 
     z = _reduce(_reduce(density[lo_x:hi_x, lo_y:hi_y], kx, axis=0), ky, axis=1)
-    display_x = xs[lo_x:hi_x:kx]
-    display_y = ys[lo_y:hi_y:ky]
+    # The representative point: a block covering k atoms is filed under their
+    # mean, not under either end of the span they sit in.
+    display_x = xs[lo_x:hi_x:kx] + (kx - 1) * bs_x / 2
+    display_y = ys[lo_y:hi_y:ky] + (ky - 1) * bs_y / 2
     dx, dy = bs_x * kx, bs_y * ky
     nx, ny = len(display_x), len(display_y)
 
@@ -338,13 +359,15 @@ def _joint_surface(bv, window=DEFAULT_WINDOW, detail=DEFAULT_DETAIL,
         z=tuple(tuple(float(v) for v in row) for row in zt),
         x0=float(display_x[0]), dx=dx, nx=nx,
         y0=float(display_y[0]), dy=dy, ny=ny,
-        edge='left',
+        edge='mid',
         bs=(bs_x, bs_y),
         k=(kx, ky),
         window={
             'p': float(window),
-            'x': (float(display_x[0]), float(display_x[0] + nx * dx)),
-            'y': (float(display_y[0]), float(display_y[0] + ny * dy)),
+            'x': (float(display_x[0] - dx / 2),
+                  float(display_x[0] + (nx - 1) * dx + dx / 2)),
+            'y': (float(display_y[0] - dy / 2),
+                  float(display_y[0] + (ny - 1) * dy + dy / 2)),
             'kept': kept,
         },
         marginals={

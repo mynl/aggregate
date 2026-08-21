@@ -1,8 +1,9 @@
 """[Chart-Surface-Pilot]: the joint density surface emitter and renderer.
 
 Covers ``charts._emit_bivariate.chart_joint_surface`` (the window chosen on
-the fine lattice, the mass-preserving reduction, the left-edge coordinate
-convention, the lattice and moment fields, the encodings, determinism) and
+the fine lattice, the mass-preserving reduction, the representative-point
+coordinate convention, the lattice and moment fields, the encodings,
+determinism) and
 the generic matplotlib renderer's capability pattern (2-D projection with a
 ``(projection)`` stamp; ``ChartCapabilityError`` under ``strict``).
 
@@ -110,17 +111,22 @@ def test_reduce_passthrough_when_the_factor_is_one():
 
 @pytest.mark.parametrize('detail', [128, 32, 8])
 def test_display_grid_starts_where_the_fine_lattice_does(indep, detail):
-    """The whole-grid case: the first display coordinate is the first fine one.
+    """The whole-grid case: the first block is filed at its own center of mass.
 
-    The convention this replaced filed a block covering ``[a, a + k * bs)``
-    under its *last* fine coordinate, so ``Indep``'s y axis, which reduces
-    128 fine cells into one 512-wide bucket, reported a distribution
-    supported from 0 as starting at 508.
+    The first display coordinate sits ``(k - 1) * bs / 2`` above the first
+    fine one, which is the mean of the atoms that block covers, so backing
+    that offset out recovers the fine lattice exactly. The first convention
+    this replaced filed a block covering ``[a, a + k * bs)`` under its *last*
+    fine coordinate, so ``Indep``'s y axis, which reduces 128 fine cells into
+    one 512-wide bucket, reported a distribution supported from 0 as starting
+    at 508; the second filed it under ``a``.
     """
     s = surface_of(chart_joint_surface(indep, window=0, detail=detail))
-    assert s.edge == 'left'
-    assert s.x0 == float(indep.axis_xs[0][0])
-    assert s.y0 == float(indep.axis_xs[1][0]) == 0.0
+    assert s.edge == 'mid'
+    fine_y = float(indep.axis_xs[1][0])
+    assert fine_y == 0.0
+    assert s.x0 - (s.k[0] - 1) * s.bs[0] / 2 == float(indep.axis_xs[0][0])
+    assert s.y0 - (s.k[1] - 1) * s.bs[1] / 2 == fine_y
     assert s.x[0] == s.x0 and s.y[0] == s.y0
     # and the step really is the declared one, all the way along
     np.testing.assert_allclose(np.diff(s.x), s.dx, rtol=0, atol=1e-9)
@@ -128,15 +134,24 @@ def test_display_grid_starts_where_the_fine_lattice_does(indep, detail):
     assert s.dx == s.bs[0] * s.k[0] and s.dy == s.bs[1] * s.k[1]
 
 
-def test_display_mean_bias_is_bounded_by_one_bucket(indep):
-    """A residual bias survives 5.1 and is intrinsic, not a defect.
+def test_display_mean_bias_is_bounded_by_half_a_bucket(indep):
+    """What survives the representative point is second order and two-sided.
 
     A display cell holds ``k`` atoms; labeling it with any single coordinate
-    loses their spread, so a mean taken against the display lattice sits
-    between zero and one display bucket **low**. The old convention was up to
-    a bucket **high** and unbounded in the sense that mattered, because it
-    also moved the support. What a consumer should read instead is
-    ``moments``, which is exact.
+    loses their spread. Under the representative point that coordinate is the
+    atoms' own mean, so the residual is the deviation of the within-block mass
+    from uniform rather than a convention, it takes **either** sign, and half
+    a display bucket bounds it whatever the density does inside the block: a
+    block's conditional mean lies in ``[a, a + (k - 1) * bs]`` and the
+    coordinate is the middle of that span. Neither replaced convention has
+    that bound. Both are one-sided and reach a whole bucket, high when the
+    coordinate was the block's last fine atom, which also moved the support,
+    low when it was the first.
+
+    The whole-grid case is the bound; the second half is the case that
+    separates the three conventions, ``Indep``'s y axis at the default window
+    where a block is two atoms. What a consumer should read instead of any of
+    them is ``moments``, which is exact.
     """
     s = surface_of(chart_joint_surface(indep, window=0))
     z = np.asarray(s.z)
@@ -145,7 +160,26 @@ def test_display_mean_bias_is_bounded_by_one_bucket(indep):
         mass = z.sum(0) if axis == 'x' else z.sum(1)
         grid_mean = float((mass * coords).sum())
         fine_mean = s.moments['mean'][0 if axis == 'x' else 1]
-        assert -step < grid_mean - fine_mean <= 0
+        assert abs(grid_mean - fine_mean) < step / 2
+
+    # and the discriminating measurement: on a two-atom block the
+    # representative point is an order of magnitude closer than either end of
+    # the span, where the residual left is the window's own truncation
+    s = surface_of(chart_joint_surface(indep, window=4))
+    z = np.asarray(s.z)
+    mass = z.sum(1)
+    coords = np.asarray(s.y)
+    offset = (s.k[1] - 1) * s.bs[1] / 2
+    fine_mean = s.moments['mean'][1]
+    bias = {
+        'representative': float((mass * coords).sum()) - fine_mean,
+        'low edge': float((mass * (coords - offset)).sum()) - fine_mean,
+        'cell midpoint': float(
+            (mass * (coords - offset + s.dy / 2)).sum()) - fine_mean,
+    }
+    assert s.k[1] == 2 and s.dy == 8.0
+    assert abs(bias['representative']) < abs(bias['low edge']) / 10
+    assert abs(bias['representative']) < abs(bias['cell midpoint']) / 10
 
 
 # ------------------------------------------------ 5.2, window then reduce
@@ -161,7 +195,7 @@ def test_window_is_taken_before_the_reduction(indep):
     """
     s = surface_of(chart_joint_surface(indep, window=4, detail=128))
     assert s.ny == 116
-    assert s.y0 == 0.0
+    assert s.y0 == (s.k[1] - 1) * s.bs[1] / 2      # the first block, from 0
     assert s.dy == 8.0        # two fine buckets of 4, not 128 of them
     # what the old route could have reached: the whole axis reduced to 128
     # cells first, then cropped to the same data window
@@ -176,10 +210,12 @@ def test_window_reports_the_mass_it_kept(indep):
     assert s.window['p'] == 4.0
     assert abs(s.window['kept'] - z.sum() / indep.density.sum()) < 1e-9
     assert 0.9996 < s.window['kept'] < 1.0
-    # the box the document reports is the outer edge of the outer cells,
-    # which is what 'left' makes it
-    assert s.window['x'] == (s.x0, s.x0 + s.nx * s.dx)
-    assert s.window['y'] == (s.y0, s.y0 + s.ny * s.dy)
+    # the box the document reports is the outer edge of the outer cells, half
+    # a step outside the outer coordinates, which is what 'mid' makes it
+    assert s.window['x'] == (s.x0 - s.dx / 2,
+                             s.x0 + (s.nx - 1) * s.dx + s.dx / 2)
+    assert s.window['y'] == (s.y0 - s.dy / 2,
+                             s.y0 + (s.ny - 1) * s.dy + s.dy / 2)
 
 
 def test_deeper_windows_keep_more_mass(indep):
@@ -191,17 +227,21 @@ def test_deeper_windows_keep_more_mass(indep):
 
 def test_window_zero_is_the_whole_grid(indep):
     s = surface_of(chart_joint_surface(indep, window=0))
-    assert s.x0 == float(indep.axis_xs[0][0])
-    assert s.y0 == float(indep.axis_xs[1][0])
+    assert s.x0 - (s.k[0] - 1) * s.bs[0] / 2 == float(indep.axis_xs[0][0])
+    assert s.y0 - (s.k[1] - 1) * s.bs[1] / 2 == float(indep.axis_xs[1][0])
     assert s.nx * s.k[0] == len(indep.axis_xs[0])
     assert s.ny * s.k[1] == len(indep.axis_xs[1])
     assert abs(s.window['kept'] - 1.0) < 1e-12
 
 
 def test_low_edge_snaps_to_zero_on_positive_support(indep):
-    """``Indep``'s y is a Lomax from the origin: the window must open there."""
+    """``Indep``'s y is a Lomax from the origin: the window must open there.
+
+    The snap puts the first *fine* cell at the origin; the coordinate then
+    names that block's representative point, half a fine span above it.
+    """
     s = surface_of(chart_joint_surface(indep, window=4))
-    assert s.y0 == 0.0
+    assert s.y0 == (s.k[1] - 1) * s.bs[1] / 2
     # x is a gamma whose fine lattice was measured up from 48, so there is no
     # zero on it to reach and nothing to snap to
     assert s.x0 > 0.0 and float(indep.axis_xs[0][0]) > 0.0

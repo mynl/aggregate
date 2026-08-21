@@ -795,14 +795,20 @@
   to the canonical copy in `aggregate_api/dev/done/`, moved there 2026-08-21
   when the app half finished), a three-party plan over LIB, API and the SPA.
   **The live LIB half is `dev/plan-3d-plot-LIB.md`**, written 2026-08-21:
-  two edits the app is waiting on, both ruled by the author 2026-08-12 and
-  neither built, `[Joint-Surface-Representative-Point]` (`edge = "mid"`, the
-  canonical plan's 5.1.2) and `[Joint-Surface-Whole-Grid]` (emit the whole
-  reduced grid with `window` as the drawing range, its 5.8), plus one
-  finding of its own: `plots/_chartdoc.py` `_z_grid_panel` reads neither
-  `window` nor `edge`, so the second edit needs a renderer fix beside it or
-  the library's own picture becomes a sliver at the origin. Two bumps, in
-  that order, and the reasoning for both sits in the canonical plan.
+  two edits the app is waiting on, both ruled by the author 2026-08-12,
+  `[Joint-Surface-Representative-Point]` (`edge = "mid"`, the canonical
+  plan's 5.1.2) and `[Joint-Surface-Whole-Grid]` (emit the whole reduced
+  grid with `window` as the drawing range, its 5.8), plus one finding of
+  its own: `plots/_chartdoc.py` `_render_grid_panel` reads neither `window`
+  nor `edge`, so the second edit needs a renderer fix beside it or the
+  library's own picture becomes a sliver at the origin. Two bumps, in that
+  order, and the reasoning for both sits in the canonical plan.
+  **The first landed a307**: a display cell is filed under its
+  representative point, the mean of the fine coordinates it covers, which
+  bounds the display mean's error at half a bucket whatever the density
+  does inside the block and makes `edge = "mid"` literally true. The grid
+  itself is unchanged, verified byte for byte against a306.
+  `[Joint-Surface-Whole-Grid]` is open.
   **The first two bumps are done**, and the review notes and the five points
   where the code and the plan disagree are in the canonical plan's section
   5.0, not in a file of their own as this entry used to claim.

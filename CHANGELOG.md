@@ -20,6 +20,26 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a307
+
+**[Joint-Surface-Representative-Point] a display cell is filed under the point its mass actually sits at, and `edge` becomes literally true.** The first of the two library edits in `dev/plan-3d-plot-LIB.md`, its section 3, specified as section 5.1.2 of the canonical `dev/done/plan-3d-plot.md` and ruled by the author on 2026-08-12.
+
+**The defect this closes is a declaration, not an arithmetic slip.** A display cell covers fine atoms at `a, a + bs, ..., a + (k - 1) * bs`. a258 labeled it `a` and declared `edge='left'`, which is a true statement about a cell spanning `[a, a + dx)` and an invitation to recover its middle by adding `dx / 2`. The middle of the atoms is `(k - 1) * bs / 2` above `a`, so a consumer that accepts the invitation lands half a fine bucket past the answer, and one that does not lands half a display bucket short of it. Both readings were available and neither was right.
+
+**The coordinate is now the block's representative point**, the mean of the fine coordinates it covers, and the document says `edge='mid'`, a value `SURFACE_EDGES` already carried. `window` follows it: the box is still the outer edges of the outer cells, now half a step outside the outer coordinates rather than starting on the first one.
+
+**What the choice buys is a bound, not a better number in every case.** A block's conditional mean lies somewhere in `[a, a + (k - 1) * bs]`, so filing the block at the middle of that span holds the display mean's error under `dx / 2` whatever the density does inside the block, and no other single coordinate does: the low edge is one-sided and its bound is a whole bucket, reached by a block whose mass sits at the far end. Measured on the reference Lomax surface at the default window, where a block is two atoms, the residual is **-0.0150 display buckets against -0.2649 for the low edge and +0.2350 for a cell midpoint**, seventeen times better, and what is left there is the window's own truncation rather than the convention. Being a bound rather than a tendency, it does not promise to win every case: reduce that same axis 128 to 1 and the Lomax puts each block's mass hard against its low end, where this convention reads 0.45 buckets high and the low edge, flattered by the shape, reads 0.05 low. Both are inside the bound only one of them has, and neither is a mean a consumer should be reading off the picture when `moments` carries the exact one.
+
+**The residual changed character, which is the part worth reading.** It used to be a convention, one-sided and bounded by the reduction. It is now the deviation of the within-block mass from uniform: second order, of either sign, and shrinking as the density flattens across a block rather than toward a fixed side.
+
+**Nothing about the grid moved**, and that is the check that this edit touched the coordinate and only the coordinate. Verified against the previous release over both reference surfaces at four window depths and three detail targets: `nx`, `ny`, `k`, `dx`, `dy`, `z`, the encoded block byte for byte, both marginals, `deficit`, `moments` and `window.kept` are identical, and every coordinate moved by exactly `(k - 1) * bs / 2`.
+
+**One consequence to state rather than leave to be discovered.** The first display cell of a law supported from zero now extends to `-bs / 2`, which looks like support below the origin and is not. The fine lattice already does this and `pcolormesh` already draws it for any centered grid in this library, so it is consistent rather than new. In the other direction the library's own renderer improves: `_render_grid_panel` draws with `shading='nearest'`, which reads coordinates as cell centers, so this edit makes an assumption that was already there true rather than merely close.
+
+**Additive, so `CHART_IR_VERSION` stays 2.** No field is added, removed or retyped. Consumers holding a captured document re-capture it, the document hash having moved; app side that is one refresh of `dev/fixtures/charts.json`.
+
+---
+
 ## 1.0.0a306
 
 **[PnL-Reinsurance-Pricing] `pnl_program` learns to price the reinsurance: `net_combined_ratio` builds the premium from the bottom up, net technical premium plus the cost of each cover, grossed up once for expenses.** `dev/done/plan-pnl-reinsurance-pricing.md`, all four phases. The origin is a hole the library itself pointed at: wrap a reinsured engine in a P&L and the cession books at zero ceded premium with a `ZeroPremiumCessionWarning` saying "price the cover to silence this", and nothing in the library would price it. Now something does.
